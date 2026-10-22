@@ -1,0 +1,525 @@
+{
+ "value": {
+  "customActions": null,
+  "nativeFrame": "{{0, 0}, {402, 874}}",
+  "label": "AveriLab",
+  "rawIdentifier": null,
+  "traits": "",
+  "frame": "{{0, 0}, {402, 874}}",
+  "isVisible": "1",
+  "type": "Application",
+  "value": null,
+  "isEnabled": "1",
+  "children": [
+   {
+    "customActions": null,
+    "nativeFrame": "{{0, 0}, {402, 874}}",
+    "label": null,
+    "rawIdentifier": null,
+    "traits": "",
+    "frame": "{{0, 0}, {402, 874}}",
+    "isVisible": "1",
+    "type": "Window",
+    "value": null,
+    "isEnabled": "1",
+    "children": [
+     {
+      "customActions": null,
+      "nativeFrame": "{{0, 0}, {402, 874}}",
+      "label": null,
+      "rawIdentifier": null,
+      "traits": "",
+      "frame": "{{0, 0}, {402, 874}}",
+      "isVisible": "1",
+      "type": "Other",
+      "value": null,
+      "isEnabled": "1",
+      "children": [
+       {
+        "customActions": null,
+        "nativeFrame": "{{0, 0}, {402, 874}}",
+        "label": null,
+        "rawIdentifier": null,
+        "traits": "",
+        "frame": "{{0, 0}, {402, 874}}",
+        "isVisible": "1",
+        "type": "Other",
+        "value": null,
+        "isEnabled": "1",
+        "children": [
+         {
+          "customActions": null,
+          "nativeFrame": "{{0, 0}, {402, 874}}",
+          "label": null,
+          "rawIdentifier": null,
+          "traits": "",
+          "frame": "{{0, 0}, {402, 874}}",
+          "isVisible": "1",
+          "type": "Other",
+          "value": null,
+          "isEnabled": "1",
+          "children": [
+           {
+            "customActions": null,
+            "nativeFrame": "{{0, 0}, {402, 874}}",
+            "label": null,
+            "rawIdentifier": null,
+            "traits": "",
+            "frame": "{{0, 0}, {402, 874}}",
+            "isVisible": "0",
+            "type": "Other",
+            "value": null,
+            "isEnabled": "1",
+            "children": [
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 0}, {402, 874}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{0, 0}, {402, 874}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{348, 358}, {17, 10}}",
+                "label": "Filter transactions",
+                "rawIdentifier": "lab.chooser-over-list.filter",
+                "traits": "Button",
+                "frame": "{{348, 358}, {17, 10}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "lab.chooser-over-list.filter",
+                "rect": {
+                 "y": 358,
+                 "x": 348,
+                 "width": 17,
+                 "height": 10
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 399}, {402, 29}}",
+                "label": "17.07.2026",
+                "rawIdentifier": null,
+                "traits": "Header, StaticText",
+                "frame": "{{0, 399}, {402, 29}}",
+                "isVisible": "1",
+                "type": "StaticText",
+                "value": "17.07.2026",
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "17.07.2026",
+                "rect": {
+                 "y": 399,
+                 "x": 0,
+                 "width": 402,
+                 "height": 29
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{24, 435}, {354, 52}}",
+                "label": "Loan repayment, 17.07.2026, +602,00 EUR",
+                "rawIdentifier": "lab.chooser-over-list.R",
+                "traits": "Button",
+                "frame": "{{24, 435}, {354, 52}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "lab.chooser-over-list.R",
+                "rect": {
+                 "y": 435,
+                 "x": 24,
+                 "width": 354,
+                 "height": 52
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 494}, {402, 29}}",
+                "label": "15.07.2026",
+                "rawIdentifier": null,
+                "traits": "Header, StaticText",
+                "frame": "{{0, 494}, {402, 29}}",
+                "isVisible": "1",
+                "type": "StaticText",
+                "value": "15.07.2026",
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "15.07.2026",
+                "rect": {
+                 "y": 494,
+                 "x": 0,
+                 "width": 402,
+                 "height": 29
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{24, 531}, {354, 52}}",
+                "label": "Loan repayment, 15.07.2026, +573,00 EUR",
+                "rawIdentifier": null,
+                "traits": "Button",
+                "frame": "{{24, 531}, {354, 52}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "Loan repayment, 15.07.2026, +573,00 EUR",
+                "rect": {
+                 "y": 531,
+                 "x": 24,
+                 "width": 354,
+                 "height": 52
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 590}, {402, 29}}",
+                "label": "02.07.2026",
+                "rawIdentifier": null,
+                "traits": "Header, StaticText",
+                "frame": "{{0, 590}, {402, 29}}",
+                "isVisible": "1",
+                "type": "StaticText",
+                "value": "02.07.2026",
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "02.07.2026",
+                "rect": {
+                 "y": 590,
+                 "x": 0,
+                 "width": 402,
+                 "height": 29
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{24, 626}, {354, 52}}",
+                "label": "Loan repayment, 02.07.2026, +627,00 EUR",
+                "rawIdentifier": null,
+                "traits": "Button",
+                "frame": "{{24, 626}, {354, 52}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "Loan repayment, 02.07.2026, +627,00 EUR",
+                "rect": {
+                 "y": 626,
+                 "x": 24,
+                 "width": 354,
+                 "height": 52
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 685}, {402, 29}}",
+                "label": "25.06.2026",
+                "rawIdentifier": null,
+                "traits": "Header, StaticText",
+                "frame": "{{0, 685}, {402, 29}}",
+                "isVisible": "1",
+                "type": "StaticText",
+                "value": "25.06.2026",
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "25.06.2026",
+                "rect": {
+                 "y": 685,
+                 "x": 0,
+                 "width": 402,
+                 "height": 29
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{24, 721}, {354, 52}}",
+                "label": "Loan repayment, 25.06.2026, +162,00 EUR",
+                "rawIdentifier": null,
+                "traits": "Button",
+                "frame": "{{24, 721}, {354, 52}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "Loan repayment, 25.06.2026, +162,00 EUR",
+                "rect": {
+                 "y": 721,
+                 "x": 24,
+                 "width": 354,
+                 "height": 52
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{0, 780}, {402, 29}}",
+                "label": "14.06.2026",
+                "rawIdentifier": null,
+                "traits": "Header, StaticText",
+                "frame": "{{0, 780}, {402, 29}}",
+                "isVisible": "1",
+                "type": "StaticText",
+                "value": "14.06.2026",
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "14.06.2026",
+                "rect": {
+                 "y": 780,
+                 "x": 0,
+                 "width": 402,
+                 "height": 29
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{24, 817}, {354, 52}}",
+                "label": "Loan repayment, 14.06.2026, +208,00 EUR",
+                "rawIdentifier": null,
+                "traits": "Button",
+                "frame": "{{24, 817}, {354, 52}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "Loan repayment, 14.06.2026, +208,00 EUR",
+                "rect": {
+                 "y": 817,
+                 "x": 24,
+                 "width": 354,
+                 "height": 52
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 0,
+               "x": 0,
+               "width": 402,
+               "height": 874
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{0, 0}, {402, 874}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{0, 0}, {402, 874}}",
+              "isVisible": "0",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 0,
+               "x": 0,
+               "width": 402,
+               "height": 874
+              }
+             },
+             {
+              "customActions": null,
+              "nativeFrame": "{{24, 381}, {354, 140}}",
+              "label": null,
+              "rawIdentifier": null,
+              "traits": "",
+              "frame": "{{24, 381}, {354, 140}}",
+              "isVisible": "1",
+              "type": "Other",
+              "value": null,
+              "isEnabled": "1",
+              "children": [
+               {
+                "customActions": null,
+                "nativeFrame": "{{24, 381}, {354, 140}}",
+                "label": null,
+                "rawIdentifier": null,
+                "traits": "",
+                "frame": "{{24, 381}, {354, 140}}",
+                "isVisible": "0",
+                "type": "Other",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "0",
+                "isNativeAccessibilityElement": "0",
+                "isFocused": "0",
+                "name": null,
+                "rect": {
+                 "y": 381,
+                 "x": 24,
+                 "width": 354,
+                 "height": 140
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{45, 397}, {312, 52}}",
+                "label": "To my account",
+                "rawIdentifier": "lab.chooser-over-list.O",
+                "traits": "Button",
+                "frame": "{{45, 397}, {312, 52}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "lab.chooser-over-list.O",
+                "rect": {
+                 "y": 397,
+                 "x": 45,
+                 "width": 312,
+                 "height": 52
+                }
+               },
+               {
+                "customActions": null,
+                "nativeFrame": "{{45, 453}, {312, 52}}",
+                "label": "SWIFT payment",
+                "rawIdentifier": "lab.chooser-over-list.S",
+                "traits": "Button",
+                "frame": "{{45, 453}, {312, 52}}",
+                "isVisible": "1",
+                "type": "Button",
+                "value": null,
+                "isEnabled": "1",
+                "isAccessible": "1",
+                "isNativeAccessibilityElement": "1",
+                "isFocused": "0",
+                "name": "lab.chooser-over-list.S",
+                "rect": {
+                 "y": 453,
+                 "x": 45,
+                 "width": 312,
+                 "height": 52
+                }
+               }
+              ],
+              "isAccessible": "0",
+              "isNativeAccessibilityElement": "0",
+              "isFocused": "0",
+              "name": null,
+              "rect": {
+               "y": 381,
+               "x": 24,
+               "width": 354,
+               "height": 140
+              }
+             }
+            ],
+            "isAccessible": "0",
+            "isNativeAccessibilityElement": "0",
+            "isFocused": "0",
+            "name": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            }
+           }
+          ],
+          "isAccessible": "0",
+          "isNativeAccessibilityElement": "0",
+          "isFocused": "0",
+          "name": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          }
+         }
+        ],
+        "isAccessible": "0",
+        "isNativeAccessibilityElement": "0",
+        "isFocused": "0",
+        "name": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        }
+       }
+      ],
+      "isAccessible": "0",
+      "isNativeAccessibilityElement": "0",
+      "isFocused": "0",
+      "name": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      }
+     }
+    ],
+    "isAccessible": "0",
+    "isNativeAccessibilityElement": "0",
+    "isFocused": "0",
+    "name": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    }
+   }
+  ],
+  "isAccessible": "0",
+  "isNativeAccessibilityElement": "0",
+  "isFocused": "0",
+  "name": "AveriLab",
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  }
+ },
+ "sessionId": null
+}

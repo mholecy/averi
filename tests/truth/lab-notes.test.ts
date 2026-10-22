@@ -36,6 +36,7 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  */
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md': "LV2: the flush probe's reach, live only (and intermittent)",
+  '2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md': "a fling's rest a fraction of a point centre-out under WDA, live only (and intermittent)",
 };
 
 /**

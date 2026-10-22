@@ -172,8 +172,8 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
      the plain stop said "fully visible after 0 swipes". Now the colour assert and the plain stop refuse (the order
      question is asked where a control listed after the row holds its centre — one screenshot per plain stop, and per tap only
      where no tappable piece is left clear of it (O's tap moves clear and asks nothing); the colour assert asks on the
-     frame it measures, none added; over the 128 trees of the committed corpus (102 truth captures, 26 trees of tests/fixtures; 4425 nodes, every one judged as a target at base and head) the rule changes 3 nodes: the new cell's O, the lab's in-screen menu W in `blur-menu-grouped` (the L4 shape, ADR 0024's own: its screenshot sees W over C — tap and plain stop unchanged, one screenshot each where they took none) and mp-native's chooser `row_swift` (no screenshot in the tests)) and the tap is moved clear of
-     Continue; what the row's tap says is still `Tapped`, on the background below the clip.
+     frame it measures, none added; the targets it asks of, over the committed corpus: ADR 0015's 2026-10-22 amendment)
+     and the tap is moved clear of Continue; what the row's tap says is still `Tapped`, on the background below the clip.
    What stays, accepted: where NOTHING IS LISTED BENEATH the row (no control over its centre), the tap, the plain stop
    and the strokes are judged on the screen alone — an element below a
    short scroll view (the SWIFT form's text field at `42,817`, the lab's O and S) is refused only where something the

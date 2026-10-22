@@ -1305,3 +1305,36 @@ this run's own on gRPC 10951 (`IDB_COMPANION=localhost:10951`); shut down after.
   tap that follows (the background below the clip: ADR 0010's residual 5, known).
 - **WDA**: the tap refused outside its scroll view, nothing fired; `scroll_until` stops on O after 2 swipes (list
   0→239.7), Tapped O — as the truth does.
+
+## Round 16, LE2's code review: the same cases at the final src, and mp-native's chooser rebuilt, 2026-10-22
+
+bugs/r16-le2 at `cefccf3d`'s src (`9fd4aff2`'s rule, the reading order asked lazily), run from that branch's working
+tree with the new lab cell `presented/chooser-over-list` (fixtures/apps/ios/AveriLab/Presented.swift#ChooserScreen:
+mp-native's payment-type chooser at its measured geometry, tests/fixtures/idb-modal-listed-before-content.json — a
+white card `24,381 354x140` of white option rows O `45,397 312x52` and S `45,453 312x52` over a list dimmed 40 %, date
+headers `0,y 402x29`, white rows `24,y 354x52`, R `row_0` `24,435` holding S's centre (201,479); the card's container
+listed first, so idb lists O and S before the list). The lab app built from the branch and installed by this run; the
+averi-lab iPhone 17 simulator, WDA on 8120, idb through this run's own companion on its domain socket; shut down
+after. `--sources idb,wda --groups visibility,dismissal --cells scroll-bounded-footer,chooser-over-list`.
+
+| record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-vis-r16-le2-2.json | cefccf3d | 12 | 7 | 1 | 4 (all known) |
+| ios-vis-r16-le2-3.json | cefccf3d | 12 | 8 | 1 | 3 (all known) |
+
+- **The chooser, idb — what the eyes did on real pixels**: `tap S` is refused, nothing fired, in both runs (LOUD: a
+  target a tap reaches refused): "overlapped by button "Loan repayment, …" (24,435 354x52) at its centre (201,479), the
+  two listed in reading order: which is drawn on top is not told … a screenshot could not tell either (it shows the
+  colour around it #FFFFFF beside the overlap: it may draw nothing there)". S's band below the overlap, the overlap
+  and R's bands (above, on O and the card; beside, on the card's padding) all read the card's white. ADR 0015's
+  2026-10-22 amendment, its accepted residual. `tap O` Tapped, O fired; `tap R` and `scroll_until R` refused, nothing
+  fired or stroked.
+- **The chooser, WDA**: the card is listed over the list — O and S Tapped, each fired alone; R refused under S, drawn
+  over it; `scroll_until R` refused after three strokes on the dim (175, 175, 699), closing nothing — #31's shape
+  (blur-menu-grouped's C), known.
+- **scroll-bounded-footer, idb**: as at 19525e29 — `tap O` moved clear of Continue to (201,670), the app logged no
+  button; `scroll_until O` refused before any swipe; both Tapped on the background by the taps that follow (residual 5).
+- **scroll-bounded-footer, WDA**: the tap refused outside its scroll view; `scroll_until O` reached after 1 swipe (the
+  fling 240–273 pt, O clipped 54–83 % at its top, Tapped O) — once (-2.json) its centre rested 0.7 pt past the clip's top
+  and the stop still said "visible … CLIPPED at top, 49%", the tap at (201,380) firing O: intermittent, the same stop at
+  `4ee14f1c` (`--side`), filed as docs/bugs/2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md.

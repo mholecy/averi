@@ -119,6 +119,17 @@
       ]
     },
     {
+      "id": "chooser-over-list",
+      "family": "presented",
+      "layer": "chooser",
+      "platforms": ["ios"],
+      "targets": [
+        { "tag": "O", "color": "#FFFFFF", "slot": 0, "in": "layer", "declared": "open" },
+        { "tag": "S", "color": "#FFFFFF", "slot": 1, "in": "layer", "declared": "open" },
+        { "tag": "R", "color": "#FFFFFF", "slot": 0, "declared": "presented-over" }
+      ]
+    },
+    {
       "id": "dialog-fullscreen",
       "family": "presented",
       "layer": "dialog-fullscreen",

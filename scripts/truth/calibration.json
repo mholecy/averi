@@ -1147,7 +1147,7 @@
           "after": "19525e2",
           "cases": ["tap:scroll-bounded-footer.O", "scroll:scroll-bounded-footer.O"],
           "verdict": "CALIBRATED-ON-DEFECT",
-          "remark": "Before (a --side run of 4ee14f1c, idb): tap O says Tapped and the app logged button footer.continue (Continue fired, the truth probe's own result); scroll_until O says fully visible after 0 swipes, then the tap fires Continue. After (docs/truth/live-records/ios-vis-r16-le2-1.json at 19525e2): the tap is moved clear of Continue to (201,670), the app logged nothing (one touch); scroll_until stops before any swipe, naming Continue — both still tap-claim on Tapped for the tap that follows, on the background (ADR 0010 residual 5, known). WDA ok in the same run.",
+          "remark": "Before (a --side run of 4ee14f1c, idb): tap O says Tapped and the app logged button footer.continue (Continue fired, the truth probe's own result); scroll_until O says fully visible after 0 swipes, then the tap fires Continue. After (docs/truth/live-records/ios-vis-r16-le2-1.json at 19525e2): the tap is moved clear of Continue to (201,670), the app logged nothing (one touch); scroll_until stops before any swipe, naming Continue — both still tap-claim on Tapped for the tap that follows, on the background (ADR 0010 residual 5, known). WDA ok in the same run. Again at the code review's src (cefccf3d: 9fd4aff's rule, the reading order asked lazily), twice (ios-vis-r16-le2-2.json, -3.json): the same replies under idb, nothing fired.",
           "summary": "docs/truth/live-ios-2026-10-18-visibility.md"
         }
       ]
@@ -1515,6 +1515,10 @@
     {
       "note": "2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md",
       "why": "residual found by round 7's A6: `scroll_until … fully: true` on form-keyboard's phone after `back` is refused under the next field's title, which its 132-px touch target overlaps by 6 px, though the 99 px it draws are whole — live only (driven directly over MCP: docs/truth/live-records/android-k7-fully-eyes-direct.jsonl), no golden row (the replay asks no `fully: true` of phone) and no live.ts case asks it; open"
+    },
+    {
+      "note": "2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md",
+      "why": "lab finding (round 16's LE2 code review): under WDA a plain stop on a row whose fling left its centre 0.7 pt past its scroll view's clip, \"visible … CLIPPED at top, 49%\", the tap then firing the row — live only and intermittent (live.ts --udid, case scroll:scroll-bounded-footer.O under WDA: once in five runs at the fix's src, docs/truth/live-records/ios-vis-r16-le2-2.json; the same kind of stop at 4ee14f1c): a replayed tree never moves, so no row reproduces a fling's rest; open"
     }
   ]
 }

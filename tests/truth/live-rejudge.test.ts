@@ -182,6 +182,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // after that refusal both Tapped on the background, known (residual 5) — and under WDA refused / stopped inside `lower`
     // after 2 swipes, Tapped.
     ['ios-vis-r16-le2-1.json', 'visibility', { cases: 4, ok: 2, loud: 0, mismatches: 2 }],
+    // Its code review (round 16): the same two cases at the final src, and mp-native's chooser rebuilt (chooser-over-list) —
+    // under idb S refused, nothing fired (LOUD: the eyes cannot tell it over R on the real screenshot, white on white), O
+    // Tapped, R refused; under WDA O and S Tapped, R refused, its stop stroking the dim (#31). -2.json holds WDA's one
+    // intermittent stop on footer O 0.7 pt past the clip (live-known.ts), -3.json none.
+    ['ios-vis-r16-le2-2.json', 'visibility,dismissal', { cases: 12, ok: 7, loud: 1, mismatches: 4 }],
+    ['ios-vis-r16-le2-3.json', 'visibility,dismissal', { cases: 12, ok: 8, loud: 1, mismatches: 3 }],
     // Round 14's fix of LE3 (bugs/r14-le3 40b4856, a heading listed before is drawn over the target): scroll-sticky's
     // six cases ok under idb and WDA, twice — R's `fully: true` no longer stops under the pinned header: one stroke
     // (list 24→0), R whole at 51,166, fully visible after 1 swipe, Tapped; its tap and plain stop as before.

@@ -225,6 +225,28 @@
       "truth": "blur-menu-grouped.truth.json"
     },
     {
+      "file": "chooser-over-list.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "chooser-over-list.png",
+      "truth": "chooser-over-list.truth.json"
+    },
+    {
+      "file": "chooser-over-list.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "chooser-over-list.png",
+      "truth": "chooser-over-list.truth.json"
+    },
+    {
       "file": "form-basic.wda.json",
       "source": "wda",
       "form": "raw",

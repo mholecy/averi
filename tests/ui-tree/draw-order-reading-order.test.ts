@@ -100,8 +100,8 @@ describe('a control listed after a target, past a reading-order break, that hold
 describe('over every iOS tree of the committed fixtures: the untold covers listed after their target', () => {
   // Pinned: every target with a control listed after it whose order against it is not told, over the whole corpus — what the
   // eyes are asked of because of a control listed after (a screenshot per plain stop; per tap where no piece is left clear).
-  // The rule (`coversAfter`) added the first three: before it the break excused their cover.
-  it('are scroll-bounded-footer\'s O, blur-menu-grouped\'s W, mp-native\'s chooser row_swift — and the pairs a listing already gave', async () => {
+  // The rule (`coversAfter`) added all but blur-menu's: before it the break excused their cover.
+  it('are scroll-bounded-footer\'s O, blur-menu-grouped\'s W, mp-native\'s chooser row_swift and its lab rebuild\'s S — and the pair a listing already gave', async () => {
     const untold: string[] = [];
     let judged = 0;
     for (const [file, tree] of await iosTrees()) {
@@ -122,6 +122,7 @@ describe('over every iOS tree of the committed fixtures: the untold covers liste
       // the ungrouped menu: its rows listed between the targets, no break before C — untold before the rule too
       'blur-menu.idb.json#0: lab.blur-menu.W under lab.blur-menu.C',
       'blur-menu.wda.json: lab.blur-menu.W under lab.blur-menu.C',
+      'chooser-over-list.idb.json#0: lab.chooser-over-list.S under lab.chooser-over-list.R',
       'scroll-bounded-footer.idb.json#0: lab.scroll-bounded-footer.O under lab.scroll-bounded-footer.continue',
     ]);
   });

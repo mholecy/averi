@@ -39,6 +39,7 @@ const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-i
 const UNMARKED_WINDOW = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
+const CENTRE_A_POINT_OUT = 'bug:2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md';
 
 /**
  * A known case: its note, the rule it fails by (live-visibility.ts#VerdictClass), the kind of reply that verdict rests
@@ -160,6 +161,16 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // after three strokes on the blur (no node: residual 9), "content exhausted … a layout defect"; the strokes close
   // nothing (no `dismissed` logged): so at L4's final src too (94fc318b: ios-vis-r8-l4-3.json, -4.json).
   ...each('ios wda', ['scroll:blur-menu-grouped.C'], BLUR, 'presented-stroke', 'refused'),
+  // chooser-over-list's R (round 16, mp-native's chooser rebuilt): WDA lists the card row S over it (drawn over, its
+  // order told) and no node for the dim, so the stop is refused after three strokes on the dim (175, 175, 699), "content
+  // exhausted"; the strokes close nothing (no `dismissed` logged) — blur-menu-grouped C's shape (ios-vis-r16-le2-2.json).
+  ...each('ios wda', ['scroll:chooser-over-list.R'], BLUR, 'presented-stroke', 'refused'),
+  // scroll-bounded-footer's O under WDA (round 16): its one stroke on `lower` flings 240–273 pt, so O rests 54–83 %
+  // clipped at the top, its centre inside the clip — ok, then Tapped; once (ios-vis-r16-le2-2.json) at 272.7, O at
+  // 347.3, its centre 0.7 pt above the clip's top 380: "visible … CLIPPED at top, 49 %" against the truth's centre-out,
+  // the tap at (201,380) then fired O. A fraction of a point WDA's whole-point frames do not tell; the same stroke and
+  // stop at 4ee14f1c (the src before LE2's rest), so not this fix's.
+  ...each('ios wda', ['scroll:scroll-bounded-footer.O'], CENTRE_A_POINT_OUT, 'stop-claim', 'visible', { intermittent: true }),
   // iOS, both sources
   ...['idb', 'wda'].flatMap((src) => [
     // scroll-sticky's R with `fully: true` struck off by round 14's LE3 fix (40b4856: a heading listed before is drawn

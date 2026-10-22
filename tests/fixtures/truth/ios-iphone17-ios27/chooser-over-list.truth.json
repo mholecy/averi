@@ -1,0 +1,79 @@
+{
+  "cell": "chooser-over-list",
+  "layer": "chooser",
+  "device": "averi-lab iPhone 17 simulator, iOS 27.0",
+  "screen": {
+    "width": 402,
+    "height": 874
+  },
+  "scale": 3,
+  "targets": [
+    {
+      "tag": "O",
+      "id": "lab.chooser-over-list.O",
+      "color": "#FFFFFF",
+      "declared": "open",
+      "frame": {
+        "height": 52,
+        "width": 312,
+        "x": 45,
+        "y": 397
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,423.0"
+        }
+      ],
+      "drawn": 0.979,
+      "seen": "#FFFFFF"
+    },
+    {
+      "tag": "S",
+      "id": "lab.chooser-over-list.S",
+      "color": "#FFFFFF",
+      "declared": "open",
+      "frame": {
+        "height": 52,
+        "width": 312,
+        "x": 45,
+        "y": 453
+      },
+      "reached": true,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,479.0"
+        }
+      ],
+      "drawn": 0.975,
+      "seen": "#FFFFFF"
+    },
+    {
+      "tag": "R",
+      "id": "lab.chooser-over-list.R",
+      "color": "#FFFFFF",
+      "declared": "presented-over",
+      "frame": {
+        "height": 52,
+        "width": 354,
+        "x": 24,
+        "y": 435
+      },
+      "reached": false,
+      "probe": [
+        {
+          "kind": "touch",
+          "tag": "201.0,461.0"
+        },
+        {
+          "kind": "tap",
+          "tag": "S"
+        }
+      ],
+      "drawn": 0.978,
+      "seen": "#FFFFFF"
+    }
+  ]
+}
