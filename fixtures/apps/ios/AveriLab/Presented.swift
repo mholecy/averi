@@ -17,7 +17,7 @@ struct PresentedScreen: View {
     var body: some View {
         switch cell.layer {
         case "sheet-medium-scrolled": ScrolledHost(cell: cell)
-        case "blur-menu", "blur-menu-grouped": BlurMenuScreen(cell: cell, grouped: cell.layer == "blur-menu-grouped")
+        case "blur-menu", "blur-menu-grouped", "blur-menu-stacked", "blur-menu-unhidden": BlurMenuScreen(cell: cell)
         default: CellScreen(cell: cell)
         }
     }
@@ -299,47 +299,39 @@ final class LongListController: UITableViewController {
 /// reading order — the card's rows between the targets above and below them; grouped (`blur-menu-grouped`), the card
 /// and the screen beneath are each an accessibility container of the screen's size, the card's declared first: its rows
 /// listed before every target beneath, which starts above them (mp-native's chooser under idb, ADR 0015).
+/// ADR 0018 residual 9's probes (round 16), each grouped: `blur-menu-stacked` declares the three in the order they are
+/// drawn (the screen beneath, the backdrop, the card; no zIndex) — with blur-menu-grouped's reverse declaration it
+/// tells whether WDA lists the backdrop and the screen beneath, both at 0,0 the screen's size, in draw order or in
+/// declaration order; `blur-menu-unhidden` is blur-menu-grouped with the backdrop not `.accessibilityHidden`.
 struct BlurMenuScreen: View {
     @EnvironmentObject var lab: Lab
     let cell: Cell
-    let grouped: Bool
     @State private var menu = false
 
     /// The card's rows' centres: the second lies inside slot 2's target, drawn over its top.
     static let rowCentres: [CGFloat] = [412, 480]
+
+    private var grouped: Bool { cell.layer != "blur-menu" }
+    private var stacked: Bool { cell.layer == "blur-menu-stacked" }
 
     var body: some View {
         GeometryReader { geo in
             let screen = CGSize(width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing,
                                 height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
             ZStack(alignment: .topLeading) {
-                if menu {
-                    ZStack(alignment: .topLeading) {
-                        ForEach(cell.targets.filter(\.onLayer), id: \.tag) { t in
-                            TargetView(cell: cell, target: t).position(x: screen.width / 2, y: Self.rowCentres[t.slot])
-                        }
+                if stacked {
+                    beneath(screen)
+                    if menu {
+                        backdrop
+                        card(screen)
                     }
-                    .frame(width: screen.width, height: screen.height)
-                    .modifier(Grouped(on: grouped))
-                    .zIndex(2)
-                    Color.black.opacity(0.25)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            menu = false
-                            lab.event("dismissed", "menu")
-                        }
-                        .accessibilityHidden(true)
-                        .zIndex(1)
-                }
-                ZStack(alignment: .topLeading) {
-                    Color.white
-                    ForEach(cell.targets.filter { !$0.onLayer }, id: \.tag) { t in
-                        TargetView(cell: cell, target: t).position(Slot.centre(t.slot, in: screen))
+                } else {
+                    if menu {
+                        card(screen).zIndex(2)
+                        backdrop.zIndex(1)
                     }
+                    beneath(screen).zIndex(0)
                 }
-                .modifier(Grouped(on: grouped))
-                .blur(radius: menu ? 6 : 0)
-                .zIndex(0)
             }
             .frame(width: screen.width, height: screen.height)
             .ignoresSafeArea()
@@ -354,10 +346,44 @@ struct BlurMenuScreen: View {
             lab.settled()
         }
     }
+
+    /// The menu's card: the layer's targets at the card's rows.
+    private func card(_ screen: CGSize) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(cell.targets.filter(\.onLayer), id: \.tag) { t in
+                TargetView(cell: cell, target: t).position(x: screen.width / 2, y: Self.rowCentres[t.slot])
+            }
+        }
+        .frame(width: screen.width, height: screen.height)
+        .modifier(Grouped(on: grouped))
+    }
+
+    /// The dim over the screen beneath, closing the menu on a touch.
+    private var backdrop: some View {
+        Color.black.opacity(0.25)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                menu = false
+                lab.event("dismissed", "menu")
+            }
+            .accessibilityHidden(cell.layer != "blur-menu-unhidden")
+    }
+
+    /// The slot host, blurred while the menu is up.
+    private func beneath(_ screen: CGSize) -> some View {
+        ZStack(alignment: .topLeading) {
+            Color.white
+            ForEach(cell.targets.filter { !$0.onLayer }, id: \.tag) { t in
+                TargetView(cell: cell, target: t).position(Slot.centre(t.slot, in: screen))
+            }
+        }
+        .modifier(Grouped(on: grouped))
+        .blur(radius: menu ? 6 : 0)
+    }
 }
 
 /// An accessibility container of its children, when `on`.
-private struct Grouped: ViewModifier {
+struct Grouped: ViewModifier {
     let on: Bool
 
     func body(content: Content) -> some View {

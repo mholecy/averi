@@ -22,16 +22,75 @@ import UIKit
 //   SwiftUI runs the scroll view on under the keyboard to the screen's foot: measured 0,0 402x874) — #7's second fix,
 //   c3ebc62; mp-native's 0,0 402x512. No toolbar draws anything or takes a touch: a tap on the title still ends the
 //   editing (FormTruth.title).
+// - `tap-catcher-beneath` (ADR 0018 residual 9's false-positive probe, round 16): the four slot targets in a
+//   screen-sized accessibility container, a screen-wide `.accessibilityHidden` tap-to-dismiss background drawn BENEATH
+//   it (`.background`, the common "tap outside to end editing" shape) — the blur menu's backdrop's shape in the tree,
+//   but under the content, not over it; `tap-catcher-stacked` the same, the tap-catcher declared first in a ZStack
+//   with the content. A touch on it logs `dismissed background`; a tap on a target fires it.
 
 struct FalseCoversScreen: View {
     let cell: Cell
 
     var body: some View {
-        if let form = cell.form {
+        if cell.layer == "tap-catcher-beneath" || cell.layer == "tap-catcher-stacked" {
+            TapCatcherScreen(cell: cell)
+        } else if let form = cell.form {
             FormScreen(cell: cell, form: form, scrollHeight: cell.layer == "toolbar-screen-short" ? 451 : nil).overlay(alignment: .top) { if cell.layer == "toolbar-bar" { ShadowToolbar() } }
         } else {
             OwnPartsScreen(cell: cell)
         }
+    }
+}
+
+/// `tap-catcher-beneath` and `tap-catcher-stacked`: the slot targets, grouped, over a hidden screen-wide tap-catcher
+/// (see the file's head).
+struct TapCatcherScreen: View {
+    @EnvironmentObject var lab: Lab
+    let cell: Cell
+
+    var body: some View {
+        GeometryReader { geo in
+            let screen = CGSize(width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing,
+                                height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
+            Group {
+                if cell.layer == "tap-catcher-stacked" {
+                    ZStack(alignment: .topLeading) {
+                        catcher
+                        content(screen)
+                    }
+                } else {
+                    content(screen).background { catcher }
+                }
+            }
+            .frame(width: screen.width, height: screen.height)
+            .ignoresSafeArea()
+        }
+        .ignoresSafeArea()
+        .task {
+            try? await Task.sleep(for: .milliseconds(600))
+            lab.settled()
+        }
+    }
+
+    /// The screen's content: a fill passing every touch through (so the content's container lies at 0,0 the screen's
+    /// size, as the tap-catcher does — WDA lists the two at the same top) and the targets.
+    private func content(_ screen: CGSize) -> some View {
+        ZStack(alignment: .topLeading) {
+            Color(white: 0.98).allowsHitTesting(false)
+            ForEach(cell.targets, id: \.tag) { t in
+                TargetView(cell: cell, target: t).position(Slot.centre(t.slot, in: screen))
+            }
+        }
+        .frame(width: screen.width, height: screen.height)
+        .modifier(Grouped(on: true))
+    }
+
+    /// The hidden tap-to-dismiss background.
+    private var catcher: some View {
+        Color.white
+            .contentShape(Rectangle())
+            .onTapGesture { lab.event("dismissed", "background") }
+            .accessibilityHidden(true)
     }
 }
 

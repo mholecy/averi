@@ -225,6 +225,50 @@
       "truth": "blur-menu-grouped.truth.json"
     },
     {
+      "file": "blur-menu-stacked.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "blur-menu-stacked.png",
+      "truth": "blur-menu-stacked.truth.json"
+    },
+    {
+      "file": "blur-menu-stacked.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "blur-menu-stacked.png",
+      "truth": "blur-menu-stacked.truth.json"
+    },
+    {
+      "file": "blur-menu-unhidden.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "blur-menu-unhidden.png",
+      "truth": "blur-menu-unhidden.truth.json"
+    },
+    {
+      "file": "blur-menu-unhidden.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "blur-menu-unhidden.png",
+      "truth": "blur-menu-unhidden.truth.json"
+    },
+    {
       "file": "form-basic.wda.json",
       "source": "wda",
       "form": "raw",
@@ -685,6 +729,50 @@
       },
       "screenshot": "toolbar-dismiss-short.png",
       "truth": "toolbar-dismiss-short.truth.json"
+    },
+    {
+      "file": "tap-catcher-beneath.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "tap-catcher-beneath.png",
+      "truth": "tap-catcher-beneath.truth.json"
+    },
+    {
+      "file": "tap-catcher-beneath.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "tap-catcher-beneath.png",
+      "truth": "tap-catcher-beneath.truth.json"
+    },
+    {
+      "file": "tap-catcher-stacked.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "tap-catcher-stacked.png",
+      "truth": "tap-catcher-stacked.truth.json"
+    },
+    {
+      "file": "tap-catcher-stacked.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "tap-catcher-stacked.png",
+      "truth": "tap-catcher-stacked.truth.json"
     },
     {
       "file": "text-sample.wda.json",

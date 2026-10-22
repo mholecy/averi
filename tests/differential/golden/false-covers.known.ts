@@ -3,7 +3,8 @@ import { ANDROID, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS, keys, NOT_
 // The false-covers family's ratchet (fixtures/apps/cells/false-covers.json, phase 3 B5): own-parts (both platforms;
 // round 6's icon-button target I — 10 rows each; on iOS, captured by round 6's iOS device check, both sources list the
 // button alone, labelled Close, and tap it by its label: green), toolbar-dismiss, toolbar-dismiss-bar and
-// toolbar-dismiss-short (iOS: form cells).
+// toolbar-dismiss-short (iOS: form cells); tap-catcher-beneath and tap-catcher-stacked (round 16, iOS: a hidden
+// screen-wide tap-catcher beneath the targets — ADR 0018 residual 9's false-positive probe; every row green).
 
 const UNDER_KEYBOARD = ['vs', 'ks', 'ss', 'note'];
 
@@ -33,5 +34,9 @@ export const falseCovers: KnownFile = {
     [`${IOS}/toolbar-dismiss-bar.wda.json`]: 34,
     [`${IOS}/toolbar-dismiss-short.idb.json`]: 34,
     [`${IOS}/toolbar-dismiss-short.wda.json`]: 34,
+    [`${IOS}/tap-catcher-beneath.idb.json`]: 12,
+    [`${IOS}/tap-catcher-beneath.wda.json`]: 12,
+    [`${IOS}/tap-catcher-stacked.idb.json`]: 12,
+    [`${IOS}/tap-catcher-stacked.wda.json`]: 12,
   },
 };
