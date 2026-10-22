@@ -1917,6 +1917,14 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     expect(played.outcome).toMatchObject({ kind: 'presented', swipes: 0 });
   });
 
+  it('reads that fail before the call\'s first read that reads confirm nothing: a target found under a presented screen on that first read still gets its confirming read', () => {
+    const failed: Row = { error: 'WDA /source returned 500' };
+    const forgot = rowOf('finportalForgot', 'lang_sk');
+    const played = play(IPHONE, [failed, failed, failed, failed, forgot, rowOf('finportalLogin', 'lang_sk')]);
+    expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'confirm', 'confirm', 'confirm', 'confirm', 'stop']);
+    expect(played.outcome?.kind).toBe('visible');
+  });
+
   it('a modal closing between the two reads: the confirming read finds the target clear — the stop is visible, still with no stroke', () => {
     const played = play(IPHONE, [rowOf('finportalForgot', 'lang_sk'), rowOf('finportalLogin', 'lang_sk')]);
     expect(played.steps.map((st) => st.do)).toEqual(['confirm', 'stop']);

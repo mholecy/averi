@@ -1020,6 +1020,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       s.course = turnBack(s.course, stuckOn);
     }
   }
+  // No read of this call has read (`CallEvidence`'s `unread`): no stroke — one drawn with no tree read is a side effect
+  // on a screen nothing has shown, and no read before it is there to tell the next one changed (`screenBefore`). Live
+  // (idb, the lab's large sheet): every read of a call failed, and six full strokes drawn blind dismissed the sheet. Read
+  // again after a settle while the budget allows, spending no confirming read (there is no stop to confirm: a target
+  // the first read that reads finds under a presented screen still gets its own); at the deadline the bound below says no read succeeded (`neverRead`).
+  if (callEvidence(s).of === 'unread' && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
   // A confirming read that did not read, or the read after a probe: read
   // again, within the same budget, rather than stroke away from a stop the
   // last read saw.
@@ -1029,11 +1035,6 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // (a read failing three times after the popover's hold had stroked onto its dim). Not a wait to the deadline: the
   // reads are failing, and the last one that read is the evidence there is.
   if (read === undefined && s.presentedHold !== undefined) return stop(s, s.presentedHold);
-  // No read of this call has read (`CallEvidence`'s `unread`): no stroke — one drawn with no tree read is a side effect
-  // on a screen nothing has shown, and no read before it is there to tell the next one changed (`screenBefore`). Live
-  // (idb, the lab's large sheet): every read of a call failed, and six full strokes drawn blind dismissed the sheet. Read
-  // again after a settle while the budget allows; at the deadline the bound below says no read succeeded (`neverRead`).
-  if (callEvidence(s).of === 'unread' && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
   // What this round's read saw, for a target no round matched (ui-tree/miss.ts — the not-found's note; asked only at a
   // stop that may say "never appeared", so a round that goes on pays no presentation walk).
   const missed = (): Miss | undefined => (s.everFound ? undefined : missOf({ tree: read?.tree, readError, target: s.rules.target }));
