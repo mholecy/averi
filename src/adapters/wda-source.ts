@@ -415,6 +415,9 @@ const firstIn = (el: WdaElement, test: (e: WdaElement) => boolean): WdaElement |
  *   screen (a dismissed alert WDA keeps) types nothing, and the flags judge its layer.
  * - BY THE FLAGS (`screen`, `presentedScreen`), only in a payload that carries them (`flags`, `carriesFlags`): one
  *   layer per Window at most.
+ * - AN IN-WINDOW BACKDROP (`screen`, `inWindowBackdrops`), read by the flags too (a flagless payload has none), in
+ *   the app's Window and only when nothing else of that Window is marked: an element inside a layer, not a layer itself — the backdrop of a
+ *   menu laid in the screen's own container, which covers what is listed before it.
  * A layer typed is not also `screen` (one mark a layer).
  */
 function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaElement>, flags: boolean): PresentedLayers {
@@ -441,8 +444,12 @@ function presentedLayers(root: WdaElement, keyboardWindows: ReadonlySet<WdaEleme
         break;
       }
     }
-    const shown = flags ? presentedScreen(window, window === (windows[0] ?? root)) : undefined;
+    const appWindow = window === (windows[0] ?? root);
+    const shown = flags ? presentedScreen(window, appWindow) : undefined;
     if (shown !== undefined && !layers.has(shown)) layers.set(shown, 'screen');
+    if (appWindow && !(window.children ?? []).some((layer) => layers.has(layer))) {
+      for (const backdrop of inWindowBackdrops(window)) layers.set(backdrop, 'screen');
+    }
   }
   return { layers, elements };
 }
@@ -496,6 +503,52 @@ function presentedScreen(window: WdaElement, appWindow: boolean): WdaElement | u
     return beneath && someIn(layer, shownContent) ? layer : undefined;
   }
   return bare;
+}
+
+/**
+ * The IN-WINDOW BACKDROPS of `window` (`UiNode.presentation` `screen`, ADR 0018 residual 9): a SwiftUI menu card laid
+ * in the screen's own container over a dimmed backdrop that takes the touch (the lab's blur-menu-grouped, mp-native's
+ * Account Detail `PAY` menu). Each is a CHILDLESS element of a structural role (an `Other`) INSIDE one of the
+ * Window's layers (never a layer itself: those are `presentedScreen`'s), screen-sized
+ * (`SCREEN_SIZED_FRACTION` of the Window), listed after a sibling that starts at the same origin and holds content (an
+ * element of a non-structural role) — the screen beneath — when WDA's flags show the backdrop over that sibling:
+ * - HIDDEN (`.accessibilityHidden`, the menu's tap-catcher): the backdrop `isVisible="0"` and `isAccessible="0"`, the
+ *   sibling showing content on the screen (blur-menu-grouped, blur-menu-stacked);
+ * - SHOWN (the backdrop an accessibility element): the backdrop `isVisible="1"`, every element of the sibling's subtree
+ *   `isVisible="0"` — WDA's own word that the screen beneath is covered, as over a sheet (blur-menu-unhidden).
+ * Why "listed after, at the same origin" is "drawn over": WDA lists a container's children by their top, and siblings
+ * of the same top in the order they are DRAWN, whatever order they are declared in — measured (iPhone 17 simulator,
+ * iOS 27.0, WDA 16.1.7, tests/fixtures/truth/ios-iphone17-ios27): blur-menu-grouped (declared card, backdrop, screen
+ * beneath; zIndex 2, 1, 0) and blur-menu-stacked (declared screen beneath, backdrop, card; no zIndex) both list the
+ * screen beneath, then the backdrop, then the card; tap-catcher-beneath (a hidden tap-to-dismiss `.background` of the
+ * content) and tap-catcher-stacked (declared first in a ZStack) both list the tap-catcher BEFORE the content it lies
+ * beneath — no backdrop. A sibling of a smaller top is listed first whatever is drawn on top, so it is no evidence:
+ * the ungrouped blur-menu lists its backdrop first of seven siblings by top (ADR 0015's reading order), and stays
+ * unjudged. idb lists no trace of a hidden backdrop at all.
+ */
+function inWindowBackdrops(window: WdaElement): readonly WdaElement[] {
+  const screen = usableRect(window.rect);
+  if (screen === undefined) return [];
+  const content = (e: WdaElement): boolean => !STRUCTURAL_ROLES.has(iosRoleOf(e.type, ROLE_MAP));
+  const shownContent = (e: WdaElement): boolean => content(e) && onScreen(e, screen);
+  const sameOrigin = (a: Rect, b: Rect | undefined): boolean => b !== undefined && a.x === b.x && a.y === b.y;
+  /** `backdrop` is drawn over `beneath`, as WDA's flags show it. */
+  const over = (backdrop: WdaElement, beneath: WdaElement): boolean =>
+    isZero(backdrop.isVisible) ? isZero(backdrop.isAccessible) && someIn(beneath, shownContent) : String(backdrop.isVisible) === '1' && allIn(beneath, (e) => isZero(e.isVisible));
+  const found: WdaElement[] = [];
+  const visit = (el: WdaElement): void => {
+    const kids = el.children ?? [];
+    kids.forEach((backdrop, i) => {
+      const rect = usableRect(backdrop.rect);
+      if (rect === undefined || (backdrop.children ?? []).length > 0 || content(backdrop) || rectArea(rect) < rectArea(screen) * SCREEN_SIZED_FRACTION) return;
+      if (kids.slice(0, i).some((beneath) => sameOrigin(rect, usableRect(beneath.rect)) && someIn(beneath, content) && over(backdrop, beneath))) found.push(backdrop);
+    });
+    kids.forEach(visit);
+  };
+  // Inside a layer, never a layer itself: the Window's own layers are `presentedScreen`'s, where a bare shown leaf
+  // after a hidden layer presents nothing (Contacts' sheet with the keyboard up ends its Window with one).
+  (window.children ?? []).forEach(visit);
+  return found;
 }
 
 /**

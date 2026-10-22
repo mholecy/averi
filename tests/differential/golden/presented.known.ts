@@ -24,9 +24,6 @@ const unmarkedWindow = (file: string, as: Classed) => [
   ...keys(file, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),
   ...keys(file, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(ADB_STROKE), note: 'uiautomator lists only the presented window, unmarked: scroll_until strokes it twice, then "never appeared in the tree" with the active-window hint', as }),
 ];
-const IDB_UP = 'idb ui swipe 201 175 201 437 --duration 0.3';
-/** The short stroke down after two IDB_UP, the third of blur-menu-grouped C's strokes (and of sheet-medium-edges.wda G's until L3's fix). */
-const IDB_DOWN_SHORT = 'idb ui swipe 201 699 201 568 --duration 0.3';
 /**
  * The slot targets' probe points (Base.swift#Slot) and the colour the screenshot shows over each under the blur menu:
  * A, B, D their own blurred and dimmed; C (#00897B) the menu row W's own colour — W is drawn over C's centre.
@@ -123,28 +120,18 @@ export const presented: KnownFile = {
     ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
     ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier', as: NO_ID }),
-    // RESIDUAL #31 (ADR 0018 residual 9): nothing in either tree shows the blur menu's backdrop over A, B, D — they read
-    // as open. C's centre lies under the menu row W (its probe fires W): C is refused under W, truly, but not "close it
-    // first" (#31's) — on the grouped WDA trees as W is listed after it, elsewhere since L4's fix (a control listed
-    // before it in reading order, overlapping it, is a cover whose order is not told, ADR 0015's amendment) and, since
-    // ADR 0024, seen drawn over it on the screenshot.
+    // RESIDUAL #31 (ADR 0018 residual 9): under idb, and in WDA's ungrouped reading-order run, nothing shows the blur
+    // menu's backdrop over A, B, D — they read as open. C's centre lies under the menu row W (its probe fires W): C is
+    // refused under W, truly, but not "close it first" (#31's) — since L4's fix (a control listed before it in reading
+    // order, overlapping it, is a cover whose order is not told, ADR 0015's amendment) and, since ADR 0024, seen drawn
+    // over it on the screenshot. The grouped WDA trees (blur-menu-grouped, -stacked, -unhidden) went green in round 16
+    // (adapters/wda-source.ts#inWindowBackdrops: the backdrop listed after the screen beneath at its origin is a
+    // presented screen) — their 12, 12 and 12 rows struck off / never listed.
     ...beneathTheBlur(`${IOS}/blur-menu.idb.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu.wda.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu-grouped.idb.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu-stacked.idb.json`, ['A', 'B', 'D']),
     ...beneathTheBlur(`${IOS}/blur-menu-unhidden.idb.json`, ['A', 'B', 'D'], BARE_FRAME),
-    ...beneathTheBlur(`${IOS}/blur-menu-grouped.wda.json`, ['A', 'B', 'D']),
-    ...beneathTheBlur(`${IOS}/blur-menu-stacked.wda.json`, ['A', 'B', 'D']),
-    ...beneathTheBlur(`${IOS}/blur-menu-unhidden.wda.json`, ['A', 'B', 'D'], BARE_FRAME),
-    ...[
-      [`${IOS}/blur-menu-grouped.wda.json`, NO_NODE],
-      [`${IOS}/blur-menu-stacked.wda.json`, NO_NODE],
-      [`${IOS}/blur-menu-unhidden.wda.json`, BARE_FRAME],
-    ].flatMap(([file, backdrop]) => [
-      ...keys(file, ['C'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'refused', calls: [], note: `refused under the menu row W drawn over its centre; ${backdrop}`, as: BLUR }),
-      ...keys(file, ['C'], ['colour'], { cls: 'failed without "close it first"', kind: 'FAIL', calls: [], note: `fails under the menu row W; ${backdrop}`, as: BLUR }),
-      ...keys(file, ['C'], ['scroll_until'], { cls: 'swiped 3× beneath a presented layer', kind: 'refused', calls: [IDB_UP, IDB_UP, IDB_DOWN_SHORT], note: `strokes for C under the menu row W; ${backdrop}`, as: BLUR }),
-    ]),
     ...[
       [`${IOS}/blur-menu.idb.json`, NO_NODE],
       [`${IOS}/blur-menu.wda.json`, NO_NODE],
