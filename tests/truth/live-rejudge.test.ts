@@ -110,8 +110,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // presented layer — sheet-medium's and sheet-background's cells twice: sheet-medium's A–D stopped before any swipe,
     // ok; sheet-background's A and B LOUD, the changed stop (the stroke dismissed the large sheet, averi said the swipe
     // changed the screen and claimed nothing), C and D two strokes on the layer, residual 6's
-    ['ios-idb-sheet-a5-1.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }],
-    ['ios-idb-sheet-a5-2.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }],
     // (…and the whole visibility group under idb once, ios-idb-vis-a5.json: below, before L4's fix)
     // round 7's A6 (src arch/r23-eyes through --side; docs/truth/live-android-2026-10-18-visibility.md): k7 with the
     // eyes — "visible after 1 swipe — PARTLY UNDER a surface the tree does not list: its bottom 28 px …", the band
@@ -152,7 +150,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-forms-r8-l2-1.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
     ['ios-forms-r8-l2-2.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
     ['ios-forms-r8-l2-3.json', 'forms', { cases: 4, ok: 4, loud: 0, mismatches: 0 }],
-    ['ios-vis-r9-final-sanity.json', 'visibility', { cases: 78, ok: 66, loud: 2, mismatches: 10 }],
     // Round 14's fix of LE1 (bugs/r14-le1, the drawn frame on Android): its six cases ok — S's and C's taps refused
     // outside their scroll view, P and S stroked inside upper/lower, C stroked sideways inside the carousel (824,497).
     ['android-vis-r14-le1.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
@@ -206,7 +203,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-vis-r14-lv3-floating-R-1.json', 'visibility', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
     ['ios-vis-r14-lv3-floating-R-2.json', 'visibility', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
     ['ios-vis-r14-lv3-floating-R-3.json', 'visibility', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
-    ['ios-vis-r14-lv3.json', 'visibility', { cases: 149, ok: 111, loud: 7, mismatches: 31 }],
     // Round 16's in-window backdrop (bugs/r16-blur 7fd1ee57, ADR 0018 residual 9): WDA's three grouped blur menus
     // (blur-menu-grouped, -stacked, -unhidden) twice — A, B, C, D each tap refused "close it first", nothing fired, each
     // scroll_until stopped before any swipe, nothing stroked or dismissed; K and W Tapped, each alone fired.
@@ -219,6 +215,16 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // Tapped, the menu dismissed (residual 9, known), S refused (LOUD), footer O as LE2's records.
     ['ios-vis-r16-merge-1.json', 'visibility', { cases: 72, ok: 51, loud: 1, mismatches: 20 }],
     ['ios-vis-r16-merge-2.json', 'visibility', { cases: 72, ok: 51, loud: 1, mismatches: 20 }],
+    // Round 16's feeler (bugs/r16-r6, ADR 0018 "idb's presented layer" Decision 3), idb: sheet-background, alert-dim,
+    // dim-cover and the content-up cells (scroll-top-edge, tabbar-dense, tabbar-floating, carousel-in-list), twice —
+    // sheet-background's A and B two feelers from (201,175), nothing dismissed, the unmoved stop with "idb lists only
+    // what a presented sheet, alert or cover leaves" (presented-stroke, residual 6, known); every other case as before.
+    ['ios-vis-r16-r6-1.json', 'visibility', { cases: 47, ok: 34, loud: 0, mismatches: 13 }],
+    ['ios-vis-r16-r6-2.json', 'visibility', { cases: 47, ok: 34, loud: 0, mismatches: 13 }],
+    // …and sheet-background's A and B alone, three runs, the feeler's measurement at the values chosen (160 pt, 600 ms)
+    ['ios-idb-sheet-r16-r6-1.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
+    ['ios-idb-sheet-r16-r6-2.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
+    ['ios-idb-sheet-r16-r6-3.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -227,6 +233,34 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ ...want, notKnown: 0, skipped: 0 });
     expect(out).not.toMatch(/NOT known|FIXED, not intermittent/);
     expect(code, out.slice(-2000)).toBe(0);
+  });
+});
+
+/**
+ * sheet-background's A and B under idb as they read before round 16's feeler (bugs/r16-r6, ADR 0018 "idb's presented
+ * layer" Decision 3): the full stroke from (201,175) dismissed the large sheet and averi said the swipe changed the
+ * screen (`presented-changed`, LOUD) — known so as residual 6's cost from round 7's A5 until the feeler, since which the
+ * sheet springs back and the stop is the unmoved one (`presented-stroke`): a record before it reads not known.
+ */
+const R6_IDB = ['scroll:sheet-background.A', 'scroll:sheet-background.B'];
+
+describe('live.ts --rejudge over the committed iOS records of the src before the feeler', () => {
+  // In these records, each an older src's, A's and B's stroke dismissed the sheet and averi said so — LOUD, which
+  // counts as no mismatch, so the run exits 0 as recorded; but HEAD's KNOWN pins them as the feeler's unmoved stop
+  // (`presented-stroke` on `not found`), so each LOUD line is marked NOT known — a calibration of that src now, not
+  // HEAD's. Everything else as HEAD knows it.
+  it.each([
+    ['ios-idb-sheet-a5-1.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }],
+    ['ios-idb-sheet-a5-2.json', 'visibility', { cases: 18, ok: 14, loud: 2, mismatches: 2 }],
+    ['ios-vis-r9-final-sanity.json', 'visibility', { cases: 78, ok: 66, loud: 2, mismatches: 10 }],
+    ['ios-vis-r14-lv3.json', 'visibility', { cases: 149, ok: 111, loud: 7, mismatches: 31 }],
+  ] as const)('%s (--groups %s): sheet-background\'s A and B LOUD, marked not known; everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want) => {
+    const { code, out } = await rejudge(record, groups);
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(0 not known\\), 0 skipped$`, 'm'));
+    const marked = [...out.matchAll(/^- (?:MISMATCH|LOUD) (?:\([A-Za-z-]+\) )?(\S+) .*\[NOT known: presented-changed on refused, where KNOWN pins presented-stroke on not found .*$/gm)].map((m) => m[1]);
+    expect(marked.sort()).toEqual([...R6_IDB].sort());
+    expect(out.match(/NOT known/g)).toHaveLength(R6_IDB.length);
+    expect(code).toBe(0);
   });
 });
 

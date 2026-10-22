@@ -7,7 +7,7 @@ installed before each run. Reproduce (outside the sandbox):
   node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources wda --groups visibility \
     --cells blur-menu-grouped,blur-menu-stacked,blur-menu-unhidden [--record <file>]
 Records (docs/truth/live-records, rejudged by tests/truth/live-rejudge.test.ts): ios-vis-r16-blur-1.json, -2.json; at the
-merge (§3) ios-vis-r16-merge-1.json, -2.json.
+merge (§3) ios-vis-r16-merge-1.json, -2.json; the feeler (§4) ios-vis-r16-r6-1.json, -2.json, ios-idb-sheet-r16-r6-1…3.json.
 The previous iOS runs: docs/truth/live-ios-2026-10-19-lab-fixes.md, live-ios-2026-10-18-visibility.md. -->
 
 # What round 16's in-window backdrop measured
@@ -71,3 +71,40 @@ simulator shut down after. Reproduce (outside the sandbox):
   and W Tapped. chooser-over-list: S refused (LOUD, ADR 0015's 2026-10-22 residual), O Tapped, R refused, nothing
   stroked. scroll-bounded-footer's O as LE2's records: the tap moved clear of Continue to (201,670), no button logged;
   `scroll_until` refused before any swipe; both Tapped on the background by the taps that follow (ADR 0010 residual 5).
+
+## 4. Round 16, the feeler (open-bugs #9, ADR 0018 residual 6), 2026-10-22
+
+bugs/r16-r6 at `4ad446f5`'s src (from bugs/round-16 `da68586f`; ADR 0018, "idb's presented layer", Decision 3), run
+from that worktree; the lab app built from it and installed before the runs; the averi-lab iPhone 17 simulator
+(3AB1E82E, iOS 27.0), idb through a companion of this run's own on gRPC 10971 (`IDB_COMPANION=localhost:10971`),
+killed by its PID; the simulator shut down after. (A first attempt read every tree as "The simulator's accessibility
+service named no frontmost application" and was discarded; the simulator rebooted, every later read read.) Reproduce
+(outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources idb --groups visibility
+--cells sheet-background,alert-dim,dim-cover,scroll-top-edge,tabbar-dense,tabbar-floating,carousel-in-list --record <file>`.
+
+| record (docs/truth/live-records/) | src | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|
+| ios-vis-r16-r6-1.json | 4ad446f5 | 47 | 34 | 0 | 13 (all known) |
+| ios-vis-r16-r6-2.json | 4ad446f5 | 47 | 34 | 0 | 13 (all known) |
+| ios-idb-sheet-r16-r6-1…3.json (`--cases scroll:sheet-background.A,scroll:sheet-background.B`) | 4ad446f5 | 2 each | 0 | 0 | 2 (known) |
+
+- **The threshold, measured first** (`idb ui swipe 201 175 201 175+t --duration d` on sheet-background, two strokes
+  400 ms apart, three tries each, the app's own log): the large sheet sprang back from 120–350 pt at 600 and 900 ms,
+  120–300 pt at 300 ms and 160 pt at 200 ms, every try; dismissed by 400 pt at 900 ms, 200 pt at 150 ms and the full
+  524 pt at 300 ms, every try. The feeler: 160 pt over 600 ms.
+- **sheet-background's A and B** (content above): two feelers from (201,175), the app logging two touches and nothing
+  dismissed — in all five runs (the two cell runs and the three alone); the reply the unmoved stop, "… or the swipes were
+  not taken — idb lists only what a presented sheet, alert or cover leaves to accessibility, nothing beneath it: if one
+  is up, close it first) — element never appeared in the tree …". `presented-stroke` on `not found` (residual 6, known;
+  live-known.ts re-filed them with C, D and the alert's and cover's, no longer the loud `presented-changed` after a
+  dismissal). Before (round 7 to `da68586f`): the full stroke dismissed the sheet every run.
+- **alert-dim, dim-cover (A–D), sheet-background C and D**: two strokes on the layer, nothing dismissed, as before (A
+  and B as feelers now), each unmoved stop with the note. Their taps refused (timed out), S Tapped.
+- **The cost on the content-up cases** (scroll-top-edge, tabbar-dense, tabbar-floating, carousel-in-list: 21 cases,
+  timed runs of the four cells alternating base `da68586f` and this branch, two each): wall time 197 s and 195 s
+  against 199 s and 198 s — within run-to-run noise; the swipes per case the same spread (scroll-top-edge T 5 and 2 at
+  the base, 5 and 5 here; tabbar-floating R 4 and 5 at the base, 5 and 5 here; every other case equal). No feeler is
+  sent there: idb lists every node of the app's hierarchy, on the screen or not (scroll-top-edge's A at y −282,
+  carousel-in-list's U at −200), so the target is seen at the first read. A feeler costs a call one short stroke
+  (160 pt, 300 ms slower) only where idb has not listed the target before the first stroke.

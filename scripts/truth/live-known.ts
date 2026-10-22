@@ -120,8 +120,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // A's and B's stroke still dismisses it, but scroll_until's changed stop says so and claims nothing — LOUD
   // (`presented-changed`) on `refused`, no longer a stop claimed on `visible`: known still, the sheet's loss
   // residual 6's cost; C and D, never dismissed, two strokes as before.
-  ...each('ios idb', ['scroll:sheet-background.A', 'scroll:sheet-background.B'], NOT_YET_IN_TREE, 'presented-changed', 'refused'),
-  ...each('ios idb', ['scroll:sheet-background.C', 'scroll:sheet-background.D', ...['A', 'B', 'C', 'D'].flatMap((t) => [`scroll:alert-dim.${t}`, `scroll:dim-cover.${t}`])], NOT_YET_IN_TREE, 'presented-stroke', 'not found'),
+  // Round 16 (bugs/r16-r6, ADR 0018 "idb's presented layer" Decision 3; ios-vis-r16-r6-1.json, -2.json): A's and B's
+  // strokes are feelers (160 pt in 600 ms from (201,175)) — the sheet springs back, nothing dismissed, the unmoved
+  // stop saying idb lists only what a presented sheet, alert or cover leaves: `presented-stroke` on `not found`, as C,
+  // D and the alert's and the cover's (two strokes on the layer, still residual 6).
+  ...each('ios idb', ['A', 'B', 'C', 'D'].flatMap((t) => [`scroll:sheet-background.${t}`, `scroll:alert-dim.${t}`, `scroll:dim-cover.${t}`]), NOT_YET_IN_TREE, 'presented-stroke', 'not found'),
   // idb lists no carousel (LE2 across, as edges.known.ts files C's replayed rows): strokes across the screen's middle,
   // none moving the carousel, the reply "content exhausted … a layout defect" — ADR 0010's residual 5.
   ...each('ios idb', ['scroll:carousel-in-list.C'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
