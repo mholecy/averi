@@ -56,7 +56,7 @@ open note on the working tree. See the script for the verdicts.
 | L4.2 | 2026-10-16-lab-ios-swiftui-menu-row-listed-in-reading-order-reads-covered-by-the-row-beneath | calibrate | e52d179 → 1ef11b9 | CALIBRATED; live ios: CALIBRATED |
 | LE1 | 2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-container-read-as-drawn | calibrate | caa0f41 → 16ff607 | CALIBRATED |
 | LE2.1 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | calibrate | 3b6d2b0 → 11daf08 | CALIBRATED |
-| LE2.2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | calibrate | 4ee14f1 → 19525e2 | CALIBRATED-ON-DEFECT; live ios: CALIBRATED-ON-DEFECT |
+| LE2.2 | 2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn | calibrate | 4ee14f1 → 9fd4aff | CALIBRATED-ON-DEFECT; live ios: CALIBRATED-ON-DEFECT |
 | LE3 | 2026-10-16-lab-ios-pinned-section-header-is-no-cover-of-the-row-beneath | calibrate | 003edf3 → 40b4856 | CALIBRATED |
 | LE4 | 2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view | calibrate | 0e179aa → fecb0b3 | CALIBRATED |
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | calibrate | cbc584b → 7957a62 | CALIBRATED |
@@ -1122,14 +1122,14 @@ Red before the fix (3b6d2b0a, its first parent; and at every commit before it: s
   - RED ios-iphone17-ios27/scroll-bounded-footer.idb.json O tap — Tapped: Tapped id:"lab.scroll-bounded-footer.O"
   - RED ios-iphone17-ios27/scroll-bounded-footer.idb.json O colour — passed on #263238: PASS  element id:"lab.scroll-bounded-footer.O" fill within dE00 8 of #263238 — sampled #263238 (dominant, 57% of region) vs expected #263238 → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/scroll-bounded-footer.idb.json O scroll_until — no swipe: Element id:"lab.scroll-bounded-footer.O" fully visible after 0 swipes
-- after 19525e2:
+- after 9fd4aff:
   - RED ios-iphone17-ios27/scroll-bounded-footer.idb.json O tap — Tapped: Tapped id:"lab.scroll-bounded-footer.O" at (201,670) — its centre (201,652) is overlapped by button "Continue" (16,600 370x56), the two listed in reading order: which is drawn on top is not told; tapp
   - ok ios-iphone17-ios27/scroll-bounded-footer.idb.json O colour — FAIL  element id:"lab.scroll-bounded-footer.O" fill within dE00 8 of #263238 — button "Continue" (16,600 370x56) overlaps the element (element 51,620 300x64), the two listed in reading order: which is drawn on top is not
   - RED ios-iphone17-ios27/scroll-bounded-footer.idb.json O scroll_until — no swipe: ERROR scroll_until id:"lab.scroll-bounded-footer.O" stopped before any swipe — element is in the viewport but overlapped by button "Continue" (16,600 370x56) at its centre (201,652), the two listed in
 
 Live (phase 5, ios idb): **CALIBRATED-ON-DEFECT**, 4ee14f1 → 19525e2, tap:scroll-bounded-footer.O, scroll:scroll-bounded-footer.O — Before (a --side run of 4ee14f1c, idb): tap O says Tapped and the app logged button footer.continue (Continue fired, the truth probe's own result); scroll_until O says fully visible after 0 swipes, then the tap fires Continue. After (docs/truth/live-records/ios-vis-r16-le2-1.json at 19525e2): the tap is moved clear of Continue to (201,670), the app logged nothing (one touch); scroll_until stops before any swipe, naming Continue — both still tap-claim on Tapped for the tap that follows, on the background (ADR 0010 residual 5, known). WDA ok in the same run. (docs/truth/live-ios-2026-10-18-visibility.md)
 
-The harmful remainder, on the new lab cell scroll-bounded-footer (round 16; WDA answers all three rows as the truth does). Before (4ee14f1c): the tap is Tapped with no moved point (idb ui tap 201 652 — on Continue, which the lab probe shows firing), the colour passed on #263238 (Continue's), the plain stop said fully visible after 0 swipes. After (19525e2): the colour fails closed, naming Continue as overlapping, the order not told; the plain stop stops before any swipe; the tap is moved to the part below Continue (201,670). The tap and the stop stay red for another class (ADR 0010 residual 5: Tapped on the background below the clip, no swipe toward a row the tree does not place in a scroll view), KNOWN.
+The harmful remainder, on the new lab cell scroll-bounded-footer (round 16; WDA answers all three rows as the truth does). Before (4ee14f1c): the tap is Tapped with no moved point (idb ui tap 201 652 — on Continue, which the lab probe shows firing), the colour passed on #263238 (Continue's), the plain stop said fully visible after 0 swipes. After (19525e2, and 9fd4aff, its review round: the rule moved into the break's own row, the rows unchanged): the colour fails closed, naming Continue as overlapping, the order not told; the plain stop stops before any swipe; the tap is moved to the part below Continue (201,670). The tap and the stop stay red for another class (ADR 0010 residual 5: Tapped on the background below the clip, no swipe toward a row the tree does not place in a scroll view), KNOWN.
 
 ## LE3: CALIBRATED
 
