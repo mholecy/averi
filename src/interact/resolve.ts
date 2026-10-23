@@ -3,6 +3,7 @@ import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
+import { markedByWindow } from '../ui-tree/window-mark.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -259,7 +260,7 @@ export interface ResolvedSettled extends Resolved {
  * docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md
  */
 export async function resolveSettled(
-  adapter: Pick<DeviceAdapter, 'uiTree'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<ResolvedSettled> {
@@ -313,7 +314,7 @@ export async function resolveSettled(
       ),
     );
   }
-  throw notFound(target, timeoutMs, outcome);
+  throw await notFound(adapter, target, timeoutMs, outcome);
 }
 
 /** What a wait that gave up saw of its target — the evidence absenceError judges. */
@@ -348,14 +349,23 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * (ui-tree/miss.ts#missOf, the one decision, asked with the target: a match
  * only at 0×0 is the fact this wait's filter makes — still absence for
  * ElementNotFoundError's purpose, nothing was ever ACTIONABLE).
+ * The last tree is first marked by the window manager's word on its window, when it may type it (one call, on this
+ * miss only: ui-tree/window-mark.ts#markedByWindow).
  * The miss's note goes beneath the headline (pollTimeoutMessage drops it when the
  * last read failed: `unread`). A `presented` miss says itself in place of the
  * headline, as a plain Error: beneath a presented window listed alone the target is
  * not known absent — nobody saw the screen beneath (an optional step is skipped with
  * this headline, never "(not present)", as scroll_until's stop there).
  */
-function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number; lastTree?: UiNode }): Error {
-  const miss = missOf({ tree: outcome.lastTree, readError: outcome.readError, target });
+async function notFound(
+  adapter: Pick<DeviceAdapter, 'focusedWindow'>,
+  target: Target,
+  timeoutMs: number,
+  outcome: { readError?: Error; treesRead: number; lastTree?: UiNode },
+): Promise<Error> {
+  // The window manager's word on the last tree's window, asked now the wait has found nothing (ui-tree/window-mark.ts).
+  const tree = outcome.readError === undefined ? await markedByWindow(adapter, outcome.lastTree) : outcome.lastTree;
+  const miss = missOf({ tree, readError: outcome.readError, target });
   if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss)}`);
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, missNote(miss)), { sighted: false, ...outcome, miss });
 }
@@ -375,14 +385,14 @@ function notFound(target: Target, timeoutMs: number, outcome: { readError?: Erro
  * budget shorter than one read still gets one honest look.
  */
 export async function resolvePresent(
-  adapter: Pick<DeviceAdapter, 'uiTree'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<Resolved> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_SETTLE_TIMEOUT_MS;
   const outcome = await pollTree(adapter, (tree) => resolveNow(tree, target, opts), { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS });
   if (!outcome.timedOut) return outcome.value;
-  throw notFound(target, timeoutMs, outcome);
+  throw await notFound(adapter, target, timeoutMs, outcome);
 }
 
 // ─── Refused on a present element ────────────────────────────────────────────

@@ -11,6 +11,7 @@ import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOpti
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
+import { markedByWindow } from '../ui-tree/window-mark.js';
 import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
 import { missCarried, MissedError, missNote, missOf, withMissNote, type Miss } from '../ui-tree/miss.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
@@ -1554,7 +1555,9 @@ export class FlowEngine {
     const outcome = await pollTree(this.adapter, fn, { timeoutMs, pollMs: this.pollMs });
     if (!outcome.timedOut) return outcome.value;
     const bareNote = outcome.undecidedTree === undefined ? undefined : bareTimeoutNote(outcome.undecidedTree);
-    const { hint: said, miss } = hint?.(outcome.lastTree) ?? {};
+    // The window manager's word on the last tree's window, asked now the wait has given up (ui-tree/window-mark.ts).
+    const lastTree = hint === undefined || outcome.readError !== undefined ? outcome.lastTree : await markedByWindow(this.adapter, outcome.lastTree);
+    const { hint: said, miss } = hint?.(lastTree) ?? {};
     const message = pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? said);
     // The miss rides on the error only where its note is what the message says beneath the headline.
     const saidMiss = miss !== undefined && bareNote === undefined && outcome.readError === undefined && missNote(miss) !== undefined;

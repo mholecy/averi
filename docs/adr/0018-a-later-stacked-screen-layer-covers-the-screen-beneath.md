@@ -50,7 +50,11 @@ there says what idb does not list (see the same amendment's Decision 3). Amended
 on idb's flat list a read that lists no identifier on any element is a fact of its own (`noIdListed`, beside
 `containerId` — renamed `idUnlisted` — in decision 5's precedence), both say every reason idb gives, and every reply that says a target is not in the tree says idb's dialect —
 the tap's and fill's wait, an optional step's skip and every assert's not-found included (see "Amendment: an idb read
-that lists no identifier" below; residual 20).
+that lists no identifier" below; residual 20). Amended again 2026-10-24 (round 1023b, open-bugs #17): on a miss, the
+uiautomator root the parser left unmarked is typed by the window manager's word on the focused window — a Dialog's
+window at the root's bounds is presented, the activity's own window alone drops the active-window hint (see
+"Amendment: Android's window by the window manager's word" below; residual 19 closed for such windows, residual 18
+narrowed).
 
 ## Context
 
@@ -1160,6 +1164,86 @@ on a read that lists no id (a stroke could bring in nodes that carry ids; a spee
 the notes on a small read (alert-dim's) instead of naming the reasons (a threshold with no measure behind it); the hint
 left to the docs (the reply is where the agent loses the time).
 
+## Amendment: Android's window by the window manager's word (2026-10-24)
+
+Open-bugs #17, residual 19: the full-screen Compose dialog (`dialog-fullscreen`, `[0,66][1080,2153]`) dumps as the
+app's screen. `uiautomator dump` lists the active window only and its XML holds nothing of the window itself
+(`<hierarchy rotation>` and each node's `package` are the same for an activity and its dialog; the decor's levels and
+Compose's `DialogLayout` depend on theme and toolkit — LW1's "The full-screen dialog"). So its 12 golden rows were
+KNOWN: the taps waited 5 s "to appear" with the hint, `scroll_until` stroked the dialog twice (`540 1776 → 540 444`,
+about 2.7 s; nothing dismissed: it has no outside, but a full-screen dialog holding a list or a form would have its
+content scrolled), and the hint rode on every uiautomator not-found, a plain screen's too — where an agent that obeys
+"close it first" presses `back` and navigates away.
+
+**The fact is the window manager's.** It types every window, whatever the theme or the toolkit: an activity's window
+is TYPE_BASE_APPLICATION; every `android.app.Dialog` — AppCompat's, Material's, a DialogFragment, a BottomSheetDialog,
+Compose's `Dialog` and, in material3 1.3.1, its ModalBottomSheet — TYPE_APPLICATION; a popup a panel. Probed on
+averi_lab (API 33) with each presented lab cell up: the focus (`mCurrentFocus`, printed by `dumpsys window displays` on
+API 33, not by `windows`) is TYPE_APPLICATION at exactly the dumped root's bounds on alert-dim `[155,851][925,1368]`,
+sheet-medium, bottom-sheet-dialog and form-picker `[0,0][1080,2220]`, dialog-fullscreen `[0,66][1080,2153]` (the
+`Frames: … frame=`, already clipped: `1080`, where `mAttrs` reads `1081x2087`), and the new cell
+`presented/dialog-views-fullscreen` — an AppCompatDialog laid full screen (`setLayout(MATCH_PARENT, MATCH_PARENT)`, no
+fitted insets): `[0,0][1080,2220]`, an activity's very shape, which `mTopFullscreenOpaqueWindowState` reads as the
+focus too; the plain screen's focus is the activity's own window with no other window of an app visible (the
+launcher's and another app's activity windows listed `isVisible=false`). One shell line
+(adapters/android.ts#FOCUSED_WINDOW_COMMAND: the focus and `DisplayFrames` out of `displays`, then `windows`), 41 KB,
+25–26 ms through execFile, ten runs.
+
+**Decision.**
+
+1. **One adapter question, named and failing open**: `DeviceAdapter.focusedWindow?()` (Android only) answers a
+   `FocusedWindow` — `stacked` (the focus an app's window that is neither the activity's own nor a starting window:
+   its frame and the screen's size), `screenAlone` (the activity's own window, no other window of an app visible: its
+   frame), or `unknown` (the call failed or timed out at 2 s, no focus, a system window focused, a dump not read).
+   Parsed by `parseFocusedWindow`, beside the adapter's other dumpsys readers.
+2. **One owner of what the word says, pure: `ui-tree/window-mark.ts#markByWindow`.** Only for a root that lists the
+   active window only and that the parser left unmarked; only when the window's frame IS the root's bounds (else a
+   window opened or closed between the dump and the read — nothing marked). `stacked` marks the root `presentation`
+   — `screen` when the window spans the screen's width, `dialog` when narrower (a popup against an edge); decisions 3
+   and 4 then read it as the parser's own mark. `screenAlone` marks it `windowAlone` (`UiNode.windowAlone`), and
+   `missOf` answers `none` for it: no hint. `unknown` leaves the tree as it was — today's reply.
+3. **Asked on a miss only, never per poll** (the speed goal): after a wait that found nothing, of its last tree — the
+   tap's, fill's and presence check's (interact/resolve.ts#notFound), every assert's (verify/assert.ts#Verifier.poll,
+   verify/pixel-poll.ts), a flow's `wait:` (flow/engine.ts#pollUntil) — and by `scroll_until` before a stroke for a
+   target its read does not hold, once per window (`CallWindow`: later reads of the same root bounds marked by the same
+   word; a read of other bounds asked again). A flow's detect probe does not ask: it words no miss. A found target
+   costs nothing; a miss one adb call of about 26 ms — after a 5 s wait, or in place of `scroll_until`'s strokes onto
+   a dialog.
+
+**Decision 5 narrowed.** The active-window hint is said where the window manager gives no word, and dropped where it
+says the app's screen is alone. **A departure** from decision 2's "the parser reads what ui-tree never sees": this
+mark is set after the read, from a second device call, because the dump holds no such fact.
+
+**Rejected.** `mTopFullscreenOpaqueWindowState` ≠ the focus (already read with `displays`, no new call): it differs
+only for a window that is not MATCH_PARENT at 0,0 — Compose's own size — and reads the Views full-screen dialog, a
+sheet dialog and Compose's sheet as the app's screen (measured: dialog-views-fullscreen's focus IS the top fullscreen
+window). `uiautomator dump --windows` (API 30+): the accessibility window list stops at a touch-modal window and types
+the activity and the dialog alike. A shape rule for the full-screen dialog: none holds across toolkits.
+
+**Measured.** Golden against `6ff9ca3e` (every Android capture the round recaptured has its WM sidecar,
+`<cell>.windows.txt`, read right after the tree; the recaptured dumps byte-identical to the stored ones, so only the
+sidecar and the truth's `windows` were added; a capture without one makes the call fail — never a stock dump, which
+would type a capture's sheet as the app's screen): 226 → 215 mismatches, 44 checks changed. Verdicts: dialog-fullscreen
+A–D tap (the presented headline) and `scroll_until` (stopped before any swipe, calls `[]`, was two strokes) and
+form-picker's name, country and submit taps green — 11 rows struck. Replies only: dialog-fullscreen's colour 4 (the
+presented note in place of the hint, still vacuous), form-picker's three `scroll_until` and country.ST's tap and
+`scroll_until` (the presented remedy in place of the hint; the strokes on the sheet's own list unchanged), and 24
+replies on plain screens with a sidecar (carousel-in-list B, U; scroll-bounded O, F; scroll-top-edge(-end) A;
+tabbar-floating F — tap, colour, `scroll_until` each; text-under-bar P tap, `scroll_until`, ocr) that lose the hint.
+No other device call changed. The new cell (captured at `103c4056`, its 12 rows beneath the dialog KNOWN there as
+this residual, the hint and two strokes as dialog-fullscreen's): its 8 tap and `scroll_until` rows green too, the
+colour 4 the presented note (vacuous); S Tapped, PASS, visible.
+
+**Residuals.** A translucent or dialog-themed ACTIVITY over another is TYPE_BASE_APPLICATION with another app window
+visible: `unknown`, the hint stays. A window opened or closed between the dump and the read: the frames disagree, or
+(a dialog of the activity's very bounds) the word is about the other window — a refusal or a plain miss, never a false
+`Tapped`; within one `scroll_until` call the word is kept per root bounds, so a dialog of the screen's very bounds that
+opens mid-call is read as the word said. A target INSIDE a presented sheet's lazy list, not yet composed
+(form-picker's country.ST), gets the tap's "close it first; no scroll moves it out from under that screen" — as on a
+sheet the parser marks; `scroll_until` still strokes the sheet's own list for it (decision 3). Measured on API 33 only:
+another API's `windows` format, unread, is `unknown` — today's hint. A Compose `Popup` (a panel) is typed `stacked` by
+the rule but unmeasured (no lab cell).
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -1351,14 +1435,22 @@ left to the docs (the reply is where the agent loses the time).
    scroll view of that layer's own lets the stroke go. A scroll view of a LATER layer or Window the source did not
    mark, drawn above the marked one, holds the point all the same and is not asked, so the stroke stops there
    (toward refusal). No tree of the corpus lays one so.
-18. **A fully expanded sheet is no presented window** (2026-10-18, the amendment "Android's presented window"). Its dump
-   carries no scrim — `form-picker`'s country picker lists the sheet and its drag handle only — so it is not marked: the
-   form beneath times out "to appear" and `scroll_until` strokes (on the sheet's own list, which the rule would let
-   through anyway). The tree has no fact for it but Material's localized "Drag handle". Accepted by the owner
-   2026-10-18 with the active-window hint (the amendment's decision 5), which every such reply now carries: its six
-   rows (tests/differential/golden/forms.known.ts) are filed as this residual, and lab note L1's calibration leaves
-   nothing open (scripts/truth/calibration.json).
-19. **Android's presented window: the shapes are measured on one AVD and Material 3 only** (2026-10-18). A floating
+18. **A target beneath a fully expanded sheet is stroked for on the sheet's own list** (2026-10-18, the amendment
+   "Android's presented window"; narrowed 2026-10-24). Its dump carries no scrim — `form-picker`'s country picker lists
+   the sheet and its drag handle only — so the parser does not mark it. ~~The form beneath times out "to appear"~~:
+   since 2026-10-24 the window manager types the sheet a Dialog's window on the miss (the amendment "Android's window
+   by the window manager's word"), so the taps say the presented remedy (three rows green). `scroll_until` still
+   strokes the sheet's own list (decision 3: a target inside it, not yet composed, reads alike), then says the
+   presented remedy: its three rows (tests/differential/golden/forms.known.ts) stay filed as this residual.
+19. **Android's presented window: the shapes are measured on one AVD and Material 3 only** (2026-10-18). **Closed
+   2026-10-24 for any window the window manager types a Dialog's or a panel's** (the amendment "Android's window by the
+   window manager's word"; measured: the full-screen Compose dialog, a Views dialog laid full screen, the Compose and
+   Views sheets, the alert): asked on a miss, its frame matched to the dumped root, it is marked presented, and a
+   floating window against an edge is typed so too. **Standing:** a translucent or dialog-themed activity over another
+   (TYPE_BASE_APPLICATION, another app window visible: the hint stays); a dialog opened or closed between the dump and
+   the read (a refusal or a plain miss, never a false `Tapped`); API levels other than 33 (`unknown`: today's hint);
+   an app's own window offset on both axes still reads as a `dialog` by the parser. Before:
+   A floating
    window against the screen's top or left edge (a popup at the top-left corner, a bottom-anchored full-width dialog)
    and a full-screen dialog are not marked; an app's own window offset on BOTH axes reads as a `dialog` — a freeform
    (desktop-mode) window, a compat-mode app letterboxed and pillarboxed at once — while one offset on one axis only (a

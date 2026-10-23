@@ -519,6 +519,14 @@ export interface UiNode {
    */
   activeWindowOnly?: true;
   /**
+   * Set on the ROOT of an `activeWindowOnly` tree that the window manager says is the app's screen ALONE: the focused
+   * window is the activity's own (TYPE_BASE_APPLICATION), at the root's bounds, and no other window of an app is
+   * visible — so a target missing from it is not beneath a window the dump does not show. Set after the read, on a
+   * miss only, by ui-tree/window-mark.ts#markByWindow (from `DeviceAdapter.focusedWindow`); read by
+   * ui-tree/miss.ts#missOf, which then says no active-window hint. Absent everywhere else.
+   */
+  windowAlone?: true;
+  /**
    * Set on the ROOT of a tree whose source reports every frame UNCLIPPED: WDA's (adapters/wda-source.ts
    * #parseWdaSourceValue). It lists a scroll view's content at its laid-out rect even past the scroll view's frame,
    * where the scroll view draws none of it (UIKit's `UIScrollView` clips to its bounds; so do a table, a collection
@@ -910,6 +918,18 @@ export interface LaunchOutcome {
  */
 export type TypingDelivery = 'on-return' | 'may-arrive-late';
 
+/**
+ * What the window manager says of the focused window, as the uiautomator dump's root is matched to it
+ * (ui-tree/window-mark.ts#markByWindow): `stacked` — a window presented over the app's screen (a Dialog's, a popup's:
+ * TYPE_APPLICATION or a panel, never the activity's own), its frame on the screen and the screen's size; `screenAlone`
+ * — the activity's own window (TYPE_BASE_APPLICATION) with no other window of an app visible, its frame; `unknown` —
+ * the call failed, timed out or said neither (a system window has focus, an app window shows beside the activity's).
+ */
+export type FocusedWindow =
+  | { readonly of: 'stacked'; readonly frame: Rect; readonly screen: { readonly width: number; readonly height: number } }
+  | { readonly of: 'screenAlone'; readonly frame: Rect }
+  | { readonly of: 'unknown' };
+
 export interface DeviceAdapter {
   readonly platform: Platform;
   /** Reinstall triggers the app's login requirement — intentional. */
@@ -1045,6 +1065,14 @@ export interface DeviceAdapter {
    * tail-again.md). Absent: `may-arrive-late`, the retype never sent.
    */
   readonly typingDelivery?: TypingDelivery;
+
+  /**
+   * The window manager's word on the window that has focus (`FocusedWindow`) — present where the tree lists the active
+   * window only and the window manager types it (Android: adapters/android.ts#focusedWindow, one adb call), absent
+   * where the tree lists every window or nothing types it (iOS). Never throws: a failed or unreadable answer is
+   * `unknown`. Asked on a miss only (ui-tree/window-mark.ts), never per poll.
+   */
+  focusedWindow?(): Promise<FocusedWindow>;
 
   /** logcat / os_log excerpt for crash detection. */
   logs(sinceMs: number): Promise<string[]>;

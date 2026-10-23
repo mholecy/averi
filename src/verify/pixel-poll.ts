@@ -6,6 +6,7 @@ import { judgedWithOrder, type OrderEyes, type PairQuestion } from '../ui-tree/e
 import { lookOn, type Look } from '../ui-tree/look.js';
 import type { OrderSeen } from '../ui-tree/seen-order.js';
 import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
+import { markedByWindow } from '../ui-tree/window-mark.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause } from '../ui-tree/cover.js';
@@ -768,7 +769,7 @@ export const screenshotFailed = (reason: string, unchecked: Unchecked): string =
  * N s" with the last tree-read error.
  */
 export async function pollPixels(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport' | 'keyboard' | 'keyboardAdvice'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport' | 'keyboard' | 'keyboardAdvice' | 'focusedWindow'>,
   spec: PixelPollSpec,
 ): Promise<PollVerdict> {
   const { element, timeoutMs, pollMs, unchecked, measure } = spec;
@@ -845,5 +846,7 @@ export async function pollPixels(
   });
   if (outcome instanceof FinalMiss) return { pass: false, detail: outcome.detail };
   if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
-  return { pass: false, detail: memory.timeoutDetail(timeoutMs, outcome, element) };
+  // The window manager's word on the last tree's window, asked now the poll has given up (ui-tree/window-mark.ts).
+  const lastTree = outcome.readError === undefined ? await markedByWindow(adapter, outcome.lastTree) : outcome.lastTree;
+  return { pass: false, detail: memory.timeoutDetail(timeoutMs, { ...outcome, lastTree }, element) };
 }

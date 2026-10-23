@@ -347,7 +347,7 @@ describe('tool descriptions on a screen presented over the target', () => {
   it('tap, scroll_until, ui_snapshot and the troubleshooting reference: on Android a presented window is listed alone, and a target not in it gets the presented remedy', async () => {
     const { presentedRemedy, presentedStop } = await vi.importActual<typeof import('../../src/ui-tree/standing.js')>('../../src/ui-tree/standing.js');
     expect(description('tap')).toContain('On Android uiautomator lists the active window only: with a dialog or a bottom sheet up the tree holds that window alone');
-    expect(description('scroll_until')).toContain('The same on Android when the tree is a presented window (ui_snapshot\'s root carries "presentation": "dialog" or "screen")');
+    expect(description('scroll_until')).toContain('The same on Android when the tree is a presented window (ui_snapshot\'s root carries "presentation": "dialog" or "screen"; or, for a target its read does not hold, the window manager names the window a Dialog\'s — asked once before the first swipe');
     expect(description('ui_snapshot')).toContain('"activeWindowOnly": true under Android — uiautomator lists the active window only');
     expect(description('ui_snapshot')).toContain('the screen beneath is not in the tree at all — tap, fill and scroll_until say');
     expect(description('tap')).toContain('and the wait for it (this tap\'s, and fill\'s) ends');
@@ -357,11 +357,12 @@ describe('tool descriptions on a screen presented over the target', () => {
 
   it('tap, assert and the troubleshooting reference quote the active-window hint every not-found carries on Android with no window marked presented — the waits\', scroll_until\'s, the asserts\', a flow\'s wait: and an optional step\'s skip', async () => {
     const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/miss.js')>('../../src/ui-tree/miss.js');
-    expect(description('tap')).toContain(`the wait still ends "… to appear", with "(${ACTIVE_WINDOW_HINT})" beneath it (on every such tap or fill wait on Android, unless the target matched only 0×0 nodes, whose hint takes its place:`);
+    expect(description('tap')).toContain(`the wait still ends "… to appear", with "(${ACTIVE_WINDOW_HINT})" beneath it when the window manager does not say the window is the app's screen alone (its call failed, or another window of the app shows; unless the target matched only 0×0 nodes, whose hint takes its place:`);
+    expect(description('tap')).toContain('is asked of the window manager once the wait has found nothing, and a Dialog\'s window it names is said the same way');
     expect(description('tap')).toContain(
       'as scroll_until\'s "element never appeared in the tree" carries it (its stop under a keyboard over the whole screen too), and so do a flow\'s tap, fill and scroll_until steps (the same waits), a flow\'s wait: on an element (beneath its "Timed out …"), every assert\'s "not found within …" (after it) and a skipped optional step\'s line ("(not present) (…)", or a skipped wait:\'s "Timed out … (…)"): every reply that says a target is not in such a tree, once.',
     );
-    expect(description('assert')).toContain(`On Android an assert whose element is not in the tree fails "not found within … (${ACTIVE_WINDOW_HINT})"`);
+    expect(description('assert')).toContain(`On Android an assert whose element is not in the tree fails "not found within … (${ACTIVE_WINDOW_HINT})" when the window manager does not say the window is the app's screen alone`);
     expect(TROUBLESHOOTING).toContain(
       `\`element never appeared in the tree\` (its stop under a keyboard over the whole screen too), every assert's \`not found within …\`, a flow's \`wait:\` on an element and an optional step's \`(not present)\` (a skipped \`wait:\`'s headline too) carry \`(${ACTIVE_WINDOW_HINT})\``,
     );

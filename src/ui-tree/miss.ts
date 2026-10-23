@@ -37,7 +37,10 @@ import { isBareTreeMemo } from './verdict.js';
  * - `activeWindow`: the source lists the active window only (`UiNode.activeWindowOnly`, uiautomator) and marks no
  *   presented window — a sheet or a dialog it does not mark (a fully expanded bottom sheet with no scrim, form-picker;
  *   a full-screen dialog; a window against the screen's edge: ADR 0018's residuals 18 and 19) still hides the screen
- *   beneath, and nothing in the dump tells it from no window at all: ACTIVE_WINDOW_HINT, a possibility, never the cause;
+ *   beneath, and nothing in the dump tells it from no window at all: ACTIVE_WINDOW_HINT, a possibility, never the cause.
+ *   Where the window manager typed the window after the read (ui-tree/window-mark.ts, on a miss only), its word is in
+ *   the root's marks: a Dialog's window is `presented` (above), and the activity's own window alone (`UiNode
+ *   .windowAlone`) is `none` — no hint; with no word (the call failed, the frames disagree) the hint stays;
  * - `noIdListed`: the tree is idb's flat list (its own mark, below), the target named an id ALONE, nothing matched, the
  *   read is not bare (ui-tree/verdict.ts#isBareTreeMemo: a launch-transition read lists nothing of the app's, so its
  *   ids say nothing of the screen), and no element of the read carries an identifier at all — a fact the read states,
@@ -125,7 +128,7 @@ export function missOf({ tree, readError, target }: { tree?: UiNode; readError?:
   // The root-mark tests are a cost guard too: only a tree whose root is marked presented pays the presentation's walk.
   const alone = tree.presentation === undefined ? undefined : presentationOf(tree).alone;
   if (alone !== undefined) return { of: 'presented', layer: alone, listed: tree.activeWindowOnly === true ? 'window' : 'layer' };
-  if (tree.activeWindowOnly === true) return { of: 'activeWindow' };
+  if (tree.activeWindowOnly === true && tree.windowAlone !== true) return { of: 'activeWindow' };
   const id = tree.flatList === true && target !== undefined && matched.length === 0 ? soleIdOf(target) : undefined;
   if (id === undefined || isBareTreeMemo(tree)) return { of: 'none' };
   return listsNoId(tree) ? { of: 'noIdListed', id } : { of: 'idUnlisted', id };

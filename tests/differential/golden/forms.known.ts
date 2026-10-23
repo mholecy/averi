@@ -1,15 +1,16 @@
-import { ANDROID, IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_TREE, NOT_IN_TREE_HINTED, twice, type KnownFile } from './known.js';
+import { ANDROID, IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_TREE, twice, type KnownFile } from './known.js';
 
 // The forms family's ratchet (fixtures/apps/cells/forms.json, phase 1b).
 
 // Phase 2b's Android form cells. uiautomator lists only the presented window — here the picker's ModalBottomSheet,
 // fully expanded — so the form beneath is not found and scroll_until strokes the sheet: lab note L1, whose fix
 // (d43df5d, round 6) marks the AlertDialog and the half-expanded sheet but not a sheet whose dump carries no scrim.
-// L1 is calibrated on those (calibration.json); these rows are ADR 0018's residual 18, accepted by the owner 2026-10-18
-// with the active-window hint every Android tap/fill wait and scroll_until not-found now carries — the taps' "to
-// appear" reads "close it first" in it, so their judge finds them vacuous (`not in the tree`) where it found them
-// refused without the remedy before.
-const EXPANDED_SHEET = 'residual:ADR 0018 residual 18 — a fully expanded sheet is no presented window';
+// L1 is calibrated on those (calibration.json); these rows were ADR 0018's residual 18, accepted by the owner
+// 2026-10-18 with the active-window hint. Since round 1023b (the amendment "Android's window by the window manager's
+// word") the window manager types the sheet a Dialog's window, asked on the miss: the three taps say the presented
+// remedy, green, struck off; scroll_until still strokes the sheet's own list (decision 3: a target inside it, not yet
+// composed, reads alike), the residual narrowed to that.
+const EXPANDED_SHEET = 'residual:ADR 0018 residual 18 — a target beneath a fully expanded sheet is stroked for on the sheet\'s own list';
 /** The Android picker sheet's scroll_until stroke (the sheet fully expanded, 1080x2220). */
 const ADB_SHEET_STROKE = 'adb shell input swipe 540 1768 540 608 1162';
 
@@ -44,8 +45,7 @@ export const forms: KnownFile = {
     // — the pinned submit between a floating Gboard's panel and its strip, refused under the full-width cut: fixed by
     // round 1023b (ADR 0027, the panel gap is the app's), the submit scroll_until row green, struck off here,
     // calibrated in scripts/truth/calibration.json.
-    ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['tap'], { cls: NOT_IN_TREE_HINTED, kind: 'not found', calls: [], note: 'uiautomator lists only the presented sheet, unmarked (no scrim): the tap times out "to appear" with the active-window hint — its conditional "close it first", not the presented remedy', as: EXPANDED_SHEET }),
-    ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(ADB_SHEET_STROKE), note: 'uiautomator lists only the presented sheet, unmarked (no scrim): scroll_until strokes it twice, then "never appeared in the tree" with the active-window hint', as: EXPANDED_SHEET }),
+    ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(ADB_SHEET_STROKE), note: 'uiautomator lists only the presented sheet, marked by the window manager\'s word: scroll_until strokes the sheet\'s own list twice (a target inside it, not yet composed, reads alike), then "never appeared in the tree" with the presented remedy', as: EXPANDED_SHEET }),
   ]),
   counts: {
     [`${ANDROID}/form-basic.xml`]: 16,

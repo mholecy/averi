@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTree, Undecided } from '../ui-tree/read-tree.js';
+import { markedByWindow } from '../ui-tree/window-mark.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
 import { regexSource } from '../util/regex.js';
 import { elementAssertSchema } from './element-assert.js';
@@ -505,10 +506,12 @@ export class Verifier {
       pollMs: this.pollMs,
     });
     if (!outcome.timedOut) return { description, pass: true, detail: outcome.value.detail };
+    // The window manager's word on the last tree's window, asked now the poll has given up (ui-tree/window-mark.ts).
+    const lastTree = outcome.readError === undefined ? await markedByWindow(this.adapter, outcome.lastTree) : outcome.lastTree;
     return {
       description,
       pass: false,
-      detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError, undecidedTree: outcome.undecidedTree, lastTree: outcome.lastTree }),
+      detail: spec.timeoutDetail({ detail: outcome.detail, readError: outcome.readError, undecidedTree: outcome.undecidedTree, lastTree }),
     };
   }
 

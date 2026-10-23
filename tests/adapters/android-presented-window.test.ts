@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
+import type { DeviceScreen, FocusedWindow, UiNode } from '../../src/adapters/types.js';
+import { parseFocusedWindow } from '../../src/adapters/android.js';
+import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { walkOf } from '../../src/ui-tree/placed.js';
 import { presentationOf } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
@@ -405,5 +407,113 @@ describe('scroll_until\'s covered stop (a keyboard over the whole screen) on a t
     expect(error.message).toContain(`element never appeared in the tree (${ACTIVE_WINDOW_HINT}); the soft keyboard over [0,0][1080,2220] covers the whole screen`);
     expect(error.message.split(ACTIVE_WINDOW_HINT)).toHaveLength(2);
     expect((error as ElementNotFoundError).miss).toEqual({ of: 'activeWindow' });
+  });
+});
+
+// THE WINDOW MANAGER'S WORD (ADR 0018, "Android's window by the window manager's word"): the dump has no fact for a
+// full-screen dialog (dialog-fullscreen) or an expanded sheet with no scrim (form-picker), but the window manager types
+// the focused window — a Dialog's is TYPE_APPLICATION, an activity's TYPE_BASE_APPLICATION. Asked on a miss only (an
+// adb call after the wait, or before scroll_until's first stroke), it marks the root presented, or says the screen is
+// alone and drops the active-window hint; where it gives no word, the replies are as before.
+describe('a miss on an unmarked uiautomator tree asks the window manager', () => {
+  const TRUTH = new URL('../fixtures/truth/android-averi_lab-api33/', import.meta.url);
+  const lab = (cell: string): UiNode => {
+    const raw = readFileSync(new URL(`${cell}.xml`, TRUTH), 'utf8');
+    return parseDump(raw.slice(0, raw.lastIndexOf('>') + 1));
+  };
+  const word = (cell: string): FocusedWindow => parseFocusedWindow(readFileSync(new URL(`${cell}.windows.txt`, TRUTH), 'utf8'));
+  /** An adapter whose tree is `tree` and whose window manager answers `window`, counting the asks. */
+  const device = (tree: UiNode, window?: FocusedWindow) => {
+    const fake = new FakeAdapter({ s: tree }, 's');
+    fake.viewportSize = PIXEL;
+    const asked: number[] = [];
+    if (window !== undefined) fake.focusedWindow = async () => (asked.push(1), window);
+    return { fake, asked };
+  };
+  const FAST = { ambiguous: 'first' as const, timeoutMs: 30, pollMs: 2 };
+  const fails = (p: Promise<unknown>): Promise<Error> =>
+    p.then(
+      () => {
+        throw new Error('resolved');
+      },
+      (e: unknown) => e as Error,
+    );
+
+  it('dialog-fullscreen, stacked: the tap\'s wait names the presented screen — a plain failure, not absence, and asked once', async () => {
+    const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
+    const error = await fails(resolveSettled(fake, 'id:"lab.dialog-fullscreen.A"', FAST));
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    expect(error.message).toBe(
+      'Timed out after 30ms: element id:"lab.dialog-fullscreen.A" is not in the tree, which lists only the window presented on top (the tree source lists the ' +
+        `active window alone) — ${presentedRemedy('it', { kind: 'screen' })}`,
+    );
+    expect(asked).toHaveLength(1);
+  });
+
+  it('…the presence check and every assert say it too', async () => {
+    const { fake } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
+    expect((await fails(resolvePresent(fake, 'id:"lab.dialog-fullscreen.A"', FAST))).message).toContain(presentedRemedy('it', { kind: 'screen' }));
+    const v = new Verifier(fake, { pollMs: 2, timeoutMs: 30 });
+    const note = `not found within ${formatSeconds(30)} (a sheet or modal is presented over it, and the tree lists only that window — close it first)`;
+    expect((await v.assert({ element: { id: 'lab.dialog-fullscreen.A' } })).detail).toBe(note);
+    expect((await v.assert({ element: { id: 'lab.dialog-fullscreen.A' }, color: { expected: '#E53935' } })).detail).toBe(note);
+  });
+
+  it('the Views dialog at an activity\'s shape (dialog-views-fullscreen) and the expanded picker (form-picker): the same remedy', async () => {
+    for (const [cell, id] of [['dialog-views-fullscreen', 'lab.dialog-views-fullscreen.A'], ['form-picker', 'lab.form-picker.name']] as const) {
+      const { fake } = device(lab(cell), word(cell));
+      expect((await fails(resolveSettled(fake, `id:"${id}"`, FAST))).message).toContain(presentedRemedy('it', { kind: 'screen' }));
+    }
+  });
+
+  it('with no word (the call failed, the frames disagree): today\'s reply, the hint', async () => {
+    for (const window of [{ of: 'unknown' } as const, undefined]) {
+      const { fake } = device(lab('dialog-fullscreen'), window);
+      expect((await fails(resolveSettled(fake, 'id:"lab.dialog-fullscreen.A"', FAST))).message).toBe(
+        `Timed out after 30ms waiting for element id:"lab.dialog-fullscreen.A" to appear\n  (${ACTIVE_WINDOW_HINT})`,
+      );
+    }
+  });
+
+  it('open, the screen alone: "to appear" with no hint — still absence', async () => {
+    const { fake } = device(lab('open'), word('open'));
+    const error = await fails(resolveSettled(fake, 'id:"nothing.here"', FAST));
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect(error.message).toBe('Timed out after 30ms waiting for element id:"nothing.here" to appear');
+    expect((await new Verifier(fake, { pollMs: 2, timeoutMs: 30 }).assert({ element: { id: 'nothing.here' } })).detail).toBe(`not found within ${formatSeconds(30)}`);
+  });
+
+  it('a found target never asks: no window-manager call on the path that succeeds', async () => {
+    const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
+    await resolveSettled(fake, 'id:"lab.dialog-fullscreen.S"', { ...FAST, timeoutMs: 500 });
+    expect((await new Verifier(fake, { pollMs: 2, timeoutMs: 500 }).assert({ element: { id: 'lab.dialog-fullscreen.S' } })).pass).toBe(true);
+    await scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.S"', { settleMs: 1, timeoutMs: 2_000 });
+    expect(asked).toHaveLength(0);
+  });
+
+  it('scroll_until on dialog-fullscreen: stops before any swipe, the remedy said — no stroke on the dialog', async () => {
+    const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
+    const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { settleMs: 1, timeoutMs: 5_000 }));
+    expect(fake.swipes).toEqual([]);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    expect(error.message).toContain('stopped before any swipe — element is not in the tree');
+    expect(error.message).toContain(`${presentedStop({ kind: 'screen' })}, so none was sent.`);
+    expect(asked).toHaveLength(1);
+  });
+
+  it('scroll_until on dialog-fullscreen with no word: strokes as before, the hint said', async () => {
+    const { fake } = device(lab('dialog-fullscreen'), { of: 'unknown' });
+    const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { settleMs: 1, timeoutMs: 5_000 }));
+    expect(fake.swipes.length).toBeGreaterThan(0);
+    expect(error.message).toContain(`element never appeared in the tree (${ACTIVE_WINDOW_HINT})`);
+  });
+
+  it('scroll_until on open, the screen alone: strokes, the window asked once for the call, and no hint', async () => {
+    const { fake, asked } = device(lab('open'), word('open'));
+    const error = await fails(scrollUntilVisible(fake, 'id:"nothing.here"', { settleMs: 1, timeoutMs: 5_000 }));
+    expect(fake.swipes.length).toBeGreaterThan(0);
+    expect(error.message).toContain('element never appeared in the tree');
+    expect(error.message).not.toContain(ACTIVE_WINDOW_HINT);
+    expect(asked).toHaveLength(1);
   });
 });
