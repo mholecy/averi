@@ -78,6 +78,14 @@ describe('judgeClear — the overlap against the control\'s own rows beside the 
       expect(seenOf(painted(png, beside, [0, 0, 0], 2), q)).toMatchObject([{ seen: 'untold', why: expect.stringContaining('not one colour') }]);
     });
 
+    it('a 1-px line the field draws across its rows beside the text, missing from the overlap (what a text background hides): untold — the beside rows held as strictly as the overlap', () => {
+      const besides = q.pairs.flatMap((p) => ('beside' in p ? p.beside : []));
+      const lined = besides.reduce((at, b) => painted(at, { x: b.x, y: 496, width: b.width, height: 1 }, [40, 40, 40]), png);
+      expect(seenOf(lined, q)).toMatchObject([{ seen: 'untold', why: expect.stringContaining('not one colour') }]);
+      const grey = besides.reduce((at, b) => painted(at, { x: b.x, y: 501, width: b.width, height: 1 }, [0xbd, 0xbd, 0xbd]), png);
+      expect(seenOf(grey, q)).toMatchObject([{ seen: 'untold' }]);
+    });
+
     it('a frame whose scale the tree refuses: untold, said why', () => {
       const half = new PNG({ width: 700, height: 2220 });
       expect(orderOfFrame(measuredFrameFor(tree, half, { width: 1080, height: 2220 }), q).map((s) => s.seen)).toEqual(['untold']);

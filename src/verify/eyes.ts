@@ -399,8 +399,10 @@ export function judgeOrder(png: RgbaImage, scale: number, q: OrderQuestion): rea
 /**
  * THE OVERLAP SEEN CLEAR, pure over a decoded png at `scale` px per tree unit (ui-tree/eyes.ts#ClearPair): does a text
  * in the control's touch margin (ui-tree/cover.ts#marginText) paint anything over it where the two overlap?
- * 1. THE CONTROL'S OWN ROWS beside the text (`beside`), landed in the png, each at least FLANK_MIN_PX wide, all one
- *    colour with their dominant (`oneColour`) — else `untold`: no plain colour of the control's to compare with.
+ * 1. THE CONTROL'S OWN ROWS beside the text (`beside`), landed in the png, each at least FLANK_MIN_PX wide, each held
+ *    to their dominant as strictly as the overlap is below (at most OWN_PIXELS_MAX points' worth of strays, not
+ *    `oneColour`'s LINE_SHARE: a line the control draws across its width, seen beside the text and missing from the
+ *    overlap, is what an opaque text background hides) — else `untold`: no plain colour of the control's to compare with.
  * 2. THE OVERLAP, landed whole (no pixel in from its edges: a text's ink may lie on its very first row): every pixel of
  *    it within EYES_SAME_DE of that colour, at most OWN_PIXELS_MAX points' worth of strays (`nearCount`, the strict
  *    count `apartOfFrame` reads — not LINE_SHARE, which would pass a 1-px line of ink across a 6-px band) — `clear`:
@@ -421,7 +423,11 @@ function judgeClear(png: RgbaImage, scale: number, pair: ClearPair): PairSeen {
   });
   if (beside.length === 0) return untold('no part of it shows beside the text');
   const own = sampleDominant(png, beside)?.rgb;
-  if (own === undefined || !beside.every((b) => oneColour(png, b, own))) return untold('it is not one colour beside the text');
+  const plain = (b: EdgeBounds): boolean => {
+    const { near, total } = nearCount(png, b, own!, EYES_SAME_DE);
+    return total - near <= OWN_PIXELS_MAX * scale * scale;
+  };
+  if (own === undefined || !beside.every(plain)) return untold('it is not one colour beside the text');
   const overlap = pngRegion(pair.overlap, scale, png);
   if (overlap === undefined || overlap.x1 <= overlap.x0 || overlap.y1 <= overlap.y0) return untold('the overlap lies off the screenshot');
   const { near, total } = nearCount(png, overlap, own, EYES_SAME_DE);
