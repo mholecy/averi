@@ -91,6 +91,14 @@ describe('the unmoved stop for a target never seen under idb says what idb does 
     );
   });
 
+  it('by an id alone: the miss\'s note says what idb does not list, and the stop says it no second time', () => {
+    const message = failureOf(play({ ...UP, target: 'id:A' }, [{ tree: sheet(), found: [] }, { tree: sheet(), found: [] }, { tree: sheet(), found: [] }]), 'id:A').message;
+    expect(message).toContain('content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:"A"');
+    expect(message).not.toContain('idb lists only');
+    expect(message).not.toContain('close it first');
+    expect(message.split('close that first')).toHaveLength(2);
+  });
+
   it('not once a stroke has moved the tree: the list ran to its end, the cause as before', () => {
     const played = play(UP, [{ tree: rows(20, 62) }, { tree: rows(20, 222) }, { tree: rows(20, 222) }, { tree: rows(20, 222) }]);
     expect(failureOf(played, 'label:"Z"').message).not.toContain('idb lists only');

@@ -7,7 +7,7 @@ import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import { hasArea, tapPoint } from '../ui-tree/selectors.js';
-import { missOf, topLayerOnlySource, type Miss, type TopLayerOnlySource } from '../ui-tree/miss.js';
+import { missOf, saysTopLayerOnly, topLayerOnlySource, type Miss, type TopLayerOnlySource } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type Remedy } from '../ui-tree/standing.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
@@ -342,7 +342,8 @@ export type Flush =
  * (ui-tree/miss.ts#TopLayerOnlySource), so they may have landed on a sheet, alert or cover it does not list; carried by
  * the unmoved stop of a call whose strokes are `unfelt` (`CallEvidence`) and said where that stop names no other cause
  * (scroll-text.ts#boundText: no end proven, nothing named under the touch-down) — a possibility, never the cause
- * (ui-tree/miss.ts#TOP_LAYER_ONLY_HINT); no device call.
+ * (ui-tree/miss.ts#TOP_LAYER_ONLY_HINT); not carried when the call's miss says it already (ui-tree/miss.ts
+ * #saysTopLayerOnly: idb's id notes), so the reply says it once; no device call.
  */
 export type BoundBy =
   | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof; unlisted?: TopLayerOnlySource }
@@ -1094,6 +1095,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // would land.
     const onPresented = best === undefined ? undefined : plan.presented;
     const course = courseFacts(s.course);
+    const miss = missed();
     const by: BoundBy =
       exhausted !== undefined
       ? {
@@ -1102,12 +1104,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           unchanged: exhausted,
           ...(touched !== undefined && { touched }),
           ...(ends !== undefined && observed !== undefined && { ends: { way: course.lastStroke, ...endProof(s, ends, exhausted, observed.streaks) } }),
-          ...(learnt.of === 'unfelt' && { unlisted: learnt.source }),
+          ...(learnt.of === 'unfelt' && (miss === undefined || !saysTopLayerOnly(miss)) && { unlisted: learnt.source }),
         }
       : s.swipes >= s.rules.maxSwipes
         ? { of: 'maxSwipes' }
         : { of: 'timeout', timeoutMs: s.rules.timeoutMs, elapsedMs: seen.elapsedMs, reads: s.reads };
-    const miss = missed();
     return stop(s, {
       kind: 'bound',
       swipes: s.swipes,

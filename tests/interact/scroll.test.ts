@@ -1320,7 +1320,7 @@ describe('scroll_until\'s feeler on idb, as the driver sends it', () => {
     fake.platform = 'ios';
     fake.keyboard = undefined;
     fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
-    await expect(scrollUntilVisible(fake, 'id:lab.sheet-background.A', { ...FAST, direction: 'up' })).rejects.toThrow(/idb lists only what a presented sheet/);
+    await expect(scrollUntilVisible(fake, 'id:lab.sheet-background.A', { ...FAST, direction: 'up' })).rejects.toThrow(/idb lists nothing beneath the keyboard or a presented sheet, alert or cover/);
     expect(fake.swipes).toEqual([
       { from: { x: 201, y: 175 }, to: { x: 201, y: 335 }, durationMs: 600 },
       { from: { x: 201, y: 175 }, to: { x: 201, y: 335 }, durationMs: 600 },

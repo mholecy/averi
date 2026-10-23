@@ -1,6 +1,7 @@
 import type { Rect, UiNode } from '../adapters/types.js';
 import { PollMiss } from '../ui-tree/read-tree.js';
 import { missOf, withMissNote } from '../ui-tree/miss.js';
+import type { Target } from '../ui-tree/selectors.js';
 import { formatSeconds } from '../util/duration.js';
 import type { MeasuredFrame } from './capture.js';
 
@@ -76,10 +77,11 @@ export const verdictToPoll = (verdict: PollVerdict | undefined): { detail?: stri
 
 /**
  * Every assert's "not found within N s" (formatSeconds), of the poll's last round: the last tree-read error when that
- * read failed; else what the last tree read saw (ui-tree/miss.ts#missOf — a window it lists alone, presented over the
- * screen beneath, or a source that lists the active window only), its note in the same place.
+ * read failed; else what the last tree read saw of the assert's `target` (ui-tree/miss.ts#missOf — a window it lists
+ * alone, presented over the screen beneath, a source that lists the active window only, idb's dialect for an id it
+ * does not list), its note in the same place. The target is required, so no assert can ask without it.
  */
-export const notFound = (timeoutMs: number, last: { readError?: Error; lastTree?: UiNode }): string => {
+export const notFound = (timeoutMs: number, last: { readError?: Error; lastTree?: UiNode }, target: Target): string => {
   const headline = `not found within ${formatSeconds(timeoutMs)}`;
-  return last.readError !== undefined ? `${headline} (last UI tree read failed: ${last.readError.message})` : withMissNote(headline, missOf({ tree: last.lastTree }));
+  return last.readError !== undefined ? `${headline} (last UI tree read failed: ${last.readError.message})` : withMissNote(headline, missOf({ tree: last.lastTree, target }));
 };

@@ -1,16 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { ACTIVE_WINDOW_HINT, missNote, missOf, withMissNote, type Miss } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT, missNote, missOf, NO_ID_LISTED, TREE_SOURCE_REMEDY, withMissNote, type Miss } from '../../src/ui-tree/miss.js';
 import type { Target } from '../../src/ui-tree/selectors.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { node, screen } from '../helpers/fake.js';
 
 // THE decision behind every not-found (ui-tree/miss.ts): why a target is not in the last read, asked with the target,
 // in one precedence — a failed read; a match only at 0×0; a layer listed alone; the active window only; idb's dialect
-// (an id set on a container is in no idb read) — and its words. Over the lab's captures (tests/fixtures/truth/): the
+// (a read that lists no identifier at all; an id set on a container is in no idb read) — and its words. Over the lab's captures (tests/fixtures/truth/): the
 // iOS twins read by idb and by WDA on the same screen, and the Android dumps.
 
 const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
@@ -32,7 +32,10 @@ const ghost = (identifier: string, clippedOut?: 'top' | 'bottom'): UiNode =>
 
 const R = 'id:lab.sheet-long-list.R';
 const SHORT_R = 'id:lab.sheet-long-list-short.R';
-const idR = (id: string): Miss => ({ of: 'containerId', id });
+const idR = (id: string): Miss => ({ of: 'idUnlisted', id });
+const noId = (id: string): Miss => ({ of: 'noIdListed', id });
+/** A launch-transition read idb gave: its Application root alone, nothing of the app's (ui-tree/bare-tree.ts). */
+const bareIdb = (): UiNode => markIdbDialect(node({ role: 'container', identifier: null, label: null, rect: { x: 0, y: 0, width: 402, height: 874 } }));
 
 describe('missOf — (tree, target) → Miss, one table', () => {
   const rows: readonly [what: string, last: { tree?: UiNode; readError?: Error }, target: Target | undefined, miss: Miss][] = [
@@ -40,15 +43,19 @@ describe('missOf — (tree, target) → Miss, one table', () => {
     ['a failed read', { tree: idb('sheet-long-list'), readError: new Error('idb gone') }, R, { of: 'unread' }],
     ['no read at all', {}, R, { of: 'unread' }],
 
-    // The idb/WDA twins (NI1's screen: a SwiftUI List in a sheet, its rows' ids set on the row). idb lists the row as
-    // its text alone ("Target R", no id) — the miss says idb's dialect; WDA lists the id, so the tree holds it.
-    ['idb, an id alone the list does not hold (sheet-long-list)', { tree: idb('sheet-long-list') }, R, idR('lab.sheet-long-list.R')],
+    // The idb/WDA twins (the lab's sheet-long-list: a UITableViewController in a sheet, its rows' ids set on each cell's
+    // label). idb lists no identifier on any element of the read (every AXUniqueId null) — the miss says that fact; WDA
+    // lists the id, so the tree holds it.
+    ['idb, a read listing no identifier at all (sheet-long-list)', { tree: idb('sheet-long-list') }, R, noId('lab.sheet-long-list.R')],
     ['WDA, the same id on the same screen: the tree holds it, nothing of idb', { tree: wda('sheet-long-list') }, R, { of: 'none' }],
-    ['idb, an id alone (sheet-long-list-short)', { tree: idb('sheet-long-list-short') }, SHORT_R, idR('lab.sheet-long-list-short.R')],
+    ['idb, a read listing no identifier at all (sheet-long-list-short)', { tree: idb('sheet-long-list-short') }, SHORT_R, noId('lab.sheet-long-list-short.R')],
     ['WDA, its twin', { tree: wda('sheet-long-list-short') }, SHORT_R, { of: 'none' }],
     ['WDA, an id in no tree: no dialect fact (WDA lists containers\' ids)', { tree: wda('sheet-long-list') }, 'id:lab.nowhere', { of: 'none' }],
     ['idb, an id the list holds, with area: nothing of idb\'s dialect', { tree: plus(idb('sheet-long-list'), node({ identifier: 'g' })) }, 'id:g', { of: 'none' }],
-    ['idb, a flow\'s spec naming the id alone', { tree: idb('sheet-long-list') }, { id: 'lab.sheet-long-list.R' }, idR('lab.sheet-long-list.R')],
+    ['idb, one identifier listed elsewhere: the id unlisted, not the read\'s fact', { tree: plus(idb('sheet-long-list'), node({ identifier: 'g' })) }, R, idR('lab.sheet-long-list.R')],
+    ['idb, a flow\'s spec naming the id alone', { tree: idb('sheet-long-list') }, { id: 'lab.sheet-long-list.R' }, noId('lab.sheet-long-list.R')],
+    ['idb, an alert whose buttons carry no identifier (alert-dim)', { tree: idb('alert-dim') }, 'id:lab.alert-dim.A', noId('lab.alert-dim.A')],
+    ['idb, a bare launch read: it lists nothing of the app\'s, so its ids say nothing of the screen', { tree: bareIdb() }, R, { of: 'none' }],
 
     // Only an id ALONE is a statement about the id: the fields AND, and a regex names no one id.
     ['idb, id AND text', { tree: idb('sheet-long-list') }, `${R} text:"Target R"`, { of: 'none' }],
@@ -59,7 +66,7 @@ describe('missOf — (tree, target) → Miss, one table', () => {
 
     // A layer listed alone outranks idb's dialect: the screen beneath is not in the list at all.
     ['idb, a sheet over the screen (its dismiss region listed)', { tree: idb('sheet-medium') }, 'id:lab.sheet-medium.A', { of: 'presented', layer: { kind: 'screen' }, listed: 'layer' }],
-    ['idb, a large sheet with no dismiss region: idb\'s dialect', { tree: idb('sheet-background') }, 'id:lab.sheet-background.A', idR('lab.sheet-background.A')],
+    ['idb, a large sheet with no dismiss region, listing the sheet\'s own ids: idb\'s dialect', { tree: idb('sheet-background') }, 'id:lab.sheet-background.A', idR('lab.sheet-background.A')],
 
     // Android: the windows uiautomator lists.
     ['uiautomator, a dialog listed alone', { tree: uiautomator('alert-dim') }, 'id:lab.alert-dim.A', { of: 'presented', layer: { kind: 'dialog' }, listed: 'window' }],
@@ -94,13 +101,28 @@ describe('missNote — the words, once', () => {
     expect(missNote({ of: 'zeroArea', clippedOut: ['top'] })).toBe('it matched only nodes clipped out above its scroll container (scrolled past it) — scroll_until it with direction: "up" first');
     expect(missNote({ of: 'zeroArea', clippedOut: ['right'] })).toBe('it matched only nodes clipped out right of its scroll container (scrolled past it) — scroll_until it with direction: "right" first');
     expect(missNote({ of: 'zeroArea', clippedOut: ['top', 'bottom'] })).toBe('it matched only nodes clipped out above or below its scroll container — scroll_until it first');
-    expect(missNote({ of: 'containerId', id: 'amount_input' })).toBe(
-      'no tree read contained id:"amount_input". iOS treeSource: idb never exposes an identifier set on a container — ' +
-        'SwiftUI .accessibilityElement(children: .contain), React Native testID on a non-interactive view. ' +
-        'If the screen is showing, set app.ios.treeSource: wda in averi.yaml',
+    const reasons =
+      'Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, ' +
+      "any set on a container and a UIKit table cell label's among them.";
+    expect(missNote({ of: 'idUnlisted', id: 'amount_input' })).toBe(
+      `no tree read contained id:"amount_input". ${reasons} ` +
+        'If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml',
+    );
+    expect(missNote({ of: 'noIdListed', id: 'lab.sheet-long-list.R' })).toBe(
+      `no tree read contained id:"lab.sheet-long-list.R", and idb's read lists no id on any element. ${reasons} ` +
+        'If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml',
     );
     expect(missNote({ of: 'unread' })).toBeUndefined();
     expect(missNote({ of: 'none' })).toBeUndefined();
+  });
+
+  it('idb\'s two notes: the read\'s fact (NO_ID_LISTED) in one phrase with no parenthesis inside, both ending on the one remedy (TREE_SOURCE_REMEDY)', () => {
+    const noIdNote = missNote({ of: 'noIdListed', id: 'x' })!;
+    expect(noIdNote).toContain(NO_ID_LISTED);
+    for (const note of [noIdNote, missNote({ of: 'idUnlisted', id: 'x' })!]) expect(note).not.toMatch(/[()]/);
+    expect(noIdNote.endsWith(TREE_SOURCE_REMEDY)).toBe(true);
+    expect(missNote({ of: 'idUnlisted', id: 'x' })!.endsWith(TREE_SOURCE_REMEDY)).toBe(true);
+    expect(missNote({ of: 'idUnlisted', id: 'x' })).not.toContain(NO_ID_LISTED);
   });
 
   it('withMissNote: the note after a one-line not-found, in a parenthesis; nothing added for none or no miss', () => {

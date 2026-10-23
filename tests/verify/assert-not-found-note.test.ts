@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { Verifier, type AssertSpec } from '../../src/verify/assert.js';
+import { notFound } from '../../src/verify/poll-verdict.js';
+import { missNote } from '../../src/ui-tree/miss.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
@@ -59,5 +61,22 @@ describe("every assert's not-found carries the last read's miss note", () => {
     it(`${kind}: on idb's list marked presented (sheet-medium.idb.json), the note that the layer is presented and alone in the tree`, async () => {
       expect(await detailOn(idb('sheet-medium'), spec)).toBe(PRESENTED_LAYER);
     });
+
+    it(`${kind}: on idb's read that lists no identifier at all (sheet-long-list.idb.json), asked by an id alone, the note that idb lists none`, async () => {
+      expect(await detailOn(idb('sheet-long-list'), spec)).toBe(`not found within 1 s (${missNote({ of: 'noIdListed', id: 'ghost' })})`);
+    });
+
+    it(`${kind}: on idb's read that lists other ids (sheet-background.idb.json), the note of an id idb leaves unlisted`, async () => {
+      expect(await detailOn(idb('sheet-background'), spec)).toBe(`not found within 1 s (${missNote({ of: 'idUnlisted', id: 'ghost' })})`);
+    });
   }
+});
+
+describe('notFound — asked with the assert\'s element', () => {
+  it('the element decides idb\'s dialect fact: an id alone says it, a text selector does not; a failed read is the story', () => {
+    const tree = idb('sheet-long-list');
+    expect(notFound(1000, { lastTree: tree }, { id: 'lab.sheet-long-list.R' })).toBe(`not found within 1 s (${missNote({ of: 'noIdListed', id: 'lab.sheet-long-list.R' })})`);
+    expect(notFound(1000, { lastTree: tree }, { text: 'Nope' })).toBe('not found within 1 s');
+    expect(notFound(1000, { readError: new Error('idb gone') }, { id: 'lab.sheet-long-list.R' })).toBe('not found within 1 s (last UI tree read failed: idb gone)');
+  });
 });

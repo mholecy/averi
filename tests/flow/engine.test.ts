@@ -3573,11 +3573,11 @@ flows:
     return (error as Error).message;
   };
   const HINT = 'no tree read contained id:';
-  const NOTE = missNote({ of: 'containerId', id: 'amount_input' })!;
+  const NOTE = missNote({ of: 'idUnlisted', id: 'amount_input' })!;
 
   it('a tree idb gave, config omitting treeSource (the measured case): the note beneath the headline, the flow advice after it', async () => {
     const message = await failure(cfgFor('', waitOn('id: amount_input')), fakeOn('ios', true));
-    expect(message.split('\n').slice(0, 2)).toEqual(['Timed out after 60ms waiting for element id:"amount_input"', `  (${NOTE}, or wait on a button/row id idb does show)`]);
+    expect(message.split('\n').slice(0, 2)).toEqual(['Timed out after 60ms waiting for element id:"amount_input"', `  (${NOTE}, or wait on an id idb does list)`]);
   });
 
   it('a tree no idb mark is on: no hint, whatever averi.yaml says — the tree, not the config, says what read it', async () => {
@@ -3610,25 +3610,32 @@ flows:
     expect(message).not.toContain(HINT);
   });
 
-  // An optional step's skip line: the wait's and the tap's say nothing of idb's dialect — as before the miss knew the
-  // target (left to NI1, docs/truth/open-bugs.md) — and scroll_until's "(not present)" says it, as its reply does.
-  it('optional steps under idb: the wait and the tap skip with their own words alone; scroll_until says the note after "(not present)"', async () => {
+  // An optional step's skip line says idb's dialect after its own words, as each step's reply does: the wait's after its
+  // timeout, the tap's and scroll_until's after "(not present)" (the miss each error carries, ui-tree/miss.ts).
+  it('optional steps under idb: the wait, the tap and scroll_until each skip with the note after their own words', async () => {
     const skipOf = async (inner: string) => {
       const trace = await FlowEngine.run(cfgFor('', `optional:\n          - ${inner}`), fakeOn('ios', true), FAST, { flow: 'f' });
       expect(trace.some((t) => t.action.startsWith('✗'))).toBe(false);
       return trace.filter((t) => t.action === 'optional').map((t) => t.detail);
     };
-    expect(await skipOf('wait: { element: { id: amount_input }, timeout: 20ms }')).toEqual(['skipped step (Timed out after 20ms waiting for element id:"amount_input")']);
-    expect(await skipOf('tap: { id: amount_input, timeout: 20ms }')).toEqual(['skipped id:"amount_input" (not present)']);
+    expect(await skipOf('wait: { element: { id: amount_input }, timeout: 20ms }')).toEqual([`skipped step (Timed out after 20ms waiting for element id:"amount_input" (${NOTE}))`]);
+    expect(await skipOf('tap: { id: amount_input, timeout: 20ms }')).toEqual([`skipped id:"amount_input" (not present) (${NOTE})`]);
     expect(await skipOf('scroll_until: { element: { id: amount_input }, maxSwipes: 1 }')).toEqual([`skipped step (not present) (${NOTE})`]);
   });
 
   describe('waitTimeoutHint — the condition, pure', () => {
     const id = { element: { id: 'x' } };
-    const idbList = markIdbDialect(screen());
-    it('idb\'s note, with the flow advice, only for a non-absent element condition whose SOLE selector is an id, on a tree idb gave — and no miss to carry', () => {
-      expect(waitTimeoutHint(id, idbList)).toEqual({ hint: `${missNote({ of: 'containerId', id: 'x' })}, or wait on a button/row id idb does show` });
+    /** A rendered idb read that lists other identifiers (the button idb does show). */
+    const idbList = markIdbDialect(screen(el({ role: 'button', identifier: 'debit_select' })));
+    /** A rendered idb read that lists no identifier on any element (the lab's UIKit table, docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md). */
+    const idbNoIds = markIdbDialect(screen(el({ role: 'text', label: 'Target R' }), el({ role: 'text', label: 'Row 2' })));
+    it('idb\'s note, with the flow advice after the unlisted-id one, only for a non-absent element condition whose SOLE selector is an id, on a tree idb gave — and its miss to carry', () => {
+      expect(waitTimeoutHint(id, idbList)).toEqual({ hint: `${missNote({ of: 'idUnlisted', id: 'x' })}, or wait on an id idb does list`, miss: { of: 'idUnlisted', id: 'x' } });
+      // A read that lists no identifier at all: its own note, which names text:/label: — no advice to wait on an id idb shows.
+      expect(waitTimeoutHint(id, idbNoIds)).toEqual({ hint: missNote({ of: 'noIdListed', id: 'x' }), miss: { of: 'noIdListed', id: 'x' } });
       expect(waitTimeoutHint(id, screen())).toEqual({ hint: undefined, miss: { of: 'none' } });
+      // A bare idb read (a launch's): its ids say nothing of the screen — no note of idb's dialect.
+      expect(waitTimeoutHint(id, markIdbDialect(screen()))).toEqual({ hint: undefined, miss: { of: 'none' } });
       expect(waitTimeoutHint(id, undefined)).toEqual({ hint: undefined, miss: { of: 'unread' } });
       expect(waitTimeoutHint({ element: { id: 'x' }, absent: true }, idbList)).toEqual({});
       expect(waitTimeoutHint({ element: { text: 'x' } }, idbList).hint).toBeUndefined();

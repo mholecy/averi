@@ -477,7 +477,7 @@ export interface UiNode {
    * at the list's bottom covers down to the screen's bottom
    * (`bottomPinned`) — and asks an on-target text to repeat the target
    * (`onTarget`), the sibling guard being void there; and by ui-tree/miss.ts#missOf, for idb's dialect: an id
-   * set on a container is in no idb read (`containerId`). A mark of the source,
+   * in no idb read (`noIdListed`, `idUnlisted`) — set on a container, dropped, or beneath a presented layer. A mark of the source,
    * like `ofKeyboard` and `clipsDescendants`: ui-tree knows no platform,
    * and the shape alone (a rectless root over leaves) would also match a
    * test's or a future source's tree that is not idb's. Absent on WDA and

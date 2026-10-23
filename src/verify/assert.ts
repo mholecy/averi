@@ -329,11 +329,11 @@ export class Verifier {
         description,
         timeoutMs,
         timeoutDetail: ({ detail, readError, lastTree }) => {
-          if (readError !== undefined) return notFound(timeoutMs, { readError });
+          if (readError !== undefined) return notFound(timeoutMs, { readError }, element);
           const base =
             detail !== undefined ?
               `element found but ${error !== undefined ? 'error' : 'content'} was: ${detail}`
-            : notFound(timeoutMs, { lastTree });
+            : notFound(timeoutMs, { lastTree }, element);
           const hint =
             exactText === undefined || hintScope === undefined ?
               undefined
@@ -375,7 +375,7 @@ export class Verifier {
       {
         description,
         timeoutMs,
-        timeoutDetail: ({ detail, ...last }) => detail ?? notFound(timeoutMs, last),
+        timeoutDetail: ({ detail, ...last }) => detail ?? notFound(timeoutMs, last, element),
       },
     );
   }

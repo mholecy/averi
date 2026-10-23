@@ -342,7 +342,7 @@ const configSchema = z
              * same goes for a native SwiftUI identifier on a container
              * (`.accessibilityElement(children: .contain)`, measured
              * 2026-10-05) — a `wait:` or a `scroll_until` on one under idb
-             * says so when it gives up (ui-tree/miss.ts, `containerId`).
+             * says so when it gives up (ui-tree/miss.ts, `idUnlisted`).
              * No `auto` value — deferred until the Phase 4 latency
              * measurement of /source on deep trees. The kinds are the
              * tree-source seam's (adapters/ios-node.ts), spelled once.

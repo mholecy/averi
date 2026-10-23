@@ -13,8 +13,6 @@ import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_T
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 /** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
-/** Review round 4's P4 (calibration.json NI1): idb lists a UIKit table's labels without their identifiers. */
-const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
 /** Round 7 (T2): Android's presented window the uiautomator parser does not mark. */
 const FULL_SCREEN_DIALOG: Classed = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /**
@@ -110,20 +108,16 @@ export const presented: KnownFile = {
     // "close it first" and scroll_until stops before any swipe — all 15 rows green, struck off here, calibrated in
     // scripts/truth/calibration.json.
     // sheet-long-list.idb.json — idb lists the UIKit table's labels without their accessibility identifiers (AXUniqueId
-    // null), and none of the rows below the fold: no target answers to its id. R's rows are NI1's (filed as its note).
-    // F's (a tree source's limit no note files) turned green at round 7's recapture (the 56-row table, its L added):
-    // the truth now records F unlisted under idb (TargetTruth.listed), and the contract asks of it what an unlisted
-    // target can meet — L's rows green alike.
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
-    ...keys(`${IOS}/sheet-long-list.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier', as: NO_ID }),
+    // null), and none of the rows below the fold: no target answers to its id. F's (a tree source's limit no note
+    // files) turned green at round 7's recapture (the 56-row table, its L added): the truth now records F unlisted
+    // under idb (TargetTruth.listed), and the contract asks of it what an unlisted target can meet — L's rows green
+    // alike. R's rows (NI1, docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md) are
+    // green since its fix: the reply names idb's limit (ui-tree/miss.ts, `noIdListed`), and an open target its source
+    // does not list is asked that (golden-spec/base.ts#openRows) — struck off.
     // sheet-long-list-short (round 3): the same table cut short of the sheet's foot. Under idb R answers to no id, as
-    // above (F, below the table's clip, is refused or fails as its rows ask: green). Under WDA F's stroke touched down
-    // on the footer, beside the table holding it — lab finding LE4 (edges.known.ts), fixed on arch/r21-strokes: the
-    // stroke goes inside the table (201 369 → 139), the row green and struck off.
-    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['tap'], { cls: 'not tapped', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
-    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['colour'], { cls: 'failed', kind: 'not found', calls: [], note: 'idb lists the table label without its identifier', as: NO_ID }),
-    ...keys(`${IOS}/sheet-long-list-short.idb.json`, ['R'], ['scroll_until'], { cls: 'stopped', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists the table label without its identifier', as: NO_ID }),
+    // above, its rows green since NI1's fix (F, below the table's clip, is refused or fails as its rows ask: green).
+    // Under WDA F's stroke touched down on the footer, beside the table holding it — lab finding LE4 (edges.known.ts),
+    // fixed on arch/r21-strokes: the stroke goes inside the table (201 369 → 139), the row green and struck off.
     // RESIDUAL #31 (ADR 0018 residual 9): under idb, and in WDA's ungrouped reading-order run, nothing shows the blur
     // menu's backdrop over A, B, D — they read as open. C's centre lies under the menu row W (its probe fires W): C is
     // refused under W, truly, but not "close it first" (#31's) — since L4's fix (a control listed before it in reading

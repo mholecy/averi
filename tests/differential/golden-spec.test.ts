@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Outcome } from '../../scripts/differential/differential.js';
 import { expectations, formExpectations, pairingOf, taps, touchDowns, type Expectation } from '../../scripts/differential/golden-spec.js';
 import { replyKind } from '../../scripts/truth/replies.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
+import { missNote } from '../../src/ui-tree/miss.js';
 
 // The golden spec's judges (scripts/differential/golden-spec/*.ts, behind the façade golden-spec.ts), each on the
 // replies that decide it — the real ones, as the committed captures produce them (tests/differential/golden.test.ts
@@ -71,6 +73,53 @@ const target = (over: Partial<TargetTruth>): TargetTruth => ({
   drawn: 0,
   seen: '#B72E2A',
   ...over,
+});
+
+/**
+ * An open target its replayed source does not list (TargetTruth.listed): the lab's UIKit table row under idb, which lists
+ * no identifier on any element (docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md).
+ * The honest answer is not tapped, nothing sent, the source's limit named; under WDA, which lists it, the rows are the
+ * open ones. The replies are the captures' own (before the fix, from the golden run; after it, as averi words them).
+ */
+describe('an open target the replayed source does not list (sheet-long-list R under idb)', () => {
+  const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
+  const cell = JSON.parse(readFileSync(new URL('sheet-long-list.truth.json', IOS), 'utf8')) as CellTruth;
+  const R = cell.targets.find((t) => t.tag === 'R')!;
+  const tree = (source: string) => readFileSync(new URL(`sheet-long-list.${source}.json`, IOS), 'utf8');
+  const idbRows = expectations('ios', R, cell, 'idb', tree('idb'));
+  const wdaRows = expectations('ios', R, cell, 'wda', tree('wda'));
+  const NOTE = missNote({ of: 'noIdListed', id: R.id })!;
+  const UNLISTED = missNote({ of: 'idUnlisted', id: R.id })!;
+  const SWIPES = ['idb ui swipe 201 699 201 175 --duration 0.3', 'idb ui swipe 201 699 201 175 --duration 0.3'];
+  const timeout = (note?: string) => `ERROR Timed out after 5000ms waiting for element id:"${R.id}" to appear${note === undefined ? '' : `\n  (${note})`}`;
+  const colour = (note?: string) => `1/1 asserts FAILED\nFAIL  element id:"${R.id}" fill within dE00 8 of ${R.color} — not found within 1 s${note === undefined ? '' : ` (${note})`}\nappAlive: true`;
+  const stop = (note: string) => `ERROR scroll_until id:"${R.id}" failed after 2 swipes (the last 2, swiping down, did not change the screen) — element never appeared in the tree (${note})`;
+
+  it('tap: a refusal that sent nothing and names the source\'s limit; one that says nothing of it, or sent a tap, is a mismatch', () => {
+    const tap = row(idbRows, 'tap');
+    expect(tap.judge(out(timeout(NOTE)))).toBeUndefined();
+    expect(tap.judge(out(timeout()))).toBeDefined();
+    expect(tap.judge(out(timeout(UNLISTED)))).toBeDefined();
+    expect(tap.judge(out(timeout(NOTE), ['idb ui tap 201 158']))).toBeDefined();
+  });
+
+  it('colour: fails not found naming the source\'s limit; the bare not-found is a mismatch', () => {
+    const c = row(idbRows, 'colour');
+    expect(c.judge(out(colour(NOTE)))).toBeUndefined();
+    expect(c.judge(out(colour()))).toBeDefined();
+  });
+
+  it('scroll_until: not reached, any strokes, naming the source\'s limit; the container words alone are a mismatch', () => {
+    const s = row(idbRows, 'scroll_until');
+    expect(s.judge(out(stop(NOTE), SWIPES))).toBeUndefined();
+    expect(s.judge(out(stop(UNLISTED), SWIPES))).toBeDefined();
+  });
+
+  it('under WDA, which lists it, the open rows: a refusal is a mismatch whatever it names', () => {
+    expect(row(wdaRows, 'tap').judge(out(timeout(NOTE)))).toBeDefined();
+    expect(row(wdaRows, 'colour').judge(out(colour(NOTE)))).toBeDefined();
+    expect(row(wdaRows, 'scroll_until').judge(out(stop(NOTE), SWIPES))).toBeDefined();
+  });
 });
 
 describe('a target beneath a presented layer', () => {

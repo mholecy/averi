@@ -32,7 +32,15 @@ Find the line or error you see, then act on it. Each entry gives the meaning, th
 
 Under the default `treeSource: idb`, this is expected:
 - React Native `testID` on a static `Text` or a container is invisible, because idb returns only accessibility elements;
-- the same applies to a SwiftUI identifier on an `.accessibilityElement(children: .contain)` container.
+- the same applies to a SwiftUI identifier on an `.accessibilityElement(children: .contain)` container;
+- idb drops some identifiers the app sets, a UIKit table cell label's among them (WebDriverAgent reads them);
+- idb lists nothing beneath the keyboard or a presented sheet, alert or cover.
+
+The reply says so beneath its not-found: `no tree read contained id:"x". Possible reasons: idb lists nothing beneath …`,
+or, when the read lists no identifier on any element, `no tree read contained id:"x", and idb's read lists no id on
+any element. Possible reasons: …`. If something covers the element (the keyboard, a sheet, an alert), close that
+first. If it is showing, ask for it by `text:` or `label:` (read the label from `ui_snapshot`), or switch the tree
+source.
 
 Do not restructure app code (a `Pressable` wrapper, blanket `accessible={true}`) to please the tool. Set `app.ios.treeSource: wda` in `averi.yaml`:
 - `id:` then resolves on static text and containers, as on Android;
@@ -41,7 +49,7 @@ Do not restructure app code (a `Pressable` wrapper, blanket `accessible={true}`)
 
 WDA comes from `appium-webdriveragent`, an optional dependency of averi. If an install skipped it (`--omit=optional`), the error names the package.
 
-Alternatively, detect on a button or row id.
+Alternatively, detect on an id idb does list, or by `text:`/`label:`.
 
 ## A tap target off screen
 
