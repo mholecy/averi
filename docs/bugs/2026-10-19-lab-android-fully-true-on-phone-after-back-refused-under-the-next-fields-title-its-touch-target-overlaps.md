@@ -1,7 +1,8 @@
 # BUG: on Android `scroll_until … fully: true` on form-keyboard's phone, once `back` has hidden the IME, never stops — its 132-px touch target overlaps the "Variable symbol" title below it by 6 px, a cover the tree lists, though the field it draws is whole
 
-> **Status (2026-10-23):** fixed at `7d8c8c43` (bugs/r1023-phone, docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md),
-> measured by live k7f (docs/truth/live-records/android-forms-r1023-phone-1.json, -2.json): after `back`, "fully
+> **Status (2026-10-23):** fixed at `7d8c8c43` + `7ba6db20` + `05c4fbcd` + `0d0dd32b` (bugs/r1023-phone,
+> docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md), measured by live k7f
+> (docs/truth/live-records/android-forms-r1023-phone-1.json, -2.json; at the tip, -3.json): after `back`, "fully
 > visible after 0 swipes — text "Variable symbol" (55,1406 258x56), drawn after it, overlaps its bottom 6 px with
 > nothing a screenshot shows". The tree only suspects a text in a control's touch margin (src/ui-tree/cover.ts#marginText);
 > one screenshot decides (src/verify/eyes.ts#judgeClear), for the `fully` stop and the ocr assert alike. Golden 0

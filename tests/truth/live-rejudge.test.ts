@@ -235,6 +235,8 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // the next title over its touch margin seen clear on one screenshot — and k7 unchanged; then the whole forms group.
     ['android-forms-r1023-phone-1.json', 'forms', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     ['android-forms-r1023-phone-2.json', 'forms', { cases: 29, ok: 27, loud: 2, mismatches: 0 }],
+    // The same two at the branch's tip (the strict beside rows, one kept answer per text, the code review's renames).
+    ['android-forms-r1023-phone-3.json', 'forms', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);

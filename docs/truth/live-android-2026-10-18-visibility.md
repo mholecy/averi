@@ -356,6 +356,10 @@ b7, `adb input text` cannot type `Š` or `’`, accepted — 0 mismatches); both
 - `k7` (the IME up) unchanged: one stroke, phone 1129–1228, "visible after 1 swipe — PARTLY UNDER a surface the tree
   does not list: its bottom 28 px show #F2F2F7 …", nothing submitted.
 - Nothing else changed: every other forms case as before.
+- At the branch's tip `c48e82ea` (after `7ba6db20`: the field's rows beside the title held to its colour as strictly
+  as the overlap; `05c4fbcd`: one kept answer per text; `0d0dd32b`; and the code review's renames and tests, no change
+  of behaviour), the same two again: docs/truth/live-records/android-forms-r1023-phone-3.json (`--cases k7,k7f`: 2
+  cases, 2 ok, exit 0), the replies word for word as above.
 
 # Round 7 final device check, 2026-10-19
 
