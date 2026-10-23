@@ -127,8 +127,8 @@ with the target's own rows beside it.
 4. **A `clear` kept across reads in one call** while the target and the text lie where they were seen: a text that gains
    ink with no change to its node in between is not looked at again (its label changing is: the key misses).
 5. **When the eyes answer `under`** the text still moves with the target and the round strokes until its timeout. A
-   "the cover moved with it over a stroke" fast-fail from the motion ledger would save about 12 s; it needs its own
-   note.
+   "the cover moved with it over a stroke" fast-fail from the motion ledger would save about 12 s: open,
+   docs/bugs/2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md (open-bugs row 19).
 6. Measured on one AVD (averi_lab, API 33, Material 3 lab forms). Another app's margin texts are found by the same rule;
    whether its pixels read clear is the eyes' to say.
 
