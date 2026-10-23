@@ -423,11 +423,12 @@ function judgeClear(png: RgbaImage, scale: number, pair: ClearPair): PairSeen {
   });
   if (beside.length === 0) return untold('no part of it shows beside the text');
   const own = sampleDominant(png, beside)?.rgb;
+  if (own === undefined) return untold('it is not one colour beside the text');
   const plain = (b: EdgeBounds): boolean => {
-    const { near, total } = nearCount(png, b, own!, EYES_SAME_DE);
+    const { near, total } = nearCount(png, b, own, EYES_SAME_DE);
     return total - near <= OWN_PIXELS_MAX * scale * scale;
   };
-  if (own === undefined || !beside.every(plain)) return untold('it is not one colour beside the text');
+  if (!beside.every(plain)) return untold('it is not one colour beside the text');
   const overlap = pngRegion(pair.overlap, scale, png);
   if (overlap === undefined || overlap.x1 <= overlap.x0 || overlap.y1 <= overlap.y0) return untold('the overlap lies off the screenshot');
   const { near, total } = nearCount(png, overlap, own, EYES_SAME_DE);
