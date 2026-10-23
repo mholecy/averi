@@ -1,11 +1,11 @@
 import type { DeviceScreen, Point, Rect, UiNode } from '../adapters/types.js';
-import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, quoted, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { CLIP_LINE, type EyesFinding, type SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
 import { TOP_LAYER_ONLY_HINT, withMissNote } from '../ui-tree/miss.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
-import { coverClause, type Cover } from '../ui-tree/cover.js';
+import { coverClause, marginBand, type Cover } from '../ui-tree/cover.js';
 import { outsideItsScrollView, orderRemedyText, presentedRemedy, presentedStop, type ScrollViewCut } from '../ui-tree/standing.js';
 import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from '../ui-tree/system-bar.js';
 import { revealText, SIDES } from '../ui-tree/sides.js';
@@ -107,6 +107,12 @@ export interface ScrollUntilResult {
    * The reply says so; absent when the eyes saw its own colour to every edge, or were not asked.
    */
   eyes?: EyesFinding;
+  /**
+   * Set on a stop whose covers the eyes excused: texts drawn after it in its touch margin (ui-tree/cover.ts#marginText)
+   * whose overlap a screenshot showed paints nothing over it (ui-tree/seen-order.ts#PairSeen's `clear`) — each with
+   * the edge it overlaps and how deep. The reply says so (ADR 0026); absent when none.
+   */
+  seenClear?: readonly { readonly by: QuotedNode; readonly edge: 'top' | 'bottom'; readonly depth: number }[];
   /** Set when a sheet moved to another detent during the call — by a swipe or not (scroll-rounds.ts#DetentMove); the reply ends saying so. */
   detent?: DetentMove;
   /** Set when the strokes turned once from the caller's direction, the content proven exhausted that way (course.ts#EndTurn); the reply says so. */
@@ -143,6 +149,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
         ? { state: 'unlocated' }
         : undefined;
   const by = facts.covers.at(-1)?.node;
+  const seenClear = (facts.marginSeen ?? []).filter((m) => m.seen === 'clear').map(({ peer }) => ({ by: quoted(peer), ...marginBand(judged.node.rect, peer.rect) }));
   return {
     swipes: o.swipes,
     visible: facts.visible,
@@ -152,6 +159,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     ...(o.flush !== undefined && { flush: o.flush }),
     ...(by !== undefined && { covered: { by: { role: by.role, label: by.label, identifier: by.identifier, rect: { ...by.rect } }, shows: facts.shows } }),
     ...(o.eyes !== undefined && { eyes: o.eyes }),
+    ...(seenClear.length > 0 && { seenClear }),
     ...(o.detent !== undefined && { detent: o.detent }),
     ...(o.endTurn !== undefined && { endTurn: o.endTurn }),
   };
@@ -172,8 +180,31 @@ const percent = (fraction: number): number => Math.min(Math.round(fraction * 100
 function underText({ judged, cover }: { readonly judged: Judged; readonly cover: Cover }): string {
   const { facts } = judged.standing;
   const clause = coverClause(cover, { of: 'touch', ...(cover === facts.centreCover && { centre: tapPoint(judged.node) }) });
-  return cover.order.kind === 'overlaid' ? clause : `${clause} — ${percent(facts.shows)}% of it shows`;
+  if (cover.order.kind === 'overlaid') return clause;
+  // A text in its touch margin the eyes looked at (ADR 0026): what they saw, which kept the cover.
+  const looked = facts.marginSeen?.find((m) => m.peer === cover.node);
+  const eyes =
+    looked?.seen === 'untold'
+      ? ` — a screenshot could not tell whether it draws over it (${looked.why})`
+      : looked?.seen === 'under'
+        ? ` — a screenshot shows it drawn over its ${marginBandText(judged.node.rect, cover.node.rect)}`
+        : '';
+  return `${clause} — ${percent(facts.shows)}% of it shows${eyes}`;
 }
+
+/** A margin text's band, as the sentences say it (ui-tree/cover.ts#marginBand): `bottom 6 px` — tree units, which on Android (the only source it is asked of) are pixels. */
+const marginBandText = (target: Rect, text: Rect): string => {
+  const { edge, depth } = marginBand(target, text);
+  return `${edge} ${depth} px`;
+};
+
+/**
+ * A text in the element's touch margin the eyes excused (`ScrollUntilResult.seenClear`, ADR 0026): `text "Variable
+ * symbol" (55,1406 258x56), drawn after it, overlaps its bottom 6 px with nothing a screenshot shows (Android dumps a
+ * control's touch target, past what it draws)`.
+ */
+const seenClearText = ({ by, edge, depth }: NonNullable<ScrollUntilResult['seenClear']>[number]): string =>
+  `${nodeText(by)}, drawn after it, overlaps its ${edge} ${depth} px with nothing a screenshot shows (Android dumps a control's touch target, past what it draws)`;
 
 /** When a stop that sends no swipe came: `before any swipe`, or `after N swipes, without swiping further`. */
 const stoppedWhen = (swipes: number): string => (swipes === 0 ? 'before any swipe' : `after ${swipesText(swipes)}, without swiping further`);
@@ -220,7 +251,8 @@ export function describeScrollResult(r: ScrollUntilResult): string {
     const unjudged = r.eyes?.sees === 'unjudged' ? r.eyes : undefined;
     const claim = unjudged === undefined ? `fully visible after ${n}` : `fully visible by the tree after ${n}`;
     const eyes = unjudged === undefined ? '' : `; ${unjudgedText(unjudged)}`;
-    return `${claim}${above}${flushText(r.flush)}${eyes}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
+    const clear = r.seenClear === undefined ? '' : ` — ${r.seenClear.map(seenClearText).join('; ')}`;
+    return `${claim}${above}${flushText(r.flush)}${clear}${eyes}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
   }
   // Partly under something of the app: a plain stop, its centre
   // clear — said like a clip, and with what a measurement would take in.

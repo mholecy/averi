@@ -92,6 +92,35 @@ export function judgePhoneScroll(s: LabState, [reply]: string[], _source: string
 }
 
 /**
+ * k7f: once `back` has hidden the IME of k7's launch, scroll_until phone with `fully: true`. Compose dumps phone's
+ * 48-dp touch target, which the next field's title `vs.title` overlaps by 6 px though what phone draws ends 11 px above
+ * it; the eyes judge that overlap on one screenshot (ADR 0026). Judged on the app's model: where phone is drawn whole on
+ * the screen, clear of the bar dropped to the bottom and of `vs.title`, the right answer is "fully visible" — a failure
+ * there is the false refusal of the note; a "fully visible" while any of phone is off the screen, under the bar, or
+ * under the title is a MISMATCH. No submit, ever.
+ * docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md
+ */
+export function judgePhoneAfterBack(s: LabState, replies: string[], _source: string, launched: LabState): LiveVerdict {
+  const reply = replies.at(-1) ?? '';
+  const submits = (s.submits ?? []).length;
+  if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×); averi: ${short(reply)}` };
+  if (s.keyboard?.visible === true) return { outcome: 'LOUD', why: `back did not hide the IME: ${short(replies[0])}` };
+  const phone = s.frames.phone;
+  const title = s.frames['vs.title'];
+  if (phone == null) return { outcome: 'LOUD', why: `phone not laid out: ${short(reply)}` };
+  const onScreen = phone.y >= 0 && phone.y + phone.height <= s.screen.height;
+  const barOver = underBar(phone, s.frames['submit.bar']);
+  const titleClear = title == null || title.y >= phone.y + phone.height || title.y + title.height <= phone.y;
+  const whole = onScreen && barOver === 0 && titleClear;
+  const touches = touchesSince(s, launched);
+  const where = `phone ${phone.y}–${phone.y + phone.height}${title == null ? '' : `, vs.title from ${title.y}`}, ${barOver} px under the bar; ${touches.length} stroke(s)`;
+  if (replyKind(reply) === 'visible') {
+    return whole ? { outcome: 'ok', why: `${where}: ${short(reply)}` } : { outcome: 'MISMATCH', why: `averi says ${short(reply)} — phone is not drawn whole (${where})` };
+  }
+  return whole ? { outcome: 'MISMATCH', why: `refused, though phone is drawn whole (${where}): ${short(reply)}` } : { outcome: 'ok', why: `no stop, phone not drawn whole (${where}): ${short(reply)}` };
+}
+
+/**
  * What a reply beneath form-picker's sheet must say, once, per tree source — as much as the source can know: WDA marks
  * the sheet, so the presented remedy ("close it first"); uiautomator's dump marks no presented window here (no scrim:
  * ADR 0018's residual 18, accepted with the active-window hint), so the hint (src/ui-tree/miss.ts#ACTIVE_WINDOW_HINT);

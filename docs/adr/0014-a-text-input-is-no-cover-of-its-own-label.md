@@ -76,6 +76,10 @@ Decided (the orchestrator's, round 7):
   one filling the screen is not.
 - A label not spanning its field's height — at the top of a tall multiline field — is still covered (unmeasured; the
   safe direction).
+- The NEXT field's title (or a field's error text) laid in a Compose field's touch margin — 6–11 px over its dumped
+  48-dp touch target, clear of what it draws — is no label of that field and still covers it by the tree: no allowance
+  or density can tell it from a text over a drawn indicator line. The eyes tell it from one screenshot since 2026-10-23:
+  docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md.
 
 ## Bug notes
 

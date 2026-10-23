@@ -4,7 +4,7 @@ import { everyNode, type DeviceScreen, type Rect, type UiNode } from '../../src/
 import type { KeyboardLine } from '../../src/ui-tree/keyboard-position.js';
 import { lookAt, lookOn } from '../../src/ui-tree/look.js';
 import { orderRemedyText, presentedRemedy, sceneOf } from '../../src/ui-tree/standing.js';
-import type { OrderQuestion } from '../../src/ui-tree/eyes.js';
+import type { PairQuestion } from '../../src/ui-tree/eyes.js';
 import type { OrderSeen } from '../../src/ui-tree/seen-order.js';
 import { judgeOrder } from '../../src/verify/eyes.js';
 import { PNG } from 'pngjs';
@@ -111,7 +111,7 @@ const colourSaid = async (tree: UiNode, target: UiNode, { device }: On = ON_IPHO
   overElement({ viewport: async () => device }, lookOn({ keyboard: undefined, keyboardAdvice: 'ADV' }, tree), target, { reads: colorSampleRect, glyphs: false, ...(order !== undefined && { eyes: { order } }) });
 
 /** The eyes' order question, as a verb asks it (ui-tree/eyes.ts#Eyes.order). */
-type Order = (question: OrderQuestion) => Promise<readonly OrderSeen[]>;
+type Order = (question: PairQuestion) => Promise<readonly OrderSeen[]>;
 
 /** scroll_until's outcome for `target`: two reads of the same tree, the status band known. */
 function stopOf(tree: UiNode, target: UiNode, { device, usable }: On = ON_IPHONE) {
@@ -766,9 +766,9 @@ describe('one remedy for a target under a cover a screenshot saw drawn over it â
   /** The eyes over the committed screenshot, counting the questions. */
   const eyesOver = async () => {
     const png = PNG.sync.read(await lab('blur-menu.png'));
-    const asked: OrderQuestion[] = [];
+    const asked: PairQuestion[] = [];
     const order: Order = async (q) => (asked.push(q), judgeOrder(png, 3, q));
-    return { order, asked, sync: (q: OrderQuestion) => (asked.push(q), judgeOrder(png, 3, q)) };
+    return { order, asked, sync: (q: PairQuestion) => (asked.push(q), judgeOrder(png, 3, q)) };
   };
   const RULES = { direction: 'down', fully: false, maxSwipes: 5, timeoutMs: 30_000, screen: IPHONE } as const;
   const SEEN = 'under button "Target W" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order)';

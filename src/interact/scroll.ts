@@ -1,5 +1,5 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
-import { orderSeenBy, unseen, type Eyes } from '../ui-tree/eyes.js';
+import { pairsSeenBy, unseen, type Eyes } from '../ui-tree/eyes.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
@@ -334,7 +334,7 @@ export async function scrollUntilVisible(
     while (next.step.do === 'ask') {
       if (next.step.what === 'witness') seen.corroborated = reading !== undefined && (await reading.corroborated());
       else if (next.step.what === 'eyes') seen.eyes = opts.eyes === undefined ? unseen(next.step.question, 'no screenshot was taken') : await opts.eyes.fully(next.step.question);
-      else if (next.step.what === 'order') seen.order = await orderSeenBy(opts.eyes, next.step.question);
+      else if (next.step.what === 'order') seen.order = await pairsSeenBy(opts.eyes, next.step.question);
       else seen.unlocated = reading !== undefined && (await reading.unlocated());
       next = round(state, { ...seen, elapsedMs: Date.now() - started });
     }

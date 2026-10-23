@@ -1,5 +1,6 @@
 import type { Point, Rect, UiNode } from '../adapters/types.js';
 import { containsPoint, coverText, nodeText, type Edge, type QuotedNode } from './geometry.js';
+import { isInteractive, tapPoint } from './selectors.js';
 
 /**
  * A COVER: one node drawn over a target — as the draw order found it (draw-order.ts#DrawOrder.exposure), or, where it
@@ -62,6 +63,54 @@ export const coverAtPoint = (covers: readonly Cover[], point: Point): Cover | un
 
 /** The last of `covers` that is the surface of a screen presented over the target (`Cover.presented`), or undefined. */
 export const lastPresented = (covers: readonly Cover[]): Cover | undefined => covers.filter((c) => c.presented).at(-1);
+
+/**
+ * THE MARGIN TEXT — the suspicion, the tree's alone: `cover` may lie over nothing `target` draws, only over the margin
+ * of its touch target. Compose dumps a control's semantics bounds, its touch target grown symmetrically to 48 dp
+ * (`touchBoundsInRoot`), not what it draws, and lays the next field's title, or a field's error text, in that margin:
+ * on the lab's form-keyboard after `back` phone is `55,1280 970x132` (it draws `55,1296 970x99`) and the next title
+ * `vs.title` `55,1406 258x56` overlaps its dumped bottom by 6 px, 11 px below what it draws. The dump has no fact for the
+ * drawn extent, so no tree rule can excuse it (ADR 0026: an allowance of 11 px would excuse a text over a Material
+ * TextField's indicator line, whose dump is not padded; the 48-dp height needs the density ADR 0014 refused the draw
+ * order). The eyes decide (ui-tree/eyes.ts#pairQuestion's `clear` pair, verify/eyes.ts#judgeClear); this only says
+ * when to ask. All of:
+ * 1. the tree's source pads touch targets (`UiNode.paddedTouchTargets` on `tree`, Compose's dialect) — the one reason a
+ *    dumped rect holds an undrawn margin;
+ * 2. `target` is a control, and the cover a `text` leaf (a role no control has): glyphs only, no touch;
+ * 3. the cover crosses exactly one of the target's horizontal edges, its far end outside the target, and does not hold
+ *    the target's centre (selectors.ts#tapPoint) — so what the tap presses never changes;
+ * 4. it lies within the target's columns, narrower than it, leaving at least MARGIN_BESIDE_MIN of the target's own rows
+ *    beside it on one side — what the eyes compare the overlap with; a cover as wide as the target is the cut and
+ *    overlay family's (later-edges.ts), not this one;
+ * 5. its order is `drawn`, and it is the surface of no presented screen.
+ * Over every Android capture the tests carry it holds of the stacked Compose form cells' next titles and error texts
+ * only, each 6–11 px clear of what its field draws (tests/ui-tree/eyes-margin.test.ts).
+ * docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md
+ */
+export function marginText(cover: Cover, target: UiNode, tree: UiNode): boolean {
+  const c = cover.node.rect;
+  const t = target.rect;
+  if (tree.paddedTouchTargets !== true || cover.order.kind !== 'drawn' || cover.presented) return false;
+  if (!isInteractive(target) || cover.node.role !== 'text' || cover.node.children.length > 0) return false;
+  const [cBottom, tBottom] = [c.y + c.height, t.y + t.height];
+  const overTop = c.y < t.y && cBottom > t.y && cBottom < tBottom;
+  const overBottom = c.y > t.y && c.y < tBottom && cBottom > tBottom;
+  if (!(overTop || overBottom) || containsPoint(c, tapPoint(target))) return false;
+  const [left, right] = [c.x - t.x, t.x + t.width - (c.x + c.width)];
+  return left >= 0 && right >= 0 && Math.max(left, right) >= MARGIN_BESIDE_MIN;
+}
+
+/** Where a margin text (`marginText`) meets `target`: the horizontal edge it crosses, and how deep it lies over it — the rows the eyes judged (ui-tree/eyes.ts#ClearPair's `overlap`), as a sentence says them. */
+export function marginBand(target: Rect, text: Rect): { readonly edge: 'top' | 'bottom'; readonly depth: number } {
+  return text.y > target.y ? { edge: 'bottom', depth: target.y + target.height - text.y } : { edge: 'top', depth: text.y + text.height - target.y };
+}
+
+/**
+ * The least width of the target's own rows beside a margin text (`marginText`'s rule 4, ui-tree/eyes.ts#ClearPair's
+ * `beside`), in tree units: the judge's least readable strip (verify/eyes.ts's FLANK_MIN_PX, 4 png px) at Android's one
+ * png pixel per tree unit — the only source whose trees `marginText` holds of.
+ */
+export const MARGIN_BESIDE_MIN = 4;
 
 /**
  * The two GRAMMARS a cover is said in (`coverClause`):

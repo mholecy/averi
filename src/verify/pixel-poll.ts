@@ -2,7 +2,7 @@ import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { coverText, isUntold, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { judgedWithOrder, type OrderEyes, type OrderQuestion } from '../ui-tree/eyes.js';
+import { judgedWithOrder, type OrderEyes, type PairQuestion } from '../ui-tree/eyes.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
 import type { OrderSeen } from '../ui-tree/seen-order.js';
 import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
@@ -309,14 +309,15 @@ class PixelPollMemory {
    * captures the round's frame, and an answer that keeps it covered (no pair seen `over`) would cost that capture again
    * every round for nothing. So such an answer, judged on a frame settled over the whole screen, is kept and handed back
    * while the tree reads the same (ui-tree/read-tree.ts#treeFingerprint: every node's role, text, id and rect) and the
-   * question asks the same pairs — the poll asks once per distinct tree. An answer that unlocks (a pair `over`) is never
-   * kept: that round measures the very frame it was judged on, so keeping it saves nothing, and each round's unlock rests
-   * on its own frame. Nor is an untold one for want of a frame (a failed, unsettled or undecoded capture): the next
+   * question asks the same pairs — the poll asks once per distinct tree. An answer that unlocks (`unlocks`: a pair seen
+   * `over`, or a text in the touch margin seen `clear`, ADR 0026) is never kept: that round measures the very frame it
+   * was judged on, so keeping it saves nothing, and each round's unlock rests on its own frame — the tree reads the same
+   * while the pixels need not (a text that gains ink, a field's own background changing). Nor is an untold one for want of a frame (a failed, unsettled or undecoded capture): the next
    * round looks again.
    */
   keptOrder(tree: UiNode): KeptOrder {
     let fingerprint: string | undefined;
-    const keyOf = (q: OrderQuestion): string => `${(fingerprint ??= treeFingerprint(tree))} ${JSON.stringify(q.pairs.map((p) => [p.peer.rect, p.overlap]))}`;
+    const keyOf = (q: PairQuestion): string => `${(fingerprint ??= treeFingerprint(tree))} ${JSON.stringify(q.pairs.map((p) => [p.peer.rect, p.overlap]))}`;
     return {
       answer: (q) => {
         const kept = this.order;
@@ -324,7 +325,7 @@ class PixelPollMemory {
         return q.pairs.map((p, i) => ({ ...kept.seen[i]!, peer: p.peer }));
       },
       keep: (q, seen) => {
-        this.order = seen.some((s) => s.seen === 'over') ? undefined : { key: keyOf(q), seen };
+        this.order = seen.some(unlocks) ? undefined : { key: keyOf(q), seen };
       },
     };
   }
@@ -680,12 +681,15 @@ const FIXED_REMEDY: Record<Extract<Remedy, { of: 'fixed' }>['what'], string> = {
   footer: `the capture would show it, not the element — ${CLEAR_CHILD} (its content above the bar, say); no scroll moves an element laid to the screen's bottom edge out from under it`,
 };
 
+/** `seen` unlocks the element (`PixelPollMemory.keptOrder`): its peer seen under it (`over`), or seen to paint nothing over it (`clear`). */
+const unlocks = (seen: OrderSeen): boolean => seen.seen === 'over' || seen.seen === 'clear';
+
 /** The order answer a poll keeps across rounds, as one round asks it (`PixelPollMemory.keptOrder`). */
 interface KeptOrder {
   /** The answer kept for `question` on this round's tree, its peers this tree's nodes; undefined when none is kept. */
-  answer(question: OrderQuestion): readonly OrderSeen[] | undefined;
+  answer(question: PairQuestion): readonly OrderSeen[] | undefined;
   /** Keep `seen`, judged for `question` on a settled whole-screen frame — or forget the kept one, when `seen` unlocks. */
-  keep(question: OrderQuestion, seen: readonly OrderSeen[]): void;
+  keep(question: PairQuestion, seen: readonly OrderSeen[]): void;
 }
 
 /**
@@ -696,7 +700,7 @@ interface KeptOrder {
  * the poll only where the round measures). Judged only on a frame settled over the WHOLE screen: the bands and the
  * strips around the two lie outside the element's region, which a region-settled frame does not vouch for.
  */
-async function orderOnCapture(question: OrderQuestion, kept: KeptOrder, capture: () => Promise<TreeRequestedFrame>): Promise<readonly OrderSeen[]> {
+async function orderOnCapture(question: PairQuestion, kept: KeptOrder, capture: () => Promise<TreeRequestedFrame>): Promise<readonly OrderSeen[]> {
   const known = kept.answer(question);
   if (known !== undefined) return known;
   let frame: TreeRequestedFrame;
