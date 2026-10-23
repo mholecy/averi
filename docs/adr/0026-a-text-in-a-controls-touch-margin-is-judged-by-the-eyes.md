@@ -81,7 +81,7 @@ precedent), ADR 0002 (the pixel slack) and ADR 0010 (the keyboard judged first).
    captures anyway: zero extra captures; a `clear` answer, like `over`, is never kept across poll rounds — each round's
    unlock rests on its own frame). The tap never asks (rule 3: no tap standing is covered by a margin text). A caller
    with no eyes (`ui_snapshot`, the dismissal picker, tree-only tests) behaves as before.
-6. **Once per text where it lies** in `scroll_until` (`scroll-rounds.ts#State.marginSeen`): unlike ADR 0024's
+6. **Once per text where it lies** in `scroll_until` (`scroll-rounds.ts#State.marginKept`): unlike ADR 0024's
    unordered stop, a refused clear question is followed by strokes, and the text moves with the target. What was seen
    is kept by the text's identifier, label and size within a pixel (one entry per text, the latest answer) and told to
    every later read: `under` for the call (the cover stands, no screenshot again); `clear` and `untold`, answers of the

@@ -271,7 +271,7 @@ describe('scroll_until — fully: true on a field under a text in its touch marg
 });
 
 /**
- * WHAT WAS SEEN OF A MARGIN TEXT, KEPT (interact/scroll-rounds.ts#State.marginSeen) across the reads of one call: the
+ * WHAT WAS SEEN OF A MARGIN TEXT, KEPT (interact/scroll-rounds.ts#State.marginKept) across the reads of one call: the
  * after-back form served first 700 px lower (phone below the viewport: a stroke), then where it was captured — the clear
  * question asked there — then, for the read that confirms the stop, either there again or 10 px higher. A `clear` is an
  * answer of the frame it was read on: kept while the two lie where they were seen, asked again once they moved; the

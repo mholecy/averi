@@ -219,7 +219,7 @@ pairs: OrderPair[] }` (this ADR's) and `{ asks: 'clear', pairs: ClearPair[] }`: 
 each paints anything over the target; `PairSeen` gains `clear`, which one NOT_DRAWN row (`seenClear`) takes as no cover.
 `judgedWithOrder`, the port (`OrderEyes`) and `orderOfFrame` are unchanged; `scroll_until`'s driver now hands the
 reducer the eyes' answers as they came (`RoundSeen.order: OrderSeen[]`) instead of `orderSeenBy`'s told order, so the
-reducer can keep what it saw of margin texts (`scroll-rounds.ts#State.marginSeen`) — a refused clear
+reducer can keep what it saw of margin texts (`scroll-rounds.ts#State.marginKept`) — a refused clear
 question is followed by strokes, unlike this ADR's unordered stop. The pixel assert never keeps a `clear` across poll
 rounds, as it never keeps an `over`. Every reading-order behaviour of this ADR is unchanged (a `clear` is no order of
 two controls: `reading-order.ts` reads it as nothing seen).
