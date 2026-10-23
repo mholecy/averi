@@ -13,7 +13,7 @@ import { loadSide } from '../differential/side.js';
 import { familyOf } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { holds, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
+import { holds, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
@@ -126,7 +126,7 @@ if (rejudging === undefined) console.error(`lab: ${ios !== undefined ? await ios
 // --- the cases ---
 
 interface Call {
-  tool: 'type_text' | 'tap' | 'scroll_until' | 'assert' | 'run_flow';
+  tool: 'type_text' | 'tap' | 'scroll_until' | 'assert' | 'run_flow' | 'press_key';
   args: Record<string, unknown>;
 }
 
@@ -256,6 +256,20 @@ const FORMS: Omit<Case, 'group'>[] = [
     says: 'scroll_until phone, under the bar riding on the keyboard: no stop while its centre lies under the bar or the keyboard, never a submit (the strokes counted)',
     calls: [{ tool: 'scroll_until', args: { selector: id(K, 'phone'), direction: 'down' } }],
     judge: (s, replies, source, launched) => judgePhoneScroll(s, replies, source, launched),
+  },
+  // Phone after back (docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md):
+  // k7's launch, `back` hides the IME, then `fully: true` on phone — the next field's title over its touch target's margin.
+  {
+    id: 'k7f',
+    cell: K,
+    keyboard: true,
+    platforms: ['android'],
+    says: 'after back hid the IME, scroll_until phone fully: true: "fully visible" where phone is drawn whole, its touch target under the next title judged on one screenshot',
+    calls: [
+      { tool: 'press_key', args: { key: 'back' } },
+      { tool: 'scroll_until', args: { selector: id(K, 'phone'), direction: 'down', fully: true } },
+    ],
+    judge: (s, replies, source, launched) => judgePhoneAfterBack(s, replies, source, launched),
   },
   { id: 'b1', cell: B, says: 'fill, no clear, a name', calls: [fill(B, 'name', 'Jan Novak')], judge: holds('name', 'Jan Novak') },
   { id: 'b1d', cell: B, says: 'fill, no clear, a name with diacritics', calls: [fill(B, 'name', 'Jan Šťastný')], judge: holds('name', 'Jan Šťastný') },

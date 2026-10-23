@@ -339,6 +339,24 @@ known and now ok (LV1's three entries struck off live-known.ts). The same in bot
   node, or a node cut at both of the container's edges), so how far they moved it is unknown — the element may lie
   further down: raise maxSwipes or timeoutMs"; `turn:scroll-bounded.F` unchanged.
 
+# Round 1023, phone after back: a text in a control's touch margin, judged by the eyes (2026-10-23)
+
+bugs/r1023-phone at `7d8c8c43` (ui-tree/cover.ts#marginText, verify/eyes.ts#judgeClear, draw-order.ts's `seenClear` row;
+docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md; the live case `k7f` of live.ts's forms group
+added with the records), run from that checkout on averi_lab (emulator-5554, booted `-no-snapshot-save`, shut down
+after), the lab app as installed (no app change). Records docs/truth/live-records/android-forms-r1023-phone-1.json
+(`--cases k7,k7f`: 2 cases, 2 ok) and -2.json (`--groups forms`, the whole group: 29 cases, 27 ok, 2 loud — b1d and
+b7, `adb input text` cannot type `Š` or `’`, accepted — 0 mismatches); both exit 0.
+
+- `k7f` (k7's launch, `press_key back`, then `scroll_until phone fully: true`): the app lays phone at 1296–1395 (drawn),
+  `vs.title` from 1406, nothing under the bar; no stroke — "Element id:"lab.form-keyboard.phone" fully visible after
+  0 swipes — text "Variable symbol" (55,1406 258x56), drawn after it, overlaps its bottom 6 px with nothing a
+  screenshot shows (Android dumps a control's touch target, past what it draws)". Before (the note, round 7's A6,
+  driven by hand): 5 swipes, two turns, "failed after 17290ms … stayed under text "Variable symbol" … 99% of it shows".
+- `k7` (the IME up) unchanged: one stroke, phone 1129–1228, "visible after 1 swipe — PARTLY UNDER a surface the tree
+  does not list: its bottom 28 px show #F2F2F7 …", nothing submitted.
+- Nothing else changed: every other forms case as before.
+
 # Round 7 final device check, 2026-10-19
 
 truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and

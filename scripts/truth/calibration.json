@@ -1580,7 +1580,7 @@
     },
     {
       "note": "2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md",
-      "why": "residual found by round 7's A6: `scroll_until … fully: true` on form-keyboard's phone after `back` is refused under the next field's title, which its 132-px touch target overlaps by 6 px, though the 99 px it draws are whole — live only (driven directly over MCP: docs/truth/live-records/android-k7-fully-eyes-direct.jsonl), no golden row (the replay asks no `fully: true` of phone) and no live.ts case asks it; open"
+      "why": "residual found by round 7's A6: `scroll_until … fully: true` on form-keyboard's phone after `back` is refused under the next field's title, which its 132-px touch target overlaps by 6 px, though the 99 px it draws are whole — live only (driven directly over MCP: docs/truth/live-records/android-k7-fully-eyes-direct.jsonl), no golden row (the replay asks no `fully: true` or ocr assert of a field clear of the IME); fixed live by round 1023 at 7d8c8c43 (src/ui-tree/cover.ts#marginText suspects a text in a control's touch margin, src/verify/eyes.ts#judgeClear tells it from one screenshot; docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md), k7f ok — fully visible after 0 swipes, the title seen clear (docs/truth/live-records/android-forms-r1023-phone-1.json, -2.json), k7 unchanged; golden 0 changed"
     },
     {
       "note": "2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md",

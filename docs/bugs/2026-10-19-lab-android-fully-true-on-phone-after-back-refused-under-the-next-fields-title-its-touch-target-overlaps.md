@@ -1,9 +1,14 @@
 # BUG: on Android `scroll_until … fully: true` on form-keyboard's phone, once `back` has hidden the IME, never stops — its 132-px touch target overlaps the "Variable symbol" title below it by 6 px, a cover the tree lists, though the field it draws is whole
 
-> **Status (2026-10-19):** open, a residual. Found by round 7's A6 (arch/r23-eyes) while driving k7's `fully: true`
-> by hand; not the eyes' (no screenshot is taken: the stop is refused by the tree before any claim). No golden row asks
-> it (the replay's verbs ask no `fully: true` of form-keyboard's phone), no live.ts case either: calibration.json lists
-> it excluded until a case does.
+> **Status (2026-10-23):** fixed at `7d8c8c43` (bugs/r1023-phone, docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md),
+> measured by live k7f (docs/truth/live-records/android-forms-r1023-phone-1.json, -2.json): after `back`, "fully
+> visible after 0 swipes — text "Variable symbol" (55,1406 258x56), drawn after it, overlaps its bottom 6 px with
+> nothing a screenshot shows". The tree only suspects a text in a control's touch margin (src/ui-tree/cover.ts#marginText);
+> one screenshot decides (src/verify/eyes.ts#judgeClear), for the `fully` stop and the ocr assert alike. Golden 0
+> changed (no row asks it); calibration.json keeps it excluded (live only).
+>
+> (2026-10-19: open, a residual. Found by round 7's A6 (arch/r23-eyes) while driving k7's `fully: true` by hand; no
+> golden row asked it, no live.ts case either.)
 
 Found **2026-10-19** on averi_lab (emulator-5554, API 33), the lab app as installed for round 7, averi =
 arch/r23-eyes (from arch/round-23 `bd43fc66`), driven directly over MCP — the record is
