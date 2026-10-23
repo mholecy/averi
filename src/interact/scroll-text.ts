@@ -411,6 +411,7 @@ function flushCutText(cut: FlushCut): string {
     budget: '',
     room: ', and no scroll container around it has room for a swipe to reveal the rest',
     axis: `, and every scroll container around it from that one outward scrolls only ${axisOfEdge(cut.edge) === 'vertical' ? 'sideways' : 'up and down'}, so no swipe can reveal the rest`,
+    tap: ', and the swipe that followed to reveal the rest moved nothing but was too short to tell from a tap',
   }[cut.why];
   return `${where}, ${cuts}, and a probe swipe toward it showed ${cut.revealed} px more of it — part of it lay past that edge, so it may still be cut there${unrevealed}`;
 }

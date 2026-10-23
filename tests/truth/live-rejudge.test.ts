@@ -245,7 +245,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-r1023-lv2-4.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-5.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-group.json', 'visibility', { cases: 140, ok: 130, loud: 6, mismatches: 4 }],
-    // The cell twice more at the branch's tip, after the code review kept the proof (a path S never takes): the same.
+    // The cell twice more with the proof kept (`ProvenCut`, a path S never takes): the same.
     ['android-vis-r1023-lv2-6.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-7.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {

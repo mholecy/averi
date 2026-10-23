@@ -93,6 +93,15 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     );
   });
 
+  it('a reveal drawn too short to tell from a tap that moved nothing: no "fully visible" — the read is short of the cut', () => {
+    const tap = { from: { x: 540, y: 1443 }, to: { x: 540, y: 1425 } }; // 18 px, under twice the slop
+    const played = play(RULES, [sAt(0), sAt(60), { ...sAt(60), drawn: tap, elapsedMs: 15_000 }]);
+    expect(played.outcome).toMatchObject({ kind: 'bound', short: { of: 'flushCut', revealed: 60, why: 'tap' } });
+    expect(failureOf(played, `id:"${S_ID}"`).message).toContain(
+      'so it may still be cut there, and the swipe that followed to reveal the rest moved nothing but was too short to tell from a tap (last rect {"x":128,"y":1459,"width":825,"height":82}); check with a screenshot',
+    );
+  });
+
   it('the proof is kept while it lies flush on that edge: a later read, after a stroke that was no reveal, reveals at once — no confirm, no quarter probe', () => {
     const played = play(RULES, [sAt(0), sAt(60, {}, true), sAt(60), sAt(280), sAt(280)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'confirm', 'stop']);

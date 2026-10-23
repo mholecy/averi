@@ -334,9 +334,10 @@ export type Flush =
 /**
  * A `fully: true` match on a cut the flush check's probe PROVED (`ProvenCut`) that no reveal could be sent for this
  * read: it lies flush on that `edge` of that `container` (or `pinned` node), and the probe had shown `revealed` px more
- * of it — content lay past that edge, and part of the match with it. `why` the reveal was not sent: no swipe or time
+ * of it — content lay past that edge, and part of the match with it. `why` no reveal showed the rest: no swipe or time
  * left (`budget`), no scroll container around it with room for one (`room`), or every one from that edge outward
- * scrolling only across it (`axis`) — the last two only when the tree changed since the probe. Never a stop: it is
+ * scrolling only across it (`axis`) — those two only when the tree changed since the probe — or a reveal that moved
+ * nothing drawn too short to tell from a tap (`tap`: the driver drew it under twice the slop). Never a stop: it is
  * what the target was short of, at the bound or a stuck stop, never "fully visible" with a hedge. The round's, never
  * scroll-read.ts#shortOf's: the tree alone reads it whole.
  * docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
@@ -348,15 +349,18 @@ export interface FlushCut {
   container: Rect;
   pinned?: QuotedNode;
   revealed: number;
-  why: 'budget' | 'room' | 'axis';
+  why: 'budget' | 'room' | 'axis' | 'tap';
 }
 
 /**
  * A cut the flush check's probe PROVED (`revealedBy`): after the probe the match lay flush on the same `edge` of the
- * same `container` with `revealed` px more of it showing. Kept (`State.provenCut`) while every later flush check finds
- * the match flush on that edge of that container (`stillProven`): such a read claims no stop and confirms none, and
- * its next stroke is a reveal (course.ts#Revealing) — or, with none to send, the read is short of the cut
- * (`FlushCut`). A read that finds it anywhere else lets it go: the round judges that read like any other.
+ * same `container` — its own edge or a `pinned` node's there, alike — with `revealed` px more of it showing. Kept
+ * (`State.provenCut`) while every later flush check finds the judged match flush on that edge of that container
+ * (`stillProven`): such a read claims no stop and confirms none, and its next stroke is a reveal (course.ts#Revealing)
+ * — or, with none to send, the read is short of the cut (`FlushCut`). A read that finds it anywhere else lets it go:
+ * the round judges that read like any other. Kept by edge and container, not by node: another match judged there
+ * (a selector matching two rows) is taken for the same — the cost a failure naming the cut, never a false "fully
+ * visible"; reads that judge no stop leave it as it was.
  */
 interface ProvenCut {
   readonly edge: Edge;
@@ -1454,7 +1458,9 @@ function flushCheck(s: Mutable<State>, { best, facts, chain, flushed, probeHeld,
   const { edge, at } = flushed;
   const container = chain[at];
   const where = { edge, container, ...(flushed.pinned !== undefined && { pinned: flushed.pinned }) };
-  if (probeHeld) return probeStroked ? { ...where, checked: true } : { ...where, checked: false, why: 'tap' };
+  // A probe or reveal that moved nothing: checked — nothing lies past the edge now — unless drawn too short to tell
+  // from a tap, which on a proven cut is no stop but that cut.
+  if (probeHeld) return probeStroked ? { ...where, checked: true } : proven === undefined ? { ...where, checked: false, why: 'tap' } : { of: 'flushCut', judged: best, ...where, revealed: proven.revealed, why: 'tap' };
   // With no gesture box (`RoundSeen.screen` absent) nothing has room and the stop says `room` — the wrong reason (it
   // is "no screen box"), accepted as unreachable in practice: screenBox throws only when the device's size is
   // unusable AND the tree has no window, and adapters/viewport-memo.ts keeps a successful size for the session — so it

@@ -410,7 +410,8 @@ match in its place), has proved the cut — content lay past that edge, and part
 4. is remembered: the proof is KEPT (`scroll-rounds.ts#ProvenCut`, `State.provenCut`) while every later flush check finds the match
    flush on that edge of that container, and let go when one finds it anywhere else. So a read that cannot send the
    reveal — no swipe or time (`budget`), or a tree changed between the probe and its read: no room for a stroke (a
-   keyboard or an overlay come up) or only a scroll view across the axis — is short of the cut (`FlushCut`, its `why`)
+   keyboard or an overlay come up) or only a scroll view across the axis — or that finds a reveal that moved nothing
+   drawn too short to tell from a tap (`tap`) is short of the cut (`FlushCut`, its `why`)
    and claims no stop; the strokes go on the caller's way as for any shortfall, and a later read still flush there
    reveals at once, or is short of the cut again. The bound fails naming it, a stuck stop too (`… so no swipe can
    reveal the rest — and swiping down no longer moves it …; check with a screenshot`): "fully visible" is never said
