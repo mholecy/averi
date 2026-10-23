@@ -27,6 +27,7 @@
         {
           "rows": ["android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until"],
           "broke": "cb77485",
+          "fixed": "34f82f2",
           "why": "the fix's documented full-width cut (`highestCover`: everything below the panel's top counts as covered): the pinned submit between the panel's bottom (1884) and the strip (2088), drawn and tapped by its probe, is refused after two swipes, `never intersected the 1080x1092 screen above the soft keyboard` — green at 7d9a783; lab finding FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md)"
         }
       ],
@@ -1282,11 +1283,12 @@
     {
       "n": "FU1",
       "note": "2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["34f82f2"],
       "verified": "golden",
       "defect": "never intersected the \\d+x\\d+ screen above the soft keyboard",
       "checks": ["android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until"],
-      "remark": "No fix yet: red at HEAD and at cb77485, green at 7d9a783 (#1's regression elsewhere, recorded there). forms.known.ts owns the ratchet; this entry only links the note to its row."
+      "remark": "Fixed by round 1023b, 34f82f2 on bugs/r1023b-fu1 (ui-tree/keyboard-cover.ts#panelGap, interact/scroll-read.ts#inGap: a match wholly in the strip between a floating keyboard's panels and its band, stopping cleanly there, is judged there; ADR 0027): the pair is 34f82f2 and its parent 9aee4db7. Before: refused after two swipes above the panel, `never intersected the 1080x1092 screen above the soft keyboard`; after: `fully visible after 0 swipes`, no stroke. Red since cb77485 (#1's regression elsewhere, recorded there), green at 7d9a783. Live, 2026-10-23 on averi_lab with Gboard floated by hand (region `(359,1269,1040,1912)(0,2088,1080,2220)`): kf1–kf3 ok three runs of three (docs/truth/live-android-2026-10-23-floating-gap.md)."
     },
     {
       "n": "OC1",

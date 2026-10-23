@@ -62,7 +62,7 @@ open note on the working tree. See the script for the verdicts.
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | calibrate | cbc584b → 7957a62 | CALIBRATED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → 151b2ca | CALIBRATED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | calibrate | b71cbbb → 6d8f8de | CALIBRATED |
-| FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
+| FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | calibrate | 9aee4db → 34f82f2 | CALIBRATED |
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | calibrate | 3d668f1 → 9837ef6 | CALIBRATED |
 | OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | calibrate | 9837ef6 → cb0b7ac | CALIBRATED |
 | NI1 | 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier | calibrate | a0463c6 → 75d6c07 | CALIBRATED |
@@ -107,7 +107,7 @@ Regressed elsewhere at cb77485 (green at 7d9a783):
 
 Regressions recorded:
 
-- android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until: broke at cb77485, not fixed — the fix's documented full-width cut (`highestCover`: everything below the panel's top counts as covered): the pinned submit between the panel's bottom (1884) and the strip (2088), drawn and tapped by its probe, is refused after two swipes, `never intersected the 1080x1092 screen above the soft keyboard` — green at 7d9a783; lab finding FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md)
+- android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until: broke at cb77485, fixed at 34f82f2 — the fix's documented full-width cut (`highestCover`: everything below the panel's top counts as covered): the pinned submit between the panel's bottom (1884) and the strip (2088), drawn and tapped by its probe, is refused after two swipes, `never intersected the 1080x1092 screen above the soft keyboard` — green at 7d9a783; lab finding FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md)
 
 forms/form-keyboard-floating (round 4): form-keyboard on averi_lab with Gboard switched to Floating by hand (its grid → the Floating tile; no adb command or setting switches it; docked again after, the touchable region back to `(0,1398,1080,2220)`): `ITYPE_IME` only the 132-px strip `[0,2088][1080,2220]`, the panel the second rect of `touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))` — the note's three readings, served by the fake device (CellTruth.ime) — and postcode, phone, vs, ks with their centres under the panel, clear of the strip (truth.ts#imePanels, situationOf: under-keyboard; each probe at its centre pressed a key, each after one back focused it). At 7d9a783 each is `Tapped` with no back (the key pressed), its colour PASSES on the panel, and scroll_until calls it `fully visible after 0 swipes`; at cb77485 one back then a tap inside it, the colour fails closed, and scroll_until swipes touching down above the panel (y 874), clear of it and the strip. The docked leg (form-keyboard under a docked Gboard): green at 7d9a783 and at cb77485 alike, golden identical on the cell — docked, the region is the band, nothing beyond it (by design); 1.2 judges the docked half the fix was built on.
 
@@ -128,7 +128,7 @@ forms/form-keyboard-floating (round 4): form-keyboard on averi_lab with Gboard s
 
 Regressions recorded:
 
-- android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until: broke at cb77485, not fixed — the fix's documented full-width cut (`highestCover`: everything below the panel's top counts as covered): the pinned submit between the panel's bottom (1884) and the strip (2088), drawn and tapped by its probe, is refused after two swipes, `never intersected the 1080x1092 screen above the soft keyboard` — green at 7d9a783; lab finding FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md)
+- android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until: broke at cb77485, fixed at 34f82f2 — the fix's documented full-width cut (`highestCover`: everything below the panel's top counts as covered): the pinned submit between the panel's bottom (1884) and the strip (2088), drawn and tapped by its probe, is refused after two swipes, `never intersected the 1080x1092 screen above the soft keyboard` — green at 7d9a783; lab finding FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md)
 
 1.2: 9131730, the scroll_until half fix/r2-d-gboard sits on (the note: 'on top of fix/keyboard-aware-scroll'), judged alone on the docked capture's under-IME fields — the same pair (98e49b7 → 9131730) and the same four rows as #5's Android leg, which calibrates them too — kept here because the floating note's fix is built on it. At 98e49b7 'fully visible after 0 swipes' behind the docked IME; at 9131730 a stop above the band naming the keyboard.
 
@@ -1312,14 +1312,16 @@ Fixed by round 9 on fix/r9-b4l1 (ui-tree/standing.ts#OverlaidEdge; ADR 0013 refi
 
 Fixed by round 6's S2, 6d8f8de on arch/r22-f2a1 (ui-tree/standing.ts#cutByLater: a control Compose cut to a strip under the tap minimum by a node drawn after it is a sliver; the owner's decision of 2026-10-17, ADR 0013's refinement), merged into arch/round-22 as 8b2530c with its review fixes (wording only): the pair is 6d8f8de itself and its parent b71cbbb (round 5's src). Before: phone reached with no swipe, its strip under the bar riding on the IME; after: no stop — it fails after 3 swipes naming the bar. (The replay's: its tree never moves. Live, round 6's Android device check, 2026-10-18, case k7: the form scrolls above the IME — one stroke at 540,1034 moved it 167 px and stopped on phone, its centre clear of the bar; tap phone and tap note refused, no submit.)
 
-## FU1: OPEN-RED
+## FU1: CALIBRATED
 
 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md — defect: `never intersected the \d+x\d+ screen above the soft keyboard`
 
-- working tree:
+- before 9aee4db:
   - RED android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until — stopped: ERROR scroll_until id:"lab.form-keyboard-floating.submit" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never
+- after 34f82f2:
+  - ok android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until — Element id:"lab.form-keyboard-floating.submit" fully visible after 0 swipes
 
-No fix yet: red at HEAD and at cb77485, green at 7d9a783 (#1's regression elsewhere, recorded there). forms.known.ts owns the ratchet; this entry only links the note to its row.
+Fixed by round 1023b, 34f82f2 on bugs/r1023b-fu1 (ui-tree/keyboard-cover.ts#panelGap, interact/scroll-read.ts#inGap: a match wholly in the strip between a floating keyboard's panels and its band, stopping cleanly there, is judged there; ADR 0027): the pair is 34f82f2 and its parent 9aee4db7. Before: refused after two swipes above the panel, `never intersected the 1080x1092 screen above the soft keyboard`; after: `fully visible after 0 swipes`, no stroke. Red since cb77485 (#1's regression elsewhere, recorded there), green at 7d9a783. Live, 2026-10-23 on averi_lab with Gboard floated by hand (region `(359,1269,1040,1912)(0,2088,1080,2220)`): kf1–kf3 ok three runs of three (docs/truth/live-android-2026-10-23-floating-gap.md).
 
 ## OC1: CALIBRATED
 

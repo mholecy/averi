@@ -1,6 +1,6 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, windowHintSaid } from './replies.js';
+import { ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
 import type { LabState, Rect } from './schema.js';
 
 /**
@@ -189,4 +189,72 @@ export const judgeMissUnderSheet =
     if (times > 1) return { outcome: 'LOUD', kind, why: `failed, nothing fired, but "close it first" said ${times} times: ${firstLine(reply)}` };
     if (said === undefined) return { outcome: 'LOUD', kind, why: `failed, nothing fired, but no "close it first": ${firstLine(reply)}` };
     return { outcome: 'ok', kind, why: `failed, nothing fired; ${said}: ${firstLine(reply)}` };
+  };
+
+/**
+ * Where the lab's hand-floated Gboard panel was measured (the IME window's touchable region beside its 132-px strip):
+ * the capture's `SkRegion((71,1092,1008,1884)(0,2088,1080,2220))`
+ * (tests/fixtures/truth/android-averi_lab-api33/form-keyboard-floating.ime.json) and the 2026-10-23 live run's
+ * `SkRegion((359,1269,1040,1912)(0,2088,1080,2220))` (docs/truth/live-android-2026-10-23-floating-gap.md, also the
+ * 2026-10-08 device check's). No adb setting places it; a run that finds it elsewhere reads its region and adds it here.
+ * kf3 refuses a visible claim on ks whose centre lies in ANY of them.
+ */
+export const LAB_FLOATING_PANELS: readonly Rect[] = [
+  { x: 71, y: 1092, width: 937, height: 792 },
+  { x: 359, y: 1269, width: 681, height: 643 },
+];
+
+/**
+ * The kf cases' precondition: the IME is FLOATING at launch — the app hears of only its strip (the inset the panel's
+ * window gives, 132 px on the lab AVD), not a docked keyboard's 822 px. No adb setting floats Gboard, so a run whose
+ * Gboard came up docked is not run, never ok.
+ */
+export function floatingAtLaunch(launched: LabState): LiveVerdict | undefined {
+  const ime = launched.keyboard;
+  if (ime?.visible !== true) return { outcome: 'SKIP', why: 'no IME at launch' };
+  return ime.frame.height > 200 ? { outcome: 'SKIP', why: `keyboard docked (the app hears an IME ${ime.frame.height} px tall, not the floating strip)` } : undefined;
+}
+
+const centreIn = (r: Rect | undefined | null, p: Rect): boolean => {
+  if (r == null) return false;
+  const x = r.x + r.width / 2;
+  const y = r.y + r.height / 2;
+  return x >= p.x && x < p.x + p.width && y >= p.y && y < p.y + p.height;
+};
+
+/**
+ * kf1–kf3, form-keyboard-floating under a floating Gboard: the pinned submit lies wholly in the strip between the panel
+ * and the strip the app hears of, drawn and tappable (ADR 0027).
+ * - `kf1` scroll_until submit: a visible claim with no stroke (0 swipes, no touch the app logged); a refusal is the
+ *   false refusal of the note, a stroke one the bar never needed.
+ * - `kf2` scroll_until submit, then tap it: one submit, the IME still up (no `back` sent for it), the tap the one
+ *   touch the app logged.
+ * - `kf3` scroll_until ks: never a visible claim while ks's centre lies in the panel; postcode, focused under it, as
+ *   the launch left it (no key typed).
+ * docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md
+ */
+export const judgeFloatingGap =
+  (kind: 'kf1' | 'kf2' | 'kf3') =>
+  (s: LabState, replies: string[], _source: string, launched: LabState): LiveVerdict => {
+    const docked = floatingAtLaunch(launched);
+    if (docked !== undefined) return docked;
+    const [scroll, tap] = replies;
+    const submits = (s.submits ?? []).length;
+    const touches = touchesSince(s, launched);
+    const logged = `${touches.length} touch(es) the app logged${touches.length === 0 ? '' : ` at ${touchPointsText(touches)}`}`;
+    if (kind === 'kf3') {
+      if (valueOf(s, 'postcode') !== valueOf(launched, 'postcode')) return { outcome: 'MISMATCH', why: `postcode CHANGED to ${JSON.stringify(valueOf(s, 'postcode'))} — a key was typed; averi: ${short(scroll)}` };
+      if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×); averi: ${short(scroll)}` };
+      const ks = s.frames.ks;
+      const where = ks == null ? 'ks not laid out' : `ks ${ks.y}–${ks.y + ks.height}`;
+      if (replyKind(scroll) === 'visible' && (ks == null || LAB_FLOATING_PANELS.some((p) => centreIn(ks, p)))) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — ks's centre lies in a measured panel (${where}); ${logged}` };
+      return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panels (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
+    }
+    if (replyKind(scroll) !== 'visible') return { outcome: 'MISMATCH', why: `refused, though the submit lies wholly between the panel and the strip: ${short(scroll)}` };
+    // kf2's one touch is its tap, sent after the scroll; any other is a stroke.
+    if (swipesOf(scroll) !== 0 || touches.length > (kind === 'kf2' ? 1 : 0)) return { outcome: 'MISMATCH', why: `a stroke the pinned submit never needed (${swipesOf(scroll) ?? '?'} swipes; ${logged}): ${short(scroll)}` };
+    if (kind === 'kf1') return { outcome: submits === 0 ? 'ok' : 'MISMATCH', why: `${submits === 0 ? '' : `the form was SUBMITTED (${submits}×) by a scroll — `}${short(scroll)}` };
+    if (!claimsTap(tap) || submits !== 1) return { outcome: claimsTap(tap) ? 'MISMATCH' : 'LOUD', why: `${submits} submit(s); averi: ${short(tap)}` };
+    if (s.keyboard?.visible !== true) return { outcome: 'MISMATCH', why: `submitted, but the IME went (a back sent for a tap clear of it): ${short(tap)}` };
+    return { outcome: 'ok', why: `1 submit, the IME still up: ${short(scroll)} / ${short(tap)}` };
   };

@@ -1,5 +1,15 @@
 # BUG: on Android `scroll_until` refuses a pinned submit that lies between a floating keyboard's panel and its strip — drawn, tappable, and "never intersected the screen above the soft keyboard"
 
+> **Status (2026-10-23):** fixed at `34f82f25` (bugs/r1023b-fu1, docs/adr/0027-a-floating-keyboards-panel-gap-is-the-apps-screen.md):
+> `ui-tree/keyboard-cover.ts#panelGap` names the strip between a floating keyboard's panels and its band, and
+> `interact/scroll-read.ts#inGap` judges a match wholly inside it there, kept only when it stops cleanly (reachable,
+> all of it in the gap, nothing clipped) — so the cover is moot and the reply is `fully visible after 0 swipes`, no
+> stroke. Measured by golden (the row below green, no other reply changed; KNOWN struck; calibrate CALIBRATED) and live
+> on averi_lab (2026-10-23, Gboard floated by hand, region `(359,1269,1040,1912)(0,2088,1080,2220)`): kf1 visible with
+> no stroke, kf2 tapped once with the IME still up, kf3 (ks under the panel) never visible, no key typed — three runs
+> of three (docs/truth/live-android-2026-10-23-floating-gap.md). Still refused (fails closed): a target beside the
+> panel, or partly in the gap and partly beside or under a panel's rows.
+
 Lab note FU1. **Found 2026-10-16** by the golden mode (scripts/differential/golden.ts) over the Android lab app's
 ground truth (`tests/fixtures/truth/android-averi_lab-api33/form-keyboard-floating.*`, captured by
 scripts/truth/capture-android.ts on the dedicated `averi_lab` AVD, Android 13 / API 33, 1080x2220, gesture navigation,

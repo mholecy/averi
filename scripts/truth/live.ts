@@ -13,7 +13,7 @@ import { loadSide } from '../differential/side.js';
 import { familyOf } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { holds, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
+import { holds, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
@@ -160,6 +160,7 @@ const P = 'form-prefilled';
 const RN = 'rn-field';
 const B = 'form-basic';
 const K = 'form-keyboard';
+const KF = 'form-keyboard-floating';
 const TITLE = { tap: { text: 'Transfer details' } };
 
 const FORMS: Omit<Case, 'group'>[] = [
@@ -270,6 +271,39 @@ const FORMS: Omit<Case, 'group'>[] = [
       { tool: 'scroll_until', args: { selector: id(K, 'phone'), direction: 'down', fully: true } },
     ],
     judge: (s, replies, source, launched) => judgePhoneAfterBack(s, replies, source, launched),
+  },
+  // FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md):
+  // Gboard floated by hand (no adb setting does it), its panel over the form and the pinned submit in the strip below it
+  // — live-forms.ts#judgeFloatingGap; a run whose Gboard came up docked is SKIP.
+  {
+    id: 'kf1',
+    cell: KF,
+    keyboard: true,
+    platforms: ['android'],
+    says: 'scroll_until the submit between a floating keyboard\'s panel and its strip: visible with no stroke',
+    calls: [{ tool: 'scroll_until', args: { selector: id(KF, 'submit'), direction: 'down' } }],
+    judge: judgeFloatingGap('kf1'),
+  },
+  {
+    id: 'kf2',
+    cell: KF,
+    keyboard: true,
+    platforms: ['android'],
+    says: 'scroll_until the submit there, then tap it: one submit, the IME still up',
+    calls: [
+      { tool: 'scroll_until', args: { selector: id(KF, 'submit'), direction: 'down' } },
+      { tool: 'tap', args: { selector: id(KF, 'submit') } },
+    ],
+    judge: judgeFloatingGap('kf2'),
+  },
+  {
+    id: 'kf3',
+    cell: KF,
+    keyboard: true,
+    platforms: ['android'],
+    says: 'scroll_until ks, under the floating panel: never visible while its centre lies in the panel, no key typed',
+    calls: [{ tool: 'scroll_until', args: { selector: id(KF, 'ks'), direction: 'down' } }],
+    judge: judgeFloatingGap('kf3'),
   },
   { id: 'b1', cell: B, says: 'fill, no clear, a name', calls: [fill(B, 'name', 'Jan Novak')], judge: holds('name', 'Jan Novak') },
   { id: 'b1d', cell: B, says: 'fill, no clear, a name with diacritics', calls: [fill(B, 'name', 'Jan Šťastný')], judge: holds('name', 'Jan Šťastný') },
