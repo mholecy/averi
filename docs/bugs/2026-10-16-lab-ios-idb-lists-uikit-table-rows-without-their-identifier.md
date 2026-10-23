@@ -1,5 +1,21 @@
 # BUG (tree source, diagnostics): under idb, a UIKit table row's label is listed without its accessibility identifier — `tap` and `scroll_until` by that id time out "to appear" on a row idb lists by its text, and the reply never says why
 
+> **Status (2026-10-23, round 1023): fixed** at `2c2f566` (bugs/r1023-ni1; ADR 0018 amended, "an idb read that lists
+> no identifier", residual 20), measured by the golden mode (against `a0463c6b`: the 6 rows below green — R's tap,
+> colour and scroll_until in both cells; 73 more replies changed by the notes' words alone, no verdict class and no
+> device call changed), calibrate (CALIBRATED, `a0463c6b` → `2c2f566`) and the lab simulator
+> (docs/truth/live-records/ios-vis-r1023-ni1-1.json: under idb R's two taps refused, nothing fired, the reply naming
+> idb's limit — ok; F, L and short F not reached, LOUD, residual 20; ios-vis-r1023-ni1-wda-1.json, WDA the control, 9
+> of 9 ok). A read idb gives that lists no identifier on any element is a miss of its own (`ui-tree/miss.ts`,
+> `noIdListed`, asked before the container fact and not on a bare read): `no tree read contained
+> id:"lab.sheet-long-list.R", and idb lists no accessibility identifier on any element of the screen — it drops some,
+> a UIKit table cell label's among them. If the screen is showing, ask for it by text: or label:, or set
+> app.ios.treeSource: wda in averi.yaml`. The three hold-backs of round 15 (below) are lifted: the tap's, fill's and
+> presence check's wait, an optional step's skip and every assert's not-found say idb's dialect. The golden rows ask an
+> open target its source does not list the honest answer (ADR 0020). The rest is ADR 0018's residual 20:
+> `scroll_until` still strokes for such a target, and a dropped id on a screen where idb lists other ids reads as the
+> container fact.
+
 **Found 2026-10-16** by the live golden (scripts/truth/live.ts, phase 5) and the golden mode over the iOS lab app's
 ground truth (`tests/fixtures/truth/ios-iphone17-ios27/sheet-long-list*.idb.json`, captured by scripts/truth/capture.ts
 on the dedicated `averi-lab iPhone 17` simulator, iOS 27.0, 402x874). averi = mobile-verify `src/` at `debc9b2`.

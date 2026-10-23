@@ -225,6 +225,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-idb-sheet-r16-r6-1.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
     ['ios-idb-sheet-r16-r6-2.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
     ['ios-idb-sheet-r16-r6-3.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
+    // NI1's fix (bugs/r1023-ni1, ADR 0018 "an idb read that lists no identifier"): sheet-long-list and
+    // sheet-long-list-short under idb — R's taps refused, nothing fired, the reply naming idb's limit (ok: a target its
+    // source does not list is not asked to fire); F, L and short F not reached, LOUD, ADR 0018 residual 20 — and the
+    // same cells under WDA as a control, every case ok (R Tapped).
+    ['ios-vis-r1023-ni1-1.json', 'visibility', { cases: 8, ok: 5, loud: 3, mismatches: 0 }],
+    ['ios-vis-r1023-ni1-wda-1.json', 'visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);

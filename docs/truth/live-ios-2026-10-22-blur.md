@@ -7,7 +7,8 @@ installed before each run. Reproduce (outside the sandbox):
   node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources wda --groups visibility \
     --cells blur-menu-grouped,blur-menu-stacked,blur-menu-unhidden [--record <file>]
 Records (docs/truth/live-records, rejudged by tests/truth/live-rejudge.test.ts): ios-vis-r16-blur-1.json, -2.json; at the
-merge (§3) ios-vis-r16-merge-1.json, -2.json; the feeler (§4) ios-vis-r16-r6-1.json, -2.json, ios-idb-sheet-r16-r6-1…3.json.
+merge (§3) ios-vis-r16-merge-1.json, -2.json; the feeler (§4) ios-vis-r16-r6-1.json, -2.json, ios-idb-sheet-r16-r6-1…3.json;
+NI1 (§5) ios-vis-r1023-ni1-1.json, ios-vis-r1023-ni1-wda-1.json.
 The previous iOS runs: docs/truth/live-ios-2026-10-19-lab-fixes.md, live-ios-2026-10-18-visibility.md. -->
 
 # What round 16's in-window backdrop measured
@@ -112,3 +113,31 @@ stroke before a read of the call has read — tests only, not run live.) Reprodu
   sent there: idb lists every node of the app's hierarchy, on the screen or not (scroll-top-edge's A at y −282,
   carousel-in-list's U at −200), so the target is seen at the first read. A feeler costs a call one short stroke
   (160 pt, 300 ms slower) only where idb has not listed the target before the first stroke.
+
+## 5. Round 1023, NI1: an idb read that lists no identifier (ADR 0018's amendment, residual 20), 2026-10-23
+
+bugs/r1023-ni1 at `2c2f566`'s src (from bugs/round-1023 `a0463c6b`), run from that worktree; the lab app as installed
+on 2026-10-22 (no app source changed since `907433f2`); the averi-lab iPhone 17 simulator (3AB1E82E, iOS 27.0), idb
+through a companion of this run's own on gRPC 10991 (`IDB_COMPANION=localhost:10991`), killed by its PID; WDA on 8120
+for the control; the simulator shut down after. Reproduce (outside the sandbox):
+`node --import tsx scripts/truth/live.ts --udid <lab simulator> --wda-port 8120 --sources idb --groups visibility
+--cells sheet-long-list,sheet-long-list-short --record <file>` (and `--sources wda` for the control).
+
+| record (docs/truth/live-records/) | src | source | cases | ok | loud | mismatches |
+|---|---|---|---|---|---|---|
+| ios-vis-r1023-ni1-1.json | 2c2f566 | idb | 8 | 5 | 3 (known: residual 20) | 0 |
+| ios-vis-r1023-ni1-wda-1.json | 2c2f566 | wda | 9 | 9 | 0 | 0 |
+
+- **R's taps under idb** (`tap:sheet-long-list.R`, `tap:sheet-long-list-short.R`): refused, nothing fired, the reply
+  `Timed out after 5000ms waiting for element id:"lab.sheet-long-list.R" to appear` with, beneath it, `(no tree read
+  contained id:"lab.sheet-long-list.R", and idb lists no accessibility identifier on any element of the screen — it
+  drops some, a UIKit table cell label's among them. If the screen is showing, ask for it by text: or label:, or set
+  app.ios.treeSource: wda in averi.yaml)`. ok: a target its source does not list is not asked to fire. Before (every
+  record since round 1): the same refusal with nothing beneath it, LOUD `tap-refused`, filed under NI1.
+- **F, L and short F under idb**: not reached, honest, the strokes the same as before (F 6 swipes, L 5, short F 3,
+  every touch-down at (201,699), nothing fired), each stop's "element never appeared in the tree" now with the new
+  note; LOUD `not-reached`, known (ADR 0018 residual 20: `scroll_until` still strokes for a target idb never lists).
+  Their taps refused with the note too.
+- **WDA, the control**: every case ok — R Tapped in both cells, F, L and short F reached and then Tapped, L's carry
+  case reached; WDA lists the identifiers, so nothing of the new note is said there.
+
