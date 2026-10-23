@@ -1585,6 +1585,10 @@
     {
       "note": "2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md",
       "why": "lab finding (round 16's LE2 code review): under WDA a plain stop on a row whose fling left its centre 0.7 pt past its scroll view's clip, \"visible … CLIPPED at top, 49%\", the tap then firing the row — live only and intermittent (live.ts --udid, case scroll:scroll-bounded-footer.O under WDA: once in five runs at the fix's src, docs/truth/live-records/ios-vis-r16-le2-2.json; the same kind of stop at 4ee14f1c): a replayed tree never moves, so no row reproduces a fling's rest; open"
+    },
+    {
+      "note": "2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md",
+      "why": "found fixing the phone-after-back note (ADR 0026 residual 5): `scroll_until … fully: true` under a margin text the eyes saw drawn over the field strokes to its timeout, the text moving with it — wall time, not what a target shows; no lab cell draws in the margin (unit only: tests/interact/scroll-eyes.test.ts); open"
     }
   ]
 }

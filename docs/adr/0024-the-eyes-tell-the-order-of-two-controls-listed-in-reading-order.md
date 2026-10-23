@@ -40,8 +40,8 @@ told the answer — the tap and the pixel assert supply only their purpose; `scr
 its driver answers with `orderSeenBy`, the read judged again on `lookTold`). The port is one shape everywhere,
 `OrderEyes` (`Pick<Eyes, 'order'>`).
 
-WHEN — asked only of a standing `covered` with remedy `unordered` (`eyes.ts#orderQuestion`; 6 targets over all 153
-trees of `tests/fixtures`), once per look, by the three verbs that may act on the answer; a caller without eyes (the
+WHEN — asked only of a standing `covered` with remedy `unordered` (`eyes.ts#pairQuestion`, then `orderQuestion`; 6
+targets over all 153 trees of `tests/fixtures`), once per look, by the three verbs that may act on the answer; a caller without eyes (the
 dismissal picker, `ui_snapshot`, a test) keeps today's untold order:
 - the tap (`interact/tap-judgement.ts#TapJudge.aim`, through `GuardOptions.eyes` → `TapAsks.eyes`): one screenshot,
   then the standing judged again on a look told the order (tests/flow/engine.test.ts pins that an uncovered target and
