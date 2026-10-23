@@ -1101,7 +1101,7 @@ identifier. A fact the read states, made by one walk of the flat list after a mi
 extra read; no `id:` selector can match anything in such a read, so the wait is hopeless, not late. Nothing ties
 `lab.sheet-long-list.R` to `"Target R"`, so no node is offered as the target.
 
-**idb's reasons, never one as the cause.** Why idb lists no element by an id is not in its read, and the lab measures
+**idb's reasons, never one as the cause.** Why idb lists no element by an id is not in its read, and averi has measured
 four reasons: nothing beneath the keyboard (form-keyboard and the toolbar cells: vs, ks, ss, note) or a presented
 sheet, alert or cover (sheet-background, dim-cover, form-picker, alert-dim — the alert's read is the alert alone), an
 identifier dropped (the UIKit table cell's label), and none on a container (SwiftUI `.contain`, a React Native
@@ -1387,7 +1387,10 @@ left to the docs (the reply is where the agent loses the time).
    or on a container, so an agent may try a remedy that does not apply (close a layer that is not there, ask by
    `text:` an element that is beneath one) before the one that does. `scroll_until` still strokes for such a target (a
    stroke could bring in nodes that carry ids), so the live sheet-long-list F/L and short F stay `not-reached`, honest.
-   Remedy: close what lies over it, a `text:`/`label:` selector, or `treeSource: wda`.
+   Under the keyboard, `scroll_until`'s reply says the keyboard twice — the note's "close it first" and its own
+   paragraph on the band, which says how hard hiding it is under idb — accepted: the paragraph is the measured one, and
+   a note without the keyboard for that one reply would be a variant for a wording's sake. Remedy: close what lies over
+   it, a `text:`/`label:` selector, or `treeSource: wda`.
 
 ## Bug notes
 

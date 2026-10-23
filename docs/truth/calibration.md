@@ -65,7 +65,7 @@ open note on the working tree. See the script for the verdicts.
 | FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | open | working tree | OPEN-RED |
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | calibrate | 3d668f1 → 9837ef6 | CALIBRATED |
 | OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | calibrate | 9837ef6 → cb0b7ac | CALIBRATED |
-| NI1 | 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier | calibrate | a0463c6 → 2c2f566 | CALIBRATED |
+| NI1 | 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier | calibrate | a0463c6 → 1cecfaf | CALIBRATED |
 | LW1 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 054a59f → f924893 | CALIBRATED |
 | LR1 | 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
 | LR2 | 2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
@@ -1370,15 +1370,15 @@ A text note judged on the real pixels by the host's recognizer (NOT-ASKED where 
   - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R tap — not tapped, without naming the source's limit: ERROR Timed out after 5000ms waiting for element id:"lab.sheet-long-list-short.R" to appear
   - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R colour — failed, without naming the source's limit: FAIL  element id:"lab.sheet-long-list-short.R" fill within dE00 8 of #1E88E5 — not found within 1 s
   - RED ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until — not reached, without naming the source's limit: ERROR scroll_until id:"lab.sheet-long-list-short.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken — idb lis
-- after 2c2f566:
+- after 1cecfaf:
   - ok ios-iphone17-ios27/sheet-long-list.idb.json R tap — ERROR Timed out after 5000ms waiting for element id:"lab.sheet-long-list.R" to appear
-  - ok ios-iphone17-ios27/sheet-long-list.idb.json R colour — FAIL  element id:"lab.sheet-long-list.R" fill within dE00 8 of #1E88E5 — not found within 1 s (no tree read contained id:"lab.sheet-long-list.R", and idb lists no accessibility identifier on any element of the screen — i
-  - ok ios-iphone17-ios27/sheet-long-list.idb.json R scroll_until — ERROR scroll_until id:"lab.sheet-long-list.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken — idb lists only what a presented s
+  - ok ios-iphone17-ios27/sheet-long-list.idb.json R colour — FAIL  element id:"lab.sheet-long-list.R" fill within dE00 8 of #1E88E5 — not found within 1 s (no tree read contained id:"lab.sheet-long-list.R", and idb's read lists no accessibility identifier on any element: idb lists
+  - ok ios-iphone17-ios27/sheet-long-list.idb.json R scroll_until — ERROR scroll_until id:"lab.sheet-long-list.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tr
   - ok ios-iphone17-ios27/sheet-long-list-short.idb.json R tap — ERROR Timed out after 5000ms waiting for element id:"lab.sheet-long-list-short.R" to appear
-  - ok ios-iphone17-ios27/sheet-long-list-short.idb.json R colour — FAIL  element id:"lab.sheet-long-list-short.R" fill within dE00 8 of #1E88E5 — not found within 1 s (no tree read contained id:"lab.sheet-long-list-short.R", and idb lists no accessibility identifier on any element of th
-  - ok ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until — ERROR scroll_until id:"lab.sheet-long-list-short.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken — idb lists only what a prese
+  - ok ios-iphone17-ios27/sheet-long-list-short.idb.json R colour — FAIL  element id:"lab.sheet-long-list-short.R" fill within dE00 8 of #1E88E5 — not found within 1 s (no tree read contained id:"lab.sheet-long-list-short.R", and idb's read lists no accessibility identifier on any elemen
+  - ok ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until — ERROR scroll_until id:"lab.sheet-long-list-short.R" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in 
 
-Fixed at 2c2f566: the miss names the read's fact (idb lists no identifier on the screen), the tap, fill, wait and asserts say it, and the rows ask it (open target unlisted by its source, golden-spec/base.ts#openRows). Red before: R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply said why (review round 4, P4). Live: idb tap:sheet-long-list.R and tap:sheet-long-list-short.R ok since the fix (struck from scripts/truth/live-known.ts); the scroll cases of F, L and short F stay not-reached, ADR 0018 residual 20.
+Fixed at 2c2f566 and 1cecfaf (its review: idb's notes name every reason idb gives, none the cause): the miss names the read's fact (idb's read lists no identifier on any element), the tap, fill, wait and asserts say it, and the rows ask it (open target unlisted by its source, golden-spec/base.ts#openRows). Red before: R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply said why (review round 4, P4). Live: idb tap:sheet-long-list.R and tap:sheet-long-list-short.R ok since the fix, by the live judge's unlisted guard (struck from scripts/truth/live-known.ts; live judges no wording); the scroll cases of F, L and short F stay not-reached, ADR 0018 residual 20.
 
 ## LW1: CALIBRATED
 
