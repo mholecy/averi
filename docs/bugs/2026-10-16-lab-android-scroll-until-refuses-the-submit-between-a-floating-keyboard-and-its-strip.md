@@ -7,7 +7,8 @@
 > stroke. Measured by golden (the row below green, no other reply changed; KNOWN struck; calibrate CALIBRATED) and live
 > on averi_lab (2026-10-23, Gboard floated by hand, region `(359,1269,1040,1912)(0,2088,1080,2220)`): kf1 visible with
 > no stroke, kf2 tapped once with the IME still up, kf3 (ks under the panel) never visible, no key typed — three runs
-> of three (docs/truth/live-android-2026-10-23-floating-gap.md). Still refused (fails closed): a target beside the
+> of three, kf1 and kf2 each quoting the panel over ks first, so neither passes with no panel up
+> (docs/truth/live-android-2026-10-23-floating-gap.md). Still refused (fails closed): a target beside the
 > panel, or partly in the gap and partly beside or under a panel's rows; and no gap at all from a region `panelsBeyond`
 > admitted only in part (`760dadea`: a rect it dropped may lie in the strip), the gap carried as `KeyboardCover.gap`.
 

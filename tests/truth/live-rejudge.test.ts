@@ -249,10 +249,11 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-r1023-lv2-6.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-7.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     // FU1's fix (docs/truth/live-android-2026-10-23-floating-gap.md): form-keyboard-floating under a hand-floated
-    // Gboard, three runs — the submit in the gap visible with no stroke and tapped once, ks under the panel never visible.
-    ['android-forms-r1023b-fu1-1.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
-    ['android-forms-r1023b-fu1-2.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
-    ['android-forms-r1023b-fu1-3.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    // Gboard, three runs — the panel quoted over ks first, the submit in the gap visible with no stroke and tapped once,
+    // ks under the panel never visible.
+    ['android-forms-r1023b-fu1-cr-1.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    ['android-forms-r1023b-fu1-cr-2.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    ['android-forms-r1023b-fu1-cr-3.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -691,6 +692,20 @@ describe('live.ts --rejudge over the committed Android records of the src before
     expect(notKnown(out).sort()).toEqual([...want.unknown].sort());
     expect(out).toMatch(/^- MISMATCH k7 .*fully visible after 1 swipe — 18 px of phone under the bar, unsaid/m);
     expect(code).toBe(1);
+  });
+});
+
+describe('live.ts --rejudge over the first committed records of FU1\'s fix, before kf1 and kf2 evidenced the panel', () => {
+  // android-forms-r1023b-fu1-{1,2,3}.json: the same device and floating Gboard, run before kf1 and kf2 began with a
+  // colour assert on ks that quotes the panel over it. With no such reply a floating panel is not evidenced (an IME
+  // collapsed to its strip reads the same to the app), so kf1 and kf2 are SKIP; kf3's refusal names the panel: ok.
+  it.each(['android-forms-r1023b-fu1-1.json', 'android-forms-r1023b-fu1-2.json', 'android-forms-r1023b-fu1-3.json'])('%s: kf1 and kf2 SKIP, no panel quoted; kf3 ok', { timeout: 60_000 }, async (record) => {
+    const { code, out } = await rejudge(record, 'forms');
+    expect(out).toMatch(/^# Live golden: 3 cases, 1 ok, 0 loud, 0 mismatches \(0 not known\), 2 skipped$/m);
+    expect(out).toMatch(/^- SKIP kf1 .*no measured panel quoted over ks/m);
+    expect(out).toMatch(/^- SKIP kf2 .*no measured panel quoted over ks/m);
+    expect(out).toMatch(/^- ok kf3 /m);
+    expect(code).toBe(0);
   });
 });
 

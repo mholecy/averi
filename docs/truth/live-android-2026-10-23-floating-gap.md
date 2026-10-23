@@ -36,3 +36,28 @@ tests/truth/live-rejudge.test.ts.
 **Docked control.** Gboard docked again (grid → Floating, the tile now off): `touchable region=SkRegion((0,1398,1080,2220))`
 — one rect, the band. kf1 once more: SKIP, "keyboard docked (the app hears an IME 822 px tall, not the floating strip)"
 (not recorded). Then `adb -s emulator-5554 emu kill`.
+
+## 2026-10-23 — kf1 and kf2 evidence the panel themselves (FU1's code review)
+
+The app's state cannot tell a floating panel from an IME collapsed to its strip with no panel: both give the app the
+132-px strip, and with no panel kf1 and kf2 pass with no gap rule at all. Only kf3's refusal quoted the panel. So kf1
+and kf2 now begin with a colour assert on ks (`live-forms.ts#FLOATING_PANEL_EVIDENCE`). The pixel poll refuses it
+naming the rect over ks (`keyboard 359,1269 681x643`), with no touch and no key, and the IME left up. The judge is SKIP
+unless that reply quotes a measured panel. The call goes first because a submit lays the form out again: sent after
+kf2's tap, ks lay at y 2148 under the strip, and the reply quoted the band (`keyboard 0,2088 1080x132`).
+
+averi_lab, as above, at this branch's tip (src as at `760dadea`, plus the review's refactor, which leaves behaviour the
+same). Gboard was floated by hand the same way, and the region read was the same as above:
+`SkRegion((359,1269,1040,1912)(0,2088,1080,2220))`.
+
+There were three runs (docs/truth/live-records/android-forms-r1023b-fu1-cr-1.json, -2.json, -3.json), each 3 of 3 ok:
+- **kf1:** the evidence reply quotes `keyboard 359,1269 681x643` over ks `55,1644 970x132`, then
+  `fully visible after 0 swipes`.
+- **kf2:** the same, then `Tapped`, with one submit and the IME still up.
+- **kf3:** as before.
+
+Docked again (the region was the band alone, `(0,1398,1080,2220)`), kf1–kf3 were SKIP "keyboard docked" (not
+recorded). Then `adb -s emulator-5554 emu kill`.
+
+The first three records (-1, -2 and -3, without the evidence call) now rejudge as kf1 and kf2 SKIP and kf3 ok. They are
+pinned that way in tests/truth/live-rejudge.test.ts.

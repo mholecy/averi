@@ -13,7 +13,7 @@ import { loadSide } from '../differential/side.js';
 import { familyOf } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { holds, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
+import { FLOATING_PANEL_EVIDENCE, holds, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
@@ -280,8 +280,8 @@ const FORMS: Omit<Case, 'group'>[] = [
     cell: KF,
     keyboard: true,
     platforms: ['android'],
-    says: 'scroll_until the submit between a floating keyboard\'s panel and its strip: visible with no stroke',
-    calls: [{ tool: 'scroll_until', args: { selector: id(KF, 'submit'), direction: 'down' } }],
+    says: 'scroll_until the submit between a floating keyboard\'s panel and its strip: visible with no stroke (the panel evidenced over ks first)',
+    calls: [FLOATING_PANEL_EVIDENCE, { tool: 'scroll_until', args: { selector: id(KF, 'submit'), direction: 'down' } }],
     judge: judgeFloatingGap('kf1'),
   },
   {
@@ -291,6 +291,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     platforms: ['android'],
     says: 'scroll_until the submit there, then tap it: one submit, the IME still up',
     calls: [
+      FLOATING_PANEL_EVIDENCE,
       { tool: 'scroll_until', args: { selector: id(KF, 'submit'), direction: 'down' } },
       { tool: 'tap', args: { selector: id(KF, 'submit') } },
     ],
