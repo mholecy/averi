@@ -1639,14 +1639,14 @@ export function stepSummary(step: Step, platform: 'android' | 'ios'): string {
  * `noIdListed`'s note: on a read that lists no id at all there is none to wait on, and that note names
  * `text:`/`label:` instead.
  */
-const WAIT_ON_A_SHOWN_ID = 'or wait on an id idb does list';
+const WAIT_ON_A_LISTED_ID = 'or wait on an id idb does list';
 
 /**
  * What a `wait:` timeout says beneath its headline, and the miss its error carries — only for a step that waited for
  * an element to be PRESENT (`absent` waits are about something that stayed; a state/any/all condition is not one
  * target's story): why the last tree read did not hold the element (ui-tree/miss.ts#missOf, asked with the
  * element: it decides every not-found reply), its note (`missNote`) — and after idb's `idUnlisted` note, the
- * flow-step advice (`WAIT_ON_A_SHOWN_ID`). The miss reads the tree source from the tree's own mark
+ * flow-step advice (`WAIT_ON_A_LISTED_ID`). The miss reads the tree source from the tree's own mark
  * (`UiNode.flatList`), not from the adapter or averi.yaml: idb's parser marks every tree it gives
  * (adapters/ios-tree-source.ts#markIdbDialect) and no other source does, and a read that failed has no tree to say
  * anything of — its error is the story (pollTimeoutMessage drops the hint beneath a failed last read).
@@ -1658,7 +1658,7 @@ export function waitTimeoutHint(cond: Condition, lastTree: UiNode | undefined): 
   if (cond.element === undefined || cond.absent) return {};
   const miss = missOf({ tree: lastTree, target: cond.element });
   const note = missNote(miss);
-  return { hint: miss.of === 'idUnlisted' ? `${note}, ${WAIT_ON_A_SHOWN_ID}` : note, miss };
+  return { hint: miss.of === 'idUnlisted' ? `${note}, ${WAIT_ON_A_LISTED_ID}` : note, miss };
 }
 
 /**

@@ -95,7 +95,8 @@ describe('the unmoved stop for a target never seen under idb says what idb does 
     const message = failureOf(play({ ...UP, target: 'id:A' }, [{ tree: sheet(), found: [] }, { tree: sheet(), found: [] }, { tree: sheet(), found: [] }]), 'id:A').message;
     expect(message).toContain('content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:"A"');
     expect(message).not.toContain('idb lists only');
-    expect(message.split('close it first')).toHaveLength(2);
+    expect(message).not.toContain('close it first');
+    expect(message.split('close that first')).toHaveLength(2);
   });
 
   it('not once a stroke has moved the tree: the list ran to its end, the cause as before', () => {

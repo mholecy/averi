@@ -36,9 +36,9 @@ Under the default `treeSource: idb`, this is expected:
 - idb drops some identifiers the app sets, a UIKit table cell label's among them (WebDriverAgent reads them);
 - idb lists nothing beneath the keyboard or a presented sheet, alert or cover.
 
-The reply says so beneath its not-found: `no tree read contained id:"x". iOS treeSource: idb lists nothing beneath …`,
-or, when the read lists no identifier on any element, `no tree read contained id:"x", and idb's read lists no
-accessibility identifier on any element: …`. If the element lies beneath the keyboard or a presented layer, close it
+The reply says so beneath its not-found: `no tree read contained id:"x". Possible reasons: idb lists nothing beneath …`,
+or, when the read lists no identifier on any element, `no tree read contained id:"x", and idb's read lists no id on
+any element. Possible reasons: …`. If something covers the element (the keyboard, a sheet, an alert), close that
 first. If it is showing, ask for it by `text:` or `label:` (read the label from `ui_snapshot`), or switch the tree
 source.
 

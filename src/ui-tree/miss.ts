@@ -157,32 +157,33 @@ function zeroAreaNote([only, ...more]: readonly Edge[]): string {
 export const TREE_SOURCE_REMEDY = 'set app.ios.treeSource: wda in averi.yaml';
 
 /** THE fact of `noIdListed`'s note, as its words say it — the phrase a judge of the reply reads (scripts/truth/replies.ts). */
-export const NO_ID_LISTED = "idb's read lists no accessibility identifier on any element";
+export const NO_ID_LISTED = "idb's read lists no id on any element";
 
 /**
  * Why idb may list no element by an id the app sets — every reason measured, none of them the cause (the read cannot
- * tell them apart): both of idb's dialect notes say them, after their fact. One phrase with no parenthesis inside but
- * the SwiftUI modifier's own, since a one-line reply wraps the note in one (`withMissNote`).
+ * tell them apart): both of idb's dialect notes say them, after their fact, as possible reasons. One phrase with no
+ * parenthesis inside, since a one-line reply wraps the note in one (`withMissNote`); the container's forms (SwiftUI's
+ * `.contain`, a React Native `testID` on a non-interactive view) are the ui_snapshot description's and the
+ * troubleshooting reference's, not each reply's.
  */
 const IDB_UNLISTS =
-  'idb lists nothing beneath the keyboard or a presented sheet, alert or cover, drops some identifiers, a UIKit table ' +
-  'cell label\'s among them, and never lists one set on a container: SwiftUI .accessibilityElement(children: .contain), ' +
-  'a React Native testID on a non-interactive view';
+  'idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, ' +
+  "any set on a container and a UIKit table cell label's among them";
 
 /** The remedies both notes open with: close what lies over the element; else, if it shows, what each read leaves. */
-const BENEATH_ONE = 'If the element lies beneath the keyboard or a presented layer, close it first; if it is showing,';
+const COVERED_FIRST = 'If something covers it, close that first; if it is showing,';
 
 /** The note of a read that lists no identifier (`noIdListed`): the fact, idb's reasons, then the remedies — a `text:`/`label:` selector among them. */
 const noIdListedNote = (id: string): string =>
-  `no tree read contained id:${JSON.stringify(id)}, and ${NO_ID_LISTED}: ${IDB_UNLISTS}. ` +
-  `${BENEATH_ONE} ask for it by text: or label:, or ${TREE_SOURCE_REMEDY}`;
+  `no tree read contained id:${JSON.stringify(id)}, and ${NO_ID_LISTED}. Possible reasons: ${IDB_UNLISTS}. ` +
+  `${COVERED_FIRST} ask for it by text: or label:, or ${TREE_SOURCE_REMEDY}`;
 
 /**
  * The note of an id idb's reads never listed (`idUnlisted`): the fact, idb's reasons, the remedies. Flow-step advice
  * ("wait on an id idb does list") is the flow's, added after it (flow/engine.ts#waitTimeoutHint).
  */
 const idUnlistedNote = (id: string): string =>
-  `no tree read contained id:${JSON.stringify(id)}. iOS treeSource: ${IDB_UNLISTS}. ${BENEATH_ONE} ${TREE_SOURCE_REMEDY}`;
+  `no tree read contained id:${JSON.stringify(id)}. Possible reasons: ${IDB_UNLISTS}. ${COVERED_FIRST} ${TREE_SOURCE_REMEDY}`;
 
 /**
  * Whether the miss's note already says that idb lists nothing beneath a presented layer (`IDB_UNLISTS`): a reply that

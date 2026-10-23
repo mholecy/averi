@@ -225,7 +225,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-idb-sheet-r16-r6-1.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
     ['ios-idb-sheet-r16-r6-2.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
     ['ios-idb-sheet-r16-r6-3.json', 'visibility', { cases: 2, ok: 0, loud: 0, mismatches: 2 }],
-    // NI1's fix (bugs/r1023-ni1, ADR 0018 "an idb read that lists no identifier"): sheet-long-list and
+    // NI1's fix (ADR 0018 "an idb read that lists no identifier"): sheet-long-list and
     // sheet-long-list-short under idb — R's taps refused, nothing fired, the reply naming idb's limit (ok: a target its
     // source does not list is not asked to fire); F, L and short F not reached, LOUD, ADR 0018 residual 20 — and the
     // same cells under WDA as a control, every case ok (R Tapped).

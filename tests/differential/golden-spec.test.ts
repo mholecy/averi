@@ -89,7 +89,7 @@ describe('an open target the replayed source does not list (sheet-long-list R un
   const idbRows = expectations('ios', R, cell, 'idb', tree('idb'));
   const wdaRows = expectations('ios', R, cell, 'wda', tree('wda'));
   const NOTE = missNote({ of: 'noIdListed', id: R.id })!;
-  const CONTAINER = missNote({ of: 'idUnlisted', id: R.id })!;
+  const UNLISTED = missNote({ of: 'idUnlisted', id: R.id })!;
   const SWIPES = ['idb ui swipe 201 699 201 175 --duration 0.3', 'idb ui swipe 201 699 201 175 --duration 0.3'];
   const timeout = (note?: string) => `ERROR Timed out after 5000ms waiting for element id:"${R.id}" to appear${note === undefined ? '' : `\n  (${note})`}`;
   const colour = (note?: string) => `1/1 asserts FAILED\nFAIL  element id:"${R.id}" fill within dE00 8 of ${R.color} — not found within 1 s${note === undefined ? '' : ` (${note})`}\nappAlive: true`;
@@ -99,7 +99,7 @@ describe('an open target the replayed source does not list (sheet-long-list R un
     const tap = row(idbRows, 'tap');
     expect(tap.judge(out(timeout(NOTE)))).toBeUndefined();
     expect(tap.judge(out(timeout()))).toBeDefined();
-    expect(tap.judge(out(timeout(CONTAINER)))).toBeDefined();
+    expect(tap.judge(out(timeout(UNLISTED)))).toBeDefined();
     expect(tap.judge(out(timeout(NOTE), ['idb ui tap 201 158']))).toBeDefined();
   });
 
@@ -112,7 +112,7 @@ describe('an open target the replayed source does not list (sheet-long-list R un
   it('scroll_until: not reached, any strokes, naming the source\'s limit; the container words alone are a mismatch', () => {
     const s = row(idbRows, 'scroll_until');
     expect(s.judge(out(stop(NOTE), SWIPES))).toBeUndefined();
-    expect(s.judge(out(stop(CONTAINER), SWIPES))).toBeDefined();
+    expect(s.judge(out(stop(UNLISTED), SWIPES))).toBeDefined();
   });
 
   it('under WDA, which lists it, the open rows: a refusal is a mismatch whatever it names', () => {

@@ -109,8 +109,8 @@ export const windowHintSaid = (reply: string) => reply.includes(ACTIVE_WINDOW_HI
 
 /**
  * The reply names idb's limit on a read that lists no identifier (src/ui-tree/miss.ts#NO_ID_LISTED, imported, not
- * copied): "idb lists no accessibility identifier on any element of the screen". Keyed on the fact, not on the remedy
- * it ends with (miss.ts#TREE_SOURCE_REMEDY), which the container-id note says too.
+ * copied): "idb's read lists no id on any element". Keyed on the fact, not on the remedy it ends with
+ * (miss.ts#TREE_SOURCE_REMEDY), which the note of an id unlisted among others (`idUnlisted`) says too.
  */
 export const noIdListedSaid = (reply: string) => reply.includes(NO_ID_LISTED);
 

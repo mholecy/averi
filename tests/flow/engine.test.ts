@@ -3627,9 +3627,9 @@ flows:
     const id = { element: { id: 'x' } };
     /** A rendered idb read that lists other identifiers (the button idb does show). */
     const idbList = markIdbDialect(screen(el({ role: 'button', identifier: 'debit_select' })));
-    /** A rendered idb read that lists no identifier on any element (the lab's UIKit table, NI1). */
+    /** A rendered idb read that lists no identifier on any element (the lab's UIKit table, docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md). */
     const idbNoIds = markIdbDialect(screen(el({ role: 'text', label: 'Target R' }), el({ role: 'text', label: 'Row 2' })));
-    it('idb\'s note, with the flow advice after the container one, only for a non-absent element condition whose SOLE selector is an id, on a tree idb gave — and its miss to carry', () => {
+    it('idb\'s note, with the flow advice after the unlisted-id one, only for a non-absent element condition whose SOLE selector is an id, on a tree idb gave — and its miss to carry', () => {
       expect(waitTimeoutHint(id, idbList)).toEqual({ hint: `${missNote({ of: 'idUnlisted', id: 'x' })}, or wait on an id idb does list`, miss: { of: 'idUnlisted', id: 'x' } });
       // A read that lists no identifier at all: its own note, which names text:/label: — no advice to wait on an id idb shows.
       expect(waitTimeoutHint(id, idbNoIds)).toEqual({ hint: missNote({ of: 'noIdListed', id: 'x' }), miss: { of: 'noIdListed', id: 'x' } });

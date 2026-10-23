@@ -1099,7 +1099,7 @@ describe('a tap or fill by an id idb\'s read does not list: the timeout says idb
     expect(fake.tapPoints).toEqual([]);
   });
 
-  it('tap, a read listing other ids (sheet-background): the container note beneath, carried', async () => {
+  it('tap, a read listing other ids (sheet-background): the unlisted-id note beneath, carried', async () => {
     const error = await tapElement(await idbFake('sheet-background'), 'id:"lab.sheet-background.nowhere"', OPTS).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ElementNotFoundError);
     const miss = (error as ElementNotFoundError).miss;

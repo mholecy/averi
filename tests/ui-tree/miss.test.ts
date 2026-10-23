@@ -43,9 +43,9 @@ describe('missOf — (tree, target) → Miss, one table', () => {
     ['a failed read', { tree: idb('sheet-long-list'), readError: new Error('idb gone') }, R, { of: 'unread' }],
     ['no read at all', {}, R, { of: 'unread' }],
 
-    // The idb/WDA twins (NI1's screen: a UITableViewController in a sheet, its rows' ids set on each cell's label). idb
-    // lists no identifier on any element of the read (every AXUniqueId null) — the miss says that fact; WDA lists the id,
-    // so the tree holds it.
+    // The idb/WDA twins (the lab's sheet-long-list: a UITableViewController in a sheet, its rows' ids set on each cell's
+    // label). idb lists no identifier on any element of the read (every AXUniqueId null) — the miss says that fact; WDA
+    // lists the id, so the tree holds it.
     ['idb, a read listing no identifier at all (sheet-long-list)', { tree: idb('sheet-long-list') }, R, noId('lab.sheet-long-list.R')],
     ['WDA, the same id on the same screen: the tree holds it, nothing of idb', { tree: wda('sheet-long-list') }, R, { of: 'none' }],
     ['idb, a read listing no identifier at all (sheet-long-list-short)', { tree: idb('sheet-long-list-short') }, SHORT_R, noId('lab.sheet-long-list-short.R')],
@@ -101,28 +101,25 @@ describe('missNote — the words, once', () => {
     expect(missNote({ of: 'zeroArea', clippedOut: ['top'] })).toBe('it matched only nodes clipped out above its scroll container (scrolled past it) — scroll_until it with direction: "up" first');
     expect(missNote({ of: 'zeroArea', clippedOut: ['right'] })).toBe('it matched only nodes clipped out right of its scroll container (scrolled past it) — scroll_until it with direction: "right" first');
     expect(missNote({ of: 'zeroArea', clippedOut: ['top', 'bottom'] })).toBe('it matched only nodes clipped out above or below its scroll container — scroll_until it first');
-    const idbUnlists =
-      'idb lists nothing beneath the keyboard or a presented sheet, alert or cover, drops some identifiers, a UIKit table cell ' +
-      'label\'s among them, and never lists one set on a container: SwiftUI .accessibilityElement(children: .contain), a ' +
-      'React Native testID on a non-interactive view.';
+    const reasons =
+      'Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, ' +
+      "any set on a container and a UIKit table cell label's among them.";
     expect(missNote({ of: 'idUnlisted', id: 'amount_input' })).toBe(
-      `no tree read contained id:"amount_input". iOS treeSource: ${idbUnlists} ` +
-        'If the element lies beneath the keyboard or a presented layer, close it first; if it is showing, ' +
-        'set app.ios.treeSource: wda in averi.yaml',
+      `no tree read contained id:"amount_input". ${reasons} ` +
+        'If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml',
     );
     expect(missNote({ of: 'noIdListed', id: 'lab.sheet-long-list.R' })).toBe(
-      `no tree read contained id:"lab.sheet-long-list.R", and idb's read lists no accessibility identifier on any element: ${idbUnlists} ` +
-        'If the element lies beneath the keyboard or a presented layer, close it first; if it is showing, ' +
-        'ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml',
+      `no tree read contained id:"lab.sheet-long-list.R", and idb's read lists no id on any element. ${reasons} ` +
+        'If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml',
     );
     expect(missNote({ of: 'unread' })).toBeUndefined();
     expect(missNote({ of: 'none' })).toBeUndefined();
   });
 
-  it('idb\'s two notes: the read\'s fact (NO_ID_LISTED) in one phrase with no parenthesis inside but the SwiftUI modifier\'s own, both ending on the one remedy (TREE_SOURCE_REMEDY)', () => {
+  it('idb\'s two notes: the read\'s fact (NO_ID_LISTED) in one phrase with no parenthesis inside, both ending on the one remedy (TREE_SOURCE_REMEDY)', () => {
     const noIdNote = missNote({ of: 'noIdListed', id: 'x' })!;
     expect(noIdNote).toContain(NO_ID_LISTED);
-    for (const note of [noIdNote, missNote({ of: 'idUnlisted', id: 'x' })!]) expect(note.replace('(children: .contain)', '')).not.toMatch(/[()]/);
+    for (const note of [noIdNote, missNote({ of: 'idUnlisted', id: 'x' })!]) expect(note).not.toMatch(/[()]/);
     expect(noIdNote.endsWith(TREE_SOURCE_REMEDY)).toBe(true);
     expect(missNote({ of: 'idUnlisted', id: 'x' })!.endsWith(TREE_SOURCE_REMEDY)).toBe(true);
     expect(missNote({ of: 'idUnlisted', id: 'x' })).not.toContain(NO_ID_LISTED);
