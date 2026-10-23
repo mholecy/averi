@@ -245,6 +245,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-r1023-lv2-4.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-5.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-group.json', 'visibility', { cases: 140, ok: 130, loud: 6, mismatches: 4 }],
+    // The cell twice more at the branch's tip, after the code review kept the proof (a path S never takes): the same.
+    ['android-vis-r1023-lv2-6.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023-lv2-7.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -260,7 +263,7 @@ describe('the flush probe\'s live records on a deep cut: a probe, then one revea
   // docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md: S
   // (176 px, 154 of it below `lower`'s clip at rest) whole after the probe and one reveal of at most half the room above
   // it — the list never carried past the clip's top (S's top stays inside 1046–1541), and the tap fires S.
-  it.each([1, 2, 3, 4, 5])('android-vis-r1023-lv2-%i.json: S.fully a probe of ~60 px, then a reveal that leaves S whole', (n) => {
+  it.each([1, 2, 3, 4, 5, 6, 7])('android-vis-r1023-lv2-%i.json: S.fully a probe of ~60 px, then a reveal that leaves S whole', (n) => {
     const record = JSON.parse(readFileSync(new URL(`../../docs/truth/live-records/android-vis-r1023-lv2-${n}.json`, import.meta.url), 'utf8')) as {
       results: { id: string; replies: string[]; state: { strokes: { view: string; from: number; to: number }[]; frames: Record<string, { y: number; height: number }> } }[];
     };

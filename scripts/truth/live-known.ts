@@ -74,8 +74,8 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // LV2 (scroll-bounded-flush's P.fully and S.fully, intermittent;
   // docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md): fixed
   // at ae4d988a (a probe that showed more of a still-flush row proved its cut: no confirm, the next
-  // stroke a reveal of half the room), S.fully "fully visible after 2 swipes" five runs of five (lower 0→58–61, then
-  // →291–296; android-vis-r1023-lv2-1…5.json), P.fully after 1 as before; both struck off.
+  // stroke a reveal of half the room), S.fully "fully visible after 2 swipes" in seven cell runs of seven (lower 0→58–61,
+  // then →288–296; android-vis-r1023-lv2-1…7.json), P.fully after 1 as before; both struck off.
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),
   // Round 7 (T2): the presented windows the parser does not mark (android-vis-dialogs.json, -scroll-run2/3.json; the
   // same in all three runs). Beneath the full-screen Compose Dialog every target's two strokes land on the dialog

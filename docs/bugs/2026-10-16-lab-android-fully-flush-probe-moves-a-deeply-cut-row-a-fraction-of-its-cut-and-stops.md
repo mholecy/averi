@@ -11,14 +11,16 @@ docs/truth/live-android-2026-10-16-visibility.md (the debc9b2 run, appendix), do
 
 ## Status
 
-**Fixed** at `ae4d988a` (bugs/r1023-lv2; ADR 0013, refined 2026-10-23), measured live on `averi_lab` five runs of five
-(docs/truth/live-records/android-vis-r1023-lv2-1…5.json; docs/truth/live-android-2026-10-18-visibility.md, its round-1023
-LV2 section): a probe after whose read the row moved and lies flush on the same edge with more of it showing has proved the
+**Fixed** at `ae4d988a`, refined by its code review (`c2af22de`, `1126ca60`: the proof kept while the row lies flush on
+that edge, so no read claims it fully visible; bugs/r1023-lv2; ADR 0013, refined 2026-10-23), measured live on
+`averi_lab` in eight runs of eight — the cell five times and the visibility group once at `ae4d988a`, the cell twice
+more at the branch's tip `55b71635` (docs/truth/live-records/android-vis-r1023-lv2-1…7.json, -group.json;
+docs/truth/live-android-2026-10-18-visibility.md, its round-1023 LV2 section): a probe after whose read the row moved and lies flush on the same edge with more of it showing has proved the
 cut — no confirming read, and the next stroke is a REVEAL, the whole stroke with its travel half the room the row
 leaves in its container (capped at a top or left edge, where a pull-to-refresh lies); at the bound the call fails
 naming the cut, never "fully visible". S.fully: `fully visible after 2 swipes` every run, `lower` 0→58–61 then
-→291–296 (S whole at 1223–1228, Tapped), 12.6 s from the first touch to the tap where the committed runs before took
-17.6–19.6 s; P.fully `after 1 swipe` as before. Correction to the Cause below: the probe's finger travel on `lower` is
+→287–296 (S whole at 1223–1231, Tapped), 12.6 s from the first touch to the tap at `ae4d988a` where the committed runs
+before took 17.6–19.6 s; P.fully `after 1 swipe` as before. Correction to the Cause below: the probe's finger travel on `lower` is
 74 px (0.25 of the full stroke's 297 over the 495-px container), not 178 — the cap is never reached there; and a
 probe round costs ~5.1 s (two reads when it moves the row).
 
