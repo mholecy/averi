@@ -133,7 +133,7 @@ for the control; the simulator shut down after. Reproduce (outside the sandbox):
   contained id:"lab.sheet-long-list.R", and idb lists no accessibility identifier on any element of the screen — it
   drops some, a UIKit table cell label's among them. If the screen is showing, ask for it by text: or label:, or set
   app.ios.treeSource: wda in averi.yaml)` (the note's words at `2c2f566`; reworded at `1cecfaf` to name every reason
-  idb gives, ADR 0018's amendment — the replay measures the words, live judges none). ok because the live judge no
+  idb gives and shortened at `75d6c07`, ADR 0018's amendment — the replay measures the words, live judges none). ok because the live judge no
   longer asks a target its source does not list to fire — a change of the judge, which rejudges every earlier record's
   same refusal ok too (before: LOUD `tap-refused`, filed under NI1); what the src changed live is the note beneath.
 - **F, L and short F under idb**: not reached, honest, the strokes the same as before (F 6 swipes, L 5, short F 3,

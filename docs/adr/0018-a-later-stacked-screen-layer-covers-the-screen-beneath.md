@@ -1112,15 +1112,19 @@ on 52 more replies, none of whose targets is a container. So both of idb's notes
 `text:`/`label:` selector (on a read that lists no id) or `treeSource: wda` — and the kind of an id unlisted on a read
 that lists others is named for what it saw, `idUnlisted` (was `containerId`):
 
-- `no tree read contained id:"lab.sheet-long-list.R", and idb's read lists no accessibility identifier on any element:
-  idb lists nothing beneath the keyboard or a presented sheet, alert or cover, drops some identifiers, a UIKit table
-  cell label's among them, and never lists one set on a container: SwiftUI .accessibilityElement(children: .contain),
-  a React Native testID on a non-interactive view. If the element lies beneath the keyboard or a presented layer,
-  close it first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml`;
-- `idUnlisted`: `no tree read contained id:"x". iOS treeSource: idb lists nothing beneath …` (the same reasons), `If
-  the element lies beneath the keyboard or a presented layer, close it first; if it is showing, set
-  app.ios.treeSource: wda in averi.yaml`; a flow's `wait:` adds "or wait on an id idb does list" after it, and after
-  `noIdListed`'s nothing: there is none.
+- `no tree read contained id:"lab.sheet-long-list.R", and idb's read lists no id on any element. Possible reasons: idb
+  lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container
+  and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by
+  text: or label:, or set app.ios.treeSource: wda in averi.yaml`;
+- `idUnlisted`: `no tree read contained id:"x". Possible reasons: …` (the same reasons), `If something covers it, close
+  that first; if it is showing, set app.ios.treeSource: wda in averi.yaml`; a flow's `wait:` adds "or wait on an id
+  idb does list" after it, and after `noIdListed`'s nothing: there is none.
+
+**The notes' length.** The notes ride on every idb not-found of an id-alone target (101 golden replies), so each word
+is paid many times: about 410 and 330 characters for R's id. They name every reason ("Possible reasons:", none the
+cause), and leave the container's forms (SwiftUI `.accessibilityElement(children: .contain)`, a React Native `testID`
+on a non-interactive view) to `ui_snapshot`'s description and the troubleshooting reference, so no note carries a
+parenthesis inside the one `withMissNote` wraps it in.
 
 The fact phrase (`NO_ID_LISTED`) and the remedy (`TREE_SOURCE_REMEDY`) are exported; the harness imports them. A bare
 read (ui-tree/verdict.ts#isBareTreeMemo: a launch-transition read lists nothing of the app's) gets neither: its ids say

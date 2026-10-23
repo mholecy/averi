@@ -1,16 +1,16 @@
 # BUG (tree source, diagnostics): under idb, a UIKit table row's label is listed without its accessibility identifier — `tap` and `scroll_until` by that id time out "to appear" on a row idb lists by its text, and the reply never says why
 
-> **Status (2026-10-23, round 1023): fixed** at `2c2f566` and `1cecfaf` (its review: idb's notes name every reason
-> idb gives, none the cause) on bugs/r1023-ni1 (ADR 0018 amended, "an idb read that lists no identifier", residual
-> 20), measured by the golden mode (against `a0463c6b`: the 6 rows below green — R's tap, colour and scroll_until in
-> both cells; 101 more replies changed by the notes' words alone, no verdict class and no device call changed) and
-> calibrate (CALIBRATED, `a0463c6b` → `1cecfaf`). A read idb gives that lists no identifier on any element is a miss
-> of its own (`ui-tree/miss.ts`, `noIdListed`, asked before the id idb leaves unlisted among others, `idUnlisted`, and
-> neither on a bare read): `no tree read contained id:"lab.sheet-long-list.R", and idb's read lists no accessibility
-> identifier on any element: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, drops some
-> identifiers, a UIKit table cell label's among them, and never lists one set on a container: … If the element lies
-> beneath the keyboard or a presented layer, close it first; if it is showing, ask for it by text: or label:, or set
-> app.ios.treeSource: wda in averi.yaml`. The three hold-backs of round 15 (below) are lifted: the tap's, fill's and
+> **Status (2026-10-23, round 1023): fixed** at `2c2f566`, `1cecfaf` (its review: idb's notes name every reason
+> idb gives, none the cause) and `75d6c07` (its code review: the notes shortened) on bugs/r1023-ni1 (ADR 0018 amended,
+> "an idb read that lists no identifier", residual 20), measured by the golden mode (against `a0463c6b`: the 6 rows
+> below green — R's tap, colour and scroll_until in both cells; 101 more replies changed by the notes' words alone, no
+> verdict class and no device call changed) and calibrate (CALIBRATED, `a0463c6b` → `75d6c07`). A read idb gives that
+> lists no identifier on any element is a miss of its own (`ui-tree/miss.ts`, `noIdListed`, asked before the id idb
+> leaves unlisted among others, `idUnlisted`, and neither on a bare read): `no tree read contained
+> id:"lab.sheet-long-list.R", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath
+> the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell
+> label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or
+> set app.ios.treeSource: wda in averi.yaml`. The three hold-backs of round 15 (below) are lifted: the tap's, fill's and
 > presence check's wait, an optional step's skip and every assert's not-found say idb's dialect. The golden rows ask an
 > open target its source does not list the honest answer (ADR 0020). On the lab simulator at `2c2f566`
 > (docs/truth/live-records/ios-vis-r1023-ni1-1.json) R's two taps under idb were refused with nothing fired and the

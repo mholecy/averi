@@ -1326,7 +1326,8 @@
       "status": "calibrate",
       "fix": [
         "2c2f566",
-        "1cecfaf"
+        "1cecfaf",
+        "75d6c07"
       ],
       "verified": "golden",
       "defect": "to appear$|not found within|never appeared in the tree",
@@ -1338,7 +1339,7 @@
         "ios-iphone17-ios27/sheet-long-list-short.idb.json R colour",
         "ios-iphone17-ios27/sheet-long-list-short.idb.json R scroll_until"
       ],
-      "remark": "Fixed at 2c2f566 and 1cecfaf (its review: idb's notes name every reason idb gives, none the cause): the miss names the read's fact (idb's read lists no identifier on any element), the tap, fill, wait and asserts say it, and the rows ask it (open target unlisted by its source, golden-spec/base.ts#openRows). Red before: R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply said why (review round 4, P4). Live: idb tap:sheet-long-list.R and tap:sheet-long-list-short.R ok since the fix, by the live judge's unlisted guard (struck from scripts/truth/live-known.ts; live judges no wording); the scroll cases of F, L and short F stay not-reached, ADR 0018 residual 20."
+      "remark": "Fixed at 2c2f566, 1cecfaf (its review: idb's notes name every reason idb gives, none the cause) and 75d6c07 (its code review: the notes shortened): the miss names the read's fact (idb's read lists no identifier on any element), the tap, fill, wait and asserts say it, and the rows ask it (open target unlisted by its source, golden-spec/base.ts#openRows). Red before: R, on the screen and drawn, is listed by idb under its text with AXUniqueId null, so no call by its id finds it, and no reply said why (review round 4, P4). Live: idb tap:sheet-long-list.R and tap:sheet-long-list-short.R ok since the fix, by the live judge's unlisted guard (struck from scripts/truth/live-known.ts; live judges no wording); the scroll cases of F, L and short F stay not-reached, ADR 0018 residual 20."
     },
     {
       "n": "LW1",
