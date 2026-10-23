@@ -377,7 +377,7 @@ down after), the lab app as installed (no app change). Records docs/truth/live-r
   runs before took 17.6–17.7 s (android-vis.json, -e98b87e-run1, -r7final, -b71cbbb, -r14-lv1: three probes) and
   19.6 s (cal12-9c7885e-1…3) — and two runs before had ended cut (note).
 - The group run's S.fully the same: 0→58, 58→287, after 2 swipes.
-- At the branch's tip `55b71635` (the code review's kept proof, `ProvenCut`; a path S never takes), the cell twice more
+- At `55b71635` (the code review's kept proof, `ProvenCut`; a path S never takes), the cell twice more
   (android-vis-r1023-lv2-6.json, -7.json: 7 cases, 7 ok each, exit 0): S.fully `lower` 0→61, 61→295 · 0→60, 60→288,
   after 2 swipes, S whole at 1224 and 1231, Tapped, probe to reveal 2.9 s; P.fully after 1 swipe.
 - `P.fully`: one probe, `upper` 0→77–82, "fully visible after 1 swipe", Tapped — as before.
