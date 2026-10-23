@@ -1,0 +1,63 @@
+# Live golden, Android, 2026-10-23: the strip between a floating Gboard's panel and its band (FU1)
+
+## 2026-10-23 — FU1's fix, `34f82f25` (bugs/r1023b-fu1)
+
+averi_lab (emulator-5554, API 33, 1080x2220, gesture navigation; booted `-no-window -no-snapshot-save`, shut down
+after), the lab app as installed. averi = this checkout at `34f82f25` (its src; the kf cases and their judge,
+scripts/truth/live.ts and live-forms.ts#judgeFloatingGap, added in the records' commit). Note:
+docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md, ADR 0027.
+
+**Floating, by hand.** No adb setting floats Gboard. With `form-keyboard-floating` launched (postcode focused, Gboard
+docked: `touchable region=SkRegion((0,1398,1080,2220))`, `ITYPE_IME frame=[0,1398][1080,2220]`), screenshot-guided taps:
+the toolbar's grid key (63,1456), the grid's second page, the **Floating** tile (294,1770). Read after:
+
+```
+touchable region=SkRegion((359,1269,1040,1912)(0,2088,1080,2220))
+InsetsSource type=ITYPE_IME frame=[0,2088][1080,2220] visibleFrame=[0,2088][1080,2220] visible=true
+```
+
+Two rects: the panel `359,1269 681x643` (where Gboard put it — the 2026-10-08 device check's place, not the capture's
+`71,1092 937x792`; left there, its region recorded instead) and the 132-px strip. The gap is `0,1912 1080x176`; the
+dump's submit `[55,1928][1025,2060]` lies wholly in it, ks `[55,1644][1025,1776]` under the panel.
+
+**The cases** (`--groups forms --cells form-keyboard-floating --cases kf1,kf2,kf3`, three runs:
+docs/truth/live-records/android-forms-r1023b-fu1-1.json, -2.json, -3.json — 3 of 3 ok each):
+
+| case | reply (each run) | the app |
+|---|---|---|
+| kf1 `scroll_until submit` | `Element id:"lab.form-keyboard-floating.submit" fully visible after 0 swipes` | no touch, no submit |
+| kf2 `scroll_until submit`, `tap submit` | the same, then `Tapped id:"lab.form-keyboard-floating.submit"` | one touch at (540,1994), one submit, the IME still up (no `back`) |
+| kf3 `scroll_until ks` | `ERROR … failed after 3 swipes … never intersected the 1080x1269 screen above the soft keyboard over [359,1269][1040,1912]` | three strokes touching down at (540,1060), above the panel; ks 1493–1592, under the panel; postcode untouched |
+
+The run's judge first counted kf2's tap as a stroke (the app logs the tap's touch too) and called it a MISMATCH; the
+judge was fixed (kf2's one touch is its tap) and the three records rejudged: 3 of 3 ok each, as pinned in
+tests/truth/live-rejudge.test.ts.
+
+**Docked control.** Gboard docked again (grid → Floating, the tile now off): `touchable region=SkRegion((0,1398,1080,2220))`
+— one rect, the band. kf1 once more: SKIP, "keyboard docked (the app hears an IME 822 px tall, not the floating strip)"
+(not recorded). Then `adb -s emulator-5554 emu kill`.
+
+## 2026-10-23 — kf1 and kf2 evidence the panel themselves (FU1's code review)
+
+The app's state cannot tell a floating panel from an IME collapsed to its strip with no panel: both give the app the
+132-px strip, and with no panel kf1 and kf2 pass with no gap rule at all. Only kf3's refusal quoted the panel. So kf1
+and kf2 now begin with a colour assert on ks (`live-forms.ts#FLOATING_PANEL_EVIDENCE`). The pixel poll refuses it
+naming the rect over ks (`keyboard 359,1269 681x643`), with no touch and no key, and the IME left up. The judge is SKIP
+unless that reply quotes a measured panel. The call goes first because a submit lays the form out again: sent after
+kf2's tap, ks lay at y 2148 under the strip, and the reply quoted the band (`keyboard 0,2088 1080x132`).
+
+averi_lab, as above, at this branch's tip (src as at `760dadea`, plus the review's refactor, which leaves behaviour the
+same). Gboard was floated by hand the same way, and the region read was the same as above:
+`SkRegion((359,1269,1040,1912)(0,2088,1080,2220))`.
+
+There were three runs (docs/truth/live-records/android-forms-r1023b-fu1-cr-1.json, -2.json, -3.json), each 3 of 3 ok:
+- **kf1:** the evidence reply quotes `keyboard 359,1269 681x643` over ks `55,1644 970x132`, then
+  `fully visible after 0 swipes`.
+- **kf2:** the same, then `Tapped`, with one submit and the IME still up.
+- **kf3:** as before.
+
+Docked again (the region was the band alone, `(0,1398,1080,2220)`), kf1–kf3 were SKIP "keyboard docked" (not
+recorded). Then `adb -s emulator-5554 emu kill`.
+
+The first three records (-1, -2 and -3, without the evidence call) now rejudge as kf1 and kf2 SKIP and kf3 ok. They are
+pinned that way in tests/truth/live-rejudge.test.ts.

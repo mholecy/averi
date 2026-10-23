@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -248,6 +248,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // The cell twice more with the proof kept (`ProvenCut`, a path S never takes): the same.
     ['android-vis-r1023-lv2-6.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-7.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
+    // FU1's fix (docs/truth/live-android-2026-10-23-floating-gap.md): form-keyboard-floating under a hand-floated
+    // Gboard, three runs — the panel quoted over ks first, the submit in the gap visible with no stroke and tapped once,
+    // ks under the panel never visible.
+    ['android-forms-r1023b-fu1-cr-1.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    ['android-forms-r1023b-fu1-cr-2.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    ['android-forms-r1023b-fu1-cr-3.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -686,6 +692,20 @@ describe('live.ts --rejudge over the committed Android records of the src before
     expect(notKnown(out).sort()).toEqual([...want.unknown].sort());
     expect(out).toMatch(/^- MISMATCH k7 .*fully visible after 1 swipe — 18 px of phone under the bar, unsaid/m);
     expect(code).toBe(1);
+  });
+});
+
+describe('live.ts --rejudge over the first committed records of FU1\'s fix, before kf1 and kf2 evidenced the panel', () => {
+  // android-forms-r1023b-fu1-{1,2,3}.json: the same device and floating Gboard, run before kf1 and kf2 began with a
+  // colour assert on ks that quotes the panel over it. With no such reply a floating panel is not evidenced (an IME
+  // collapsed to its strip reads the same to the app), so kf1 and kf2 are SKIP; kf3's refusal names the panel: ok.
+  it.each(['android-forms-r1023b-fu1-1.json', 'android-forms-r1023b-fu1-2.json', 'android-forms-r1023b-fu1-3.json'])('%s: kf1 and kf2 SKIP, no panel quoted; kf3 ok', { timeout: 60_000 }, async (record) => {
+    const { code, out } = await rejudge(record, 'forms');
+    expect(out).toMatch(/^# Live golden: 3 cases, 1 ok, 0 loud, 0 mismatches \(0 not known\), 2 skipped$/m);
+    expect(out).toMatch(/^- SKIP kf1 .*no measured panel quoted over ks/m);
+    expect(out).toMatch(/^- SKIP kf2 .*no measured panel quoted over ks/m);
+    expect(out).toMatch(/^- ok kf3 /m);
+    expect(code).toBe(0);
   });
 });
 

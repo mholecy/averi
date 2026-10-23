@@ -44,8 +44,9 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * one of its inputs; this module imports nothing from it.
  *
  * Its interface, eight exports: `readKeyboard` and the `KeyboardReading` it
- * builds; the reading's cover (`KeyboardCover`) and `UNLOCATED_KEYBOARD`;
- * and the verdicts its point questions answer (`FrameVerdict`, `Uncovered`,
+ * builds; the reading's cover (`KeyboardCover`, with the strip below its
+ * panels that none of it covers, `gap`) and `UNLOCATED_KEYBOARD`; and the
+ * verdicts its point questions answer (`FrameVerdict`, `Uncovered`,
  * `KeyboardVerdict`, `Covering`) — answers to a question, not positions.
  *
  * WHAT A READING ASKS, AND WHEN — stated once, here. Three oracle calls, each at most
@@ -137,6 +138,8 @@ export interface KeyboardCover {
   top: Rect;
   /** The inset band (`SoftKeyboard.frame`). */
   band: Rect;
+  /** The strip below a floating keyboard's panels that none of it covers (`panelGap`), when its region was admitted whole; absent otherwise. */
+  gap?: Rect;
   remedy: KeyboardRemedy;
 }
 
@@ -361,7 +364,7 @@ const noticed = new WeakMap<KeyboardOracle, Set<string>>();
  * device first. The seam for it is here: return the witness beside the
  * keyboard and let `readKeyboard` memoise it.
  */
-async function withPanels(oracle: KeyboardOracle, keyboard: Extract<SoftKeyboard, { state: 'shown' }>): Promise<SoftKeyboard> {
+async function withPanels(oracle: KeyboardOracle, keyboard: Extract<SoftKeyboard, { state: 'shown' }>): Promise<WholeShown> {
   const touchable = await oracle.touchable();
   const { panels, refused } = panelsBeyond(keyboard.frame, touchable);
   if (refused !== undefined) {
@@ -377,11 +380,40 @@ async function withPanels(oracle: KeyboardOracle, keyboard: Extract<SoftKeyboard
       console.error(line);
     }
   }
-  return panels.length === 0 ? keyboard : { ...keyboard, panels };
+  if (panels.length === 0) return keyboard;
+  // A gap only from a region admitted WHOLE: a dropped rect may lie in it, and the panels kept cannot say.
+  const gap = refused === undefined ? panelGap(keyboard.frame, panels) : undefined;
+  return { ...keyboard, panels, ...(gap !== undefined && { gap }) };
 }
+
+/** A shown keyboard as a reading holds it: the band, its panels, and the gap below them (`panelGap`) when its region was admitted whole. */
+type WholeShown = Extract<SoftKeyboard, { state: 'shown' }> & { gap?: Rect };
 
 /** Every rect a `shown` keyboard covers: the band, then its panels — the one list every geometric question tests. */
 const keyboardRects = (keyboard: Extract<SoftKeyboard, { state: 'shown' }>): readonly Rect[] => [keyboard.frame, ...(keyboard.panels ?? [])];
+
+/**
+ * THE PANEL GAP below a floating keyboard's panels: the strip between them
+ * and its band, which none of the keyboard covers — the band's width, from
+ * the lowest panel's bottom down to the band's top. None when there is no
+ * panel (docked, WDA's band, idb's) or a panel reaches into the band's rows
+ * (no height left). `withPanels` asks it only of a region `panelsBeyond`
+ * admitted whole: a rect it dropped (off the band's screen) may lie in the
+ * strip, so a partly refused region has no gap. Measured on API 33 (the lab's
+ * floating Gboard, region `SkRegion((71,1092,1008,1884)(0,2088,1080,2220))`):
+ * the gap `0,1884 1080x204` held the app's pinned submit, drawn and tapped
+ * there; the screenshot shows the gap clean but for a few pixels of the
+ * panel's shadow at its top. Computed from the same rects every other
+ * question tests, so a rect inside it misses every covered rect by
+ * construction.
+ * docs/adr/0027-a-floating-keyboards-panel-gap-is-the-apps-screen.md
+ * docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md
+ */
+function panelGap(band: Rect, panels: readonly Rect[]): Rect | undefined {
+  if (panels.length === 0) return undefined;
+  const top = Math.max(...panels.map((r) => r.y + r.height));
+  return top < band.y ? { x: band.x, y: top, width: band.width, height: band.y - top } : undefined;
+}
 
 /** Memoise one async call: asked on the first need, never again for this reading. */
 function once<T>(ask: () => Promise<T>): () => Promise<T> {
@@ -404,7 +436,7 @@ export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboard
   // The three oracle calls, each once (the module doc's order); on the
   // in-tree model the band, read off the tree on first need.
   const state = once(async (): Promise<SoftKeyboard> => (oracle === undefined ? (tree === undefined ? inTree : keyboardInTree(tree)) : oracle.state()));
-  const whole = once(async (): Promise<SoftKeyboard> => {
+  const whole = once(async (): Promise<Exclude<SoftKeyboard, { state: 'shown' }> | WholeShown> => {
     const keyboard = await state();
     return oracle === undefined || keyboard.state !== 'shown' ? keyboard : withPanels(oracle, keyboard);
   });
@@ -442,7 +474,7 @@ export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboard
       const keyboard = await whole();
       if (keyboard.state !== 'shown') return undefined;
       const rects = keyboardRects(keyboard);
-      return { rects, top: rects.reduce((top, r) => (r.y < top.y ? r : top)), band: keyboard.frame, remedy };
+      return { rects, top: rects.reduce((top, r) => (r.y < top.y ? r : top)), band: keyboard.frame, ...(keyboard.gap !== undefined && { gap: keyboard.gap }), remedy };
     },
     async corroborated() {
       if ((await state()).state !== 'shown') return false;

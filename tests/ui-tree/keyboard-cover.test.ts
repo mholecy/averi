@@ -250,7 +250,7 @@ describe('the keyboard window\'s region, read only once the band is up — the f
     const said = notices();
     const { reading, oracle } = shownBeside(GBOARD_STRIP, touchableOf(GBOARD.floating.touchable));
     const cover = await reading.cover();
-    expect(cover).toEqual({ rects: [GBOARD_STRIP, GBOARD_PANEL], top: GBOARD_PANEL, band: GBOARD_STRIP, remedy: { dismissal: 'back', advice: undefined } });
+    expect(cover).toEqual({ rects: [GBOARD_STRIP, GBOARD_PANEL], top: GBOARD_PANEL, band: GBOARD_STRIP, gap: { x: 0, y: 1912, width: 1080, height: 176 }, remedy: { dismissal: 'back', advice: undefined } });
     expect(calls(oracle)).toEqual([1, 1, 0]);
     expect(said).not.toHaveBeenCalled();
   });
@@ -364,5 +364,53 @@ describe('the keyboard window\'s region, read only once the band is up — the f
       expect(await readKeyboard(fake).cover()).toBeUndefined();
       expect(calls(oracle)).toEqual([1, 0, 0]);
     }
+  });
+});
+
+describe('the cover\'s gap — the strip between a floating keyboard\'s panels and its band, which none of it covers', () => {
+  const region = (text: string) => touchableOf(`    touchable region=SkRegion(${text})\n`, 'shown');
+  const coverWith = async (touchable: ReturnType<typeof touchableOf>) => {
+    const fake = new FakeAdapter({ s: screen() }, 's');
+    fake.attachKeyboard({ state: 'shown', frame: GBOARD_STRIP }).touchableAnswers.current = touchable;
+    return readKeyboard(fake, screen()).cover();
+  };
+
+  it('the lab\'s floating Gboard, read as the device gave it: the cover\'s gap is the band\'s width from the panel\'s bottom down to the band', async () => {
+    // tests/fixtures/truth/android-averi_lab-api33/form-keyboard-floating.ime.json
+    expect((await coverWith(region('(71,1092,1008,1884)(0,2088,1080,2220)')))?.gap).toEqual({ x: 0, y: 1884, width: 1080, height: 204 });
+  });
+
+  it('a region only partly admitted (a rect off the band\'s screen dropped, in the strip): the panels kept, no gap — the dropped rect may lie in it', async () => {
+    for (const dropped of ['(-10,1900,1008,2000)', '(500,1900,1100,2000)']) {
+      const cover = await coverWith(region(`(71,1092,1008,1884)${dropped}(0,2088,1080,2220)`));
+      expect(cover?.rects).toHaveLength(2);
+      expect(cover?.gap).toBeUndefined();
+    }
+  });
+
+  it('docked — the band alone: no gap', async () => {
+    expect((await coverWith(region('(0,2088,1080,2220)')))?.gap).toBeUndefined();
+  });
+
+  it('two panels: the gap starts below the lower one', async () => {
+    expect((await coverWith(region('(71,1092,1008,1592)(359,1269,1040,1912)(0,2088,1080,2220)')))?.gap).toEqual({ x: 0, y: 1912, width: 1080, height: 176 });
+  });
+
+  it('two panels, the lower one reaching into the band\'s rows: no gap — not one below the other', async () => {
+    const cover = await coverWith(region('(71,1092,1008,1592)(359,1700,1040,2100)(0,2088,1080,2220)'));
+    expect(cover?.rects).toHaveLength(3); // the panels admitted: no gap by their geometry, not by a refusal
+    expect(cover?.gap).toBeUndefined();
+  });
+
+  it('a panel whose bottom is the band\'s top: no gap (no height)', async () => {
+    const cover = await coverWith(region('(71,1092,1008,2088)(0,2088,1080,2220)'));
+    expect(cover?.rects).toHaveLength(2); // the panels admitted: no gap by their geometry, not by a refusal
+    expect(cover?.gap).toBeUndefined();
+  });
+
+  it('a panel reaching into the band\'s rows: no gap', async () => {
+    const cover = await coverWith(region('(71,1092,1008,2100)(0,2088,1080,2220)'));
+    expect(cover?.rects).toHaveLength(2); // the panels admitted: no gap by their geometry, not by a refusal
+    expect(cover?.gap).toBeUndefined();
   });
 });
