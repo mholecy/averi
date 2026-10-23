@@ -263,11 +263,13 @@ export const judgeFloatingGap =
       return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panels (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
     }
     const [evidence, scroll, tap] = replies;
+    // Damage is judged before the evidence: a submit the case never asked for is wrong with a panel up or not.
+    if (submits > (kind === 'kf2' ? 1 : 0)) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×) — more than the case's ${kind === 'kf2' ? 'one tap' : 'none'}: ${short(scroll)}${kind === 'kf2' ? ` / ${short(tap)}` : ''}` };
     if (!panelQuoted(evidence, (p) => `keyboard ${rectText(p)}`)) return { outcome: 'SKIP', why: `no measured panel quoted over ks — the IME was not floating there: ${short(evidence)}` };
     if (replyKind(scroll) !== 'visible') return { outcome: 'MISMATCH', why: `refused, though the submit lies wholly between the panel and the strip: ${short(scroll)}` };
     // kf2's one touch is its tap, sent after the scroll; any other is a stroke.
     if (swipesOf(scroll) !== 0 || touches.length > (kind === 'kf2' ? 1 : 0)) return { outcome: 'MISMATCH', why: `a stroke the pinned submit never needed (${swipesOf(scroll) ?? '?'} swipes; ${logged}): ${short(scroll)}` };
-    if (kind === 'kf1') return { outcome: submits === 0 ? 'ok' : 'MISMATCH', why: `${submits === 0 ? '' : `the form was SUBMITTED (${submits}×) by a scroll — `}${short(scroll)}` };
+    if (kind === 'kf1') return { outcome: 'ok', why: short(scroll) };
     if (!claimsTap(tap) || submits !== 1) return { outcome: claimsTap(tap) ? 'MISMATCH' : 'LOUD', why: `${submits} submit(s); averi: ${short(tap)}` };
     if (s.keyboard?.visible !== true) return { outcome: 'MISMATCH', why: `submitted, but the IME went (a back sent for a tap clear of it): ${short(tap)}` };
     return { outcome: 'ok', why: `1 submit, the IME still up: ${short(scroll)} / ${short(tap)}` };

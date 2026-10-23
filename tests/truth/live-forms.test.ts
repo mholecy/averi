@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet } from '../../scripts/truth/live-forms.js';
+import { judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet } from '../../scripts/truth/live-forms.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
@@ -133,5 +133,37 @@ describe('c5–c7: an assert and a flow\'s wait: on name beneath form-picker\'s 
     expect(judge(logged({ kind: 'select', tag: 'AL' }), [asserted], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^failed, but the app logged select AL/) });
     expect(judge(logged({ kind: 'dismissed', tag: 'sheet' }), [waited], 'uiautomator', launched).outcome).toBe('MISMATCH');
     expect(judge({ ...launched, focus: 'name' }, [coloured], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/focus name/) });
+  });
+});
+
+describe('kf1–kf2: the submit between a floating panel and its strip — the panel evidenced by the case\'s own first reply', () => {
+  // docs/truth/live-records/android-forms-r1023b-fu1-cr-1.json: Gboard floated by hand; each case begins with a colour
+  // assert on ks whose refusal quotes the panel over it.
+  const fu1 = JSON.parse(readFileSync(new URL('../../docs/truth/live-records/android-forms-r1023b-fu1-cr-1.json', import.meta.url), 'utf8')) as Rec;
+  const kf = (id: string) => fu1.results.find((r) => r.id === id)!;
+  const noPanel = 'FAIL  element id:"lab.form-keyboard-floating.ks" fill within dE00 8 of #FFFFFF — measured #FFFFFF';
+
+  it('the record: the panel quoted, the submit visible with no stroke, tapped once — ok', () => {
+    for (const id of ['kf1', 'kf2'] as const) {
+      const { replies, launched, state } = kf(id);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched).outcome).toBe('ok');
+    }
+  });
+
+  it('no panel quoted (an IME collapsed to its strip reads the same to the app): SKIP, never ok', () => {
+    for (const id of ['kf1', 'kf2'] as const) {
+      const { replies, launched, state } = kf(id);
+      expect(judgeFloatingGap(id)(state, [noPanel, ...replies.slice(1)], 'uiautomator', launched)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^no measured panel quoted over ks/) });
+    }
+  });
+
+  it('a submit the case never asked for is a MISMATCH before any evidence: kf1 with one, kf2 with two, panel quoted or not', () => {
+    for (const [id, n] of [['kf1', 1], ['kf2', 2]] as const) {
+      const { replies, launched, state } = kf(id);
+      const submitted = { ...state, submits: Array.from({ length: n }, (_, i) => ({ at: i })) } as LabState;
+      for (const first of [replies[0], noPanel]) {
+        expect(judgeFloatingGap(id)(submitted, [first, ...replies.slice(1)], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^the form was SUBMITTED/) });
+      }
+    }
   });
 });
