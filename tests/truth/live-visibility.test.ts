@@ -382,10 +382,12 @@ describe('the tap after a stop is judged on the state after the tap', () => {
 
 describe('the live KNOWN pins the rule a case fails by and the kind of reply it rests on', () => {
   it('a known case failing by its entry\'s rule on its entry\'s kind is known; by another rule, or another kind, it is not', () => {
-    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', 'not found')).toMatch(/residual 19/);
-    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'unchanged-claim', 'not found')).toBeUndefined();
-    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', 'refused')).toBeUndefined();
-    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', undefined)).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-refused', 'refused')).toMatch(/FAB host layer/);
+    expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-claim', 'refused')).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-refused', 'not found')).toBeUndefined();
+    expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-refused', undefined)).toBeUndefined();
+    // Struck off by residual 19's fix (round 1023b): the strokes beneath the full-screen dialog are no longer known.
+    expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', 'not found')).toBeUndefined();
     // Struck off by LV1's fix (round 14): its unchanged claim is no longer known.
     expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', 'not found')).toBeUndefined();
     expect(knownLive('android', 'uiautomator', 'tap:scroll-bounded.S', 'tap-refused-fired', 'refused')).toBeUndefined();
