@@ -62,7 +62,7 @@ open note on the working tree. See the script for the verdicts.
 | VA1 | 2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole | calibrate | cbc584b → 7957a62 | CALIBRATED |
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → 151b2ca | CALIBRATED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | calibrate | b71cbbb → 6d8f8de | CALIBRATED |
-| FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | calibrate | 9aee4db → 34f82f2 | CALIBRATED |
+| FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | calibrate | 9aee4db → 760dade | CALIBRATED |
 | OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | calibrate | 3d668f1 → 9837ef6 | CALIBRATED |
 | OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | calibrate | 9837ef6 → cb0b7ac | CALIBRATED |
 | NI1 | 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier | calibrate | a0463c6 → 75d6c07 | CALIBRATED |
@@ -1318,10 +1318,10 @@ Fixed by round 6's S2, 6d8f8de on arch/r22-f2a1 (ui-tree/standing.ts#cutByLater:
 
 - before 9aee4db:
   - RED android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until — stopped: ERROR scroll_until id:"lab.form-keyboard-floating.submit" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never
-- after 34f82f2:
+- after 760dade:
   - ok android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until — Element id:"lab.form-keyboard-floating.submit" fully visible after 0 swipes
 
-Fixed by round 1023b, 34f82f2 on bugs/r1023b-fu1 (ui-tree/keyboard-cover.ts#panelGap, interact/scroll-read.ts#inGap: a match wholly in the strip between a floating keyboard's panels and its band, stopping cleanly there, is judged there; ADR 0027): the pair is 34f82f2 and its parent 9aee4db7. Before: refused after two swipes above the panel, `never intersected the 1080x1092 screen above the soft keyboard`; after: `fully visible after 0 swipes`, no stroke. Red since cb77485 (#1's regression elsewhere, recorded there), green at 7d9a783. Live, 2026-10-23 on averi_lab with Gboard floated by hand (region `(359,1269,1040,1912)(0,2088,1080,2220)`): kf1–kf3 ok three runs of three (docs/truth/live-android-2026-10-23-floating-gap.md).
+Fixed by round 1023b, 34f82f2 on bugs/r1023b-fu1 (ui-tree/keyboard-cover.ts#panelGap, interact/scroll-read.ts#inGap: a match wholly in the strip between a floating keyboard's panels and its band, stopping cleanly there, is judged there; ADR 0027): the pair is 760dade (the last fix: a gap only from a region admitted whole) and 34f82f2's parent 9aee4db7. Before: refused after two swipes above the panel, `never intersected the 1080x1092 screen above the soft keyboard`; after: `fully visible after 0 swipes`, no stroke. Red since cb77485 (#1's regression elsewhere, recorded there), green at 7d9a783. Live, 2026-10-23 on averi_lab with Gboard floated by hand (region `(359,1269,1040,1912)(0,2088,1080,2220)`): kf1–kf3 ok three runs of three, kf1 and kf2 each quoting the panel over ks (docs/truth/live-android-2026-10-23-floating-gap.md).
 
 ## OC1: CALIBRATED
 
