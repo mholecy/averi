@@ -13,16 +13,16 @@ import type { ReplyKind } from './replies.js';
  * Its contract is weaker than ADR 0020 §4's in two ways, on purpose. The strokes are not pinned: a device's timing
  * moves how many a scroll_until sends, run to run. And a case on the device can pass by chance of timing: so live.ts
  * (a run of this checkout, or a `--rejudge` of one) exits 1 on a MISMATCH not listed here, and on a listed case that
- * comes back ok unless its entry is `intermittent` — one whose runs of the same commit differ (LV2: the flush probe
- * reveals a deep cut in most runs, not all). A non-intermittent case ok is fixed and must be struck off, as the static
- * ratchet asks; an intermittent one ok is printed as such. A `--side` run (a calibration of an older commit) is held to
- * neither: this KNOWN is HEAD's.
+ * comes back ok unless its entry is `intermittent` — one whose runs of the same commit differ (the WDA stop on a row
+ * resting a fraction of a point centre-out; LV2's flush cases were, until round 1023 fixed them). A non-intermittent
+ * case ok is fixed and must be struck off, as the static ratchet asks; an intermittent one ok is printed as such. A
+ * `--side` run (a calibration of an older commit) is held to neither: this KNOWN is HEAD's.
  *
  * The kind is pinned since round 5 (it was not before: "a device's timing moves it" was assumed, not measured). The
  * committed records measured it (docs/truth/live-records, rejudged by tests/truth/live-rejudge.test.ts): every entry's
  * kind below is what its case's record reads; and the cases with
- * several records, LV2's two flush cases (android-vis.json at HEAD, cal12-*.json: three runs at 9c7885e, two at
- * d043e65), read `visible` in all six — ok in four, a stop-claim in two: the timing moves the outcome, not the kind;
+ * several records, LV2's two flush cases (android-vis.json, cal12-*.json: three runs at 9c7885e, two at d043e65), read
+ * `visible` in all six — ok in four, a stop-claim in two: the timing moved the outcome, not the kind (struck off since);
  * LV5's case likewise (ios-vis-2725e76.json and ios-scroll-bounded-wda-2725e76-*.json, three runs at
  * b71cbbb's src): `refused` where it is not reached, ok in two.
  * A run that reads another kind for a known case fails as NOT known, naming both: refile it. (An entry could once list
@@ -32,7 +32,6 @@ import type { ReplyKind } from './replies.js';
 
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
-const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID_RESIDUAL = 'residual:ADR 0018 residual 20 — idb lists no identifier on a UIKit table cell label: an id-asked target there is never found, only said so';
@@ -72,7 +71,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // off — live three times (android-vis-r14-lv1.json, -2.json at its first form bd1c1107; -3.json at 770344ae):
   // tabbar-floating F visible after 5 swipes and Tapped, also with timeoutMs 30000 (blank:tabbar-floating.F);
   // scroll-bounded O and F an honest LOUD at the deadline with no unchanged claim, the blank clause naming `upper`.
-  ...each('android uiautomator', ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'], LV2, 'stop-claim', 'visible', { intermittent: true }),
+  // LV2 (scroll-bounded-flush's P.fully and S.fully, intermittent;
+  // docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md): fixed
+  // by round 1023's bugs/r1023-lv2 (a probe that showed more of a still-flush row proved its cut: no confirm, the next
+  // stroke a reveal of half the room), S.fully "fully visible after 2 swipes" five runs of five (lower 0→58–61, then
+  // →291–296; android-vis-r1023-lv2-1…5.json), P.fully after 1 as before; both struck off.
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),
   // Round 7 (T2): the presented windows the parser does not mark (android-vis-dialogs.json, -scroll-run2/3.json; the
   // same in all three runs). Beneath the full-screen Compose Dialog every target's two strokes land on the dialog

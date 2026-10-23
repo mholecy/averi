@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -237,6 +237,14 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-forms-r1023-phone-2.json', 'forms', { cases: 29, ok: 27, loud: 2, mismatches: 0 }],
     // The same two at the branch's tip (the strict beside rows, one kept answer per text, the code review's renames).
     ['android-forms-r1023-phone-3.json', 'forms', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
+    // Round 1023's LV2 fix (bugs/r1023-lv2, ADR 0013 refined 2026-10-23): scroll-bounded-flush five times — S.fully
+    // fully visible after 2 swipes, a probe then a reveal (pinned below), P.fully after 1 — then the visibility group once.
+    ['android-vis-r1023-lv2-1.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023-lv2-2.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023-lv2-3.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023-lv2-4.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023-lv2-5.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023-lv2-group.json', 'visibility', { cases: 140, ok: 130, loud: 6, mismatches: 4 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -245,6 +253,29 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ ...want, notKnown: 0, skipped: 0 });
     expect(out).not.toMatch(/NOT known|FIXED, not intermittent/);
     expect(code, out.slice(-2000)).toBe(0);
+  });
+});
+
+describe('the LV2 fix\'s records: the flush probe, then one reveal', () => {
+  // docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md: S
+  // (176 px, 154 of it below `lower`'s clip at rest) whole after the probe and one reveal of at most half the room above
+  // it — the list never carried past the clip's top (S's top stays inside 1046–1541), and the tap fires S.
+  it.each([1, 2, 3, 4, 5])('android-vis-r1023-lv2-%i.json: S.fully a probe of ~60 px, then a reveal that leaves S whole', (n) => {
+    const record = JSON.parse(readFileSync(new URL(`../../docs/truth/live-records/android-vis-r1023-lv2-${n}.json`, import.meta.url), 'utf8')) as {
+      results: { id: string; replies: string[]; state: { strokes: { view: string; from: number; to: number }[]; frames: Record<string, { y: number; height: number }> } }[];
+    };
+    const s = record.results.find((c) => c.id === 'scroll:scroll-bounded-flush.S.fully')!;
+    expect(s.replies).toEqual(['Element id:"lab.scroll-bounded-flush.S" fully visible after 2 swipes', 'Tapped id:"lab.scroll-bounded-flush.S"']);
+    const [probe, reveal] = s.state.strokes;
+    expect(s.state.strokes).toHaveLength(2);
+    expect(probe).toMatchObject({ view: 'lower', from: 0 });
+    expect(probe.to).toBeGreaterThanOrEqual(50);
+    expect(probe.to).toBeLessThan(154);
+    expect(reveal).toMatchObject({ view: 'lower', from: probe.to });
+    expect(reveal.to).toBeGreaterThanOrEqual(154);
+    const S = s.state.frames.S;
+    expect(S.y).toBeGreaterThanOrEqual(1046);
+    expect(S.y + S.height).toBeLessThanOrEqual(1541);
   });
 });
 
@@ -655,18 +686,17 @@ describe('live.ts --rejudge over the committed Android records of the src before
   });
 });
 
-describe('live.ts --rejudge over a committed calibration record where the flush probe\'s intermittent cases read as a stop claim', () => {
-  // Lab note LV2. Its flush cases are intermittent and ok in android-vis.json, so the record above never asks their entries' class
-  // or kind. cal12-d043e65-1.json (#12's live calibration, a --side run of d043e65) reads both as a stop claimed on
-  // `visible`: known by LV2's entries. Its one case not known, scroll-bounded-flush.S, is #12's own defect at that
-  // commit (a calibration, not HEAD's KNOWN): exit 1, as recorded.
-  it('cal12-d043e65-1.json: P.fully and S.fully known by the flush probe\'s note, S alone not known', { timeout: 60_000 }, async () => {
+describe('live.ts --rejudge over a committed calibration record of the src before the flush probe', () => {
+  // cal12-d043e65-1.json (#12's live calibration, a --side run of d043e65, before the flush probe existed) reads
+  // scroll-bounded-flush's S, P.fully and S.fully as a stop claimed on `visible` ("fully visible after 0 swipes"): #12's
+  // own defect at that commit. P.fully and S.fully were known by LV2's intermittent entries until round 1023 fixed LV2
+  // and struck them off; they never were LV2's at that src (no probe was sent), so all three read not known now — a
+  // calibration, not HEAD's KNOWN: exit 1, as recorded.
+  it('cal12-d043e65-1.json: S, P.fully and S.fully not known', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('cal12-d043e65-1.json', 'visibility');
-    expect(out).toMatch(/^# Live golden: 7 cases, 4 ok, 0 loud, 3 mismatches \(1 not known\), 0 skipped$/m);
-    const lv2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
-    for (const id of ['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S.fully'])
-      expect(out).toMatch(new RegExp(`^- MISMATCH \\(stop-claim\\) ${id.replaceAll('.', '\\.')} .*\\[known: ${lv2.replaceAll('.', '\\.')}\\]$`, 'm'));
-    expect(out).toMatch(/^- MISMATCH \(stop-claim\) scroll:scroll-bounded-flush\.S scroll-bounded-flush: .*(?<!\])$/m);
+    expect(out).toMatch(/^# Live golden: 7 cases, 4 ok, 0 loud, 3 mismatches \(3 not known\), 0 skipped$/m);
+    expect(notKnown(out).sort()).toEqual(['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S', 'scroll:scroll-bounded-flush.S.fully']);
+    expect(out).toMatch(/^- MISMATCH \(stop-claim\) scroll:scroll-bounded-flush\.S\.fully .*fully visible after 0 swipes/m);
     expect(code).toBe(1);
   });
 });

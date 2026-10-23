@@ -32,10 +32,10 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  * recorded F unlisted under idb — no live entry files it since, so it is no exemption. LV4's and the carousel triage
  * note's left with their live entries, struck off by round 7's A1: fixed, still excluded with that reason; LV1's with
  * its three, struck off by round 14's bugs/r14-lv1 — fixed live, still excluded, its `why` saying so; LV3's with its idb
- * one, struck off by round 14's bugs/r14-lv3 — fixed live, still excluded.)
+ * one, struck off by round 14's bugs/r14-lv3 — fixed live, still excluded; LV2's with its two, struck off by round
+ * 1023's bugs/r1023-lv2 — fixed live, still excluded.)
  */
 const LIVE_ONLY: Readonly<Record<string, string>> = {
-  '2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md': "LV2: the flush probe's reach, live only (and intermittent)",
   '2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md': "a fling's rest a fraction of a point centre-out under WDA, live only (and intermittent)",
 };
 

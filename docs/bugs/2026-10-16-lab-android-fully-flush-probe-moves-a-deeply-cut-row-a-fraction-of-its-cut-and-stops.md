@@ -9,6 +9,19 @@ scroll offset, stroke log and frames (LabState.offsets, .strokes, .frames — ro
 docs/truth/live-android-2026-10-16-visibility.md (the debc9b2 run, appendix), docs/truth/live-calibration-2026-10-16.md
 (every #12 run, the 9c7885e one above included).
 
+## Status
+
+**Fixed** at `ae4d988a` (bugs/r1023-lv2; ADR 0013, refined 2026-10-23), measured live on `averi_lab` five runs of five
+(docs/truth/live-records/android-vis-r1023-lv2-1…5.json; docs/truth/live-android-2026-10-18-visibility.md, its round-1023
+LV2 section): a probe after whose read the row moved and lies flush on the same edge with more of it showing has proved the
+cut — no confirming read, and the next stroke is a REVEAL, the whole stroke with its travel half the room the row
+leaves in its container (capped at a top or left edge, where a pull-to-refresh lies); at the bound the call fails
+naming the cut, never "fully visible". S.fully: `fully visible after 2 swipes` every run, `lower` 0→58–61 then
+→291–296 (S whole at 1223–1228, Tapped), 12.6 s from the first touch to the tap where the committed runs before took
+17.6–19.6 s; P.fully `after 1 swipe` as before. Correction to the Cause below: the probe's finger travel on `lower` is
+74 px (0.25 of the full stroke's 297 over the 495-px container), not 178 — the cap is never reached there; and a
+probe round costs ~5.1 s (two reads when it moves the row).
+
 ## Observed (measured)
 
 S: a 300x64-dp row (825x176 px) in `lower` (clip 0,1046 1080x495), 22 px of it showing above the clip's bottom
