@@ -4,7 +4,7 @@ import type { PinnedEdge } from '../ui-tree/later-edges.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
-import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
+import { askedOf, eyesQuestion, pairQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type PairQuestion } from '../ui-tree/eyes.js';
 import { seenOrderOf, type OrderSeen, type PairSeen } from '../ui-tree/seen-order.js';
 import { hasArea, tapPoint } from '../ui-tree/selectors.js';
 import { missOf, saysTopLayerOnly, topLayerOnlySource, type Miss, type TopLayerOnlySource } from '../ui-tree/miss.js';
@@ -171,7 +171,7 @@ export type RoundStep =
   /** Look (ui-tree/eyes.ts): ask the eyes `question` — one screenshot — and call `round` again with the same seen and the answer (`eyes`); the state is unchanged. */
   | { do: 'ask'; what: 'eyes'; question: EyesQuestion }
   /** Look (ui-tree/eyes.ts#Eyes.order): ask the eyes which of the target and a control the listing does not order is drawn on top — one screenshot — and call `round` again with the same seen and the answer (`order`); the state is unchanged. */
-  | { do: 'ask'; what: 'order'; question: OrderQuestion }
+  | { do: 'ask'; what: 'order'; question: PairQuestion }
   /** Settle, read again, send nothing — a confirming read (SETTLE_CONFIRM_READS), or a confirming read that did not read, read again. */
   | { do: 'confirm' }
   /**
@@ -728,9 +728,9 @@ function keptAnswerOf(kept: readonly KeptMarginAnswer[], target: UiNode, peer: U
  */
 function orderKnown(
   marginKept: readonly KeptMarginAnswer[],
-  question: OrderQuestion,
+  question: PairQuestion,
   answered: readonly OrderSeen[] | undefined,
-): { readonly ask: OrderQuestion } | { readonly told: readonly OrderSeen[]; readonly marginKept: readonly KeptMarginAnswer[] } {
+): { readonly ask: PairQuestion } | { readonly told: readonly OrderSeen[]; readonly marginKept: readonly KeptMarginAnswer[] } {
   if (question.asks === 'order') return answered === undefined ? { ask: question } : { told: answered, marginKept };
   const { node } = question;
   const kept = question.pairs.flatMap(({ peer }): OrderSeen[] => {
@@ -913,7 +913,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // the scroll's question — or covered by texts in its touch margin only (ADR 0026), each asked once where it lies: what
   // was seen of one is kept (`State.marginKept`) and told to every later read; one seen drawn over it or untold keeps the
   // cover, so the rest are not asked. The read is judged again, told what was seen (`RoundSeen.order`).
-  const ordering = judged?.best === undefined || read === undefined ? undefined : orderQuestion(read.tree, judged.best.node, judged.best.standing);
+  const ordering = judged?.best === undefined || read === undefined ? undefined : pairQuestion(read.tree, judged.best.node, judged.best.standing);
   if (ordering !== undefined && read !== undefined) {
     const known = orderKnown(s.marginKept, ordering, seen.order);
     if ('ask' in known) return { state, step: { do: 'ask', what: 'order', question: known.ask } };

@@ -213,12 +213,12 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
 ## Amendment 2026-10-23: a text in a control's touch margin (ADR 0026)
 
 The order question gets a second pair kind and a trigger on a cover whose order the tree TELLS:
-docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md. `OrderQuestion` is one of `{ asks: 'order',
-pairs: OrderPair[] }` (this ADR's) and `{ asks: 'clear', pairs: ClearPair[] }`: a standing `covered` with remedy
+docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md. The eyes' question is a `PairQuestion` (picked by
+`eyes.ts#pairQuestion`, formerly `orderQuestion`): this ADR's `OrderQuestion` or a `ClearQuestion` (`ClearPair[]`): a standing `covered` with remedy
 `scroll` whose every cover is a margin text (`ui-tree/cover.ts#marginText`, Android's Compose dialect only) asks whether
 each paints anything over the target; `PairSeen` gains `clear`, which one NOT_DRAWN row (`seenClear`) takes as no cover.
 `judgedWithOrder`, the port (`OrderEyes`) and `orderOfFrame` are unchanged; `scroll_until`'s driver now hands the
-reducer the eyes' answers as they came (`RoundSeen.order: OrderSeen[]`) instead of `orderSeenBy`'s told order, so the
+reducer the eyes' answers as they came (`pairsSeenBy`, `RoundSeen.order: OrderSeen[]`) instead of `orderSeenBy`'s told order, so the
 reducer can keep what it saw of margin texts (`scroll-rounds.ts#State.marginKept`) — a refused clear
 question is followed by strokes, unlike this ADR's unordered stop. The pixel assert never keeps a `clear` across poll
 rounds, as it never keeps an `over`. Every reading-order behaviour of this ADR is unchanged (a `clear` is no order of

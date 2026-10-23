@@ -58,8 +58,8 @@ precedent), ADR 0002 (the pixel slack) and ADR 0010 (the keyboard judged first).
    and overlay family (later-edges.ts), not this one; (5) its order is `drawn` and it is the surface of no presented
    screen. Over the 44 Android trees it holds of exactly the 78 pairs above (tests/ui-tree/eyes-margin.test.ts freezes
    the list).
-2. **The question** (`ui-tree/eyes.ts`): `OrderQuestion` becomes `{ asks: 'order', pairs: OrderPair[] } | { asks:
-   'clear', pairs: ClearPair[] }`. A standing `covered` with remedy `scroll` whose EVERY cover is a margin text asks one
+2. **The question** (`ui-tree/eyes.ts`): the eyes' pair question becomes `PairQuestion = OrderQuestion |
+   ClearQuestion` (`asks: 'order'`, `OrderPair[]`; `asks: 'clear'`, `ClearPair[]`), picked by `pairQuestion`. A standing `covered` with remedy `scroll` whose EVERY cover is a margin text asks one
    `ClearPair` per cover: `overlap`, the two's intersection in the frame, and `beside`, the target's own rows of the
    overlap left and right of the text. One cover the eyes cannot be asked about keeps the standing, so nothing is asked.
 3. **The answer** (`verify/eyes.ts#judgeClear`, `ui-tree/seen-order.ts#PairSeen`'s new `clear`):

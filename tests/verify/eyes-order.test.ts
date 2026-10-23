@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { orderQuestion, type AroundStrip, type OrderPair, type OrderQuestion } from '../../src/ui-tree/eyes.js';
+import { pairQuestion, type AroundStrip, type OrderPair, type PairQuestion } from '../../src/ui-tree/eyes.js';
 import type { Edge } from '../../src/ui-tree/geometry.js';
 import { seenOrderOf } from '../../src/ui-tree/seen-order.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
@@ -13,7 +13,7 @@ import { FakeAdapter, node } from '../helpers/fake.js';
 import { Verifier } from '../../src/verify/assert.js';
 
 /**
- * THE EYES TELL THE ORDER (ui-tree/eyes.ts#orderQuestion, verify/eyes.ts#judgeOrder) over the lab's real blur-menu
+ * THE EYES TELL THE ORDER (ui-tree/eyes.ts#pairQuestion, verify/eyes.ts#judgeOrder) over the lab's real blur-menu
  * captures — the menu row W drawn over the row C beneath it, both listed in reading order (iOS 27, 402x874 pt, the png
  * 1206x2622) — and synthetic pngs for every way the judge can only answer `untold`.
  * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
@@ -28,11 +28,11 @@ const byId = (tree: UiNode, id: string): UiNode => [...everyNode(tree)].find((n)
 const USABLE = { box: { x: 0, y: 0, width: 402, height: 874 }, boxes: [{ x: 0, y: 0, width: 402, height: 874 }], oriented: { x: 0, y: 0, width: 402, height: 874 }, from: 'device' as const };
 
 /** The pairs of an order question (ui-tree/eyes.ts#OrderPair) — none of a clear question's. */
-const orderPairs = (q: OrderQuestion | undefined): readonly OrderPair[] => (q?.asks === 'order' ? q.pairs : []);
+const orderPairs = (q: PairQuestion | undefined): readonly OrderPair[] => (q?.asks === 'order' ? q.pairs : []);
 
-const questionOf = (tree: UiNode, id: string): OrderQuestion | undefined => {
+const questionOf = (tree: UiNode, id: string): PairQuestion | undefined => {
   const target = byId(tree, id);
-  return orderQuestion(tree, target, sceneOf(tree).standing(target, USABLE, { of: 'tap' }));
+  return pairQuestion(tree, target, sceneOf(tree).standing(target, USABLE, { of: 'tap' }));
 };
 
 describe('the order question — asked of a standing covered by a cover the listing does not order', () => {
@@ -44,7 +44,6 @@ describe('the order question — asked of a standing covered by a cover the list
     const q = questionOf(t, 'lab.blur-menu.W');
     expect(q?.pairs.map(({ peer, ...rects }) => ({ peer: peer.identifier, ...rects }))).toEqual([
       {
-        asks: 'order',
         peer: 'lab.blur-menu.C',
         overlap: { x: 51, y: 470, width: 300, height: 42 },
         nodeBands: [{ x: 51, y: 448, width: 300, height: 22 }],
@@ -63,7 +62,7 @@ describe('the order question — asked of a standing covered by a cover the list
     const card = node({ role: 'button', label: 'Card', rect: { x: 51, y: 300, width: 300, height: 212 } });
     const row = node({ role: 'button', label: 'Row', rect: { x: 51, y: 470, width: 300, height: 64 } });
     const t = node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, readingOrder: true, children: [card, row] })] });
-    const q = orderQuestion(t, row, sceneOf(t).standing(row, USABLE, { of: 'tap' }));
+    const q = pairQuestion(t, row, sceneOf(t).standing(row, USABLE, { of: 'tap' }));
     expect(orderPairs(q).map(({ nodeBands, peerBands, nodeAround, peerAround }) => ({ nodeBands, peerBands, nodeAround, peerAround }))).toEqual([
       {
         nodeBands: [{ x: 51, y: 512, width: 300, height: 22 }],
@@ -82,7 +81,7 @@ describe('the order question — asked of a standing covered by a cover the list
     const seen = seenOrderOf(w, [{ peer: byId(t, 'lab.blur-menu.C'), seen: 'untold', why: 'the two look alike (ΔE 3.10)' }]);
     const standing = sceneOf(t, seen).standing(w, USABLE, { of: 'tap' });
     expect(standing).toMatchObject({ kind: 'covered', remedy: { of: 'unordered', why: 'the two look alike (ΔE 3.10)' } });
-    expect(orderQuestion(t, w, standing)).toBeUndefined();
+    expect(pairQuestion(t, w, standing)).toBeUndefined();
   });
 
   it('a horizontal overlap: bands left and right of it, each with the strip ahead past its control\'s side edge and the two above and below it on the band\'s columns', () => {
@@ -90,7 +89,7 @@ describe('the order question — asked of a standing covered by a cover the list
     const right = node({ role: 'button', label: 'Right', rect: { x: 121, y: 470, width: 230, height: 64 } });
     const t = node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, readingOrder: true, children: [left, right] })] });
     // Judged for the colour assert, over its whole rect: a tap would move to Left's clear 70-pt part.
-    const q = orderQuestion(t, left, sceneOf(t).standing(left, USABLE, { of: 'pixel', reads: (r) => r, glyphs: false }));
+    const q = pairQuestion(t, left, sceneOf(t).standing(left, USABLE, { of: 'pixel', reads: (r) => r, glyphs: false }));
     expect(orderPairs(q).map(({ overlap, nodeBands, peerBands, nodeAround, peerAround }) => ({ overlap, nodeBands, peerBands, nodeAround, peerAround }))).toEqual([
       {
         overlap: { x: 121, y: 470, width: 130, height: 64 },
@@ -106,7 +105,7 @@ describe('the order question — asked of a standing covered by a cover the list
     const MODAL = JSON.parse(await readFile(new URL('../fixtures/idb-modal-listed-before-content.json', import.meta.url), 'utf8')) as { screens: Record<string, unknown[]> };
     const t = parseIdbDescribeAll(JSON.stringify(MODAL.screens.chooser));
     const row = [...everyNode(t)].find((n) => n.label?.startsWith('Loan repayment'))!;
-    const q = orderQuestion(t, row, sceneOf(t).standing(row, USABLE, { of: 'tap' }));
+    const q = pairQuestion(t, row, sceneOf(t).standing(row, USABLE, { of: 'tap' }));
     const swift = q?.pairs.find((p) => p.peer.label === 'SWIFT payment');
     expect(swift).toMatchObject({
       overlap: { x: 45, y: 453, width: 312, height: 34 },
@@ -186,7 +185,6 @@ const C = { x: 51, y: 470, width: 300, height: 64 };
 const peer = node({ role: 'button', label: 'C', rect: C });
 const target = node({ role: 'button', label: 'W', rect: W });
 const PAIR: OrderPair = {
-  asks: 'order',
   peer,
   overlap: { x: 51, y: 470, width: 300, height: 42 },
   nodeBands: [{ x: 51, y: 448, width: 300, height: 22 }],
@@ -198,8 +196,8 @@ const PAIR: OrderPair = {
     { x: 351, y: 470, width: 51, height: 42 },
   ],
 };
-const ask = (pair: Partial<OrderPair> = {}): OrderQuestion => ({ tree: node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 } }), node: target, asks: 'order', pairs: [{ ...PAIR, ...pair }] });
-const seenOf = (img: PNG, q: OrderQuestion = ask()) => {
+const ask = (pair: Partial<OrderPair> = {}): PairQuestion => ({ tree: node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 } }), node: target, asks: 'order', pairs: [{ ...PAIR, ...pair }] });
+const seenOf = (img: PNG, q: PairQuestion = ask()) => {
   const [answer] = judgeOrder(img, 1, q);
   return answer!.seen === 'untold' ? { untold: answer!.why } : { seen: answer!.seen };
 };
@@ -425,9 +423,9 @@ describe('the order question over a control listed after the row, past the break
   };
 
   // The plain stop asks the question; the tap moves clear of Continue to O's 656–684 and asks nothing.
-  const stopQuestion = (t: UiNode): OrderQuestion | undefined => {
+  const stopQuestion = (t: UiNode): PairQuestion | undefined => {
     const o = byId(t, 'lab.scroll-bounded.O');
-    return orderQuestion(t, o, sceneOf(t).standing(o, USABLE, { of: 'stop' }));
+    return pairQuestion(t, o, sceneOf(t).standing(o, USABLE, { of: 'stop' }));
   };
 
   it('asked of O: Continue is the peer, the overlap 51,620 300x36, O\'s band below it 656–684', async () => {
@@ -461,7 +459,7 @@ describe('the judge over the lab captures — where the eyes cannot tell, on rea
   const stopOf = async (cell: string, id: string, of: 'tap' | 'stop') => {
     const t = parseIdbDescribeAll((await file(`${cell}.idb.json`)).toString('utf8'));
     const n = byId(t, id);
-    return { t, q: orderQuestion(t, n, sceneOf(t).standing(n, USABLE, { of }))! };
+    return { t, q: pairQuestion(t, n, sceneOf(t).standing(n, USABLE, { of }))! };
   };
   const WHITE_AROUND = 'it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there';
 

@@ -72,7 +72,7 @@ export const lastPresented = (covers: readonly Cover[]): Cover | undefined => co
  * `vs.title` `55,1406 258x56` overlaps its dumped bottom by 6 px, 11 px below what it draws. The dump has no fact for the
  * drawn extent, so no tree rule can excuse it (ADR 0026: an allowance of 11 px would excuse a text over a Material
  * TextField's indicator line, whose dump is not padded; the 48-dp height needs the density ADR 0014 refused the draw
- * order). The eyes decide (ui-tree/eyes.ts#orderQuestion's `clear` pair, verify/eyes.ts#judgeClear); this only says
+ * order). The eyes decide (ui-tree/eyes.ts#pairQuestion's `clear` pair, verify/eyes.ts#judgeClear); this only says
  * when to ask. All of:
  * 1. the tree's source pads touch targets (`UiNode.paddedTouchTargets` on `tree`, Compose's dialect) — the one reason a
  *    dumped rect holds an undrawn margin;

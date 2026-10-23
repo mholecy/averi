@@ -225,7 +225,7 @@ export function tapStandings(look: Pick<Look, 'scene' | 'keyboard'>, node: UiNod
  * What the tap's judgement may ask besides the look, and what it is told: `sent` — what the keyboard guard sent before
  * this look (`Hiding.sent`), which fronts every refusal; `eyes` — the eyes' order question (ui-tree/eyes.ts#Eyes.order,
  * the composition root's verify/eyes.ts#eyesOn), asked by `TapJudge.aim` once, only of a centre covered by a control the
- * listing does not order (`orderQuestion`). Without it the listing's untold order stands.
+ * listing does not order (`pairQuestion`). Without it the listing's untold order stands.
  */
 export interface TapAsks {
   readonly sent?: string;

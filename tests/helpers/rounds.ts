@@ -1,5 +1,5 @@
 import type { DeviceScreen, Rect, Stroke, UiNode } from '../../src/adapters/types.js';
-import type { EyesAnswer, OrderQuestion } from '../../src/ui-tree/eyes.js';
+import type { EyesAnswer, PairQuestion } from '../../src/ui-tree/eyes.js';
 import type { OrderSeen } from '../../src/ui-tree/seen-order.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
@@ -82,7 +82,7 @@ export interface Row {
   /** The answer to `ask eyes` (ui-tree/eyes.ts); default `own` — the claim confirmed. */
   eyes?: EyesAnswer;
   /** The answer to `ask order` (ui-tree/eyes.ts#Eyes.order), from its question; default none — no eyes, the listing's order. */
-  order?: (question: OrderQuestion) => readonly OrderSeen[];
+  order?: (question: PairQuestion) => readonly OrderSeen[];
   /** The stroke the previous step drew, when it was a stroke; default `drawnFor` that step — the driver's points for it. */
   drawn?: Stroke;
   /** ms since the scroll began; default 0. */

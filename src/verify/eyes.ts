@@ -2,7 +2,7 @@ import { PNG } from 'pngjs';
 import type { DeviceAdapter, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
 import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
 import type { FlushNeighbour } from '../ui-tree/later-edges.js';
-import { CLIP_LINE, unseen, type AroundStrip, type ClearPair, type Eyes, type EyesAnswer, type EyesQuestion, type OrderPair, type OrderQuestion } from '../ui-tree/eyes.js';
+import { CLIP_LINE, unseen, type AroundStrip, type ClearPair, type Eyes, type EyesAnswer, type EyesQuestion, type OrderPair, type PairQuestion } from '../ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
 import { errorMessage } from '../util/error-message.js';
 import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type MeasuredFrame, type RgbaImage } from './capture.js';
@@ -52,7 +52,7 @@ export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>):
  * which captures one anyway (verify/pixel-poll.ts): no second screenshot. A frame whose scale the tree refused is every
  * pair `untold`, said why.
  */
-export const orderOfFrame = (frame: MeasuredFrame, question: OrderQuestion): readonly OrderSeen[] =>
+export const orderOfFrame = (frame: MeasuredFrame, question: PairQuestion): readonly OrderSeen[] =>
   frame.scale.error !== undefined ? untoldAll(question, `the screenshot could not be scaled to the tree: ${frame.scale.error}`) : judgeOrder(frame.png, frame.scale.scale, question);
 
 /**
@@ -139,7 +139,7 @@ export function apartOfFrame(frame: MeasuredFrame, region: Rect): ApartSeen {
 }
 
 /** Every pair of `question` untold, for `why`. */
-export const untoldAll = (question: OrderQuestion, why: string): readonly OrderSeen[] => question.pairs.map(({ peer }) => ({ peer, seen: 'untold', why }));
+export const untoldAll = (question: PairQuestion, why: string): readonly OrderSeen[] => question.pairs.map(({ peer }) => ({ peer, seen: 'untold', why }));
 
 /**
  * Two colours read as one surface: CIEDE2000 within this — about one just-noticeable difference. Measured on the
@@ -391,7 +391,7 @@ const AROUND_SHARE = 0.25;
  *    to W's band, 17.69 to C's.
  * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
-export function judgeOrder(png: RgbaImage, scale: number, q: OrderQuestion): readonly OrderSeen[] {
+export function judgeOrder(png: RgbaImage, scale: number, q: PairQuestion): readonly OrderSeen[] {
   if (q.asks === 'clear') return q.pairs.map((pair) => ({ peer: pair.peer, ...judgeClear(png, scale, pair) }));
   return q.pairs.map((pair) => ({ peer: pair.peer, ...judgePair(png, scale, pair) }));
 }

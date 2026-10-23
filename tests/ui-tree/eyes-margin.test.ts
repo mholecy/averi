@@ -2,14 +2,14 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { marginText } from '../../src/ui-tree/cover.js';
-import { orderQuestion } from '../../src/ui-tree/eyes.js';
+import { pairQuestion } from '../../src/ui-tree/eyes.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
 /**
  * A TEXT IN A CONTROL'S TOUCH MARGIN (ui-tree/cover.ts#marginText) and the eyes' question of it (ui-tree/eyes.ts
- * #orderQuestion's `clear`): Compose dumps a control's touch target, grown to 48 dp past what it draws, and lays the next
+ * #pairQuestion's `clear`): Compose dumps a control's touch target, grown to 48 dp past what it draws, and lays the next
  * field's title in that margin — on the lab's form-keyboard after `back`, phone `55,1280 970x132` (drawn `55,1296
  * 970x99`) and `vs.title` `55,1406 258x56` over its dumped bottom 6 px. The tree only suspects; the eyes decide.
  * docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md
@@ -24,7 +24,7 @@ const VS_TITLE = 'lab.form-keyboard.vs.title';
 const afterBack = (): UiNode => read('android-lab-form-keyboard-after-back.xml');
 const fullyQuestion = (tree: UiNode, id = PHONE) => {
   const target = byId(tree, id);
-  return orderQuestion(tree, target, sceneOf(tree).standing(target, SCREEN, { of: 'fully' }));
+  return pairQuestion(tree, target, sceneOf(tree).standing(target, SCREEN, { of: 'fully' }));
 };
 /** `tree` with the node `id` patched — the real dump, one fact changed. */
 const patched = (tree: UiNode, id: string, patch: Partial<UiNode>): UiNode => {
@@ -32,7 +32,7 @@ const patched = (tree: UiNode, id: string, patch: Partial<UiNode>): UiNode => {
   return walk(tree);
 };
 
-describe('orderQuestion — the clear question of a `fully` stop under texts in its touch margin', () => {
+describe('pairQuestion — the clear question of a `fully` stop under texts in its touch margin', () => {
   it('phone after back: one pair, the title, its overlap the 6 px of phone it lies over, beside it phone\'s own rows right of it', () => {
     const t = afterBack();
     const q = fullyQuestion(t);
@@ -72,7 +72,7 @@ describe('orderQuestion — the clear question of a `fully` stop under texts in 
     const phone = byId(t, PHONE);
     const standing = sceneOf(t).standing(phone, SCREEN, { of: 'tap' });
     expect(standing.kind).toBe('reachable');
-    expect(orderQuestion(t, phone, standing)).toBeUndefined();
+    expect(pairQuestion(t, phone, standing)).toBeUndefined();
   });
 });
 

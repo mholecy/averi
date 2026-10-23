@@ -2,7 +2,7 @@ import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { coverText, isUntold, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
-import { judgedWithOrder, type OrderEyes, type OrderQuestion } from '../ui-tree/eyes.js';
+import { judgedWithOrder, type OrderEyes, type PairQuestion } from '../ui-tree/eyes.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
 import type { OrderSeen } from '../ui-tree/seen-order.js';
 import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
@@ -317,7 +317,7 @@ class PixelPollMemory {
    */
   keptOrder(tree: UiNode): KeptOrder {
     let fingerprint: string | undefined;
-    const keyOf = (q: OrderQuestion): string => `${(fingerprint ??= treeFingerprint(tree))} ${JSON.stringify(q.pairs.map((p) => [p.peer.rect, p.overlap]))}`;
+    const keyOf = (q: PairQuestion): string => `${(fingerprint ??= treeFingerprint(tree))} ${JSON.stringify(q.pairs.map((p) => [p.peer.rect, p.overlap]))}`;
     return {
       answer: (q) => {
         const kept = this.order;
@@ -687,9 +687,9 @@ const unlocks = (seen: OrderSeen): boolean => seen.seen === 'over' || seen.seen 
 /** The order answer a poll keeps across rounds, as one round asks it (`PixelPollMemory.keptOrder`). */
 interface KeptOrder {
   /** The answer kept for `question` on this round's tree, its peers this tree's nodes; undefined when none is kept. */
-  answer(question: OrderQuestion): readonly OrderSeen[] | undefined;
+  answer(question: PairQuestion): readonly OrderSeen[] | undefined;
   /** Keep `seen`, judged for `question` on a settled whole-screen frame — or forget the kept one, when `seen` unlocks. */
-  keep(question: OrderQuestion, seen: readonly OrderSeen[]): void;
+  keep(question: PairQuestion, seen: readonly OrderSeen[]): void;
 }
 
 /**
@@ -700,7 +700,7 @@ interface KeptOrder {
  * the poll only where the round measures). Judged only on a frame settled over the WHOLE screen: the bands and the
  * strips around the two lie outside the element's region, which a region-settled frame does not vouch for.
  */
-async function orderOnCapture(question: OrderQuestion, kept: KeptOrder, capture: () => Promise<TreeRequestedFrame>): Promise<readonly OrderSeen[]> {
+async function orderOnCapture(question: PairQuestion, kept: KeptOrder, capture: () => Promise<TreeRequestedFrame>): Promise<readonly OrderSeen[]> {
   const known = kept.answer(question);
   if (known !== undefined) return known;
   let frame: TreeRequestedFrame;
