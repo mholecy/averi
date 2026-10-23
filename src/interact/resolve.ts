@@ -355,18 +355,10 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * this headline, never "(not present)", as scroll_until's stop there).
  */
 function notFound(target: Target, timeoutMs: number, outcome: { readError?: Error; treesRead: number; lastTree?: UiNode }): Error {
-  const miss = unsaidByTheTap(missOf({ tree: outcome.lastTree, readError: outcome.readError, target }));
+  const miss = missOf({ tree: outcome.lastTree, readError: outcome.readError, target });
   if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss)}`);
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, missNote(miss)), { sighted: false, ...outcome, miss });
 }
-
-/**
- * The tap's and fill's wait does not say idb's container-id fact (`containerId`) — not in its message, not in the
- * miss its absence carries to an optional step's skip line: it said nothing of it before the miss knew the target
- * (round 15, a refactor that changed no tap reply), and what idb's dialect should say to a tap is NI1's decision
- * (docs/truth/open-bugs.md): it reads as `none`. A flow's `wait:` and `scroll_until` say it.
- */
-const unsaidByTheTap = (miss: Miss): Miss => (miss.of === 'containerId' ? { of: 'none' } : miss);
 
 /**
  * Wait only for the target to APPEAR — one round that resolves it under the

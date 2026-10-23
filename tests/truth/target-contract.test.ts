@@ -9,6 +9,7 @@ import type { CellTruth, Geometry, LabState, TargetTruth } from '../../scripts/t
 import { askedUnlistedBy, bandNamed, contractOf, fullyAsked, isBand, judgedContext, judgedGeometry, stopAsk, stringUnlistedBy, tapAsk, unlistedBy, type StopAsk, type TapAsk } from '../../scripts/truth/target-contract.js';
 import { geometryOf, probePoint } from '../../scripts/truth/truth.js';
 import { probeDelivered } from '../../scripts/differential/golden-spec/base.js';
+import { missNote } from '../../src/ui-tree/miss.js';
 
 // The target contract (scripts/truth/target-contract.ts): what a target is asked, decided once — and both goldens its
 // consumers. The parity block below runs over every committed truth (tests/fixtures/truth): for every target both the
@@ -136,8 +137,15 @@ function captures(): Capture[] {
 }
 
 const outcome = (reply: string, device: string[] = []): Outcome => ({ reply, device }) as unknown as Outcome;
-/** A refusal that sent nothing, naming the clause's remedy where it has one (as averi's refusals word them). */
-const refusal = (ask: TapAsk) => `ERROR id:"x" was not tapped${ask.must === 'refuse' && ask.remedy !== undefined ? ` — ${ask.remedy === 'scroll_until' ? 'scroll_until it first' : 'a screen is presented over it (a modal or a sheet) — close it first'}` : ''}; nothing was tapped`;
+/**
+ * A refusal that sent nothing, naming the clause's remedy where it has one (as averi's refusals word them) — and, for a
+ * target its source does not list (`unlisted`), the wait that never found it, naming the source's limit as averi's
+ * reply does (ui-tree/miss.ts, `noIdListed`).
+ */
+const refusal = (ask: TapAsk, unlisted: boolean) =>
+  unlisted
+    ? `ERROR Timed out after 5000ms waiting for element id:"x" to appear\n  (${missNote({ of: 'noIdListed', id: 'x' })})`
+    : `ERROR id:"x" was not tapped${ask.must === 'refuse' && ask.remedy !== undefined ? ` — ${ask.remedy === 'scroll_until' ? 'scroll_until it first' : 'a screen is presented over it (a modal or a sheet) — close it first'}` : ''}; nothing was tapped`;
 /** The app as its capture laid it out (the live judge's state), the target's own tap logged or not. */
 const appAt = (truth: CellTruth, t: TargetTruth, fired: boolean): LabState => ({
   cell: truth.cell,
@@ -199,14 +207,15 @@ describe('static ↔ live: for every committed truth target both goldens ask, th
     expect(differ).toEqual([]);
   });
 
-  it('a refusal that sent and fired nothing: both judges accept it unless the tap must fire', () => {
+  it('a refusal that sent and fired nothing: both judges accept it unless the tap must fire on a target the source lists', () => {
     const differ = taps.flatMap((p) => {
       const ask = p.live.asks as TapAsk;
-      const reply = refusal(ask);
+      const unlisted = askedUnlistedBy(p.t, p.source) !== undefined;
+      const reply = refusal(ask, unlisted);
       const staticOk = p.row.judge(outcome(reply)) === undefined;
       const app = appAt(p.truth, p.t, false);
       const liveOk = p.live.judge(app, [reply], app, p.source, []).outcome === 'ok';
-      return staticOk === liveOk && staticOk === (ask.must !== 'fire') ? [] : [`${p.key} (${JSON.stringify(ask)}): static ${staticOk ? 'accepts' : 'rejects'}, live ${liveOk ? 'accepts' : 'rejects'}`];
+      return staticOk === liveOk && staticOk === (ask.must !== 'fire' || unlisted) ? [] : [`${p.key} (${JSON.stringify(ask)}): static ${staticOk ? 'accepts' : 'rejects'}, live ${liveOk ? 'accepts' : 'rejects'}`];
     });
     expect(differ).toEqual([]);
   });

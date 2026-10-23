@@ -1,10 +1,10 @@
 import type { Platform } from '../corpus.js';
 import type { Rect, TargetTruth } from '../../truth/schema.js';
 import type { Outcome } from '../differential.js';
-import { claimsTap, movedTap } from '../../truth/replies.js';
+import { claimsTap, isError, movedTap, noIdListedSaid } from '../../truth/replies.js';
 import { pointText, probePoint, selectorOf, touchesAt } from '../../truth/truth.js';
 import type { TargetContract } from '../../truth/target-contract.js';
-import { BUDGET_MS, classed, first, passes, pointsText, reachedWithNoSwipe, tapPoints, type Expectation, type Point } from './judges.js';
+import { BUDGET_MS, classed, first, notTapped, passed, passes, pointsText, reachedWithNoSwipe, said, tapPoints, type Expectation, type Point } from './judges.js';
 
 /**
  * The base family's rows (fixtures/apps/cells/base.json): a coloured target open — reached by its probe and drawn as
@@ -13,37 +13,57 @@ import { BUDGET_MS, classed, first, passes, pointsText, reachedWithNoSwipe, tapP
  * | truth | tap | colour assert | scroll_until down |
  * |---|---|---|---|
  * | open: reached, drawn as itself | `Tapped` at the centre of its node in the recorded tree, or where the tree lists none, at its probe point (atProbe) | passes on its own colour | visible after 0 swipes |
+ * | open, unlisted by the replayed source | as open, or not tapped with nothing sent, the reply naming the source's limit | fails not found, naming the source's limit | as open, or not reached (any strokes: averi cannot know where a node it never saw lies), naming the source's limit |
  *
  * The tap and scroll_until ask by truth.ts#selectorOf — the target's identifier, or a text target's text
  * (golden-spec/false-covers.ts#ownPartsRows). `nodes`: the frames of the nodes the replayed tree lists as the target,
  * by that same element (truth.ts#elementOf, #nodeFramesIn; golden-spec.ts#expectations reads them) — none given, none
  * known. `c`, the target's contract (target-contract.ts#contractOf), whose clauses chose these rows — the tap `fire` at
  * its node, the plain stop holding where it lies — each row records the clause it judges (Expectation.asks).
+ *
+ * `absent` (target-contract.ts#askedUnlistedBy, the target as the tap and the stop ask it) and `nodeAbsent` (#unlistedBy,
+ * the colour's identifier): why the replayed source's capture did not list the target — the lab's UIKit table row under
+ * idb, which lists no identifier on any element (docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-
+ * identifier.md). The truth that the source does not list it outranks "open → Tapped" (ADR 0020): no reply of that
+ * source can find it, so the honest one says the source's limit (replies.ts#noIdListedSaid) — a not-found that says
+ * nothing of why is a mismatch, as the bare timeout was.
  */
-export function openRows(platform: Platform, t: TargetTruth, c: Pick<TargetContract, 'tap' | 'stop'>, nodes: readonly Rect[] = []): Expectation[] {
+export function openRows(
+  platform: Platform,
+  t: TargetTruth,
+  c: Pick<TargetContract, 'tap' | 'stop'>,
+  nodes: readonly Rect[] = [],
+  { absent, nodeAbsent }: { absent?: string; nodeAbsent?: string } = {},
+): Expectation[] {
   const selector = selectorOf(t);
   const element = { id: t.id };
   const centres = nodeCentres(nodes, t);
+  const limitUnsaid = (o: Outcome, why: string) => (noIdListedSaid(o.reply) ? undefined : said(o, `${why}, without naming the source's limit`));
   return ([
     {
       asks: c.tap,
       verb: 'tap',
-      says: centres.length === 0 ? `Tapped at its probe point ${pointText(probeDelivered(t))}` : `Tapped at its node's centre ${centres.map(pointText).join(' or ')} in the tree`,
+      says:
+        (centres.length === 0 ? `Tapped at its probe point ${pointText(probeDelivered(t))}` : `Tapped at its node's centre ${centres.map(pointText).join(' or ')} in the tree`) +
+        (absent === undefined ? '' : `, or (${absent}) not tapped, nothing sent, naming the source's limit`),
       call: { tool: 'tap', args: { platform, selector } },
-      judge: (o) => (claimsTap(o.reply) ? atProbe(o, t, nodes) : `not tapped: ${first(o)}`),
+      judge: (o) => (claimsTap(o.reply) ? atProbe(o, t, nodes) : absent === undefined ? `not tapped: ${first(o)}` : (notTapped(o) ?? limitUnsaid(o, 'not tapped'))),
+      ...(absent !== undefined && { absent }),
     },
     {
       verb: 'colour',
-      says: `passes on its own colour ${t.color}`,
+      says: nodeAbsent === undefined ? `passes on its own colour ${t.color}` : `fails not found (${nodeAbsent}), naming the source's limit`,
       call: { tool: 'assert', args: { platform, asserts: [{ element, color: { expected: t.color }, timeout: BUDGET_MS }] } },
-      judge: passes,
+      judge: nodeAbsent === undefined ? passes : (o) => (passed(o) ? `passed on ${t.color}: ${first(o)}` : limitUnsaid(o, 'failed')),
+      ...(nodeAbsent !== undefined && { absent: nodeAbsent }),
     },
     {
       asks: c.stop,
       verb: 'scroll_until',
-      says: 'reached with no swipe',
+      says: absent === undefined ? 'reached with no swipe' : `reached with no swipe, or (${absent}) not reached, naming the source's limit`,
       call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },
-      judge: reachedWithNoSwipe,
+      judge: (o) => (absent === undefined || !isError(o.reply) ? reachedWithNoSwipe(o) : limitUnsaid(o, 'not reached')),
+      ...(absent !== undefined && { absent }),
     },
   ] satisfies Expectation[]).map(classed);
 }

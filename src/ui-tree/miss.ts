@@ -1,9 +1,10 @@
-import type { UiNode } from '../adapters/types.js';
+import { everyNode, type UiNode } from '../adapters/types.js';
 import type { Edge } from './geometry.js';
 import { presentationOf, type MarkedLayer } from './presentation.js';
 import { findTarget, hasArea, soleIdOf, type Target } from './selectors.js';
 import { clippedOutText, revealText } from './sides.js';
 import { presentedLayerName, presentedRemedy } from './standing.js';
+import { isBareTreeMemo } from './verdict.js';
 
 /**
  * WHY A TARGET IS NOT IN THE TREE: the one decision behind every reply that says a target is not in the tree — the
@@ -37,26 +38,32 @@ import { presentedLayerName, presentedRemedy } from './standing.js';
  *   presented window — a sheet or a dialog it does not mark (a fully expanded bottom sheet with no scrim, form-picker;
  *   a full-screen dialog; a window against the screen's edge: ADR 0018's residuals 18 and 19) still hides the screen
  *   beneath, and nothing in the dump tells it from no window at all: ACTIVE_WINDOW_HINT, a possibility, never the cause;
+ * - `noIdListed`: the tree is idb's flat list (its own mark, below), the target named an id ALONE, nothing matched, and
+ *   no element of the read carries an identifier at all — a fact the read states, so no `id:` selector can match
+ *   anything in it: the wait is hopeless, not late. idb drops some identifiers an app sets — measured on a UIKit table
+ *   cell's label, which WDA reads from the same process (docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-
+ *   without-their-identifier.md) — so the words offer that as a possibility, and the remedies: a `text:` or `label:`
+ *   selector, or WDA. Asked before `containerId`, and only of a read that is not bare (ui-tree/verdict.ts
+ *   #isBareTreeMemo): a launch-transition read lists no ids because it lists nothing of the app's;
  * - `containerId`: the tree is idb's flat list (its own mark, `UiNode.flatList` — the tree's, not averi.yaml's nor
  *   the adapter's: the mark is on every tree idb's parser gives, adapters/ios-tree-source.ts#markIdbDialect, and on
  *   no other) and the target named an id ALONE (selectors.ts#soleIdOf): idb returns accessibility elements only, so
  *   an identifier set on a CONTAINER (SwiftUI `.accessibilityElement(children: .contain)`, a React Native `testID` on
  *   a non-interactive host view) is in no read at all — a wait on it is not late, it is hopeless (measured
  *   2026-10-05, docs/bugs/2026-10-06-wait-timeout-no-hint-for-ids-idb-cannot-see.md). A possible cause: the miss
- *   knows only that the id was in no tree it read. The tree source's dialect, read from the tree; a second fact of
- *   it (NI1: idb lists a UIKit table row by its text without its id) is one more kind here;
+ *   knows only that the id was in no tree it read. The tree source's dialect, read from the tree, as `noIdListed` is;
  * - `none`: a tree that lists every window (WDA), or idb's with no presented layer marked and no id-alone target,
  *   and matched nothing.
  *
- * A reader that asks of the tree alone — an assert's not-found (verify/poll-verdict.ts#notFound is not handed the
- * assert's selector), a table of `scroll_until` rounds — passes no target, and gets no fact of the target: no
- * `zeroArea`, no `containerId`.
+ * A reader that asks of the tree alone — a table of `scroll_until` rounds — passes no target, and gets no fact of the
+ * target: no `zeroArea`, no `noIdListed`, no `containerId`.
  */
 export type Miss =
   | { readonly of: 'unread' }
   | { readonly of: 'zeroArea'; readonly clippedOut: readonly Edge[] }
   | { readonly of: 'presented'; readonly layer: MarkedLayer; readonly listed: ListedAs }
   | { readonly of: 'activeWindow' }
+  | { readonly of: 'noIdListed'; readonly id: string }
   | { readonly of: 'containerId'; readonly id: string }
   | { readonly of: 'none' };
 
@@ -116,7 +123,14 @@ export function missOf({ tree, readError, target }: { tree?: UiNode; readError?:
   if (alone !== undefined) return { of: 'presented', layer: alone, listed: tree.activeWindowOnly === true ? 'window' : 'layer' };
   if (tree.activeWindowOnly === true) return { of: 'activeWindow' };
   const id = tree.flatList === true && target !== undefined && matched.length === 0 ? soleIdOf(target) : undefined;
-  return id === undefined ? { of: 'none' } : { of: 'containerId', id };
+  if (id === undefined) return { of: 'none' };
+  return listsNoId(tree) && !isBareTreeMemo(tree) ? { of: 'noIdListed', id } : { of: 'containerId', id };
+}
+
+/** No element of the read carries an identifier (`noIdListed`): a walk of idb's flat list that stops at the first one. */
+function listsNoId(tree: UiNode): boolean {
+  for (const n of everyNode(tree)) if (n.identifier !== null) return false;
+  return true;
 }
 
 /** The sides every match was dumped clipped out past (UiNode.clippedOut), in first-seen order — none when any match was not. */
@@ -135,6 +149,20 @@ function zeroAreaNote([only, ...more]: readonly Edge[]): string {
   return `it matched only nodes ${clippedOutText([only])} (scrolled past it) — ${revealText(only)} first`;
 }
 
+/** THE remedy both of idb's dialect notes end on (`noIdListed`, `containerId`): the tree source that lists identifiers. */
+export const TREE_SOURCE_REMEDY = 'set app.ios.treeSource: wda in averi.yaml';
+
+/** THE fact of `noIdListed`'s note, as its words say it — the phrase a judge of the reply reads (scripts/truth/replies.ts). */
+export const NO_ID_LISTED = 'idb lists no accessibility identifier on any element of the screen';
+
+/**
+ * The note of a read that lists no identifier (`noIdListed`) — the fact first, the measured cause as a possibility, then
+ * both remedies — in one phrase with no parenthesis inside, since a one-line reply wraps it in one (`withMissNote`).
+ */
+const noIdListedNote = (id: string): string =>
+  `no tree read contained id:${JSON.stringify(id)}, and ${NO_ID_LISTED} — it drops some, a UIKit table cell label's among them. ` +
+  `If the screen is showing, ask for it by text: or label:, or ${TREE_SOURCE_REMEDY}`;
+
 /**
  * The idb container-id note — the fact and the tree source to read with instead. Flow-step advice ("wait on a
  * button/row id idb does show") is the flow's, added after it (flow/engine.ts#waitTimeoutHint).
@@ -142,7 +170,7 @@ function zeroAreaNote([only, ...more]: readonly Edge[]): string {
 const containerIdNote = (id: string): string =>
   `no tree read contained id:${JSON.stringify(id)}. iOS treeSource: idb never exposes an identifier set on a container — ` +
   'SwiftUI .accessibilityElement(children: .contain), React Native testID on a non-interactive view. ' +
-  'If the screen is showing, set app.ios.treeSource: wda in averi.yaml';
+  `If the screen is showing, ${TREE_SOURCE_REMEDY}`;
 
 /** THE words a miss says beneath or after its not-found; undefined for `unread` and `none`, which add nothing. */
 export function missNote(miss: Miss): string | undefined {
@@ -153,6 +181,8 @@ export function missNote(miss: Miss): string | undefined {
       return `${presentedLayerName(miss.layer)} is presented over it, and the tree lists only that ${miss.listed} — close it first`;
     case 'activeWindow':
       return ACTIVE_WINDOW_HINT;
+    case 'noIdListed':
+      return noIdListedNote(miss.id);
     case 'containerId':
       return containerIdNote(miss.id);
     case 'unread':

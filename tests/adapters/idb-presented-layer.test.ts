@@ -137,9 +137,9 @@ describe('tap: the wait for a target beneath idb\'s presented layer names the la
     );
   });
 
-  it('an unmarked list (sheet-background) still waits "to appear"', async () => {
+  it('an unmarked list (sheet-background) still waits "to appear", idb\'s container note beneath', async () => {
     const error = await waitFails(capture('sheet-background'), 'id:"lab.sheet-background.A"');
     expect(error).toBeInstanceOf(ElementNotFoundError);
-    expect(error.message).toMatch(/to appear$/);
+    expect(error.message).toBe(`Timed out after 30ms waiting for element id:"lab.sheet-background.A" to appear\n  (${missNote({ of: 'containerId', id: 'lab.sheet-background.A' })})`);
   });
 });

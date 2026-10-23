@@ -1636,7 +1636,8 @@ export function stepSummary(step: Step, platform: 'android' | 'ios'): string {
 /**
  * The flow-step advice after idb's container-id note (ui-tree/miss.ts, `containerId`: an identifier set on a
  * container is in no idb read at all): wait on an id idb DOES show. Lives here, not with the miss: "wait on a
- * button/row id" is advice for a `wait:` step.
+ * button/row id" is advice for a `wait:` step. Not after `noIdListed`'s note: on a read that lists no id at all there
+ * is none to wait on, and that note names `text:`/`label:` instead.
  */
 const WAIT_ON_A_SHOWN_ID = 'or wait on a button/row id idb does show';
 
@@ -1650,17 +1651,14 @@ const WAIT_ON_A_SHOWN_ID = 'or wait on a button/row id idb does show';
  * (adapters/ios-tree-source.ts#markIdbDialect) and no other source does, and a read that failed has no tree to say
  * anything of — its error is the story (pollTimeoutMessage drops the hint beneath a failed last read).
  *
- * The miss rides on the error (`WaitMissedError`, for an optional step's skip line) except idb's container-id one,
- * which the skip line has never said: round 15 moved the fact into the miss and changed no flow reply; whether the
- * skip line should say it is left to NI1 (docs/truth/open-bugs.md), with the tap's (interact/resolve.ts
- * #unsaidByTheTap).
+ * The miss rides on the error (`WaitMissedError`) whatever its kind, so an optional step's skip line says its note —
+ * without the flow advice, which is for a failed `wait:` step.
  */
 export function waitTimeoutHint(cond: Condition, lastTree: UiNode | undefined): { hint?: string; miss?: Miss } {
   if (cond.element === undefined || cond.absent) return {};
   const miss = missOf({ tree: lastTree, target: cond.element });
   const note = missNote(miss);
-  if (miss.of === 'containerId') return { hint: `${note}, ${WAIT_ON_A_SHOWN_ID}` };
-  return { hint: note, miss };
+  return { hint: miss.of === 'containerId' ? `${note}, ${WAIT_ON_A_SHOWN_ID}` : note, miss };
 }
 
 /**

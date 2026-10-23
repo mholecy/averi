@@ -35,7 +35,7 @@ const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll
 const LV2 = 'bug:2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
-const NO_ID = 'bug:2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md';
+const NO_ID_RESIDUAL = 'residual:ADR 0018 residual 20 — idb lists no identifier on a UIKit table cell label: an id-asked target there is never found, only said so';
 const UNMARKED_WINDOW = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
@@ -103,10 +103,11 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // sheet-long-list's F and L: idb lists the table's labels without their identifiers (and no row below the fold), so
   // neither is ever in its tree — an honest not-reached, its strokes unjudged since round 7's recapture records them
   // unlisted (TargetTruth.listed); until then F read R-direction, filed as
-  // docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md.
-  ...each('ios idb', ['scroll:sheet-long-list.F', 'scroll:sheet-long-list.L'], NO_ID, 'not-reached', 'not found'),
-  ...each('ios idb', ['tap:sheet-long-list.R', 'tap:sheet-long-list-short.R'], NO_ID, 'tap-refused', 'not found'),
-  ...each('ios idb', ['scroll:sheet-long-list-short.F'], NO_ID, 'not-reached', 'not found'),
+  // docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md. Since NI1's fix the reply names idb's limit
+  // (ui-tree/miss.ts, `noIdListed`); the stops stay not-reached, as they must (ADR 0018 residual 20). R's taps, refused
+  // with nothing fired, are ok since the fix: a target its source does not list is not asked to fire
+  // (live-visibility.ts#visibilityCases) — struck off.
+  ...each('ios idb', ['scroll:sheet-long-list.F', 'scroll:sheet-long-list.L', 'scroll:sheet-long-list-short.F'], NO_ID_RESIDUAL, 'not-reached', 'not found'),
   // blur-menu-grouped's C under idb: struck off by round 8's L4 fix (37bf5a15) with blur-menu's C under both sources
   // — refused as overlapped by the menu row W listed before it in reading order, nothing fired, in two runs of two
   // (ios-vis-r8-l4-1.json, -2.json) and two more at its final src (94fc318b: -3.json, -4.json, the order untold); WDA's

@@ -1,4 +1,4 @@
-import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
@@ -106,6 +106,13 @@ export const presentedRemedySaid = (reply: string) => /is presented over (?:it|t
  * or a dialog is open over the screen, close it first", a possibility, never the presented remedy.
  */
 export const windowHintSaid = (reply: string) => reply.includes(ACTIVE_WINDOW_HINT);
+
+/**
+ * The reply names idb's limit on a read that lists no identifier (src/ui-tree/miss.ts#NO_ID_LISTED, imported, not
+ * copied): "idb lists no accessibility identifier on any element of the screen". Keyed on the fact, not on the remedy
+ * it ends with (miss.ts#TREE_SOURCE_REMEDY), which the container-id note says too.
+ */
+export const noIdListedSaid = (reply: string) => reply.includes(NO_ID_LISTED);
 
 /**
  * scroll_until's changed stop (src/interact/scroll-text.ts#changedText, scroll-rounds.ts#ScreenChange): its swipe

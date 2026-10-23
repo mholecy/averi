@@ -19,6 +19,7 @@ import { tapElement } from '../../src/interact/tap.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 import { bandNode, dropBand, el, FakeAdapter, iosLoginFake, node, recorded, resetLayout, screen } from '../helpers/fake.js';
+import { missNote } from '../../src/ui-tree/miss.js';
 
 const FAST = { ambiguous: 'first' as const, timeoutMs: 60, pollMs: 2 };
 const FIRST = { ambiguous: 'first' as const };
@@ -1067,6 +1068,55 @@ describe('a selector that matched only 0×0 nodes: the never-found timeout says 
     };
     const error = await resolveSettled(fake, 'id:iban', { ...REFUSE, timeoutMs: 20, pollMs: 2 }).catch((e: unknown) => e);
     expect((error as Error).message).toBe('Timed out after 20ms waiting for element id:iban to appear\n  (last UI tree read failed: device offline)');
+  });
+});
+
+/**
+ * The tap's and fill's wait on an id idb's read never lists says idb's dialect, as every not-found reply does
+ * (ui-tree/miss.ts#missOf): the lab's UIKit table under idb lists no identifier on any element
+ * (docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md), and a SwiftUI large sheet
+ * lists some but not the container's (docs/bugs/2026-10-06-wait-timeout-no-hint-for-ids-idb-cannot-see.md). The note
+ * goes beneath the headline, and the absence carries the miss for an optional step's skip line.
+ */
+describe('a tap or fill by an id idb\'s read does not list: the timeout says idb\'s dialect', () => {
+  const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
+  const idbFake = async (cell: string) => {
+    const fake = new FakeAdapter({ s: parseIdbDescribeAll(await readFile(new URL(`${cell}.idb.json`, IOS), 'utf8')) }, 's');
+    fake.keyboard = undefined;
+    fake.viewportSize = { width: 402, height: 874 };
+    return fake;
+  };
+  const R = 'id:"lab.sheet-long-list.R"';
+  const OPTS = { ...REFUSE, timeoutMs: 20, pollMs: 2 };
+
+  it('tap, a read listing no identifier at all (sheet-long-list): ElementNotFoundError, the noIdListed note beneath, nothing tapped', async () => {
+    const fake = await idbFake('sheet-long-list');
+    const error = await tapElement(fake, R, OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    const miss = (error as ElementNotFoundError).miss;
+    expect(miss).toEqual({ of: 'noIdListed', id: 'lab.sheet-long-list.R' });
+    expect((error as Error).message).toBe(`Timed out after 20ms waiting for element ${R} to appear\n  (${missNote(miss)})`);
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('tap, a read listing other ids (sheet-background): the container note beneath, carried', async () => {
+    const error = await tapElement(await idbFake('sheet-background'), 'id:"lab.sheet-background.nowhere"', OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    const miss = (error as ElementNotFoundError).miss;
+    expect(miss).toEqual({ of: 'containerId', id: 'lab.sheet-background.nowhere' });
+    expect((error as Error).message).toBe(`Timed out after 20ms waiting for element id:"lab.sheet-background.nowhere" to appear\n  (${missNote(miss)})`);
+  });
+
+  it('fill, by the same wait: the same note and miss', async () => {
+    const error = await fillField(await idbFake('sheet-long-list-short'), 'id:"lab.sheet-long-list-short.R"', 'x', OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as ElementNotFoundError).miss).toEqual({ of: 'noIdListed', id: 'lab.sheet-long-list-short.R' });
+    expect((error as Error).message.split('\n')[1]).toBe(`  (${missNote({ of: 'noIdListed', id: 'lab.sheet-long-list-short.R' })})`);
+  });
+
+  it('resolvePresent (the optional tap\'s presence check): the same', async () => {
+    const error = await resolvePresent(await idbFake('sheet-long-list'), { id: 'lab.sheet-long-list.R' }, OPTS).catch((e: unknown) => e);
+    expect((error as ElementNotFoundError).miss).toEqual({ of: 'noIdListed', id: 'lab.sheet-long-list.R' });
   });
 });
 

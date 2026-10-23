@@ -46,7 +46,11 @@ dismiss region over the whole screen is a presented layer listed alone, and a st
 a loud one (see "Amendment: idb's presented layer" below). Amended again 2026-10-22 (round 16, open-bugs #9): on idb's
 flat list, a content-up stroke for a target never seen is a FEELER — short and slow — until a stroke of the call has
 moved the tree, so the large sheet idb shows no sign of springs back instead of being dismissed; the unmoved stop
-there says what idb does not list (see the same amendment's Decision 3).
+there says what idb does not list (see the same amendment's Decision 3). Amended again 2026-10-23 (round 1023, NI1):
+on idb's flat list a read that lists no identifier on any element is a fact of its own (`noIdListed`, beside
+`containerId` in decision 5's precedence), and every reply that says a target is not in the tree says idb's dialect —
+the tap's and fill's wait, an optional step's skip and every assert's not-found included (see "Amendment: an idb read
+that lists no identifier" below; residual 20).
 
 ## Context
 
@@ -816,8 +820,10 @@ asserts there still fail "not found" (vacuous, KNOWN): the pixel assert's wait i
    it IS in the tree — asked by the miss itself since round 15, no longer the caller's), `presented` (a window listed
    alone — decision 4's remedy), `activeWindow` (this hint), `containerId` (since round 15: idb's flat list, by the
    tree's own mark, and a target naming an id alone — an id on a container idb never lists; a possibility, said by a
-   flow's `wait:`, as its hint said before, and now by `scroll_until`; the tap's and fill's wait read it as `none`,
-   interact/resolve.ts#unsaidByTheTap, until NI1, and an assert, which passes no target, never gets it) or `none` (WDA, idb), in that precedence;
+   flow's `wait:`, as its hint said before, and now by `scroll_until`; ~~the tap's and fill's wait read it as `none`
+   until NI1, and an assert, which passes no target, never gets it~~ — since NI1's fix (2026-10-23, the amendment "an
+   idb read that lists no identifier") every verb says it, an assert asking with its element; and before it, on the
+   same guard, `noIdListed`: a read that lists no identifier at all) or `none` (WDA, idb), in that precedence;
    `missNote` words it; the replies only pick the layout — beneath a thrown poll timeout's headline (the tap's, fill's
    and presence check's wait, a flow's `wait:` on a present element), after a one-line not-found in a parenthesis
    (`withMissNote`: `scroll_until`'s "element never appeared in the tree", its `covered` stop under a keyboard over
@@ -939,7 +945,7 @@ tree per case, so Decision 2 shows only live (below).
 **Residuals.** A presentation UIKit lays with no dimming view — a large-detent or full-screen sheet (sheet-background:
 the sheet's button alone), an alert, a transparent cover — is no presented layer on idb: its targets are still stroked
 for (residual 6 stands there), and where a stroke dismisses it Decision 2 says so, the stroke already sent. A sheet
-whose reads list no id (label-only content, idb's UIKit rows, NI1) is never told changed. RECYCLED ROWS give a loud
+whose reads list no id (label-only content, idb's UIKit rows, NI1 — said since NI1's fix) is never told changed. RECYCLED ROWS give a loud
 stop: under idb, which lists no scroll view, a fling that replaces every identified row it lists, with nothing under
 the touch-down kept (no header, no scroll view), reads as changed — a stop where the scroll could go on, the failure
 preferred to a claimed stop. A stroke whose touched node PERSISTS while the sheet goes — a row label the host repeats by
@@ -979,7 +985,7 @@ app logging the two touches and NOTHING dismissed, the reply the unmoved stop wi
 target, and idb lists every node of the app's hierarchy, on the screen or not (scroll-top-edge's A at y −282,
 carousel-in-list's U at −200): on the content-up cases (scroll-top-edge, tabbar-dense, tabbar-floating,
 carousel-in-list) no feeler was sent — the same swipes and wall time as the base (below). Where a lazy list has not
-built the target yet (a UIKit table under idb lists its rows without ids, NI1, or none below the fold), the first stroke
+built the target yet (a UIKit table under idb lists its rows without ids, NI1 — said since NI1's fix — or none below the fold), the first stroke
 of an `up` call is a feeler: 160 pt rather than the full 524, 300 ms slower, one short stroke a call before the full
 ones. Golden: 37 replies change by the note's words alone (every idb `scroll_until` for a target no tree lists, stopped
 unmoved — alert-dim, dim-cover, sheet-background A–D, the forms under the keyboard, sheet-long-list's rows, NI1), no
@@ -990,7 +996,7 @@ idb's own swipe profile: a shorter sheet (a custom detent idb also shows no sign
 dismiss at less — the feeler keeps a margin of two on distance and five on speed, not a proof. A large sheet holding a
 LIST (a sheet whose content scrolls) is still dismissed once the list reaches its top: the feeler moves the list, the
 tree moves, the strokes are full, and the full pull-down at the list's top dismisses the sheet — Decision 2's loud stop
-says so, the stroke already sent. A target idb never lists (NI1's UIKit rows, an id on a container) makes every call's
+says so, the stroke already sent. A target idb never lists (NI1's UIKit rows — said since NI1's fix — an id on a container) makes every call's
 first `up` stroke a feeler; and a feeler covers 160 pt where a full stroke covers 524, so such a call may need one round more
 (a stroke, its settle and a read). The un-feeling is any change of the tree between reads (motion-ledger.ts#treeMoved),
 not motion along the stroke: a tree that changes on its own beneath the sheet (a clock, a counter, the sheet still
@@ -1077,6 +1083,51 @@ Residuals of the amendment:
 - **A same-top tie is draw order only here.** The reading-order cover rule (ui-tree/reading-order.ts, ADR 0015) keeps
   the order of same-top siblings untold; only this rule reads the tie as draw order (the four probes above).
 
+## Amendment: an idb read that lists no identifier (2026-10-23)
+
+NI1 (docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md): under idb the lab's UIKit
+table (`sheet-long-list`, `sheet-long-list-short`) lists every row with `AXUniqueId: null`, its target labels too,
+while WDA reads `lab.sheet-long-list(-short).R` from the same process. `tap` and `scroll_until` by that id timed out
+"to appear" / "never appeared in the tree" — the words of a slow screen — and the assert's not-found said nothing; since
+round 15 `scroll_until` said the `containerId` words, the remedy right, the cause the wrong one. A census of every
+committed idb list: the two tables and alert-dim (the alert's own buttons, no id set) list no identifier on any node;
+every other lists at least one.
+
+**Decision.** One more fact of idb's dialect in decision 5's precedence (ui-tree/miss.ts#missOf), `noIdListed`, in
+`containerId`'s slot and asked before it. It holds when the tree is idb's flat list (`UiNode.flatList`), the target
+names an id alone (selectors.ts#soleIdOf), nothing matched, the read is not bare (ui-tree/verdict.ts#isBareTreeMemo: a
+launch-transition read lists no ids because it lists nothing of the app's — it keeps `containerId`, as before), and no
+node of the read carries an identifier. A fact the read states, made by one walk of the flat list after a miss — no
+device call, no screenshot, no extra read; no `id:` selector can match anything in such a read, so the wait is
+hopeless, not late. Nothing ties `lab.sheet-long-list.R` to `"Target R"`, so no node is offered as the target. Its
+words (`missNote`), one phrase with no parenthesis inside: `no tree read contained id:"lab.sheet-long-list.R", and idb
+lists no accessibility identifier on any element of the screen — it drops some, a UIKit table cell label's among them.
+If the screen is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml` — the fact
+first (`NO_ID_LISTED`), the measured cause as a possibility, both remedies; the tail is shared with the container note
+(`TREE_SOURCE_REMEDY`). A flow's `wait:` adds no "wait on a button/row id idb does show" after it: there is none.
+
+**The three hold-backs lifted** (round 15 changed no reply but `scroll_until`'s, and left them to NI1): the tap's,
+fill's and presence check's wait (interact/resolve.ts#notFound) say `containerId` and `noIdListed` beneath "… to
+appear" and carry the miss to an optional `tap:`'s skip, `(not present) (<note>)`; a flow's `wait:` carries every
+kind's miss (flow/engine.ts#waitTimeoutHint), so a skipped `wait:` reads `Timed out … (<note>)`; every assert's
+not-found asks with its element (verify/poll-verdict.ts#notFound takes the target, required), `not found within 1 s
+(<note>)`. So every reply that says a target is not in the tree says what the miss saw, once (round 7's refinement of
+decision 5), idb's dialect included.
+
+**Golden.** The truth records R unlisted under idb (`TargetTruth.listed`); its rows were `open → Tapped`, which no idb
+reply can meet. Under ADR 0020 the truth outranks the hand-written row: an open target its replayed source does not
+list is asked the honest answer (`openRows`, scripts/differential/golden-spec/base.ts: not tapped, nothing sent, the
+source's limit named; the colour fails not found naming it; the stop not reached, any strokes, naming it). The 6 R
+rows turn green; 73 more
+replies change by the notes' words alone (idb's taps and colour asserts on sheet-background, dim-cover, the forms and
+the toolbar cells now carry the container note; sheet-long-list's F/L, short F and alert-dim A–D the new one), no
+verdict class and no device call changed. Live, R's taps under idb, refused with nothing fired, are ok (a target its
+source does not list is not asked to fire, as `judgeScroll`'s `unlisted`).
+
+Rejected: rewording `containerId` to name UIKit cells too (not measured on a screen where idb lists other ids: residual
+20); stopping `scroll_until` before any stroke on a read that lists no id (a stroke could bring in nodes that carry ids;
+a speed gain resting on a guess); the hint left to the docs (the reply is where the agent loses the time).
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -1147,7 +1198,7 @@ Residuals of the amendment:
      still dismissing: a large sheet HOLDING A LIST, once the list reaches its top (the feeler moved it, so the strokes
      are full — Decision 2's loud stop); a sheet that dismisses at less than the feeler (the threshold is measured on one
      simulator, one sheet); a tree that changes on its own between reads (it un-feels the call, `treeMoved` being any change); and a target idb
-     never lists (NI1: every call's first `up` stroke is a feeler, no more). No stroke at all is sent before a read of the
+     never lists (NI1, said since NI1's fix: every call's first `up` stroke is a feeler, no more). No stroke at all is sent before a read of the
      call has read (Decision 3's code review: six blind full strokes had dismissed the sheet live);
    - a target with the EXACT FRAME of the presented surface at the touch-down: the target column excuses a node of the
      target's own frame (`sameFrame`), so `presentedAt` does not name it. Measured: the Fees half-sheet trees list a
@@ -1302,6 +1353,13 @@ Residuals of the amendment:
    25da22d4 (the amendment "a Views BottomSheetDialog by Material's ids": the window marked by Material's own view ids,
    `…:id/touch_outside` followed by `…:id/design_bottom_sheet`, read against the scrim's edges, not the window's; live
    13/13 ok in three runs, docs/truth/live-records/android-vis-sheet-dialog-run1…3.json).
+20. **idb lists no identifier on a UIKit table cell label: an id-asked target there is never found, only said so**
+   (2026-10-23, the amendment "an idb read that lists no identifier"). The reply names idb's limit where the read
+   lists no id at all; a UIKit cell whose id idb drops on a screen where idb lists OTHER ids reads as `containerId` —
+   the right remedy, the wrong cause named (not measured: the lab's only drop is on an id-less read). `scroll_until`
+   still strokes for such a target (a stroke could bring in nodes that carry ids), so the live sheet-long-list F/L and
+   short F stay `not-reached`, honest. An app that sets no ids at all and is read by idb gets the same words, "drops
+   some" a possibility there. Remedy: a `text:`/`label:` selector, or `treeSource: wda`.
 
 ## Bug notes
 
@@ -1314,3 +1372,4 @@ docs/bugs/2026-10-14-ios-wda-tap-and-pixel-assert-beneath-a-presented-screen-giv
 docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-measures-the-sheet-and-passes.md
 docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
 docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md
+docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md

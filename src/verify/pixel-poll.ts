@@ -374,8 +374,9 @@ class PixelPollMemory {
    * unconfirmed, whichever silenced the last such round), which outranks
    * not-found. A covered miss that a later query contradicted is not a
    * finding any more (`lastCovered`): the silent round after it speaks.
+   * Not-found is asked with the assert's `element` (poll-verdict.ts#notFound).
    */
-  timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error; lastTree?: UiNode }): string {
+  timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error; lastTree?: UiNode }, element: ElementSpec): string {
     const stale = this.coverCleared && last.detail === this.lastCovered;
     if (last.detail !== undefined && !stale) return last.detail;
     const roundCost = `the slowest round — a tree read and its captures — took ${formatSeconds(this.slowestRoundMs)} here`;
@@ -388,7 +389,7 @@ class PixelPollMemory {
         `with a second tree read (${roundCost}) — raise this assert timeout or let the screen come to rest`
       );
     }
-    return notFound(timeoutMs, last);
+    return notFound(timeoutMs, last, element);
   }
 }
 
@@ -840,5 +841,5 @@ export async function pollPixels(
   });
   if (outcome instanceof FinalMiss) return { pass: false, detail: outcome.detail };
   if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
-  return { pass: false, detail: memory.timeoutDetail(timeoutMs, outcome) };
+  return { pass: false, detail: memory.timeoutDetail(timeoutMs, outcome, element) };
 }

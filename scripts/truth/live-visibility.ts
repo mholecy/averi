@@ -493,7 +493,9 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
       says: `tap ${t.tag} (${contract.geometry ?? t.declared}): ${fires ? 'fires it alone' : 'refused, nothing fires — or fires it alone'}`,
       calls: [{ tool: 'tap', args: { selector: selectorOf(t) } }],
       asks: ask,
-      judge: (s, [reply], launched) => judgeTap(t.tag, fires, reply, s, launched),
+      // A target its source does not list (askedUnlistedBy: the lab's UIKit table row under idb) cannot be found by it: a
+      // refusal with nothing fired is ok there, as judgeScroll's `unlisted` is — live judges no wording, the replay does.
+      judge: (s, [reply], launched, source) => judgeTap(t.tag, fires && askedUnlistedBy(t, source) === undefined, reply, s, launched),
     });
     if (t.declared === 'presented-over') {
       cases.push({
