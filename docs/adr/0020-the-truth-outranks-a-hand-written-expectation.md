@@ -46,8 +46,8 @@ all), and the screenshot says how much of the target is drawn as itself. The gol
    the row's truth allows the target to be absent (a lazy row not laid out). An open target its replayed source does
    not list (`TargetTruth.listed`: the lab's UIKit table row under idb, which lists no identifier, NI1) is asked the
    honest answer, as an unlisted target off the screen is — not tapped, nothing sent, the source's limit named
-   (`openRows`, scripts/differential/golden-spec/base.ts; 2026-10-23): the one place a row reads a fact of the
-   wording, since no other reply of that source tells the agent why. Wording stays the OLD/NEW differential's business.
+   (`openRows`, scripts/differential/golden-spec/base.ts; 2026-10-23): the row reads a fact of the wording, since no
+   other reply of that source tells the agent why. Wording stays the OLD/NEW differential's business.
 3. **A broken cell is reported, not judged.** When a capture's sources disagree with each other — declared open but not
    reached, a probe tap that left no touch in the app, an open control the probe did not reach (the consistency checks
    of scripts/truth/truth.ts) — it says nothing about averi: it is listed broken and the run fails until the cell is
