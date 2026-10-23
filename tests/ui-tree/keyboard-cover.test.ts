@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import { KEYBOARD_ROLE, type KeyboardTouchable, type KeyboardWitness, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
-import { panelGap, readKeyboard } from '../../src/ui-tree/keyboard-cover.js';
+import { readKeyboard } from '../../src/ui-tree/keyboard-cover.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, recorded, screen, type FakeKeyboard } from '../helpers/fake.js';
 
@@ -367,7 +367,7 @@ describe('the keyboard window\'s region, read only once the band is up — the f
   });
 });
 
-describe('panelGap — the strip between a floating keyboard\'s panels and its band, which none of it covers', () => {
+describe('the cover\'s gap — the strip between a floating keyboard\'s panels and its band, which none of it covers', () => {
   const region = (text: string) => touchableOf(`    touchable region=SkRegion(${text})\n`, 'shown');
   const coverWith = async (touchable: ReturnType<typeof touchableOf>) => {
     const fake = new FakeAdapter({ s: screen() }, 's');
@@ -388,23 +388,29 @@ describe('panelGap — the strip between a floating keyboard\'s panels and its b
     }
   });
 
-  it('docked — the band alone: no gap', () => {
-    expect(panelGap({ x: 0, y: 1398, width: 1080, height: 822 }, [])).toBeUndefined();
+  it('docked — the band alone: no gap', async () => {
+    expect((await coverWith(region('(0,2088,1080,2220)')))?.gap).toBeUndefined();
   });
 
-  it('two panels: the gap starts below the lower one', () => {
-    expect(panelGap(GBOARD_STRIP, [{ x: 71, y: 1092, width: 937, height: 500 }, { x: 359, y: 1269, width: 681, height: 643 }])).toEqual({ x: 0, y: 1912, width: 1080, height: 176 });
+  it('two panels: the gap starts below the lower one', async () => {
+    expect((await coverWith(region('(71,1092,1008,1592)(359,1269,1040,1912)(0,2088,1080,2220)')))?.gap).toEqual({ x: 0, y: 1912, width: 1080, height: 176 });
   });
 
-  it('two panels, the lower one reaching into the band\'s rows: no gap — not one below the other', () => {
-    expect(panelGap(GBOARD_STRIP, [{ x: 71, y: 1092, width: 937, height: 500 }, { x: 359, y: 1700, width: 681, height: 400 }])).toBeUndefined();
+  it('two panels, the lower one reaching into the band\'s rows: no gap — not one below the other', async () => {
+    const cover = await coverWith(region('(71,1092,1008,1592)(359,1700,1040,2100)(0,2088,1080,2220)'));
+    expect(cover?.rects).toHaveLength(3); // the panels admitted: no gap by their geometry, not by a refusal
+    expect(cover?.gap).toBeUndefined();
   });
 
-  it('a panel whose bottom is the band\'s top: no gap (no height)', () => {
-    expect(panelGap(GBOARD_STRIP, [{ x: 71, y: 1092, width: 937, height: 996 }])).toBeUndefined();
+  it('a panel whose bottom is the band\'s top: no gap (no height)', async () => {
+    const cover = await coverWith(region('(71,1092,1008,2088)(0,2088,1080,2220)'));
+    expect(cover?.rects).toHaveLength(2); // the panels admitted: no gap by their geometry, not by a refusal
+    expect(cover?.gap).toBeUndefined();
   });
 
-  it('a panel reaching into the band\'s rows: no gap', () => {
-    expect(panelGap(GBOARD_STRIP, [{ x: 71, y: 1092, width: 937, height: 1008 }])).toBeUndefined();
+  it('a panel reaching into the band\'s rows: no gap', async () => {
+    const cover = await coverWith(region('(71,1092,1008,2100)(0,2088,1080,2220)'));
+    expect(cover?.rects).toHaveLength(2); // the panels admitted: no gap by their geometry, not by a refusal
+    expect(cover?.gap).toBeUndefined();
   });
 });

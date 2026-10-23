@@ -43,9 +43,9 @@ import { keyboardInTree, keyboardSideNodes, type KeyboardRemedy } from './soft-k
  * dismissal picker, `scroll_until`'s read and the pixel poll. A reading is
  * one of its inputs; this module imports nothing from it.
  *
- * Its interface, nine exports: `readKeyboard` and the `KeyboardReading` it
- * builds; the reading's cover (`KeyboardCover`), the strip below its panels
- * that none of it covers (`panelGap`, carried as its `gap`) and `UNLOCATED_KEYBOARD`; and the
+ * Its interface, eight exports: `readKeyboard` and the `KeyboardReading` it
+ * builds; the reading's cover (`KeyboardCover`, with the strip below its
+ * panels that none of it covers, `gap`) and `UNLOCATED_KEYBOARD`; and the
  * verdicts its point questions answer (`FrameVerdict`, `Uncovered`,
  * `KeyboardVerdict`, `Covering`) — answers to a question, not positions.
  *
@@ -405,13 +405,11 @@ const keyboardRects = (keyboard: Extract<SoftKeyboard, { state: 'shown' }>): rea
  * there; the screenshot shows the gap clean but for a few pixels of the
  * panel's shadow at its top. Computed from the same rects every other
  * question tests, so a rect inside it misses every covered rect by
- * construction. Read by `scroll_until`'s round alone, as `KeyboardCover.gap`
- * (interact/scroll-read.ts#AppliedKeyboard.gap): the tap guard and the
- * pixel poll test the rects themselves and need no gap.
+ * construction.
  * docs/adr/0027-a-floating-keyboards-panel-gap-is-the-apps-screen.md
  * docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md
  */
-export function panelGap(band: Rect, panels: readonly Rect[]): Rect | undefined {
+function panelGap(band: Rect, panels: readonly Rect[]): Rect | undefined {
   if (panels.length === 0) return undefined;
   const top = Math.max(...panels.map((r) => r.y + r.height));
   return top < band.y ? { x: band.x, y: top, width: band.width, height: band.y - top } : undefined;

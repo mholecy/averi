@@ -195,12 +195,10 @@ function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboar
  * [359,1269][1040,1912], 681 px wide and mid-screen. The
  * invariant: only its `.y` is meaningful as a cut — the rect need not be
  * full width nor reach the bottom; the rest of it is quoted in messages.
- * One part of the screen below that edge is the app's again: the strip
- * between the panels and the band (`gap`), which none of the keyboard
- * covers (none from a region read only in part) — a match WHOLLY inside it
- * that stops cleanly there is judged there (`inGap`). The cost of the full-width cut that is left, accepted (it
- * never certifies a covered target): content BESIDE a panel, in its rows
- * (x < 71 or x ≥ 1008 on the lab's capture), or partly in the gap and partly beside or under the
+ * One part of the screen below that edge is the app's again: the panel
+ * gap (`gap`, judged by `inGap`). The cost of the full-width cut that is
+ * left, accepted (it never certifies a covered target): content BESIDE a
+ * panel, in its rows, or partly in the gap and partly beside or under the
  * panel's rows, is never judged visible, so a target there that cannot be
  * scrolled above the panel fails `scroll_until` with the keyboard named,
  * though the tap guard — which tests the panel's rect itself — would tap
@@ -210,7 +208,7 @@ function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboar
 export interface AppliedKeyboard {
   topCover: Rect;
   above: DeviceScreen | undefined;
-  /** The strip between a floating keyboard's panels and its band, which none of it covers (`KeyboardCover.gap`, ui-tree/keyboard-cover.ts#panelGap) — a match wholly inside it is judged there (`inGap`). A reading's cover only, and only with a panel above the band; never idb's band. */
+  /** The strip between a floating keyboard's panels and its band, which none of it covers (`KeyboardCover.gap`): a reading's cover only, never idb's band. */
   gap?: Rect;
   remedy: KeyboardRemedy;
   /** Its top edge as a keyboard line (`line.y` is `topCover.y`): witnessed for a reading's cover, which the witness stood by; unwitnessed for idb's band (`bandKeyboardOf`), which no reading stands by — a centre under it stops nothing. */
@@ -220,8 +218,8 @@ export interface AppliedKeyboard {
 /**
  * One match as judged: the keyboard cover it was judged under (none for a
  * whole-screen judgement, a keyboard-side node or a clean stop in the panel
- * gap, `inGap`) and where it stands for
- * the stop (ui-tree/standing.ts#Scene.standing) — the kind `stops` and
+ * gap, `inGap`) and where it stands for the stop
+ * (ui-tree/standing.ts#Scene.standing) — the kind `stops` and
  * `shortOf` read, and the facts the rest of the round and the sentences
  * read: how much of it is in the frame, the frame's edges it extends past,
  * what of the app is drawn over it inside that frame (the covers, the one
@@ -386,10 +384,10 @@ export function strokeLine(cover: AppliedKeyboard | undefined, facts: Pick<TreeF
  * is the scene's (ui-tree/standing.ts#Scene.standing), in the frame's box
  * with its system bands. Under a cover, a keyboard-side node (the round's
  * reading's `ofKeyboard`, one walk per round) is judged against the whole
- * screen; every other node against the part above the cover's top edge —
- * or, wholly inside the cover's panel gap and stopping cleanly there, in
- * the gap (`inGap`), under no cover — and what is drawn over a node is counted only there: a
- * bar under the keyboard covers nothing the round can see.
+ * screen; every other node against the part above the cover's top edge, or
+ * in the cover's panel gap (`inGap`), and what is drawn over a node is
+ * counted only there: a bar under the keyboard covers nothing the round can
+ * see.
  */
 function judge(
   found: readonly UiNode[],
