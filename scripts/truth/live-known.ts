@@ -14,7 +14,7 @@ import type { ReplyKind } from './replies.js';
  * moves how many a scroll_until sends, run to run. And a case on the device can pass by chance of timing: so live.ts
  * (a run of this checkout, or a `--rejudge` of one) exits 1 on a MISMATCH not listed here, and on a listed case that
  * comes back ok unless its entry is `intermittent` — one whose runs of the same commit differ (the WDA stop on a row
- * resting a fraction of a point centre-out; LV2's flush cases were, until round 1023 fixed them). A non-intermittent
+ * resting a fraction of a point centre-out; LV2's flush cases were, until fixed at ae4d988a). A non-intermittent
  * case ok is fixed and must be struck off, as the static ratchet asks; an intermittent one ok is printed as such. A
  * `--side` run (a calibration of an older commit) is held to neither: this KNOWN is HEAD's.
  *
@@ -73,7 +73,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // scroll-bounded O and F an honest LOUD at the deadline with no unchanged claim, the blank clause naming `upper`.
   // LV2 (scroll-bounded-flush's P.fully and S.fully, intermittent;
   // docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md): fixed
-  // by round 1023's bugs/r1023-lv2 (a probe that showed more of a still-flush row proved its cut: no confirm, the next
+  // at ae4d988a (a probe that showed more of a still-flush row proved its cut: no confirm, the next
   // stroke a reveal of half the room), S.fully "fully visible after 2 swipes" five runs of five (lower 0→58–61, then
   // →291–296; android-vis-r1023-lv2-1…5.json), P.fully after 1 as before; both struck off.
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),

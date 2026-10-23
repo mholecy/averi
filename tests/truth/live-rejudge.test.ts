@@ -256,7 +256,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
   });
 });
 
-describe('the LV2 fix\'s records: the flush probe, then one reveal', () => {
+describe('the flush probe\'s live records on a deep cut: a probe, then one reveal', () => {
   // docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md: S
   // (176 px, 154 of it below `lower`'s clip at rest) whole after the probe and one reveal of at most half the room above
   // it — the list never carried past the clip's top (S's top stays inside 1046–1541), and the tap fires S.
