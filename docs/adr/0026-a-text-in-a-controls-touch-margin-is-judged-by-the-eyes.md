@@ -63,7 +63,9 @@ precedent), ADR 0002 (the pixel slack) and ADR 0010 (the keyboard judged first).
    `ClearPair` per cover: `overlap`, the two's intersection in the frame, and `beside`, the target's own rows of the
    overlap left and right of the text. One cover the eyes cannot be asked about keeps the standing, so nothing is asked.
 3. **The answer** (`verify/eyes.ts#judgeClear`, `ui-tree/seen-order.ts#PairSeen`'s new `clear`):
-   - `clear` — the beside strips are one colour (`oneColour`), and every pixel of the overlap lies within EYES_SAME_DE
+   - `clear` — the beside strips are one colour, each held to it as strictly as the overlap (not `oneColour`'s
+     LINE_SHARE: a line the target draws across its width, seen beside the text and missing from the overlap, is what
+     an opaque text background hides), and every pixel of the overlap lies within EYES_SAME_DE
      of it, at most OWN_PIXELS_MAX points' worth of strays (the strict count `apartOfFrame` uses, not LINE_SHARE, which
      would pass a 1-px line of ink across a 6-px band): the text paints nothing a screenshot, an OCR crop or a colour
      sample of the target reads;
@@ -79,11 +81,13 @@ precedent), ADR 0002 (the pixel slack) and ADR 0010 (the keyboard judged first).
    captures anyway: zero extra captures; a `clear` answer, like `over`, is never kept across poll rounds — each round's
    unlock rests on its own frame). The tap never asks (rule 3: no tap standing is covered by a margin text). A caller
    with no eyes (`ui_snapshot`, the dismissal picker, tree-only tests) behaves as before.
-6. **Once per text per call** in `scroll_until` (`scroll-rounds.ts#State.marginSeen`): unlike ADR 0024's unordered
-   stop, a refused clear question is followed by strokes, and the text moves with the target. What was seen is kept by
-   the text's identifier, label and size within a pixel and told to every later read: `under`/`untold` for the call
-   (the cover stands, no screenshot again), `clear` while the target and the text lie where they were seen (moved, the
-   pixels moved: asked again).
+6. **Once per text where it lies** in `scroll_until` (`scroll-rounds.ts#State.marginSeen`): unlike ADR 0024's
+   unordered stop, a refused clear question is followed by strokes, and the text moves with the target. What was seen
+   is kept by the text's identifier, label and size within a pixel (one entry per text, the latest answer) and told to
+   every later read: `under` for the call (the cover stands, no screenshot again); `clear` and `untold`, answers of the
+   frame they were read on (a displaced capture may read `clear`, a blended one `untold`), while the target and the
+   text lie where they were seen — moved, asked again. So one screenshot per text while the two stay put, one more each
+   time a stroke moves them; a text seen drawn over the target costs one for the call.
 7. **Replies.** After `clear`: `fully visible after 0 swipes — text "Variable symbol" (55,1406 258x56), drawn after it,
    overlaps its bottom 6 px with nothing a screenshot shows (Android dumps a control's touch target, past what it
    draws)` — the prefix unchanged, so scripts/truth/replies.ts still reads it as "fully visible". After `under`, the
@@ -99,7 +103,8 @@ with the target's own rows beside it.
 - The lab's real captures, judged by `judgeClear` (tests/verify/eyes-clear.test.ts): form-keyboard (IME up) street ←
   city.title, overlap `55,860 175x6`: clear (#FFFFFF, as street's rows beside it); k7's stop, the same pair at
   `55,693 175x6`: clear; form-errors name ← its error text, `55,491 440x11`: clear. The same png with a 1-px dark line
-  across the band: under; the band painted #F2F2F7 (a text background): under; the beside rows striped: untold; a frame
+  across the band: under; the band painted #F2F2F7 (a text background): under; the beside rows striped, or one 1-px line drawn across the
+  beside rows only (what a text background would hide): untold; a frame
   whose scale the tree refuses: untold.
 - The round over the after-back tree (tests/interact/scroll-eyes.test.ts): a white frame — fully visible after 0
   swipes, one screenshot, no stroke; the band inked — the covered failure with what the screenshot showed, still one
@@ -113,7 +118,8 @@ with the target's own rows beside it.
 ## Residuals accepted
 
 1. **A frame caught mid-animation** (ADR 0013's one-capture residual): `scroll_until`'s capture is unsettled by design;
-   a blend reads `under` or `untold` — the cover kept. The pixel assert judges only a frame settled over the whole
+   a blend reads `under` or `untold` — the cover kept; a capture displaced from the read's frame may read `clear`,
+   which is then kept only while the two lie where that read had them (rule 6). The pixel assert judges only a frame settled over the whole
    screen, as in ADR 0024.
 2. **A text box over drawn content of the same plain colour, with no ink in the band**: read `clear`. Nothing visible is
    hidden, so nothing a measurement reads differs.

@@ -79,7 +79,7 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  *
  * ORDER inside a round, fixed: the read's judgement, its `ask witness` included (interact/scroll-read.ts#judgeRead),
  * then `ask order` for a best match covered by a control the listing does not order (ADR 0024), or by texts in its
- * touch margin only (ADR 0026: what was seen of those kept for the call, `State.marginSeen`), and the judgement again
+ * touch margin only (ADR 0026: what was seen of those kept, `State.marginSeen`), and the judgement again
  * on what the eyes saw; the motion ledger shown the round (`seeMotion`, before the stroke plan sees the read); motion
  * observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
  * stop flush with a clipping scroll container, the probe — `ask witness` first for a band the moot rule left unasked —
@@ -581,10 +581,11 @@ interface State {
   /**
    * What the eyes saw of the texts in the target's touch margin this call (ui-tree/eyes.ts#ClearPair, ADR 0026), one
    * entry per text asked: a later read tells its judgement what was seen instead of looking again — one screenshot per
-   * text per call. Seen drawn over the target or untold: kept for the call, wherever the two move (the text is content
-   * of the target's own scroll view and moves with it; a later screenshot would only cost the time again). Seen clear:
-   * kept while the target and the text lie where they were seen, each within a pixel — the pixels moved with them, so
-   * moved, they are asked again.
+   * text where it lies. Seen drawn over the target: kept for the call, wherever the two move (the text is content of
+   * the target's own scroll view and moves with it; a later screenshot would only cost the time again). Seen clear or
+   * untold — answers of the frame they were read on (a displaced or blended capture reads either): kept while the
+   * target and the text lie where they were seen, each within a pixel; moved, they are asked again. A text asked again
+   * replaces its entry.
    */
   readonly marginSeen: readonly MarginSeen[];
   /** The last step was a `stroke`: the next seen must hand back `drawn`. */
@@ -700,12 +701,21 @@ interface MarginSeen {
   readonly seen: PairSeen;
 }
 
-/** The kept answer about `peer` of a clear question of `target` (`State.marginSeen`): the same text — its identifier and label, its size within a pixel — and, for `clear`, both where they were seen. */
+/** `kept` and `peer` are the same text: its identifier and label, its size within a pixel (`State.marginSeen`'s key). */
+function sameText(kept: MarginSeen, peer: UiNode): boolean {
+  const { rect } = kept.peer;
+  return kept.peer.identifier === peer.identifier && kept.peer.label === peer.label && Math.abs(rect.width - peer.rect.width) <= 1 && Math.abs(rect.height - peer.rect.height) <= 1;
+}
+
+/**
+ * The kept answer about `peer` of a clear question of `target` (`State.marginSeen`): the same text (`sameText`) and —
+ * for `clear` and `untold`, answers of the frame they were read on — both where they were seen; `under` for the call
+ * (the cover stands wherever the two lie).
+ */
 function marginKept(kept: readonly MarginSeen[], target: UiNode, peer: UiNode): PairSeen | undefined {
-  const sameSize = (a: Rect, b: Rect): boolean => Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
-  const found = kept.find((k) => k.peer.identifier === peer.identifier && k.peer.label === peer.label && sameSize(k.peer.rect, peer.rect));
+  const found = kept.find((k) => sameText(k, peer));
   if (found === undefined) return undefined;
-  if (found.seen.seen !== 'clear') return found.seen;
+  if (found.seen.seen === 'under') return found.seen;
   return sameRectWithinPixel(found.peer.rect, peer.rect) && sameRectWithinPixel(found.target, target.rect) ? found.seen : undefined;
 }
 
@@ -730,7 +740,10 @@ function orderKnown(
   const unasked = question.pairs.filter(({ peer }) => !kept.some((k) => k.peer === peer));
   if (answered === undefined && unasked.length > 0 && !kept.some((k) => k.seen !== 'clear')) return { ask: { ...question, pairs: unasked } };
   const now = answered ?? [];
-  return { told: [...kept, ...now], marginSeen: [...marginSeen, ...now.map(({ peer, ...seen }): MarginSeen => ({ peer: quoted(peer), target: { ...node.rect }, seen }))] };
+  const seenNow = now.map(({ peer, ...seen }): MarginSeen => ({ peer: quoted(peer), target: { ...node.rect }, seen }));
+  // A text asked again replaces what was seen of it before (one entry per text, the latest answer).
+  const before = marginSeen.filter((k) => !now.some(({ peer }) => sameText(k, peer)));
+  return { told: [...kept, ...now], marginSeen: [...before, ...seenNow] };
 }
 
 /** What one read that read says about motion (`observe`): the motion ledger's answer (interact/motion-ledger.ts#Moved), and what the round makes of it. */
@@ -897,8 +910,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
   // THE ORDER SEEN (ui-tree/eyes.ts): the best match covered by a control the listing does not order (ADR 0024) — the
   // eyes are asked once which is drawn on top; such a stop never strokes (`overlapped`, below), so one screenshot ends
-  // the scroll's question — or covered by texts in its touch margin only (ADR 0026), each asked once a call: what was
-  // seen of one is kept (`State.marginSeen`) and told to every later read; one seen drawn over it or untold keeps the
+  // the scroll's question — or covered by texts in its touch margin only (ADR 0026), each asked once where it lies: what
+  // was seen of one is kept (`State.marginSeen`) and told to every later read; one seen drawn over it or untold keeps the
   // cover, so the rest are not asked. The read is judged again, told what was seen (`RoundSeen.order`).
   const ordering = judged?.best === undefined || read === undefined ? undefined : orderQuestion(read.tree, judged.best.node, judged.best.standing);
   if (ordering !== undefined && read !== undefined) {

@@ -252,7 +252,7 @@ export function describeScrollResult(r: ScrollUntilResult): string {
     const claim = unjudged === undefined ? `fully visible after ${n}` : `fully visible by the tree after ${n}`;
     const eyes = unjudged === undefined ? '' : `; ${unjudgedText(unjudged)}`;
     const clear = r.seenClear === undefined ? '' : ` — ${r.seenClear.map(seenClearText).join('; ')}`;
-    return `${claim}${clear}${above}${flushText(r.flush)}${eyes}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
+    return `${claim}${above}${flushText(r.flush)}${clear}${eyes}${unlocated}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
   }
   // Partly under something of the app: a plain stop, its centre
   // clear — said like a clip, and with what a measurement would take in.

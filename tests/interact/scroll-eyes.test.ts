@@ -269,3 +269,65 @@ describe('scroll_until — fully: true on a field under a text in its touch marg
     expect(fake.screenshots).toHaveLength(0);
   });
 });
+
+/**
+ * WHAT WAS SEEN OF A MARGIN TEXT, KEPT (interact/scroll-rounds.ts#State.marginSeen) across the reads of one call: the
+ * after-back form served first 700 px lower (phone below the viewport: a stroke), then where it was captured — the clear
+ * question asked there — then, for the read that confirms the stop, either there again or 10 px higher. A `clear` is an
+ * answer of the frame it was read on: kept while the two lie where they were seen, asked again once they moved; the
+ * answer given then replaces it, so a text seen drawn over the field is not asked again however many reads follow.
+ */
+describe('scroll_until — what was seen of a margin text, kept across the reads of the call', () => {
+  const shifted = (n: UiNode, dy: number): UiNode => ({ ...n, rect: { ...n.rect, y: n.rect.y + dy }, children: n.children.map((c) => shifted(c, dy)) });
+  /** `tree` with the content of its largest clipping container moved `dy` (the container itself where it is). */
+  const scrolled = (tree: UiNode, dy: number): UiNode => {
+    const clips = (n: UiNode): UiNode[] => [...(n.clipsDescendants ? [n] : []), ...n.children.flatMap(clips)];
+    const list = clips(tree).sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height)[0]!;
+    const walk = (n: UiNode): UiNode => (n === list ? { ...n, children: n.children.map((c) => shifted(c, dy)) } : { ...n, children: n.children.map(walk) });
+    return walk(tree);
+  };
+  const run = async (confirmDy: number, answers: readonly ('clear' | 'under' | 'untold')[]) => {
+    const fake = await fakeOf('android-lab-form-keyboard-after-back.xml', { ime: false });
+    const base = await fake.uiTree();
+    const reads = [scrolled(base, 700), base, scrolled(base, confirmDy)];
+    let n = 0;
+    fake.uiTree = async () => structuredClone(reads[Math.min(n++, reads.length - 1)]!);
+    const asked: number[] = [];
+    const eyes: Eyes = {
+      fully: async () => ({ sees: 'own' }),
+      order: async (q) => {
+        asked.push(n);
+        const seen = answers[asked.length - 1] ?? 'clear';
+        return q.pairs.map(({ peer }) =>
+          seen === 'clear'
+            ? { peer, seen, overlap: '#FFFFFF', beside: '#FFFFFF' }
+            : seen === 'untold'
+              ? { peer, seen, why: 'it is not one colour beside the text' }
+              : { peer, seen, overlap: '#1E1E1E', own: '#FFFFFF', other: '#1E1E1E' },
+        );
+      },
+    };
+    const outcome = await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes }).then(describeScrollResult, (e: unknown) => (e as Error).message);
+    return { outcome, asked, swipes: fake.swipes.length };
+  };
+
+  it('nothing moved between the read that saw it clear and the one confirming: the answer reused — one question, fully visible', async () => {
+    const { outcome, asked } = await run(0, ['clear']);
+    expect(outcome).toMatch(/^fully visible after 1 swipe — text "Variable symbol" .* with nothing a screenshot shows/);
+    expect(asked).toHaveLength(1);
+  });
+
+  it('the two moved 10 px before the confirming read: asked again — seen drawn over it there, the cover stands, and no later read asks again', async () => {
+    const { outcome, asked, swipes } = await run(-10, ['clear', 'under']);
+    expect(asked).toHaveLength(2);
+    expect(outcome).toContain('under text "Variable symbol"');
+    expect(outcome).toContain('a screenshot shows it drawn over its bottom 6 px');
+    expect(swipes).toBeGreaterThan(1);
+  });
+
+  it('untold where it was first asked (a blended frame), the two moved by the next stroke: asked again there — seen clear, fully visible', async () => {
+    const { outcome, asked } = await run(-10, ['untold', 'clear']);
+    expect(asked).toHaveLength(2);
+    expect(outcome).toMatch(/^fully visible after \d+ swipes? — text "Variable symbol"/);
+  });
+});
