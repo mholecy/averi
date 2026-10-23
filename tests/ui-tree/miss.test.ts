@@ -32,7 +32,7 @@ const ghost = (identifier: string, clippedOut?: 'top' | 'bottom'): UiNode =>
 
 const R = 'id:lab.sheet-long-list.R';
 const SHORT_R = 'id:lab.sheet-long-list-short.R';
-const idR = (id: string): Miss => ({ of: 'containerId', id });
+const idR = (id: string): Miss => ({ of: 'idUnlisted', id });
 const noId = (id: string): Miss => ({ of: 'noIdListed', id });
 /** A launch-transition read idb gave: its Application root alone, nothing of the app's (ui-tree/bare-tree.ts). */
 const bareIdb = (): UiNode => markIdbDialect(node({ role: 'container', identifier: null, label: null, rect: { x: 0, y: 0, width: 402, height: 874 } }));
@@ -52,10 +52,10 @@ describe('missOf — (tree, target) → Miss, one table', () => {
     ['WDA, its twin', { tree: wda('sheet-long-list-short') }, SHORT_R, { of: 'none' }],
     ['WDA, an id in no tree: no dialect fact (WDA lists containers\' ids)', { tree: wda('sheet-long-list') }, 'id:lab.nowhere', { of: 'none' }],
     ['idb, an id the list holds, with area: nothing of idb\'s dialect', { tree: plus(idb('sheet-long-list'), node({ identifier: 'g' })) }, 'id:g', { of: 'none' }],
-    ['idb, one identifier listed elsewhere: the container fact, not the read\'s', { tree: plus(idb('sheet-long-list'), node({ identifier: 'g' })) }, R, idR('lab.sheet-long-list.R')],
+    ['idb, one identifier listed elsewhere: the id unlisted, not the read\'s fact', { tree: plus(idb('sheet-long-list'), node({ identifier: 'g' })) }, R, idR('lab.sheet-long-list.R')],
     ['idb, a flow\'s spec naming the id alone', { tree: idb('sheet-long-list') }, { id: 'lab.sheet-long-list.R' }, noId('lab.sheet-long-list.R')],
     ['idb, an alert whose buttons carry no identifier (alert-dim)', { tree: idb('alert-dim') }, 'id:lab.alert-dim.A', noId('lab.alert-dim.A')],
-    ['idb, a bare launch read: it says nothing of the screen\'s ids — the container fact, as before', { tree: bareIdb() }, R, idR('lab.sheet-long-list.R')],
+    ['idb, a bare launch read: it lists nothing of the app\'s, so its ids say nothing of the screen', { tree: bareIdb() }, R, { of: 'none' }],
 
     // Only an id ALONE is a statement about the id: the fields AND, and a regex names no one id.
     ['idb, id AND text', { tree: idb('sheet-long-list') }, `${R} text:"Target R"`, { of: 'none' }],
@@ -66,7 +66,7 @@ describe('missOf — (tree, target) → Miss, one table', () => {
 
     // A layer listed alone outranks idb's dialect: the screen beneath is not in the list at all.
     ['idb, a sheet over the screen (its dismiss region listed)', { tree: idb('sheet-medium') }, 'id:lab.sheet-medium.A', { of: 'presented', layer: { kind: 'screen' }, listed: 'layer' }],
-    ['idb, a large sheet with no dismiss region: idb\'s dialect', { tree: idb('sheet-background') }, 'id:lab.sheet-background.A', idR('lab.sheet-background.A')],
+    ['idb, a large sheet with no dismiss region, listing the sheet\'s own ids: idb\'s dialect', { tree: idb('sheet-background') }, 'id:lab.sheet-background.A', idR('lab.sheet-background.A')],
 
     // Android: the windows uiautomator lists.
     ['uiautomator, a dialog listed alone', { tree: uiautomator('alert-dim') }, 'id:lab.alert-dim.A', { of: 'presented', layer: { kind: 'dialog' }, listed: 'window' }],
@@ -101,27 +101,31 @@ describe('missNote — the words, once', () => {
     expect(missNote({ of: 'zeroArea', clippedOut: ['top'] })).toBe('it matched only nodes clipped out above its scroll container (scrolled past it) — scroll_until it with direction: "up" first');
     expect(missNote({ of: 'zeroArea', clippedOut: ['right'] })).toBe('it matched only nodes clipped out right of its scroll container (scrolled past it) — scroll_until it with direction: "right" first');
     expect(missNote({ of: 'zeroArea', clippedOut: ['top', 'bottom'] })).toBe('it matched only nodes clipped out above or below its scroll container — scroll_until it first');
-    expect(missNote({ of: 'containerId', id: 'amount_input' })).toBe(
-      'no tree read contained id:"amount_input". iOS treeSource: idb never exposes an identifier set on a container — ' +
-        'SwiftUI .accessibilityElement(children: .contain), React Native testID on a non-interactive view. ' +
-        'If the screen is showing, set app.ios.treeSource: wda in averi.yaml',
+    const idbUnlists =
+      'idb lists nothing beneath the keyboard or a presented sheet, alert or cover, drops some identifiers, a UIKit table cell ' +
+      'label\'s among them, and never lists one set on a container: SwiftUI .accessibilityElement(children: .contain), a ' +
+      'React Native testID on a non-interactive view.';
+    expect(missNote({ of: 'idUnlisted', id: 'amount_input' })).toBe(
+      `no tree read contained id:"amount_input". iOS treeSource: ${idbUnlists} ` +
+        'If the element lies beneath the keyboard or a presented layer, close it first; if it is showing, ' +
+        'set app.ios.treeSource: wda in averi.yaml',
     );
     expect(missNote({ of: 'noIdListed', id: 'lab.sheet-long-list.R' })).toBe(
-      'no tree read contained id:"lab.sheet-long-list.R", and idb lists no accessibility identifier on any element of the screen — ' +
-        'it drops some, a UIKit table cell label\'s among them. If the screen is showing, ask for it by text: or label:, ' +
-        'or set app.ios.treeSource: wda in averi.yaml',
+      `no tree read contained id:"lab.sheet-long-list.R", and idb's read lists no accessibility identifier on any element: ${idbUnlists} ` +
+        'If the element lies beneath the keyboard or a presented layer, close it first; if it is showing, ' +
+        'ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml',
     );
     expect(missNote({ of: 'unread' })).toBeUndefined();
     expect(missNote({ of: 'none' })).toBeUndefined();
   });
 
-  it('idb\'s two notes: the read\'s fact (NO_ID_LISTED) in one phrase with no parenthesis inside, both ending on the one remedy (TREE_SOURCE_REMEDY)', () => {
+  it('idb\'s two notes: the read\'s fact (NO_ID_LISTED) in one phrase with no parenthesis inside but the SwiftUI modifier\'s own, both ending on the one remedy (TREE_SOURCE_REMEDY)', () => {
     const noIdNote = missNote({ of: 'noIdListed', id: 'x' })!;
     expect(noIdNote).toContain(NO_ID_LISTED);
-    expect(noIdNote).not.toMatch(/[()]/);
+    for (const note of [noIdNote, missNote({ of: 'idUnlisted', id: 'x' })!]) expect(note.replace('(children: .contain)', '')).not.toMatch(/[()]/);
     expect(noIdNote.endsWith(TREE_SOURCE_REMEDY)).toBe(true);
-    expect(missNote({ of: 'containerId', id: 'x' })!.endsWith(TREE_SOURCE_REMEDY)).toBe(true);
-    expect(missNote({ of: 'containerId', id: 'x' })).not.toContain(NO_ID_LISTED);
+    expect(missNote({ of: 'idUnlisted', id: 'x' })!.endsWith(TREE_SOURCE_REMEDY)).toBe(true);
+    expect(missNote({ of: 'idUnlisted', id: 'x' })).not.toContain(NO_ID_LISTED);
   });
 
   it('withMissNote: the note after a one-line not-found, in a parenthesis; nothing added for none or no miss', () => {

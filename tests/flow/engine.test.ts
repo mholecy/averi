@@ -3573,11 +3573,11 @@ flows:
     return (error as Error).message;
   };
   const HINT = 'no tree read contained id:';
-  const NOTE = missNote({ of: 'containerId', id: 'amount_input' })!;
+  const NOTE = missNote({ of: 'idUnlisted', id: 'amount_input' })!;
 
   it('a tree idb gave, config omitting treeSource (the measured case): the note beneath the headline, the flow advice after it', async () => {
     const message = await failure(cfgFor('', waitOn('id: amount_input')), fakeOn('ios', true));
-    expect(message.split('\n').slice(0, 2)).toEqual(['Timed out after 60ms waiting for element id:"amount_input"', `  (${NOTE}, or wait on a button/row id idb does show)`]);
+    expect(message.split('\n').slice(0, 2)).toEqual(['Timed out after 60ms waiting for element id:"amount_input"', `  (${NOTE}, or wait on an id idb does list)`]);
   });
 
   it('a tree no idb mark is on: no hint, whatever averi.yaml says — the tree, not the config, says what read it', async () => {
@@ -3625,14 +3625,17 @@ flows:
 
   describe('waitTimeoutHint — the condition, pure', () => {
     const id = { element: { id: 'x' } };
-    const idbList = markIdbDialect(screen());
+    /** A rendered idb read that lists other identifiers (the button idb does show). */
+    const idbList = markIdbDialect(screen(el({ role: 'button', identifier: 'debit_select' })));
     /** A rendered idb read that lists no identifier on any element (the lab's UIKit table, NI1). */
     const idbNoIds = markIdbDialect(screen(el({ role: 'text', label: 'Target R' }), el({ role: 'text', label: 'Row 2' })));
     it('idb\'s note, with the flow advice after the container one, only for a non-absent element condition whose SOLE selector is an id, on a tree idb gave — and its miss to carry', () => {
-      expect(waitTimeoutHint(id, idbList)).toEqual({ hint: `${missNote({ of: 'containerId', id: 'x' })}, or wait on a button/row id idb does show`, miss: { of: 'containerId', id: 'x' } });
+      expect(waitTimeoutHint(id, idbList)).toEqual({ hint: `${missNote({ of: 'idUnlisted', id: 'x' })}, or wait on an id idb does list`, miss: { of: 'idUnlisted', id: 'x' } });
       // A read that lists no identifier at all: its own note, which names text:/label: — no advice to wait on an id idb shows.
       expect(waitTimeoutHint(id, idbNoIds)).toEqual({ hint: missNote({ of: 'noIdListed', id: 'x' }), miss: { of: 'noIdListed', id: 'x' } });
       expect(waitTimeoutHint(id, screen())).toEqual({ hint: undefined, miss: { of: 'none' } });
+      // A bare idb read (a launch's): its ids say nothing of the screen — no note of idb's dialect.
+      expect(waitTimeoutHint(id, markIdbDialect(screen()))).toEqual({ hint: undefined, miss: { of: 'none' } });
       expect(waitTimeoutHint(id, undefined)).toEqual({ hint: undefined, miss: { of: 'unread' } });
       expect(waitTimeoutHint({ element: { id: 'x' }, absent: true }, idbList)).toEqual({});
       expect(waitTimeoutHint({ element: { text: 'x' } }, idbList).hint).toBeUndefined();

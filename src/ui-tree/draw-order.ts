@@ -1555,7 +1555,7 @@ const wordsOf = (n: UiNode): ReadonlySet<string> =>
  * list (`UiNode.flatList`), whose nodes are all siblings of one root. The
  * tree's dialect is read here and in its reading-order module — this and `listsUnclippedFrames` (a third,
  * reading-order.ts#listsInReadingOrder, is that module's alone); outside draw order only ui-tree/miss.ts reads the
- * same mark, for a miss (`containerId`) and for strokes (`topLayerOnlySource`) — what geometry.ts#clipsOf's `inScroller` and
+ * same mark, for a miss (`noIdListed`, `idUnlisted`) and for strokes (`topLayerOnlySource`) — what geometry.ts#clipsOf's `inScroller` and
  * `drawnIn` ask, through ui-tree/standing.ts#sceneOf, and the pixel
  * standing's flat-list root (ui-tree/standing.ts#Standing,
  * `covered.overRoot`).

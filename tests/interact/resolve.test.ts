@@ -1103,7 +1103,7 @@ describe('a tap or fill by an id idb\'s read does not list: the timeout says idb
     const error = await tapElement(await idbFake('sheet-background'), 'id:"lab.sheet-background.nowhere"', OPTS).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ElementNotFoundError);
     const miss = (error as ElementNotFoundError).miss;
-    expect(miss).toEqual({ of: 'containerId', id: 'lab.sheet-background.nowhere' });
+    expect(miss).toEqual({ of: 'idUnlisted', id: 'lab.sheet-background.nowhere' });
     expect((error as Error).message).toBe(`Timed out after 20ms waiting for element id:"lab.sheet-background.nowhere" to appear\n  (${missNote(miss)})`);
   });
 

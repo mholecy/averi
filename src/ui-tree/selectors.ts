@@ -173,7 +173,7 @@ export const hasArea = (node: UiNode): boolean => node.rect.width > 0 && node.re
 
 /**
  * The id a target names ALONE — one exact `id` and nothing else (`id:"x"`, `{ id: x }`) — or undefined. Only then is
- * "no tree read held a match" a statement about the id (miss.ts's `containerId`): the fields AND (`matches`), so
+ * "no tree read held a match" a statement about the id (miss.ts's `noIdListed`, `idUnlisted`): the fields AND (`matches`), so
  * `{ id, text }` misses with the id in every read when the text is what never matched; and a regex id (`id~"…"`)
  * names no one id.
  */

@@ -1539,7 +1539,7 @@ export class FlowEngine {
    * line is that tree's bareness (ui-tree/verdict.ts `bareTimeoutNote`) and
    * what it means — the author's question is why a condition that may well
    * hold was never seen to, and the answer is that the screen had not
-   * rendered. It replaces the caller's own hint (the idb container-id one):
+   * rendered. It replaces the caller's own hint (idb's id one):
    * about a tree that held nothing, a hint on what the tree held would point
    * the wrong way. A later rendered tree that said no clears it — the note
    * is about the last tree only — and pollTimeoutMessage still drops it when
@@ -1634,18 +1634,18 @@ export function stepSummary(step: Step, platform: 'android' | 'ios'): string {
 }
 
 /**
- * The flow-step advice after idb's container-id note (ui-tree/miss.ts, `containerId`: an identifier set on a
- * container is in no idb read at all): wait on an id idb DOES show. Lives here, not with the miss: "wait on a
- * button/row id" is advice for a `wait:` step. Not after `noIdListed`'s note: on a read that lists no id at all there
- * is none to wait on, and that note names `text:`/`label:` instead.
+ * The flow-step advice after the note of an id idb's reads never listed (ui-tree/miss.ts, `idUnlisted`): wait on an
+ * id idb DOES list. Lives here, not with the miss: "wait on an id" is advice for a `wait:` step. Not after
+ * `noIdListed`'s note: on a read that lists no id at all there is none to wait on, and that note names
+ * `text:`/`label:` instead.
  */
-const WAIT_ON_A_SHOWN_ID = 'or wait on a button/row id idb does show';
+const WAIT_ON_A_SHOWN_ID = 'or wait on an id idb does list';
 
 /**
  * What a `wait:` timeout says beneath its headline, and the miss its error carries — only for a step that waited for
  * an element to be PRESENT (`absent` waits are about something that stayed; a state/any/all condition is not one
  * target's story): why the last tree read did not hold the element (ui-tree/miss.ts#missOf, asked with the
- * element: it decides every not-found reply), its note (`missNote`) — and after idb's container-id note, the
+ * element: it decides every not-found reply), its note (`missNote`) — and after idb's `idUnlisted` note, the
  * flow-step advice (`WAIT_ON_A_SHOWN_ID`). The miss reads the tree source from the tree's own mark
  * (`UiNode.flatList`), not from the adapter or averi.yaml: idb's parser marks every tree it gives
  * (adapters/ios-tree-source.ts#markIdbDialect) and no other source does, and a read that failed has no tree to say
@@ -1658,7 +1658,7 @@ export function waitTimeoutHint(cond: Condition, lastTree: UiNode | undefined): 
   if (cond.element === undefined || cond.absent) return {};
   const miss = missOf({ tree: lastTree, target: cond.element });
   const note = missNote(miss);
-  return { hint: miss.of === 'containerId' ? `${note}, ${WAIT_ON_A_SHOWN_ID}` : note, miss };
+  return { hint: miss.of === 'idUnlisted' ? `${note}, ${WAIT_ON_A_SHOWN_ID}` : note, miss };
 }
 
 /**

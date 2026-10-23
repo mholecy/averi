@@ -67,7 +67,7 @@ describe("every assert's not-found carries the last read's miss note", () => {
     });
 
     it(`${kind}: on idb's read that lists other ids (sheet-background.idb.json), the container note`, async () => {
-      expect(await detailOn(idb('sheet-background'), spec)).toBe(`not found within 1 s (${missNote({ of: 'containerId', id: 'ghost' })})`);
+      expect(await detailOn(idb('sheet-background'), spec)).toBe(`not found within 1 s (${missNote({ of: 'idUnlisted', id: 'ghost' })})`);
     });
   }
 });
