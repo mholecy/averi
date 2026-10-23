@@ -59,6 +59,30 @@ describe('pairQuestion — the clear question of a `fully` stop under texts in i
     }
   });
 
+  it('marginText: each rule of the suspicion, one fact of the real pair changed', () => {
+    const t = afterBack();
+    const phone = byId(t, PHONE);
+    const cover = sceneOf(t).order.exposure(phone, BOX).covers.find((c) => c.node.identifier === VS_TITLE)!;
+    const title = cover.node;
+    const at = (rect: UiNode['rect']) => ({ ...cover, node: { ...title, rect } });
+    // phone 55,1280 970x132 (bottom 1412, centre 540,1346); the title 55,1406 258x56.
+    expect(marginText(cover, phone, t)).toBe(true);
+    expect(marginText(at({ x: 55, y: 1250, width: 258, height: 56 }), phone, t), 'over the top edge instead').toBe(true);
+    expect(marginText(at({ x: 55, y: 1406, width: 966, height: 56 }), phone, t), '4 px of phone beside it').toBe(true);
+    const refused: [string, Parameters<typeof marginText>][] = [
+      ['its order untold, not drawn', [{ ...cover, order: { kind: 'untold' } }, phone, t]],
+      ['the surface of a presented screen', [{ ...cover, presented: true }, phone, t]],
+      ['the target no control', [cover, { ...phone, role: 'text' }, t]],
+      ['the cover no text', [{ ...cover, node: { ...title, role: 'image' } }, phone, t]],
+      ['the text with a child', [{ ...cover, node: { ...title, children: [{ ...title, children: [] }] } }, phone, t]],
+      ['across both horizontal edges', [at({ x: 55, y: 1270, width: 258, height: 150 }), phone, t]],
+      ['inside phone, across neither edge', [at({ x: 55, y: 1290, width: 258, height: 40 }), phone, t]],
+      ['past phone\'s left edge', [at({ x: 40, y: 1406, width: 258, height: 56 }), phone, t]],
+      ['3 px of phone beside it', [at({ x: 55, y: 1406, width: 967, height: 56 }), phone, t]],
+    ];
+    for (const [name, args] of refused) expect(marginText(...args), name).toBe(false);
+  });
+
   it('the IME up (k7\'s launch): phone is cut by the submit bar, not covered — nothing asked', () => {
     const t = read('android-lab-form-keyboard.xml');
     const phone = byId(t, PHONE);

@@ -76,7 +76,7 @@ export const lastPresented = (covers: readonly Cover[]): Cover | undefined => co
  * when to ask. All of:
  * 1. the tree's source pads touch targets (`UiNode.paddedTouchTargets` on `tree`, Compose's dialect) — the one reason a
  *    dumped rect holds an undrawn margin;
- * 2. `target` is a control, and the cover a `text` leaf that is no control: glyphs only, no touch;
+ * 2. `target` is a control, and the cover a `text` leaf (a role no control has): glyphs only, no touch;
  * 3. the cover crosses exactly one of the target's horizontal edges, its far end outside the target, and does not hold
  *    the target's centre (selectors.ts#tapPoint) — so what the tap presses never changes;
  * 4. it lies within the target's columns, narrower than it, leaving at least MARGIN_BESIDE_MIN of the target's own rows
@@ -91,7 +91,7 @@ export function marginText(cover: Cover, target: UiNode, tree: UiNode): boolean 
   const c = cover.node.rect;
   const t = target.rect;
   if (tree.paddedTouchTargets !== true || cover.order.kind !== 'drawn' || cover.presented) return false;
-  if (!isInteractive(target) || cover.node.role !== 'text' || cover.node.children.length > 0 || isInteractive(cover.node)) return false;
+  if (!isInteractive(target) || cover.node.role !== 'text' || cover.node.children.length > 0) return false;
   const [cBottom, tBottom] = [c.y + c.height, t.y + t.height];
   const overTop = c.y < t.y && cBottom > t.y && cBottom < tBottom;
   const overBottom = c.y > t.y && c.y < tBottom && cBottom > tBottom;
