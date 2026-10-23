@@ -865,7 +865,7 @@ function shortText(short: Shortfall): string {
       // for a probed side (scripts/truth/replies.ts, flushProbedSide).
       const { where, cuts } = flushEdgeText(short, 'still lies');
       return (
-        `element reached the viewport but ${where}, ${cuts}, and the last probe swipe toward it showed ${short.revealed} px more of it — it is cut there ` +
+        `element reached the viewport but ${where}, ${cuts}, and the last probe swipe toward it showed ${short.revealed} px more of it — part of it lay past that edge, so it may still be cut there ` +
         `(last rect ${JSON.stringify(short.judged.node.rect)}); raise maxSwipes or timeoutMs`
       );
     }

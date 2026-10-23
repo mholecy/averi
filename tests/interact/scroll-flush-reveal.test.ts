@@ -71,7 +71,7 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     expect(failureOf(late, `id:"${S_ID}"`).message).toBe(
       `scroll_until id:"${S_ID}" failed after 15000ms (timeout 15000ms; 1 swipe sent; 2 tree reads took 0ms, the last 0ms) — ` +
         "element reached the viewport but its bottom edge still lies on its scroll container's (0,1046 1080x495), where Android cuts a node's bounds to the container, " +
-        'and the last probe swipe toward it showed 60 px more of it — it is cut there (last rect {"x":128,"y":1459,"width":825,"height":82}); raise maxSwipes or timeoutMs',
+        'and the last probe swipe toward it showed 60 px more of it — part of it lay past that edge, so it may still be cut there (last rect {"x":128,"y":1459,"width":825,"height":82}); raise maxSwipes or timeoutMs',
     );
     const spent = play({ ...RULES, maxSwipes: 1 }, [sAt(0), sAt(60)]);
     expect(spent.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' }, short: { of: 'flushCut', revealed: 60 } });
@@ -80,6 +80,20 @@ describe('a probe that revealed more of a match still flush on the same edge pro
 
   it('a probe after which it lies flush on the same edge with LESS of it showing proved nothing: confirmed and probed again, no reveal', () => {
     const played = play(RULES, [sAt(60), sAt(30), sAt(30), sAt(30)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
+    expect(strokes(played).map((s) => s.do === 'stroke' && s.reach)).toEqual([0.25, 0.25]);
+  });
+
+  it('a match that grew flush on the same edge with its uncut edge where it was (its container grew, the content did not carry it) proved no cut: confirmed, no reveal', () => {
+    // The list grows 40 px at its bottom and S's cut bounds with it; S's top stays at 1519 — nothing scrolled.
+    const grown = (): Row => {
+      const xml = XML.replace('bounds="[0,1046][1080,1541]"', 'bounds="[0,1046][1080,1581]"').replace('bounds="[128,1519][953,1541]"', 'bounds="[128,1519][953,1581]"');
+      const tree = parseDump(xml);
+      const s = [...everyNode(tree)].find((n: UiNode) => n.identifier === S_ID);
+      if (s === undefined) throw new Error('no S in the capture');
+      return { tree, found: [s] };
+    };
+    const played = play(RULES, [sAt(0), grown(), grown(), grown()]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
     expect(strokes(played).map((s) => s.do === 'stroke' && s.reach)).toEqual([0.25, 0.25]);
   });

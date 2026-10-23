@@ -580,15 +580,23 @@ function flushOf(best: Judged, facts: TreeFacts, direction: Direction): { chain:
 
 /**
  * How many px more of the match the probe in flight (`probed`: its rect and flush edge when sent) revealed: the match,
- * now at `now`, lies flush (`flushed`) on that same edge and its extent along the edge's axis grew by more than a pixel
- * — the probe proved the cut (`FlushCut`). 0 otherwise: no longer flush, flush on another edge or filling its
- * container, or no more of it showing (a match that moved but did not grow says nothing of a cut).
+ * now at `now`, lies flush (`flushed`) on that same edge, its extent along the edge's axis grew by more than a pixel,
+ * and its uncut edge moved toward revealing the flush one by that growth, within a pixel — the content carried it out
+ * from past that edge, so the probe proved the cut (`FlushCut`). 0 otherwise: no longer flush, flush on another edge or
+ * filling its container, no more of it showing (a match that moved but did not grow says nothing of a cut), or grown
+ * with its uncut edge where the content did not carry it (a container that grew, another match in its place).
  */
 function revealedBy(probed: { readonly rect: Rect; readonly edge: Edge }, now: Rect, flushed: ReturnType<typeof flushWith>): number {
   if (flushed === undefined || 'fills' in flushed || flushed.edge !== probed.edge) return 0;
-  const extent = (r: Rect): number => (axisOfEdge(probed.edge) === 'vertical' ? r.height : r.width);
-  const grown = extent(now) - extent(probed.rect);
-  return grown > 1 ? grown : 0;
+  const was = probed.rect;
+  const grown = axisOfEdge(probed.edge) === 'vertical' ? now.height - was.height : now.width - was.width;
+  const uncutMoved = {
+    bottom: was.y - now.y,
+    top: now.y + now.height - (was.y + was.height),
+    right: was.x - now.x,
+    left: now.x + now.width - (was.x + was.width),
+  }[probed.edge];
+  return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? grown : 0;
 }
 
 /** px from `rect`'s edge opposite `edge` to `container`'s same side: what the content may move toward revealing `edge` before that edge leaves the container. */
@@ -1052,7 +1060,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       const probeStroked = probeHeld && drawn !== undefined && strokeLength(drawn) >= 2 * TOUCH_SLOP;
       // The probe moved it and it lies flush on the same edge with more of it showing (`revealedBy`): the cut is
       // proved, so no stop is claimed and none confirmed — the next stroke reveals the rest (`flushCheck`), at once.
-      const revealed = fully && probed !== undefined && !probeHeld ? revealedBy(probed, best.node.rect, flushOf(best, now.facts, s.rules.direction).flushed) : 0;
+      const flushAt = fully ? flushOf(best, now.facts, s.rules.direction) : undefined;
+      const revealed = flushAt !== undefined && probed !== undefined && !probeHeld ? revealedBy(probed, best.node.rect, flushAt.flushed) : 0;
       // A stop after a stroke is reported only once a read finds the target
       // where the last one did (SETTLE_CONFIRM_READS): a fling can carry it
       // on, or out of the frame, after the settle read caught it inside. A
@@ -1064,7 +1073,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       if (!settled && revealed === 0 && mayConfirm(s, seen.elapsedMs)) return confirm(s);
       // `fully: true`, an edge flush with the clipping container: possibly cut there — probe once toward it
       // (`flushCheck`), reveal what a probe proved cut, or say it could not be checked.
-      const checked = fully ? flushCheck(s, { best, facts: now.facts, probeHeld, probeStroked, revealed, gesture, cover, offered, seen, ask }) : undefined;
+      const checked = flushAt !== undefined ? flushCheck(s, { best, facts: now.facts, flushAt, probeHeld, probeStroked, revealed, gesture, cover, offered, seen, ask }) : undefined;
       if (checked !== undefined && 'step' in checked) return checked;
       if (checked !== undefined && 'of' in checked) flushCut = checked;
       else {
@@ -1289,6 +1298,8 @@ interface FlushRound {
   /** The judged match, a stop in the frame. */
   readonly best: Judged;
   readonly facts: TreeFacts;
+  /** Where the match lies flush of its clipping ancestors in this read (`flushOf`), as the round read it for `revealed`. */
+  readonly flushAt: ReturnType<typeof flushOf>;
   /** The probe in flight came back with the match where it was sent from (`round`), and was drawn as a stroke, not a tap. */
   readonly probeHeld: boolean;
   readonly probeStroked: boolean;
@@ -1392,8 +1403,8 @@ interface FlushRound {
  * in it, legitimate ones included (a first row at rest, under a sticky
  * header or not). iOS has no clipping container
  * (types.ts#UiNode.clipsDescendants), so it never probes. At the bound —
- * no swipe or time left — the stop is reported with `flush.checked` false
- * and a sentence saying it may be cut.
+ * no swipe or time left — a stop never probed is reported with `flush.checked` false
+ * and a sentence saying it may be cut; a cut a probe proved fails the bound (`FlushCut`).
  *
  * The check itself: where the match lies flush with its clipping ancestors
  * (`flushWith`), and either the stop's `Flush` — `fills`, `checked` by the probe that came back, or unchecked for
@@ -1403,8 +1414,7 @@ interface FlushRound {
  * ancestors from the flush one outward with room above the keyboard — none, and no probe is sent). Undefined: not
  * flush with any.
  */
-function flushCheck(s: Mutable<State>, { best, facts, probeHeld, probeStroked, revealed, gesture, cover, offered, seen, ask }: FlushRound): Flush | FlushCut | Next | undefined {
-  const { chain, flushed } = flushOf(best, facts, s.rules.direction);
+function flushCheck(s: Mutable<State>, { best, facts, flushAt: { chain, flushed }, probeHeld, probeStroked, revealed, gesture, cover, offered, seen, ask }: FlushRound): Flush | FlushCut | Next | undefined {
   if (flushed === undefined) return undefined;
   if ('fills' in flushed) return { edges: flushed.fills, container: chain[0], ...(flushed.pinned !== undefined && { pinned: flushed.pinned }), checked: false, why: 'fills' };
   const { edge, at } = flushed;
