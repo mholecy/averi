@@ -13,6 +13,7 @@ import { node } from '../helpers/fake.js';
 import { stackedLayers } from '../helpers/stacked-layers.js';
 import { colorSampleRect } from '../../src/verify/color-parity.js';
 import { tapPoint } from '../../src/ui-tree/selectors.js';
+import { seenOrderOf, type PairSeen } from '../../src/ui-tree/seen-order.js';
 import { CLASSIC_VIEWS, SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 
 const box = (width: number, height: number) => ({ x: 0, y: 0, width, height });
@@ -1578,5 +1579,50 @@ describe('Scene.standing — a sliver cut by a node drawn after it (Compose\'s b
   it('iOS cannot show it: a tree of unclipped frames (WDA\'s) lists a thin control whole — no cut', () => {
     const { t, field } = shaped({ unclipped: true });
     expect(sceneOf(t).standing(field, PIXEL, TAP).kind).toBe('reachable');
+  });
+});
+
+/**
+ * A text in a control's touch margin (ui-tree/cover.ts#marginText): Compose dumps a control's touch target, grown to
+ * 48 dp past what it draws, and lays the next field's title in that margin. After `back` on the lab's form-keyboard,
+ * phone is `55,1280 970x132` (what it draws: `55,1296 970x99`), and `vs.title` `55,1406 258x56` overlaps its dumped
+ * bottom by 6 px, 11 px below what it draws. The tree alone cannot tell, so the cover stands; only the eyes' `clear`
+ * excuses it, and then for every reader of the draw order alike.
+ * docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md
+ */
+describe('Scene.standing — a text in a control\'s touch margin, seen clear or not', () => {
+  const afterBack = async () => parseDump(await fixture('android-lab-form-keyboard-after-back.xml'));
+  const PHONE = 'lab.form-keyboard.phone';
+  const VS_TITLE = 'lab.form-keyboard.vs.title';
+  const told = (t: UiNode, seen: PairSeen) => sceneOf(t, seenOrderOf(byId(t, PHONE), [{ peer: byId(t, VS_TITLE), ...seen }]));
+
+  it('the tree alone: `fully` and the ocr assert covered by the title, the colour assert reachable (its inset clears the band)', async () => {
+    const t = await afterBack();
+    const phone = byId(t, PHONE);
+    expect(said(sceneOf(t).standing(phone, PIXEL, FULLY))).toMatchObject({ kind: 'covered', cover: VS_TITLE });
+    expect(said(sceneOf(t).standing(phone, PIXEL, OCR(phone)))).toMatchObject({ kind: 'covered', cover: VS_TITLE });
+    expect(sceneOf(t).standing(phone, PIXEL, COLOUR(phone)).kind).toBe('reachable');
+  });
+
+  it('told the eyes saw the overlap clear: reachable for `fully`, the ocr and the colour assert — the facts keep what was seen', async () => {
+    const t = await afterBack();
+    const scene = told(t, { seen: 'clear', overlap: '#FFFFFF', beside: '#FFFFFF' });
+    const phone = byId(t, PHONE);
+    const fully = scene.standing(phone, PIXEL, FULLY);
+    expect(fully.kind).toBe('reachable');
+    expect(fully.facts.covers).toEqual([]);
+    expect(fully.facts.marginSeen).toEqual([{ peer: byId(t, VS_TITLE), seen: 'clear', overlap: '#FFFFFF', beside: '#FFFFFF' }]);
+    expect(scene.standing(phone, PIXEL, OCR(phone)).kind).toBe('reachable');
+    expect(scene.standing(phone, PIXEL, COLOUR(phone)).kind).toBe('reachable');
+  });
+
+  it('told the eyes saw it drawn over, or could not tell: covered as before, the answer kept in the facts', async () => {
+    const t = await afterBack();
+    const phone = byId(t, PHONE);
+    for (const seen of [{ seen: 'under', overlap: '#000000', own: '#FFFFFF', other: '#000000' }, { seen: 'untold', why: 'no plain strip beside it' }] as const) {
+      const fully = told(t, seen).standing(phone, PIXEL, FULLY);
+      expect(said(fully)).toMatchObject({ kind: 'covered', cover: VS_TITLE });
+      expect(fully.facts.marginSeen).toEqual([{ peer: byId(t, VS_TITLE), ...seen }]);
+    }
   });
 });

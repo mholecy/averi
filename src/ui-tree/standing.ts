@@ -9,7 +9,7 @@ import {
 import { coverAtPoint, lastPresented, overlaidCover, type Cover } from './cover.js';
 import { laterEdgesIn, type FlushNeighbour, type LaterEdges, type PinnedEdge } from './later-edges.js';
 import type { MarkedLayer, PresentedPress } from './presentation.js';
-import type { SeenOrder } from './seen-order.js';
+import type { OrderSeen, SeenOrder } from './seen-order.js';
 import {
   aboveNavigationBand,
   across,
@@ -441,6 +441,13 @@ export interface StandingFacts {
   readonly centreCover?: Cover;
   /** draw-order.ts#Exposure's: what the `target` column excused at the centre — no cover, but what a tap there may press. */
   readonly centreExcused: readonly UiNode[];
+  /**
+   * What a screenshot showed of the nodes the eyes were asked about as texts in its touch margin (cover.ts#marginText,
+   * ui-tree/eyes.ts#ClearPair), from the scene's order seen: each one the draw order excused as seen `clear`
+   * (draw-order.ts#Exposure.seenClear), then each cover whose order the tree tells (`drawn`) that the eyes saw drawn
+   * over it or could not tell — what the sentences say the eyes decided. Absent when none.
+   */
+  readonly marginSeen?: readonly OrderSeen[];
   readonly shows: number;
   /** The least piece a tap may be aimed at (draw-order.ts#Exposure.minPiece); absent when the frame leaves nothing to judge. */
   readonly minPiece?: number;
@@ -1239,6 +1246,17 @@ function cutByLater({ node, later }: Judged, minPiece: number): Cut | undefined 
   return undefined;
 }
 
+/** `StandingFacts.marginSeen` of `node`'s exposure `seen`, as a spread: the nodes seen clear, then the told covers the eyes looked at. */
+function marginSeenOf({ orderSeen }: Scene, node: UiNode, seen: Exposure): { marginSeen?: readonly OrderSeen[] } {
+  if (orderSeen === undefined) return {};
+  const told = [...seen.seenClear, ...seen.covers.filter((c) => c.order.kind === 'drawn').map((c) => c.node)];
+  const marginSeen = told.flatMap((peer): OrderSeen[] => {
+    const pair = orderSeen.between(node, peer);
+    return pair === undefined ? [] : [{ peer, ...pair }];
+  });
+  return marginSeen.length === 0 ? {} : { marginSeen };
+}
+
 /** The facts of a node judged in `frame`, from its exposure there. */
 function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: judgeSliver = true } = {}): { facts: StandingFacts; seen: Exposure } {
   const { scene, node, centre } = judged;
@@ -1254,6 +1272,7 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
     covers: seen.covers,
     ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
     centreExcused: seen.centreExcused,
+    ...marginSeenOf(scene, node, seen),
     shows: seen.shows,
     minPiece: seen.minPiece,
     ...(sliver !== undefined && { sliver }),

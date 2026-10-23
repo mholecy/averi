@@ -187,7 +187,7 @@ function peersOf(
   // What a screenshot saw of the PEER against the target: drawn over it (`over`), or under it — no peer then.
   const peerSeen = (p: Placed): 'over' | 'under' | undefined => {
     const pair = seen?.between(p.node, t);
-    return pair === undefined || pair.seen === 'untold' ? undefined : pair.seen;
+    return pair === undefined || pair.seen === 'untold' || pair.seen === 'clear' ? undefined : pair.seen;
   };
   const overIt = (p: Placed): boolean => peerSeen(p) === 'over';
   const kept = peers.filter((p) => peerSeen(p) !== 'under');

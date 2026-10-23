@@ -1,6 +1,6 @@
 import type { DeviceScreen, Rect, Stroke, UiNode } from '../../src/adapters/types.js';
 import type { EyesAnswer, OrderQuestion } from '../../src/ui-tree/eyes.js';
-import { seenOrderOf, type OrderSeen } from '../../src/ui-tree/seen-order.js';
+import type { OrderSeen } from '../../src/ui-tree/seen-order.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { KeyboardRemedy } from '../../src/ui-tree/soft-keyboard.js';
 import { round, startRounds, type RoundRules, type RoundSeen, type RoundStep, type ScrollOutcome } from '../../src/interact/scroll-rounds.js';
@@ -197,7 +197,7 @@ export function play(rules: RoundRules & { screen: DeviceScreen }, rows: readonl
       asks.push(next.step.what);
       if (next.step.what === 'witness') seen.corroborated = row.corroborated ?? true;
       else if (next.step.what === 'eyes') seen.eyes = row.eyes ?? { sees: 'own' };
-      else if (next.step.what === 'order') seen.order = seenOrderOf(next.step.question.node, row.order?.(next.step.question) ?? []);
+      else if (next.step.what === 'order') seen.order = row.order?.(next.step.question) ?? [];
       else seen.unlocated = row.unlocated ?? false;
       next = round(state, seen);
     }

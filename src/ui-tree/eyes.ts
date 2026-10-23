@@ -1,5 +1,6 @@
 import { rectIntersection, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { axisOfEdge, EDGES, isUntold, sameRectWithinPixel, type Edge } from './geometry.js';
+import { marginText, MARGIN_BESIDE_MIN } from './cover.js';
 import { lookTold, type Look, type LookReading } from './look.js';
 import { seenOrderOf, type OrderSeen, type SeenOrder } from './seen-order.js';
 import type { FlushNeighbour } from './later-edges.js';
@@ -9,8 +10,8 @@ import { treeScreen, type UsableScreen } from './usable-screen.js';
 /**
  * THE EYES — two questions a screenshot answers where the tree cannot, one capture each: does a surface the tree does
  * not list lie over a `fully visible` claim's edge, or a clip line cut it (`Eyes.fully`, below), and which of two
- * controls the tree lists in reading order is drawn on top (`Eyes.order`, `orderQuestion`: ADR 0024, after the first
- * question's section). A third is asked only of a frame the colour assert captures anyway — whether its region reads
+ * controls the tree lists in reading order is drawn on top — or whether a text in a control's touch margin paints
+ * anything over it (`Eyes.order`, `orderQuestion`: ADR 0024 and ADR 0026, after the first question's section). A third is asked only of a frame the colour assert captures anyway — whether its region reads
  * as the screen beside it, on a tree that tells no drawn frame — and lives with its judge (verify/eyes.ts#apartOfFrame).
  *
  * THE EYES CONFIRM A FULLY CLAIM: the question a `fully visible` stop asks of the screenshot before it is claimed, and
@@ -205,7 +206,16 @@ export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, poin
  * WHEN — narrow, as the first question's trigger: only for a standing `covered` with remedy `unordered` (a cover the
  * listing does not order — ui-tree/standing.ts#Remedy), once per look, by the verbs that may act on the answer (the tap,
  * `scroll_until`'s stop, the pixel assert, which reuses the frame it captures anyway); a tree-only caller (the dismissal
- * picker, `ui_snapshot`) asks nothing and keeps the untold order. One capture, unsettled for the tap and the stop: a
+ * picker, `ui_snapshot`) asks nothing and keeps the untold order.
+ *
+ * AND A TEXT IN A CONTROL'S TOUCH MARGIN (`ClearPair`, ADR 0026): a standing `covered` with remedy `scroll` whose every
+ * cover is a text the tree suspects lies in the target's touch margin only (cover.ts#marginText: Compose dumps a
+ * control's touch target, past what it draws, and lays the next field's title there) asks, per cover, whether the text
+ * paints anything over the target where they overlap. The answer `clear` (verify/eyes.ts#judgeClear: the overlap
+ * pixel-identical to the target's own rows beside the text) excuses the cover (draw-order.ts's `seenClear` row); `under`
+ * or `untold` keep it — the first time the eyes may excuse a cover the tree's order TELLS, and only on pixel identity.
+ * The tap never asks it: the text holds no part of the target's centre (marginText's rule 3), so no tap standing is
+ * covered by one. One capture, unsettled for the tap and the stop: a
  * frame mid-animation reads a blend, which the judge cannot tell — the safe side.
  *
  * WHAT is asked (`OrderQuestion`): per `unordered` cover of the target (a `peer`), where the two overlap and where each
@@ -218,8 +228,10 @@ export function reachesPoint({ edge, depth }: SurfaceFinding, region: Rect, poin
  *
  * ASKED BY ONE CYCLE (`judgedWithOrder`): judge the look, ask the question its standing asks (if any) once, judge again
  * on the look told the answer — the verbs supply only their purpose (the tap's standings, the pixel assert's region).
- * `scroll_until`'s pure reducer cannot await, so it asks by a step and its driver answers with `orderSeenBy`, the read
- * judged again on `lookTold` (interact/scroll-read.ts#factsOf) — the same conversion and the same told look.
+ * `scroll_until`'s pure reducer cannot await, so it asks by a step and its driver answers with what the eyes saw, the
+ * read judged again on `lookTold` of `seenOrderOf` (interact/scroll-read.ts#factsOf) — the same conversion and the same
+ * told look; the reducer keeps what it saw of texts in the touch margin for the call (interact/scroll-rounds.ts
+ * #State.marginSeen).
  */
 
 /** The eyes as a verb is handed them for the order question (verify/eyes.ts#eyesOn at the composition root; a table in tests). */
@@ -248,6 +260,7 @@ export async function judgedWithOrder<R extends LookReading, S extends Standing 
 
 /** One pair the eyes are asked to order: the target against `peer`, in tree units. */
 export interface OrderPair {
+  readonly asks: 'order';
   /** The `untold` cover of the target (cover.ts#CoverOrder): its order against the target the listing does not give. */
   readonly peer: UiNode;
   /** Where the two overlap, in the frame the standing was judged in. */
@@ -269,19 +282,37 @@ export interface OrderPair {
   readonly beside: readonly Rect[];
 }
 
-/** The order question of one target: its tree (the png's scale is derived against it, verify/capture.ts#measuredFrameFor), the target and its pairs. */
-export interface OrderQuestion {
-  readonly tree: UiNode;
-  readonly node: UiNode;
-  readonly pairs: readonly OrderPair[];
+/**
+ * One text the eyes are asked whether it paints anything over the target where they overlap (cover.ts#marginText), in
+ * tree units: `overlap` the two's intersection in the standing's frame; `beside` the target's own rows of the overlap,
+ * left and right of the text inside the target, each at least MARGIN_BESIDE_MIN wide — what the overlap must match.
+ */
+export interface ClearPair {
+  readonly asks: 'clear';
+  readonly peer: UiNode;
+  readonly overlap: Rect;
+  readonly beside: readonly Rect[];
 }
 
 /**
+ * The order question of one target: its tree (the png's scale is derived against it, verify/capture.ts#measuredFrameFor),
+ * the target and its pairs — every pair of one kind, as one standing asks it (`orderQuestion`): which of two controls
+ * listed in reading order is on top (`OrderPair`), or whether texts in its touch margin paint over it (`ClearPair`).
+ */
+export type OrderQuestion = { readonly tree: UiNode; readonly node: UiNode } & (
+  | { readonly asks: 'order'; readonly pairs: readonly OrderPair[] }
+  | { readonly asks: 'clear'; readonly pairs: readonly ClearPair[] }
+);
+
+/**
  * The question `standing` of `node` asks the eyes — when it is `covered` with remedy `unordered` (a cover the listing
- * does not order, ui-tree/standing.ts#Remedy) and not yet looked at (no `why`) — or undefined: every other standing
- * asks nothing. Its pairs are the standing's `untold` covers, judged in its frame (`facts.screen`).
+ * does not order, ui-tree/standing.ts#Remedy) and not yet looked at (no `why`), the order pairs; when it is `covered`
+ * with remedy `scroll` and every cover is a margin text (`clearQuestion`), the clear pairs — or undefined: every other
+ * standing asks nothing. Its pairs are judged in its frame (`facts.screen`). A clear question is asked once per look by
+ * its callers (ui-tree/eyes.ts#judgedWithOrder; interact/scroll-rounds.ts#round, which also keeps the answers per call).
  */
 export function orderQuestion(tree: UiNode, node: UiNode, standing: Standing | PixelStanding): OrderQuestion | undefined {
+  if (standing.kind === 'covered' && standing.remedy.of === 'scroll') return clearQuestion(tree, node, standing.facts);
   if (standing.kind !== 'covered' || standing.remedy.of !== 'unordered' || standing.remedy.why !== undefined) return undefined;
   const { facts } = standing;
   const frame = facts.screen;
@@ -309,9 +340,37 @@ export function orderQuestion(tree: UiNode, node: UiNode, standing: Standing | P
       { x: frame.x, y: overlap.y, width: left - frame.x, height: overlap.height },
       { x: right, y: overlap.y, width: frame.x + frame.width - right, height: overlap.height },
     ].filter((r) => r.width > 0 && r.height > 0);
-    return [{ peer, overlap, nodeBands: nodeBands.map((b) => b.band), peerBands: peerBands.map((b) => b.band), nodeAround: aroundOf(nodeBands), peerAround: aroundOf(peerBands), beside }];
+    return [{ asks: 'order', peer, overlap, nodeBands: nodeBands.map((b) => b.band), peerBands: peerBands.map((b) => b.band), nodeAround: aroundOf(nodeBands), peerAround: aroundOf(peerBands), beside }];
   });
-  return pairs.length === 0 ? undefined : { tree, node, pairs };
+  return pairs.length === 0 ? undefined : { tree, node, asks: 'order', pairs };
+}
+
+/**
+ * The clear question of a `covered` stand of `node` (`ClearPair`): one pair per cover, when every cover of `facts` is a
+ * margin text (cover.ts#marginText) whose overlap and own rows beside it lie in the frame — else undefined: a cover the
+ * eyes cannot be asked about stands, and with it the standing, so asking of the rest would cost a screenshot for nothing.
+ */
+function clearQuestion(tree: UiNode, node: UiNode, facts: Standing['facts']): OrderQuestion | undefined {
+  const frame = facts.screen;
+  const t = node.rect;
+  const pairs: ClearPair[] = [];
+  for (const cover of facts.covers) {
+    if (!marginText(cover, node, tree)) return undefined;
+    const c = cover.node.rect;
+    const both = rectIntersection(t, c);
+    const overlap = both === undefined ? undefined : rectIntersection(both, frame);
+    if (overlap === undefined) return undefined;
+    const beside = [
+      { x: t.x, y: overlap.y, width: c.x - t.x, height: overlap.height },
+      { x: c.x + c.width, y: overlap.y, width: t.x + t.width - (c.x + c.width), height: overlap.height },
+    ].flatMap((r) => {
+      const on = rectIntersection(r, frame);
+      return on === undefined || on.width < MARGIN_BESIDE_MIN ? [] : [on];
+    });
+    if (beside.length === 0) return undefined;
+    pairs.push({ asks: 'clear', peer: cover.node, overlap, beside });
+  }
+  return pairs.length === 0 ? undefined : { tree, node, asks: 'clear', pairs };
 }
 
 /**

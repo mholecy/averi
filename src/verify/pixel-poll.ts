@@ -309,9 +309,10 @@ class PixelPollMemory {
    * captures the round's frame, and an answer that keeps it covered (no pair seen `over`) would cost that capture again
    * every round for nothing. So such an answer, judged on a frame settled over the whole screen, is kept and handed back
    * while the tree reads the same (ui-tree/read-tree.ts#treeFingerprint: every node's role, text, id and rect) and the
-   * question asks the same pairs — the poll asks once per distinct tree. An answer that unlocks (a pair `over`) is never
-   * kept: that round measures the very frame it was judged on, so keeping it saves nothing, and each round's unlock rests
-   * on its own frame. Nor is an untold one for want of a frame (a failed, unsettled or undecoded capture): the next
+   * question asks the same pairs — the poll asks once per distinct tree. An answer that unlocks (`unlocks`: a pair seen
+   * `over`, or a text in the touch margin seen `clear`, ADR 0026) is never kept: that round measures the very frame it
+   * was judged on, so keeping it saves nothing, and each round's unlock rests on its own frame — the tree reads the same
+   * while the pixels need not (a text that gains ink, a field's own background changing). Nor is an untold one for want of a frame (a failed, unsettled or undecoded capture): the next
    * round looks again.
    */
   keptOrder(tree: UiNode): KeptOrder {
@@ -324,7 +325,7 @@ class PixelPollMemory {
         return q.pairs.map((p, i) => ({ ...kept.seen[i]!, peer: p.peer }));
       },
       keep: (q, seen) => {
-        this.order = seen.some((s) => s.seen === 'over') ? undefined : { key: keyOf(q), seen };
+        this.order = seen.some(unlocks) ? undefined : { key: keyOf(q), seen };
       },
     };
   }
@@ -679,6 +680,9 @@ const FIXED_REMEDY: Record<Extract<Remedy, { of: 'fixed' }>['what'], string> = {
   header: `the capture would show it, not the element — ${CLEAR_CHILD} (its title, say); no scroll moves an element laid from the screen's top edge out from under it`,
   footer: `the capture would show it, not the element — ${CLEAR_CHILD} (its content above the bar, say); no scroll moves an element laid to the screen's bottom edge out from under it`,
 };
+
+/** `seen` unlocks the element (`PixelPollMemory.keptOrder`): its peer seen under it (`over`), or seen to paint nothing over it (`clear`). */
+const unlocks = (seen: OrderSeen): boolean => seen.seen === 'over' || seen.seen === 'clear';
 
 /** The order answer a poll keeps across rounds, as one round asks it (`PixelPollMemory.keptOrder`). */
 interface KeptOrder {

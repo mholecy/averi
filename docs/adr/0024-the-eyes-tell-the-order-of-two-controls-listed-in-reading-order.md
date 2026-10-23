@@ -4,7 +4,8 @@ Status: accepted 2026-10-19 (orchestrator's decision for round 9, L4's remaining
 and stability of results; the agent's hands must not be stuck on a false refusal where a cheap, reliable signal
 exists). Implemented on `fix/r9-l4w`. Amends ADR 0015 (its 2026-10-19 amendment's first residual closed, its second
 narrowed) and extends ADR 0013 (the eyes get a second question). Amended 2026-10-22 (round 16, LE2's rest): a third
-trigger for the order question (below, "WHEN").
+trigger for the order question (below, "WHEN"). Amended 2026-10-23 (round 1023, ADR 0026): a second pair kind, below
+("Amendment 2026-10-23").
 
 ## Context
 
@@ -208,3 +209,17 @@ screenshot": "no scroll tells which is on top: a screenshot could not tell eithe
   live records, `docs/truth/live-records/ios-vis-r9-l4w-*.json`, keep replies, not timings) for 6 targets in 153 trees.
 - Keeping an answer that unlocks across the pixel poll's rounds: that round measures the frame it was judged on, so
   keeping it saves no capture, and it would let an unlock outlive the pixels it rested on.
+
+## Amendment 2026-10-23: a text in a control's touch margin (ADR 0026)
+
+The order question gets a second pair kind and a trigger on a cover whose order the tree TELLS:
+docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md. `OrderQuestion` is one of `{ asks: 'order',
+pairs: OrderPair[] }` (this ADR's) and `{ asks: 'clear', pairs: ClearPair[] }`: a standing `covered` with remedy
+`scroll` whose every cover is a margin text (`ui-tree/cover.ts#marginText`, Android's Compose dialect only) asks whether
+each paints anything over the target; `PairSeen` gains `clear`, which one NOT_DRAWN row (`seenClear`) takes as no cover.
+`judgedWithOrder`, the port (`OrderEyes`) and `orderOfFrame` are unchanged; `scroll_until`'s driver now hands the
+reducer the eyes' answers as they came (`RoundSeen.order: OrderSeen[]`) instead of `orderSeenBy`'s told order, so the
+reducer can keep what it saw of margin texts for the call (`scroll-rounds.ts#State.marginSeen`) — a refused clear
+question is followed by strokes, unlike this ADR's unordered stop. The pixel assert never keeps a `clear` across poll
+rounds, as it never keeps an `over`. Every reading-order behaviour of this ADR is unchanged (a `clear` is no order of
+two controls: `reading-order.ts` reads it as nothing seen).

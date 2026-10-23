@@ -5,7 +5,7 @@ import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
 import { askedOf, eyesQuestion, orderQuestion, reachesPoint, sameQuestion, type EyesAnswer, type EyesAsked, type EyesFinding, type EyesQuestion, type OrderQuestion } from '../ui-tree/eyes.js';
-import type { SeenOrder } from '../ui-tree/seen-order.js';
+import { seenOrderOf, type OrderSeen, type PairSeen } from '../ui-tree/seen-order.js';
 import { hasArea, tapPoint } from '../ui-tree/selectors.js';
 import { missOf, saysTopLayerOnly, topLayerOnlySource, type Miss, type TopLayerOnlySource } from '../ui-tree/miss.js';
 import { outsideItsScrollView, type Remedy } from '../ui-tree/standing.js';
@@ -78,7 +78,8 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  *   renders it — the reply or the failure, one switch over its kind).
  *
  * ORDER inside a round, fixed: the read's judgement, its `ask witness` included (interact/scroll-read.ts#judgeRead),
- * then `ask order` for a best match covered by a control the listing does not order (ADR 0024) and the judgement again
+ * then `ask order` for a best match covered by a control the listing does not order (ADR 0024), or by texts in its
+ * touch margin only (ADR 0026: what was seen of those kept for the call, `State.marginSeen`), and the judgement again
  * on what the eyes saw; the motion ledger shown the round (`seeMotion`, before the stroke plan sees the read); motion
  * observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
  * stop flush with a clipping scroll container, the probe — `ask witness` first for a band the moot rule left unasked —
@@ -145,8 +146,8 @@ export interface RoundSeen {
   unlocated?: boolean;
   /** The answer to `ask eyes`: what the eyes saw of the step's question (ui-tree/eyes.ts). */
   eyes?: EyesAnswer;
-  /** The answer to `ask order`: the order the eyes saw of the step's question (ui-tree/eyes.ts#Eyes.order), as a look is told it (ui-tree/eyes.ts#orderSeenBy) — none seen when no eyes were wired. */
-  order?: SeenOrder;
+  /** The answer to `ask order`: what the eyes saw of the step's question's pairs (ui-tree/eyes.ts#Eyes.order) — none seen when no eyes were wired. */
+  order?: readonly OrderSeen[];
   /** ms since the scroll began (after the device's screen was read), stamped on every call — re-entry included. */
   elapsedMs: number;
   /**
@@ -577,6 +578,15 @@ interface State {
    * the stuck test counts. Undefined until a refusal.
    */
   readonly eyesRefused: { readonly asked: EyesAsked; readonly short: Extract<InFrameShort, { of: 'unlisted' }> } | undefined;
+  /**
+   * What the eyes saw of the texts in the target's touch margin this call (ui-tree/eyes.ts#ClearPair, ADR 0026), one
+   * entry per text asked: a later read tells its judgement what was seen instead of looking again — one screenshot per
+   * text per call. Seen drawn over the target or untold: kept for the call, wherever the two move (the text is content
+   * of the target's own scroll view and moves with it; a later screenshot would only cost the time again). Seen clear:
+   * kept while the target and the text lie where they were seen, each within a pixel — the pixels moved with them, so
+   * moved, they are asked again.
+   */
+  readonly marginSeen: readonly MarginSeen[];
   /** The last step was a `stroke`: the next seen must hand back `drawn`. */
   readonly owesDrawn: boolean;
   /**
@@ -672,6 +682,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     inFrameAfter: undefined,
     probe: undefined,
     eyesRefused: undefined,
+    marginSeen: [],
     inTreeAfter: undefined,
     detents: undefined,
     screenBefore: undefined,
@@ -681,6 +692,46 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+
+/** What the eyes saw of one text in a target's touch margin (`State.marginSeen`): the text by what a later read can find it by, where the two lay, and the answer. */
+interface MarginSeen {
+  readonly peer: Pick<UiNode, 'identifier' | 'label' | 'rect'>;
+  readonly target: Rect;
+  readonly seen: PairSeen;
+}
+
+/** The kept answer about `peer` of a clear question of `target` (`State.marginSeen`): the same text — its identifier and label, its size within a pixel — and, for `clear`, both where they were seen. */
+function marginKept(kept: readonly MarginSeen[], target: UiNode, peer: UiNode): PairSeen | undefined {
+  const sameSize = (a: Rect, b: Rect): boolean => Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
+  const found = kept.find((k) => k.peer.identifier === peer.identifier && k.peer.label === peer.label && sameSize(k.peer.rect, peer.rect));
+  if (found === undefined) return undefined;
+  if (found.seen.seen !== 'clear') return found.seen;
+  return sameRectWithinPixel(found.peer.rect, peer.rect) && sameRectWithinPixel(found.target, target.rect) ? found.seen : undefined;
+}
+
+/**
+ * What the round knows of `question` on this read (`round`'s THE ORDER SEEN), from what the eyes `answered` it on this
+ * read (`RoundSeen.order`) and, for a clear question, what was seen this call (`State.marginSeen`, `marginKept`): the
+ * pairs to ask the eyes (`ask`: an order question whole; of a clear one the texts not yet seen — none asked when one
+ * seen drawn over the target or untold keeps the cover anyway), else what to tell the read (`told`) and the call's
+ * kept answers with this read's added.
+ */
+function orderKnown(
+  marginSeen: readonly MarginSeen[],
+  question: OrderQuestion,
+  answered: readonly OrderSeen[] | undefined,
+): { readonly ask: OrderQuestion } | { readonly told: readonly OrderSeen[]; readonly marginSeen: readonly MarginSeen[] } {
+  if (question.asks === 'order') return answered === undefined ? { ask: question } : { told: answered, marginSeen };
+  const { node } = question;
+  const kept = question.pairs.flatMap(({ peer }): OrderSeen[] => {
+    const seen = marginKept(marginSeen, node, peer);
+    return seen === undefined ? [] : [{ peer, ...seen }];
+  });
+  const unasked = question.pairs.filter(({ peer }) => !kept.some((k) => k.peer === peer));
+  if (answered === undefined && unasked.length > 0 && !kept.some((k) => k.seen !== 'clear')) return { ask: { ...question, pairs: unasked } };
+  const now = answered ?? [];
+  return { told: [...kept, ...now], marginSeen: [...marginSeen, ...now.map(({ peer, ...seen }): MarginSeen => ({ peer: quoted(peer), target: { ...node.rect }, seen }))] };
+}
 
 /** What one read that read says about motion (`observe`): the motion ledger's answer (interact/motion-ledger.ts#Moved), and what the round makes of it. */
 interface Observed {
@@ -842,14 +893,22 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // judged and the frames — or the witness to ask first, which changes
   // nothing (the state comes back as it went in). A round whose tree did
   // not read judges nothing.
-  const judged = read === undefined ? undefined : judgeRead(seen.order === undefined ? read : { ...read, seen: seen.order }, s.frame, fully, seen.corroborated);
+  let judged = read === undefined ? undefined : judgeRead(read, s.frame, fully, seen.corroborated);
   if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
+  // THE ORDER SEEN (ui-tree/eyes.ts): the best match covered by a control the listing does not order (ADR 0024) — the
+  // eyes are asked once which is drawn on top; such a stop never strokes (`overlapped`, below), so one screenshot ends
+  // the scroll's question — or covered by texts in its touch margin only (ADR 0026), each asked once a call: what was
+  // seen of one is kept (`State.marginSeen`) and told to every later read; one seen drawn over it or untold keeps the
+  // cover, so the rest are not asked. The read is judged again, told what was seen (`RoundSeen.order`).
+  const ordering = judged?.best === undefined || read === undefined ? undefined : orderQuestion(read.tree, judged.best.node, judged.best.standing);
+  if (ordering !== undefined && read !== undefined) {
+    const known = orderKnown(s.marginSeen, ordering, seen.order);
+    if ('ask' in known) return { state, step: { do: 'ask', what: 'order', question: known.ask } };
+    s.marginSeen = known.marginSeen;
+    if (known.told.length > 0) judged = judgeRead({ ...read, seen: seenOrderOf(ordering.node, known.told) }, s.frame, fully, seen.corroborated);
+    if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
+  }
   const best = judged?.best;
-  // THE ORDER SEEN (ui-tree/eyes.ts, ADR 0024): the best match covered by a control the listing does not order — the
-  // eyes are asked once which is drawn on top, and the read judged again on what they saw (`RoundSeen.order`). Such a
-  // stop never strokes (`overlapped`, below), so one screenshot ends the scroll's question.
-  const ordering = seen.order !== undefined || best === undefined || read === undefined ? undefined : orderQuestion(read.tree, best.node, best.standing);
-  if (ordering !== undefined) return { state, step: { do: 'ask', what: 'order', question: ordering } };
   const cover = judged?.cover;
   const offered = judged?.offered;
   if (cover !== undefined) {

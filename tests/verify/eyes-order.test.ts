@@ -27,6 +27,9 @@ const strip = (x: number, y: number, width: number, height: number, against: Edg
 const byId = (tree: UiNode, id: string): UiNode => [...everyNode(tree)].find((n) => n.identifier === id)!;
 const USABLE = { box: { x: 0, y: 0, width: 402, height: 874 }, boxes: [{ x: 0, y: 0, width: 402, height: 874 }], oriented: { x: 0, y: 0, width: 402, height: 874 }, from: 'device' as const };
 
+/** The pairs of an order question (ui-tree/eyes.ts#OrderPair) — none of a clear question's. */
+const orderPairs = (q: OrderQuestion | undefined): readonly OrderPair[] => (q?.asks === 'order' ? q.pairs : []);
+
 const questionOf = (tree: UiNode, id: string): OrderQuestion | undefined => {
   const target = byId(tree, id);
   return orderQuestion(tree, target, sceneOf(tree).standing(target, USABLE, { of: 'tap' }));
@@ -41,6 +44,7 @@ describe('the order question — asked of a standing covered by a cover the list
     const q = questionOf(t, 'lab.blur-menu.W');
     expect(q?.pairs.map(({ peer, ...rects }) => ({ peer: peer.identifier, ...rects }))).toEqual([
       {
+        asks: 'order',
         peer: 'lab.blur-menu.C',
         overlap: { x: 51, y: 470, width: 300, height: 42 },
         nodeBands: [{ x: 51, y: 448, width: 300, height: 22 }],
@@ -60,7 +64,7 @@ describe('the order question — asked of a standing covered by a cover the list
     const row = node({ role: 'button', label: 'Row', rect: { x: 51, y: 470, width: 300, height: 64 } });
     const t = node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, readingOrder: true, children: [card, row] })] });
     const q = orderQuestion(t, row, sceneOf(t).standing(row, USABLE, { of: 'tap' }));
-    expect(q?.pairs.map(({ nodeBands, peerBands, nodeAround, peerAround }) => ({ nodeBands, peerBands, nodeAround, peerAround }))).toEqual([
+    expect(orderPairs(q).map(({ nodeBands, peerBands, nodeAround, peerAround }) => ({ nodeBands, peerBands, nodeAround, peerAround }))).toEqual([
       {
         nodeBands: [{ x: 51, y: 512, width: 300, height: 22 }],
         peerBands: [{ x: 51, y: 428, width: 300, height: 42 }],
@@ -87,7 +91,7 @@ describe('the order question — asked of a standing covered by a cover the list
     const t = node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 }, readingOrder: true, children: [left, right] })] });
     // Judged for the colour assert, over its whole rect: a tap would move to Left's clear 70-pt part.
     const q = orderQuestion(t, left, sceneOf(t).standing(left, USABLE, { of: 'pixel', reads: (r) => r, glyphs: false }));
-    expect(q?.pairs.map(({ overlap, nodeBands, peerBands, nodeAround, peerAround }) => ({ overlap, nodeBands, peerBands, nodeAround, peerAround }))).toEqual([
+    expect(orderPairs(q).map(({ overlap, nodeBands, peerBands, nodeAround, peerAround }) => ({ overlap, nodeBands, peerBands, nodeAround, peerAround }))).toEqual([
       {
         overlap: { x: 121, y: 470, width: 130, height: 64 },
         nodeBands: [{ x: 51, y: 470, width: 70, height: 64 }],
@@ -182,6 +186,7 @@ const C = { x: 51, y: 470, width: 300, height: 64 };
 const peer = node({ role: 'button', label: 'C', rect: C });
 const target = node({ role: 'button', label: 'W', rect: W });
 const PAIR: OrderPair = {
+  asks: 'order',
   peer,
   overlap: { x: 51, y: 470, width: 300, height: 42 },
   nodeBands: [{ x: 51, y: 448, width: 300, height: 22 }],
@@ -193,7 +198,7 @@ const PAIR: OrderPair = {
     { x: 351, y: 470, width: 51, height: 42 },
   ],
 };
-const ask = (pair: Partial<OrderPair> = {}): OrderQuestion => ({ tree: node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 } }), node: target, pairs: [{ ...PAIR, ...pair }] });
+const ask = (pair: Partial<OrderPair> = {}): OrderQuestion => ({ tree: node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 } }), node: target, asks: 'order', pairs: [{ ...PAIR, ...pair }] });
 const seenOf = (img: PNG, q: OrderQuestion = ask()) => {
   const [answer] = judgeOrder(img, 1, q);
   return answer!.seen === 'untold' ? { untold: answer!.why } : { seen: answer!.seen };
@@ -428,7 +433,7 @@ describe('the order question over a control listed after the row, past the break
   it('asked of O: Continue is the peer, the overlap 51,620 300x36, O\'s band below it 656–684', async () => {
     const t = await tree();
     const q = stopQuestion(t)!;
-    expect(q.pairs.map(({ peer, overlap, nodeBands }) => ({ peer: peer.identifier, overlap, nodeBands }))).toEqual([
+    expect(orderPairs(q).map(({ peer, overlap, nodeBands }) => ({ peer: peer.identifier, overlap, nodeBands }))).toEqual([
       { peer: 'lab.scroll-bounded.continue', overlap: { x: 51, y: 620, width: 300, height: 36 }, nodeBands: [{ x: 51, y: 656, width: 300, height: 28 }] },
     ]);
   });
@@ -462,7 +467,7 @@ describe('the judge over the lab captures — where the eyes cannot tell, on rea
 
   it.each(['tap', 'stop'] as const)('chooser-over-list.png: asked of S (%s), R is the peer — overlap, S\'s band and R\'s bands all the card\'s white: untold', async (of) => {
     const { t, q } = await stopOf('chooser-over-list', 'lab.chooser-over-list.S', of);
-    expect(q.pairs.map(({ peer, overlap, nodeBands, peerBands }) => ({ peer: peer.identifier, overlap, nodeBands, peerBands }))).toEqual([
+    expect(orderPairs(q).map(({ peer, overlap, nodeBands, peerBands }) => ({ peer: peer.identifier, overlap, nodeBands, peerBands }))).toEqual([
       {
         peer: 'lab.chooser-over-list.R',
         overlap: { x: 45, y: 453, width: 312, height: 34 },

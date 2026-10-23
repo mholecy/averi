@@ -379,6 +379,12 @@ export interface Exposure {
    */
   readonly centreExcused: readonly UiNode[];
   /**
+   * The nodes listed after it that meet what shows of it and that the `target` column excused as SEEN CLEAR (the
+   * `seenClear` row: a screenshot showed them paint nothing over it where they overlap), in pre-order; empty when none
+   * — so a sentence can say what the eyes excused (interact/scroll-text.ts's fully visible claim).
+   */
+  readonly seenClear: readonly UiNode[];
+  /**
    * Where a tap on it goes: its centre (`tapPoint`) when that lies inside
    * `within` under no cover (no `centreCover`) — `moved: false`; else the
    * centre (`rectCentre`) of the largest uncovered piece whose sides are
@@ -419,6 +425,8 @@ interface SeenFor extends Seen {
   readonly labelOverhang: number;
   /** What the target's listing, given in reading order, says of its order against its siblings (reading-order.ts#readingOrderOf): the break never excuses its `coversAfter`. */
   readonly readingOrder: ReadingOrder;
+  /** The order a screenshot saw (`drawOrder`'s `orderSeen`), when the caller looked: the `seenClear` row's evidence. */
+  readonly orderSeen: SeenOrder | undefined;
 }
 
 /**
@@ -1282,6 +1290,24 @@ const NOT_DRAWN = {
   hidden: {
     target: (placed, about) => placed.node.hidden === true && about.over.surface(placed) !== 'inferred',
   },
+
+  /**
+   * SEEN CLEAR: a node a screenshot showed paints nothing over the target where the two overlap (the order seen's
+   * `clear`, ui-tree/seen-order.ts#PairSeen, `drawOrder`'s `orderSeen`) — every pixel of the overlap the colour of the
+   * target's own rows beside it. Asked only of a text the tree suspects lies in the target's touch margin
+   * (cover.ts#marginText: Compose dumps a control's touch target, grown to 48 dp past what it draws, and lays the next
+   * field's title there), so a tree-only caller, which hands in no order seen, keeps every such cover. `target` only, and
+   * one row, so `exposure`, `paintsOver` and the readers of both — the `fully` stop, the plain stop and the pixel
+   * assert — agree. Beside the reading-order peers seen under the target (`exposure`'s `seenUnder` filter), not instead
+   * of it: that one says which of two is on top, this one that the later of the two draws nothing over the other.
+   * Measured on the lab's form-keyboard after `back`: phone `55,1280 970x132` (it draws `55,1296 970x99`), `vs.title`
+   * `55,1406 258x56` over its dumped bottom 6 px, all #FFFFFF as the 712 px of phone's rows beside it.
+   * docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md
+   * docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md
+   */
+  seenClear: {
+    target: (placed, about) => about.orderSeen?.between(about.target.node, placed.node)?.seen === 'clear',
+  },
 } as const satisfies Record<string, Row>;
 
 const ROWS: readonly Row[] = Object.values(NOT_DRAWN);
@@ -1646,6 +1672,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       bottomChrome,
       paddedTouchTargets,
       labelOverhang: overhang,
+      orderSeen,
       get readingOrder() {
         return (readingOrder ??= readingOrderOf(order, { target, flatList, contentFrom, bottomChrome }, pinnedTargets, orderSeen));
       },
@@ -1795,6 +1822,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       const onCentre = shown !== undefined && containsPoint(shown, centre);
       const centreCover = onCentre ? coverAtPoint(covers, centre) : undefined;
       const centreExcused = onCentre ? met.filter((c) => !c.draws && containsPoint(c.reach, centre)).map((c) => c.node) : [];
+      const seenClear = about === undefined ? [] : met.filter((c) => !c.draws && NOT_DRAWN.seenClear.target(c.placed, about)).map((c) => c.node);
       const tappable = largestRect(aimable.filter((r) => r.width >= minPiece && r.height >= minPiece));
       const tapAt: Exposure['tapAt'] =
         onCentre && centreCover === undefined
@@ -1809,6 +1837,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
         aimedClearOf: aimedClearOf.map((p) => p.node),
         ...(centreCover !== undefined && { centreCover }),
         centreExcused,
+        seenClear,
         ...(tapAt !== undefined && { tapAt }),
         minPiece,
       };

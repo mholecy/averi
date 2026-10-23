@@ -222,3 +222,50 @@ describe('scroll_until — the eyes against what the tree already rules (the rev
     expect(reply).toMatch(/^fully visible by the tree after 0 swipes; .* \(the screen beside it shows that surface's colour #F2F2F7 too: the band may be its own margin over that background\)$/);
   });
 });
+
+/**
+ * A TEXT IN A CONTROL'S TOUCH MARGIN (ui-tree/cover.ts#marginText, ADR 0026), through scroll_until: after `back`, phone's
+ * dumped touch target `55,1280 970x132` reaches 6 px under the next field's title `vs.title` `55,1406 258x56`, though
+ * what phone draws ends 11 px above it. The tree only suspects; one screenshot decides, once per call.
+ * docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md
+ */
+describe('scroll_until — fully: true on a field under a text in its touch margin', () => {
+  const afterBack = async (png: Buffer): Promise<FakeAdapter> => {
+    const fake = await fakeOf('android-lab-form-keyboard-after-back.xml', { ime: false });
+    fake.nextScreenshot = png;
+    return fake;
+  };
+
+  it('the overlap white as phone\'s rows beside the title: fully visible, no stroke, one screenshot, the reply says what the eyes excused', async () => {
+    const fake = await afterBack(pngOf([]));
+    const reply = describeScrollResult(await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: eyesOn(fake) }));
+    expect(reply).toBe(
+      'fully visible after 0 swipes — text "Variable symbol" (55,1406 258x56), drawn after it, overlaps its bottom 6 px with nothing a screenshot shows (Android dumps a control\'s touch target, past what it draws)',
+    );
+    expect(fake.screenshots).toHaveLength(1);
+    expect(fake.swipes).toEqual([]);
+  });
+
+  it('ink in the band: the cover stands — the failure says what the screenshot showed, and no read after a stroke looks again', async () => {
+    const fake = await afterBack(pngOf([[60, 1406, 300, 1412, [30, 30, 30]]]));
+    const failure = (await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: eyesOn(fake) }).catch((e: unknown) => e)) as Error;
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.message).toContain('under text "Variable symbol" (55,1406 258x56), drawn over it — 99% of it shows — a screenshot shows it drawn over its bottom 6 px');
+    expect(fake.swipes.length).toBeGreaterThan(0);
+    expect(fake.screenshots).toHaveLength(1);
+  });
+
+  it('the eyes cannot tell (no screenshot): the cover stands, said why', async () => {
+    const fake = await afterBack(pngOf([]));
+    const blind: Eyes = { fully: async () => ({ sees: 'own' }), order: async (q) => q.pairs.map(({ peer }) => ({ peer, seen: 'untold', why: 'the screenshot failed: offline' })) };
+    const failure = (await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: blind }).catch((e: unknown) => e)) as Error;
+    expect(failure.message).toContain('drawn over it — 99% of it shows — a screenshot could not tell whether it draws over it (the screenshot failed: offline)');
+  });
+
+  it('no eyes handed in: today\'s failure, word for word, and no screenshot', async () => {
+    const fake = await afterBack(pngOf([]));
+    const failure = (await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true }).catch((e: unknown) => e)) as Error;
+    expect(failure.message).toContain('element is in the viewport but under text "Variable symbol" (55,1406 258x56), drawn over it — 99% of it shows — and the content is exhausted');
+    expect(fake.screenshots).toHaveLength(0);
+  });
+});

@@ -2,7 +2,7 @@ import { PNG } from 'pngjs';
 import type { DeviceAdapter, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
 import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
 import type { FlushNeighbour } from '../ui-tree/later-edges.js';
-import { CLIP_LINE, unseen, type AroundStrip, type Eyes, type EyesAnswer, type EyesQuestion, type OrderPair, type OrderQuestion } from '../ui-tree/eyes.js';
+import { CLIP_LINE, unseen, type AroundStrip, type ClearPair, type Eyes, type EyesAnswer, type EyesQuestion, type OrderPair, type OrderQuestion } from '../ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
 import { errorMessage } from '../util/error-message.js';
 import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type MeasuredFrame, type RgbaImage } from './capture.js';
@@ -12,7 +12,7 @@ import { DEFAULT_TOLERANCE_DE, sampleDominant } from './color-parity.js';
 /**
  * THE EYES' production adapter (ui-tree/eyes.ts has the concept and the triggers): for either question one screenshot,
  * decoded and scaled against the question's tree as every pixel reader's (verify/capture.ts#measuredFrameFor), judged
- * by `judgeEyes` or `judgeOrder`. Never throws: a screenshot that fails, a png that does not decode, a scale the tree
+ * by `judgeEyes` or `judgeOrder` (which judges a clear question by `judgeClear`). Never throws: a screenshot that fails, a png that does not decode, a scale the tree
  * refuses is `unjudged` (every pair `untold`), said why.
  */
 export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>): Eyes => {
@@ -392,7 +392,61 @@ const AROUND_SHARE = 0.25;
  * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
 export function judgeOrder(png: RgbaImage, scale: number, q: OrderQuestion): readonly OrderSeen[] {
+  if (q.asks === 'clear') return q.pairs.map((pair) => ({ peer: pair.peer, ...judgeClear(png, scale, pair) }));
   return q.pairs.map((pair) => ({ peer: pair.peer, ...judgePair(png, scale, pair) }));
+}
+
+/**
+ * THE OVERLAP SEEN CLEAR, pure over a decoded png at `scale` px per tree unit (ui-tree/eyes.ts#ClearPair): does a text
+ * in the control's touch margin (ui-tree/cover.ts#marginText) paint anything over it where the two overlap?
+ * 1. THE CONTROL'S OWN ROWS beside the text (`beside`), landed in the png, each at least FLANK_MIN_PX wide, all one
+ *    colour with their dominant (`oneColour`) — else `untold`: no plain colour of the control's to compare with.
+ * 2. THE OVERLAP, landed whole (no pixel in from its edges: a text's ink may lie on its very first row): every pixel of
+ *    it within EYES_SAME_DE of that colour, at most OWN_PIXELS_MAX points' worth of strays (`nearCount`, the strict
+ *    count `apartOfFrame` reads — not LINE_SHARE, which would pass a 1-px line of ink across a 6-px band) — `clear`:
+ *    the text paints nothing a screenshot, an OCR crop or a colour sample of the control reads. Else `under`: it draws
+ *    ink or a background of its own over the control (`other`: the commonest colour of what differs).
+ * Asymmetric on purpose, as `judgePair`: `clear` excuses a cover, so it is said only on pixel identity, every missing
+ * piece of evidence `untold` (the cover stands). Residuals (ADR 0026): one frame caught mid-animation (ADR 0013's); a
+ * text box over drawn content of the same plain colour with no ink in the band (nothing visible is hidden); ink fainter
+ * than ΔE 1. Measured on the lab's form-keyboard and form-errors: every overlap (6 and 11 px) #FFFFFF to the pixel, as
+ * the field's rows beside the text.
+ * docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md
+ */
+function judgeClear(png: RgbaImage, scale: number, pair: ClearPair): PairSeen {
+  const untold = (why: string): PairSeen => ({ seen: 'untold', why });
+  const beside = pair.beside.flatMap((r) => {
+    const at = pngRegion(r, scale, png);
+    return at === undefined || at.x1 - at.x0 < FLANK_MIN_PX || at.y1 <= at.y0 ? [] : [at];
+  });
+  if (beside.length === 0) return untold('no part of it shows beside the text');
+  const own = sampleDominant(png, beside)?.rgb;
+  if (own === undefined || !beside.every((b) => oneColour(png, b, own))) return untold('it is not one colour beside the text');
+  const overlap = pngRegion(pair.overlap, scale, png);
+  if (overlap === undefined || overlap.x1 <= overlap.x0 || overlap.y1 <= overlap.y0) return untold('the overlap lies off the screenshot');
+  const { near, total } = nearCount(png, overlap, own, EYES_SAME_DE);
+  const shows = rgbToHex(sampleDominant(png, [overlap])?.rgb ?? own);
+  if (total - near <= OWN_PIXELS_MAX * scale * scale) return { seen: 'clear', overlap: shows, beside: rgbToHex(own) };
+  return { seen: 'under', overlap: shows, own: rgbToHex(own), other: rgbToHex(commonestApart(png, overlap, own)) };
+}
+
+/** The commonest exact colour among `bounds`' pixels further than EYES_SAME_DE from `ref` (`judgeClear`'s ink); `ref` when none is. */
+function commonestApart(png: RgbaImage, bounds: EdgeBounds, ref: Rgb): Rgb {
+  const { data, width } = png;
+  const counts = new Map<number, number>();
+  for (let y = bounds.y0; y < bounds.y1; y++) {
+    for (let x = bounds.x0; x < bounds.x1; x++) {
+      const o = (y * width + x) * 4;
+      const key = (data[o]! << 16) | (data[o + 1]! << 8) | data[o + 2]!;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  let best: [number, number] | undefined;
+  for (const [key, n] of counts) {
+    const rgb: Rgb = [key >> 16, (key >> 8) & 0xff, key & 0xff];
+    if (distance(rgb, ref) > EYES_SAME_DE && (best === undefined || n > best[1])) best = [key, n];
+  }
+  return best === undefined ? ref : [best[0] >> 16, (best[0] >> 8) & 0xff, best[0] & 0xff];
 }
 
 function judgePair(png: RgbaImage, scale: number, pair: OrderPair): PairSeen {
