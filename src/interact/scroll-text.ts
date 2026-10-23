@@ -370,13 +370,7 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
       'usual for a card as tall as its carousel — check with a screenshot'
     );
   }
-  // A pinned node's edge (scroll-rounds.ts#Flush's `pinned`): where the container's content ends as it shows, and the
-  // cut it may make is Compose's at a node drawn after the match, not the container's.
-  const where =
-    flush.pinned === undefined
-      ? `its ${flush.edge} edge lies on its scroll container's (${box})`
-      : `its ${flush.edge} edge lies on the edge of ${nodeText(flush.pinned)}, pinned at its scroll container's (${box}) ${flush.edge} and drawn after it`;
-  const cuts = flush.pinned === undefined ? "where Android cuts a node's bounds to the container" : "where Android cuts a node's bounds at a node drawn over it";
+  const { where, cuts } = flushEdgeText(flush, 'lies');
   if (flush.checked) return `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`;
   const unchecked = {
     budget: 'no swipe or time was left to check it',
@@ -385,6 +379,24 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
     tap: 'the probe swipe was too short to tell from a tap',
   }[flush.why];
   return `; but ${where}, ${cuts}, and ${unchecked} — ${cut}`;
+}
+
+/**
+ * Where a flush edge lies (scroll-rounds.ts#Flush, #FlushCut) and what Android cuts there, in one dialect for the
+ * stop's clause and the bound's (the truth reader, scripts/truth/replies.ts, reads its probed side): `its bottom edge
+ * lies on its scroll container's (0,1046 1080x495)`, `where Android cuts a node's bounds to the container`. A pinned
+ * node's edge (`pinned`): where the container's content ends as it shows, and the cut it may make is Compose's at a
+ * node drawn after the match, not the container's. `lies`: `still lies` for a cut a probe proved (scroll-rounds.ts#FlushCut).
+ */
+function flushEdgeText({ edge, container, pinned }: { edge: Edge; container: Rect; pinned?: QuotedNode }, lies: 'lies' | 'still lies'): { where: string; cuts: string } {
+  const box = rectText(container);
+  return {
+    where:
+      pinned === undefined
+        ? `its ${edge} edge ${lies} on its scroll container's (${box})`
+        : `its ${edge} edge ${lies} on the edge of ${nodeText(pinned)}, pinned at its scroll container's (${box}) ${edge} and drawn after it`,
+    cuts: pinned === undefined ? "where Android cuts a node's bounds to the container" : "where Android cuts a node's bounds at a node drawn over it",
+  };
 }
 
 /** The `settled: false` note — what the reader should know before measuring the element. */
@@ -848,6 +860,15 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${unlistedText(short.finding)} (last rect ${JSON.stringify(short.judged.node.rect)})`;
     case 'carriedUnder':
       return `element reached the screen but ${carriedUnderText(short.under)} (last rect ${JSON.stringify(short.judged.node.rect)}); ${UNTOLD_SCROLL_VIEW_REMEDY}`;
+    case 'flushCut': {
+      // Never "a probe swipe toward it moved nothing": that is the checked stop's clause, which the truth reader takes
+      // for a probed side (scripts/truth/replies.ts, flushProbedSide).
+      const { where, cuts } = flushEdgeText(short, 'still lies');
+      return (
+        `element reached the viewport but ${where}, ${cuts}, and the last probe swipe toward it showed ${short.revealed} px more of it — it is cut there ` +
+        `(last rect ${JSON.stringify(short.judged.node.rect)}); raise maxSwipes or timeoutMs`
+      );
+    }
     case 'systemBar': {
       const { judged } = short;
       const region = short.band === undefined ? '' : ` — fully: true stops only with none of it under the bar (${centreClear(short)})`;

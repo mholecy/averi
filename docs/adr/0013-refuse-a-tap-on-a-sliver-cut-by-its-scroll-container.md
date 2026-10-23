@@ -325,10 +325,12 @@ outranks a harness regex, so the golden harness reply parser (`flushProbedSide`,
 forms.
 The tap, the plain stop and the sliver rules are unchanged (`cutByLater` reads any class but `none`, as before).
 
-**Costs, stated:** one probe (a stroke of at most PROBE_MAX_TRAVEL_FRACTION, a settle and a read — ~2.5–3 s on the
-lab AVD) on every `fully: true` stop flush under a sticky header pinned in its list: a first row at rest pays one
-probe that moves nothing; VA1's cut row pays two (the first moves the list 66 → 0 and R grows, flush again; the second
-moves nothing). The tap, the plain stop and the pixel assert pay nothing. As between a scroll view's own two edges, a
+**Costs, stated:** one probe (a stroke of at most PROBE_MAX_TRAVEL_FRACTION, a settle and a read — ~2.5 s on the
+lab AVD for a probe that moves nothing; one that moves the match pays its confirming read too, ~5.1 s a round, unless
+it proved the cut: refined 2026-10-23, below) on every `fully: true` stop flush under a sticky header pinned in its
+list: a first row at rest pays one probe that moves nothing; VA1's cut row pays two (the first moves the list 66 → 0
+and R grows, flush again — the cut proved, so no confirming read since 2026-10-23 — the second, a reveal, moves
+nothing). The tap, the plain stop and the pixel assert pay nothing. As between a scroll view's own two edges, a
 row whose probe toward the header leaves it flush at the far edge (or the reverse) is probed again from there; every
 probe spends one of `maxSwipes`, so at worst the stop says `budget`, unchecked, never a false "nothing of it is cut".
 
@@ -363,6 +365,51 @@ from inside the list, the list 66 → 0 then 0 → 0, "fully visible after 2 swi
 nothing, "fully visible after 1 swipe", Tapped.
 
 Bug note: docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md
+
+## Refined 2026-10-23 (round 1023, LV2): a probe that revealed more of a still-flush match proved its cut
+
+The flush probe (`interact/scroll-rounds.ts#flushCheck`, its size `interact/course.ts#probeOf`) is a quarter of the
+stroke over the flush container — on the lab's `scroll-bounded-flush` `lower` list (495 px) 74 px of finger travel,
+under the 177-px cap — and each probe that moves the match pays a settle, a read and a confirming read. Measured over
+every committed record holding `scroll-bounded-flush` S.fully (S 176 px tall, 22 showing at rest, cut by 154):
+
+| records | strokes on `lower` (app log) | a probe round | reply |
+|---|---|---|---|
+| cal12-9c7885e-1/2/3 | 0→60→121→181 · 0→60→120→178 · 0→57→117→178 | 5.05 s | fully visible after 3 swipes |
+| android-vis, -e98b87e-run1, -r14-lv1, -r7final, -b71cbbb | 0→59/61→118/122→179/181 | 5.18–5.20 s | after 3 swipes; "still moving at the last read" |
+| live-android-2026-10-16 appendix (debc9b2, no record) | 0→21→79 | – | after 2 swipes; "…may be cut there" (75 px cut) |
+| #12's run at 9c7885e (no record) | 0→38→83 | – | the same (71 px cut) |
+
+Three probes at 57–61 px reveal S by 17–29 px with about one round to spare in the 15-s budget; a first probe that
+moves 21 or 38 px for the same stroke (a loaded host; the cause not measured) leaves it cut, and the stop said
+"fully visible … it may be cut there".
+
+**Decision.** A probe after whose read the match MOVED (not held) and lies flush on the SAME edge of its clipping
+container (or pinned node) with more than a pixel more of it showing along the axis has proved the cut — content lay
+past that edge, and part of the match with it (`revealedBy`). Such a read:
+
+1. claims no stop and confirms none (the confirming read exists to keep a stop from being claimed mid-fling; nothing
+   is claimed) — one read fewer per such round;
+2. sends a REVEAL (`course.ts#Revealing`): the whole stroke over the box the probe plan chooses, its finger travel half
+   the room the match leaves on the far side (its uncut edge to the container's opposite edge;
+   `REVEAL_ROOM_FRACTION`), so even a stroke that carries 1.25× its travel (the full stroke on `lower` moved it 359–374
+   px for 297) cannot carry the uncut edge out; at a content-START edge (top, left) still capped by
+   PROBE_MAX_TRAVEL_FRACTION — the pull-to-refresh lies that way after a probe too; a bottom or right edge has no such
+   gesture. In every other respect it is a probe: held after it → `checked`; more showing, still flush → another
+   reveal, the room taken anew; out of the flush → the ordinary stop;
+3. at the bound (no swipe or time for the reveal) is NOT "fully visible": the bound fails, its shortfall the cut the
+   probe proved (`FlushCut`) — `element reached the viewport but its bottom edge still lies on its scroll container's
+   (…), where Android cuts a node's bounds to the container, and the last probe swipe toward it showed N px more of it
+   — it is cut there (last rect …); raise maxSwipes or timeoutMs`. `flush.why: 'budget'` stays for a flush stop never
+   probed.
+
+Cost: none on a stop the first probe settles (a first row at rest, P, every golden row: a replayed tree never moves,
+so every probe holds); on a proven cut one read fewer per round, and on S one stroke fewer. No device call added.
+Deterministic in the trees: the reveal's size is a function of the read's rects only. Residual: a row nearly as long
+as its container converges in halving steps; once half the room falls under twice TOUCH_SLOP the reveal may be a tap
+(`tap`, never `checked`) or the bound ends it — said as a failure, not a claim.
+
+Bug note: docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
 
 ## Residuals accepted
 

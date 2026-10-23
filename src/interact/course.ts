@@ -22,7 +22,8 @@ import { axisOf, OPPOSITE, type Direction } from './swipe.js';
  *   it; back once when it is stuck; the end turn's after it), the reach (halved by each turn) and what the target still
  *   needs of the stroke (LV5's window, the carry model's to apply).
  * - `sent(course, { toward, turn })`, `probeSent(course, toward)` — a course stroke sent (`nextStroke`'s way and
- *   turn), or the flush check's probe (`probeOf`: its way and reach).
+ *   turn), or the flush check's probe (`probeOf`: its way and reach — a reveal's, `Revealing`, once a probe proved the
+ *   cut).
  * - `stuckTurn(course, …)`, `turnBack(course, on)` — the stuck turn's way and its stroke back.
  * - `turnAtEnd(course, …)` — the end turn (`EndTurn`), one transition.
  * - `lastSent`, `courseFacts` — what the motion ledger's read, the stops and the failures read.
@@ -95,11 +96,32 @@ export interface PastSide {
  * The REACH of the flush check's probe (scroll-rounds.ts#flushCheck has when a stop is probed, and over what): a
  * quarter of the stroke — over the container, 15 % of its side (swipe.ts#SWIPE_REACH_FRACTION, 60 % of the side,
  * × 0.25) — and never more than PROBE_MAX_TRAVEL_FRACTION of the screen's long side: 178 px on the Pixel_3a, more than
- * the 51 px the SWIFT form's Fees row was cut by; a cut larger than that is left flush again and probed again. Short so
- * it cannot carry the row out of a container of any ordinary height.
+ * the 51 px the SWIFT form's Fees row was cut by; a cut larger than what the probe moved is left flush again, with more
+ * of it showing, and the next stroke is a REVEAL (`Revealing`). Short so it cannot carry the row out of a container of
+ * any ordinary height.
  * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
  */
 const PROBE_REACH = 0.25;
+
+/**
+ * A probe moved the match and it lies flush on the same edge with more of it showing: the cut is proved, and the next
+ * stroke reveals the rest (scroll-rounds.ts#flushCheck has when). `room`: px from the match's uncut edge to the flush
+ * container's opposite edge — what the content may move before the uncut edge leaves the container.
+ */
+export interface Revealing {
+  readonly room: number;
+}
+
+/**
+ * The reveal's finger travel, as a fraction of its `room`: a whole stroke at reach 1, its travel half that room, so
+ * even a stroke that carries the content past its travel — the full stroke over the lab's bounded list moved it 359–374
+ * px for 297 of travel, 1.25× — leaves the uncut edge inside the container. Sized from the tree, not the probe's
+ * quarter: a 74-px probe moved the lab's S 57–61 px of its 154-px cut, and 21 or 38 on a loaded host, so quarter-steps
+ * took three probes and two reads each and ran out of time; the reveal takes the rest in one stroke, or halves the room
+ * toward it. At a top or left edge the cap (PROBE_MAX_TRAVEL_FRACTION) still holds: the content's start lies that way.
+ * docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
+ */
+const REVEAL_ROOM_FRACTION = 0.5;
 
 /**
  * The cap on the probe's finger travel, as a fraction of the screen's long
@@ -114,7 +136,8 @@ const PROBE_REACH = 0.25;
  * long side runs to about 1400 dp on the largest tablets, so 0.08 of it is
  * at most ≈ 112 dp, under both thresholds, on any density: 178 px (65 dp)
  * on the Pixel_3a, 205 px (102 dp) on a 2560-px tablet at density 2. Cost:
- * a cut deeper than the probe moves the row takes another probe.
+ * a cut deeper than the probe moves the row takes another probe. A REVEAL keeps it at a top or left edge only — the
+ * pull lies at the content's start, and a bottom or right edge has no such gesture (`REVEAL_ROOM_FRACTION`).
  */
 const PROBE_MAX_TRAVEL_FRACTION = 0.08;
 
@@ -611,14 +634,19 @@ export function sent(course: Course, { toward, turn }: Pick<NextStroke, 'toward'
 /**
  * The flush check's probe (scroll-rounds.ts#flushCheck) toward revealing `edge` of the judged match, on a screen of
  * box `screen`: its way, its reach (PROBE_REACH) and the cap on its finger travel (PROBE_MAX_TRAVEL_FRACTION of the
- * screen's long side).
+ * screen's long side). `revealing`: a probe proved the cut — the whole stroke, its travel REVEAL_ROOM_FRACTION of the
+ * room, the cap kept at the content's start (a top or left edge) only.
  *
  * Toward the edge, never the caller's way (verified on the triage repro):
  * a row cut at the top with the default direction down stroked "down" is
  * stroked further out — and a lazy list drops it ("gone").
  */
-export function probeOf(edge: Edge, screen: Rect): { toward: Direction; reach: number; maxTravel: number } {
-  return { toward: SIDES[edge].reveals, reach: PROBE_REACH, maxTravel: Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(screen.width, screen.height)) };
+export function probeOf(edge: Edge, screen: Rect, revealing?: Revealing): { toward: Direction; reach: number; maxTravel: number } {
+  const cap = Math.floor(PROBE_MAX_TRAVEL_FRACTION * Math.max(screen.width, screen.height));
+  const toward = SIDES[edge].reveals;
+  if (revealing === undefined) return { toward, reach: PROBE_REACH, maxTravel: cap };
+  const half = Math.floor(REVEAL_ROOM_FRACTION * revealing.room);
+  return { toward, reach: 1, maxTravel: edge === 'top' || edge === 'left' ? Math.min(half, cap) : half };
 }
 
 /**
