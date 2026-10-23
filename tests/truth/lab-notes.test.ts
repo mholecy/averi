@@ -220,8 +220,9 @@ describe('calibration.json ↔ the KNOWN rows', () => {
   });
 
   it('every note expected OPEN-RED has rows, each a static KNOWN row filed as that note', () => {
-    // None is expected OPEN-RED since FU1's fix: the rule holds vacuously until a note is opened again.
     const open = table.notes.filter((e) => expected(e) === 'OPEN-RED');
+    // Possibly none (every note fixed or residual): then the set must still be the open notes', so a broken `expected` cannot empty it.
+    expect(open.map((e) => e.n)).toEqual(table.notes.filter((e) => e.expect === undefined ? e.status === 'open' : e.expect === 'OPEN-RED').map((e) => e.n));
     const bad = open.flatMap((e) => {
       if ((e.checks ?? []).length === 0) return [`#${e.n}: no rows`];
       return e.checks!.flatMap((k) => {

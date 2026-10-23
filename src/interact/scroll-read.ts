@@ -2,7 +2,7 @@ import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { largestScroller, rectIntersection, rectWithin, type Cut } from '../ui-tree/geometry.js';
 import type { Cover } from '../ui-tree/cover.js';
 import type { SurfaceFinding } from '../ui-tree/eyes.js';
-import { panelGap, type KeyboardCover } from '../ui-tree/keyboard-cover.js';
+import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
 import { coverLine, type KeyboardLine } from '../ui-tree/keyboard-position.js';
 import { lookAt, lookTold, type Look } from '../ui-tree/look.js';
 import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '../ui-tree/read-tree.js';
@@ -197,10 +197,10 @@ function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboar
  * full width nor reach the bottom; the rest of it is quoted in messages.
  * One part of the screen below that edge is the app's again: the strip
  * between the panels and the band (`gap`), which none of the keyboard
- * covers — a match WHOLLY inside it that stops cleanly there is judged
- * there (`inGap`). The cost of the full-width cut that is left, accepted (it
- * never certifies a covered target): content BESIDE the panel (x < 71 on
- * the lab's Gboard), or partly in the gap and partly beside or under the
+ * covers (none from a region read only in part) — a match WHOLLY inside it
+ * that stops cleanly there is judged there (`inGap`). The cost of the full-width cut that is left, accepted (it
+ * never certifies a covered target): content BESIDE a panel, in its rows
+ * (x < 71 or x ≥ 1008 on the lab's capture), or partly in the gap and partly beside or under the
  * panel's rows, is never judged visible, so a target there that cannot be
  * scrolled above the panel fails `scroll_until` with the keyboard named,
  * though the tap guard — which tests the panel's rect itself — would tap
@@ -210,7 +210,7 @@ function factsOf({ tree, ofKeyboard, seen }: Pick<RoundRead, 'tree' | 'ofKeyboar
 export interface AppliedKeyboard {
   topCover: Rect;
   above: DeviceScreen | undefined;
-  /** The strip between a floating keyboard's panels and its band, which none of it covers (ui-tree/keyboard-cover.ts#panelGap) — a match wholly inside it is judged there (`inGap`). A reading's cover only, and only with a panel above the band; never idb's band. */
+  /** The strip between a floating keyboard's panels and its band, which none of it covers (`KeyboardCover.gap`, ui-tree/keyboard-cover.ts#panelGap) — a match wholly inside it is judged there (`inGap`). A reading's cover only, and only with a panel above the band; never idb's band. */
   gap?: Rect;
   remedy: KeyboardRemedy;
   /** Its top edge as a keyboard line (`line.y` is `topCover.y`): witnessed for a reading's cover, which the witness stood by; unwitnessed for idb's band (`bandKeyboardOf`), which no reading stands by — a centre under it stops nothing. */
@@ -219,7 +219,8 @@ export interface AppliedKeyboard {
 
 /**
  * One match as judged: the keyboard cover it was judged under (none for a
- * whole-screen judgement or a keyboard-side node) and where it stands for
+ * whole-screen judgement, a keyboard-side node or a clean stop in the panel
+ * gap, `inGap`) and where it stands for
  * the stop (ui-tree/standing.ts#Scene.standing) — the kind `stops` and
  * `shortOf` read, and the facts the rest of the round and the sentences
  * read: how much of it is in the frame, the frame's edges it extends past,
@@ -334,8 +335,7 @@ function offeredKeyboard(shown: KeyboardCover | undefined, viewport: DeviceScree
   // docs/bugs/2026-10-05-android-floating-gboard-keyboard.md
   const topCover = shown.top;
   if (topCover.y >= viewport.height) return undefined;
-  const gap = panelGap(shown);
-  return { topCover, above: aboveTop(topCover.y, viewport), ...(gap !== undefined && { gap }), remedy: shown.remedy, line: coverLine(shown) };
+  return { topCover, above: aboveTop(topCover.y, viewport), ...(shown.gap !== undefined && { gap: shown.gap }), remedy: shown.remedy, line: coverLine(shown) };
 }
 
 /**
@@ -388,7 +388,7 @@ export function strokeLine(cover: AppliedKeyboard | undefined, facts: Pick<TreeF
  * reading's `ofKeyboard`, one walk per round) is judged against the whole
  * screen; every other node against the part above the cover's top edge —
  * or, wholly inside the cover's panel gap and stopping cleanly there, in
- * the gap (`inGap`) — and what is drawn over a node is counted only there: a
+ * the gap (`inGap`), under no cover — and what is drawn over a node is counted only there: a
  * bar under the keyboard covers nothing the round can see.
  */
 function judge(
@@ -400,7 +400,10 @@ function judge(
 ): Judged | undefined {
   const scored = found.map((node): Judged => {
     const under = cover === undefined || cover.owns(node) ? undefined : cover.cover;
-    const standing = (under !== undefined && inGap(node, frame, facts, stop, under)) || facts.scene.standing(node, frame, { of: stop, ...(under !== undefined && { keyboardTop: under.line }) });
+    // A clean stop in the gap is judged under no cover: none of the keyboard lies over it, so no sentence names one.
+    const gapped = under === undefined ? undefined : inGap(node, frame, facts, stop, under);
+    if (gapped !== undefined) return { node, standing: gapped };
+    const standing = facts.scene.standing(node, frame, { of: stop, ...(under !== undefined && { keyboardTop: under.line }) });
     return { node, ...(under !== undefined && { under }), standing };
   });
   return scored.sort((a, b) => better(a, b))[0];

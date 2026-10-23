@@ -207,7 +207,10 @@ export const LAB_FLOATING_PANELS: readonly Rect[] = [
 /**
  * The kf cases' precondition: the IME is FLOATING at launch — the app hears of only its strip (the inset the panel's
  * window gives, 132 px on the lab AVD), not a docked keyboard's 822 px. No adb setting floats Gboard, so a run whose
- * Gboard came up docked is not run, never ok.
+ * Gboard came up docked is not run, never ok. WEAK on its own: the app's state cannot tell a floating panel from an
+ * IME collapsed to its strip with no panel (a hardware-keyboard toolbar), where kf1 and kf2 would pass with no gap
+ * rule at all; the record keeps no region. So the panel is evidenced per run by kf3, whose reply must quote it
+ * (`judgeFloatingGap`), and by the run's region read by hand (docs/truth/live-android-2026-10-23-floating-gap.md).
  */
 export function floatingAtLaunch(launched: LabState): LiveVerdict | undefined {
   const ime = launched.keyboard;
@@ -245,9 +248,13 @@ export const judgeFloatingGap =
     if (kind === 'kf3') {
       if (valueOf(s, 'postcode') !== valueOf(launched, 'postcode')) return { outcome: 'MISMATCH', why: `postcode CHANGED to ${JSON.stringify(valueOf(s, 'postcode'))} — a key was typed; averi: ${short(scroll)}` };
       if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×); averi: ${short(scroll)}` };
+      // Not run unless ks starts under a measured panel: elsewhere a visible claim is no evidence either way.
+      if (!LAB_FLOATING_PANELS.some((p) => centreIn(launched.frames.ks, p))) return { outcome: 'SKIP', why: 'ks\'s centre at launch lies in no measured panel' };
       const ks = s.frames.ks;
       const where = ks == null ? 'ks not laid out' : `ks ${ks.y}–${ks.y + ks.height}`;
       if (replyKind(scroll) === 'visible' && (ks == null || LAB_FLOATING_PANELS.some((p) => centreIn(ks, p)))) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — ks's centre lies in a measured panel (${where}); ${logged}` };
+      // An ok refusal names a panel (not the 132-px strip alone): the run's evidence that the IME was floating.
+      if (!LAB_FLOATING_PANELS.some((p) => scroll?.includes(`over [${p.x},${p.y}][${p.x + p.width},${p.y + p.height}]`))) return { outcome: 'SKIP', why: `no measured panel named in the reply — the IME was not floating there: ${short(scroll)}` };
       return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panels (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
     }
     if (replyKind(scroll) !== 'visible') return { outcome: 'MISMATCH', why: `refused, though the submit lies wholly between the panel and the strip: ${short(scroll)}` };

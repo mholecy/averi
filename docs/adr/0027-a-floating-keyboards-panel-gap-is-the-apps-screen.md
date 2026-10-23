@@ -21,7 +21,9 @@ docs/bugs/2026-10-05-android-floating-gboard-keyboard.md (`cb77485`), which no A
 **A match whose rect lies wholly inside the panel gap, and which stops cleanly there, is judged there.**
 - The gap (`ui-tree/keyboard-cover.ts#panelGap`, the one owner of keyboard geometry): for a shown cover with panels,
   the band's width from the lowest panel's bottom down to the band's top; none when it has no height (a panel reaching
-  into the band's rows), and none for a docked keyboard, WDA's band or idb's.
+  into the band's rows), none for a docked keyboard, WDA's band or idb's, and none when `panelsBeyond` dropped any rect
+  of the region (a partly refused region): the reading carries it as `KeyboardCover.gap` only from a region admitted
+  whole.
 - `scroll_until`'s read (`interact/scroll-read.ts#inGap`) judges a match in the gap only when its rect is inside it on
   all four sides, and keeps that judgement only when it is `reachable`, all of it in the gap and nothing clipped.
   Otherwise the judgement above the cover's top edge stands, word for word.
@@ -35,18 +37,20 @@ docs/bugs/2026-10-05-android-floating-gboard-keyboard.md (`cb77485`), which no A
 - A rect in the gap misses every covered rect by construction: it is below every panel and above the band, computed
   from the same reading, in the same round, that every other keyboard question uses. The tap that follows reads the
   keyboard again.
+- Only a region admitted whole has a gap. A rect `panelsBeyond` drops (off the band's screen) shrinks the cover, and
+  it may lie in the strip; the full-width cut fails closed there, so a partly refused region keeps it.
 - Rects under or beside a panel's rows are not inside the gap, so they stay refused.
 
 ## Risks accepted
 
 - (R1) An IME that DRAWS outside its touchable region, in the gap, would let a target there be called visible. Measured
   false for Gboard on API 33 (the tap fired the submit; the screenshot shows the gap clean but a few pixels of the
-  panel's shadow at its top). Other IMEs are unmeasured; `panelsBeyond`'s exact-band admission already refuses odd
-  regions. The tap stays guarded by the same rects, so the harm would be a "visible" claim, never a key press.
+  panel's shadow at its top). Other IMEs are unmeasured; `panelsBeyond`'s exact-band admission refuses odd regions
+  whole, and a region it admits only in part opens no gap. The tap stays guarded by the same rects, so the harm would be a "visible" claim, never a key press.
 - (R2) A panel dragged between rounds: the exposure the tap guard and the pixel poll already accept. The gap is read
   fresh each round, and a stop after a stroke is reported only on a settled confirming read.
 
 ## Residual
 
-A target BESIDE the panel (x < 71 on the lab's Gboard), or partly in the gap and partly beside or under a panel's rows,
+A target BESIDE a panel, in its rows (left or right of its columns: x < 71 or x ≥ 1008 on the lab's capture), or partly in the gap and partly beside or under a panel's rows,
 is still refused naming the keyboard, though the tap guard would tap it. It fails closed.
