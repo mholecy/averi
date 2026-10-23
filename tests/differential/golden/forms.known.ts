@@ -10,7 +10,6 @@ import { ANDROID, IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS
 // appear" reads "close it first" in it, so their judge finds them vacuous (`not in the tree`) where it found them
 // refused without the remedy before.
 const EXPANDED_SHEET = 'residual:ADR 0018 residual 18 — a fully expanded sheet is no presented window';
-const LAB_ANDROID_FLOATING = 'bug:2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md';
 /** The Android picker sheet's scroll_until stroke (the sheet fully expanded, 1080x2220). */
 const ADB_SHEET_STROKE = 'adb shell input swipe 540 1768 540 608 1162';
 
@@ -41,10 +40,10 @@ export const forms: KnownFile = {
     // — the phone field under the submit bar riding on the IME (Compose cuts its bounds at Continue, the bar's surface
     // has no node): fixed by round 6 (6d8f8de, merged with arch/round-22), the strip refused as cut by the bar — the
     // phone scroll_until row green, struck off here, calibrated in scripts/truth/calibration.json.
-    // LAB FINDING FU1 — round 4's form-keyboard-floating (Gboard floating, its panel 71,1092 937x792 above the 132-px
-    // strip): the pinned submit between the panel and the strip is drawn and takes its tap, but scroll_until cuts the
-    // whole screen at the panel's top (the floating fix's documented full-width cut) and refuses it after two swipes.
-    ...keys(`${ANDROID}/form-keyboard-floating.xml`, ['submit'], ['scroll_until'], { cls: 'stopped', kind: 'refused', calls: twice('adb shell input swipe 540 874 540 218 657'), note: 'lab finding FU1: the panel cut as a full-width band', as: LAB_ANDROID_FLOATING }),
+    // LAB FINDING FU1, docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md
+    // — the pinned submit between a floating Gboard's panel and its strip, refused under the full-width cut: fixed by
+    // round 1023b (ADR 0027, the panel gap is the app's), the submit scroll_until row green, struck off here,
+    // calibrated in scripts/truth/calibration.json.
     ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['tap'], { cls: NOT_IN_TREE_HINTED, kind: 'not found', calls: [], note: 'uiautomator lists only the presented sheet, unmarked (no scrim): the tap times out "to appear" with the active-window hint — its conditional "close it first", not the presented remedy', as: EXPANDED_SHEET }),
     ...keys(`${ANDROID}/form-picker.xml`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(ADB_SHEET_STROKE), note: 'uiautomator lists only the presented sheet, unmarked (no scrim): scroll_until strokes it twice, then "never appeared in the tree" with the active-window hint', as: EXPANDED_SHEET }),
   ]),

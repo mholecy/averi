@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import { KEYBOARD_ROLE, type KeyboardTouchable, type KeyboardWitness, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
-import { readKeyboard } from '../../src/ui-tree/keyboard-cover.js';
+import { panelGap, readKeyboard, type KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP } from '../helpers/android-dumps.js';
 import { FakeAdapter, node, recorded, screen, type FakeKeyboard } from '../helpers/fake.js';
 
@@ -364,5 +364,36 @@ describe('the keyboard window\'s region, read only once the band is up — the f
       expect(await readKeyboard(fake).cover()).toBeUndefined();
       expect(calls(oracle)).toEqual([1, 0, 0]);
     }
+  });
+});
+
+describe('panelGap — the strip between a floating keyboard\'s panels and its band, which none of it covers', () => {
+  const coverOf = (band: Rect, panels: readonly Rect[]): KeyboardCover => {
+    const rects = [band, ...panels];
+    return { rects, top: rects.reduce((top, r) => (r.y < top.y ? r : top)), band, remedy: { dismissal: 'back', advice: undefined } };
+  };
+
+  it('the lab\'s floating Gboard, read as the device gave it: the band\'s width from the panel\'s bottom down to the band', async () => {
+    // tests/fixtures/truth/android-averi_lab-api33/form-keyboard-floating.ime.json
+    const fake = new FakeAdapter({ s: screen() }, 's');
+    fake.attachKeyboard({ state: 'shown', frame: GBOARD_STRIP }).touchableAnswers.current = touchableOf('    touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))\n', 'shown');
+    const cover = await readKeyboard(fake, screen()).cover();
+    expect(cover === undefined ? undefined : panelGap(cover)).toEqual({ x: 0, y: 1884, width: 1080, height: 204 });
+  });
+
+  it('docked — the band alone: no gap', () => {
+    expect(panelGap(coverOf({ x: 0, y: 1398, width: 1080, height: 822 }, []))).toBeUndefined();
+  });
+
+  it('two panels: the gap starts below the lower one', () => {
+    expect(panelGap(coverOf(GBOARD_STRIP, [{ x: 71, y: 1092, width: 937, height: 500 }, { x: 359, y: 1269, width: 681, height: 643 }]))).toEqual({ x: 0, y: 1912, width: 1080, height: 176 });
+  });
+
+  it('a panel whose bottom is the band\'s top: no gap (no height)', () => {
+    expect(panelGap(coverOf(GBOARD_STRIP, [{ x: 71, y: 1092, width: 937, height: 996 }]))).toBeUndefined();
+  });
+
+  it('a panel reaching into the band\'s rows: no gap', () => {
+    expect(panelGap(coverOf(GBOARD_STRIP, [{ x: 71, y: 1092, width: 937, height: 1008 }]))).toBeUndefined();
   });
 });
