@@ -9,6 +9,7 @@
   "scale": 1,
   "targets": [],
   "navigation": "gesture",
+  "windows": "form-picker.windows.txt",
   "form": {
     "fields": [
       {

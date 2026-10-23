@@ -92,5 +92,6 @@
       "drawn": 1,
       "seen": "#FB8C00"
     }
-  ]
+  ],
+  "windows": "open.windows.txt"
 }

@@ -3,7 +3,7 @@ import { ADB_STROKE, ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_T
 // The presented family's ratchet (fixtures/apps/cells/presented.json): sheet-medium and alert-dim (phase 1/2);
 // sheet-medium-edges, sheet-background, sheet-long-list, dim-cover, blur-menu and blur-menu-grouped (phase 3, B3, iOS);
 // chooser-over-list (round 16, iOS);
-// bottom-sheet-dialog and dialog-fullscreen (round 7, Android); blur-menu-stacked and blur-menu-unhidden (round 16,
+// bottom-sheet-dialog and dialog-fullscreen (round 7, Android); dialog-views-fullscreen (round 1023b, Android); blur-menu-stacked and blur-menu-unhidden (round 16,
 // ADR 0018 residual 9's probes, iOS).
 
 // The lab finding L1's tap and scroll_until rows were this KNOWN's until round 6's fix (d43df5d on arch/r22-l1)
@@ -88,6 +88,9 @@ export const presented: KnownFile = {
     // A full-screen Compose Dialog: Compose lays its window between the bars at full width ([0,66][1080,2153]), against
     // the left edge — an app's own window by the parser's rule — and the dump carries no fact that tells it from one.
     ...unmarkedWindow(`${ANDROID}/dialog-fullscreen.xml`, FULL_SCREEN_DIALOG),
+    // Round 1023b: a Views AppCompatDialog laid full screen (dialog-views-fullscreen), its window at 0,0 the screen's
+    // size — an activity's very shape: the same, no fact in its dump either.
+    ...unmarkedWindow(`${ANDROID}/dialog-views-fullscreen.xml`, FULL_SCREEN_DIALOG),
     // --- phase 3 (B3), iOS ---
     // idb lists only the presented layer (as on sheet-medium): beneath the medium sheet over the scrolled host, the large
     // sheet's bare background and the transparent cover, the targets are not in the tree. sheet-medium-edges.idb's
@@ -165,6 +168,7 @@ export const presented: KnownFile = {
     [`${ANDROID}/sheet-medium.xml`]: 15,
     [`${ANDROID}/bottom-sheet-dialog.xml`]: 15,
     [`${ANDROID}/dialog-fullscreen.xml`]: 15,
+    [`${ANDROID}/dialog-views-fullscreen.xml`]: 15,
     [`${IOS}/alert-dim.idb.json`]: 12,
     [`${IOS}/alert-dim.wda.json`]: 12,
     [`${IOS}/sheet-medium.idb.json`]: 15,

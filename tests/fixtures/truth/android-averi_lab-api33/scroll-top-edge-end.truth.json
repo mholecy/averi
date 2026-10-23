@@ -82,5 +82,6 @@
     }
   },
   "navigation": "gesture",
+  "windows": "scroll-top-edge-end.windows.txt",
   "displays": "scroll-top-edge-end.displays.txt"
 }

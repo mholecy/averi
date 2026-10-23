@@ -142,5 +142,6 @@
     }
   },
   "navigation": "gesture",
+  "windows": "text-under-bar.windows.txt",
   "displays": "text-under-bar.displays.txt"
 }

@@ -60,6 +60,17 @@
       "truth": "bottom-sheet-dialog.truth.json"
     },
     {
+      "file": "dialog-views-fullscreen.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "dialog-views-fullscreen.png",
+      "truth": "dialog-views-fullscreen.truth.json"
+    },
+    {
       "file": "form-basic.xml",
       "source": "uiautomator",
       "form": "raw",

@@ -5,11 +5,13 @@ package dev.averi.lab
 // The presented family (fixtures/apps/cells/presented.json): a layer presented over the coloured-target host
 // (Base.kt) — a ModalBottomSheet partially expanded with its own target, an AlertDialog; round 7 (ADR 0018's residual
 // 19, the windows the uiautomator parser does not mark): a full-screen Compose Dialog and a Views BottomSheetDialog,
-// each with its own target. RecordWindowTouches is every Compose dialog's or sheet's touch log (a window of its own),
+// each with its own target; round 1023b (residual 19, the window manager's word): a Views Dialog laid full screen. RecordWindowTouches is every Compose dialog's or sheet's touch log (a window of its own),
 // for any family; recordTouches a Views dialog's.
 
+import android.graphics.drawable.ColorDrawable
 import android.view.MotionEvent
 import android.view.Window
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.appcompat.app.AppCompatDialog
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
@@ -100,6 +103,7 @@ internal fun PresentedLayer(cell: Cell, lab: Lab) {
     var alert by remember { mutableStateOf(false) }
     var fullScreen by remember { mutableStateOf(false) }
     var viewsSheet by remember { mutableStateOf(false) }
+    var viewsFullScreen by remember { mutableStateOf(false) }
     if (sheet) {
         // Partially expanded (the medium detent): content taller than half the screen, so the sheet stops at half,
         // the scrim over the rest; a tap on the scrim dismisses it.
@@ -131,6 +135,7 @@ internal fun PresentedLayer(cell: Cell, lab: Lab) {
     }
     if (fullScreen) FullScreenDialog(cell, lab) { fullScreen = false }
     if (viewsSheet) ViewsBottomSheet(cell, lab) { viewsSheet = false }
+    if (viewsFullScreen) ViewsFullScreenDialog(cell, lab) { viewsFullScreen = false }
     LaunchedEffect(Unit) {
         // The layer is raised after the screen beneath has appeared — as an app raises it — and the state marked ready
         // once its animation has had time to finish.
@@ -140,6 +145,7 @@ internal fun PresentedLayer(cell: Cell, lab: Lab) {
             "alert" -> alert = true
             "dialog-fullscreen" -> fullScreen = true
             "bottom-sheet-dialog" -> viewsSheet = true
+            "dialog-views-fullscreen" -> viewsFullScreen = true
         }
         delay(if (cell.layer == "none") 300 else 1500)
         lab.settled()
@@ -210,6 +216,54 @@ private fun ViewsBottomSheet(cell: Cell, lab: Lab, dismissed: () -> Unit) {
         dialog.setOnDismissListener { dismissed(); lab.event("dismissed", "sheet") }
         val restore = dialog.window?.let { recordTouches(it, lab) }
         dialog.show()
+        onDispose {
+            dialog.setOnDismissListener(null)
+            restore?.invoke()
+            dialog.dismiss()
+        }
+    }
+}
+
+/**
+ * A Views dialog laid full screen (`dialog-views-fullscreen`): an AppCompatDialog (Material 3's dialog theme) given an
+ * opaque background, `setLayout(MATCH_PARENT, MATCH_PARENT)` and no fitted insets once shown — the M2 full-screen
+ * dialog pattern, a window at 0,0 the screen's size, the shape of an activity's own window. Its content a ComposeView
+ * holding the layer's target over the slots beneath; no outside to touch: back dismisses it. No Compose window and no
+ * Material 3 sheet: what tells it from the app's screen is the window manager's type of it (`TYPE_APPLICATION`, a
+ * Dialog's), not its dump (ADR 0018, "Android's window by the window manager's word").
+ */
+@Composable
+private fun ViewsFullScreenDialog(cell: Cell, lab: Lab, dismissed: () -> Unit) {
+    val context = LocalContext.current
+    val parent = rememberCompositionContext()
+    val lifecycle = LocalLifecycleOwner.current
+    val savedState = LocalSavedStateRegistryOwner.current
+    DisposableEffect(Unit) {
+        val dialog = AppCompatDialog(context, com.google.android.material.R.style.Theme_Material3_Light_Dialog)
+        val content = ComposeView(dialog.context).apply {
+            setViewTreeLifecycleOwner(lifecycle)
+            setViewTreeSavedStateRegistryOwner(savedState)
+            setParentCompositionContext(parent)
+            setContent {
+                Column(
+                    Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }.padding(top = 120.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    Text("Lab Views full-screen dialog")
+                    for (t in cell.targets.filter { it.onLayer }) TargetBox(cell, t, lab)
+                }
+            }
+        }
+        dialog.setContentView(content)
+        dialog.setOnDismissListener { dismissed(); lab.event("dismissed", "dialog") }
+        val restore = dialog.window?.let { recordTouches(it, lab) }
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(0xFFECEFF1.toInt()))
+            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+            attributes = attributes.apply { fitInsetsTypes = 0 }
+        }
         onDispose {
             dialog.setOnDismissListener(null)
             restore?.invoke()

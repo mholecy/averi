@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
-import { appOf, type CatalogCell, type ImeCapture, type ImeWitness, type LabApp, type LabState, type NavigationMode } from './schema.js';
+import { appOf, type CatalogCell, type ImeCapture, type ImeWitness, type LabApp, type LabState, type NavigationMode, WINDOW_MANAGER_WORD } from './schema.js';
 
 /**
  * A lab app on one device — the native one (SwiftUI, Compose) or the React Native one (LAB_APP), each device object
@@ -43,7 +43,7 @@ export const LAB_APP: Record<LabApp, LabAppIdentity> = {
     bundle: 'dev.averi.lab',
     package: 'dev.averi.lab',
     source: { ios: 'fixtures/apps/ios', android: 'fixtures/apps/android' },
-    androidLayers: new Set(['none', 'sheet-medium', 'alert', 'dialog-fullscreen', 'bottom-sheet-dialog']),
+    androidLayers: new Set(['none', 'sheet-medium', 'alert', 'dialog-fullscreen', 'bottom-sheet-dialog', 'dialog-views-fullscreen']),
   },
   'react-native': { name: 'AveriLabRN', bundle: 'dev.averi.lab.rn', package: 'dev.averi.lab.rn', source: { ios: 'fixtures/apps/rn', android: 'fixtures/apps/rn' }, androidLayers: 'any' },
 };
@@ -97,6 +97,12 @@ export interface LabDevice {
    * bar's height, the navigation bar's top: src/adapters/android.ts#systemBands) and its keyboard. Absent on iOS.
    */
   displays?(): Promise<string>;
+  /**
+   * Android: the window manager's word on the window that has focus now — what averi's Android adapter asks on a miss
+   * (src/adapters/android.ts#focusedWindow, its FOCUSED_WINDOW_COMMAND, the same line: `WINDOW_MANAGER_WORD`), read
+   * right after the trees so it is the dumped window's. Absent on iOS.
+   */
+  windows?(): Promise<string>;
   /**
    * Android: hide the IME as averi's tap guard does (one `input keyevent 4`, src/mcp/tools.ts tap: "the keyboard is
    * hidden (back) and the element found again first") and give it time to go. Absent on iOS.
@@ -373,6 +379,11 @@ export class AndroidLab implements LabDevice {
   async displays(): Promise<string> {
     await this.guard();
     return (await this.adb('shell', 'dumpsys', 'window', 'displays')).stdout;
+  }
+
+  async windows(): Promise<string> {
+    await this.guard();
+    return (await this.adb('shell', WINDOW_MANAGER_WORD)).stdout;
   }
 
   async hideKeyboard(): Promise<void> {

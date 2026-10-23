@@ -83,6 +83,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     }
     const s = await lab.launch(cell.id);
     const trees = await lab.trees();
+    // Android: the window manager's word on the focused window (CellTruth.windows), right after the trees: the dumped window's.
+    const windows = await lab.windows?.();
     const shot = await lab.screenshot();
     const png = PNG.sync.read(shot);
     await writeFile(join(opts.out, `${cell.id}.png`), shot);
@@ -107,6 +109,10 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       ...(cell.config !== undefined && { config: cell.config }),
       ...(navigation !== undefined && { navigation }),
     };
+    if (windows !== undefined) {
+      await writeFile(join(opts.out, `${cell.id}.windows.txt`), windows);
+      truth.windows = `${cell.id}.windows.txt`;
+    }
     for (const t of cell.targets) {
       const frame = s.frames[t.tag];
       if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);

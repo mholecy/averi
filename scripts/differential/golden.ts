@@ -130,6 +130,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
   const ime = imeJson === undefined ? undefined : (JSON.parse(imeJson) as ImeCapture);
   const afterBackXml = await beside(truth.afterBack?.trees.uiautomator);
   const windowDisplays = await beside(truth.displays);
+  const windowManager = await beside(truth.windows);
   const profile = {
     platform: recording.platform,
     screen: recording.screen ?? truth.screen,
@@ -139,6 +140,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     ...(ime !== undefined && { ime }),
     ...(afterBackXml !== undefined && { afterBackXml }),
     ...(windowDisplays !== undefined && { windowDisplays }),
+    ...(windowManager !== undefined && { windowManager }),
   };
   const config = await configFor(recording, undefined, truth.config);
   const c = await connect(side, recording, profile);

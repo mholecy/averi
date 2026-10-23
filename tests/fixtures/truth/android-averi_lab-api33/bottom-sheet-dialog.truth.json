@@ -123,5 +123,6 @@
     }
   ],
   "navigation": "gesture",
+  "windows": "bottom-sheet-dialog.windows.txt",
   "displays": "bottom-sheet-dialog.displays.txt"
 }

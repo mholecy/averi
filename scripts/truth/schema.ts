@@ -89,7 +89,7 @@ export interface CatalogCell {
   family?: Family;
   /**
    * `none`, `sheet-medium`, `alert`; a form cell's own picker sheet, `sheet-large`; Android's `dialog-fullscreen` and
-   * `bottom-sheet-dialog` (round 7); the iOS app's own layers of phase 3.
+   * `bottom-sheet-dialog` (round 7), `dialog-views-fullscreen` (round 1023b); the iOS app's own layers of phase 3.
    */
   layer: string;
   targets: CatalogTarget[];
@@ -434,6 +434,14 @@ export interface CellTruth {
    */
   displays?: string;
   /**
+   * Android: the file beside the truth holding the window manager's word on the focused window as the trees were read
+   * (lab-device.ts#WINDOW_MANAGER_WORD: the focus and display size out of `dumpsys window displays`, then `dumpsys
+   * window windows`) — what averi's adapter asks on a miss (src/adapters/android.ts#focusedWindow), served by the
+   * golden mode's fake device for that command (fake-device.ts#DeviceProfile.windowManager). Absent on iOS and on
+   * captures before round 1023b: there the command fails, and averi reads the window as unknown.
+   */
+  windows?: string;
+  /**
    * Android, a cell captured with the IME up: the screen after one `back` hid it, as files beside the truth — the
    * state (`state`) and each raw tree by source (`trees`) — the layout averi finds an element again in after its tap
    * guard's `back`; golden's fake device serves the tree once `input keyevent 4` is sent (DeviceProfile.afterBackXml).
@@ -569,3 +577,10 @@ export interface FormTruth {
 /** A target counts as drawn as itself from this fraction on (a frame's edge pixels may be antialiased). */
 export const DRAWN = 0.95;
 export const pct = (f: number) => `${Math.round(f * 100)}%`;
+
+/**
+ * The window manager's word on the focused window, as src/adapters/android.ts#FOCUSED_WINDOW_COMMAND asks it (pinned
+ * equal in tests): the focus and the display's size out of `dumpsys window displays`, then `dumpsys window windows`.
+ * The capture records its answer (CellTruth.windows), the golden mode's fake device serves it.
+ */
+export const WINDOW_MANAGER_WORD = "dumpsys window displays | grep -E 'mCurrentFocus=|DisplayFrames w='; dumpsys window windows";
