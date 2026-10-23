@@ -699,11 +699,26 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     );
   });
 
-  it('one probe per candidate stop: a probe that moves the row to a NEW flush stop (cut by more than the probe reveals) probes again; the one after which it holds is accepted', () => {
-    const played = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(242, 20), formRead(242, 60), formRead(242, 60), formRead(242, 100), formRead(242, 100)]);
-    // probe; moved (20 → 60): confirm; held: a new candidate, probe; moved: …
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'confirm', 'stroke']);
-    expect(probeOf(played)).toHaveLength(3);
+  it('a probe that shows more of the row still flush on the same edge proved the cut: no confirm, the next stroke a reveal — at a top edge still capped (the pull-to-refresh lies that way); the one after which it holds is accepted', () => {
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(242, 20), formRead(242, 60), formRead(242, 100), formRead(242, 100)]);
+    // probe; grew (20 → 60): reveal; grew (60 → 100): reveal; held: checked.
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
+    // The reveal's travel is half the room below the row (1978 − 302 = 1676 → 838), capped at 0.08 of the long side.
+    expect(probeOf(played).map((s) => s.do === 'stroke' && [s.reach, s.maxTravel])).toEqual([
+      [0.25, 177],
+      [1, 177],
+      [1, 177],
+    ]);
+    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'top', checked: true } });
+  });
+
+  it('a probe after which more of the row shows flush on the OTHER edge proved nothing of the edge it asked about: a new candidate, confirmed and probed toward its own edge — no reveal', () => {
+    const played = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(242, 92), formRead(1878, 100), formRead(1878, 100), formRead(1878, 100)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
+    expect(probeOf(played).map((s) => s.do === 'stroke' && [s.toward, s.reach])).toEqual([
+      ['up', 0.25],
+      ['down', 0.25],
+    ]);
   });
 
   it('no swipe left to probe with: reported fully visible with flush unchecked, and the reply says it may be cut', () => {
@@ -2540,9 +2555,9 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
   };
   const probes = (played: Played) => played.steps.filter((s) => s.do === 'stroke' && s.probe === true);
 
-  it('VA1\'s capture: probed toward the header (content up, the finger down) from inside the list; R grows, flush again, probed again; the probe that moves nothing settles it — "fully visible after 2 swipes", naming the header', () => {
-    const played = play(FULLY_ANDROID, [read('cut'), read('rest'), read('rest'), read('rest')]);
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stroke', 'stop']);
+  it('the merged sticky header\'s capture: probed toward the header (content up, the finger down) from inside the list; R grows, flush again — the cut proved, so no confirm — revealed; the reveal that moves nothing settles it — "fully visible after 2 swipes", naming the header', () => {
+    const played = play(FULLY_ANDROID, [read('cut'), read('rest'), read('rest')]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stop']);
     for (const p of probes(played)) {
       expect(p).toMatchObject({ toward: 'up', probe: true });
       const box = (p as { box: Rect }).box;

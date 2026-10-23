@@ -361,6 +361,32 @@ b7, `adb input text` cannot type `Š` or `’`, accepted — 0 mismatches); both
   of behaviour), the same two again: docs/truth/live-records/android-forms-r1023-phone-3.json (`--cases k7,k7f`: 2
   cases, 2 ok, exit 0), the replies word for word as above.
 
+# Round 1023, LV2: the flush probe's proven cut revealed in one stroke (2026-10-23)
+
+bugs/r1023-lv2 at `ae4d988a` (interact/scroll-rounds.ts#revealedBy, #FlushCut; interact/course.ts#Revealing; ADR 0013,
+refined 2026-10-23), run from that checkout on averi_lab (emulator-5554, booted `-no-window -no-snapshot-save`, shut
+down after), the lab app as installed (no app change). Records docs/truth/live-records/android-vis-r1023-lv2-1…5.json
+(`--cells scroll-bounded-flush`: 7 cases, 7 ok, each run) and -group.json (`--groups visibility`: 140 cases, 130 ok,
+6 loud, 4 mismatches, 0 not known); all exit 0.
+
+- `S.fully` (154 px of S below `lower`'s clip at rest), five runs of five: "fully visible after 2 swipes", then Tapped
+  S. `lower` 0→61, 61→291 · 0→58, 58→291 · 0→61, 61→292 · 0→60, 60→296 · 0→61, 61→292: the probe (74 px of finger
+  travel) as before, then one reveal (the whole stroke, at most half the room above S: 206–207 px of travel) that
+  carried the list 230–236 px, S whole at 1223–1228 (bottom 1399–1404 < 1541, top inside the clip). Probe to reveal
+  2.8 s (no confirming read; was 5.2 s probe to probe), first touch to the tap 12.6 s in every run, where the committed
+  runs before took 17.6–17.7 s (android-vis.json, -e98b87e-run1, -r7final, -b71cbbb, -r14-lv1: three probes) and
+  19.6 s (cal12-9c7885e-1…3) — and two runs before had ended cut (note).
+- The group run's S.fully the same: 0→58, 58→287, after 2 swipes.
+- At `55b71635` (the code review's kept proof, `ProvenCut`; a path S never takes), the cell twice more
+  (android-vis-r1023-lv2-6.json, -7.json: 7 cases, 7 ok each, exit 0): S.fully `lower` 0→61, 61→295 · 0→60, 60→288,
+  after 2 swipes, S whole at 1224 and 1231, Tapped, probe to reveal 2.9 s; P.fully after 1 swipe.
+- `P.fully`: one probe, `upper` 0→77–82, "fully visible after 1 swipe", Tapped — as before.
+- The group: every case as HEAD knows it; the mismatches the four dialog-fullscreen strokes (ADR 0018 residual 19), the
+  loud fab L/K (accepted) and scroll-bounded O/F with turn F (LV1's honest deadline). tabbar-floating F read LOUD this
+  run — "failed after 15115ms (timeout 15000ms; 4 swipes sent; 5 tree reads took 9994ms …)", the list 0→3424 — where
+  android-vis-r14-lv1.json reached it after 5 swipes: the reads were slower (~2 s each), a plain stop no flush probe
+  touches; LV1's honest deadline LOUD, not a mismatch.
+
 # Round 7 final device check, 2026-10-19
 
 truth/round-7 836e04b1 (after integration 3), run from this checkout; the native and RN lab apps rebuilt from it and

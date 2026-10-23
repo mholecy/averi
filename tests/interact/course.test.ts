@@ -182,6 +182,16 @@ describe('the probe: its way and reach', () => {
     expect(probeOf('bottom', { x: 0, y: 0, width: 1600, height: 2560 })).toEqual({ toward: 'down', reach: 0.25, maxTravel: 204 });
     expect(probeOf('left', PHONE).toward).toBe('left');
   });
+
+  it('a reveal (a probe proved the cut): the whole stroke, its travel half the room the match leaves — capped at the content\'s start only', () => {
+    const PIXEL: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
+    // At a bottom edge no pull-to-refresh lies that way: half the room, past the probe's cap of 177.
+    expect(probeOf('bottom', PIXEL, { room: 413 })).toEqual({ toward: 'down', reach: 1, maxTravel: 206 });
+    expect(probeOf('right', PIXEL, { room: 600 })).toEqual({ toward: 'right', reach: 1, maxTravel: 300 });
+    // At a top or left edge the stroke pulls the content's start: the cap holds.
+    expect(probeOf('top', PIXEL, { room: 838 })).toEqual({ toward: 'up', reach: 1, maxTravel: 177 });
+    expect(probeOf('left', PIXEL, { room: 100 })).toEqual({ toward: 'left', reach: 1, maxTravel: 50 });
+  });
 });
 
 describe('what a failure reads of the course', () => {

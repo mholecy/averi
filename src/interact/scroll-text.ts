@@ -12,7 +12,7 @@ import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
@@ -370,13 +370,7 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
       'usual for a card as tall as its carousel — check with a screenshot'
     );
   }
-  // A pinned node's edge (scroll-rounds.ts#Flush's `pinned`): where the container's content ends as it shows, and the
-  // cut it may make is Compose's at a node drawn after the match, not the container's.
-  const where =
-    flush.pinned === undefined
-      ? `its ${flush.edge} edge lies on its scroll container's (${box})`
-      : `its ${flush.edge} edge lies on the edge of ${nodeText(flush.pinned)}, pinned at its scroll container's (${box}) ${flush.edge} and drawn after it`;
-  const cuts = flush.pinned === undefined ? "where Android cuts a node's bounds to the container" : "where Android cuts a node's bounds at a node drawn over it";
+  const { where, cuts } = flushEdgeText(flush, 'lies');
   if (flush.checked) return `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`;
   const unchecked = {
     budget: 'no swipe or time was left to check it',
@@ -385,6 +379,41 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
     tap: 'the probe swipe was too short to tell from a tap',
   }[flush.why];
   return `; but ${where}, ${cuts}, and ${unchecked} — ${cut}`;
+}
+
+/**
+ * Where a flush edge lies (scroll-rounds.ts#Flush, #FlushCut) and what Android cuts there, in one dialect for the
+ * stop's clause and the bound's (the truth reader, scripts/truth/replies.ts, reads its probed side): `its bottom edge
+ * lies on its scroll container's (0,1046 1080x495)`, `where Android cuts a node's bounds to the container`. A pinned
+ * node's edge (`pinned`): where the container's content ends as it shows, and the cut it may make is Compose's at a
+ * node drawn after the match, not the container's. `lies`: `still lies` for a cut a probe proved (scroll-rounds.ts#FlushCut).
+ */
+function flushEdgeText({ edge, container, pinned }: { edge: Edge; container: Rect; pinned?: QuotedNode }, lies: 'lies' | 'still lies'): { where: string; cuts: string } {
+  const box = rectText(container);
+  return {
+    where:
+      pinned === undefined
+        ? `its ${edge} edge ${lies} on its scroll container's (${box})`
+        : `its ${edge} edge ${lies} on the edge of ${nodeText(pinned)}, pinned at its scroll container's (${box}) ${edge} and drawn after it`,
+    cuts: pinned === undefined ? "where Android cuts a node's bounds to the container" : "where Android cuts a node's bounds at a node drawn over it",
+  };
+}
+
+/**
+ * A cut a probe proved and no reveal was sent for (scroll-rounds.ts#FlushCut), for the bound's and the stuck stop's
+ * sentences: where the flush edge still lies, what the probe showed, and why no reveal followed when that was not the
+ * budget. Never "a probe swipe toward it moved nothing": that is the checked stop's clause, which the truth reader
+ * takes for a probed side (scripts/truth/replies.ts, flushProbedSide).
+ */
+function flushCutText(cut: FlushCut): string {
+  const { where, cuts } = flushEdgeText(cut, 'still lies');
+  const unrevealed = {
+    budget: '',
+    room: ', and no scroll container around it has room for a swipe to reveal the rest',
+    axis: `, and every scroll container around it from that one outward scrolls only ${axisOfEdge(cut.edge) === 'vertical' ? 'sideways' : 'up and down'}, so no swipe can reveal the rest`,
+    tap: ', and the swipe that followed to reveal the rest moved nothing but was too short to tell from a tap',
+  }[cut.why];
+  return `${where}, ${cuts}, and a probe swipe toward it showed ${cut.revealed} px more of it — part of it lay past that edge, so it may still be cut there${unrevealed}`;
 }
 
 /** The `settled: false` note — what the reader should know before measuring the element. */
@@ -555,6 +584,13 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${surfaceText(short.finding)} — and the content is exhausted: ` +
               `swiping ${o.lastStroke} no longer moves it${away}. That surface stays over it at the end of the content — ${why}. ${last}`,
+        };
+      }
+      // A cut a probe proved (scroll-rounds.ts#FlushCut), the strokes the caller's way no longer moving it: no claim
+      // either way of what lies past that edge now — a screenshot tells.
+      if (short.of === 'flushCut') {
+        return {
+          message: `scroll_until ${describe} failed after ${n} — element is in the viewport but ${flushCutText(short)} — and swiping ${o.lastStroke} no longer moves it${neither}; check with a screenshot. ${last}`,
         };
       }
       if (short.of === 'carriedUnder') {
@@ -848,6 +884,8 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${unlistedText(short.finding)} (last rect ${JSON.stringify(short.judged.node.rect)})`;
     case 'carriedUnder':
       return `element reached the screen but ${carriedUnderText(short.under)} (last rect ${JSON.stringify(short.judged.node.rect)}); ${UNTOLD_SCROLL_VIEW_REMEDY}`;
+    case 'flushCut':
+      return `element reached the viewport but ${flushCutText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}); ${short.why === 'budget' ? 'raise maxSwipes or timeoutMs' : 'check with a screenshot'}`;
     case 'systemBar': {
       const { judged } = short;
       const region = short.band === undefined ? '' : ` — fully: true stops only with none of it under the bar (${centreClear(short)})`;
