@@ -105,8 +105,9 @@ export type EyesAnswer =
 
 /**
  * The eyes: two questions, each answered from one screenshot (verify/eyes.ts#eyesOn) — `fully`, a `fully visible`
- * claim's flush edges; `order`, which of two controls listed in reading order is drawn on top (`pairQuestion`), one
- * answer per pair, never throwing (a failed screenshot is every pair `untold`, said why).
+ * claim's flush edges; `order`, which of two controls listed in reading order is drawn on top, or whether a text in a
+ * control's touch margin paints over it (`pairQuestion`), one answer per pair, never throwing (a failed screenshot is
+ * every pair `untold`, said why).
  */
 export interface Eyes {
   readonly fully: (question: EyesQuestion) => Promise<EyesAnswer>;

@@ -170,7 +170,7 @@ export type RoundStep =
   | { do: 'ask'; what: 'witness' | 'unlocated' }
   /** Look (ui-tree/eyes.ts): ask the eyes `question` — one screenshot — and call `round` again with the same seen and the answer (`eyes`); the state is unchanged. */
   | { do: 'ask'; what: 'eyes'; question: EyesQuestion }
-  /** Look (ui-tree/eyes.ts#Eyes.order): ask the eyes which of the target and a control the listing does not order is drawn on top — one screenshot — and call `round` again with the same seen and the answer (`order`); the state is unchanged. */
+  /** Look (ui-tree/eyes.ts#Eyes.order): ask the eyes which of the target and a control the listing does not order is drawn on top, or whether a text in its touch margin paints over it — one screenshot — and call `round` again with the same seen and the answer (`order`); the state is unchanged. */
   | { do: 'ask'; what: 'order'; question: PairQuestion }
   /** Settle, read again, send nothing — a confirming read (SETTLE_CONFIRM_READS), or a confirming read that did not read, read again. */
   | { do: 'confirm' }

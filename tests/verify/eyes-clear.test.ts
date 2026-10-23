@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { pairQuestion, type PairQuestion } from '../../src/ui-tree/eyes.js';
+import { pairQuestion, type ClearQuestion } from '../../src/ui-tree/eyes.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { measuredFrameFor, type RgbaImage } from '../../src/verify/capture.js';
 import { judgeOrder, orderOfFrame } from '../../src/verify/eyes.js';
@@ -24,13 +24,13 @@ const capture = (name: string): { tree: UiNode; png: RgbaImage } => ({
   png: PNG.sync.read(readFileSync(new URL(`${name}.png`, fixtures))),
 });
 /** The clear question `fully: true` on the control `id` asks (ui-tree/eyes.ts#pairQuestion). */
-const questionOf = (tree: UiNode, id: string): PairQuestion => {
+const questionOf = (tree: UiNode, id: string): ClearQuestion => {
   const target = [...everyNode(tree)].find((n) => n.identifier === id && n.role !== 'text')!;
   const q = pairQuestion(tree, target, sceneOf(tree).standing(target, SCREEN, { of: 'fully' }));
   if (q?.asks !== 'clear') throw new Error(`no clear question of ${id}`);
   return q;
 };
-const seenOf = (png: RgbaImage, q: PairQuestion) => judgeOrder(png, 1, q).map(({ peer: _peer, ...seen }) => seen);
+const seenOf = (png: RgbaImage, q: ClearQuestion) => judgeOrder(png, 1, q).map(({ peer: _peer, ...seen }) => seen);
 /** `png` copied, `rect` painted `rgb` — every `step`-th column only when given (a striped strip). */
 const painted = (png: RgbaImage, rect: Rect, rgb: readonly [number, number, number], step = 1): RgbaImage => {
   const data = Buffer.from(png.data);

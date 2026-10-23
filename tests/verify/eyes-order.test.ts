@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
-import { pairQuestion, type AroundStrip, type OrderPair, type PairQuestion } from '../../src/ui-tree/eyes.js';
+import { pairQuestion, type AroundStrip, type OrderPair, type OrderQuestion, type PairQuestion } from '../../src/ui-tree/eyes.js';
 import type { Edge } from '../../src/ui-tree/geometry.js';
 import { seenOrderOf } from '../../src/ui-tree/seen-order.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
@@ -196,7 +196,7 @@ const PAIR: OrderPair = {
     { x: 351, y: 470, width: 51, height: 42 },
   ],
 };
-const ask = (pair: Partial<OrderPair> = {}): PairQuestion => ({ tree: node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 } }), node: target, asks: 'order', pairs: [{ ...PAIR, ...pair }] });
+const ask = (pair: Partial<OrderPair> = {}): OrderQuestion => ({ tree: node({ role: 'other', rect: { x: 0, y: 0, width: 402, height: 874 } }), node: target, asks: 'order', pairs: [{ ...PAIR, ...pair }] });
 const seenOf = (img: PNG, q: PairQuestion = ask()) => {
   const [answer] = judgeOrder(img, 1, q);
   return answer!.seen === 'untold' ? { untold: answer!.why } : { seen: answer!.seen };
