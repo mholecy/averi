@@ -459,11 +459,13 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     expect((await v.assert({ element: { id: 'lab.dialog-fullscreen.A' }, color: { expected: '#E53935' } })).detail).toBe(note);
   });
 
-  it('the Views dialog at an activity\'s shape (dialog-views-fullscreen) and the expanded picker (form-picker): the same remedy', async () => {
-    for (const [cell, id] of [['dialog-views-fullscreen', 'lab.dialog-views-fullscreen.A'], ['form-picker', 'lab.form-picker.name']] as const) {
-      const { fake } = device(lab(cell), word(cell));
-      expect((await fails(resolveSettled(fake, `id:"${id}"`, FAST))).message).toContain(presentedRemedy('it', { kind: 'screen' }));
-    }
+  it('the Views dialog at an activity\'s shape (dialog-views-fullscreen): the same remedy; the expanded picker (form-picker), whose sheet holds its own list: scroll_until there first, close it only if not', async () => {
+    const { fake } = device(lab('dialog-views-fullscreen'), word('dialog-views-fullscreen'));
+    expect((await fails(resolveSettled(fake, 'id:"lab.dialog-views-fullscreen.A"', FAST))).message).toContain(presentedRemedy('it', { kind: 'screen' }));
+    const picker = device(lab('form-picker'), word('form-picker')).fake;
+    const message = (await fails(resolveSettled(picker, 'id:"lab.form-picker.country.ST"', FAST))).message;
+    expect(message).toContain('— if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal is presented over it — close it first');
+    expect(message).not.toContain('no scroll moves it');
   });
 
   it('with no word (the call failed, the frames disagree): today\'s reply, the hint', async () => {
@@ -488,6 +490,21 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     await resolveSettled(fake, 'id:"lab.dialog-fullscreen.S"', { ...FAST, timeoutMs: 500 });
     expect((await new Verifier(fake, { pollMs: 2, timeoutMs: 500 }).assert({ element: { id: 'lab.dialog-fullscreen.S' } })).pass).toBe(true);
     await scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.S"', { settleMs: 1, timeoutMs: 2_000 });
+    expect(asked).toHaveLength(0);
+  });
+
+  it('a failure that words no not-found never asks: an absent check still visible, an element found with the wrong content, a wait: absent', async () => {
+    const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
+    const v = new Verifier(fake, { pollMs: 2, timeoutMs: 30 });
+    expect((await v.assert({ element: { id: 'lab.dialog-fullscreen.S' }, absent: true })).pass).toBe(false);
+    expect((await v.assert({ element: { id: 'lab.dialog-fullscreen.S' }, text: 'no such text' })).detail).toMatch(/^element found but content was/);
+    // …and so when the element seen with the wrong content is gone from the last read: the finding is the reply.
+    const dialog = lab('dialog-fullscreen');
+    const without = { ...dialog, children: [] };
+    let reads = 0;
+    fake.uiTree = async () => (reads++ === 0 ? dialog : without);
+    expect((await v.assert({ element: { id: 'lab.dialog-fullscreen.S' }, text: 'no such text' })).detail).toMatch(/^element found but content was/);
+    expect(reads).toBeGreaterThan(1);
     expect(asked).toHaveLength(0);
   });
 

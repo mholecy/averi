@@ -3,7 +3,7 @@ import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
-import { markedByWindow } from '../ui-tree/window-mark.js';
+import { markedForMiss } from '../ui-tree/window-mark.js';
 
 /**
  * The interaction module (interact/): what it takes to ACT on an element —
@@ -350,7 +350,7 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * only at 0×0 is the fact this wait's filter makes — still absence for
  * ElementNotFoundError's purpose, nothing was ever ACTIONABLE).
  * The last tree is first marked by the window manager's word on its window, when it may type it (one call, on this
- * miss only: ui-tree/window-mark.ts#markedByWindow).
+ * miss only: ui-tree/window-mark.ts#markedForMiss).
  * The miss's note goes beneath the headline (pollTimeoutMessage drops it when the
  * last read failed: `unread`). A `presented` miss says itself in place of the
  * headline, as a plain Error: beneath a presented window listed alone the target is
@@ -364,7 +364,7 @@ async function notFound(
   outcome: { readError?: Error; treesRead: number; lastTree?: UiNode },
 ): Promise<Error> {
   // The window manager's word on the last tree's window, asked now the wait has found nothing (ui-tree/window-mark.ts).
-  const tree = outcome.readError === undefined ? await markedByWindow(adapter, outcome.lastTree) : outcome.lastTree;
+  const tree = await markedForMiss(adapter, outcome, target);
   const miss = missOf({ tree, readError: outcome.readError, target });
   if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss)}`);
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, missNote(miss)), { sighted: false, ...outcome, miss });

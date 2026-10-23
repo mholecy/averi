@@ -609,7 +609,10 @@ export interface UiNode {
    * top and left edges both, and `screen` for one whose clickable, labelled scrim lies screen-wide above its sheet;
    * the root also carries `activeWindowOnly`), and by the idb parser on the root of its flat list
    * (adapters/ios-tree-source.ts#listsPresentedLayer: `screen`, the list holding UIKit's dismiss region over the whole
-   * screen — the list is then the presented layer alone).
+   * screen — the list is then the presented layer alone). One writer works after the read: on a miss only, the root of
+   * a uiautomator tree its parser left unmarked is marked by the window manager's word on the focused window
+   * (ui-tree/window-mark.ts#markByWindow, from `DeviceAdapter.focusedWindow`: a Dialog's or a panel's window at the
+   * root's bounds, `screen` when it spans the screen's width, else `dialog`).
    * WDA's marks:
    * - by the TYPE of an element the layer holds ON THE SCREEN (one parked off it, as WDA keeps a dismissed alert,
    *   types nothing): `alert` (WDA's `Alert`), `actionSheet` (a `Sheet`: UIKit's action sheet, its message the label),

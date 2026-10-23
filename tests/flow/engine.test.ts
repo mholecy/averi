@@ -2079,10 +2079,11 @@ flows:
         return fake;
       };
       const [wait] = await skipOf(stacked(), 'wait: { element: { id: lab.form-picker.name }, timeout: 50ms }');
-      expect(wait).toContain('(a sheet or modal is presented over it, and the tree lists only that window — close it first)');
+      // The sheet holds its own list: the name may be a row of it not laid out yet, so the scroll is said first.
+      expect(wait).toContain('(if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal is presented over it, and the tree lists only that window — close it first)');
       expect(wait).not.toContain(ACTIVE_WINDOW_HINT);
       const [tap] = await skipOf(stacked(), 'tap: { id: lab.form-picker.name }');
-      expect(tap).toMatch(/is not in the tree, which lists only the window presented on top .* a screen is presented over it \(a modal or a sheet\) — close it first/);
+      expect(tap).toMatch(/is not in the tree, which lists only the window presented on top .* — if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal is presented over it — close it first/);
       expect(tap).not.toContain(ACTIVE_WINDOW_HINT);
     });
 

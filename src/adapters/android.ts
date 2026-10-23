@@ -7,7 +7,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -1050,21 +1050,27 @@ interface WmWindow {
  *   activity over another, a non-focusable popup, a starting window all fail this); with its frame;
  * - `unknown` — anything else: no focus (a transition), a focus the windows dump does not list, no display size, a
  *   system window focused (the notification shade), a dump cut short or not this one.
- * Which window of the dump the uiautomator root is, is not decided here: ui-tree/window-mark.ts matches the frame.
+ * The frame is clipped to the display, as the dump clips its root: the window manager may lay a window past the
+ * screen's edge (dialog-fullscreen's `Requested w=1081` of a 1080 screen; API 33's `Frames: … frame=` prints it
+ * clipped, `mAttrs` does not). A frame wholly off the display is none: `unknown`. Which window of the dump the
+ * uiautomator root is, is not decided here: ui-tree/window-mark.ts matches the frame.
  */
 export function parseFocusedWindow(dump: string): FocusedWindow {
   const focus = CURRENT_FOCUS_RE.exec(dump)?.[1];
   const [, w, h] = /DisplayFrames w=(\d+) h=(\d+)/.exec(dump) ?? [];
   if (focus === undefined || w === undefined) return { of: 'unknown' };
+  const screen = { width: Number(w), height: Number(h) };
   const windows = wmWindows(dump);
   const focused = windows.find((x) => x.hash === focus);
   if (focused?.type === undefined || focused.frame === undefined || !isAppWindow(focused.type)) return { of: 'unknown' };
+  const frame = rectIntersection(focused.frame, { x: 0, y: 0, ...screen });
+  if (frame === undefined) return { of: 'unknown' };
   if (focused.type === TYPE_BASE_APPLICATION) {
     const beside = windows.some((x) => x !== focused && x.visible && (x.type === undefined || isAppWindow(x.type)));
-    return beside ? { of: 'unknown' } : { of: 'screenAlone', frame: focused.frame };
+    return beside ? { of: 'unknown' } : { of: 'screenAlone', frame };
   }
   if (focused.type === TYPE_APPLICATION_STARTING) return { of: 'unknown' };
-  return { of: 'stacked', frame: focused.frame, screen: { width: Number(w), height: Number(h) } };
+  return { of: 'stacked', frame, screen };
 }
 
 /** Each window block of `dumpsys window windows`, in the dump's order. */

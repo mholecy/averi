@@ -11,7 +11,7 @@ import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOpti
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided } from '../ui-tree/read-tree.js';
-import { markedByWindow } from '../ui-tree/window-mark.js';
+import { markedForMiss } from '../ui-tree/window-mark.js';
 import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
 import { missCarried, MissedError, missNote, missOf, withMissNote, type Miss } from '../ui-tree/miss.js';
 import { bareTimeoutNote, isBareTreeMemo, type Verdict } from '../ui-tree/verdict.js';
@@ -373,7 +373,14 @@ export type EngineContext = Pick<EngineOptions, 'environment' | 'session'>;
 const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
 
 /** A wait's explanation, asked at its timeout of the last tree it read (undefined when it read none): its probable-cause note, and the miss it carries. */
-type TimeoutHint = (lastTree: UiNode | undefined) => { hint?: string; miss?: Miss };
+/**
+ * What a wait says of its last read at a timeout (`waitTimeoutHint`): `missing` — the element whose not-found it words,
+ * which the window manager's word is asked about (ui-tree/window-mark.ts#markedForMiss) — and `say`, the words.
+ */
+interface TimeoutHint {
+  readonly missing: ElementSpec | undefined;
+  readonly say: (lastTree: UiNode | undefined) => { hint?: string; miss?: Miss };
+}
 
 /**
  * A `wait:` on an element that timed out with what its last read saw said beneath its headline (ui-tree/miss.ts):
@@ -1263,7 +1270,7 @@ export class FlowEngine {
   private async runWait(spec: StepPayload<'wait'>): Promise<void> {
     const timeoutMs = spec.timeout !== undefined ? parseDuration(spec.timeout) : this.waitTimeoutMs;
     const cond: Condition = spec.element ? { element: spec.element } : { state: spec.state };
-    await this.waitFor(cond, timeoutMs, describeCondition(cond), (lastTree) => waitTimeoutHint(cond, lastTree));
+    await this.waitFor(cond, timeoutMs, describeCondition(cond), { missing: missedElement(cond), say: (lastTree) => waitTimeoutHint(cond, lastTree) });
     this.log('wait', describeCondition(cond));
   }
 
@@ -1556,8 +1563,8 @@ export class FlowEngine {
     if (!outcome.timedOut) return outcome.value;
     const bareNote = outcome.undecidedTree === undefined ? undefined : bareTimeoutNote(outcome.undecidedTree);
     // The window manager's word on the last tree's window, asked now the wait has given up (ui-tree/window-mark.ts).
-    const lastTree = hint === undefined || outcome.readError !== undefined ? outcome.lastTree : await markedByWindow(this.adapter, outcome.lastTree);
-    const { hint: said, miss } = hint?.(lastTree) ?? {};
+    const lastTree = await markedForMiss(this.adapter, outcome, hint?.missing);
+    const { hint: said, miss } = hint?.say(lastTree) ?? {};
     const message = pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? said);
     // The miss rides on the error only where its note is what the message says beneath the headline.
     const saidMiss = miss !== undefined && bareNote === undefined && outcome.readError === undefined && missNote(miss) !== undefined;
@@ -1644,6 +1651,9 @@ export function stepSummary(step: Step, platform: 'android' | 'ios'): string {
  */
 const WAIT_ON_A_LISTED_ID = 'or wait on an id idb does list';
 
+/** The element a wait on `cond` misses when it times out: one it waited to be PRESENT — not an `absent` wait's, nor a condition of no element. */
+const missedElement = (cond: Condition): ElementSpec | undefined => (cond.absent ? undefined : cond.element);
+
 /**
  * What a `wait:` timeout says beneath its headline, and the miss its error carries — only for a step that waited for
  * an element to be PRESENT (`absent` waits are about something that stayed; a state/any/all condition is not one
@@ -1658,8 +1668,9 @@ const WAIT_ON_A_LISTED_ID = 'or wait on an id idb does list';
  * without the flow advice, which is for a failed `wait:` step.
  */
 export function waitTimeoutHint(cond: Condition, lastTree: UiNode | undefined): { hint?: string; miss?: Miss } {
-  if (cond.element === undefined || cond.absent) return {};
-  const miss = missOf({ tree: lastTree, target: cond.element });
+  const element = missedElement(cond);
+  if (element === undefined) return {};
+  const miss = missOf({ tree: lastTree, target: element });
   const note = missNote(miss);
   return { hint: miss.of === 'idUnlisted' ? `${note}, ${WAIT_ON_A_LISTED_ID}` : note, miss };
 }

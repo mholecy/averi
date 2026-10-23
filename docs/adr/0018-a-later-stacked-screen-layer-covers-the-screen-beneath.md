@@ -1197,18 +1197,35 @@ launcher's and another app's activity windows listed `isVisible=false`). One she
    frame), or `unknown` (the call failed or timed out at 2 s, no focus, a system window focused, a dump not read).
    Parsed by `parseFocusedWindow`, beside the adapter's other dumpsys readers.
 2. **One owner of what the word says, pure: `ui-tree/window-mark.ts#markByWindow`.** Only for a root that lists the
-   active window only and that the parser left unmarked; only when the window's frame IS the root's bounds (else a
-   window opened or closed between the dump and the read — nothing marked). `stacked` marks the root `presentation`
+   active window only and that the parser left unmarked; only when the window's frame, clipped to the screen as the
+   dump clips its root, IS the root's bounds within a pixel each way (`sameRectWithinPixel`: the window manager lays
+   dialog-fullscreen's window `1081` wide on a 1080 screen; else a window opened or closed between the dump and the
+   read — nothing marked). `stacked` marks the root `presentation`
    — `screen` when the window spans the screen's width, `dialog` when narrower (a popup against an edge); decisions 3
    and 4 then read it as the parser's own mark. `screenAlone` marks it `windowAlone` (`UiNode.windowAlone`), and
    `missOf` answers `none` for it: no hint. `unknown` leaves the tree as it was — today's reply.
-3. **Asked on a miss only, never per poll** (the speed goal): after a wait that found nothing, of its last tree — the
-   tap's, fill's and presence check's (interact/resolve.ts#notFound), every assert's (verify/assert.ts#Verifier.poll,
-   verify/pixel-poll.ts), a flow's `wait:` (flow/engine.ts#pollUntil) — and by `scroll_until` before a stroke for a
+3. **Asked on a miss only, never per poll** (the speed goal): after a wait that found nothing, of its last tree, by
+   one door that owns the rule (`ui-tree/window-mark.ts#markedForMiss`: a read that did not fail, an unmarked window,
+   and no match of the target whose not-found the reply words — none for an `absent` assert still visible, an element
+   found with the wrong content, a condition of no element) — the tap's, fill's and presence check's
+   (interact/resolve.ts#notFound), every assert's (verify/assert.ts#Verifier.poll, verify/pixel-poll.ts), a flow's
+   `wait:` (flow/engine.ts#pollUntil) — and by `scroll_until` before a stroke for a
    target its read does not hold, once per window (`CallWindow`: later reads of the same root bounds marked by the same
    word; a read of other bounds asked again). A flow's detect probe does not ask: it words no miss. A found target
    costs nothing; a miss one adb call of about 26 ms — after a 5 s wait, or in place of `scroll_until`'s strokes onto
    a dialog.
+
+4. **A presented window that holds a scroll view of its own: the scroll first.** A target missing from such a window
+   may be a row of its list not laid out yet — a lazy list composes only what shows: form-picker's country.ST, which
+   `scroll_until` reaches on the sheet's own list (live c1). So the miss carries where else it may lie
+   (ui-tree/miss.ts, `Miss`'s `presented` `mayLieIn: 'itsScrollView'`), and the tap's headline and every not-found's
+   note say first "if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal
+   is presented over it … — close it first" — never "no scroll moves it out from under that screen", which would send
+   an agent to dismiss the very window it needs, and lose what it holds. Not where the reader has stroked that list
+   already (`scroll_until`'s own not-found after its strokes: its words stay "close it first"), and not on idb's flat
+   list, which lists no scroll view (its remedy is as before: residual 18). Only form-picker of the presented
+   captures holds a scroll view: its name, country, submit and country.ST taps say it; the golden judges a lazy row's
+   tap that is told to close its layer with no `scroll_until` a mismatch (golden-spec/judges.ts#closesItsOwnLayer).
 
 **Decision 5 narrowed.** The active-window hint is said where the window manager gives no word, and dropped where it
 says the app's screen is alone. **A departure** from decision 2's "the parser reads what ui-tree never sees": this
@@ -1238,9 +1255,7 @@ colour 4 the presented note (vacuous); S Tapped, PASS, visible.
 visible: `unknown`, the hint stays. A window opened or closed between the dump and the read: the frames disagree, or
 (a dialog of the activity's very bounds) the word is about the other window — a refusal or a plain miss, never a false
 `Tapped`; within one `scroll_until` call the word is kept per root bounds, so a dialog of the screen's very bounds that
-opens mid-call is read as the word said. A target INSIDE a presented sheet's lazy list, not yet composed
-(form-picker's country.ST), gets the tap's "close it first; no scroll moves it out from under that screen" — as on a
-sheet the parser marks; `scroll_until` still strokes the sheet's own list for it (decision 3). Measured on API 33 only:
+opens mid-call is read as the word said. Measured on API 33 only:
 another API's `windows` format, unread, is `unknown` — today's hint. A Compose `Popup` (a panel) is typed `stacked` by
 the rule but unmeasured (no lab cell).
 
@@ -1439,9 +1454,13 @@ the rule but unmeasured (no lab cell).
    "Android's presented window"; narrowed 2026-10-24). Its dump carries no scrim — `form-picker`'s country picker lists
    the sheet and its drag handle only — so the parser does not mark it. ~~The form beneath times out "to appear"~~:
    since 2026-10-24 the window manager types the sheet a Dialog's window on the miss (the amendment "Android's window
-   by the window manager's word"), so the taps say the presented remedy (three rows green). `scroll_until` still
+   by the window manager's word"), so the taps say the presented remedy — the sheet's own list first, scroll_until it
+   there, then close it first if not (that amendment's decision 4; three rows green). `scroll_until` still
    strokes the sheet's own list (decision 3: a target inside it, not yet composed, reads alike), then says the
-   presented remedy: its three rows (tests/differential/golden/forms.known.ts) stay filed as this residual.
+   presented remedy: its three rows (tests/differential/golden/forms.known.ts) stay filed as this residual. On idb's
+   flat list, which lists no scroll view, a target missing beneath a presented layer listed alone still gets "close it
+   first; no scroll moves it out" — word for word as before 2026-10-24 — though it may be a row of that layer's own
+   lazy list not laid out yet: the read cannot tell the two apart.
 19. **Android's presented window: the shapes are measured on one AVD and Material 3 only** (2026-10-18). **Closed
    2026-10-24 for any window the window manager types a Dialog's or a panel's** (the amendment "Android's window by the
    window manager's word"; measured: the full-screen Compose dialog, a Views dialog laid full screen, the Compose and

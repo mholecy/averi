@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTree, Undecided } from '../ui-tree/read-tree.js';
-import { markedByWindow } from '../ui-tree/window-mark.js';
+import { markedForMiss } from '../ui-tree/window-mark.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
 import { regexSource } from '../util/regex.js';
 import { elementAssertSchema } from './element-assert.js';
@@ -231,6 +231,12 @@ interface PollSpec {
    * ocr asserts (verify/pixel-poll.ts), which word theirs there.
    */
   timeoutDetail: (last: { detail?: string; readError?: Error; undecidedTree?: UiNode; lastTree?: UiNode }) => string;
+  /**
+   * The element whose not-found `timeoutDetail` words when no evaluation left a detail — what the window manager's word
+   * is asked about at the deadline (ui-tree/window-mark.ts#markedForMiss). Absent for an assert that words no
+   * not-found (`absent`: "still visible").
+   */
+  missing?: ElementSpec;
 }
 
 export class Verifier {
@@ -329,6 +335,7 @@ export class Verifier {
       {
         description,
         timeoutMs,
+        missing: element,
         timeoutDetail: ({ detail, readError, lastTree }) => {
           if (readError !== undefined) return notFound(timeoutMs, { readError }, element);
           const base =
@@ -376,6 +383,7 @@ export class Verifier {
       {
         description,
         timeoutMs,
+        missing: element,
         timeoutDetail: ({ detail, ...last }) => detail ?? notFound(timeoutMs, last, element),
       },
     );
@@ -506,8 +514,9 @@ export class Verifier {
       pollMs: this.pollMs,
     });
     if (!outcome.timedOut) return { description, pass: true, detail: outcome.value.detail };
-    // The window manager's word on the last tree's window, asked now the poll has given up (ui-tree/window-mark.ts).
-    const lastTree = outcome.readError === undefined ? await markedByWindow(this.adapter, outcome.lastTree) : outcome.lastTree;
+    // The window manager's word on the last tree's window, asked now the poll has given up on a target it never found
+    // (ui-tree/window-mark.ts): a detail is the finding, and no not-found is worded beside it.
+    const lastTree = await markedForMiss(this.adapter, outcome, outcome.detail === undefined ? spec.missing : undefined);
     return {
       description,
       pass: false,

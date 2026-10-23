@@ -6,7 +6,7 @@ import { judgedWithOrder, type OrderEyes, type PairQuestion } from '../ui-tree/e
 import { lookOn, type Look } from '../ui-tree/look.js';
 import type { OrderSeen } from '../ui-tree/seen-order.js';
 import { pollTree, treeFingerprint } from '../ui-tree/read-tree.js';
-import { markedByWindow } from '../ui-tree/window-mark.js';
+import { markedForMiss } from '../ui-tree/window-mark.js';
 import { findBySpec } from '../ui-tree/selectors.js';
 import { cannotHide, type KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import { coverClause } from '../ui-tree/cover.js';
@@ -846,7 +846,8 @@ export async function pollPixels(
   });
   if (outcome instanceof FinalMiss) return { pass: false, detail: outcome.detail };
   if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
-  // The window manager's word on the last tree's window, asked now the poll has given up (ui-tree/window-mark.ts).
-  const lastTree = outcome.readError === undefined ? await markedByWindow(adapter, outcome.lastTree) : outcome.lastTree;
+  // The window manager's word on the last tree's window, asked now the poll has given up on an element it never found
+  // (ui-tree/window-mark.ts): a round's finding is the detail, and no not-found is worded beside it.
+  const lastTree = await markedForMiss(adapter, outcome, outcome.detail === undefined ? element : undefined);
   return { pass: false, detail: memory.timeoutDetail(timeoutMs, { ...outcome, lastTree }, element) };
 }

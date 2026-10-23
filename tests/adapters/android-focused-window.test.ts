@@ -48,6 +48,29 @@ describe('parseFocusedWindow: the focused window by its type, its frame and what
     expect(parseFocusedWindow(asBase)).toEqual({ of: 'unknown' });
   });
 
+  it('a frame laid past the screen\'s edge is clipped to it, as the dump clips its root (`Requested w=1081` of a 1080 screen)', () => {
+    const past = dumpOf('dialog-fullscreen').replace('frame=[0,66][1080,2153] last=', 'frame=[0,66][1081,2153] last=');
+    expect(past).not.toBe(dumpOf('dialog-fullscreen'));
+    expect(parseFocusedWindow(past)).toEqual({ of: 'stacked', frame: { x: 0, y: 66, width: 1080, height: 2087 }, screen: SCREEN });
+  });
+
+  it('a system window focused (the notification shade, `ty=2040`), or the app\'s starting window: unknown, never stacked', () => {
+    const dump = dumpOf('dialog-fullscreen');
+    const shade = /Window\{([0-9a-f]+) u0 NotificationShade\}/.exec(dump)?.[1];
+    expect(shade).toBeDefined();
+    expect(parseFocusedWindow(dump.replace(/mCurrentFocus=Window\{[0-9a-f]+ [^}]*\}/, `mCurrentFocus=Window{${shade} u0 NotificationShade}`))).toEqual({ of: 'unknown' });
+    expect(parseFocusedWindow(dump.replace('ty=APPLICATION fmt=TRANSPARENT', 'ty=APPLICATION_STARTING fmt=TRANSPARENT'))).toEqual({ of: 'unknown' });
+  });
+
+  it('a visible window whose type the dump does not print counts as an app\'s beside the activity\'s: unknown, the hint stays', () => {
+    const dump = dumpOf('open');
+    const at = dump.indexOf('Window{ab27f1c u0 NavigationBar0}:');
+    const end = dump.indexOf('\n  Window #', at);
+    expect(at).toBeGreaterThan(0);
+    const untyped = dump.slice(0, at) + dump.slice(at, end).replace(/ty=NAVIGATION_BAR /g, '') + dump.slice(end);
+    expect(parseFocusedWindow(untyped)).toEqual({ of: 'unknown' });
+  });
+
   it('no focus, no such window, no display size, a cut dump or garbage: unknown', () => {
     const dump = dumpOf('dialog-fullscreen');
     expect(parseFocusedWindow(dump.replace(/mCurrentFocus=Window\{[^}]*\}/, 'mCurrentFocus=null'))).toEqual({ of: 'unknown' });
@@ -71,6 +94,12 @@ describe('AndroidAdapter.focusedWindow: one adb call, failing open', () => {
     });
     expect(await adapter.focusedWindow()).toMatchObject({ of: 'stacked' });
     expect(calls).toEqual([['adb', '-s', 'emulator-5554', 'shell', FOCUSED_WINDOW_COMMAND]]);
+  });
+
+  it('bounds the call at 2 s, so a hung adb delays a miss\'s reply by no more', async () => {
+    const timeouts: (number | undefined)[] = [];
+    await adapterAnswering(async (_cmd, _args, opts) => (timeouts.push(opts?.timeoutMs), { stdout: Buffer.from(dumpOf('open')), stderr: '' })).focusedWindow();
+    expect(timeouts).toEqual([2_000]);
   });
 
   it('an adb exit, a timeout or garbage: unknown', async () => {
