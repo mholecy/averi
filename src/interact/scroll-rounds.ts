@@ -238,7 +238,7 @@ export type ScrollOutcome = (
   | {
       kind: 'stuck';
       swipes: number;
-      short: InFrameShort;
+      short: InFrameShort | FlushCut;
       /** The way the strokes no longer move it. */
       lastStroke: Direction;
       viewport: Rect;
@@ -332,11 +332,13 @@ export type Flush =
   | { edges: readonly [Edge, Edge]; container: Rect; pinned?: QuotedNode; checked: false; why: 'fills' };
 
 /**
- * A `fully: true` match the flush check's probe PROVED cut (`flushCheck`, `revealedBy`): the probe moved it, and it
- * lies flush on the same `edge` of the same `container` (or `pinned` node) with `revealed` px more of it showing —
- * content lay past that edge, and part of the match with it. Never a stop: with a swipe and time left the next stroke
- * reveals the rest; at the bound it is what the target was short of, never "fully visible" with a hedge. The round's,
- * never scroll-read.ts#shortOf's: the tree alone reads it whole.
+ * A `fully: true` match on a cut the flush check's probe PROVED (`ProvenCut`) that no reveal could be sent for this
+ * read: it lies flush on that `edge` of that `container` (or `pinned` node), and the probe had shown `revealed` px more
+ * of it — content lay past that edge, and part of the match with it. `why` the reveal was not sent: no swipe or time
+ * left (`budget`), no scroll container around it with room for one (`room`), or every one from that edge outward
+ * scrolling only across it (`axis`) — the last two only when the tree changed since the probe. Never a stop: it is
+ * what the target was short of, at the bound or a stuck stop, never "fully visible" with a hedge. The round's, never
+ * scroll-read.ts#shortOf's: the tree alone reads it whole.
  * docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
  */
 export interface FlushCut {
@@ -346,6 +348,20 @@ export interface FlushCut {
   container: Rect;
   pinned?: QuotedNode;
   revealed: number;
+  why: 'budget' | 'room' | 'axis';
+}
+
+/**
+ * A cut the flush check's probe PROVED (`revealedBy`): after the probe the match lay flush on the same `edge` of the
+ * same `container` with `revealed` px more of it showing. Kept (`State.provenCut`) while every later flush check finds
+ * the match flush on that edge of that container (`stillProven`): such a read claims no stop and confirms none, and
+ * its next stroke is a reveal (course.ts#Revealing) — or, with none to send, the read is short of the cut
+ * (`FlushCut`). A read that finds it anywhere else lets it go: the round judges that read like any other.
+ */
+interface ProvenCut {
+  readonly edge: Edge;
+  readonly container: Rect;
+  readonly revealed: number;
 }
 
 /**
@@ -391,8 +407,8 @@ export interface ReadTime {
  * - `covered`: in the frame, not clipped so, but a node of the
  *   app drawn over it — over any of it with `fully: true`, over its centre
  *   without (`stops`);
- * - `flushCut`: a `fully: true` match a probe proved cut at its flush edge (`FlushCut`), with no swipe or time left to
- *   reveal the rest;
+ * - `flushCut`: a `fully: true` match a probe proved cut at its flush edge (`FlushCut`), with no reveal of the rest
+ *   sent (no swipe or time left, or no room or axis for one);
  * - `absent`: not in the last tree, and never in the frame before it —
  *   `unsearched` the side the strokes never
  *   read, when there is evidence it is the only one left: a stroke changed
@@ -539,6 +555,9 @@ interface FlushEdge {
   readonly pinned?: QuotedNode;
 }
 
+/** Where the match lies flush (`flushWith`): one edge and the ancestor's index, both edges of the nearest, or neither. */
+type Flushed = (FlushEdge & { at: number }) | { fills: readonly [Edge, Edge]; pinned?: QuotedNode } | undefined;
+
 /**
  * Where the match lies flush, of `chain` (clipping ancestors, nearest
  * first; `flushEdges`, ui-tree/geometry.ts, along the scroll's axis, within
@@ -554,7 +573,7 @@ function flushWith(
   chain: readonly Rect[],
   pinned: readonly PinnedEdge[],
   direction: Direction,
-): (FlushEdge & { at: number }) | { fills: readonly [Edge, Edge]; pinned?: QuotedNode } | undefined {
+): Flushed {
   const axis = axisOf(direction);
   const edgesAt = (at: number): FlushEdge[] => {
     const own: FlushEdge[] = flushEdges(rect, chain[at], axis).map((edge) => ({ edge }));
@@ -573,21 +592,21 @@ function flushWith(
 }
 
 /** Where the judged match lies flush (`flushWith`) of its clipping ancestors (`chain`, nearest first) in this read. */
-function flushOf(best: Judged, facts: TreeFacts, direction: Direction): { chain: readonly Rect[]; flushed: ReturnType<typeof flushWith> } {
+function flushOf(best: Judged, facts: TreeFacts, direction: Direction): { chain: readonly Rect[]; flushed: Flushed } {
   const chain = facts.scene.clips.scrollersOf(best.node);
   return { chain, flushed: flushWith(best.node.rect, chain, facts.scene.pinnedEdges(best.node), direction) };
 }
 
 /**
- * How many px more of the match the probe in flight (`probed`: its rect and flush edge when sent) revealed: the match,
- * now at `now`, lies flush (`flushed`) on that same edge, its extent along the edge's axis grew by more than a pixel,
- * and its uncut edge moved toward revealing the flush one by that growth, within a pixel — the content carried it out
- * from past that edge, so the probe proved the cut (`FlushCut`). 0 otherwise: no longer flush, flush on another edge or
- * filling its container, no more of it showing (a match that moved but did not grow says nothing of a cut), or grown
- * with its uncut edge where the content did not carry it (a container that grew, another match in its place).
+ * The cut the probe in flight (`probed`: its rect and flush edge when sent) proved (`ProvenCut`): the match, now at
+ * `now`, lies flush (`flushed`, of `chain`) on that same edge, its extent along the edge's axis grew by more than a
+ * pixel, and its uncut edge moved toward revealing the flush one by that growth, within a pixel — the content carried
+ * it out from past that edge. Undefined otherwise: no longer flush, flush on another edge or filling its container, no
+ * more of it showing (a match that moved but did not grow says nothing of a cut), or grown with its uncut edge where
+ * the content did not carry it (a container that grew, another match in its place).
  */
-function revealedBy(probed: { readonly rect: Rect; readonly edge: Edge }, now: Rect, flushed: ReturnType<typeof flushWith>): number {
-  if (flushed === undefined || 'fills' in flushed || flushed.edge !== probed.edge) return 0;
+function revealedBy(probed: { readonly rect: Rect; readonly edge: Edge }, now: Rect, { chain, flushed }: { chain: readonly Rect[]; flushed: Flushed }): ProvenCut | undefined {
+  if (flushed === undefined || 'fills' in flushed || flushed.edge !== probed.edge) return undefined;
   const was = probed.rect;
   const grown = axisOfEdge(probed.edge) === 'vertical' ? now.height - was.height : now.width - was.width;
   const uncutMoved = {
@@ -596,7 +615,13 @@ function revealedBy(probed: { readonly rect: Rect; readonly edge: Edge }, now: R
     right: was.x - now.x,
     left: now.x + now.width - (was.x + was.width),
   }[probed.edge];
-  return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? grown : 0;
+  return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? { edge: probed.edge, container: chain[flushed.at], revealed: grown } : undefined;
+}
+
+/** `cut` (`State.provenCut`) while the match still lies flush on its edge of its container (`flushed`, of `chain`), within a pixel; undefined once it lies anywhere else. */
+function stillProven(cut: ProvenCut | undefined, { chain, flushed }: { chain: readonly Rect[]; flushed: Flushed }): ProvenCut | undefined {
+  if (cut === undefined || flushed === undefined || 'fills' in flushed) return undefined;
+  return flushed.edge === cut.edge && sameRectWithinPixel(chain[flushed.at], cut.container) ? cut : undefined;
 }
 
 /** px from `rect`'s edge opposite `edge` to `container`'s same side: what the content may move toward revealing `edge` before that edge leaves the container. */
@@ -709,6 +734,8 @@ interface State {
   readonly inFrameAfter: number | undefined;
   /** The probe in flight (`flushCheck`): the judged match's rect and edge when it was sent. Cleared by the next read that reads. */
   readonly probe: { rect: Rect; edge: Edge } | undefined;
+  /** The cut a probe proved (`ProvenCut`), while the match lies flush on it; undefined until one is. */
+  readonly provenCut: ProvenCut | undefined;
   /** The swipe count at the last read that had the target in the tree at all — for "was in the tree … then left it". */
   readonly inTreeAfter: number | undefined;
   /** The top sheet's grabber at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
@@ -743,6 +770,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     presentedHold: undefined,
     inFrameAfter: undefined,
     probe: undefined,
+    provenCut: undefined,
     eyesRefused: undefined,
     marginKept: [],
     inTreeAfter: undefined,
@@ -1035,8 +1063,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const answersBack = sighted?.answersBack === true;
   // A band the eyes saw that refuses the stop (THE EYES, below): no stop, the shortfall the stuck and bound failures name.
   let unlisted: Extract<InFrameShort, { of: 'unlisted' }> | undefined;
-  // A cut the flush check's probe proved with no swipe or time left to reveal the rest (`FlushCut`): no stop, the
-  // shortfall the bound failure names.
+  // A cut the flush check's probe proved with no reveal to send this read (`FlushCut`): no stop, the shortfall the
+  // stuck and bound failures name.
   let flushCut: FlushCut | undefined;
   if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
     // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies.
@@ -1058,10 +1086,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // been a tap, and a tap moves nothing whatever lies beyond the edge.
       const drawn = lastDrawn(s.motion);
       const probeStroked = probeHeld && drawn !== undefined && strokeLength(drawn) >= 2 * TOUCH_SLOP;
-      // The probe moved it and it lies flush on the same edge with more of it showing (`revealedBy`): the cut is
-      // proved, so no stop is claimed and none confirmed — the next stroke reveals the rest (`flushCheck`), at once.
-      const flushAt = fully ? flushOf(best, now.facts, s.rules.direction) : undefined;
-      const revealed = flushAt !== undefined && probed !== undefined && !probeHeld ? revealedBy(probed, best.node.rect, flushAt.flushed) : 0;
+      // The probe moved it and it lies flush on the same edge with more of it showing (`revealedBy`), or it still lies
+      // flush on a cut an earlier probe proved (`stillProven`): no stop is claimed and none confirmed — the next stroke
+      // reveals the rest (`flushCheck`), at once.
+      const flush = fully ? flushOf(best, now.facts, s.rules.direction) : undefined;
+      if (flush !== undefined) s.provenCut = (probed !== undefined && !probeHeld ? revealedBy(probed, best.node.rect, flush) : undefined) ?? stillProven(s.provenCut, flush);
+      const proven = flush === undefined ? undefined : s.provenCut;
       // A stop after a stroke is reported only once a read finds the target
       // where the last one did (SETTLE_CONFIRM_READS): a fling can carry it
       // on, or out of the frame, after the settle read caught it inside. A
@@ -1069,15 +1099,14 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       const settled = s.swipes === 0 || probeHeld || (current === 'settle' && observed.bestUnmoved);
       // A fling still slowing is waited out, spending none of the budget (SETTLE_CONFIRM_READS): the stop is judged on
       // the read it comes to rest in, not on one it is still carrying the target through.
-      if (!settled && revealed === 0 && observed.slowing && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
-      if (!settled && revealed === 0 && mayConfirm(s, seen.elapsedMs)) return confirm(s);
+      if (!settled && proven === undefined && observed.slowing && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
+      if (!settled && proven === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
       // `fully: true`, an edge flush with the clipping container: possibly cut there — probe once toward it
       // (`flushCheck`), reveal what a probe proved cut, or say it could not be checked.
-      const checked = flushAt !== undefined ? flushCheck(s, { best, facts: now.facts, flushAt, probeHeld, probeStroked, revealed, gesture, cover, offered, seen, ask }) : undefined;
+      const checked = flush !== undefined ? flushCheck(s, { best, facts: now.facts, ...flush, probeHeld, probeStroked, proven, gesture, cover, offered, seen, ask }) : undefined;
       if (checked !== undefined && 'step' in checked) return checked;
       if (checked !== undefined && 'of' in checked) flushCut = checked;
       else {
-        const flush = checked;
         // The `unlocated` row on a `fully: true` stop only — where the answer
         // changes what the reader does next — and only with no cover under
         // the judgement: a band THIS stop was judged under is what it reports.
@@ -1098,7 +1127,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         if (question !== undefined && eyes === undefined) return ask(question);
         const finding: EyesFinding | undefined = eyes === undefined || eyes.sees === 'own' ? undefined : eyes;
         if (finding?.sees !== 'surface' || !(fully || reachesPoint(finding, question?.region ?? best.node.rect, tapPoint(best.node)))) {
-          return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(flush !== undefined && { flush }), ...(finding !== undefined && { eyes: finding }) });
+          return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(checked !== undefined && { flush: checked }), ...(finding !== undefined && { eyes: finding }) });
         }
         unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: { lineY: offered.line.y, remedy: offered.remedy } }) };
         if (question !== undefined) s.eyesRefused = { asked: askedOf(question), short: unlisted };
@@ -1153,7 +1182,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     if (stuck !== undefined) {
       const { on: stuckOn, otherWay } = stuck;
       const strokeBack = otherWay === 'untried' && s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
-      if (!strokeBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: unlisted ?? under ?? shortOf(best), lastStroke: stuckOn, viewport, otherWay });
+      if (!strokeBack) return stop(s, { kind: 'stuck', swipes: s.swipes, short: unlisted ?? flushCut ?? under ?? shortOf(best), lastStroke: stuckOn, viewport, otherWay });
       s.course = turnBack(s.course, stuckOn);
     }
   }
@@ -1298,13 +1327,14 @@ interface FlushRound {
   /** The judged match, a stop in the frame. */
   readonly best: Judged;
   readonly facts: TreeFacts;
-  /** Where the match lies flush of its clipping ancestors in this read (`flushOf`), as the round read it for `revealed`. */
-  readonly flushAt: ReturnType<typeof flushOf>;
+  /** The match's clipping ancestors, nearest first, and where it lies flush of them in this read (`flushOf`). */
+  readonly chain: readonly Rect[];
+  readonly flushed: Flushed;
   /** The probe in flight came back with the match where it was sent from (`round`), and was drawn as a stroke, not a tap. */
   readonly probeHeld: boolean;
   readonly probeStroked: boolean;
-  /** px more of the match the probe in flight showed, flush on the same edge (`revealedBy`): the cut proved; 0 otherwise. */
-  readonly revealed: number;
+  /** The cut a probe proved, the match still flush on it (`State.provenCut`); undefined when none is. */
+  readonly proven: ProvenCut | undefined;
   /** The round's gesture box (`RoundSeen.screen`'s `oriented`). */
   readonly gesture: Rect | undefined;
   /** The keyboard cover the read applied, and the one it offered the witness (scroll-read.ts#ReadJudgement). */
@@ -1337,8 +1367,12 @@ interface FlushRound {
  * of the match with it — so that read claims no stop and confirms none: the
  * next stroke is a REVEAL (course.ts#Revealing: the whole stroke, its travel
  * half the room the match leaves in that container), a probe in every other
- * respect; at the bound the failure names the cut (`FlushCut`), never
- * "fully visible". Measured on the lab's bounded list
+ * respect. The proof is kept while the match lies flush on that edge of that
+ * container (`ProvenCut`, `State.provenCut`), so no later read claims it
+ * fully visible there either; with no reveal to send (no swipe or time
+ * left, or a tree changed since the probe with no room or only a scroll view
+ * across the axis) the read is short of the cut (`FlushCut`), which the bound
+ * or a stuck stop names — never "fully visible". Measured on the lab's bounded list
  * (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md):
  * a 74-px probe moved S 57–61 px of its 154-px cut (21 or 38 on a loaded
  * host), and quarter-strokes with a confirming read each — ~5.1 s a round —
@@ -1404,17 +1438,17 @@ interface FlushRound {
  * header or not). iOS has no clipping container
  * (types.ts#UiNode.clipsDescendants), so it never probes. At the bound —
  * no swipe or time left — a stop never probed is reported with `flush.checked` false
- * and a sentence saying it may be cut; a cut a probe proved fails the bound (`FlushCut`).
+ * and a sentence saying it may be cut; a cut a probe proved is no stop (`FlushCut`).
  *
  * The check itself: where the match lies flush with its clipping ancestors
  * (`flushWith`), and either the stop's `Flush` — `fills`, `checked` by the probe that came back, or unchecked for
- * `tap`, `room` or `budget` — the cut a probe proved with no swipe or time left (`FlushCut`, `revealed` > 0), or the
+ * `tap`, `room`, `axis` or `budget` — the cut a probe proved with no reveal sent (`FlushCut`, for `room`, `axis` or `budget`), or the
  * step that answers it first: the witness asked about a band the moot rule left
  * unasked, or the probe sent, as the stroke plan makes it (interact/stroke-plan.ts#planProbe: over the first of the
  * ancestors from the flush one outward with room above the keyboard — none, and no probe is sent). Undefined: not
  * flush with any.
  */
-function flushCheck(s: Mutable<State>, { best, facts, flushAt: { chain, flushed }, probeHeld, probeStroked, revealed, gesture, cover, offered, seen, ask }: FlushRound): Flush | FlushCut | Next | undefined {
+function flushCheck(s: Mutable<State>, { best, facts, chain, flushed, probeHeld, probeStroked, proven, gesture, cover, offered, seen, ask }: FlushRound): Flush | FlushCut | Next | undefined {
   if (flushed === undefined) return undefined;
   if ('fills' in flushed) return { edges: flushed.fills, container: chain[0], ...(flushed.pinned !== undefined && { pinned: flushed.pinned }), checked: false, why: 'fills' };
   const { edge, at } = flushed;
@@ -1426,16 +1460,18 @@ function flushCheck(s: Mutable<State>, { best, facts, flushAt: { chain, flushed 
   // unusable AND the tree has no window, and adapters/viewport-memo.ts keeps a successful size for the session — so it
   // takes a device reporting 0×0 throughout, and a tree whose window stood in on an earlier round (else the frame is
   // 0×0 and no stop is ever visible) but not on this one.
-  const noRoom = { ...where, checked: false, why: 'room' } as const;
+  // A check that cannot be made: the stop's hedge — or, on a cut a probe proved, no stop at all but that cut, with why
+  // no reveal was sent (`FlushCut`).
+  const unchecked = (why: 'budget' | 'room' | 'axis'): Flush | FlushCut => (proven === undefined ? { ...where, checked: false, why } : { of: 'flushCut', judged: best, ...where, revealed: proven.revealed, why });
   // Its way and reach are the course's (interact/course.ts#probeOf): toward revealing the edge, a short stroke capped
   // by the screen's long side — or, once a probe proved the cut, the reveal sized from the room the match leaves in
   // that container.
-  const revealing = revealed > 0 ? { room: roomPast(best.node.rect, container, edge) } : undefined;
+  const revealing = proven === undefined ? undefined : { room: roomPast(best.node.rect, container, edge) };
   const way = probeOf(edge, s.frame.box, revealing);
-  if (probeAcrossOnly({ toward: way.toward, facts, scrollViews: chain.slice(at) })) return { ...where, checked: false, why: 'axis' };
+  if (probeAcrossOnly({ toward: way.toward, facts, scrollViews: chain.slice(at) })) return unchecked('axis');
   const probeOver = (keyboardTop: number | undefined) => planProbe(s.strokes, { ...way, gesture, facts, scrollViews: chain.slice(at), keyboardTop });
-  if (probeOver(undefined) === undefined) return noRoom;
-  if (s.swipes >= s.rules.maxSwipes || seen.elapsedMs >= s.rules.timeoutMs) return revealing === undefined ? { ...where, checked: false, why: 'budget' } : { of: 'flushCut', judged: best, ...where, revealed };
+  if (probeOver(undefined) === undefined) return unchecked('room');
+  if (s.swipes >= s.rules.maxSwipes || seen.elapsedMs >= s.rules.timeoutMs) return unchecked('budget');
   // Clear of a keyboard as any stroke is — and one the moot rule never asked about (the stop was clean either way) is
   // asked about now: the probe touches down on the container's lower part for a bottom edge, which may be under the
   // band.
@@ -1448,7 +1484,7 @@ function flushCheck(s: Mutable<State>, { best, facts, flushAt: { chain, flushed 
   // it — the probe would touch down off it and move nothing. Twice only to keep the ask order: no room even over the
   // whole screen is `room` with no witness asked.
   const planned = probeOver(strokeLine(probeCover, facts)?.y);
-  return planned === undefined ? noRoom : probe(s, edge, way.toward, best.node.rect, planned);
+  return planned === undefined ? unchecked('room') : probe(s, edge, way.toward, best.node.rect, planned);
 }
 
 /**

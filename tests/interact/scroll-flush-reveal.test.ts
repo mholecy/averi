@@ -19,11 +19,17 @@ const S_TOP = 1519;
 const S_HEIGHT = 176;
 const S_ID = 'lab.scroll-bounded-flush.S';
 
-/** The read with the lower list scrolled `offset` px: S's top at 1519 − offset, its bounds cut at the list's bottom. */
-function sAt(offset: number, extra: Row = {}): Row {
+/**
+ * The read with the lower list scrolled `offset` px: S's top at 1519 − offset, its bounds cut at the list's bottom.
+ * `across`: the lower list dumped as a HorizontalScrollView — a tree changed since the probe, no list around S
+ * scrolling along its bottom edge's axis.
+ */
+function sAt(offset: number, extra: Row = {}, across = false): Row {
   const top = S_TOP - offset;
   const bottom = Math.min(LOWER.y + LOWER.height, top + S_HEIGHT);
-  const xml = XML.replace('bounds="[128,1519][953,1541]"', `bounds="[128,${top}][953,${bottom}]"`).replace('bounds="[128,1519][953,1607]"', `bounds="[128,${top}][953,${top + 88}]"`);
+  const lower = across ? XML.replace('class="android.widget.ScrollView" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="true" long-clickable="false" password="false" selected="false" bounds="[0,1046][1080,1541]"', 'class="android.widget.HorizontalScrollView" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="true" long-clickable="false" password="false" selected="false" bounds="[0,1046][1080,1541]"') : XML;
+  if (across && lower === XML) throw new Error('no lower list in the capture');
+  const xml = lower.replace('bounds="[128,1519][953,1541]"', `bounds="[128,${top}][953,${bottom}]"`).replace('bounds="[128,1519][953,1607]"', `bounds="[128,${top}][953,${top + 88}]"`);
   const tree = parseDump(xml);
   const s = [...everyNode(tree)].find((n: UiNode) => n.identifier === S_ID);
   if (s === undefined) throw new Error('no S in the capture');
@@ -71,11 +77,39 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     expect(failureOf(late, `id:"${S_ID}"`).message).toBe(
       `scroll_until id:"${S_ID}" failed after 15000ms (timeout 15000ms; 1 swipe sent; 2 tree reads took 0ms, the last 0ms) — ` +
         "element reached the viewport but its bottom edge still lies on its scroll container's (0,1046 1080x495), where Android cuts a node's bounds to the container, " +
-        'and the last probe swipe toward it showed 60 px more of it — part of it lay past that edge, so it may still be cut there (last rect {"x":128,"y":1459,"width":825,"height":82}); raise maxSwipes or timeoutMs',
+        'and a probe swipe toward it showed 60 px more of it — part of it lay past that edge, so it may still be cut there (last rect {"x":128,"y":1459,"width":825,"height":82}); raise maxSwipes or timeoutMs',
     );
     const spent = play({ ...RULES, maxSwipes: 1 }, [sAt(0), sAt(60)]);
     expect(spent.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' }, short: { of: 'flushCut', revealed: 60 } });
     expect(failureOf(spent, `id:"${S_ID}"`).message).toContain('failed after 1 swipe (maxSwipes) — element reached the viewport but its bottom edge still lies on');
+  });
+
+  it('no reveal can be drawn on the read that proved the cut (a tree changed: only a list across the axis): no "fully visible" — the read is short of the cut', () => {
+    const played = play(RULES, [sAt(0), sAt(60, {}, true), { ...sAt(60, {}, true), elapsedMs: 15_000 }]);
+    expect(played.steps.map((s) => s.do)).not.toContain('confirm');
+    expect(played.outcome).toMatchObject({ kind: 'bound', short: { of: 'flushCut', edge: 'bottom', container: LOWER, revealed: 60, why: 'axis' } });
+    expect(failureOf(played, `id:"${S_ID}"`).message).toContain(
+      'and a probe swipe toward it showed 60 px more of it — part of it lay past that edge, so it may still be cut there, and every scroll container around it from that one outward scrolls only sideways, so no swipe can reveal the rest (last rect {"x":128,"y":1459,"width":825,"height":82}); check with a screenshot',
+    );
+  });
+
+  it('the proof is kept while it lies flush on that edge: a later read, after a stroke that was no reveal, reveals at once — no confirm, no quarter probe', () => {
+    const played = play(RULES, [sAt(0), sAt(60, {}, true), sAt(60), sAt(280), sAt(280)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'confirm', 'stop']);
+    const [probe, course, reveal] = strokes(played);
+    expect(probe).toMatchObject({ probe: true, reach: 0.25 });
+    expect(course).not.toHaveProperty('probe');
+    expect(reveal).toMatchObject({ probe: true, reach: 1, maxTravel: 206 });
+    expect(resultOf(played)).toEqual({ swipes: 3, visible: 1, clipped: [] });
+  });
+
+  it('strokes that no longer move a match on a proven cut it cannot reveal: the stuck stop names the cut, never "fully visible"', () => {
+    const across = sAt(60, {}, true);
+    const played = play(RULES, [sAt(0), across, across, across, across]);
+    expect(played.outcome).toMatchObject({ kind: 'stuck', short: { of: 'flushCut', why: 'axis', revealed: 60 } });
+    expect(failureOf(played, `id:"${S_ID}"`).message).toContain(
+      'so no swipe can reveal the rest — and swiping down no longer moves it, nor does swiping up; check with a screenshot. Last rect {"x":128,"y":1459,"width":825,"height":82}',
+    );
   });
 
   it('a probe after which it lies flush on the same edge with LESS of it showing proved nothing: confirmed and probed again, no reveal', () => {

@@ -401,12 +401,21 @@ match in its place), has proved the cut — content lay past that edge, and part
    reveal, the room taken anew; out of the flush → the ordinary stop;
 3. at the bound (no swipe or time for the reveal) is NOT "fully visible": the bound fails, its shortfall the cut the
    probe proved (`FlushCut`) — `element reached the viewport but its bottom edge still lies on its scroll container's
-   (…), where Android cuts a node's bounds to the container, and the last probe swipe toward it showed N px more of it
+   (…), where Android cuts a node's bounds to the container, and a probe swipe toward it showed N px more of it
    — part of it lay past that edge, so it may still be cut there (last rect …); raise maxSwipes or timeoutMs`. Not
    "it is cut": the probe proved part of it lay past the edge BEFORE it, not after — the last row of a list cut by
    40 px is whole after a 40-px probe that brought the list to its end, and still flush (the next reveal, had there
    been budget, would have moved nothing and said `checked`). `flush.why: 'budget'` stays for a flush stop never
-   probed.
+   probed;
+4. is remembered: the proof is KEPT (`scroll-rounds.ts#ProvenCut`, `State.provenCut`) while every later flush check finds the match
+   flush on that edge of that container, and let go when one finds it anywhere else. So a read that cannot send the
+   reveal — no swipe or time (`budget`), or a tree changed between the probe and its read: no room for a stroke (a
+   keyboard or an overlay come up) or only a scroll view across the axis — is short of the cut (`FlushCut`, its `why`)
+   and claims no stop; the strokes go on the caller's way as for any shortfall, and a later read still flush there
+   reveals at once, or is short of the cut again. The bound fails naming it, a stuck stop too (`… so no swipe can
+   reveal the rest — and swiping down no longer moves it …; check with a screenshot`): "fully visible" is never said
+   of a match on a proven cut. Room and axis never measured (golden 0 changed; the lab's S never takes that path); the
+   unit tests hand the probe's read a list dumped as a HorizontalScrollView.
 
 Cost: none on a stop the first probe settles (a first row at rest, P, every golden row: a replayed tree never moves,
 so every probe holds); on a proven cut one read fewer per round, and on S one stroke fewer. No device call added.
@@ -414,12 +423,7 @@ Deterministic in the trees: the reveal's size is a function of the read's rects 
 as its container converges in halving steps; the stroke is never drawn under 2 × TOUCH_SLOP nor 3 % of the box's side
 (`swipe.ts#shortenStroke`), so under a room of about 96 px the reveal travels more than half of it, and at a room of a few
 tens of px it may carry the uncut edge out — the row then reads flush at both edges (`fills`), said as "may be cut", or the
-bound ends it as a failure; never a claim. And the reveal's own checks still come first on the read that proved the
-cut: should the probe's read find no room for a stroke (`room`: a keyboard or an overlay come up during the probe) or
-only a scroll view across the axis (`axis`) — neither depends on the reveal's size, so only a tree that changed
-between the probe and its read — the stop is reported as before, "fully visible …; but … may be cut"; never measured,
-not handled: a reveal it cannot draw would be a stroke of the caller's way, and the next read, with no probe behind it,
-would stop on the same words.
+bound ends it as a failure; never a claim.
 
 Bug note: docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
 

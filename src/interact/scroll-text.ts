@@ -12,7 +12,7 @@ import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
@@ -399,6 +399,22 @@ function flushEdgeText({ edge, container, pinned }: { edge: Edge; container: Rec
   };
 }
 
+/**
+ * A cut a probe proved and no reveal was sent for (scroll-rounds.ts#FlushCut), for the bound's and the stuck stop's
+ * sentences: where the flush edge still lies, what the probe showed, and why no reveal followed when that was not the
+ * budget. Never "a probe swipe toward it moved nothing": that is the checked stop's clause, which the truth reader
+ * takes for a probed side (scripts/truth/replies.ts, flushProbedSide).
+ */
+function flushCutText(cut: FlushCut): string {
+  const { where, cuts } = flushEdgeText(cut, 'still lies');
+  const unrevealed = {
+    budget: '',
+    room: ', and no scroll container around it has room for a swipe to reveal the rest',
+    axis: `, and every scroll container around it from that one outward scrolls only ${axisOfEdge(cut.edge) === 'vertical' ? 'sideways' : 'up and down'}, so no swipe can reveal the rest`,
+  }[cut.why];
+  return `${where}, ${cuts}, and a probe swipe toward it showed ${cut.revealed} px more of it — part of it lay past that edge, so it may still be cut there${unrevealed}`;
+}
+
 /** The `settled: false` note — what the reader should know before measuring the element. */
 const STILL_MOVING = 'still moving at the last read (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match';
 
@@ -567,6 +583,13 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
           message:
             `scroll_until ${describe} failed after ${n} — element is in the viewport but ${surfaceText(short.finding)} — and the content is exhausted: ` +
               `swiping ${o.lastStroke} no longer moves it${away}. That surface stays over it at the end of the content — ${why}. ${last}`,
+        };
+      }
+      // A cut a probe proved (scroll-rounds.ts#FlushCut), the strokes the caller's way no longer moving it: no claim
+      // either way of what lies past that edge now — a screenshot tells.
+      if (short.of === 'flushCut') {
+        return {
+          message: `scroll_until ${describe} failed after ${n} — element is in the viewport but ${flushCutText(short)} — and swiping ${o.lastStroke} no longer moves it${neither}; check with a screenshot. ${last}`,
         };
       }
       if (short.of === 'carriedUnder') {
@@ -860,15 +883,8 @@ function shortText(short: Shortfall): string {
       return `element reached the viewport but stayed ${unlistedText(short.finding)} (last rect ${JSON.stringify(short.judged.node.rect)})`;
     case 'carriedUnder':
       return `element reached the screen but ${carriedUnderText(short.under)} (last rect ${JSON.stringify(short.judged.node.rect)}); ${UNTOLD_SCROLL_VIEW_REMEDY}`;
-    case 'flushCut': {
-      // Never "a probe swipe toward it moved nothing": that is the checked stop's clause, which the truth reader takes
-      // for a probed side (scripts/truth/replies.ts, flushProbedSide).
-      const { where, cuts } = flushEdgeText(short, 'still lies');
-      return (
-        `element reached the viewport but ${where}, ${cuts}, and the last probe swipe toward it showed ${short.revealed} px more of it — part of it lay past that edge, so it may still be cut there ` +
-        `(last rect ${JSON.stringify(short.judged.node.rect)}); raise maxSwipes or timeoutMs`
-      );
-    }
+    case 'flushCut':
+      return `element reached the viewport but ${flushCutText(short)} (last rect ${JSON.stringify(short.judged.node.rect)}); ${short.why === 'budget' ? 'raise maxSwipes or timeoutMs' : 'check with a screenshot'}`;
     case 'systemBar': {
       const { judged } = short;
       const region = short.band === undefined ? '' : ` — fully: true stops only with none of it under the bar (${centreClear(short)})`;
