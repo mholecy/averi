@@ -19,7 +19,7 @@ import { findTarget, type Target } from './selectors.js';
  *   edge — one floating off both edges the parser has marked already). Decisions 3 and 4 then read it as they read the
  *   parser's: the wait names the layer, `scroll_until` sends no stroke but on the window's own scroll view;
  * - `screenAlone` marks the root `windowAlone`: the active-window hint is not said (ui-tree/miss.ts#missOf);
- * - `unknown` leaves the tree as it was — today's reply, the hint.
+ * - `unknown` leaves the tree as it was: the miss says the active-window hint.
  * The parser's own mark comes first: a marked tree is never asked. A departure from "the parser reads what ui-tree
  * never sees": this mark is set after the read, from a second call, because the dump holds no such fact.
  *
@@ -28,7 +28,8 @@ import { findTarget, type Target } from './selectors.js';
  * up with its target in no read it can still type (interact/resolve.ts#notFound: the tap's, fill's and the presence
  * check's; verify/assert.ts#Verifier.poll and verify/pixel-poll.ts: every assert's not-found; the flow's `wait:`,
  * flow/engine.ts#pollUntil) — never for a wait whose reply words no not-found (an `absent` check still visible, an
- * element found with the wrong content, a condition of no element: those callers hand no target), a failed read, or a
+ * element found with the wrong content, a condition of no element, a flow's wait whose last read was bare: those
+ * callers hand no target), a failed read, or a
  * read that matched the target; and `CallWindow`, `scroll_until`'s before a stroke for a target its read does not hold
  * (interact/scroll.ts). A flow's detect probe does not ask: it words no miss. What a mark changes is asked only for a
  * target the tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped` (ADR 0018's
@@ -36,11 +37,11 @@ import { findTarget, type Target } from './selectors.js';
  */
 
 /** A tree whose window the window manager may still type: it lists the active window only, and its parser marked none. */
-const unmarkedWindow = (tree: UiNode): boolean => tree.activeWindowOnly === true && tree.presentation === undefined && tree.windowAlone !== true;
+const windowMayBeTyped = (tree: UiNode): boolean => tree.activeWindowOnly === true && tree.presentation === undefined && tree.windowAlone !== true;
 
 /** THE decision: `tree` marked by the window manager's word on its window (the module doc), or `tree` itself. Pure. */
 export function markByWindow(tree: UiNode, window: FocusedWindow): UiNode {
-  if (window.of === 'unknown' || !unmarkedWindow(tree) || !sameRectWithinPixel(window.frame, tree.rect)) return tree;
+  if (window.of === 'unknown' || !windowMayBeTyped(tree) || !sameRectWithinPixel(window.frame, tree.rect)) return tree;
   if (window.of === 'screenAlone') return { ...tree, windowAlone: true };
   // Screen-wide within the frame's own pixel of tolerance: a window 1079 wide of a 1080 screen spans it.
   return { ...tree, presentation: window.screen.width - window.frame.width <= 1 ? 'screen' : 'dialog' };
@@ -58,7 +59,7 @@ export async function markedForMiss(
   missing: Target | undefined,
 ): Promise<UiNode | undefined> {
   const tree = last.lastTree;
-  if (tree === undefined || last.readError !== undefined || missing === undefined || !unmarkedWindow(tree) || adapter.focusedWindow === undefined) return tree;
+  if (tree === undefined || last.readError !== undefined || missing === undefined || !windowMayBeTyped(tree) || adapter.focusedWindow === undefined) return tree;
   if (findTarget(tree, missing).length > 0) return tree;
   return markByWindow(tree, await adapter.focusedWindow());
 }
@@ -75,7 +76,7 @@ export class CallWindow {
 
   /** `tree` marked by the word on its window; `holdsTarget` — the call has matched the target, so no miss's word is asked for this read (asked only of a tree the word may type). */
   async mark(tree: UiNode, holdsTarget: () => boolean): Promise<UiNode> {
-    if (!unmarkedWindow(tree) || this.adapter.focusedWindow === undefined) return tree;
+    if (!windowMayBeTyped(tree) || this.adapter.focusedWindow === undefined) return tree;
     if (this.said === undefined || !sameRectWithinPixel(this.said.rect, tree.rect)) {
       if (holdsTarget()) return tree;
       this.said = { rect: tree.rect, window: await this.adapter.focusedWindow() };

@@ -468,7 +468,7 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     expect(message).not.toContain('no scroll moves it');
   });
 
-  it('with no word (the call failed, the frames disagree): today\'s reply, the hint', async () => {
+  it('with no word (the call failed, the frames disagree): the active-window hint', async () => {
     for (const window of [{ of: 'unknown' } as const, undefined]) {
       const { fake } = device(lab('dialog-fullscreen'), window);
       expect((await fails(resolveSettled(fake, 'id:"lab.dialog-fullscreen.A"', FAST))).message).toBe(

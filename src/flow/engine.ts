@@ -1562,8 +1562,9 @@ export class FlowEngine {
     const outcome = await pollTree(this.adapter, fn, { timeoutMs, pollMs: this.pollMs });
     if (!outcome.timedOut) return outcome.value;
     const bareNote = outcome.undecidedTree === undefined ? undefined : bareTimeoutNote(outcome.undecidedTree);
-    // The window manager's word on the last tree's window, asked now the wait has given up (ui-tree/window-mark.ts).
-    const lastTree = await markedForMiss(this.adapter, outcome, hint?.missing);
+    // The window manager's word on the last tree's window, asked now the wait has given up (ui-tree/window-mark.ts) —
+    // not where the bare-tree note is the message, which words no miss.
+    const lastTree = await markedForMiss(this.adapter, outcome, bareNote === undefined ? hint?.missing : undefined);
     const { hint: said, miss } = hint?.say(lastTree) ?? {};
     const message = pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? said);
     // The miss rides on the error only where its note is what the message says beneath the headline.

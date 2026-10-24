@@ -35,7 +35,7 @@ const KEYBOARD_QUERY_TIMEOUT_MS = 2_000;
 const KEYBOARD_WITNESS_TIMEOUT_MS = 2_000;
 /** The same reasoning for the status band beside the screen size (statusBand): past it, no band. */
 const STATUS_BAND_QUERY_TIMEOUT_MS = 2_000;
-/** The same reasoning for the window manager's word on a miss (focusedWindow): past it, `unknown` — today's hint. */
+/** The same reasoning for the window manager's word on a miss (focusedWindow): past it, `unknown` — the active-window hint. */
 const FOCUSED_WINDOW_TIMEOUT_MS = 2_000;
 
 /** A refusal's lines as the messages below quote them: `<command> said: a / b`. */
