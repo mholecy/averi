@@ -359,7 +359,7 @@ describe('tool descriptions on a screen presented over the target', () => {
     const { ACTIVE_WINDOW_HINT } = await vi.importActual<typeof import('../../src/ui-tree/miss.js')>('../../src/ui-tree/miss.js');
     expect(description('tap')).toContain(`the wait still ends "… to appear", with "(${ACTIVE_WINDOW_HINT})" beneath it when the window manager does not say the window is the app's screen alone (its call failed, or another window of the app shows; unless the target matched only 0×0 nodes, whose hint takes its place:`);
     expect(description('tap')).toContain('a full-screen dialog or a sheet whose dump carries no scrim, once the wait has found nothing, by the window manager\'s word');
-    expect(description('tap')).toContain('instead of "… to appear" — first to scroll_until it there where that window holds a list of its own (');
+    expect(description('tap')).toContain('instead of "… to appear" — where that window holds a list of its own, the reply says first to scroll_until it in that list (');
     expect(description('tap')).toContain(
       'as scroll_until\'s "element never appeared in the tree" carries it (its stop under a keyboard over the whole screen too), and so do a flow\'s tap, fill and scroll_until steps (the same waits), a flow\'s wait: on an element (beneath its "Timed out …"), every assert\'s "not found within …" (after it) and a skipped optional step\'s line ("(not present) (…)", or a skipped wait:\'s "Timed out … (…)"): every reply that says a target is not in such a tree, once.',
     );

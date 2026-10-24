@@ -517,7 +517,7 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     fake.uiTree = async () => (reads++ === 0 ? dialog : without);
     const { pass, detail } = await new Verifier(fake, { pollMs: 2, timeoutMs: 2_000 }).assert({ element: { id: 'lab.dialog-fullscreen.S' }, color: { expected: '#00FF00' } });
     expect(pass).toBe(false);
-    expect(detail).not.toMatch(/^not found/);
+    expect(detail).toMatch(/vs expected #00FF00/);
     expect(reads).toBeGreaterThan(1);
     expect(asked).toHaveLength(0);
   });
