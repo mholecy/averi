@@ -1,6 +1,6 @@
 # BUG: on Android `scroll_until … fully: true` on a field whose touch-margin text a screenshot saw drawn over it strokes until its timeout — the text moves with the field, so no stroke can clear it
 
-> **Status (2026-10-24):** fixed at `074b48c3` (bugs/r1023b-row19, ADR 0026 amended: rule 6, rule 8), measured by the unit
+> **Status (2026-10-24):** fixed at `074b48c3`, review fix `11a5f92a` (a carry only in a scroll view that stayed put) (bugs/r1023b-row19, ADR 0026 amended: rule 6, rule 8), measured by the unit
 > tests (tests/interact/scroll-eyes.test.ts, "what was seen of a margin text, kept"; tests/interact/motion-ledger.test.ts,
 > "a pair carried together"): seen `under`, then carried with the field by a stroke, the call fails after 1 swipe —
 > "failed after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there: it

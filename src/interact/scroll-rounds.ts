@@ -87,8 +87,8 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * say "fully visible" with a flush neighbour — THE EYES, ui-tree/eyes.ts — whose band under `fully: true` is no stop);
  * stuck; the confirming read, or the
  * read after a probe, that did not read; covered (nothing above the band); the end turn (`EndTurn`), which takes an
- * exhaustion it applies to out of the bound; the bound (exhausted, `movesWith` — a margin text seen drawn over it
- * carried with it —, maxSwipes, deadline — and `ask unlocated` of a round that read); the stroke. The witness comes before the deadline is consulted, so a witness that waits out its 2 s
+ * exhaustion it applies to out of the bound; the bound (exhausted; `movesWith`, a margin text seen drawn over it
+ * carried with it; maxSwipes; deadline — and `ask unlocated` of a round that read); the stroke. The witness comes before the deadline is consulted, so a witness that waits out its 2 s
  * counts against the scroll's budget: the driver stamps `elapsedMs` afresh on every call, re-entry included.
  *
  * BOUND: at most 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes` non-ask steps

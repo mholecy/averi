@@ -176,6 +176,9 @@ with the target's own rows beside it.
      margin pair there) leaves the sighting in place, so a pair back in the sighted relation and offset after such
      reads fires on the carry since the sighting, whatever moved in between — contrived (a pinned text would have to
      move by the content's offset), and accepted.
+   - **A scroll view that moves with the content never fires**: a field in a carousel carried by the list around it,
+     or in a scroll view the tree does not mark, strokes to the bound as before — a slow honest failure, never a false
+     one.
    - **Unit only:** the lab's titles draw nothing in the margin, so no lab cell answers `under` live; a cell whose next
      title draws a background over the field's touch margin would measure it.
 6. Measured on one AVD (averi_lab, API 33, Material 3 lab forms). Another app's margin texts are found by the same rule;
