@@ -5,6 +5,8 @@ and stable, truthful results; no false refusal where a cheap, reliable signal ex
 Implemented on `bugs/r1023-phone`. Amends ADR 0024 (a second pair kind for the eyes' order question, and a trigger on a
 cover whose order the tree tells). Cites ADR 0013 (one capture), ADR 0014 (the density refused, the allowance
 precedent), ADR 0002 (the pixel slack) and ADR 0010 (the keyboard judged first).
+Amended 2026-10-24 (round 1023b, open-bugs row 19, on `bugs/r1023b-row19`): rule 6's `under` kept while the two keep
+their relation, and rule 8, the cover carried with it ends the call — residual 5 closed.
 
 ## Context
 
@@ -84,16 +86,36 @@ precedent), ADR 0002 (the pixel slack) and ADR 0010 (the keyboard judged first).
 6. **Once per text where it lies** in `scroll_until` (`scroll-rounds.ts#State.marginKept`): unlike ADR 0024's
    unordered stop, a refused clear question is followed by strokes, and the text moves with the target. What was seen
    is kept by the text's identifier, label and size within a pixel (one entry per text, the latest answer) and told to
-   every later read: `under` for the call (the cover stands, no screenshot again); `clear` and `untold`, answers of the
-   frame they were read on (a displaced capture may read `clear`, a blended one `untold`), while the target and the
-   text lie where they were seen — moved, asked again. So one screenshot per text while the two stay put, one more each
-   time a stroke moves them; a text seen drawn over the target costs one for the call.
+   every later read: `under` while the two keep their relation — unmoved, or carried together by the same offset
+   (`interact/motion-ledger.ts#movedTogether`: the target moved more than a pixel, the text by the same offset within a
+   pixel, both at the same size); a changed relation (a text pinned over the content, which a stroke moves the target
+   past) is asked again (amended 2026-10-24: kept "for the call" before, on the unchecked belief that every margin text
+   is content of the target's scroll view — a pinned one seen over one band would have refused every later band
+   unasked); `clear` and `untold`, answers of the frame they were read on (a displaced capture may read `clear`, a
+   blended one `untold`), while the target and the text lie where they were seen — moved, asked again. So one
+   screenshot per text while the two stay put, one more each time a stroke moves them; a text seen drawn over the
+   target and carried with it costs one for the call.
 7. **Replies.** After `clear`: `fully visible after 0 swipes — text "Variable symbol" (55,1406 258x56), drawn after it,
    overlaps its bottom 6 px with nothing a screenshot shows (Android dumps a control's touch target, past what it
    draws)` — the prefix unchanged, so scripts/truth/replies.ts still reads it as "fully visible". After `under`, the
    covered failure as before plus `— a screenshot shows it drawn over its bottom 6 px`; after `untold`, plus `— a
    screenshot could not tell whether it draws over it (<why>)`. The ocr assert reads the field after a `clear` of its
    own frame; the colour assert is unchanged (its inset clears the band).
+
+8. **The cover carried with it ends the call** (2026-10-24, `interact/scroll-rounds.ts#coverMovesWith`, `BoundBy`'s
+   `movesWith`): on a `fully: true` read whose judged match is `covered` by a margin text whose kept answer is `under`,
+   and the two moved since that screenshot by the same offset (rule 6's `movedTogether`), no stroke can bring the
+   field out from under a node that moves with it — the bound, on that read: no confirming read, no further stroke, no
+   screenshot (one dump is one frame; the pair's relation in it is a fact, mid-fling or not). Unmoved (the content at
+   its end) keeps the strokes' own failures; `untold` never ends it (the next frame may read `clear`); sizes changed (a
+   field cut at a container edge or by the IME line) do not fire. Reply, the covered shortfall's words unchanged:
+   `scroll_until id:"lab.form-keyboard.phone" fully: true failed after 1 swipe (the text drawn over it moved with it,
+   both by 0,-300 since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out
+   from under it) — element reached the viewport but stayed under text "Variable symbol" (55,1106 258x56), drawn over
+   it — 99% of it shows — a screenshot shows it drawn over its bottom 6 px (last rect {…})`; no remedy (an app layout
+   fact; the tap is unaffected, rule 3). Not a new outcome kind and not `stuck` (it moved): a bound, as `exhausted`,
+   the motion-proven early end beside it. At k7's live pace (about 1.9 s a read, 3.4 s a stroke round) about 5–6 s in
+   place of the 17.3 s timeout.
 
 This is the first time the eyes may excuse a cover the tree's order TELLS — and only on pixel identity of the overlap
 with the target's own rows beside it.
@@ -114,6 +136,14 @@ with the target's own rows beside it.
 - Golden (1569 checks): 0 changed against the base — no row asks `fully: true` or an ocr assert of a field clear of the
   IME in these cells.
 - Live: see docs/truth/live-android-2026-10-18-visibility.md, the 2026-10-23 section (case k7f).
+- Rules 6 (amended) and 8, unit only (tests/interact/scroll-eyes.test.ts, "what was seen of a margin text, kept";
+  tests/interact/motion-ledger.test.ts, "a pair carried together"): seen `under`, then carried 300 px up by a stroke —
+  fails after 1 swipe, one screenshot; the text pinned 3 px off the carry — asked again, `clear`, fully visible after 1
+  swipe; pinned where it was — fully visible, nothing asked again; inked and unmoved — the strokes' "content is
+  exhausted" as before; `untold` then carried — asked again, the strokes go on. Every guard mutation-checked (the
+  more-than-a-pixel move, the peer's offset, the sizes, `untold`, the relation kept, the bound). Golden (1584 checks)
+  0 changed: no capture is answered `under`. Live k7 and k7f at the branch, the clear path, as before (the 2026-10-24
+  section of the live summary).
 
 ## Residuals accepted
 
@@ -126,9 +156,17 @@ with the target's own rows beside it.
 3. **Ink fainter than ΔE00 1** from the target's colour: unmeasurable, read `clear`.
 4. **A `clear` kept across reads in one call** while the target and the text lie where they were seen: a text that gains
    ink with no change to its node in between is not looked at again (its label changing is: the key misses).
-5. **When the eyes answer `under`** the text still moves with the target and the round strokes until its timeout. A
-   "the cover moved with it over a stroke" fast-fail from the motion ledger would save about 12 s: open,
-   docs/bugs/2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md (open-bugs row 19).
+5. ~~**When the eyes answer `under`** the text still moves with the target and the round strokes until its timeout.~~
+   **Closed** 2026-10-24 by rule 8 (bugs/r1023b-row19),
+   docs/bugs/2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md (open-bugs row 19). What it leaves:
+   - **One stroke is spent** to see the carry. A tree rule "the text and the field share a scroll view", failing at 0
+     swipes, was refused: the dumps' scroll views are not reliable enough to bet a failure on (idb lists none;
+     Compose's scroll marking, nested scrollers, a text in an outer scroller over an inner one), and it would be a
+     second "moves with" model beside the motion ledger.
+   - **A field cut at an edge or by the IME line** (its size changed) does not fire, and is asked again (one more
+     screenshot); a later read with both whole fires.
+   - **Unit only:** the lab's titles draw nothing in the margin, so no lab cell answers `under` live; a cell whose next
+     title draws a background over the field's touch margin would measure it.
 6. Measured on one AVD (averi_lab, API 33, Material 3 lab forms). Another app's margin texts are found by the same rule;
    whether its pixels read clear is the eyes' to say.
 

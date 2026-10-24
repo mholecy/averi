@@ -251,6 +251,9 @@ describe('scroll_until — fully: true on a field under a text in its touch marg
     const failure = (await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: eyesOn(fake) }).catch((e: unknown) => e)) as Error;
     expect(failure).toBeInstanceOf(Error);
     expect(failure.message).toContain('under text "Variable symbol" (55,1406 258x56), drawn over it — 99% of it shows — a screenshot shows it drawn over its bottom 6 px');
+    // Nothing moved (the content exhausted at once): the strokes' own failure, never the carried text's.
+    expect(failure.message).toContain('and the content is exhausted');
+    expect(failure.message).not.toContain('moved with it');
     expect(fake.swipes.length).toBeGreaterThan(0);
     expect(fake.screenshots).toHaveLength(1);
   });
@@ -286,10 +289,13 @@ describe('scroll_until — what was seen of a margin text, kept across the reads
     const walk = (n: UiNode): UiNode => (n === list ? { ...n, children: n.children.map((c) => shifted(c, dy)) } : { ...n, children: n.children.map(walk) });
     return walk(tree);
   };
-  const run = async (confirmDy: number, answers: readonly ('clear' | 'under' | 'untold')[]) => {
+  /** `tree` with the node `id` moved `dy` more (a text pinned over the content, or moved by its own layout). */
+  const nudged = (tree: UiNode, id: string, dy: number): UiNode => (tree.identifier === id ? shifted(tree, dy) : { ...tree, children: tree.children.map((c) => nudged(c, id, dy)) });
+  const VS_TITLE = 'lab.form-keyboard.vs.title';
+  /** The after-back form served as `readsOf(base)` gives it, read for read (the last again for every later read); the eyes answer each clear question as `answers` say, in turn. */
+  const play = async (readsOf: (base: UiNode) => UiNode[], answers: readonly ('clear' | 'under' | 'untold')[]) => {
     const fake = await fakeOf('android-lab-form-keyboard-after-back.xml', { ime: false });
-    const base = await fake.uiTree();
-    const reads = [scrolled(base, 700), base, scrolled(base, confirmDy)];
+    const reads = readsOf(await fake.uiTree());
     let n = 0;
     fake.uiTree = async () => structuredClone(reads[Math.min(n++, reads.length - 1)]!);
     const asked: number[] = [];
@@ -308,8 +314,9 @@ describe('scroll_until — what was seen of a margin text, kept across the reads
       },
     };
     const outcome = await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes }).then(describeScrollResult, (e: unknown) => (e as Error).message);
-    return { outcome, asked, swipes: fake.swipes.length };
+    return { outcome, asked, swipes: fake.swipes.length, screenshots: fake.screenshots.length };
   };
+  const run = (confirmDy: number, answers: readonly ('clear' | 'under' | 'untold')[]) => play((base) => [scrolled(base, 700), base, scrolled(base, confirmDy)], answers);
 
   it('nothing moved between the read that saw it clear and the one confirming: the answer reused — one question, fully visible', async () => {
     const { outcome, asked } = await run(0, ['clear']);
@@ -329,5 +336,33 @@ describe('scroll_until — what was seen of a margin text, kept across the reads
     const { outcome, asked } = await run(-10, ['untold', 'clear']);
     expect(asked).toHaveLength(2);
     expect(outcome).toMatch(/^fully visible after \d+ swipes? — text "Variable symbol"/);
+  });
+  it('seen drawn over it, then carried with it by a stroke (both 300 px up): no stroke can clear it — the call fails at once, today\'s words, one question', async () => {
+    const { outcome, asked, swipes } = await play((base) => [base, scrolled(base, -300)], ['under']);
+    expect(outcome).toContain(
+      'failed after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out from under it) — ' +
+        'element reached the viewport but stayed under text "Variable symbol" (55,1106 258x56), drawn over it — 99% of it shows — a screenshot shows it drawn over its bottom 6 px',
+    );
+    expect(swipes).toBe(1);
+    expect(asked).toHaveLength(1);
+  });
+
+  it('seen drawn over it, then a stroke moved the field and not the text the same way (pinned, 3 px apart): asked again — seen clear, fully visible', async () => {
+    const { outcome, asked } = await play((base) => [base, nudged(scrolled(base, -300), VS_TITLE, -3)], ['under', 'clear']);
+    expect(outcome).toMatch(/^fully visible after 1 swipe — text "Variable symbol" .* with nothing a screenshot shows/);
+    expect(asked).toHaveLength(2);
+  });
+
+  it('seen drawn over it, then a stroke carried the field clear of the text (pinned where it was): fully visible, nothing asked again', async () => {
+    const { outcome, asked } = await play((base) => [base, nudged(scrolled(base, -300), VS_TITLE, 300)], ['under']);
+    expect(outcome).toBe('fully visible after 1 swipe');
+    expect(asked).toHaveLength(1);
+  });
+  it('untold where it was asked, then carried with it: asked again (an answer of its frame), and the strokes go on — untold never fails at once', async () => {
+    const { outcome, asked, swipes } = await play((base) => [base, scrolled(base, -300)], ['untold', 'untold']);
+    expect(asked).toHaveLength(2);
+    expect(outcome).toContain('a screenshot could not tell whether it draws over it');
+    expect(outcome).not.toContain('moved with it');
+    expect(swipes).toBeGreaterThan(1);
   });
 });
