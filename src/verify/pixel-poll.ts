@@ -374,23 +374,22 @@ class PixelPollMemory {
   /**
    * The timeout wording: the last finding, else found-but-no-time (cut or
    * unconfirmed, whichever silenced the last such round), which outranks
-   * not-found. A covered miss that a later query contradicted is not a
-   * finding any more (`lastCovered`): the silent round after it speaks.
+   * not-found — said where neither is left (`wordsNotFound`, the one rule of
+   * it). A covered miss that a later query contradicted is not a finding any
+   * more (`lastCovered`): the silent round after it speaks.
    * Not-found is asked with the assert's `element` (poll-verdict.ts#notFound).
    */
   timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error; lastTree?: UiNode }, element: ElementSpec): string {
+    if (this.wordsNotFound(last.detail)) return notFound(timeoutMs, last, element);
     if (this.findingStands(last.detail)) return last.detail!;
     const roundCost = `the slowest round — a tree read and its captures — took ${formatSeconds(this.slowestRoundMs)} here`;
-    if (this.foundSilently === 'cut') {
-      return `element found, but no time was left within ${formatSeconds(timeoutMs)} to capture a settled frame (${roundCost}) — raise this assert timeout`;
-    }
     if (this.foundSilently === 'unconfirmed') {
       return (
         `element found and its region held still, but no time was left within ${formatSeconds(timeoutMs)} to confirm its position ` +
         `with a second tree read (${roundCost}) — raise this assert timeout or let the screen come to rest`
       );
     }
-    return notFound(timeoutMs, last, element);
+    return `element found, but no time was left within ${formatSeconds(timeoutMs)} to capture a settled frame (${roundCost}) — raise this assert timeout`;
   }
 
   /** The last finding is what the timeout says (`timeoutDetail`): there is one, and no later query contradicted it. */
@@ -398,7 +397,10 @@ class PixelPollMemory {
     return detail !== undefined && !(this.coverCleared && detail === this.lastCovered);
   }
 
-  /** The timeout words a not-found (`timeoutDetail`'s last case): no finding stands, and the element was never found silently. */
+  /**
+   * The timeout words a not-found (`timeoutDetail`): no finding stands, and the element was never found silently — the
+   * one case the window manager's word is asked for (`pollPixels`).
+   */
   wordsNotFound(detail: string | undefined): boolean {
     return !this.findingStands(detail) && this.foundSilently === undefined;
   }
