@@ -61,3 +61,15 @@ over it — close it first", and c5–c7's not-founds the same note (c7, the flo
 amendment "Android's window by the window manager's word", decision 4). c1 fully visible after 3 swipes; nothing fired.
 
 Then `adb -s emulator-5554 emu kill`.
+
+## 2026-10-24 — the second review's fixes, `6ecfb54` (bugs/r1023b-r19)
+
+The same AVD and lab app (booted `-no-snapshot-save`, shut down after); averi at `6ecfb54` (src as at `a3c3996`). One
+run each: docs/truth/live-records/android-vis-r1023b-r19-cr-2.json (the three dialog cells: 39 of 39 ok, the replies
+as before) and android-forms-r1023b-r19-cr-2.json (`--groups forms`: 32 cases, 27 ok, b1d and b7 LOUD as known,
+kf1–kf3 SKIP: Gboard docked). form-picker's c2–c4 taps now say "… — scroll_until it in that window's own list first;
+if it is not there, a sheet or modal is presented over it — close it first", c5 and c6 the note "(the tree lists only
+the window on top: scroll_until it in that window's own list first; …)"; c1 fully visible after 3 swipes; nothing
+fired.
+
+Then `adb -s emulator-5554 emu kill`.

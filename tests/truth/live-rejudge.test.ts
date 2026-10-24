@@ -260,6 +260,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // …and once more where form-picker's taps and its not-founds say the sheet's own list first.
     ['android-vis-r1023b-r19-cr-1.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
     ['android-forms-r1023b-r19-cr-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
+    // …and where the sheet's own list is said in the shorter words ("scroll_until it in that window's own list first").
+    ['android-vis-r1023b-r19-cr-2.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
+    ['android-forms-r1023b-r19-cr-2.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
