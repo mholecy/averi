@@ -1,16 +1,17 @@
 import type { Rect, UiNode } from '../adapters/types.js';
-import { quoted, sameRectWithinPixel, type QuotedNode } from '../ui-tree/geometry.js';
+import { quoted, sameRectWithinPixel, sameSizeWithinPixel, type QuotedNode } from '../ui-tree/geometry.js';
 import type { ClearQuestion } from '../ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../ui-tree/seen-order.js';
 import type { Judged, TreeFacts } from './scroll-read.js';
 
 /**
  * THE MARGIN MEMO: what the eyes saw this `scroll_until` call of the texts in the target's touch margin
- * (ui-tree/eyes.ts#ClearPair), and the two rules of docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md
- * that read it — rule 6, once per text where it lies (`known`: which texts to ask, what to tell the read), and rule 8, the
- * cover carried with the target ends the call (`carriedCover`). One entry per text asked, so a later read tells its
- * judgement what was seen instead of looking again: one screenshot per text where it lies. The round
- * (interact/scroll-rounds.ts#State.marginKept) holds it.
+ * (ui-tree/eyes.ts#ClearPair), and the two rules of
+ * docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md that read it — rule 6, once per text where
+ * it lies (`seeMargin`: which texts to ask, what to tell the read), and rule 8, the cover carried with the target ends
+ * the call (`carriedCover`). One entry per text asked, so a later read tells its judgement what was seen instead of
+ * looking again: one screenshot per text where it lies. The round (interact/scroll-rounds.ts#State.marginKept) holds
+ * it.
  *
  * - Seen drawn over the target (`under`): kept while the two keep the relation they were seen in — where they were, or
  *   carried together by the same offset in the target's scroll view, which stayed where it was (`movedTogether`): a
@@ -26,10 +27,25 @@ import type { Judged, TreeFacts } from './scroll-read.js';
  * The target's scroll view is its nearest clipping ancestor in the read (ui-tree/geometry.ts#Clips.scrollersOf),
  * undefined when the tree marks none — then nothing is carried.
  *
- * The interface, which is also the test surface (tests/interact/margin-memo.test.ts): `known` (once a read that poses a
- * clear question), `carriedCover` (once a `fully: true` bound). Pure: no adapter, no clock, no I/O.
+ * The interface, which is also the test surface (tests/interact/margin-memo.test.ts): `startMargin` (the call's memo
+ * before its first read), `seeMargin` (once a read that poses a clear question), `carriedCover` (once a `fully: true`
+ * bound). Pure: no adapter, no clock, no I/O.
  */
-export type MarginMemo = readonly MarginAnswer[];
+
+declare const opaque: unique symbol;
+
+/** The margin memo — opaque: only this module reads it (its entries are `MarginAnswer`s, one per text asked). */
+export interface MarginMemo {
+  readonly [opaque]: 'margin-memo';
+}
+
+const open = (memo: MarginMemo): readonly MarginAnswer[] => memo as unknown as readonly MarginAnswer[];
+const close = (answers: readonly MarginAnswer[]): MarginMemo => answers as unknown as MarginMemo;
+
+/** The memo before a call's first read: nothing seen. */
+export function startMargin(): MarginMemo {
+  return close([]);
+}
 
 /** A target and a text that lies over it, where one read found them, and the target's nearest scroll view there — undefined when it has none. */
 interface PairAt {
@@ -63,7 +79,7 @@ export type MarginKnown = { readonly ask: ClearQuestion } | { readonly told: rea
  * untold keeps the cover anyway — else what to tell the read, and the memo with this read's answers kept, each
  * replacing what was seen of that text before.
  */
-export function known(memo: MarginMemo, question: ClearQuestion, answered: readonly OrderSeen[] | undefined, facts: TreeFacts): MarginKnown {
+export function seeMargin(memo: MarginMemo, question: ClearQuestion, answered: readonly OrderSeen[] | undefined, facts: TreeFacts): MarginKnown {
   const { node } = question;
   const scrollView = nearestScrollView(facts, node);
   const kept = question.pairs.flatMap(({ peer }): OrderSeen[] => {
@@ -85,7 +101,7 @@ export function known(memo: MarginMemo, question: ClearQuestion, answered: reado
 export function carriedCover(memo: MarginMemo, best: Judged, facts: TreeFacts): Offset | undefined {
   if (best.standing.kind !== 'covered') return undefined;
   const cover = best.standing.cover.node;
-  const found = memo.find((kept) => about(kept, cover));
+  const found = open(memo).find((kept) => about(kept, cover));
   return found === undefined ? undefined : carriedSince(found, { target: best.node.rect, peer: cover.rect, scrollView: nearestScrollView(facts, best.node) });
 }
 
@@ -96,11 +112,8 @@ function nearestScrollView(facts: TreeFacts, node: UiNode): Rect | undefined {
 
 /** `kept` is an answer about `peer` — the same text: its identifier and label, its size within a pixel (the memo's key). */
 function about(kept: MarginAnswer, peer: UiNode): boolean {
-  return kept.peer.identifier === peer.identifier && kept.peer.label === peer.label && sameSize(kept.peer.rect, peer.rect);
+  return kept.peer.identifier === peer.identifier && kept.peer.label === peer.label && sameSizeWithinPixel(kept.peer.rect, peer.rect);
 }
-
-/** The same size within a pixel each way: a node that grew or shrank (cut at an edge, a header collapsing) did not just move. */
-const sameSize = (a: Rect, b: Rect): boolean => Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
 
 /**
  * The offset a kept `under` was carried by since its screenshot (`movedTogether`, from where the eyes saw the pair to
@@ -114,7 +127,7 @@ function carriedSince(found: MarginAnswer, now: PairAt): Offset | undefined {
 /**
  * The offset the pair moved by from `seen` to `now`, when it moved as one in the target's scroll view: that scroll view
  * where it was (within a pixel), the target moved more than a pixel on some axis, the peer by the same offset within a
- * pixel each way, neither grown nor shrunk (`sameSize`) — undefined otherwise. A pair carried so lies in that
+ * pixel each way, neither grown nor shrunk (`sameSizeWithinPixel`) — undefined otherwise. A pair carried so lies in that
  * scroll view's moving content: no stroke separates them (scroll-rounds.ts#BoundBy's `movesWith`). A scroll view that
  * moved itself (a sheet dragged to another detent, an outer scroller carrying an inner one) carried what lies over it
  * too, a pinned text among them, which the next stroke of the list may leave behind; a target in no scroll view the
@@ -128,12 +141,12 @@ function movedTogether(seen: PairAt, now: PairAt): Offset | undefined {
   const dy = now.target.y - seen.target.y;
   if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1) return undefined;
   const peerAlong = Math.abs(now.peer.x - seen.peer.x - dx) <= 1 && Math.abs(now.peer.y - seen.peer.y - dy) <= 1;
-  return peerAlong && sameSize(seen.target, now.target) && sameSize(seen.peer, now.peer) ? { dx, dy } : undefined;
+  return peerAlong && sameSizeWithinPixel(seen.target, now.target) && sameSizeWithinPixel(seen.peer, now.peer) ? { dx, dy } : undefined;
 }
 
 /** The kept answer about `peer`, the pair as `now` finds it: both where they were seen, or, for `under`, carried together since (`carriedSince`). */
 function recall(memo: MarginMemo, peer: UiNode, now: PairAt): PairSeen | undefined {
-  const found = memo.find((kept) => about(kept, peer));
+  const found = open(memo).find((kept) => about(kept, peer));
   if (found === undefined) return undefined;
   const where = sameRectWithinPixel(found.where.peer, now.peer) && sameRectWithinPixel(found.where.target, now.target);
   return where || carriedSince(found, now) !== undefined ? found.seen : undefined;
@@ -142,6 +155,6 @@ function recall(memo: MarginMemo, peer: UiNode, now: PairAt): PairSeen | undefin
 /** `memo` with what the eyes `answered` of `target`'s margin texts on this read kept, in `scrollView` (the target's nearest), each replacing what was seen of that text before. */
 function remember(memo: MarginMemo, answered: readonly OrderSeen[], target: Rect, scrollView: Rect | undefined): MarginMemo {
   const now = answered.map(({ peer, ...seen }): MarginAnswer => ({ peer: quoted(peer), where: { target: { ...target }, peer: { ...peer.rect }, scrollView }, seen }));
-  const before = memo.filter((kept) => !answered.some(({ peer }) => about(kept, peer)));
-  return [...before, ...now];
+  const before = open(memo).filter((kept) => !answered.some(({ peer }) => about(kept, peer)));
+  return close([...before, ...now]);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
-import { carriedCover, known, type MarginKnown, type MarginMemo } from '../../src/interact/margin-memo.js';
+import { carriedCover, seeMargin, startMargin, type MarginKnown, type MarginMemo } from '../../src/interact/margin-memo.js';
 import { judgeRead, type Judged, type TreeFacts } from '../../src/interact/scroll-read.js';
 import type { ClearQuestion } from '../../src/ui-tree/eyes.js';
 import type { OrderSeen, PairSeen } from '../../src/ui-tree/seen-order.js';
@@ -11,7 +11,7 @@ import { node } from '../helpers/fake.js';
  * THE MARGIN MEMO through its interface (interact/margin-memo.ts): ADR 0026 rules 6 and 8 on rects. Each read is the lab
  * form's phone field and the texts in its touch margin (the after-back capture's "Variable symbol" title, and a second
  * text beside it), in a list marked as Android marks a clipping container, judged as the round judges it
- * (interact/scroll-read.ts#judgeRead). `known` — the texts to ask the eyes, or what to tell the read, with the memo that
+ * (interact/scroll-read.ts#judgeRead). `seeMargin` — the texts to ask the eyes, or what to tell the read, with the memo that
  * keeps this read's answers; `carriedCover` — the offset the cover seen drawn over the field was carried by with it.
  * How the round asks and what it replies is pinned in its plays (tests/interact/scroll-eyes.test.ts, "what was seen of a
  * margin text, kept").
@@ -66,15 +66,15 @@ type Answer = typeof UNDER | typeof CLEAR | typeof UNTOLD;
 /** The memo after the eyes answered `title` and `hint` as given on the read at `at` (from an empty memo). */
 function seenAt(at: At, title: Answer, hint: Answer = CLEAR): MarginMemo {
   const r = readAt(at);
-  const said = known([], r.question, [{ peer: r.title, ...title } as OrderSeen, { peer: r.hint, ...hint } as OrderSeen], r.facts);
+  const said = seeMargin(startMargin(), r.question, [{ peer: r.title, ...title } as OrderSeen, { peer: r.hint, ...hint } as OrderSeen], r.facts);
   if ('ask' in said) throw new Error('answered, yet asked');
   return said.memo;
 }
 
-/** What `known` says on the read at `at`, nothing answered yet: the texts asked by label, or what is told, by label. */
+/** What `seeMargin` says on the read at `at`, nothing answered yet: the texts asked by label, or what is told, by label. */
 function on(memo: MarginMemo, at: At): { ask: (string | null | undefined)[] } | { told: Record<string, PairSeen['seen']> } {
   const r = readAt(at);
-  const said: MarginKnown = known(memo, r.question, undefined, r.facts);
+  const said: MarginKnown = seeMargin(memo, r.question, undefined, r.facts);
   if ('ask' in said) return { ask: said.ask.pairs.map(({ peer }) => peer.label) };
   return { told: Object.fromEntries(said.told.map(({ peer, seen }) => [peer.label ?? '', seen])) };
 }
@@ -88,15 +88,14 @@ function carryAt(memo: MarginMemo, at: At): unknown {
 
 describe('the margin memo — once per text where it lies (ADR 0026 rule 6)', () => {
   it('nothing seen yet: every text asked; answered, the read told the answers and the memo keeps them', () => {
-    expect(on([], {})).toEqual({ ask: ['Variable symbol', 'Optional'] });
+    expect(on(startMargin(), {})).toEqual({ ask: ['Variable symbol', 'Optional'] });
     const memo = seenAt({}, CLEAR);
-    expect(memo).toHaveLength(2);
     expect(on(memo, {})).toEqual({ told: { 'Variable symbol': 'clear', Optional: 'clear' } });
   });
 
   it('a kept under suppresses asking the others: told what was kept, nothing asked', () => {
     const r = readAt();
-    const titleUnder = known([], { ...r.question, pairs: [r.question.pairs[0]!] }, [{ peer: r.title, ...UNDER }], r.facts);
+    const titleUnder = seeMargin(startMargin(), { ...r.question, pairs: [r.question.pairs[0]!] }, [{ peer: r.title, ...UNDER }], r.facts);
     if ('ask' in titleUnder) throw new Error('answered, yet asked');
     expect(on(titleUnder.memo, {})).toEqual({ told: { 'Variable symbol': 'under' } });
   });
@@ -104,7 +103,7 @@ describe('the margin memo — once per text where it lies (ADR 0026 rule 6)', ()
   it('a kept untold suppresses asking the others too; a kept clear does not — only the unseen text is asked', () => {
     const r = readAt();
     const only = (seen: Answer) => {
-      const said = known([], { ...r.question, pairs: [r.question.pairs[0]!] }, [{ peer: r.title, ...seen } as OrderSeen], r.facts);
+      const said = seeMargin(startMargin(), { ...r.question, pairs: [r.question.pairs[0]!] }, [{ peer: r.title, ...seen } as OrderSeen], r.facts);
       if ('ask' in said) throw new Error('answered, yet asked');
       return said.memo;
     };
@@ -138,9 +137,8 @@ describe('the margin memo — once per text where it lies (ADR 0026 rule 6)', ()
 
   it('a text asked again replaces its entry: the new answer told', () => {
     const r = readAt({ dy: -300, peerDy: 0 });
-    const again = known(seenAt({}, UNDER), r.question, [{ peer: r.title, ...CLEAR }, { peer: r.hint, ...CLEAR }], r.facts);
+    const again = seeMargin(seenAt({}, UNDER), r.question, [{ peer: r.title, ...CLEAR }, { peer: r.hint, ...CLEAR }], r.facts);
     if ('ask' in again) throw new Error('answered, yet asked');
-    expect(again.memo).toHaveLength(2);
     expect(on(again.memo, { dy: -300, peerDy: 0 })).toEqual({ told: { 'Variable symbol': 'clear', Optional: 'clear' } });
   });
 });

@@ -1,5 +1,5 @@
 import type { Rect, Stroke, UiNode } from '../adapters/types.js';
-import { isUntold, sameRectWithinPixel } from '../ui-tree/geometry.js';
+import { isUntold, sameRectWithinPixel, sameSizeWithinPixel } from '../ui-tree/geometry.js';
 import { nodeIdentity } from '../ui-tree/read-tree.js';
 import { carriedUnder, goesOver, NO_REGION, seeRegion, type CarriedUnder, type MotionShown, type RegionMemory } from './motion-shown.js';
 import type { Since, TreeFacts } from './scroll-read.js';
@@ -204,7 +204,7 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
   // The carry sample: only where the round allows one (`carryToward`), and only of the SAME node at the same size — a
   // judged match that switched to another node, or one that changed size, moved by no stroke.
   const carry =
-    since === 'stroke' && carryToward !== undefined && judged !== undefined && before !== undefined && sameNode && sameSize(before.rect, judged.rect) && lastDrawn !== undefined
+    since === 'stroke' && carryToward !== undefined && judged !== undefined && before !== undefined && sameNode && sameSizeWithinPixel(before.rect, judged.rect) && lastDrawn !== undefined
       ? { moved: motionToward(before.rect, judged.rect, carryToward), drawn: lastDrawn }
       : undefined;
   // The region (motion-shown.ts): seen only on a read that found the target, and only where its tree tells no scroll
@@ -281,9 +281,6 @@ function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
  * moved since the read before, for `Moved.slowing`. A fling's motion shrinks read for read; an animation's does not.
  */
 const motionOf = (from: Rect, to: Rect): number => Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y), Math.abs(to.width - from.width), Math.abs(to.height - from.height));
-
-/** The same size within a pixel each way: a node that grew or shrank (a header collapsing) did not just move. */
-const sameSize = (a: Rect, b: Rect): boolean => Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
 
 /** How far `to` lies from `from` the way content moves for a stroke toward `toward` (for `down`, up the screen): negative when the other way. */
 function motionToward(from: Rect, to: Rect, toward: Direction): number {
