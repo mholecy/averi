@@ -93,7 +93,7 @@ export interface PastSide {
 }
 
 /**
- * The REACH of the flush check's probe (scroll-rounds.ts#flushCheck has when a stop is probed, and over what): a
+ * The REACH of the flush check's probe (flush-check.ts has when a stop is probed, and over what): a
  * quarter of the stroke — over the container, 15 % of its side (swipe.ts#SWIPE_REACH_FRACTION, 60 % of the side,
  * × 0.25) — and never more than PROBE_MAX_TRAVEL_FRACTION of the screen's long side: 178 px on the Pixel_3a, more than
  * the 51 px the SWIFT form's Fees row was cut by; a cut larger than what the probe moved is left flush again, with more
@@ -105,7 +105,7 @@ const PROBE_REACH = 0.25;
 
 /**
  * A probe moved the match and it lies flush on the same edge with more of it showing: the cut is proved, and the next
- * stroke reveals the rest (scroll-rounds.ts#flushCheck has when). `room`: px from the match's uncut edge to the flush
+ * stroke reveals the rest (flush-check.ts has when). `room`: px from the match's uncut edge to the flush
  * container's opposite edge — what the content may move before the uncut edge leaves the container.
  */
 export interface Revealing {
@@ -634,7 +634,7 @@ export function sent(course: Course, { toward, turn }: Pick<NextStroke, 'toward'
 }
 
 /**
- * The flush check's probe (scroll-rounds.ts#flushCheck) toward revealing `edge` of the judged match, on a screen of
+ * The flush check's probe (flush-check.ts) toward revealing `edge` of the judged match, on a screen of
  * box `screen`: its way, its reach (PROBE_REACH) and the cap on its finger travel (PROBE_MAX_TRAVEL_FRACTION of the
  * screen's long side). `revealing`: a probe proved the cut — the whole stroke, its travel REVEAL_ROOM_FRACTION of the
  * room, the cap kept at the content's start (a top or left edge) only.

@@ -78,10 +78,10 @@ export interface ScrollUntilResult {
   /**
    * Set on a `fully: true` stop whose edge along the scroll lies exactly on
    * its scroll container's edge (Android only:
-   * interact/scroll-rounds.ts#flushCheck) — where uiautomator cuts a
+   * interact/flush-check.ts) — where uiautomator cuts a
    * node's bounds, so the rect cannot say whether more of it lies beyond.
    * `checked`: a probe swipe toward that edge moved nothing, so nothing
-   * does (the probe is one of `swipes`). Not checked (`why`, scroll-rounds.ts
+   * does (the probe is one of `swipes`). Not checked (`why`, flush-check.ts
    * #Flush): no swipe or time left, no container with room for a probe, a
    * probe short enough to be a tap, or — `fills`, with both `edges` and no
    * one `edge` — it fills its nearest container along the scroll, which no
@@ -340,7 +340,7 @@ export const endTurnText = (turn: EndTurn | undefined): string =>
 const detentText = (detent: DetentMove | undefined): string => (detent === undefined ? '' : `; the sheet moved from its ${detent.from} detent to ${detent.to}`);
 
 /**
- * The flush clause (scroll-rounds.ts#flushCheck): what the stop's edge on
+ * The flush clause (flush-check.ts): what the stop's edge on
  * its scroll container means — checked by a probe, or not checked. The
  * container is quoted as a node's rect (`rectText`): it is one. Exported for
  * the troubleshooting reference (tests/mcp/tool-descriptions.test.ts pins
@@ -351,7 +351,7 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
   const cut = "it may be cut there, a rect assert or screenshot may measure part of it";
   const box = rectText(flush.container);
   if ('edges' in flush) {
-    // A node pinned at the content's start (scroll-rounds.ts#Flush: always `edges[0]`): the match spans from that
+    // A node pinned at the content's start (flush-check.ts#Flush: always `edges[0]`): the match spans from that
     // node's inner edge to the container's far edge — cut at either, by Compose at the node or by the container.
     if (flush.pinned !== undefined) {
       const [start, end] = flush.edges;
@@ -382,11 +382,11 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
 }
 
 /**
- * Where a flush edge lies (scroll-rounds.ts#Flush, #FlushCut) and what Android cuts there, in one dialect for the
+ * Where a flush edge lies (flush-check.ts#Flush, #FlushCut) and what Android cuts there, in one dialect for the
  * stop's clause and the bound's (the truth reader, scripts/truth/replies.ts, reads its probed side): `its bottom edge
  * lies on its scroll container's (0,1046 1080x495)`, `where Android cuts a node's bounds to the container`. A pinned
  * node's edge (`pinned`): where the container's content ends as it shows, and the cut it may make is Compose's at a
- * node drawn after the match, not the container's. `lies`: `still lies` for a cut a probe proved (scroll-rounds.ts#FlushCut).
+ * node drawn after the match, not the container's. `lies`: `still lies` for a cut a probe proved (flush-check.ts#FlushCut).
  */
 function flushEdgeText({ edge, container, pinned }: { edge: Edge; container: Rect; pinned?: QuotedNode }, lies: 'lies' | 'still lies'): { where: string; cuts: string } {
   const box = rectText(container);
@@ -400,7 +400,7 @@ function flushEdgeText({ edge, container, pinned }: { edge: Edge; container: Rec
 }
 
 /**
- * A cut a probe proved and no reveal was sent for (scroll-rounds.ts#FlushCut), for the bound's and the stuck stop's
+ * A cut a probe proved and no reveal was sent for (flush-check.ts#FlushCut), for the bound's and the stuck stop's
  * sentences: where the flush edge still lies, what the probe showed, and why no reveal followed when that was not the
  * budget. Never "a probe swipe toward it moved nothing": that is the checked stop's clause, which the truth reader
  * takes for a probed side (scripts/truth/replies.ts, flushProbedSide).
@@ -586,7 +586,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
               `swiping ${o.lastStroke} no longer moves it${away}. That surface stays over it at the end of the content — ${why}. ${last}`,
         };
       }
-      // A cut a probe proved (scroll-rounds.ts#FlushCut), the strokes the caller's way no longer moving it: no claim
+      // A cut a probe proved (flush-check.ts#FlushCut), the strokes the caller's way no longer moving it: no claim
       // either way of what lies past that edge now — a screenshot tells.
       if (short.of === 'flushCut') {
         return {

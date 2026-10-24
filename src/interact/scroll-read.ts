@@ -104,7 +104,7 @@ export interface RoundRead {
  * - its `scene`, once a round: the judgement (`judge`, `Scene.standing`); a match's clipping ancestors, nearest first
  *   (`clips.scrollersOf`) — Android's scroll containers, to whose edges uiautomator cuts the match's bounds (most
  *   of the time: ui-tree/geometry.ts#Clips.drawnIn judges a rect past them); empty when it has none (every node of
- *   an iOS tree) — for the `fully: true` stop's flush check (scroll-rounds.ts#flushCheck) and the box the strokes are drawn in (interact/stroke-plan.ts#planStroke); what is drawn OVER a
+ *   an iOS tree) — for the `fully: true` stop's flush check (flush-check.ts) and the box the strokes are drawn in (interact/stroke-plan.ts#planStroke); what is drawn OVER a
  *   clipping container (the floating tab bar) — `order.drawnOver`, what a stroke over it keeps clear of
  *   (stroke-plan.ts#strokeRoom cuts the box above them), and `order.drawnOverAt`, the one a stroke that still touched
  *   down on it names (stroke-plan.ts#touchedOn), asked of the rects `clips.scrollersOf` and `mainScroller` give,

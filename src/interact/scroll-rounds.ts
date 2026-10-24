@@ -1,6 +1,5 @@
 import { type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { axisOfEdge, belowStatusBand, EDGES, flushEdges, quoted, sameRectWithinPixel, toldFrame, type Edge, type ListedContent, type QuotedNode } from '../ui-tree/geometry.js';
-import type { PinnedEdge } from '../ui-tree/later-edges.js';
+import { belowStatusBand, quoted, toldFrame, type Edge, type ListedContent } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
@@ -15,9 +14,10 @@ import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts } from './scroll-read.js';
 import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Offset, type Streaks, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, recall, remember, type MarginMemo } from './margin-memo.js';
-import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
-import { courseFacts, lastSent, nextStroke, probeOf, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
-import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
+import { carried, planStroke, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
+import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
+import { probing, seeFlush, startFlush, type Flush, type FlushCheck, type FlushCut, type FlushVerdict, type ProbeMeans } from './flush-check.js';
+import type { Direction } from './swipe.js';
 
 /**
  * `scroll_until`'s ROUND as one pure function: `round(state, seen) → { state, step }` — what a read of the
@@ -45,7 +45,14 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * the probe's reach — is the course's (interact/course.ts), which `round`
  * shows where the target stood on each read that read, asks for each
  * stroke and tells what was sent; when a turn applies (the stuck turn's
- * budget and the outward rule, the end turn's proof) stays here.
+ * budget and the outward rule, the end turn's proof) stays here. Whether a
+ * `fully: true` stop flush with a clipping scroll container is cut there —
+ * the probe in flight and what it proved, the reveal, the stop's `Flush`
+ * and the proven cut's `FlushCut` — is the flush check's
+ * (interact/flush-check.ts), which `round` shows each read that read once
+ * and whose one verdict it reads: whether that read may settle or wait, and
+ * the hedge, the cut, the witness or the probe to send; sending it stays
+ * here.
  *
  * Pure: no adapter, no clock, no I/O, no exceptions but the protocol's own
  * (below). Deterministic: the same state and seen give the same step, so a
@@ -84,7 +91,8 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * on what the eyes saw; the motion ledger shown the round (`seeMotion`, before the stroke plan sees the read); motion
  * observed (a read that read only); the stop verdict (settled / confirm / unsettled; then, on a `fully: true`
  * stop flush with a clipping scroll container, the probe — `ask witness` first for a band the moot rule left unasked —
- * `flushCheck`; then `ask unlocated` on a `fully: true` stop with no cover under it; then `ask eyes` on a stop that would
+ * the flush check's verdict, interact/flush-check.ts#FlushVerdict; then `ask unlocated` on a `fully: true` stop with
+ * no cover under it; then `ask eyes` on a stop that would
  * say "fully visible" with a flush neighbour — THE EYES, ui-tree/eyes.ts — whose band under `fully: true` is no stop);
  * stuck; the confirming read, or the
  * read after a probe, that did not read; covered (nothing above the band); the end turn (`EndTurn`), which takes an
@@ -122,6 +130,9 @@ export type { RoundRead } from './scroll-read.js';
 
 /** What a stop carries of the course (interact/course.ts): the end turn, its proof, the side the target was found past — part of `ScrollOutcome`, so importable from here. */
 export type { EndProof, EndTurn, PastSide } from './course.js';
+
+/** What a stop or a shortfall carries of the flush check (interact/flush-check.ts): the stop's `Flush`, the proven cut's `FlushCut` — part of `ScrollOutcome`, so importable from here. */
+export type { Flush, FlushCut } from './flush-check.js';
 
 /** What one round saw — the driver's gathering, or a test's table row. */
 export interface RoundSeen {
@@ -185,7 +196,7 @@ export type RoundStep =
    * scroll view is known or none has room — kept clear of a cover whose top edge is `coverTop` when set (the
    * keyboard's, or a node's drawn over the scroll view's lower part: a floating tab bar). `box` and `points` are
    * absent only when the round had no gesture box (the driver throws why). `probe`: the stroke is the flush check's
-   * (`flushCheck`; its reach course.ts#PROBE_REACH, or a reveal's, course.ts#Revealing), not a step toward the target — its `box` always a scroll view's, never the screen's fallback;
+   * (interact/flush-check.ts; its reach course.ts#PROBE_REACH, or a reveal's, course.ts#Revealing), not a step toward the target — its `box` always a scroll view's, never the screen's fallback;
    * `maxTravel` caps its finger travel (course.ts#PROBE_MAX_TRAVEL_FRACTION; a reveal's, half its room).
    */
   | ({ do: 'stroke'; probe?: true } & PlannedStroke)
@@ -200,7 +211,7 @@ export type RoundStep =
  * - `visible`: the stop. `settled` false when no confirming read found the
  *   target still (the reply says so); `unlocated` only on a `fully: true`
  *   stop judged with no cover under it; `flush` only on a `fully: true`
- *   stop whose edge lies on its clipping container's (`flushCheck`).
+ *   stop whose edge lies on its clipping container's (interact/flush-check.ts#Flush).
  * - `stuck`: the judged match in the frame but short of the stop (`short`,
  *   `shortOf`: clipped, or under a node of the app) — and
  *   UNMOVED_STROKES_EXHAUST identical strokes left it where it was — the
@@ -305,69 +316,6 @@ export type ScrollOutcome = (
 export interface DetentMove {
   from: string;
   to: string;
-}
-
-/**
- * A `fully: true` stop whose edge along the scroll lies on its scroll
- * container's edge (`flushCheck`): `checked` when a probe toward that edge
- * moved nothing — nothing of it is cut there — and false, so it may be,
- * `why`: no swipe or time was left (`budget`); no clipping ancestor from
- * the flush one outward has room for a stroke (`room`: a probe drawn over
- * the screen instead would touch down off the container and move nothing
- * whatever lies beyond, so none is sent); every one of them scrolls only across the edge (`axis`: a probe along it
- * moves none of them — interact/stroke-plan.ts#probeAcrossOnly); or the
- * probe was drawn under twice TOUCH_SLOP and may have been a tap (`tap`).
- *
- * `fills`: flush with BOTH of its
- * nearest container's `edges` along the scroll, and with ONE edge of no
- * clipping ancestor — a row taller than its list, cut at both ends, reads
- * exactly the list's rect. Never probed (one probe cannot tell which side,
- * if either, is cut), so never checked — and never a plain "fully visible".
- *
- * `pinned`: the flush edge lies not on the container's own edge but on the inner edge of a node pinned in it at that
- * side, drawn after the match (ui-tree/later-edges.ts#PinnedEdge: a merged sticky header) — the scroll view shows
- * nothing of its content past it, so it is that edge the probe asks about. With `fills`, the pinned one of the two is
- * always `edges[0]`: a node pins at the content's start only (top, left), and the far edge is the container's own.
- */
-export type Flush =
-  | ({ edge: Edge; container: Rect; pinned?: QuotedNode } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'axis' | 'tap' }))
-  | { edges: readonly [Edge, Edge]; container: Rect; pinned?: QuotedNode; checked: false; why: 'fills' };
-
-/**
- * A `fully: true` match on a cut the flush check's probe PROVED (`ProvenCut`) that no reveal could be sent for this
- * read: it lies flush on that `edge` of that `container` (or `pinned` node), and the probe had shown `revealed` px more
- * of it — content lay past that edge, and part of the match with it. `why` no reveal showed the rest: no swipe or time
- * left (`budget`), no scroll container around it with room for one (`room`), or every one from that edge outward
- * scrolling only across it (`axis`) — those two only when the tree changed since the probe — or a reveal that moved
- * nothing drawn too short to tell from a tap (`tap`: the driver drew it under twice the slop). Never a stop: it is
- * what the target was short of, at the bound or a stuck stop, never "fully visible" with a hedge. The round's, never
- * scroll-read.ts#shortOf's: the tree alone reads it whole.
- * docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
- */
-export interface FlushCut {
-  of: 'flushCut';
-  judged: Judged;
-  edge: Edge;
-  container: Rect;
-  pinned?: QuotedNode;
-  revealed: number;
-  why: 'budget' | 'room' | 'axis' | 'tap';
-}
-
-/**
- * A cut the flush check's probe PROVED (`revealedBy`): after the probe the match lay flush on the same `edge` of the
- * same `container` — its own edge or a `pinned` node's there, alike — with `revealed` px more of it showing. Kept
- * (`State.provenCut`) while every later flush check finds the judged match flush on that edge of that container
- * (`stillProven`): such a read claims no stop and confirms none, and its next stroke is a reveal (course.ts#Revealing)
- * — or, with none to send, the read is short of the cut (`FlushCut`). A read that finds it anywhere else lets it go:
- * the round judges that read like any other. Kept by edge and container, not by node: another match judged there
- * (a selector matching two rows) is taken for the same — the cost a failure naming the cut, never a false "fully
- * visible"; reads that judge no stop leave it as it was.
- */
-interface ProvenCut {
-  readonly edge: Edge;
-  readonly container: Rect;
-  readonly revealed: number;
 }
 
 /**
@@ -562,95 +510,6 @@ export const SETTLE_CONFIRM_READS = 3;
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
 
-/** A flush edge of the match: on its container's own edge, or on a node `pinned` in its nearest at that side (`Flush`). */
-interface FlushEdge {
-  readonly edge: Edge;
-  readonly pinned?: QuotedNode;
-}
-
-/** Where the match lies flush (`flushWith`): one edge and the ancestor's index, both edges of the nearest, or neither. */
-type Flushed = (FlushEdge & { at: number }) | { fills: readonly [Edge, Edge]; pinned?: QuotedNode } | undefined;
-
-/**
- * Where the match lies flush, of `chain` (clipping ancestors, nearest
- * first; `flushEdges`, ui-tree/geometry.ts, along the scroll's axis, within
- * a pixel — and, for the NEAREST, the match's `pinned` edges along it, laid
- * flush under a node pinned in it, ui-tree/later-edges.ts#PinnedEdge: where
- * that scroll view's content ends as it shows): the nearest it is flush with
- * on ONE edge along the scroll — that edge and the ancestor's index, the
- * probe's question — else, when it fills the NEAREST along the scroll, both
- * edges (`fills`: reported, never probed); undefined when neither.
- */
-function flushWith(
-  rect: Rect,
-  chain: readonly Rect[],
-  pinned: readonly PinnedEdge[],
-  direction: Direction,
-): Flushed {
-  const axis = axisOf(direction);
-  const edgesAt = (at: number): FlushEdge[] => {
-    const own: FlushEdge[] = flushEdges(rect, chain[at], axis).map((edge) => ({ edge }));
-    if (at !== 0) return own;
-    const under = pinned.filter((p) => axisOfEdge(p.edge) === axis && !own.some((o) => o.edge === p.edge)).map((p) => ({ edge: p.edge, pinned: quoted(p.by) }));
-    return [...own, ...under].sort((a, b) => EDGES.indexOf(a.edge) - EDGES.indexOf(b.edge));
-  };
-  for (const at of chain.keys()) {
-    const edges = edgesAt(at);
-    if (edges.length === 1) return { ...edges[0], at };
-  }
-  const nearest = chain.length === 0 ? [] : edgesAt(0);
-  if (nearest.length !== 2) return undefined;
-  const under = nearest.find((e) => e.pinned !== undefined)?.pinned;
-  return { fills: [nearest[0].edge, nearest[1].edge], ...(under !== undefined && { pinned: under }) };
-}
-
-/** Where the judged match lies flush (`flushWith`) of its clipping ancestors (`chain`, nearest first) in this read. */
-function flushOf(best: Judged, facts: TreeFacts, direction: Direction): { chain: readonly Rect[]; flushed: Flushed } {
-  const chain = facts.scene.clips.scrollersOf(best.node);
-  return { chain, flushed: flushWith(best.node.rect, chain, facts.scene.pinnedEdges(best.node), direction) };
-}
-
-/**
- * The cut the probe in flight (`probed`: its rect and flush edge when sent) proved (`ProvenCut`): the match, now at
- * `now`, lies flush (`flushed`, of `chain`) on that same edge, its extent along the edge's axis grew by more than a
- * pixel, and its uncut edge moved toward revealing the flush one by that growth, within a pixel — the content carried
- * it out from past that edge. Undefined otherwise: no longer flush, flush on another edge or filling its container, no
- * more of it showing (a match that moved but did not grow says nothing of a cut), or grown with its uncut edge where
- * the content did not carry it (a container that grew, another match in its place).
- */
-function revealedBy(probed: { readonly rect: Rect; readonly edge: Edge }, now: Rect, { chain, flushed }: { chain: readonly Rect[]; flushed: Flushed }): ProvenCut | undefined {
-  if (flushed === undefined || 'fills' in flushed || flushed.edge !== probed.edge) return undefined;
-  const was = probed.rect;
-  const grown = axisOfEdge(probed.edge) === 'vertical' ? now.height - was.height : now.width - was.width;
-  const uncutMoved = {
-    bottom: was.y - now.y,
-    top: now.y + now.height - (was.y + was.height),
-    right: was.x - now.x,
-    left: now.x + now.width - (was.x + was.width),
-  }[probed.edge];
-  return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? { edge: probed.edge, container: chain[flushed.at], revealed: grown } : undefined;
-}
-
-/** `cut` (`State.provenCut`) while the match still lies flush on its edge of its container (`flushed`, of `chain`), within a pixel; undefined once it lies anywhere else. */
-function stillProven(cut: ProvenCut | undefined, { chain, flushed }: { chain: readonly Rect[]; flushed: Flushed }): ProvenCut | undefined {
-  if (cut === undefined || flushed === undefined || 'fills' in flushed) return undefined;
-  return flushed.edge === cut.edge && sameRectWithinPixel(chain[flushed.at], cut.container) ? cut : undefined;
-}
-
-/** px from `rect`'s edge opposite `edge` to `container`'s same side: what the content may move toward revealing `edge` before that edge leaves the container. */
-function roomPast(rect: Rect, container: Rect, edge: Edge): number {
-  switch (edge) {
-    case 'bottom':
-      return rect.y - container.y;
-    case 'top':
-      return container.y + container.height - (rect.y + rect.height);
-    case 'right':
-      return rect.x - container.x;
-    case 'left':
-      return container.x + container.width - (rect.x + rect.width);
-  }
-}
-
 declare const opaque: unique symbol;
 
 /** The reducer's state — what the caller holds between rounds and hands back. Opaque: only `round` reads it (the fields are `State`'s). */
@@ -741,10 +600,11 @@ interface State {
   readonly presentedHold: Extract<ScrollOutcome, { kind: 'presented' }> | undefined;
   /** The swipe count at the last read that had the target in the frame (any part of it) — for a failure after it left again. */
   readonly inFrameAfter: number | undefined;
-  /** The probe in flight (`flushCheck`): the judged match's rect and edge when it was sent. Cleared by the next read that reads. */
-  readonly probe: { rect: Rect; edge: Edge } | undefined;
-  /** The cut a probe proved (`ProvenCut`), while the match lies flush on it; undefined until one is. */
-  readonly provenCut: ProvenCut | undefined;
+  /**
+   * THE FLUSH CHECK (interact/flush-check.ts): a `fully: true` stop flush with a clipping container — the probe in
+   * flight and the cut a probe proved. Shown each read that read once (`seeFlush`), its verdict read once.
+   */
+  readonly flush: FlushCheck;
   /** The swipe count at the last read that had the target in the tree at all — for "was in the tree … then left it". */
   readonly inTreeAfter: number | undefined;
   /** The top sheet's grabber at the first read that read and at the last (`TreeFacts.detent`); undefined until a read reads. */
@@ -778,8 +638,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     confirmReads: 0,
     presentedHold: undefined,
     inFrameAfter: undefined,
-    probe: undefined,
-    provenCut: undefined,
+    flush: startFlush(rules.direction),
     eyesRefused: undefined,
     marginKept: [],
     inTreeAfter: undefined,
@@ -895,7 +754,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   }
   const offFrame = best !== undefined && best.standing.facts.visible === 0 && found.some(hasArea);
   // The tree's proof (`Observed.ends`): asked only of a read a stroke toward the target left unmoved, and never while a
-  // progress node shows (content may yet load there). The flush probe (`flushCheck`) never meets it, by the trees'
+  // progress node shows (content may yet load there). The flush probe (interact/flush-check.ts) never meets it, by the trees'
   // dialects: a probe is planned only over CLIPPING ancestors (`scrollersOf`), which only Android's tree marks, and the
   // proof needs `Clips.contentToward`'s `ends`, which only a tree of unclipped frames (WDA's) answers — no real source gives both. The
   // probe's own answer is the stop it checks (pinned, on a synthetic tree carrying both marks, in
@@ -936,7 +795,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
 function ledgerRead(s: State, current: Since, facts: TreeFacts, found: readonly UiNode[], best: Judged | undefined, screen: UsableScreen | undefined, listed: () => ListedContent | undefined): LedgerRead {
   const sentToward = lastSent(s.course);
   const blank = current === 'stroke' && found.length === 0 ? listed() : undefined;
-  const carryToward = current === 'stroke' && s.probe === undefined && best?.standing.facts.listedWhereItLies === true ? sentToward : undefined;
+  const carryToward = current === 'stroke' && !probing(s.flush) && best?.standing.facts.listedWhereItLies === true ? sentToward : undefined;
   const shows = screen === undefined ? undefined : belowStatusBand(screen.oriented, screen);
   return {
     since: current,
@@ -947,6 +806,16 @@ function ledgerRead(s: State, current: Since, facts: TreeFacts, found: readonly 
     ...(blank?.kind === 'blank' && sentToward !== undefined && { blank: { within: blank.view.rect, toward: sentToward } }),
     ...(carryToward !== undefined && { carryToward }),
   };
+}
+
+/**
+ * What the flush check's probe would be sent with this round (interact/flush-check.ts#ProbeMeans): the frame's box, the
+ * gesture box, the stroke plan's memory, the read's cover and the one it offered the witness, the witness's answer, and
+ * whether a swipe and time are left.
+ */
+function probeMeans(s: State, seen: RoundSeen, cover: AppliedKeyboard | undefined, offered: AppliedKeyboard | undefined): ProbeMeans {
+  const budget = s.swipes < s.rules.maxSwipes && seen.elapsedMs < s.rules.timeoutMs;
+  return { screen: s.frame.box, gesture: seen.screen?.oriented, strokes: s.strokes, cover, offered, corroborated: seen.corroborated, budget };
 }
 
 /** Another confirming read is within the stroke's budget and the deadline. */
@@ -1052,11 +921,6 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (sighted !== undefined) s.course = sighted.course;
   const observed = now === undefined || motion.moved === undefined ? undefined : observe(s, current, now, best, motion.moved, listed);
   if (now !== undefined) s.detents = { first: s.detents === undefined ? now.facts.detent : s.detents.first, last: now.facts.detent };
-  // The probe this read answers (`flushCheck`) — kept across a read that did
-  // not read, which is read again below rather than stroked away from.
-  const probed = s.probe;
-  if (read !== undefined) s.probe = undefined;
-
   // `presentedHold` is this read's to set again (below).
   const presentedBefore = s.presentedHold !== undefined;
   if (now !== undefined) s.presentedHold = undefined;
@@ -1067,46 +931,43 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // A cut the flush check's probe proved with no reveal to send this read (`FlushCut`): no stop, the shortfall the
   // stuck and bound failures name.
   let flushCut: FlushCut | undefined;
-  if (best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined) {
-    // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies.
-    const { facts } = best.standing;
-    // Covered: by a cover the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover —
-    // neutral either way today: an overlaid cover lies over a node in no scroll view, which has no flush neighbour to ask of.
-    const question = fullyClaimed({ clipped: facts.clipped, covered: facts.covers.some(drawOrderFound) }) && read !== undefined ? eyesQuestion(now.facts.scene, read.tree, best.node, s.frame, fully ? 'fully' : 'stop') : undefined;
-    // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
-    // last refused them — no confirm, no screenshot; this stroke's read, short as before.
-    const refused = s.eyesRefused;
-    const refusedAgain = current === 'stroke' && refused !== undefined && question !== undefined && sameQuestion(refused.asked, question);
+  // The judged match in the frame, on a read that read: what a stop is judged on.
+  const inFrame = best !== undefined && best.standing.facts.visible > 0 && observed !== undefined && now !== undefined;
+  // The question a `fully visible` claim on it would ask the eyes (THE EYES, below), when the trigger applies.
+  // Covered: by a cover the draw order found (cover.ts#drawOrderFound), as before the overlaid edge was a cover —
+  // neutral either way today: an overlaid cover lies over a node in no scroll view, which has no flush neighbour to ask of.
+  const question = inFrame && fullyClaimed({ clipped: best.standing.facts.clipped, covered: best.standing.facts.covers.some(drawOrderFound) }) ? eyesQuestion(now.facts.scene, now.read.tree, best.node, s.frame, fully ? 'fully' : 'stop') : undefined;
+  // Refused again (`State.eyesRefused`): the read after a stroke finds the target and its neighbours where the eyes
+  // last refused them — no confirm, no screenshot; this stroke's read, short as before.
+  const refused = s.eyesRefused;
+  const refusedAgain = current === 'stroke' && refused !== undefined && question !== undefined && sameQuestion(refused.asked, question);
+  // A stop is judged on this read: the match a stop by its standing, not refused again, not held back by its motion.
+  const judgesStop = inFrame && stops(best) && !refusedAgain && under === undefined;
+  // THE FLUSH CHECK (interact/flush-check.ts) is shown every read that read once — a `fully: true` stop's match, or
+  // none — and answers the probe in flight; a read that did not read keeps it, and is read again below rather than
+  // stroked away from.
+  const flush = read === undefined ? undefined : seeFlush(s.flush, judgesStop && fully ? { judged: best, facts: now.facts, drawn: lastDrawn(s.motion), means: probeMeans(s, seen, cover, offered) } : undefined);
+  if (flush !== undefined) s.flush = flush.check;
+  if (inFrame) {
     if (refusedAgain) unlisted = { ...refused.short, judged: best };
-    if (stops(best) && !refusedAgain && under === undefined) {
-      // The probe moved nothing: the match is where it was sent from — the
-      // stop holds (it held still through a stroke), and nothing lies
-      // beyond its flush edge.
-      const probeHeld = probed !== undefined && sameRectWithinPixel(probed.rect, best.node.rect);
-      // …and was a stroke: one drawn shorter than twice the slop may have
-      // been a tap, and a tap moves nothing whatever lies beyond the edge.
-      const drawn = lastDrawn(s.motion);
-      const probeStroked = probeHeld && drawn !== undefined && strokeLength(drawn) >= 2 * TOUCH_SLOP;
-      // The probe moved it and it lies flush on the same edge with more of it showing (`revealedBy`), or it still lies
-      // flush on a cut an earlier probe proved (`stillProven`): no stop is claimed and none confirmed — the next stroke
-      // reveals the rest (`flushCheck`), at once.
-      const flush = fully ? flushOf(best, now.facts, s.rules.direction) : undefined;
-      if (flush !== undefined) s.provenCut = (probed !== undefined && !probeHeld ? revealedBy(probed, best.node.rect, flush) : undefined) ?? stillProven(s.provenCut, flush);
-      const proven = flush === undefined ? undefined : s.provenCut;
+    if (judgesStop && flush !== undefined) {
       // A stop after a stroke is reported only once a read finds the target
       // where the last one did (SETTLE_CONFIRM_READS): a fling can carry it
       // on, or out of the frame, after the settle read caught it inside. A
-      // stop at 0 swipes was not stroked: reported at once.
-      const settled = s.swipes === 0 || probeHeld || (current === 'settle' && observed.bestUnmoved);
+      // stop at 0 swipes was not stroked, nor one a probe came back from
+      // unmoved (`FlushSeen.settles`): reported at once.
+      const settled = s.swipes === 0 || flush.settles || (current === 'settle' && observed.bestUnmoved);
       // A fling still slowing is waited out, spending none of the budget (SETTLE_CONFIRM_READS): the stop is judged on
-      // the read it comes to rest in, not on one it is still carrying the target through.
-      if (!settled && proven === undefined && observed.slowing && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
-      if (!settled && proven === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
-      // `fully: true`, an edge flush with the clipping container: possibly cut there — probe once toward it
-      // (`flushCheck`), reveal what a probe proved cut, or say it could not be checked.
-      const checked = flush !== undefined ? flushCheck(s, { best, facts: now.facts, ...flush, probeHeld, probeStroked, proven, gesture, cover, offered, seen, ask }) : undefined;
-      if (checked !== undefined && 'step' in checked) return checked;
-      if (checked !== undefined && 'of' in checked) flushCut = checked;
+      // the read it comes to rest in, not on one it is still carrying the target through. Neither on a cut a probe
+      // proved (`FlushSeen.waits`): the next stroke reveals the rest, at once.
+      if (!settled && flush.waits && observed.slowing && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
+      if (!settled && flush.waits && mayConfirm(s, seen.elapsedMs)) return confirm(s);
+      // `fully: true`, an edge flush with the clipping container: possibly cut there — probe once toward it, reveal
+      // what a probe proved cut, or say it could not be checked (`FlushVerdict`).
+      const { verdict } = flush;
+      if (verdict.of === 'witness') return ask('witness');
+      if (verdict.of === 'probe') return probe(s, verdict);
+      if (verdict.of === 'cut') flushCut = verdict.cut;
       else {
         // The `unlocated` row on a `fully: true` stop only — where the answer
         // changes what the reader does next — and only with no cover under
@@ -1128,7 +989,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         if (question !== undefined && eyes === undefined) return ask(question);
         const finding: EyesFinding | undefined = eyes === undefined || eyes.sees === 'own' ? undefined : eyes;
         if (finding?.sees !== 'surface' || !(fully || reachesPoint(finding, question?.region ?? best.node.rect, tapPoint(best.node)))) {
-          return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(checked !== undefined && { flush: checked }), ...(finding !== undefined && { eyes: finding }) });
+          return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(verdict.of === 'flush' && { flush: verdict.flush }), ...(finding !== undefined && { eyes: finding }) });
         }
         unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: { lineY: offered.line.y, remedy: offered.remedy } }) };
         if (question !== undefined) s.eyesRefused = { asked: askedOf(question), short: unlisted };
@@ -1197,7 +1058,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // A confirming read that did not read, or the read after a probe: read
   // again, within the same budget, rather than stroke away from a stop the
   // last read saw.
-  if ((current === 'settle' || s.probe !== undefined) && read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
+  if ((current === 'settle' || probing(s.flush)) && read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
   // A presented stop held for its confirming read (`presentedHold`) and no read left to confirm it with: stop as the
   // last read that read left it — never a stroke drawn blind, which would land on the screen that read saw presented
   // (a read failing three times after the popover's hold had stroked onto its dim). Not a wait to the deadline: the
@@ -1330,173 +1191,6 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
 /** One round's step, as `round` returns it. */
 type Next = { state: Rounds; step: RoundStep };
 
-/** What the flush check reads of the round (`flushCheck`). */
-interface FlushRound {
-  /** The judged match, a stop in the frame. */
-  readonly best: Judged;
-  readonly facts: TreeFacts;
-  /** The match's clipping ancestors, nearest first, and where it lies flush of them in this read (`flushOf`). */
-  readonly chain: readonly Rect[];
-  readonly flushed: Flushed;
-  /** The probe in flight came back with the match where it was sent from (`round`), and was drawn as a stroke, not a tap. */
-  readonly probeHeld: boolean;
-  readonly probeStroked: boolean;
-  /** The cut a probe proved, the match still flush on it (`State.provenCut`); undefined when none is. */
-  readonly proven: ProvenCut | undefined;
-  /** The round's gesture box (`RoundSeen.screen`'s `oriented`). */
-  readonly gesture: Rect | undefined;
-  /** The keyboard cover the read applied, and the one it offered the witness (scroll-read.ts#ReadJudgement). */
-  readonly cover: AppliedKeyboard | undefined;
-  readonly offered: AppliedKeyboard | undefined;
-  readonly seen: RoundSeen;
-  /** `round`'s ask: the state as it came in, the question asked. */
-  readonly ask: (what: 'witness') => Next;
-}
-
-/**
- * THE FLUSH CHECK of a `fully: true` stop, and its probe:
- * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
- * The one short stroke (its reach course.ts#PROBE_REACH) a `fully: true` stop is answered with when the
- * judged match's edge along the scroll lies exactly — within a pixel — on
- * its scroll container's edge (`flushEdge`). On Android that is where
- * uiautomator cuts a node's bounds: a row half behind a pinned bar, or half
- * past the fold of a list with no chrome, or half below the display in an
- * edge-to-edge scroller (the display clips too), reads SHORTER, inside the
- * container, with no edge past the viewport — measured: the SWIFT form's
- * Fees row read `{y:242, height:92}` of 143 against a container starting at
- * 242, and was "fully visible after 0 swipes". The cut is not in the tree,
- * so it is asked of the device: a stroke TOWARD revealing that edge (content
- * that lies up, for a top edge — the finger moves down), drawn inside the
- * container. Moves nothing: the content is at its end that way, nothing
- * lies beyond the edge, the stop is accepted as it stood (the first row of
- * a list at rest is flush with its container's top and is not cut). Moves
- * it, and it lies flush on the same edge with more of it showing
- * (`revealedBy`): the cut is PROVED — content lay past that edge, and part
- * of the match with it — so that read claims no stop and confirms none: the
- * next stroke is a REVEAL (course.ts#Revealing: the whole stroke, its travel
- * half the room the match leaves in that container), a probe in every other
- * respect. The proof is kept while the match lies flush on that edge of that
- * container (`ProvenCut`, `State.provenCut`), so no later read claims it
- * fully visible there either; with no reveal to send (no swipe or time
- * left, or a tree changed since the probe with no room or only a scroll view
- * across the axis) the read is short of the cut (`FlushCut`), which the bound
- * or a stuck stop names — never "fully visible". Measured on the lab's bounded list
- * (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md):
- * a 74-px probe moved S 57–61 px of its 154-px cut (21 or 38 on a loaded
- * host), and quarter-strokes with a confirming read each — ~5.1 s a round —
- * ended cut at the deadline in 2 of the runs recorded. Moves it otherwise: the round
- * judges the new read like any other, and a stop flush again after it is a
- * new candidate with a probe of its own.
- *
- * Toward the edge, never the caller's way (course.ts#probeOf). Along the
- * scroll's axis only (the caller's direction's): a vertical list's cell
- * flush with the left edge of its container is the ordinary grid layout,
- * and a sideways stroke there could turn a page of a pager around it. Not
- * when BOTH edges on the axis are flush — the match fills its container,
- * and one probe cannot tell which side, if either, is cut: unless an outer
- * ancestor gives it a one-edge flush (below), such a stop is reported
- * unchecked, `flush.why` `fills` (`Flush`), and the reply says so. One
- * probe per candidate stop:
- * a probe (or a reveal) after which the match is where it was settles it.
- *
- * Every clipping ancestor, not the nearest alone:
- * the match is flush with one of them on one edge — a card that fills a
- * carousel's height is flush with both of the carousel's edges, but the
- * carousel is cut by the list around it, and the card with it, on the
- * list's edge — and the probe answers the nearest ancestor flush on ONE
- * edge. Exempt only when no ancestor is. The probe is drawn over that
- * ancestor, or an outer one, whichever is the first with room for a stroke
- * (interact/stroke-plan.ts#planProbe) — a carousel cut to a 30-px strip has none, and a
- * stroke there is a tap on the card — room ABOVE the keyboard the probe
- * keeps clear of (a list running on under the IME from 58 px above it has
- * room on the screen and none above the keyboard; a probe over the whole
- * screen lands off the list and reports "nothing of it is cut there"). When no ancestor has room (a lone 79-px
- * scroller, that list), no probe is sent — over the screen it would touch
- * down off the container and move nothing whatever is cut — and the stop
- * is reported with `flush.checked` false. A probe drawn shorter than twice
- * TOUCH_SLOP anyway (a tiny screen) never reports `checked`: it may have
- * been a tap that moved nothing.
- *
- * A node PINNED in the nearest scroll view counts as its edge
- * (ui-tree/later-edges.ts#PinnedEdge, `Scene.pinnedEdges`): Compose also
- * subtracts what a later node covers, so a row under a merged sticky header
- * pinned at its list's top is dumped from the header's bottom — and so is a
- * first row at rest, whole under it: the same tree (measured, the lab's
- * scroll-sticky-cut R `128,457 825x110` under the header `0,303 1080x154`;
- * docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-reads-whole.md).
- * The probe goes toward the header from inside the list; the stop names it
- * (`Flush.pinned`). At the content's start only (top, left), where a sticky
- * header pins: at the far edge that shape is the next row cut at the fold.
- *
- * Residuals, stated: Android's View bounds are cut to every
- * ancestor, not only scrollers, and Compose also subtracts what an overlay
- * sibling covers — a row cut by a pinned bar drawn over the list reads cut
- * at the bar's edge, not flush with any scroller, so it is not probed (the
- * bar itself is a cover, ui-tree/standing.ts#Scene's; a bar outside the list
- * is a flush neighbour, the eyes'); a RecyclerView with padding
- * and clipToPadding draws a row cut at its padding edge while the row's
- * rect runs to the view's edge — not flush, not probed.
- *
- * Cost, stated: one stroke (it spends one of `maxSwipes` and counts in the
- * reply's swipes), one settle and one tree read — a probe that moves the
- * match also its confirming read, unless it proved the cut — plus, on Android, what a
- * round's keyboard reading costs (ui-tree/keyboard-cover.ts) — on every
- * `fully: true` stop flush with a clipping container or under a node pinned
- * in it, legitimate ones included (a first row at rest, under a sticky
- * header or not). iOS has no clipping container
- * (types.ts#UiNode.clipsDescendants), so it never probes. At the bound —
- * no swipe or time left — a stop never probed is reported with `flush.checked` false
- * and a sentence saying it may be cut; a cut a probe proved is no stop (`FlushCut`).
- *
- * The check itself: where the match lies flush with its clipping ancestors
- * (`flushWith`), and either the stop's `Flush` — `fills`, `checked` by the probe that came back, or unchecked for
- * `tap`, `room`, `axis` or `budget` — the cut a probe proved with no reveal sent (`FlushCut`, for `room`, `axis` or `budget`), or the
- * step that answers it first: the witness asked about a band the moot rule left
- * unasked, or the probe sent, as the stroke plan makes it (interact/stroke-plan.ts#planProbe: over the first of the
- * ancestors from the flush one outward with room above the keyboard — none, and no probe is sent). Undefined: not
- * flush with any.
- */
-function flushCheck(s: Mutable<State>, { best, facts, chain, flushed, probeHeld, probeStroked, proven, gesture, cover, offered, seen, ask }: FlushRound): Flush | FlushCut | Next | undefined {
-  if (flushed === undefined) return undefined;
-  if ('fills' in flushed) return { edges: flushed.fills, container: chain[0], ...(flushed.pinned !== undefined && { pinned: flushed.pinned }), checked: false, why: 'fills' };
-  const { edge, at } = flushed;
-  const container = chain[at];
-  const where = { edge, container, ...(flushed.pinned !== undefined && { pinned: flushed.pinned }) };
-  // A probe or reveal that moved nothing: checked — nothing lies past the edge now — unless drawn too short to tell
-  // from a tap, which on a proven cut is no stop but that cut.
-  if (probeHeld) return probeStroked ? { ...where, checked: true } : proven === undefined ? { ...where, checked: false, why: 'tap' } : { of: 'flushCut', judged: best, ...where, revealed: proven.revealed, why: 'tap' };
-  // With no gesture box (`RoundSeen.screen` absent) nothing has room and the stop says `room` — the wrong reason (it
-  // is "no screen box"), accepted as unreachable in practice: screenBox throws only when the device's size is
-  // unusable AND the tree has no window, and adapters/viewport-memo.ts keeps a successful size for the session — so it
-  // takes a device reporting 0×0 throughout, and a tree whose window stood in on an earlier round (else the frame is
-  // 0×0 and no stop is ever visible) but not on this one.
-  // A check that cannot be made: the stop's hedge — or, on a cut a probe proved, no stop at all but that cut, with why
-  // no reveal was sent (`FlushCut`).
-  const unchecked = (why: 'budget' | 'room' | 'axis'): Flush | FlushCut => (proven === undefined ? { ...where, checked: false, why } : { of: 'flushCut', judged: best, ...where, revealed: proven.revealed, why });
-  // Its way and reach are the course's (interact/course.ts#probeOf): toward revealing the edge, a short stroke capped
-  // by the screen's long side — or, once a probe proved the cut, the reveal sized from the room the match leaves in
-  // that container.
-  const revealing = proven === undefined ? undefined : { room: roomPast(best.node.rect, container, edge) };
-  const way = probeOf(edge, s.frame.box, revealing);
-  if (probeAcrossOnly({ toward: way.toward, facts, scrollViews: chain.slice(at) })) return unchecked('axis');
-  const probeOver = (keyboardTop: number | undefined) => planProbe(s.strokes, { ...way, gesture, facts, scrollViews: chain.slice(at), keyboardTop });
-  if (probeOver(undefined) === undefined) return unchecked('room');
-  if (s.swipes >= s.rules.maxSwipes || seen.elapsedMs >= s.rules.timeoutMs) return unchecked('budget');
-  // Clear of a keyboard as any stroke is — and one the moot rule never asked about (the stop was clean either way) is
-  // asked about now: the probe touches down on the container's lower part for a bottom edge, which may be under the
-  // band.
-  let probeCover = cover;
-  if (probeCover === undefined && offered !== undefined) {
-    if (seen.corroborated === undefined) return ask('witness');
-    if (seen.corroborated) probeCover = offered;
-  }
-  // Room judged again ABOVE that keyboard: a list running on under the IME may have room on the screen and none above
-  // it — the probe would touch down off it and move nothing. Twice only to keep the ask order: no room even over the
-  // whole screen is `room` with no witness asked.
-  const planned = probeOver(strokeLine(probeCover, facts)?.y);
-  return planned === undefined ? unchecked('room') : probe(s, edge, way.toward, best.node.rect, planned);
-}
-
 /**
  * A `presented` stop (`outcome`) on this read: made at once when this read confirms the last one's hold
  * (`confirming`) or no confirming read is left; else held (`presentedHold`) for one more read with no stroke between.
@@ -1508,22 +1202,22 @@ function holdPresented(s: Mutable<State>, outcome: Extract<ScrollOutcome, { kind
 }
 
 /**
- * Send the flush check's probe (`flushCheck`) as the plan made it (interact/stroke-plan.ts#planProbe): toward
- * revealing `edge` (`toward`), over a scroll view with room above the probe's keyboard and what is drawn over it —
- * never the screen box: a stop with no ancestor that has room is reported unchecked, not probed — its reach and travel
- * the course's (interact/course.ts#probeOf). A swipe like any other for the count and the bound, but not a step of the
- * scroll's course (interact/course.ts#probeSent: a probe the other way from the caller's direction is not a turn and
- * halves no reach).
+ * Send the flush check's probe (interact/flush-check.ts#FlushVerdict's `probe`) as the plan made it
+ * (interact/stroke-plan.ts#planProbe): toward revealing its edge (`toward`), over a scroll view with room above the
+ * probe's keyboard and what is drawn over it — never the screen box: a stop with no ancestor that has room is reported
+ * unchecked, not probed — its reach and travel the course's (interact/course.ts#probeOf); the check kept with it in
+ * flight. A swipe like any other for the count and the bound, but not a step of the scroll's course
+ * (interact/course.ts#probeSent: a probe the other way from the caller's direction is not a turn and halves no reach).
  */
-function probe(s: Mutable<State>, edge: Edge, toward: Direction, rect: Rect, planned: { stroke: PlannedStroke; memory: StrokeMemory }): { state: Rounds; step: RoundStep } {
-  s.probe = { rect: { ...rect }, edge };
-  s.strokes = strokeSent(planned.memory);
+function probe(s: Mutable<State>, { toward, stroke, memory, check }: Extract<FlushVerdict, { of: 'probe' }>): { state: Rounds; step: RoundStep } {
+  s.flush = check;
+  s.strokes = strokeSent(memory);
   s.course = probeSent(s.course, toward);
   s.confirmReads = 0;
   s.since = 'stroke';
   s.swipes++;
   s.owesDrawn = true;
-  return { state: s as unknown as Rounds, step: { do: 'stroke', ...planned.stroke, probe: true } };
+  return { state: s as unknown as Rounds, step: { do: 'stroke', ...stroke, probe: true } };
 }
 
 /** Spend a confirming read: the next read follows a settle, not a stroke. */

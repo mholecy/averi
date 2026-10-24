@@ -359,7 +359,7 @@ export interface UiNode {
    * nothing in the rect says the rest exists. Read by
    * ui-tree/geometry.ts#clipsOf, which `scroll_until`'s round asks for
    * each match's such ancestors so a `fully: true` stop flush with one is
-   * checked before it is reported (interact/scroll-rounds.ts#flushCheck).
+   * checked before it is reported (interact/flush-check.ts).
    * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
    *
    * A flag, not a role: mapping a Compose scroller to

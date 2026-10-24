@@ -221,8 +221,8 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * reads every match's nearest clipping ancestors (ui-tree/geometry.ts
  * #clipsOf, `Clips.scrollersOf`, over the `clipsDescendants` the parser sets), and a `fully: true` stop flush with
  * one of them is answered with one short probe toward that edge, drawn over
- * a container with room for it above the keyboard (scroll-rounds.ts
- * #flushCheck has the rule and its cost; interact/stroke-plan.ts the box).
+ * a container with room for it above the keyboard (interact/flush-check.ts
+ * has the rule and its cost; interact/stroke-plan.ts the box).
  * Only the screen box comes from here — the round decides the stroke's.
  *
  * The unlocated keyboard (ui-tree/keyboard-cover.ts#UNLOCATED_KEYBOARD — the input
