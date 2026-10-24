@@ -985,7 +985,7 @@
       "n": "L1",
       "note": "2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md",
       "status": "calibrate",
-      "fix": ["d43df5d", "b3acdeb", "59dccf2"],
+      "fix": ["d43df5d", "b3acdeb", "59dccf2", "b584755"],
       "after": "d43df5d",
       "verified": "golden",
       "partial": "AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker), ADR 0018's residual 18, by the second pair (the window manager's word, round 1023b) for its three taps; its three scroll_until rows stay filed as that residual (narrowed: the strokes on the sheet's own list)",
@@ -1011,14 +1011,14 @@
       "pairs": [
         {
           "before": "103c405",
-          "after": "59dccf2",
+          "after": "b584755",
           "checks": [
             "android-averi_lab-api33/form-picker.xml name tap",
             "android-averi_lab-api33/form-picker.xml country tap",
             "android-averi_lab-api33/form-picker.xml submit tap"
           ],
           "defect": "to appear$|active-window hint",
-          "remark": "2: b3acdeb (bugs/r1023b-r19, ADR 0018's amendment \"Android's window by the window manager's word\"), judged on form-picker's three taps: at its parent 103c405 (the round's captures, the window manager's word beside them, round 1023b's src unchanged from 6ff9ca3) each times out \"to appear\" with the active-window hint; at b3acdeb the window manager types the sheet a Dialog's window (TYPE_APPLICATION at the root's bounds), asked once the wait has found nothing, and each says the presented remedy. Its three scroll_until rows still stroke the sheet's own list (decision 3), now with the presented remedy — residual 18, narrowed. The pair is 103c405 → 59dccf2 (before given: 59dccf2's first parent already holds b3acdeb), b3acdeb's review fixes judged with it: the sheet holds its own list, so each tap says first to scroll_until it there, then the presented remedy if not (the amendment's decision 4)."
+          "remark": "2: b3acdeb (bugs/r1023b-r19, ADR 0018's amendment \"Android's window by the window manager's word\"), judged on form-picker's three taps: at its parent 103c405 (the round's captures, the window manager's word beside them, round 1023b's src unchanged from 6ff9ca3) each times out \"to appear\" with the active-window hint; at b3acdeb the window manager types the sheet a Dialog's window (TYPE_APPLICATION at the root's bounds), asked once the wait has found nothing, and each says the presented remedy. Its three scroll_until rows still stroke the sheet's own list (decision 3), now with the presented remedy — residual 18, narrowed. The pair is 103c405 → b584755 (before given: the review fixes' first parents already hold b3acdeb), b3acdeb's review fixes 59dccf2 and b584755 judged with it: the sheet holds its own list, so each tap says first to scroll_until it there, then the presented remedy if not (the amendment's decision 4)."
         }
       ],
       "remark": "Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment \"Android's presented window\"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out \"to appear\" without \"close it first\", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's \"not found\" is vacuous). Partial: form-picker's fully expanded sheet dumps no scrim and is not marked — its six tap and scroll_until rows stay KNOWN (tests/differential/golden/forms.known.ts), filed as ADR 0018's residual 18 since the owner accepted it (2026-10-18) with the active-window hint Android's tap and fill wait and scroll_until not-found now carry (the taps' \"to appear\" then reads the hint's conditional \"close it first\", no presented remedy: their class `not in the tree (active-window hint)`)."
@@ -1364,7 +1364,8 @@
       "fix": [
         "f924893",
         "b3acdeb",
-        "59dccf2"
+        "59dccf2",
+        "b584755"
       ],
       "after": "f924893",
       "verified": "golden",
@@ -1382,7 +1383,7 @@
       "pairs": [
         {
           "before": "103c405",
-          "after": "59dccf2",
+          "after": "b584755",
           "checks": [
             "android-averi_lab-api33/dialog-fullscreen.xml A tap",
             "android-averi_lab-api33/dialog-fullscreen.xml A scroll_until",
@@ -1402,7 +1403,7 @@
             "android-averi_lab-api33/dialog-views-fullscreen.xml D scroll_until"
           ],
           "defect": "to appear$|active-window hint|never appeared in the tree|swiped \\d+× beneath a presented layer",
-          "remark": "2: b3acdeb (bugs/r1023b-r19, ADR 0018's amendment \"Android's window by the window manager's word\"; open-bugs #17, residual 19 — this note's \"The full-screen dialog\" section), judged on the full-screen Compose dialog's (dialog-fullscreen) and round 1023b's Views dialog laid full screen (dialog-views-fullscreen, captured at 103c405) taps and scroll_until: at its parent 103c405 the taps time out \"to appear\" with the active-window hint and scroll_until strokes the dialog twice; at b3acdeb the window manager types the focused window a Dialog's at the root's bounds, asked on the miss, so the taps say the presented remedy and scroll_until stops before any swipe. The colour rows stay KNOWN as no note's (vacuous). Live: the four dialog-fullscreen scroll cases struck off scripts/truth/live-known.ts, the dialog cells ok in three runs of three (docs/truth/live-records/android-vis-r1023b-r19-1…3.json). The pair is 103c405 → 59dccf2 (before given: 59dccf2's first parent already holds b3acdeb), b3acdeb's review fixes judged with it (the ask by one door, the frame within a pixel; these rows' replies unchanged)."
+          "remark": "2: b3acdeb (bugs/r1023b-r19, ADR 0018's amendment \"Android's window by the window manager's word\"; open-bugs #17, residual 19 — this note's \"The full-screen dialog\" section), judged on the full-screen Compose dialog's (dialog-fullscreen) and round 1023b's Views dialog laid full screen (dialog-views-fullscreen, captured at 103c405) taps and scroll_until: at its parent 103c405 the taps time out \"to appear\" with the active-window hint and scroll_until strokes the dialog twice; at b3acdeb the window manager types the focused window a Dialog's at the root's bounds, asked on the miss, so the taps say the presented remedy and scroll_until stops before any swipe. The colour rows stay KNOWN as no note's (vacuous). Live: the four dialog-fullscreen scroll cases struck off scripts/truth/live-known.ts, the dialog cells ok in three runs of three (docs/truth/live-records/android-vis-r1023b-r19-1…3.json). The pair is 103c405 → b584755 (before given: the review fixes' first parents already hold b3acdeb), b3acdeb's review fixes 59dccf2 and b584755 judged with it (the ask by one door, the frame within a pixel; these rows' replies unchanged)."
         }
       ],
       "remark": "Fixed by round 7's A7, f924893 on arch/r23-sheet-dialog (adapters/android.ts#presentedWindow asks the window of an ordered list of named recognizers, and #materialSheetDialog — Material's touch_outside followed by design_bottom_sheet under a coordinator, read by the ids' entries against the scrim's edges — is one; ADR 0018's amendment \"a Views BottomSheetDialog by Material's ids\"), its ADR amended at 25da22d4, merged into arch/round-23 as 3ec1f26: the pair is f924893 itself and its parent 054a59f (a docs commit over round 6's src 565bcb9, LW1's note carried). Before: the taps time out \"to appear\" with the active-window hint, scroll_until strokes the window twice and says it never appeared in the tree with the hint; after: each tap's wait says the presented remedy, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's \"not found\" is vacuous; with ui-tree/miss.ts its miss now says the presented remedy). Live: the four scroll cases struck off scripts/truth/live-known.ts — round 7's A7 run three times (docs/truth/live-records/android-vis-sheet-dialog-run1…3.json), 13/13 ok each, the sheet never dismissed."
