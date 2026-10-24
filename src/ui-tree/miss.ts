@@ -1,7 +1,7 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
 import type { Edge } from './geometry.js';
 import { presentationOf, type MarkedLayer } from './presentation.js';
-import { scrolls } from './scroll-containers.js';
+import { clips } from './scroll-containers.js';
 import { findTarget, hasArea, soleIdOf, type Target } from './selectors.js';
 import { clippedOutText, revealText } from './sides.js';
 import { presentedLayerName, presentedRemedy } from './standing.js';
@@ -144,8 +144,10 @@ export function missOf({ tree, readError, target, scrolled }: { tree?: UiNode; r
   const alone = tree.presentation === undefined ? undefined : presentationOf(tree).alone;
   if (alone !== undefined) {
     const listed: ListedAs = tree.activeWindowOnly === true ? 'window' : 'layer';
-    // The window listed alone IS the tree: a scroll view anywhere in it is the window's own.
-    const ownList = listed === 'window' && scrolled !== true && [...everyNode(tree)].some(scrolls);
+    // The window listed alone IS the tree: a scroll view anywhere in it is the window's own. One that scrolls NOW
+    // (uiautomator's scrollable="true", scroll-containers.ts#clips): a lazy list with rows not laid out has a range to
+    // scroll, while a ScrollView-classed node that fits (an AlertDialog's message) is no list to look in.
+    const ownList = listed === 'window' && scrolled !== true && [...everyNode(tree)].some(clips);
     return { of: 'presented', layer: alone, listed, ...(ownList && { mayLieIn: 'itsScrollView' as const }) };
   }
   if (tree.activeWindowOnly === true && tree.windowAlone !== true) return { of: 'activeWindow' };

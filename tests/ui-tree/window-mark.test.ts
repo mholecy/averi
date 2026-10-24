@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { FocusedWindow, UiNode } from '../../src/adapters/types.js';
+import { everyNode, type FocusedWindow, type UiNode } from '../../src/adapters/types.js';
 import { parseFocusedWindow } from '../../src/adapters/android.js';
 import { markByWindow, markedForMiss } from '../../src/ui-tree/window-mark.js';
 import { missNote, missOf, presentedAloneHeadline, type Miss } from '../../src/ui-tree/miss.js';
@@ -65,6 +65,9 @@ describe('markByWindow: (tree, the WM\'s word) → the tree marked, or as it was
     expect(at({ ...tree.rect, height: tree.rect.height + 1 })).toBe('screen');
     expect(at({ ...tree.rect, y: tree.rect.y - 1 })).toBe('screen');
     expect(at({ ...tree.rect, height: tree.rect.height + 2 })).toBeUndefined();
+    // …and a window a pixel narrower than the screen still spans it: a screen, not a dialog.
+    const wide = uiautomator('dialog-views-fullscreen');
+    expect(markByWindow(wide, { of: 'stacked', frame: { ...wide.rect, width: wide.rect.width - 1 }, screen: SCREEN }).presentation).toBe('screen');
   });
 
   it('unknown leaves the tree as it was', () => {
@@ -91,6 +94,13 @@ describe('a presented window that holds a scroll view of its own: a target missi
   it('the miss says the window\'s own scroll view may hold it (`mayLieIn`), unless the reader has stroked it already', () => {
     expect(missOf({ tree: sheet(), target: ST })).toEqual({ of: 'presented', layer: { kind: 'screen' }, listed: 'window', mayLieIn: 'itsScrollView' });
     expect(missOf({ tree: sheet(), target: ST, scrolled: true })).toEqual({ of: 'presented', layer: { kind: 'screen' }, listed: 'window' });
+  });
+
+  it('a scroll view that cannot scroll now (a ScrollView-classed node that fits, an AlertDialog\'s message) is no list to look in', () => {
+    const fits = (n: UiNode): UiNode => ({ ...n, clipsDescendants: undefined, role: n.clipsDescendants === true ? 'scrollable' : n.role, children: n.children.map(fits) });
+    const tree = fits(sheet());
+    expect([...everyNode(tree)].some((n) => n.role === 'scrollable')).toBe(true);
+    expect(missOf({ tree, target: ST })).toEqual({ of: 'presented', layer: { kind: 'screen' }, listed: 'window' });
   });
 
   it('a window with no scroll view of its own says no scroll (dialog-fullscreen, alert-dim, sheet-medium)', () => {

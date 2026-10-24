@@ -10,8 +10,9 @@ import { findTarget, type Target } from './selectors.js';
  *
  * The word is tied to the dump by FRAME: the window's frame, clipped to the screen (adapters/android.ts
  * #parseFocusedWindow: the dump clips the root, the window manager may lay a window a pixel past the screen's edge,
- * `1081` of a 1080 screen), must be the root's bounds within a pixel each way (types.ts#sameRectWithinPixel, rounding
- * between two readers of one layout), or nothing is marked (a window opened or closed between the dump and the read).
+ * `1081` of a 1080 screen), must be the root's bounds, x, y, width and height each within a pixel
+ * (types.ts#sameRectWithinPixel, rounding between two readers of one layout), or nothing is marked (a window opened or
+ * closed between the dump and the read).
  * Then:
  * - `stacked` marks the root presented, as the parser marks a window it recognizes (`UiNode.presentation`): `screen`
  *   when the window spans the screen's width ("a sheet or modal"), `dialog` when it is narrower (a popup against an
@@ -29,8 +30,9 @@ import { findTarget, type Target } from './selectors.js';
  * flow/engine.ts#pollUntil) — never for a wait whose reply words no not-found (an `absent` check still visible, an
  * element found with the wrong content, a condition of no element: those callers hand no target), a failed read, or a
  * read that matched the target; and `CallWindow`, `scroll_until`'s before a stroke for a target its read does not hold
- * (interact/scroll.ts). A flow's detect probe does not ask: it words no miss. What a mark changes is asked only for a target the tree does not hold, so a misreading costs a refusal or a
- * stop, never a false `Tapped` (ADR 0018's invariant).
+ * (interact/scroll.ts). A flow's detect probe does not ask: it words no miss. What a mark changes is asked only for a
+ * target the tree does not hold, so a misreading costs a refusal or a stop, never a false `Tapped` (ADR 0018's
+ * invariant).
  */
 
 /** A tree whose window the window manager may still type: it lists the active window only, and its parser marked none. */
@@ -40,7 +42,8 @@ const unmarkedWindow = (tree: UiNode): boolean => tree.activeWindowOnly === true
 export function markByWindow(tree: UiNode, window: FocusedWindow): UiNode {
   if (window.of === 'unknown' || !unmarkedWindow(tree) || !sameRectWithinPixel(window.frame, tree.rect)) return tree;
   if (window.of === 'screenAlone') return { ...tree, windowAlone: true };
-  return { ...tree, presentation: window.frame.width >= window.screen.width ? 'screen' : 'dialog' };
+  // Screen-wide within the frame's own pixel of tolerance: a window 1079 wide of a 1080 screen spans it.
+  return { ...tree, presentation: window.screen.width - window.frame.width <= 1 ? 'screen' : 'dialog' };
 }
 
 /**

@@ -1198,7 +1198,7 @@ launcher's and another app's activity windows listed `isVisible=false`). One she
    Parsed by `parseFocusedWindow`, beside the adapter's other dumpsys readers.
 2. **One owner of what the word says, pure: `ui-tree/window-mark.ts#markByWindow`.** Only for a root that lists the
    active window only and that the parser left unmarked; only when the window's frame, clipped to the screen as the
-   dump clips its root, IS the root's bounds within a pixel each way (`sameRectWithinPixel`: the window manager lays
+   dump clips its root, IS the root's bounds, its x, y, width and height each within a pixel (`sameRectWithinPixel`: the window manager lays
    dialog-fullscreen's window `1081` wide on a 1080 screen; else a window opened or closed between the dump and the
    read — nothing marked). `stacked` marks the root `presentation`
    — `screen` when the window spans the screen's width, `dialog` when narrower (a popup against an edge); decisions 3

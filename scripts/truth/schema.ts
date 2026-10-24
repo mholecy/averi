@@ -435,8 +435,8 @@ export interface CellTruth {
   displays?: string;
   /**
    * Android: the file beside the truth holding the window manager's word on the focused window as the trees were read
-   * (lab-device.ts#WINDOW_MANAGER_WORD: the focus and display size out of `dumpsys window displays`, then `dumpsys
-   * window windows`) — what averi's adapter asks on a miss (src/adapters/android.ts#focusedWindow), served by the
+   * (`WINDOW_MANAGER_WORD`, below, as lab-device.ts asks it: the focus and display size out of `dumpsys window
+   * displays`, then `dumpsys window windows`) — what averi's adapter asks on a miss (src/adapters/android.ts#focusedWindow), served by the
    * golden mode's fake device for that command (fake-device.ts#DeviceProfile.windowManager). Absent on iOS and on
    * captures before round 1023b: there the command fails, and averi reads the window as unknown.
    */

@@ -1,8 +1,9 @@
 # BUG: `scroll_until` on Android, for a target beneath a presented layer (an AlertDialog, a half-expanded ModalBottomSheet), strokes the screen anyway — the first stroke DISMISSES the dialog (it lands on its dim) or EXPANDS the sheet, so the layer the caller did not ask to touch is gone or changed; `tap` waits 5 s for the element "to appear" without naming the layer either
 
-> **Status (2026-10-24):** the fully expanded sheet's taps fixed at `b3acdeb` (bugs/r1023b-r19, ADR 0018's amendment
-> "Android's window by the window manager's word"): on the miss the window manager types the sheet a Dialog's window,
-> so the three form-picker taps say the presented remedy (golden green, calibrated as this note's second pair; live
+> **Status (2026-10-24):** the fully expanded sheet's taps fixed at `b3acdeb` and `59dccf2` (bugs/r1023b-r19, ADR 0018's
+> amendment "Android's window by the window manager's word", its decision 4): on the miss the window manager types the
+> sheet a Dialog's window, so the three form-picker taps say the presented remedy — the sheet's own list first
+> (scroll_until it there), close it first if not (golden green, calibrated as this note's second pair; live
 > android-forms-r1023b-r19-1…3.json); its `scroll_until` rows still stroke the sheet's own list, now with the remedy —
 > ADR 0018's residual 18, narrowed.
 >

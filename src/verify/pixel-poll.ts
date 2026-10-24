@@ -379,8 +379,7 @@ class PixelPollMemory {
    * Not-found is asked with the assert's `element` (poll-verdict.ts#notFound).
    */
   timeoutDetail(timeoutMs: number, last: { detail?: string; readError?: Error; lastTree?: UiNode }, element: ElementSpec): string {
-    const stale = this.coverCleared && last.detail === this.lastCovered;
-    if (last.detail !== undefined && !stale) return last.detail;
+    if (this.findingStands(last.detail)) return last.detail!;
     const roundCost = `the slowest round — a tree read and its captures — took ${formatSeconds(this.slowestRoundMs)} here`;
     if (this.foundSilently === 'cut') {
       return `element found, but no time was left within ${formatSeconds(timeoutMs)} to capture a settled frame (${roundCost}) — raise this assert timeout`;
@@ -392,6 +391,16 @@ class PixelPollMemory {
       );
     }
     return notFound(timeoutMs, last, element);
+  }
+
+  /** The last finding is what the timeout says (`timeoutDetail`): there is one, and no later query contradicted it. */
+  private findingStands(detail: string | undefined): boolean {
+    return detail !== undefined && !(this.coverCleared && detail === this.lastCovered);
+  }
+
+  /** The timeout words a not-found (`timeoutDetail`'s last case): no finding stands, and the element was never found silently. */
+  wordsNotFound(detail: string | undefined): boolean {
+    return !this.findingStands(detail) && this.foundSilently === undefined;
   }
 }
 
@@ -847,7 +856,7 @@ export async function pollPixels(
   if (outcome instanceof FinalMiss) return { pass: false, detail: outcome.detail };
   if (!outcome.timedOut) return { pass: true, detail: outcome.value.detail };
   // The window manager's word on the last tree's window, asked now the poll has given up on an element it never found
-  // (ui-tree/window-mark.ts): a round's finding is the detail, and no not-found is worded beside it.
-  const lastTree = await markedForMiss(adapter, outcome, outcome.detail === undefined ? element : undefined);
+  // (ui-tree/window-mark.ts): only where the timeout words a not-found — a standing finding is the detail instead.
+  const lastTree = await markedForMiss(adapter, outcome, memory.wordsNotFound(outcome.detail) ? element : undefined);
   return { pass: false, detail: memory.timeoutDetail(timeoutMs, { ...outcome, lastTree }, element) };
 }

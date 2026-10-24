@@ -518,6 +518,15 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     expect(asked).toHaveLength(1);
   });
 
+  it('scroll_until on form-picker, whose sheet holds its own list: strokes that list, then — having searched it — says close it first, not scroll_until it there', async () => {
+    const { fake, asked } = device(lab('form-picker'), word('form-picker'));
+    const error = await fails(scrollUntilVisible(fake, 'id:"lab.form-picker.name"', { settleMs: 1, timeoutMs: 5_000 }));
+    expect(fake.swipes.length).toBeGreaterThan(0);
+    expect(error.message).toContain('element never appeared in the tree (a sheet or modal is presented over it, and the tree lists only that window — close it first)');
+    expect(error.message).not.toContain('scroll_until it there');
+    expect(asked).toHaveLength(1);
+  });
+
   it('scroll_until on dialog-fullscreen with no word: strokes as before, the hint said', async () => {
     const { fake } = device(lab('dialog-fullscreen'), { of: 'unknown' });
     const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { settleMs: 1, timeoutMs: 5_000 }));
