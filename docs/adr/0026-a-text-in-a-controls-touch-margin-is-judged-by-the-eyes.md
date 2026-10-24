@@ -147,7 +147,7 @@ with the target's own rows beside it.
   the real eyes on the inked capture, then carried — fails after 1 swipe, one screenshot. Every guard mutation-checked
   (the scroll view kept, the more-than-a-pixel move, the peer's offset, the sizes, `untold` — one guard,
   `interact/margin-memo.ts#carriedSince`, for the kept answer and the bound —, the relation kept, the bound). Golden (1584 checks)
-  0 changed: no capture is answered `under`. Live k7 and k7f at `074b48c3`, the clear path, as before (the 2026-10-24
+  0 changed: no capture is answered `under`. Live k7 and k7f at `074b48c3`, before `11a5f92a` (the scroll view kept in the pair), which leaves the clear path as it is: the clear path, as before (the 2026-10-24
   section of the live summary).
 
 ## Residuals accepted

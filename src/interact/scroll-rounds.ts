@@ -387,8 +387,8 @@ interface ProvenCut {
  * #saysTopLayerOnly: idb's id notes), so the reply says it once; no device call.
  * `movesWith`: a `fully: true` match covered by a text in its touch margin that a screenshot saw drawn over it
  * (`State.marginKept`'s `under`), the two moved since by the same `offset` in a scroll view that stayed where it was
- * (margin-memo.ts#carriedCover, motion-ledger.ts#movedTogether) — the text scrolls with it, so no stroke brings it out from under the text
- * (`coverMovesWith`); the shortfall the `covered` one.
+ * (margin-memo.ts#carriedCover, motion-ledger.ts#movedTogether) — the text scrolls with it, so no stroke brings it out
+ * from under the text (`coverMovesWith`); the shortfall the `covered` one.
  * docs/bugs/2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md
  */
 export type BoundBy =
@@ -679,7 +679,7 @@ interface State {
   readonly eyesRefused: { readonly asked: EyesAsked; readonly short: Extract<InFrameShort, { of: 'unlisted' }> } | undefined;
   /**
    * What the eyes saw of the texts in the target's touch margin this call, kept while it holds (interact/margin-memo.ts,
-   * ADR 0026 rules 6 and 8): a later read is told it instead of looking again; a `under` carried with the target ends
+   * ADR 0026 rules 6 and 8): a later read is told it instead of looking again; an `under` carried with the target ends
    * the call (`coverMovesWith`).
    */
   readonly marginKept: MarginMemo;

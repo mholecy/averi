@@ -386,9 +386,10 @@ describe('scroll_until — what was seen of a margin text, kept across the reads
   it('seen drawn over it, then carried with it in a tree that marks no scroll view: asked again, no fail at once — no content the tree marks to be carried in', async () => {
     const unmarked = ({ clipsDescendants: _, ...n }: UiNode): UiNode => ({ ...n, children: n.children.map(unmarked) });
     const { outcome, asked, swipes } = await play((base) => [unmarked(base), unmarked(scrolled(base, -300))], ['under', 'under']);
-    expect(asked.length).toBeGreaterThan(1);
+    expect(asked).toHaveLength(2);
     expect(outcome).not.toContain('moved with it');
-    expect(swipes).toBeGreaterThan(1);
+    expect(outcome).toContain('failed after 4 swipes — element is in the viewport but under text "Variable symbol"');
+    expect(swipes).toBe(4);
   });
 
   it('untold where it was asked, then carried with it: asked again (an answer of its frame), and the strokes go on — untold never fails at once', async () => {
