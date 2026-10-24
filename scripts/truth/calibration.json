@@ -985,7 +985,7 @@
       "n": "L1",
       "note": "2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md",
       "status": "calibrate",
-      "fix": ["d43df5d", "b3acdeb", "59dccf2", "b584755"],
+      "fix": ["d43df5d", "b3acdeb", "59dccf2", "b584755", "64e0cb7"],
       "after": "d43df5d",
       "verified": "golden",
       "partial": "AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker), ADR 0018's residual 18, by the second pair (the window manager's word, round 1023b) for its three taps; its three scroll_until rows stay filed as that residual (narrowed: the strokes on the sheet's own list)",
@@ -1011,14 +1011,14 @@
       "pairs": [
         {
           "before": "103c405",
-          "after": "b584755",
+          "after": "64e0cb7",
           "checks": [
             "android-averi_lab-api33/form-picker.xml name tap",
             "android-averi_lab-api33/form-picker.xml country tap",
             "android-averi_lab-api33/form-picker.xml submit tap"
           ],
           "defect": "to appear$|active-window hint",
-          "remark": "2: b3acdeb (bugs/r1023b-r19, ADR 0018's amendment \"Android's window by the window manager's word\"), judged on form-picker's three taps: at its parent 103c405 (the round's captures, the window manager's word beside them, round 1023b's src unchanged from 6ff9ca3) each times out \"to appear\" with the active-window hint; at b3acdeb the window manager types the sheet a Dialog's window (TYPE_APPLICATION at the root's bounds), asked once the wait has found nothing, and each says the presented remedy. Its three scroll_until rows still stroke the sheet's own list (decision 3), now with the presented remedy — residual 18, narrowed. The pair is 103c405 → b584755 (before given: the review fixes' first parents already hold b3acdeb), b3acdeb's review fixes 59dccf2 and b584755 judged with it: the sheet holds its own list, so each tap says first to scroll_until it there, then the presented remedy if not (the amendment's decision 4)."
+          "remark": "2: b3acdeb (bugs/r1023b-r19, ADR 0018's amendment \"Android's window by the window manager's word\"), judged on form-picker's three taps: at its parent 103c405 (the round's captures, the window manager's word beside them, round 1023b's src unchanged from 6ff9ca3) each times out \"to appear\" with the active-window hint; at b3acdeb the window manager types the sheet a Dialog's window (TYPE_APPLICATION at the root's bounds), asked once the wait has found nothing, and each says the presented remedy. Its three scroll_until rows still stroke the sheet's own list (decision 3), now with the presented remedy — residual 18, narrowed. The pair is 103c405 → 64e0cb7 (before given: the review fixes' first parents already hold b3acdeb), b3acdeb's review fixes 59dccf2, b584755 and 64e0cb7 judged with it: the sheet holds its own list, so each tap says first to scroll_until it in that window's own list, then the presented remedy if it is not there (the amendment's decision 4)."
         }
       ],
       "remark": "Fixed by round 6's S3, d43df5d on arch/r22-l1 (adapters/android.ts#presentedWindow: the uiautomator root marked activeWindowOnly, the AlertDialog's window marked a dialog, the half-expanded sheet's scrim-led window a screen; ADR 0018's amendment \"Android's presented window\"), merged into arch/round-22 as 1eafbd1 with its review fixes: the pair is d43df5d itself and its parent b71cbbb (round 5's src). Before: the taps time out \"to appear\" without \"close it first\", scroll_until swipes twice beneath the dialog or sheet; after: each tap's wait says close it first, scroll_until stops before any swipe. The colour rows stay KNOWN, filed as no note (the assert's \"not found\" is vacuous). Partial: form-picker's fully expanded sheet dumps no scrim and is not marked — its six tap and scroll_until rows stay KNOWN (tests/differential/golden/forms.known.ts), filed as ADR 0018's residual 18 since the owner accepted it (2026-10-18) with the active-window hint Android's tap and fill wait and scroll_until not-found now carry (the taps' \"to appear\" then reads the hint's conditional \"close it first\", no presented remedy: their class `not in the tree (active-window hint)`)."

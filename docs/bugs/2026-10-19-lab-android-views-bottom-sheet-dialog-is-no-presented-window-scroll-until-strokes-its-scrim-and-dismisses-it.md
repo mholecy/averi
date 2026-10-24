@@ -110,7 +110,7 @@ it; and a `BottomSheetDialogFragment` uses the same layout (unmeasured, expected
 
 ## The full-screen dialog (dialog-fullscreen): no signal — residual 19 stands
 
-> **Status (2026-10-24):** fixed at `b3acdeb` (bugs/r1023b-r19; ADR 0018's amendment "Android's window by the window
+> **Status (2026-10-24):** fixed at `b3acdeb`, `59dccf2` and `b584755` (bugs/r1023b-r19; ADR 0018's amendment "Android's window by the window
 > manager's word"; open-bugs #17). The dump has no signal, but the window manager has: the focused window is
 > TYPE_APPLICATION (a Dialog's) at exactly the dumped root's bounds (`[0,66][1080,2153]`), the activity's window
 > TYPE_BASE_APPLICATION beneath it. Asked once on a miss (one adb call, about 26 ms), it marks the root a presented
