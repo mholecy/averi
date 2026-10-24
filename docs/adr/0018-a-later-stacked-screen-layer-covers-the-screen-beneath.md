@@ -1225,7 +1225,7 @@ launcher's and another app's activity windows listed `isVisible=false`). One she
    already (`scroll_until`'s own not-found after its strokes: its words stay "close it first"), and not on idb's flat
    list, which lists no scroll view (its remedy is as before: residual 18). Only form-picker of the presented
    captures holds a scroll view: its name, country, submit and country.ST taps say it; the golden judges a lazy row's
-   tap that is told to close its layer with no `scroll_until` a mismatch (golden-spec/judges.ts#closesItsOwnLayer).
+   tap that is told to close its layer with no `scroll_until` a mismatch (scripts/differential/golden-spec/judges.ts, `closesItsOwnLayer`).
 
 **Decision 5 narrowed.** The active-window hint is said where the window manager gives no word, and dropped where it
 says the app's screen is alone. **A departure** from decision 2's "the parser reads what ui-tree never sees": this
