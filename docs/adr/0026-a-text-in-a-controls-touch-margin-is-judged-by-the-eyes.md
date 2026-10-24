@@ -83,7 +83,7 @@ their relation, and rule 8, the cover carried with it ends the call — residual
    captures anyway: zero extra captures; a `clear` answer, like `over`, is never kept across poll rounds — each round's
    unlock rests on its own frame). The tap never asks (rule 3: no tap standing is covered by a margin text). A caller
    with no eyes (`ui_snapshot`, the dismissal picker, tree-only tests) behaves as before.
-6. **Once per text where it lies** in `scroll_until` (`interact/margin-memo.ts#known`, held as `scroll-rounds.ts#State.marginKept`): unlike ADR 0024's
+6. **Once per text where it lies** in `scroll_until` (`interact/margin-memo.ts#seeMargin`, held as `scroll-rounds.ts#State.marginKept`): unlike ADR 0024's
    unordered stop, a refused clear question is followed by strokes, and the text moves with the target. What was seen
    is kept by the text's identifier, label and size within a pixel (one entry per text, the latest answer) and told to
    every later read: `under` while the two keep their relation — unmoved, or carried together by the same offset
@@ -167,7 +167,7 @@ with the target's own rows beside it.
    - **One stroke is spent** to see the carry. A tree rule "the text and the field share a scroll view", failing at 0
      swipes, was refused: the dumps' scroll views are not reliable enough to bet a failure on (idb lists none;
      Compose's scroll marking, nested scrollers, a text in an outer scroller over an inner one), and it would be a
-     second "moves with" model beside the measured carry (`interact/margin-memo.ts#movedTogether`).
+     second "moves with" model beside the motion ledger (since round 16 that carry is `interact/margin-memo.ts#movedTogether`).
    - **A field cut at an edge or by the IME line** (its size changed) does not fire, and is asked again: one more
      screenshot on every read while the cut changes, and on the first whole read after it too (its size differs from
      the cut sighting); the whole read after that fires. A text the swipes move against the field a few pixels a read,

@@ -185,6 +185,11 @@ export function sameRectWithinPixel(a: Rect, b: Rect): boolean {
   return Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1 && Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
 }
 
+/** The same size within a pixel each way, wherever the two lie: a node that grew or shrank (cut at an edge, a header collapsing) did not just move. */
+export function sameSizeWithinPixel(a: Rect, b: Rect): boolean {
+  return Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
+}
+
 /**
  * Do two rects share any area at all? Positive area only: rects that merely
  * touch along an edge or at a corner — `a` ending at y=1285 where `b` begins —

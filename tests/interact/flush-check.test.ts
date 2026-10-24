@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Rect, Stroke } from '../../src/adapters/types.js';
+import type { Rect, ScrollAxis, Stroke, UiNode } from '../../src/adapters/types.js';
 import { probing, seeFlush, startFlush, type FlushCheck, type FlushSeen, type FlushStop, type FlushVerdict } from '../../src/interact/flush-check.js';
-import { judgeRead } from '../../src/interact/scroll-read.js';
+import { judgeRead, type AppliedKeyboard } from '../../src/interact/scroll-read.js';
 import { startStrokes } from '../../src/interact/stroke-plan.js';
 import type { Direction } from '../../src/interact/swipe.js';
 import type { Edge } from '../../src/ui-tree/geometry.js';
@@ -10,11 +10,11 @@ import { node } from '../helpers/fake.js';
 
 /**
  * THE FLUSH CHECK through its interface (interact/flush-check.ts): a `fully: true` stop's match in a clipping list, as
- * rects, in; the verdict out — none, the stop's `Flush`, the proven cut (`FlushCut`), or the probe or reveal to send —
- * with whether the read settles or may wait. Each read is judged as the round judges it (interact/scroll-read.ts
- * #judgeRead) on an Android-sized screen, the list marked as Android marks a clipping container. When the round shows
- * the check a stop at all, and what it does with the verdict, is pinned in its play tables
- * (tests/interact/scroll-flush-reveal.test.ts, scroll-rounds.test.ts).
+ * rects, in; the verdict out — none, the stop's `Flush`, the proven cut (`FlushCut`), the witness to ask first, or the
+ * probe or reveal to send — with whether the read settles or may wait. Each read is judged as the round judges it
+ * (interact/scroll-read.ts#judgeRead) on an Android-sized screen, the list marked as Android marks a clipping
+ * container. When the round shows the check a stop at all, and what it does with the verdict, is pinned in its play
+ * tables (tests/interact/scroll-flush-reveal.test.ts, scroll-rounds.test.ts).
  */
 
 const SCREEN_BOX: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
@@ -26,17 +26,30 @@ const LIST: Rect = { x: 0, y: 1046, width: 1080, height: 495 };
 const SWIPE: Stroke = { from: { x: 540, y: 1400 }, to: { x: 540, y: 1200 } };
 const TAP: Stroke = { from: { x: 540, y: 1443 }, to: { x: 540, y: 1425 } }; // 18 px, under twice the slop
 
+/** How a stop is shown: its list (and that list's axis, untold by default), what is listed after the row in it, the stroke drawn and the probe's means. */
+interface StopShown {
+  list?: Rect;
+  axis?: ScrollAxis;
+  after?: UiNode[];
+  drawn?: Stroke;
+  budget?: boolean;
+  gesture?: Rect;
+  offered?: AppliedKeyboard;
+  corroborated?: boolean;
+}
+
 /** The stop the round shows the check: the match at `rect` in a clipping list at `list`, judged `fully`. */
-function stopAt(rect: Rect, { list = LIST, drawn = SWIPE, budget = true, gesture = SCREEN_BOX }: { list?: Rect; drawn?: Stroke; budget?: boolean; gesture?: Rect } = {}): FlushStop {
+function stopAt(rect: Rect, { list = LIST, axis, after = [], drawn = SWIPE, budget = true, gesture = SCREEN_BOX, offered, corroborated }: StopShown = {}): FlushStop {
   const row = node({ role: 'button', identifier: 'S', rect: { ...rect } });
-  const tree = node({ role: 'container', rect: SCREEN_BOX, children: [node({ role: 'scrollable', clipsDescendants: true, rect: { ...list }, children: [row] })] });
+  const scrollable = node({ role: 'scrollable', clipsDescendants: true, ...(axis !== undefined && { scrollAxis: axis }), rect: { ...list }, children: [row, ...after] });
+  const tree = node({ role: 'container', rect: SCREEN_BOX, children: [scrollable] });
   const judged = judgeRead({ tree, found: [row], ofKeyboard: () => false, remedy: { dismissal: 'none' } }, SCREEN, true);
   if ('ask' in judged || judged.best === undefined) throw new Error('no stop judged');
   return {
     judged: judged.best,
     facts: judged.facts,
     drawn,
-    means: { screen: SCREEN_BOX, gesture, strokes: startStrokes(), cover: undefined, offered: undefined, corroborated: undefined, budget },
+    means: { screen: SCREEN_BOX, gesture, strokes: startStrokes(), cover: undefined, offered, corroborated, budget },
   };
 }
 
@@ -161,6 +174,33 @@ describe('the flush check', () => {
     const away: Rect = { x: 0, y: 100, width: 1080, height: 200 };
     expect(seeFlush(inFlight, stopAt(now, { gesture: away })).verdict).toMatchObject({ of: 'cut', cut: { why: 'room', revealed: 60 } });
     expect(said(seeFlush(startFlush('down'), stopAt(now, { gesture: away })))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'room' } });
+  });
+
+  it('a list that scrolls only across the edge: no probe — unchecked `axis`', () => {
+    expect(said(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22), { axis: 'horizontal' })))).toEqual({
+      of: 'flush',
+      flush: { edge: 'bottom', container: LIST, checked: false, why: 'axis' },
+    });
+  });
+
+  it('a stop flush under a node pinned at its list\'s top: the probe asks that edge, and the `Flush` names the node', () => {
+    const header = node({ role: 'container', identifier: 'H', rect: { x: 0, y: 1046, width: 1080, height: 100 }, children: [node({ role: 'text', label: 'Section', rect: { x: 400, y: 1070, width: 281, height: 52 } })] });
+    const row: Rect = { x: 128, y: 1146, width: 825, height: 110 };
+    const first = seeFlush(startFlush('up'), stopAt(row, { after: [header] }));
+    expect(said(first)).toEqual({ of: 'probe', toward: 'up', reach: 0.25, maxTravel: CAP });
+    expect(said(seeFlush(sent(first.verdict), stopAt(row, { after: [header] })))).toEqual({
+      of: 'flush',
+      flush: { edge: 'top', container: LIST, pinned: expect.objectContaining({ identifier: 'H' }), checked: true },
+    });
+  });
+
+  it('a keyboard the moot rule offered and never asked about: the witness first — then the probe over the screen, or above the keyboard it stood by', () => {
+    // A keyboard whose line lies above the whole list: stood by, no probe has room above it.
+    const offered: AppliedKeyboard = { topCover: { x: 0, y: 1000, width: 1080, height: 1220 }, above: undefined, remedy: { dismissal: 'none' }, line: { y: 1000, witnessed: true } };
+    const at = flushOn('bottom', 22);
+    expect(said(seeFlush(startFlush('down'), stopAt(at, { offered })))).toEqual({ of: 'witness' });
+    expect(said(seeFlush(startFlush('down'), stopAt(at, { offered, corroborated: false })))).toEqual({ of: 'probe', toward: 'down', reach: 0.25, maxTravel: CAP });
+    expect(said(seeFlush(startFlush('down'), stopAt(at, { offered, corroborated: true })))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'room' } });
   });
 
   it('a list with no room for a stroke: no probe — unchecked `room`', () => {

@@ -13,7 +13,7 @@ import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts } from './scroll-read.js';
 import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type UnseenStrokes } from './motion-ledger.js';
-import { carriedCover, known, type MarginMemo, type Offset } from './margin-memo.js';
+import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
 import { carried, planStroke, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
 import { probing, seeFlush, startFlush, type Flush, type FlushCheck, type FlushCut, type FlushVerdict, type ProbeMeans } from './flush-check.js';
@@ -538,7 +538,7 @@ interface State {
   readonly eyesRefused: { readonly asked: EyesAsked; readonly short: Extract<InFrameShort, { of: 'unlisted' }> } | undefined;
   /**
    * What the eyes saw of the texts in the target's touch margin this call, kept while it holds (interact/margin-memo.ts,
-   * ADR 0026 rules 6 and 8): a later read is told it instead of looking again (`known`); an `under` carried with the
+   * ADR 0026 rules 6 and 8): a later read is told it instead of looking again (`seeMargin`); an `under` carried with the
    * target ends the call (`carriedCover`).
    */
   readonly marginKept: MarginMemo;
@@ -640,7 +640,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     inFrameAfter: undefined,
     flush: startFlush(rules.direction),
     eyesRefused: undefined,
-    marginKept: [],
+    marginKept: startMargin(),
     inTreeAfter: undefined,
     detents: undefined,
     screenBefore: undefined,
@@ -826,11 +826,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // THE ORDER SEEN (ui-tree/eyes.ts): the best match covered by a control the listing does not order (ADR 0024) — the
   // eyes are asked once which is drawn on top; such a stop never strokes (`overlapped`, below), so one screenshot ends
   // the scroll's question, asked whole and told what the eyes answered — or covered by texts in its touch margin only
-  // (ADR 0026), each asked once where it lies (interact/margin-memo.ts#known: the texts to ask, or what to tell the read,
-  // and the call's memo, `State.marginKept`). The read is judged again, told what was seen (`RoundSeen.order`).
+  // (ADR 0026), each asked once where it lies (interact/margin-memo.ts#seeMargin: the texts to ask, or what to tell the
+  // read, and the call's memo, `State.marginKept`). The read is judged again, told what was seen (`RoundSeen.order`).
   const ordering = judged?.best === undefined || read === undefined ? undefined : pairQuestion(read.tree, judged.best.node, judged.best.standing);
   if (ordering !== undefined && read !== undefined && judged !== undefined) {
-    const said = ordering.asks === 'order' ? (seen.order === undefined ? { ask: ordering } : { told: seen.order, memo: s.marginKept }) : known(s.marginKept, ordering, seen.order, judged.facts);
+    const said = ordering.asks === 'order' ? (seen.order === undefined ? { ask: ordering } : { told: seen.order, memo: s.marginKept }) : seeMargin(s.marginKept, ordering, seen.order, judged.facts);
     if ('ask' in said) return { state, step: { do: 'ask', what: 'order', question: said.ask } };
     s.marginKept = said.memo;
     if (said.told.length > 0) judged = judgeRead({ ...read, seen: seenOrderOf(ordering.node, said.told) }, s.frame, fully, seen.corroborated);

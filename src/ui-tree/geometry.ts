@@ -1,5 +1,5 @@
 import { clips, isScrollViewOf, scrollAxis, scrolls } from './scroll-containers.js';
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -493,13 +493,12 @@ export function visibleFractionInViewport(
 }
 
 /**
- * `rectArea`, `rectsOverlap`, `rectIntersection`, `sameRect` and
- * `sameRectWithinPixel` live beside `Rect` in adapters/types.ts — the idb
- * tree source and the WDA parser (its keyboard band test,
- * wda-source.ts#isTextEcho) need them and may not import this layer — and
- * are re-exported here, where the rect arithmetic's callers look for them.
+ * `rectArea`, `rectsOverlap`, `rectIntersection`, `sameRect`, `sameRectWithinPixel` and `sameSizeWithinPixel` live
+ * beside `Rect` in adapters/types.ts — the idb tree source and the WDA parser (its keyboard band test,
+ * wda-source.ts#isTextEcho) need them and may not import this layer — and are re-exported here, where the rect
+ * arithmetic's callers look for them.
  */
-export { rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel };
+export { rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel };
 
 /**
  * Is the point inside the rect — left and top inclusive, right and bottom

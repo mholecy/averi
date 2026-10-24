@@ -245,7 +245,7 @@ export interface ReadJudgement {
   readonly best: Judged | undefined;
   /** The cover the read applied — the reading's once the witness stood by it, or idb's band — or none (moot, denied, or no keyboard). */
   readonly cover: AppliedKeyboard | undefined;
-  /** The reading's cover, applied or not — for the probe's late witness (scroll-rounds.ts#round). Never idb's band. */
+  /** The reading's cover, applied or not — for the probe's late witness (flush-check.ts#FlushVerdict's `witness`, which the round asks). Never idb's band. */
   readonly offered: AppliedKeyboard | undefined;
   /**
    * The frames the far edge is judged in (ui-tree/standing.ts#farEdgeFrames):

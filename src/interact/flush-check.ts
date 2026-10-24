@@ -96,21 +96,17 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  */
 
 /**
- * A `fully: true` stop whose edge along the scroll lies on its scroll
- * container's edge (`seeFlush`): `checked` when a probe toward that edge
- * moved nothing — nothing of it is cut there — and false, so it may be,
- * `why`: no swipe or time was left (`budget`); no clipping ancestor from
- * the flush one outward has room for a stroke (`room`: a probe drawn over
- * the screen instead would touch down off the container and move nothing
- * whatever lies beyond, so none is sent); every one of them scrolls only across the edge (`axis`: a probe along it
- * moves none of them — interact/stroke-plan.ts#probeAcrossOnly); or the
- * probe was drawn under twice TOUCH_SLOP and may have been a tap (`tap`).
+ * A `fully: true` stop whose edge along the scroll lies on its scroll container's edge (`seeFlush`): `checked` when a
+ * probe toward that edge moved nothing — nothing of it is cut there — and false, so it may be, `why`: no swipe or time
+ * was left (`budget`); no clipping ancestor from the flush one outward has room for a stroke (`room`: a probe drawn
+ * over the screen instead would touch down off the container and move nothing whatever lies beyond, so none is sent);
+ * every one of them scrolls only across the edge (`axis`: a probe along it moves none of them —
+ * interact/stroke-plan.ts#probeAcrossOnly); or the probe was drawn under twice TOUCH_SLOP and may have been a tap
+ * (`tap`).
  *
- * `fills`: flush with BOTH of its
- * nearest container's `edges` along the scroll, and with ONE edge of no
- * clipping ancestor — a row taller than its list, cut at both ends, reads
- * exactly the list's rect. Never probed (one probe cannot tell which side,
- * if either, is cut), so never checked — and never a plain "fully visible".
+ * `fills`: flush with BOTH of its nearest container's `edges` along the scroll, and with ONE edge of no clipping
+ * ancestor — a row taller than its list, cut at both ends, reads exactly the list's rect. Never probed (one probe
+ * cannot tell which side, if either, is cut), so never checked — and never a plain "fully visible".
  *
  * `pinned`: the flush edge lies not on the container's own edge but on the inner edge of a node pinned in it at that
  * side, drawn after the match (ui-tree/later-edges.ts#PinnedEdge: a merged sticky header) — the scroll view shows
@@ -165,10 +161,16 @@ export interface FlushCheck {
   readonly [opaque]: 'flush-check';
 }
 
+/** A probe sent: the judged match's rect and flush edge when it was sent. */
+interface SentProbe {
+  readonly rect: Rect;
+  readonly edge: Edge;
+}
+
 /** Everything the flush check remembers between reads, one record with one writer (this module). */
 interface Memory {
-  /** The probe in flight: the judged match's rect and flush edge when it was sent. Cleared by the next read that reads. */
-  readonly probe: { readonly rect: Rect; readonly edge: Edge } | undefined;
+  /** The probe in flight (`SentProbe`). Cleared by the next read that reads. */
+  readonly probe: SentProbe | undefined;
   /** The cut a probe proved (`ProvenCut`), while the match lies flush on it; undefined until one is. */
   readonly proven: ProvenCut | undefined;
   /** The caller's direction (scroll-rounds.ts#RoundRules): the scroll's axis, along which alone the match is asked flush. */
@@ -289,14 +291,11 @@ interface FlushAt {
 }
 
 /**
- * Where the match lies flush, of `chain` (clipping ancestors, nearest
- * first; `flushEdges`, ui-tree/geometry.ts, along the scroll's axis, within
- * a pixel — and, for the NEAREST, the match's `pinned` edges along it, laid
- * flush under a node pinned in it, ui-tree/later-edges.ts#PinnedEdge: where
- * that scroll view's content ends as it shows): the nearest it is flush with
- * on ONE edge along the scroll — that edge and the ancestor's index, the
- * probe's question — else, when it fills the NEAREST along the scroll, both
- * edges (`fills`: reported, never probed); undefined when neither.
+ * Where the match lies flush, of `chain` (clipping ancestors, nearest first; `flushEdges`, ui-tree/geometry.ts, along
+ * the scroll's axis, within a pixel — and, for the NEAREST, the match's `pinned` edges along it, laid flush under a
+ * node pinned in it, ui-tree/later-edges.ts#PinnedEdge: where that scroll view's content ends as it shows): the nearest
+ * it is flush with on ONE edge along the scroll — that edge and the ancestor's index, the probe's question — else, when
+ * it fills the NEAREST along the scroll, both edges (`fills`: reported, never probed); undefined when neither.
  */
 function flushWith(rect: Rect, chain: readonly Rect[], pinned: readonly PinnedEdge[], direction: Direction): Flushed {
   const axis = axisOf(direction);
@@ -330,16 +329,11 @@ function flushOf(best: Judged, facts: TreeFacts, direction: Direction): FlushAt 
  * more of it showing (a match that moved but did not grow says nothing of a cut), or grown with its uncut edge where
  * the content did not carry it (a container that grew, another match in its place).
  */
-function revealedBy(probed: { readonly rect: Rect; readonly edge: Edge }, now: Rect, { chain, flushed }: FlushAt): ProvenCut | undefined {
+function revealedBy(probed: SentProbe, now: Rect, { chain, flushed }: FlushAt): ProvenCut | undefined {
   if (flushed === undefined || 'fills' in flushed || flushed.edge !== probed.edge) return undefined;
   const was = probed.rect;
   const grown = axisOfEdge(probed.edge) === 'vertical' ? now.height - was.height : now.width - was.width;
-  const uncutMoved = {
-    bottom: was.y - now.y,
-    top: now.y + now.height - (was.y + was.height),
-    right: was.x - now.x,
-    left: now.x + now.width - (was.x + was.width),
-  }[probed.edge];
+  const uncutMoved = uncutToward(now, probed.edge) - uncutToward(was, probed.edge);
   return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? { edge: probed.edge, container: chain[flushed.at], revealed: grown } : undefined;
 }
 
@@ -350,16 +344,23 @@ function stillProven(cut: ProvenCut | undefined, { chain, flushed }: FlushAt): P
 }
 
 /** px from `rect`'s edge opposite `edge` to `container`'s same side: what the content may move toward revealing `edge` before that edge leaves the container. */
-function roomPast(rect: Rect, container: Rect, edge: Edge): number {
+const roomPast = (rect: Rect, container: Rect, edge: Edge): number => uncutToward(container, edge) - uncutToward(rect, edge);
+
+/**
+ * Where `rect`'s side opposite `edge` lies, measured the way content moves to reveal `edge` (up for `bottom`, down for
+ * `top`, left for `right`, right for `left`): the difference of two is how far that side moved toward revealing it, or
+ * how far it may.
+ */
+function uncutToward(rect: Rect, edge: Edge): number {
   switch (edge) {
     case 'bottom':
-      return rect.y - container.y;
+      return -rect.y;
     case 'top':
-      return container.y + container.height - (rect.y + rect.height);
+      return rect.y + rect.height;
     case 'right':
-      return rect.x - container.x;
+      return -rect.x;
     case 'left':
-      return container.x + container.width - (rect.x + rect.width);
+      return rect.x + rect.width;
   }
 }
 

@@ -31,7 +31,7 @@ of 132.
 
 ## Suggestion
 
-Treat a target whose rect lies flush on its clipping container's edge (`scroll-rounds.ts#flushEdges` already finds that) and is smaller
+Treat a target whose rect lies flush on its clipping container's edge (`ui-tree/geometry.ts#flushEdges` already finds that) and is smaller
 than the move-to minimum (65 px here) like a cover-cut one: refuse with `only a 948x55 part of it shows at its scroll container's edge —
 scroll_until it fully first; nothing was tapped`. Or scroll it in first, as the keyboard guard does for the IME.
 
