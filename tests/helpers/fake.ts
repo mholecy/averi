@@ -1,4 +1,4 @@
-import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
@@ -112,6 +112,8 @@ export class FakeAdapter implements DeviceAdapter {
    */
   nextScreenshot: Buffer = Buffer.from('fake:screen');
   logLines: string[] = [];
+  /** Assignable: the window manager's word (types.ts#DeviceAdapter.focusedWindow) — absent, as on iOS, unless a test sets it. */
+  focusedWindow?: () => Promise<FocusedWindow>;
 
   constructor(
     private screens: Record<string, UiNode>,

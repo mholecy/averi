@@ -92,6 +92,14 @@ export const NOT_IN_TREE_HINTED = 'not in the tree (active-window hint)';
 export const presentedRemedyMissing = (o: Outcome, missing: string): string | undefined =>
   presentedRemedySaid(o.reply) ? undefined : windowHintSaid(o.reply) ? said(o, NOT_IN_TREE_HINTED) : said(o, missing);
 
+/**
+ * A row INSIDE a presented layer's own lazy list, not laid out yet, must not be told to close that layer without the
+ * scroll that reaches it: the presented remedy said with no `scroll_until` sends an agent to dismiss the very sheet the
+ * row is in (src/ui-tree/miss.ts, `mayLieIn`). Undefined when the reply says no presented remedy, or says the scroll too.
+ */
+export const closesItsOwnLayer = (o: Outcome): string | undefined =>
+  presentedRemedySaid(o.reply) && !o.reply.includes('scroll_until') ? said(o, 'told to close the layer it lies in, no scroll_until offered') : undefined;
+
 const NOT_IN_TREE = 'not in the tree: ';
 /**
  * The one classification every row's judge goes through: the row's judge first — a reply it rejects is a mismatch of

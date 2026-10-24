@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { PNG } from 'pngjs';
 import type { Platform, Screen } from './corpus.js';
-import type { ImeCapture } from '../truth/schema.js';
+import { WINDOW_MANAGER_WORD, type ImeCapture } from '../truth/schema.js';
 
 /**
  * The fake device of the differential harness: the PROCESS boundary, faked
@@ -44,7 +44,9 @@ import type { ImeCapture } from '../truth/schema.js';
  *    the device's own keyboard answers instead (DeviceProfile.ime), and a
  *    capture's own `dumpsys window displays` with the IME down is served
  *    while the keyboard is hidden (DeviceProfile.windowDisplays: its system
- *    bands, the navigation mode's own).
+ *    bands, the navigation mode's own); the window manager's word on the
+ *    focused window only from a capture that holds it (DeviceProfile
+ *    .windowManager), else it fails.
  *  - The frame: one grey PNG, one rect of it painted (`paint`) when the
  *    caller asks — what a colour assert on that rect must sample; or, for
  *    a ground-truth capture (golden.ts), the screenshot the device showed.
@@ -97,6 +99,13 @@ export interface DeviceProfile {
    * (a three-button capture's navigation bar from 2088, not the stock gesture band from 2154).
    */
   windowDisplays?: string;
+  /**
+   * Android, a ground-truth capture (scripts/truth/schema.ts#CellTruth.windows): the window manager's word on the
+   * focused window as the trees were read, answered for that command (WINDOW_MANAGER_WORD). Without it the command
+   * fails — never a stock dump, which would type a capture's sheet as the app's screen — and averi reads the window as
+   * unknown.
+   */
+  windowManager?: string;
 }
 
 /** A rect of the frame, in its pixels, painted one colour. */
@@ -338,6 +347,10 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
       return `Physical size: ${profile.screen.width}x${profile.screen.height}\n`;
     }
     if (shell === 'dumpsys window displays') return displays(profile, keyboard);
+    if (shell === WINDOW_MANAGER_WORD) {
+      if (profile.windowManager === undefined) throw new CommandError('differential: no window manager dump recorded', 1);
+      return profile.windowManager;
+    }
     if (shell.startsWith('dumpsys input_method')) {
       const ime = captured(profile, keyboard);
       if (ime !== undefined) return shell.includes('touchable region') ? ime.touchable : ime.inputShown;

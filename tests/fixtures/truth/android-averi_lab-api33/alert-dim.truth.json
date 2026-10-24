@@ -100,5 +100,6 @@
       "drawn": 0,
       "seen": "#643800"
     }
-  ]
+  ],
+  "windows": "alert-dim.windows.txt"
 }

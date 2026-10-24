@@ -1,6 +1,7 @@
 import type { DeviceAdapter, Stroke } from '../adapters/types.js';
 import { pairsSeenBy, unseen, type Eyes } from '../ui-tree/eyes.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
+import { CallWindow } from '../ui-tree/window-mark.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
 import { describeTarget, matchesToJudge, type Target } from './resolve.js';
@@ -43,7 +44,7 @@ export interface ScrollOptions {
  * reader the driver hands it to takes a `Pick` of its own
  * (`readTreeOrError`, `screenBox`, `readKeyboard`).
  */
-export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed'>;
+export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed' | 'focusedWindow'>;
 
 /**
  * Swipe until the element is present AND visibly inside the viewport
@@ -265,6 +266,11 @@ export async function scrollUntilVisible(
   };
   let state: Rounds = startRounds(rules, asBuilt);
   let drawn: Stroke | undefined;
+  // The window manager's word on the window read (ui-tree/window-mark.ts#CallWindow): asked before a stroke for a
+  // target the read does not hold, once per window — a Dialog's window marked presented stops the call before any
+  // stroke onto it, as the parser's own mark does; the screen alone drops the active-window hint.
+  const window = new CallWindow(adapter);
+  let matched = false; // some read of the call matched the target: no miss's word is asked any more
   for (;;) {
     // A failed read is a miss, not a failure — see readTreeOrError. Timed
     // alone (`readMs`), failed or not: a timeout says how long the reads took,
@@ -273,7 +279,7 @@ export async function scrollUntilVisible(
     const readStarted = Date.now();
     const read = await readTreeOrError(adapter);
     const readMs = Date.now() - readStarted;
-    const { tree } = read;
+    const tree = read.tree === undefined ? undefined : await window.mark(read.tree, () => matched || matchesToJudge(read.tree!, target).length > 0);
     // The round's screen box (swipe.ts#screenBox), read once and handed to
     // the round whole (`RoundSeen.screen`): the frame it judges in and the
     // gesture box it decides the stroke's box over.
@@ -307,6 +313,7 @@ export async function scrollUntilVisible(
     } else {
       // The matches the round judges: the one the next tap would act on, when the preference picks one (resolve.ts#matchesToJudge).
       const found = matchesToJudge(tree, target);
+      matched ||= found.length > 0;
       reading = readKeyboard(adapter, tree);
       const cover = await reading.cover();
       // The tree itself: what the round asks of it — the matches' clipping

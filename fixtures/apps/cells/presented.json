@@ -1,6 +1,6 @@
 {
   "family": "presented",
-  "note": "A layer presented over the targets: a sheet at the medium detent (with a target inside it), an alert (phase 1; #33, #35). Phase 3 (B3, iOS only — every note it calibrates is iOS's; the Android app builds none of their layers): the medium sheet over a scrolled host whose targets lie at the screen's edges (#30, #32, #34), a large sheet's bare background over the targets (#28), a large sheet holding a UIKit table longer than the screen (#20; round 7: 56 rows, its L far enough down for ADR 0021 decision 4's long-list carry; round 3, sheet-long-list-short: the table cut short of the sheet's foot, F below its clip but on the screen), an RN-style transparent cover's dim (#27), an in-screen menu over a blurred backdrop no tree lists, its rows listed in reading order or, grouped, before the screen beneath (#31, #15); round 16, ADR 0018 residual 9's probes (iOS only): blur-menu-stacked, the grouped menu declared in the order it is drawn (no zIndex), and blur-menu-unhidden, its backdrop not accessibility-hidden. Round 16 (iOS only, LE2's rest): chooser-over-list — mp-native's payment-type chooser rebuilt at its measured geometry (tests/fixtures/idb-modal-listed-before-content.json): a white card of option rows O and S, white on white, over a dimmed list of white rows, the card's container listed before the list's, the list row R holding S's centre — whether the eyes (ADR 0024) tell S drawn over R on real pixels. App files: AveriLab/Presented.swift, Presented.kt. Round 7 (Android only; ADR 0018's residual 19, the presented windows the uiautomator parser does not mark): a full-screen Compose Dialog (usePlatformDefaultWidth = false; Compose lays its window between the system bars at full width, [0,66][1080,2153] on averi_lab, whatever the window is told) and a Views BottomSheetDialog (its touch_outside scrim), each over the four slot targets with a target of its own (Presented.kt#FullScreenDialog, #ViewsBottomSheet).",
+  "note": "A layer presented over the targets: a sheet at the medium detent (with a target inside it), an alert (phase 1; #33, #35). Phase 3 (B3, iOS only — every note it calibrates is iOS's; the Android app builds none of their layers): the medium sheet over a scrolled host whose targets lie at the screen's edges (#30, #32, #34), a large sheet's bare background over the targets (#28), a large sheet holding a UIKit table longer than the screen (#20; round 7: 56 rows, its L far enough down for ADR 0021 decision 4's long-list carry; round 3, sheet-long-list-short: the table cut short of the sheet's foot, F below its clip but on the screen), an RN-style transparent cover's dim (#27), an in-screen menu over a blurred backdrop no tree lists, its rows listed in reading order or, grouped, before the screen beneath (#31, #15); round 16, ADR 0018 residual 9's probes (iOS only): blur-menu-stacked, the grouped menu declared in the order it is drawn (no zIndex), and blur-menu-unhidden, its backdrop not accessibility-hidden. Round 16 (iOS only, LE2's rest): chooser-over-list — mp-native's payment-type chooser rebuilt at its measured geometry (tests/fixtures/idb-modal-listed-before-content.json): a white card of option rows O and S, white on white, over a dimmed list of white rows, the card's container listed before the list's, the list row R holding S's centre — whether the eyes (ADR 0024) tell S drawn over R on real pixels. App files: AveriLab/Presented.swift, Presented.kt. Round 7 (Android only; ADR 0018's residual 19, the presented windows the uiautomator parser does not mark): a full-screen Compose Dialog (usePlatformDefaultWidth = false; Compose lays its window between the system bars at full width, [0,66][1080,2153] on averi_lab, whatever the window is told) and a Views BottomSheetDialog (its touch_outside scrim), each over the four slot targets with a target of its own (Presented.kt#FullScreenDialog, #ViewsBottomSheet). Round 1023b (Android only; residual 19, the window manager's word): dialog-views-fullscreen, a Views AppCompatDialog laid full screen (setLayout MATCH_PARENT both ways, no fitted insets: a window at 0,0 the screen's size, an activity's shape), its own target over the four (Presented.kt#ViewsFullScreenDialog).",
   "cells": [
     {
       "id": "sheet-medium",
@@ -149,6 +149,18 @@
     {
       "id": "bottom-sheet-dialog",
       "layer": "bottom-sheet-dialog",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },
+        { "tag": "B", "color": "#1E88E5", "slot": 1, "declared": "presented-over" },
+        { "tag": "C", "color": "#43A047", "slot": 2, "declared": "presented-over" },
+        { "tag": "D", "color": "#FB8C00", "slot": 3, "declared": "presented-over" },
+        { "tag": "S", "color": "#8E24AA", "slot": 0, "in": "layer", "declared": "open" }
+      ]
+    },
+    {
+      "id": "dialog-views-fullscreen",
+      "layer": "dialog-views-fullscreen",
       "platforms": ["android"],
       "targets": [
         { "tag": "A", "color": "#E53935", "slot": 0, "declared": "presented-over" },

@@ -26,7 +26,7 @@ beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'averi-golden-wiring-'));
   const run = join(dir, 'android-wiring');
   await mkdir(run);
-  for (const f of ['open.xml', 'open.png']) await copyFile(join(RUN, f), join(run, f));
+  for (const f of ['open.xml', 'open.png', 'open.windows.txt']) await copyFile(join(RUN, f), join(run, f));
   const truth = JSON.parse(await readFile(join(RUN, 'open.truth.json'), 'utf8')) as CellTruth;
   const [a, b, c, d] = truth.targets;
   const targets: TargetTruth[] = [

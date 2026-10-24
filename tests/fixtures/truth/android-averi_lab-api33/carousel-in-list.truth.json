@@ -102,5 +102,6 @@
     }
   },
   "navigation": "gesture",
+  "windows": "carousel-in-list.windows.txt",
   "displays": "carousel-in-list.displays.txt"
 }

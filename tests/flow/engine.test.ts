@@ -2069,6 +2069,35 @@ flows:
       expect(await skipOf(formPicker(), 'scroll_until: { element: { id: lab.form-picker.nope }, maxSwipes: 1 }')).toEqual([`skipped step (not present) (${ACTIVE_WINDOW_HINT})`]);
     });
 
+    // The window manager's word (ADR 0018, "Android's window by the window manager's word"): asked after the wait, it
+    // types form-picker's sheet a Dialog's window, so a flow's `wait:` and an optional step's skip say the presented
+    // remedy instead of the hint.
+    it('with the window manager\'s word that the sheet is a Dialog\'s window: a skipped wait: and tap say the presented remedy, no hint', async () => {
+      const stacked = (): FakeAdapter => {
+        const fake = formPicker();
+        fake.focusedWindow = async () => ({ of: 'stacked', frame: { x: 0, y: 0, width: 1080, height: 2220 }, screen: { width: 1080, height: 2220 } });
+        return fake;
+      };
+      const [wait] = await skipOf(stacked(), 'wait: { element: { id: lab.form-picker.name }, timeout: 50ms }');
+      // The sheet holds its own list: the name may be a row of it not laid out yet, so the scroll is said first.
+      expect(wait).toContain('(the tree lists only the window on top: scroll_until it in that window\'s own list first; if it is not there, a sheet or modal is presented over it — close it first)');
+      expect(wait).not.toContain(ACTIVE_WINDOW_HINT);
+      const [tap] = await skipOf(stacked(), 'tap: { id: lab.form-picker.name }');
+      expect(tap).toMatch(/is not in the tree, which lists only the window presented on top .* — scroll_until it in that window's own list first; if it is not there, a sheet or modal is presented over it — close it first/);
+      expect(tap).not.toContain(ACTIVE_WINDOW_HINT);
+    });
+
+    it('a wait: whose every read was bare (a launch\'s): the bare-tree note is the message, and the window manager is not asked', async () => {
+      const bare = parseDump(`<?xml version='1.0' ?><hierarchy rotation="0"><node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="p" content-desc="" clickable="false" bounds="[0,0][1080,2220]" /></hierarchy>`);
+      const fake = new FakeAdapter({ s: bare }, 's');
+      const asked: number[] = [];
+      fake.focusedWindow = async () => (asked.push(1), { of: 'stacked', frame: { x: 0, y: 0, width: 1080, height: 2220 }, screen: { width: 1080, height: 2220 } });
+      const [wait] = await skipOf(fake, 'wait: { element: { id: lab.nothing }, timeout: 50ms }');
+      // The skip's line is the headline alone; the bare-tree note is beneath it — and no window's word beside it.
+      expect(wait).toBe('skipped step (Timed out after 50ms waiting for element id:"lab.nothing")');
+      expect(asked).toHaveLength(0);
+    });
+
     // A target matched only at 0×0 is absence too ("(not present)"), and the skip says what the wait's message says
     // beneath it (ui-tree/miss.ts's zero-area note): it may be scrolled off — scroll_until it first.
     it('an optional tap whose target matched only 0×0 nodes: skipped (not present) with the zero-area note after it', async () => {

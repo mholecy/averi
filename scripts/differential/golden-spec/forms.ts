@@ -4,7 +4,7 @@ import { claimsTap, isError, namesKeyboard, snapshotNodes, type SnapshotNode } f
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
 import { ocrFailsClosed } from './text.js';
-import { BUDGET_MS, classed, failed, first, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, closesItsOwnLayer, failed, first, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
@@ -88,7 +88,7 @@ export type FormExpectation = Expectation & { target: string };
  * | a control under the picker sheet | tap / scroll_until | refused / stopped before any swipe: `close it first` (ADR 0018, as presented-over) |
  * | a control partly hidden whose probe tap fired ANOTHER control (a field under the pinned submit's bar: the tap submitted the form) | tap | not tapped, nothing sent (tools.ts tap: "a target whose centre lies under another element of the app drawn over it (a pinned button bar …) … with less showing it is REFUSED, naming the cover, nothing tapped") — or, where a probe at its piece clear of the keyboard and the submit reached it (ControlTruth.atPiece), `Tapped` with every tap inside that piece (ADR 0005: a covered target's tap moved to its piece) |
  * | the same | scroll_until down | never "reached" without a swipe |
- * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent |
+ * | a picker row off the screen or not laid out (lazy list) | tap | not tapped, nothing sent — and never the presented remedy without the scroll_until that reaches it (judges.ts#closesItsOwnLayer) |
  * | the same | scroll_until down | swipes for it, every touch-down on the sheet ("a row of the presented sheet itself is still swiped for on the sheet") |
  */
 /**
@@ -387,7 +387,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
     case 'not-rendered': {
       const absent = `${c.situation}: a row of a lazy list need not be in the tree until it is scrolled to`;
       return [
-        { target, verb: 'tap', says: 'not tapped, nothing sent', call: tap, judge: notTapped, absent },
+        { target, verb: 'tap', says: 'not tapped, nothing sent', call: tap, judge: (o) => notTapped(o) ?? closesItsOwnLayer(o), absent },
         {
           target,
           verb: 'scroll_until',

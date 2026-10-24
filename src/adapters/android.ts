@@ -7,7 +7,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -35,6 +35,8 @@ const KEYBOARD_QUERY_TIMEOUT_MS = 2_000;
 const KEYBOARD_WITNESS_TIMEOUT_MS = 2_000;
 /** The same reasoning for the status band beside the screen size (statusBand): past it, no band. */
 const STATUS_BAND_QUERY_TIMEOUT_MS = 2_000;
+/** The same reasoning for the window manager's word on a miss (focusedWindow): past it, `unknown` — the active-window hint. */
+const FOCUSED_WINDOW_TIMEOUT_MS = 2_000;
 
 /** A refusal's lines as the messages below quote them: `<command> said: a / b`. */
 function startSaid(refused: StartRefused): string {
@@ -890,6 +892,37 @@ export class AndroidAdapter implements DeviceAdapter {
     return { witness: parseInputShown(out), region: parseTouchableRegion(out) };
   }
 
+  /**
+   * The window manager's word on the focused window (types.ts#FocusedWindow), in ONE adb call (FOCUSED_WINDOW_COMMAND,
+   * read by parseFocusedWindow). Why: `uiautomator dump` lists the active window only and its XML says nothing of the
+   * window itself — `<hierarchy rotation>` and each node's `package` are the same for an activity and its dialog — so a
+   * full-screen dialog Compose lays between the bars (`[0,66][1080,2153]`), a Views dialog laid full screen (`[0,0]
+   * [1080,2220]`, an activity's very shape) and an expanded sheet with no scrim dump as the app's screen. The window
+   * manager types every window, whatever the theme or the toolkit: an activity's is TYPE_BASE_APPLICATION (set by
+   * ActivityThread); every `android.app.Dialog` — AppCompat's, Material's, a DialogFragment, a BottomSheetDialog,
+   * Compose's `Dialog` and, in material3 1.3.1, its ModalBottomSheet — is TYPE_APPLICATION, the default of
+   * `WindowManager.LayoutParams`; a PopupWindow or a Compose `Popup` a panel. Measured on averi_lab (API 33): every
+   * presented lab cell's focus is TYPE_APPLICATION at the dumped root's bounds, the plain screen's the activity's with
+   * nothing else of an app visible (ADR 0018, "Android's window by the window manager's word"; the captures'
+   * `<cell>.windows.txt`). Rejected: `mTopFullscreenOpaqueWindowState` ≠ the focus (one line of the `displays` dump,
+   * already read) — it tells only a window that is not MATCH_PARENT at 0,0 (Compose's own size), and reads a Views dialog
+   * laid full screen, a sheet dialog or Compose's sheet as the app's screen; `uiautomator dump --windows` — the
+   * accessibility window list stops at a touch-modal window, and types the activity and the dialog alike.
+   *
+   * Cost: 41 KB, 25–26 ms through execFile (the whole `windows` dump alone 21–23 ms; filtered on the device 26–30 ms,
+   * no gain), measured ten times each. Asked on a MISS only — after a wait that found nothing, before `scroll_until`'s
+   * first stroke for a target its read does not hold (ui-tree/window-mark.ts) — never per poll.
+   *
+   * Never throws: a failed or timed-out call, or a dump parseFocusedWindow cannot read, is `unknown`.
+   */
+  async focusedWindow(): Promise<FocusedWindow> {
+    try {
+      return parseFocusedWindow((await this.rawShell(FOCUSED_WINDOW_COMMAND, { timeoutMs: FOCUSED_WINDOW_TIMEOUT_MS })).stdout.toString('utf8'));
+    } catch {
+      return { of: 'unknown' };
+    }
+  }
+
   async clearText(count: number): Promise<void> {
     if (count <= 0) return;
     // One keyevent per adb call: batched multi-keycode calls drop events in
@@ -961,6 +994,101 @@ export function parseInputShown(out: string): KeyboardWitness {
  * word a constant.
  */
 const TOUCHABLE_COMMAND = `${INPUT_SHOWN_COMMAND}; dumpsys window InputMethod | grep -F 'touchable region='; true`;
+
+/**
+ * The window manager's word on the focused window, in one shell line: the focus and the display's size out of `dumpsys
+ * window displays` (API 33 prints `mCurrentFocus` there, not in `windows`; one line each per display, the first
+ * display's first), then `dumpsys window windows` — each window's hash, type (`mAttrs … ty=`), frame (`Frames: …
+ * frame=`) and `isVisible=`. Every word a constant; the line's status is the last command's.
+ */
+export const FOCUSED_WINDOW_COMMAND = "dumpsys window displays | grep -E 'mCurrentFocus=|DisplayFrames w='; dumpsys window windows";
+
+/** The focused window's hash: `mCurrentFocus=Window{c6f91da u0 dev.averi.lab/…}` (`mCurrentFocus=null` in a transition). */
+const CURRENT_FOCUS_RE = /mCurrentFocus=Window\{([0-9a-f]+) /;
+/** One window's block of `dumpsys window windows`: its header, `  Window #9 Window{c6f91da u0 …}:`. */
+const WINDOW_HEADER_RE = /^ {2}Window #\d+ Window\{([0-9a-f]+) [^\n]*:$/gm;
+/** A window's type, the first `ty=` of its block — `mAttrs`'s (its `paramsForRotation` follow): a name, or a number for a type with none. */
+const WINDOW_TYPE_RE = /\bty=([A-Z_]+|\d+)/;
+/** A window's frame on the display: `Frames: parent=… display=… frame=[0,66][1080,2153] last=…`. */
+const WINDOW_FRAME_RE = /^ +Frames: .*? frame=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/m;
+/** A window shown on the display: WindowState.isVisible's own line. */
+const WINDOW_VISIBLE_RE = /^ {4}isVisible=true$/m;
+
+/**
+ * The window types of an app (`WindowManager.LayoutParams`): application windows 1–99 and sub-windows 1000–1999, by
+ * the names the dump prints for them. A type the dump prints as a number (`ty=2040`) is read as that number.
+ */
+const APP_WINDOW_TYPES: Readonly<Record<string, number>> = {
+  BASE_APPLICATION: 1,
+  APPLICATION: 2,
+  APPLICATION_STARTING: 3,
+  DRAWN_APPLICATION: 4,
+  APPLICATION_PANEL: 1000,
+  APPLICATION_MEDIA: 1001,
+  APPLICATION_SUB_PANEL: 1002,
+  APPLICATION_ATTACHED_DIALOG: 1003,
+  APPLICATION_MEDIA_OVERLAY: 1004,
+  APPLICATION_ABOVE_SUB_PANEL: 1005,
+};
+const TYPE_BASE_APPLICATION = 1;
+const TYPE_APPLICATION_STARTING = 3;
+const isAppWindow = (type: number): boolean => (type >= 1 && type <= 99) || (type >= 1000 && type <= 1999);
+
+/** One window of the dump as parseFocusedWindow reads it. */
+interface WmWindow {
+  hash: string;
+  type: number | undefined;
+  frame: Rect | undefined;
+  visible: boolean;
+}
+
+/**
+ * The focused window out of FOCUSED_WINDOW_COMMAND's answer (types.ts#FocusedWindow):
+ * - `stacked` — the focus is an app's window that is not the activity's own (TYPE_BASE_APPLICATION) nor a starting
+ *   window: a Dialog's (TYPE_APPLICATION), a panel; with its frame and the display's size;
+ * - `screenAlone` — the focus is the activity's own window and no OTHER window of an app is visible (a translucent
+ *   activity over another, a non-focusable popup, a starting window all fail this); with its frame;
+ * - `unknown` — anything else: no focus (a transition), a focus the windows dump does not list, no display size, a
+ *   system window focused (the notification shade), a dump cut short or not this one.
+ * The frame is clipped to the display, as the dump clips its root: the window manager may lay a window past the
+ * screen's edge (dialog-fullscreen's `Requested w=1081` of a 1080 screen; API 33's `Frames: … frame=` prints it
+ * clipped, `mAttrs` does not). A frame wholly off the display is none: `unknown`. Which window of the dump the
+ * uiautomator root is, is not decided here: ui-tree/window-mark.ts matches the frame.
+ */
+export function parseFocusedWindow(dump: string): FocusedWindow {
+  const focus = CURRENT_FOCUS_RE.exec(dump)?.[1];
+  const [, w, h] = /DisplayFrames w=(\d+) h=(\d+)/.exec(dump) ?? [];
+  if (focus === undefined || w === undefined) return { of: 'unknown' };
+  const screen = { width: Number(w), height: Number(h) };
+  const windows = wmWindows(dump);
+  const focused = windows.find((x) => x.hash === focus);
+  if (focused?.type === undefined || focused.frame === undefined || !isAppWindow(focused.type)) return { of: 'unknown' };
+  const frame = rectIntersection(focused.frame, { x: 0, y: 0, ...screen });
+  if (frame === undefined) return { of: 'unknown' };
+  if (focused.type === TYPE_BASE_APPLICATION) {
+    const beside = windows.some((x) => x !== focused && x.visible && (x.type === undefined || isAppWindow(x.type)));
+    return beside ? { of: 'unknown' } : { of: 'screenAlone', frame };
+  }
+  if (focused.type === TYPE_APPLICATION_STARTING) return { of: 'unknown' };
+  return { of: 'stacked', frame, screen };
+}
+
+/** Each window block of `dumpsys window windows`, in the dump's order. */
+function wmWindows(dump: string): WmWindow[] {
+  const headers = [...dump.matchAll(WINDOW_HEADER_RE)];
+  return headers.map((m, i) => {
+    const block = dump.slice(m.index, headers[i + 1]?.index ?? dump.length);
+    const ty = WINDOW_TYPE_RE.exec(block)?.[1];
+    const f = WINDOW_FRAME_RE.exec(block);
+    const [l, t, r, b] = f === null ? [] : f.slice(1, 5).map(Number);
+    return {
+      hash: m[1],
+      type: ty === undefined ? undefined : /^\d+$/.test(ty) ? Number(ty) : APP_WINDOW_TYPES[ty] ?? 0,
+      frame: f === null ? undefined : { x: l, y: t, width: r - l, height: b - t },
+      visible: WINDOW_VISIBLE_RE.test(block),
+    };
+  });
+}
 
 /** `touchable region=SkRegion(<rects>)` — the whole line's value, the rects read by TOUCHABLE_RECT_RE. */
 const TOUCHABLE_REGION_RE = /(?:^|\s)touchable region=SkRegion\(((?:\s*\(\s*-?\d+\s*,\s*-?\d+\s*,\s*-?\d+\s*,\s*-?\d+\s*\))*)\s*\)/;
@@ -1294,7 +1422,9 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
  *   width, with a full-width sibling under it to the bottom, reads as a scrim, and an app's own views it gave
  *   Material's three ids, laid so, as Material's sheet dialog. What a mark changes is asked only for a target the tree
  *   does not hold (presentation.ts#Presentation.topmostAt, #alone), so a misreading costs a refusal, never a false
- *   `Tapped`.
+ *   `Tapped`. The windows the dump has no fact for — the full-screen dialog, the expanded sheet, a window against an
+ *   edge — are typed after the read, on a miss, by the window manager's word (`focusedWindow`,
+ *   ui-tree/window-mark.ts#markByWindow).
  * docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
  */
 function presentedWindow(window: RawNode, rect: Rect): 'dialog' | 'screen' | undefined {

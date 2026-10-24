@@ -196,5 +196,6 @@
       "width": 1080,
       "height": 495
     }
-  }
+  },
+  "windows": "scroll-bounded.windows.txt"
 }

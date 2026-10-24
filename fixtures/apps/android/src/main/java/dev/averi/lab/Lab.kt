@@ -25,9 +25,9 @@ import kotlin.math.roundToInt
 /**
  * The layers this app can build. A cell of another layer (one the iOS app gained first) is shown as unsupported.
  * `dialog-fullscreen` and `bottom-sheet-dialog` are Android's own (round 7, Presented.kt): the windows ADR 0018's
- * residual 19 names unmeasured.
+ * residual 19 names unmeasured; `dialog-views-fullscreen` (round 1023b) a Views dialog at an activity's shape.
  */
-val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen", "bottom-sheet-dialog")
+val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen", "bottom-sheet-dialog", "dialog-views-fullscreen")
 
 /**
  * `text`: a text target (B5's own-parts) — this text drawn on its coloured control, the control's box `<tag>.box`;

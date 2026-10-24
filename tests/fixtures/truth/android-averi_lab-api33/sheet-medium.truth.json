@@ -125,5 +125,6 @@
       "drawn": 1,
       "seen": "#8E24AA"
     }
-  ]
+  ],
+  "windows": "sheet-medium.windows.txt"
 }

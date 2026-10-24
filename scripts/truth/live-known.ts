@@ -35,7 +35,6 @@ const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 const NO_ID_RESIDUAL = 'residual:ADR 0018 residual 20 — idb lists no identifier on a UIKit table cell label: an id-asked target there is never found, only said so';
-const UNMARKED_WINDOW = 'residual:ADR 0018 residual 19 — Android\'s presented window: the shapes are measured on one AVD and Material 3 only';
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
 const CENTRE_A_POINT_OUT = 'bug:2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md';
@@ -78,12 +77,13 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // then →288–296; android-vis-r1023-lv2-1…7.json), P.fully after 1 as before; both struck off.
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),
   // Round 7 (T2): the presented windows the parser does not mark (android-vis-dialogs.json, -scroll-run2/3.json; the
-  // same in all three runs). Beneath the full-screen Compose Dialog every target's two strokes land on the dialog
-  // (nothing dismissed: it has no outside) — residual 19, accepted with the hint every reply carries. (LW1's four
-  // scroll cases beneath the Views BottomSheetDialog — A's and B's stroke up on the touch_outside scrim dismissing the
-  // sheet, C's and D's two strokes on it — struck off by round 7's A7, f924893e: the window marked presented by
-  // Material's ids, scroll_until stops before any stroke, ok in three runs of three: android-vis-sheet-dialog-run1…3.json.)
-  ...each('android uiautomator', ['A', 'B', 'C', 'D'].map((t) => `scroll:dialog-fullscreen.${t}`), UNMARKED_WINDOW, 'presented-stroke', 'not found'),
+  // same in all three runs). Beneath the full-screen Compose Dialog every target's two strokes landed on the dialog
+  // (nothing dismissed: it has no outside) — residual 19, struck off since the window manager's word types the window
+  // (ADR 0018's amendment: the focused window a Dialog's at the root's bounds, asked on the miss — scroll_until stops
+  // before any stroke), ok in three runs of three (android-vis-r1023b-r19-1…3.json). (LW1's four scroll cases beneath
+  // the Views BottomSheetDialog — A's and B's stroke up on the touch_outside scrim dismissing the sheet, C's and D's two strokes
+  // on it — struck off by round 7's A7, f924893e: the window marked presented by Material's ids, scroll_until stops
+  // before any stroke, ok in three runs of three: android-vis-sheet-dialog-run1…3.json.)
   // iOS, idb: no scroll view listed (LE2, docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md),
   // partly fixed by round 14's 11daf08 — ADR 0010's residual 5 the rest. P.fully and S.fully no longer claim a stop:
   // the eyes see the clip line, the stop fails after two strokes over the screen — P's touching down below `lower`,

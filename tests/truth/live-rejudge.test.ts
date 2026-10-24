@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -142,7 +142,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-rn-r7final-1.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
     ['android-rn-r7final-2.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
     ['android-rn-r7final-3.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
-    ['android-vis-dialogs-r7final.json', 'visibility', { cases: 26, ok: 22, loud: 0, mismatches: 4 }],
     // round 8's L2 fix (fix/r8-l2; docs/truth/live-ios-2026-10-18-visibility.md, its round-8 section): k6 and k7, opened
     // to iOS, under idb and WDA three times — no submit; idb's k6 refused under Continue in runs 2 and 3 (run 1: idb's
     // describe-all failed, no frontmost application, so no tree — the wait timed out, nothing fired: vacuous for the
@@ -180,7 +179,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // timeoutMs 30000 (blank:tabbar-floating.F); scroll-bounded's O and F LOUD at the deadline with the blank clause, no
     // unchanged claim; turn:scroll-bounded.F as before. The whole visibility group (its 4 mismatches dialog-fullscreen's,
     // residual 19), then the two cells again.
-    ['android-vis-r14-lv1.json', 'visibility', { cases: 140, ok: 131, loud: 5, mismatches: 4 }],
     ['android-vis-r14-lv1-2.json', 'visibility', { cases: 18, ok: 15, loud: 3, mismatches: 0 }],
     // ... and the two cells once more at the reviewed fix (770344ae, 00ed9ec8's src but for names and comments: rows
     // apart across a stroke shown, the clause's final wording "how far", counted over one scroll view): the same outcomes.
@@ -244,7 +242,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-r1023-lv2-3.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-4.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-5.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
-    ['android-vis-r1023-lv2-group.json', 'visibility', { cases: 140, ok: 130, loud: 6, mismatches: 4 }],
     // The cell twice more with the proof kept (`ProvenCut`, a path S never takes): the same.
     ['android-vis-r1023-lv2-6.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
     ['android-vis-r1023-lv2-7.json', 'visibility', { cases: 7, ok: 7, loud: 0, mismatches: 0 }],
@@ -254,12 +251,24 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-forms-r1023b-fu1-cr-1.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['android-forms-r1023b-fu1-cr-2.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['android-forms-r1023b-fu1-cr-3.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023b-r19-1.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023b-r19-2.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
+    ['android-vis-r1023b-r19-3.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
+    ['android-forms-r1023b-r19-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
+    ['android-forms-r1023b-r19-2.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
+    ['android-forms-r1023b-r19-3.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
+    // …and once more where form-picker's taps and its not-founds say the sheet's own list first.
+    ['android-vis-r1023b-r19-cr-1.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
+    ['android-forms-r1023b-r19-cr-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
+    // …and where the sheet's own list is said in the shorter words ("scroll_until it in that window's own list first").
+    ['android-vis-r1023b-r19-cr-2.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
+    ['android-forms-r1023b-r19-cr-2.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
     expect(header, out.slice(0, 2000)).not.toBeNull();
     const [, cases, ok, loud, mismatches, notKnown, skipped] = header!.map(Number);
-    expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ ...want, notKnown: 0, skipped: 0 });
+    expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ notKnown: 0, skipped: 0, ...want });
     expect(out).not.toMatch(/NOT known|FIXED, not intermittent/);
     expect(code, out.slice(-2000)).toBe(0);
   });
@@ -619,6 +628,12 @@ const LE1_CASES = ['scroll:scroll-bounded.P.fully', 'tap:scroll-bounded.S', 'scr
  */
 const LV1_CASES = ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll:tabbar-floating.F'];
 
+/**
+ * Residual 19's four live cases beneath the full-screen Compose Dialog (its two strokes on the dialog), struck off
+ * live-known.ts since the window manager's word types the window (scroll_until stops before any stroke).
+ */
+const FULL_SCREEN_DIALOG_CASES = ['A', 'B', 'C', 'D'].map((t) => `scroll:dialog-fullscreen.${t}`);
+
 /** The ids of a rejudged record's mismatches no entry of live-known.ts explains. */
 const notKnown = (out: string): string[] => [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
 
@@ -645,13 +660,15 @@ describe('live.ts --rejudge over the committed Android visibility records of the
     // L1's eight presented scroll cases new and ok, round 6's new cells' cases new — carousel-in-list's C known as LE1;
     // the turn of scroll-collapsing's A (#10's, known until then) ok since the owner's decision of 2026-10-18 (ADR 0021:
     // no turn on uiautomator, a loud failure naming `up` after the two-stroke stop — live-visibility.ts#judgeAndroidTurn)
-    ['android-vis.json', { cases: 111, ok: 98, loud: 3, mismatches: 10 }],
-    ['android-vis-r7final.json', { cases: 137, ok: 120, loud: 3, mismatches: 14 }],
+    ['android-vis.json', { cases: 111, ok: 98, loud: 3, mismatches: 10, dialog: [] }],
+    // (and residual 19's four beneath the full-screen dialog, since the window manager's word types it)
+    ['android-vis-r7final.json', { cases: 137, ok: 120, loud: 3, mismatches: 14, dialog: FULL_SCREEN_DIALOG_CASES }],
   ] as const)('%s: LE1\'s six cases not known, and VA1\'s and LV1\'s', { timeout: 60_000 }, async (record, want) => {
     const { code, out } = await rejudge(record, 'visibility');
     // (6 not known until VA1's fix, round 14: its case since; 7 until LV1's, its three since.)
-    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(10 not known\\), 0 skipped$`, 'm'));
-    expect(notKnown(out).sort()).toEqual([...LE1_CASES, VA1_CASE, ...LV1_CASES].sort());
+    const unknown = [...LE1_CASES, VA1_CASE, ...LV1_CASES, ...want.dialog];
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${unknown.length} not known\\), 0 skipped$`, 'm'));
+    expect(notKnown(out).sort()).toEqual(unknown.sort());
     expect(code).toBe(1);
   });
 });
@@ -792,18 +809,32 @@ describe('live.ts --rejudge over the committed records of the src before the par
 describe('live.ts --rejudge over the committed records of the src before the Views BottomSheetDialog was marked presented', () => {
   // Round 7's presented windows the parser did not mark: both cells' taps, scroll_until and colour asserts, then their
   // eight scroll cases twice more — the same in every run. Beneath the full-screen Compose Dialog residual 19's four,
-  // known; beneath the Views BottomSheetDialog LW1's four (A's and B's stroke up on the scrim dismissing the sheet and
+  // known until the window manager's word struck them off; beneath the Views BottomSheetDialog LW1's four (A's and B's stroke up on the scrim dismissing the sheet and
   // claiming the stop, C's and D's two strokes on it), whose entries round 7's A7 struck off (f924893e: the window
   // marked by Material's ids): not known here — the src before the fix, a calibration of it now: exit 1, as recorded.
   it.each([
-    ['android-vis-dialogs.json', { cases: 26, ok: 18, loud: 0, mismatches: 8, notKnown: 4 }],
-    ['android-vis-dialogs-scroll-run2.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 4 }],
-    ['android-vis-dialogs-scroll-run3.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 4 }],
-  ] as const)('%s: the bottom sheet dialog\'s four scroll cases not known, the full-screen dialog\'s known', { timeout: 60_000 }, async (record, want) => {
+    ['android-vis-dialogs.json', { cases: 26, ok: 18, loud: 0, mismatches: 8, notKnown: 8 }],
+    ['android-vis-dialogs-scroll-run2.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 8 }],
+    ['android-vis-dialogs-scroll-run3.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 8 }],
+  ] as const)('%s: the bottom sheet dialog\'s four scroll cases not known, and the full-screen dialog\'s', { timeout: 60_000 }, async (record, want) => {
     const { code, out } = await rejudge(record, 'visibility');
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.notKnown} not known\\), 0 skipped$`, 'm'));
-    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
-    expect(unknown.sort()).toEqual(['A', 'B', 'C', 'D'].map((t) => `scroll:bottom-sheet-dialog.${t}`));
+    expect(notKnown(out).sort()).toEqual([...['A', 'B', 'C', 'D'].map((t) => `scroll:bottom-sheet-dialog.${t}`), ...FULL_SCREEN_DIALOG_CASES].sort());
+    expect(code).toBe(1);
+  });
+});
+
+describe('live.ts --rejudge over the committed records of the src before the full-screen dialog was typed by the window manager', () => {
+  // Residual 19's four scroll cases beneath the full-screen Compose Dialog, known until the window manager's word
+  // struck them off: their two strokes on the dialog read MISMATCH not known — each record a calibration of its src now.
+  it.each([
+    ['android-vis-dialogs-r7final.json', { cases: 26, ok: 22, loud: 0, mismatches: 4 }],
+    ['android-vis-r14-lv1.json', { cases: 140, ok: 131, loud: 5, mismatches: 4 }],
+    ['android-vis-r1023-lv2-group.json', { cases: 140, ok: 130, loud: 6, mismatches: 4 }],
+  ] as const)('%s: the full-screen dialog\'s four scroll cases not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, want) => {
+    const { code, out } = await rejudge(record, 'visibility');
+    expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(4 not known\\), 0 skipped$`, 'm'));
+    expect(notKnown(out).sort()).toEqual([...FULL_SCREEN_DIALOG_CASES].sort());
     expect(code).toBe(1);
   });
 });

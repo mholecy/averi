@@ -6,7 +6,7 @@
 > BottomSheetDialog by Material's ids"). Measured: golden 8 rows green, every other row byte-identical; live on
 > averi_lab ×3 (docs/truth/live-records/android-vis-sheet-dialog-run{1,2,3}.json), 13/13 ok each — taps refused with
 > the presented remedy, scroll_until stopped before any swipe, the sheet not dismissed. The colour 4 stay KNOWN `not in
-> the tree` as no note's. The full-screen dialog stays residual 19 (below, "The full-screen dialog").
+> the tree` as no note's. The full-screen dialog stayed residual 19 (below, "The full-screen dialog"), fixed at `b3acdeb`.
 > Was: open, measured on the lab (round 7, T2), KNOWN as this note — its 8 replayed rows
 > (tests/differential/golden/presented.known.ts, `bottom-sheet-dialog.xml` A–D tap and scroll_until) and its four live
 > scroll cases (scripts/truth/live-known.ts, `android uiautomator scroll:bottom-sheet-dialog.A`–`D`), struck off at
@@ -109,6 +109,16 @@ top at the scrim's, or the scrim covered whole) is unmeasured — the rule's `>=
 it; and a `BottomSheetDialogFragment` uses the same layout (unmeasured, expected to match).
 
 ## The full-screen dialog (dialog-fullscreen): no signal — residual 19 stands
+
+> **Status (2026-10-24):** fixed at `b3acdeb`, `59dccf2` and `b584755` (bugs/r1023b-r19; ADR 0018's amendment "Android's window by the window
+> manager's word"; open-bugs #17). The dump has no signal, but the window manager has: the focused window is
+> TYPE_APPLICATION (a Dialog's) at exactly the dumped root's bounds (`[0,66][1080,2153]`), the activity's window
+> TYPE_BASE_APPLICATION beneath it. Asked once on a miss (one adb call, about 26 ms), it marks the root a presented
+> `screen`: the taps say the presented remedy, `scroll_until` stops before any swipe (was two strokes). Measured: golden
+> 8 rows green against `6ff9ca3e`, the colour 4 the presented note (vacuous, no note's); the new cell
+> `presented/dialog-views-fullscreen` (a Views dialog laid full screen, `[0,0][1080,2220]`, an activity's very shape)
+> the same; live 39 of 39 ok in three runs of three (docs/truth/live-records/android-vis-r1023b-r19-1…3.json). Calibrated
+> as this note's second pair. The section below is the measurement before the fix.
 
 A Compose `Dialog` with `usePlatformDefaultWidth = false` and `decorFitsSystemWindows = false`, its content
 `fillMaxSize`, opaque. Compose lays the window ITSELF, between the system bars at full width: `dumpsys window` reads

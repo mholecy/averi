@@ -1207,8 +1207,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // reads are failing, and the last one that read is the evidence there is.
   if (read === undefined && s.presentedHold !== undefined) return stop(s, s.presentedHold);
   // What this round's read saw, for a target no round matched (ui-tree/miss.ts — the not-found's note; asked only at a
-  // stop that may say "never appeared", so a round that goes on pays no presentation walk).
-  const missed = (): Miss | undefined => (s.everFound ? undefined : missOf({ tree: read?.tree, readError, target: s.rules.target }));
+  // stop that may say "never appeared", so a round that goes on pays no presentation walk). A call that has stroked has
+  // searched a presented window's own scroll view (ADR 0018 decision 3: the strokes go there), so its note sends no one
+  // back to it.
+  const missed = (): Miss | undefined => (s.everFound ? undefined : missOf({ tree: read?.tree, readError, target: s.rules.target, scrolled: s.swipes > 0 }));
   const evidence: WaitEvidence = { sighted: s.everFound, treesRead: s.treesRead, readError };
   // A keyboard that leaves nothing above it: nothing but its own UI can be
   // judged, and no stroke can start on the content — fail now, naming it,

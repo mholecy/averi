@@ -1,6 +1,7 @@
 import { everyNode, type UiNode } from '../adapters/types.js';
 import type { Edge } from './geometry.js';
 import { presentationOf, type MarkedLayer } from './presentation.js';
+import { clips } from './scroll-containers.js';
 import { findTarget, hasArea, soleIdOf, type Target } from './selectors.js';
 import { clippedOutText, revealText } from './sides.js';
 import { presentedLayerName, presentedRemedy } from './standing.js';
@@ -33,11 +34,20 @@ import { isBareTreeMemo } from './verdict.js';
  *   #Presentation.alone: Android's dialog, a sheet whose scrim the dump carries, its active window; idb's flat list
  *   holding UIKit's dismiss region, its top layer: `ListedAs`), the screen beneath unlisted: the layer named
  *   (`presentedLayerName`) and the remedy, close it first — in one phrase with no parenthesis inside, since a
- *   one-line reply says it in one; the tap's headline keeps `presentedRemedy`'s words;
+ *   one-line reply says it in one; the tap's headline keeps `presentedRemedy`'s words. Where the window listed
+ *   alone holds a scroll view of its own (`mayLieIn`), the target may as well be a row of that list not laid out yet
+ *   — a lazy list composes only what shows (form-picker's country sheet, whose far rows `scroll_until` reaches on the
+ *   sheet's own list): the words then say that first, scroll_until it in that list, and close it first only if not —
+ *   never "no scroll moves it out", which would send an agent to dismiss the very window it needs. Not where the
+ *   reader has already stroked that list (`scrolled`: `scroll_until`'s own stop, ADR 0018 decision 3), nor on idb's
+ *   flat list, which lists no scroll view (the remedy stays as it was: ADR 0018, residual 18);
  * - `activeWindow`: the source lists the active window only (`UiNode.activeWindowOnly`, uiautomator) and marks no
  *   presented window — a sheet or a dialog it does not mark (a fully expanded bottom sheet with no scrim, form-picker;
  *   a full-screen dialog; a window against the screen's edge: ADR 0018's residuals 18 and 19) still hides the screen
- *   beneath, and nothing in the dump tells it from no window at all: ACTIVE_WINDOW_HINT, a possibility, never the cause;
+ *   beneath, and nothing in the dump tells it from no window at all: ACTIVE_WINDOW_HINT, a possibility, never the cause.
+ *   Where the window manager typed the window after the read (ui-tree/window-mark.ts, on a miss only), its word is in
+ *   the root's marks: a Dialog's window is `presented` (above), and the activity's own window alone (`UiNode
+ *   .windowAlone`) is `none` — no hint; with no word (the call failed, the frames disagree) the hint stays;
  * - `noIdListed`: the tree is idb's flat list (its own mark, below), the target named an id ALONE, nothing matched, the
  *   read is not bare (ui-tree/verdict.ts#isBareTreeMemo: a launch-transition read lists nothing of the app's, so its
  *   ids say nothing of the screen), and no element of the read carries an identifier at all — a fact the read states,
@@ -65,7 +75,7 @@ import { isBareTreeMemo } from './verdict.js';
 export type Miss =
   | { readonly of: 'unread' }
   | { readonly of: 'zeroArea'; readonly clippedOut: readonly Edge[] }
-  | { readonly of: 'presented'; readonly layer: MarkedLayer; readonly listed: ListedAs }
+  | { readonly of: 'presented'; readonly layer: MarkedLayer; readonly listed: ListedAs; readonly mayLieIn?: InPresentedWindow }
   | { readonly of: 'activeWindow' }
   | { readonly of: 'noIdListed'; readonly id: string }
   | { readonly of: 'idUnlisted'; readonly id: string }
@@ -107,6 +117,13 @@ export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a s
  */
 export type ListedAs = 'window' | 'layer';
 
+/**
+ * Where in a presented window listed alone a target missing from the tree may still lie (`Miss`'s `presented`
+ * `mayLieIn`): `itsScrollView` — the window holds a scroll view of its own, which the reader has not stroked, so the
+ * target may be a row of it not laid out yet.
+ */
+export type InPresentedWindow = 'itsScrollView';
+
 /** What the tree lists when it lists a presented layer alone, as the tap's headline says it (`presentedAloneHeadline`). */
 const PRESENTED_ALONE: Record<ListedAs, string> = {
   window: 'lists only the window presented on top (the tree source lists the active window alone)',
@@ -115,17 +132,25 @@ const PRESENTED_ALONE: Record<ListedAs, string> = {
 
 /**
  * THE decision: why `target` is not in the last read of a miss (`Miss`, in its precedence). `tree` is that read, or
- * `readError` the error that stood in for it; `target` what the miss looked for, when the reader has it. Asked after a
- * miss: of a tree that holds a match with area it says only the tree's own facts (`presented`, `activeWindow`).
+ * `readError` the error that stood in for it; `target` what the miss looked for, when the reader has it; `scrolled` —
+ * the reader stroked the presented window's own scroll view for it already (`scroll_until`), so no `mayLieIn`. Asked
+ * after a miss: of a tree that holds a match with area it says only the tree's own facts (`presented`, `activeWindow`).
  */
-export function missOf({ tree, readError, target }: { tree?: UiNode; readError?: Error; target?: Target }): Miss {
+export function missOf({ tree, readError, target, scrolled }: { tree?: UiNode; readError?: Error; target?: Target; scrolled?: boolean }): Miss {
   if (readError !== undefined || tree === undefined) return { of: 'unread' };
   const matched = target === undefined ? [] : findTarget(tree, target);
   if (matched.length > 0 && !matched.some(hasArea)) return { of: 'zeroArea', clippedOut: clippedOutOf(matched) };
   // The root-mark tests are a cost guard too: only a tree whose root is marked presented pays the presentation's walk.
   const alone = tree.presentation === undefined ? undefined : presentationOf(tree).alone;
-  if (alone !== undefined) return { of: 'presented', layer: alone, listed: tree.activeWindowOnly === true ? 'window' : 'layer' };
-  if (tree.activeWindowOnly === true) return { of: 'activeWindow' };
+  if (alone !== undefined) {
+    const listed: ListedAs = tree.activeWindowOnly === true ? 'window' : 'layer';
+    // The window listed alone IS the tree: a scroll view anywhere in it is the window's own. One that scrolls NOW
+    // (uiautomator's scrollable="true", scroll-containers.ts#clips): a lazy list with rows not laid out has a range to
+    // scroll, while a ScrollView-classed node that fits (an AlertDialog's message) is no list to look in.
+    const ownList = listed === 'window' && scrolled !== true && [...everyNode(tree)].some(clips);
+    return { of: 'presented', layer: alone, listed, ...(ownList && { mayLieIn: 'itsScrollView' as const }) };
+  }
+  if (tree.activeWindowOnly === true && tree.windowAlone !== true) return { of: 'activeWindow' };
   const id = tree.flatList === true && target !== undefined && matched.length === 0 ? soleIdOf(target) : undefined;
   if (id === undefined || isBareTreeMemo(tree)) return { of: 'none' };
   return listsNoId(tree) ? { of: 'noIdListed', id } : { of: 'idUnlisted', id };
@@ -196,8 +221,10 @@ export function missNote(miss: Miss): string | undefined {
   switch (miss.of) {
     case 'zeroArea':
       return zeroAreaNote(miss.clippedOut);
-    case 'presented':
-      return `${presentedLayerName(miss.layer)} is presented over it, and the tree lists only that ${miss.listed} — close it first`;
+    case 'presented': {
+      const beneath = `${presentedLayerName(miss.layer)} is presented over it, and the tree lists only that ${miss.listed} — close it first`;
+      return miss.mayLieIn === undefined ? beneath : `the tree lists only the window on top: ${scrollFirst(miss.layer)}`;
+    }
     case 'activeWindow':
       return ACTIVE_WINDOW_HINT;
     case 'noIdListed':
@@ -211,12 +238,22 @@ export function missNote(miss: Miss): string | undefined {
 }
 
 /**
+ * A `presented` miss's remedy where the target may lie in the window's own scroll view (`mayLieIn`): the scroll first,
+ * the one way to look there, and the layer's remedy only if it is not there — its one phrase (`presentedLayerName`),
+ * without `presentedRemedy`'s "no scroll moves it out", which a row of that very list would belie.
+ */
+const scrollFirst = (layer: MarkedLayer): string =>
+  `scroll_until it in that window's own list first; if it is not there, ${presentedLayerName(layer)} is presented over it — close it first`;
+
+/**
  * The headline of the tap's and fill's wait on a `presented` miss (interact/resolve.ts#notFound), which says the miss
  * in place of "… to appear": `element id:"x" is not in the tree, which lists only the window presented on top (the
- * tree source lists the active window alone) — a dialog is presented over it — close it first`.
+ * tree source lists the active window alone) — a dialog is presented over it — close it first`; where the target may
+ * lie in that window's own scroll view (`mayLieIn`), the scroll first (`scrollFirst`).
  */
-export const presentedAloneHeadline = (subject: string, { layer, listed }: Extract<Miss, { of: 'presented' }>): string =>
-  `${subject} is not in the tree, which ${PRESENTED_ALONE[listed]} — ${presentedRemedy('it', layer)}`;
+export const presentedAloneHeadline = (subject: string, { layer, listed, mayLieIn }: Extract<Miss, { of: 'presented' }>): string =>
+  `${subject} is not in the tree, which ${PRESENTED_ALONE[listed]} — ` +
+  (mayLieIn === undefined ? presentedRemedy('it', layer) : scrollFirst(layer));
 
 /** A one-line not-found `what`, the miss's note after it in a parenthesis when it has one. */
 export const withMissNote = (what: string, miss: Miss | undefined): string => {
