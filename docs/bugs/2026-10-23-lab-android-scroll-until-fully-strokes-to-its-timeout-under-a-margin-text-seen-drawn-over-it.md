@@ -2,7 +2,7 @@
 
 > **Status (2026-10-24):** fixed at `074b48c3`, review fix `11a5f92a` (a carry only in a scroll view that stayed put) (bugs/r1023b-row19, ADR 0026 amended: rule 6, rule 8), measured by the unit
 > tests (tests/interact/scroll-eyes.test.ts, "what was seen of a margin text, kept"; tests/interact/motion-ledger.test.ts,
-> "a pair carried together"): seen `under`, then carried with the field by a stroke, the call fails after 1 swipe —
+> "a pair carried together"; tests/interact/margin-memo.test.ts): seen `under`, then carried with the field by a stroke, the call fails after 1 swipe —
 > "failed after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there: it
 > scrolls with the element, so no swipe brings the element out from under it) — element reached the viewport but stayed
 > under text …"; a text pinned off the carry is asked again. Golden 0 changed; live k7 and k7f as before (the clear

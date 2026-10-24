@@ -717,7 +717,7 @@ Known but ok this run: uiautomator scroll:scroll-bounded-flush.P.fully, uiautoma
 bugs/r1023b-row19 at `074b48c3` (interact/motion-ledger.ts#movedTogether, interact/scroll-rounds.ts#coverMovesWith;
 docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md, rules 6 and 8), run from that checkout on
 averi_lab (emulator-5554, booted `-no-window -no-snapshot-save`, shut down after), the lab app as installed (no app
-change). Record docs/truth/live-records/android-forms-r1023b-row19-1.json (`--cases k7,k7f`: 2 cases, 2 ok, exit 0). A
+change). Run before the review fix `11a5f92a` (the scroll view kept in the pair), which leaves the clear path as it is. Record docs/truth/live-records/android-forms-r1023b-row19-1.json (`--cases k7,k7f`: 2 cases, 2 ok, exit 0). A
 regression check of the clear path only: no lab cell answers `under`, so the fast fail is measured by the unit tests.
 
 - `k7f`: "Element id:"lab.form-keyboard.phone" fully visible after 0 swipes — text "Variable symbol" (55,1406 258x56),

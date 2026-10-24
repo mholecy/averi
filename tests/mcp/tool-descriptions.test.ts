@@ -194,7 +194,7 @@ describe('tool descriptions quote each operation default from its owner', () => 
     const troubleshooting = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
     const words = boundText({ of: 'movesWith', offset: { dx: 0, dy: -300 } }, 1);
     expect(words).toBe('after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out from under it)');
-    expect(troubleshooting).toContain(`failed ${words.replace('0,-300', 'dx,dy')} — …`);
+    expect(troubleshooting).toContain(`failed ${words.replace('1 swipe', 'N swipes').replace('0,-300', 'dx,dy')} — …`);
     expect(troubleshooting).not.toContain('runs to its timeout (a known limit)');
   });
 

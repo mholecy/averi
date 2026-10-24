@@ -274,7 +274,7 @@ describe('scroll_until — fully: true on a field under a text in its touch marg
 });
 
 /**
- * WHAT WAS SEEN OF A MARGIN TEXT, KEPT (interact/scroll-rounds.ts#State.marginKept) across the reads of one call: the
+ * WHAT WAS SEEN OF A MARGIN TEXT, KEPT (interact/margin-memo.ts) across the reads of one call: the
  * after-back form served first 700 px lower (phone below the viewport: a stroke), then where it was captured — the clear
  * question asked there — then, for the read that confirms the stop, either there again or 10 px higher. A `clear` is an
  * answer of the frame it was read on: kept while the two lie where they were seen, asked again once they moved; the
@@ -381,6 +381,14 @@ describe('scroll_until — what was seen of a margin text, kept across the reads
     expect(failure.message).toContain('a screenshot shows it drawn over its bottom 6 px');
     expect(fake.swipes).toHaveLength(1);
     expect(fake.screenshots).toHaveLength(1);
+  });
+
+  it('seen drawn over it, then carried with it in a tree that marks no scroll view: asked again, no fail at once — no content the tree marks to be carried in', async () => {
+    const unmarked = ({ clipsDescendants: _, ...n }: UiNode): UiNode => ({ ...n, children: n.children.map(unmarked) });
+    const { outcome, asked, swipes } = await play((base) => [unmarked(base), unmarked(scrolled(base, -300))], ['under', 'under']);
+    expect(asked.length).toBeGreaterThan(1);
+    expect(outcome).not.toContain('moved with it');
+    expect(swipes).toBeGreaterThan(1);
   });
 
   it('untold where it was asked, then carried with it: asked again (an answer of its frame), and the strokes go on — untold never fails at once', async () => {
