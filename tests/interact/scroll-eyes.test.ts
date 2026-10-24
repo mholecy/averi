@@ -278,7 +278,8 @@ describe('scroll_until — fully: true on a field under a text in its touch marg
  * after-back form served first 700 px lower (phone below the viewport: a stroke), then where it was captured — the clear
  * question asked there — then, for the read that confirms the stop, either there again or 10 px higher. A `clear` is an
  * answer of the frame it was read on: kept while the two lie where they were seen, asked again once they moved; the
- * answer given then replaces it, so a text seen drawn over the field is not asked again however many reads follow.
+ * answer given then replaces it. A text seen drawn over the field is kept while the two keep that relation — where
+ * they were, or carried together in a scroll view that stayed put — and asked again once it changed.
  */
 describe('scroll_until — what was seen of a margin text, kept across the reads of the call', () => {
   const shifted = (n: UiNode, dy: number): UiNode => ({ ...n, rect: { ...n.rect, y: n.rect.y + dy }, children: n.children.map((c) => shifted(c, dy)) });
@@ -337,6 +338,7 @@ describe('scroll_until — what was seen of a margin text, kept across the reads
     expect(asked).toHaveLength(2);
     expect(outcome).toMatch(/^fully visible after \d+ swipes? — text "Variable symbol"/);
   });
+
   it('seen drawn over it, then carried with it by a stroke (both 300 px up): no stroke can clear it — the call fails at once, today\'s words, one question', async () => {
     const { outcome, asked, swipes } = await play((base) => [base, scrolled(base, -300)], ['under']);
     expect(outcome).toContain(
@@ -358,6 +360,29 @@ describe('scroll_until — what was seen of a margin text, kept across the reads
     expect(outcome).toBe('fully visible after 1 swipe');
     expect(asked).toHaveLength(1);
   });
+
+  it('seen drawn over it, then the whole screen moved with the two (a sheet dragged, its scroll view with it): asked again, no fail at once — the next stroke leaves the pinned text behind, fully visible', async () => {
+    const shiftedAll = (base: UiNode) => shifted(base, -300);
+    const { outcome, asked, swipes } = await play((base) => [base, shiftedAll(base), nudged(scrolled(shiftedAll(base), -300), VS_TITLE, 300)], ['under', 'under']);
+    expect(asked).toHaveLength(2);
+    expect(swipes).toBe(2);
+    expect(outcome).toBe('fully visible after 2 swipes');
+  });
+
+  it('the real eyes on ink in the band, then the form carried 300 px up: the call fails at once on the one screenshot', async () => {
+    const fake = await fakeOf('android-lab-form-keyboard-after-back.xml', { ime: false });
+    fake.nextScreenshot = pngOf([[60, 1406, 300, 1412, [30, 30, 30]]]);
+    const base = await fake.uiTree();
+    const reads = [base, scrolled(base, -300)];
+    let n = 0;
+    fake.uiTree = async () => structuredClone(reads[Math.min(n++, reads.length - 1)]!);
+    const failure = (await scrollUntilVisible(fake, PHONE, { ...FAST, fully: true, eyes: eyesOn(fake) }).catch((e: unknown) => e)) as Error;
+    expect(failure.message).toContain('failed after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there');
+    expect(failure.message).toContain('a screenshot shows it drawn over its bottom 6 px');
+    expect(fake.swipes).toHaveLength(1);
+    expect(fake.screenshots).toHaveLength(1);
+  });
+
   it('untold where it was asked, then carried with it: asked again (an answer of its frame), and the strokes go on — untold never fails at once', async () => {
     const { outcome, asked, swipes } = await play((base) => [base, scrolled(base, -300)], ['untold', 'untold']);
     expect(asked).toHaveLength(2);

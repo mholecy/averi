@@ -13,7 +13,7 @@ import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts } from './scroll-read.js';
-import { heldBack as heldBackBy, lastDrawn, movedTogether, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Offset, type Streaks, type UnseenStrokes } from './motion-ledger.js';
+import { heldBack as heldBackBy, lastDrawn, movedTogether, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Offset, type Pair, type Streaks, type UnseenStrokes } from './motion-ledger.js';
 import { carried, planProbe, planStroke, probeAcrossOnly, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeOf, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
 import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
@@ -87,9 +87,8 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * say "fully visible" with a flush neighbour — THE EYES, ui-tree/eyes.ts — whose band under `fully: true` is no stop);
  * stuck; the confirming read, or the
  * read after a probe, that did not read; covered (nothing above the band); the end turn (`EndTurn`), which takes an
- * exhaustion it applies to out of the bound; the bound (exhausted, a margin text seen drawn over it carried with it —
- * `movesWith` —, maxSwipes, deadline — and `ask unlocated` of a round
- * that read); the stroke. The witness comes before the deadline is consulted, so a witness that waits out its 2 s
+ * exhaustion it applies to out of the bound; the bound (exhausted, `movesWith` — a margin text seen drawn over it
+ * carried with it —, maxSwipes, deadline — and `ask unlocated` of a round that read); the stroke. The witness comes before the deadline is consulted, so a witness that waits out its 2 s
  * counts against the scroll's budget: the driver stamps `elapsedMs` afresh on every call, re-entry included.
  *
  * BOUND: at most 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes` non-ask steps
@@ -374,7 +373,7 @@ interface ProvenCut {
  * the direction last swiped, what stayed put — every match of a target
  * off the frame, or the whole tree of one not in it — and, when the last
  * stroke touched down on a node drawn over its container, that node:
- * `touchedOn`), `maxSwipes`, or the deadline. `ends`: the exhaustion was PROVEN by the tree — the scroll view the
+ * `touchedOn`), a margin text seen drawn over it carried with it (`movesWith`), `maxSwipes`, or the deadline. `ends`: the exhaustion was PROVEN by the tree — the scroll view the
  * last stroke went over lists its content ending that way (`EndProof`, its `way` the `lastStroke`) — after its
  * `unmoved` strokes (one, where UNMOVED_STROKES_EXHAUST's two are the proof otherwise). `unlisted`: why strokes for a
  * target never seen may have moved nothing, beside the content's end — the tree source lists only the top layer
@@ -384,8 +383,9 @@ interface ProvenCut {
  * (ui-tree/miss.ts#TOP_LAYER_ONLY_HINT); not carried when the call's miss says it already (ui-tree/miss.ts
  * #saysTopLayerOnly: idb's id notes), so the reply says it once; no device call.
  * `movesWith`: a `fully: true` match covered by a text in its touch margin that a screenshot saw drawn over it
- * (`State.marginKept`'s `under`), the two moved since by the same `offset` (motion-ledger.ts#movedTogether) — the text
- * scrolls with it, so no stroke brings it out from under the text (`coverMovesWith`); the shortfall the `covered` one.
+ * (`State.marginKept`'s `under`), the two moved since by the same `offset` in a scroll view that stayed where it was
+ * (motion-ledger.ts#movedTogether) — the text scrolls with it, so no stroke brings it out from under the text
+ * (`coverMovesWith`); the shortfall the `covered` one.
  * docs/bugs/2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md
  */
 export type BoundBy =
@@ -678,10 +678,11 @@ interface State {
    * What the eyes saw of the texts in the target's touch margin this call (ui-tree/eyes.ts#ClearPair, ADR 0026), one
    * entry per text asked: a later read tells its judgement what was seen instead of looking again — one screenshot per
    * text where it lies. Seen drawn over the target: kept while the two keep the relation they were seen in — where they
-   * were, or carried together by the same offset (motion-ledger.ts#movedTogether: a text in the target's own moving
-   * content paints over it wherever the two go, so a later screenshot would only cost the time again, and the carry
-   * ends the call, `coverMovesWith`); a relation changed (a text pinned over the content, which a stroke moves the
-   * target past) is asked again. Seen clear or untold — answers of the frame they were read on (a displaced or blended
+   * were, or carried together by the same offset in the target's scroll view, which stayed where it was
+   * (motion-ledger.ts#movedTogether: a text in the target's own moving content paints over it wherever the two go, so a
+   * later screenshot would only cost the time again, and the carry ends the call, `coverMovesWith`); a relation changed
+   * (a text pinned over the content, which a stroke moves the target past; the scroll view itself moved, a sheet dragged
+   * with what lies over it) is asked again. Seen clear or untold — answers of the frame they were read on (a displaced or blended
    * capture reads either): kept while the target and the text lie where they were seen, each within a pixel; moved,
    * they are asked again. A text asked again replaces its entry.
    */
@@ -795,10 +796,11 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
-/** What the eyes saw of one text in a target's touch margin (`State.marginKept`): the text by what a later read can find it by, where the two lay, and the answer. */
+/** What the eyes saw of one text in a target's touch margin (`State.marginKept`): the text by what a later read can find it by, where the two and the target's scroll view lay, and the answer. */
 interface KeptMarginAnswer {
   readonly peer: QuotedNode;
   readonly target: Rect;
+  readonly scrollView: Rect | undefined;
   readonly seen: PairSeen;
 }
 
@@ -809,30 +811,39 @@ function sameText(kept: KeptMarginAnswer, peer: UiNode): boolean {
 }
 
 /**
- * The kept answer about `peer` of a clear question of `target` (`State.marginKept`): the same text (`sameText`) and
- * both where they were seen — for `clear` and `untold`, answers of the frame they were read on — or, for `under`, also
- * carried together since (motion-ledger.ts#movedTogether): the cover stands while the two keep their relation.
+ * The offset a kept `under` was carried by since its screenshot (motion-ledger.ts#movedTogether, from where the eyes
+ * saw the pair to `now`) — the one reading of "the cover moves with it", for the kept answer (`keptAnswerOf`) and the
+ * bound (`coverMovesWith`) alike; undefined for `clear` and `untold`, answers of their frame only.
  */
-function keptAnswerOf(kept: readonly KeptMarginAnswer[], target: UiNode, peer: UiNode): PairSeen | undefined {
+function carriedSince(found: KeptMarginAnswer, now: Pair): Offset | undefined {
+  return found.seen.seen === 'under' ? movedTogether({ target: found.target, peer: found.peer.rect, scrollView: found.scrollView }, now) : undefined;
+}
+
+/**
+ * The kept answer about `peer` of a clear question of the target, the two and the target's scroll view as `now` finds
+ * them (`State.marginKept`): the same text (`sameText`) and both where they were seen — for `clear` and `untold`,
+ * answers of the frame they were read on — or, for `under`, also carried together since (`carriedSince`): the cover
+ * stands while the two keep their relation.
+ */
+function keptAnswerOf(kept: readonly KeptMarginAnswer[], now: Pair, peer: UiNode): PairSeen | undefined {
   const found = kept.find((k) => sameText(k, peer));
   if (found === undefined) return undefined;
-  const where = sameRectWithinPixel(found.peer.rect, peer.rect) && sameRectWithinPixel(found.target, target.rect);
-  const carried = found.seen.seen === 'under' && movedTogether({ target: found.target, peer: found.peer.rect }, { target: target.rect, peer: peer.rect }) !== undefined;
-  return where || carried ? found.seen : undefined;
+  const where = sameRectWithinPixel(found.peer.rect, now.peer) && sameRectWithinPixel(found.target, now.target);
+  return where || carriedSince(found, now) !== undefined ? found.seen : undefined;
 }
 
 /**
  * The cover of `best` carried with it (BoundBy's `movesWith`): `best` covered (its standing's named cover) by a text a
- * screenshot saw drawn over it (`State.marginKept`'s `under`), and the two moved by the same offset since that
- * screenshot (motion-ledger.ts#movedTogether) — the offset; undefined otherwise. Moved, not merely still there: a pair
- * unmoved since may lie at the end of the content, which the strokes' own failures name. One read is enough — one dump
- * is one frame, the pair's relation in it a fact mid-fling or not — so no confirming read and no screenshot.
+ * screenshot saw drawn over it, and the two moved by the same offset since that screenshot in a scroll view that stayed
+ * where it was (`carriedSince`) — the offset; undefined otherwise. Moved, not merely still there: a pair unmoved since
+ * may lie at the end of the content, which the strokes' own failures name. One read is enough — one dump is one frame,
+ * the pair's relation in it a fact mid-fling or not — so no confirming read and no screenshot.
  */
-function coverMovesWith(kept: readonly KeptMarginAnswer[], best: Judged): Offset | undefined {
+function coverMovesWith(kept: readonly KeptMarginAnswer[], best: Judged, scrollView: Rect | undefined): Offset | undefined {
   if (best.standing.kind !== 'covered') return undefined;
   const text = best.standing.cover.node;
-  const seen = kept.find((k) => sameText(k, text));
-  return seen?.seen.seen === 'under' ? movedTogether({ target: seen.target, peer: seen.peer.rect }, { target: best.node.rect, peer: text.rect }) : undefined;
+  const found = kept.find((k) => sameText(k, text));
+  return found === undefined ? undefined : carriedSince(found, { target: best.node.rect, peer: text.rect, scrollView });
 }
 
 /**
@@ -846,17 +857,18 @@ function orderKnown(
   marginKept: readonly KeptMarginAnswer[],
   question: PairQuestion,
   answered: readonly OrderSeen[] | undefined,
+  scrollView: Rect | undefined,
 ): { readonly ask: PairQuestion } | { readonly told: readonly OrderSeen[]; readonly marginKept: readonly KeptMarginAnswer[] } {
   if (question.asks === 'order') return answered === undefined ? { ask: question } : { told: answered, marginKept };
   const { node } = question;
   const kept = question.pairs.flatMap(({ peer }): OrderSeen[] => {
-    const seen = keptAnswerOf(marginKept, node, peer);
+    const seen = keptAnswerOf(marginKept, { target: node.rect, peer: peer.rect, scrollView }, peer);
     return seen === undefined ? [] : [{ peer, ...seen }];
   });
   const unasked = question.pairs.filter(({ peer }) => !kept.some((k) => k.peer === peer));
   if (answered === undefined && unasked.length > 0 && !kept.some((k) => k.seen !== 'clear')) return { ask: { ...question, pairs: unasked } };
   const now = answered ?? [];
-  const seenNow = now.map(({ peer, ...seen }): KeptMarginAnswer => ({ peer: quoted(peer), target: { ...node.rect }, seen }));
+  const seenNow = now.map(({ peer, ...seen }): KeptMarginAnswer => ({ peer: quoted(peer), target: { ...node.rect }, scrollView, seen }));
   // A text asked again replaces what was seen of it before (one entry per text, the latest answer).
   const before = marginKept.filter((k) => !now.some(({ peer }) => sameText(k, peer)));
   return { told: [...kept, ...now], marginKept: [...before, ...seenNow] };
@@ -1031,7 +1043,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // cover, so the rest are not asked. The read is judged again, told what was seen (`RoundSeen.order`).
   const ordering = judged?.best === undefined || read === undefined ? undefined : pairQuestion(read.tree, judged.best.node, judged.best.standing);
   if (ordering !== undefined && read !== undefined) {
-    const known = orderKnown(s.marginKept, ordering, seen.order);
+    const known = orderKnown(s.marginKept, ordering, seen.order, judged?.facts.scene.clips.scrollersOf(ordering.node)[0]);
     if ('ask' in known) return { state, step: { do: 'ask', what: 'order', question: known.ask } };
     s.marginKept = known.marginKept;
     if (known.told.length > 0) judged = judgeRead({ ...read, seen: seenOrderOf(ordering.node, known.told) }, s.frame, fully, seen.corroborated);
@@ -1261,7 +1273,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   }
   // A text a screenshot saw drawn over a `fully: true` match, carried with it since (`coverMovesWith`): no stroke brings
   // it out from under the text — the bound, now. Exclusive with `exhausted`, which needs every match unmoved.
-  const movesWith = fully && exhausted === undefined && best !== undefined ? coverMovesWith(s.marginKept, best) : undefined;
+  const movesWith = fully && exhausted === undefined && best !== undefined ? coverMovesWith(s.marginKept, best, now?.facts.scene.clips.scrollersOf(best.node)[0]) : undefined;
   // The stroke this round would draw, asked of the plan once (interact/stroke-plan.ts#planStroke): toward the course's
   // direction, at its reach (course.ts#nextStroke), over this round's gesture box, with this read's facts — its scroll view,
   // box and cover, the points the driver sends, and the presented surface those points touch down on. A bound quotes

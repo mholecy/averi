@@ -40,8 +40,9 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  * - the TREE unmoved: the same fingerprint, nothing loading, and no blank read (`UnseenStrokes`);
  * - SLOWING: the same node (ui-tree/read-tree.ts#nodeIdentity) moved less over this settle than over the one before;
  * - the CARRY SAMPLE: the same node at the same size (within a pixel each way) after a course stroke;
- * - the PAIR carried together: the target moved more than a pixel, its peer by the same offset within a pixel, both
- *   at the same size — measured from where the eyes saw the two, not from the last read (`movedTogether`);
+ * - the PAIR carried together: the target's scroll view where it was, the target moved more than a pixel, its peer by
+ *   the same offset within a pixel, both at the same size — measured from where the eyes saw the two, not from the last
+ *   read (`movedTogether`);
  * - the REGION: motion-shown.ts's own rules (a node listed once, its delta within a 20th).
  *
  * Pure: no adapter, no clock, no I/O.
@@ -256,10 +257,11 @@ export const unseenStrokes = (ledger: MotionLedger): UnseenStrokes | undefined =
 /** Some read after a stroke found the whole tree changed from the read before: the content moved at least once (scroll-rounds.ts#Shortfall `absent`'s `unsearched`: not a screen no stroke ever changed). */
 export const treeMoved = (ledger: MotionLedger): boolean => open(ledger).treeMoved;
 
-/** A target and a node that lies over it, where one read found them (`movedTogether`). */
+/** A target and a node that lies over it, where one read found them, and the target's nearest scroll view there (its clipping ancestor: ui-tree/geometry.ts#Clips.scrollersOf; undefined when it has none) — `movedTogether`. */
 export interface Pair {
   readonly target: Rect;
   readonly peer: Rect;
+  readonly scrollView: Rect | undefined;
 }
 
 /** How far a node moved, in the source's frame units: across (`dx`) and down (`dy`). */
@@ -269,12 +271,17 @@ export interface Offset {
 }
 
 /**
- * The offset the pair moved by from `seen` to `now`, when it moved as one: the target more than a pixel on some axis,
- * the peer by the same offset within a pixel each way, neither grown nor shrunk (`sameSize`) — undefined otherwise. A
- * pair carried so lies in one moving content: no stroke separates them (scroll-rounds.ts#BoundBy's `movesWith`). A
- * target cut at its container's edge, or by the soft keyboard's line, changed size: not carried, though it moved.
+ * The offset the pair moved by from `seen` to `now`, when it moved as one in the target's scroll view: that scroll view
+ * where it was (within a pixel), the target moved more than a pixel on some axis, the peer by the same offset within a
+ * pixel each way, neither grown nor shrunk (`sameSize`) — undefined otherwise. A pair carried so lies in that scroll
+ * view's moving content: no stroke separates them (scroll-rounds.ts#BoundBy's `movesWith`). A scroll view that moved
+ * itself (a sheet dragged to another detent, an outer scroller carrying an inner one) carried what lies over it too, a
+ * pinned text among them, which the next stroke of the list may leave behind; a target in no scroll view the tree
+ * marks has no content to be carried in: neither is carried. A target cut at its container's edge, or by the soft
+ * keyboard's line, changed size: not carried, though it moved.
  */
 export function movedTogether(seen: Pair, now: Pair): Offset | undefined {
+  if (seen.scrollView === undefined || now.scrollView === undefined || !sameRectWithinPixel(seen.scrollView, now.scrollView)) return undefined;
   const dx = now.target.x - seen.target.x;
   const dy = now.target.y - seen.target.y;
   if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1) return undefined;

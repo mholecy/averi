@@ -87,9 +87,10 @@ their relation, and rule 8, the cover carried with it ends the call — residual
    unordered stop, a refused clear question is followed by strokes, and the text moves with the target. What was seen
    is kept by the text's identifier, label and size within a pixel (one entry per text, the latest answer) and told to
    every later read: `under` while the two keep their relation — unmoved, or carried together by the same offset
-   (`interact/motion-ledger.ts#movedTogether`: the target moved more than a pixel, the text by the same offset within a
-   pixel, both at the same size); a changed relation (a text pinned over the content, which a stroke moves the target
-   past) is asked again (amended 2026-10-24: kept "for the call" before, on the unchecked belief that every margin text
+   (`interact/motion-ledger.ts#movedTogether`: the target's nearest scroll view where it was, the target moved more
+   than a pixel, the text by the same offset within a pixel, both at the same size); a changed relation (a text pinned
+   over the content, which a stroke moves the target past; the scroll view itself moved, a sheet dragged or an outer
+   scroller carrying it, which carries a pinned text with it) is asked again (amended 2026-10-24: kept "for the call" before, on the unchecked belief that every margin text
    is content of the target's scroll view — a pinned one seen over one band would have refused every later band
    unasked); `clear` and `untold`, answers of the frame they were read on (a displaced capture may read `clear`, a
    blended one `untold`), while the target and the text lie where they were seen — moved, asked again. So one
@@ -104,7 +105,8 @@ their relation, and rule 8, the cover carried with it ends the call — residual
 
 8. **The cover carried with it ends the call** (2026-10-24, `interact/scroll-rounds.ts#coverMovesWith`, `BoundBy`'s
    `movesWith`): on a `fully: true` read whose judged match is `covered` by a margin text whose kept answer is `under`,
-   and the two moved since that screenshot by the same offset (rule 6's `movedTogether`), no stroke can bring the
+   and the two moved since that screenshot by the same offset in a scroll view that stayed where it was (rule 6's
+   `movedTogether`; a field in no scroll view the tree marks never fires), no stroke can bring the
    field out from under a node that moves with it — the bound, on that read: no confirming read, no further stroke, no
    screenshot (one dump is one frame; the pair's relation in it is a fact, mid-fling or not). Unmoved (the content at
    its end) keeps the strokes' own failures; `untold` never ends it (the next frame may read `clear`); sizes changed (a
@@ -140,8 +142,11 @@ with the target's own rows beside it.
   tests/interact/motion-ledger.test.ts, "a pair carried together"): seen `under`, then carried 300 px up by a stroke —
   fails after 1 swipe, one screenshot; the text pinned 3 px off the carry — asked again, `clear`, fully visible after 1
   swipe; pinned where it was — fully visible, nothing asked again; inked and unmoved — the strokes' "content is
-  exhausted" as before; `untold` then carried — asked again, the strokes go on. Every guard mutation-checked (the
-  more-than-a-pixel move, the peer's offset, the sizes, `untold`, the relation kept, the bound). Golden (1584 checks)
+  exhausted" as before; `untold` then carried — asked again, the strokes go on; the whole screen moved with the two
+  (its scroll view too) — asked again, the next stroke leaves the pinned text behind, fully visible after 2 swipes;
+  the real eyes on the inked capture, then carried — fails after 1 swipe, one screenshot. Every guard mutation-checked
+  (the scroll view kept, the more-than-a-pixel move, the peer's offset, the sizes, `untold` — one guard,
+  `scroll-rounds.ts#carriedSince`, for the kept answer and the bound —, the relation kept, the bound). Golden (1584 checks)
   0 changed: no capture is answered `under`. Live k7 and k7f at the branch, the clear path, as before (the 2026-10-24
   section of the live summary).
 
@@ -163,8 +168,14 @@ with the target's own rows beside it.
      swipes, was refused: the dumps' scroll views are not reliable enough to bet a failure on (idb lists none;
      Compose's scroll marking, nested scrollers, a text in an outer scroller over an inner one), and it would be a
      second "moves with" model beside the motion ledger.
-   - **A field cut at an edge or by the IME line** (its size changed) does not fire, and is asked again (one more
-     screenshot); a later read with both whole fires.
+   - **A field cut at an edge or by the IME line** (its size changed) does not fire, and is asked again: one more
+     screenshot on every read while the cut changes, and on the first whole read after it too (its size differs from
+     the cut sighting); the whole read after that fires. A text the swipes move against the field a few pixels a read,
+     still over it, is asked on every read too — the cost `clear` and `untold` already pay, at most one screenshot a read.
+   - **Measured from the sighting, not over the last stroke**: a read that poses no clear question (the pair not a
+     margin pair there) leaves the sighting in place, so a pair back in the sighted relation and offset after such
+     reads fires on the carry since the sighting, whatever moved in between — contrived (a pinned text would have to
+     move by the content's offset), and accepted.
    - **Unit only:** the lab's titles draw nothing in the margin, so no lab cell answers `under` live; a cell whose next
      title draws a background over the field's touch margin would measure it.
 6. Measured on one AVD (averi_lab, API 33, Material 3 lab forms). Another app's margin texts are found by the same rule;
