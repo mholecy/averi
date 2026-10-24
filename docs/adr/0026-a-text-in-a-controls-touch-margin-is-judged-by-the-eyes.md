@@ -83,11 +83,11 @@ their relation, and rule 8, the cover carried with it ends the call — residual
    captures anyway: zero extra captures; a `clear` answer, like `over`, is never kept across poll rounds — each round's
    unlock rests on its own frame). The tap never asks (rule 3: no tap standing is covered by a margin text). A caller
    with no eyes (`ui_snapshot`, the dismissal picker, tree-only tests) behaves as before.
-6. **Once per text where it lies** in `scroll_until` (`interact/margin-memo.ts`, held as `scroll-rounds.ts#State.marginKept`): unlike ADR 0024's
+6. **Once per text where it lies** in `scroll_until` (`interact/margin-memo.ts#known`, held as `scroll-rounds.ts#State.marginKept`): unlike ADR 0024's
    unordered stop, a refused clear question is followed by strokes, and the text moves with the target. What was seen
    is kept by the text's identifier, label and size within a pixel (one entry per text, the latest answer) and told to
    every later read: `under` while the two keep their relation — unmoved, or carried together by the same offset
-   (`interact/motion-ledger.ts#movedTogether`: the target's nearest scroll view where it was, the target moved more
+   (`interact/margin-memo.ts#movedTogether`: the target's nearest scroll view where it was, the target moved more
    than a pixel, the text by the same offset within a pixel, both at the same size); a changed relation (a text pinned
    over the content, which a stroke moves the target past; the scroll view itself moved, a sheet dragged or an outer
    scroller carrying it, which carries a pinned text with it) is asked again (amended 2026-10-24: kept "for the call" before, on the unchecked belief that every margin text
@@ -103,7 +103,7 @@ their relation, and rule 8, the cover carried with it ends the call — residual
    screenshot could not tell whether it draws over it (<why>)`. The ocr assert reads the field after a `clear` of its
    own frame; the colour assert is unchanged (its inset clears the band).
 
-8. **The cover carried with it ends the call** (2026-10-24, `interact/scroll-rounds.ts#coverMovesWith`, `BoundBy`'s
+8. **The cover carried with it ends the call** (2026-10-24, `interact/margin-memo.ts#carriedCover`, `scroll-rounds.ts#BoundBy`'s
    `movesWith`): on a `fully: true` read whose judged match is `covered` by a margin text whose kept answer is `under`,
    and the two moved since that screenshot by the same offset in a scroll view that stayed where it was (rule 6's
    `movedTogether`; a field in no scroll view the tree marks never fires), no stroke can bring the
@@ -139,7 +139,7 @@ with the target's own rows beside it.
   IME in these cells.
 - Live: see docs/truth/live-android-2026-10-18-visibility.md, the 2026-10-23 section (case k7f).
 - Rules 6 (amended) and 8, unit only (tests/interact/scroll-eyes.test.ts, "what was seen of a margin text, kept";
-  tests/interact/motion-ledger.test.ts, "a pair carried together"): seen `under`, then carried 300 px up by a stroke —
+  tests/interact/margin-memo.test.ts, the memo's two rules on rects since round 16): seen `under`, then carried 300 px up by a stroke —
   fails after 1 swipe, one screenshot; the text pinned 3 px off the carry — asked again, `clear`, fully visible after 1
   swipe; pinned where it was — fully visible, nothing asked again; inked and unmoved — the strokes' "content is
   exhausted" as before; `untold` then carried — asked again, the strokes go on; the whole screen moved with the two
@@ -167,7 +167,7 @@ with the target's own rows beside it.
    - **One stroke is spent** to see the carry. A tree rule "the text and the field share a scroll view", failing at 0
      swipes, was refused: the dumps' scroll views are not reliable enough to bet a failure on (idb lists none;
      Compose's scroll marking, nested scrollers, a text in an outer scroller over an inner one), and it would be a
-     second "moves with" model beside the motion ledger.
+     second "moves with" model beside the measured carry (`interact/margin-memo.ts#movedTogether`).
    - **A field cut at an edge or by the IME line** (its size changed) does not fire, and is asked again: one more
      screenshot on every read while the cut changes, and on the first whole read after it too (its size differs from
      the cut sighting); the whole read after that fires. A text the swipes move against the field a few pixels a read,

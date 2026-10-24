@@ -25,8 +25,6 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  * - `regionOf(ledger)` / `overRegion(ledger, toward)` — the region as the target's one scroll view, for the stroke plan,
  *   and whether a stroke toward `toward` goes over it (motion-shown.ts#goesOver).
  * - `lastDrawn`, `unseenStrokes`, `treeMoved` — what the probe, the fast fail and the bound read of the run so far.
- * - `movedTogether(seen, now)` — whether a pair moved as one since it was seen (`PairAt`): stateless, the sighting the
- *   caller's (margin-memo.ts).
  *
  * EACH QUESTION KEEPS ITS OWN "same". Every question here is within a pixel (a unit of the source's frames); the
  * exact-rect side of docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md d2 — the scroll view a proof or a carry
@@ -40,10 +38,9 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  * - the TREE unmoved: the same fingerprint, nothing loading, and no blank read (`UnseenStrokes`);
  * - SLOWING: the same node (ui-tree/read-tree.ts#nodeIdentity) moved less over this settle than over the one before;
  * - the CARRY SAMPLE: the same node at the same size (within a pixel each way) after a course stroke;
- * - the PAIR carried together: the target's scroll view where it was, the target moved more than a pixel, its peer by
- *   the same offset within a pixel, both at the same size — measured from where the eyes saw the two, not from the last
- *   read (`movedTogether`);
  * - the REGION: motion-shown.ts's own rules (a node listed once, its delta within a 20th).
+ * Not here: whether a margin text and the target were carried together since the eyes saw them — measured from that
+ * sighting, which the margin memo keeps, not from the last read (interact/margin-memo.ts#movedTogether).
  *
  * Pure: no adapter, no clock, no I/O.
  */
@@ -256,38 +253,6 @@ export const unseenStrokes = (ledger: MotionLedger): UnseenStrokes | undefined =
 
 /** Some read after a stroke found the whole tree changed from the read before: the content moved at least once (scroll-rounds.ts#Shortfall `absent`'s `unsearched`: not a screen no stroke ever changed). */
 export const treeMoved = (ledger: MotionLedger): boolean => open(ledger).treeMoved;
-
-/** A target and a node that lies over it, where one read found them, and the target's nearest scroll view there (its clipping ancestor: ui-tree/geometry.ts#Clips.scrollersOf; undefined when it has none) — `movedTogether`. */
-export interface PairAt {
-  readonly target: Rect;
-  readonly peer: Rect;
-  readonly scrollView: Rect | undefined;
-}
-
-/** How far a node moved, in the source's frame units: across (`dx`) and down (`dy`). */
-export interface Offset {
-  readonly dx: number;
-  readonly dy: number;
-}
-
-/**
- * The offset the pair moved by from `seen` to `now`, when it moved as one in the target's scroll view: that scroll view
- * where it was (within a pixel), the target moved more than a pixel on some axis, the peer by the same offset within a
- * pixel each way, neither grown nor shrunk (`sameSize`) — undefined otherwise. A pair carried so lies in that scroll
- * view's moving content: no stroke separates them (scroll-rounds.ts#BoundBy's `movesWith`). A scroll view that moved
- * itself (a sheet dragged to another detent, an outer scroller carrying an inner one) carried what lies over it too, a
- * pinned text among them, which the next stroke of the list may leave behind; a target in no scroll view the tree
- * marks has no content to be carried in: neither is carried. A target cut at its container's edge, or by the soft
- * keyboard's line, changed size: not carried, though it moved.
- */
-export function movedTogether(seen: PairAt, now: PairAt): Offset | undefined {
-  if (seen.scrollView === undefined || now.scrollView === undefined || !sameRectWithinPixel(seen.scrollView, now.scrollView)) return undefined;
-  const dx = now.target.x - seen.target.x;
-  const dy = now.target.y - seen.target.y;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1) return undefined;
-  const peerAlong = Math.abs(now.peer.x - seen.peer.x - dx) <= 1 && Math.abs(now.peer.y - seen.peer.y - dy) <= 1;
-  return peerAlong && sameSize(seen.target, now.target) && sameSize(seen.peer, now.peer) ? { dx, dy } : undefined;
-}
 
 /**
  * `unseen` with one more blank read over `within`, toward `toward` — counted on only over the same scroll view, the same

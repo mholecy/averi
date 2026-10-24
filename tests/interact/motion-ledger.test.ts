@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { heldBack, lastDrawn, movedTogether, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved } from '../../src/interact/motion-ledger.js';
+import { heldBack, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved } from '../../src/interact/motion-ledger.js';
 import type { Since } from '../../src/interact/scroll-read.js';
 import type { Direction } from '../../src/interact/swipe.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
@@ -248,49 +248,5 @@ describe('the region the motion showed, and the last stroke drawn', () => {
     const told = node({ role: 'container', rect: PHONE, children: [list] });
     const dropped = seeMotion(ledger, { drawn: undefined, read: { ...idbRead(told), facts: { tree: told, scene: sceneOf(told), fingerprint: '', loading: false } } }).ledger;
     expect(regionOf(dropped)).toBeUndefined();
-  });
-});
-
-/**
- * The PAIR carried together (`movedTogether`): a target and a peer measured where the eyes saw them and now — the
- * target's offset when its scroll view stayed where it was and it moved more than a pixel, the peer by the same offset
- * within a pixel, both sizes within one.
- */
-describe('the motion ledger — a pair carried together', () => {
-  const list = { x: 0, y: 200, width: 1080, height: 1800 };
-  const seen = { target: { x: 55, y: 1280, width: 970, height: 132 }, peer: { x: 55, y: 1406, width: 258, height: 56 }, scrollView: list };
-  const by = (r: Rect, dx: number, dy: number, dh = 0): Rect => ({ ...r, x: r.x + dx, y: r.y + dy, height: r.height + dh });
-  const pairBy = (dx: number, dy: number, peerDy = dy) => ({ target: by(seen.target, dx, dy), peer: by(seen.peer, dx, peerDy), scrollView: list });
-
-  it('both by the same offset: that offset', () => {
-    expect(movedTogether(seen, pairBy(0, -300))).toEqual({ dx: 0, dy: -300 });
-  });
-
-  it('the peer off by a pixel: the same; by two: not carried together', () => {
-    expect(movedTogether(seen, pairBy(0, -300, -299))).toEqual({ dx: 0, dy: -300 });
-    expect(movedTogether(seen, pairBy(0, -300, -298))).toBeUndefined();
-  });
-
-  it('moved a pixel or less: not moved, so not carried', () => {
-    expect(movedTogether(seen, pairBy(0, -1))).toBeUndefined();
-    expect(movedTogether(seen, seen)).toBeUndefined();
-  });
-
-  it('the target cut (its height 10 less): not carried — it did not just move', () => {
-    expect(movedTogether(seen, { ...pairBy(0, -300), target: by(seen.target, 0, -300, -10) })).toBeUndefined();
-  });
-
-  it('carried across only: that offset', () => {
-    expect(movedTogether(seen, pairBy(-200, 0))).toEqual({ dx: -200, dy: 0 });
-  });
-
-  it('the scroll view moved with the two (a sheet dragged, an outer scroller carrying it): not carried — the next stroke may leave a pinned text behind', () => {
-    expect(movedTogether(seen, { ...pairBy(0, -300), scrollView: by(list, 0, -300) })).toBeUndefined();
-    expect(movedTogether(seen, { ...pairBy(0, -300), scrollView: by(list, 0, -1) })).toEqual({ dx: 0, dy: -300 });
-  });
-
-  it('in no scroll view the tree marks, then or now: not carried', () => {
-    expect(movedTogether({ ...seen, scrollView: undefined }, { ...pairBy(0, -300), scrollView: undefined })).toBeUndefined();
-    expect(movedTogether(seen, { ...pairBy(0, -300), scrollView: undefined })).toBeUndefined();
   });
 });
