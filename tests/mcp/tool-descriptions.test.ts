@@ -6,6 +6,7 @@ import { AdapterRegistry } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { snapshotNote } from '../../src/mcp/tool-text.js';
 import { wholeThinWayPast } from '../../src/interact/target-text.js';
+import { boundText } from '../../src/interact/scroll-text.js';
 import { node } from '../helpers/fake.js';
 
 /**
@@ -187,6 +188,14 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(
       'The budget is checked once a round, after its tree read and keyboard queries, so the time taken can pass `timeoutMs` by one swipe, the settle after it and one more round — its tree read and, on Android, its keyboard queries — and includes them.',
     );
+  });
+
+  it('troubleshooting quotes the failure of a fully: true call whose margin text, seen drawn over it, moved with it, as the code words it', () => {
+    const troubleshooting = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+    const words = boundText({ of: 'movesWith', offset: { dx: 0, dy: -300 } }, 1);
+    expect(words).toBe('after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out from under it)');
+    expect(troubleshooting).toContain(`failed ${words.replace('1 swipe', 'N swipes').replace('0,-300', 'dx,dy')} — …`);
+    expect(troubleshooting).not.toContain('runs to its timeout (a known limit)');
   });
 
   it('swipe: how far a direction stroke reaches from the centre (interact/swipe.ts SWIPE_REACH_FRACTION)', () => {

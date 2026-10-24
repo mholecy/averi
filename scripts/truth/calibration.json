@@ -1634,7 +1634,7 @@
     },
     {
       "note": "2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md",
-      "why": "found fixing the phone-after-back note (ADR 0026 residual 5): `scroll_until … fully: true` under a margin text the eyes saw drawn over the field strokes to its timeout, the text moving with it — wall time, not what a target shows; no lab cell draws in the margin (unit only: tests/interact/scroll-eyes.test.ts); open"
+      "why": "found fixing the phone-after-back note (ADR 0026 residual 5): `scroll_until … fully: true` under a margin text the eyes saw drawn over the field strokes to its timeout, the text moving with it — wall time, not what a target shows; fixed at 074b48c3 and 11a5f92a (ADR 0026 rule 8: the cover carried with it ends the call), measured by the unit tests only (tests/interact/scroll-eyes.test.ts, tests/interact/motion-ledger.test.ts): a replay carries no eyes' answer, and no lab cell draws in the margin, so no golden row asks it — golden 0 changed"
     }
   ]
 }

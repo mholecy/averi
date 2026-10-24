@@ -819,6 +819,9 @@ export function boundText(by: BoundBy, swipes: number): string {
       const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
       return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${verb}: ${why})`;
     }
+    case 'movesWith':
+      // The text drawn over it moves with it (scroll-rounds.ts#BoundBy's `movesWith`): an app layout fact, no remedy.
+      return `after ${swipesText(swipes)} (the text drawn over it moved with it, both by ${by.offset.dx},${by.offset.dy} since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out from under it)`;
     case 'maxSwipes':
       return `after ${swipesText(swipes)} (maxSwipes)`;
     case 'timeout':

@@ -711,3 +711,16 @@ Known but ok this run: uiautomator scroll:scroll-bounded-flush.P.fully, uiautoma
     tap → ERROR id:"lab.fab.L" is under container id:lab.fab.host (0,1758 1080x352) at its centre (204,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
 - LOUD (tap-refused) tap:fab.K fab: tap K (whole): fires it alone — refused a target a tap reaches, nothing fired: ERROR id:"lab.fab.K" is under container id:lab.fab.host (0,1758 1080x352) at its centre (876,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped [known: residual:accepted (round 13: the FAB host layer is a cover)]
     tap → ERROR id:"lab.fab.K" is under container id:lab.fab.host (0,1758 1080x352) at its centre (876,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped
+
+# Round 1023b, row 19: the margin text carried with the field (2026-10-24)
+
+bugs/r1023b-row19 at `074b48c3` (interact/motion-ledger.ts#movedTogether, interact/scroll-rounds.ts#coverMovesWith;
+docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md, rules 6 and 8), run from that checkout on
+averi_lab (emulator-5554, booted `-no-window -no-snapshot-save`, shut down after), the lab app as installed (no app
+change). Run before the review fix `11a5f92a` (the scroll view kept in the pair), which leaves the clear path as it is. Record docs/truth/live-records/android-forms-r1023b-row19-1.json (`--cases k7,k7f`: 2 cases, 2 ok, exit 0). A
+regression check of the clear path only: no lab cell answers `under`, so the fast fail is measured by the unit tests.
+
+- `k7f`: "Element id:"lab.form-keyboard.phone" fully visible after 0 swipes — text "Variable symbol" (55,1406 258x56),
+  drawn after it, overlaps its bottom 6 px with nothing a screenshot shows (…)", word for word as at round 1023.
+- `k7`: one stroke, phone 1129–1228, "visible after 1 swipe — PARTLY UNDER a surface the tree does not list: its bottom
+  28 px show #F2F2F7 …", as before.

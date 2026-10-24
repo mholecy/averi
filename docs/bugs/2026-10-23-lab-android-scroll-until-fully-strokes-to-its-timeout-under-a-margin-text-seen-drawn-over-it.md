@@ -1,5 +1,14 @@
 # BUG: on Android `scroll_until … fully: true` on a field whose touch-margin text a screenshot saw drawn over it strokes until its timeout — the text moves with the field, so no stroke can clear it
 
+> **Status (2026-10-24):** fixed at `074b48c3`, review fix `11a5f92a` (a carry only in a scroll view that stayed put) (bugs/r1023b-row19, ADR 0026 amended: rule 6, rule 8), measured by the unit
+> tests (tests/interact/scroll-eyes.test.ts, "what was seen of a margin text, kept"; tests/interact/motion-ledger.test.ts,
+> "a pair carried together"; tests/interact/margin-memo.test.ts): seen `under`, then carried with the field by a stroke, the call fails after 1 swipe —
+> "failed after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there: it
+> scrolls with the element, so no swipe brings the element out from under it) — element reached the viewport but stayed
+> under text …"; a text pinned off the carry is asked again. Golden 0 changed; live k7 and k7f as before (the clear
+> path, docs/truth/live-records/android-forms-r1023b-row19-1.json); no lab cell answers `under`, so the fast fail itself
+> is unit only (ADR 0026 residual 5's rest).
+>
 > **Status (2026-10-23):** open, Priority 2 (a slow honest failure: the reply is right, the wall time is not). Found
 > while fixing docs/bugs/2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md
 > (bugs/r1023-phone); recorded as docs/adr/0026-a-text-in-a-controls-touch-margin-is-judged-by-the-eyes.md, residual 5.
