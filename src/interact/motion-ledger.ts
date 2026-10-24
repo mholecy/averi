@@ -25,8 +25,8 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  * - `regionOf(ledger)` / `overRegion(ledger, toward)` — the region as the target's one scroll view, for the stroke plan,
  *   and whether a stroke toward `toward` goes over it (motion-shown.ts#goesOver).
  * - `lastDrawn`, `unseenStrokes`, `treeMoved` — what the probe, the fast fail and the bound read of the run so far.
- * - `movedTogether(seen, now)` — whether a pair moved as one since it was seen (`Pair`): stateless, the sighting the
- *   caller's (scroll-rounds.ts#State.marginKept).
+ * - `movedTogether(seen, now)` — whether a pair moved as one since it was seen (`PairAt`): stateless, the sighting the
+ *   caller's (margin-memo.ts).
  *
  * EACH QUESTION KEEPS ITS OWN "same". Every question here is within a pixel (a unit of the source's frames); the
  * exact-rect side of docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md d2 — the scroll view a proof or a carry
@@ -258,7 +258,7 @@ export const unseenStrokes = (ledger: MotionLedger): UnseenStrokes | undefined =
 export const treeMoved = (ledger: MotionLedger): boolean => open(ledger).treeMoved;
 
 /** A target and a node that lies over it, where one read found them, and the target's nearest scroll view there (its clipping ancestor: ui-tree/geometry.ts#Clips.scrollersOf; undefined when it has none) — `movedTogether`. */
-export interface Pair {
+export interface PairAt {
   readonly target: Rect;
   readonly peer: Rect;
   readonly scrollView: Rect | undefined;
@@ -280,7 +280,7 @@ export interface Offset {
  * marks has no content to be carried in: neither is carried. A target cut at its container's edge, or by the soft
  * keyboard's line, changed size: not carried, though it moved.
  */
-export function movedTogether(seen: Pair, now: Pair): Offset | undefined {
+export function movedTogether(seen: PairAt, now: PairAt): Offset | undefined {
   if (seen.scrollView === undefined || now.scrollView === undefined || !sameRectWithinPixel(seen.scrollView, now.scrollView)) return undefined;
   const dx = now.target.x - seen.target.x;
   const dy = now.target.y - seen.target.y;

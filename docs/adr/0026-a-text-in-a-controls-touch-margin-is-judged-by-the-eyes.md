@@ -83,7 +83,7 @@ their relation, and rule 8, the cover carried with it ends the call — residual
    captures anyway: zero extra captures; a `clear` answer, like `over`, is never kept across poll rounds — each round's
    unlock rests on its own frame). The tap never asks (rule 3: no tap standing is covered by a margin text). A caller
    with no eyes (`ui_snapshot`, the dismissal picker, tree-only tests) behaves as before.
-6. **Once per text where it lies** in `scroll_until` (`scroll-rounds.ts#State.marginKept`): unlike ADR 0024's
+6. **Once per text where it lies** in `scroll_until` (`interact/margin-memo.ts`, held as `scroll-rounds.ts#State.marginKept`): unlike ADR 0024's
    unordered stop, a refused clear question is followed by strokes, and the text moves with the target. What was seen
    is kept by the text's identifier, label and size within a pixel (one entry per text, the latest answer) and told to
    every later read: `under` while the two keep their relation — unmoved, or carried together by the same offset
@@ -146,8 +146,8 @@ with the target's own rows beside it.
   (its scroll view too) — asked again, the next stroke leaves the pinned text behind, fully visible after 2 swipes;
   the real eyes on the inked capture, then carried — fails after 1 swipe, one screenshot. Every guard mutation-checked
   (the scroll view kept, the more-than-a-pixel move, the peer's offset, the sizes, `untold` — one guard,
-  `scroll-rounds.ts#carriedSince`, for the kept answer and the bound —, the relation kept, the bound). Golden (1584 checks)
-  0 changed: no capture is answered `under`. Live k7 and k7f at the branch, the clear path, as before (the 2026-10-24
+  `interact/margin-memo.ts#carriedSince`, for the kept answer and the bound —, the relation kept, the bound). Golden (1584 checks)
+  0 changed: no capture is answered `under`. Live k7 and k7f at `074b48c3`, the clear path, as before (the 2026-10-24
   section of the live summary).
 
 ## Residuals accepted
