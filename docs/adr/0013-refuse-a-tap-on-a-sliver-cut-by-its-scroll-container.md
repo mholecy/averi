@@ -312,7 +312,7 @@ far edges the same shape is the list's next row cut at the fold (listed after th
 would turn every `fully` stop on the row above it into probes carrying it on (measured on the test's Settings list: 3
 swipes where 1 did); at the start the row before is listed before it.
 
-**Its one reader is the `fully` stop's flush probe** (`interact/scroll-rounds.ts#flushWith`): the nearest scroll view's
+**Its one reader is the `fully` stop's flush probe** (`interact/flush-check.ts#flushWith`): the nearest scroll view's
 flush edges along the scroll are its own and the match's pinned ones; one edge is probed toward (the probe planned,
 held, budgeted and refused for room or axis exactly as before), two are `fills` (the row spanning from under the pinned
 node to the scroll view's far edge: no probe, the reply naming both edges for what they lie on). The stop's `Flush`
@@ -369,7 +369,7 @@ Bug note: docs/bugs/2026-10-16-lab-android-row-cut-at-a-merged-sticky-header-rea
 
 ## Refined 2026-10-23 (round 1023, LV2): a probe that revealed more of a still-flush match proved its cut
 
-The flush probe (`interact/scroll-rounds.ts#flushCheck`, its size `interact/course.ts#probeOf`) is a quarter of the
+The flush probe (`interact/flush-check.ts`, its size `interact/course.ts#probeOf`) is a quarter of the
 stroke over the flush container — on the lab's `scroll-bounded-flush` `lower` list (495 px) 74 px of finger travel,
 under the 177-px cap — and each probe that moves the match pays a settle, a read and a confirming read. Measured over
 every committed record holding `scroll-bounded-flush` S.fully (S 176 px tall, 22 showing at rest, cut by 154):
@@ -407,7 +407,7 @@ match in its place), has proved the cut — content lay past that edge, and part
    40 px is whole after a 40-px probe that brought the list to its end, and still flush (the next reveal, had there
    been budget, would have moved nothing and said `checked`). `flush.why: 'budget'` stays for a flush stop never
    probed;
-4. is remembered: the proof is KEPT (`scroll-rounds.ts#ProvenCut`, `State.provenCut`) while every later flush check finds the match
+4. is remembered: the proof is KEPT (`flush-check.ts#ProvenCut`, in the check the round holds, `scroll-rounds.ts#State.flush`) while every later flush check finds the match
    flush on that edge of that container, and let go when one finds it anywhere else. So a read that cannot send the
    reveal — no swipe or time (`budget`), or a tree changed between the probe and its read: no room for a stroke (a
    keyboard or an overlay come up) or only a scroll view across the axis — or that finds a reveal that moved nothing

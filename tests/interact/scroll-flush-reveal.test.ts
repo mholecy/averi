@@ -141,6 +141,17 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     expect(strokes(played).map((s) => s.do === 'stroke' && s.reach)).toEqual([0.25, 0.25]);
   });
 
+  it('a read that judges no stop answers the probe in flight: the match back where the probe was sent from on a later read is a new candidate, probed again — not held', () => {
+    // S flush at the bottom (142 of it showing), probed; the probe's read lost it; it comes back where it was, after a
+    // stroke and a confirming read: no stop held through a probe — a probe of its own.
+    const played = play(RULES, [sAt(120), { found: [] }, sAt(120), sAt(120)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'confirm', 'stroke']);
+    const [probe, course, again] = strokes(played);
+    expect(probe).toMatchObject({ probe: true, reach: 0.25 });
+    expect(course).not.toHaveProperty('probe');
+    expect(again).toMatchObject({ probe: true, reach: 0.25, toward: 'down' });
+  });
+
   it('a probe that moved it out of the flush: the ordinary stop — confirmed, no reveal', () => {
     const played = play(RULES, [sAt(0), sAt(200), sAt(200)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);

@@ -30,7 +30,7 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  *   (`PresentedTouchDown`, asked of the scene at the points as sent: ui-tree/standing.ts#Scene.presentedAt), and ONE
  *   memory to keep whatever the round does with the stroke (held for a presented screen's confirming read, held back at
  *   a bound, or sent).
- * - `planProbe(memory, ask)` — the `fully: true` flush check's probe (scroll-rounds.ts#flushCheck): over the first of
+ * - `planProbe(memory, ask)` — the `fully: true` flush check's probe (flush-check.ts): over the first of
  *   the given scroll views with room, never the screen box — undefined when none has room.
  * - `strokeSent(memory)` — the plan's stroke (or probe) was sent: the scroll view it chose becomes the one the last
  *   stroke went over (for `touchedOn`). The one thing the round adds to a plan's memory, and only on sending: a plan
@@ -341,7 +341,7 @@ export interface ProbeAsk {
 }
 
 /**
- * The flush check's probe (scroll-rounds.ts#flushCheck): over the first of `scrollViews` with room for a stroke
+ * The flush check's probe (flush-check.ts): over the first of `scrollViews` with room for a stroke
  * toward `toward` above the keyboard and what is drawn over it — never the screen box: undefined is NO ROOM (a stop
  * reported unchecked, not probed; over the screen it would touch down off the scroll view and move nothing whatever
  * is cut). `memory`: the memory with the scroll view it chose, for `strokeSent` once the probe is sent.
@@ -366,7 +366,7 @@ export function planProbe(memory: StrokeMemory, { toward, reach, maxTravel, gest
 /**
  * Every one of the probe's scroll views scrolls only ACROSS a stroke toward `toward`, as `facts`' tree tells
  * (`acrossOnly`): no probe along the flush edge can move any of them, so none is sent — `planProbe` answers no room
- * for them — and scroll-rounds.ts reports the stop unchecked for that reason (`flush.why: 'axis'`), not for want of
+ * for them — and the flush check (interact/flush-check.ts) reports the stop unchecked for that reason (`flush.why: 'axis'`), not for want of
  * room. False when there are none. Android only in practice: the probe's scroll views are the CLIPPING chain
  * (ui-tree/geometry.ts#Clips.scrollersOf), empty on every WDA tree, and of Android's scrollers only a class that fixes
  * the axis says it (`HorizontalScrollView`, a Compose `horizontalScroll`; a lazy row's axis is unknown).
@@ -636,7 +636,7 @@ interface StrokeRoom {
  * the stroke): `within`, the candidate as the tree gives it, `box`, what the stroke is drawn in, and `coverTop`, the
  * top edge of what covers that box's lower part — the keyboard's, or a node's drawn over the scroll view
  * (`overlayTop`), the higher of the two — for the stroke to keep clear of (`scrollStroke`); absent when nothing does.
- * Undefined is NO ROOM: a probe is then not sent (scroll-rounds.ts reports `flush.why: 'room'`), and a stroke toward
+ * Undefined is NO ROOM: a probe is then not sent (flush-check.ts reports `flush.why: 'room'`), and a stroke toward
  * the target goes over the screen whole. One judgement of room, the keyboard in it. No gesture `box` at all
  * (screenBox threw): no room.
  *
