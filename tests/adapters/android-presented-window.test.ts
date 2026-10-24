@@ -508,6 +508,20 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     expect(asked).toHaveLength(0);
   });
 
+  it('a pixel assert whose finding stands when its element is gone from the last read never asks: the finding is the reply', async () => {
+    const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
+    fake.nextScreenshot = readFileSync(new URL('dialog-fullscreen.png', TRUTH));
+    const dialog = lab('dialog-fullscreen');
+    const without = { ...dialog, children: [] };
+    let reads = 0;
+    fake.uiTree = async () => (reads++ === 0 ? dialog : without);
+    const { pass, detail } = await new Verifier(fake, { pollMs: 2, timeoutMs: 2_000 }).assert({ element: { id: 'lab.dialog-fullscreen.S' }, color: { expected: '#00FF00' } });
+    expect(pass).toBe(false);
+    expect(detail).not.toMatch(/^not found/);
+    expect(reads).toBeGreaterThan(1);
+    expect(asked).toHaveLength(0);
+  });
+
   it('scroll_until on dialog-fullscreen: stops before any swipe, the remedy said — no stroke on the dialog', async () => {
     const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
     const error = await fails(scrollUntilVisible(fake, 'id:"lab.dialog-fullscreen.D"', { settleMs: 1, timeoutMs: 5_000 }));
