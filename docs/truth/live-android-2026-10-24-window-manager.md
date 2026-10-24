@@ -48,3 +48,16 @@ ms ("failed after 2 swipes"); at `b3acdeb` 4512–4585 ms ("stopped before any s
 ms of it — the rest the two reads the stop takes.
 
 Then `adb -s emulator-5554 emu kill`.
+
+## 2026-10-24 — the review fixes, `59dccf2` (bugs/r1023b-r19)
+
+The same AVD and lab app (booted `-no-snapshot-save`, shut down after); averi at `59dccf2`. One run each:
+docs/truth/live-records/android-vis-r1023b-r19-cr-1.json (`--groups visibility --cells
+dialog-fullscreen,bottom-sheet-dialog,dialog-views-fullscreen`: 39 of 39 ok, the replies as before — none of these
+windows holds a scroll view) and android-forms-r1023b-r19-cr-1.json (`--groups forms`: 32 cases, 27 ok, b1d and b7
+LOUD as known, kf1–kf3 SKIP: Gboard docked). form-picker's sheet holds its own lazy list, so c2–c4's taps now say
+"… — if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal is presented
+over it — close it first", and c5–c6's not-founds the same note: the sheet is never the only way out (ADR 0018, the
+amendment "Android's window by the window manager's word", decision 4). c1 fully visible after 3 swipes; nothing fired.
+
+Then `adb -s emulator-5554 emu kill`.
