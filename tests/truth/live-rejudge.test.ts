@@ -257,7 +257,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-forms-r1023b-r19-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
     ['android-forms-r1023b-r19-2.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
     ['android-forms-r1023b-r19-3.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
-    // …and once more at the review fixes (59dccf2): form-picker's taps and its not-founds say the sheet's own list first.
+    // …and once more where form-picker's taps and its not-founds say the sheet's own list first.
     ['android-vis-r1023b-r19-cr-1.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
     ['android-forms-r1023b-r19-cr-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
@@ -627,7 +627,7 @@ const LV1_CASES = ['scroll:scroll-bounded.O', 'scroll:scroll-bounded.F', 'scroll
 
 /**
  * Residual 19's four live cases beneath the full-screen Compose Dialog (its two strokes on the dialog), struck off
- * live-known.ts by round 1023b's fix (b3acdeb: the window manager's word — scroll_until stops before any stroke).
+ * live-known.ts since the window manager's word types the window (scroll_until stops before any stroke).
  */
 const FULL_SCREEN_DIALOG_CASES = ['A', 'B', 'C', 'D'].map((t) => `scroll:dialog-fullscreen.${t}`);
 
@@ -658,7 +658,7 @@ describe('live.ts --rejudge over the committed Android visibility records of the
     // the turn of scroll-collapsing's A (#10's, known until then) ok since the owner's decision of 2026-10-18 (ADR 0021:
     // no turn on uiautomator, a loud failure naming `up` after the two-stroke stop — live-visibility.ts#judgeAndroidTurn)
     ['android-vis.json', { cases: 111, ok: 98, loud: 3, mismatches: 10, dialog: [] }],
-    // (and, since round 1023b, residual 19's four beneath the full-screen dialog)
+    // (and residual 19's four beneath the full-screen dialog, since the window manager's word types it)
     ['android-vis-r7final.json', { cases: 137, ok: 120, loud: 3, mismatches: 14, dialog: FULL_SCREEN_DIALOG_CASES }],
   ] as const)('%s: LE1\'s six cases not known, and VA1\'s and LV1\'s', { timeout: 60_000 }, async (record, want) => {
     const { code, out } = await rejudge(record, 'visibility');
@@ -806,14 +806,14 @@ describe('live.ts --rejudge over the committed records of the src before the par
 describe('live.ts --rejudge over the committed records of the src before the Views BottomSheetDialog was marked presented', () => {
   // Round 7's presented windows the parser did not mark: both cells' taps, scroll_until and colour asserts, then their
   // eight scroll cases twice more — the same in every run. Beneath the full-screen Compose Dialog residual 19's four,
-  // known until round 1023b's fix struck them off (b3acdeb); beneath the Views BottomSheetDialog LW1's four (A's and B's stroke up on the scrim dismissing the sheet and
+  // known until the window manager's word struck them off; beneath the Views BottomSheetDialog LW1's four (A's and B's stroke up on the scrim dismissing the sheet and
   // claiming the stop, C's and D's two strokes on it), whose entries round 7's A7 struck off (f924893e: the window
   // marked by Material's ids): not known here — the src before the fix, a calibration of it now: exit 1, as recorded.
   it.each([
     ['android-vis-dialogs.json', { cases: 26, ok: 18, loud: 0, mismatches: 8, notKnown: 8 }],
     ['android-vis-dialogs-scroll-run2.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 8 }],
     ['android-vis-dialogs-scroll-run3.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 8 }],
-  ] as const)('%s: the bottom sheet dialog\'s four scroll cases not known, and since round 1023b the full-screen dialog\'s', { timeout: 60_000 }, async (record, want) => {
+  ] as const)('%s: the bottom sheet dialog\'s four scroll cases not known, and the full-screen dialog\'s', { timeout: 60_000 }, async (record, want) => {
     const { code, out } = await rejudge(record, 'visibility');
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.notKnown} not known\\), 0 skipped$`, 'm'));
     expect(notKnown(out).sort()).toEqual([...['A', 'B', 'C', 'D'].map((t) => `scroll:bottom-sheet-dialog.${t}`), ...FULL_SCREEN_DIALOG_CASES].sort());
@@ -822,8 +822,8 @@ describe('live.ts --rejudge over the committed records of the src before the Vie
 });
 
 describe('live.ts --rejudge over the committed records of the src before the full-screen dialog was typed by the window manager', () => {
-  // Residual 19's four scroll cases beneath the full-screen Compose Dialog, known until round 1023b's fix struck them
-  // off (b3acdeb): their two strokes on the dialog read MISMATCH not known — each record a calibration of its src now.
+  // Residual 19's four scroll cases beneath the full-screen Compose Dialog, known until the window manager's word
+  // struck them off: their two strokes on the dialog read MISMATCH not known — each record a calibration of its src now.
   it.each([
     ['android-vis-dialogs-r7final.json', { cases: 26, ok: 22, loud: 0, mismatches: 4 }],
     ['android-vis-r14-lv1.json', { cases: 140, ok: 131, loud: 5, mismatches: 4 }],

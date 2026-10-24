@@ -78,10 +78,10 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ...each('android uiautomator', ['tap:fab.L', 'tap:fab.K'], FAB, 'tap-refused', 'refused'),
   // Round 7 (T2): the presented windows the parser does not mark (android-vis-dialogs.json, -scroll-run2/3.json; the
   // same in all three runs). Beneath the full-screen Compose Dialog every target's two strokes landed on the dialog
-  // (nothing dismissed: it has no outside) — residual 19, struck off by round 1023b's b3acdeb (the window manager's
-  // word: the focused window a Dialog's at the root's bounds, asked on the miss — scroll_until stops before any stroke),
-  // ok in three runs of three (android-vis-r1023b-r19-1…3.json). (LW1's four scroll cases beneath the Views
-  // BottomSheetDialog — A's and B's stroke up on the touch_outside scrim dismissing the sheet, C's and D's two strokes
+  // (nothing dismissed: it has no outside) — residual 19, struck off since the window manager's word types the window
+  // (ADR 0018's amendment: the focused window a Dialog's at the root's bounds, asked on the miss — scroll_until stops
+  // before any stroke), ok in three runs of three (android-vis-r1023b-r19-1…3.json). (LW1's four scroll cases beneath
+  // the Views BottomSheetDialog — A's and B's stroke up on the touch_outside scrim dismissing the sheet, C's and D's two strokes
   // on it — struck off by round 7's A7, f924893e: the window marked presented by Material's ids, scroll_until stops
   // before any stroke, ok in three runs of three: android-vis-sheet-dialog-run1…3.json.)
   // iOS, idb: no scroll view listed (LE2, docs/bugs/2026-10-16-lab-ios-idb-lists-no-scroll-view-rows-past-its-clip-read-as-drawn.md),

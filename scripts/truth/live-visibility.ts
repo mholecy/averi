@@ -419,7 +419,7 @@ export function presentedAssertCase(cell: string, t: TargetTruth): VisibilityCas
   };
 }
 
-/** The cells presentedAssertCase is asked of: round 7's full-screen dialog and Views bottom sheet, round 1023b's Views full-screen dialog (Presented.kt). */
+/** The cells presentedAssertCase is asked of: the full-screen Compose dialog, the Views bottom sheet and the Views full-screen dialog (Presented.kt). */
 export const PRESENTED_WINDOW_CELLS: readonly string[] = ['dialog-fullscreen', 'bottom-sheet-dialog', 'dialog-views-fullscreen'];
 
 // --- the cases ---

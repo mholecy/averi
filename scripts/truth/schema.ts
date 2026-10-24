@@ -89,7 +89,7 @@ export interface CatalogCell {
   family?: Family;
   /**
    * `none`, `sheet-medium`, `alert`; a form cell's own picker sheet, `sheet-large`; Android's `dialog-fullscreen` and
-   * `bottom-sheet-dialog` (round 7), `dialog-views-fullscreen` (round 1023b); the iOS app's own layers of phase 3.
+   * `bottom-sheet-dialog`, `dialog-views-fullscreen`; the iOS app's own layers of phase 3.
    */
   layer: string;
   targets: CatalogTarget[];
@@ -438,7 +438,7 @@ export interface CellTruth {
    * (`WINDOW_MANAGER_WORD`, below, as lab-device.ts asks it: the focus and display size out of `dumpsys window
    * displays`, then `dumpsys window windows`) — what averi's adapter asks on a miss (src/adapters/android.ts#focusedWindow), served by the
    * golden mode's fake device for that command (fake-device.ts#DeviceProfile.windowManager). Absent on iOS and on
-   * captures before round 1023b: there the command fails, and averi reads the window as unknown.
+   * captures taken without it: there the command fails, and averi reads the window as unknown.
    */
   windows?: string;
   /**

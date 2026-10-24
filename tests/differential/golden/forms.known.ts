@@ -6,8 +6,8 @@ import { ANDROID, IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS
 // fully expanded — so the form beneath is not found and scroll_until strokes the sheet: lab note L1, whose fix
 // (d43df5d, round 6) marks the AlertDialog and the half-expanded sheet but not a sheet whose dump carries no scrim.
 // L1 is calibrated on those (calibration.json); these rows were ADR 0018's residual 18, accepted by the owner
-// 2026-10-18 with the active-window hint. Since round 1023b (the amendment "Android's window by the window manager's
-// word") the window manager types the sheet a Dialog's window, asked on the miss: the three taps say the presented
+// 2026-10-18 with the active-window hint. Since the amendment "Android's window by the window manager's
+// word" the window manager types the sheet a Dialog's window, asked on the miss: the three taps say the presented
 // remedy, green, struck off; scroll_until still strokes the sheet's own list (decision 3: a target inside it, not yet
 // composed, reads alike), the residual narrowed to that.
 const EXPANDED_SHEET = 'residual:ADR 0018 residual 18 — a target beneath a fully expanded sheet is stroked for on the sheet\'s own list';

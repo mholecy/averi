@@ -3,7 +3,7 @@ import { ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_TREE, twice, 
 // The presented family's ratchet (fixtures/apps/cells/presented.json): sheet-medium and alert-dim (phase 1/2);
 // sheet-medium-edges, sheet-background, sheet-long-list, dim-cover, blur-menu and blur-menu-grouped (phase 3, B3, iOS);
 // chooser-over-list (round 16, iOS);
-// bottom-sheet-dialog and dialog-fullscreen (round 7, Android); dialog-views-fullscreen (round 1023b, Android); blur-menu-stacked and blur-menu-unhidden (round 16,
+// bottom-sheet-dialog and dialog-fullscreen (round 7, Android); dialog-views-fullscreen (Android); blur-menu-stacked and blur-menu-unhidden (round 16,
 // ADR 0018 residual 9's probes, iOS).
 
 // The lab finding L1's tap and scroll_until rows were this KNOWN's until round 6's fix (d43df5d on arch/r22-l1)
@@ -76,10 +76,10 @@ export const presented: KnownFile = {
     ...keys(`${ANDROID}/bottom-sheet-dialog.xml`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),
     // A full-screen Compose Dialog: Compose lays its window between the bars at full width ([0,66][1080,2153]), against
     // the left edge — an app's own window by the parser's rule — and the dump carries no fact that tells it from one.
-    // ADR 0018 residual 19, closed for it in round 1023b (the amendment "Android's window by the window manager's
-    // word"): the window manager types the focused window a Dialog's at the root's bounds, asked on the miss, so the
+    // ADR 0018 residual 19, closed for it by the amendment "Android's window by the window manager's
+    // word": the window manager types the focused window a Dialog's at the root's bounds, asked on the miss, so the
     // tap's wait says the presented remedy and scroll_until stops before any swipe — the 8 rows green, struck off here.
-    // So does round 1023b's dialog-views-fullscreen, a Views dialog at an activity's very shape. The colour asserts
+    // So does dialog-views-fullscreen, a Views dialog at an activity's very shape. The colour asserts
     // there fail "not found" with the presented remedy in their note: vacuous, as alert-dim's — no note's.
     ...['dialog-fullscreen', 'dialog-views-fullscreen'].flatMap((cell) =>
       keys(`${ANDROID}/${cell}.xml`, ['A', 'B', 'C', 'D'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: 'uiautomator lists only the presented window' }),

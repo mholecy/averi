@@ -386,7 +386,7 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
     expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-claim', 'refused')).toBeUndefined();
     expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-refused', 'not found')).toBeUndefined();
     expect(knownLive('android', 'uiautomator', 'tap:fab.L', 'tap-refused', undefined)).toBeUndefined();
-    // Struck off by residual 19's fix (round 1023b): the strokes beneath the full-screen dialog are no longer known.
+    // Struck off by residual 19's fix (the window manager's word): the strokes beneath the full-screen dialog are no longer known.
     expect(knownLive('android', 'uiautomator', 'scroll:dialog-fullscreen.A', 'presented-stroke', 'not found')).toBeUndefined();
     // Struck off by LV1's fix (round 14): its unchanged claim is no longer known.
     expect(knownLive('android', 'uiautomator', 'scroll:tabbar-floating.F', 'unchanged-claim', 'not found')).toBeUndefined();

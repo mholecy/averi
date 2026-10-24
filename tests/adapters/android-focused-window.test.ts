@@ -85,7 +85,7 @@ describe('parseFocusedWindow: the focused window by its type, its frame and what
 describe('AndroidAdapter.focusedWindow: one adb call, failing open', () => {
   const adapterAnswering = (answer: ExecFn) => new AndroidAdapter({ serial: 'emulator-5554', exec: answer, drawnOverStrip });
 
-  it('sends the one command line the capture records (lab-device\'s WINDOW_MANAGER_WORD) and reads its answer', async () => {
+  it('sends the one command line the capture records (schema.ts\'s WINDOW_MANAGER_WORD, which lab-device asks) and reads its answer', async () => {
     expect(FOCUSED_WINDOW_COMMAND).toBe(WINDOW_MANAGER_WORD);
     const calls: string[][] = [];
     const adapter = adapterAnswering(async (cmd, args) => {
