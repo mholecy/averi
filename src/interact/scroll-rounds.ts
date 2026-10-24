@@ -12,8 +12,8 @@ import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts } from './scroll-read.js';
-import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Offset, type Streaks, type UnseenStrokes } from './motion-ledger.js';
-import { carriedCover, recall, remember, type MarginMemo } from './margin-memo.js';
+import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type UnseenStrokes } from './motion-ledger.js';
+import { carriedCover, known, type MarginMemo, type Offset } from './margin-memo.js';
 import { carried, planStroke, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
 import { probing, seeFlush, startFlush, type Flush, type FlushCheck, type FlushCut, type FlushVerdict, type ProbeMeans } from './flush-check.js';
@@ -335,8 +335,8 @@ export interface DetentMove {
  * #saysTopLayerOnly: idb's id notes), so the reply says it once; no device call.
  * `movesWith`: a `fully: true` match covered by a text in its touch margin that a screenshot saw drawn over it
  * (`State.marginKept`'s `under`), the two moved since by the same `offset` in a scroll view that stayed where it was
- * (margin-memo.ts#carriedCover, motion-ledger.ts#movedTogether) — the text scrolls with it, so no stroke brings it out
- * from under the text (`coverMovesWith`); the shortfall the `covered` one.
+ * (margin-memo.ts#carriedCover) — the text scrolls with it, so no stroke brings it out from under the text; the
+ * shortfall the `covered` one.
  * docs/bugs/2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md
  */
 export type BoundBy =
@@ -538,8 +538,8 @@ interface State {
   readonly eyesRefused: { readonly asked: EyesAsked; readonly short: Extract<InFrameShort, { of: 'unlisted' }> } | undefined;
   /**
    * What the eyes saw of the texts in the target's touch margin this call, kept while it holds (interact/margin-memo.ts,
-   * ADR 0026 rules 6 and 8): a later read is told it instead of looking again; an `under` carried with the target ends
-   * the call (`coverMovesWith`).
+   * ADR 0026 rules 6 and 8): a later read is told it instead of looking again (`known`); an `under` carried with the
+   * target ends the call (`carriedCover`).
    */
   readonly marginKept: MarginMemo;
   /** The last step was a `stroke`: the next seen must hand back `drawn`. */
@@ -650,50 +650,6 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
 }
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
-
-/**
- * The cover of `best` carried with it (BoundBy's `movesWith`): `best` covered (its standing's named cover) by a text a
- * screenshot saw drawn over it, and the two moved by the same offset since that screenshot in a scroll view that stayed
- * where it was (margin-memo.ts#carriedCover) — the offset; undefined otherwise. Moved, not merely still there: a pair
- * unmoved since may lie at the end of the content, which the strokes' own failures name. One read is enough — one dump
- * is one frame, the pair's relation in it a fact mid-fling or not — so no confirming read and no screenshot.
- */
-function coverMovesWith(marginKept: MarginMemo, best: Judged, facts: TreeFacts): Offset | undefined {
-  if (best.standing.kind !== 'covered') return undefined;
-  const text = best.standing.cover.node;
-  return carriedCover(marginKept, text, { target: best.node.rect, peer: text.rect, scrollView: nearestScrollView(facts, best.node) });
-}
-
-/** `node`'s nearest scroll view in this read — its nearest clipping ancestor (ui-tree/geometry.ts#Clips.scrollersOf) — undefined when the tree marks none. */
-function nearestScrollView(facts: TreeFacts, node: UiNode): Rect | undefined {
-  return facts.scene.clips.scrollersOf(node)[0];
-}
-
-/**
- * What the round knows of `question` on this read (`round`'s THE ORDER SEEN), from what the eyes `answered` it on this
- * read (`RoundSeen.order`) and, for a clear question, what was seen this call (`State.marginKept`, margin-memo.ts): the
- * pairs to ask the eyes (`ask`: an order question whole; of a clear one the texts not yet seen — none asked when one
- * seen drawn over the target or untold keeps the cover anyway), else what to tell the read (`told`) and the call's
- * kept answers with this read's added.
- */
-function orderKnown(
-  marginKept: MarginMemo,
-  question: PairQuestion,
-  answered: readonly OrderSeen[] | undefined,
-  facts: TreeFacts,
-): { readonly ask: PairQuestion } | { readonly told: readonly OrderSeen[]; readonly marginKept: MarginMemo } {
-  if (question.asks === 'order') return answered === undefined ? { ask: question } : { told: answered, marginKept };
-  const { node } = question;
-  const scrollView = nearestScrollView(facts, node);
-  const kept = question.pairs.flatMap(({ peer }): OrderSeen[] => {
-    const seen = recall(marginKept, peer, { target: node.rect, peer: peer.rect, scrollView });
-    return seen === undefined ? [] : [{ peer, ...seen }];
-  });
-  const unasked = question.pairs.filter(({ peer }) => !kept.some((k) => k.peer === peer));
-  if (answered === undefined && unasked.length > 0 && !kept.some((k) => k.seen !== 'clear')) return { ask: { ...question, pairs: unasked } };
-  const now = answered ?? [];
-  return { told: [...kept, ...now], marginKept: remember(marginKept, now, node.rect, scrollView) };
-}
 
 /** What one read that read says about motion (`observe`): the motion ledger's answer (interact/motion-ledger.ts#Moved), and what the round makes of it. */
 interface Observed {
@@ -869,15 +825,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
   // THE ORDER SEEN (ui-tree/eyes.ts): the best match covered by a control the listing does not order (ADR 0024) — the
   // eyes are asked once which is drawn on top; such a stop never strokes (`overlapped`, below), so one screenshot ends
-  // the scroll's question — or covered by texts in its touch margin only (ADR 0026), each asked once where it lies: what
-  // was seen of one is kept (`State.marginKept`) and told to every later read; one seen drawn over it or untold keeps the
-  // cover, so the rest are not asked. The read is judged again, told what was seen (`RoundSeen.order`).
+  // the scroll's question, asked whole and told what the eyes answered — or covered by texts in its touch margin only
+  // (ADR 0026), each asked once where it lies (interact/margin-memo.ts#known: the texts to ask, or what to tell the read,
+  // and the call's memo, `State.marginKept`). The read is judged again, told what was seen (`RoundSeen.order`).
   const ordering = judged?.best === undefined || read === undefined ? undefined : pairQuestion(read.tree, judged.best.node, judged.best.standing);
   if (ordering !== undefined && read !== undefined && judged !== undefined) {
-    const known = orderKnown(s.marginKept, ordering, seen.order, judged.facts);
-    if ('ask' in known) return { state, step: { do: 'ask', what: 'order', question: known.ask } };
-    s.marginKept = known.marginKept;
-    if (known.told.length > 0) judged = judgeRead({ ...read, seen: seenOrderOf(ordering.node, known.told) }, s.frame, fully, seen.corroborated);
+    const said = ordering.asks === 'order' ? (seen.order === undefined ? { ask: ordering } : { told: seen.order, memo: s.marginKept }) : known(s.marginKept, ordering, seen.order, judged.facts);
+    if ('ask' in said) return { state, step: { do: 'ask', what: 'order', question: said.ask } };
+    s.marginKept = said.memo;
+    if (said.told.length > 0) judged = judgeRead({ ...read, seen: seenOrderOf(ordering.node, said.told) }, s.frame, fully, seen.corroborated);
     if (judged !== undefined && 'ask' in judged) return ask(judged.ask);
   }
   const best = judged?.best;
@@ -1094,9 +1050,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     s.course = turned;
     exhausted = undefined;
   }
-  // A text a screenshot saw drawn over a `fully: true` match, carried with it since (`coverMovesWith`): no stroke brings
-  // it out from under the text — the bound, now. Exclusive with `exhausted`, which needs every match unmoved.
-  const movesWith = fully && exhausted === undefined && best !== undefined && now !== undefined ? coverMovesWith(s.marginKept, best, now.facts) : undefined;
+  // A text a screenshot saw drawn over a `fully: true` match, carried with it since (margin-memo.ts#carriedCover): no
+  // stroke brings it out from under the text — the bound, now. One read is enough — one dump is one frame, the pair's
+  // relation in it a fact mid-fling or not — so no confirming read and no screenshot. Exclusive with `exhausted`, which
+  // needs every match unmoved.
+  const movesWith = fully && exhausted === undefined && best !== undefined && now !== undefined ? carriedCover(s.marginKept, best, now.facts) : undefined;
   // The stroke this round would draw, asked of the plan once (interact/stroke-plan.ts#planStroke): toward the course's
   // direction, at its reach (course.ts#nextStroke), over this round's gesture box, with this read's facts — its scroll view,
   // box and cover, the points the driver sends, and the presented surface those points touch down on. A bound quotes
