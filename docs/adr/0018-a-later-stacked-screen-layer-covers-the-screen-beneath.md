@@ -1219,8 +1219,8 @@ launcher's and another app's activity windows listed `isVisible=false`). One she
    may be a row of its list not laid out yet — a lazy list composes only what shows: form-picker's country.ST, which
    `scroll_until` reaches on the sheet's own list (live c1). So the miss carries where else it may lie
    (ui-tree/miss.ts, `Miss`'s `presented` `mayLieIn: 'itsScrollView'`), and the tap's headline and every not-found's
-   note say first "if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal
-   is presented over it … — close it first" — never "no scroll moves it out from under that screen", which would send
+   note say first "scroll_until it in that window's own list first; if it is not there, a sheet or modal is presented
+   over it — close it first" — never "no scroll moves it out from under that screen", which would send
    an agent to dismiss the very window it needs, and lose what it holds. Not where the reader has stroked that list
    already (`scroll_until`'s own not-found after its strokes: its words stay "close it first"), and not on idb's flat
    list, which lists no scroll view (its remedy is as before: residual 18). Only form-picker of the presented

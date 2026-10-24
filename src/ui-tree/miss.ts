@@ -37,7 +37,7 @@ import { isBareTreeMemo } from './verdict.js';
  *   one-line reply says it in one; the tap's headline keeps `presentedRemedy`'s words. Where the window listed
  *   alone holds a scroll view of its own (`mayLieIn`), the target may as well be a row of that list not laid out yet
  *   — a lazy list composes only what shows (form-picker's country sheet, whose far rows `scroll_until` reaches on the
- *   sheet's own list): the words then say that first, scroll_until it there, and close it first only if it is not —
+ *   sheet's own list): the words then say that first, scroll_until it in that list, and close it first only if not —
  *   never "no scroll moves it out", which would send an agent to dismiss the very window it needs. Not where the
  *   reader has already stroked that list (`scrolled`: `scroll_until`'s own stop, ADR 0018 decision 3), nor on idb's
  *   flat list, which lists no scroll view (the remedy stays as it was: ADR 0018, residual 18);
@@ -223,7 +223,7 @@ export function missNote(miss: Miss): string | undefined {
       return zeroAreaNote(miss.clippedOut);
     case 'presented': {
       const beneath = `${presentedLayerName(miss.layer)} is presented over it, and the tree lists only that ${miss.listed} — close it first`;
-      return miss.mayLieIn === undefined ? beneath : `${IN_ITS_SCROLL_VIEW}; if not, ${beneath}`;
+      return miss.mayLieIn === undefined ? beneath : `the tree lists only the window on top: ${scrollFirst(miss.layer)}`;
     }
     case 'activeWindow':
       return ACTIVE_WINDOW_HINT;
@@ -238,22 +238,22 @@ export function missNote(miss: Miss): string | undefined {
 }
 
 /**
- * The scroll a `presented` miss says first where the target may lie in the window's own scroll view (`mayLieIn`):
- * the one way to look there, before anything is closed.
+ * A `presented` miss's remedy where the target may lie in the window's own scroll view (`mayLieIn`): the scroll first,
+ * the one way to look there, and the layer's remedy only if it is not there — its one phrase (`presentedLayerName`),
+ * without `presentedRemedy`'s "no scroll moves it out", which a row of that very list would belie.
  */
-const IN_ITS_SCROLL_VIEW = 'if it is in the scroll view of the window on top, scroll_until it there';
+const scrollFirst = (layer: MarkedLayer): string =>
+  `scroll_until it in that window's own list first; if it is not there, ${presentedLayerName(layer)} is presented over it — close it first`;
 
 /**
  * The headline of the tap's and fill's wait on a `presented` miss (interact/resolve.ts#notFound), which says the miss
  * in place of "… to appear": `element id:"x" is not in the tree, which lists only the window presented on top (the
- * tree source lists the active window alone) — a dialog is presented over it — close it first`. Where the target may
- * lie in that window's own scroll view (`mayLieIn`), the scroll first, and the layer's remedy only if it is not — its
- * one phrase (`presentedLayerName`), without `presentedRemedy`'s "no scroll moves it out", which a row of that very
- * list would belie.
+ * tree source lists the active window alone) — a dialog is presented over it — close it first`; where the target may
+ * lie in that window's own scroll view (`mayLieIn`), the scroll first (`scrollFirst`).
  */
 export const presentedAloneHeadline = (subject: string, { layer, listed, mayLieIn }: Extract<Miss, { of: 'presented' }>): string =>
   `${subject} is not in the tree, which ${PRESENTED_ALONE[listed]} — ` +
-  (mayLieIn === undefined ? presentedRemedy('it', layer) : `${IN_ITS_SCROLL_VIEW}; if not, ${presentedLayerName(layer)} is presented over it — close it first`);
+  (mayLieIn === undefined ? presentedRemedy('it', layer) : scrollFirst(layer));
 
 /** A one-line not-found `what`, the miss's note after it in a parenthesis when it has one. */
 export const withMissNote = (what: string, miss: Miss | undefined): string => {

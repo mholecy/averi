@@ -464,7 +464,7 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     expect((await fails(resolveSettled(fake, 'id:"lab.dialog-views-fullscreen.A"', FAST))).message).toContain(presentedRemedy('it', { kind: 'screen' }));
     const picker = device(lab('form-picker'), word('form-picker')).fake;
     const message = (await fails(resolveSettled(picker, 'id:"lab.form-picker.country.ST"', FAST))).message;
-    expect(message).toContain('— if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal is presented over it — close it first');
+    expect(message).toContain('— scroll_until it in that window\'s own list first; if it is not there, a sheet or modal is presented over it — close it first');
     expect(message).not.toContain('no scroll moves it');
   });
 
@@ -532,12 +532,12 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
     expect(asked).toHaveLength(1);
   });
 
-  it('scroll_until on form-picker, whose sheet holds its own list: strokes that list, then — having searched it — says close it first, not scroll_until it there', async () => {
+  it('scroll_until on form-picker, whose sheet holds its own list: strokes that list, then — having searched it — says close it first, not scroll_until it in that list', async () => {
     const { fake, asked } = device(lab('form-picker'), word('form-picker'));
     const error = await fails(scrollUntilVisible(fake, 'id:"lab.form-picker.name"', { settleMs: 1, timeoutMs: 5_000 }));
     expect(fake.swipes.length).toBeGreaterThan(0);
     expect(error.message).toContain('element never appeared in the tree (a sheet or modal is presented over it, and the tree lists only that window — close it first)');
-    expect(error.message).not.toContain('scroll_until it there');
+    expect(error.message).not.toContain("scroll_until it in that window's own list");
     expect(asked).toHaveLength(1);
   });
 

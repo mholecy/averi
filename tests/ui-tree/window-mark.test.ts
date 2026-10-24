@@ -113,10 +113,10 @@ describe('a presented window that holds a scroll view of its own: a target missi
     const miss = missOf({ tree: sheet(), target: ST }) as Extract<Miss, { of: 'presented' }>;
     expect(presentedAloneHeadline('element id:"x"', miss)).toBe(
       'element id:"x" is not in the tree, which lists only the window presented on top (the tree source lists the active window alone) — ' +
-        'if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal is presented over it — close it first',
+        'scroll_until it in that window\'s own list first; if it is not there, a sheet or modal is presented over it — close it first',
     );
     expect(missNote(miss)).toBe(
-      'if it is in the scroll view of the window on top, scroll_until it there; if not, a sheet or modal is presented over it, and the tree lists only that window — close it first',
+      'the tree lists only the window on top: scroll_until it in that window\'s own list first; if it is not there, a sheet or modal is presented over it — close it first',
     );
     const { mayLieIn: _, ...stroked } = miss;
     expect(presentedAloneHeadline('element id:"x"', stroked)).toMatch(/no scroll moves it out from under that screen$/);
