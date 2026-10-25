@@ -295,7 +295,9 @@ export function consistency(
     return NOT_DELIVERED;
   }
   if (t.declared === 'presented-over') return t.reached ? 'declared presented-over, but the probe tap reached it' : undefined;
-  if (t.declared === 'covered') return t.reached ? 'declared covered, but the probe tap reached it' : undefined;
+  // Covered (lab note LR3's cell: "not reached, drawn under 95 %"): the probe reaches no target, and the screenshot shows
+  // less of it than an open target needs (DRAWN).
+  if (t.declared === 'covered') return t.reached ? 'declared covered, but the probe tap reached it' : t.drawn >= DRAWN ? `declared covered, but drawn ${pct(t.drawn)}` : undefined;
   if (g === 'whole') return t.reached && t.drawn >= DRAWN ? undefined : `declared open, but reached ${t.reached}, drawn ${pct(t.drawn)}`;
   // The band is the app's (navigationBandTakes): reached — and on iOS drawn as itself, as the open rows it is asked
   // need (golden-spec/bars.ts); Android's gesture handle is drawn over its band (bands N: 90 %), and R-band asks no

@@ -10,14 +10,17 @@ import type { SeenOrder } from './seen-order.js';
  * (`UiNode.readingOrder`: idb's flat list, a WDA run sorted by top), so a node drawn on top may be listed BEFORE the
  * node it is drawn over, and the draw order's rule "listed later = drawn later" (draw-order.ts#DrawOrder's doc) does
  * not hold there. This module is the one owner of "listed before, but drawn over" in such a listing: which siblings
- * listed before a target cover it — a heading (`headingsOver`: drawn over it, SwiftUI's pinned section header) or a
- * control whose order against it the listing does not tell (`peersOf`) — which covers' order is not told, which
+ * listed before a target cover it — a heading (`headingsOver`: drawn over it, SwiftUI's pinned section header), a
+ * control whose order against it the listing does not tell (`peersOf`), or, in a nested run (`listsNestedReadingOrder`:
+ * WDA's), any sibling that draws there, whose order is not told either (React Native's covers, lab note LR3) — which
+ * covers' order is not told, which
  * siblings a moved tap must keep clear of, and which controls listed AFTER it stay covers past the draw order's
  * reading-order break (`coversAfter`). draw-order.ts#drawOrder's `asTarget` asks it once for every question of a target
  * (`SeenFor.readingOrder`): `exposure` joins its covers to the draw order's own, the break's row
  * (`NOT_DRAWN.flatListReadingOrder`) reads `coversAfter`; it knows nothing of rows, presented layers or reaches.
  * docs/adr/0015-flat-list-reading-order-break.md (its amendments, "covers listed before the target", "a heading
- * listed before" and "a control past the break that holds the centre")
+ * listed before", "a control past the break that holds the centre" and "React Native's covers listed before the
+ * target")
  * docs/adr/0024-the-eyes-tell-the-order-of-two-controls-listed-in-reading-order.md
  */
 
@@ -33,10 +36,11 @@ export interface ReadingOrderAbout {
   readonly contentFrom: number;
   readonly bottomChrome: ReadonlySet<Placed>;
   /**
-   * Whether a sibling draws over the target by the draw order's `target` column (draw-order.ts#NOT_DRAWN: no frame
-   * excuse, not on the target), asked of a NON-interactive sibling listed before it (`peersOf`). Absent: none does.
+   * Whether a sibling listed before the target draws over it — the draw order's `target` column (draw-order.ts#NOT_DRAWN),
+   * the field's own floating label excused (ADR 0014's relation, draw-order.ts#ownLabelOf) — asked of the siblings
+   * `peersOf` takes past the controls, in a nested run in reading order only.
    */
-  readonly drawn?: (p: Placed) => boolean;
+  readonly drawn: (p: Placed) => boolean;
 }
 
 /**
@@ -46,6 +50,16 @@ export interface ReadingOrderAbout {
  */
 function listsInReadingOrder(parent: UiNode): boolean {
   return parent.readingOrder === true;
+}
+
+/**
+ * Whether `parent` lists its children in reading order in a NESTED tree (`listsInReadingOrder`, and no flat list): WDA's
+ * run sorted by top — where a sibling listed before a target may be drawn over it whatever it is (`peersOf`), and a
+ * childless node the app named is drawn unless it wraps a sibling (placed.ts#FRAME_EXCUSES `structural`: React
+ * Native's flattened views). Not idb's flat list (`UiNode.flatList`), whose listing is its own (ADR 0015).
+ */
+export function listsNestedReadingOrder(parent: Placed): boolean {
+  return listsInReadingOrder(parent.node) && parent.node.flatList !== true;
 }
 
 /**
@@ -128,7 +142,11 @@ function headingsOver(order: readonly Placed[], target: Placed): Placed[] {
 }
 
 /**
- * The controls whose ORDER against a control target a listing given in reading order does not tell
+ * The siblings whose ORDER against a target a listing given in reading order does not tell — two controls, as below;
+ * and, in a nested run (`listsNestedReadingOrder`), any sibling listed BEFORE a target of any kind that draws there
+ * (`ReadingOrderAbout.drawn`: the draw order's rows but its own-content one, a field's own floating label excused),
+ * which then follows the same `before` / `unordered` / `listedBefore` rules (lab note LR3). The rest of this doc is the
+ * controls'. The controls whose ORDER against a control target a listing given in reading order does not tell
  * (`listsInReadingOrder` of the target's parent, `about.target`): its siblings that are interactive and overlap it past
  * geometry.ts#PIXEL_OVERLAP_SLACK, neither holding the other whole nor of its frame (a control's own wrapper, its own
  * title) — in idb's flat list from its content on (`contentFrom`: the top bar's are chrome before content, ADR 0004)
@@ -179,26 +197,24 @@ function peersOf(
   const { target, flatList, contentFrom, bottomChrome, drawn } = about;
   const t = target.node;
   if (flatList && (target.at < contentFrom || bottomChrome.has(target))) return NONE;
-  // A control's peers are controls, either side of it. Under WDA (a nested run sorted by top, not idb's flat list) a
-  // sibling listed BEFORE the target that draws there (`drawn`) is a peer too, control or not, and of any target: React
-  // Native's covers (lab note LR3) — WDA lists RN's views by their tops, so a later sibling drawn over the target (a
-  // toast, a banner) whose top lies above the target's is listed before it (measured on the lab's rn-banner). Listed
-  // after it, the draw order already makes such a sibling a cover. Not idb's flat list: there a modal is listed before
-  // the screen beneath it and its frame (mp-native's value date picker `Value date 56,291 298x375`) over form rows
-  // measured clear (tests/verify/assert.test.ts). Not the target's own content: a sibling narrower than it whose centre
-  // lies on it (a field's floating label, drawn under the transparent field it is listed before: rn-field's M label
-  // 69,491 175x23 over its wrapper 69,492 264x20).
-  const ownOf = (p: Placed): boolean => p.node.rect.width < t.rect.width && containsPoint(t.rect, tapPoint(p.node));
-  const drawnBefore = (p: Placed): boolean => !flatList && p.at < target.at && !ownOf(p) && drawn?.(p) === true;
-  const peerOf = (p: Placed): boolean => (isInteractive(t) && isInteractive(p.node)) || drawnBefore(p);
+  // A control's peers are controls, either side of it. In a NESTED run in reading order (`listsNestedReadingOrder`:
+  // WDA's run sorted by top, SwiftUI's, UIKit's and React Native's alike — not idb's flat list) a sibling listed BEFORE
+  // the target that draws over it (`drawn`: the draw order's `target` column, a field's own floating label excused) is a
+  // peer too, control or not, and of any target: React Native's covers (lab note LR3) — WDA lists RN's views by their
+  // tops, so a later sibling drawn over the target (a toast, a banner) whose top lies above the target's is listed
+  // before it (measured on the lab's rn-banner). Listed after it, the draw order already makes such a sibling a cover.
+  // Not idb's flat list: there a modal is listed before the screen beneath it and its frame (mp-native's value date
+  // picker `Value date 56,291 298x375`) over form rows measured clear (tests/verify/assert.test.ts).
+  const nested = target.parent !== undefined && listsNestedReadingOrder(target.parent);
+  const peerOf = (p: Placed): boolean => (isInteractive(t) && isInteractive(p.node)) || (nested && p.at < target.at && drawn(p));
   const peers = order.filter(
     (p) =>
       p !== target &&
       p.parent === target.parent &&
       !headings.has(p) &&
       (flatList ? p.at >= contentFrom && !bottomChrome.has(p) : !pinnedTargets().has(p)) &&
-      peerOf(p) &&
-      overlapsApart(p, target),
+      overlapsApart(p, target) &&
+      peerOf(p),
   );
   if (peers.length === 0) return NONE;
   const centre = tapPoint(t);

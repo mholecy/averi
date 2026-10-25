@@ -6,7 +6,7 @@ open note on the working tree. See the script for the verdicts.
 
 | # | note | status | before → after | verdict |
 |---|---|---|---|---|
-| 1.1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | CALIBRATED, regressed elsewhere: 2 rows — **1 unrecorded** |
+| 1.1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | CALIBRATED, regressed elsewhere: 1 row (recorded) |
 | 1.2 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the docked leg of the fix cb77485 was built on (fix/keyboard-aware-scroll, #5's fix): scroll_until judging the screen above the IME's band) |
 | 2 | 2026-10-05-ios-tap-lands-on-soft-keyboard | calibrate | 73eea5f → 6f41787 | CALIBRATED (partial: stage A only) |
 | 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED |
@@ -107,7 +107,6 @@ open note on the working tree. See the script for the verdicts.
 Regressed elsewhere at cb77485 (green at 7d9a783):
 
   - RED android-averi_lab-api33/form-keyboard-floating.xml submit scroll_until — stopped: ERROR scroll_until id:"lab.form-keyboard-floating.submit" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never
-  - RED android-averi_lab-api33/own-parts.xml L ocr — failed: FAIL  element text:"LOGIN" renders text "LOGIN" — OCR failed: Command timed out: <tmp>; failing closed, rendered text unchecked — **not in `regressions`**
 
 Regressions recorded:
 

@@ -268,11 +268,14 @@ and a childless NAMED leaf was excused as structural (C.cover, U.cover).
 
 Decided (owner, 2026-10-25, round 9):
 
-1. **Under WDA** (a nested run in reading order, not idb's flat list), a sibling listed BEFORE the target that draws
-   there by the draw order's `target` column is a peer of any target, control or not: a cover whose order is not
-   told, which the eyes tell (ADR 0024) — reading-order.ts#peersOf, `ReadingOrderAbout.drawn`. Not the target's own
-   content: a sibling narrower than it whose centre lies on it (rn-field's M label `69,491 175x23`, listed before the
-   transparent field it lies under).
+1. **Under WDA** (a nested run in reading order, reading-order.ts#listsNestedReadingOrder — not idb's flat list), a
+   sibling listed BEFORE the target that draws there by the draw order's `target` column is a peer of any target,
+   control or not: a cover whose order is not told, which the eyes tell (ADR 0024) — reading-order.ts#peersOf,
+   `ReadingOrderAbout.drawn`. Judged by every row but the own-content one (`onTarget`: a peer listed before overlaps the
+   target apart, so it is none of its content — a toast narrower than the row it lies over stays a cover, the review's
+   shapes), and the field's OWN floating label excused by ADR 0014's relation seen from the field (draw-order.ts
+   #ownLabelOf: a text spanning the height of the text input the target is — rn-field's M label `69,491 175x23` before
+   its field's wrapper `69,492 264x20`).
 2. **Under WDA, a childless node the app named (an identifier) is drawn** — no structural excuse (placed.ts
    `FRAME_EXCUSES.structural`, `inWdaRun`) — unless it holds a sibling of its own whole: WDA's flattening of an RN View
    lists its content as its siblings (myport's `login_username_field 36,339 330x80` and the field row it wraps).
@@ -292,6 +295,11 @@ the RN forms group (12 of 12) unchanged (docs/truth/live-records/ios-rn-*-lr3*.j
 - A wrapper WDA flattens that holds no sibling whole (its content laid partly outside it) reads as drawn — a false
   refusal, the safe direction. A cover that holds a small sibling whole (a badge under a banner) reads as a wrapper —
   a false "clear", as before this amendment.
-- A non-control sibling listed before a target and drawn there, but drawn UNDER it (RN's earlier JSX sibling wider
-  than the target), is now an untold cover: one screenshot per tap and colour assert, and a refusal when the eyes
-  cannot tell.
+- Every WDA run in reading order is affected, SwiftUI's and UIKit's too, not React Native's alone: a sibling listed
+  before a target and drawn there but drawn UNDER it (an earlier sibling wider than the target — RN's earlier JSX
+  sibling, a SwiftUI background) is now an untold cover: one screenshot per tap and colour assert, and a refusal when
+  the eyes cannot tell. Measured over the repo's 62 WDA trees (the round-9 review's sweep): besides rn-banner, only the
+  SwiftUI forms' "Vertical scroll bar, 1 page" indicator as a target of its content container, and form-shared-id's
+  field titles now kept clear of a moved tap (`aimedClearOf`); no golden row changed.
+- A named childless host listed AFTER a sibling whose top lies above it (a badge on a pressable host) now covers that
+  sibling — a false refusal of the badge, the safe direction; no fixture has the shape.

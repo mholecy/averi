@@ -48,9 +48,44 @@ describe('rn-banner under idb: what the flat list lists', () => {
 });
 
 describe('rn-field under WDA: a field\'s own floating label listed before it is no cover of it', () => {
-  it('M\'s label (69,491 175x23, narrower than its field, its centre on it) listed before the field wrapper: the field shows whole', async () => {
+  it('M\'s label (69,491 175x23, spanning its input\'s height) listed before the field\'s wrapper (69,492 264x20, nothing but the input): the wrapper shows whole', async () => {
     const t = parseWdaSource(await capture('rn-field.wda.json'));
-    const field = byId(t, 'lab.rn-field.M.field');
-    expect(drawOrder(t).exposure(field, IPHONE).covers.map((c) => c.node.identifier ?? c.node.label)).not.toContain('lab.rn-field.M');
+    const label = [...everyNode(t)].find((n) => n.label === 'Message for the recipient')!;
+    const wrapper = parentOf(t, byId(t, 'lab.rn-field.M.field'))!;
+    expect(wrapper.identifier ?? null).toBeNull();
+    const seen = drawOrder(t).exposure(wrapper, IPHONE);
+    expect(seen.covers.map((c) => c.node)).not.toContain(label);
+    expect(seen.aimedClearOf).not.toContain(label);
   });
 });
+
+/**
+ * The review's shapes (round 9, MAJOR-1), on the rn-banner capture edited: a cover NARROWER than its target is no
+ * target's own content — only a field's own floating label is (ADR 0014's relation) — so it stays a cover.
+ */
+describe('rn-banner edited: a cover narrower than its target is still its cover', () => {
+  const edited = async (edit: (n: UiNode) => UiNode) => {
+    const walk = (n: UiNode): UiNode => edit({ ...n, children: n.children.map(walk) });
+    return walk(parseWdaSource(await capture('rn-banner.wda.json')));
+  };
+  it('S1: T a full-width row (0,110 402x64) under its 340-pt toast: untold, over its centre', async () => {
+    const t = await edited((n) => (n.identifier === 'lab.rn-banner.T' ? { ...n, rect: { x: 0, y: 110, width: 402, height: 64 } } : n));
+    const [target, cover] = at(t, 'T');
+    expect(tagged(drawOrder(t).exposure(target, IPHONE).covers)).toEqual([{ node: cover, order: 'untold', presented: false }]);
+  });
+  it('S2: a 120-pt labelled toast over T\'s centre, its top above T\'s: untold', async () => {
+    const t = await edited((n) => (n.identifier === 'lab.rn-banner.T.cover' ? { ...n, rect: { x: 141, y: 100, width: 120, height: 52 } } : n));
+    const [target, cover] = at(t, 'T');
+    expect(tagged(drawOrder(t).exposure(target, IPHONE).covers)).toEqual([{ node: cover, order: 'untold', presented: false }]);
+  });
+  it('S5: a text "Copied" 200 pt wide over a full-width T: untold', async () => {
+    const t = await edited((n) =>
+      n.identifier === 'lab.rn-banner.T' ? { ...n, rect: { x: 0, y: 110, width: 402, height: 64 } } : n.identifier === 'lab.rn-banner.T.cover' ? { ...n, role: 'text', identifier: null, label: 'Copied', rect: { x: 101, y: 100, width: 200, height: 52 } } : n,
+    );
+    const target = byId(t, 'lab.rn-banner.T');
+    const cover = [...everyNode(t)].find((n) => n.label === 'Copied')!;
+    expect(tagged(drawOrder(t).exposure(target, IPHONE).covers)).toEqual([{ node: cover, order: 'untold', presented: false }]);
+  });
+});
+
+const parentOf = (root: UiNode, child: UiNode): UiNode | undefined => [...everyNode(root)].find((n) => n.children.includes(child));
