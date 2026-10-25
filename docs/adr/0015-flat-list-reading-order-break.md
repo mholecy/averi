@@ -38,7 +38,8 @@ The row is `ui-tree/draw-order.ts`'s `flatListReadingOrder`, and only the `targe
    after it.
 3. A pinned bottom bar of the content behind a modal still covers the modal's rows where it reaches them. That is a
    false refusal, the safe direction.
-4. **idb does not see React Native's covers** (round 9, 2026-10-25; the amendment "React Native's covers listed before
+4. **idb does not see React Native's covers** (round 9, accepted by the owner 2026-10-25, with the amendment's rules
+   applying to every WDA run in reading order, SwiftUI's and UIKit's too; the amendment "React Native's covers listed before
    the target" below): idb lists no bare View, and reads a cover above its flat list's top-bar line as the bar — the lab's
    rn-banner under idb: every tap `Tapped`, every colour assert passing on the cover. Remedy: `treeSource: wda`.
 

@@ -124,7 +124,8 @@ fling) and residual 2 (the WDA plain stop on a centre a fraction of a point out)
    **Not caught live yet**: today's reads come ~1.2 s after a stroke under idb too (round 9's traces), past the
    bounce, so the lab case and Settings › General went green by the rule below, not by this one — the settled read is
    proven by the tests alone.
-   **The tree unmoved is within a point where strokes fling** (the same round): with no target in the tree, a stroke
+   **The tree unmoved is within a point where strokes fling** (the same round; the owner accepted it, 2026-10-25, for
+   every read after a stroke on iOS — the end proof and the two-stroke stop included — not only the rebound's): with no target in the tree, a stroke
    left it unmoved when every node is where it was within a unit (`read-tree.ts#sameTreeWithinPixel`; the same
    fingerprint says so at once) — decision 2's rule for the matches, made the tree's, on iOS only (the owner's scope;
    no Android source was measured rounding so, and its test stays the exact fingerprint). Measured live under idb (lab
