@@ -1,5 +1,13 @@
 # BUG: under WDA, React Native's sibling views are listed by their frames' tops, not in the order they are drawn — a later sibling drawn over an earlier one can be listed BEFORE it, against averi's "listed later is drawn over" premise
 
+> **Status (2026-10-25): fixed under WDA** on `fix/r9-lr3` (ADR 0015's amendment "React Native's covers listed before
+> the target", owner's decision of round 9): under WDA a sibling listed BEFORE the target that draws there is a peer of
+> any target, control or not — a cover whose order the eyes tell (ADR 0024) — unless it is narrower than the target with
+> its centre on it (a field's own label); and a childless leaf the app named is drawn unless it holds a sibling of its
+> own whole (WDA's flattening of an RN View). Golden: rn-banner's six WDA rows green — T and U refused "drawn over it as
+> a screenshot shows", C "drawn over it" — nothing else in the corpus changed. Under idb the six rows stay red as ADR
+> 0015 residual 4: idb lists no bare View, and T's toast above its flat list's top-bar line reads as the bar.
+>
 > **Status (2026-10-25):** reproduced by round 9's react-native cell **rn-banner** (fixtures/apps/rn, `declared:
 > covered`, golden-spec/covered.ts): T under a labelled toast and U under a bare View, each a later JSX sibling whose top
 > lies 10 pt above the target's, listed BEFORE it by WDA; C, the control, under the same bare View laid 10 pt below its

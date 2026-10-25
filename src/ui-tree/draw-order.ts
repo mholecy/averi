@@ -5,7 +5,7 @@ import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSiz
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
-import { readingOrderOf, type ReadingOrder } from './reading-order.js';
+import { NO_READING_ORDER, readingOrderOf, type ReadingOrder } from './reading-order.js';
 import type { SeenOrder } from './seen-order.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
@@ -1661,7 +1661,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
    */
   const asTarget = (target: Placed): SeenFor => {
     let readingOrder: ReadingOrder | undefined;
-    return {
+    const base = {
       ...seen,
       target,
       over: presentation.over(target.node),
@@ -1673,8 +1673,15 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       paddedTouchTargets,
       labelOverhang: overhang,
       orderSeen,
+    };
+    // Whether a sibling listed before the target draws over it, for the listing's untold peers (reading-order.ts#peersOf):
+    // the `target` column judged with no reading order of its own — the order is what is being asked.
+    const unordered: SeenFor = { ...base, readingOrder: NO_READING_ORDER };
+    const drawn = (p: Placed): boolean => drawsOverTarget(p, unordered);
+    return {
+      ...base,
       get readingOrder() {
-        return (readingOrder ??= readingOrderOf(order, { target, flatList, contentFrom, bottomChrome }, pinnedTargets, orderSeen));
+        return (readingOrder ??= readingOrderOf(order, { target, flatList, contentFrom, bottomChrome, drawn }, pinnedTargets, orderSeen));
       },
     };
   };

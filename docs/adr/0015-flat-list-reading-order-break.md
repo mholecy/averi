@@ -32,12 +32,15 @@ The row is `ui-tree/draw-order.ts`'s `flatListReadingOrder`, and only the `targe
 
 ## Residuals accepted
 
-- A menu, sheet or popover listed after the content that starts ABOVE a content target is no cover of it, nor is
-  anything listed after it. The result is a false "clear": the tap may press the menu.
-- A floating label listed after its field and above it ends the field's covers; only a pinned bottom bar still counts
-  after it.
-- A pinned bottom bar of the content behind a modal still covers the modal's rows where it reaches them. That is a
-  false refusal, the safe direction.
+1. A menu, sheet or popover listed after the content that starts ABOVE a content target is no cover of it, nor is
+   anything listed after it. The result is a false "clear": the tap may press the menu.
+2. A floating label listed after its field and above it ends the field's covers; only a pinned bottom bar still counts
+   after it.
+3. A pinned bottom bar of the content behind a modal still covers the modal's rows where it reaches them. That is a
+   false refusal, the safe direction.
+4. **idb does not see React Native's covers** (round 9, 2026-10-25; the amendment "React Native's covers listed before
+   the target" below): idb lists no bare View, and reads a cover above its flat list's top-bar line as the bar — the lab's
+   rn-banner under idb: every tap `Tapped`, every colour assert passing on the cover. Remedy: `treeSource: wda`.
 
 ## Amendment: covers listed before the target (2026-10-19, round 8)
 
@@ -252,3 +255,41 @@ reachable at (201,479) when the screenshot sees `row_0` under).
   lets a footer label listed before Continue bring the harm back). Remedy: `treeSource: wda`. Not measured: a card no
   wider than its rows (45–357), whose row's side strips would show the dimmed list — the eyes may tell it there. The
   way out not taken: teach ADR 0024's question to read a peer's bands that show something else — a design change.
+
+## Amendment: React Native's covers listed before the target (2026-10-25, round 9, LR3)
+
+Lab note LR3 (docs/bugs/2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md):
+WDA lists React Native's views by their tops, in one run it marks `readingOrder`, so a LATER JSX sibling drawn over the
+target — a toast, a banner — whose top lies above the target's is listed BEFORE it. Measured on the lab's rn-banner
+(the react-native family, `declared: covered`): T.cover "Saved" `31,100 340x52` before T `51,110 300x64`, U.cover (a bare
+View, its testID only) `31,280` before U; C.cover `31,480` after C `51,470`. Every tap was `Tapped` and every colour
+assert passed on the cover (`#263238`): the reading-order peers were controls only (T is a Pressable, WDA's `Other`),
+and a childless NAMED leaf was excused as structural (C.cover, U.cover).
+
+Decided (owner, 2026-10-25, round 9):
+
+1. **Under WDA** (a nested run in reading order, not idb's flat list), a sibling listed BEFORE the target that draws
+   there by the draw order's `target` column is a peer of any target, control or not: a cover whose order is not
+   told, which the eyes tell (ADR 0024) — reading-order.ts#peersOf, `ReadingOrderAbout.drawn`. Not the target's own
+   content: a sibling narrower than it whose centre lies on it (rn-field's M label `69,491 175x23`, listed before the
+   transparent field it lies under).
+2. **Under WDA, a childless node the app named (an identifier) is drawn** — no structural excuse (placed.ts
+   `FRAME_EXCUSES.structural`, `inWdaRun`) — unless it holds a sibling of its own whole: WDA's flattening of an RN View
+   lists its content as its siblings (myport's `login_username_field 36,339 330x80` and the field row it wraps).
+
+Golden: rn-banner's six WDA rows green (T and U refused "drawn over it as a screenshot shows", C refused "drawn over
+it"); nothing else changed over the corpus.
+
+### Residuals accepted
+
+- **idb** (residual 4 above; rn-banner's six idb rows, KNOWN): idb lists no bare View (U.cover, C.cover are not in its list), and T's
+  toast, ending at 152 above the flat list's top-bar line, is read as its top bar (ADR 0004). Neither rule above applies
+  to idb's flat list: there a modal is listed before the screen beneath it, its frame over form rows measured clear
+  (mp-native's value date picker, tests/verify/assert.test.ts), and a transparent field is a named leaf listed after the
+  label it lies over (rn-field's M). Remedy: `treeSource: wda`.
+- A wrapper WDA flattens that holds no sibling whole (its content laid partly outside it) reads as drawn — a false
+  refusal, the safe direction. A cover that holds a small sibling whole (a badge under a banner) reads as a wrapper —
+  a false "clear", as before this amendment.
+- A non-control sibling listed before a target and drawn there, but drawn UNDER it (RN's earlier JSX sibling wider
+  than the target), is now an untold cover: one screenshot per tap and colour assert, and a refusal when the eyes
+  cannot tell.

@@ -32,6 +32,11 @@ export interface ReadingOrderAbout {
   readonly flatList: boolean;
   readonly contentFrom: number;
   readonly bottomChrome: ReadonlySet<Placed>;
+  /**
+   * Whether a sibling draws over the target by the draw order's `target` column (draw-order.ts#NOT_DRAWN: no frame
+   * excuse, not on the target), asked of a NON-interactive sibling listed before it (`peersOf`). Absent: none does.
+   */
+  readonly drawn?: (p: Placed) => boolean;
 }
 
 /**
@@ -66,7 +71,8 @@ export interface ReadingOrder {
   readonly coversAfter: ReadonlySet<Placed>;
 }
 
-const NONE: ReadingOrder = {
+/** What a listing that tells the order says: nothing (`readingOrderOf` of a target whose parent lists in draw order). */
+export const NO_READING_ORDER: ReadingOrder = {
   before: [],
   unordered: new Set<Placed>(),
   seenOver: new Set<Placed>(),
@@ -74,6 +80,7 @@ const NONE: ReadingOrder = {
   listedBefore: [],
   coversAfter: new Set<Placed>(),
 };
+const NONE = NO_READING_ORDER;
 
 /**
  * What the listing of `about.target`'s parent says of the target's order against its siblings (`ReadingOrder`) —
@@ -169,16 +176,28 @@ function peersOf(
   seen: SeenOrder | undefined,
   headings: ReadonlySet<Placed>,
 ): ReadingOrder {
-  const { target, flatList, contentFrom, bottomChrome } = about;
+  const { target, flatList, contentFrom, bottomChrome, drawn } = about;
   const t = target.node;
-  if (!isInteractive(t) || (flatList && (target.at < contentFrom || bottomChrome.has(target)))) return NONE;
+  if (flatList && (target.at < contentFrom || bottomChrome.has(target))) return NONE;
+  // A control's peers are controls, either side of it. Under WDA (a nested run sorted by top, not idb's flat list) a
+  // sibling listed BEFORE the target that draws there (`drawn`) is a peer too, control or not, and of any target: React
+  // Native's covers (lab note LR3) — WDA lists RN's views by their tops, so a later sibling drawn over the target (a
+  // toast, a banner) whose top lies above the target's is listed before it (measured on the lab's rn-banner). Listed
+  // after it, the draw order already makes such a sibling a cover. Not idb's flat list: there a modal is listed before
+  // the screen beneath it and its frame (mp-native's value date picker `Value date 56,291 298x375`) over form rows
+  // measured clear (tests/verify/assert.test.ts). Not the target's own content: a sibling narrower than it whose centre
+  // lies on it (a field's floating label, drawn under the transparent field it is listed before: rn-field's M label
+  // 69,491 175x23 over its wrapper 69,492 264x20).
+  const ownOf = (p: Placed): boolean => p.node.rect.width < t.rect.width && containsPoint(t.rect, tapPoint(p.node));
+  const drawnBefore = (p: Placed): boolean => !flatList && p.at < target.at && !ownOf(p) && drawn?.(p) === true;
+  const peerOf = (p: Placed): boolean => (isInteractive(t) && isInteractive(p.node)) || drawnBefore(p);
   const peers = order.filter(
     (p) =>
       p !== target &&
       p.parent === target.parent &&
       !headings.has(p) &&
       (flatList ? p.at >= contentFrom && !bottomChrome.has(p) : !pinnedTargets().has(p)) &&
-      isInteractive(p.node) &&
+      peerOf(p) &&
       overlapsApart(p, target),
   );
   if (peers.length === 0) return NONE;

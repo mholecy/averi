@@ -7,22 +7,21 @@ import { ANDROID_RN, IOS_RN, type KnownFile } from './known.js';
 // (src/ui-tree/draw-order.ts; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md) — tap, scroll_until and
 // ocr green under every source (the ocr rows judged outside the sandbox, where Vision runs).
 // rn-banner (round 9, lab note LR3): each target under a later sibling drawn over its centre (`declared: covered`) —
-// every tap Tapped, every colour assert passing on the cover, under WDA and idb.
+// green under WDA (ADR 0015's amendment of 2026-10-25); under idb its residual: idb lists no bare View (U's and C's
+// covers), and T's toast above the flat list's top-bar line is read as its bar — every tap Tapped, every colour assert
+// passing on the cover.
 
-const LR3 = 'bug:2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md';
-const BANNER = (source: 'idb' | 'wda') => `${IOS_RN}/rn-banner.${source}.json`;
-const BANNER_IDB = BANNER('idb');
+const IDB_COVER_UNSEEN = 'residual:ADR 0015 residual 4 — idb lists no bare React Native View, and reads a cover above its top-bar line as the bar';
+const BANNER_IDB = `${IOS_RN}/rn-banner.idb.json`;
 
 export const reactNative: KnownFile = {
   family: 'react-native',
-  known: Object.fromEntries(
-    (['idb', 'wda'] as const).flatMap((source) =>
-      (['T', 'U', 'C'] as const).flatMap((t) => [
-        [`${BANNER(source)} ${t} tap`, { cls: 'Tapped', kind: 'Tapped' as const, calls: [`idb ui tap 201 ${({ T: 142, U: 322, C: 502 } as const)[t]}`], note: 'the cover listed before the target (T, U) or excused as a named leaf (U, C)', as: LR3 }] as const,
-        [`${BANNER(source)} ${t} colour`, { cls: 'passed on #263238', kind: 'PASS' as const, calls: [], note: 'the colour of the cover drawn over it', as: LR3 }] as const,
-      ]),
-    ),
-  ),
+  known: Object.fromEntries([
+    ...(['T', 'U', 'C'] as const).flatMap((t) => [
+      [`${BANNER_IDB} ${t} tap`, { cls: 'Tapped', kind: 'Tapped' as const, calls: [`idb ui tap 201 ${({ T: 142, U: 322, C: 502 } as const)[t]}`], note: 'idb: the cover is not listed, or read as the top bar', as: IDB_COVER_UNSEEN }] as const,
+      [`${BANNER_IDB} ${t} colour`, { cls: 'passed on #263238', kind: 'PASS' as const, calls: [], note: 'idb: the cover is not listed, or read as the top bar', as: IDB_COVER_UNSEEN }] as const,
+    ]),
+  ]),
   counts: {
     [`${ANDROID_RN}/rn-field.xml`]: 10,
     [`${IOS_RN}/rn-field.idb.json`]: 10,
