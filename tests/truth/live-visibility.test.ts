@@ -201,6 +201,8 @@ describe('judgeAbsentAtEnd — a row not there, on a list already at its end (AD
   });
   it('the whole budget spent (the bug): end-unread', () => {
     expect(judgeAbsentAtEnd([said(6, 'maxSwipes')], state(), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'end-unread' });
+    // …and the round-9 finding: two swipes, but naming a side never stroked for a page that never moved.
+    expect(judgeAbsentAtEnd([`${said(2, unchanged)} — if it lies above, try direction: "up"`], state(), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'end-unread' });
   });
   it('an unchanged claim the app\'s strokes break, a stop, or anything fired: MISMATCH by its rule', () => {
     expect(judgeAbsentAtEnd([said(2, unchanged)], state({ strokes: [stroke(1200, 900), stroke(900, 600)] }), launched).cls).toBe('unchanged-claim');

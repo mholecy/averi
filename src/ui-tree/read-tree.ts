@@ -1,4 +1,4 @@
-import { everyNode, rectArea, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type UiNode } from '../adapters/types.js';
+import { everyNode, rectArea, sameRectWithinPixel, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type UiNode } from '../adapters/types.js';
 import { containsPoint, screenOf } from './geometry.js';
 import { fillsScreen } from './placed.js';
 import { isScrollViewOf, scrolls } from './scroll-containers.js';
@@ -330,9 +330,24 @@ export function treeFingerprint(tree: UiNode): string {
   };
   for (const n of everyNode(tree)) {
     const { x, y, width, height } = n.rect;
-    feed(`${n.role}\u0000${n.label ?? ''}\u0000${n.identifier ?? ''}\u0000${n.value ?? ''}\u0000${x},${y},${width},${height}\u0001`);
+    feed(`${saysOf(n)}\u0000${x},${y},${width},${height}\u0001`);
   }
   return h.toString(16).padStart(8, '0');
+}
+
+/** What a node says, as `treeFingerprint` and `sameTreeWithinPixel` both read it: its role, label, identifier and value — everything of it but its rect. */
+const saysOf = (n: UiNode): string => `${n.role}\u0000${n.label ?? ''}\u0000${n.identifier ?? ''}\u0000${n.value ?? ''}`;
+
+/**
+ * The same tree within a pixel: node for node in the order listed, each saying the same (`saysOf`, what
+ * `treeFingerprint` hashes besides the rect) with its rect within a pixel (a unit of the source's frames) — what two
+ * fingerprints that differ may still be, where a source rounds a resting list's frames a point either way
+ * (interact/motion-ledger.ts#seeMotion, the tree's unmoved test on a platform that flings).
+ */
+export function sameTreeWithinPixel(a: UiNode, b: UiNode): boolean {
+  const left = [...everyNode(a)];
+  const right = [...everyNode(b)];
+  return left.length === right.length && left.every((n, i) => saysOf(n) === saysOf(right[i]!) && sameRectWithinPixel(n.rect, right[i]!.rect));
 }
 
 /**
@@ -391,6 +406,19 @@ export function screenIdentity(tree: UiNode): ScreenIdentity {
  * those.
  */
 export const nodeIdentity = (n: UiNode): string => JSON.stringify([n.role, n.identifier, n.label]);
+
+/** Every node of `tree` whose identity (`nodeIdentity`) it lists once, by that identity — duplicates of one identity dropped, as `nodeIdentity`'s callers that need one node per identity do. */
+export function listedOnce(tree: UiNode): Map<string, UiNode> {
+  const nodes = new Map<string, UiNode>();
+  const twice = new Set<string>();
+  for (const n of everyNode(tree)) {
+    const key = nodeIdentity(n);
+    if (nodes.has(key)) twice.add(key);
+    else nodes.set(key, n);
+  }
+  for (const key of twice) nodes.delete(key);
+  return nodes;
+}
 
 /** `a` and `b` are the same screen by identity: the very same ids (`ScreenIdentity`). */
 export const sameScreen = (a: ScreenIdentity, b: ScreenIdentity): boolean => a.ids.size === b.ids.size && [...a.ids].every((id) => b.ids.has(id));

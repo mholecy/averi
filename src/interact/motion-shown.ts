@@ -1,6 +1,6 @@
-import { everyNode, rectIntersection, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
+import { rectIntersection, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
 import { quoted, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
-import { nodeIdentity } from '../ui-tree/read-tree.js';
+import { listedOnce, nodeIdentity } from '../ui-tree/read-tree.js';
 import { SIDES } from '../ui-tree/sides.js';
 import { EDGE_TOWARD, OPPOSITE, swipeVector, type Direction } from './swipe.js';
 
@@ -169,14 +169,7 @@ interface Listing {
 
 /** `tree`'s listing for `motionShown` (`Listing`): the target's identity, each identity listed once, the gesture box. One walk. */
 function listingOf(tree: UiNode, target: UiNode, gesture: Rect | undefined): Listing {
-  const nodes = new Map<string, QuotedNode>();
-  const twice = new Set<string>();
-  for (const n of everyNode(tree)) {
-    const key = nodeIdentity(n);
-    if (nodes.has(key)) twice.add(key);
-    else nodes.set(key, quoted(n));
-  }
-  for (const key of twice) nodes.delete(key);
+  const nodes = new Map([...listedOnce(tree)].map(([key, n]) => [key, quoted(n)] as const));
   return { target: nodeIdentity(target), nodes, gesture: gesture === undefined ? undefined : { ...gesture } };
 }
 

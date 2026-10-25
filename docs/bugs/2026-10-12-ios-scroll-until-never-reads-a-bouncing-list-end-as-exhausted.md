@@ -7,8 +7,8 @@ round-8 device check (R-6.6, the B1 wording on iOS).
 > **Status (2026-10-25): fixed** on `fix/round-9` (ADR 0021 decision 6, the owner's choice of the note's two
 > suggestions together, only where the stroke carried the content less far than the finger): where the platform flings
 > (iOS), a read after a stroke with the target nowhere that found the content carried less far than the finger drew is
-> read again after a settle and compared with the read BEFORE the stroke, every node within a point — and the tree's
-> unmoved test is within a point everywhere. Measured by `tests/interact/scroll-rebound.test.ts` (this note's reads:
+> read again after a settle (the stroke's first confirming read) and compared with the read BEFORE the stroke, every
+> node within a point — and, where strokes fling, the tree's unmoved test is within a point (Android's stays exact). Measured by `tests/interact/scroll-rebound.test.ts` (this note's reads:
 > exhausted after 2 swipes, not 6) and the driver's `scroll.test.ts` (a bouncing fake, red before), golden 0 changed,
 > and live under idb and WDA on the new case `absent:scroll-top-edge-end` (docs/truth/live-records/ios-vis-r9-absent-*.json,
 > 2 of 2 each: "failed after 2 swipes … did not change the screen", nothing fired). There today's idb read came ~1.2 s

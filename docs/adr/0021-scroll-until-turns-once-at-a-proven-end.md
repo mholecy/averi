@@ -17,6 +17,8 @@ docs/truth/live-records/ios-wda-stop-carousel-r23-1…4.json, and the visibility
 ios-vis-r23-ios-stop-e687fe83.json, at e687fe83; the scroll cells at 659fdf00, ios-wda-scroll-cells-659fdf00.json)
 turn after one stroke; the carry model cuts a first stroke over each scroll view too (decision 4); a stop is judged on
 the read a fling comes to rest in (decision 5).
+Round 9 (2026-10-25, the owner): decision 6 (a rebound read settled, the tree unmoved within a point where strokes
+fling) and residual 2 (the WDA plain stop on a centre a fraction of a point out) accepted.
 
 ## Context
 
@@ -101,31 +103,41 @@ the read a fling comes to rest in (decision 5).
    fling then carried it out. Now every run stops on two agreeing reads, 6 of 6 (in the traced four, C moving e.g. 44, 17, 5, then 0). An
    animation moving as much at every read still spends the budget and is reported "still moving", as before.
 6. **A rebound is read settled** (owner, 2026-10-25, round 9; `motion-ledger.ts#Moved.rebounding`,
-   `scroll-rounds.ts#RoundRules.flings`): decision 2's "a read still moving proves nothing until one reads still" made
-   a rule for a target NOT in the tree. Where the platform flings every stroke (iOS, no drag speed), a read after a
-   stroke that finds no match, lists content the stroke went over, and finds some node — listed once in both reads, at
-   the same size — carried along the stroke's axis by more than a unit but none as far as the finger drew, may be a
-   list's end rubber-banding: nothing is counted on it, and ONE more read after a settle (no confirming read spent;
-   only while time is left) answers for the stroke, compared with the read BEFORE the stroke — the same fingerprint, or
-   every node within a unit. Measured (docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md,
-   idb, Settings › General at its end): a 524-pt stroke dragged `About` 173 pt and back over ~0.75 s, the read after it
-   at a different offset each time, so `UNMOVED_STROKES_EXHAUST`'s two unchanged reads never came and every stroke of
-   the budget was spent; a fling carries content 2.1–2.8 times the drag (decision 4's samples), so it takes no extra
-   read. Now the two strokes into such an end read exhausted after 2 swipes, and a list that never moved still names no
-   side never stroked (`treeMoved` is set by the settled comparison, not by the bounce). WDA reads ~1.1 s after a stroke,
-   mostly past the bounce: the rule rarely fires there and, when it does, the settled read may carry decision 2's proof.
-   Cost: one read (and the 400 ms settle) per stroke that carried content less far than the finger with the target
-   nowhere — at an end, or a list's last partial page; none mid-list, none on Android (strokes drag: the content moves
-   about the finger's travel, and a rule on it would fire on the touch slop). Residual: a screen whose content moves on
-   its own by less than a stroke between two reads (an animation carrying nodes) takes the extra read too, and is
-   judged as before on it.
-   **The tree unmoved is within a point too** (the same round): with no target in the tree, a stroke left it unmoved when
-   every node is where it was within a unit (`motion-ledger.ts#sameTreeWithinPixel`; the same fingerprint says so at
-   once) — decision 2's rule for the matches, made the tree's. Measured live under idb (lab case
-   `absent:scroll-top-edge-end`, the page at its end, no bounce caught: idb's read lands ~1.2 s after the stroke): the
-   first stroke left A at -283 where it was read at -282, the page resting a fraction of a point off; the exact
-   fingerprint read that as motion — a third stroke, and "if it lies above, try direction: "up"" for a list that never
-   moved. Now 2 swipes and no such side, under idb and WDA, twice each (docs/truth/live-records/ios-vis-r9-absent-*.json).
+   `motion-ledger.ts#StrokePhysics`, `scroll-rounds.ts#RoundRules.strokes`): decision 2's "a read still moving proves
+   nothing until one reads still" made a rule for a target NOT in the tree. Where the platform flings every stroke
+   (`fling`: iOS, no drag speed), a read after a stroke that finds no match, lists content the stroke went over, and
+   finds some node — listed once in both reads, at the same size — carried along the stroke's axis by more than a unit
+   but none as far as the finger drew, may be a list's end rubber-banding: nothing is counted on it, and ONE more read
+   after a settle — the stroke's first confirming read (`SETTLE_CONFIRM_READS`), so the round's bound holds; only while
+   time is left, at maxSwipes too — answers for the stroke, compared with the read BEFORE the stroke: the same
+   fingerprint, or every node within a unit. Measured
+   (docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md, idb, Settings › General at
+   its end, round 8's src): a 524-pt stroke dragged `About` 173 pt and back over ~0.75 s, the read after it at a
+   different offset each time, so `UNMOVED_STROKES_EXHAUST`'s two unchanged reads never came and every stroke of the
+   budget was spent; a fling carries content 2.1–2.8 times the drag (decision 4's samples), so it takes no extra read.
+   Now the two strokes into such an end read exhausted after 2 swipes (tests/interact/scroll-rebound.test.ts), and a
+   list that never moved names no side never stroked (`treeMoved` is set by the settled comparison, not by the bounce).
+   WDA reads ~1.1 s after a stroke, mostly past the bounce: the rule rarely fires there. Cost: one read (and the 400 ms
+   settle) per stroke after which some node, listed in both reads at its size, moved less far than the finger and the
+   target is nowhere — at an end, a list's last partial page, or a pinned header pushed part-way; none on Android
+   (`drag`: the content moves about the finger's travel, and a rule on it would fire on the touch slop).
+   **Not caught live yet**: today's reads come ~1.2 s after a stroke under idb too (round 9's traces), past the
+   bounce, so the lab case and Settings › General went green by the rule below, not by this one — the settled read is
+   proven by the tests alone.
+   **The tree unmoved is within a point where strokes fling** (the same round): with no target in the tree, a stroke
+   left it unmoved when every node is where it was within a unit (`read-tree.ts#sameTreeWithinPixel`; the same
+   fingerprint says so at once) — decision 2's rule for the matches, made the tree's, on iOS only (the owner's scope;
+   no Android source was measured rounding so, and its test stays the exact fingerprint). Measured live under idb (lab
+   case `absent:scroll-top-edge-end`, the page at its end, no bounce caught): the first stroke left A at -283 where it
+   was read at -282, the page resting a fraction of a point off; the exact fingerprint read that as motion — a third
+   stroke, and "if it lies above, try direction: "up"" for a list that never moved. Settings › General the same
+   (`About` 247 → 246 → 246). Now 2 swipes and no such side, under idb and WDA, twice each
+   (docs/truth/live-records/ios-vis-r9-absent-*.json). That the round-8 note's six strokes were this rounding rather
+   than the bounce is possible — both are fixed.
+   Residuals: a settled read still inside the bounce (400 ms and a read are not always past ~0.75 s) reads the list
+   moved — the strokes run on as before, and a list that never moved may name the side never stroked; a content that
+   genuinely moves a unit per stroke where strokes fling reads unmoved (no stroke moves content that little); a screen
+   whose content moves on its own by less than a stroke between reads takes the extra read too, and is judged as before.
 
 ## Where it applies, and where not
 

@@ -12,7 +12,7 @@ import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts } from './scroll-read.js';
-import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type UnseenStrokes } from './motion-ledger.js';
+import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
 import { carried, planStroke, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
@@ -95,7 +95,7 @@ import type { Direction } from './swipe.js';
  * no cover under it; then `ask eyes` on a stop that would
  * say "fully visible" with a flush neighbour — THE EYES, ui-tree/eyes.ts — whose band under `fully: true` is no stop);
  * stuck; the confirming read, or the
- * read after a probe, that did not read; covered (nothing above the band); the end turn (`EndTurn`), which takes an
+ * read after a probe, that did not read; a rebound's settled read (UNMOVED_STROKES_EXHAUST's rebound); covered (nothing above the band); the end turn (`EndTurn`), which takes an
  * exhaustion it applies to out of the bound; the bound (exhausted; `movesWith`, a margin text seen drawn over it
  * carried with it; maxSwipes; deadline — and `ask unlocated` of a round that read); the stroke. The witness comes
  * before the deadline is consulted, so a witness that waits out its 2 s counts against the scroll's budget: the driver
@@ -121,12 +121,8 @@ export interface RoundRules {
   fully: boolean;
   maxSwipes: number;
   timeoutMs: number;
-  /**
-   * The platform flings every stroke — its own scroll physics, no drag speed (iOS: adapters/types.ts#DeviceAdapter's
-   * `dragSpeed` absent) — so a stroke into a list's end rubber-bands the content back, and the read after it may land
-   * inside the bounce (motion-ledger.ts#LedgerRead's `flings`, UNMOVED_STROKES_EXHAUST's rebound). Default false.
-   */
-  flings?: boolean;
+  /** How the platform's scroll views take a stroke (motion-ledger.ts#StrokePhysics: `fling` on iOS, `drag` where the adapter has a drag speed): UNMOVED_STROKES_EXHAUST's rebound and the tree's within-a-pixel test. Default `drag`. */
+  strokes?: StrokePhysics;
   /** What the scroll looks for — asked of only by a miss (ui-tree/miss.ts#missOf); absent in a table of rounds, which hands each read its matches and gets the miss's facts of the tree alone. */
   target?: Target;
 }
@@ -443,6 +439,8 @@ export type Shortfall =
  * `maxSwipes`: they send nothing.
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
  *
+ * A REBOUND's settled read (UNMOVED_STROKES_EXHAUST) is the stroke's first confirming read, spent like any other.
+ *
  * A FLING STILL SLOWING spends none of them (`Observed.slowing`): a confirming read that found the target — the
  * same node — moved less over its settle pause than the read before found it moved over its own is read again
  * free, until the deadline. A fling slows read for read; an animation moves as much at every read and spends the
@@ -476,10 +474,11 @@ export const SETTLE_CONFIRM_READS = 3;
  * turned round) is a new attempt. The `fully: true` clipped stop's stuck
  * test takes the same two, watching the judged match
  * alone — a visible clipped match that does not move is the defect it
- * reports. For both, only strokes count: a confirming read sent none.
+ * reports. For both, only strokes count: a confirming read sent none — but a rebound's settled read (below) answers for
+ * the stroke it followed, in that stroke's place.
  *
  * And a target NOT in the tree (the note below): the same stroke twice after
- * which the WHOLE tree is unchanged (`TreeFacts.fingerprint`) — content at
+ * which the WHOLE tree is unchanged (`TreeFacts.fingerprint`; where strokes fling, within a pixel: below) — content at
  * its end, the target not in it, or no longer: measured, `scroll_until
  * row_40` on a list ending at row_36 swiped 5 times to the 15 s timeout,
  * "never appeared". It fails after the two, in the same words, the
@@ -504,7 +503,8 @@ export const SETTLE_CONFIRM_READS = 3;
  * container, so blank space — a spacer, an image or a chart with no node — dumps the same tree at every offset:
  * measured, the lab app's `tabbar-floating` read "the last 2 … did not change the screen" after 4 strokes while each
  * moved the list ~860 px, F one stroke away. Such a read is no unmoved read — the streak starts again, a reset, not a
- * freeze, the conservative side; nor a moved one: only a changed fingerprint sets the motion ledger's
+ * freeze, the conservative side; nor a moved one: only a tree changed (the fingerprint; where strokes fling, past a
+ * pixel, and after a rebound on the settled read) sets the motion ledger's
  * motion-ledger.ts#treeMoved — and the strokes run on to the bound, where an `absent` failure says the last of them
  * went over blank content (motion-ledger.ts#UnseenStrokes: raise maxSwipes or timeoutMs). The streak keeps its
  * meaning — the same stroke twice left a tree that WOULD show motion unchanged — so "did not change the screen" stays true. Cost: none wherever the list shows content along the stroke's
@@ -515,15 +515,19 @@ export const SETTLE_CONFIRM_READS = 3;
  * two.
  *
  * A REBOUND is read settled (ADR 0021 decision 6, owner 2026-10-25): where the platform flings every stroke
- * (`RoundRules.flings`, iOS), a stroke into a list's end rubber-bands the content back over ~0.75 s, and the read after
+ * (`RoundRules.strokes` `fling`, iOS), a stroke into a list's end rubber-bands the content back over ~0.75 s, and the read after
  * it lands inside the bounce at another offset each time — measured under idb on Settings › General, a target not there
  * cost all six strokes, "failed after 6 swipes (maxSwipes)". A read after a stroke with the target nowhere that found
  * the content carried less far than the finger drew (motion-ledger.ts#Moved `rebounding`) counts nothing; one more
  * read after a settle, spending no confirming read, answers for the stroke against the read before it (every node
- * within a pixel). Now "the last 2 … did not change the screen" after the two strokes. And the whole tree unchanged is
- * within a pixel, as every match's is: measured under idb, a page at its end read a point off after the first stroke
- * (its rest rounded the other way), and the exact fingerprint called it motion — a third stroke, and a side never
- * stroked named (motion-ledger.ts#sameTreeWithinPixel).
+ * within a pixel). Now "the last 2 … did not change the screen" after the two strokes. The settled read is the stroke's
+ * first confirming read (SETTLE_CONFIRM_READS), so the round's BOUND holds. And where strokes fling the whole tree
+ * unchanged is within a pixel, as every match's is: measured under idb, a page at its end read a point off after the
+ * first stroke (its rest rounded the other way), and the exact fingerprint called it motion — a third stroke, and a
+ * side never stroked named (ui-tree/read-tree.ts#sameTreeWithinPixel); where strokes drag (Android) it stays exact.
+ * Residuals: a settled read still inside the bounce (400 ms and a read are not always past it) reads the list moved —
+ * the strokes run on as before, and a list that never moved may name the side never stroked; a screen whose content
+ * moves on its own by less than a stroke between reads takes the extra read too.
  * docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
@@ -779,7 +783,7 @@ function ledgerRead(s: State, current: Since, facts: TreeFacts, found: readonly 
     ...(shows !== undefined && { gesture: shows }),
     ...(blank?.kind === 'blank' && sentToward !== undefined && { blank: { within: blank.view.rect, toward: sentToward } }),
     ...(carryToward !== undefined && { carryToward }),
-    ...(current === 'stroke' && s.rules.flings === true && { flings: true as const }),
+    ...(s.rules.strokes !== undefined && { strokes: s.rules.strokes }),
   };
 }
 
@@ -1031,9 +1035,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // no read succeeded (`neverRead`).
   if (callEvidence(s).of === 'unread' && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
   // A rebound that may be under way (UNMOVED_STROKES_EXHAUST's rebound, motion-ledger.ts#Moved `rebounding`): read again
-  // after a settle, spending no confirming read — the settled read answers for the stroke. Only while time is left: at
-  // the deadline the bound, as before.
-  if (motion.moved?.rebounding === true && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
+  // after a settle, the stroke's first confirming read (the stroke left none spent) — the settled read answers for the
+  // stroke. Only while time is left: at the deadline the bound, as before. At maxSwipes too: the last stroke is answered.
+  if (motion.moved?.rebounding === true && mayConfirm(s, seen.elapsedMs)) return confirm(s);
   // A confirming read that did not read, or the read after a probe: read
   // again, within the same budget, rather than stroke away from a stop the
   // last read saw.

@@ -1,6 +1,6 @@
-import { everyNode, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
+import type { Rect, Stroke, UiNode } from '../adapters/types.js';
 import { isUntold, sameRectWithinPixel, sameSizeWithinPixel } from '../ui-tree/geometry.js';
-import { nodeIdentity } from '../ui-tree/read-tree.js';
+import { listedOnce, nodeIdentity, sameTreeWithinPixel } from '../ui-tree/read-tree.js';
 import { carriedUnder, goesOver, NO_REGION, seeRegion, type CarriedUnder, type MotionShown, type RegionMemory } from './motion-shown.js';
 import type { Since, TreeFacts } from './scroll-read.js';
 import { sameStroke, type Direction } from './swipe.js';
@@ -10,9 +10,10 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
 /**
  * THE MOTION LEDGER: every answer to "did it move" across one `scroll_until` run, kept in one place. The round
  * (interact/scroll-rounds.ts#round) shows it each round's read and the stroke drawn before it, and asks it; it keeps
- * what the answers are measured against — the last read's rects, fingerprint, judged rect and identity, the streak's
- * stroke, the last stroke drawn, the motion over the last settle, and, on a tree that tells no scroll view, the region
- * the motion showed (interact/motion-shown.ts, its internal module).
+ * what the answers are measured against — the last read's rects, fingerprint, tree, judged rect and identity, the
+ * streak's stroke, the last stroke drawn, the motion over the last settle, the read before a stroke that may have
+ * rebounded (kept for the settled read: `rebounding`), and, on a tree that tells no scroll view, the region the motion
+ * showed (interact/motion-shown.ts, its internal module).
  *
  * The interface, which is also the test surface (tests/interact/motion-ledger.test.ts; the region over measured idb
  * captures, with the plan's stroke over it, tests/interact/motion-region.test.ts):
@@ -35,9 +36,12 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  *   settle confirm);
  * - EVERY match unmoved: the same multiset of rects, each within a pixel (`sameRects`) — "exhausted" must look at every
  *   match, since the judged one can be a static duplicate while the real one moved;
- * - the TREE unmoved: the same tree, every node within a pixel (`sameTreeWithinPixel`; the same fingerprint says so at
- *   once), nothing loading, and no blank read (`UnseenStrokes`) — after a stroke that may have rebounded off a list's
- *   end (`rebounding`), the settled read's tree against the read BEFORE the stroke;
+ * - the TREE unmoved: the same fingerprint, nothing loading, and no blank read (`UnseenStrokes`) — where the platform
+ *   flings (`StrokePhysics`, iOS, whose sources round a resting list's frames a point either way), the same tree within
+ *   a pixel (ui-tree/read-tree.ts#sameTreeWithinPixel); after a stroke that may have rebounded off a list's end
+ *   (`rebounding`), the settled read's tree against the read BEFORE the stroke;
+ * - the REBOUND (`carriedShort`): a node listed once in both reads (ui-tree/read-tree.ts#listedOnce), at the same size
+ *   within a pixel, carried along the stroke's axis by more than a pixel, and none as far as the finger drew;
  * - SLOWING: the same node (ui-tree/read-tree.ts#nodeIdentity) moved less over this settle than over the one before;
  * - the CARRY SAMPLE: the same node at the same size (within a pixel each way) after a course stroke;
  * - the REGION: motion-shown.ts's own rules (a node listed once, its delta within a 20th).
@@ -84,14 +88,21 @@ export interface LedgerRead {
    * the same size (`Moved.carry`).
    */
   readonly carryToward?: Direction;
-  /**
-   * The stroke this read follows was flung by the platform (scroll-rounds.ts#RoundRules `flings`: iOS), so a list's
-   * end rubber-bands under it: a read after it that finds no match, lists content the stroke went over (no `blank`),
-   * and finds some node carried along the stroke's axis but none as far as the finger drew may be read inside the bounce
-   * (`rebounding`) — its verdict on the tree waits for a settled read.
-   */
-  readonly flings?: true;
+  /** How the platform's scroll views take a stroke (`StrokePhysics`); default `drag`. */
+  readonly strokes?: StrokePhysics;
 }
+
+/**
+ * How a platform's scroll views take a stroke (scroll-rounds.ts#RoundRules `strokes`, from the adapter: interact/scroll.ts):
+ * - `fling`: its own scroll physics, no drag speed (iOS: adapters/types.ts#DeviceAdapter's `dragSpeed` absent) — a
+ *   stroke into a list's end rubber-bands the content back, so a read after it that finds no match, lists content the
+ *   stroke went over (no `blank`) and finds the content carried less far than the finger drew may be read inside the
+ *   bounce (`Moved.rebounding`); and iOS's sources round a resting list's frames a point either way, so the tree's
+ *   unmoved test is within a pixel;
+ * - `drag`: dragged at a speed that does not fling (Android's `dragSpeed`) — the content moves about the finger's
+ *   travel, and the tree's unmoved test is the fingerprint's, exact.
+ */
+export type StrokePhysics = 'fling' | 'drag';
 
 /** Identical strokes in a row (`sameStroke`) after which the judged match, every match, and the whole tree stayed put. */
 export interface Streaks {
@@ -117,7 +128,7 @@ export interface Moved {
   /** What the stroke just sent carried the target (interact/stroke-plan.ts#carried's sample), when `LedgerRead.carryToward` allowed one and the judged match is the same node at the same size: how far it moved the way the content goes, and the stroke as drawn. */
   readonly carry: { readonly moved: number; readonly drawn: Stroke } | undefined;
   /**
-   * A REBOUND MAY BE UNDER WAY (`LedgerRead.flings`, `rebounding`): this read after a stroke found the content carried less
+   * A REBOUND MAY BE UNDER WAY (`StrokePhysics` `fling`): this read after a stroke found the content carried less
    * far than the finger drew, the target nowhere — the tree's verdict on that stroke waits for the next read that reads
    * after a settle, which is compared with the read before the stroke. Nothing is counted on this read.
    * docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md
@@ -195,7 +206,7 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
   const m = open(ledger);
   const lastDrawn = drawn ?? m.lastDrawn;
   if (read === undefined) return { ledger: close({ ...m, lastDrawn }), moved: undefined };
-  const { since, found, judged, facts, gesture, blank, carryToward, flings } = read;
+  const { since, found, judged, facts, gesture, blank, carryToward, strokes = 'drag' } = read;
   const rects = found.map((n) => ({ ...n.rect }));
   const before = m.judged;
   // This read's judged match as the ledger keeps it: kept until a read judges another.
@@ -212,8 +223,8 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
   // A rebound that may be under way (`Moved.rebounding`): this read after a stroke counts nothing, the read before the
   // stroke kept for the settled read to be compared with.
   const rebounding =
-    since === 'stroke' && flings === true && blank === undefined && found.length === 0 && m.tree !== undefined && m.fingerprint !== undefined && m.fingerprint !== facts.fingerprint && lastDrawn !== undefined && carriedShort(m.tree, facts.tree, lastDrawn);
-  const rebound = rebounding && m.tree !== undefined && m.fingerprint !== undefined ? { tree: m.tree, fingerprint: m.fingerprint, rects: m.rects } : since === 'start' ? m.rebound : undefined;
+    since === 'stroke' && strokes === 'fling' && blank === undefined && found.length === 0 && m.tree !== undefined && m.fingerprint !== undefined && m.fingerprint !== facts.fingerprint && lastDrawn !== undefined && carriedShort(m.tree, facts.tree, lastDrawn);
+  const rebound = rebounding && m.tree !== undefined && m.fingerprint !== undefined ? { tree: m.tree, fingerprint: m.fingerprint, rects: m.rects } : undefined;
   // The settled read a rebound waited for answers for that stroke, against the read before it.
   const settled = since === 'settle' ? m.rebound : undefined;
   const strokeRead = (since === 'stroke' && !rebounding) || settled !== undefined;
@@ -222,10 +233,11 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
   if (since === 'stroke') unseen = blank === undefined ? undefined : unseenAfter(unseen, blank.within, blank.toward);
   if (strokeRead) {
     const was = settled ?? { tree: m.tree, fingerprint: m.fingerprint, rects: m.rects };
-    // Within a pixel: whole-point frames round a list resting a fraction of a point off a point either way — measured
-    // under idb, scroll-top-edge-end's page at its end read A at -282 before the first stroke into it and -283 after,
-    // which the exact fingerprint read as motion: a third stroke, and a side never stroked named.
-    const sameTree = was.fingerprint === facts.fingerprint || (was.tree !== undefined && sameTreeWithinPixel(was.tree, facts.tree));
+    // Within a pixel where the platform flings: iOS's whole-point frames round a list resting a fraction of a point off a
+    // point either way — measured under idb, scroll-top-edge-end's page at its end read A at -282 before the first
+    // stroke into it and -283 after, which the exact fingerprint read as motion: a third stroke, and a side never
+    // stroked named. Exact where strokes drag (Android): no source of it was measured rounding so.
+    const sameTree = was.fingerprint === facts.fingerprint || (strokes === 'fling' && was.tree !== undefined && sameTreeWithinPixel(was.tree, facts.tree));
     treeUnmoved = sameTree && !facts.loading && unseen === undefined;
     if (was.fingerprint !== undefined && !sameTree) treeMoved = true;
     // Every match, not only the judged one: with several matches off the frame the judged one is the first in tree
@@ -321,26 +333,6 @@ function carriedShort(before: UiNode, after: UiNode, drawn: Stroke): boolean {
     if (then !== undefined && sameSizeWithinPixel(then.rect, n.rect)) most = Math.max(most, Math.abs(along(n.rect) - along(then.rect)));
   }
   return most > 1 && most < Math.max(dx, dy);
-}
-
-/** Every node of `tree` whose identity (ui-tree/read-tree.ts#nodeIdentity) it lists once, by that identity. */
-function listedOnce(tree: UiNode): Map<string, UiNode> {
-  const seen = new Map<string, UiNode | null>();
-  for (const n of everyNode(tree)) {
-    const identity = nodeIdentity(n);
-    seen.set(identity, seen.has(identity) ? null : n);
-  }
-  return new Map([...seen].filter((e): e is [string, UiNode] => e[1] !== null));
-}
-
-/** The same tree, node for node in the order listed — role, label, identifier and value equal, each rect within a pixel. */
-function sameTreeWithinPixel(a: UiNode, b: UiNode): boolean {
-  const left = [...everyNode(a)];
-  const right = [...everyNode(b)];
-  return left.length === right.length && left.every((n, i) => {
-    const o = right[i]!;
-    return n.role === o.role && n.label === o.label && n.identifier === o.identifier && n.value === o.value && sameRectWithinPixel(n.rect, o.rect);
-  });
 }
 
 /** The same set of rects, each within a pixel — every match where it was. Empty sets say nothing. */

@@ -143,3 +143,19 @@ for the control; the simulator shut down after. Reproduce (outside the sandbox):
 - **WDA, the control**: every case ok — R Tapped in both cells, F, L and short F reached and then Tapped, L's carry
   case reached; WDA lists the identifiers, so nothing of the new note is said there.
 
+
+## 6. Round 9, a list's end that rebounds (ADR 0021 decision 6), 2026-10-25
+
+The new case `absent:scroll-top-edge-end` (live-visibility.ts#ABSENT_AT_END): `scroll_until` for a row the cell does
+not have, `down` into scroll-top-edge-end's page, which rests at its end — docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md.
+
+- **Before, main's src (265a2bb4 through `--side`)**: under idb "failed after 3 swipes … — if it lies above, try
+  direction: "up"" (the first stroke's read put A at -283 where it rested at -282: the exact fingerprint read the point
+  as motion), under WDA "failed after 6 swipes (maxSwipes)" — both `end-unread`
+  (docs/truth/live-records/ios-vis-r9-absent-before.json).
+- **After, fix/round-9**: under idb and WDA "failed after 2 swipes (the last 2, swiping down, did not change the screen
+  …)", nothing fired, the app's page unmoved at 382 — three runs (ios-vis-r9-absent-1.json, -2.json, -3.json, the last
+  after the review's fixes).
+- **Settings › General, traced by hand under idb** (the note's own screen, at the end): "failed after 2 swipes", each
+  read ~1.2 s after its stroke, `About` 247 → 246 → 246. No read was caught inside the bounce in any run: the settled
+  read of decision 6 is proven by the tests alone; what made today's runs green is the tree's within-a-point test.

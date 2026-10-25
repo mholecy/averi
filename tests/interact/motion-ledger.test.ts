@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { heldBack, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved } from '../../src/interact/motion-ledger.js';
+import { heldBack, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type StrokePhysics } from '../../src/interact/motion-ledger.js';
 import type { Since } from '../../src/interact/scroll-read.js';
 import type { Direction } from '../../src/interact/swipe.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
@@ -29,6 +29,11 @@ interface Row {
   readonly loading?: boolean;
   readonly blank?: LedgerRead['blank'];
   readonly carryToward?: Direction;
+  /** Content nodes besides the matches (texts `row <i>`, listed once each): what a rebound is measured on. */
+  readonly content?: readonly Rect[];
+  readonly strokes?: StrokePhysics;
+  /** The screen's text in the tree, when not the fingerprint: two reads whose fingerprints differ only as a device's would for rects a point apart. */
+  readonly screen?: string;
 }
 
 /** A read's facts for `row`: its matches as buttons on a phone screen (a tree that lists them in no scroll view), its fingerprint as given — and in the tree, as a text of that label, so trees of other fingerprints differ as on a device. */
@@ -36,7 +41,8 @@ function readOf(row: Row): LedgerRead {
   const at = row.at ?? [];
   const index = row.judged === null ? undefined : (row.judged ?? (at.length > 0 ? 0 : undefined));
   const found = at.map((rect, i) => node({ role: 'button', label: i === index ? (row.name ?? 'F') : `match ${i}`, rect: { ...rect } }));
-  const tree = node({ role: 'container', rect: PHONE, children: [...found, node({ role: 'text', label: row.fingerprint ?? 'screen' })] });
+  const content = (row.content ?? []).map((rect, i) => node({ role: 'text', label: `row ${i}`, rect: { ...rect } }));
+  const tree = node({ role: 'container', rect: PHONE, children: [...found, ...content, node({ role: 'text', label: row.screen ?? row.fingerprint ?? 'screen' })] });
   return {
     since: row.since ?? 'stroke',
     found,
@@ -44,6 +50,7 @@ function readOf(row: Row): LedgerRead {
     facts: { tree, scene: sceneOf(tree), fingerprint: row.fingerprint ?? 'screen', loading: row.loading ?? false },
     ...(row.blank !== undefined && { blank: row.blank }),
     ...(row.carryToward !== undefined && { carryToward: row.carryToward }),
+    ...(row.strokes !== undefined && { strokes: row.strokes }),
   };
 }
 
@@ -248,5 +255,48 @@ describe('the region the motion showed, and the last stroke drawn', () => {
     const told = node({ role: 'container', rect: PHONE, children: [list] });
     const dropped = seeMotion(ledger, { drawn: undefined, read: { ...idbRead(told), facts: { tree: told, scene: sceneOf(told), fingerprint: '', loading: false } } }).ledger;
     expect(regionOf(dropped)).toBeUndefined();
+  });
+});
+
+// A list's end that rebounds (docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md,
+// ADR 0021 decision 6): where strokes fling, a read after a stroke with no match that found the content carried less far
+// than the finger drew counts nothing; the next read after a settle answers for the stroke, against the read before it.
+describe('the rebound', () => {
+  const rowAt = (y: number): Rect => ({ x: 16, y, width: 370, height: 44 });
+  const list = (top: number, fingerprint: string): Pick<Row, 'content' | 'fingerprint'> => ({ content: [rowAt(top), rowAt(top + 44)], fingerprint });
+  const STROKE: Stroke = { from: { x: 201, y: 699 }, to: { x: 201, y: 175 } };
+
+  it('a stroke read carried short is rebounding (nothing counted); the settled read back at rest answers for it — unmoved, a stroke read; the tree never moved', () => {
+    const { ledger, moved } = play([
+      { since: 'start', ...list(247, 'rest') },
+      { drawn: STROKE, strokes: 'fling', ...list(74, 'bounce') },
+      { since: 'settle', strokes: 'fling', ...list(247, 'rest') },
+    ]);
+    expect(moved.map((m) => [m?.rebounding, m?.strokeRead, m?.unmoved.tree, m?.streaks.tree])).toEqual([
+      [false, false, false, 0],
+      [true, false, false, 0],
+      [false, true, true, 1],
+    ]);
+    expect(treeMoved(ledger)).toBe(false);
+  });
+
+  it('the settled read somewhere else: moved, and the tree moved', () => {
+    const { ledger, moved } = play([{ since: 'start', ...list(247, 'a') }, { drawn: STROKE, strokes: 'fling', ...list(100, 'b') }, { since: 'settle', strokes: 'fling', ...list(130, 'c') }]);
+    expect(moved[2]).toMatchObject({ strokeRead: true, unmoved: { tree: false } });
+    expect(treeMoved(ledger)).toBe(true);
+  });
+
+  it('no rebound where strokes drag, nor past the finger\'s travel, nor with nothing carried', () => {
+    const second = (r: Row) => play([{ since: 'start', ...list(247, 'a') }, { drawn: STROKE, ...r }]).moved[1];
+    expect(second({ strokes: 'drag', ...list(74, 'b') })).toMatchObject({ rebounding: false, strokeRead: true });
+    expect(second({ strokes: 'fling', ...list(-600, 'b') })).toMatchObject({ rebounding: false, strokeRead: true });
+    expect(second({ strokes: 'fling', ...list(247, 'b') })).toMatchObject({ rebounding: false, strokeRead: true });
+  });
+
+  it('the tree within a pixel where strokes fling; exact where they drag', () => {
+    // The rows a point off: the fingerprints differ (the rects are hashed), the trees are the same within a pixel.
+    const unmovedBy = (strokes: StrokePhysics) => play([{ since: 'start', ...list(247, 'a'), screen: 'S' }, { drawn: STROKE, strokes, ...list(248, 'b'), screen: 'S' }]).moved[1]?.unmoved.tree;
+    expect(unmovedBy('fling')).toBe(true);
+    expect(unmovedBy('drag')).toBe(false);
   });
 });

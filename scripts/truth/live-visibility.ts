@@ -578,7 +578,8 @@ function absentAtEndCase(cell: string, view: string, direction: Direction): Visi
  * An absent-at-the-end case's judge (ABSENT_AT_END): a failure after at most UNMOVED_STROKES_EXHAUST swipes that says
  * the last of them did not change the screen — true of the app's strokes (`unchangedClaimBroken`) — with nothing fired,
  * is ok; a stop is a `stop-claim`, a false unchanged claim an `unchanged-claim`, anything fired a `tap-claim`; any
- * other failure (maxSwipes, the deadline, more strokes) an `end-unread` MISMATCH.
+ * other failure (maxSwipes, the deadline, more strokes, or a side never stroked named: the page never moved) an
+ * `end-unread` MISMATCH.
  */
 export function judgeAbsentAtEnd([scroll]: readonly string[], final: LabState, launched: LabState): LiveVerdict {
   const kind = replyKind(scroll);
@@ -588,6 +589,9 @@ export function judgeAbsentAtEnd([scroll]: readonly string[], final: LabState, l
   const broken = unchangedClaimBroken(scroll, strokesSince(final, launched));
   if (broken !== undefined) return { outcome: 'MISMATCH', cls: 'unchanged-claim', kind, why: broken };
   const swipes = swipesOf(scroll);
+  // "if it lies above, try …" names a side never stroked: the list never moved, so it is false here (the round-9 live
+  // finding behind the tree's within-a-point test).
+  if (/if it lies (above|below|to the)/.test(scroll)) return { outcome: 'MISMATCH', cls: 'end-unread', kind, why: `a list that never moved names a side never stroked — averi: ${short(scroll)}` };
   if (swipes !== undefined && swipes <= UNMOVED_STROKES_EXHAUST && screenUnchangedFor(scroll) !== undefined) return { outcome: 'ok', kind, why: `exhausted after ${swipes} swipes, nothing fired — ${short(scroll)}` };
   return { outcome: 'MISMATCH', cls: 'end-unread', kind, why: `the list's end read as more to come — averi: ${short(scroll)}` };
 }

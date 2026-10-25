@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
-import type { RoundRules } from '../../src/interact/scroll-rounds.js';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
+import { SETTLE_CONFIRM_READS, type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { node } from '../helpers/fake.js';
 import { failureOf, play, type Played, type Row } from '../helpers/rounds.js';
 
@@ -17,13 +19,13 @@ import { failureOf, play, type Played, type Row } from '../helpers/rounds.js';
 type Rules = RoundRules & { screen: { width: number; height: number } };
 const PHONE: Rect = { x: 0, y: 0, width: 402, height: 874 };
 /** iOS: the platform flings every stroke (no drag speed). */
-const IOS: Rules = { direction: 'down', fully: false, maxSwipes: 6, timeoutMs: 15_000, flings: true, screen: { width: 402, height: 874 } };
+const IOS: Rules = { direction: 'down', fully: false, maxSwipes: 6, timeoutMs: 15_000, strokes: 'fling', screen: { width: 402, height: 874 } };
 /** The same reads, where strokes drag rather than fling (Android). */
-const DRAGS: Rules = { ...IOS, flings: false };
+const DRAGS: Rules = { ...IOS, strokes: 'drag' };
 
-/** Settings › General as idb lists it, its title fixed, `About` at `top` and the rows below it carried with it; `title` the navigation title's text. */
-function general(top: number, title = 'General'): Row {
-  const row = (label: string, y: number): UiNode => node({ role: 'button', label, rect: { x: 16, y, width: 370, height: 44 } });
+/** Settings › General as idb lists it, its title fixed, `About` at `top` and the rows below it carried with it, each `height` tall; `title` the navigation title's text. */
+function general(top: number, title = 'General', height = 44): Row {
+  const row = (label: string, y: number): UiNode => node({ role: 'button', label, rect: { x: 16, y, width: 370, height } });
   const tree = node({
     role: 'container',
     rect: { x: 0, y: 0, width: 0, height: 0 },
@@ -56,13 +58,17 @@ describe('round — a list\'s end that rebounds under a fling (iOS)', () => {
     expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 2, by: { of: 'exhausted', unchanged: 'tree' } });
   });
 
-  it('measured live (idb, scroll-top-edge-end at its end, no bounce caught): the first stroke rounds the rest a point off (A -282 → -283) — unmoved within a point, exhausted after the two strokes, with or without flings', () => {
-    for (const rules of [IOS, DRAGS]) {
-      const played = play(rules, [general(247), general(246), general(246)]);
-      expect(steps(played)).toEqual(['stroke', 'stroke', 'stop']);
-      expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 2, by: { of: 'exhausted', unchanged: 'tree' } });
-      expect(failureOf(played, 'text:"No Such Row"').message).not.toMatch(/lies above/);
-    }
+  it('measured live (idb, scroll-top-edge-end at its end, no bounce caught): the first stroke rounds the rest a point off (A -282 → -283) — unmoved within a point where the platform flings, exhausted after the two strokes, no side never stroked named', () => {
+    const played = play(IOS, [general(247), general(246), general(246)]);
+    expect(steps(played)).toEqual(['stroke', 'stroke', 'stop']);
+    expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 2, by: { of: 'exhausted', unchanged: 'tree' } });
+    expect(failureOf(played, 'text:"No Such Row"').message).not.toMatch(/lies above/);
+  });
+
+  it('where strokes drag (Android) the tree\'s test stays exact: a point is a change, as before', () => {
+    const played = play({ ...DRAGS, maxSwipes: 3 }, [general(247), general(246), general(246), general(246)]);
+    expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 3, by: { of: 'exhausted', unchanged: 'tree' } });
+    expect(failureOf(played, 'text:"No Such Row"').message).toMatch(/lies above/);
   });
 
   it('a fling that carried the content further than the finger drew is no rebound: no settled read, the next stroke at once', () => {
@@ -87,5 +93,57 @@ describe('round — a list\'s end that rebounds under a fling (iOS)', () => {
     const played = play(IOS, [general(247), { ...general(74), elapsedMs: 15_000 }]);
     expect(steps(played)).toEqual(['stroke', 'stop']);
     expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'timeout' } });
+  });
+
+  it('the last stroke the budget allows is answered too: a rebound at maxSwipes is read settled — exhausted, not maxSwipes', () => {
+    const played = play({ ...IOS, maxSwipes: 2 }, [general(247), general(74), general(247), general(235), general(247)]);
+    expect(steps(played)).toEqual(['stroke', 'confirm', 'stroke', 'confirm', 'stop']);
+    expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 2, by: { of: 'exhausted', unchanged: 'tree' } });
+  });
+
+  it('the round\'s BOUND holds (1 + (1 + SETTLE_CONFIRM_READS) × maxSwipes): the settled read is the stroke\'s first confirming read — each stroke caught in the bounce, every read after it failing', () => {
+    const failed: Row = { error: 'idb describe-all failed' };
+    const rows: Row[] = [general(247)];
+    for (const caught of [74, 160]) rows.push(general(caught), failed, failed, failed);
+    const played = play({ ...IOS, maxSwipes: 2 }, rows);
+    expect(played.steps.length).toBeLessThanOrEqual(1 + (1 + SETTLE_CONFIRM_READS) * 2);
+    expect(steps(played).filter((s) => s === 'confirm')).toHaveLength(2 * SETTLE_CONFIRM_READS);
+  });
+
+  it('content that changed size as it moved is no rebound (no node carried at its size): no settled read', () => {
+    const played = play({ ...IOS, maxSwipes: 1 }, [general(247), general(74, 'General', 52)]);
+    expect(steps(played)).toEqual(['stroke', 'stop']);
+  });
+
+  it('a read that lists none of the stroked scroll view\'s content (a blank read, UnseenStrokes) is no rebound: no settled read', () => {
+    const list: Rect = { x: 0, y: 120, width: 402, height: 700 };
+    const header = (y: number): UiNode => node({ role: 'text', label: 'Header', rect: { x: 0, y, width: 402, height: 40 } });
+    const rows: Row[] = [
+      { found: [], mainScroller: list, mainContent: [], over: [header(60)] },
+      { found: [], mainScroller: list, mainContent: [], over: [header(20)] },
+    ];
+    expect(steps(play({ ...IOS, maxSwipes: 1 }, rows))).toEqual(['stroke', 'stop']);
+  });
+});
+
+/**
+ * WDA (a nested tree of unclipped frames): the lab's scroll-bounded capture, `lower` at rest at its top, asked `up` for
+ * a row it does not have — each stroke's read catches `lower`'s content dragged down, each settled read finds it back at
+ * rest. No end proof here (a target not in the tree is stroked over the screen, no scroll view of it: ADR 0021 decision
+ * 2's `ends` is never asked), so the two-stroke rule decides, on the settled reads.
+ */
+describe('round — a rebound under WDA', () => {
+  const CAPTURE = parseWdaSource(readFileSync(new URL('../fixtures/wda-capture-lab-scroll-bounded.json', import.meta.url), 'utf8'));
+  const LOWER: Rect = { x: 0, y: 380, width: 402, height: 180 };
+  const scrolled = (offset: number): Row => {
+    const shift = (n: UiNode, by: number): UiNode => ({ ...n, rect: { ...n.rect, y: n.rect.y - by }, children: n.children.map((c) => shift(c, by)) });
+    const walk = (n: UiNode): UiNode =>
+      n.role === 'scrollable' && n.rect.y === LOWER.y && n.rect.height === LOWER.height ? { ...n, children: n.children.map((c) => shift(c, offset)) } : { ...n, children: n.children.map(walk) };
+    return { tree: walk(CAPTURE), found: [] };
+  };
+  it('each stroke\'s read inside the bounce, each settled read at rest: exhausted after the two strokes', () => {
+    const played = play({ ...IOS, direction: 'up' }, [scrolled(0), scrolled(-60), scrolled(0), scrolled(-25), scrolled(0)]);
+    expect(steps(played)).toEqual(['stroke', 'confirm', 'stroke', 'confirm', 'stop']);
+    expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 2, by: { of: 'exhausted', unchanged: 'tree' } });
   });
 });
