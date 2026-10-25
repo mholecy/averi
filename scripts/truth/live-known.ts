@@ -180,7 +180,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // clipped at the top, its centre inside the clip — ok, then Tapped; once (ios-vis-r16-le2-2.json) at 272.7, O at
   // 347.3, its centre 0.7 pt above the clip's top 380: "visible … CLIPPED at top, 49 %" against the truth's centre-out,
   // the tap at (201,380) then fired O. A fraction of a point WDA's whole-point frames do not tell; the same stroke and
-  // stop at 4ee14f1c (the src before LE2's rest), so not this fix's.
+  // stop at 4ee14f1c (the src before LE2's rest), so not this fix's. Accepted 2026-10-25 as ADR 0021 residual 2.
   ...each('ios wda', ['scroll:scroll-bounded-footer.O'], CENTRE_A_POINT_OUT, 'stop-claim', 'visible', { intermittent: true }),
   // iOS, both sources
   ...['idb', 'wda'].flatMap((src) => [

@@ -284,4 +284,16 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
    residual stays as the mechanism's bound — the cut is still planned over the largest carry sampled — but its measured
    margin is now 51 pt inside, not 14 pt past (the lab logs the table's offset after the strokes, not per stroke, so
    which of A1's changes moved it is not measured).
-
+2. **A plain stop under WDA may claim a row whose true centre rests within a point outside its scroll view's clip**
+   (accepted 2026-10-25 by the owner, round 9;
+   docs/bugs/2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md). WDA rounds each
+   part of a frame to a whole point on its own (decision 2), so a row whose centre lies a fraction of a point past the
+   clip's line can read with its centre ON the line; the stop judges the rounded centre — where the tap presses
+   (ui-tree/geometry.ts#rectCentre, `containsPoint` taking the clip's edge as inside) — and calls it visible, while the
+   truth, which rounds the app's own frame, calls it `centre-out`. Measured once in ~6 runs of scroll-bounded-footer's O
+   (ios-vis-r16-le2-2.json: O's centre 379.3 against the clip's top 380, "visible … CLIPPED at top, 49 %"). Harmless as
+   measured: the reply says the row is clipped and by how much, and the tap at the rounded centre lies on the clip's line,
+   which hit-tests inside, and fires the row. Rejected: another stroke when the centre lies within a point of the clip
+   (on this cell it flings O out of the clip's top and ends in a turn or a LOUD failure, for a stop that worked); a
+   tolerance in the truth harness (it would bend ADR 0020's contract for one wording). The live KNOWN entry stays,
+   intermittent (`ios wda scroll:scroll-bounded-footer.O`, stop-claim on `visible`).

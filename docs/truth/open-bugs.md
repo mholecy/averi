@@ -81,6 +81,7 @@ The order is by harm to the agent that uses averi as its eyes and hands in a ban
   - a target as wide as the screen is always `unjudged`;
   - a screen-spanning neighbour is not asked.
 - ADR 0021, residual 1: the carry margin on a long WDA list. It was re-measured in round 7 and is green 4 of 4.
+- ADR 0021, residual 2 (round 9, 2026-10-25): under WDA a plain stop may claim a row whose true centre rests within a point outside its scroll view's clip ("visible … CLIPPED"); the tap at the rounded centre fires the row. Live KNOWN `ios wda scroll:scroll-bounded-footer.O`, intermittent.
 - The live forms cases b1d and b7 stay LOUD, because neither `adb input text` nor idb can type `Š` or `’`. p5 stays LOUD as well.
 - The FAB host layer is a cover (accepted in round 13).
 - ADR 0010, residual 5 (LE2's rest, accepted in round 14, narrowed in round 16 to "nothing listed beneath": a control listed after the row that holds its centre is a cover whose order the eyes tell — `scroll-bounded-footer`): under idb, which lists no scroll view, the tap, the plain stop and the strokes judge a row past its scroll view's clip on the screen alone — `scroll-bounded`'s S and O `Tapped` on the background and reached with no swipe, F's and `carousel-in-list`'s C's strokes over the screen's middle. Why: nothing in idb's tree tells the clip, and a screenshot per tap or plain stop would double the cost of the commonest verbs under the default tree source; the colour assert and `fully: true` already look (LE2's fix). Remedy: `treeSource: wda`.

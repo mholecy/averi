@@ -4,6 +4,9 @@
 code review of LE2's rest (bugs/r16-le2), record `docs/truth/live-records/ios-vis-r16-le2-2.json`. Not caused by that
 fix: the same stroke and the same kind of stop come out of the src before it (`4ee14f1c`, run through `live.ts --side`).
 
+> **Status (2026-10-25): accepted residual** — ADR 0021 residual 2 (the owner's choice, round 9): no src change; the
+> stop judges the rounded centre where the tap presses, which lies on the row. The live KNOWN entry stays intermittent.
+>
 > **Status (2026-10-22): open, filed KNOWN and intermittent** (`scripts/truth/live-known.ts`,
 > `ios wda scroll:scroll-bounded-footer.O`, stop-claim on `visible`). Low harm: the reply says the row is clipped and by
 > how much, and the tap that follows fires the row.
