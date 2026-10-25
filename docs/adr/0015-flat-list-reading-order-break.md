@@ -299,7 +299,12 @@ the RN forms group (12 of 12) unchanged (docs/truth/live-records/ios-rn-*-lr3*.j
   before a target and drawn there but drawn UNDER it (an earlier sibling wider than the target — RN's earlier JSX
   sibling, a SwiftUI background) is now an untold cover: one screenshot per tap and colour assert, and a refusal when
   the eyes cannot tell. Measured over the repo's 62 WDA trees (the round-9 review's sweep): besides rn-banner, only the
-  SwiftUI forms' "Vertical scroll bar, 1 page" indicator as a target of its content container, and form-shared-id's
-  field titles now kept clear of a moved tap (`aimedClearOf`); no golden row changed.
+  SwiftUI forms' "Vertical scroll bar, 1 page" indicator as a target of its content container, form-shared-id's field
+  titles now kept clear of a moved tap (`aimedClearOf`), rn-banner's C.cover as a target (C, listed before it and drawn
+  under it, now an untold cover of it) and the Contacts new-contact sheet's grabber kept clear of a moved tap on the
+  sheet's container; no golden row changed.
+- A toast held whole by a row wider than it and listed AFTER the row (its top below the row's) is still excused as the
+  row's own content (draw-order.ts#NOT_DRAWN `onTarget`) — a `Tapped` on the toast, as before this amendment; outside
+  LR3 (the listing tells the order there), a later cell's to measure.
 - A named childless host listed AFTER a sibling whose top lies above it (a badge on a pressable host) now covers that
   sibling — a false refusal of the badge, the safe direction; no fixture has the shape.
