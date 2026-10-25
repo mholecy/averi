@@ -4,7 +4,8 @@
 mobile-verify `fix/round-8` @ `0ff6df3` (idb, port 47873). Settings › General (a UIKit list one screen and a half long). Found by the
 round-8 device check (R-6.6, the B1 wording on iOS).
 
-> **Status (2026-10-25): fixed** on `fix/round-9` (ADR 0021 decision 6, the owner's choice of the note's two
+> **Status (2026-10-25): fixed** at `b7240df4` + `ca6d9a7e` (the review's: the settled read a confirming read, the tree
+> within a point only where strokes fling) on `fix/round-9` (ADR 0021 decision 6, the owner's choice of the note's two
 > suggestions together, only where the stroke carried the content less far than the finger): where the platform flings
 > (iOS), a read after a stroke with the target nowhere that found the content carried less far than the finger drew is
 > read again after a settle (the stroke's first confirming read) and compared with the read BEFORE the stroke, every

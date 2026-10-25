@@ -514,7 +514,7 @@ export const SETTLE_CONFIRM_READS = 3;
  * content (a sticky header child) reads as content shown, so a blank stretch under it still reads exhausted after the
  * two.
  *
- * A REBOUND is read settled (ADR 0021 decision 6, owner 2026-10-25): where the platform flings every stroke
+ * A REBOUND is read settled (ADR 0021 decision 6): where the platform flings every stroke
  * (`RoundRules.strokes` `fling`, iOS), a stroke into a list's end rubber-bands the content back over ~0.75 s, and the read after
  * it lands inside the bounce at another offset each time — measured under idb on Settings › General, a target not there
  * cost all six strokes, "failed after 6 swipes (maxSwipes)". A read after a stroke with the target nowhere that found

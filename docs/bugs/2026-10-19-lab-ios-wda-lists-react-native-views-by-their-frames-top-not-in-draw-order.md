@@ -1,6 +1,7 @@
 # BUG: under WDA, React Native's sibling views are listed by their frames' tops, not in the order they are drawn — a later sibling drawn over an earlier one can be listed BEFORE it, against averi's "listed later is drawn over" premise
 
-> **Status (2026-10-25): fixed under WDA** on `fix/r9-lr3` (ADR 0015's amendment "React Native's covers listed before
+> **Status (2026-10-25): fixed under WDA** at `8b747ee5` + `13908164` (the review's: only a field's own label excused,
+> a narrower cover still one) on `fix/r9-lr3`, merged into `fix/round-9` at `e4648f5f` (ADR 0015's amendment "React Native's covers listed before
 > the target", owner's decision of round 9): under WDA a sibling listed BEFORE the target that draws there is a peer of
 > any target, control or not — a cover whose order the eyes tell (ADR 0024) — unless it is narrower than the target with
 > its centre on it (a field's own label); and a childless leaf the app named is drawn unless it holds a sibling of its

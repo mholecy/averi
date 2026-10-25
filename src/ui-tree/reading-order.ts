@@ -94,7 +94,6 @@ export const NO_READING_ORDER: ReadingOrder = {
   listedBefore: [],
   coversAfter: new Set<Placed>(),
 };
-const NONE = NO_READING_ORDER;
 
 /**
  * What the listing of `about.target`'s parent says of the target's order against its siblings (`ReadingOrder`) —
@@ -111,10 +110,10 @@ export function readingOrderOf(
   seen: SeenOrder | undefined,
 ): ReadingOrder {
   const { target } = about;
-  if (target.parent === undefined || !listsInReadingOrder(target.parent.node)) return NONE;
+  if (target.parent === undefined || !listsInReadingOrder(target.parent.node)) return NO_READING_ORDER;
   const headings = headingsOver(order, target);
   const peers = peersOf(order, about, pinnedTargets, seen, new Set(headings));
-  if ((headings.length === 0 && peers === NONE) || pinnedTargets().has(target)) return NONE;
+  if ((headings.length === 0 && peers === NO_READING_ORDER) || pinnedTargets().has(target)) return NO_READING_ORDER;
   return { ...peers, before: [...headings, ...peers.before].sort((a, b) => a.at - b.at) };
 }
 
@@ -196,7 +195,7 @@ function peersOf(
 ): ReadingOrder {
   const { target, flatList, contentFrom, bottomChrome, drawn } = about;
   const t = target.node;
-  if (flatList && (target.at < contentFrom || bottomChrome.has(target))) return NONE;
+  if (flatList && (target.at < contentFrom || bottomChrome.has(target))) return NO_READING_ORDER;
   // A control's peers are controls, either side of it. In a NESTED run in reading order (`listsNestedReadingOrder`:
   // WDA's run sorted by top, SwiftUI's, UIKit's and React Native's alike — not idb's flat list) a sibling listed BEFORE
   // the target that draws over it (`drawn`: the draw order's `target` column, a field's own floating label excused) is a
@@ -216,7 +215,7 @@ function peersOf(
       overlapsApart(p, target) &&
       peerOf(p),
   );
-  if (peers.length === 0) return NONE;
+  if (peers.length === 0) return NO_READING_ORDER;
   const centre = tapPoint(t);
   const holdsCentre = (p: Placed): boolean => containsPoint(p.node.rect, centre);
   // What a screenshot saw of the PEER against the target: drawn over it (`over`), or under it — no peer then.

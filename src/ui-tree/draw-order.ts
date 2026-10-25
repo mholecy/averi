@@ -1337,7 +1337,7 @@ const ROWS: readonly Row[] = Object.values(NOT_DRAWN);
  * every row but `onTarget`, whose own-content rule reads a narrower sibling with its centre on the target as drawn on
  * it — true of what the target carries, listed after it; a peer listed before it overlaps it apart
  * (reading-order.ts#overlapsApart: never held whole), so it is none of the target's content — a toast narrower than
- * the row it lies over (the round-9 review's shapes) stays a cover.
+ * the row it lies over stays a cover (tests/ui-tree/draw-order-rn-covers.test.ts, rn-banner edited).
  */
 const PEER_ROWS: readonly Row[] = ROWS.filter((row) => row !== NOT_DRAWN.onTarget);
 
