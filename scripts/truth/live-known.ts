@@ -31,6 +31,7 @@ import type { ReplyKind } from './replies.js';
  */
 
 /** LE2's rest, accepted — the static KNOWN's own wording (tests/differential/golden/edges.known.ts). */
+const IDB_RN_COVER = 'residual:ADR 0015 residual 4 — idb lists no bare React Native View, and reads a cover above its top-bar line as the bar';
 const IDB_NO_SCROLL_VIEW = 'residual:ADR 0010 residual 5 — idb lists no scroll view: the tap, the plain stop and the strokes are judged on the screen alone';
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
@@ -97,6 +98,10 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   // past the clip is still Tapped, on the background: by the tap case, and by the scroll case's own tap after its
   // refused stop (ios-vis-r16-le2-1.json): the residual, a tap-claim on Tapped in both.
   ...each('ios idb', ['tap:scroll-bounded-footer.O', 'scroll:scroll-bounded-footer.O'], IDB_NO_SCROLL_VIEW, 'tap-claim', 'Tapped'),
+  // rn-banner (round 9, the react-native app, LR3): under idb each tap Tapped, the app logging nothing — idb lists no
+  // bare View (U's and C's covers) and reads T's toast above its top-bar line as the bar (ADR 0015 residual 4); under
+  // WDA all three refused, nothing fired (ios-rn-banner-lr3-*.json).
+  ...each('ios idb', ['tap:rn-banner.T', 'tap:rn-banner.U', 'tap:rn-banner.C'], IDB_RN_COVER, 'tap-claim', 'Tapped'),
   ...each('ios idb', ['scroll:scroll-bounded.F', 'turn:scroll-bounded.F'], IDB_NO_SCROLL_VIEW, 'R-direction', 'refused'),
   // LV3's idb entry (R-direction on `refused`: the turned strokes touching down at y 175, in the header) struck off by
   // round 14's bugs/r14-lv3 (02aabfa6: a stroke carrying content back goes over the region the rows carried with R

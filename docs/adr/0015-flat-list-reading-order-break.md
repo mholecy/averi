@@ -278,7 +278,9 @@ Decided (owner, 2026-10-25, round 9):
    lists its content as its siblings (myport's `login_username_field 36,339 330x80` and the field row it wraps).
 
 Golden: rn-banner's six WDA rows green (T and U refused "drawn over it as a screenshot shows", C refused "drawn over
-it"); nothing else changed over the corpus.
+it"); nothing else changed over the corpus; calibrate: LR3 CALIBRATED. Live on the lab simulator, twice: under WDA T, U
+and C refused, nothing fired; under idb each `Tapped`, nothing fired (residual 4); rn-field's visibility (6 of 6) and
+the RN forms group (12 of 12) unchanged (docs/truth/live-records/ios-rn-*-lr3*.json).
 
 ### Residuals accepted
 

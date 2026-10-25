@@ -1428,7 +1428,10 @@
     {
       "n": "LR3",
       "note": "2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": [
+        "8b747ee"
+      ],
       "verified": "golden",
       "defect": "^(Tapped|passed on #263238): ",
       "checks": [
@@ -1437,15 +1440,9 @@
         "ios-rn-iphone17-ios27/rn-banner.wda.json U tap",
         "ios-rn-iphone17-ios27/rn-banner.wda.json U colour",
         "ios-rn-iphone17-ios27/rn-banner.wda.json C tap",
-        "ios-rn-iphone17-ios27/rn-banner.wda.json C colour",
-        "ios-rn-iphone17-ios27/rn-banner.idb.json T tap",
-        "ios-rn-iphone17-ios27/rn-banner.idb.json T colour",
-        "ios-rn-iphone17-ios27/rn-banner.idb.json U tap",
-        "ios-rn-iphone17-ios27/rn-banner.idb.json U colour",
-        "ios-rn-iphone17-ios27/rn-banner.idb.json C tap",
-        "ios-rn-iphone17-ios27/rn-banner.idb.json C colour"
+        "ios-rn-iphone17-ios27/rn-banner.wda.json C colour"
       ],
-      "remark": "Round 9's react-native cell rn-banner (each target under a later sibling drawn over its centre, `declared: covered`): under WDA and idb every tap Tapped and every colour assert passing on the cover."
+      "remark": "Round 9's react-native cell rn-banner (each target under a later sibling drawn over its centre, `declared: covered`): under WDA and idb every tap Tapped and every colour assert passing on the cover. Fixed under WDA by round 9 (fix/r9-lr3; ADR 0015 amendment 2026-10-25: a sibling listed before the target and drawn there is an untold peer of any target, and a named childless leaf in a WDA run is drawn unless it wraps a sibling): the six WDA rows green, nothing else in the corpus changed. The six idb rows stay red as ADR 0015 residual 4 (idb lists no bare View; T's toast above the flat list's top-bar line reads as the bar)."
     },
     {
       "n": "LR2",

@@ -80,6 +80,7 @@ The order is by harm to the agent that uses averi as its eyes and hands in a ban
   - one unsettled screenshot;
   - a target as wide as the screen is always `unjudged`;
   - a screen-spanning neighbour is not asked.
+- ADR 0015, residual 4 (round 9, LR3, 2026-10-25): idb does not see React Native's covers — it lists no bare View, and reads a cover above its flat list's top-bar line as the bar; a tap beneath one answers `Tapped`. Fixed under WDA. Remedy: `treeSource: wda`.
 - ADR 0021, residual 1: the carry margin on a long WDA list. It was re-measured in round 7 and is green 4 of 4.
 - The live forms cases b1d and b7 stay LOUD, because neither `adb input text` nor idb can type `Š` or `’`. p5 stays LOUD as well.
 - The FAB host layer is a cover (accepted in round 13).
