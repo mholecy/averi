@@ -1,5 +1,12 @@
 # BUG: under WDA, React Native's sibling views are listed by their frames' tops, not in the order they are drawn — a later sibling drawn over an earlier one can be listed BEFORE it, against averi's "listed later is drawn over" premise
 
+> **Status (2026-10-25):** reproduced by round 9's react-native cell **rn-banner** (fixtures/apps/rn, `declared:
+> covered`, golden-spec/covered.ts): T under a labelled toast and U under a bare View, each a later JSX sibling whose top
+> lies 10 pt above the target's, listed BEFORE it by WDA; C, the control, under the same bare View laid 10 pt below its
+> top, listed after it. Golden red under WDA and idb, all twelve rows: every tap `Tapped`, every colour assert passing
+> on the cover `#263238` — C too, which showed the second hole: a childless named leaf (`C.cover`, a View with a testID)
+> is excused as structural. calibration.json LR3 (open).
+>
 > **Status (2026-10-19):** open, no golden row yet: rn-field's own fields do not hit it since 843229f laid M's field
 > below its label's top. A cell for it is the next react-native one (below). Calibration.json lists it excluded until
 > then. Found while building lab note LR1's cell.

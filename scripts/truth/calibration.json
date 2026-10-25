@@ -1426,6 +1426,28 @@
       "remark": "Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#outermostSelf — the input and every unnamed `container` of its rect holding it alone are one node to its label, the label's sibling in any parent; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height, so a composer or search field in a screen-sized parent still covers). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes; idb lists the field flat and is green on both sides. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src."
     },
     {
+      "n": "LR3",
+      "note": "2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md",
+      "status": "open",
+      "verified": "golden",
+      "defect": "^(Tapped|passed on #263238): ",
+      "checks": [
+        "ios-rn-iphone17-ios27/rn-banner.wda.json T tap",
+        "ios-rn-iphone17-ios27/rn-banner.wda.json T colour",
+        "ios-rn-iphone17-ios27/rn-banner.wda.json U tap",
+        "ios-rn-iphone17-ios27/rn-banner.wda.json U colour",
+        "ios-rn-iphone17-ios27/rn-banner.wda.json C tap",
+        "ios-rn-iphone17-ios27/rn-banner.wda.json C colour",
+        "ios-rn-iphone17-ios27/rn-banner.idb.json T tap",
+        "ios-rn-iphone17-ios27/rn-banner.idb.json T colour",
+        "ios-rn-iphone17-ios27/rn-banner.idb.json U tap",
+        "ios-rn-iphone17-ios27/rn-banner.idb.json U colour",
+        "ios-rn-iphone17-ios27/rn-banner.idb.json C tap",
+        "ios-rn-iphone17-ios27/rn-banner.idb.json C colour"
+      ],
+      "remark": "Round 9's react-native cell rn-banner (each target under a later sibling drawn over its centre, `declared: covered`): under WDA and idb every tap Tapped and every colour assert passing on the cover."
+    },
+    {
       "n": "LR2",
       "note": "2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md",
       "status": "calibrate",
@@ -1619,10 +1641,6 @@
     {
       "note": "2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md",
       "why": "flow: typing (`idb ui text` into a React Native single-line field loses the tail of the text, 6 of 12 fills in round 7's two live runs, ios-rn-field-055c666.json and ios-rn-field-97de1b9.json) — averi's read-back reports it; not a visibility judgement, no golden row; fixed by round 7's A9 at 6ff68e5 and 7909c61 (src/interact/fill-type.ts#typeAndConfirm types a dropped tail again, at most twice, only where the typing provably stayed in the field; docs/adr/0023-fill-types-a-dropped-tail-again.md), measured live: 29 RN single-line fills whole over 5 runs × idb and WDA, 14 with a tail typed again (docs/truth/live-records/ios-rn-forms-a9-1…5.json), the native forms group unchanged (ios-forms-a9.json)"
-    },
-    {
-      "note": "2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md",
-      "why": "lab finding LR3: WDA lists RN sibling views by their frames' tops, not their draw order — measured on rn-field's M before 843229f; no golden row yet (rn-field's fields no longer hit it): the note names the react-native cell that would reproduce it"
     },
     {
       "note": "2026-10-19-lab-android-fully-true-on-phone-after-back-refused-under-the-next-fields-title-its-touch-target-overlaps.md",

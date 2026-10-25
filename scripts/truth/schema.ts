@@ -6,7 +6,8 @@ import type { Platform, SourceKind } from '../differential/corpus.js';
  * capture script writes beside each capture.
  *
  * The truth of a coloured target has three sources, each answering one question:
- *  - DECLARED (the catalog): what the cell builds — `open`, or `presented-over` (a layer is presented over the target);
+ *  - DECLARED (the catalog): what the cell builds — `open`, `presented-over` (a layer is presented over the target), or
+ *    `covered` (a sibling of its own screen drawn over its centre: the react-native family's rn-banner, lab note LR3);
  *  - REACHED (the tap probe): whether a raw tap at the target's centre fired its action — and, its positive control,
  *    whether the tap reached the app at all (the app logs every touch its windows receive);
  *  - DRAWN (the screenshot): the fraction of the target's frame painted its own colour.
@@ -19,7 +20,7 @@ import type { Platform, SourceKind } from '../differential/corpus.js';
  */
 
 /** What a cell builds around a target. New kinds come with the cells that need them. */
-export type Declared = 'open' | 'presented-over';
+export type Declared = 'open' | 'presented-over' | 'covered';
 
 export interface CatalogTarget {
   tag: string;

@@ -7,6 +7,7 @@ import { openRows } from './golden-spec/base.js';
 import { edgeRows } from './golden-spec/edges.js';
 import { dismissRows, ownPartsRows } from './golden-spec/false-covers.js';
 import { formRows, type FormExpectation } from './golden-spec/forms.js';
+import { coveredRows } from './golden-spec/covered.js';
 import { presentedOverRows } from './golden-spec/presented.js';
 import { textRows } from './golden-spec/text.js';
 import type { Expectation } from './golden-spec/judges.js';
@@ -82,9 +83,10 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   // contradicts (no tap clause: a presented-over one reached, an open whole one not reached or not drawn) —
   // consistency reports it broken.
   // A measured geometry is judged on its capture's screen: without it (a unit test of one row) no geometry row is asked.
-  if (cell === undefined && t.declared !== 'presented-over' && t.geometry !== undefined && t.geometry !== 'whole') return [];
+  if (cell === undefined && t.declared === 'open' && t.geometry !== undefined && t.geometry !== 'whole') return [];
   const c = contractOf(platform, t, cell);
   if (t.declared === 'presented-over') return c.tap === undefined ? [] : presentedOverRows(platform, t, c.tap);
+  if (t.declared === 'covered') return c.tap === undefined ? [] : coveredRows(platform, t, c.tap);
   const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, elementOf(t));
   // A text target's own rows (golden-spec/text.ts, phase 4: its string from the tree and, by the host's recognizer, from
   // the screenshot) after the rows its geometry asks.

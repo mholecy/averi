@@ -25,6 +25,28 @@
       },
       "screenshot": "rn-field.png",
       "truth": "rn-field.truth.json"
+    },
+    {
+      "file": "rn-banner.wda.json",
+      "source": "wda",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "rn-banner.png",
+      "truth": "rn-banner.truth.json"
+    },
+    {
+      "file": "rn-banner.idb.json",
+      "source": "idb",
+      "form": "raw",
+      "screen": {
+        "width": 402,
+        "height": 874
+      },
+      "screenshot": "rn-banner.png",
+      "truth": "rn-banner.truth.json"
     }
   ]
 }

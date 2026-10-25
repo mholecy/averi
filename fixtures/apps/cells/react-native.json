@@ -1,6 +1,6 @@
 {
   "family": "react-native",
-  "note": "React Native's own text fields, built by the React Native lab app alone (fixtures/apps/rn, src/ReactNative.tsx; scripts/truth/schema.ts#appOf) — round 7, calibration.json #18's field half: mp-native's RN field lists its own scroll indicator (`container 'Horizontal scroll bar, 1 page'`) under the field, over its floating label, which neither SwiftUI's TextField nor UIKit's UITextField does. rn-field: N a single-line TextInput's floating label (mp-native's SWIFT payee field), I the field with an icon (a trailing 44-pt icon button labelled Clear, a label target), M a multiline TextInput's label (its field laid as N's, from 1 pt below the label's top; its text view lists the `Horizontal scroll bar, 1 page` over the label's centre) — each target on a box of its colour, its field identified lab.<cell>.<tag>.field; a tap on a label focuses its field (logged as the target's tap), the icon's press empties its field. Every field reports its value and focus (LabState.fields, by the target's tag): the live golden's forms cases on the RN fields.",
+  "note": "React Native's own text fields, built by the React Native lab app alone (fixtures/apps/rn, src/ReactNative.tsx; scripts/truth/schema.ts#appOf) — round 7, calibration.json #18's field half: mp-native's RN field lists its own scroll indicator (`container 'Horizontal scroll bar, 1 page'`) under the field, over its floating label, which neither SwiftUI's TextField nor UIKit's UITextField does. rn-field: N a single-line TextInput's floating label (mp-native's SWIFT payee field), I the field with an icon (a trailing 44-pt icon button labelled Clear, a label target), M a multiline TextInput's label (its field laid as N's, from 1 pt below the label's top; its text view lists the `Horizontal scroll bar, 1 page` over the label's centre) — each target on a box of its colour, its field identified lab.<cell>.<tag>.field; a tap on a label focuses its field (logged as the target's tap), the icon's press empties its field. Every field reports its value and focus (LabState.fields, by the target's tag): the live golden's forms cases on the RN fields. rn-banner (round 9, lab note LR3, docs/bugs/2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md; `declared: covered`, golden-spec/covered.ts): each target a coloured Pressable (a press logs its `tap`) with, as its LATER JSX sibling, an opaque cover drawn over its centre (no touch handler: a touch on it reaches no target) — T under a toast whose frame starts 10 pt ABOVE T's top, an accessible view labelled `Saved` (`<tag>.cover`); U under a bare View of the same frame with an identifier only (lab.<cell>.U.cover, no label: the shape the structural excuse reads as undrawn); C, the control, under a cover whose frame starts 10 pt BELOW its top, so iOS's top order and the draw order agree. React Native draws the cover over the target; WDA lists RN's views by their tops, so T's and U's covers come before them.",
   "cells": [
     {
       "id": "rn-field",
@@ -9,6 +9,15 @@
         { "tag": "N", "color": "#B2EBF2", "slot": 0, "declared": "open", "text": "Payee’s name" },
         { "tag": "I", "color": "#3949AB", "slot": 1, "declared": "open", "label": "Clear" },
         { "tag": "M", "color": "#FFE0B2", "slot": 2, "declared": "open", "text": "Message for the recipient" }
+      ]
+    },
+    {
+      "id": "rn-banner",
+      "layer": "none",
+      "targets": [
+        { "tag": "T", "color": "#43A047", "slot": 0, "declared": "covered" },
+        { "tag": "U", "color": "#8E24AA", "slot": 1, "declared": "covered" },
+        { "tag": "C", "color": "#FB8C00", "slot": 2, "declared": "covered" }
       ]
     }
   ]

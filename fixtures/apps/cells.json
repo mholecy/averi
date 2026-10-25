@@ -737,6 +737,16 @@
         { "tag": "I", "color": "#3949AB", "slot": 1, "declared": "open", "label": "Clear" },
         { "tag": "M", "color": "#FFE0B2", "slot": 2, "declared": "open", "text": "Message for the recipient" }
       ]
+    },
+    {
+      "id": "rn-banner",
+      "family": "react-native",
+      "layer": "none",
+      "targets": [
+        { "tag": "T", "color": "#43A047", "slot": 0, "declared": "covered" },
+        { "tag": "U", "color": "#8E24AA", "slot": 1, "declared": "covered" },
+        { "tag": "C", "color": "#FB8C00", "slot": 2, "declared": "covered" }
+      ]
     }
   ]
 }
