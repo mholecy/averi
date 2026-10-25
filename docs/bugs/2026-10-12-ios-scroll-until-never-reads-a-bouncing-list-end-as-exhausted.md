@@ -13,8 +13,10 @@ round-8 device check (R-6.6, the B1 wording on iOS).
 > and live under idb and WDA on the new case `absent:scroll-top-edge-end` (docs/truth/live-records/ios-vis-r9-absent-*.json,
 > 2 of 2 each: "failed after 2 swipes … did not change the screen", nothing fired). There today's idb read came ~1.2 s
 > after the stroke, past the bounce, and what failed was a 1-pt rounding of the page's rest (-282 → -283) — a third
-> stroke and a false "try up" before the tree's test was made within a point. Settings › General itself was not run
-> again (the lab's idb HID connection broke after a reboot of the simulator); calibration.json keeps the note excluded
+> stroke and a false "try up" before the tree's test was made within a point. Settings › General on the lab simulator
+> (traced 2026-10-25, idb, at the end): "failed after 2 swipes (the last 2 … did not change the screen)" — each read
+> ~1.2 s after its stroke, past the bounce, `About` 247 → 246 → 246 (the point the tree's test now forgives); so the
+> rebound's settled read is proven by the tests alone, not yet caught live. calibration.json keeps the note excluded
 > (live only).
 
 ## Observed (measured)
