@@ -272,6 +272,10 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-rn-banner-lr3-2.json', 'visibility', { cases: 6, ok: 3, loud: 0, mismatches: 3 }],
     ['ios-rn-field-lr3.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-rn-forms-lr3.json', 'forms', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
+    // …and after the review's fixes (only a field's own label excused, a narrower cover still one): rn-banner and rn-field
+    // together, the RN forms group again — the same.
+    ['ios-rn-vis-lr3-3.json', 'visibility', { cases: 12, ok: 9, loud: 0, mismatches: 3 }],
+    ['ios-rn-forms-lr3-2.json', 'forms', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);

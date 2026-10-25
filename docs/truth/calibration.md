@@ -70,7 +70,7 @@ open note on the working tree. See the script for the verdicts.
 | LW1.1 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 054a59f → f924893 | CALIBRATED |
 | LW1.2 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 103c405 → b584755 | CALIBRATED |
 | LR1 | 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
-| LR3 | 2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order | calibrate | c4853bb → 8b747ee | CALIBRATED |
+| LR3 | 2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order | calibrate | c4853bb → 1390816 | CALIBRATED |
 | LR2 | 2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
 
 ## 1.1: CALIBRATED
@@ -1498,7 +1498,7 @@ Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd
   - RED ios-rn-iphone17-ios27/rn-banner.wda.json U colour — passed on #263238: it measured the cover over the target as the target
   - RED ios-rn-iphone17-ios27/rn-banner.wda.json C tap — Tapped: Tapped id:"lab.rn-banner.C"
   - RED ios-rn-iphone17-ios27/rn-banner.wda.json C colour — passed on #263238: it measured the cover over the target as the target
-- after 8b747ee:
+- after 1390816:
   - ok ios-rn-iphone17-ios27/rn-banner.wda.json T tap — ERROR id:"lab.rn-banner.T" is under container "Saved" (31,100 340x52) at its centre (201,142), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, under the 24x24 a 
   - ok ios-rn-iphone17-ios27/rn-banner.wda.json T colour — FAIL  element id:"lab.rn-banner.T" fill within dE00 8 of #263238 — container "Saved" (31,100 340x52) is drawn over the element (element 51,110 300x64) as a screenshot shows (the two are listed in reading order) — the cap
   - ok ios-rn-iphone17-ios27/rn-banner.wda.json U tap — ERROR id:"lab.rn-banner.U" is under container id:lab.rn-banner.U.cover (31,280 340x52) at its centre (201,322), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, u

@@ -1430,7 +1430,8 @@
       "note": "2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md",
       "status": "calibrate",
       "fix": [
-        "8b747ee"
+        "8b747ee",
+        "1390816"
       ],
       "verified": "golden",
       "defect": "^(Tapped|passed on #263238): ",
