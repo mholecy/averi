@@ -1582,7 +1582,7 @@
     },
     {
       "note": "2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md",
-      "why": "scroll dynamics: a bouncing list end (live)"
+      "why": "scroll dynamics: a bouncing list end (live; a replayed tree never moves); fixed live by round 9 (fix/round-9, ADR 0021 decision 6: a rebound read settled, the tree unmoved within a point) — absent:scroll-top-edge-end under idb and WDA, twice each, failed after 2 swipes saying the screen did not change (ios-vis-r9-absent-1.json, -2.json)"
     },
     {
       "note": "2026-10-15-android-numeric-character-references-in-uiautomator-attributes-are-not-decoded.md",

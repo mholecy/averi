@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
@@ -192,6 +192,28 @@ describe('judgeBlankStretch — tabbar-floating\'s F past the blank stretch of i
   });
 });
 
+describe('judgeAbsentAtEnd — a row not there, on a list already at its end (ADR 0021 decision 6)', () => {
+  const launched = state();
+  const said = (swipes: number, cause: string) => `ERROR scroll_until id:"lab.scroll-top-edge-end.absent" failed after ${swipes} swipes (${cause}) — element never appeared in the tree`;
+  const unchanged = 'the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken';
+  it('a failure after the two strokes saying they changed nothing, nothing fired, the app logging no motion: ok', () => {
+    expect(judgeAbsentAtEnd([said(2, unchanged)], state({ strokes: [stroke(1200, 1200), stroke(1200, 1200)] }), launched).outcome).toBe('ok');
+  });
+  it('the whole budget spent (the bug): end-unread', () => {
+    expect(judgeAbsentAtEnd([said(6, 'maxSwipes')], state(), launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'end-unread' });
+  });
+  it('an unchanged claim the app\'s strokes break, a stop, or anything fired: MISMATCH by its rule', () => {
+    expect(judgeAbsentAtEnd([said(2, unchanged)], state({ strokes: [stroke(1200, 900), stroke(900, 600)] }), launched).cls).toBe('unchanged-claim');
+    expect(judgeAbsentAtEnd(['Element id:"lab.scroll-top-edge-end.absent" visible after 1 swipe'], state(), launched).cls).toBe('stop-claim');
+    expect(judgeAbsentAtEnd([said(2, unchanged)], state({ events: [{ kind: 'tap', tag: 'T', at }] }), launched).cls).toBe('tap-claim');
+  });
+  it('visibilityCases asks it of scroll-top-edge-end on iOS only, down', () => {
+    const truth: CellTruth = { cell: 'scroll-top-edge-end', layer: 'none', device: 'd', screen: { width: 402, height: 874 }, scale: 3, targets: [] };
+    expect(visibilityCases(truth, 'ios').map((c) => [c.id, c.calls])).toEqual([['absent:scroll-top-edge-end', [{ tool: 'scroll_until', args: { selector: 'id:"lab.scroll-top-edge-end.absent"', direction: 'down' } }]]]);
+    expect(visibilityCases(truth, 'android')).toEqual([]);
+  });
+});
+
 describe('judgePresentedScroll', () => {
   const c = { tag: 'E', view: 'host', platform: 'ios' as const };
   it('refused with nothing moved or fired: ok; a stroke on the host beneath, or the layer dismissed: MISMATCH', () => {
@@ -206,7 +228,7 @@ describe('visibilityCases', () => {
   const truth = (cell: string, targets: TargetTruth[]): CellTruth => ({ cell, layer: 'none', device: 'd', screen: { width: 402, height: 874 }, scale: 3, targets });
   it('a tap per target, a scroll toward each one not whole (fully too where it is cut or in a band), the turn-back cases', () => {
     const ids = visibilityCases(truth('scroll-top-edge-end', [target({ geometry: 'status-band', scrollView: 'page', visible: { x: 51, y: 0, width: 300, height: 62 } }), target({ tag: 'W', id: 'lab.c.W', geometry: 'whole', scrollView: 'page', reached: true })]), 'ios').map((c) => c.id);
-    expect(ids).toEqual(['tap:scroll-top-edge-end.T', 'scroll:scroll-top-edge-end.T', 'scroll:scroll-top-edge-end.T.fully', 'tap:scroll-top-edge-end.W', 'turn:scroll-top-edge-end.T', 'turn:scroll-top-edge-end.T.fully']);
+    expect(ids).toEqual(['tap:scroll-top-edge-end.T', 'scroll:scroll-top-edge-end.T', 'scroll:scroll-top-edge-end.T.fully', 'tap:scroll-top-edge-end.W', 'turn:scroll-top-edge-end.T', 'turn:scroll-top-edge-end.T.fully', 'absent:scroll-top-edge-end']);
   });
   it('toward it: up for a target above what shows, its turn-back case the wrong way', () => {
     const cs = visibilityCases(truth('scroll-top-edge-end', [target({ geometry: 'status-band', scrollView: 'page', visible: { x: 51, y: 0, width: 300, height: 62 } })]), 'ios');

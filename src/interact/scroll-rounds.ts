@@ -121,6 +121,12 @@ export interface RoundRules {
   fully: boolean;
   maxSwipes: number;
   timeoutMs: number;
+  /**
+   * The platform flings every stroke — its own scroll physics, no drag speed (iOS: adapters/types.ts#DeviceAdapter's
+   * `dragSpeed` absent) — so a stroke into a list's end rubber-bands the content back, and the read after it may land
+   * inside the bounce (motion-ledger.ts#LedgerRead's `flings`, UNMOVED_STROKES_EXHAUST's rebound). Default false.
+   */
+  flings?: boolean;
   /** What the scroll looks for — asked of only by a miss (ui-tree/miss.ts#missOf); absent in a table of rounds, which hands each read its matches and gets the miss's facts of the tree alone. */
   target?: Target;
 }
@@ -507,6 +513,18 @@ export const SETTLE_CONFIRM_READS = 3;
  * AVD), a true end with a blank viewport included. Residual: a node inside the scroll view that does not move with its
  * content (a sticky header child) reads as content shown, so a blank stretch under it still reads exhausted after the
  * two.
+ *
+ * A REBOUND is read settled (ADR 0021 decision 6, owner 2026-10-25): where the platform flings every stroke
+ * (`RoundRules.flings`, iOS), a stroke into a list's end rubber-bands the content back over ~0.75 s, and the read after
+ * it lands inside the bounce at another offset each time — measured under idb on Settings › General, a target not there
+ * cost all six strokes, "failed after 6 swipes (maxSwipes)". A read after a stroke with the target nowhere that found
+ * the content carried less far than the finger drew (motion-ledger.ts#Moved `rebounding`) counts nothing; one more
+ * read after a settle, spending no confirming read, answers for the stroke against the read before it (every node
+ * within a pixel). Now "the last 2 … did not change the screen" after the two strokes. And the whole tree unchanged is
+ * within a pixel, as every match's is: measured under idb, a page at its end read a point off after the first stroke
+ * (its rest rounded the other way), and the exact fingerprint called it motion — a third stroke, and a side never
+ * stroked named (motion-ledger.ts#sameTreeWithinPixel).
+ * docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md
  */
 export const UNMOVED_STROKES_EXHAUST = 2;
 
@@ -700,7 +718,7 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   const { read, facts } = now;
   const { found } = read;
   const { loading } = facts;
-  const { unmoved, streaks, slowing, carry } = moved;
+  const { unmoved, streaks, slowing, carry, strokeRead } = moved;
   if (best !== undefined) {
     s.inTreeAfter = s.swipes;
     // What the stroke just sent carried the target (interact/stroke-plan.ts#carried, the carry model): the ledger's
@@ -719,14 +737,14 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
   // Nor of a stroke that touched down on a node drawn over its scroll view (`touchedOn`): that node may have taken it,
   // and the fast fail names it first — the two-stroke rule's sentence, as before the proof.
   const proof =
-    current === 'stroke' && unmovedNow && lastSent(s.course) !== undefined && touchedOn(s.strokes, facts, lastDrawn(s.motion)) === undefined
+    strokeRead && unmovedNow && lastSent(s.course) !== undefined && touchedOn(s.strokes, facts, lastDrawn(s.motion)) === undefined
       ? listed()
       : undefined;
   const ends = proof?.kind === 'ends' ? proof.view : undefined;
   const exhausted =
     offFrame && (streaks.all >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
       ? 'matches'
-      : current === 'stroke' && found.length === 0 && (streaks.tree >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
+      : strokeRead && found.length === 0 && (streaks.tree >= UNMOVED_STROKES_EXHAUST || ends !== undefined)
         ? 'tree'
         : undefined;
   return {
@@ -761,6 +779,7 @@ function ledgerRead(s: State, current: Since, facts: TreeFacts, found: readonly 
     ...(shows !== undefined && { gesture: shows }),
     ...(blank?.kind === 'blank' && sentToward !== undefined && { blank: { within: blank.view.rect, toward: sentToward } }),
     ...(carryToward !== undefined && { carryToward }),
+    ...(current === 'stroke' && s.rules.flings === true && { flings: true as const }),
   };
 }
 
@@ -1011,6 +1030,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // the first read that reads finds under a presented screen still gets its own); at the deadline the bound below says
   // no read succeeded (`neverRead`).
   if (callEvidence(s).of === 'unread' && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
+  // A rebound that may be under way (UNMOVED_STROKES_EXHAUST's rebound, motion-ledger.ts#Moved `rebounding`): read again
+  // after a settle, spending no confirming read — the settled read answers for the stroke. Only while time is left: at
+  // the deadline the bound, as before.
+  if (motion.moved?.rebounding === true && seen.elapsedMs < s.rules.timeoutMs) return waitOut(s);
   // A confirming read that did not read, or the read after a probe: read
   // again, within the same budget, rather than stroke away from a stop the
   // last read saw.

@@ -53,7 +53,9 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
  * failure where the app shows the stop; `not-reached` (LOUD) an honest failure; `presented-stop`, `presented-fired`,
  * `presented-stroke` a scroll_until beneath a presented layer that stopped, fired or stroked; `presented-changed`
  * (LOUD) one whose stroke changed the screen — the layer dismissed — and that said so, claiming nothing; `presented-pass` a colour
- * assert beneath a presented layer that passed (it measured the layer); `dismissal` the dismissal's judge.
+ * assert beneath a presented layer that passed (it measured the layer); `dismissal` the dismissal's judge; `end-unread`
+ * a scroll_until for a row not there, at its list's end, that spent more strokes than UNMOVED_STROKES_EXHAUST before
+ * failing (the end read as more to come, ABSENT_AT_END).
  */
 export type VerdictClass =
   | 'stop-claim'
@@ -69,7 +71,8 @@ export type VerdictClass =
   | 'presented-stroke'
   | 'presented-changed'
   | 'presented-pass'
-  | 'dismissal';
+  | 'dismissal'
+  | 'end-unread';
 
 export interface LiveVerdict {
   outcome: Outcome;
@@ -549,7 +552,44 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     const t = truth.targets.find((x) => x.tag === b.tag);
     if (t?.scrollView !== undefined) cases.push(blankStretchCase(truth.cell, t, t.scrollView, b.timeoutMs));
   }
+  for (const a of ABSENT_AT_END.filter((x) => x.cell === truth.cell && platform === 'ios')) cases.push(absentAtEndCase(a.cell, a.view, a.direction));
   return cases;
+}
+
+/**
+ * The absent-at-the-end cases (docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md,
+ * ADR 0021 decision 6): a scroll_until for a row no cell has, on a list already at its end the way asked — on iOS every
+ * stroke into it rubber-bands the content back, and a read inside the bounce read as a change, so the call spent its
+ * whole budget. scroll-top-edge-end's page ends at the screen's bottom (scrolled to its end): `down` strokes into the end.
+ */
+export const ABSENT_AT_END: readonly { cell: string; view: string; direction: Direction }[] = [{ cell: 'scroll-top-edge-end', view: 'page', direction: 'down' }];
+
+function absentAtEndCase(cell: string, view: string, direction: Direction): VisibilityCase {
+  return {
+    id: `absent:${cell}`,
+    cell,
+    says: `scroll_until a row ${cell} does not have, ${direction} into ${view}'s end: fails after at most ${UNMOVED_STROKES_EXHAUST} swipes saying the last did not change the screen, nothing fired — not the whole budget (ADR 0021 decision 6)`,
+    calls: [{ tool: 'scroll_until', args: { selector: `id:"lab.${cell}.absent"`, direction } }],
+    judge: (s, replies, launched) => judgeAbsentAtEnd(replies, s, launched),
+  };
+}
+
+/**
+ * An absent-at-the-end case's judge (ABSENT_AT_END): a failure after at most UNMOVED_STROKES_EXHAUST swipes that says
+ * the last of them did not change the screen — true of the app's strokes (`unchangedClaimBroken`) — with nothing fired,
+ * is ok; a stop is a `stop-claim`, a false unchanged claim an `unchanged-claim`, anything fired a `tap-claim`; any
+ * other failure (maxSwipes, the deadline, more strokes) an `end-unread` MISMATCH.
+ */
+export function judgeAbsentAtEnd([scroll]: readonly string[], final: LabState, launched: LabState): LiveVerdict {
+  const kind = replyKind(scroll);
+  if (kind === 'visible') return { outcome: 'MISMATCH', cls: 'stop-claim', kind, why: `averi says ${short(scroll)} — the row does not exist` };
+  const fired = firedSince(final, launched);
+  if (fired.length > 0) return { outcome: 'MISMATCH', cls: 'tap-claim', kind, why: `the app logged ${eventsText(fired)} — averi: ${short(scroll)}` };
+  const broken = unchangedClaimBroken(scroll, strokesSince(final, launched));
+  if (broken !== undefined) return { outcome: 'MISMATCH', cls: 'unchanged-claim', kind, why: broken };
+  const swipes = swipesOf(scroll);
+  if (swipes !== undefined && swipes <= UNMOVED_STROKES_EXHAUST && screenUnchangedFor(scroll) !== undefined) return { outcome: 'ok', kind, why: `exhausted after ${swipes} swipes, nothing fired — ${short(scroll)}` };
+  return { outcome: 'MISMATCH', cls: 'end-unread', kind, why: `the list's end read as more to come — averi: ${short(scroll)}` };
 }
 
 /**

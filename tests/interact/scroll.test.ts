@@ -472,6 +472,43 @@ describe('scrollUntilVisible — after the device check', () => {
   });
 });
 
+describe('scrollUntilVisible — a list\'s end that rebounds (docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md)', () => {
+  /** A list at its end, `About` at y 247: the first read after each stroke inside the bounce (each at another offset), every later one at rest. */
+  function bouncing(dragSpeed?: number) {
+    resetLayout();
+    const about = node({ role: 'button', label: 'About', rect: { x: 16, y: 247, width: 370, height: 44 } });
+    const s = node({ role: 'container', rect: { x: 0, y: 0, width: 402, height: 874 }, children: [node({ role: 'text', label: 'General', rect: { x: 0, y: 62, width: 402, height: 44 } }), about] });
+    const offsets = [173, 12, 120, 60, 150, 90];
+    let fresh = false;
+    class Bouncing extends FakeAdapter {
+      readonly dragSpeed = dragSpeed;
+      override async swipe(from: Point, to: Point, durationMs?: number): Promise<void> {
+        await super.swipe(from, to, durationMs);
+        fresh = true;
+      }
+      override async uiTree(): Promise<UiNode> {
+        about.rect = { ...about.rect, y: fresh ? 247 - offsets[(this.swipes.length - 1) % offsets.length]! : 247 };
+        fresh = false;
+        return super.uiTree();
+      }
+    }
+    return new Bouncing({ s }, 's');
+  }
+
+  it('a platform that flings (no drag speed): the read after each stroke caught inside the bounce is read again settled — "content exhausted" after 2 swipes, not the whole budget', async () => {
+    const fake = bouncing();
+    const error = await scrollUntilVisible(fake, 'text:"No Such Row"', { settleMs: 0 }).catch((e: unknown) => e);
+    expect((error as Error).message).toMatch(/failed after 2 swipes \(the last 2, swiping down, did not change the screen: content exhausted/);
+    expect(fake.swipes).toHaveLength(2);
+  });
+
+  it('a platform whose strokes drag (Android\'s drag speed): no settled read, the strokes run to maxSwipes as before', async () => {
+    const fake = bouncing(0.45);
+    const error = await scrollUntilVisible(fake, 'text:"No Such Row"', { settleMs: 0 }).catch((e: unknown) => e);
+    expect((error as Error).message).toContain('failed after 6 swipes (maxSwipes)');
+  });
+});
+
 describe('scrollUntilVisible — the round bound (code review of round 2, 2026-10-08)', () => {
   it('at the defaults the rounds number at most 1 + (1 + SETTLE_CONFIRM_READS) × maxSwipes = 25: a target that leaves the frame every fourth read after a stroke', async () => {
     resetLayout();

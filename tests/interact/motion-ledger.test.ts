@@ -31,12 +31,12 @@ interface Row {
   readonly carryToward?: Direction;
 }
 
-/** A read's facts for `row`: its matches as buttons on a phone screen (a tree that lists them in no scroll view), its fingerprint as given. */
+/** A read's facts for `row`: its matches as buttons on a phone screen (a tree that lists them in no scroll view), its fingerprint as given — and in the tree, as a text of that label, so trees of other fingerprints differ as on a device. */
 function readOf(row: Row): LedgerRead {
   const at = row.at ?? [];
   const index = row.judged === null ? undefined : (row.judged ?? (at.length > 0 ? 0 : undefined));
   const found = at.map((rect, i) => node({ role: 'button', label: i === index ? (row.name ?? 'F') : `match ${i}`, rect: { ...rect } }));
-  const tree = node({ role: 'container', rect: PHONE, children: found });
+  const tree = node({ role: 'container', rect: PHONE, children: [...found, node({ role: 'text', label: row.fingerprint ?? 'screen' })] });
   return {
     since: row.since ?? 'stroke',
     found,
