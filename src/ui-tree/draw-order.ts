@@ -5,7 +5,7 @@ import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSiz
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
-import { readingOrderOf, type ReadingOrder } from './reading-order.js';
+import { NO_READING_ORDER, readingOrderOf, type ReadingOrder } from './reading-order.js';
 import type { SeenOrder } from './seen-order.js';
 import { flatListKeyboardBand } from './soft-keyboard.js';
 
@@ -329,7 +329,8 @@ export interface Exposure {
   /**
    * The nodes drawn over it inside `within`, in pre-order (in idb's flat list, a floating tab bar's items listed before
    * it among them, `tabBarsOf`; in a reading-order listing, the headings listed before it that overlap it and the
-   * controls listed before it that overlap it when one holds its centre, reading-order.ts#readingOrderOf), each as one record (cover.ts#Cover); empty when none. Each with:
+   * controls listed before it that overlap it when one holds its centre — and, in a nested run, any sibling listed before it
+   * that draws there — reading-order.ts#readingOrderOf), each as one record (cover.ts#Cover); empty when none. Each with:
    * - its REACH: its rect, or — for a node pinned at a flat list's bottom (`bottomPinned`) — its reach (`pinnedReach`),
    *   raised by its bar's lift for a floating tab bar's item (`tabBarsOf`, `TAB_BAR_REACH_FRACTION`), or the whole
    *   screen for a presented layer's cover. The rects `shows`, `largest` and cover.ts#coverAtPoint are judged against, so a caller
@@ -351,10 +352,10 @@ export interface Exposure {
    *   docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md).
    */
   readonly covers: readonly Cover[];
-  /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals) that a tap may be aimed at — clear, too, of the controls listed before it in reading order that overlap it (reading-order.ts#ReadingOrder's `listedBefore`); undefined when nothing of it shows. What a refusal quotes. */
+  /** The largest uncovered piece of it inside `within` (a rectangle of the subtraction's pieces, not the largest empty rectangle; the first of equals) that a tap may be aimed at — clear, too, of the peers listed before it in reading order that overlap it (reading-order.ts#ReadingOrder's `listedBefore`); undefined when nothing of it shows. What a refusal quotes. */
   readonly largest?: Rect;
   /**
-   * The controls listed before it in reading order that overlap it (reading-order.ts#ReadingOrder's `listedBefore`) and meet what
+   * The peers listed before it in reading order that overlap it (reading-order.ts#ReadingOrder's `listedBefore`) and meet what
    * shows of it, which the pieces `largest` is chosen from are cut clear of — in the list's order; empty when none meets it. Covers or not: one that is no cover
    * (it holds no part of its centre) still counts in `shows`, so a sentence quoting `largest` names these.
    */
@@ -591,6 +592,20 @@ const ownField = (placed: Placed, { target, labelOverhang: overhang }: SeenFor):
   );
 };
 
+/**
+ * `label` is the floating label of `field`, the target — ADR 0014's relation (`ownField`) seen from the field: a text
+ * spanning the height of the text input the target is (`inputOf`: it, or the one it is nothing but), each edge within
+ * the label overhang (`spansHeight`). Asked of a sibling listed BEFORE a field in a nested run in reading order
+ * (`asTarget`'s `drawn`, reading-order.ts#peersOf): React Native lays a field after its label and draws it over it,
+ * transparent — rn-field's M label `69,491 175x23` before its field's wrapper `69,492 264x20`. A text a field merely
+ * lies over (a header title under a search field) spans no field's height, and a toast over a row is no text over a
+ * text input: both stay covers.
+ */
+const ownLabelOf = (label: Placed, field: Placed, overhang: number): boolean => {
+  const input = inputOf(field.node);
+  return label.node.role === 'text' && input !== undefined && spansHeight(label.node.rect, input.rect, overhang);
+};
+
 /** `label` spans `field`'s height: its top and its bottom each within `overhang` of the field's (`ownField`). */
 const spansHeight = (label: Rect, field: Rect, overhang: number): boolean =>
   Math.abs(label.y - field.y) <= overhang && Math.abs(label.y + label.height - (field.y + field.height)) <= overhang;
@@ -676,8 +691,13 @@ const NOT_DRAWN = {
    * app named) was excused here, and a tap on the login screen beneath was
    * sent onto it. A wrapper with children stays excused there too: it may be
    * a pass-through layer (Safari's `CapsuleViewController`, its bar only).
+   * In a NESTED run in reading order (reading-order.ts#listsNestedReadingOrder: WDA's), a LEAF the app named (an
+   * identifier) is drawn — React Native's View with a testID and nothing in it, a cover over the target (lab note LR3,
+   * rn-banner's `C.cover`) — unless it holds a sibling of its own whole: WDA flattens an RN View's content into its
+   * siblings (myport's `login_username_field`). Elsewhere a named leaf stays excused (placed.ts#FRAME_EXCUSES).
    * docs/bugs/2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md
    * docs/bugs/2026-10-09-ios-wda-cell-background-and-textfield-scroll-bar-read-as-covers.md
+   * docs/bugs/2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md
    */
   structural: {
     drawnOver: ({ node }) => STRUCTURAL_ROLES.has(node.role) && node.children.length === 0 && !node.label && !node.value,
@@ -1313,6 +1333,15 @@ const NOT_DRAWN = {
 const ROWS: readonly Row[] = Object.values(NOT_DRAWN);
 
 /**
+ * The rows a sibling listed BEFORE the target is judged by as a peer (reading-order.ts#peersOf, `asTarget`'s `drawn`):
+ * every row but `onTarget`, whose own-content rule reads a narrower sibling with its centre on the target as drawn on
+ * it — true of what the target carries, listed after it; a peer listed before it overlaps it apart
+ * (reading-order.ts#overlapsApart: never held whole), so it is none of the target's content — a toast narrower than
+ * the row it lies over (the round-9 review's shapes) stays a cover.
+ */
+const PEER_ROWS: readonly Row[] = ROWS.filter((row) => row !== NOT_DRAWN.onTarget);
+
+/**
  * Where a flat list's CONTENT starts (`flatListChrome`): the walk index of
  * the first node, after the root and the screen-sized structural hosts
  * (idb's Application, `other`), that lies
@@ -1654,6 +1683,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
 
   const draws = (placed: Placed): boolean => !ROWS.some((row) => row.drawnOver?.(placed, seen) === true);
   const drawsOverTarget = (placed: Placed, about: SeenFor): boolean => !ROWS.some((row) => row.target?.(placed, about) === true);
+  const drawsAsPeer = (placed: Placed, about: SeenFor): boolean => !PEER_ROWS.some((row) => row.target?.(placed, about) === true);
   /**
    * What the `target` column knows of `target`: the tree's facts, what is presented over it, where its reading order breaks, and what its listing
    * in reading order says (reading-order.ts#readingOrderOf) — that one asked on its first read, as `exposure` and the break's row past the break
@@ -1661,7 +1691,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
    */
   const asTarget = (target: Placed): SeenFor => {
     let readingOrder: ReadingOrder | undefined;
-    return {
+    const base = {
       ...seen,
       target,
       over: presentation.over(target.node),
@@ -1673,8 +1703,17 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
       paddedTouchTargets,
       labelOverhang: overhang,
       orderSeen,
+    };
+    // Whether a sibling listed before the target draws over it, for the listing's untold peers (reading-order.ts#peersOf):
+    // the `target` column's rows but `onTarget` (`PEER_ROWS`), judged with no reading order of its own — the order is
+    // what is being asked — and the target field's own floating label excused (`ownLabelOf`, ADR 0014's relation the
+    // other way round).
+    const unordered: SeenFor = { ...base, readingOrder: NO_READING_ORDER };
+    const drawn = (p: Placed): boolean => !ownLabelOf(p, target, overhang) && drawsAsPeer(p, unordered);
+    return {
+      ...base,
       get readingOrder() {
-        return (readingOrder ??= readingOrderOf(order, { target, flatList, contentFrom, bottomChrome }, pinnedTargets, orderSeen));
+        return (readingOrder ??= readingOrderOf(order, { target, flatList, contentFrom, bottomChrome, drawn }, pinnedTargets, orderSeen));
       },
     };
   };
@@ -1803,7 +1842,8 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
           ? []
           : [...before, ...laterFor(places, about).filter((p) => peers?.seenUnder.has(p) !== true)]
               .filter((p) => rectIntersection(reachOf(p), shown) !== undefined)
-              .map((p) => ({ placed: p, node: p.node, reach: reachOf(p), draws: wholeScreen(p) || drawsOverTarget(p, about), wholeScreen: wholeScreen(p) }));
+              // A peer listed before it is judged as a peer (`drawsAsPeer`: no own-content excuse — it overlaps the target apart).
+              .map((p) => ({ placed: p, node: p.node, reach: reachOf(p), draws: wholeScreen(p) || (peers?.before.includes(p) === true ? drawsAsPeer(p, about) : drawsOverTarget(p, about)), wholeScreen: wholeScreen(p) }));
       const covers = met
         .filter((c) => c.draws)
         .map((c): Cover => ({

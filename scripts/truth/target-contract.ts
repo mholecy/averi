@@ -179,6 +179,8 @@ export type TapAsk =
  */
 export function tapAsk(t: TargetTruth, judged: Geometry | undefined): TapAsk | undefined {
   if (t.declared === 'presented-over') return t.reached ? undefined : { must: 'refuse', remedy: 'close it first' };
+  // A sibling of its own screen drawn over its centre (golden-spec/covered.ts): refused, no remedy asked.
+  if (t.declared === 'covered') return t.reached ? undefined : { must: 'refuse' };
   const g = judged ?? 'whole';
   if (g === 'whole') return t.reached && t.drawn >= DRAWN ? { must: 'fire', inside: 'node' } : undefined;
   if (g === 'off-screen' || g === 'outside-scroll-view' || g === 'sliver') return { must: 'refuse', remedy: 'scroll_until' };
@@ -242,7 +244,7 @@ export function fullyAsked(g: Geometry | undefined, scrollView: string | undefin
  * has not got (golden-spec.ts#expectations returns none before asking the contract).
  */
 function contractGeometry(platform: Platform, t: TargetTruth, cell: JudgedScreen | undefined): Geometry | undefined {
-  if (t.declared === 'presented-over' || t.geometry === undefined || t.geometry === 'whole') return t.geometry;
+  if (t.declared === 'presented-over' || t.declared === 'covered' || t.geometry === undefined || t.geometry === 'whole') return t.geometry;
   if (cell === undefined) throw new Error(`${t.id}: its measured geometry ${t.geometry} is judged on its capture's screen, and none was given`);
   return judgedGeometry(platform, t, cell);
 }

@@ -70,6 +70,7 @@ open note on the working tree. See the script for the verdicts.
 | LW1.1 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 054a59f → f924893 | CALIBRATED |
 | LW1.2 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 103c405 → b584755 | CALIBRATED |
 | LR1 | 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
+| LR3 | 2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order | calibrate | c4853bb → 1390816 | CALIBRATED |
 | LR2 | 2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
 
 ## 1.1: CALIBRATED
@@ -1485,6 +1486,27 @@ Fixed by round 7's A7, f924893 on arch/r23-sheet-dialog (adapters/android.ts#pre
   - ok ios-rn-iphone17-ios27/rn-field.wda.json M ocr — PASS  element text:"Message for the recipient" renders text "Message for the recipient" — read "Message for the recipient"; vs expected "Message for the recipient" =
 
 Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#outermostSelf — the input and every unnamed `container` of its rect holding it alone are one node to its label, the label's sibling in any parent; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height, so a composer or search field in a screen-sized parent still covers). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes; idb lists the field flat and is green on both sides. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src.
+
+## LR3: CALIBRATED
+
+2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order.md — defect: `^(Tapped|passed on #263238): `
+
+- before c4853bb:
+  - RED ios-rn-iphone17-ios27/rn-banner.wda.json T tap — Tapped: Tapped id:"lab.rn-banner.T"
+  - RED ios-rn-iphone17-ios27/rn-banner.wda.json T colour — passed on #263238: it measured the cover over the target as the target
+  - RED ios-rn-iphone17-ios27/rn-banner.wda.json U tap — Tapped: Tapped id:"lab.rn-banner.U"
+  - RED ios-rn-iphone17-ios27/rn-banner.wda.json U colour — passed on #263238: it measured the cover over the target as the target
+  - RED ios-rn-iphone17-ios27/rn-banner.wda.json C tap — Tapped: Tapped id:"lab.rn-banner.C"
+  - RED ios-rn-iphone17-ios27/rn-banner.wda.json C colour — passed on #263238: it measured the cover over the target as the target
+- after 1390816:
+  - ok ios-rn-iphone17-ios27/rn-banner.wda.json T tap — ERROR id:"lab.rn-banner.T" is under container "Saved" (31,100 340x52) at its centre (201,142), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, under the 24x24 a 
+  - ok ios-rn-iphone17-ios27/rn-banner.wda.json T colour — FAIL  element id:"lab.rn-banner.T" fill within dE00 8 of #263238 — container "Saved" (31,100 340x52) is drawn over the element (element 51,110 300x64) as a screenshot shows (the two are listed in reading order) — the cap
+  - ok ios-rn-iphone17-ios27/rn-banner.wda.json U tap — ERROR id:"lab.rn-banner.U" is under container id:lab.rn-banner.U.cover (31,280 340x52) at its centre (201,322), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, u
+  - ok ios-rn-iphone17-ios27/rn-banner.wda.json U colour — FAIL  element id:"lab.rn-banner.U" fill within dE00 8 of #263238 — container id:lab.rn-banner.U.cover (31,280 340x52) is drawn over the element (element 51,290 300x64) as a screenshot shows (the two are listed in reading
+  - ok ios-rn-iphone17-ios27/rn-banner.wda.json C tap — ERROR id:"lab.rn-banner.C" is under container id:lab.rn-banner.C.cover (31,480 340x52) at its centre (201,502), drawn over it; only a 300x10 part of it shows, under the 24x24 a tap may be moved to — scroll_until it first
+  - ok ios-rn-iphone17-ios27/rn-banner.wda.json C colour — FAIL  element id:"lab.rn-banner.C" fill within dE00 8 of #263238 — container id:lab.rn-banner.C.cover (31,480 340x52) is drawn over the element (element 51,470 300x64) — the capture would show it, not the element; scroll
+
+Round 9's react-native cell rn-banner (each target under a later sibling drawn over its centre, `declared: covered`): under WDA and idb every tap Tapped and every colour assert passing on the cover. Fixed under WDA by round 9 (fix/r9-lr3; ADR 0015 amendment 2026-10-25: a sibling listed before the target and drawn there is an untold peer of any target, and a named childless leaf in a WDA run is drawn unless it wraps a sibling): the six WDA rows green, nothing else in the corpus changed. The six idb rows stay red as ADR 0015 residual 4 (idb lists no bare View; T's toast above the flat list's top-bar line reads as the bar).
 
 ## LR2: CALIBRATED
 

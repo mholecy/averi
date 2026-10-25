@@ -16,7 +16,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before; ios-rn-*-lr3*.json, round 9's LR3 fix) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -272,6 +272,17 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-vis-r9-absent-2.json', 'visibility', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     // …and once more after the review's fixes (the settled read a confirming read; the tree within a point where strokes fling).
     ['ios-vis-r9-absent-3.json', 'visibility', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
+    // Round 9's LR3 fix (fix/r9-lr3, ADR 0015's amendment of 2026-10-25): the react-native app's rn-banner twice — under
+    // WDA T, U and C refused, nothing fired; under idb each Tapped with nothing fired (ADR 0015 residual 4, known) — and
+    // its rn-field visibility and forms groups, unchanged, every case ok.
+    ['ios-rn-banner-lr3-1.json', 'visibility', { cases: 6, ok: 3, loud: 0, mismatches: 3 }],
+    ['ios-rn-banner-lr3-2.json', 'visibility', { cases: 6, ok: 3, loud: 0, mismatches: 3 }],
+    ['ios-rn-field-lr3.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
+    ['ios-rn-forms-lr3.json', 'forms', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
+    // …and after the review's fixes (only a field's own label excused, a narrower cover still one): rn-banner and rn-field
+    // together, the RN forms group again — the same.
+    ['ios-rn-vis-lr3-3.json', 'visibility', { cases: 12, ok: 9, loud: 0, mismatches: 3 }],
+    ['ios-rn-forms-lr3-2.json', 'forms', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);

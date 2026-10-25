@@ -1,5 +1,6 @@
 import { everyNode, KEYBOARD_ROLE, rectArea, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Rect, type UiNode } from '../adapters/types.js';
 import { rectWithin } from './geometry.js';
+import { listsNestedReadingOrder } from './reading-order.js';
 import { scrolls } from './scroll-containers.js';
 import { isInteractive } from './selectors.js';
 
@@ -130,6 +131,20 @@ const holdsWhole = (node: UiNode, target: Placed, screenArea: number): boolean =
   rectWithin(target.node.rect, node.rect) &&
   (fillsScreen(node.rect, screenArea) || (target.scroller !== undefined && rectWithin(target.scroller.node.rect, node.rect)));
 
+/**
+ * A childless node the app NAMED (an identifier), in a nested run in reading order (reading-order.ts#listsNestedReadingOrder:
+ * WDA's top-sorted run, React Native's flattened screen among them), is drawn — lab note LR3: rn-banner's bare cover
+ * `lab.rn-banner.C.cover 31,480 340x52`, a View with a testID and nothing in it, drawn over C — unless it holds a sibling
+ * of its own whole (this predicate). Elsewhere a named leaf stays excused as before (an Android Snackbar host's icon,
+ * a bare overlay with only an id: tests/ui-tree/draw-order.test.ts, tests/adapters/android.test.ts). WDA's flattening of React
+ * Native's tree lists a View's content as the View's siblings — myport's login lists `login_username_field
+ * 36,339 330x80`, childless, and after it the field's row `36,367 330x52` it wraps: such a wrapper draws through its
+ * content, as any wrapper.
+ */
+function flattenedWrapper(node: UiNode, parent: Placed | undefined): boolean {
+  return parent !== undefined && parent.node.children.some((c) => c !== node && rectArea(c.rect) > 0 && rectWithin(c.rect, node.rect));
+}
+
 /** The three frame rows of draw order's `target` column (`FRAME_EXCUSES`) the shape adapter may take back. */
 export type FrameRow = 'structural' | 'screenSizedHost' | 'contentFramed';
 
@@ -141,8 +156,8 @@ export type FrameRow = 'structural' | 'screenSizedHost' | 'contentFramed';
  * too, to name such a screen's surface from the same rows (`presentedSurface`).
  */
 export const FRAME_EXCUSES = {
-  structural: ({ node }: Placed, target: Placed, screenArea: number): boolean =>
-    STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && (node.children.length === 0 || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
+  structural: ({ node, parent }: Placed, target: Placed, screenArea: number): boolean =>
+    STRUCTURAL_ROLES.has(node.role) && !node.label && !node.value && ((node.children.length === 0 && (!node.identifier || parent === undefined || !listsNestedReadingOrder(parent) || flattenedWrapper(node, parent))) || holdsWhole(node, target, screenArea) || (!node.identifier && framesOnly(node))),
   screenSizedHost: ({ node }: Placed, _target: Placed, screenArea: number): boolean => !isInteractive(node) && screenSized(node, screenArea),
   // `!isInteractive` is moot while `scrollable` is no interactive role (selectors.ts); it guards CONTENT_FRAMED_ROLES
   // growing one.

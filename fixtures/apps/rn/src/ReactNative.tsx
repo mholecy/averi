@@ -25,14 +25,27 @@ import type { Cell, Lab, Target } from './lab';
 //   press logs the target's `tap` and empties the field.
 // Every field reports its value and focus (the forms oracle, LabState.fields, by the target's tag), the keyboard its
 // frame — what the live golden's forms cases judge a fill by.
+//
+// `rn-banner` (round 9, lab note LR3: docs/bugs/2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-
+// in-draw-order.md): each target a coloured Pressable filling its slot (a press logs its `tap`), and after it, its LATER
+// JSX sibling, an opaque cover over its centre (`COVERS`, reported as `<tag>.cover`) — React Native draws it over the
+// target, and it has no touch handler, so a touch on it reaches no target. T's and U's covers start 10 pt ABOVE the
+// target's top: iOS lists RN's views by their tops, so the cover is listed BEFORE the target it is drawn over. T's is an
+// accessible view labelled `Saved` (a toast); U's a bare View with an identifier only (lab.<cell>.U.cover). C's starts
+// 10 pt BELOW its top — listed after it, the draw order and the listing agree: the control.
 
 export const SLOT = { width: 300, height: 64 };
 const slotTop = (slot: number) => 142 + 180 * slot - SLOT.height / 2;
 /** The multiline target's tag: its field is a multiline TextInput. */
 const MULTILINE = 'M';
 
-/** The fields of a cell: one per target. */
-export const fieldsOf = (cell: Cell) => cell.targets.map((t) => t.tag);
+/** The cell whose targets lie under a later sibling (LR3). */
+const BANNER = 'rn-banner';
+/** Each rn-banner target's cover, in the slot's coordinates: its top against the target's, and whether it is a labelled toast. */
+const COVERS: Record<string, { top: number; label?: string }> = { T: { top: -10, label: 'Saved' }, U: { top: -10 }, C: { top: 10 } };
+
+/** The fields of a cell: one per target (none in rn-banner, whose targets are no fields). */
+export const fieldsOf = (cell: Cell) => (cell.id === BANNER ? [] : cell.targets.map((t) => t.tag));
 
 /** Reports a view's frame on the screen once it is laid out (and again whenever its layout changes). */
 function useFrame(lab: Lab, tag: string) {
@@ -62,7 +75,7 @@ export function ReactNativeScreen({ cell, lab }: { cell: Cell; lab: Lab }) {
     <View style={styles.screen}>
       {cell.targets.map((t) => (
         <View key={t.tag} style={[styles.slot, { left: (width - SLOT.width) / 2, top: slotTop(t.slot) }]}>
-          {t.label !== undefined ? <IconField cell={cell} target={t} lab={lab} /> : <LabelledField cell={cell} target={t} lab={lab} />}
+          {cell.id === BANNER ? <CoveredTarget cell={cell} target={t} lab={lab} /> : t.label !== undefined ? <IconField cell={cell} target={t} lab={lab} /> : <LabelledField cell={cell} target={t} lab={lab} />}
         </View>
       ))}
     </View>
@@ -144,6 +157,28 @@ function IconField({ cell, target, lab }: { cell: Cell; target: Target; lab: Lab
   );
 }
 
+/** An rn-banner target: a coloured Pressable, then its cover (`COVERS`) drawn over its centre. */
+function CoveredTarget({ cell, target, lab }: { cell: Cell; target: Target; lab: Lab }) {
+  const id = `lab.${cell.id}.${target.tag}`;
+  const own = useFrame(lab, target.tag);
+  const coverFrame = useFrame(lab, `${target.tag}.cover`);
+  const cover = COVERS[target.tag] ?? { top: -10 };
+  return (
+    <>
+      <Pressable testID={id} ref={own.ref} onLayout={own.onLayout} style={[styles.box, { backgroundColor: target.color }]} onPress={() => lab.event('tap', target.tag)} />
+      <View
+        testID={`${id}.cover`}
+        ref={coverFrame.ref}
+        onLayout={coverFrame.onLayout}
+        accessible={cover.label !== undefined}
+        {...(cover.label !== undefined && { accessibilityLabel: cover.label })}
+        style={[styles.cover, { top: cover.top }]}>
+        {cover.label !== undefined ? <Text style={styles.toast}>{cover.label}</Text> : null}
+      </View>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFFFFF' },
   slot: { position: 'absolute', width: SLOT.width, height: SLOT.height },
@@ -154,4 +189,6 @@ const styles = StyleSheet.create({
   multiline: { position: 'absolute', left: 18, right: 18, top: 22, height: 20, paddingTop: 0, paddingBottom: 0, paddingHorizontal: 0, margin: 0, fontSize: 15, color: '#1F2933', backgroundColor: 'transparent', textAlignVertical: 'top' },
   icon: { position: 'absolute', right: 10, top: 10, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   glyph: { color: '#FFFFFF', fontSize: 24, lineHeight: 28 },
+  cover: { position: 'absolute', left: -20, width: 340, height: 52, backgroundColor: '#263238', justifyContent: 'center', paddingLeft: 16 },
+  toast: { color: '#FFFFFF', fontSize: 15 },
 });
