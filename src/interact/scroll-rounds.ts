@@ -519,7 +519,7 @@ export const SETTLE_CONFIRM_READS = 3;
  * it lands inside the bounce at another offset each time — measured under idb on Settings › General, a target not there
  * cost all six strokes, "failed after 6 swipes (maxSwipes)". A read after a stroke with the target nowhere that found
  * the content carried less far than the finger drew (motion-ledger.ts#Moved `rebounding`) counts nothing; one more
- * read after a settle, spending no confirming read, answers for the stroke against the read before it (every node
+ * read after a settle answers for the stroke against the read before it (every node
  * within a pixel). Now "the last 2 … did not change the screen" after the two strokes. The settled read is the stroke's
  * first confirming read (SETTLE_CONFIRM_READS), so the round's BOUND holds. And where strokes fling the whole tree
  * unchanged is within a pixel, as every match's is: measured under idb, a page at its end read a point off after the
