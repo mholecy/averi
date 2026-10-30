@@ -22,7 +22,7 @@ measured before and after.
 | P1 | `framesOnly` stops at the first non-empty frame | CPU | done (5ea456ff) |
 | P2 | draw-order: `bottomPinned` O(N), cheap test first in `lastPresentedSurface`, one node → places index | CPU | done (4c07b631) |
 | P3 | `everyNode` as an explicit stack | CPU | done (ff612d57) |
-| P4 | PNG decode fast path (native inflate + typed unfilter, pngjs fallback) | CPU | open |
+| P4 | PNG decode fast path (native inflate + typed unfilter, pngjs fallback) | CPU | done (1e8a0c50) |
 | P5 | `sampleDominant` / `nearCount` on typed arrays | CPU | won't do — real bands cost 0.1 ms |
 | P6 | OCR toolchain probe memoised per module, not per `VisionOcr` | spawn | done (5731c309) |
 | P7 | Selector regexes compiled once in `parseSelector` | CPU | won't do — cosmetic |
@@ -92,6 +92,12 @@ pngjs spends ~90 % of its 25–32 ms (iOS 1206×2622) in its JS unfilter/bitmapp
 `zlib.inflateSync` + a typed-array unfilter for 8-bit RGB/RGBA non-interlaced, pngjs for everything else, gave
 byte-identical output in 12.2 ms (iOS) and 9.6 ms (Android). Gate: equality with pngjs on every fixture PNG. sharp
 (6–7 ms, ~8 MB per-platform binary) and napi-rs/WASM were weighed and rejected for the npx story.
+
+Done in 1e8a0c50: `src/verify/png.ts#decodePng` is the one decoder in src. iOS 1206×2622 24 → 7 ms, Android 1080×2220
+20 → 7.5 ms (a word-at-a-time Up filter, which is ~90 % of real rows, beats the prototype). The fast path takes only what
+pngjs decodes to the same bytes — every fixture, ~8.6k fuzzed decodes, a seeded 400-case test — and declines tRNS, PLTE,
+bad CRCs, trailing bytes after the zlib stream or IEND, and every Node without `zlib.crc32` (< 20.15 / 22.2: there P4
+gives no speed-up, pngjs runs). zlib is imported as a namespace so those Nodes still load the server.
 
 ### P5 — pixel histograms (verify/color-parity.ts:176, verify/eyes.ts:298, :316, :444)
 `sampleDominant` keys a `Map` per pixel: 34.5 ms full screen vs 5.1 ms with a `Uint32Array(4096)` histogram.
