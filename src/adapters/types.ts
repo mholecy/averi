@@ -684,10 +684,25 @@ export interface UiNode {
  * only: a walk that needs each node's subtree end in the order
  * (ui-tree/draw-order.ts) or what its ancestors hand down
  * (ui-tree/geometry.ts#clipsOf) recurses on its own.
+ *
+ * Lazy: a node's children are read only once the consumer has had the node
+ * and asked for the next, so a consumer that stops early reads nothing past
+ * where it stopped, and one that replaces a node's `children` while it holds
+ * that node is walked through the new ones. An explicit stack, not a
+ * recursive `yield*`: each node is reached in one step rather than through a
+ * generator per ancestor, and the walk has no depth limit. Children are
+ * pushed last first, so they pop in the order listed — the pre-order of the
+ * recursive definition. What it never sees is a `children` array changed
+ * in place after its node was walked past: its children are on the stack
+ * by then.
  */
 export function* everyNode(root: UiNode): Generator<UiNode> {
-  yield root;
-  for (const child of root.children) yield* everyNode(child);
+  const stack = [root];
+  for (let node = stack.pop(); node !== undefined; node = stack.pop()) {
+    yield node;
+    const { children } = node;
+    for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+  }
 }
 
 /**
