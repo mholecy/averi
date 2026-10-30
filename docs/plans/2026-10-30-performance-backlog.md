@@ -39,7 +39,7 @@ measured before and after.
 | D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | open |
 | D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | open |
 | D11 | One deadline per tool call that every window is clamped to | device | open |
-| D12 | `tools/list` is 73 KB (~18k tokens): shorten the tool descriptions | agent context | open |
+| D12 | `tools/list` is 73 KB (~18k tokens): shorten the tool descriptions | agent context | done (f8b62f5b) |
 | D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | open |
 | D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | open |
 | D15 | Two engines compiling the OCR helper at once share the `${binary}.${pid}` staging path (pre-existing; found in P6) | stability | open |
@@ -151,6 +151,14 @@ unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 
 cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
+
+### D12 — tool descriptions
+Done in f8b62f5b: instructions + tools/list 73,447 → 29,513 B (~18.4k → ~7.4k tokens). Shared vocabulary is said once in the
+server `instructions`; each description keeps its tool's contract and the rules an agent must not break (pinned phrase
+by phrase in `tests/mcp/tool-descriptions.test.ts`), units and selector quoting are repeated where the agent acts on
+them; the full former text is `skill/references/tools.md` (linked by version from the instructions), pinned to its
+owners. A budget test holds the total ≤ 31,000 B and each description ≤ 4,096 chars (Claude Code's default cut, which
+had been truncating the old tap, scroll_until, ui_snapshot and assert).
 
 ### D1–D13
 Sources and estimates are in the artifact. Before each: measure on D0's scenario; after: the same run, golden and
