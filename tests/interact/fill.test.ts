@@ -73,7 +73,14 @@ describe('fillField — focus, clear, type, verify', () => {
       fake.typed.push(text);
     };
     sleeps.length = 0;
-    await expect(fillField(fake, { id: 'amount_input' }, '12.34', { ambiguous: 'first' })).rejects.toThrow(/typed 5 characters/);
+    // Date frozen (Date ONLY), so every read takes 0 ms: the settle pause is pollMs less the read's own duration
+    // (pollTree, ADR 0029), and a real clock's millisecond tick inside a fake read would make the 500 a 499 (D1).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      await expect(fillField(fake, { id: 'amount_input' }, '12.34', { ambiguous: 'first' })).rejects.toThrow(/typed 5 characters/);
+    } finally {
+      vi.useRealTimers();
+    }
     expect(sleeps).toEqual([500, 350, 400, 400, 400, 400, 400]);
   });
 
@@ -1268,7 +1275,13 @@ describe('fillField — the review probes of the hint-aware clear (2026-10-09)',
       return real(...a);
     };
     sleeps.length = 0;
-    const result = await fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true });
+    vi.useFakeTimers({ toFake: ['Date'] }); // frozen: the settle pause is a whole pollMs (as in the delays test above, D1)
+    let result: Awaited<ReturnType<typeof fillField>>;
+    try {
+      result = await fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true });
+    } finally {
+      vi.useRealTimers();
+    }
     expect(fake.deletes).toEqual([3]);
     expect(sleeps).toEqual([FAST.pollMs, DEFAULT_FOCUS_DELAY_MS, FAST.pollMs]); // the settle pause, the focus delay, the re-read's cadence
     expect(reads).toBe(5); // settle (2), post-focus (1), after the deletes (1), the re-read (1)

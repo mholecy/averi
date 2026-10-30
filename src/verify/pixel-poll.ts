@@ -172,7 +172,7 @@ interface PixelPollSpec {
   element: ElementSpec;
   timeoutMs: number;
   /**
-   * The pause between rounds and NOTHING else — never forwarded as the
+   * The cadence of the rounds (pollTree sleeps what the read left of it, ADR 0029) and NOTHING else — never forwarded as the
    * stability delay, which is capture.ts's constant (the "one budget"
    * rule; see the header there for the 300-vs-500 split it closed).
    */

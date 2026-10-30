@@ -188,8 +188,9 @@ export const ASSERT_TIMEOUT_MS = 3_000;
  * round, once a second read confirms the rect — two rounds on any screen
  * with a clock or a caret. Measured on the Android emulator (the bug note
  * below): one round is a 2.7 s uiautomator read plus two
- * 0.65 s screencaps 300 ms apart, ~4.3 s, so two rounds and the pause
- * between them are ~8.9 s. With the shared 3 s these asserts could not pass
+ * 0.65 s screencaps 300 ms apart, ~4.3 s, so two rounds are ~8.6 s (~8.9 s
+ * before 2026-10-31, when the 300 ms poll was slept on top of a read that
+ * already outlasts it — pollTree, ADR 0029). With the shared 3 s these asserts could not pass
  * on that device even on a still screen: the 3 s only ever "worked" because
  * the capture overran it, which the capture no longer does. 12 s covers two
  * rounds there with a margin for a slower emulator; a poll that passes
@@ -476,7 +477,8 @@ export class Verifier {
    * is the verifier's vocabulary: a PollVerdict in, an AssertResult out, and
    * the per-assert timeout wording.
    *
-   * `pollMs` is the interval between rounds and NOTHING else: forwarded to
+   * `pollMs` is the cadence of the rounds (reads start at least pollMs
+   * apart: pollTree sleeps what the read left of it) and NOTHING else: forwarded to
    * the capture as its stability delay too, it made an assert inside a flow
    * (engine pollMs 500) wait 500 ms between stability captures and the same
    * assert from the MCP tool 300 — the budget capture.ts documents as one.

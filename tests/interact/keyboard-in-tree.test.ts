@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { fillField } from '../../src/interact/fill.js';
 import { AfterDismissalTap, AfterKeyboardDismissal, KeyboardWithoutDismissal, dismissKeyboard, resolveClearOfKeyboard, type KeyboardDismissal } from '../../src/interact/keyboard.js';
@@ -19,14 +19,22 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 //
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (as in
 // fill.test.ts): the hide delay is asserted as a delay in a sequence.
+// Date is faked (Date ONLY) and each recorded sleep moves it by its own length, so every read takes exactly 0 ms:
+// the settle poll's pause is `pollMs` less the read's own duration (ui-tree/read-tree.ts#pollTree, ADR 0029), and on
+// a real clock a fake read that straddled a millisecond tick would turn the pinned 2 into a 1 (D1, 2026-10-31).
 const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
 vi.mock('../../src/util/sleep.js', () => ({
   sleep: async (ms: number) => {
     sleeps.push(ms);
+    if (vi.isFakeTimers()) vi.setSystemTime(Date.now() + ms);
   },
 }));
 beforeEach(() => {
   sleeps.length = 0;
+  vi.useFakeTimers({ toFake: ['Date'] });
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 /**
