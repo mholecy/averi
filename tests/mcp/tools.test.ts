@@ -818,6 +818,26 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(result.texts[0]).toContain('"presentation": "screen"');
   });
 
+  it('ui_snapshot prints "secure": true on a secure input and nothing on a plain one — `false` is the fill\'s, not the agent\'s', async () => {
+    const form = node({
+      role: 'container',
+      rect: { x: 0, y: 0, width: 1080, height: 2220 },
+      children: [
+        node({ role: 'textfield', identifier: 'pin', rect: { x: 0, y: 100, width: 1080, height: 120 }, secure: true }),
+        node({ role: 'textfield', identifier: 'name', rect: { x: 0, y: 300, width: 1080, height: 120 }, secure: false }),
+      ],
+    });
+    const { call } = await connect({ android: new FakeAdapter({ form }, 'form'), ios: home() });
+    const full = await call('ui_snapshot', { platform: 'android' });
+    expect(full.texts[0]).toContain('"secure": true');
+    expect(full.texts[0]).not.toContain('"secure": false');
+    const filtered = await call('ui_snapshot', { platform: 'android', filter: 'role:textfield' });
+    expect(JSON.parse(filtered.texts[0])).toEqual([
+      expect.objectContaining({ identifier: 'pin', secure: true }),
+      expect.not.objectContaining({ secure: expect.anything() }),
+    ]);
+  });
+
   it('ui_snapshot: a filter nothing matches in a tree WITH content returns `[]` and a second block with the tree size — no warning', async () => {
     const { call } = await connect({ android: pin(), ios: home() });
     const result = await call('ui_snapshot', { platform: 'android', filter: 'role:textfield' });

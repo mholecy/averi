@@ -175,6 +175,16 @@ const assertsInput = z
 
 const parseAsserts = (raw: unknown[]) => raw.map((a) => assertSpecSchema.parse(a));
 
+/**
+ * What `ui_snapshot` prints of a tree or of its matches: the nodes as JSON, but for `"secure": false`. A plain input
+ * says `false` (types.ts#UiNode.secure) so that a fill may skip its post-focus re-read; to the agent, a mark that
+ * every plain field of an Android form would repeat is noise, and absent and `false` ask the same of it. `true` is
+ * printed, as `heading` is.
+ */
+function snapshotJson(value: UiNode | readonly Omit<UiNode, 'children'>[]): string {
+  return JSON.stringify(value, (key, v: unknown) => (key === 'secure' && v === false ? undefined : v), 2);
+}
+
 function stripChildren(node: UiNode): Omit<UiNode, 'children'> {
   const { children: _children, ...rest } = node;
   return rest;
@@ -379,7 +389,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       // screenshot's unsettledNote is — a parser of the first block sees what
       // it always saw.
       const note = snapshotNote(tree, matched === undefined || selector === undefined ? undefined : { selector, matched });
-      const body = text(matched ?? tree);
+      const body = text(snapshotJson(matched ?? tree));
       return note === undefined ? body : { content: [...body.content, ...text(note).content] };
     },
   );
