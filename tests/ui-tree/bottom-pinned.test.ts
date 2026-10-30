@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { rectArea, type Rect, type UiNode } from '../../src/adapters/types.js';
-import { bottomPinned, FLAT_LIST_BOTTOM_BAR_FRACTION } from '../../src/ui-tree/draw-order.js';
+import { bottomPinned, FLAT_LIST_BOTTOM_BAR_FRACTION, type KeyboardBand } from '../../src/ui-tree/draw-order.js';
 import { screenOf } from '../../src/ui-tree/geometry.js';
 import { walkOf, type Placed } from '../../src/ui-tree/placed.js';
 import { isInteractive } from '../../src/ui-tree/selectors.js';
@@ -18,7 +18,7 @@ const flat = (...children: UiNode[]): UiNode => node({ role: 'other', rect: { x:
 const at = (y: number, height: number, role = 'button', label = 'b'): UiNode => node({ role, label, rect: { x: 24, y, width: 354, height } });
 
 /** The plain definition, asking every later node for every interactive node: the oracle. */
-function plainPinned(order: readonly Placed[], screen: Rect, keyboard: { readonly top: number; readonly keys: ReadonlySet<Placed> } | undefined): Map<Placed, number> {
+function plainPinned(order: readonly Placed[], screen: Rect, keyboard: Pick<KeyboardBand, 'top' | 'keys'> | undefined): Map<Placed, number> {
   const band = screen.height * FLAT_LIST_BOTTOM_BAR_FRACTION;
   const floors = [{ floor: screen.y + screen.height, keys: new Set<Placed>() as ReadonlySet<Placed> }, ...(keyboard === undefined ? [] : [{ floor: keyboard.top, keys: keyboard.keys }])];
   const pinned = new Map<Placed, number>();

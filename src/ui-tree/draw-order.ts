@@ -1674,9 +1674,9 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   const overhang = labelOverhang(screen);
   const order = walkOf(tree);
   /** Every place of each node in the walk (placed.ts#placesBy), shared with the presentation. */
-  const placesOfAll = placesBy(order);
+  const places = placesBy(order);
   /** What is presented over what (presentation.ts#presentationOf), over this walk. */
-  const presentation = presentationOf(tree, order, placesOfAll);
+  const presentation = presentationOf(tree, order, places);
   const barLine = flatListBarLine(screen);
   const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
   const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
@@ -1756,7 +1756,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     };
   };
   /** Every place of `node` in the walk — the same object may sit at several (`laterThan` reads after the first, outside them all). */
-  const placesOf = (node: UiNode): readonly Placed[] => placesOfAll.get(node) ?? [];
+  const placesOf = (node: UiNode): readonly Placed[] => places.get(node) ?? [];
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
   const laterThan = (places: readonly Placed[], keep: (p: Placed) => boolean): Placed[] =>
     after(places[0]).filter((p) => !places.some((place) => within(p, place)) && keep(p));
