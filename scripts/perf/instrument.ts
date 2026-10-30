@@ -29,7 +29,7 @@ import type { DeviceCall, Sleep, Window } from './stats.js';
 /** A recorder's own clock: performance.now() unless a test hands one in. */
 export class Recorder {
   private open = false;
-  private calls: DeviceCall[] = [];
+  private calls: (Omit<DeviceCall, 'endMs' | 'ok'> & { endMs?: number; ok?: boolean })[] = [];
   private sleeps: (Omit<Sleep, 'endMs'> & { endMs?: number })[] = [];
 
   constructor(private readonly now: () => number = () => performance.now()) {}
@@ -40,19 +40,30 @@ export class Recorder {
     this.sleeps = [];
   }
 
-  /** Close the window: what began in it, a sleep still pending ending now. */
+  /**
+   * Close the window: a copy of what began in it. A call still open ends now, not ok and marked `pending` (the tool
+   * returned with it in flight — it is the window's cost only as far as the window); a sleep still pending ends now.
+   * What finishes later changes the recorder's own entries, never the window returned.
+   */
   end(): Window {
     this.open = false;
     const at = this.now();
-    return { calls: this.calls, sleeps: this.sleeps.map((s) => ({ ...s, endMs: s.endMs ?? at })) };
+    return {
+      calls: this.calls.map(({ endMs, ok, ...c }) => (endMs === undefined ? { ...c, endMs: at, ok: false, pending: true as const } : { ...c, endMs, ok: ok! })),
+      sleeps: this.sleeps.map((s) => ({ ...s, endMs: s.endMs ?? at })),
+    };
   }
 
   /** A call begins; the returned function ends it. Outside a window both do nothing. */
   call(kind: string, label: string): (ok: boolean) => void {
     if (!this.open) return () => undefined;
-    const startMs = this.now();
-    const calls = this.calls;
-    return (ok) => void calls.push({ kind, label, startMs, endMs: this.now(), ok });
+    const entry: Omit<DeviceCall, 'endMs' | 'ok'> & { endMs?: number; ok?: boolean } = { kind, label, startMs: this.now() };
+    this.calls.push(entry);
+    return (ok) => {
+      if (entry.endMs !== undefined) return;
+      entry.endMs = this.now();
+      entry.ok = ok;
+    };
   }
 
   /** A sleep begins; the returned function is called when it fires. */

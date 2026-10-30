@@ -1,5 +1,6 @@
 import type { execFile } from 'node:child_process';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { sleep } from '../../src/util/sleep.js';
 import { classify, Recorder, recordingExecFile, recordingFetch, recordingSetTimeout } from '../../scripts/perf/instrument.js';
 
 // instrument.ts: the baseline's wrappers over the process boundary (child_process.execFile, fetch) and averi's sleep
@@ -77,6 +78,35 @@ describe('recordingExecFile', () => {
   });
 });
 
+describe('Recorder — a window is a copy, closed at its end', () => {
+  it('ends a call still open at the window\'s end there, marked pending, and a late answer does not change what was returned', () => {
+    const c = clock();
+    const rec = new Recorder(c.now);
+    rec.begin();
+    c.set(10);
+    const done = rec.call('adb', 'adb exec-out uiautomator dump');
+    c.set(50);
+    const window = rec.end();
+    c.set(90);
+    done(true);
+    expect(window.calls).toEqual([{ kind: 'adb', label: 'adb exec-out uiautomator dump', startMs: 10, endMs: 50, ok: false, pending: true }]);
+    rec.begin();
+    expect(rec.end().calls).toEqual([]);
+  });
+
+  it('keeps a late-firing sleep out of the window it was returned in', () => {
+    const c = clock();
+    const rec = new Recorder(c.now);
+    rec.begin();
+    const fired = rec.sleep(500, 'src/ui-tree/read-tree.ts:306');
+    c.set(100);
+    const window = rec.end();
+    c.set(500);
+    fired();
+    expect(window.sleeps).toEqual([{ ms: 500, caller: 'src/ui-tree/read-tree.ts:306', startMs: 0, endMs: 100 }]);
+  });
+});
+
 describe('recordingFetch', () => {
   it('records a WebDriverAgent request by method and path, the session id and query dropped', async () => {
     const c = clock();
@@ -136,5 +166,27 @@ describe('recordingSetTimeout — averi\'s sleeps, told by the frame that set th
     wrapped(() => undefined, 250);
     c.set(90);
     expect(rec.end().sleeps).toEqual([{ ms: 250, caller: 'src/ui-tree/read-tree.ts:306', startMs: 20, endMs: 90 }]);
+  });
+
+  it('attributes a real sleep() to its caller off a real V8 stack — the frame right after src/util/sleep.ts', async () => {
+    vi.useFakeTimers();
+    const saved = globalThis.setTimeout;
+    try {
+      const rec = new Recorder(() => Date.now());
+      globalThis.setTimeout = recordingSetTimeout(saved, rec);
+      rec.begin();
+      const slept = sleep(250);
+      await vi.advanceTimersByTimeAsync(250);
+      await slept;
+      const { sleeps } = rec.end();
+      expect(sleeps).toHaveLength(1);
+      expect(sleeps[0]).toMatchObject({ ms: 250 });
+      expect(sleeps[0].endMs - sleeps[0].startMs).toBe(250);
+      // This file has no /src/ in its path, so the caller is named by its whole path.
+      expect(sleeps[0].caller).toMatch(/[/\\]tests[/\\]perf[/\\]instrument\.test\.ts:\d+$/);
+    } finally {
+      globalThis.setTimeout = saved;
+      vi.useRealTimers();
+    }
   });
 });

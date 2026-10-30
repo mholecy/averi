@@ -19,6 +19,8 @@ export interface DeviceCall {
   startMs: number;
   endMs: number;
   ok: boolean;
+  /** Still open when the window closed: ended there (Recorder.end). */
+  pending?: true;
 }
 
 /** One `sleep(ms)` of src/util/sleep.ts: what it asked for, who asked (file:line of the caller), when it began and fired. */
