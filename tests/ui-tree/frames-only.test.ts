@@ -36,8 +36,21 @@ describe('framesOnly — every descendant an empty frame', () => {
     expect(framesOnly(frame(frame(node({ role: 'text', label: 'stop' }), unwalked), unwalked))).toBe(false);
   });
 
+  it('asks a child before its own descendants: a child that is no empty frame ends it before its subtree is walked', () => {
+    const named = node({ role: 'button', label: 'Go' });
+    Object.defineProperty(named, 'children', {
+      get: () => {
+        throw new Error('walked under a child that is no empty frame');
+      },
+    });
+    expect(framesOnly(frame(named))).toBe(false);
+  });
+
   it('answers as "every node of every child\'s subtree is an empty frame" on every node of the committed captures', async () => {
-    const androidDirs = ['android-averi_lab-api33', 'android-rn-averi_lab-api33'].map((d) => new URL(`../fixtures/truth/${d}/`, import.meta.url));
+    const truth = new URL('../fixtures/truth/', import.meta.url);
+    const androidDirs = readdirSync(truth)
+      .filter((d) => d.startsWith('android'))
+      .map((d) => new URL(`${d}/`, truth));
     const android = androidDirs.flatMap((dir) =>
       readdirSync(dir)
         .filter((f) => f.endsWith('.xml'))
@@ -48,6 +61,7 @@ describe('framesOnly — every descendant an empty frame', () => {
     let falses = 0;
     for (const [, tree] of trees) {
       for (const n of everyNode(tree)) {
+        // the definition before the early stop, kept as the migration's oracle — not a second implementation
         const expected = n.children.every((child) => [...everyNode(child)].every(emptyFrame));
         expect(framesOnly(n)).toBe(expected);
         asked++;
