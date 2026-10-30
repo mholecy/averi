@@ -5,7 +5,7 @@ description: Verify mobile app changes on iOS Simulators and Android Emulators t
 
 # averi — verify your mobile work on simulators
 
-The averi MCP tools drive booted iOS Simulators and Android Emulators. The repo's `averi.yaml` declares the app's states (logged in, a given screen) and the flows that reach them, so you never log in tap by tap. The tool descriptions cover each tool's arguments and limits. This skill covers how to use the tools together, and what they do not tell you.
+The averi MCP tools drive booted iOS Simulators and Android Emulators. The repo's `averi.yaml` declares the app's states (logged in, a given screen) and the flows that reach them, so you never log in tap by tap. The tool descriptions cover each tool's arguments, result and rules; [references/tools.md](references/tools.md) holds every case in full (each refusal, the platform and tree-source specifics). This skill covers how to use the tools together, and what they do not tell you.
 
 ## Golden path (verify a change)
 
@@ -37,7 +37,7 @@ The averi MCP tools drive booted iOS Simulators and Android Emulators. The repo'
 - **Unexpected screen?** Take a `screenshot` and a `ui_snapshot`, then re-run `ensure_state`. If you are still stuck, show both to the user.
 - **Several devices booted?** Run `list_devices`, then `select_device(platform, device)`. Otherwise tools use the first booted device.
 - **`averi.yaml` is code.** When your change alters navigation and a flow breaks, fix the descriptor in the same change. Keep selectors on stable `id:`s.
-- **A `⚠`/`✗` line or error you do not understand?** Read [references/troubleshooting.md](references/troubleshooting.md) before guessing.
+- **A `⚠`/`✗` line or error you do not understand?** Read [references/troubleshooting.md](references/troubleshooting.md) before guessing. A reply or refusal that surprises you: the tool's section in [references/tools.md](references/tools.md).
 
 ## averi.yaml: states and the reach ladder
 
