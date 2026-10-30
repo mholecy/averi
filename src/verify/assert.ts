@@ -1,7 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import pixelmatch from 'pixelmatch';
-import { PNG } from 'pngjs';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
@@ -26,6 +25,7 @@ import { pollPixels, screenshotFailed } from './pixel-poll.js';
 import { notFound, verdictToPoll, type PollVerdict } from './poll-verdict.js';
 import { colorSampleRect, DEFAULT_TOLERANCE_DE, evaluateColorAssert, normalizeHex, type ColorExpectation } from './color-parity.js';
 import { ocrEngineFor, type OcrEngineChoice } from './ocr.js';
+import { decodePng } from './png.js';
 import { DEFAULT_TOLERANCE_PCT, evaluateRectAssert, type RectExpectation } from './rect-parity.js';
 import { measureOcrAssert, type OcrExpectation } from './text-parity.js';
 import { findBySpec } from '../ui-tree/selectors.js';
@@ -642,8 +642,8 @@ export class Verifier {
     const note = unsettledNote(frame);
     const withNote = (detail: string): string => (note === undefined ? detail : `${detail}\n${note}`);
 
-    const a = PNG.sync.read(baseline);
-    const b = PNG.sync.read(current);
+    const a = decodePng(baseline);
+    const b = decodePng(current);
     if (a.width !== b.width || a.height !== b.height) {
       return {
         description,

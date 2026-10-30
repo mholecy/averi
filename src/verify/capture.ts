@@ -1,8 +1,8 @@
-import { PNG } from 'pngjs';
 import type { DeviceAdapter, DeviceScreen, Rect, UiNode } from '../adapters/types.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
+import { decodePng, type DecodedPng } from './png.js';
 import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.js';
 
 /**
@@ -187,11 +187,11 @@ export const STABILITY_DELAY_MS = 300;
 const TREE_READ_ATTEMPTS = 5;
 const TREE_READ_DELAY_MS = 300;
 
-/** Decoded RGBA screenshot — pngjs's `PNG` satisfies this structurally. */
+/** Decoded RGBA screenshot — `verify/png.ts#decodePng`'s answer satisfies this structurally. */
 export interface RgbaImage {
   width: number;
   height: number;
-  /** 8-bit RGBA, row-major (pngjs normalizes every PNG variant to this). */
+  /** 8-bit RGBA, row-major (the decoder normalizes every PNG variant to this). */
   data: Buffer | Uint8Array;
 }
 
@@ -548,10 +548,10 @@ export async function captureFrame(
   const witness = await ScreenWitness.read(adapter);
   const window = await witness.judge(tree, size);
   const { screen } = witness;
-  let png: PNG;
+  let png: DecodedPng;
   try {
     // A shot the region check already decoded (settled or moving) is not decoded twice.
-    png = waitPng ?? PNG.sync.read(shot);
+    png = waitPng ?? decodePng(shot);
   } catch (e) {
     return {
       ...wait,
@@ -787,7 +787,7 @@ async function stableScreenshot(
   adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>,
   deadline?: number,
   region?: SizedRegion,
-): Promise<Pick<Frame, 'shot' | 'stability' | 'settledOver' | 'captures'> & { png?: PNG }> {
+): Promise<Pick<Frame, 'shot' | 'stability' | 'settledOver' | 'captures'> & { png?: DecodedPng }> {
   const memo = lastDecodeMemo();
   let previous = await screenshotOf(adapter);
   let captures = 1;
@@ -875,9 +875,9 @@ interface SizedRegion extends StabilityRegion {
 async function regionSettled(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   region: SizedRegion,
-  earlier: PNG | undefined,
-  later: PNG | undefined,
-): Promise<PNG | undefined> {
+  earlier: DecodedPng | undefined,
+  later: DecodedPng | undefined,
+): Promise<DecodedPng | undefined> {
   if (earlier === undefined || later === undefined) return undefined;
   if (earlier.width !== later.width || earlier.height !== later.height) return undefined;
   const screen = await witnessScreen(adapter);
@@ -905,14 +905,14 @@ async function regionSettled(
  * `decoded` only looks: the png of a shot already decoded, else `undefined`
  * (never decoded, or did not decode), and the frame decodes it itself.
  */
-function lastDecodeMemo(): { decode: (shot: Buffer) => PNG | undefined; decoded: (shot: Buffer) => PNG | undefined } {
-  let last: { shot: Buffer; png: PNG | undefined } | undefined;
+function lastDecodeMemo(): { decode: (shot: Buffer) => DecodedPng | undefined; decoded: (shot: Buffer) => DecodedPng | undefined } {
+  let last: { shot: Buffer; png: DecodedPng | undefined } | undefined;
   return {
     decode: (shot) => {
       if (last?.shot !== shot) {
-        let png: PNG | undefined;
+        let png: DecodedPng | undefined;
         try {
-          png = PNG.sync.read(shot);
+          png = decodePng(shot);
         } catch {
           png = undefined;
         }

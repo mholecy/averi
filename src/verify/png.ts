@@ -1,0 +1,236 @@
+import { crc32, inflateSync } from 'node:zlib';
+import { PNG } from 'pngjs';
+
+/**
+ * THE ONE PNG DECODER of the pixel readers (capture's frame and stability wait,
+ * the eyes, the screenshot diff). Its answer is pngjs's `PNG.sync.read` answer,
+ * byte for byte — width, height and an 8-bit RGBA buffer, row-major — and a
+ * PNG that does not decode throws pngjs's own error, so every caller's wording
+ * of a damaged capture is unchanged.
+ *
+ * Why not pngjs alone: on a full-screen capture (iOS 1206×2622, Android
+ * 1080×2220) pngjs spends ~90 % of its 20–30 ms in its JavaScript unfilter and
+ * bitmapper, one closure call and one fresh line Buffer per row, and zlib is
+ * 2–3 ms of it. Every device screenshot this server takes is the same shape —
+ * 8-bit RGBA (or RGB), not interlaced — so `fastDecode` handles exactly that
+ * shape with native inflate and CRC and a flat typed-array unfilter, and hands
+ * anything else to pngjs. Native image libraries (sharp) and WASM/napi decoders
+ * were weighed and rejected: a per-platform binary breaks the `npx` install.
+ */
+
+/** A decoded PNG: what every pixel reader reads (`verify/capture.ts#RgbaImage`). */
+export interface DecodedPng {
+  width: number;
+  height: number;
+  /** 8-bit RGBA, row-major, `width * height * 4` bytes. */
+  data: Buffer;
+}
+
+/**
+ * Decodes `bytes` as pngjs would: the fast path when it takes the input, pngjs
+ * otherwise. Throws exactly when pngjs throws, with its error — the fast path
+ * never throws, it declines, and pngjs then decides.
+ */
+export function decodePng(bytes: Buffer): DecodedPng {
+  const fast = fastDecode(bytes);
+  if (fast !== undefined) return fast;
+  const png = PNG.sync.read(bytes);
+  return { width: png.width, height: png.height, data: png.data };
+}
+
+const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+// Chunk types as big-endian uint32, the way they sit in the stream.
+const IHDR = 0x49484452;
+const IDAT = 0x49444154;
+const IEND = 0x49454e44;
+const PLTE = 0x504c5445;
+const tRNS = 0x74524e53;
+const gAMA = 0x67414d41;
+
+/** IHDR colour types the fast path decodes, to their bytes per pixel. */
+const BYTES_PER_PIXEL: Readonly<Record<number, number>> = { 2: 3, 6: 4 };
+
+/**
+ * `zlib.crc32` arrived in Node 22.2 / 20.15; the package supports Node 20, so
+ * on an older 20 the fast path steps aside rather than checking CRCs in
+ * JavaScript (that loop alone would cost a large part of what it saves).
+ */
+const nativeCrc: ((data: Uint8Array) => number) | undefined = typeof crc32 === 'function' ? crc32 : undefined;
+
+/**
+ * The fast path: the decode of an 8-bit, non-interlaced RGB (colour type 2) or
+ * RGBA (colour type 6) PNG, or `undefined` — "not mine, ask pngjs". It returns a
+ * result only where it is byte-identical to pngjs, so it mirrors pngjs's PARSER
+ * as well as the PNG spec. The rules, each with its reason:
+ *
+ * - Signature, then IHDR first (13 bytes), then chunks up to IEND, with nothing
+ *   after IEND's CRC: pngjs throws on a bad signature, a first chunk that is not
+ *   IHDR, a stream that ends early and trailing bytes after IEND, so each of
+ *   those declines and pngjs words the error.
+ * - CRC: pngjs checks the CRC of every chunk it reads (IHDR, IDAT, IEND, gAMA —
+ *   and PLTE, tRNS) and throws on a mismatch, so the fast path checks the same
+ *   chunks (natively) and declines on a mismatch — a corrupt capture must not
+ *   decode here when pngjs would have refused it.
+ * - Ancillary chunks pngjs does not know (sRGB, sBIT, eXIf, pHYs, iCCP, Apple's
+ *   iDOT, APNG's acTL/fcTL/fdAT…) are skipped WITHOUT a CRC check, exactly as
+ *   pngjs skips them; real screenshots carry them (iOS: sRGB+sBIT, Android:
+ *   sRGB+eXIf), so declining on them would decline every capture. An unknown
+ *   CRITICAL chunk declines (pngjs throws "Unsupported critical chunk type").
+ * - gAMA is read for its CRC only: pngjs records the gamma on its result but
+ *   never applies it to the pixels, and no caller reads it.
+ * - tRNS declines: on an RGB image pngjs turns the pixels matching its colour
+ *   key to transparent black (alpha AND colour zeroed). PLTE declines too —
+ *   allowed as a suggested palette on a truecolour image, but rare enough that
+ *   pngjs is the cheaper place to get it exactly right.
+ * - Bit depth other than 8, colour types 0/3/4 (grey, palette, grey+alpha),
+ *   interlacing, a compression or filter method other than 0, a zero width or
+ *   height: pngjs's (or its error), never reimplemented here.
+ * - The inflated IDAT stream must be exactly `height * (1 + width * bpp)` bytes
+ *   and inflate cleanly; anything else — a short, long or damaged stream —
+ *   declines, and pngjs (whose own inflate stops at that length) decides.
+ * - A row whose filter byte is not 0–4 declines (pngjs throws on it).
+ */
+export function fastDecode(bytes: Buffer): DecodedPng | undefined {
+  if (nativeCrc === undefined) return undefined;
+  if (bytes.length < SIGNATURE.length || !bytes.subarray(0, SIGNATURE.length).equals(SIGNATURE)) return undefined;
+
+  let header: { width: number; height: number; bpp: number } | undefined;
+  const idat: Buffer[] = [];
+  let offset = SIGNATURE.length;
+  for (;;) {
+    if (offset + 8 > bytes.length) return undefined;
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.readUInt32BE(offset + 4);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (dataEnd + 4 > bytes.length) return undefined;
+    if (header === undefined && type !== IHDR) return undefined;
+    const crcOk = (): boolean => nativeCrc(bytes.subarray(offset + 4, dataEnd)) >>> 0 === bytes.readUInt32BE(dataEnd);
+
+    if (type === IHDR) {
+      if (header !== undefined || length !== 13 || !crcOk()) return undefined;
+      header = parseHeader(bytes.subarray(dataStart, dataEnd));
+      if (header === undefined) return undefined;
+    } else if (type === IDAT) {
+      if (!crcOk()) return undefined;
+      idat.push(bytes.subarray(dataStart, dataEnd));
+    } else if (type === gAMA) {
+      if (length !== 4 || !crcOk()) return undefined;
+    } else if (type === IEND) {
+      if (!crcOk() || dataEnd + 4 !== bytes.length) return undefined;
+      break;
+    } else if (type === PLTE || type === tRNS) {
+      return undefined;
+    } else if ((bytes[offset + 4]! & 0x20) === 0) {
+      return undefined; // an unknown critical chunk
+    }
+    offset = dataEnd + 4;
+  }
+  if (header === undefined || idat.length === 0) return undefined;
+
+  const { width, height, bpp } = header;
+  const rowBytes = width * bpp;
+  const expected = height * (rowBytes + 1);
+  let inflated: Buffer;
+  try {
+    inflated = inflateSync(idat.length === 1 ? idat[0]! : Buffer.concat(idat), { maxOutputLength: expected });
+  } catch {
+    return undefined;
+  }
+  if (inflated.length !== expected) return undefined;
+
+  // RGBA unfilters straight into the result; RGB into a scratch image, expanded after.
+  const out = Buffer.allocUnsafe(width * height * 4);
+  const pixels = bpp === 4 ? out : Buffer.allocUnsafe(rowBytes * height);
+  if (!unfilter(inflated, pixels, rowBytes, height, bpp)) return undefined;
+  if (bpp === 3) {
+    for (let src = 0, dst = 0; src < pixels.length; src += 3, dst += 4) {
+      out[dst] = pixels[src]!;
+      out[dst + 1] = pixels[src + 1]!;
+      out[dst + 2] = pixels[src + 2]!;
+      out[dst + 3] = 255;
+    }
+  }
+  return { width, height, data: out };
+}
+
+/** The IHDR fields, or `undefined` when they are not the fast path's shape. */
+function parseHeader(ihdr: Buffer): { width: number; height: number; bpp: number } | undefined {
+  const width = ihdr.readUInt32BE(0);
+  const height = ihdr.readUInt32BE(4);
+  const [depth, colorType, compression, filter, interlace] = [ihdr[8], ihdr[9], ihdr[10], ihdr[11], ihdr[12]];
+  const bpp = BYTES_PER_PIXEL[colorType!];
+  if (depth !== 8 || bpp === undefined || compression !== 0 || filter !== 0 || interlace !== 0) return undefined;
+  if (width === 0 || height === 0) return undefined;
+  return { width, height, bpp };
+}
+
+/**
+ * Reverses the per-row filters of PNG spec §9.2 from `raw` (one filter byte,
+ * then `rowBytes` bytes, per row) into `out` (rows packed, no filter bytes).
+ * "Left" is the same channel one pixel back (`bpp` bytes, zero before the first
+ * pixel); "up" is the decoded row above (zero on the first row). Stores into the
+ * Uint8Array wrap modulo 256, which is the spec's arithmetic. `false` on a
+ * filter type outside 0–4.
+ *
+ * Up is the filter screenshots are made of (≈90 % of rows on both platforms'
+ * captures: a flat UI repeats the row above), so when rows are whole 32-bit
+ * words (RGBA always is) it adds four bytes per step: copy the row, then add the
+ * row above lane by lane with the carries kept out of the neighbouring byte —
+ * the low seven bits of each byte summed, the top bit XORed back in. That alone
+ * takes a full-screen decode from ~11 ms to ~5–8 ms. The lanes are independent,
+ * so the platform's byte order does not matter.
+ */
+function unfilter(raw: Uint8Array, out: Uint8Array, rowBytes: number, height: number, bpp: number): boolean {
+  const words = rowBytes % 4 === 0 && out.byteOffset % 4 === 0 ? new Uint32Array(out.buffer, out.byteOffset, out.length >> 2) : undefined;
+  for (let y = 0; y < height; y++) {
+    const filterType = raw[y * (rowBytes + 1)]!;
+    const src = y * (rowBytes + 1) + 1;
+    const row = y * rowBytes;
+    const above = row - rowBytes; // negative on the first row: "up" is then 0
+    switch (filterType) {
+      case 0: // None
+        out.set(raw.subarray(src, src + rowBytes), row);
+        break;
+      case 1: // Sub: + left
+        for (let x = 0; x < bpp; x++) out[row + x] = raw[src + x]!;
+        for (let x = bpp; x < rowBytes; x++) out[row + x] = raw[src + x]! + out[row + x - bpp]!;
+        break;
+      case 2: // Up: + up
+        out.set(raw.subarray(src, src + rowBytes), row);
+        if (y > 0) {
+          if (words !== undefined) {
+            for (let i = row >> 2, end = (row + rowBytes) >> 2, up = above >> 2; i < end; i++, up++) {
+              const a = words[i]!;
+              const b = words[up]!;
+              words[i] = ((a & 0x7f7f7f7f) + (b & 0x7f7f7f7f)) ^ ((a ^ b) & 0x80808080);
+            }
+          } else for (let x = 0; x < rowBytes; x++) out[row + x] += out[above + x]!;
+        }
+        break;
+      case 3: // Average: + floor((left + up) / 2)
+        for (let x = 0; x < rowBytes; x++) {
+          const left = x >= bpp ? out[row + x - bpp]! : 0;
+          const up = y > 0 ? out[above + x]! : 0;
+          out[row + x] = raw[src + x]! + ((left + up) >> 1);
+        }
+        break;
+      case 4: // Paeth: + whichever of left, up, up-left is nearest left + up - upLeft
+        for (let x = 0; x < rowBytes; x++) {
+          const left = x >= bpp ? out[row + x - bpp]! : 0;
+          const up = y > 0 ? out[above + x]! : 0;
+          const upLeft = x >= bpp && y > 0 ? out[above + x - bpp]! : 0;
+          const p = left + up - upLeft;
+          const pLeft = Math.abs(p - left);
+          const pUp = Math.abs(p - up);
+          const pUpLeft = Math.abs(p - upLeft);
+          out[row + x] = raw[src + x]! + (pLeft <= pUp && pLeft <= pUpLeft ? left : pUp <= pUpLeft ? up : upLeft);
+        }
+        break;
+      default:
+        return false;
+    }
+  }
+  return true;
+}
