@@ -82,6 +82,12 @@ export function parseLabApp(value: string | undefined): LabApp {
 /** The app that builds a family's cells: the react-native family the React Native app's alone, every other the native apps'. */
 export const appOf = (family: Family | undefined): LabApp => (family === 'react-native' ? 'react-native' : 'native');
 
+/** A lab target's or form control's identifier: `lab.<cell>.<tag>` (cells.json's note; a picker row's tag `<field>.<code>`). */
+export const labId = (cell: string, tag: string) => `lab.${cell}.${tag}`;
+
+/** The selector of a lab id, as the tools take it: `id:"lab.<cell>.<tag>"`. */
+export const labSelector = (cell: string, tag: string) => `id:"${labId(cell, tag)}"`;
+
 export interface CatalogCell {
   id: string;
   /**

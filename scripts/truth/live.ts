@@ -15,8 +15,8 @@ import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } fro
 import { knownEntry, knownLive } from './live-known.js';
 import { FLOATING_PANEL_EVIDENCE, holds, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
-import { allPassed, claimsTap, isError } from './replies.js';
-import { appOf, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
+import { allPassed, callReply, claimsTap, isError } from './replies.js';
+import { appOf, labSelector, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
 
 /**
  * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
@@ -151,7 +151,7 @@ interface Case extends RunsUnder {
   judge(state: LabState, replies: string[], source: Source, launched: LabState, after: readonly (LabState | undefined)[]): LiveVerdict;
 }
 
-const id = (cell: string, tag: string) => `id:"lab.${cell}.${tag}"`;
+const id = labSelector;
 const fill = (cell: string, tag: string, text: string, clear?: boolean): Call => ({
   tool: 'type_text',
   args: { selector: id(cell, tag), text, ...(clear !== undefined && { clear }) },
@@ -547,14 +547,8 @@ async function configFor(source: Source, c: Case): Promise<string> {
   return path;
 }
 
-async function callTool(client: Client, call: Call, configPath: string): Promise<string> {
-  try {
-    const r = await client.callTool({ name: call.tool, arguments: { platform, ...call.args, configPath } }, undefined, { timeout: 300_000 });
-    const text = (r.content as { type: string; text?: string }[]).map((c) => (c.type === 'text' ? c.text ?? '' : `[${c.type}]`)).join('\n');
-    return `${r.isError === true ? 'ERROR ' : ''}${text}`;
-  } catch (e) {
-    return `ERROR (thrown) ${(e as Error).message}`;
-  }
+function callTool(client: Client, call: Call, configPath: string): Promise<string> {
+  return callReply(client, call.tool, { platform, ...call.args, configPath });
 }
 
 type Result = { source: Source; c: Case; verdict: LiveVerdict; replies: string[] };
