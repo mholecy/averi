@@ -24,7 +24,7 @@ measured before and after.
 | P3 | `everyNode` as an explicit stack | CPU | done (ff612d57) |
 | P4 | PNG decode fast path (native inflate + typed unfilter, pngjs fallback) | CPU | open |
 | P5 | `sampleDominant` / `nearCount` on typed arrays | CPU | won't do — real bands cost 0.1 ms |
-| P6 | OCR toolchain probe memoised per module, not per `VisionOcr` | spawn | open |
+| P6 | OCR toolchain probe memoised per module, not per `VisionOcr` | spawn | done (5731c309) |
 | P7 | Selector regexes compiled once in `parseSelector` | CPU | won't do — cosmetic |
 | T1 | Fake the settle/poll timers in the slowest test files | tests | deferred — after the D rows |
 | D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | open |
@@ -42,6 +42,7 @@ measured before and after.
 | D12 | `tools/list` is 73 KB (~18k tokens): shorten the tool descriptions | agent context | open |
 | D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | open |
 | D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | open |
+| D15 | Two engines compiling the OCR helper at once share the `${binary}.${pid}` staging path (pre-existing; found in P6) | stability | open |
 
 ## Notes
 
@@ -93,6 +94,11 @@ and the harness; keep CIEDE2000 as it is (the calibrated 10.19 dE source).
 Every new `Verifier` builds a `VisionOcr` that runs `swiftc --version` (80 ms; 0.1–0.5 s in the repo's notes) and a
 filesystem check again. Memoise the binary promise at module level, keeping which failures stick
 (`OcrUnavailableError`).
+
+Done in 5731c309: the probe (not the binary) is memoized per exec, as `adapters/xcode-env.ts` does; the per-engine
+`existsSync` stays so a swept temp dir rebuilds. 20 Verifiers 1.7 s → 0.2 ms. A missing or refusing `swiftc` now sticks
+for the process (the error says to restart averi); a probe timeout or EAGAIN is forgotten; a failed compile stays the
+engine's answer and the next Verifier compiles again, as before. Left: D15.
 
 ### P7 — selectors (ui-tree/selectors.ts:101)
 `new RegExp(cond.value)` per node per condition; compile once on the `Condition`. 0.06 ms per query at N=242 —
