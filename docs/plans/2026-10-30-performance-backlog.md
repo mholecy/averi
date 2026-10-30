@@ -20,7 +20,7 @@ measured before and after.
 | # | Item | Kind | Status |
 |---|---|---|---|
 | P1 | `framesOnly` stops at the first non-empty frame | CPU | done (5ea456ff) |
-| P2 | draw-order: `bottomPinned` O(N), cheap test first in `lastPresentedSurface`, one node → places index | CPU | open |
+| P2 | draw-order: `bottomPinned` O(N), cheap test first in `lastPresentedSurface`, one node → places index | CPU | done (4c07b631) |
 | P3 | `everyNode` as an explicit stack | CPU | done (ff612d57) |
 | P4 | PNG decode fast path (native inflate + typed unfilter, pngjs fallback) | CPU | open |
 | P5 | `sampleDominant` / `nearCount` on typed arrays | CPU | won't do — real bands cost 0.1 ms |
@@ -43,6 +43,7 @@ measured before and after.
 | D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | open |
 | D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | open |
 | D15 | Two engines compiling the OCR helper at once share the `${binary}.${pid}` staging path (pre-existing; found in P6) | stability | open |
+| D16 | `tests/truth/calibration.test.ts` spawns a `git merge-base` per fix and times out (5 s) under load | tests | open |
 
 ## Notes
 
@@ -69,6 +70,13 @@ over every iOS and Android truth tree; `tests/helpers/android-trees.ts` now sits
   `Map<UiNode, Placed[]>` beside `walkOf`, shared with `presentationOf`; cache `asTarget` per `Placed`, `readingBreak`
   lazy.
 - Not wanted: a spatial index over the later nodes — the visit order is part of the rules (ADR 0014, 0015).
+
+Done in 4c07b631: all three parts; `readingBreak` stays eager — with `asTarget` cached it is built once per target, it
+returns at once on nested trees, and on flat lists the `readingBreak` row reads it for nearly every later node (a lazy
+getter measured within noise). Tap + pixel standing for every node: N=1803 656 → 194 ms, flat N=3010 5.2 → 2.8 s,
+the corpus 215 → 160 ms. Golden 0 changed; the proof is an equivalence run main vs branch over 554 trees / 41,438 nodes
+plus `tests/ui-tree/{bottom-pinned,places-by,presented-surface-first,target-facts-once}.test.ts`. What is left on a flat
+list is the visit over later nodes, which the rules require.
 
 ### P3 — `everyNode` (adapters/types.ts:688)
 Recursive `yield*` costs O(N·depth): 145 µs per walk of 363 nodes vs 12 µs for an explicit stack pushing children in
