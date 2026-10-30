@@ -307,8 +307,99 @@ describe('fastDecode declines what is not its shape; decodePng answers as pngjs 
     expectDeclinedToPngjs(pngOf([ihdr(1, 2, 8, 6), { type: 'IDAT', data: idat }, { type: 'IEND', data: Buffer.alloc(0) }]));
   });
 
+  it('bytes after the zlib stream inside IDAT — Node\'s inflate ignores them, pngjs throws', () => {
+    const [head, ...rest] = chunksOf(ok);
+    const idat = rest.filter((c) => c.type === 'IDAT').map((c) => c.data);
+    const padded = pngOf([head!, { type: 'IDAT', data: Buffer.concat([...idat, Buffer.from([1, 2, 3])]) }, { type: 'IEND', data: Buffer.alloc(0) }]);
+    expect(() => PNG.sync.read(padded)).toThrow();
+    expectDeclinedToPngjs(padded);
+  });
+
+  it('every input, on a Node without zlib.crc32 (before 22.2 / 20.15)', () => {
+    expect(fastDecode(ok)).toBeDefined();
+    expect(fastDecode(ok, null)).toBeUndefined();
+  });
+
   it('a file with no IDAT', () => {
     // pngjs, again, decodes memory it never wrote here — only the decline is pinned.
     expect(fastDecode(pngOf([ihdr(1, 1, 8, 6), { type: 'IEND', data: Buffer.alloc(0) }]))).toBeUndefined();
+  });
+});
+
+describe('decodePng input', () => {
+  it('a Uint8Array view at an offset into a larger buffer decodes as its bytes do', () => {
+    const png = encoded(9, 7, { colorType: 6, filterType: -1 }, 11);
+    const backing = new Uint8Array(png.length + 13);
+    backing.set(png, 5);
+    const view = backing.subarray(5, 5 + png.length);
+    expect(Buffer.isBuffer(view)).toBe(false);
+    expect(Buffer.compare(decodePng(view).data, reference(png).data)).toBe(0);
+  });
+});
+
+/**
+ * A seeded differential sweep: pngjs-encoded images (every filter choice, both
+ * colour types plus grey ones, 8- and 16-bit, assorted sizes), half of them
+ * damaged — bytes overwritten, then CRCs re-fixed half the time so the damage
+ * reaches past the CRC check, or cut short, or extended. Whatever the input,
+ * the fast path's answer must be pngjs's: if it decodes, pngjs decodes to the
+ * same bytes; if pngjs throws, the fast path declined. Inputs pngjs itself
+ * answers differently call to call (it reads memory it never wrote on some
+ * short streams) only need the fast path to have declined.
+ */
+describe('fastDecode against pngjs, seeded random and damaged inputs', () => {
+  let state = 0x5eed;
+  const rnd = (n: number): number => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return Math.floor((state / 2 ** 32) * n);
+  };
+
+  function sample(): Buffer {
+    const width = 1 + rnd(rnd(5) === 0 ? 200 : 16);
+    const height = 1 + rnd(16);
+    const options: PackerOptions = { colorType: ([6, 2, 6, 2, 0, 4] as const)[rnd(6)], filterType: rnd(6) - 1 };
+    if (rnd(10) === 0) options.bitDepth = 16;
+    const png = encoded(width, height, options, rnd(2 ** 31));
+    if (rnd(2) === 0) return png;
+    const kind = rnd(10);
+    if (kind === 0) return png.subarray(0, rnd(png.length));
+    if (kind === 1) return Buffer.concat([png, Buffer.alloc(1 + rnd(4), rnd(256))]);
+    const damaged = Buffer.from(png);
+    for (let i = 1 + rnd(3); i > 0; i--) damaged[rnd(damaged.length)] = rnd(256);
+    if (rnd(2) === 0) {
+      for (let o = 8; o + 12 <= damaged.length; ) {
+        const length = damaged.readUInt32BE(o);
+        if (o + 12 + length > damaged.length) break;
+        damaged.writeUInt32BE(crc32(damaged.subarray(o + 4, o + 8 + length)) >>> 0, o + 8 + length);
+        o += 12 + length;
+      }
+    }
+    return damaged;
+  }
+
+  const outcome = (bytes: Buffer): Buffer | string => {
+    try {
+      return PNG.sync.read(bytes).data;
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+
+  it('400 cases: the fast path decodes only what pngjs decodes, to the same bytes', () => {
+    let taken = 0;
+    for (let i = 0; i < 400; i++) {
+      const bytes = sample();
+      const fast = fastDecode(bytes);
+      // A decline is always pngjs's answer (decodePng hands it over), so only a take is checked —
+      // which also keeps pngjs off damaged headers that ask it for gigabytes.
+      if (fast === undefined) continue;
+      taken++;
+      const [first, second] = [outcome(bytes), outcome(bytes)];
+      const deterministic = typeof first === 'string' ? first === second : typeof second !== 'string' && Buffer.compare(first, second) === 0;
+      expect(deterministic, `case ${i}: pngjs answers differently call to call`).toBe(true);
+      expect(typeof first, `case ${i}: pngjs threw "${String(first)}"`).not.toBe('string');
+      expect(Buffer.compare(fast.data, first as Buffer), `case ${i}`).toBe(0);
+    }
+    expect(taken).toBeGreaterThan(100);
   });
 });

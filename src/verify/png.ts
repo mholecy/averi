@@ -1,12 +1,16 @@
-import { crc32, inflateSync } from 'node:zlib';
+// A namespace import, not `{ crc32 }`: Node 20.0–20.14 has no `zlib.crc32`, and a
+// named import of a missing export fails the ESM link — the whole server would
+// not start. Through the namespace it is only `undefined`, and the fast path steps aside.
+import * as zlib from 'node:zlib';
 import { PNG } from 'pngjs';
 
 /**
  * THE ONE PNG DECODER of the pixel readers (capture's frame and stability wait,
  * the eyes, the screenshot diff). Its answer is pngjs's `PNG.sync.read` answer,
- * byte for byte — width, height and an 8-bit RGBA buffer, row-major — and a
- * PNG that does not decode throws pngjs's own error, so every caller's wording
- * of a damaged capture is unchanged.
+ * byte for byte — width, height and an 8-bit RGBA buffer, row-major: the fast
+ * path takes only inputs pngjs decodes, to the same bytes, and every other input
+ * is decoded by pngjs itself, so a PNG that does not decode throws pngjs's own
+ * error and every caller's wording of a damaged capture is unchanged.
  *
  * Why not pngjs alone: on a full-screen capture (iOS 1206×2622, Android
  * 1080×2220) pngjs spends ~90 % of its 20–30 ms in its JavaScript unfilter and
@@ -28,13 +32,15 @@ export interface DecodedPng {
 
 /**
  * Decodes `bytes` as pngjs would: the fast path when it takes the input, pngjs
- * otherwise. Throws exactly when pngjs throws, with its error — the fast path
- * never throws, it declines, and pngjs then decides.
+ * otherwise. The fast path never throws — it declines — so whatever throws here
+ * is `PNG.sync.read` on an input the fast path declined: pngjs's error, worded
+ * by pngjs.
  */
-export function decodePng(bytes: Buffer): DecodedPng {
-  const fast = fastDecode(bytes);
+export function decodePng(bytes: Uint8Array): DecodedPng {
+  const buffer = asBuffer(bytes);
+  const fast = fastDecode(buffer);
   if (fast !== undefined) return fast;
-  const png = PNG.sync.read(bytes);
+  const png = PNG.sync.read(buffer);
   return { width: png.width, height: png.height, data: png.data };
 }
 
@@ -51,12 +57,20 @@ const gAMA = 0x67414d41;
 /** IHDR colour types the fast path decodes, to their bytes per pixel. */
 const BYTES_PER_PIXEL: Readonly<Record<number, number>> = { 2: 3, 6: 4 };
 
+/** A CRC-32 (PNG's, zlib's) of `data`. */
+export type Crc32 = (data: Uint8Array) => number;
+
 /**
  * `zlib.crc32` arrived in Node 22.2 / 20.15; the package supports Node 20, so
  * on an older 20 the fast path steps aside rather than checking CRCs in
  * JavaScript (that loop alone would cost a large part of what it saves).
  */
-const nativeCrc: ((data: Uint8Array) => number) | undefined = typeof crc32 === 'function' ? crc32 : undefined;
+const nativeCrc: Crc32 | null = typeof zlib.crc32 === 'function' ? zlib.crc32 : null;
+
+/** `bytes` as a Buffer view over the same memory — no copy — for its big-endian readers. */
+function asBuffer(bytes: Uint8Array): Buffer {
+  return Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length);
+}
 
 /**
  * The fast path: the decode of an 8-bit, non-interlaced RGB (colour type 2) or
@@ -86,13 +100,20 @@ const nativeCrc: ((data: Uint8Array) => number) | undefined = typeof crc32 === '
  * - Bit depth other than 8, colour types 0/3/4 (grey, palette, grey+alpha),
  *   interlacing, a compression or filter method other than 0, a zero width or
  *   height: pngjs's (or its error), never reimplemented here.
- * - The inflated IDAT stream must be exactly `height * (1 + width * bpp)` bytes
- *   and inflate cleanly; anything else — a short, long or damaged stream —
- *   declines, and pngjs (whose own inflate stops at that length) decides.
+ * - The concatenated IDAT data must be one zlib stream, consumed to its last
+ *   byte, that inflates cleanly to exactly `height * (1 + width * bpp)` bytes.
+ *   Anything else declines and pngjs decides: a short, long or damaged stream,
+ *   and bytes after the stream's end inside IDAT — Node's inflate ignores those,
+ *   pngjs throws on them.
  * - A row whose filter byte is not 0–4 declines (pngjs throws on it).
+ *
+ * `crc32` is the CRC the chunks are checked with — Node's native one; `null`
+ * (an older Node 20) declines every input. A parameter so that a test can stand
+ * in for the older Node.
  */
-export function fastDecode(bytes: Buffer): DecodedPng | undefined {
-  if (nativeCrc === undefined) return undefined;
+export function fastDecode(input: Uint8Array, crc32: Crc32 | null = nativeCrc): DecodedPng | undefined {
+  if (crc32 === null) return undefined;
+  const bytes = asBuffer(input);
   if (bytes.length < SIGNATURE.length || !bytes.subarray(0, SIGNATURE.length).equals(SIGNATURE)) return undefined;
 
   let header: { width: number; height: number; bpp: number } | undefined;
@@ -106,7 +127,7 @@ export function fastDecode(bytes: Buffer): DecodedPng | undefined {
     const dataEnd = dataStart + length;
     if (dataEnd + 4 > bytes.length) return undefined;
     if (header === undefined && type !== IHDR) return undefined;
-    const crcOk = (): boolean => nativeCrc(bytes.subarray(offset + 4, dataEnd)) >>> 0 === bytes.readUInt32BE(dataEnd);
+    const crcOk = (): boolean => crc32(bytes.subarray(offset + 4, dataEnd)) >>> 0 === bytes.readUInt32BE(dataEnd);
 
     if (type === IHDR) {
       if (header !== undefined || length !== 13 || !crcOk()) return undefined;
@@ -132,9 +153,12 @@ export function fastDecode(bytes: Buffer): DecodedPng | undefined {
   const { width, height, bpp } = header;
   const rowBytes = width * bpp;
   const expected = height * (rowBytes + 1);
+  const stream = idat.length === 1 ? idat[0]! : Buffer.concat(idat);
   let inflated: Buffer;
   try {
-    inflated = inflateSync(idat.length === 1 ? idat[0]! : Buffer.concat(idat), { maxOutputLength: expected });
+    const { buffer, engine } = zlib.inflateSync(stream, { maxOutputLength: expected, info: true }) as unknown as InflateInfo;
+    if (engine.bytesWritten !== stream.length) return undefined; // bytes after the zlib stream
+    inflated = buffer;
   } catch {
     return undefined;
   }
@@ -153,6 +177,12 @@ export function fastDecode(bytes: Buffer): DecodedPng | undefined {
     }
   }
   return { width, height, data: out };
+}
+
+/** `inflateSync` with `info: true` — its result and the engine, whose `bytesWritten` is the input it consumed. */
+interface InflateInfo {
+  buffer: Buffer;
+  engine: { bytesWritten: number };
 }
 
 /** The IHDR fields, or `undefined` when they are not the fast path's shape. */
