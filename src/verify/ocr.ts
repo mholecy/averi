@@ -218,11 +218,73 @@ const probeDidNotAnswer = (e: unknown): boolean =>
   (e instanceof ExecError && e.timedOut) || /\bEAGAIN\b/.test(errorMessage(e));
 
 /**
+ * The compiler's answer to `swiftc --version`, memoised per ExecFn (as in
+ * adapters/xcode-env.ts): every Verifier builds its own VisionOcr, and every
+ * flow step and verify leg its own Verifier, so a per-engine probe paid 0.1–0.5 s
+ * per Verifier. Production engines all share the real exec, so the probe runs
+ * once per process; a test's fake exec is a cache of its own.
+ *
+ * Which outcomes the process keeps:
+ * - the version string — the binary cache key below is derived from it, and
+ *   the on-disk check for that binary still runs per engine, so a binary the
+ *   OS swept out of the temp dir is rebuilt rather than trusted;
+ * - an `OcrUnavailableError` — the compiler is missing (ENOENT) or refused
+ *   (a non-zero exit, e.g. no active developer dir). That is the host's
+ *   answer; installing the Command Line Tools mid-process needs a restart of
+ *   the server to be seen, the same as the xcode-env probe.
+ * A probe that did not ANSWER (timed out, spawn refused with EAGAIN) says
+ * nothing about the compiler, so it is dropped and the next engine probes
+ * again. The compile is NOT memoised here: its failures (a timeout, a killed
+ * swiftc, a full disk) are not reliably told apart from a real compile error,
+ * so they stay the failing engine's answer only (`VisionOcr#binary`), and the
+ * next Verifier tries again.
+ */
+const toolchainProbes = new WeakMap<ExecFn, Promise<string>>();
+
+function swiftToolchain(exec: ExecFn): Promise<string> {
+  let probe = toolchainProbes.get(exec);
+  if (probe === undefined) {
+    probe = probeSwiftToolchain(exec).catch((e: unknown) => {
+      if (!(e instanceof OcrUnavailableError)) toolchainProbes.delete(exec);
+      throw e;
+    });
+    toolchainProbes.set(exec, probe);
+  }
+  return probe;
+}
+
+async function probeSwiftToolchain(exec: ExecFn): Promise<string> {
+  try {
+    const { stdout } = await exec('swiftc', ['--version']);
+    return stdout.toString('utf8');
+  } catch (e) {
+    // A probe that did not ANSWER says nothing about the compiler: a plain
+    // error, not memoized, so one flaky probe does not fail every OCR read of
+    // the process. A missing binary (ENOENT) or a non-zero exit is the
+    // compiler's answer, and permanent.
+    // One line: the reason ends up inside an assert's one-line fail-closed
+    // sentence and the text table's note, and ExecError puts the spawn error
+    // under its own line (`Command failed (exit null): swiftc --version⏎spawn
+    // swiftc ENOENT`, device check 2026-10-08).
+    const cause = errorMessage(e).replace(/\s*\n\s*/g, ' — ');
+    if (probeDidNotAnswer(e)) {
+      throw new Error(`the Swift compiler probe (\`swiftc --version\`) did not answer: ${cause}`);
+    }
+    throw new OcrUnavailableError(
+      'OCR needs the Swift compiler: `swiftc --version` failed — install the Xcode Command Line ' +
+        `Tools (xcode-select --install). Underlying error: ${cause}`,
+    );
+  }
+}
+
+/**
  * Vision-backed engine. The recognizer is compiled ONCE and cached under the
  * system temp dir, keyed by a hash of the source and the toolchain version:
  * `swift <file>` recompiles on every invocation and that cost dominates a run
  * of 14 anchor reads. Same reasoning (and same shape) as the WDA build cache in
- * adapters/wda.ts.
+ * adapters/wda.ts. The toolchain version comes from the process-wide probe
+ * (`swiftToolchain`), so a fresh engine costs one existence check of the
+ * cached binary, not a `swiftc --version`.
  */
 export class VisionOcr implements OcrEngine {
   private binaryPromise: Promise<string> | undefined;
@@ -267,7 +329,10 @@ export class VisionOcr implements OcrEngine {
    * Compile-once-and-cache; concurrent callers share one promise per instance
    * — a rejected one too when the rejection is an `OcrUnavailableError`: a
    * missing compiler or a failed compile is this instance's answer from then
-   * on. Any other rejection is dropped and the next call builds again.
+   * on, so one Verifier's reads do not each pay a doomed compile. Any other
+   * rejection is dropped and the next call builds again. A missing compiler is
+   * also the process's answer (`swiftToolchain`); a failed compile is not, so
+   * the next Verifier's engine compiles afresh.
    */
   private binary(): Promise<string> {
     this.binaryPromise ??= this.buildBinary().catch((e: unknown) => {
@@ -281,28 +346,7 @@ export class VisionOcr implements OcrEngine {
   }
 
   private async buildBinary(): Promise<string> {
-    let toolchain: string;
-    try {
-      const { stdout } = await this.exec('swiftc', ['--version']);
-      toolchain = stdout.toString('utf8');
-    } catch (e) {
-      // A probe that did not ANSWER says nothing about the compiler: a plain
-      // error, not memoized (`binary`), so one flaky probe does not fail every
-      // OCR read of the run (review 2026-10-08). A missing binary (ENOENT) or
-      // a non-zero exit is the compiler's answer, and permanent.
-      // One line: the reason ends up inside an assert's one-line fail-closed
-      // sentence and the text table's note, and ExecError puts the spawn
-      // error under its own line (`Command failed (exit null): swiftc
-      // --version⏎spawn swiftc ENOENT`, device check 2026-10-08).
-      const cause = errorMessage(e).replace(/\s*\n\s*/g, ' — ');
-      if (probeDidNotAnswer(e)) {
-        throw new Error(`the Swift compiler probe (\`swiftc --version\`) did not answer: ${cause}`);
-      }
-      throw new OcrUnavailableError(
-        'OCR needs the Swift compiler: `swiftc --version` failed — install the Xcode Command Line ' +
-          `Tools (xcode-select --install). Underlying error: ${cause}`,
-      );
-    }
+    const toolchain = await swiftToolchain(this.exec);
     const key = createHash('sha256').update(RECOGNIZER_SWIFT).update(toolchain).digest('hex').slice(0, 16);
     const dir = join(tmpdir(), 'averi-ocr-bin');
     const binary = join(dir, `recognizer-${key}`);

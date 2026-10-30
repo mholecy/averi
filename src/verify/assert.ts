@@ -247,8 +247,9 @@ export class Verifier {
   /**
    * The caller's OCR choice, else the host's, decided on the first `ocr`
    * assert and memoized — one VisionOcr per Verifier, so its compiled binary
-   * (and its one `swiftc --version` probe) is reused across asserts. Building
-   * it costs nothing: the engine probes for its toolchain on its first read.
+   * is reused across asserts. Building it costs nothing: the engine asks for
+   * the toolchain on its first read, and that `swiftc --version` probe runs
+   * once per process, shared by every Verifier's engine.
    */
   private ocr: OcrEngineChoice | undefined;
 
