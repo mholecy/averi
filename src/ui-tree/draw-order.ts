@@ -1790,7 +1790,11 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
    * The last node drawn after `node` whose reach `where` keeps (a presented layer's cover reaches the whole screen,
    * presentation.ts#PresentedOver.wholeScreen), that draws for it as a target and is the surface of a screen presented
    * over its own (presentation.ts#PresentedOver.surface) — or that cover: `presentedAt` keeps those holding its point,
-   * `presentedOver` every one.
+   * `presentedOver` every one. Whether it is such a surface is asked BEFORE whether it draws: both are pure questions
+   * of the same node — neither changes what the other, or any later question, answers (the reading order the rows may
+   * read is asked once per target and is the same whenever it is first read) — so their order changes no answer, and
+   * the surface test is the cheap one (on most nodes a set's or a few rects' look says no), the rows the costly one
+   * (every row of the `target` column, a flat list's reading order among them).
    */
   const lastPresentedSurface = (node: UiNode, where: (reach: Rect) => boolean = () => true): UiNode | undefined => {
     const places = placesOf(node);
@@ -1798,7 +1802,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     const about = asTarget(places[0]);
     const { wholeScreen, surface } = about.over;
     return laterFor(places, about)
-      .filter((p) => (wholeScreen(p) ? where(screen) : where(p.node.rect) && drawsOverTarget(p, about) && surface(p) !== undefined))
+      .filter((p) => (wholeScreen(p) ? where(screen) : where(p.node.rect) && surface(p) !== undefined && drawsOverTarget(p, about)))
       .at(-1)?.node;
   };
 

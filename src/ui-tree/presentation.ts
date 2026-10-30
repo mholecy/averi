@@ -128,7 +128,9 @@ export interface PresentedOver {
   /**
    * `p` is the SURFACE of a screen presented over the target's, and on what evidence (`SurfaceBy`): a node of a marked
    * `screen` layer over it (`fact`), or a cover the shape fallback names (`inferred`, which wins where both hold: the
-   * `hidden` row asks it). Asked of a node draw order already judged to draw for the target, or of a cover.
+   * `hidden` row asks it). Asked of any node drawn after the target — draw-order.ts#lastPresentedSurface asks it
+   * before the rows judge whether the node draws, the cheaper question first — and pure: its answer is the same
+   * whatever was asked before it.
    */
   surface(p: Placed): SurfaceBy | undefined;
   /** `row`'s frame excuse of `p` (placed.ts#FRAME_EXCUSES) gives way: `p` lies on a screen presented over the target's, by shape. */
