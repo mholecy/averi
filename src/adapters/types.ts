@@ -1085,6 +1085,25 @@ export interface DeviceAdapter {
    */
   readonly dragSpeed?: number;
   /**
+   * The tree read waits for the screen at rest: `uiTree` returns a snapshot taken only once the app has been quiet,
+   * so the read after a stroke shows where the stroke left the content, not a frame of it still moving. `scroll_until`
+   * then takes that read as the settled one (interact/scroll-rounds.ts#RoundRules.readSettles, ADR 0021 decision 7):
+   * a stop judged on it is reported at once, with no confirming read, and no settle pause is spent between the stroke
+   * and the read (interact/scroll.ts). A platform fact, so the adapter's — which tree source waits and how long the
+   * platform's strokes carry on are the platform's; the scroll is platform-agnostic.
+   *
+   * Set by Android only, for two reasons that hold together: `uiautomator dump` waits for the accessibility
+   * framework to fall idle — 1 s with no accessibility event, up to 10 s, and no snapshot at all when it never does —
+   * before it snapshots (adapters/android.ts#treeReadSettles has the AOSP source and the measurement); and its
+   * strokes are drags (`dragSpeed`), which leave little to carry on once the finger lifts (≈ 90 px of fling by AOSP's
+   * spline at the drag speed, android.ts#dragSpeed) — over within the dump's own second of quiet.
+   * Absent on iOS: neither WDA's /source nor idb's describe-all waits for anything, and the read after a WDA fling
+   * was measured carrying the row 730–800 pt on (SETTLE_CONFIRM_READS). A tree source that snapshots at once — a
+   * persistent accessibility service answering from its cache — must not set it, whatever the platform: the read
+   * after its stroke is any frame of the motion.
+   */
+  readonly treeReadSettles?: true;
+  /**
    * When text sent by `typeText` has reached the focused field
    * (`TypingDelivery`) — the platform fact the fill's retype of a dropped
    * tail asks (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-

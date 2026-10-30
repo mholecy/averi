@@ -5,7 +5,7 @@ import { AndroidAdapter, parseImeInsets, parseInputShown, parseNavigationBand, p
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { GBOARD, GBOARD_PANEL, GBOARD_STRIP, INPUT_SHOWN_LINE, parseDump, drawnOverStrip } from '../helpers/android-dumps.js';
-import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { everyNode, type DeviceAdapter, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { resolveSettled } from '../../src/interact/resolve.js';
@@ -503,6 +503,11 @@ describe('AndroidAdapter interactions', () => {
       'adb -s emulator-5554 shell input swipe 540 1871 540 1021 851',
       'adb -s emulator-5554 shell input swipe 540 1776 540 444 300',
     ]);
+  });
+
+  it('its tree read waits for the screen at rest (types.ts#treeReadSettles, ADR 0021 decision 7): uiautomator dump snapshots only after 1 s with no accessibility event, so the read after a stroke is the settled read', () => {
+    const adapter: DeviceAdapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fakeExec({}).fn });
+    expect(adapter.treeReadSettles).toBe(true);
   });
 
   it('uiTree strips the trailing uiautomator status line', async () => {

@@ -26,7 +26,7 @@ export interface ScrollOptions {
   fully?: boolean;
   /** Default DEFAULT_SCROLL_TIMEOUT_MS. The flow engine converts its `timeout: 2s` before calling. */
   timeoutMs?: number;
-  /** Pause after each swipe before the next read. Default 400. */
+  /** Pause before a read that follows a swipe or a confirming step. Default 400. Not spent after a swipe where the adapter's tree read waits for the screen at rest (DeviceAdapter.treeReadSettles). */
   settleMs?: number;
   /**
    * The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition
@@ -38,13 +38,13 @@ export interface ScrollOptions {
 
 /**
  * What a scroll needs of a device: the tree, the screen's size,
- * the stroke and how fast it may be drawn (`dragSpeed`), and the keyboard's oracle and advice for the round's reading
+ * the stroke and how fast it may be drawn (`dragSpeed`), whether its read waits for the screen at rest (`treeReadSettles`), and the keyboard's oracle and advice for the round's reading
  * (`readKeyboard`) — nothing it does not use, so a caller with a narrower
  * adapter can scroll, and a reader sees what a scroll can touch. Every
  * reader the driver hands it to takes a `Pick` of its own
  * (`readTreeOrError`, `screenBox`, `readKeyboard`).
  */
-export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed' | 'focusedWindow'>;
+export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed' | 'treeReadSettles' | 'focusedWindow'>;
 
 /**
  * Swipe until the element is present AND visibly inside the viewport
@@ -76,7 +76,8 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * container and its child, and the MOST revealed of the two is the honest
  * report, so this loop does not go through resolveNow. It keeps its own loop
  * on readTreeOrError rather than pollTree because it ACTS between reads (a
- * swipe, then a settle pause) and has a second stop bound (maxSwipes); the
+ * swipe, then a settle pause — none where the tree read waits for the screen
+ * at rest, `DeviceAdapter.treeReadSettles`) and has a second stop bound (maxSwipes); the
  * read-failure rule is the same — a failed read is a miss, the last error is
  * quoted at the stop.
  *
@@ -137,7 +138,10 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * it is. The rounds — strokes and confirming reads alike — number at most
  * 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes`, 25 at the defaults, besides a
  * slowing fling's reads (scroll-rounds.ts#SETTLE_CONFIRM_READS), bounded by the
- * deadline — and stop at the deadline whichever comes first. A failed or `fully: true`
+ * deadline; where the tree read waits for the screen at rest (Android,
+ * `DeviceAdapter.treeReadSettles`) a stroke's read confirms nothing of its
+ * motion, and the confirming reads left are a presented screen's hold, a read
+ * that failed and a probe's read that moved — and stop at the deadline whichever comes first. A failed or `fully: true`
  * stop may add one more query, the `unlocated` row's (below). A band that does not change the round is not reported
  * either: the result carries `keyboard: shown` only when the stop was
  * judged under one this round — a clip at its edge, or another of several
@@ -177,7 +181,10 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   viewport, "fully visible after 1 swipe", and it came to rest at y -48 to
  *   -133. A target that moved is judged from the new read like any round;
  *   one that never holds still, or a stop at the deadline, is reported with
- *   `settled: false`. A fling that carried the target across the frame —
+ *   `settled: false`. Where the tree read itself waits for the screen at
+ *   rest (`DeviceAdapter.treeReadSettles`: uiautomator dump's second of
+ *   quiet, ADR 0021 decision 7) the read after the stroke IS that further
+ *   read: the stop is reported on it, and no settle pause comes between. A fling that carried the target across the frame —
  *   beyond its far edge, after a read saw it short of that — turns the next
  *   stroke round (course.ts#nextStroke), instead of swiping on into
  *   exhausted content (measured: 613 → -357, then five swipes down that
@@ -263,6 +270,7 @@ export async function scrollUntilVisible(
     fully: opts.fully === true,
     timeoutMs: opts.timeoutMs ?? DEFAULT_SCROLL_TIMEOUT_MS,
     strokes: adapter.dragSpeed === undefined ? ('fling' as const) : ('drag' as const),
+    readSettles: adapter.treeReadSettles === true,
     target,
   };
   let state: Rounds = startRounds(rules, asBuilt);
@@ -377,6 +385,11 @@ export async function scrollUntilVisible(
       if (durationMs !== undefined) await adapter.swipe(drawn.from, drawn.to, durationMs);
       else if (adapter.dragSpeed === undefined) await adapter.swipe(drawn.from, drawn.to);
       else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, screen.usable.oriented));
+      // Where the tree read itself waits for the screen at rest (DeviceAdapter.treeReadSettles: uiautomator dump's
+      // second of quiet), the pause would only be spent before that wait: the read after the stroke is read at once.
+      // A confirming read still pauses first (below) — it is asked for when something other than the stroke's motion
+      // is awaited: a presented screen's hold, a read that failed, a probe's read that moved.
+      if (adapter.treeReadSettles === true) continue;
     }
     await sleep(settleMs);
   }
