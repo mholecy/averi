@@ -11,6 +11,14 @@ export const node = (partial: Partial<UiNode>): UiNode => ({
   ...partial,
 });
 
+/** `n`, whose children throw `walked` when read: a node a walk must not look under. */
+export const unwalkable = (n: UiNode, walked: string): UiNode =>
+  Object.defineProperty(n, 'children', {
+    get: () => {
+      throw new Error(walked);
+    },
+  });
+
 /** Each element gets a distinct rect so coordinate taps map back to one node. */
 let nextY = 0;
 export const resetLayout = () => {

@@ -1,19 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { androidTrees } from '../helpers/android-trees.js';
-import { node } from '../helpers/fake.js';
+import { node, unwalkable } from '../helpers/fake.js';
 import { iosTrees } from '../helpers/ios-trees.js';
 
 // EVERY NODE (adapters/types.ts#everyNode): the one tree walk — the root, then each child's subtree in the order
 // listed, lazily, so a consumer that stops early never reads what it did not reach.
-
-/** `n`, whose children throw `walked` when read: a node the walk must not look under. */
-const unwalkable = (n: UiNode, walked: string): UiNode =>
-  Object.defineProperty(n, 'children', {
-    get: () => {
-      throw new Error(walked);
-    },
-  });
 
 const ids = (nodes: Iterable<UiNode>): (string | null)[] => [...nodes].map((n) => n.identifier);
 
