@@ -27,7 +27,7 @@ measured before and after.
 | P6 | OCR toolchain probe memoised per module, not per `VisionOcr` | spawn | done (5731c309) |
 | P7 | Selector regexes compiled once in `parseSelector` | CPU | won't do — cosmetic |
 | T1 | Fake the settle/poll timers in the slowest test files | tests | deferred — after the D rows |
-| D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | open |
+| D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | Android done (0119d76d); iOS run by the owner |
 | D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | open |
 | D2 | `ensure_state`'s second look ends on a held "no" | device | open |
 | D3 | Per-call tree snapshot cache, invalidated by every action | device | open |
@@ -126,6 +126,31 @@ cosmetic, take it only alongside other selector work.
 Per platform, on the lab apps: a selector tap, a fill of an empty field (and a 20-character value on Android), a
 scroll_until over 3 screens, `ensure_state` cold and warm, an ocr assert, a color assert, one screenshot, one tree
 read. Record wall clock, device calls and time slept. Then decide which D rows go in and in what order.
+
+Harness (0119d76d): `node --import tsx scripts/perf/baseline.ts --platform android|ios --device <id> --repeat 5
+[--app react-native] [--tree-source wda]` — averi's real MCP tools, per scenario wall, device calls, device busy time,
+averi's sleeps by caller (header of `scripts/perf/baseline.ts`). iOS needs idb/WDA, which this sandbox blocks: run it
+outside. The simulator is named `averi-lab iPhone 17` for the lab guards.
+
+Android, averi_lab API 33, native AveriLab, 5 repeats, medians, with P1–P6 (load 2.5–2.8):
+
+| scenario | wall ms | device calls | device ms | slept ms |
+|---|---|---|---|---|
+| tree | 2426 | 3 | 2424 | 0 |
+| screenshot | 1080 | 4 | 776 | 302 |
+| tap | 5336 | 6 | 4830 | 502 |
+| color assert | 3591 | 7 | 3226 | 302 |
+| fill, 3 chars | 11627 | 13 | 9854 | 1761 |
+| fill, 20 chars | 17330 | 30 | 11266 | 6044 |
+| scroll_until, content ~3 screens (4 swipes) | 21226 | 19 | 19197 | 2010 |
+| ensure_state cold | 14280 | 14 | 13458 | 804 |
+| ensure_state warm | 3390 | 6 | 3081 | 302 |
+
+The React Native app has the same shape (tree 2.3 s, fill 10.9 s, fill-20 17.0 s). OCR could not run here (Vision is
+unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 % of a tap, 80 % of a fill, 86 % of a
+cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
+takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
+D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
 
 ### D1–D13
 Sources and estimates are in the artifact. Before each: measure on D0's scenario; after: the same run, golden and
