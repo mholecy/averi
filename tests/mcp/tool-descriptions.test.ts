@@ -646,6 +646,11 @@ describe('every description keeps the rules an agent must not break', () => {
     ['launch_app', 'the launcher activity is picked arbitrarily — LeakCanary instead of the app'],
     ['get_logs', 'An invalid grep is refused before any device is touched'],
     ['swipe', 'in tree units (px on Android, pt on iOS)'],
+    ['tap', "Element to tap, e.g. 'id:login_button' or 'text:\"Sign in\"' (quote values with spaces)"],
+    ['ui_snapshot', 'Selector to filter nodes (quote values with spaces)'],
+    ['type_text', "Field to focus first, e.g. 'id:amount_input' (quote values with spaces)"],
+    ['scroll_until', "Element to scroll into view, e.g. 'id:submit_button' (quote values with spaces)"],
+    ['ui_snapshot', '"heading": true (iOS) — drawn over the nodes listed after it that it overlaps (a pinned section header)'],
     ['instructions', 'Coordinates and rects are in tree units: pixels on Android, points on iOS.'],
     ['instructions', 'follow it rather than retrying unchanged'],
   ];

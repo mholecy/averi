@@ -202,7 +202,10 @@ export const serverInstructions = (version: string): string => [
 /** The repository package.json names (`repository.url`); tests/mcp/tool-surface-budget.test.ts holds the two to one. */
 export const REPOSITORY_URL = 'https://github.com/mholecy/averi';
 
-/** The full tool reference as released with this version: its file at the release tag (`v<version>`). */
+/**
+ * The full tool reference as released with this version: its file at the release tag (`v<version>`). From a checkout
+ * ahead of its version's tag (unreleased work, a version bumped before tagging) the URL 404s until that tag exists.
+ */
 export const toolsReferenceUrl = (version: string): string => `${REPOSITORY_URL}/blob/v${version}/skill/references/tools.md`;
 
 export interface AveriServerDeps {
