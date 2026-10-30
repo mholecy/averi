@@ -22,11 +22,20 @@ import { PNG } from 'pngjs';
  * were weighed and rejected: a per-platform binary breaks the `npx` install.
  */
 
-/** A decoded PNG: what every pixel reader reads (`verify/capture.ts#RgbaImage`). */
-export interface DecodedPng {
+/**
+ * A decoded RGBA screenshot — what every pixel reader reads. Defined here, beside
+ * its decoder, so the dependency runs one way (capture.ts imports this module and
+ * re-exports the type); readers that only index the bytes accept any Uint8Array.
+ */
+export interface RgbaImage {
   width: number;
   height: number;
-  /** 8-bit RGBA, row-major, `width * height * 4` bytes. */
+  /** 8-bit RGBA, row-major, `width * height * 4` bytes (every PNG variant is normalized to this). */
+  data: Buffer | Uint8Array;
+}
+
+/** `decodePng`'s answer: an `RgbaImage` whose bytes are a Buffer (pixelmatch, `Buffer.compare`). */
+export interface DecodedPng extends RgbaImage {
   data: Buffer;
 }
 
@@ -58,7 +67,7 @@ const gAMA = 0x67414d41;
 const BYTES_PER_PIXEL: Readonly<Record<number, number>> = { 2: 3, 6: 4 };
 
 /** A CRC-32 (PNG's, zlib's) of `data`. */
-export type Crc32 = (data: Uint8Array) => number;
+type Crc32 = (data: Uint8Array) => number;
 
 /**
  * `zlib.crc32` arrived in Node 22.2 / 20.15; the package supports Node 20, so
@@ -110,13 +119,16 @@ function asBuffer(bytes: Uint8Array): Buffer {
  * `crc32` is the CRC the chunks are checked with — Node's native one; `null`
  * (an older Node 20) declines every input. A parameter so that a test can stand
  * in for the older Node.
+ *
+ * Exported for the tests (tests/verify/png.test.ts), which pin which inputs the
+ * fast path takes; no production importer — callers decode with `decodePng`.
  */
 export function fastDecode(input: Uint8Array, crc32: Crc32 | null = nativeCrc): DecodedPng | undefined {
   if (crc32 === null) return undefined;
   const bytes = asBuffer(input);
   if (bytes.length < SIGNATURE.length || !bytes.subarray(0, SIGNATURE.length).equals(SIGNATURE)) return undefined;
 
-  let header: { width: number; height: number; bpp: number } | undefined;
+  let header: Header | undefined;
   const idat: Buffer[] = [];
   let offset = SIGNATURE.length;
   for (;;) {
@@ -185,8 +197,15 @@ interface InflateInfo {
   engine: { bytesWritten: number };
 }
 
+/** The IHDR fields the decode needs: the size, and bytes per pixel (3 for RGB, 4 for RGBA). */
+interface Header {
+  width: number;
+  height: number;
+  bpp: number;
+}
+
 /** The IHDR fields, or `undefined` when they are not the fast path's shape. */
-function parseHeader(ihdr: Buffer): { width: number; height: number; bpp: number } | undefined {
+function parseHeader(ihdr: Buffer): Header | undefined {
   const width = ihdr.readUInt32BE(0);
   const height = ihdr.readUInt32BE(4);
   const [depth, colorType, compression, filter, interlace] = [ihdr[8], ihdr[9], ihdr[10], ihdr[11], ihdr[12]];

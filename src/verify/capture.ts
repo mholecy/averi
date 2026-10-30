@@ -2,7 +2,7 @@ import type { DeviceAdapter, DeviceScreen, Rect, UiNode } from '../adapters/type
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
-import { decodePng, type DecodedPng } from './png.js';
+import { decodePng, type DecodedPng, type RgbaImage } from './png.js';
 import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.js';
 
 /**
@@ -187,13 +187,8 @@ export const STABILITY_DELAY_MS = 300;
 const TREE_READ_ATTEMPTS = 5;
 const TREE_READ_DELAY_MS = 300;
 
-/** Decoded RGBA screenshot — `verify/png.ts#decodePng`'s answer satisfies this structurally. */
-export interface RgbaImage {
-  width: number;
-  height: number;
-  /** 8-bit RGBA, row-major (the decoder normalizes every PNG variant to this). */
-  data: Buffer | Uint8Array;
-}
+/** Defined beside its decoder (verify/png.ts imports nothing from here); re-exported for the pixel readers that import their frame types from capture. */
+export type { RgbaImage } from './png.js';
 
 /**
  * A frame that decoded and has a tree beside it: what the pixel comparators
