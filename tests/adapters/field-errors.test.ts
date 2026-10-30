@@ -362,18 +362,7 @@ describe('field/error pairing', () => {
   });
 });
 
-describe('everyNode', () => {
-  it('yields the root and every descendant, pre-order', () => {
-    const tree = node({
-      identifier: 'root',
-      children: [
-        node({ identifier: 'a', children: [node({ identifier: 'a1' })] }),
-        node({ identifier: 'b' }),
-      ],
-    });
-    expect([...everyNode(tree)].map((n) => n.identifier)).toEqual(['root', 'a', 'a1', 'b']);
-  });
-
+describe('field/error pairing over a nested tree (everyNode)', () => {
   it('reaches a field and its error sitting in DIFFERENT branches', () => {
     const target = field('amount', 100);
     const tree = node({

@@ -2,21 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { emptyFrame, framesOnly } from '../../src/ui-tree/placed.js';
 import { androidTrees } from '../helpers/android-trees.js';
-import { node } from '../helpers/fake.js';
+import { node, unwalkable } from '../helpers/fake.js';
 import { iosTrees } from '../helpers/ios-trees.js';
 
 // FRAMES ONLY (ui-tree/placed.ts#framesOnly): every descendant of a node, not the node itself, is an empty frame — a
 // bare `container` (`emptyFrame`). Draw order's `structural` frame excuse asks it of every candidate for every target,
 // so it answers at the first descendant that is no empty frame, without walking the rest.
 const frame = (...children: UiNode[]): UiNode => node({ role: 'container', children });
-
-/** `n`, whose children throw `walked` when read: a node framesOnly must answer without walking under. */
-const unwalkable = (n: UiNode, walked: string): UiNode =>
-  Object.defineProperty(n, 'children', {
-    get: () => {
-      throw new Error(walked);
-    },
-  });
 
 describe('framesOnly — every descendant an empty frame', () => {
   it('a leaf has no descendant: true, whatever its own role', () => {
