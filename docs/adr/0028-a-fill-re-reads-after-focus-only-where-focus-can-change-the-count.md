@@ -39,9 +39,9 @@ the verdict:
 - the other inputs `whereTyped` compares are read off the resolution's tree, keyed by rect. A layout that moves on
   focus (keyboard avoidance) then reads every one of them gone, `unproven`. That proof gates only the dropped tail's
   retype (docs/adr/0023-fill-types-a-dropped-tail-again.md), which only an `on-return` adapter does: so **iOS keeps the
-  re-read** (a review of this branch reproduced it: rects up 100 on focus, the first typing keeping 3 of 9 — "landed,
-  retyped [6]" with the re-read, "typed 9 characters but the field shows 3" without), and Android, which never
-  retypes a tail, loses nothing.
+  re-read** (pinned: tests/interact/fill.test.ts "kept on-return: a layout that moves on focus…" — rects up 100 on
+  focus, the first typing keeping 3 of 9: "landed, retyped [6]" with the re-read, "typed 9 characters but the field
+  shows 3" without), and Android, which never retypes a tail, loses nothing.
 
 Everything else is read as before: a masked pre-read, a secure field, an unknown one, any selector but a sole `id`,
 `clear`, iOS. `screenBeforeTyping` is NOT seeded from the pre-tap tree: a field's own clear button appearing on focus
@@ -58,12 +58,12 @@ The 350 ms focus delay stays.
 
 ## Why it is safe (priority 1 first)
 
-- The skip adds no way for a fill to pass that the re-read would have failed. A plain read-back is compared to the
-  value from fresh reads of the field found by its id, as before (the pre-typing count is not part of that
-  comparison). A masked read-back passes only at exactly the typed length — the one reading that needs no count. A
-  dropped tail is never retyped on Android, so `whereTyped` decides nothing there.
+- The skip adds no way for a fill to pass that the re-read would have failed, except the residual (R1) below. A plain
+  read-back is compared to the value from fresh reads of the field found by its id, as before (the pre-typing count
+  is not part of that comparison). A masked read-back passes only at exactly the typed length — the one reading that
+  needs no count. A dropped tail is never retyped on Android, so `whereTyped` decides nothing there.
 - A wrong `false` (a source that says plain of a field that masks) turns the masked-append warning the re-read would
-  have given into a failure: fail-safe.
+  have given into a failure — fail-safe, except (R1).
 
 ## Costs accepted
 
@@ -74,6 +74,11 @@ The 350 ms focus delay stays.
 
 ## Residual
 
+- (R1) A source that WRONGLY says plain of a masking field (a Compose field with a custom `VisualTransformation`
+  dumps `password="false"`), an autofill of N bullets on focus, and exactly N dropped keys: the field shows the typed
+  length and the fill passes silently, where the re-read (held N, so `N + typed` expected) would have failed it. No
+  read-back can tell it apart: bullets carry no content. Accepted: it needs a wrong source word, an autofill and a
+  coincidental drop count at once. Pinned as such: tests/interact/fill.test.ts "accepted residual (R1)…".
 - React Native's `secureTextEntry` on iOS: unmeasured on WDA and idb — no captured fixture holds an RN secure field —
   so whether either source names it secure is unknown. It concerns only the parsers' word, not the skip: iOS keeps the
   re-read whatever the word. On Android an RN secure `TextInput` dumps as an `EditText`; its `password` attribute is

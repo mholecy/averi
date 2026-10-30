@@ -474,6 +474,29 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     await expect(fillField(fake, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(`fill: typed 8 characters but the field shows 6 ${SAID_PLAIN}`);
   });
 
+  it('accepted residual (R1, ADR 0028): a field WRONGLY said plain, autofilled with N bullets on focus, dropping exactly N keys, passes silently', async () => {
+    // Review of this branch, scenario K. With the re-read the count would start at 3 and `3 + 5` fail; skipped, the
+    // field shows 3 + (5 − 3) = 5 bullets, the typed length — the one reading no read-back can tell from a landed fill.
+    // Recorded, not wanted: if this ever fails, the residual is closed and ADR 0028 must say so.
+    const fake = field({ secure: false });
+    onFocus(fake, (f) => (f.value = '•'.repeat(3)));
+    appendBullets(fake, 3);
+    const { readBack, maskedAppend } = await fillField(fake, { id: 'amount_input' }, '12345', FAST);
+    expect(readBack).toEqual({ kind: 'landed' });
+    expect(maskedAppend).toBeUndefined();
+  });
+
+  it('cost C1 (ADR 0028): a "+421 " prefix inserted on focus, none of the typing taken — a length mismatch, not "did not change"', async () => {
+    const fake = field({ secure: false });
+    onFocus(fake, (f) => (f.value = '+421 '));
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text); // nothing reaches the field
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, '903123456', FAST)).rejects.toThrow(
+      'fill: typed 9 characters but the field shows 5 (content withheld from this error)',
+    );
+  });
+
   it('skipped: a masked read-back of exactly the typed length passes, with no append', async () => {
     const fake = field({ secure: false });
     appendBullets(fake);
