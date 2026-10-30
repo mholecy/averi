@@ -1383,7 +1383,7 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
  */
 export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
 
-/** idb's soft keyboard as draw order reads it (`keyboardOf`): its top, its run of nodes (`keys`), and of those its own. */
+/** idb's soft keyboard as draw order reads it (`keyboardOf`): its top, its run of nodes (`keys`), and of those its own. Exported because `bottomPinned`'s signature names it. */
 export interface KeyboardBand {
   readonly top: number;
   readonly keys: ReadonlySet<Placed>;
@@ -1450,7 +1450,9 @@ const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
  * safe direction). Asked of a flat list for its covers' reach (`pinned`); of a
  * nested tree only for reading-order.ts#readingOrderOf's guard (`pinnedTargets`: the same
  * shape, read in pre-order — a pinned target keeps its place on top), never
- * for a reach there.
+ * for a reach there. Exported for the tests (tests/ui-tree/bottom-pinned.test.ts),
+ * which pin it against the plain definition; no production importer outside
+ * this module.
  */
 export function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: Pick<KeyboardBand, 'top' | 'keys'> | undefined): ReadonlyMap<Placed, number> {
   const band = screen.height * FLAT_LIST_BOTTOM_BAR_FRACTION;
