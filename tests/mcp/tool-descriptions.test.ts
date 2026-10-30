@@ -567,7 +567,7 @@ describe('troubleshooting on scroll_until\'s end proof, unchecked axis and the d
  * each pinned here against its owner's REAL constant, as the descriptions are against the mocked one above.
  */
 describe('the full reference quotes each operation default as shipped', () => {
-  it('the settle, assert and foreground budgets, the swipe reach and the scroll, log and contract defaults', async () => {
+  it('the settle, assert, foreground and ensure budgets, the swipe reach and the scroll, log and contract defaults', async () => {
     const actual = async <T>(path: string): Promise<T> => vi.importActual<T>(path);
     const { formatSeconds } = await actual<typeof import('../../src/util/duration.js')>('../../src/util/duration.js');
     const { DEFAULT_SETTLE_TIMEOUT_MS } = await actual<typeof import('../../src/interact/resolve.js')>('../../src/interact/resolve.js');
@@ -575,6 +575,7 @@ describe('the full reference quotes each operation default as shipped', () => {
     const { FOREGROUND_WAIT_MS } = await actual<typeof import('../../src/adapters/ios-foreground.js')>('../../src/adapters/ios-foreground.js');
     const { SWIPE_REACH_FRACTION } = await actual<typeof import('../../src/interact/swipe.js')>('../../src/interact/swipe.js');
     const { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS } = await actual<typeof import('../../src/interact/scroll.js')>('../../src/interact/scroll.js');
+    const { DEFAULT_ENSURE_TIMEOUT_MS } = await actual<typeof import('../../src/flow/engine.js')>('../../src/flow/engine.js');
     const { LOG_MAX_LINES } = await actual<typeof import('../../src/run/verify.js')>('../../src/run/verify.js');
     const { DEFAULT_TOLERANCE_DE, CONTRACT_TOL_FACTOR } = await actual<typeof import('../../src/verify/color-parity.js')>('../../src/verify/color-parity.js');
     const { DEFAULT_SIZE_TOLERANCE_PCT } = await actual<typeof import('../../src/verify/text-parity.js')>('../../src/verify/text-parity.js');
@@ -583,6 +584,7 @@ describe('the full reference quotes each operation default as shipped', () => {
     expect(full('ui_snapshot')).toContain(`assert polls (${formatSeconds(ASSERT_TIMEOUT_MS)} by default`);
     expect(full('assert')).toContain(`waits up to ${formatSeconds(ASSERT_TIMEOUT_MS)} (tree asserts) or ${formatSeconds(PIXEL_ASSERT_TIMEOUT_MS)} (color/ocr`);
     expect(full('launch_app')).toContain(`waiting at most ${formatSeconds(FOREGROUND_WAIT_MS)}`);
+    expect(full('ensure_state')).toContain(`the whole ~${formatSeconds(DEFAULT_ENSURE_TIMEOUT_MS)} second look`);
     expect(full('swipe')).toContain(`a stroke through the screen centre, ${Number((SWIPE_REACH_FRACTION * 100).toFixed(2))}% of the screen either side`);
     expect(full('scroll_until')).toContain(`\`maxSwipes\`: Default ${DEFAULT_MAX_SWIPES} `);
     expect(full('scroll_until')).toContain(`\`timeoutMs\`: Default ${DEFAULT_SCROLL_TIMEOUT_MS}\n`);
@@ -593,7 +595,7 @@ describe('the full reference quotes each operation default as shipped', () => {
 });
 
 /**
- * What the server's instructions say once for every tool (mcp/tools.ts#SERVER_INSTRUCTIONS), and the pointers that
+ * What the server's instructions say once for every tool (mcp/tools.ts#serverInstructions), and the pointers that
  * send an agent from a description to the full reference: each must land on a section that exists.
  */
 describe('the server instructions and the pointers into the full reference', () => {
@@ -611,5 +613,45 @@ describe('the server instructions and the pointers into the full reference', () 
     const pointed = texts.flatMap((text) => [...text.matchAll(/references\/tools\.md#([a-z_]+)/g)].map((m) => m[1]));
     expect(pointed.length).toBeGreaterThanOrEqual(6);
     for (const tool of pointed) expect(full(tool), tool).not.toBe('');
+  });
+});
+
+/**
+ * The rules a description keeps because breaking them makes an agent do something wrong or unsafe — the reason the
+ * descriptions stayed this long and no shorter. Each is pinned by its phrase where the agent reads it (the description,
+ * a parameter's, or the server's instructions), so a later trim cannot drop one unseen.
+ */
+describe('every description keeps the rules an agent must not break', () => {
+  const KEPT: ReadonlyArray<readonly [tool: string, phrase: string]> = [
+    ['tap', 'never the return key (it submits)'],
+    ['tap', 'hide it yourself (tap a neutral element such as a title), then tap again'],
+    ['tap', 'several interactive matches are REFUSED with the list — narrow the selector'],
+    ['tap', 'at x/y coordinates (sent as given, unguarded)'],
+    ['type_text', 'APPENDING to pre-filled content unless clear: true deletes it first'],
+    ['type_text', '"Typed … — NOT verified"'],
+    ['type_text', 'FAILS the read-back, saying whether only letter case differs — never the text'],
+    ['type_text', 'The keyboard is NOT dismissed afterwards'],
+    ['scroll_until', 'Pass fully: true when the next step MEASURES the element'],
+    ['scroll_until', 'It never swipes on a screen presented over the target'],
+    ['scroll_until', 'a swipe that CHANGES THE SCREEN stops the call'],
+    ['scroll_until', 'A top bar the tree lists before the scroll view (iOS\'s navigation bar under wda) is not seen: check a stop near the top with a screenshot.'],
+    ['assert', 'it fails closed naming what and where'],
+    ['assert', 'is refused before any device is touched'],
+    ['assert', 'pass timeout to shorten it'],
+    ['verify', 'run the default (both) before declaring the task done'],
+    ['verify', 'REFUSES the call before any device is touched'],
+    ['ensure_state', 'is refused rather than run blind'],
+    ['ensure_state', 'nothing was wiped'],
+    ['select_device', 'never a silent fallback to another device'],
+    ['launch_app', 'the launcher activity is picked arbitrarily — LeakCanary instead of the app'],
+    ['get_logs', 'An invalid grep is refused before any device is touched'],
+    ['swipe', 'in tree units (px on Android, pt on iOS)'],
+    ['instructions', 'Coordinates and rects are in tree units: pixels on Android, points on iOS.'],
+    ['instructions', 'follow it rather than retrying unchanged'],
+  ];
+
+  it.each(KEPT)('%s: "%s"', (tool, phrase) => {
+    const where = tool === 'instructions' ? [instructions] : [description(tool), ...Object.keys(tools.get(tool)?.inputSchema.properties ?? {}).map((p) => property(tool, p).description ?? '')];
+    expect(where.some((text) => text.includes(phrase)), `${tool} no longer says: ${phrase}`).toBe(true);
   });
 });

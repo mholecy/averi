@@ -1,8 +1,9 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AdapterRegistry } from '../../src/mcp/registry.js';
-import { createAveriServer } from '../../src/mcp/tools.js';
+import { createAveriServer, REPOSITORY_URL } from '../../src/mcp/tools.js';
 
 /**
  * What every agent session pays before its first call: the server's `instructions` (initialize) plus the whole
@@ -11,6 +12,12 @@ import { createAveriServer } from '../../src/mcp/tools.js';
  * three); tokens are roughly bytes / 4.
  */
 const BUDGET_BYTES = 31_000;
+
+/**
+ * Claude Code cuts an MCP server's instructions and each tool description past CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH
+ * characters, 4096 by default: the tail of a longer one — where a rule may sit — never reaches the agent.
+ */
+const CLIENT_CUT_CHARS = 4096;
 
 let listed: { instructions: string; tools: Awaited<ReturnType<Client['listTools']>> };
 let close: () => Promise<void>;
@@ -36,5 +43,16 @@ describe('the tool surface an agent loads every session', () => {
   it(`instructions + tools/list stay within ${BUDGET_BYTES} bytes`, () => {
     const bytes = Buffer.byteLength(listed.instructions) + Buffer.byteLength(JSON.stringify(listed.tools));
     expect(bytes).toBeLessThanOrEqual(BUDGET_BYTES);
+  });
+
+  it(`the instructions and every description fit Claude Code's default cut (${CLIENT_CUT_CHARS} characters)`, () => {
+    expect(listed.instructions.length).toBeLessThanOrEqual(CLIENT_CUT_CHARS);
+    for (const tool of listed.tools.tools) expect((tool.description ?? '').length, tool.name).toBeLessThanOrEqual(CLIENT_CUT_CHARS);
+  });
+
+  it("the instructions point at the full reference at this release's tag, in the repository package.json names", () => {
+    const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { repository: { url: string } };
+    expect(pkg.repository.url.replace(/^git\+/, '').replace(/\.git$/, '')).toBe(REPOSITORY_URL);
+    expect(listed.instructions).toContain(`${REPOSITORY_URL}/blob/v0.0.0-test/skill/references/tools.md`);
   });
 });

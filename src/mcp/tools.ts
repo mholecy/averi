@@ -169,7 +169,7 @@ const assertsInput = z
   .describe(
     'Assert specs, e.g. [{"element":{"id":"form"}}, {"element":{"id":"error"},"absent":true}, {"element":{"id":"amount"},"text":"100.00"}, ' +
       '{"element":{"id":"title"},"match":"^Pay"}, {"element":{"id":"card"},"rect":{"x":24,"w":345,"h":129,"frameWidth":393}} (Figma-frame units), ' +
-      '{"element":{"id":"card"},"color":{"expected":"#FDFDFD","deltaE":8}}, {"element":{"id":"cta"},"ocr":{"text":"CONTINUE","heightPct":2.96}}, ' +
+      '{"element":{"id":"card"},"color":{"expected":"#FDFDFD","deltaE":8,"sample":"dominant"}} (sample: "dominant" | "patches"), {"element":{"id":"cta"},"ocr":{"text":"CONTINUE","heightPct":2.96}}, ' +
       '{"screenshot":{"baseline":"transfers","threshold":0.01}}]. Each element spec takes "timeout" (ms, or "10s").',
   );
 
@@ -183,20 +183,27 @@ function stripChildren(node: UiNode): Omit<UiNode, 'children'> {
 /**
  * The server's `instructions` (the initialize result): what every tool shares, said once rather than in each
  * description — the selector grammar (ui-tree/selectors.ts), the units, configPath's rules, the iOS tree source, what
- * a refusal is — and where the full behaviour lives: the averi skill's references, which no session loads unasked.
- * Counted with tools/list against one budget (tests/mcp/tool-surface-budget.test.ts).
+ * a refusal is — and where the full behaviour lives: the averi skill's references, which no session loads unasked,
+ * and, for a session without the skill, the same file at this release's tag ({@link toolsReferenceUrl}). Counted with
+ * tools/list against one budget (tests/mcp/tool-surface-budget.test.ts).
  */
-export const SERVER_INSTRUCTIONS = [
+export const serverInstructions = (version: string): string => [
   'averi drives booted iOS Simulators and Android Emulators. A device tool takes platform ("android" or "ios") and acts on that platform\'s first booted device, or the one select_device pinned.',
   'Selectors (tap, type_text, scroll_until, ui_snapshot\'s filter, flows): space-separated conditions that must all match, over the fields id, text (label or value), role, label and value; ":" is exact and case-sensitive, "~" an unanchored JavaScript regex (no inline flags such as (?i)). ' +
     'Double-quote a value with spaces: text:"Sign in" (text:Sign in fails at "in"). Prefer stable id:s.',
   'Coordinates and rects are in tree units: pixels on Android, points on iOS.',
   'configPath: averi.yaml is read only when a call uses a value from it; an invalid file fails the call, naming it; a missing one fails only the tools that cannot work without it (ensure_state, run_flow, verify, install_app without a path).',
   'iOS tree source (app.ios.treeSource in averi.yaml): idb by default — no scroll views, no container ids, nothing beneath the keyboard or a presented layer; wda (WebDriverAgent) sees those, ~2x slower.',
-  'A refusal acts on nothing and names its cause and remedy (scroll_until it first, close the presented screen first, hide the keyboard): follow it rather than retrying unchanged. Under a screen presented over the target (an alert, a sheet, a modal, an Android dialog) no scroll helps: close it first. ' +
+  'A refusal taps, types or swipes nothing on its target (a keyboard dismissal it tried is named in it) and names its cause and remedy (scroll_until it first, close the presented screen first, hide the keyboard): follow it rather than retrying unchanged. Under a screen presented over the target (an alert, a sheet, a modal, an Android dialog) no scroll helps: close it first. ' +
     'An empty or bare tree is not absence: compare with screenshot.',
-  'Full behaviour of each tool: the averi skill\'s references/tools.md; error lines by symptom: references/troubleshooting.md.',
+  `Full behaviour of each tool: the averi skill's references/tools.md (without the skill: ${toolsReferenceUrl(version)}); error lines by symptom: references/troubleshooting.md.`,
 ].join('\n');
+
+/** The repository package.json names (`repository.url`); tests/mcp/tool-surface-budget.test.ts holds the two to one. */
+export const REPOSITORY_URL = 'https://github.com/mholecy/averi';
+
+/** The full tool reference as released with this version: its file at the release tag (`v<version>`). */
+export const toolsReferenceUrl = (version: string): string => `${REPOSITORY_URL}/blob/v${version}/skill/references/tools.md`;
 
 export interface AveriServerDeps {
   /** Resolves a platform to a device-bound adapter. The caller owns its lifetime (shutdown). */
@@ -207,7 +214,7 @@ export interface AveriServerDeps {
 
 /** Build the averi MCP server with all its tools registered. Does not connect it. */
 export function createAveriServer({ registry, version }: AveriServerDeps): McpServer {
-  const server = new McpServer({ name: 'averi', version }, { instructions: SERVER_INSTRUCTIONS });
+  const server = new McpServer({ name: 'averi', version }, { instructions: serverInstructions(version) });
 
   const registerTool: typeof server.registerTool = server.registerTool.bind(server);
 
@@ -350,12 +357,12 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'An EMPTY textfield\'s "value" is often its placeholder; a node whose "placeholder" equals its value is an empty field. ' +
         'Marks: "presentation" ("alert", "actionSheet", "popover", "screen", "backdrop"; on an Android root "dialog"/"screen") — a layer presented over the screen, covering everything beneath it: targets there are refused until it is closed; ' +
         '"hidden": true (iOS wda) — listed but not shown (a tab bar a pushed screen hides), no cover; role "keyboard" (iOS wda) — the band where a tap is refused, while "ofKeyboard": true nodes are the keyboard\'s own, tappable UI; ' +
-        '"readingOrder": true — its children are listed by their tops, not in draw order; "clipsDescendants", "clippedOut", "cutBounds" (Android) — a rect cut by its scroll container or by something drawn after it; "scrollAxis". ' +
-        'Root marks name the tree source\'s dialect: "unclippedFrames" (iOS wda: frames as laid out, past their scroll view\'s), "flatList" (iOS idb: no nesting), "activeWindowOnly" (Android: only the active window is listed). ' +
+        '"heading": true (iOS) — drawn over the nodes listed after it that it overlaps (a pinned section header); "readingOrder": true — its children are listed by their tops, not in draw order; "clipsDescendants", "clippedOut", "cutBounds" (Android) — a rect cut by its scroll container or by something drawn after it; "scrollAxis". ' +
+        'Root marks name the tree source\'s dialect: "unclippedFrames" (iOS wda: frames as laid out, past their scroll view\'s), "flatList" (iOS idb: no nesting), "activeWindowOnly" (Android: only the active window is listed), "presentationsJudged": true (iOS wda: presentation was judged, so a layer with no "presentation" mark was not seen presented). ' +
         'Each mark in full: references/tools.md#ui_snapshot.',
       inputSchema: {
         platform,
-        filter: z.string().optional().describe('Selector to filter nodes'),
+        filter: z.string().optional().describe('Selector to filter nodes (quote values with spaces)'),
         configPath,
       },
     },
@@ -381,7 +388,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Tap an element by selector (preferred: \'id:login_button\', \'text:"Continue"\', \'role:button label~"Pay.*"\') or at x/y coordinates (sent as given, unguarded). ' +
         `With a selector, waits up to ${SETTLE_BUDGET} for the element to appear and hold still — a selector matching nothing is a wait, then "Timed out … to appear" (or "… to hold still" if it keeps moving); zero-area nodes are ignored. ` +
         'When several match it taps the only interactive one and says so; several interactive matches are REFUSED with the list — narrow the selector. ' +
-        'A refusal taps nothing and names its cause and remedy: a centre off the screen, under the status bar, outside its scroll view (iOS wda), or a target cut to a strip too thin to tap → "scroll_until it first"; ' +
+        'A refusal taps nothing and names its cause and remedy: a centre off the screen, under the status bar, outside its scroll view (iOS wda), or a target cut to a strip too thin to tap → "scroll_until it first" (the refusal says when no scroll moves it); ' +
         'a centre under another element of the app drawn over it (a pinned button bar, a floating tab bar) → tapped on an uncovered part when enough shows (the reply says where), else REFUSED naming the cover; ' +
         'two controls iOS lists in reading order → one screenshot tells which is on top, and a refusal advises no scroll (close the menu or popover; if the target is on top, tap it by coordinates). ' +
         `Under a screen presented over the target (an alert, a sheet, a modal, an Android dialog) the refusal says '${presentedRemedy('it')}' instead, whatever else is wrong. ` +
@@ -419,7 +426,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'Swipe across the screen, by direction OR by coordinates — exactly one of the two. ' +
         `direction (up/down/left/right) names the FINGER's movement (up reveals content below): a stroke through the screen centre, ${SWIPE_REACH} of the screen either side; ` +
         'the reply says when the screen size had to be estimated, and with none it refuses, sending nothing. ' +
-        'Coordinates (fromX, fromY, toX, toY — all four) are sent as given, in tree units. To bring an element into view use scroll_until instead.',
+        'Coordinates (fromX, fromY, toX, toY — all four) are sent as given, in tree units (px on Android, pt on iOS). To bring an element into view use scroll_until instead.',
       inputSchema: {
         platform,
         direction: z.enum(['up', 'down', 'left', 'right']).optional()
@@ -468,7 +475,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       inputSchema: {
         platform,
         text: z.string(),
-        selector: z.string().optional().describe('Field to focus first, e.g. \'id:amount_input\''),
+        selector: z.string().optional().describe('Field to focus first, e.g. \'id:amount_input\' (quote values with spaces)'),
         clear: z.boolean().optional().describe('Delete existing content before typing (needs selector)'),
         configPath,
       },
@@ -497,11 +504,12 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         `It never swipes on a screen presented over the target (an alert, a sheet, a modal, an Android dialog) — a swipe there could dismiss it — and fails "… ${presentedStop()}". ` +
         'Where no tree shows such a layer (iOS idb), a swipe that CHANGES THE SCREEN stops the call: it most likely dismissed a sheet or modal. ' +
         'Two controls iOS lists in reading order are judged on one screenshot, as for tap; with the target not seen on top it stops before any swipe. ' +
+        'A top bar the tree lists before the scroll view (iOS\'s navigation bar under wda) is not seen: check a stop near the top with a screenshot. ' +
         'With the soft keyboard up the viewport is the screen above it; nothing is pressed to hide it (press_key back first on Android to use the whole screen). ' +
         'Every case in full: references/tools.md#scroll_until.',
       inputSchema: {
         platform,
-        selector: z.string().describe('Element to scroll into view, e.g. \'id:submit_button\''),
+        selector: z.string().describe('Element to scroll into view, e.g. \'id:submit_button\' (quote values with spaces)'),
         direction: z.enum(['up', 'down', 'left', 'right']).optional().describe('Default down'),
         maxSwipes: z.number().int().min(1).optional().describe(`Default ${DEFAULT_MAX_SWIPES}`),
         fully: z
