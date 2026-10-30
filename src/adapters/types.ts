@@ -582,13 +582,13 @@ export interface UiNode {
    * On an INPUT (`role` INPUT_ROLE), whether its source marks it a SECURE field — one that masks what it holds:
    * uiautomator's `password` attribute (`"true"`/`"false"` on every node it dumps; read on text inputs only,
    * adapters/android.ts#normalizeNode), WDA's element type (`SecureTextField` → true, `TextField`/`TextView` → false,
-   * adapters/wda-source.ts#toUiNode), idb's `traits` naming `SecureTextField` or its `subrole` `AXSecureTextField`
-   * → true, a `TextField`/`TextView` whose traits were printed and name neither → false (idb types a secure field
-   * `TextField` too: the lab's `lab.form-basic.pin`, adapters/ios-tree-source.ts#idbTree). ABSENT is unknown, never
+   * adapters/wda-source.ts#toUiNode), and on idb's `TextField`/`TextView` only, its `traits` naming `SecureTextField`
+   * or its `subrole` `AXSecureTextField` → true, traits printed naming neither → false (idb types a secure field
+   * `TextField` too: the lab's `lab.form-basic.pin`, adapters/ios-tree-source.ts#idbSecure). ABSENT is unknown, never
    * plain: a node of another role, an input-like node of another one (an iOS search field reads `other`), a source or
-   * a dump that did not print it. The one reader: the fill's post-focus re-read is skipped for an empty input that
-   * says `false` (interact/fill.ts, docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md),
-   * so a `false` the source did not say would be the costly mistake. A mark of the source, like `heading`: ui-tree
+   * a dump that did not print it. The one reader: an Android fill's post-focus re-read is skipped for an empty input
+   * that says `false` (interact/fill.ts, docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md),
+   * and a field said plain that reads as bullets then fails unless it shows exactly the typed length. A mark of the source, like `heading`: ui-tree
    * knows no platform. Printed by `ui_snapshot` only when `true` (mcp/tools.ts#snapshotJson).
    */
   secure?: boolean;

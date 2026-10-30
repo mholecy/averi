@@ -171,13 +171,14 @@ function idbTree(elements: IdbElement[]): UiNode {
 /**
  * Whether idb marks the element a SECURE field (types.ts#UiNode.secure). idb types the lab's PIN `TextField`, like
  * the plain fields (tests/fixtures/truth/ios-iphone17-ios27/form-basic.idb.json); what tells it apart is its traits
- * (`SecureTextField`) and its subrole (`AXSecureTextField`). Either says true; a `TextField` or `TextView` whose
- * traits were printed and that says neither is plain; without traits — an idb that did not print them — nothing is
- * known, and neither is it of any other type.
+ * (`SecureTextField`) and its subrole (`AXSecureTextField`). On a `TextField` or `TextView` only: either says true;
+ * one whose traits were printed and that says neither is plain; without traits — an idb that did not print them —
+ * nothing is known, and nothing is of any other type (an input-like `other`, a search field, stays unknown).
  */
 function idbSecure(el: IdbElement): boolean | undefined {
+  if (el.type !== 'TextField' && el.type !== 'TextView') return undefined;
   if (el.traits?.includes('SecureTextField') === true || el.subrole === 'AXSecureTextField') return true;
-  return Array.isArray(el.traits) && (el.type === 'TextField' || el.type === 'TextView') ? false : undefined;
+  return Array.isArray(el.traits) ? false : undefined;
 }
 
 /** The identifier UIKit gives the dimming view it lays under a sheet or a popover presented over a screen (idb's `AXUniqueId`, WDA's `name`). */

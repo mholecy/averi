@@ -73,4 +73,11 @@ describe('the parsers say which input is secure (UiNode.secure)', () => {
     const idbTree = parseIdbDescribeAll(JSON.stringify([{ type: 'TextView', AXUniqueId: 'f', traits: ['TextEntry'], frame: rect }]));
     expect(byId(idbTree, 'f').secure).toBe(false);
   });
+
+  it('idb: a node of another type carrying the secure trait is no input — unknown', () => {
+    const t = parseIdbDescribeAll(
+      JSON.stringify([{ type: 'Other', AXUniqueId: 'f', traits: ['SecureTextField'], subrole: 'AXSecureTextField', frame: { x: 0, y: 0, width: 100, height: 30 } }]),
+    );
+    expect([...everyNode(t)].find((n) => n.identifier === 'f')).not.toHaveProperty('secure');
+  });
 });
