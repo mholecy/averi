@@ -8,6 +8,9 @@ write-up is the private artifact <https://claude.ai/artifact/QPEDgRtnV65QydVsDjx
 device read; the only CPU that shows is the pixel path (30–150 ms per assert) and it has pure-JS fixes. Wall clock is
 device I/O and fixed sleeps.
 
+**Cut (2026-10-30):** P1, P3, P2, P6, P4 in that order; P5 and P7 not worth a loop; T1 after the D rows. D12
+needs no device and goes in with the D rows.
+
 **Order:** the P rows first, one implementation loop each: pure CPU, no device needed, behaviour-preserving (golden
 `--against <base>` 0 changed). Then D0 (baseline on the lab devices), then the D rows chosen by what D0 measures, each
 measured before and after.
@@ -16,14 +19,14 @@ measured before and after.
 
 | # | Item | Kind | Status |
 |---|---|---|---|
-| P1 | `framesOnly` stops at the first non-empty frame | CPU | open |
+| P1 | `framesOnly` stops at the first non-empty frame | CPU | done (5ea456ff) |
 | P2 | draw-order: `bottomPinned` O(N), cheap test first in `lastPresentedSurface`, one node → places index | CPU | open |
 | P3 | `everyNode` as an explicit stack | CPU | open |
 | P4 | PNG decode fast path (native inflate + typed unfilter, pngjs fallback) | CPU | open |
-| P5 | `sampleDominant` / `nearCount` on typed arrays | CPU | open |
+| P5 | `sampleDominant` / `nearCount` on typed arrays | CPU | won't do — real bands cost 0.1 ms |
 | P6 | OCR toolchain probe memoised per module, not per `VisionOcr` | spawn | open |
-| P7 | Selector regexes compiled once in `parseSelector` | CPU | open |
-| T1 | Fake the settle/poll timers in the slowest test files | tests | open |
+| P7 | Selector regexes compiled once in `parseSelector` | CPU | won't do — cosmetic |
+| T1 | Fake the settle/poll timers in the slowest test files | tests | deferred — after the D rows |
 | D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | open |
 | D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | open |
 | D2 | `ensure_state`'s second look ends on a held "no" | device | open |
@@ -38,6 +41,7 @@ measured before and after.
 | D11 | One deadline per tool call that every window is clamped to | device | open |
 | D12 | `tools/list` is 73 KB (~18k tokens): shorten the tool descriptions | agent context | open |
 | D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | open |
+| D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | open |
 
 ## Notes
 
@@ -47,6 +51,11 @@ candidate per target through `FRAME_EXCUSES.structural` → `frameExcused` (draw
 N=1838. Fix: `n.children.every((c) => emptyFrame(c) && framesOnly(c))`; a `WeakMap` memo optional. Measured: judging
 every node 12.5 → 7.9 ms at N=242, 682 → 320 ms at N=1838; identical answers on all 1757 nodes of the iOS truth
 fixtures.
+
+Done in 5ea456ff: the suggested line, no memo (measured no gain). 223 → 155 ms judging every node at N=1811 (five
+copies of the largest capture), 8.2 → 6.0 ms at N=363. Golden is blind to this function (two mutations that change its
+answers left it at 0 changed), so the proof is `tests/ui-tree/frames-only.test.ts`'s sweep against the plain definition
+over every iOS and Android truth tree; `tests/helpers/android-trees.ts` now sits beside `iosTrees()`.
 
 ### P2 — draw-order (ui-tree/draw-order.ts)
 - `bottomPinned` (:1452–1461): `order.slice(placed.end).filter(…)` then `.some(…)` per interactive node, O(I·N), eager
