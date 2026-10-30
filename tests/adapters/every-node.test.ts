@@ -53,6 +53,11 @@ describe('everyNode — pre-order, the root first', () => {
     expect(last?.identifier).toBe('bottom');
   });
 
+  it('a hole in a children array fails the walk loudly, never ends it there', () => {
+    const tree = node({ identifier: 'root', children: [node({ identifier: 'a' }), undefined as unknown as UiNode, node({ identifier: 'b' })] });
+    expect(() => [...everyNode(tree)]).toThrow(TypeError);
+  });
+
   it('yields, node for node, what the plain recursive definition lists, on every tree of the committed captures', async () => {
     const trees = [...(await iosTrees()), ...(await androidTrees())];
     let nodes = 0;

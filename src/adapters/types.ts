@@ -698,7 +698,8 @@ export interface UiNode {
  */
 export function* everyNode(root: UiNode): Generator<UiNode> {
   const stack = [root];
-  for (let node = stack.pop(); node !== undefined; node = stack.pop()) {
+  while (stack.length > 0) {
+    const node = stack.pop()!;
     yield node;
     const { children } = node;
     for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
