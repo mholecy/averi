@@ -222,7 +222,7 @@ const probeDidNotAnswer = (e: unknown): boolean =>
   (e instanceof ExecError && e.timedOut) || /\bEAGAIN\b/.test(errorMessage(e));
 
 /**
- * The compiler's answer to `swiftc --version`, memoised per ExecFn (as in
+ * The compiler's answer to `swiftc --version`, memoized per ExecFn (as in
  * adapters/xcode-env.ts): every Verifier builds its own VisionOcr, and every
  * flow step and verify leg its own Verifier, so a per-engine probe paid 0.1–0.5 s
  * per Verifier. Production engines all share the real exec, so the probe runs
@@ -238,7 +238,7 @@ const probeDidNotAnswer = (e: unknown): boolean =>
  *   the server to be seen, the same as the xcode-env probe.
  * A probe that did not ANSWER (timed out, spawn refused with EAGAIN) says
  * nothing about the compiler, so it is dropped and the next engine probes
- * again. The compile is NOT memoised here: its failures (a timeout, a killed
+ * again. The compile is NOT memoized here: its failures (a timeout, a killed
  * swiftc, a full disk) are not reliably told apart from a real compile error,
  * so they stay the failing engine's answer only (`VisionOcr#binary`), and the
  * next Verifier tries again.

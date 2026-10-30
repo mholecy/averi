@@ -21,6 +21,10 @@ const onHost = async (platform: string, body: () => void | Promise<void>) => {
   }
 };
 
+/** Which of the engine's three commands a scripted exec was asked for. */
+const callKind = (cmd: string, args: readonly string[]): 'version' | 'compile' | 'run' =>
+  cmd !== 'swiftc' ? 'run' : args[0] === '--version' ? 'version' : 'compile';
+
 describe('ocrEngineFor', () => {
   it('a supplied engine is used as given — the test seam, wherever the host is', () =>
     onHost('linux', () => {
@@ -58,7 +62,7 @@ describe('VisionOcr — which failures are permanent (2026-10-08, review 2026-10
     const calls: string[] = [];
     const toolchain = `swift-driver test ${randomUUID()}`;
     const exec: ExecFn = async (cmd, args) => {
-      const kind = cmd !== 'swiftc' ? 'run' : args[0] === '--version' ? 'version' : 'compile';
+      const kind = callKind(cmd, args);
       calls.push(kind);
       await handlers[kind]?.(args);
       return { stdout: Buffer.from(kind === 'version' ? toolchain : kind === 'run' ? '{"results":[]}' : ''), stderr: '' };
@@ -156,11 +160,11 @@ describe('VisionOcr — which failures are permanent (2026-10-08, review 2026-10
     }));
 });
 
-describe('VisionOcr — the toolchain probe runs once per process, not once per engine (P6)', () => {
+describe('VisionOcr — the toolchain probe runs once per process, not once per engine', () => {
   /**
    * Every Verifier builds its own VisionOcr, and every flow step and verify
    * leg builds its own Verifier — so a per-instance probe paid `swiftc
-   * --version` (0.1–0.5 s) per Verifier. The probe is memoised per ExecFn,
+   * --version` (0.1–0.5 s) per Verifier. The probe is memoized per ExecFn,
    * like xcode-env's: the real exec is shared by every production engine, so
    * the probe runs once per process; a test's fake exec is its own cache.
    * What the shared memo keeps is the compiler's ANSWER — its version, or its
@@ -173,7 +177,7 @@ describe('VisionOcr — the toolchain probe runs once per process, not once per 
     let probes = 0;
     const toolchain = `swift-driver test ${randomUUID()}`;
     const exec: ExecFn = async (cmd, args) => {
-      const kind = cmd !== 'swiftc' ? 'run' : args[0] === '--version' ? 'version' : 'compile';
+      const kind = callKind(cmd, args);
       calls.push(kind);
       if (kind === 'version') await version(++probes);
       // The probe answered: stop each build at its compile, which is per engine.
@@ -234,7 +238,7 @@ describe('VisionOcr — the toolchain probe runs once per process, not once per 
       const toolchain = `swift-driver test ${randomUUID()}`;
       let binary: string | undefined;
       const exec: ExecFn = async (cmd, args) => {
-        const kind = cmd !== 'swiftc' ? 'run' : args[0] === '--version' ? 'version' : 'compile';
+        const kind = callKind(cmd, args);
         calls.push(kind);
         // The compile "publishes" a binary by writing the staging path it was asked for.
         if (kind === 'compile') {

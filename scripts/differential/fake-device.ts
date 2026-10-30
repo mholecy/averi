@@ -129,7 +129,7 @@ let current: DeviceState | undefined;
  * Who reads text off a frame: `none` the fake recognizer (no text in any region, the differential's default), `vision`
  * the host's — the side's own recognizer compiled by the real `swiftc` and run on the frame the fake serves (the golden
  * mode's `ocr` rows, judged against real pixels: golden.ts#ocrAvailability). Set for the whole process, and before the
- * side's first OCR read: averi memoises its `swiftc --version` probe per process (src/verify/ocr.ts#swiftToolchain), so
+ * side's first OCR read: averi memoizes its `swiftc --version` probe per process (src/verify/ocr.ts#swiftToolchain), so
  * a switch after it would key the real recognizer by the fake compiler's version, and the reverse.
  */
 export type Recognizer = 'none' | 'vision';
