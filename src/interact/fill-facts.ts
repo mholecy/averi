@@ -290,7 +290,10 @@ export interface OtherInput {
  * fill.ts chose `unchanged`, `masked` and a partly masked `length` in a
  * ternary at the throw, and a helper of its own the rest):
  * - `masked`: the field shows bullets, compared by length only; `held` the
- *   bullets it held after focus, without `clear` (undefined with it).
+ *   bullets it held after focus, without `clear` (undefined with it);
+ *   `saidPlain` when its source said it is plain and so what it held after
+ *   focus was never read (interact/fill.ts, the skipped re-read: docs/adr/
+ *   0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md).
  * - `case`: the typed text IS there but for letter case — at `positions`
  *   characters (with clear the whole field; without, the best-matching run
  *   of it). UIKit's sentence auto-capitalisation turning `hello` into
@@ -313,7 +316,7 @@ export interface OtherInput {
  * case-insensitive pass would hide exactly that.
  */
 export type Difference =
-  | { kind: 'masked'; held?: number }
+  | { kind: 'masked'; held?: number; saidPlain?: true }
   | { kind: 'case'; positions: number }
   | { kind: 'same-length'; positions: number }
   | { kind: 'unchanged' }

@@ -1,11 +1,11 @@
 import { everyNode, INPUT_ROLE, rectArea, rectIntersection, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
+import { soleIdOf } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { resolveClearOfKeyboard, type GuardOptions } from './keyboard.js';
 import { describeTarget, resolveNow, type Target } from './resolve.js';
-import { soleIdOf } from '../ui-tree/selectors.js';
 import { assertTypeable } from './type-text.js';
 import { fillFailureText, focusTapNote } from './fill-text.js';
 import { heldText, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
@@ -175,6 +175,38 @@ export async function fillField(
   // answer, which carries the why with the missing field.
   let lostOnLastRead: LostWhy | undefined;
   const isInput = node.role === INPUT_ROLE;
+  // The post-focus re-read (below, after the focus tap) is SKIPPED where nothing it feeds can change the verdict
+  // (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md): a value typed without
+  // `clear` into an EMPTY input its source says is plain (types.ts#UiNode.secure `false`), named by a sole `id`
+  // selector, on an adapter that never types a dropped tail again. What the re-read feeds, and why none of it
+  // matters there:
+  // - the count the masked length rule starts from (`maskedHeld`): a plain field shows its text, not bullets, so the
+  //   read-back compares content (`includes`), which needs no count. A field said plain that shows bullets after all
+  //   is failed loudly instead (`saidPlain` below): its count was never read, so no length of it proves anything.
+  // - `lastTree`, which becomes `screenBeforeTyping` when typing starts — the screen sameField's twin fallback must
+  //   stay on. The fallback is asked only when the selector stops matching; an `id` keeps matching through typing,
+  //   while a label, hint or value selector may stop (the field's text changed), and without a pre-typing read the
+  //   fallback is off (`null`). Hence the sole-id gate. NOT seeded from the pre-tap tree: a field's own clear button
+  //   appearing on focus changed that screen's identity
+  //   (docs/bugs/2026-10-09-ios-fill-screen-changed-from-fields-own-clear-button.md). That tree only words a `lost`
+  //   (`skippedFrom`, in refetch).
+  // - the other inputs `whereTyped` compares (fill-type.ts), keyed by rect: read off the resolution's tree instead,
+  //   so a layout that moves on focus (keyboard avoidance) reads `unproven` there. That proof gates only the dropped
+  //   tail's retype (docs/adr/0023-fill-types-a-dropped-tail-again.md), which only an `on-return` adapter (iOS) does —
+  //   hence the delivery gate: iOS keeps the re-read, Android (`may-arrive-late`, never retyping a tail) skips it.
+  // - what the field showed before typing (`shownBeforeTyping`): empty before the tap, and taken as empty. The cost:
+  //   a plain field that inserts text on focus (a `+421 ` prefix) and takes none of the typing is worded as a length
+  //   mismatch, not as "did not change".
+  const skipsReread =
+    value !== '' &&
+    !clear &&
+    isInput &&
+    node.secure === false &&
+    heldText(node.value, node.placeholder) === '' &&
+    soleIdOf(target) !== undefined &&
+    adapter.typingDelivery !== 'on-return';
+  // Where the re-read was skipped: the screen the field was resolved on — the wording of a `lost` alone (refetch).
+  const skippedFrom = skipsReread ? screenIdentity(resolvedIn) : undefined;
   const refetch = async (): Promise<{ node: UiNode; lost?: undefined } | { node?: undefined; lost: LostWhy }> => {
     // Only the READ is wrapped: a refusal from resolveNow (a second match
     // appearing mid-fill — a suggestion row, a duplicated field) is a
@@ -192,7 +224,10 @@ export async function fillField(
     const screenChanged = screenBeforeTyping !== undefined && screenBeforeTyping !== null && !sameScreen(screenIdentity(tree), screenBeforeTyping);
     const twin = screenBeforeTyping === undefined || (screenBeforeTyping !== null && !screenChanged) ? sameField(tree, node) : undefined;
     if (twin !== undefined) return { node: twin };
-    lostOnLastRead = screenChanged ? 'screen-changed' : 'unmatched';
+    // Without a pre-typing read (the re-read skipped), the screen the field was resolved on says whether the screen
+    // changed — for the wording only: the twin fallback above stays off.
+    const changedSinceResolved = screenBeforeTyping === null && skippedFrom !== undefined && !sameScreen(screenIdentity(tree), skippedFrom);
+    lostOnLastRead = screenChanged || changedSinceResolved ? 'screen-changed' : 'unmatched';
     return { lost: lostOnLastRead };
   };
   const refetchNode = async (): Promise<UiNode | undefined> => (await refetch()).node;
@@ -221,26 +256,7 @@ export async function fillField(
   let current: UiNode | undefined = node;
   let preText = heldText(node.value, placeholder); // what the field holds when typing starts (see `landed`)
   let maskedAppend: FillResult['maskedAppend'];
-  // The post-focus re-read below is SKIPPED where nothing it feeds can change the verdict
-  // (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md): an empty input its source
-  // says is plain (types.ts#UiNode.secure `false`), named by a sole `id` selector. What the re-read feeds, and why
-  // none of it matters there:
-  // - the count the masked length rule starts from (`maskedHeld`): a plain field shows its text, not bullets, so the
-  //   read-back compares content (`includes`), which needs no count. A field said plain that masks anyway is caught
-  //   from the read-back instead (`overHeld` below).
-  // - `lastTree`, which becomes `screenBeforeTyping` when typing starts — the screen sameField's twin fallback must
-  //   stay on. The fallback is asked only when the selector stops matching; an `id` keeps matching through typing,
-  //   while a label, hint or value selector may stop (the field's text changed), and without a pre-typing read the
-  //   fallback would be off (`null`). Hence the sole-id gate. NOT seeded from the pre-tap tree: a field's own clear
-  //   button appearing on focus changed that screen's identity
-  //   (docs/bugs/2026-10-09-ios-fill-screen-changed-from-fields-own-clear-button.md).
-  // - what the field showed before typing (`shownBeforeTyping`): empty before the tap, and taken as empty. The cost:
-  //   a plain field that inserts text on focus (a `+421 ` prefix) is no longer seen doing so, and its dropped tail
-  //   fails the fill loudly instead of being typed again. No path to a false success: the read-back still compares
-  //   what the field shows to the value.
-  // - the other inputs `whereTyped` compares (fill-type.ts): read off the resolution's tree instead.
-  const focusCannotChangeCount = preText === '' && isInput && node.secure === false && soleIdOf(target) !== undefined;
-  if (value !== '' && !clear && (preText === '' || isMaskedValue(preText)) && !focusCannotChangeCount) {
+  if (value !== '' && !clear && (preText === '' || isMaskedValue(preText)) && !skipsReread) {
     // The pre-tap read is stale for exactly the fields the length rule cares
     // about: Android autofill POPULATES a password field on focus, and a
     // re-entry screen CLEARS one on focus (review 2026-09-18 measured both as
@@ -371,6 +387,13 @@ export async function fillField(
         delivery: adapter.typingDelivery ?? 'may-arrive-late',
       },
     );
+    // A field said plain that shows bullets after all, where the re-read was skipped: what it held after focus was
+    // never read (an autofill on focus would be unseen), so its length proves nothing unless it is exactly the
+    // typed length. Any other length fails, saying so — never the length rule's pass on `held + typed` with a
+    // `held` of 0 (two dropped keys under five autofilled bullets read as a pass).
+    if (skipsReread && (typed.kind === 'landed' || typed.kind === 'missed') && isMaskedValue(typed.observed) && typed.observed.length !== value.length) {
+      throw failure({ code: 'mismatch', typed: value.length, shows: typed.observed.length, differs: { kind: 'masked', saidPlain: true } });
+    }
     if (typed.kind === 'missed') {
       const wrong = await notInput();
       throw failure({
@@ -384,11 +407,6 @@ export async function fillField(
       });
     }
     if (typed.kind === 'landed') retyped = typed.again.flatMap((a) => (a.kind === 'tail' ? [a.length] : []));
-    // The re-read's masked-append finding, where it was skipped: a field said plain that masks after all, and was
-    // filled on focus (an autofill), passes the length rule with more bullets than were typed — the excess is what
-    // it held. Only where skipped: a re-read field's `maskedHeld` already says it.
-    const overHeld = typed.kind === 'landed' && focusCannotChangeCount && isMaskedValue(typed.observed) ? typed.observed.length - value.length : 0;
-    if (overHeld > 0) maskedAppend = { held: overHeld };
     readBack =
       typed.kind === 'not-taken'
         ? { kind: 'not-taken' }

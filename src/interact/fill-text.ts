@@ -314,7 +314,10 @@ function againText(again: readonly SentAgain[]): string {
  * which characters or where.
  */
 const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { kind: K }>) => string } = {
-  masked: ({ held }) => ` (masked field — compared by length${held === undefined ? '' : `; it held ${held} after focus`})`,
+  masked: ({ held, saidPlain }) =>
+    saidPlain === true
+      ? ' (masked field, though its source said it is plain: what it held after focus was not read, so only the typed length passes — retry with clear: true)'
+      : ` (masked field — compared by length${held === undefined ? '' : `; it held ${held} after focus`})`,
   case: ({ positions }) =>
     ` — the typed text is there but for letter case, ${countOf(positions, 'character')} differing: ` +
     'the app transformed the input (auto-capitalisation?); content withheld from this error',

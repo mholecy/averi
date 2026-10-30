@@ -333,21 +333,24 @@ describe('fillField — masked fields verify by length', () => {
     expect(maskedAppend).toBeUndefined(); // nothing was held after focus
   });
 });
-
 /**
  * The post-focus re-read is skipped where nothing it feeds can change the verdict
- * (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md): an EMPTY input its source
- * says is plain (`secure: false`), named by a sole `id` selector. Everything else is read after focus as before.
+ * (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md): a value typed without `clear`
+ * into an EMPTY input its source says is plain (`secure: false`), named by a sole `id` selector, on an adapter that
+ * never types a dropped tail again (`may-arrive-late`: Android). Everything else is read after focus as before.
  * Each case logs what the fill asks of the device in order; between the focus tap and the typing a `read` is the
  * re-read.
  */
 describe('fillField — the post-focus re-read, only where focus can change the count', () => {
-  const field = (partial: Partial<UiNode>) => {
+  /** An Android-style fake (typing may arrive late: no tail is typed again) unless `delivery` says otherwise. */
+  const field = (partial: Partial<UiNode>, delivery: FakeAdapter['typingDelivery'] = 'may-arrive-late') => {
     resetLayout();
-    return new FakeAdapter(
+    const fake = new FakeAdapter(
       { form: screen(el({ role: 'textfield', identifier: 'amount_input', label: 'Amount', ...partial }), el({ role: 'button', identifier: 'submit_button' })) },
       'form',
     );
+    fake.typingDelivery = delivery;
+    return fake;
   };
   /** The device calls in order: `read`, `tap`, `type:<text>`. */
   const logged = (fake: FakeAdapter): string[] => {
@@ -360,6 +363,14 @@ describe('fillField — the post-focus re-read, only where focus can change the 
   };
   /** What the fill asked between its focus tap and its first typing. */
   const betweenTapAndType = (log: string[]) => log.slice(log.indexOf('tap') + 1, log.findIndex((e) => e.startsWith('type:')));
+  /** Run `then` on the live field right after the focus tap lands. */
+  const onFocus = (fake: FakeAdapter, then: (f: UiNode) => void) => {
+    const origTap = fake.tap.bind(fake);
+    fake.tap = async (x: number, y: number) => {
+      await origTap(x, y);
+      if (fake.focused) then(fake.focused);
+    };
+  };
 
   it.each([
     ['an empty plain field, by an id spec', {}, { id: 'amount_input' }],
@@ -379,6 +390,7 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     ['a field whose source said nothing (unknown)', {}, { id: 'amount_input' }],
     ['a plain field held by a label selector', { secure: false }, 'label:Amount'],
     ['a plain field held by an id AND a role', { secure: false }, { id: 'amount_input', role: 'textfield' }],
+    ['a node of another role said plain (`secure` is an input\'s word)', { role: 'other', secure: false }, { id: 'amount_input' }],
   ] as const)('kept: %s — one read between tap and type', async (_name, partial, target) => {
     const fake = field(partial);
     const log = logged(fake);
@@ -386,11 +398,41 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     expect(betweenTapAndType(log)).toEqual(['read']);
   });
 
-  it('kept: a node of another role said plain (the gate asks the role too: `secure` is an input\'s word)', async () => {
-    const fake = field({ role: 'other', secure: false });
+  it('kept: an empty plain field by id on an adapter that types a dropped tail again (on-return: iOS)', async () => {
+    const fake = field({ secure: false }, 'on-return');
     const log = logged(fake);
     await fillField(fake, { id: 'amount_input' }, '12', FAST);
     expect(betweenTapAndType(log)).toEqual(['read']);
+  });
+
+  it('kept on-return: a layout that moves on focus (keyboard avoidance) still has its dropped tail typed again — the other inputs are compared as read after focus', async () => {
+    // Review of this branch, scenario A: every rect moves up 100 on focus and the first typing keeps 3 of 9. With the
+    // other inputs taken from the pre-tap tree (keyed by rect), every one reads gone: `unproven`, no retype.
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        form: screen(
+          el({ role: 'textfield', identifier: 'phone', secure: false }),
+          el({ role: 'textfield', identifier: 'note', secure: false }),
+          el({ role: 'button', identifier: 'submit_button' }),
+        ),
+      },
+      'form',
+    );
+    const origTap = fake.tap.bind(fake);
+    fake.tap = async (x: number, y: number) => {
+      await origTap(x, y);
+      for (const n of fake.live().children) n.rect = { ...n.rect, y: n.rect.y - 100 };
+    };
+    let first = true;
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (text: string) => {
+      const sent = first ? text.slice(0, 3) : text;
+      first = false;
+      return origType(sent);
+    };
+    const result = await fillField(fake, { id: 'phone' }, '903123456', FAST);
+    expect(result).toMatchObject({ readBack: { kind: 'landed' }, retyped: [6] });
   });
 
   it('kept: a plain-said field reading MASKED before the tap (the masked pre-read is the re-read\'s own case)', async () => {
@@ -409,58 +451,76 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     expect(betweenTapAndType(log)).toEqual([]);
   });
 
-  it('skipped, the safety net: a field said plain that autofills BULLETS on focus — the read-back longer than typed is the masked append, held = the excess', async () => {
-    // A source that says `false` of a field that masks (a custom view, a Compose field without the password
-    // semantics): the skipped re-read never saw the autofill, so maskedHeld is 0 and the length rule passes the
-    // longer read-back. What the field held is the excess over what was typed.
+  const SAID_PLAIN = '(masked field, though its source said it is plain: what it held after focus was not read, so only the typed length passes — retry with clear: true)';
+
+  it('skipped: a field said plain that shows BULLETS of another length FAILS, saying so — five autofilled bullets and two dropped keys are no pass', async () => {
+    // Review of this branch, scenario B: the length rule's `held + typed` with a `held` of 0 passed 5 + 6 ≥ 8.
     const fake = field({ secure: false });
-    const origTap = fake.tap.bind(fake);
-    fake.tap = async (x: number, y: number) => {
-      await origTap(x, y);
-      if (fake.focused) fake.focused.value = '•'.repeat(20);
-    };
-    appendBullets(fake);
-    const log = logged(fake);
-    const { maskedAppend, readBack } = await fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST);
-    expect(betweenTapAndType(log)).toEqual([]);
-    expect(readBack).toEqual({ kind: 'landed' });
-    expect(maskedAppend).toEqual({ held: 20 });
+    onFocus(fake, (f) => (f.value = '•'.repeat(5)));
+    appendBullets(fake, 2);
+    await expect(fillField(fake, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(`fill: typed 8 characters but the field shows 11 ${SAID_PLAIN}`);
   });
 
-  it('skipped: a PLAIN read-back longer than typed (a prefix inserted on focus, every key landed) is no masked append', async () => {
+  it('skipped: every key landing on an autofilled field said plain fails the same way — what it held is unknown', async () => {
     const fake = field({ secure: false });
-    const origTap = fake.tap.bind(fake);
-    fake.tap = async (x: number, y: number) => {
-      await origTap(x, y);
-      if (fake.focused) fake.focused.value = '+421 ';
-    };
+    onFocus(fake, (f) => (f.value = '•'.repeat(20)));
+    appendBullets(fake);
+    await expect(fillField(fake, { id: 'amount_input' }, 'hunter2-password', FAST)).rejects.toThrow(`fill: typed 16 characters but the field shows 36 ${SAID_PLAIN}`);
+  });
+
+  it('skipped: a field said plain that shows FEWER bullets than typed fails with the same words', async () => {
+    const fake = field({ secure: false });
+    appendBullets(fake, 2);
+    await expect(fillField(fake, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(`fill: typed 8 characters but the field shows 6 ${SAID_PLAIN}`);
+  });
+
+  it('skipped: a masked read-back of exactly the typed length passes, with no append', async () => {
+    const fake = field({ secure: false });
+    appendBullets(fake);
+    const { maskedAppend, readBack } = await fillField(fake, { id: 'amount_input' }, '1234', FAST);
+    expect(readBack).toEqual({ kind: 'landed' });
+    expect(maskedAppend).toBeUndefined();
+  });
+
+  it('skipped: a PLAIN read-back longer than typed (a prefix inserted on focus, every key landed) passes, with no append', async () => {
+    const fake = field({ secure: false });
+    onFocus(fake, (f) => (f.value = '+421 '));
     const { maskedAppend, readBack } = await fillField(fake, { id: 'amount_input' }, '903123456', FAST);
     expect(readBack).toEqual({ kind: 'landed' });
     expect(maskedAppend).toBeUndefined();
   });
 
-  it('skipped: a masked read-back of exactly the typed length is no append', async () => {
-    const fake = field({ secure: false });
-    appendBullets(fake);
-    const { maskedAppend } = await fillField(fake, { id: 'amount_input' }, '1234', FAST);
-    expect(maskedAppend).toBeUndefined();
+  it('skipped: a code box that navigates on its last digit reads `lost` as the screen changing, against the screen it was resolved on', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        otp: screen(el({ role: 'textfield', identifier: 'otp', secure: false }), el({ role: 'text', identifier: 'otp_title', label: 'Enter the code' })),
+        home: screen(el({ role: 'text', identifier: 'home_title', label: 'Welcome' })),
+      },
+      'otp',
+    );
+    fake.typingDelivery = 'may-arrive-late';
+    const log = logged(fake);
+    const origType = fake.typeText.bind(fake);
+    fake.typeText = async (text: string) => {
+      await origType(text);
+      fake.current = 'home';
+    };
+    const result = await fillField(fake, { id: 'otp' }, '123456', FAST);
+    expect(betweenTapAndType(log)).toEqual([]);
+    expect(result.readBack).toEqual({ kind: 'lost', why: 'screen-changed' });
   });
 
-  it('skipped: a plain field that inserts text on focus (a "+421 " prefix) fails loudly — the accepted cost', async () => {
+  it('skipped: the field still listed but no longer a target (zero-area) on the same screen reads `unmatched`', async () => {
     const fake = field({ secure: false });
-    const origTap = fake.tap.bind(fake);
-    fake.tap = async (x: number, y: number) => {
-      await origTap(x, y);
-      if (fake.focused) fake.focused.value = '+421 ';
-    };
     const origType = fake.typeText.bind(fake);
-    let first = true;
     fake.typeText = async (text: string) => {
-      const sent = first ? text.slice(0, -2) : text; // the first typing's tail dropped
-      first = false;
-      return origType(sent);
+      await origType(text);
+      const f = fake.live().children[0];
+      f.rect = { ...f.rect, width: 0, height: 0 };
     };
-    await expect(fillField(fake, { id: 'amount_input' }, '903123456', FAST)).rejects.toThrow(/typed 9 characters but the field shows/);
+    const result = await fillField(fake, { id: 'amount_input' }, '12', FAST);
+    expect(result.readBack).toEqual({ kind: 'lost', why: 'unmatched' });
   });
 });
 
