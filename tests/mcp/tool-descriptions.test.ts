@@ -119,9 +119,9 @@ const property = (tool: string, name: string): { description?: string; default?:
 
 /**
  * One tool's section of the full reference (skill/references/tools.md, `## \`<tool>\`` to the next `## `), its
- * bullets joined back into running text. What a description no longer says lives there, so its pins moved there too —
- * against the owners' REAL sentences and numbers (the mocks above reach only the descriptions; no import reaches the
- * file), as troubleshooting.md's pins always were.
+ * bullets joined back into running text: the tool's whole behaviour, of which its description keeps the rules. Pinned
+ * against the owners' REAL sentences and numbers — the mocks above reach only the descriptions, no import reaches the
+ * file — as troubleshooting.md is.
  */
 const TOOLS_MD = readFileSync(new URL('../../skill/references/tools.md', import.meta.url), 'utf8');
 const full = (tool: string): string => {
@@ -353,7 +353,7 @@ describe('tool descriptions on a screen presented over the target', () => {
     for (const tool of ['tap', 'scroll_until', 'assert']) {
       for (const sentence of [PRESENTED_OVER, PRESENTED_STOP, PRESENTED_OVER_THE_ELEMENT]) expect(description(tool)).not.toContain(sentence);
     }
-    expect(description('tap')).toContain(`Under a screen presented over the target (an alert, a sheet, a modal, an Android dialog) the refusal says '${TAP_SENTINEL}' instead, whatever else is wrong.`);
+    expect(description('tap')).toContain(`Under a screen presented over the target the refusal says '${TAP_SENTINEL}' instead, whatever else is wrong.`);
     expect(description('scroll_until')).toContain(`— a swipe there could dismiss it — and fails "… ${STOP_SENTINEL}".`);
     expect(description('assert')).toContain(`under a screen presented over the element it says '${PIXEL_SENTINEL}'.`);
   });
@@ -650,6 +650,8 @@ describe('every description keeps the rules an agent must not break', () => {
     ['ui_snapshot', 'Selector to filter nodes (quote values with spaces)'],
     ['type_text', "Field to focus first, e.g. 'id:amount_input' (quote values with spaces)"],
     ['scroll_until', "Element to scroll into view, e.g. 'id:submit_button' (quote values with spaces)"],
+    ['tap', 'In tree units: px on Android, pt on iOS'],
+    ['ui_snapshot', 'Rects are in tree units (px on Android, pt on iOS).'],
     ['ui_snapshot', '"heading": true (iOS) — drawn over the nodes listed after it that it overlaps (a pinned section header)'],
     ['instructions', 'Coordinates and rects are in tree units: pixels on Android, points on iOS.'],
     ['instructions', 'follow it rather than retrying unchanged'],

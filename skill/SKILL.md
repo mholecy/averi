@@ -5,7 +5,7 @@ description: Verify mobile app changes on iOS Simulators and Android Emulators t
 
 # averi — verify your mobile work on simulators
 
-The averi MCP tools drive booted iOS Simulators and Android Emulators. The repo's `averi.yaml` declares the app's states (logged in, a given screen) and the flows that reach them, so you never log in tap by tap. The tool descriptions cover each tool's arguments, result and rules; [references/tools.md](references/tools.md) holds every case in full (each refusal, the platform and tree-source specifics). This skill covers how to use the tools together, and what they do not tell you.
+The averi MCP tools drive booted iOS Simulators and Android Emulators. The repo's `averi.yaml` declares the app's states (logged in, a given screen) and the flows that reach them, so you never log in tap by tap. The tool descriptions cover each tool's arguments, result and rules; [references/tools.md](references/tools.md) holds the full behaviour of each tool whose description was shortened (each refusal, the platform and tree-source specifics). This skill covers how to use the tools together, and what they do not tell you.
 
 ## Golden path (verify a change)
 

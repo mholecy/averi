@@ -1,8 +1,8 @@
 # averi tools in full
 
 The tool descriptions an agent sees every session say what each tool does, its result and the rules that must not be
-broken. This file holds the rest: every refusal case, the platform and tree-source specifics, and the mechanisms behind
-them, tool by tool. Read the section of a tool when its reply or refusal surprises you; for a `⚠`/`✗` line or an error
+broken. This file holds the rest for each tool whose description was shortened: every refusal case, the platform and
+tree-source specifics, and the mechanisms behind them. Read the section of a tool when its reply or refusal surprises you; for a `⚠`/`✗` line or an error
 message, [troubleshooting.md](troubleshooting.md) is organised by symptom.
 
 ## Shared arguments

@@ -353,10 +353,10 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     'ui_snapshot',
     {
       description:
-        'Normalized accessibility tree as JSON — cheap text-based verification. filter (a selector) returns only the matching nodes, without their children. ' +
+        'Normalized accessibility tree as JSON — cheap text-based verification. filter (a selector) returns only the matching nodes, without their children. Rects are in tree units (px on Android, pt on iOS). ' +
         `A filter that matches nothing returns [] plus a second text block: the tree's size and roles, or a ⚠ that the tree is bare (${BARE_TREE_CONTENTS}) — still loading, or stuck on a rendered screen: compare with screenshot, and never read the element as absent from a bare tree. ` +
         `iOS idb's stuck tree (a 0×0 Application) fails the call instead. Does not wait, but for one re-read of an unreadable first read; to wait for an element, assert polls (${ASSERT_BUDGET} by default; set "timeout" in the spec). ` +
-        'iOS: an id: that finds nothing on screen is often the default idb tree source (no React Native static text/container ids, no SwiftUI .contain ids, some UIKit ids dropped, nothing beneath the keyboard or a presented layer) — set app.ios.treeSource: wda in averi.yaml and retry, or ask by text:/label:. ' +
+        'iOS: an id: that finds nothing on screen is often the default idb tree source (React Native static text and containers, SwiftUI .contain containers, some UIKit ids) — set app.ios.treeSource: wda in averi.yaml and retry, or ask by text:/label:. ' +
         'An EMPTY textfield\'s "value" is often its placeholder; a node whose "placeholder" equals its value is an empty field. ' +
         'Marks: "presentation" ("alert", "actionSheet", "popover", "screen", "backdrop"; on an Android root "dialog"/"screen") — a layer presented over the screen, covering everything beneath it: targets there are refused until it is closed; ' +
         '"hidden": true (iOS wda) — listed but not shown (a tab bar a pushed screen hides), no cover; role "keyboard" (iOS wda) — the band where a tap is refused, while "ofKeyboard": true nodes are the keyboard\'s own, tappable UI; ' +
@@ -394,7 +394,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'A refusal taps nothing and names its cause and remedy: a centre off the screen, under the status bar, outside its scroll view (iOS wda), or a target cut to a strip too thin to tap → "scroll_until it first" (the refusal says when no scroll moves it); ' +
         'a centre under another element of the app drawn over it (a pinned button bar, a floating tab bar) → tapped on an uncovered part when enough shows (the reply says where), else REFUSED naming the cover; ' +
         'two controls iOS lists in reading order → one screenshot tells which is on top, and a refusal advises no scroll (close the menu or popover; if the target is on top, tap it by coordinates). ' +
-        `Under a screen presented over the target (an alert, a sheet, a modal, an Android dialog) the refusal says '${presentedRemedy('it')}' instead, whatever else is wrong. ` +
+        `Under a screen presented over the target the refusal says '${presentedRemedy('it')}' instead, whatever else is wrong. ` +
         `On Android the tree lists the active window only: a target beneath a dialog or sheet is not in it, and the wait ends "… is not in the tree, which lists only the window presented on top …", or, when the window manager does not confirm the app\'s screen alone, "… to appear" with "(${ACTIVE_WINDOW_HINT})". ` +
         'A selector target under the soft keyboard: Android hides it (back) first; iOS wda taps the first on-screen entry of averi.yaml app.ios.keyboardDismiss, then tries averi\'s own drag — never the return key (it submits) — and when nothing hides it REFUSES: hide it yourself (tap a neutral element such as a title), then tap again; iOS idb marks no keyboard and refuses a centre below the keyboard\'s top line likewise. The keyboard\'s own keys and toolbar are tappable. ' +
         'iOS idb lists no scroll view, so a target past its scroll view\'s clip may be tapped on what lies there — set app.ios.treeSource: wda to have scroll views judged. ' +
@@ -402,8 +402,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       inputSchema: {
         platform,
         selector: z.string().optional().describe('Element to tap, e.g. \'id:login_button\' or \'text:"Sign in"\' (quote values with spaces)'),
-        x: z.number().optional(),
-        y: z.number().optional(),
+        x: z.number().optional().describe('In tree units: px on Android, pt on iOS'),
+        y: z.number().optional().describe('In tree units: px on Android, pt on iOS'),
         configPath,
       },
     },
@@ -504,7 +504,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'A default stop has the element\'s CENTRE on screen, below the status bar, clear of anything of the app drawn over it (a pinned button bar, a floating tab bar) and not cut to a strip too thin to tap; the rest may still be clipped — the reply says which edges and what fraction show, or "fully visible". ' +
         `Pass fully: true when the next step MEASURES the element (a rect/color/ocr assert, a screenshot): none of it may then be clipped, covered, under the keyboard, or under a system bar past ${SLACK} units (pt on iOS, px on Android), and the call fails loudly naming the shortfall. ` +
         'It fails, naming the cause, when swiping no longer moves the element out (the cover, the status bar, the cut), when content is exhausted, or at maxSwipes / timeoutMs (checked once a round, so a call can run past it by one swipe and one more read). ' +
-        `It never swipes on a screen presented over the target (an alert, a sheet, a modal, an Android dialog) — a swipe there could dismiss it — and fails "… ${presentedStop()}". ` +
+        `It never swipes on a screen presented over the target — a swipe there could dismiss it — and fails "… ${presentedStop()}". ` +
         'Where no tree shows such a layer (iOS idb), a swipe that CHANGES THE SCREEN stops the call: it most likely dismissed a sheet or modal. ' +
         'Two controls iOS lists in reading order are judged on one screenshot, as for tap; with the target not seen on top it stops before any swipe. ' +
         'A top bar the tree lists before the scroll view (iOS\'s navigation bar under wda) is not seen: check a stop near the top with a screenshot. ' +
