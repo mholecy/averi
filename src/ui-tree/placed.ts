@@ -1,4 +1,4 @@
-import { everyNode, KEYBOARD_ROLE, rectArea, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Rect, type UiNode } from '../adapters/types.js';
+import { KEYBOARD_ROLE, rectArea, SCREEN_SIZED_FRACTION, STRUCTURAL_ROLES, type Rect, type UiNode } from '../adapters/types.js';
 import { rectWithin } from './geometry.js';
 import { listsNestedReadingOrder } from './reading-order.js';
 import { scrolls } from './scroll-containers.js';
@@ -114,8 +114,12 @@ export const isUnnamedWrapper = (n: UiNode): boolean => STRUCTURAL_ROLES.has(n.r
  */
 export const emptyFrame = (n: UiNode): boolean => n.role === 'container' && isUnnamedWrapper(n);
 
-/** Every descendant of `n` is an empty frame (`emptyFrame`) — true of a leaf. */
-export const framesOnly = (n: UiNode): boolean => n.children.every((child) => [...everyNode(child)].every(emptyFrame));
+/**
+ * Every descendant of `n`, not `n` itself, is an empty frame (`emptyFrame`) — true of a leaf. Answered at the first
+ * descendant in pre-order that is none, the rest unwalked: draw order's `structural` frame excuse asks it of every
+ * candidate for every target (`FRAME_EXCUSES`).
+ */
+export const framesOnly = (n: UiNode): boolean => n.children.every((child) => emptyFrame(child) && framesOnly(child));
 
 /** A `toolbar` none of whose descendants could be an item (draw-order.ts's `itemlessToolbar` row). */
 export const itemless = (n: UiNode): boolean => n.role === 'toolbar' && framesOnly(n);
