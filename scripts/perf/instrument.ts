@@ -2,6 +2,7 @@ import type { execFile as ExecFileFn } from 'node:child_process';
 import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
+import { SLEEP_OWNER } from '../differential/clock.js';
 import type { DeviceCall, Sleep, Window } from './stats.js';
 
 /**
@@ -26,12 +27,18 @@ import type { DeviceCall, Sleep, Window } from './stats.js';
  * made device calls and recorded none.
  */
 
-/** A recorder's own clock: performance.now() unless a test hands one in. */
+/** A call as the recorder holds it while it may still be open: its end and outcome come with its answer. */
+type OpenCall = Omit<DeviceCall, 'endMs' | 'ok'> & { endMs?: number; ok?: boolean };
+/** A sleep as the recorder holds it while it may still be pending: its end comes when it fires. */
+type OpenSleep = Omit<Sleep, 'endMs'> & { endMs?: number };
+
+/** The calls and sleeps that begin between `begin` and `end` — one window per measured tool call. */
 export class Recorder {
   private open = false;
-  private calls: (Omit<DeviceCall, 'endMs' | 'ok'> & { endMs?: number; ok?: boolean })[] = [];
-  private sleeps: (Omit<Sleep, 'endMs'> & { endMs?: number })[] = [];
+  private calls: OpenCall[] = [];
+  private sleeps: OpenSleep[] = [];
 
+  /** @param now the recorder's clock: performance.now() unless a test hands one in. */
   constructor(private readonly now: () => number = () => performance.now()) {}
 
   begin(): void {
@@ -57,7 +64,7 @@ export class Recorder {
   /** A call begins; the returned function ends it. Outside a window both do nothing. */
   call(kind: string, label: string): (ok: boolean) => void {
     if (!this.open) return () => undefined;
-    const entry: Omit<DeviceCall, 'endMs' | 'ok'> & { endMs?: number; ok?: boolean } = { kind, label, startMs: this.now() };
+    const entry: OpenCall = { kind, label, startMs: this.now() };
     this.calls.push(entry);
     return (ok) => {
       if (entry.endMs !== undefined) return;
@@ -69,7 +76,7 @@ export class Recorder {
   /** A sleep begins; the returned function is called when it fires. */
   sleep(ms: number, caller: string): () => void {
     if (!this.open) return () => undefined;
-    const entry: Omit<Sleep, 'endMs'> & { endMs?: number } = { ms, caller, startMs: this.now() };
+    const entry: OpenSleep = { ms, caller, startMs: this.now() };
     this.sleeps.push(entry);
     return () => void (entry.endMs ??= this.now());
   }
@@ -151,7 +158,6 @@ export function recordingFetch(original: typeof fetch, rec: Recorder): typeof fe
   };
 }
 
-const SLEEP_OWNER = /[/\\]src[/\\]util[/\\]sleep\.[jt]s:/;
 const FRAME = /\(?((?:[A-Za-z]:)?[^\s()]+):(\d+):\d+\)?$/;
 
 /** The frame that called `sleep`: the first after the last sleep.ts frame, as `src/<path>:<line>`. */

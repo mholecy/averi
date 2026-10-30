@@ -13,8 +13,8 @@ import type { Platform } from '../../src/adapters/types.js';
 import { AdapterRegistry, defaultDiscovery, defaultFactory } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_WDA_DERIVED_DATA } from '../truth/lab-device.js';
-import { allPassed, claimsDone, claimsTap, claimsVisible, isError } from '../truth/replies.js';
-import { parseLabApp, type LabApp } from '../truth/schema.js';
+import { allPassed, callReply, claimsDone, claimsTap, claimsVisible, isError, OCR_FAILED_CLOSED } from '../truth/replies.js';
+import { labId, labSelector, parseLabApp, type LabApp } from '../truth/schema.js';
 import { installRecorder, Recorder } from './instrument.js';
 import { breakdown, measure, summarize, type Breakdown, type Measured, type Status, type Summary, type Window } from './stats.js';
 
@@ -90,6 +90,7 @@ if (!Number.isInteger(repeat) || repeat < 1) throw new Error(`--repeat ${values.
 const treeSource: IosTreeSourceKind = (values['tree-source'] as IosTreeSourceKind | undefined) ?? (app === 'react-native' ? 'wda' : 'idb');
 if (treeSource !== 'idb' && treeSource !== 'wda') throw new Error(`--tree-source ${treeSource as string}: idb or wda`);
 const wdaPort = Number(values['wda-port'] ?? 8120);
+if (!Number.isInteger(wdaPort) || wdaPort < 1024 || wdaPort > 65535) throw new Error(`--wda-port ${values['wda-port']}: a whole port number, 1024–65535`);
 
 // --- the scenarios ---
 
@@ -109,7 +110,7 @@ interface Scenario {
   unavailable?: RegExp;
 }
 
-const id = (cell: string, tag: string) => `id:"lab.${cell}.${tag}"`;
+const id = labSelector;
 const answered = (reply: string) => !isError(reply);
 /** 20 characters: Android types one `input text` per character, 250 ms apart (src/adapters/android.ts#typeText). */
 const TWENTY = 'Jan Novak Bratislava';
@@ -131,7 +132,7 @@ const SCENARIOS: Scenario[] = [
     app: 'native',
     setup: { cell: 'open' },
     tool: 'assert',
-    args: { asserts: [{ element: { id: 'lab.open.A' }, color: { expected: '#E53935' } }] },
+    args: { asserts: [{ element: { id: labId('open', 'A') }, color: { expected: '#E53935' } }] },
     ok: allPassed,
   },
   {
@@ -140,13 +141,9 @@ const SCENARIOS: Scenario[] = [
     app: 'native',
     setup: { cell: 'text-sample' },
     tool: 'assert',
-    args: { asserts: [{ element: { id: 'lab.text-sample.A' }, ocr: { text: 'Prihlásiť sa' } }] },
+    args: { asserts: [{ element: { id: labId('text-sample', 'A') }, ocr: { text: 'Prihlásiť sa' } }] },
     ok: allPassed,
-    // The fail-closed lines of src/verify/ocr.ts, word for word, and nothing else — an OCR that ran and read other
-    // text is a failed run: no Vision on this host (ocrUnavailableReason), no swiftc (the probe), a recognizer that did
-    // not compile, or one that ran and whose Vision request failed (the Swift helper's `recognizer failed: <error>`; in
-    // a sandbox Vision answers nilError).
-    unavailable: /OCR needs the macOS Vision framework|OCR needs the Swift compiler|the OCR recognizer did not compile|recognizer failed: /,
+    unavailable: OCR_FAILED_CLOSED,
   },
   { id: 'fill', says: 'fill the empty name field of form-basic with "Jan"', app: 'native', setup: { cell: 'form-basic' }, tool: 'type_text', args: { selector: id('form-basic', 'name'), text: 'Jan' }, ok: claimsDone },
   { id: 'fill-20', says: `fill the empty name field of form-basic with 20 characters`, app: 'native', setup: { cell: 'form-basic' }, tool: 'type_text', args: { selector: id('form-basic', 'name'), text: TWENTY }, ok: claimsDone },
@@ -192,10 +189,10 @@ await writeFile(
       android: { package: LAB_APP[app].package, activity: '.MainActivity' },
       ios: { bundleId: LAB_APP[app].bundle, treeSource },
     },
-    states: { [STATE]: { detect: { element: { id: 'lab.open.A' } }, reach: ['open_from_catalog'] } },
+    states: { [STATE]: { detect: { element: { id: labId('open', 'A') } }, reach: ['open_from_catalog'] } },
     flows: {
       open_from_catalog: {
-        steps: [{ launch: {} }, { tap: { text: 'open' } }, { wait: { element: { id: 'lab.open.A' }, timeout: '15s' } }],
+        steps: [{ launch: {} }, { tap: { text: 'open' } }, { wait: { element: { id: labId('open', 'A') }, timeout: '15s' } }],
       },
     },
   }),
@@ -237,16 +234,8 @@ await server.connect(serverSide);
 const client = new Client({ name: 'perf-baseline', version: '0' });
 await client.connect(clientSide);
 
-/** A tool call's reply as text, `ERROR ` prefixed when it is an error (scripts/truth/replies.ts reads it so). */
-async function call(tool: string, args: Record<string, unknown>): Promise<string> {
-  try {
-    const r = await client.callTool({ name: tool, arguments: { platform, configPath, ...args } }, undefined, { timeout: 300_000 });
-    const text = (r.content as { type: string; text?: string }[]).map((c) => (c.type === 'text' ? c.text ?? '' : `[${c.type}]`)).join('\n');
-    return `${r.isError === true ? 'ERROR ' : ''}${text}`;
-  } catch (e) {
-    return `ERROR (thrown) ${(e as Error).message}`;
-  }
-}
+/** A tool call's reply as the judges read it (scripts/truth/replies.ts#callReply), the platform and config added. */
+const call = (tool: string, args: Record<string, unknown>) => callReply(client, tool, { platform, configPath, ...args });
 
 // --- the runs ---
 

@@ -1,3 +1,4 @@
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ACTIVE_WINDOW_HINT, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 
 /**
@@ -10,6 +11,23 @@ import { ACTIVE_WINDOW_HINT, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
  * Everything here takes the reply as averi returned it: its text, `ERROR ` prefixed when the tool call was an error
  * (differential.ts and live.ts#callTool both spell it so).
  */
+
+// --- a reply as the live harnesses read it ---
+
+/**
+ * One tool call through a real MCP client, its reply as the judges read it: the text blocks joined (any other block
+ * `[<type>]`), `ERROR ` prefixed when the call was an error, `ERROR (thrown) …` when the client threw (a timeout, a
+ * closed transport). The live golden (live.ts) and the performance baseline (scripts/perf/baseline.ts) call through it.
+ */
+export async function callReply(client: Client, name: string, args: Record<string, unknown>, timeoutMs = 300_000): Promise<string> {
+  try {
+    const r = await client.callTool({ name, arguments: args }, undefined, { timeout: timeoutMs });
+    const text = (r.content as { type: string; text?: string }[]).map((c) => (c.type === 'text' ? c.text ?? '' : `[${c.type}]`)).join('\n');
+    return `${r.isError === true ? 'ERROR ' : ''}${text}`;
+  } catch (e) {
+    return `ERROR (thrown) ${(e as Error).message}`;
+  }
+}
 
 // --- the kind of reply: one closed set, the ratchets pin it ---
 
@@ -242,3 +260,11 @@ export function snapshotNodes(reply: string): SnapshotNode[] | undefined {
     return undefined;
   }
 }
+
+/**
+ * An OCR assert that could not read at all on this host — src/verify/ocr.ts's fail-closed lines, word for word: no
+ * Vision here (ocrUnavailableReason), no swiftc (the probe), a recognizer that did not compile, or one that ran and
+ * whose Vision request failed (the Swift helper's `recognizer failed: <error>`; in a sandbox Vision answers nilError).
+ * Nothing else: an OCR that read other text is a failed assert. tests/truth/replies.test.ts pins each in the source.
+ */
+export const OCR_FAILED_CLOSED = /OCR needs the macOS Vision framework|OCR needs the Swift compiler|the OCR recognizer did not compile|recognizer failed: /;

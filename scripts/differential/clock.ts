@@ -23,7 +23,11 @@ const START = Date.UTC(2026, 0, 1);
 let clock = START;
 let sleeps = 0;
 
-const SLEEP_OWNER = /[/\\]src[/\\]util[/\\]sleep\.[jt]s/;
+/**
+ * A stack frame in averi's one sleep owner, src/util/sleep.ts — shared with the performance baseline
+ * (scripts/perf/instrument.ts), which times the same timers: if the owner moves, this is the one line to change.
+ */
+export const SLEEP_OWNER = /[/\\]src[/\\]util[/\\]sleep\.[jt]s:/;
 
 function fakeSetTimeout(this: unknown, fn: (...a: unknown[]) => void, ms?: number, ...args: unknown[]) {
   const stack = new Error().stack ?? '';

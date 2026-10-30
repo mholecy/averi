@@ -1,10 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { PresentationKind } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { flushText } from '../../src/interact/scroll-text.js';
-import { flushProbedSide, presentedRemedySaid, windowHintSaid } from '../../scripts/truth/replies.js';
+import { flushProbedSide, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid } from '../../scripts/truth/replies.js';
 
 // The two "close it first" the harness reads apart (scripts/truth/replies.ts): the presented remedy, driven here by
 // src's own builders (ui-tree/standing.ts#presentedRemedy, #presentedStop) over every layer they word, and the
@@ -50,5 +51,24 @@ describe('flushProbedSide: the probed side in both forms src builds (src/interac
   it('none where no probe moved nothing: unchecked, or spanning the container', () => {
     expect(flushProbedSide(`fully visible after 0 swipes${flushText({ edge: 'top', container, pinned, checked: false, why: 'budget' })}`)).toBeUndefined();
     expect(flushProbedSide(`fully visible after 0 swipes${flushText({ edges: ['top', 'bottom'], container, pinned, checked: false, why: 'fills' })}`)).toBeUndefined();
+  });
+});
+
+describe('OCR_FAILED_CLOSED — the OCR fail-closed lines, word for word', () => {
+  // Each alternative is a plain string src/verify/ocr.ts writes (its messages and the Swift helper's per-region error):
+  // a rewording there must be followed here, or the baseline would call a host that cannot read a failed assert.
+  const source = readFileSync(new URL('../../src/verify/ocr.ts', import.meta.url), 'utf8');
+  const alternatives = OCR_FAILED_CLOSED.source.split('|');
+
+  it('has only plain alternatives, each one written in src/verify/ocr.ts', () => {
+    expect(alternatives.length).toBe(4);
+    for (const words of alternatives) {
+      expect(words).not.toMatch(/[\\^$*+?()[\]{}]/);
+      expect(source).toContain(words);
+    }
+  });
+
+  it('does not match an OCR assert that read other text', () => {
+    expect(OCR_FAILED_CLOSED.test('FAIL  element id:"lab.text-sample.A" renders text "Prihlásiť sa" — read "Prihlasit sa"')).toBe(false);
   });
 });
