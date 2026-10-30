@@ -21,6 +21,10 @@ const onHost = async (platform: string, body: () => void | Promise<void>) => {
   }
 };
 
+/** Which of the engine's three commands a scripted exec was asked for. */
+const callKind = (cmd: string, args: readonly string[]): 'version' | 'compile' | 'run' =>
+  cmd !== 'swiftc' ? 'run' : args[0] === '--version' ? 'version' : 'compile';
+
 describe('ocrEngineFor', () => {
   it('a supplied engine is used as given — the test seam, wherever the host is', () =>
     onHost('linux', () => {
@@ -58,7 +62,7 @@ describe('VisionOcr — which failures are permanent (2026-10-08, review 2026-10
     const calls: string[] = [];
     const toolchain = `swift-driver test ${randomUUID()}`;
     const exec: ExecFn = async (cmd, args) => {
-      const kind = cmd !== 'swiftc' ? 'run' : args[0] === '--version' ? 'version' : 'compile';
+      const kind = callKind(cmd, args);
       calls.push(kind);
       await handlers[kind]?.(args);
       return { stdout: Buffer.from(kind === 'version' ? toolchain : kind === 'run' ? '{"results":[]}' : ''), stderr: '' };
@@ -150,6 +154,104 @@ describe('VisionOcr — which failures are permanent (2026-10-08, review 2026-10
         expect(thrown).toBeInstanceOf(Error);
         expect(thrown).not.toBeInstanceOf(OcrUnavailableError);
         expect((thrown as Error).message).toBe('recognizer exited 2');
+      } finally {
+        if (binary !== undefined) await rm(binary, { force: true });
+      }
+    }));
+});
+
+describe('VisionOcr — the toolchain probe runs once per process, not once per engine', () => {
+  /**
+   * Every Verifier builds its own VisionOcr, and every flow step and verify
+   * leg builds its own Verifier — so a per-instance probe paid `swiftc
+   * --version` (0.1–0.5 s) per Verifier. The probe is memoized per ExecFn,
+   * like xcode-env's: the real exec is shared by every production engine, so
+   * the probe runs once per process; a test's fake exec is its own cache.
+   * What the shared memo keeps is the compiler's ANSWER — its version, or its
+   * refusal; a probe that did not answer is forgotten. A failed compile is
+   * not the probe's business and stays per engine.
+   */
+  const REGION = [{ id: 'element', x: 0, y: 0, w: 10, h: 10 }];
+  const recorder = (version: (n: number) => Promise<void>) => {
+    const calls: string[] = [];
+    let probes = 0;
+    const toolchain = `swift-driver test ${randomUUID()}`;
+    const exec: ExecFn = async (cmd, args) => {
+      const kind = callKind(cmd, args);
+      calls.push(kind);
+      if (kind === 'version') await version(++probes);
+      // The probe answered: stop each build at its compile, which is per engine.
+      if (kind === 'compile') throw new Error('stop here: the probe answered');
+      return { stdout: Buffer.from(toolchain), stderr: '' };
+    };
+    return { exec, calls };
+  };
+  const read = (ocr: VisionOcr) => ocr.recognize(Buffer.from('png'), REGION).catch((e: unknown) => e);
+
+  it('three engines on one exec probe the toolchain once — concurrently or one after another', () =>
+    onHost('darwin', async () => {
+      const { exec, calls } = recorder(async () => {});
+      await Promise.all([read(new VisionOcr(exec)), read(new VisionOcr(exec))]);
+      await read(new VisionOcr(exec));
+      expect(calls).toEqual(['version', 'compile', 'compile', 'compile']);
+    }));
+
+  it('a compiler that answered "no" is the process\'s answer: the next engine fails the same way without probing', () =>
+    onHost('darwin', async () => {
+      const { exec, calls } = recorder(async () => {
+        throw new ExecError('swiftc --version', 1, 'xcrun: error: invalid active developer path');
+      });
+      const first = await read(new VisionOcr(exec));
+      const second = await read(new VisionOcr(exec));
+      expect(first).toBeInstanceOf(OcrUnavailableError);
+      expect(second).toBe(first);
+      expect(calls).toEqual(['version']);
+    }));
+
+  it('a probe that did not answer is forgotten process-wide: the next engine probes again and gets the answer', () =>
+    onHost('darwin', async () => {
+      const { exec, calls } = recorder(async (n) => {
+        if (n === 1) throw new ExecError('swiftc --version', null, '', true);
+      });
+      const first = await read(new VisionOcr(exec));
+      expect(first).not.toBeInstanceOf(OcrUnavailableError);
+      expect((first as Error).message).toMatch(/did not answer/);
+      expect(await read(new VisionOcr(exec))).toMatchObject({ message: expect.stringMatching(/did not compile.*stop here/) });
+      // ...and that answer is now the process's: a third engine goes straight to its compile.
+      await read(new VisionOcr(exec));
+      expect(calls).toEqual(['version', 'version', 'compile', 'compile']);
+    }));
+
+  it('a failed compile stays the failing engine\'s answer: the next engine compiles again, without probing', () =>
+    onHost('darwin', async () => {
+      const { exec, calls } = recorder(async () => {});
+      const ocr = new VisionOcr(exec);
+      await read(ocr);
+      await read(ocr);
+      await read(new VisionOcr(exec));
+      expect(calls).toEqual(['version', 'compile', 'compile']);
+    }));
+
+  it('a binary the OS swept out of the temp dir is rebuilt by the next engine, not trusted from the shared probe', () =>
+    onHost('darwin', async () => {
+      const calls: string[] = [];
+      const toolchain = `swift-driver test ${randomUUID()}`;
+      let binary: string | undefined;
+      const exec: ExecFn = async (cmd, args) => {
+        const kind = callKind(cmd, args);
+        calls.push(kind);
+        // The compile "publishes" a binary by writing the staging path it was asked for.
+        if (kind === 'compile') {
+          binary = args[2].replace(/\.\d+$/, '');
+          await writeFile(args[2], '');
+        }
+        return { stdout: Buffer.from(kind === 'version' ? toolchain : kind === 'run' ? '{"results":[]}' : ''), stderr: '' };
+      };
+      try {
+        await new VisionOcr(exec).recognize(Buffer.from('png'), REGION);
+        await rm(binary!, { force: true });
+        await new VisionOcr(exec).recognize(Buffer.from('png'), REGION);
+        expect(calls).toEqual(['version', 'compile', 'run', 'compile', 'run']);
       } finally {
         if (binary !== undefined) await rm(binary, { force: true });
       }
