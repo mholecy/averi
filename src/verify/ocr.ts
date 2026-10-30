@@ -69,7 +69,9 @@ export interface OcrEngine {
    * Rejects when nothing could be read at all. A rejection with
    * `OcrUnavailableError` is PERMANENT for this engine — no later call can
    * succeed — and the `ocr` assert ends at once on it (text-parity.ts#
-   * measureOcrAssert); any other rejection is one failed read.
+   * measureOcrAssert); any other rejection is one failed read. For
+   * `VisionOcr`, a missing or refusing `swiftc` is permanent for the whole
+   * process, every later engine included (`swiftToolchain`).
    */
   recognize(png: Buffer, regions: OcrRegion[]): Promise<OcrRegionResult[]>;
 }
@@ -79,8 +81,10 @@ export interface OcrEngine {
  * the host has no Vision, `swiftc` is missing or exits non-zero on its
  * probe, or the recognizer did not compile — `VisionOcr` memoizes its build,
  * so a failed one is the answer to every later call on the same instance (a
- * probe that timed out or hit EAGAIN is a plain error and is not memoized) (2026-10-08, review 2026-10-07
- * assert-capture-ocr C2). A class rather than a message match so the `ocr`
+ * probe that timed out or hit EAGAIN is a plain error and is not memoized).
+ * A missing or refusing `swiftc` goes further: the probe is memoized per
+ * process (`swiftToolchain`), so it is every later engine's answer too, until
+ * averi restarts. A class rather than a message match so the `ocr`
  * assert can tell "this engine will never read" from "this read failed":
  * until then the assert's catch swallowed both and polled a missing
  * compiler for the whole 12 s budget. Not a SetupError (flow/errors): the
@@ -272,7 +276,7 @@ async function probeSwiftToolchain(exec: ExecFn): Promise<string> {
     }
     throw new OcrUnavailableError(
       'OCR needs the Swift compiler: `swiftc --version` failed — install the Xcode Command Line ' +
-        `Tools (xcode-select --install). Underlying error: ${cause}`,
+        `Tools (xcode-select --install), then restart averi. Underlying error: ${cause}`,
     );
   }
 }

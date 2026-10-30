@@ -227,4 +227,29 @@ describe('VisionOcr — the toolchain probe runs once per process, not once per 
       await read(new VisionOcr(exec));
       expect(calls).toEqual(['version', 'compile', 'compile']);
     }));
+
+  it('a binary the OS swept out of the temp dir is rebuilt by the next engine, not trusted from the shared probe', () =>
+    onHost('darwin', async () => {
+      const calls: string[] = [];
+      const toolchain = `swift-driver test ${randomUUID()}`;
+      let binary: string | undefined;
+      const exec: ExecFn = async (cmd, args) => {
+        const kind = cmd !== 'swiftc' ? 'run' : args[0] === '--version' ? 'version' : 'compile';
+        calls.push(kind);
+        // The compile "publishes" a binary by writing the staging path it was asked for.
+        if (kind === 'compile') {
+          binary = args[2].replace(/\.\d+$/, '');
+          await writeFile(args[2], '');
+        }
+        return { stdout: Buffer.from(kind === 'version' ? toolchain : kind === 'run' ? '{"results":[]}' : ''), stderr: '' };
+      };
+      try {
+        await new VisionOcr(exec).recognize(Buffer.from('png'), REGION);
+        await rm(binary!, { force: true });
+        await new VisionOcr(exec).recognize(Buffer.from('png'), REGION);
+        expect(calls).toEqual(['version', 'compile', 'run', 'compile', 'run']);
+      } finally {
+        if (binary !== undefined) await rm(binary, { force: true });
+      }
+    }));
 });
