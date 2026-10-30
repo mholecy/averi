@@ -331,11 +331,12 @@ Verification philosophy: three tiers, cheapest first — (1) AX-tree asserts (fa
 
 ## 7. The skill
 
-Ships with the package (`averi` skill — SETUP.md copies the `skill/` directory into the app repo). It teaches the agent the workflow, not the plumbing, and only what the tool descriptions do not already say (since 2026-10-08, when an eval on Opus 5.5 found most of the old single-file skill duplicated them; the value it measured was in the `ensure_state` ladder and `averi.yaml` modelling):
+Ships with the package (`averi` skill — SETUP.md copies the `skill/` directory into the app repo). It teaches the agent the workflow, not the plumbing, and only what the tool descriptions do not already say (since 2026-10-08, when an eval on Opus 5.5 found most of the old single-file skill duplicated them; the value it measured was in the `ensure_state` ladder and `averi.yaml` modelling). The one exception is references/tools.md, which repeats the descriptions in full so that they can stay short:
 
 1. **SKILL.md** (loaded every session): the golden path (build → `install_app` → `ensure_state` → `run_flow`/navigation → cheapest assert first → `verify` on both platforms), short rules (no manual login, never ask for credentials, numbers over eyeballing, `match` across platforms, no `appAlive` on a failed run → logs first, an unreadable tree is not absence, the wipe count), and the `averi.yaml` reach ladder: cheap rungs first, destructive last, recoverable screens as states, gate states for late interstitials.
 2. **references/averi-yaml.md** (read when writing yaml): every key and step kind, `optional:`/`branch:`/`detect` semantics.
-3. **references/troubleshooting.md** (read on a `⚠`/`✗` line it does not understand): trace lines, empty/bare trees, iOS ids and `treeSource: wda`, the soft keyboard, pixel and contract checks, launch and logs — by symptom.
+3. **references/tools.md** (read when a reply or refusal surprises it): the full behaviour of each tool whose description was shortened — every refusal case, the platform and tree-source specifics — of which the tool descriptions keep what the tool does, its result and the rules that must not be broken (every session pays for the descriptions, so their size is held to the budget tests/mcp/tool-surface-budget.test.ts pins, `instructions` included; the shared vocabulary — selectors, units, configPath, the iOS tree source, refusals — is said once there, in the server's `instructions`, except for safety-critical one-liners — the units on coordinate parameters and rects, selector quoting — which are repeated where the agent acts on them, for clients that drop `instructions`).
+4. **references/troubleshooting.md** (read on a `⚠`/`✗` line it does not understand): trace lines, empty/bare trees, iOS ids and `treeSource: wda`, the soft keyboard, pixel and contract checks, launch and logs — by symptom.
 
 ---
 

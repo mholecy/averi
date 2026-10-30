@@ -607,15 +607,15 @@ async function judgeOver(
  * The head of the miss for an element NOTHING of which — of what the assert reads — lies on the screen judged
  * (ui-tree/standing.ts's pixel `offScreen`: below the fold, above the screen's top, past a side): no capture shows any
  * of it. Its remedy is the standing's: beneath a presented screen, close it first (ui-tree/standing.ts#presentedRemedy, of "the element"); else
- * scroll it on-screen. The one sentence head the `assert` tool's description and the troubleshooting reference quote
- * (mcp/tools.ts).
+ * scroll it on-screen. The one sentence head the full tool reference (skill/references/tools.md, `assert`) and the
+ * troubleshooting reference quote.
  */
 export const OFF_THE_SCREEN = 'nothing of the element lies on the screen';
 
 /**
  * The head of the same miss when the screen's edge leaves only a sliver of the element no thicker than the pixel
  * slack (ui-tree/standing.ts#thinSliver): the sliver is quoted, and its remedy is the off-screen one. The one sentence
- * head the `assert` tool's description and the troubleshooting reference quote for it (mcp/tools.ts).
+ * head the full tool reference and the troubleshooting reference quote for it.
  */
 export const TOO_THIN_ON_THE_SCREEN = 'only a sliver of the element lies on the screen, too thin to measure';
 
@@ -626,14 +626,14 @@ export const TOO_THIN_ON_THE_SCREEN = 'only a sliver of the element lies on the 
  * ui-tree/geometry.ts#outsideScrollViewText's begin, the tap's and `scroll_until`'s. Measured: the at-rest SWIFT form's
  * `payee_street_input` `24,869 354x52`, 5 pt of it on the screen below its form's `0,0 402x780`, passed a colour assert
  * on the bare background. A sentence names the scroll view after these words; its remedy is the off-screen one. The
- * one sentence head the `assert` tool's description and the troubleshooting reference quote (mcp/tools.ts).
+ * one sentence head the full tool reference and the troubleshooting reference quote.
  */
 export const OUTSIDE_ITS_SCROLL_VIEW = 'nothing of the element is drawn: it lies outside its scroll view';
 
 /**
  * The head of the same miss when the scroll view's edge leaves only a sliver of the element drawn, no thicker than the
  * pixel slack (ui-tree/standing.ts#thinSliver, at the scroll view's edge as at the screen's): the drawn sliver is
- * quoted. The one sentence head the `assert` tool's description and the troubleshooting reference quote.
+ * quoted. The one sentence head the full tool reference and the troubleshooting reference quote.
  */
 export const TOO_THIN_IN_ITS_SCROLL_VIEW = 'only a sliver of the element is drawn, too thin to measure: the rest lies outside its scroll view';
 

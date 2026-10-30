@@ -157,7 +157,7 @@ curl -fsSL "$(npm view averi dist.tarball)" \
 (For agents other than Claude Code, put the directory wherever that agent loads skills/instructions from.)
 
 **Check:** `.claude/skills/averi/SKILL.md` exists and its YAML frontmatter has `name: averi`, and
-`.claude/skills/averi/references/` holds `averi-yaml.md` and `troubleshooting.md`.
+`.claude/skills/averi/references/` holds `averi-yaml.md`, `tools.md` and `troubleshooting.md`.
 
 ---
 
