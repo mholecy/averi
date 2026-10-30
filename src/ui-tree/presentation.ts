@@ -1,6 +1,6 @@
 import { isTyped, rectArea, rectIntersection, STRUCTURAL_ROLES, type Point, type PresentationKind, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, screenOf } from './geometry.js';
-import { CONTENT_FRAMED_ROLES, emptyFrame, FRAME_EXCUSES, fillsScreen, holderOf, itemless, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
+import { CONTENT_FRAMED_ROLES, emptyFrame, FRAME_EXCUSES, fillsScreen, holderOf, itemless, placesBy, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { scrolls } from './scroll-containers.js';
 
 /**
@@ -128,7 +128,7 @@ export interface PresentedOver {
   /**
    * `p` is the SURFACE of a screen presented over the target's, and on what evidence (`SurfaceBy`): a node of a marked
    * `screen` layer over it (`fact`), or a cover the shape fallback names (`inferred`, which wins where both hold: the
-   * `hidden` row asks it). Asked of a node draw order already judged to draw for the target, or of a cover.
+   * `hidden` row asks it). Asked of any node drawn after the target; pure.
    */
   surface(p: Placed): SurfaceBy | undefined;
   /** `row`'s frame excuse of `p` (placed.ts#FRAME_EXCUSES) gives way: `p` lies on a screen presented over the target's, by shape. */
@@ -161,11 +161,12 @@ const NOTHING_OVER: PresentedOver = { drawn: () => true, wholeScreen: () => fals
 
 /**
  * The presentation of `tree`, over its walk (`order`, placed.ts#walkOf — draw order hands its own, so the tree is
- * walked once): the marks adapter on every tree, and the shape fallback (`Presentation.fallback`) only on a tree whose
- * source did not judge presented layers.
+ * walked once) and each node's places in it (`places`, placed.ts#placesBy — draw order hands its own too): the marks
+ * adapter on every tree, and the shape fallback (`Presentation.fallback`) only on a tree whose source did not judge
+ * presented layers.
  * The tree must not change while the answer is in use.
  */
-export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(tree)): Presentation {
+export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(tree), places: ReadonlyMap<UiNode, readonly Placed[]> = placesBy(order)): Presentation {
   const screen = screenOf(tree);
   const screenArea = rectArea(screen);
   const fallback = tree.presentationsJudged === true ? undefined : ('shape' as const);
@@ -174,9 +175,9 @@ export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(t
     fallback,
     alone: adapters.reduce<MarkedLayer | undefined>((found, a) => found ?? a.alone, undefined),
     over(node) {
-      const places = order.filter((p) => p.node === node);
-      if (places.length === 0) return NOTHING_OVER;
-      const overs = adapters.map((a) => a.over(places));
+      const here = places.get(node);
+      if (here === undefined) return NOTHING_OVER;
+      const overs = adapters.map((a) => a.over(here));
       return {
         drawn: (p) => overs.every((o) => o.drawn(p)),
         wholeScreen: (p) => overs.some((o) => o.wholeScreen(p)),

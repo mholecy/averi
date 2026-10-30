@@ -1,7 +1,7 @@
 import { INPUT_ROLE, rectArea, rectIntersection, sameRect, sameRectWithinPixel, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { coverAtPoint, type Cover } from './cover.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
-import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
+import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, placesBy, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
@@ -1383,6 +1383,13 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
  */
 export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
 
+/** idb's soft keyboard as draw order reads it (`keyboardOf`): its top, its run of nodes (`keys`), and of those its own. Exported because `bottomPinned`'s signature names it. */
+export interface KeyboardBand {
+  readonly top: number;
+  readonly keys: ReadonlySet<Placed>;
+  readonly own: ReadonlySet<UiNode>;
+}
+
 /**
  * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): the band
  * soft-keyboard.ts#flatListKeyboardBand finds in the walk's order (the
@@ -1392,11 +1399,7 @@ export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
  * them) and of those the keyboard's `own` (`sharesRow`,
  * `DrawOrder.ofKeyboardBand`).
  */
-function keyboardOf(
-  order: readonly Placed[],
-  screen: Rect,
-  barLine: number,
-): { readonly top: number; readonly keys: ReadonlySet<Placed>; readonly own: ReadonlySet<UiNode> } | undefined {
+function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): KeyboardBand | undefined {
   const band = flatListKeyboardBand(order.map((p) => p.node), screen, barLine);
   if (band === undefined) return undefined;
   const run = order.slice(band.from, band.to).map((p) => p.node);
@@ -1447,21 +1450,46 @@ const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
  * safe direction). Asked of a flat list for its covers' reach (`pinned`); of a
  * nested tree only for reading-order.ts#readingOrderOf's guard (`pinnedTargets`: the same
  * shape, read in pre-order — a pinned target keeps its place on top), never
- * for a reach there.
+ * for a reach there. Exported for the tests (tests/ui-tree/bottom-pinned.test.ts),
+ * which pin it against the plain definition; no production importer outside
+ * this module.
  */
-function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnType<typeof keyboardOf>): ReadonlyMap<Placed, number> {
+export function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: Pick<KeyboardBand, 'top' | 'keys'> | undefined): ReadonlyMap<Placed, number> {
   const band = screen.height * FLAT_LIST_BOTTOM_BAR_FRACTION;
   const pinned = new Map<Placed, number>();
-  const floors = [{ floor: screen.y + screen.height, keys: new Set<Placed>() }, ...(keyboard === undefined ? [] : [{ floor: keyboard.top, keys: keyboard.keys }])];
+  const floors = [{ floor: screen.y + screen.height, keys: new Set<Placed>() }, ...(keyboard === undefined ? [] : [{ floor: keyboard.top, keys: keyboard.keys }])].map(
+    ({ floor, keys }) => ({ floor, lowest: lowestTopsFrom(order, keys) }),
+  );
   for (const placed of order) {
     if (!isInteractive(placed.node)) continue;
     const r = placed.node.rect;
     const end = r.y + r.height;
-    const later = order.slice(placed.end).filter(({ node }) => rectArea(node.rect) > 0);
-    const on = floors.find(({ floor, keys }) => end <= floor && end >= floor - band && !later.some((p) => !keys.has(p) && p.node.rect.y >= end));
+    const on = floors.find(({ floor, lowest }) => end <= floor && end >= floor - band && !(lowest[placed.end] >= end));
     if (on !== undefined) pinned.set(placed, on.floor);
   }
   return pinned;
+}
+
+/**
+ * `bottomPinned`'s "nothing listed after it starts at or below its bottom", read in ONE backward pass over the walk
+ * instead of once per interactive node: at each index `i` (and at `order.length`), the LOWEST TOP — the largest
+ * `rect.y` — of the nodes of area from `i` on that are not among `keys` (that floor's keyboard keys), `-Infinity` when
+ * there is none. "Some later node starts at or below `end`" is then "the lowest top from the node's `end` on is at or
+ * below `end`": the same answer, since the largest of the tops reaches `end` exactly when one of them does. A top that
+ * is no number (`NaN`) never reaches `end`, as no comparison with it holds, and so never takes the place of the largest
+ * here either (`>` with it is false). The suffix runs from each node's `end`, past its subtree, so a nested tree's
+ * descendants are left out as the walk's slice left them out.
+ */
+function lowestTopsFrom(order: readonly Placed[], keys: ReadonlySet<Placed>): Float64Array {
+  const lowest = new Float64Array(order.length + 1);
+  lowest[order.length] = -Infinity;
+  for (let i = order.length - 1; i >= 0; i--) {
+    const p = order[i];
+    const r = p.node.rect;
+    lowest[i] = lowest[i + 1];
+    if (rectArea(r) > 0 && !keys.has(p) && r.y > lowest[i]) lowest[i] = r.y;
+  }
+  return lowest;
 }
 
 /**
@@ -1645,8 +1673,10 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   const minPiece = minTapPiece(screen);
   const overhang = labelOverhang(screen);
   const order = walkOf(tree);
+  /** Every place of each node in the walk (placed.ts#placesBy), shared with the presentation. */
+  const places = placesBy(order);
   /** What is presented over what (presentation.ts#presentationOf), over this walk. */
-  const presentation = presentationOf(tree, order);
+  const presentation = presentationOf(tree, order, places);
   const barLine = flatListBarLine(screen);
   const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
   const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
@@ -1687,9 +1717,17 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   /**
    * What the `target` column knows of `target`: the tree's facts, what is presented over it, where its reading order breaks, and what its listing
    * in reading order says (reading-order.ts#readingOrderOf) — that one asked on its first read, as `exposure` and the break's row past the break
-   * read it: a question that reads neither walks no siblings for it.
+   * read it: a question that reads neither walks no siblings for it. Built once per target and kept (`targets`): every
+   * question about one node — its exposure, its covers, the presented surface over it — reads the same facts of it, so
+   * none builds them again, and its reading order, once read, is read by them all.
    */
+  const targets = new Map<Placed, SeenFor>();
   const asTarget = (target: Placed): SeenFor => {
+    let about = targets.get(target);
+    if (about === undefined) targets.set(target, (about = targetFacts(target)));
+    return about;
+  };
+  const targetFacts = (target: Placed): SeenFor => {
     let readingOrder: ReadingOrder | undefined;
     const base = {
       ...seen,
@@ -1718,7 +1756,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     };
   };
   /** Every place of `node` in the walk — the same object may sit at several (`laterThan` reads after the first, outside them all). */
-  const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);
+  const placesOf = (node: UiNode): readonly Placed[] => places.get(node) ?? [];
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
   const laterThan = (places: readonly Placed[], keep: (p: Placed) => boolean): Placed[] =>
     after(places[0]).filter((p) => !places.some((place) => within(p, place)) && keep(p));
@@ -1764,7 +1802,11 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
    * The last node drawn after `node` whose reach `where` keeps (a presented layer's cover reaches the whole screen,
    * presentation.ts#PresentedOver.wholeScreen), that draws for it as a target and is the surface of a screen presented
    * over its own (presentation.ts#PresentedOver.surface) — or that cover: `presentedAt` keeps those holding its point,
-   * `presentedOver` every one.
+   * `presentedOver` every one. Whether it is such a surface is asked BEFORE whether it draws: both are pure questions
+   * of the same node — neither changes what the other, or any later question, answers (the reading order the rows may
+   * read is asked once per target and is the same whenever it is first read) — so their order changes no answer, and
+   * the surface test is the cheap one (on most nodes a set's or a few rects' look says no), the rows the costly one
+   * (every row of the `target` column, a flat list's reading order among them).
    */
   const lastPresentedSurface = (node: UiNode, where: (reach: Rect) => boolean = () => true): UiNode | undefined => {
     const places = placesOf(node);
@@ -1772,7 +1814,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     const about = asTarget(places[0]);
     const { wholeScreen, surface } = about.over;
     return laterFor(places, about)
-      .filter((p) => (wholeScreen(p) ? where(screen) : where(p.node.rect) && drawsOverTarget(p, about) && surface(p) !== undefined))
+      .filter((p) => (wholeScreen(p) ? where(screen) : where(p.node.rect) && surface(p) !== undefined && drawsOverTarget(p, about)))
       .at(-1)?.node;
   };
 
