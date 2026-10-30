@@ -394,7 +394,7 @@ const SMALL_CHILD_FRACTION = 0.25;
  * wrapper still counts as drawn over its whole rect (draw-order.ts's `structural` row: the tree cannot tell it from a
  * tab bar's host that swallows touches), so the refusal stands; this says what to do instead of only scrolling. A host
  * of several children — a tab bar's — gets none. Undefined when the cover is no such wrapper.
- * The trade-off as the agent reads it: mcp/tools.ts, the `tap` description.
+ * The trade-off as the agent reads it: skill/references/tools.md, the `tap` section.
  */
 function positionerRemedy(cover: UiNode): string | undefined {
   if (!STRUCTURAL_ROLES.has(cover.role) || cover.children.length !== 1) return undefined;
