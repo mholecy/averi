@@ -1,4 +1,3 @@
-import { PNG } from 'pngjs';
 import type { DeviceAdapter, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
 import { axisOfEdge, PIXEL_OVERLAP_SLACK, type Edge } from '../ui-tree/geometry.js';
 import type { FlushNeighbour } from '../ui-tree/later-edges.js';
@@ -8,6 +7,7 @@ import { errorMessage } from '../util/error-message.js';
 import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type MeasuredFrame, type RgbaImage } from './capture.js';
 import { ciede2000, rgbToHex, srgbToLab, type Rgb } from './ciede2000.js';
 import { DEFAULT_TOLERANCE_DE, sampleDominant } from './color-parity.js';
+import { decodePng } from './png.js';
 
 /**
  * THE EYES' production adapter (ui-tree/eyes.ts has the concept and the triggers): for either question one screenshot,
@@ -26,7 +26,7 @@ export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>):
     }
     let png: RgbaImage;
     try {
-      png = PNG.sync.read(shot);
+      png = decodePng(shot);
     } catch (e) {
       return { why: `the screenshot did not decode: ${errorMessage(e).split('\n')[0]}` };
     }
