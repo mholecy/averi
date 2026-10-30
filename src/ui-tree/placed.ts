@@ -53,6 +53,22 @@ export function walkOf(tree: UiNode): Placed[] {
 }
 
 /**
+ * Every place of each node in the walk `order` (`walkOf`), in walk order — the same node object may sit at several, and
+ * a node not in the walk has none (no entry). Built once beside the walk, so a question about one node looks its places
+ * up instead of filtering the whole walk: draw order hands it to the presentation module (presentation.ts
+ * #presentationOf) with the walk, and both read a node's places here.
+ */
+export function placesBy(order: readonly Placed[]): ReadonlyMap<UiNode, readonly Placed[]> {
+  const places = new Map<UiNode, Placed[]>();
+  for (const placed of order) {
+    const found = places.get(placed.node);
+    if (found === undefined) places.set(placed.node, [placed]);
+    else found.push(placed);
+  }
+  return places;
+}
+
+/**
  * A rect whose area reaches SCREEN_SIZED_FRACTION of the screen's (`screenOf`) — the one area test; children or none,
  * the caller asks.
  */

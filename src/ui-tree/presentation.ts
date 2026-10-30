@@ -1,6 +1,6 @@
 import { isTyped, rectArea, rectIntersection, STRUCTURAL_ROLES, type Point, type PresentationKind, type Rect, type UiNode } from '../adapters/types.js';
 import { containsPoint, screenOf } from './geometry.js';
-import { CONTENT_FRAMED_ROLES, emptyFrame, FRAME_EXCUSES, fillsScreen, holderOf, itemless, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
+import { CONTENT_FRAMED_ROLES, emptyFrame, FRAME_EXCUSES, fillsScreen, holderOf, itemless, placesBy, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { scrolls } from './scroll-containers.js';
 
 /**
@@ -163,11 +163,12 @@ const NOTHING_OVER: PresentedOver = { drawn: () => true, wholeScreen: () => fals
 
 /**
  * The presentation of `tree`, over its walk (`order`, placed.ts#walkOf — draw order hands its own, so the tree is
- * walked once): the marks adapter on every tree, and the shape fallback (`Presentation.fallback`) only on a tree whose
- * source did not judge presented layers.
+ * walked once) and each node's places in it (`places`, placed.ts#placesBy — draw order hands its own too): the marks
+ * adapter on every tree, and the shape fallback (`Presentation.fallback`) only on a tree whose source did not judge
+ * presented layers.
  * The tree must not change while the answer is in use.
  */
-export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(tree)): Presentation {
+export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(tree), places: ReadonlyMap<UiNode, readonly Placed[]> = placesBy(order)): Presentation {
   const screen = screenOf(tree);
   const screenArea = rectArea(screen);
   const fallback = tree.presentationsJudged === true ? undefined : ('shape' as const);
@@ -176,9 +177,9 @@ export function presentationOf(tree: UiNode, order: readonly Placed[] = walkOf(t
     fallback,
     alone: adapters.reduce<MarkedLayer | undefined>((found, a) => found ?? a.alone, undefined),
     over(node) {
-      const places = order.filter((p) => p.node === node);
-      if (places.length === 0) return NOTHING_OVER;
-      const overs = adapters.map((a) => a.over(places));
+      const at = places.get(node);
+      if (at === undefined) return NOTHING_OVER;
+      const overs = adapters.map((a) => a.over(at));
       return {
         drawn: (p) => overs.every((o) => o.drawn(p)),
         wholeScreen: (p) => overs.some((o) => o.wholeScreen(p)),

@@ -1,7 +1,7 @@
 import { INPUT_ROLE, rectArea, rectIntersection, sameRect, sameRectWithinPixel, STRUCTURAL_ROLES, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import { coverAtPoint, type Cover } from './cover.js';
 import { containsPoint, flatListBarLine, largestRect, overlapsPastSlack, rectCentre, rectWithin, screenOf, subtract } from './geometry.js';
-import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
+import { emptyFrame, FRAME_EXCUSES, fillsScreen, framesOnly, itemless, placesBy, screenSized, stackedScreens, walkOf, within, type FrameRow, type Placed } from './placed.js';
 import { presentationOf, type Presentation, type PresentedOver } from './presentation.js';
 import { isInteractive, tapPoint } from './selectors.js';
 import { clips, isScrollViewOf, scrolls } from './scroll-containers.js';
@@ -1671,8 +1671,10 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   const minPiece = minTapPiece(screen);
   const overhang = labelOverhang(screen);
   const order = walkOf(tree);
+  /** Every place of each node in the walk (placed.ts#placesBy), shared with the presentation. */
+  const placesOfAll = placesBy(order);
   /** What is presented over what (presentation.ts#presentationOf), over this walk. */
-  const presentation = presentationOf(tree, order);
+  const presentation = presentationOf(tree, order, placesOfAll);
   const barLine = flatListBarLine(screen);
   const contentFrom = flatList ? firstContent(order, screen, seen.screenArea, barLine) : order.length;
   const keyboard = flatList ? keyboardOf(order, screen, barLine) : undefined;
@@ -1713,9 +1715,17 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
   /**
    * What the `target` column knows of `target`: the tree's facts, what is presented over it, where its reading order breaks, and what its listing
    * in reading order says (reading-order.ts#readingOrderOf) — that one asked on its first read, as `exposure` and the break's row past the break
-   * read it: a question that reads neither walks no siblings for it.
+   * read it: a question that reads neither walks no siblings for it. Built once per target and kept (`targets`): every
+   * question about one node — its exposure, its covers, the presented surface over it — reads the same facts of it, so
+   * none builds them again, and its reading order, once read, is read by them all.
    */
+  const targets = new Map<Placed, SeenFor>();
   const asTarget = (target: Placed): SeenFor => {
+    let about = targets.get(target);
+    if (about === undefined) targets.set(target, (about = targetFacts(target)));
+    return about;
+  };
+  const targetFacts = (target: Placed): SeenFor => {
     let readingOrder: ReadingOrder | undefined;
     const base = {
       ...seen,
@@ -1744,7 +1754,7 @@ export function drawOrder(tree: UiNode, orderSeen?: SeenOrder): DrawOrder {
     };
   };
   /** Every place of `node` in the walk — the same object may sit at several (`laterThan` reads after the first, outside them all). */
-  const placesOf = (node: UiNode): Placed[] => order.filter((p) => p.node === node);
+  const placesOf = (node: UiNode): readonly Placed[] => placesOfAll.get(node) ?? [];
   /** What is drawn after `node` — after its first place, outside every one of its places' subtrees — that `keep` keeps. */
   const laterThan = (places: readonly Placed[], keep: (p: Placed) => boolean): Placed[] =>
     after(places[0]).filter((p) => !places.some((place) => within(p, place)) && keep(p));
