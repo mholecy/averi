@@ -21,7 +21,7 @@ measured before and after.
 |---|---|---|---|
 | P1 | `framesOnly` stops at the first non-empty frame | CPU | done (5ea456ff) |
 | P2 | draw-order: `bottomPinned` O(N), cheap test first in `lastPresentedSurface`, one node → places index | CPU | open |
-| P3 | `everyNode` as an explicit stack | CPU | open |
+| P3 | `everyNode` as an explicit stack | CPU | done (ff612d57) |
 | P4 | PNG decode fast path (native inflate + typed unfilter, pngjs fallback) | CPU | open |
 | P5 | `sampleDominant` / `nearCount` on typed arrays | CPU | won't do — real bands cost 0.1 ms |
 | P6 | OCR toolchain probe memoised per module, not per `VisionOcr` | spawn | open |
@@ -72,6 +72,11 @@ over every iOS and Android truth tree; `tests/helpers/android-trees.ts` now sits
 ### P3 — `everyNode` (adapters/types.ts:688)
 Recursive `yield*` costs O(N·depth): 145 µs per walk of 363 nodes vs 12 µs for an explicit stack pushing children in
 reverse (same pre-order). Safe while nothing mutates `children` during a walk.
+
+Done in ff612d57: still a lazy generator; 65 → 4.6 µs per walk of 363 nodes, all 148 corpus trees 931 → 98 µs; no depth
+limit (the recursion threw past ~5000 levels); a hole in `children` still throws. The edge it documents: an array changed
+in place after its node was passed is not seen (no caller does that). Golden is blind to sibling order (a reversed walk
+left it at 0 changed); `tests/adapters/every-node.test.ts` checks identity per node against a recursive oracle.
 
 ### P4 — PNG decode (verify/capture.ts:554, :915; verify/eyes.ts:29; verify/assert.ts:644)
 pngjs spends ~90 % of its 25–32 ms (iOS 1206×2622) in its JS unfilter/bitmapper; zlib is 2–3 ms. A prototype of
