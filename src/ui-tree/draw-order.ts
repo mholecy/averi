@@ -1383,6 +1383,13 @@ function firstContent(order: readonly Placed[], screen: Rect, screenArea: number
  */
 export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
 
+/** idb's soft keyboard as draw order reads it (`keyboardOf`): its top, its run of nodes (`keys`), and of those its own. */
+export interface KeyboardBand {
+  readonly top: number;
+  readonly keys: ReadonlySet<Placed>;
+  readonly own: ReadonlySet<UiNode>;
+}
+
 /**
  * idb's SOFT KEYBOARD, read by its shape (`flatListReadingOrder`): the band
  * soft-keyboard.ts#flatListKeyboardBand finds in the walk's order (the
@@ -1392,11 +1399,7 @@ export const FLAT_LIST_BOTTOM_BAR_FRACTION = 0.06;
  * them) and of those the keyboard's `own` (`sharesRow`,
  * `DrawOrder.ofKeyboardBand`).
  */
-function keyboardOf(
-  order: readonly Placed[],
-  screen: Rect,
-  barLine: number,
-): { readonly top: number; readonly keys: ReadonlySet<Placed>; readonly own: ReadonlySet<UiNode> } | undefined {
+function keyboardOf(order: readonly Placed[], screen: Rect, barLine: number): KeyboardBand | undefined {
   const band = flatListKeyboardBand(order.map((p) => p.node), screen, barLine);
   if (band === undefined) return undefined;
   const run = order.slice(band.from, band.to).map((p) => p.node);
@@ -1449,19 +1452,42 @@ const sharesRow = (node: UiNode, run: readonly UiNode[]): boolean =>
  * shape, read in pre-order — a pinned target keeps its place on top), never
  * for a reach there.
  */
-function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: ReturnType<typeof keyboardOf>): ReadonlyMap<Placed, number> {
+export function bottomPinned(order: readonly Placed[], screen: Rect, keyboard: Pick<KeyboardBand, 'top' | 'keys'> | undefined): ReadonlyMap<Placed, number> {
   const band = screen.height * FLAT_LIST_BOTTOM_BAR_FRACTION;
   const pinned = new Map<Placed, number>();
-  const floors = [{ floor: screen.y + screen.height, keys: new Set<Placed>() }, ...(keyboard === undefined ? [] : [{ floor: keyboard.top, keys: keyboard.keys }])];
+  const floors = [{ floor: screen.y + screen.height, keys: new Set<Placed>() }, ...(keyboard === undefined ? [] : [{ floor: keyboard.top, keys: keyboard.keys }])].map(
+    ({ floor, keys }) => ({ floor, lowest: lowestTopsFrom(order, keys) }),
+  );
   for (const placed of order) {
     if (!isInteractive(placed.node)) continue;
     const r = placed.node.rect;
     const end = r.y + r.height;
-    const later = order.slice(placed.end).filter(({ node }) => rectArea(node.rect) > 0);
-    const on = floors.find(({ floor, keys }) => end <= floor && end >= floor - band && !later.some((p) => !keys.has(p) && p.node.rect.y >= end));
+    const on = floors.find(({ floor, lowest }) => end <= floor && end >= floor - band && !(lowest[placed.end] >= end));
     if (on !== undefined) pinned.set(placed, on.floor);
   }
   return pinned;
+}
+
+/**
+ * `bottomPinned`'s "nothing listed after it starts at or below its bottom", read in ONE backward pass over the walk
+ * instead of once per interactive node: at each index `i` (and at `order.length`), the LOWEST TOP — the largest
+ * `rect.y` — of the nodes of area from `i` on that are not among `keys` (that floor's keyboard keys), `-Infinity` when
+ * there is none. "Some later node starts at or below `end`" is then "the lowest top from the node's `end` on is at or
+ * below `end`": the same answer, since the largest of the tops reaches `end` exactly when one of them does. A top that
+ * is no number (`NaN`) never reaches `end`, as no comparison with it holds, and so never takes the place of the largest
+ * here either (`>` with it is false). The suffix runs from each node's `end`, past its subtree, so a nested tree's
+ * descendants are left out as the walk's slice left them out.
+ */
+function lowestTopsFrom(order: readonly Placed[], keys: ReadonlySet<Placed>): Float64Array {
+  const lowest = new Float64Array(order.length + 1);
+  lowest[order.length] = -Infinity;
+  for (let i = order.length - 1; i >= 0; i--) {
+    const p = order[i];
+    const r = p.node.rect;
+    lowest[i] = lowest[i + 1];
+    if (rectArea(r) > 0 && !keys.has(p) && r.y > lowest[i]) lowest[i] = r.y;
+  }
+  return lowest;
 }
 
 /**
