@@ -137,6 +137,10 @@ outside. The simulator is named `averi-lab iPhone 17` for the lab guards. First 
 idb tree read failed with "The simulator's accessibility service named no frontmost application" (the known idb state
 of docs/truth/live-ios-2026-10-18-visibility.md) — reboot the simulator, or run a companion of its own
 (`IDB_COMPANION=localhost:<port>`), and check `idb ui describe-all` by hand before a run; not a harness or src fault.
+The second probe read every tree but every tap and swipe failed "The dtuhidd connection … has been invalidated" (a
+companion registered before the reboot; docs/truth/live-ios-2026-10-19-lab-fixes.md). So before an iOS run: kill every
+`idb_companion` and WDA, reboot the simulator, start a companion of the run's own AFTER the boot, export
+`IDB_COMPANION`, and check both a read (`idb ui describe-all`) and a stroke (`idb ui swipe`) by hand.
 
 Android, averi_lab API 33, native AveriLab, 5 repeats, medians, with P1–P6 (load 2.5–2.8):
 
