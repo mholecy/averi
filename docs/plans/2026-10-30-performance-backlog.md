@@ -31,10 +31,10 @@ measured before and after.
 | D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | done (0d551270; with a 150 ms floor, ADR 0029) |
 | D2 | `ensure_state`'s second look ends on a held "no" | device | open |
 | D3 | Per-call tree snapshot cache, invalidated by every action | device | done (8bdb8004; a one-shot hand-off, not a cache — ADR 0030) |
-| D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | open |
+| D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | won't do — the recognizer is 150–160 ms on iOS (D0 on iOS); a persistent helper saves ≤ 50–80 ms on OCR asserts only |
 | D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | won't do — raw over exec-out is ~610 ms slower (see D19) |
 | D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | done (86505377; pace 250 → 100 ms; the script and clearText not worth it) |
-| D7 | iOS: persistent idb gRPC client; WDA `excluded_attributes`; no `/status` before `/source`; parallel `defaults write`; one key-sequence in `clearText` | device | open |
+| D7 | iOS: a persistent idb client (the `idb` CLI's Python start-up ~90 ms of every idb call) — narrowed 2026-10-31; measure a one-shot helper against the CLI first | device | open |
 | D8 | Fill re-reads after focus only for secure or unknown fields | device | done (1083523e; Android only, ADR 0028) |
 | D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | won't do — the second look guards a re-flow after the keyboard hides; iOS only, 0 in D0 |
 | D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | done (4cd4825a); keyboard beside the tree: won't do (stale IME band → false "fully visible") |
@@ -49,6 +49,9 @@ measured before and after.
 | D19 | Android capture by `shell screencap <file>` + `adb pull` (raw RGBA, PNG encoded on the host only when returned/stored): −80…110 ms per capture on lab screens, −1.3 s on photo-heavy ones; changes the `screenshot()` contract | device | open |
 | D20 | iOS idb: `scroll_until` on a flinging list stopped "the swipe CHANGED THE SCREEN" after one stroke | stability | done (7e32f1d3; idb full strokes paced at 349 pt/s, ADR 0018 Decision 4; device-checked 5/5, 9.0 s) |
 | D21 | iOS idb: right after a simulator boot with a fresh companion every `idb ui describe-all` fails "The simulator's accessibility service named no frontmost application" for the whole call (D20's device check 2026-10-31: 133 reads in 90 s, 5 of 5 repeats); a hand launch + read before the run cured it once. Find the cause and what averi can do (re-front the app? a named recovery in the reply?) — needs the device | stability | open |
+| D22 | iOS registry probe: read the bound simulator's `device.plist` (state 3 = booted, < 1 ms) before `simctl list devices` (~110 ms, every verb); anything else falls back to simctl | device | open |
+| D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) as one spawn — −225 ms a launch | device | open |
+| D24 | iOS RN: `idb ui text` drops the last 5–7 characters into rn-field in every fill-20 (D0 on iOS), so fill polls 5 × 400 ms and retypes (~2.6 s of 5.9 s) — find why, then pace | stability | open |
 
 ## Notes
 
@@ -233,6 +236,16 @@ wrapper): the picker's GB `scroll_until` under idb 5/5 ok, median 9 038 ms [9 00
 (`idb ui swipe` ×3 6 521 ms: 1.5 s of stroke plus idb's own ~0.67 s), 5 reads 776 ms, settles 1 600 ms; no row selected
 (every reply claims the target). Before: 0/5. WDA on the same call: 6 908 ms. A faster pace (between 300 ms and 1.5 s)
 stays unmeasured — the next saving, if this scroll matters.
+
+### iOS per-call costs (analysed 2026-10-31, from D0 on iOS)
+
+Decided from an analysis of the D0 windows (and simctl timed on the lab simulator): D22 (probe from device.plist), D23
+(one `defaults write` spawn), D7 narrowed to the idb client (measure first), D24 (RN dropped tail, stability). Won't do:
+dropping the capture pair or its 300 ms spacing on iOS — docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-
+caret.md measured the iOS caret blinking too, and without the sleep an equal pair on a caret screen falls from ~38 % to
+~22 % of tries (estimate), so a settled verdict would cost more captures or come back `moving`; PNG vs TIFF/BMP (no gain);
+D7's `/status` (2–7 ms) and WDA `excluded_attributes` (averi parses isVisible/isAccessible). Deferred: appHealth from the
+host's process list (−200 ms an assert) — it moves D13's "health after the frame" rule. D4 won't do.
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
