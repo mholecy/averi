@@ -18,9 +18,11 @@
  *   the text only by CHANGING to show it (`tookText`). The history of each
  *   clause is in the comments below; they moved here unchanged from fill.ts
  *   (2026-10-19). Since D18 an input also lands REFORMATTED: every
- *   character it should hold, in order, with only separators of its own
- *   added (`reformatOf`; docs/adr/0034-a-fill-passes-a-field-that-reformats-
- *   as-it-is-typed.md).
+ *   character it should hold, in order, with ONE separator character of its
+ *   own added between groups of typed letters or digits — between two
+ *   letters only in a code, an added `.` or `,` only where a thousands mark
+ *   sits (`reformatOf` has every rule; docs/adr/0034-a-fill-passes-a-field-
+ *   that-reformats-as-it-is-typed.md).
  * - the poll: READ_BACK_POLLS (five) reads at `pollMs` until the reading lands, never stopping
  *   early on an unchanged mismatch (`pollValue`).
  * - what is sent again, bounded, in this order:

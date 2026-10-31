@@ -86,8 +86,13 @@ beside `retyped`, or the `reformatted-point` caveat), counts only — a value ma
   - a separator outside the set (`12:30` for `1230`), a prefix or a suffix (`€`);
   - a letter split by a separator in prose (`a lot` for `alot` — autocorrect; review round 2, MAJOR-A): between two
     letters a separator passes only in a code, digits and no typed space (an IBAN's `MALT MTLC`).
-  Astral characters (`𝐀𝐁𝐂𝐃 1234`) were one until review round 2 (NIT-B): the rule now reads code points on both
-  sides, and they pass.
+  Astral letters and digits (`𝐀𝐁𝐂𝐃 1234`) were one until review round 2 (NIT-B): the rule now reads code points on
+  both sides, and they pass; an emoji or a symbol is neither letter nor digit, so a separator beside one still fails —
+  the safe side.
+- **Residual, deliberate (review round 3, MINOR-1):** a split inside a code (`Pass word1`, `user 123name`,
+  `jo hn2@x.com`) and any split between a letter and a digit pass as a reformat, said in the reply's aside — no known
+  input source inserts a separator there, and a rule tight enough to refuse them would refuse postcodes, number plates
+  and IBANs.
 - **Residual (review round 1, MINOR-3; a backlog row of its own): a dropped tail on a reformatting field is neither
   typed again nor reported.** ADR 0023's retype needs the reading to be an EXACT strict prefix of what the field
   should hold, and a reformatted partial reading (`SK31 12` for `SK311200…`) is none — so the tail is not retyped,
