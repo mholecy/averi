@@ -33,7 +33,7 @@ measured before and after.
 | D3 | Per-call tree snapshot cache, invalidated by every action | device | done (8bdb8004; a one-shot hand-off, not a cache — ADR 0030) |
 | D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | open |
 | D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | open |
-| D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | open |
+| D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | done (86505377; pace 250 → 100 ms; the script and clearText not worth it) |
 | D7 | iOS: persistent idb gRPC client; WDA `excluded_attributes`; no `/status` before `/source`; parallel `defaults write`; one key-sequence in `clearText` | device | open |
 | D8 | Fill re-reads after focus only for secure or unknown fields | device | done (1083523e; Android only, ADR 0028) |
 | D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | won't do — the second look guards a re-flow after the keyboard hides; iOS only, 0 in D0 |
@@ -153,6 +153,15 @@ unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 
 cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
+
+### D6 — typing pace
+Done in 86505377: measured first (2026-10-31, averi_lab API 33; scripts and per-trial records kept outside the repo):
+~9,600 characters typed per character at 250/150/100/50/0 ms, per call and as one script, on the Compose form-basic
+name field and the React Native field, idle and under host load (yes ×4, ×14) and device load (yes ×4) — 0 dropped,
+garbled or added. One script per chunk saves only 10–25 ms a character, so not done; clearText (per call, one script,
+one batched keyevent) left nothing in 60 trials and is unchanged. `TYPING_PACE_MS` = 100 doubles the 50 ms floor that the
+2026-08-05 drops after long uptime leave. fill-20 15.2 → 12.0 s, fill 9.0 → 8.7 s; live forms 32/32 identical.
+Untested: fields that reformat as typed (D18), long uptime.
 
 ### D3 — read hand-off
 Done in 8bdb8004 (ADR 0030): not a transparent cache — a one-shot hand-off of the last read (a watched adapter whose
