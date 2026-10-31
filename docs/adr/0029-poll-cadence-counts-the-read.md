@@ -18,7 +18,7 @@ orchestrator's decision on the owner's standing: fast AND stable). Implemented o
 
 **`pollTree` sleeps `min(pollMs, max(SETTLE_FLOOR_MS, pollMs − read duration))`, with `SETTLE_FLOOR_MS` = 150:
 consecutive reads start about `pollMs` apart, rather than `pollMs` after the previous read ends, and never less than
-the floor apart.**
+the floor apart (for a `pollMs` at or above it).**
 - The duration is that of the READ alone — the `uiTree` call, a failed one included — timed on `Date.now()`, the clock
   the deadline already uses. The predicate's time is never subtracted: the color and ocr predicates capture a settled
   frame of their own, up to 1.5 s, and letting that eat the pause would shrink the gap between the two TREES a settle
@@ -40,8 +40,9 @@ the floor apart.**
 The settle proof is "the same rect on two consecutive reads". What it compares is two SNAPSHOTS — the moment each
 read captured the screen — and a read's cost says nothing about where inside the read that moment fell. The bound on
 the gap between two snapshots, per source:
-- **Android** (`uiautomator dump`): each dump snapshots after its own idle wait of at least a second, so two snapshots
-  are at least that wait plus the 150 ms floor apart — more than before D1 removed anything.
+- **Android** (`uiautomator dump`): each dump snapshots after its own idle wait of at least a second (AOSP's
+  `DumpCommand` calls `waitForIdle(1000, 10000)`; the source, not measured here), so two snapshots are ≥ 1 s + 150 ms
+  apart, larger than the gap idb ever had.
 - **idb** (`describe-all`, ~167 ms): the read is shorter than the poll, so the remainder is slept; two snapshots are
   at least `pollMs − r₁` apart (r₁ the first read's cost), typically ≈ `pollMs`, the interval the proof was always
   argued on.
@@ -50,10 +51,11 @@ the gap between two snapshots, per source:
   two snapshots as close as ~150 ms may agree on an element moving too slowly to show a change in that time; without
   the floor they could have been milliseconds apart.
 
-Why 150 ms: it is of the order of the shortest gap between snapshots the old cadence left on the fastest source (an
-idb read), it is nine frames at 60 Hz — an element in visible motion moves between two snapshots that far apart — and
-it is small beside the read it follows on the slow sources, so the saving survives (an Android round pays 150 ms
-where it paid 500). It is a judgement, not a measurement.
+Why 150 ms: the settle proof already accepts two snapshots about that close — `resolveSettled`'s run-of-one late read
+(`interact/resolve.ts`, the `run === 1` branch) reads again back to back, ~167 ms apart on idb, and takes the same
+rect as settled; it is nine frames at 60 Hz — an element in visible motion moves between two snapshots that far
+apart; and it is small beside the read it follows on the slow sources, so the saving survives (an Android round pays
+150 ms where it paid 500). It is a judgement, not a measurement.
 
 The pixel asserts' region-only settle (a second read confirming the rect, `verify/pixel-poll.ts`) is the same proof,
 and its captures run inside the predicate, so they are not counted against the pause.

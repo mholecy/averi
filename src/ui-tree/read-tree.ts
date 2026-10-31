@@ -248,12 +248,12 @@ export function readErrorLine(message: string): string | undefined {
  * fast one, and two snapshots taken a few milliseconds apart could agree on an element still in motion. With the
  * floor, two snapshots are never closer than the floor plus whatever of the reads lies between them.
  *
- * Why 150 ms: it is of the order of the shortest gap between snapshots the old cadence ever left on the fastest
- * source (idb's ~167 ms read, after which the next snapshot came a whole pollMs later — that gap is still ≈ pollMs
- * now), it is nine frames at 60 Hz, so an element in motion at any visible speed moves between two snapshots that
- * far apart, and it is small beside the read it follows on the slow sources (an Android dump is 2.2–2.5 s), so the
- * saving D1 is after survives: an Android round pays 150 ms where it paid the whole 500. It is a judgement, not a
- * measurement; the device numbers are on the ADR.
+ * Why 150 ms: the settle proof already accepts two snapshots about that close — resolveSettled's run-of-one late
+ * read (interact/resolve.ts, the `run === 1` branch) reads again back to back, ~167 ms apart on idb, and takes the
+ * same rect as settled; it is nine frames at 60 Hz, so an element in motion at any visible speed moves between two
+ * snapshots that far apart; and it is small beside the read it follows on the slow sources (an Android dump is
+ * 2.2–2.5 s), so the saving D1 is after survives: an Android round pays 150 ms where it paid the whole 500. It is a
+ * judgement, not a measurement; the device numbers are on the ADR.
  */
 export const SETTLE_FLOOR_MS = 150;
 
@@ -309,8 +309,9 @@ export const SETTLE_FLOOR_MS = 150;
  *   settle compares. The settle proof (resolveSettled's "the same rect on two
  *   consecutive reads") is about the two SNAPSHOTS those reads took, and the
  *   gap between them stays bounded on every source: an Android dump
- *   snapshots after its own idle wait of at least a second, so two are at
- *   least that plus the floor apart; an idb read is short, so its snapshots
+ *   snapshots after its own idle wait of at least a second (AOSP
+ *   DumpCommand's `waitForIdle(1000, 10000)`, not measured here), so two are
+ *   ≥ 1 s + the floor apart; an idb read is short, so its snapshots
  *   are at least pollMs − the first read apart, typically ≈ pollMs; a WDA
  *   /source (0.3–1.7 s) may snapshot anywhere inside its read, so two are at
  *   least SETTLE_FLOOR_MS apart plus whatever of the reads lies between —
