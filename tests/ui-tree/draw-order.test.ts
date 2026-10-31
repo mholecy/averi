@@ -869,6 +869,18 @@ describe('exposure — what of a target shows, and where a tap on it goes', () =
       for (const cover of [shaped({ role: 'other' }), shaped({ identifier: 'pager' })]) expect(coverNodes(drawOrder(tree(cover)).exposure(row, IPHONE).covers)).toEqual([cover]);
     });
 
+    it('…and judged by ALL its content (placed.ts#framesOnly, D14): empty frames at any depth are excused; a drawable descendant at any depth — a child, or under a frame — and the labelled indicator covers as itself', () => {
+      // A labelled one: `structural` never excuses it, so only this row's `framesOnly` decides — no truth capture has
+      // the shape (golden's mutations of it at this call site left 0 changed).
+      const row = uiNode({ role: 'button', label: 'Row', rect: rect(0, 470, 402, 52) });
+      const frame = (...children: UiNode[]) => uiNode({ role: 'container', rect: rect(43, 512, 316, 3), children });
+      const bar = (...children: UiNode[]) => uiNode({ role: 'container', label: 'Vertical scroll bar, 2 pages', rect: rect(0, 485, 402, 30), children });
+      const tree = (later: UiNode) => uiNode({ role: 'application', rect: IPHONE, children: [uiNode({ role: 'scrollable', rect: rect(0, 62, 402, 500), children: [row, later] })] });
+      const badge = () => uiNode({ role: 'text', label: '3', rect: rect(380, 512, 10, 3) });
+      for (const excused of [bar(frame()), bar(frame(frame(frame())), frame())]) expect(coverNodes(drawOrder(tree(excused)).exposure(row, IPHONE).covers)).toEqual([]);
+      for (const drawn of [bar(badge()), bar(frame(badge())), bar(frame(), frame(frame(frame(badge()))))]) expect(coverNodes(drawOrder(tree(drawn)).exposure(row, IPHONE).covers)).toContain(drawn);
+    });
+
     it('an outlined field\'s floating label straddling its top border (a narrower sibling, its centre on the field — in a nested tree it need not repeat the field): drawn on it; a full-width sibling is a header, a cover', () => {
       const field = uiNode({ role: 'textfield', identifier: 'iban', rect: rect(24, 300, 354, 56) });
       const label = uiNode({ role: 'text', label: 'IBAN', rect: rect(36, 292, 40, 16) });
