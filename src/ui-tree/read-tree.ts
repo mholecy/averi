@@ -138,7 +138,10 @@ export const pollOnVerdict = <T>(verdict: Verdict, value: T): T | typeof Undecid
 
 export interface PollOptions {
   timeoutMs: number;
-  /** Pause between rounds. Owned by the caller: the engine and the verifier each have their own cadence. */
+  /**
+   * The cadence: consecutive reads start about this far apart — the pause after a round is `pauseAfterRead`.
+   * Owned by the caller: the engine and the verifier each have their own cadence.
+   */
   pollMs: number;
 }
 
@@ -233,6 +236,47 @@ export function readErrorLine(message: string): string | undefined {
 }
 
 /**
+ * The least pause between two reads of a poll, for a pollMs at or above it — the rule, and why 150, are
+ * `pauseAfterRead`'s.
+ */
+export const SETTLE_FLOOR_MS = 150;
+
+/**
+ * The pause `pollTree` sleeps after a round whose read took `readMs`:
+ * `min(pollMs, max(SETTLE_FLOOR_MS, pollMs − readMs))` (docs/adr/0029-poll-cadence-counts-the-read.md, 2026-10-31).
+ * Reads START about pollMs apart, rather than pollMs after the previous read ENDS. Before, a read's own cost was added
+ * on top of every pause — idb's ~167 ms read made a 500 ms poll a ~667 ms one, and Android's 2.2–2.5 s
+ * `uiautomator dump` made it ~3 s.
+ *
+ * `readMs` is the READ alone — the `uiTree` call, a failed one included — never the predicate's time: a color or
+ * ocr predicate captures its own settled frame, up to 1.5 s, and letting that eat the pause would shrink the gap
+ * between the two trees a settle compares.
+ *
+ * The settle proof (resolveSettled's "the same rect on two consecutive reads") is about the two SNAPSHOTS those reads
+ * took, and a read's cost says nothing about where inside the read its snapshot fell. The gap between two snapshots,
+ * per source:
+ * - Android: a dump snapshots after its own idle wait of at least a second (AOSP DumpCommand's
+ *   `waitForIdle(1000, 10000)`, not measured here), so two are ≥ 1 s + the floor apart.
+ * - idb: the read is short, so the remainder is slept; two snapshots are at least pollMs − the first read apart,
+ *   typically ≈ pollMs.
+ * - WDA: a /source (0.3–1.7 s) may snapshot anywhere inside its read, so two are at least the floor apart plus
+ *   whatever of the reads lies between them. The residual: two snapshots as close as 150 ms may agree on an element
+ *   moving too slowly to show a change in that time. Without the floor a slow read followed by a fast one could put
+ *   them milliseconds apart.
+ *
+ * Why 150 ms: the settle proof already accepts two snapshots about that close — resolveSettled's run-of-one late read
+ * (interact/resolve.ts, the `run === 1` branch) reads again back to back, ~167 ms apart on idb, and takes the same
+ * rect as settled; it is nine frames at 60 Hz, so an element in visible motion moves between two snapshots that far
+ * apart; and it is small beside the read it follows on the slow sources, so the saving survives: an Android round
+ * pays 150 ms where it paid the whole 500. A judgement, not a measurement; the device numbers are on the ADR.
+ *
+ * `min(pollMs, …)` keeps the pause from ever exceeding the caller's cadence: a pollMs below the floor is slept whole,
+ * and a clock that stepped backwards mid-read (a negative `readMs`) cannot lengthen it.
+ */
+export const pauseAfterRead = (pollMs: number, readMs: number): number =>
+  Math.min(pollMs, Math.max(SETTLE_FLOOR_MS, pollMs - readMs));
+
+/**
  * Poll the UI tree until the predicate returns a value, or the deadline
  * passes. The one owner of the deadline loop (ARCHITECTURE.md §8, "waits,
  * not sleeps"): before 2026-10-03 it was written out in `Verifier.poll`,
@@ -271,6 +315,13 @@ export function readErrorLine(message: string): string | undefined {
  *   refusing a round after a pause that crossed the deadline (it turned two
  *   found-late cases into timeouts AT the deadline). The before/after
  *   figures are kept once, on `Verifier.poll` (verify/assert.ts).
+ * - The pause after a round is `pauseAfterRead` of the round's READ
+ *   (docs/adr/0029-poll-cadence-counts-the-read.md), timed on `Date.now()`,
+ *   the clock the deadline already uses, so a test that fakes Date
+ *   (tests/helpers/sleep-recorder.ts) plays both out in virtual time. The
+ *   deadline is still checked after each round; the denser cadence moves
+ *   where the last read starts relative to it (ADR 0029's R2, the accepted
+ *   residual pinned in read-tree.test.ts).
  *
  * Returns an outcome rather than throwing on timeout because the callers
  * disagree about what a timeout IS: a flow wait throws, an assert returns a
@@ -292,7 +343,9 @@ export async function pollTree<T>(
   let undecidedTree: UiNode | undefined;
   let lastTree: UiNode | undefined;
   for (;;) {
+    const readStart = Date.now();
     const read = await readTreeOrError(adapter);
+    const readMs = Date.now() - readStart;
     readError = read.error;
     if (read.tree !== undefined) {
       treesRead++;
@@ -303,7 +356,7 @@ export async function pollTree<T>(
       else if (verdict !== undefined && verdict !== Undecided) return { timedOut: false, value: verdict };
     }
     if (Date.now() >= deadline) return { timedOut: true, detail, readError, treesRead, undecidedTree, lastTree };
-    await sleep(opts.pollMs);
+    await sleep(pauseAfterRead(opts.pollMs, readMs));
   }
 }
 

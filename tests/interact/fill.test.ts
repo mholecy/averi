@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField } from '../../src/interact/fill.js';
 import type { ReadBack } from '../../src/interact/fill-facts.js';
@@ -9,13 +9,25 @@ import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
 // is a sequence of delays, and asserting the sequence is exact where a wall
 // clock is a flake (review 2026-10-03). Every test in this file runs on the
-// no-op; the deadline-based ones still end, on Date.now.
+// no-op, under a faked Date (Date ONLY) that each recorded sleep moves by its
+// own length — tests/helpers/sleep-recorder.ts's clock rule — so the
+// deadline-based ones end in virtual time and every fake read takes exactly
+// 0 ms: the settle pause is `pauseAfterRead` of the read (ui-tree/read-tree.ts,
+// ADR 0029), and on a real clock a millisecond tick inside a fake read would
+// shorten a pinned 500 to 499.
 const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
 vi.mock('../../src/util/sleep.js', () => ({
   sleep: async (ms: number) => {
     sleeps.push(ms);
+    if (vi.isFakeTimers()) vi.setSystemTime(Date.now() + ms);
   },
 }));
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 /** Tests must not pay the real focus delay; the default is pinned once below. */
 const FAST = { ambiguous: 'first' as const, timeoutMs: 200, pollMs: 2 };

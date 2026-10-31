@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KeyboardWitness, Rect, UiNode } from '../../src/adapters/types.js';
 import { fillField } from '../../src/interact/fill.js';
 import { AfterKeyboardDismissal, KeyboardStateDisagreement, dismissKeyboard, resolveClearOfKeyboard, type KeyboardDismissal } from '../../src/interact/keyboard.js';
@@ -16,14 +16,23 @@ import { FAST, FakeAdapter, node, recorded, screen } from '../helpers/fake.js';
 //
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (as in
 // fill.test.ts): the pause after `back` is asserted as a delay in a sequence.
+// Date is faked (Date ONLY) and each recorded sleep moves it by its own length (tests/helpers/sleep-recorder.ts's
+// clock rule), so every fake read takes exactly 0 ms and the settle pause is `pauseAfterRead` of it
+// (ui-tree/read-tree.ts, ADR 0029) whatever pollMs a test passes: on a real clock one at or above the floor would
+// lose a millisecond whenever a fake read straddled a tick.
 const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
 vi.mock('../../src/util/sleep.js', () => ({
   sleep: async (ms: number) => {
     sleeps.push(ms);
+    if (vi.isFakeTimers()) vi.setSystemTime(Date.now() + ms);
   },
 }));
 beforeEach(() => {
   sleeps.length = 0;
+  vi.useFakeTimers({ toFake: ['Date'] });
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 /**

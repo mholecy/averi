@@ -1678,7 +1678,9 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const result = await new Verifier(fake).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(true);
     expect(fake.screenshots).toHaveLength(4);
-    expect(Date.now() - t0).toBe(8900);
+    // Two rounds of 2.7 s read + 0.65 + 0.3 + 0.65 s captures, and only the 150 ms floor between them: the 2.7 s
+    // read already outlasts the 300 ms poll (pollTree, ADR 0029 — 8900 before it, when the whole 300 ms was slept).
+    expect(Date.now() - t0).toBe(8750);
   });
 
   it('an explicit budget smaller than one round still times out, and the sentence names what one round cost', async () => {
@@ -1727,13 +1729,15 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const fake = deviceTimed(true);
     // Round 1: a 3 s read, then the settled pair (0.65 + 0.3 + 0.65) — 4.6 s,
-    // settled over the region only, so unconfirmed. Round 2 (after the 300 ms
-    // pause): a 0.5 s read, one screencap that crosses the 6 s deadline — cut,
-    // 1.15 s. The sentence must name 4600, not 1150.
-    const reads = [3000, 500];
+    // settled over the region only, so unconfirmed. Round 2 (after the 150 ms
+    // floor alone: the 3 s read outlasted the 300 ms poll — pollTree, ADR
+    // 0029): a 0.8 s read to 5.55 s, one screencap that crosses the 6 s
+    // deadline — cut, 1.45 s.
+    // The sentence must name 4600, not 1450.
+    const reads = [3000, 800];
     const origTree = FakeAdapter.prototype.uiTree.bind(fake);
     fake.uiTree = async () => {
-      vi.setSystemTime(Date.now() + (reads.shift() ?? 500));
+      vi.setSystemTime(Date.now() + (reads.shift() ?? 800));
       return origTree();
     };
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 6000 }).assert({
@@ -2156,9 +2160,10 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
       fake.screenshots.push(shot);
       return shot;
     };
-    // Round 1: read 0→600 ms, covered. Pause to 900. Round 2: read to 1500,
+    // Round 1: read 0→600 ms, covered. Pause to 900 (the 300 left of a 900 ms
+    // poll after the 600 ms read — pollTree, ADR 0029). Round 2: read to 1500,
     // hidden, one screencap to 2100 — past the 2000 ms deadline, unjudged.
-    const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 2000 }).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } });
+    const result = await new Verifier(fake, { pollMs: 900, timeoutMs: 2000 }).assert({ element: { id: 'card' }, color: { expected: '#3F3F50' } });
     expect(result.pass).toBe(false);
     expect(result.detail).toBe(
       'element found, but no time was left within 2 s to capture a settled frame (the slowest round — a tree read and its captures — took 1.2 s here) — raise this assert timeout',
