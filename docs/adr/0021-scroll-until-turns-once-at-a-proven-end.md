@@ -20,7 +20,7 @@ the read a fling comes to rest in (decision 5).
 Round 9 (2026-10-25, the owner): decision 6 (a rebound read settled, the tree unmoved within a point where strokes
 fling) and residual 2 (the WDA plain stop on a centre a fraction of a point out) accepted.
 2026-10-30 (the owner, performance backlog D10): decision 7 (where the tree read waits for the screen at rest, the
-read after a stroke is the settled read) accepted.
+read after a stroke is the settled read) accepted (1a51687b, cf5c0ac0; merged 4cd4825a).
 
 ## Context
 
