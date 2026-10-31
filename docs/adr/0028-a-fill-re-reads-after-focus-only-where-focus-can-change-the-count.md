@@ -84,6 +84,23 @@ The 350 ms focus delay stays.
   re-read whatever the word. On Android an RN secure `TextInput` dumps as an `EditText`; its `password` attribute is
   likewise unmeasured, and a `false` there would meet the bullets rule above.
 
+## Measured
+
+2026-10-31, the `averi_lab` AVD (Android 13, API 33), `scripts/perf/baseline.ts --platform android --scenarios
+fill,fill-20 --repeat 5`, main (`429da60d`) against this branch (`f8eb77b5`), wall clock median [min–max]:
+
+| scenario | main | branch | saved |
+| --- | --- | --- | --- |
+| `fill` (form-basic name, `Jan`) | 11735 ms [11609–12104], 4 dumps | 9322 ms [9009–9469], 3 dumps | 2413 ms (21 %) |
+| `fill-20` (the same field, 20 characters) | 17363 ms [16221–17638], 4 dumps | 15153 ms [14241–15179], 3 dumps | 2210 ms (13 %) |
+
+The saving is the one `uiautomator dump` (≈ 2.3–2.5 s); everything else (taps, typing, sleeps) is the same.
+
+`scripts/truth/live.ts --serial emulator-5554` (the `forms` group, uiautomator), main against branch: 32 cases each,
+27 ok, 2 LOUD, 0 mismatches, 3 skipped — every verdict and every reply line the same, the skip path's b1, b2, b5 and
+the kept path's b6, p5, p6 included. b1d and b7 are LOUD on both (`adb shell input text` refuses `Š` and `’`: not this
+change); kf1–kf3 skipped on both (the keyboard docked).
+
 ## Gain
 
 One tree read saved per Android fill into an empty plain field named by id, ≈ 2.3 s per such fill. None on iOS.
