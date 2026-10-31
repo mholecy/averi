@@ -104,13 +104,13 @@ struct FormScreen: View {
     /// a fast burst (the HID typing of idb and WDA, one key per ~7 ms) — the @State held it, a submit read it, but no
     /// onChange followed, and the oracle kept the value one key short
     /// (docs/bugs/2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md).
-    /// A field with a `format` (form-format, D18) reformats in the same write, as a banking app's IBAN and amount fields
-    /// do: the model holds the formatted text (an `.onChange` would set it a write later — the burst trap above). The
-    /// field that shows it is FormattingTextField, not a SwiftUI TextField: one whose setter writes back a DIFFERENT
-    /// string kept showing what was typed (D28, the owner's iOS run of D18).
-    private func binding(_ tag: String, format: String? = nil) -> Binding<String> {
+    /// A field with a `format` (form-format, D18) is a FormattingTextField: it formats each key before it writes here,
+    /// so the model holds the formatted text in the same write (an `.onChange` would set it a write later — the burst
+    /// trap above), and the screen shows it. Not a SwiftUI TextField whose setter formats: one that writes back a
+    /// DIFFERENT string kept showing what was typed (D28, the owner's iOS run of D18).
+    private func binding(_ tag: String) -> Binding<String> {
         Binding(get: { values[tag, default: ""] }, set: {
-            values[tag] = formatted(format, $0)
+            values[tag] = $0
             report()
         })
     }
@@ -160,7 +160,7 @@ struct FormScreen: View {
                 placeholder: placeholder,
                 format: f.format,
                 keyboard: f.kind == "amount" ? .decimalPad : .default,
-                text: binding(f.tag, format: f.format)
+                text: binding(f.tag)
             ) { on in
                 if on { editing = f.tag } else if editing == f.tag { editing = nil }
             }

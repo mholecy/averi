@@ -2,7 +2,9 @@
 
 Status: accepted 2026-10-31 (performance backlog row D18, docs/plans/2026-10-30-performance-backlog.md; the
 orchestrator's proposal, tightened; tightened again in review round 1 — MAJOR-1 — with the orchestrator's decision on
-an added `.` or `,`). Implemented on `perf/d18-reformatting-field`.
+an added `.` or `,`). Implemented on `perf/d18-reformatting-field`. Amended 2026-10-31 (D28: a reformatted strict
+prefix is a dropped tail — the owner's iOS run of D18, the remedy, the diagnosis and the SwiftUI lab fix; implemented
+on `fix/d28-reformat-dropped-tail`).
 
 ## Context
 
@@ -102,11 +104,12 @@ beside `retyped`, or the `reformatted-point` caveat), counts only — a value ma
   input source inserts a separator there, and a rule tight enough to refuse them would refuse postcodes, number plates
   and IBANs.
 - **Residual (review round 1, MINOR-3; a backlog row of its own) — FIXED by D28, see the amendment below: a dropped
-  tail on a reformatting field is neither typed again nor reported.** ADR 0023's retype needs the reading to be an EXACT strict prefix of what the field
-  should hold, and a reformatted partial reading (`SK31 12` for `SK311200…`) is none — so the tail is not retyped,
-  and `reportDroppedTail` is never said, so D24's first-key-alone split never starts for that app. With `clear` the
-  wipe and retype of the whole value still runs; without it the fill fails as before. Not seen on Android (no drop);
-  the drop is iOS React Native's (`idb ui text`), and the iOS check of these fields is the owner's (below).
+  tail on a reformatting field was neither typed again nor reported.** ADR 0023's retype needed the reading to be an
+  EXACT strict prefix of what the field should hold, and a reformatted partial reading (`SK31 12` for `SK311200…`)
+  was none — so the tail was not retyped, and `reportDroppedTail` was never said, so D24's first-key-alone split
+  never started for that app. With `clear` the wipe and retype of the whole value ran instead; without it the fill
+  failed. Not seen on Android (no drop); the drop was iOS React Native's (`idb ui text`), seen live in the owner's
+  iOS run (rf2, the amendment).
 - `type_text` without a selector and a flow's `type:` stay blind (no read-back, as designed); they typed every
   character into the reformatting fields (f6, f8, rf3, rf4). `type_pin` typed every digit too (f10, rf5; "Measured" above).
 - The ibanShown case shows the uiautomator dump reads a Compose `VisualTransformation`'s SHOWN text, not the model's:
@@ -167,12 +170,14 @@ Three findings:
   differenceOf`, before the case and same-length comparisons): `… but the field shows 10 — the first 8 typed
   characters are there, grouped by the field (separators of its own added), the last 2 did not land: dropped, or
   refused by the field (a length cap, a character it does not take) — not a transformed input; content withheld from
-  this error`. The reading cannot tell a drop from a refusal (review round 1, MINOR-1: a grouping field with a
+  this error`. A prefix the field only RESPACED (a typed space shown as a no-break space, nothing added — `Jan\u00A0`
+  for `Jan Novak`) says `its spaces shown as another kind of space` instead of `grouped by the field` (D28 code
+  review; `Difference.grouped`). The reading cannot tell a drop from a refusal (review round 1, MINOR-1: a grouping field with a
   maxLength, an integer-only amount that ignores `,`), so the error names both; on iOS the tail was typed again
   first, so a fill failing the same way twice is a field refusing the rest. An exact prefix keeps its old `length`
   wording.
 - **The rules live in a pure leaf** (review round 1, MINOR-2): `reformatOf`, `prefixOf`, `tailOf` and the separator
-  sets are `interact/fill-reformat.ts`'s; the typing (`fill-type.ts`) and the judge (`fill-verdict.ts`) both import
+  sets are `interact/fill-reformat.ts`'s, `reformatOf` and `prefixOf` taking ONE greedy walk (`walk`, D28 code review); the typing (`fill-type.ts`) and the judge (`fill-verdict.ts`) both import
   it, and neither imports the other.
 - **Android** (review round 1, NIT-2). No tail is typed again there, but `whereTyped`'s missing text now comes from
   `tailOf` on every platform: an Android clear-fill whose reading is a reformatted prefix, and whose sibling input

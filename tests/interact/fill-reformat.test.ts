@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reformatOf } from '../../src/interact/fill-reformat.js';
+import { landedSome, prefixOf, reformatOf, tailOf } from '../../src/interact/fill-reformat.js';
 
 /**
  * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
@@ -112,5 +112,66 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('1.234.5', '1234.5')).toBeUndefined(); // the typing's own point
     expect(reformatOf('1,234,5', '1234,5')).toBeUndefined();
     expect(reformatOf('0,12.345', '0,12345')).toBeUndefined(); // round 2, MINOR-B: a fraction is no whole part
+  });
+});
+
+/**
+ * D28 (ADR 0034's amendment): `reformatOf`'s `typing` — the whole typing whose classes decide the code rule and the
+ * thousands rule when the reading is judged as a prefix of it.
+ */
+describe('reformatOf with `typing` — the rules of the whole typing, for a prefix of it', () => {
+  it('a letter split passes in a prefix only when the whole typing is a code', () => {
+    expect(reformatOf('a1bc de', 'a1bcde')).toEqual({ added: 1, respaced: 0 });
+    expect(reformatOf('a1bc de', 'a1bcde', 'a1bcde f')).toBeUndefined(); // the typing holds a typed space: prose
+    expect(reformatOf('ab cd', 'abcd', 'abcd12')).toEqual({ added: 1, respaced: 0 }); // the prefix has no digit, the typing does
+  });
+
+  it('an added `.`/`,` is no thousands mark when the whole typing holds it', () => {
+    expect(reformatOf('1,234', '1234')).toEqual({ added: 1, respaced: 0, point: ',' });
+    expect(reformatOf('1,234', '1234', '1234,5')).toBeUndefined();
+  });
+});
+
+describe('prefixOf — a strict prefix of the typing, exactly or reformatted', () => {
+  it('exactly: the reading itself, no reformat', () => {
+    expect(prefixOf('SK31', 'SK3112000000')).toEqual({ prefix: 'SK31' });
+    expect(prefixOf('', '12')).toEqual({ prefix: '' });
+  });
+
+  it('reformatted: the typed characters shown, and how', () => {
+    expect(prefixOf('SK31 1200 0', 'SK3112000000')).toEqual({ prefix: 'SK3112000', reformatted: { added: 2, respaced: 0 } });
+    expect(prefixOf('Jan\u00A0', 'Jan Novak')).toEqual({ prefix: 'Jan ', reformatted: { added: 0, respaced: 1 } });
+  });
+
+  it('the whole typing, more, other text, or a grouping that breaks the rules: none', () => {
+    expect(prefixOf('SK31 1200 0000', 'SK3112000000')).toBeUndefined();
+    expect(prefixOf('12', '12')).toBeUndefined();
+    expect(prefixOf('SK31 1300', 'SK3112000000')).toBeUndefined();
+    expect(prefixOf('SK31 ', 'SK3112000000')).toBeUndefined(); // a trailing mark (ADR 0034: a false mismatch, the safe side)
+  });
+});
+
+describe('tailOf — what the field is missing, and how much of the typing it holds', () => {
+  const e = (value: string, before: string | null = null, clear = false) => ({ value, clear, before, placeholder: undefined });
+
+  it('the rest, the typed characters landed, and the reformat', () => {
+    expect(tailOf('1 234 567,', e('1234567,89', null, true))).toEqual({ missing: '89', landed: 8, reformatted: { added: 2, respaced: 0 } });
+    expect(tailOf('Jan', e('Jan Novak'))).toEqual({ missing: ' Novak', landed: 3 });
+  });
+
+  it('without clear the earlier text is no landed typing', () => {
+    expect(tailOf('SK31 1200', e('12000000', 'SK31'))).toEqual({ missing: '0000', landed: 4, reformatted: { added: 1, respaced: 0 } });
+    expect(tailOf('SK31', e('12000000', 'SK31'))).toEqual({ missing: '12000000', landed: 0 });
+  });
+
+  it('a bullet in the reading or in the earlier text: none', () => {
+    expect(tailOf('••', e('12345'))).toBeUndefined();
+    expect(tailOf('••1', e('2', '••'))).toBeUndefined();
+  });
+
+  it('landedSome: some of the typing is in the prefix', () => {
+    expect(landedSome(tailOf('Jan', e('Jan Novak')))).toBe(true);
+    expect(landedSome(tailOf('SK31', e('12000000', 'SK31')))).toBe(false);
+    expect(landedSome(undefined)).toBe(false);
   });
 });

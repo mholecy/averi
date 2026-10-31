@@ -76,7 +76,7 @@
 
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
 import { hasPoint, heldText, type Difference, type FillResult, type LostWhy, type NearbyInput, type PointedReformat, type Reformat } from './fill-facts.js';
-import { tailOf } from './fill-reformat.js';
+import { landedSome, priorText, tailOf } from './fill-reformat.js';
 
 /**
  * Why a fill is NOT verified — one code per reason, in render order:
@@ -277,10 +277,13 @@ export function differenceOf(m: Mismatch): Difference {
   if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : m.maskedHeld };
   if (hasBullet(observed)) return { kind: 'length' };
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
-  const tail = tailOf(observed, { value, clear, before: m.before, placeholder: m.placeholder });
-  if (tail?.reformatted !== undefined && tail.landed > 0) return { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed };
+  // A Mismatch is an Expectation (value, clear, before, placeholder): tailOf reads it as the typing does.
+  const tail = tailOf(observed, m);
+  if (landedSome(tail) && tail.reformatted !== undefined) {
+    return { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 };
+  }
   const shown = heldText(observed, m.placeholder);
-  const prior = clear ? '' : heldText(m.before, m.placeholder);
+  const prior = priorText(m);
   // Without clear the field may hold text from before the typing; only what
   // came AFTER it is compared, when the field still starts with it (typing
   // appends at the cursor, which the focus tap leaves at the end). A field

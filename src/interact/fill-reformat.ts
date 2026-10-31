@@ -63,20 +63,9 @@ export function reformatOf(observed: string, expected: string, typing: string = 
   const typingChars = [...typing];
   // A code: digits in it and no typed space (an IBAN, a card number) — the one typing whose letters a field may split.
   const code = typingChars.some((c) => DIGIT.test(c)) && !typingChars.some((c) => SPACES.has(c));
-  // The reading as tokens: each an expected character shown (its index) or an added separator (-1).
-  const tokens: number[] = [];
-  let j = 0;
-  let respaced = 0;
-  for (const c of observed) {
-    const next = expectedChars[j];
-    if (c === next) tokens.push(j++);
-    else if (next !== undefined && SPACES.has(c) && SPACES.has(next)) {
-      tokens.push(j++);
-      respaced++;
-    } else if (SEPARATORS.has(c)) tokens.push(-1);
-    else return undefined;
-  }
-  if (j !== expectedChars.length) return undefined;
+  const walked = walk(observed, expectedChars);
+  if (walked === undefined || walked.matched !== expectedChars.length) return undefined;
+  const { tokens, respaced } = walked;
   const chars = [...observed];
   const added = new Set(chars.filter((_, k) => tokens[k] === -1));
   if (added.size > 1) return undefined;
@@ -108,6 +97,28 @@ export function reformatOf(observed: string, expected: string, typing: string = 
   return { added: count, respaced, ...(point !== undefined && { point }) };
 }
 
+/**
+ * The reading walked against `expectedChars`, greedily (see `reformatOf`): each reading character the next expected one
+ * (or a space shown for a typed space — `respaced`), else an added separator (-1 in `tokens`, an expected character's
+ * index otherwise); undefined at the first character that is neither. `matched`: how many expected characters it
+ * showed — all of them for `reformatOf`, fewer for a prefix (`prefixOf`). The one walk both ask.
+ */
+function walk(observed: string, expectedChars: readonly string[]): { tokens: number[]; matched: number; respaced: number } | undefined {
+  const tokens: number[] = [];
+  let j = 0;
+  let respaced = 0;
+  for (const c of observed) {
+    const next = expectedChars[j];
+    if (c === next) tokens.push(j++);
+    else if (next !== undefined && SPACES.has(c) && SPACES.has(next)) {
+      tokens.push(j++);
+      respaced++;
+    } else if (SEPARATORS.has(c)) tokens.push(-1);
+    else return undefined;
+  }
+  return { tokens, matched: j, respaced };
+}
+
 /** An added `.` or `,` groups digits by thousands (see `reformatOf`); `typing` the whole typing. */
 function thousands(chars: string[], tokens: number[], typing: string, point: string): boolean {
   // The typing holds this character itself (its decimal point, or its own grouping): an added one is no thousands mark.
@@ -135,34 +146,39 @@ export const priorText = (intent: Pick<Expectation, 'clear' | 'before' | 'placeh
  * The strict prefix of `whole` a reading shows: exactly, or — D28 — REFORMATTED (`reformatOf` of the prefix, its
  * rules judged over the whole typing: one separator kind, letters split only in a code, an added `.`/`,` only as a
  * thousands mark the typing does not hold itself). The prefix is the typed characters the reading shows, in order —
- * the same greedy walk as `reformatOf`'s, every other reading character an added separator; nothing else may differ.
+ * `walk`, the greedy walk `reformatOf` takes, every other reading character an added separator; nothing else may differ.
  * Undefined when the reading is no strict prefix (the whole of it, more, or other text). Pure, O(reading).
  */
-function prefixOf(held: string, whole: string): { prefix: string; reformatted?: Reformat } | undefined {
+export function prefixOf(held: string, whole: string): { prefix: string; reformatted?: Reformat } | undefined {
   if (held.length < whole.length && whole.startsWith(held)) return { prefix: held };
   const wholeChars = [...whole];
-  let j = 0;
-  for (const c of held) {
-    const next = wholeChars[j];
-    if (c === next || (next !== undefined && SPACES.has(c) && SPACES.has(next))) j++;
-    else if (!SEPARATORS.has(c)) return undefined;
-  }
-  if (j >= wholeChars.length) return undefined;
-  const prefix = wholeChars.slice(0, j).join('');
+  const walked = walk(held, wholeChars);
+  if (walked === undefined || walked.matched >= wholeChars.length) return undefined;
+  const prefix = wholeChars.slice(0, walked.matched).join('');
   const reformatted = reformatOf(held, prefix, whole);
   return reformatted === undefined ? undefined : { prefix, reformatted };
 }
 
 /**
+ * A reading that is a strict prefix of what the field should hold (`tailOf`): `missing` the rest, `landed` how many
+ * characters of the TYPING the prefix holds (UTF-16 units, as a value's length is counted — 0 when only the field's
+ * earlier text is there), `reformatted` when the field reformatted the prefix (separators added, spaces respaced).
+ */
+export interface Tail {
+  missing: string;
+  landed: number;
+  reformatted?: Reformat;
+}
+
+/** Some of the typing is in the prefix: a tail the field dropped, not a typing that never reached it. */
+export const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined && tail.landed > 0;
+
+/**
  * What the field is missing of what it should hold (its text before the typing, unless cleared, then the value),
  * when its reading is a strict prefix of that — exactly or reformatted (`prefixOf`, D28) — and shows no bullet:
- * `missing` the rest, `landed` how many characters of the TYPING the prefix holds (UTF-16 units, as a value's length
- * is counted), `reformatted` when the field grouped the prefix. Else undefined. Pure.
+ * a `Tail`, else undefined. Pure.
  */
-export function tailOf(
-  observed: string,
-  intent: Expectation,
-): { missing: string; landed: number; reformatted?: Reformat } | undefined {
+export function tailOf(observed: string, intent: Expectation): Tail | undefined {
   const held = heldText(observed, intent.placeholder);
   const prior = priorText(intent);
   if (hasBullet(held) || hasBullet(prior)) return undefined;

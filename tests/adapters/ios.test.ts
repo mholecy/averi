@@ -10,6 +10,7 @@ import { captureRefusal } from '../../src/verify/capture.js';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { fillField } from '../../src/interact/fill.js';
+import { typeIntoFocused } from '../../src/interact/type-text.js';
 import { el, FAST, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner, recorded and not waited on: uiTree's settle re-read
@@ -799,6 +800,17 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
     expect(second.retyped).toEqual([4]);
     // The split's rest kept 4 of 8 (`an N`): the tail `ovak` typed again — itself split, as every typing into this app.
     expect(typed()).toEqual(['J', FIRST_KEY_ALONE_MS, 'an Novak', 'o', FIRST_KEY_ALONE_MS, 'vak']);
+  });
+
+  // D28 code review: a flow's `type:` (and `type_text` without a selector) is blind, but types through the same adapter —
+  // after a fill reported the app's drop, it too sends its first key alone (ADR 0034's D28 amendment, rf4).
+  it('after a fill reported a drop, a flow\'s blind `type:` into that app sends its first key alone too', async () => {
+    const { adapter, typed } = rnLab(3);
+    await adapter.launch('com.lab.rn');
+    await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
+    typed();
+    await typeIntoFocused(adapter, 'SK3112000000');
+    expect(typed()).toEqual(['S', FIRST_KEY_ALONE_MS, 'K3112000000']);
   });
 
   // D24 review: a native field capped at 5 characters keeps `Jan N` for good; its fill fails after one retype that

@@ -75,7 +75,7 @@ import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adap
 import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { sleep } from '../util/sleep.js';
 import { heldText, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
-import { priorText, reformatOf, tailOf, type Expectation } from './fill-reformat.js';
+import { landedSome, priorText, reformatOf, tailOf, type Expectation } from './fill-reformat.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
 export interface FieldIo {
@@ -293,7 +293,7 @@ function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined, mi
  */
 export function droppedTail(observed: string, intent: Expectation): string | undefined {
   const tail = tailOf(observed, intent);
-  return tail !== undefined && tail.landed > 0 ? tail.missing : undefined;
+  return landedSome(tail) ? tail.missing : undefined;
 }
 
 /**

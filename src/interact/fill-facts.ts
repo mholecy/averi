@@ -341,8 +341,10 @@ export interface OtherInput {
  *   Review of this branch: probes D and D2 were told "the app transformed
  *   the input".
  * - `dropped-tail` (D28): the field holds the first `landed` characters of
- *   the typing, GROUPED by separators of its own (a reformatting field:
- *   interact/fill-reformat.ts#tailOf), and not the last `dropped` — a tail the
+ *   the typing, reformatted (interact/fill-reformat.ts#tailOf): `grouped`
+ *   when the field added separators of its own, else it only showed its typed
+ *   spaces as another kind of space (`Jan\u00A0` for `Jan Novak`) — and not the last
+ *   `dropped` — a tail the
  *   field dropped or refused (a length cap, a character it does not take:
  *   the reading cannot tell which), not an input it transformed. iOS React Native's rf2 held
  *   `1 234 567,` for `1234567,89` and was told "as many characters as were
@@ -360,5 +362,5 @@ export type Difference =
   | { kind: 'case'; positions: number }
   | { kind: 'same-length'; positions: number }
   | { kind: 'unchanged' }
-  | { kind: 'dropped-tail'; landed: number; dropped: number }
+  | { kind: 'dropped-tail'; landed: number; dropped: number; grouped: boolean }
   | { kind: 'length' };
