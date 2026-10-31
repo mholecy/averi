@@ -239,9 +239,9 @@ export class IosAdapter implements DeviceAdapter {
    *
    * The two calls run together, not one after the other (D23, 2026-10-31):
    * each is one `simctl spawn`, and the spawn, not the write, is the cost —
-   * D0 on iOS measured 247 + 225 ms of ensure-cold in them; on the lab
-   * simulator (iPhone 17, iOS 27.0, 15 interleaved pairs) serial 445 ms
-   * median (415–462), together 250 ms (233–252). One spawn writing both keys
+   * timed with simctl from the host on the lab simulator (averi-lab iPhone
+   * 17, iOS 27.0, 2026-10-31, 15 interleaved pairs of these same writes):
+   * serial 445 ms median (415–462), together 250 ms (233–252). One spawn writing both keys
    * was the plan and is not possible: the simulator runtime has no shell
    * (`simctl spawn <udid> sh -c …` → ENOENT; RuntimeRoot/bin holds only `df`
    * and `launchctl`), and `defaults write <domain> '{…}'` replaces the whole

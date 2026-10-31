@@ -70,7 +70,8 @@ the earlier notes.
     after the other — 445 → 250 ms median per launch on the lab simulator (iOS 27.0). One spawn for both keys is not
     possible: the simulator runtime has no shell (`simctl spawn <udid> sh -c …` → ENOENT), and a whole-domain
     `defaults write` would drop the domain's other keys. A failure still prints the same one line, naming the first
-    key (in the order above) that failed; both keys are now always tried.
+    key (in the order above) that failed, with that key's own reason; both keys are now always tried, and a failure
+    still never fails the launch.
   - **On by default, logged, not restored.** The suggestion above asked for the write to be opt-in "or at least
     logged". It is logged: the first successful write per adapter prints one stderr line saying the two keys were set
     to true on that simulator, that the change is simulator-wide and not restored. It is not opt-in, and there is no

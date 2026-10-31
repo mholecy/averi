@@ -398,8 +398,10 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     let maxInFlight = 0;
     const done: string[] = [];
     const overlapping: ExecFn = async (cmd, args, opts) => {
-      if (!args.includes('defaults')) {
-        expect(done).toHaveLength(2); // the launch never starts before both writes finished
+      if (args[0] !== 'simctl' || !args.includes('defaults')) {
+        // Not a write (xcode-env's `xcrun --find simctl` probe passes straight
+        // through); the launch never starts before both writes finished.
+        if (args[0] === 'simctl' && args[1] === 'launch') expect(done).toHaveLength(2);
         return fn(cmd, args, opts);
       }
       inFlight += 1;
@@ -433,7 +435,9 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     const failing: ExecFn = (cmd, args, opts) => {
       if (!args.includes('defaults')) return fn(cmd, args, opts);
       writes.push(args.join(' '));
-      return Promise.reject(new Error('Command failed (exit 1): xcrun simctl spawn …\nUnable to boot'));
+      // Each key fails with its own first line: the line must carry AutomationEnabled's own reason.
+      const which = args.includes('AutomationEnabled') ? '' : ' (second)';
+      return Promise.reject(new Error(`Command failed (exit 1): xcrun simctl spawn …${which}\nUnable to boot`));
     };
     await new IosAdapter({ udid: 'AAAA-1111', exec: failing, treeSource: NO_TREE }).launch('com.app');
     expect(writes).toHaveLength(2); // in flight together (D23), so both were tried — and still one line
