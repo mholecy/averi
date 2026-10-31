@@ -1,7 +1,8 @@
 # 33. A held rendered "no" ends the second look before a cheap rung
 
 Status: accepted 2026-10-31 (performance backlog row D2, docs/plans/2026-10-30-performance-backlog.md, section "D2 and
-D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-held-no`.
+D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-held-no`
+(938a8426, 3ab677f3, 52cb2e41, 04ec6000, d0efd6f0, a883e09a), merged 11cb9064.
 
 ## Context
 

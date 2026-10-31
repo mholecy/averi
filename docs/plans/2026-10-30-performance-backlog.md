@@ -29,7 +29,7 @@ measured before and after.
 | T1 | Fake the settle/poll timers in the slowest test files | tests | deferred — after the D rows |
 | D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | done — Android (0119d76d), iOS 2026-10-31 ("D0 on iOS") |
 | D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | done (0d551270; with a 150 ms floor, ADR 0029) |
-| D2 | `ensure_state`'s second look ends on a held "no" | device | open |
+| D2 | `ensure_state`'s second look ends on a held "no" | device | done (11cb9064, ADR 0033: before a cheap rung with no wipe ahead — transitively, nor in an enclosing ladder — the second look ends once a rendered not-"yes" screen without a spinner held still 2 s; a wipe ahead keeps the full 20 s; proven in fakes, the lab app cannot trigger it) |
 | D3 | Per-call tree snapshot cache, invalidated by every action | device | done (8bdb8004; a one-shot hand-off, not a cache — ADR 0030) |
 | D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | won't do — the recognizer is 150–160 ms on iOS (D0 on iOS); a persistent helper saves ≤ 50–80 ms on OCR asserts only |
 | D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | won't do — raw over exec-out is ~610 ms slower (see D19) |
