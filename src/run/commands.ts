@@ -74,19 +74,21 @@ interface EngineCall extends EngineContext {
  * `finalFrame` reads the raw adapter, outside the engine's read hand-off
  * (docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md),
  * which dies with the run — so ensure_state now runs them side by side, and
- * the pidof (44–48 ms on the lab emulator) hides under the frame's settle
- * sleep and screencaps. run_flow takes no frame and asks the health alone.
+ * the pidof (44–48 ms; docs/plans/2026-10-30-performance-backlog.md, D13
+ * note (2026-10-31, averi_lab API 33)) hides under the frame's settle sleep
+ * and screencaps. run_flow takes no frame and asks the health alone. A
+ * verify leg keeps them in sequence (run/verify.ts).
  */
 async function runOnEngine(
   call: EngineCall,
   resolveAdapter: ResolveAdapterFor,
   request: RunRequest,
-): Promise<{ adapter: DeviceAdapter; cfg: AveriConfig; trace: string }> {
+): Promise<{ adapter: DeviceAdapter; trace: string }> {
   const { cfg, env } = call.project;
   refuseUnknownEnvironment(cfg, env, call.environment);
   const adapter = await resolveAdapter(cfg);
   const trace = await FlowEngine.run(cfg, adapter, { env, environment: call.environment, session: call.session }, request);
-  return { adapter, cfg, trace: formatTrace(trace) };
+  return { adapter, trace: formatTrace(trace) };
 }
 
 /**
@@ -105,7 +107,8 @@ export async function runEnsureState(
   call: EngineCall & { state: string },
   resolveAdapter: ResolveAdapterFor,
 ): Promise<{ text: string; shot?: Buffer }> {
-  const { adapter, cfg, trace } = await runOnEngine(call, resolveAdapter, { state: call.state });
+  const { adapter, trace } = await runOnEngine(call, resolveAdapter, { state: call.state });
+  const { cfg } = call.project;
   // On an appHealth throw the frame's reads finish unawaited — harmless: reads only, and finalFrame never rejects.
   const [health, { frame, failed }] = await Promise.all([appHealth(adapter, cfg), finalFrame(adapter)]);
   const text = trace + health;
@@ -119,8 +122,8 @@ export async function runNamedFlow(
   call: EngineCall & { flow: string },
   resolveAdapter: ResolveAdapterFor,
 ): Promise<string> {
-  const { adapter, cfg, trace } = await runOnEngine(call, resolveAdapter, { flow: call.flow });
-  return trace + (await appHealth(adapter, cfg));
+  const { adapter, trace } = await runOnEngine(call, resolveAdapter, { flow: call.flow });
+  return trace + (await appHealth(adapter, call.project.cfg));
 }
 
 export interface AssertCall {

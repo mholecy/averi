@@ -62,6 +62,14 @@ const ADB_LINE = new RegExp(`^(\\S+)\\s+(${Object.keys(ADB_STATES).join('|')})\\
  * the getprop per attached device; on iOS the version comes free with the
  * listing (the runtime key), so the flag changes nothing there. Default: the
  * versions are read.
+ *
+ * Why the flag (D13, 2026-10-31): the registry's per-call probe
+ * (mcp/registry.ts#get) asks only "is the bound device still booted?", and
+ * a getprop is a full `adb shell` round trip — ≈30–35 ms, up to ~70 ms, per
+ * attached device, on every tool call
+ * (docs/plans/2026-10-30-performance-backlog.md, D13 note (2026-10-31,
+ * averi_lab API 33)) — for a version only select_device's reply and the
+ * device listing show. Those two still ask for it.
  */
 export interface ListOpts {
   versions?: boolean;
@@ -74,12 +82,8 @@ export interface ListOpts {
  * the one builder AndroidAdapter's `shell` uses too — every word quoted, even
  * words that need no quoting.
  *
- * `versions: false` (D13, 2026-10-31) lists from `adb devices -l` alone: the
- * registry's per-call probe asks only "is the bound device still booted?",
- * and a getprop is a full `adb shell` round trip — ≈30–35 ms on the lab
- * emulator, up to ~70 ms, per attached device, on every tool call — for a
- * version only select_device's reply and the device listing show. Those
- * two still ask for it.
+ * `versions: false` (D13, 2026-10-31) lists from `adb devices -l` alone —
+ * why, and what it saves, is on `ListOpts`.
  *
  * `unauthorized` is listed since 2026-10-09 (C5): until then its line did not
  * match, so a phone waiting on its "Allow USB debugging?" prompt vanished and

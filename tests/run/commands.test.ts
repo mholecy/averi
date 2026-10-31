@@ -134,9 +134,9 @@ describe('runEnsureState', () => {
 
 
   // D13 (2026-10-31): neither is an action and neither reads the other's
-  // result, so the health line's `isAppRunning` (a pidof, 44–48 ms on the
-  // lab emulator) and the final frame (its settle sleep and screencaps) are
-  // out at once. The answer is held until the capture starts — or, run one
+  // result, so the health line's `isAppRunning` (a pidof; its cost on
+  // run/commands.ts#runOnEngine) and the final frame (its settle sleep and
+  // screencaps) are out at once. The answer is held until the capture starts — or, run one
   // after the other, until a timeout gives up waiting for it — so the
   // events say whether the two overlapped.
   it('the health check and the final capture are out at once — the app is asked beside the frame', async () => {

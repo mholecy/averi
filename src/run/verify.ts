@@ -575,7 +575,8 @@ export async function runVerification(
     // Run side by side, the question would be answered at the frame's start
     // and could say `true` about an app gone by the time the picture was
     // taken. ensure_state always asked before its frame, so overlapping
-    // there changed nothing it promised; here it would, for ~45 ms a leg.
+    // there changed nothing it promised; here it would, for one pidof a leg
+    // (its cost on run/commands.ts#runOnEngine).
     const final = await finalFrame(adapter, { readTree: contract !== undefined });
     const health = await appHealth(adapter, cfg);
     return { trace, results, health, ...final };
