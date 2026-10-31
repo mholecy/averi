@@ -34,7 +34,7 @@ measured before and after.
 | D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | won't do — the recognizer is 150–160 ms on iOS (D0 on iOS); a persistent helper saves ≤ 50–80 ms on OCR asserts only |
 | D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | won't do — raw over exec-out is ~610 ms slower (see D19) |
 | D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | done (86505377; pace 250 → 100 ms; the script and clearText not worth it) |
-| D7 | iOS: a persistent idb helper per simulator — measured −90 ms a `describe-all`, −122 ms a `tap` (the CLI's Python start-up). Designed 2026-10-31: a Python helper running fb-idb's own `gen_main(argv)` in one process (same companion resolution, same errors), the CLI as fallback, `AVERI_IDB_HELPER=off`; D7a = the helper + `ui describe-all`, D7b = the HID verbs (no retry after a helper death) | device | D7a done (5fb79290, ADR 0032; device A/B: tree −37 %, fill −9 %, ensure cold −285 ms); D7b done (a4746de9, ADR 0032 §D7b; device A/B and the RN fill-20 re-check pending with the owner) |
+| D7 | iOS: a persistent idb helper per simulator — measured −90 ms a `describe-all`, −122 ms a `tap` (the CLI's Python start-up). Designed 2026-10-31: a Python helper running fb-idb's own `gen_main(argv)` in one process (same companion resolution, same errors), the CLI as fallback, `AVERI_IDB_HELPER=off`; D7a = the helper + `ui describe-all`, D7b = the HID verbs (no retry after a helper death) | device | D7a done (5fb79290, ADR 0032; device A/B: tree −37 %, fill −9 %, ensure cold −285 ms); D7b done (a4746de9, ADR 0032 §D7b; device A/B: tap −155 ms, fill −322, scroll −751, ensure cold −424 stall-free; RN split holds 5/5) |
 | D8 | Fill re-reads after focus only for secure or unknown fields | device | done (1083523e; Android only, ADR 0028) |
 | D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | won't do — the second look guards a re-flow after the keyboard hides; iOS only, 0 in D0 |
 | D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | done (4cd4825a); keyboard beside the tree: won't do (stale IME band → false "fully visible") |
@@ -312,6 +312,17 @@ D7b merged 2026-10-31 (a4746de9): the helper serves averi's HID verbs (tap, swip
 HOME — exactly the argv IosAdapter sends); each request is acked before `gen_main`, a death after the ack is reported
 (`INPUT_LOST`, never retried), a death before it runs the input once on the CLI. Waits for the owner's A/B
 (`AVERI_IDB_HELPER=off` vs on, `--repeat 5`) and the RN rn-fill-20 re-check that the D24 split still holds.
+
+### D7b device A/B (106cfde6, 2026-10-31)
+Owner's runs on the native lab app through `ios-run.sh` (fresh companion, 5 repeats each), `AVERI_IDB_HELPER=off` first,
+then on. Wall medians off → on: tree 190 → 114, tap 840 → 685 (−155), fill 1 571 → 1 249 (−322), fill-20 1 527 → 1 238,
+scroll 8 856 → 8 105 (−751), ocr 1 785 → 1 501, ensure-warm 1 204 → 1 043, ensure-cold 4 261 → 3 974 (stall-free
+4 208 → 3 784); screenshot and color unchanged (simctl). Per call: `idb ui tap` 205 → 111 ms, `ui text` 211 → 111,
+`ui swipe` ×3 6 430 → 6 025, `describe-all` ~150 → ~70. All 50 + 50 runs ok; screenshot stalls 2/52 off, 2/50 on (D26a
+counts). Part of the read saving again moves into D1's pause (`read-tree.ts:414` 346 → 435 ms in fill), as in D7a.
+React Native (`ios-rn-d7b`, WDA tree, input through the helper): rn-fill 2 000 ms and rn-fill-20 2 031 ms medians, 5/5
+ok each; the first rn-fill-20 (5 041 ms) is D24's learning run (the drop repaired, the app then split), the next four
+1 962–2 045 ms (D24 after: 2 346). The D24 split holds through the helper. D7 done.
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
