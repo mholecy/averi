@@ -133,7 +133,10 @@ read. Record wall clock, device calls and time slept. Then decide which D rows g
 Harness (0119d76d): `node --import tsx scripts/perf/baseline.ts --platform android|ios --device <id> --repeat 5
 [--app react-native] [--tree-source wda]` — averi's real MCP tools, per scenario wall, device calls, device busy time,
 averi's sleeps by caller (header of `scripts/perf/baseline.ts`). iOS needs idb/WDA, which this sandbox blocks: run it
-outside. The simulator is named `averi-lab iPhone 17` for the lab guards.
+outside. The simulator is named `averi-lab iPhone 17` for the lab guards. First iOS probe (2026-10-31, 13bf3ca4): every
+idb tree read failed with "The simulator's accessibility service named no frontmost application" (the known idb state
+of docs/truth/live-ios-2026-10-18-visibility.md) — reboot the simulator, or run a companion of its own
+(`IDB_COMPANION=localhost:<port>`), and check `idb ui describe-all` by hand before a run; not a harness or src fault.
 
 Android, averi_lab API 33, native AveriLab, 5 repeats, medians, with P1–P6 (load 2.5–2.8):
 
