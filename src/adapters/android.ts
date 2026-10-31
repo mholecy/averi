@@ -680,8 +680,8 @@ export class AndroidAdapter implements DeviceAdapter {
    * 1000 * 10)` — UiAutomation#waitForIdle returns once no accessibility event has arrived for 1 s, and throws after
    * 10 s, upon which the command prints `ERROR: could not get idle state.` and dumps nothing (a read that fails, read
    * again like any other) — frameworks/base cmds/uiautomator/cmds/uiautomator/src/com/android/commands/uiautomator/
-   * DumpCommand.java, android13-release (this AVD's API 33). A scroll view emits TYPE_VIEW_SCROLLED and
-   * TYPE_WINDOW_CONTENT_CHANGED while its content moves, so a dump's snapshot is taken after the content has been
+   * DumpCommand.java, android13-release (the lab AVD's API 33; the same call on `main`). A scroll view emits
+   * TYPE_VIEW_SCROLLED and TYPE_WINDOW_CONTENT_CHANGED while its content moves, so a dump's snapshot is taken after the content has been
    * still for that second. And `input swipe` returns once the finger has lifted.
    *
    * Measured (lab AVD, API 33, 2026-10-30; `input swipe`, then a dump at once and a second right after it, compared):

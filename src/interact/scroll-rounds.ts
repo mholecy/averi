@@ -448,16 +448,12 @@ export type Shortfall =
  * docs/bugs/2026-10-08-scroll-until-ignores-android-soft-keyboard.md
  *
  * WHERE THE TREE READ WAITS FOR THE SCREEN AT REST (`RoundRules.readSettles`, adapters/types.ts#DeviceAdapter
- * .treeReadSettles — Android; ADR 0021 decision 7) the read after a stroke is the settled read and spends none of
- * them: `uiautomator dump` snapshots only once the app has raised no accessibility event for a second, so the read
- * the confirming read would compare it with is the same tree (measured: a dump right after `input swipe` equalled the
- * next 35 of 35 times, Compose and Views, lists and a carousel, drags and flings —
- * adapters/android.ts#treeReadSettles). The confirming read cost a settle and a 2.3 s dump on every stop after a
- * stroke. What still confirms there: a presented hold
- * (ADR 0018, awaiting the presented screen, not the stroke's motion), a confirming read that failed, and the read
- * after the flush check's probe when the probe moved the target (flush-check.ts keeps its own evidence). Residual:
- * content that goes on moving while it raises no accessibility event is read mid-motion — the exposure a stop at 0
- * swipes always had.
+ * .treeReadSettles — Android) the read after a stroke is the settled read and spends none of them: the read a
+ * confirming read would compare it with is the same tree (the source, the measurements and the residual:
+ * adapters/android.ts#treeReadSettles, ADR 0021 decision 7). What still confirms there: a presented hold (ADR 0018,
+ * awaiting the presented screen, not the stroke's motion), a confirming read that failed, and the read after the
+ * flush check's probe when the probe moved the target (flush-check.ts keeps its own evidence); a flush row found on
+ * the read after a stroke is probed at once, no confirming read before the probe.
  *
  * A REBOUND's settled read (UNMOVED_STROKES_EXHAUST) is the stroke's first confirming read, spent like any other.
  *
@@ -790,10 +786,10 @@ function observe(s: Mutable<State>, current: Since, now: ThisRead, best: Judged 
  * tells no scroll view (idb's): the gesture box below iOS's status band, where a touch goes to the status bar, not the
  * app.
  */
-function ledgerRead(s: State, current: Since, facts: TreeFacts, found: readonly UiNode[], best: Judged | undefined, screen: UsableScreen | undefined, listed: () => ListedContent | undefined): LedgerRead {
+function ledgerRead(s: State, current: Since, afterProbe: boolean, facts: TreeFacts, found: readonly UiNode[], best: Judged | undefined, screen: UsableScreen | undefined, listed: () => ListedContent | undefined): LedgerRead {
   const sentToward = lastSent(s.course);
   const blank = current === 'stroke' && found.length === 0 ? listed() : undefined;
-  const carryToward = current === 'stroke' && !probing(s.flush) && best?.standing.facts.listedWhereItLies === true ? sentToward : undefined;
+  const carryToward = current === 'stroke' && !afterProbe && best?.standing.facts.listedWhereItLies === true ? sentToward : undefined;
   const shows = screen === undefined ? undefined : belowStatusBand(screen.oriented, screen);
   return {
     since: current,
@@ -835,7 +831,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const ask = (asked: 'witness' | 'unlocated' | EyesQuestion): Next => ({ state, step: typeof asked === 'string' ? { do: 'ask', what: asked } : { do: 'ask', what: 'eyes', question: asked } });
   const { fully } = s.rules;
   const current = s.since;
-  // The read after the flush check's probe (flush-check.ts#probing) — read before this round's flush check closes it.
+  // The read after the flush check's probe (flush-check.ts#probing) — taken before this round's flush check closes it,
+  // and the one answer every step of the round asks (the carry sample, a failed read, the settled read).
   const afterProbe = probing(s.flush);
   if (seen.drawn !== undefined) s.touchDowns = [...s.touchDowns, seen.drawn.from];
 
@@ -901,7 +898,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // THE MOTION LEDGER (interact/motion-ledger.ts) sees the stroke drawn and, when the tree read, the read — once, before
   // anything asks it: a read that did not read says nothing about motion, and the comparisons wait for the next one
   // that does.
-  const motion = seeMotion(s.motion, { drawn: seen.drawn, ...(judged !== undefined && { read: ledgerRead(s, current, judged.facts, found, best, seen.screen, listed) }) });
+  const motion = seeMotion(s.motion, { drawn: seen.drawn, ...(judged !== undefined && { read: ledgerRead(s, current, afterProbe, judged.facts, found, best, seen.screen, listed) }) });
   s.motion = motion.ledger;
   // What the strokes after this read keep of it (interact/stroke-plan.ts#seeRead): the line its strokes stay above
   // (`ReadJudgement.strokeLine`) — a round whose tree did not read keeps the last read round's, as its cover — and,
@@ -1070,7 +1067,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   // A confirming read that did not read, or the read after a probe: read
   // again, within the same budget, rather than stroke away from a stop the
   // last read saw.
-  if ((current === 'settle' || probing(s.flush)) && read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
+  if ((current === 'settle' || afterProbe) && read === undefined && mayConfirm(s, seen.elapsedMs)) return confirm(s);
   // A presented stop held for its confirming read (`presentedHold`) and no read left to confirm it with: stop as the
   // last read that read left it — never a stroke drawn blind, which would land on the screen that read saw presented
   // (a read failing three times after the popover's hold had stroked onto its dim). Not a wait to the deadline: the

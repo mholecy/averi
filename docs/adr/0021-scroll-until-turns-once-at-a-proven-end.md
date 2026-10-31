@@ -163,7 +163,9 @@ read after a stroke is the settled read) accepted.
    read compared two equal trees, at the price of a 400 ms settle and a ≈ 2.3 s dump on every stop after a stroke,
    and a settle before every read after a stroke.
    So an adapter whose tree read waits for rest says so (`treeReadSettles`, Android only), and the scroll then
-   (a) reports a stop judged on the read after a scroll stroke at once, settled, with no confirming read; and (b) sends
+   (a) reports a stop judged on the read after a scroll stroke at once, settled, with no confirming read — and under
+   `fully: true` probes a row it finds flush with its scroll view on that read at once, with no confirming read
+   before the probe; and (b) sends
    no settle pause between a stroke — a probe's included, its read being a dump too — and the read after it.
    Unchanged: a presented hold (ADR 0018) still takes its confirming read — it awaits the presented screen, not the
    stroke's motion; a confirming read that failed is read

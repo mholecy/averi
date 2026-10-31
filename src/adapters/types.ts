@@ -1092,13 +1092,10 @@ export interface DeviceAdapter {
    * and the read (interact/scroll.ts). A platform fact, so the adapter's — which tree source waits and how long the
    * platform's strokes carry on are the platform's; the scroll is platform-agnostic.
    *
-   * Set by Android only, for two reasons that hold together: `uiautomator dump` waits for the accessibility
-   * framework to fall idle — 1 s with no accessibility event, up to 10 s, and no snapshot at all when it never
-   * does — before it snapshots (adapters/android.ts#treeReadSettles has the AOSP source and the measurement); and its
-   * strokes are drags (`dragSpeed`), which leave little to carry on once the finger lifts (≈ 90 px of fling by AOSP's
-   * spline at the drag speed, android.ts#dragSpeed) — over within the dump's own second of quiet.
-   * Absent on iOS: neither WDA's /source nor idb's describe-all waits for anything, and the read after a WDA fling
-   * was measured carrying the row 730–800 pt on (SETTLE_CONFIRM_READS). A tree source that snapshots at once — a
+   * Set by Android only: `uiautomator dump` snapshots only once the app has been quiet, and its strokes are drags
+   * (`dragSpeed`) — the source, the measurements and the residual are adapters/android.ts#treeReadSettles's and ADR
+   * 0021 decision 7's. Absent on iOS: neither WDA's /source nor idb's describe-all waits (SETTLE_CONFIRM_READS has the
+   * fling a WDA read caught). A tree source that snapshots at once — a
    * persistent accessibility service answering from its cache — must not set it, whatever the platform: the read
    * after its stroke is any frame of the motion.
    */

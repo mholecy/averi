@@ -395,11 +395,11 @@ export async function scrollUntilVisible(
       if (durationMs !== undefined) await adapter.swipe(drawn.from, drawn.to, durationMs);
       else if (adapter.dragSpeed === undefined) await adapter.swipe(drawn.from, drawn.to);
       else await adapter.swipe(drawn.from, drawn.to, dragMs(drawn, adapter.dragSpeed, screen.usable.oriented));
-      // Where the tree read itself waits for the screen at rest (DeviceAdapter.treeReadSettles: uiautomator dump's
-      // second of quiet), the pause would only be spent before that wait: the read after the stroke is read at once.
+      // Where the tree read itself waits for the screen at rest (`rules.readSettles`, the adapter's treeReadSettles:
+      // the dump's second of quiet), the pause would only be spent before that wait: the read after the stroke is read at once.
       // A confirming read still pauses first (below) — it is asked for when something other than the stroke's motion
       // is awaited: a presented screen's hold, a read that failed, a probe's read that moved.
-      if (adapter.treeReadSettles === true) continue;
+      if (rules.readSettles) continue;
     }
     await sleep(settleMs);
   }
