@@ -204,18 +204,18 @@ export class AdapterRegistry {
     const binding = this.bindings.get(platform);
     if (binding) {
       // iOS first asks the simulator's own device.plist (D22): proven booted,
-      // no listing is spawned (~110 ms of `simctl list devices` a call). This
-      // path reads two facts from a listing — the device is listed (simctl's
-      // listing drops a simulator whose runtime is unavailable) and it is
-      // booted — and the file proves only the second: a booted simulator
-      // whose runtime went away now gets its adapter, and the verb's own call
-      // fails with its own error (the residuals: discovery.ts#iosBootedFromDevicePlist).
-      // Anything short of proof lists as before, so every refusal below keeps its wording.
-      const proven = platform === 'ios' && (await this.provenBooted(binding.deviceId));
+      // the adapter is handed out without `simctl list devices` (~110 ms a
+      // call); anything short of proof lists below, as before. What the file
+      // cannot prove, and the trade: docs/adr/0031-the-bound-simulator-is-proven-booted-from-its-own-record.md.
+      if (platform === 'ios' && (await this.provenBooted(binding.deviceId))) {
+        // The select() race, as after the probe below.
+        if (this.bindings.get(platform) !== binding) return this.get(platform, opts);
+        return this.adapterFor(platform, binding.deviceId, opts);
+      }
       // Every entry with the serial: cheap phones can share one, and any
       // booted entry keeps the binding, as before the C5 refusals.
-      const matches = proven ? [] : (await this.probe(platform, { versions: false })).filter((d) => d.id === binding.deviceId);
-      const stillBooted = proven || matches.some((d) => d.state === 'booted');
+      const matches = (await this.probe(platform, { versions: false })).filter((d) => d.id === binding.deviceId);
+      const stillBooted = matches.some((d) => d.state === 'booted');
       const listed = matches[0];
       // A select() may have rebound the platform while we awaited the probe.
       // Acting on the CAPTURED binding would re-cache the evicted (already
@@ -337,7 +337,7 @@ export class AdapterRegistry {
    */
   private async provenBooted(udid: string): Promise<boolean> {
     try {
-      return (await this.iosBooted(udid)) === true;
+      return await this.iosBooted(udid); // awaited HERE, so the catch sees a rejection too
     } catch {
       return false;
     }

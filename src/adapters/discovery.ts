@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { adbShellArgv } from './adb-shell.js';
 import { simctl } from './xcode-env.js';
@@ -168,7 +169,14 @@ export async function listIosDevices(exec: ExecFn = defaultExec): Promise<Device
 /** Reads one file as UTF-8 text — the seam `iosBootedFromDevicePlist`'s tests fake; a missing file rejects. */
 export type ReadText = (path: string) => Promise<string>;
 
-export const readText: ReadText = (path) => readFile(path, 'utf8');
+const readText: ReadText = (path) => readFile(path, 'utf8');
+
+/**
+ * device.plist's `state` while the simulator is booted (simctl lists it
+ * `Booted`); 1 is `Shutdown`. Read on the lab simulator, CoreSimulator-1174.9.2
+ * (2026-10-31) — CoreSimulator's private numbering, see iosBootedFromDevicePlist.
+ */
+const DEVICE_PLIST_BOOTED_STATE = '3';
 
 /**
  * Whether the simulator `udid` is booted, read from its own record in the
@@ -226,7 +234,7 @@ export const readText: ReadText = (path) => readFile(path, 'utf8');
 export async function iosBootedFromDevicePlist(udid: string, read: ReadText = readText, home: string = homedir()): Promise<boolean> {
   let text: string;
   try {
-    text = await read(`${home}/Library/Developer/CoreSimulator/Devices/${udid}/device.plist`);
+    text = await read(join(home, 'Library', 'Developer', 'CoreSimulator', 'Devices', udid, 'device.plist'));
   } catch {
     return false;
   }
@@ -237,7 +245,7 @@ export async function iosBootedFromDevicePlist(udid: string, read: ReadText = re
   return (
     (text.match(/<dict\b/g) ?? []).length === 1 &&
     one(/<key>UDID<\/key>\s*<string>([^<]*)<\/string>/g) === udid &&
-    one(/<key>state<\/key>\s*<integer>([^<]*)<\/integer>/g) === '3' &&
+    one(/<key>state<\/key>\s*<integer>([^<]*)<\/integer>/g) === DEVICE_PLIST_BOOTED_STATE &&
     !/<key>isDeleted<\/key>\s*<true\s*\/>/.test(text)
   );
 }
