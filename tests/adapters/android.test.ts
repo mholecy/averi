@@ -1747,21 +1747,55 @@ describe('AndroidAdapter.capture — the raw frame, `screencap -p` where the dev
     expect(calls).toEqual([RAW]);
   });
 
-  it("a device without gzip: `-p`'s PNG, as it is, and every later capture goes straight to `-p`", async () => {
-    const { fn, calls } = fakeExec({ [RAW]: NO_GZIP, [PNG]: devicePng });
-    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
-    expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
-    expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
-    expect((await adapter.screenshot()).equals(devicePng)).toBe(true);
-    expect(calls).toEqual([RAW, PNG, PNG, PNG]);
+  it("a device without gzip: `-p`'s PNG, as it is, every later capture straight to `-p`, and the pin said once", async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { fn, calls } = fakeExec({ [RAW]: NO_GZIP, [PNG]: devicePng });
+      const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+      expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+      expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+      expect((await adapter.screenshot()).equals(devicePng)).toBe(true);
+      expect(calls).toEqual([RAW, PNG, PNG, PNG]);
+      expect(said.mock.calls).toEqual([
+        [
+          'averi: device emulator-5554: the device answered 48 bytes starting "/system/bin/sh: gzip: inaccessible or not found", ' +
+            'not a gzip stream — captures with `screencap -p` from now on (slower: the device encodes a PNG)',
+        ],
+      ]);
+    } finally {
+      said.mockRestore();
+    }
   });
 
   it('a pixel format other than RGBA_8888 is refused the same way', async () => {
-    const { fn, calls } = fakeExec({ [RAW]: rawFrame(2), [PNG]: devicePng });
-    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
-    expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
-    await adapter.capture();
-    expect(calls).toEqual([RAW, PNG, PNG]);
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { fn, calls } = fakeExec({ [RAW]: rawFrame(2), [PNG]: devicePng });
+      const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+      expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+      await adapter.capture();
+      expect(calls).toEqual([RAW, PNG, PNG]);
+      expect(said).toHaveBeenCalledTimes(1);
+      expect(said.mock.calls[0]![0]).toContain('screencap wrote pixel format 2, not RGBA_8888 (1)');
+    } finally {
+      said.mockRestore();
+    }
+  });
+
+  it('any other answer that is not gzip, on a live device, costs that call a `-p` and pins nothing (MINOR-1)', async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      for (const answer of ['Capturing failed.\n', 'Killed\n', '\x1f']) {
+        const { fn, calls } = fakeExec({ [RAW]: Buffer.from(answer, 'latin1'), [PNG]: devicePng });
+        const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+        expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+        expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+        expect(calls, JSON.stringify(answer)).toEqual([RAW, PNG, RAW, PNG]);
+      }
+      expect(said).not.toHaveBeenCalled();
+    } finally {
+      said.mockRestore();
+    }
   });
 
   it('a refusal on a dying device is the `-p` transport error, and the raw path is tried again next time', async () => {

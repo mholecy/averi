@@ -53,15 +53,23 @@ describe('screencapRaw — the raw frame, or why not', () => {
   });
 
   it('refuses the raw path for a format other than RGBA_8888 (RGBX_8888, RGB_565), naming it', () => {
-    expect(screencapRaw(raw([2, 3, 2, 1], PIXELS_2x3), SOURCE)).toEqual({ refused: 'screencap wrote pixel format 2, not RGBA_8888 (1)' });
+    expect(screencapRaw(raw([2, 3, 2, 1], PIXELS_2x3), SOURCE)).toEqual({ refused: 'screencap wrote pixel format 2, not RGBA_8888 (1)', lasting: true });
     const rgb565 = PIXELS_2x3.subarray(0, 2 * 3 * 2);
-    expect(screencapRaw(raw([2, 3, 4, 1], rgb565), SOURCE)).toEqual({ refused: 'screencap wrote pixel format 4, not RGBA_8888 (1)' });
+    expect(screencapRaw(raw([2, 3, 4, 1], rgb565), SOURCE)).toEqual({ refused: 'screencap wrote pixel format 4, not RGBA_8888 (1)', lasting: true });
   });
 
   it('refuses the raw path when the device did not gzip (no gzip on it: the shell said so instead)', () => {
     expect(screencapRaw(Buffer.from('/system/bin/sh: gzip: inaccessible or not found\n'), SOURCE)).toEqual({
       refused: 'the device answered 48 bytes starting "/system/bin/sh: gzip: inaccessible or not found", not a gzip stream',
+      lasting: true,
     });
+    expect(screencapRaw(Buffer.from('sh: gzip: not found\n'), SOURCE)).toMatchObject({ lasting: true });
+  });
+
+  it('any other answer that is not gzip is refused for this call only: no evidence the device lacks gzip (MINOR-1)', () => {
+    for (const answer of ['Killed\n', 'Capturing failed.\n', '[Warning] Multiple displays were found, but no display id was specified!\n', '\x1f']) {
+      expect(screencapRaw(Buffer.from(answer, 'latin1'), SOURCE), JSON.stringify(answer)).toMatchObject({ lasting: false });
+    }
   });
 
   it('an empty answer is the transport error an empty `screencap -p` gives', () => {

@@ -17,13 +17,12 @@ import { decodePng, type DecodedPng } from './png.js';
  *   fell back between them) by their decodes; one that does not decode equals nothing.
  */
 export class Shot {
-  #png: Promise<Buffer> | undefined;
+  /** A raw capture's PNG, once encoded. */
+  #encoded: Promise<Buffer> | undefined;
+  /** A PNG capture's pixels, once decoded — or its decode error. */
   #decoded: { image: DecodedPng } | { error: unknown } | undefined;
 
-  private constructor(private readonly capture: ScreenCapture) {
-    if (capture.kind === 'png') this.#png = Promise.resolve(capture.bytes);
-    else this.#decoded = { image: capture.image };
-  }
+  private constructor(private readonly capture: ScreenCapture) {}
 
   static of(capture: ScreenCapture): Shot {
     return new Shot(capture);
@@ -36,15 +35,17 @@ export class Shot {
 
   /** The PNG: the device's bytes, or the raw capture encoded on the host — once. */
   png(): Promise<Buffer> {
-    this.#png ??= encodePng((this.#decoded as { image: DecodedPng }).image);
-    return this.#png;
+    if (this.capture.kind === 'png') return Promise.resolve(this.capture.bytes);
+    this.#encoded ??= encodePng(this.capture.image);
+    return this.#encoded;
   }
 
   /** The pixels; throws decodePng's error for a PNG that does not decode, every time it is asked. */
   decode(): DecodedPng {
+    if (this.capture.kind === 'rgba') return this.capture.image;
     if (this.#decoded === undefined) {
       try {
-        this.#decoded = { image: decodePng((this.capture as { bytes: Buffer }).bytes) };
+        this.#decoded = { image: decodePng(this.capture.bytes) };
       } catch (error) {
         this.#decoded = { error };
       }

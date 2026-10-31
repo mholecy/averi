@@ -403,13 +403,14 @@ export class AndroidAdapter implements DeviceAdapter {
    * 321 ms. No file is written here.
    *
    * The command is ONE word, the pipe in it — exec-out's first word reaches the device's sh unescaped (execOut).
-   * screenshot-bytes.ts#screencapRaw judges the answer: a frame, a transport error, or a refusal of the raw path (no
-   * `gzip` on the device; a format other than RGBA_8888). On a refusal this call captures with `screencap -p`, whose
-   * own check says whether the device is alive; when it is, the refusal is the device's and every later capture of
-   * this adapter goes straight to `-p` (`#rawRefused`) — today's path, never a slower one.
+   * screenshot-bytes.ts#screencapRaw judges the answer: a frame, a transport error, or a refusal of the raw path. On a
+   * refusal this call captures with `screencap -p`, whose own check says whether the device is alive. A LASTING
+   * refusal (the shell says there is no gzip; a format other than RGBA_8888) on a live device pins this adapter to
+   * `-p` (`#rawPinned`) — today's path, never a slower one — said once on stderr with its reason; any other refusal
+   * (`Killed`, a warning on stdout) costs that one call a `-p` and the next one tries raw again.
    */
   async capture(): Promise<ScreenCapture> {
-    if (this.#rawRefused === undefined) {
+    if (!this.#rawPinned) {
       const { stdout } = await this.execOut([RAW_SCREENCAP]);
       const raw = screencapRaw(stdout, {
         device: `device ${this.serial}`,
@@ -418,14 +419,17 @@ export class AndroidAdapter implements DeviceAdapter {
       });
       if ('image' in raw) return { kind: 'rgba', image: raw.image };
       const bytes = await this.pngScreenshot();
-      this.#rawRefused = raw.refused;
+      if (raw.lasting) {
+        this.#rawPinned = true;
+        console.error(`averi: device ${this.serial}: ${raw.refused} — captures with \`screencap -p\` from now on (slower: the device encodes a PNG)`);
+      }
       return { kind: 'png', bytes };
     }
     return { kind: 'png', bytes: await this.pngScreenshot() };
   }
 
-  /** Set once the raw capture was refused on a live device (`capture`): why, and from then on every capture is `-p`. */
-  #rawRefused: string | undefined;
+  /** Set once the raw capture was refused for good on a live device (`capture`): from then on every capture is `-p`. */
+  #rawPinned = false;
 
   /** The capture as a PNG: the device's when it gave one, else encoded here (adapters/png-encode.ts). */
   async screenshot(): Promise<Buffer> {

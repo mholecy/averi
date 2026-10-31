@@ -76,22 +76,28 @@ function transportError(source: ScreenshotSource, what: string, notA: string): E
  *   (API 28+: width, height, format, colour space) or 12 (before: no colour space), told apart by the length, which
  *   must be exactly one of the two. Its pixels are the device's `screencap -p` decoded, byte for byte (pinned on a real
  *   pair: tests/adapters/screenshot-raw.test.ts). The image is a view of the stream, not a copy;
- * - `refused`: the raw path cannot give a frame on this device, though the device answered — the answer is not a gzip
- *   stream (no `gzip` on the device: the shell says so on stdout), or the format is not RGBA_8888 (RGBX_8888's alpha
- *   is undefined, RGB_565 is another layout). The adapter then captures with `screencap -p`, whose own check decides
- *   whether the device is alive (`screenshotPng`);
+ * - `refused`: the raw path gave no frame this time, though the device answered. `lasting` says whether it never
+ *   will on this device — only on positive evidence (the D19 review, MINOR-1): the shell's word that there is no gzip
+ *   (`gzip: not found`, `inaccessible or not found`), or a format other than RGBA_8888 (RGBX_8888's alpha is
+ *   undefined, RGB_565 is another layout). Any other answer that is not a gzip stream — `Killed`, screencap's
+ *   "Capturing failed." or a multi-display warning on stdout, a stream cut before its second byte — is refused for
+ *   this call only. Either way the adapter captures with `screencap -p`, whose own check decides whether the device
+ *   is alive (`screenshotPng`);
  * - a transport error, worded as `screenshotPng`'s: nothing at all came back, a gzip stream that breaks, an empty
  *   frame (screencap failed and gzip compressed nothing), or a length that is not the header plus the pixels — the
  *   raw counterpart of the signature check, and stronger. A stream cut in transit already fails gunzip (its trailer
  *   holds the length and a CRC); the length check catches screencap itself writing short. One shape it cannot tell: a
  *   16-byte-header frame exactly 4 bytes short reads as a 12-byte-header one, its pixels shifted by one.
  */
-export function screencapRaw(bytes: Buffer, source: ScreenshotSource): { image: RawImage } | { refused: string } {
+export function screencapRaw(bytes: Buffer, source: ScreenshotSource): { image: RawImage } | { refused: string; lasting: boolean } {
   if (bytes.length === 0) throw transportError(source, '0 bytes', 'a screenshot');
-  if (bytes[0] !== GZIP_MAGIC[0] || bytes[1] !== GZIP_MAGIC[1]) return { refused: `the device answered ${described(bytes)}, not a gzip stream` };
+  if (bytes[0] !== GZIP_MAGIC[0] || bytes[1] !== GZIP_MAGIC[1]) {
+    return { refused: `the device answered ${described(bytes)}, not a gzip stream`, lasting: NO_GZIP.test(bytes.toString('latin1')) };
+  }
   let frame: Buffer;
   try {
-    // Sync: 1–2 ms for a 9.6 MB frame, where the thread pool's chunked inflate took 6–8 (2026-10-31).
+    // Sync: 1–2 ms for a UI frame's 9.6 MB, 7 ms for a photo's (up to ~22 under load, review round 1); the thread
+    // pool's chunked inflate took 6–8 ms and ~4× the CPU on a UI frame (2026-10-31).
     frame = zlib.gunzipSync(bytes);
   } catch (e) {
     throw transportError(source, `a damaged gzip stream (${bytes.length} bytes: ${errorMessage(e)})`, 'a screenshot');
@@ -102,7 +108,7 @@ export function screencapRaw(bytes: Buffer, source: ScreenshotSource): { image: 
   const height = frame.readUInt32LE(4);
   const format = frame.readUInt32LE(8);
   // Before the length: a format's bytes per pixel are its own (RGB_565: 2), and the adapter's fallback decides then.
-  if (format !== RGBA_8888) return { refused: `screencap wrote pixel format ${format}, not RGBA_8888 (${RGBA_8888})` };
+  if (format !== RGBA_8888) return { refused: `screencap wrote pixel format ${format}, not RGBA_8888 (${RGBA_8888})`, lasting: true };
   const pixelBytes = width * height * 4;
   const header = [HEADER_BYTES, LEGACY_HEADER_BYTES].find((h) => frame.length === h + pixelBytes);
   if (width === 0 || height === 0 || header === undefined) {
@@ -116,6 +122,8 @@ export function screencapRaw(bytes: Buffer, source: ScreenshotSource): { image: 
 }
 
 const GZIP_MAGIC = [0x1f, 0x8b] as const;
+/** The device's shell saying there is no gzip to run: toybox's sh (`inaccessible or not found`), mksh and others (`not found`). */
+const NO_GZIP = /\bgzip\b[^\n]*\b(?:not found|inaccessible)/i;
 /** screencap's raw header since API 28 (width, height, format, colour space) and before it (no colour space). */
 const HEADER_BYTES = 16;
 const LEGACY_HEADER_BYTES = 12;

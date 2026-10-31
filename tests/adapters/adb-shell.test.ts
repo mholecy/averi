@@ -227,6 +227,15 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     expect(commands).toEqual([['gzip', '-1']]);
   });
 
+  it('the `-p` fallback is screencap with `-p` as its own word', async () => {
+    // The raw path refused for this call (a warning on stdout, no gzip stream); `-p` answers a PNG signature.
+    const { fn, commands } = deviceShExec((argv) =>
+      argv[1] === 'screencap' ? { stdout: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) } : { stdout: Buffer.from('Capturing failed.\n') },
+    );
+    await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).screenshot();
+    expect(commands).toEqual([['gzip', '-1'], ['screencap', '-p']]);
+  });
+
   it('the keyboard witness stays a rawShell line: its pipe runs on the device, not as words to dumpsys', async () => {
     const { fn, commands } = deviceShExec();
     await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).keyboard?.witness();

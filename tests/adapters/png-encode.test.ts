@@ -60,10 +60,31 @@ describe('encodePng', () => {
     expect(Buffer.compare(decodePng(png).data, decodePng(DEVICE_PNG).data)).toBe(0);
   });
 
-  it('a UI frame is stored unfiltered, and is no more than 1.15× the size of the device PNG', async () => {
+  it('a UI frame: a row like the one above is Up (all zeros), the rest None; no larger than the device PNG', async () => {
     const png = await encodePng(BANDS);
-    expect([...filterTypes(png, BANDS.width, BANDS.height)]).toEqual([0]);
-    expect(png.length).toBeLessThanOrEqual(DEVICE_PNG.length * 1.15);
+    const rowBytes = BANDS.width * 4;
+    const scan = inflateSync(png.subarray(41, 41 + png.readUInt32BE(33)));
+    for (let y = 1; y < BANDS.height; y++) {
+      const same = BANDS.data.compare(BANDS.data, (y - 1) * rowBytes, y * rowBytes, y * rowBytes, (y + 1) * rowBytes) === 0;
+      expect(scan[y * (rowBytes + 1)], `row ${y}`).toBe(same ? 2 : 0);
+    }
+    expect(png.length).toBeLessThanOrEqual(DEVICE_PNG.length);
+  });
+
+  it('a UI frame with a photo strip (MINOR-2): the strip is Up, and the whole is within 1.1× of zlib 6 with adaptive filters', async () => {
+    // 120 rows: the sample's ratio stays under PHOTO_RATIO (~0.06), so the frame takes the UI path, row by row.
+    const strip = photo(BANDS.width, 120);
+    const data = Buffer.from(BANDS.data);
+    strip.data.copy(data, 800 * BANDS.width * 4);
+    const mixed = { width: BANDS.width, height: BANDS.height, data };
+    const png = await encodePng(mixed);
+    expectRoundTrip(png, mixed);
+    const scan = inflateSync(png.subarray(41, 41 + png.readUInt32BE(33)));
+    const rowBytes = BANDS.width * 4;
+    for (let y = 801; y < 920; y++) expect(scan[y * (rowBytes + 1)], `row ${y}`).toBe(2);
+    expect(filterTypes(png, mixed.width, mixed.height).has(0), 'no None row: the photo path took it').toBe(true);
+    const reference = PNG.sync.write(Object.assign(new PNG({ width: mixed.width, height: mixed.height }), { data }), { deflateLevel: 6, filterType: -1 });
+    expect(png.length).toBeLessThanOrEqual(reference.length * 1.1);
   });
 
   it('a photo is Up-filtered (the first row None) and decodes to its bytes', async () => {
