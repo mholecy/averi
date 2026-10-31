@@ -919,10 +919,24 @@ const SCREEN_EDGE_SLACK = 1;
  * full-width row of a full-width list lies on the screen's edges with its frame: none. In the order of `EDGES`.
  */
 export function cutAtScreenEdges(rect: Rect, frame: Rect, screen: Rect): Edge[] {
-  const side = (r: Rect, edge: Edge): number => (edge === 'top' ? r.y : edge === 'bottom' ? r.y + r.height : edge === 'left' ? r.x : r.x + r.width);
-  // How far inside the screen a side lies: positive inside, toward the screen's middle.
-  const inside = (r: Rect, edge: Edge): number => (edge === 'top' || edge === 'left' ? side(r, edge) - side(screen, edge) : side(screen, edge) - side(r, edge));
-  return EDGES.filter((edge) => Math.abs(inside(rect, edge)) <= SCREEN_EDGE_SLACK && inside(frame, edge) > SCREEN_EDGE_SLACK);
+  return EDGES.filter((edge) => Math.abs(insideBy(rect, screen, edge)) <= SCREEN_EDGE_SLACK && insideBy(frame, screen, edge) > SCREEN_EDGE_SLACK);
+}
+
+/**
+ * How far `rect`'s `edge` side lies INSIDE `outer`'s same side, toward `outer`'s middle: positive inside, 0 on it,
+ * negative past it. For `cutAtScreenEdges` and interact/course.ts#unknownCentreNeeds.
+ */
+export function insideBy(rect: Rect, outer: Rect, edge: Edge): number {
+  switch (edge) {
+    case 'top':
+      return rect.y - outer.y;
+    case 'bottom':
+      return outer.y + outer.height - (rect.y + rect.height);
+    case 'left':
+      return rect.x - outer.x;
+    case 'right':
+      return outer.x + outer.width - (rect.x + rect.width);
+  }
 }
 
 /** `Clips.contentToward`'s answer for content listed, not ending at the edge asked. */

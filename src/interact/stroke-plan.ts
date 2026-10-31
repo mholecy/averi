@@ -546,11 +546,11 @@ export const UNMEASURED_MIN_DRAG = 108;
 /** The reach of the full stroke (`full` points of travel) that carries the target what it still needs (the carry model, `carried`; UNMEASURED_CARRY until a stroke was measured), never above `reach`; `reach` itself while nothing is needed or one stroke cannot skip the window. */
 function carryReach(measured: number | undefined, still: StillNeeds | undefined, full: number, reach: number): number {
   if (still === undefined || full <= 0) return reach;
-  const carry = measured ?? UNMEASURED_CARRY;
+  const carry = measured ?? still.unmeasured?.carry ?? UNMEASURED_CARRY;
   if (carry * full * reach <= still.slack) return reach;
   const cut = still.needs / carry / full;
-  // Unmeasured, never under the shortest drag the carry was measured at (UNMEASURED_CARRY's floor).
-  return Math.min(reach, measured === undefined ? Math.max(cut, UNMEASURED_MIN_DRAG / full) : cut);
+  // Unmeasured, never under the shortest drag that carry was measured at (UNMEASURED_CARRY's floor, or the needs' own).
+  return Math.min(reach, measured === undefined ? Math.max(cut, (still.unmeasured?.minDrag ?? UNMEASURED_MIN_DRAG) / full) : cut);
 }
 
 /** The rects drawn over `rect` in this read, when it holds that scroll view (`TreeFacts.scene`'s draw order). */
