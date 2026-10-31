@@ -49,7 +49,7 @@ measured before and after.
 | D19 | Android capture by `shell screencap <file>` + `adb pull` (raw RGBA, PNG encoded on the host only when returned/stored): −80…110 ms per capture on lab screens, −1.3 s on photo-heavy ones; changes the `screenshot()` contract | device | open |
 | D20 | iOS idb: `scroll_until` on a flinging list stopped "the swipe CHANGED THE SCREEN" after one stroke | stability | done (7e32f1d3; idb full strokes paced at 349 pt/s, ADR 0018 Decision 4; device-checked 5/5, 9.0 s) |
 | D21 | iOS idb: right after a simulator boot with a fresh companion every `idb ui describe-all` fails "The simulator's accessibility service named no frontmost application" for the whole call (D20's device check 2026-10-31: 133 reads in 90 s, 5 of 5 repeats); a hand launch + read before the run cured it once. Find the cause and what averi can do (re-front the app? a named recovery in the reply?) — needs the device | stability | open |
-| D22 | iOS registry probe: the bound simulator proven booted from its `device.plist` (0.05 ms) before `simctl list devices` (~80–110 ms, every verb); anything else falls back to simctl | device | done (3574d5b2; ADR 0031) — the owner's iOS A/B pending |
+| D22 | iOS registry probe: the bound simulator proven booted from its `device.plist` (0.05 ms) before `simctl list devices` (~80–110 ms, every verb); anything else falls back to simctl | device | done (3574d5b2; ADR 0031) — device-checked: tree −32 %, tap −12 % |
 | D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) together, not in series | device | done (fa334d35; not one spawn — the iOS 27 runtime has no shell; 445 → 250 ms a launch on the lab simulator) |
 | D24 | iOS RN: `idb ui text` drops the last 5–7 characters into rn-field in every fill-20 (D0 on iOS), so fill polls 5 × 400 ms and retypes (~2.6 s of 5.9 s) — find why, then pace | stability | open |
 
@@ -246,6 +246,27 @@ caret.md measured the iOS caret blinking too, and without the sleep an equal pai
 ~22 % of tries (estimate), so a settled verdict would cost more captures or come back `moving`; PNG vs TIFF/BMP (no gain);
 D7's `/status` (2–7 ms) and WDA `excluded_attributes` (averi parses isVisible/isAccessible). Deferred: appHealth from the
 host's process list (−200 ms an assert) — it moves D13's "health after the frame" rule. D4 won't do.
+
+### iOS after D20, D22, D23 (a44b3189, 2026-10-31)
+
+The owner's run through `ios-run.sh`, native · idb, 5 repeats, medians (ms), against "D0 on iOS" (9c8ef1f2):
+
+| scenario | D0 | now | change |
+| --- | ---: | ---: | ---: |
+| tree | 263 | 179 | −84 (−32 %) |
+| screenshot | 1 161 | 1 120 | −41 |
+| tap | 954 | 840 | −114 (−12 %) |
+| color assert | 1 580 | 1 515 | −65 |
+| ocr assert | 1 764 | 1 709 | −55 |
+| fill (3) | 1 662 | 1 563 | −99 |
+| fill (20) | 1 680 | 1 567 | −113 |
+| scroll_until, 3 screens | failed ×5 | 8 945 | works (D20) |
+| ensure_state cold | 4 438 | 4 103 | −335 (−8 %) |
+| ensure_state warm | 1 285 | 1 214 | −71 |
+
+`simctl list devices` is gone from every window (D22); ensure-cold's two `defaults write` overlap (device busy 459 ms
+under the summed call time, D23). What is left per verb is idb itself (`describe-all` 140–180 ms, `ui tap` ~185 ms,
+`ui text` ~220 ms — about 90 ms of each the CLI's Python start-up: D7), the capture pair (kept) and appHealth (deferred).
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
