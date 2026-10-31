@@ -1,4 +1,4 @@
-import type { DeviceAdapter, Stroke } from '../adapters/types.js';
+import { PersistentReadError, type DeviceAdapter, type Stroke } from '../adapters/types.js';
 import { pairsSeenBy, unseen, type Eyes } from '../ui-tree/eyes.js';
 import { readTreeOrError } from '../ui-tree/read-tree.js';
 import { CallWindow } from '../ui-tree/window-mark.js';
@@ -307,6 +307,9 @@ export async function scrollUntilVisible(
     const readStarted = Date.now();
     const read = await readTreeOrError(adapter);
     const readMs = Date.now() - readStarted;
+    // Except the read error no wait cures (adapters/types.ts#PersistentReadError, D21): thrown at once, as pollTree
+    // throws it — D20's device run read idb's wedged accessibility service 133 times in a 90 s scroll before this.
+    if (read.error instanceof PersistentReadError) throw read.error;
     const tree = read.tree === undefined ? undefined : await window.mark(read.tree, () => matched || matchesToJudge(read.tree!, target).length > 0);
     // The round's screen box (swipe.ts#screenBox), read once and handed to
     // the round whole (`RoundSeen.screen`): the frame it judges in and the

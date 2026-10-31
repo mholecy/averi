@@ -1,4 +1,4 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { PersistentReadError, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { fillField, FillValueFailure } from '../interact/fill.js';
 import { fillStepText } from '../interact/fill-text.js';
 import { typeIntoFocused } from '../interact/type-text.js';
@@ -250,9 +250,15 @@ const notSkippable = (e: unknown): e is Error & (RefusedOnPresentElement | FillV
  * unknown state in a condition — but never a refusal), and since 2026-10-08
  * so does `optional:` (runOptionalSteps), which rethrows instead of
  * skipping, and runStep, which then gives such an error its ✗ line even
- * inside an `optional:`.
+ * inside an `optional:`. Since 2026-10-31 (D21) a PersistentReadError
+ * (adapters/types.ts) too — a tree read no wait cures, idb's wedged
+ * accessibility service: not an absent element for `optional:` to skip, and
+ * nothing a rung, a re-run or the next rung can cure (a relaunch was measured
+ * 0 of 5), so the ladder stops on it, and the final wait's recovery pass
+ * does not run on it either.
  */
-const isTerminal = (e: unknown): boolean => e instanceof SetupError || e instanceof UnreadTreeRefusal || e instanceof OptionalNotSkipped;
+const isTerminal = (e: unknown): boolean =>
+  e instanceof SetupError || e instanceof UnreadTreeRefusal || e instanceof OptionalNotSkipped || e instanceof PersistentReadError;
 
 /**
  * What one detect probe learned. `unknown` is "every read failed — the probe
@@ -851,7 +857,9 @@ export class FlowEngine {
       // recoveryPass logs the rung that got there, so there is no second
       // "reached" line here. A SetupError is exempt for the same reason the
       // ladder exempts it: re-running flows cannot fix a broken descriptor.
-      if (e instanceof SetupError || !(await this.recoveryPass(name, state, 'timed out'))) throw e;
+      // Since 2026-10-31 (D21) the same holds for an error no rung can cure — `isTerminal`, whose other members the
+      // final wait cannot raise (it never enters a ladder or an `optional:`).
+      if (isTerminal(e) || !(await this.recoveryPass(name, state, 'timed out'))) throw e;
       return;
     }
     this.log(`state ${name}`, 'reached');

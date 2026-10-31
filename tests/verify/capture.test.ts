@@ -1,6 +1,6 @@
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
 import {
   BASELINE_CONFIRMATION_DELAYS_MS,
   captureBaselineFrame,
@@ -397,6 +397,22 @@ describe('captureFrame — the tree beside the png', () => {
     expect(sleeps).toEqual([300, 300]);
     expect(got.measured.error).toBeUndefined();
     expect(got.measured.scale).toMatchObject({ scale: 1, width: 1000 });
+  });
+
+  // D21 (2026-10-31): a read error no wait cures (idb's wedged accessibility service) is not retried — four more
+  // reads 300 ms apart would only say it again. The frame carries it as any read failure, after the one attempt.
+  it('a PersistentReadError is not retried: one attempt, its message on the frame, the png still returned', async () => {
+    const fake = device([png(1000, 2000)]);
+    let reads = 0;
+    fake.uiTree = async () => {
+      reads++;
+      throw new PersistentReadError('wedged until a reboot\nthe cure');
+    };
+    const got = await captureFrame(fake, { readTree: true });
+    expect(reads).toBe(1);
+    expect(got.shot.equals(png(1000, 2000))).toBe(true);
+    expect(got.measured.error).toBe('UI tree read failed: wedged until a reboot\nthe cure');
+    expect(sleeps).toEqual([300]); // the stability wait alone
   });
 
   it('a tree read that keeps failing lands on the frame as a reason naming the attempt count and the error — the png is still returned, nothing throws', async () => {

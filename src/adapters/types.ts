@@ -971,6 +971,20 @@ export type FocusedWindow =
   | { readonly of: 'screenAlone'; readonly frame: Rect }
   | { readonly of: 'unknown' };
 
+/**
+ * A UI tree read failure that no wait cures (D21, 2026-10-31) — what `uiTree()` throws when the device's own state
+ * makes every later read fail the same way until something outside averi's reach is done to it (the error says what).
+ * Every other read error is a poll miss (ui-tree/read-tree.ts#readTreeOrError: a device still launching, a tree
+ * momentarily unproducible), and the loops that wait on a tree read past it until their deadline. This one they do
+ * not: each throws it at once — pollTree, the scroll loop, the frame capture's bounded retry — and the flow engine's
+ * ladder neither escalates past it nor re-runs rungs on it (engine.ts#isTerminal), because a re-read, a relaunch or a
+ * re-run reach flow cannot end it, and polling it to a deadline only spends the budget (D20's device run: a
+ * `scroll_until` made 133 failing reads over 90 s and then said so). The one subclass today is the idb tree source's
+ * IdbNoFrontmostError (ios-tree-source.ts). A base class here, beside the adapter contract, so the read loops ask
+ * "does this heal?" without knowing which platform said no.
+ */
+export class PersistentReadError extends Error {}
+
 export interface DeviceAdapter {
   readonly platform: Platform;
   /** Reinstall triggers the app's login requirement — intentional. */

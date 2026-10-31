@@ -20,6 +20,9 @@ Find the line or error you see, then act on it. Each entry gives the meaning, th
   1. `terminate_app`, then `launch_app` (only a new process recovers);
   2. the simulator reboot the error names;
   3. or `app.ios.treeSource: wda` as an alternative source.
+- **iOS `idb cannot read the UI tree: the simulator's accessibility service named no frontmost application`**: the simulator's accessibility service is wedged, usually by a tree read made too soon after the simulator booted. It lasts until a reboot: relaunching the app, restarting idb_companion and waiting do not cure it, so averi fails the call at once rather than retrying. Recover in this order:
+  1. the simulator reboot the error names; wait until the boot completes (`xcrun simctl bootstatus <udid> -b`) and start idb_companion a few seconds after that, before the next call that reads the tree;
+  2. or `app.ios.treeSource: wda` as an alternative source.
 - **Android `device <id> is not reachable: adb get-state says "device offline"`**: recover the emulator (wait for `adb devices` to show `device`, else `adb kill-server && adb start-server`). Do not call `ensure_state` meanwhile: its probes read nothing.
 - **Android `device <id> is not answering: adb get-state timed out`**: adb itself hangs, not the app. Run `adb devices`; if it hangs too, `adb kill-server && adb start-server`, otherwise restart the emulator (or reconnect the USB cable).
 - **Android `… is unauthorized` / `… is offline`** (`No usable Android emulator/device found`, `select_device`, or a selected device): adb lists the device but cannot drive it. Unauthorized: unlock the phone and accept the "Allow USB debugging?" prompt; for an emulator, `adb kill-server`, then `adb devices`. Offline: wait for `adb devices` to show `device`, else `adb kill-server && adb start-server`.

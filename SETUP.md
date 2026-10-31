@@ -388,6 +388,16 @@ one happens by itself.
   launch it makes, but a process that is ALREADY stuck stays stuck: `terminate_app`, then `launch_app` (a `launch_app`
   on the running app keeps the same process). If that does not clear it, reboot the simulator (`xcrun simctl shutdown
   <udid> && xcrun simctl boot <udid>` — the error spells it with the simulator's UDID), or set `app.ios.treeSource: wda` (step 4) to read through WebDriverAgent.
+- **iOS: `idb cannot read the UI tree: the simulator's accessibility service named no frontmost application`** — every
+  tree read fails this way from the first call after a simulator boot. An accessibility query made too soon after the
+  boot wedges the simulator's accessibility service until the next reboot (measured 2026-10-31 on nine reboots: a
+  companion started right after `simctl boot` returned wedged it 2 of 3 times, right after `simctl bootstatus -b` 3 of
+  3, three seconds after bootstatus 0 of 3). Relaunching the app, a new idb_companion and waiting cured it 0 of 5 times
+  each, so averi does not retry the read: a wait, assert, tap or `scroll_until` fails on its first read, and
+  `ensure_state` stops without escalating its ladder. Reboot the simulator (`xcrun simctl shutdown <udid> && xcrun
+  simctl boot <udid>` — the error spells it with the simulator's UDID), wait for `xcrun simctl bootstatus <udid> -b`,
+  and start idb_companion a few seconds after that; or set `app.ios.treeSource: wda` (step 4) to read through
+  WebDriverAgent.
 - **`ensure_state` stops with `Refused to run reach flow …` and `every UI tree read was bare` (either platform)** — every
   tree the detect probe read held nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon): a cold launch's Android decor
   (`android:id/content`, `action_bar_root`; measured +5.3…+13.8 s after launch on an RN debug build) or the WDA splash
