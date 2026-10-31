@@ -400,15 +400,24 @@ Android's trees (`listedWhereItLies` is WDA's), so it had nothing to say here.
    (interact/scroll-rounds.ts#unknownCentreStroke) takes one more stroke first. Its known far side may go up to the
    frame's far edge and no further. That distance is the stroke's `needs`, with no slack
    (interact/course.ts#unknownCentreNeeds), and the carry model cuts the stroke to it at UNMEASURED_CARRY a point
-   (stroke-plan.ts#carryReach). This is short on Android, where a drag carries about its own length (1.11 measured),
-   so it does not overshoot. On the live run's shape (C at 382, its left side 316 px inside the carousel's) the stroke
-   travels ≈ 113 px.
+   (stroke-plan.ts#carryReach). This is short on Android, where a full drag carries about its own length (1.11 measured),
+   so it does not overshoot. A short drag carries less than its own length, measured live at 0.7–0.8 a px.
 4. *Bounded.* Only ONCE per scroll (`centreStroked`). The carousel is exactly one card wide and shows C whole at one
    offset only, so a rule that stroked until the centre was known could swing it to and fro. The stroke is never a turn
    (`NextStroke.turn`), never past the bound (a swipe and time must be left), and never taken when the known side lies
    within UNKNOWN_CENTRE_MIN_GAP (216 px, twice the shortest drag) of the frame's far edge. That far side lies past the
    frame when it is unknown too, so a node cut at both edges takes none. The next read's stop is made as it stands.
    `fully: true` needs nothing new: a match past its frame is `clipped`, never a stop.
+
+**Device check (2026-11-01, emulator-5554, API 33).** The live visibility group: 153 cases, 147 ok, 6 loud, 0
+mismatches, before and after. The same six LOUD cases appear both times. `scroll:carousel-in-list.C` before: "visible
+after 1 swipe — CLIPPED at right, 89 %", with C at x 470 (63 % of it inside by the app's model). After, in five runs:
+"visible after 2 swipes — CLIPPED at right, at most 90–91 % … uiautomator does not say how far it runs past the
+screen's right edge", then Tapped. The extra stroke carried the carousel 102–140 px, and C ended at x 369–424, its
+centre inside every time and every stroke closer. The D17 shape, by averi's own reply after a 440-px drag: on main,
+with C at 599 (true centre 1073, past 1014), "visible after 0 swipes — CLIPPED at right, 86 %". On this branch, with C
+at 596, one stroke brought it to 464 (true centre 938, inside), then "visible after 1 swipe — CLIPPED at right, at most
+89 % …".
 
 **Residuals.**
 - After its one stroke, or with no room for one, a card wider than about twice what its frame shows past its known
