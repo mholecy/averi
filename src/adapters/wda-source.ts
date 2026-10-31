@@ -68,6 +68,16 @@ const ROLE_MAP: Record<string, string> = {
   // is XCUI's enum name less the prefix, which WDA strips (above) — no capture holds one yet. Here and not in the
   // shared IOS_ROLE_MAP: no idb capture shows what describe-all names a UIActivityIndicatorView, so its spelling
   // there is unknown (`ProgressIndicator`, already shared, is XCUI's other progress type).
+  // Leaving `other` (structural) changes, beside showsProgress: an unlabelled spinner now covers its rect in
+  // ui-tree/draw-order.ts (a structural leaf did not); in ui-tree/bare-tree.ts `progress` is decoration, counted only
+  // when LABELLED — so a spinner with a value and no label now counts toward bare, and a labelled screen-sized one
+  // counts as content (as `other` it was a wrapper by size); one `isVisible`/`isAccessible` 0/0 can root a hidden
+  // subtree (hiddenRoots, below); `role:other` no longer matches it, `role:progress` does.
+  // Residual, by decision (D27 review, 2026-10-31): showsProgress counts EVERY progress node with area, so an
+  // invisible spinner (a covered layer, 0/0) or an off-screen one (a FlatList footer spinner below the viewport) also
+  // reads as loading — not filtered, since a footer spinner below the fold means the list is still loading a page.
+  // The safe direction: the hold falls back to the whole ensureTimeoutMs window, scroll_until to its maxSwipes /
+  // timeoutMs bound, instead of "exhausted".
   ActivityIndicator: 'progress',
 };
 

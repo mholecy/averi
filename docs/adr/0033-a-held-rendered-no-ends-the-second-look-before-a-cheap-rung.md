@@ -58,6 +58,9 @@ full window, exactly as before.**
     `ActivityIndicator` — React Native's ActivityIndicator — read as `other`, not `progress`, and did NOT stop a hold
     there. `adapters/wda-source.ts`'s role map now makes it `progress` (WDA only: no idb capture shows idb's spelling
     of a UIActivityIndicatorView, so through idb it may still read `other`).
+    Residual, by decision (D27 review): an invisible or off-screen spinner also counts as loading — a covered layer's
+    0/0 indicator, a list footer's spinner below the viewport — safe direction, bounded by `ensureTimeoutMs` /
+    `maxSwipes`.
 - A look the hold ended writes one trace line, right before the rung: `state <name>` — `second look: not detected, the
   screen held still <s> — running <rung> before the <ensureTimeoutMs> window's end`, so a rung that runs seconds
   before the deadline is not read as a look cut short for no reason. A `no` at the deadline writes none, as before.

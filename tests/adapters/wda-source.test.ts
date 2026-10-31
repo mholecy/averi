@@ -225,6 +225,21 @@ describe('parseWdaSource — normalization and input shapes', () => {
     expect(showsProgress(tree)).toBe(true);
   });
 
+  // The stated residual (D27 review, 2026-10-31): a hidden spinner — 0/0, a covered layer's — still reads as loading.
+  // Not filtered by decision: the hold and scroll_until fall back to their bounded windows, the safe direction.
+  it('a hidden (0/0) ActivityIndicator on a loaded screen still makes showsProgress true', () => {
+    const tree = parseWdaSourceValue(
+      el('Window', {
+        children: [
+          el('StaticText', { label: 'Prehľad', rect: { x: 24, y: 120, width: 354, height: 24 } }),
+          el('ActivityIndicator', { isVisible: '0', isAccessible: '0', rect: { x: 181, y: 417, width: 40, height: 40 } }),
+        ],
+      }),
+    );
+    expect(tree.children.find((n) => n.role === 'progress')).toMatchObject({ hidden: true });
+    expect(showsProgress(tree)).toBe(true);
+  });
+
   it('maps unknown types to "other"', () => {
     expect(parseWdaSourceValue(el('SomeFutureType')).role).toBe('other');
   });
