@@ -36,14 +36,15 @@ measured before and after.
 | D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | open |
 | D7 | iOS: persistent idb gRPC client; WDA `excluded_attributes`; no `/status` before `/source`; parallel `defaults write`; one key-sequence in `clearText` | device | open |
 | D8 | Fill re-reads after focus only for secure or unknown fields | device | open |
-| D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | open |
-| D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | open |
+| D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | won't do — the second look guards a re-flow after the keyboard hides; iOS only, 0 in D0 |
+| D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | done (4cd4825a); keyboard beside the tree: won't do (stale IME band → false "fully visible") |
 | D11 | One deadline per tool call that every window is clamped to | device | open |
 | D12 | `tools/list` is 73 KB (~18k tokens): shorten the tool descriptions | agent context | done (f8b62f5b) |
 | D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | open |
 | D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | open |
 | D15 | Two engines compiling the OCR helper at once share the `${binary}.${pid}` staging path (pre-existing; found in P6) | stability | open |
 | D16 | `tests/truth/calibration.test.ts` spawns a `git merge-base` per fix and times out (5 s) under load | tests | open |
+| D17 | uiautomator cuts a sideways carousel item's bounds at the screen edge, so its true centre is unknown and "CLIPPED 88 %" can name an item whose centre is past the carousel edge (pre-existing; found in D10's live run, `carousel-in-list.C`) | correctness | open |
 
 ## Notes
 
@@ -151,6 +152,14 @@ unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 
 cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
+
+### D10 — Android settled read
+Done in 4cd4825a (ADR 0021 decision 7): `DeviceAdapter.treeReadSettles` on Android — a `uiautomator dump` snapshots only after
+a 1 s idle wait (AOSP DumpCommand), 35/35 post-stroke dumps equalled the next one — so the read after a stroke is the
+settled read, with no confirming read and no 400 ms pause. Scroll over ~3 screens 19.3 → 15.1 s (−22 %); live.ts
+forms + visibility 184/185 verdicts unchanged (the carousel one is run-to-run carry over D17's pre-existing gap). The
+keyboard read beside the dump was rejected: it would read the IME ~2 s before the snapshot. A snapping pager/LazyRow is
+unmeasured. D9 won't do: the keyboard's second look guards a layout re-flowing after the keyboard hides; iOS only.
 
 ### D12 — tool descriptions
 Done in f8b62f5b: instructions + tools/list 73,447 → 29,513 B (~18.4k → ~7.4k tokens). Shared vocabulary is said once in the
