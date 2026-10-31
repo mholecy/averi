@@ -1033,8 +1033,8 @@ describe('typeText pacing (measured anti-flake behaviour)', () => {
    * The 100ms per character and the 150ms settle after the cursor nudge are
    * not arbitrary: bulk injection and unpaced per-char injection were both
    * measured dropping characters on Compose fields (2026-08-05, 3-of-11 and
-   * 5-of-8 respectively); 100ms is M6's 0-drop delay kept at 2x the 50ms the
-   * measurement would allow (android.ts#TYPING_PACE_MS). Setting either to 0
+   * 5-of-8 respectively); 100ms doubles the 50ms floor the 2026-10-31
+   * measurement left (android.ts#TYPING_PACE_MS). Setting either to 0
    * must fail, or the next person "simplifying" the delays gets a green suite
    * and a flaky login.
    */
