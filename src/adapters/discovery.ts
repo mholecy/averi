@@ -76,10 +76,10 @@ export interface ListOpts {
  *
  * `versions: false` (D13, 2026-10-31) lists from `adb devices -l` alone: the
  * registry's per-call probe asks only "is the bound device still booted?",
- * and a getprop is a full `adb shell` round trip — 31–36 ms on the lab
- * emulator, per attached device, on every tool call — for a version only
- * select_device's reply and the device listing show. Those two still ask
- * for it.
+ * and a getprop is a full `adb shell` round trip — ≈30–35 ms on the lab
+ * emulator, up to ~70 ms, per attached device, on every tool call — for a
+ * version only select_device's reply and the device listing show. Those
+ * two still ask for it.
  *
  * `unauthorized` is listed since 2026-10-09 (C5): until then its line did not
  * match, so a phone waiting on its "Allow USB debugging?" prompt vanished and

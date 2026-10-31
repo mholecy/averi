@@ -106,6 +106,7 @@ export async function runEnsureState(
   resolveAdapter: ResolveAdapterFor,
 ): Promise<{ text: string; shot?: Buffer }> {
   const { adapter, cfg, trace } = await runOnEngine(call, resolveAdapter, { state: call.state });
+  // On an appHealth throw the frame's reads finish unawaited — harmless: reads only, and finalFrame never rejects.
   const [health, { frame, failed }] = await Promise.all([appHealth(adapter, cfg), finalFrame(adapter)]);
   const text = trace + health;
   if (frame === undefined) return { text: `${text}\n${screenshotFailedLine(failed)}` };

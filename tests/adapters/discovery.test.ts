@@ -48,8 +48,8 @@ emulator-5556          offline transport_id:2
 
   // D13 (2026-10-31): the registry's per-call probe (mcp/registry.ts#get)
   // asks only which devices are booted — the getprop per attached device
-  // (31–36 ms each on the lab emulator) was paid on every tool call for a
-  // version nothing on that path reads.
+  // (≈30–35 ms each on the lab emulator, up to ~70 ms) was paid on every
+  // tool call for a version nothing on that path reads.
   it('without versions, lists from `adb devices -l` alone — no getprop, every version `unknown`', async () => {
     const { fn, calls } = fakeExec({
       'adb devices -l': DEVICES_OUTPUT,

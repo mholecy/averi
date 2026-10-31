@@ -272,8 +272,9 @@ export class AdapterRegistry {
    * EVERY tool call (that is how a vanished device is noticed). get() reads
    * only ids and states, so it asks with `versions: false` (D13, 2026-10-31):
    * on Android that is `adb devices -l` alone, where it was `adb devices -l`
-   * plus one `getprop` per attached device — 31–36 ms each on the lab
-   * emulator, on every tool call, for a version nothing on that path shows.
+   * plus one `getprop` per attached device — ≈30–35 ms each on the lab
+   * emulator, up to ~70 ms, on every tool call, for a version nothing on
+   * that path shows.
    * select() and listAll() keep the versions: select_device's reply and the
    * device listing are where a version is read.
    *

@@ -127,7 +127,7 @@ factory (`DeviceDiscovery`, `mcp/registry.ts` — both injected or neither, so a
 with a fake factory cannot list the host's real devices) and asks it on every
 `get()`, as it asked a probe adapter before — since D13 (2026-10-31) with
 `versions: false`, so the per-call probe on Android is `adb devices -l` alone (the
-getprop per online device, 31–36 ms each, is asked only by `select()` and `listAll()`,
+getprop per online device, ≈30–35 ms each and up to ~70 ms, is asked only by `select()` and `listAll()`,
 whose replies show a version). Until then `listDevices()` was an adapter
 member, so both adapters carried an unbound mode the registry used for nothing else —
 an `IosAdapter` without a UDID (simctl's `booted` alias, a lazily resolved UDID for
