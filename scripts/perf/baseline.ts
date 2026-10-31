@@ -112,7 +112,7 @@ interface Scenario {
 
 const id = labSelector;
 const answered = (reply: string) => !isError(reply);
-/** 20 characters: Android types one `input text` per character, 250 ms apart (src/adapters/android.ts#typeText). */
+/** 20 characters: Android types one `input text` per character, 100 ms apart (src/adapters/android.ts#TYPING_PACE_MS). */
 const TWENTY = 'Jan Novak Bratislava';
 const STATE = 'lab_open';
 /**

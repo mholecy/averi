@@ -38,6 +38,26 @@ const STATUS_BAND_QUERY_TIMEOUT_MS = 2_000;
 /** The same reasoning for the window manager's word on a miss (focusedWindow): past it, `unknown` — the active-window hint. */
 const FOCUSED_WINDOW_TIMEOUT_MS = 2_000;
 
+/**
+ * typeText's wait after each character's `input text` call. Measured on Compose (and, in the 2026-10-31 run, React
+ * Native) fields under Gboard:
+ * - 2026-08-05: one bulk `input text` landed 3 of 11 characters (it races Compose's async text state); one call per
+ *   character with no wait landed 5 of 8 after hours of emulator uptime; with 300 ms, 8 of 8. 250 ms was chosen.
+ * - 2026-10-31, on the lab AVD (averi_lab, API 33): ~9,600 characters (half per call, half in one script; 4,800 per
+ *   call — the shipped mode — all landed) at 250/150/100/50/0 ms into the Compose form-basic name field and the
+ *   React Native rn-field — 20-character strings with '"$&;\ and spaces, idle, under host load and under load on
+ *   every device vCPU — 0 dropped, garbled or added in every cell (host load measured at ≤ 100 ms, device load at 50
+ *   and 0 ms). It suggests the device paces the typing itself: 0 ms landed whole, and each call takes 40–100 ms on
+ *   the device.
+ * 0 ms and 50 ms both landed whole on 2026-10-31, but unpaced typing dropped characters on 2026-08-05 after hours of
+ * uptime (the later run did not reproduce it), so 50 ms is the floor and 100 ms doubles it — for what the later run
+ * left untested: masked or formatted fields (an amount, an IBAN), long uptime, a literal %, non-ASCII, and strings
+ * past 20 characters.
+ */
+const TYPING_PACE_MS = 100;
+/** typeText's wait after the DPAD left/right nudge that commits Gboard's composing character (see typeText). */
+const COMMIT_SETTLE_MS = 150;
+
 /** A refusal's lines as the messages below quote them: `<command> said: a / b`. */
 function startSaid(refused: StartRefused): string {
   return `${refused.command} said: ${refused.lines.join(' / ')}`;
@@ -711,12 +731,11 @@ export class AndroidAdapter implements DeviceAdapter {
     // does not exist — would still go to the device, and the contract's
     // "types nothing" would be false of it.
     if (text === '') return;
-    // One `input text` call PER CHARACTER, with explicit pacing. Bulk injection
-    // races Compose's async text state and silently drops most characters
-    // (measured on the login username field: 3 of 11 landed). The adb
-    // round-trip alone is NOT enough pacing on a loaded emulator — re-measured
-    // the same evening after hours of uptime: per-char with no delay landed 5 of
-    // 8, per-char with 300ms landed 8/8. 250ms keeps a 12-char value at ~3s.
+    // One `input text` call PER CHARACTER, each followed by TYPING_PACE_MS
+    // (its doc holds the measurements): bulk injection races Compose's async
+    // text state and silently drops characters, and unpaced calls once did too.
+    // An n-char value waits n x TYPING_PACE_MS + COMMIT_SETTLE_MS on top of
+    // its n + 2 adb round-trips.
     //
     // Each character is one quoted `shell` word; a space is `input text`'s
     // own `%s`; a control character is refused up front — by interact/
@@ -733,7 +752,7 @@ export class AndroidAdapter implements DeviceAdapter {
     }
     for (const ch of text) {
       await this.shell(['input', 'text', ch === ' ' ? '%s' : ch]);
-      await sleep(250);
+      await sleep(TYPING_PACE_MS);
     }
     // Force the IME to COMMIT the final composing character: GBoard holds the
     // last injected char in a composition span for seconds, and a BACK or a
@@ -744,7 +763,7 @@ export class AndroidAdapter implements DeviceAdapter {
     // immediately).
     await this.shell(['input', 'keyevent', '21']); // DPAD_LEFT
     await this.shell(['input', 'keyevent', '22']); // DPAD_RIGHT
-    await sleep(150);
+    await sleep(COMMIT_SETTLE_MS);
   }
 
   async pressKey(key: Key): Promise<void> {

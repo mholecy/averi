@@ -1030,13 +1030,15 @@ describe('AndroidAdapter interactions', () => {
 
 describe('typeText pacing (measured anti-flake behaviour)', () => {
   /**
-   * The 250ms per character and the 150ms settle after the cursor nudge are
+   * The 100ms per character and the 150ms settle after the cursor nudge are
    * not arbitrary: bulk injection and unpaced per-char injection were both
    * measured dropping characters on Compose fields (2026-08-05, 3-of-11 and
-   * 5-of-8 respectively). Setting either to 0 must fail, or the next person
-   * "simplifying" the delays gets a green suite and a flaky login.
+   * 5-of-8 respectively); 100ms doubles the 50ms floor the 2026-10-31
+   * measurement left (android.ts#TYPING_PACE_MS). Setting either to 0
+   * must fail, or the next person "simplifying" the delays gets a green suite
+   * and a flaky login.
    */
-  it('waits 250ms after each character and 150ms after the commit nudge', async () => {
+  it('waits 100ms after each of 20 characters and 150ms after the commit nudge', async () => {
     vi.useFakeTimers();
     try {
       const { fn, calls } = fakeExec({});
@@ -1047,11 +1049,11 @@ describe('typeText pacing (measured anti-flake behaviour)', () => {
         return 0 as unknown as NodeJS.Timeout;
       }) as typeof setTimeout);
 
-      await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('abc');
+      await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('Jan Novak Bratislava');
       spy.mockRestore();
 
-      // Three characters paced at 250ms, then the DPAD nudge settle at 150ms.
-      expect(waits).toEqual([250, 250, 250, 150]);
+      // Twenty characters paced at 100ms, then the DPAD nudge settle at 150ms.
+      expect(waits).toEqual([...Array<number>(20).fill(100), 150]);
       // The nudge itself must still bracket that final wait.
       expect(calls.slice(-2)).toEqual([
         'adb -s emulator-5554 shell input keyevent 21',
