@@ -642,6 +642,15 @@ export class FlowEngine {
    * stack (ensureStateInner pushed it), so an EARLIER copy is the re-entry,
    * and the loop runs from it to the top.
    */
+  /**
+   * Can any of these rungs wipe — by its own steps or through a `requires:` into another ladder (flow/config.ts
+   * #flowIsDestructive, the transitive predicate)? The second look's "no wipe ahead" asks it of the rungs from this
+   * one on, and `wipeAhead` of the rungs after this one (ADR 0033).
+   */
+  private wipeAmong(rungs: readonly string[]): boolean {
+    return rungs.some((r) => flowIsDestructive(this.cfg, r));
+  }
+
   private refuseReentry(name: string, node: string, probe: Detection): void {
     const at = this.ensuring.indexOf(node);
     if (at === this.ensuring.length - 1) return;
@@ -755,9 +764,11 @@ export class FlowEngine {
       // one `state` line before the rung. The accepted risk, with no wipe
       // anywhere ahead: a rendered loading screen WITHOUT a progress
       // indicator (on iOS through WDA a React Native ActivityIndicator is
-      // one: its type reads `other`, not `progress`) that holds for 2 s costs
+      // one: its type reads `other`, not `progress` — backlog row D27) that
+      // holds for 2 s costs
       // a cheap rung run on it, or an escalation to the next cheap one. Bare
-      // and unknown answers are unchanged — a bare read restarts the hold.
+      // and unknown answers are unchanged — a bare or a failed read restarts
+      // the hold.
       //
       // The rung's re-detect below (the grace window after a rung) gets no
       // hold: it is not a second look. Its window IS reachRecheckMs, so a
@@ -769,9 +780,14 @@ export class FlowEngine {
         // bare entry read is still worth naming when every read of the
         // second look failed.
         const before = probe;
+        // No wipe ahead (ADR 0033): none in this rung or any after it, none after the rung of an enclosing ladder.
+        // TRANSITIVE (`wipeAmong`, flowIsDestructive), unlike `destructive` above (flowItselfIsDestructive): the
+        // warning is about this rung's own steps, the hold about every wipe a loading screen could lead to — a
+        // `requires:` into a `clearState` ladder included. Do not unify the two.
+        const noWipeAhead = this.wipeAhead === 0 && !this.wipeAmong(state.reach.slice(i));
         probe = await this.detects(state.detect, this.ensureTimeoutMs, {
           look: 'second look',
-          ...(this.wipeAhead === 0 && !state.reach.slice(i).some((r) => flowIsDestructive(this.cfg, r)) && { holdMs: this.reachRecheckMs }),
+          holdMs: noWipeAhead ? this.reachRecheckMs : undefined,
         });
         if (probe.answer === 'yes') {
           this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
@@ -848,7 +864,7 @@ export class FlowEngine {
         );
       }
       try {
-        const wipeAfter = state.reach.slice(i + 1).some((r) => flowIsDestructive(this.cfg, r));
+        const wipeAfter = this.wipeAmong(state.reach.slice(i + 1));
         if (wipeAfter) this.wipeAhead++;
         try {
           await this.runFlowInner(flow);
@@ -1090,12 +1106,14 @@ export class FlowEngine {
    * when no wipe lies ahead, as reachRecheckMs) ends the window early on a
    * settled "no": every fresh read that is not `yes` goes to a
    * `holdTracker(holdMs)` (flow/hold-tracker.ts — same fingerprint across
-   * reads spanning `holdMs`; a fingerprint change, a bare tree or a spinner
-   * starts it over), and once it says held the probe answers `no` without
-   * polling to its deadline. A spinner's or a bare tree's other counting is
-   * unchanged (a spinner tree still counts as rendered). A handed-on read is
-   * never shown to it (it may only answer `yes`); a failed read is not shown
-   * either — it read nothing, said nothing against the hold. Without
+   * reads spanning `holdMs`; a fingerprint change, a bare tree, a spinner or
+   * a failed read starts it over), and once it says held the probe answers
+   * `no` without polling to its deadline. A spinner's or a bare tree's other
+   * counting is unchanged (a spinner tree still counts as rendered). A
+   * handed-on read is never shown to it (it may only answer `yes`); a failed
+   * read is, through `reading` below (pollTree shows the predicate trees
+   * only): the same tree on both sides of reads that saw nothing did not
+   * provably hold (code review, 2026-10-31). Without
    * `holdMs` a `no` still waits for the deadline. A held `no` carries
    * `heldMs`, how long its tree held, for the ladder's trace line.
    */
@@ -1119,12 +1137,24 @@ export class FlowEngine {
     let rendered = 0;
     let lastBareTree: UiNode | undefined;
     const hold = holdMs === undefined ? undefined : holdTracker(holdMs);
+    // A failed read restarts the hold (HoldTracker.observe, code review 2026-10-31): pollTree shows the predicate only
+    // the reads that returned a tree, so with a hold the reads go through this, which tells the tracker of the others.
+    const reading: Pick<DeviceAdapter, 'uiTree'> =
+      hold === undefined ?
+        this.adapter
+      : {
+          uiTree: (opts) =>
+            this.adapter.uiTree(opts).catch((e: unknown) => {
+              hold.observe(undefined, Date.now());
+              throw e;
+            }),
+        };
     // A handed-on round (`first`, ADR 0030) may only answer `yes`: it never counts as rendered or bare, so the
     // probe's `no`, `bare` and `unknown` — the answers the ladder escalates and refuses a wipe on — rest on fresh
     // reads alone. And the probe produces: its reads may be handed to the next step.
     const outcome = await this.handOff.producing(() =>
       pollTree(
-        this.adapter,
+        reading,
         async (tree, { handedOn }) => {
           if ((await this.evaluate(cond, tree)) === 'yes') return 'yes' as const;
           if (handedOn) return undefined;

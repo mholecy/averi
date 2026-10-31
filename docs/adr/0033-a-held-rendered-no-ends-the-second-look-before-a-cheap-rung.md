@@ -39,17 +39,20 @@ full window, exactly as before.**
     [via_inner, fresh_launch]`, `via_inner.requires: inner`, `inner: [cheap]`) would otherwise hold, fail its cheap
     rung on a loading screen, and hand the outer ladder the same immediate wipe as below.
 - The hold is `flow/hold-tracker.ts#holdTracker(holdMs)`, a pure state machine shown each fresh not-"yes" read with a
-  timestamp (`observe(tree, nowMs)`); `detects` gets it through its `holdMs` option. The run starts at the
-  first rendered read with a given fingerprint; the same fingerprint at least `holdMs` after it started ends the look.
-  A different fingerprint starts a new run; a BARE read clears it (the screen went back to decor — it did not hold). A
-  failed read between two equal ones is not shown to it: it neither breaks the run nor counts as a read.
+  timestamp (`observe(tree, nowMs)`; `tree` is undefined for a read that failed); `detects` gets it through its
+  `holdMs` option. The run starts at the first rendered read with a given fingerprint; the same fingerprint at least
+  `holdMs` after it started ends the look. A different fingerprint starts a new run; a BARE read clears it (the screen
+  went back to decor — it did not hold); so does a FAILED read (the code review, 2026-10-31: the same tree before and
+  after reads that saw nothing did not provably hold across them — "held across reads spanning `holdMs`" means reads
+  that each saw it). `pollTree` never shows its predicate a failed read, so with a hold `detects` reads through a thin
+  wrapper of the adapter that shows the tracker each read that threw.
 - A rendered tree that shows a progress indicator (`ui-tree/read-tree.ts#showsProgress`: a `progress` node with area —
   Android's ProgressBar, Compose's progress indicators, an iOS `ProgressIndicator`) never starts or continues a hold:
   for the hold it is a bare read, and clears it. It still counts as rendered — the look's answer at its deadline is
   `no`, as before. A spinner keeps a fixed rect and no text, so its screen keeps one fingerprint while it loads; it is
   the one loading screen that says so, and the rule costs nothing on a screen that does not. (The coordinator's
   decision before review, 2026-10-31.)
-  - The known gap, left for its own backlog row: on iOS through WDA an XCUI `ActivityIndicator` — React Native's
+  - The known gap, backlog row D27: on iOS through WDA an XCUI `ActivityIndicator` — React Native's
     ActivityIndicator — is not in `adapters/ios-node.ts#IOS_ROLE_MAP` (which wda-source.ts extends), so it reads as
     `other`, not `progress`, and does NOT stop a hold there.
 - A look the hold ended writes one trace line, right before the rung: `state <name>` — `second look: not detected, the
@@ -96,12 +99,12 @@ before the first second look's original deadline, whatever ran in between):
 
 With NO wipe ahead, a rendered loading screen WITHOUT a progress indicator — a "Loading…" label alone, a skeleton of
 placeholder boxes, a static splash drawn as a rendered screen, an indicator a tree source does not report as `progress`
-(a React Native ActivityIndicator through WDA, above) — that holds still for `reachRecheckMs` ends the look as "no"
-(one with a spinner never holds): the cheap rung runs on it — a wasted relaunch or tap — or fails, and the ladder
-escalates to its next rung, also cheap by construction, or ends in its final wait (`ensureTimeoutMs`). The worst case
-is therefore a wasted cheap rung or a failed call that a retry cures, never a wipe. It is NOT the same risk as the
-entry probe's "no" on one read for an escalation into a wipe — that is why the hold is refused wherever a wipe lies
-ahead (above).
+(a React Native ActivityIndicator through WDA, backlog row D27, above) — that holds still for `reachRecheckMs` ends
+the look as "no" (one with a spinner never holds): the cheap rung runs on it — a wasted relaunch or tap — or fails,
+and the ladder escalates to its next rung, also cheap by construction, or ends in its final wait (`ensureTimeoutMs`).
+The worst case is therefore a wasted cheap rung or a failed call that a retry cures, never a wipe. It is NOT the same
+risk as the entry probe's "no" on one read for an escalation into a wipe — that is why the hold is refused wherever a
+wipe lies ahead (above).
 
 ## Consequences
 
@@ -110,8 +113,8 @@ ahead (above).
   tests/flow/bare-tree-ladder.test.ts, "the second look before a CHEAP rung ends on a held rendered 'no' (D2)", and
   tests/flow/hold-tracker.test.ts) — on ladders with no wipe ahead only. A ladder that ends in `clearState` (the common
   `logged_in: [cheap, login]` shape, if its login wipes) keeps the 20 s.
-- On Android a read is a `uiautomator dump` (~2.3 s each, the D3 figure in the performance backlog), so a 2 s hold is met by two identical
-  consecutive reads: the read that starts the run and the next one, ~2.3 s later. On iOS (reads ~70–180 ms) it spans
-  many reads.
+- On Android a read is a `uiautomator dump` (~2.3 s each, the D3 figure in the performance backlog), so a 2 s hold is
+  met by two identical consecutive reads: the read that starts the run and the next one, ~2.3 s later. On iOS (reads
+  ~70–180 ms) it spans many reads.
 - The second look's held "no" writes one trace line (above); a rendered "no" at the deadline still writes none.
 - Changing `reachRecheckMs` now changes two windows: the re-check after a rung and the hold before a cheap one.

@@ -9,29 +9,33 @@ import { isBareTreeMemo } from '../ui-tree/verdict.js';
  */
 export interface HoldTracker {
   /**
-   * One fresh read, at `nowMs` (the clock the poll's deadline uses). Returns how long its tree has held — since the
-   * first read of that tree in an unbroken run — once that is at least `holdMs`; otherwise undefined. The run is
-   * broken, and starts at the next rendered read, by a tree with another `treeFingerprint`, a BARE tree (the screen
-   * went back to decor: it did not hold), and a tree that shows a progress indicator (`showsProgress`: a spinner keeps
-   * one fingerprint while it loads, so a screen saying it is still loading never holds).
+   * One fresh read, at `nowMs` (the clock the poll's deadline uses): its tree, or `undefined` for a read that FAILED.
+   * Returns how long the tree has held — since the first read of that tree in an unbroken run — once that is at least
+   * `holdMs`; otherwise undefined. The run is broken, and starts at the next rendered read, by a tree with another
+   * `treeFingerprint`, a BARE tree (the screen went back to decor: it did not hold), a tree that shows a progress
+   * indicator (`showsProgress`: a spinner keeps one fingerprint while it loads, so a screen saying it is still loading
+   * never holds), and a failed read (code review, 2026-10-31: the same tree before and after reads that saw nothing
+   * did not provably hold across them — "held across reads spanning `holdMs`" means reads that each saw it).
    *
-   * Not shown, and so not counted either way: a handed-on read (ADR 0030 — the probe asks it `yes` alone) and a read
-   * that failed (it read nothing; the time still counts, from the first read of the run).
+   * Not shown, and so not counted either way: a handed-on read (ADR 0030 — the probe asks it `yes` alone).
    *
-   * The known gap: a loading screen whose indicator a tree source does not report as `progress` holds like any other.
-   * On iOS through WDA an XCUI ActivityIndicator — React Native's ActivityIndicator — maps to `other` (the type is
-   * not in adapters/ios-node.ts#IOS_ROLE_MAP, which wda-source.ts extends; only ProgressIndicator is `progress`), so
-   * it does not break a hold there. Left for its own backlog row (the coordinator, D2 round-1 review).
+   * The known gap, backlog row D27: a loading screen whose indicator a tree source does not report as `progress`
+   * holds like any other. On iOS through WDA an XCUI ActivityIndicator — React Native's ActivityIndicator — maps to
+   * `other` (the type is not in adapters/ios-node.ts#IOS_ROLE_MAP, which wda-source.ts extends; only
+   * ProgressIndicator is `progress`), so it does not break a hold there.
    */
-  observe(tree: UiNode, nowMs: number): number | undefined;
+  observe(tree: UiNode | undefined, nowMs: number): number | undefined;
 }
 
-/** A `HoldTracker` that ends a run once it has held `holdMs` (the ladder passes reachRecheckMs). Pure: no clock, no device. */
+/**
+ * A `HoldTracker` that ends a run once it has held `holdMs` (the ladder passes reachRecheckMs).
+ * Pure: no clock, no device.
+ */
 export function holdTracker(holdMs: number): HoldTracker {
   let run: { fingerprint: string; since: number } | undefined;
   return {
     observe(tree, nowMs) {
-      if (isBareTreeMemo(tree) || showsProgress(tree)) {
+      if (tree === undefined || isBareTreeMemo(tree) || showsProgress(tree)) {
         run = undefined;
         return undefined;
       }

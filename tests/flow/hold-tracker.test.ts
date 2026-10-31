@@ -56,6 +56,14 @@ describe('holdTracker', () => {
     expect(t.observe(LOGIN, 4500)).toBe(2000);
   });
 
+  it('a failed read (undefined) starts it over: nothing was seen in between, so the tree did not provably hold', () => {
+    const t = holdTracker(2000);
+    t.observe(LOGIN, 0);
+    expect(t.observe(undefined, 1000)).toBeUndefined();
+    expect(t.observe(LOGIN, 2500)).toBeUndefined();
+    expect(t.observe(LOGIN, 4500)).toBe(2000);
+  });
+
   it('a spinner read starts it over, and a spinner never holds', () => {
     const t = holdTracker(2000);
     t.observe(LOGIN, 0);

@@ -446,6 +446,14 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
   });
 
+  it('failed reads between two reads of the same screen restart the hold: the hold counts from the first read after them', async () => {
+    // Entry: decor. Second look: the home screen once (~5 ms), reads failing until 100 ms, then the home screen on.
+    const { fake, seen } = relaunching((ms, read) => (read === 0 ? ANDROID_DECOR : read === 1 ? ANDROID_HOME : ms < 100 ? ANDROID_NULL_ROOT : ANDROID_HOME));
+    await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_cheap_only' });
+    expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(140); // 100 ms + the 40 ms hold, not ~100 ms
+    expect(seen.msBeforeLaunch).toBeLessThan(500);
+  });
+
   it('a rendered screen that shows a spinner never holds: the cheap rung waits for the whole window', async () => {
     const spinning = parseDump(
       androidXml(`
