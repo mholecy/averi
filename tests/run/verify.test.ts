@@ -157,11 +157,13 @@ describe('runVerification legs', () => {
     expect(settledOut.sections[0]).not.toContain('⚠ frame');
   });
 
-  // D13 (2026-10-31): the leg's health check and its final frame are out at
-  // once (as ensure_state's, tests/run/commands.test.ts). The answer is held
-  // until the capture starts — or, one after the other, until a timeout
-  // gives up — so the events say whether the two overlapped.
-  it('the leg asks whether the app runs while its final capture is out — the health line beside the frame', async () => {
+  // The leg's health line speaks for the app at the END of its final frame's
+  // settle (an app that dies while the frame settles reads dead), so the
+  // question is asked only once the last capture is in — unlike
+  // ensure_state's, which runs beside its frame (D13, 2026-10-31,
+  // tests/run/commands.test.ts). The answer is held until a capture starts,
+  // or a timeout, so a health check run beside the frame would show.
+  it('the leg asks whether the app runs only after its final frame is in — the health line speaks for the settled screen', async () => {
     const adapter = fake('android');
     const events: string[] = [];
     let captureStarted!: () => void;
@@ -179,18 +181,15 @@ describe('runVerification legs', () => {
       return adapter.nextScreenshot;
     };
     const out = await runVerification(request({ platforms: ['android'] }), async () => adapter);
-    // Out at once: asked before the frame's last capture, answered after its first.
-    expect(events.indexOf('asked')).toBeGreaterThanOrEqual(0);
-    expect(events.indexOf('asked')).toBeLessThan(events.lastIndexOf('capture'));
-    expect(events.indexOf('capture')).toBeLessThan(events.indexOf('answered'));
+    expect(events.filter((e) => e === 'capture').length).toBeGreaterThan(0);
+    expect(events.indexOf('asked')).toBeGreaterThan(events.lastIndexOf('capture'));
     expect(out.sections[0]).toMatch(/\nappAlive: true$/);
     expect(out.screenshots).toHaveLength(1);
   });
 
-  // Beside the frame, a health check that throws still fails its leg, as it
-  // did after it. appHealth guards the question and a rejected log read, so
-  // the throw is made where it does not guard: a log read that answers with
-  // something it cannot scan.
+  // A health check that throws fails its leg, and only its leg. appHealth
+  // guards the question and a rejected log read, so the throw is made where
+  // it does not guard: a log read that answers with something it cannot scan.
   it('a health check that throws still fails its leg, and only its leg', async () => {
     const android = fake('android');
     android.appRunning = false;
