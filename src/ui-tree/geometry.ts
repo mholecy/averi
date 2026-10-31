@@ -893,6 +893,36 @@ export interface DrawnFrame {
    * scroll container (a row coming in reads short).
    */
   readonly listedWhereItLies: boolean;
+  /**
+   * The sides along which the node runs on an UNKNOWN distance past its listed rect (`cutAtScreenEdges`): each lies on
+   * the screen's edge while the frame's side lies inside the screen, on a tree whose source cuts a node's bounds at the
+   * screen whatever scroll view it lies past (`clipsOf`'s `cutAtScreen`, draw-order.ts#listsBoundsCutAtScreen:
+   * uiautomator's, adapters/types.ts#UiNode.boundsCutAtScreen). There the listed rect is the screen's cut, not the
+   * node's: its visible fraction is an upper bound and its centre along that axis unknown
+   * (ui-tree/standing.ts#StandingFacts.unknownPast). Absent when none.
+   */
+  readonly unknownPast?: readonly Edge[];
+}
+
+/**
+ * How far a side may lie off the screen's edge and still be read as cut there, and how far inside the screen a frame's
+ * side must lie for the cut to be the screen's and not the frame's (`cutAtScreenEdges`): a pixel, a rounding of the
+ * source's bounds — as `MOTION_EDGE_SLACK` reads an edge flush with a frame's.
+ */
+const SCREEN_EDGE_SLACK = 1;
+
+/**
+ * The sides of `rect` the source cut at the edge of `screen` (`DrawnFrame.unknownPast`): each lies within
+ * SCREEN_EDGE_SLACK of the screen's matching edge while `frame` — what its scroll views draw — ends more than that
+ * inside the screen on that side. Measured (lab note D17, API 33): the carousel `[66,380][1014,614]`, its card C laid at
+ * x 586 948 wide, dumped `[586,380][1080,614]` — right; at rest `[1014,380][1080,614]` — right, its left known. A
+ * full-width row of a full-width list lies on the screen's edges with its frame: none. In the order of `EDGES`.
+ */
+export function cutAtScreenEdges(rect: Rect, frame: Rect, screen: Rect): Edge[] {
+  const side = (r: Rect, edge: Edge): number => (edge === 'top' ? r.y : edge === 'bottom' ? r.y + r.height : edge === 'left' ? r.x : r.x + r.width);
+  // How far inside the screen a side lies: positive inside, toward the screen's middle.
+  const inside = (r: Rect, edge: Edge): number => (edge === 'top' || edge === 'left' ? side(r, edge) - side(screen, edge) : side(screen, edge) - side(r, edge));
+  return EDGES.filter((edge) => Math.abs(inside(rect, edge)) <= SCREEN_EDGE_SLACK && inside(frame, edge) > SCREEN_EDGE_SLACK);
 }
 
 /** `Clips.contentToward`'s answer for content listed, not ending at the edge asked. */
@@ -943,9 +973,11 @@ function stackedAcross(nodes: readonly UiNode[], axis: ScrollAxis): boolean {
  * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry), which
  * `inScroller` and `drawnIn` ask; `unclipped`: whether its source reports
  * frames unclipped (draw-order.ts#listsUnclippedFrames), which `axesOf` and
- * `contentToward` ask — the two readers of the tree's dialect, both in draw order.
+ * `contentToward` ask — the two readers of the tree's dialect, both in draw order;
+ * `cutAtScreen`: whether its source cuts a node's bounds at the screen's edge
+ * (draw-order.ts#listsBoundsCutAtScreen), which `drawnIn`'s `unknownPast` asks.
  */
-export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonly ancestry: boolean; readonly unclipped?: boolean }): Clips {
+export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen = false }: { readonly ancestry: boolean; readonly unclipped?: boolean; readonly cutAtScreen?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();
   const parents = new Map<UiNode, UiNode>();
   const walk = (n: UiNode, chain: readonly Rect[]): void => {
@@ -1022,7 +1054,8 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false }: { readonl
     const within = drawn.get(node);
     if (within === undefined) return undefined;
     const frame = within.frame === undefined ? undefined : overhangAsFlush(node.rect, within.frame);
-    return { told: true, frame, scrollers: within.scrollers, listedWhereItLies: unclipped };
+    const unknownPast = !cutAtScreen || frame === undefined ? [] : cutAtScreenEdges(node.rect, frame, screenOf(tree));
+    return { told: true, frame, scrollers: within.scrollers, listedWhereItLies: unclipped, ...(unknownPast.length > 0 && { unknownPast }) };
   };
   const axes = new Map<UiNode, ScrollAxes>();
   const axesOf = (container: Rect): ScrollAxes | undefined => {

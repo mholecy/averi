@@ -476,6 +476,33 @@ describe('Scene.standing for the stop — its covers judged below the status ban
   });
 });
 
+/**
+ * D17: uiautomator cuts a carousel's card at the SCREEN's edge, not its carousel's (adapters/types.ts#UiNode.boundsCutAtScreen).
+ * The lab's `carousel-in-list` dump (API 33), its C moved to where the live check left it: the app laid C at x 586,
+ * 948 wide, the dump `[586,380][1080,614]`.
+ */
+describe('Scene.standing — a side uiautomator cut at the screen\'s edge (D17): `unknownPast`, its visible fraction an upper bound', () => {
+  const carousel = async (cRect: Rect): Promise<{ t: UiNode; c: UiNode }> => {
+    const t = parseDump(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/carousel-in-list.xml', import.meta.url), 'utf8'));
+    const c = byId(t, 'lab.carousel-in-list.C');
+    (c as { rect: Rect }).rect = cRect;
+    return { t, c };
+  };
+
+  it("C dumped `[586,380][1080,614]`: its right side unknown, 428 of its 494 listed px drawn in the carousel — at most that share", async () => {
+    const { t, c } = await carousel({ x: 586, y: 380, width: 494, height: 234 });
+    const s = sceneOf(t).standing(c, PIXEL, PLAIN);
+    expect(s.facts.unknownPast).toEqual(['right']);
+    expect(s.facts.visible).toBeCloseTo(428 / 494);
+    expect(s.facts.clipped).toEqual(['right']);
+  });
+
+  it('C whole inside the carousel: none', async () => {
+    const { t, c } = await carousel({ x: 66, y: 380, width: 948, height: 234 });
+    expect(sceneOf(t).standing(c, PIXEL, PLAIN).facts.unknownPast).toBeUndefined();
+  });
+});
+
 /** Every fixture tree the suite parses, with its platform: the WDA sources, the idb dumps, the Compose snapshots and the synthetic uiautomator trees. */
 const everyFixture = async (): Promise<[string, UiNode, 'ios' | 'android'][]> => {
   const trees: [string, UiNode, 'ios' | 'android'][] = [];

@@ -59,6 +59,12 @@ describe('parseUiautomatorXml', () => {
     });
   });
 
+  it("marks the root with the source's dialect: it cuts a node's bounds at the screen's edge (`boundsCutAtScreen`, D17) — one window or several", () => {
+    expect(tree.boundsCutAtScreen).toBe(true);
+    const two = parseDump('<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]" /><node class="android.widget.FrameLayout" bounds="[0,1500][1080,2220]" /></hierarchy>');
+    expect(two.boundsCutAtScreen).toBe(true);
+  });
+
   it('exposes EditText text as value', () => {
     const username = tree.children[1];
     expect(username).toMatchObject({

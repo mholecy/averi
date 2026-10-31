@@ -1492,12 +1492,13 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
   const children = roots.map((root) => normalizeNode(root, { grown }));
   // The source's marks: Compose lists a control's touch target as its wrapper (types.ts#UiNode.paddedTouchTargets),
   // the dump lists the active window only (`activeWindowOnly`), and that window, when the dump shows it presented, is
-  // marked so (`presentation`, `presentedWindow`). Set before the widening: the draw order judging it reads the marks.
+  // marked so (`presentation`, `presentedWindow`), and it cuts a node's bounds at the screen's edge
+  // (`boundsCutAtScreen`). Set before the widening: the draw order judging it reads the marks.
   const presented = children.length === 1 ? presentedWindow(roots[0], children[0].rect) : undefined;
   const tree: UiNode =
     children.length === 1
-      ? { ...children[0], paddedTouchTargets: true, activeWindowOnly: true, ...(presented !== undefined && { presentation: presented }) }
-      : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true, activeWindowOnly: true };
+      ? { ...children[0], paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true, ...(presented !== undefined && { presentation: presented }) }
+      : { role: 'container', label: null, identifier: null, value: null, rect: zeroRect(), children, paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true };
   widenUnderCovers(tree, grown, drawnOverStrip);
   return tree;
 }

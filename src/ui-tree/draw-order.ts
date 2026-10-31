@@ -1661,6 +1661,16 @@ export function listsUnclippedFrames(tree: UiNode): boolean {
 }
 
 /**
+ * Whether the tree's source cuts a node's bounds at the screen's edge whatever scroll view it lies past
+ * (`UiNode.boundsCutAtScreen`: uiautomator's) — so a side lying on the screen's edge, where its drawn frame's side lies
+ * inside the screen, runs on an unknown distance past it (geometry.ts#DrawnFrame.unknownPast). What the drawn frame
+ * asks (geometry.ts#clipsOf's `cutAtScreen`, through ui-tree/standing.ts#sceneOf).
+ */
+export function listsBoundsCutAtScreen(tree: UiNode): boolean {
+  return tree.boundsCutAtScreen === true;
+}
+
+/**
  * The draw order of `tree` — `orderSeen`: the order a screenshot saw of controls the tree lists in reading order
  * (ui-tree/seen-order.ts; reading-order.ts#readingOrderOf), when the caller looked; absent, the listing alone.
  */
