@@ -92,31 +92,38 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
   A text the two would receive differently is the CLI's too: a lone surrogate reaches the CLI's argv as U+FFFD (node
   encodes it so) but the helper's JSON as itself, and a NUL makes execFile refuse the call where the helper would type
   it (both measured 2026-10-31, node 22).
-- **No retry after a death under an input.** A read the helper died under is retried on the CLI (a read twice is one
-  read); an input is not: fb-idb sends the HID event over the companion's gRPC before it answers, so a death after the
-  request was written may come after the event reached the simulator — a tap repeated is two taps, a `ui text`
+- **The ack.** The script writes `{"got": id}` on fd 3 right after it reads a request line off stdin, before
+  `gen_main` runs it (review round 1, MINOR-1). Node marks the pending request taken; an ack of any other id is stale
+  and ignored. It is what splits a death in two below.
+- **No retry after a death under an input it took.** A read the helper died under is retried on the CLI (a read twice
+  is one read); an input acknowledged is not: fb-idb sends the HID event over the companion's gRPC before it answers,
+  so a death after the ack may come after the event reached the simulator — a tap repeated is two taps, a `ui text`
   repeated types the text twice. `runIdb` throws instead, in exec's shape (an `ExecError`, exit `null` as a CLI killed
   by a signal reads, not timed out), the sentence where the CLI's stderr would be — the one new error text of the
   helper:
 
   ```
   Command failed (exit null): idb ui tap 120 640 --udid <udid>
-  idb helper exited during `idb ui tap 120 640 --udid <udid>`; the input may or may not have reached the simulator
+  the idb helper exited during this input; it may or may not have reached the simulator — look at the screen before repeating it
   ```
 
-  A disposed adapter under an input in flight reads the same. Nothing in averi matches idb's input errors by text
+  (`idb.ts#INPUT_LOST`; the first line is exec's, the second does not repeat the command — review round 1, NIT-2.) A
+  disposed adapter under an input it took reads the same. Nothing in averi matches idb's input errors by text
   (grep of `src`, `tests`, `docs` 2026-10-31: callers read `ExecError.timedOut`, never the message), so no caller
   changes.
-- **A death before the request was sent runs the CLI**, input or not, as precisely as node can tell "not sent": the
-  child has exited (`exitCode`/`signalCode` set, or stdin no longer writable) with its `exit` not handled yet — `run`
-  declines, nothing is written; or the write itself failed (EPIPE: a pipe with no reader took none of the line) —
-  `IdbHelperReply` `unsent`, and the helper is killed. A write that succeeded only says the line is in the pipe: a death
-  after it is `died`, however far the helper got — also when the exit is seen before a late write error.
+- **A death before the helper took the request runs the CLI**, input or not — `gen_main` never saw it, so it runs
+  once: the child has exited (`exitCode`/`signalCode` set, or stdin no longer writable) with its `exit` not handled
+  yet — `run` declines, nothing is written; the write itself failed (EPIPE: a pipe with no reader took none of the
+  line) — `IdbHelperReply` `unsent`, and the helper is killed; or it died and its fd 3 ended with no ack — `unsent`.
+  node may run `exit` before fd 3's last lines (an ack written just before the death), so an unacknowledged request is
+  judged only once fd 3 has ended; a fd 3 still open `DRAIN_MS` (1 s) after the exit — something else holds it, a
+  companion the helper spawned — leaves it unknown, and unknown is `died`: reported, never repeated. The reviewer's
+  fuzz of round 1 found 21 of 22 "lost" reports were inputs the helper had never read, before the ack.
 - **Timeouts** as for reads: the helper is SIGKILLed, `Command timed out: idb …`, not retried, and counted toward
   `TIMEOUTS_IN_A_ROW` with reads (a read's timeout then an input's turn it off).
 - **stdout carries bytes** (NIT-2 of D7a's review, the residual below now closed): each stream is a `TextIOWrapper`
   over a `BytesIO`, in the encoding and error handler of the helper's own stdout/stderr — the CLI's under the same
-  locale — so `sys.stdout.buffer` exists (fb-idb's `screenshot -`, `file pull … -`, `video` write there), and the
+  locale (stderr's `backslashreplace` pinned: a surrogate escape prints as `\udcff`, as the process's own stderr does) — so `sys.stdout.buffer` exists (fb-idb's `screenshot -`, `file pull … -`, `video` write there), and the
   reply carries both streams as base64 of their bytes; node decodes them as exec does (stdout a Buffer, stderr utf-8).
   The HID verbs print nothing on stdout; `--help` and argparse's errors are the paths that print, and are pinned.
 - **Busy → CLI, and ordering.** HID and reads share one helper and one request at a time: an input issued while a read
@@ -130,16 +137,19 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
   tree). A simulator served under both tree sources at once (two projects, two cached adapters) runs two helpers —
   each still one request at a time; sharing one per simulator would need a refcount across adapters, not done.
 - **D24's split through the helper.** `typeText` into an app that drops a tail sends `ui text <first>`, waits
-  `FIRST_KEY_ALONE_MS` (150 ms, explicit, unchanged), then `ui text <rest>`. Through the helper each call returns
-  ~120 ms sooner (D7's tap figure; `ui text` unmeasured), so the first key lands the same 150 ms before the rest is
-  SENT, but the rest's events start ~120 ms sooner after the first call returned than through the CLI. D24's 15/15 was
+  `FIRST_KEY_ALONE_MS` (150 ms, explicit, unchanged), then `ui text <rest>`. Through the CLI the second call paid
+  the Python start-up (~90 ms of D7's −122 on a tap; `ui text` unmeasured) between the wait and its first event; through
+  the helper it does not, so the gap between the first key and the rest shrinks by roughly that — the 150 ms itself
+  stays. D24's 15/15 was
   measured through the CLI (raw `idb ui text`); the owner's RN re-check (`ios-run.sh --app react-native`, rn-fill-20,
   helper on) must confirm the split still lands whole first time.
 - Tests: `tests/adapters/idb-helper.test.ts` (each HID argv to the helper; near-miss shapes and ill-formed texts to the
-  CLI; a death under an input → the error, no CLI call; an exit not yet seen and a failed write → the CLI; an input's
+  CLI; a death after the ack → the error, no CLI call; before it, an exit not yet seen, and a failed write → the CLI;
+  an ack read after the exit still counts; a fd 3 that never ends → the error; a stale ack ignored; an input's
   timeout counted; clearText's two sequences one after the other), `tests/adapters/idb-helper-contract.test.ts` (every
   HID argv against `--companion localhost:1`, a dash-led text, and `ui tap --help`: equal code, stderr and stdout bytes
-  to the CLI; a fake fb-idb writing to `sys.stdout.buffer`), `tests/perf/instrument.test.ts` (D0 labels each HID
+  to the CLI; a fake fb-idb writing to `sys.stdout.buffer`, printing a surrogate escape to stderr, and dying inside
+  `gen_main` — `died` five times in five, the real ack read), `tests/perf/instrument.test.ts` (D0 labels each HID
   helper call as its CLI call, `via: helper`).
 
 ## Why Python and `gen_main`, not a node gRPC client
@@ -157,7 +167,7 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
 - A helper living for hours is unmeasured: leaks, a companion restarted under it (each call builds its client afresh,
   as the CLI does, so a new companion should be found — not measured), grpc state across many calls.
 - One request at a time: concurrent iOS calls still pay the CLI.
-- A HID event lost when the helper dies mid-request (D7b) is reported, not repeated: the agent reads that the input may
+- A HID event lost when the helper dies after it took the request (D7b) is reported, not repeated: the agent reads that the input may
   or may not have landed and must look before it repeats the step. A CLI killed mid-call left the same uncertainty,
   but a helper death is a new way to get there (one process for many calls).
 - ~~stdout is TEXT~~ — closed by D7b: the streams are bytes (`sys.stdout.buffer` exists), carried as base64.

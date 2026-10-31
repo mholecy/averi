@@ -146,6 +146,14 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
     "        sys.stdout.buffer.write(bytes([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x0a]))",
     "        sys.stderr.buffer.write(b'raw \\xff\\n')",
     '        return 0',
+    // A surrogate escape (an undecodable byte of an argv or a file name) printed as text: stderr's error handler.
+    // A helper that dies inside gen_main — after it acknowledged the request (D7b).
+    "    if argv[0] == 'exit':",
+    '        import os',
+    '        os._exit(9)',
+    "    if argv[0] == 'surrogate':",
+    "        print('\\udcff', file=sys.stderr)",
+    '        return 0',
     '',
   ].join('\n');
   async function fakeIdb(root: string, who: string) {
@@ -157,7 +165,11 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), 'averi-idb-bootstrap-'));
     await fakeIdb(join(dir, 'tool'), 'beside the script');
-    await writeFile(join(dir, 'tool', 'idb-script'), '#!/usr/bin/env python3\n');
+    // Runnable as the CLI is: the fake's own `idb` process, for what the real stderr does.
+    await writeFile(
+      join(dir, 'tool', 'idb-script'),
+      '#!/usr/bin/env python3\nimport asyncio, sys\nfrom idb.cli.main import gen_main\nsys.exit(asyncio.run(gen_main(sys.argv[1:])))\n',
+    );
     await mkdir(join(dir, 'bin'));
     await symlink(join(dir, 'tool', 'idb-script'), join(dir, 'bin', 'idb'));
     await fakeIdb(join(dir, 'cwd'), 'planted in the cwd');
@@ -189,6 +201,27 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
     expect(r.stdout.equals(Buffer.concat([Buffer.from('text first, é\n'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x0a])]))).toBe(true);
     expect(r.stderr).toBe('raw \uFFFD\n'); // exec: stderr.toString('utf8')
   }, 30_000);
+
+  it('prints a surrogate escape to stderr as the fake\'s own process does — the stream\'s error handler, not strict', async () => {
+    const r = await untilReady(helper, ['surrogate']);
+    const byProcess = await exec(found!.python, [join(dir, 'bin', 'idb'), 'surrogate'], { timeoutMs: 20_000 });
+    expect(r).toMatchObject({ kind: 'answer', code: 0 });
+    if (r.kind !== 'answer') return;
+    expect(r.stderr).toBe(byProcess.stderr);
+    expect(r.stderr).toBe('\\udcff\n'); // backslashreplace, Python's stderr handler
+  }, 30_000);
+
+  it('answers `died`, not `unsent`, for a request gen_main was running when the process died — the ack is read', async () => {
+    // A helper of its own each time: one that dies before its first answer counts as a failed start (two turn it off).
+    for (let i = 0; i < 5; i++) {
+      const dying = new IdbHelper({ interpreter: async () => ({ python: found!.python, idb: join(dir, 'bin', 'idb') }) });
+      try {
+        expect(await untilReady(dying, ['exit'])).toEqual({ kind: 'died' });
+      } finally {
+        await dying.dispose();
+      }
+    }
+  }, 60_000);
 
   it('captures what a logging handler writes into the reply\'s stderr', async () => {
     expect(await untilReady(helper, ['log'])).toMatchObject({ kind: 'answer', code: 0, stderr: 'ERROR through the handler\n' });

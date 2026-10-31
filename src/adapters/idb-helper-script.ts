@@ -9,8 +9,10 @@
  * `idb.cli.main.main` runs) on an event loop of its own, created and closed per request as the CLI's one per process
  * is, with `sys.stdout`/`sys.stderr` and the stream of every logging handler on the root logger (main.py's
  * `basicConfig` puts one on the stderr of import time; `logger.exception` writes the CLI's tracebacks through it)
- * pointed at buffers. The reply, `{"id", "code", "stdout", "stderr"}` (the streams base64), goes out on fd 3 — a pipe of its own, so a stray
- * `print` of a plugin or of the import cannot corrupt the protocol. The first line on fd 3 is `{"ready": <pid>}`,
+ * pointed at buffers. The reply, `{"id", "code", "stdout", "stderr"}` (the streams base64), goes out on fd 3 — a pipe
+ * of its own, so a stray `print` of a plugin or of the import cannot corrupt the protocol. Before it runs a request it
+ * says `{"got": id}` there (D7b): node then knows the line left stdin, and a death before the ack runs an input on the
+ * CLI — gen_main never saw it — where a death after it is reported (idb.ts#inputLost). The first line on fd 3 is `{"ready": <pid>}`,
  * written only after the import succeeded: an fb-idb without `gen_main`, or an interpreter that cannot import it, exits
  * before it, and node reads that as a failed start.
  *
@@ -30,8 +32,9 @@
  * a BytesIO, in the encoding and error handler of the helper's own stdout/stderr — what the CLI's would have under the
  * same locale (D7b, ADR 0032 NIT-2): a command that writes bytes to `sys.stdout.buffer` (fb-idb's `screenshot -`,
  * `file pull … -`, `video`) runs here as in the CLI, and the reply carries both streams as base64 of their bytes, which
- * node decodes as exec does (stdout a Buffer, stderr utf-8). The HID verbs D7b serves print nothing on stdout. It exits on stdin's EOF — the end node gives it on dispose, and the one the kernel gives it when node dies —
- * so it cannot outlive the server by more than its current request.
+ * node decodes as exec does (stdout a Buffer, stderr utf-8). The HID verbs D7b serves print nothing on stdout. It
+ * exits on stdin's EOF — the end node gives it on dispose, and the one the kernel gives it when node dies — so it
+ * cannot outlive the server by more than its current request.
  */
 export const IDB_HELPER_SCRIPT = String.raw`
 import sys, os
@@ -51,6 +54,7 @@ reply({'ready': os.getpid()})
 real_out, real_err = sys.stdout, sys.stderr
 for line in sys.stdin:
     req = json.loads(line)
+    reply({'got': req['id']})
     out_b, err_b = io.BytesIO(), io.BytesIO()
     out = io.TextIOWrapper(out_b, encoding=real_out.encoding, errors=real_out.errors, write_through=True)
     err = io.TextIOWrapper(err_b, encoding=real_err.encoding, errors=real_err.errors, write_through=True)

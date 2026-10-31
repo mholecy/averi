@@ -45,7 +45,10 @@ class FakeChild extends EventEmitter {
   }
   kill(signal: string) {
     this.signals.push(signal);
-    queueMicrotask(() => this.emit('exit', null, signal));
+    queueMicrotask(() => {
+      this.emit('exit', null, signal);
+      this.fd3.end();
+    });
     return true;
   }
   ready() {
@@ -56,7 +59,17 @@ class FakeChild extends EventEmitter {
     const b64 = (t: string) => Buffer.from(t).toString('base64');
     this.fd3.write(JSON.stringify({ id, code, stdout: b64(stdout), stderr: b64(stderr) }) + '\n');
   }
+  /** The helper took the last request off stdin (`{"got": id}`, D7b): gen_main runs it next. */
+  ack(id = this.requests.at(-1)!.id) {
+    this.fd3.write(JSON.stringify({ got: id }) + '\n');
+  }
+  /** It exits: node sees the exit, then fd 3's end — the order node gives no promise about either way. */
   die() {
+    this.exitOnly();
+    this.fd3.end();
+  }
+  /** It exits, and something else still holds fd 3 open (a grandchild): its end never comes. */
+  exitOnly() {
     this.exitCode = 1;
     this.emit('exit', 1, null);
   }
@@ -454,16 +467,69 @@ describe('runIdb with an IdbHelper — input (D7b)', () => {
     const tap = runIdb(cli.exec, UDID, ['ui', 'tap', '120', '640'], { helper });
     await settle();
     expect(s.children[0].requests).toHaveLength(1); // sent
+    s.children[0].ack(); // and taken: gen_main was running it
+    await settle();
     s.children[0].die();
     const got = await tap.catch((e: unknown) => e);
     expect(got).toBeInstanceOf(ExecError);
-    const command = `idb ui tap 120 640 --udid ${UDID}`;
     expect((got as ExecError).message).toBe(
-      `Command failed (exit null): ${command}\nidb helper exited during \`${command}\`; the input may or may not have reached the simulator`,
+      `Command failed (exit null): idb ui tap 120 640 --udid ${UDID}\n` +
+        'the idb helper exited during this input; it may or may not have reached the simulator — look at the screen before repeating it',
     );
     expect((got as ExecError).exitCode).toBeNull();
     expect((got as ExecError).timedOut).toBe(false);
     expect(cli.idbCalls).toEqual([CLI_ARGV]); // the starting call only: no CLI tap
+  });
+
+  it('runs an input on the CLI when the helper died before it took the request off stdin — gen_main never ran it', async () => {
+    const { helper, s, cli } = await readyHelper();
+    const tap = runIdb(cli.exec, UDID, ['ui', 'tap', '120', '640'], { helper });
+    await settle();
+    expect(s.children[0].requests).toHaveLength(1); // written, never acknowledged
+    s.children[0].die();
+    expect((await tap).stdout.toString()).toBe('cli');
+    expect(cli.idbCalls).toEqual([CLI_ARGV, ['ui', 'tap', '120', '640', '--udid', UDID]]);
+  });
+
+  it('reads an acknowledgement that comes after the exit — fd 3 is drained before the input is judged unsent', async () => {
+    const { helper, s, cli } = await readyHelper();
+    const tap = runIdb(cli.exec, UDID, ['ui', 'tap', '120', '640'], { helper });
+    await settle();
+    s.children[0].exitOnly();
+    s.children[0].ack();
+    s.children[0].fd3.end();
+    expect(((await tap.catch((e: unknown) => e)) as ExecError).exitCode).toBeNull();
+    expect(cli.idbCalls).toEqual([CLI_ARGV]);
+  });
+
+  it('reports an input whose fd 3 never ends after the exit — unknown is not unsent', async () => {
+    const s = fakeSpawn();
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter, log, drainMs: 20 });
+    const cli = fakeExec();
+    await runIdb(cli.exec, UDID, READ, { helper });
+    await settle();
+    s.children[0].ready();
+    await settle();
+    const tap = runIdb(cli.exec, UDID, ['ui', 'tap', '120', '640'], { helper });
+    await settle();
+    s.children[0].exitOnly();
+    expect(((await tap.catch((e: unknown) => e)) as ExecError).exitCode).toBeNull();
+    expect(cli.idbCalls).toEqual([CLI_ARGV]);
+  });
+
+  it('ignores an acknowledgement of another request — a stale id does not make the pending one taken', async () => {
+    const { helper, s, cli } = await readyHelper();
+    const read = runIdb(cli.exec, UDID, READ, { helper });
+    await settle();
+    s.children[0].ack();
+    s.children[0].answer(0, 'helper');
+    await read;
+    const tap = runIdb(cli.exec, UDID, ['ui', 'tap', '120', '640'], { helper });
+    await settle();
+    s.children[0].ack(1); // the read's id again
+    await settle();
+    s.children[0].die();
+    expect((await tap).stdout.toString()).toBe('cli');
   });
 
   it('runs an input on the CLI when the helper had already exited before it was sent — its exit not seen yet', async () => {
@@ -503,8 +569,10 @@ describe('runIdb with an IdbHelper — input (D7b)', () => {
     const { helper, s, cli } = await readyHelper();
     const text = runIdb(cli.exec, UDID, ['ui', 'text', 'abc'], { helper });
     await settle();
+    s.children[0].ack();
+    await settle();
     await helper.dispose();
-    expect(((await text.catch((e: unknown) => e)) as ExecError).message).toMatch(/idb helper exited during `idb ui text abc --udid .*`; the input may or may not have reached the simulator$/);
+    expect(((await text.catch((e: unknown) => e)) as ExecError).message).toMatch(/\nthe idb helper exited during this input; it may or may not have reached the simulator/);
     expect(s.children[0].requests).toHaveLength(1);
     expect(cli.idbCalls).toEqual([CLI_ARGV]);
   });

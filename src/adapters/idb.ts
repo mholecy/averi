@@ -52,17 +52,20 @@ function helperKind(args: readonly string[]): 'read' | 'input' | undefined {
 }
 
 /**
- * The helper died with an input request in it (D7b): the request was written to it, so the HID event may or may not
- * have reached the simulator — fb-idb sends it over the companion's gRPC before it answers, and a death between the
- * two is indistinguishable from one before. Not retried: a tap repeated is two taps, a `ui text` repeated types the
- * text twice. Thrown in exec's shape (an ExecError, exit `null` as a CLI killed by a signal reads, not timed out), the
- * sentence where the CLI's stderr would be, so an agent reads `Command failed (exit null): idb ui tap 120 640 --udid U`
- * and then `idb helper exited during \`idb ui tap 120 640 --udid U\`; the input may or may not have reached the
- * simulator` — and looks before it repeats the step. The one error text the helper adds (ADR 0032, D7b); nothing in
- * averi matches idb's input errors by text (grep 2026-10-31: only ExecError.timedOut is read, by OCR and Android).
+ * The helper died with an input request it had taken (D7b): it acknowledged the line (`{"got": id}`, idb-helper.ts),
+ * so gen_main was running it, and the HID event may or may not have reached the simulator — fb-idb sends it over the
+ * companion's gRPC before it answers, and a death between the two is indistinguishable from one before. Not retried:
+ * a tap repeated is two taps, a `ui text` repeated types the text twice. (A request the helper never took is `unsent`
+ * and runs on the CLI.) Thrown in exec's shape — an ExecError, exit `null` as a CLI killed by a signal reads, not
+ * timed out — so the first line is exec's, `Command failed (exit null): idb ui tap 120 640 --udid U`, and INPUT_LOST
+ * stands where the CLI's stderr would. The one error text the helper adds (ADR 0032, D7b); nothing in averi matches
+ * idb's input errors by text (grep 2026-10-31: only ExecError.timedOut is read, by OCR and Android).
  */
+export const INPUT_LOST =
+  'the idb helper exited during this input; it may or may not have reached the simulator — look at the screen before repeating it';
+
 export function inputLost(command: string): ExecError {
-  return new ExecError(command, null, `idb helper exited during \`${command}\`; the input may or may not have reached the simulator`);
+  return new ExecError(command, null, INPUT_LOST);
 }
 
 /**
@@ -88,13 +91,14 @@ export interface IdbHelperCall {
  * also routes to the idb helper (idb-helper.ts) and publishes the helper's
  * calls on the diagnostics channels above.
  *
- * With a `helper` (D7a, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md) an argv of HELPER_ARGV is
- * offered to it first; when it takes the call, the answer is the CLI's, to the byte of the error an agent reads: a
- * nonzero code throws the ExecError exec builds for the same failure (`Command failed (exit N): idb <argv> --udid U`
- * and the stderr — exec.ts), a timeout the same `Command timed out: idb …`; a helper that died under a read is retried once on the CLI, whose
- * answer or error is the one returned — under an input (D7b) it is not: inputLost says the event may or may not have
- * landed. A request that was never sent (`unsent`) runs on the CLI either way. When the helper does not take the call
- * (not ready yet, busy, off), the CLI runs as before.
+ * With a `helper` (D7a, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md) an argv on READ_ARGV or
+ * HID_ARGV (helperKind) is offered to it first; when it takes the call, the answer is the CLI's, to the byte of the
+ * error an agent reads: a nonzero code throws the ExecError exec builds for the same failure (`Command failed (exit
+ * N): idb <argv> --udid U` and the stderr — exec.ts), a timeout the same `Command timed out: idb …`; a helper that
+ * died under a read is retried once on the CLI, whose answer or error is the one returned — under an input it had
+ * taken (D7b) it is not: inputLost says the event may or may not have landed. A request the helper never took
+ * (`unsent`: the write failed, or it died before it acknowledged the line) runs on the CLI either way. When the helper
+ * does not take the call (not ready yet, busy, off), the CLI runs as before.
  */
 export async function runIdb(
   exec: ExecFn,

@@ -358,7 +358,7 @@ one happens by itself.
 
 - **`idb` install fails** — fb-idb requires Python ≤ 3.13: `pipx install fb-idb --python python3.13`.
 - **An iOS tree read or input behaves differently than `idb ui describe-all --json` / `idb ui tap …` run by hand, or a
-  step fails with `idb helper exited during …; the input may or may not have reached the simulator`** — averi reads the
+  step fails with `the idb helper exited during this input; it may or may not have reached the simulator`** — averi reads the
   iOS tree and sends taps, swipes, text and keys through a persistent idb helper (one Python process per simulator,
   running idb's own CLI; it falls back to the `idb` CLI by itself when it cannot start or dies — but an input it died
   under is reported, not repeated: look at the screen before you repeat the step). To rule it out, set
