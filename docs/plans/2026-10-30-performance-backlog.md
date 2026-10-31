@@ -51,7 +51,7 @@ measured before and after.
 | D21 | iOS idb: right after a simulator boot with a fresh companion every `idb ui describe-all` fails "The simulator's accessibility service named no frontmost application" for the whole call (D20's device check 2026-10-31: 133 reads in 90 s, 5 of 5 repeats); a hand launch + read before the run cured it once. Find the cause and what averi can do (re-front the app? a named recovery in the reply?) — needs the device | stability | open |
 | D22 | iOS registry probe: the bound simulator proven booted from its `device.plist` (0.05 ms) before `simctl list devices` (~80–110 ms, every verb); anything else falls back to simctl | device | done (3574d5b2; ADR 0031) — device-checked: tree −32 %, tap −12 % |
 | D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) together, not in series | device | done (fa334d35; not one spawn — the iOS 27 runtime has no shell; 445 → 250 ms a launch on the lab simulator) |
-| D24 | iOS RN: `idb ui text` drops the last 5–7 characters into rn-field in every fill-20 (D0 on iOS), so fill polls 5 × 400 ms and retypes (~2.6 s of 5.9 s) — measured ("D7 and D24 measured"): the first key alone, 150 ms, then the rest, sticky per app after a loss | stability | open |
+| D24 | iOS RN: a burst from `idb ui text` drops a controlled field's tail — after a repaired drop (ADR 0023's retype landed it), later typings into that app send the first key alone, 150 ms, then the rest | stability | done (ffec743d; ADR 0023 D24 amendment) — the owner's RN A/B pending |
 
 ## Notes
 
