@@ -219,7 +219,10 @@ describe('parseWdaSource — normalization and input shapes', () => {
   // arrives as `ActivityIndicator` (WDA strips the prefix) and is a spinner: `progress`, so showsProgress sees it.
   it('maps ActivityIndicator to "progress", which showsProgress reads as loading', () => {
     const tree = parseWdaSourceValue(
-      el('Window', { children: [el('ActivityIndicator', { rect: { x: 181, y: 417, width: 40, height: 40 } })] }),
+      el('Window', {
+        rect: { x: 0, y: 0, width: 402, height: 874 },
+        children: [el('ActivityIndicator', { rect: { x: 181, y: 417, width: 40, height: 40 } })],
+      }),
     );
     expect(tree.children[0]).toMatchObject({ role: 'progress' });
     expect(showsProgress(tree)).toBe(true);
@@ -230,6 +233,7 @@ describe('parseWdaSource — normalization and input shapes', () => {
   it('a hidden (0/0) ActivityIndicator on a loaded screen still makes showsProgress true', () => {
     const tree = parseWdaSourceValue(
       el('Window', {
+        rect: { x: 0, y: 0, width: 402, height: 874 },
         children: [
           el('StaticText', { label: 'Prehľad', rect: { x: 24, y: 120, width: 354, height: 24 } }),
           el('ActivityIndicator', { isVisible: '0', isAccessible: '0', rect: { x: 181, y: 417, width: 40, height: 40 } }),
