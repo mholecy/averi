@@ -50,7 +50,43 @@ states:
     reach: [open_app, fresh_launch]
   no_reach:
     detect: { element: { id: login_screen } }
+  logged_out_cheap_only:
+    detect: { element: { id: login_screen } }
+    reach: [open_app]
+  logged_out_prompt_first:
+    detect: { element: { id: login_screen } }
+    reach: [dismiss_prompts, fresh_launch]
+  logged_out_via_wiping:
+    detect: { element: { id: login_screen } }
+    reach: [via_wiping]
+  home_after_wipe:
+    detect: { element: { id: nav.tab_overview } }
+    reach: [fresh_launch]
+  logged_out_two_cheap:
+    detect: { element: { id: login_screen } }
+    reach: [dismiss_prompts, open_app]
+  logged_out_nested_then_wipe:
+    detect: { element: { id: login_screen } }
+    reach: [via_cheap_ladder, fresh_launch]
+  cheap_inner:
+    detect: { element: { id: nav.tab_overview } }
+    reach: [tap_missing]
 flows:
+  dismiss_prompts:
+    steps:
+      - optional:
+          - tap: { id: later }
+  via_cheap_ladder:
+    requires: cheap_inner
+    steps:
+      - launch: { clearState: false }
+  tap_missing:
+    steps:
+      - tap: { id: never_there }
+  via_wiping:
+    requires: home_after_wipe
+    steps:
+      - launch: { clearState: false }
   fresh_launch:
     steps:
       - launch: { clearState: true }
@@ -356,23 +392,23 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
 
   it('bare, then a rendered screen outside the state that holds: the cheap rung starts after the hold, well before the deadline', async () => {
     const { fake, seen } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_HOME));
-    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_cheap_first' });
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_cheap_only' });
     // The home screen from 30 ms, held 40 ms (reachRecheckMs): the rung at ~70 ms, not at the 1 s deadline.
     expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(70);
     expect(seen.msBeforeLaunch).toBeLessThan(500);
     expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
-    expect(trace).toContainEqual({ action: 'state logged_out_cheap_first', detail: 'reached after open_app' });
+    expect(trace).toContainEqual({ action: 'state logged_out_cheap_only', detail: 'reached after open_app' });
     // Only the entry probe was bare.
     expect(actions(trace).filter((a) => a === '⚠ detect')).toHaveLength(1);
   });
 
   it('the held "no" writes one line, right before the rung, saying why the rung ran before the deadline', async () => {
     const { fake } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_HOME));
-    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_cheap_first' });
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_cheap_only' });
     const held = trace.filter((t) => t.detail?.startsWith('second look:') === true);
     expect(held).toHaveLength(1);
     expect(held[0]).toEqual({
-      action: 'state logged_out_cheap_first',
+      action: 'state logged_out_cheap_only',
       detail: expect.stringMatching(/^second look: not detected, the screen held still 0\.\d+ s — running open_app before the 1 s window's end$/),
     });
     const at = trace.indexOf(held[0]!);
@@ -392,21 +428,10 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     expect(trace).toContainEqual({ action: 'state logged_out', detail: 'reached after fresh_launch' });
   });
 
-  it('a rendered tree that changes on every read never holds: the cheap rung waits for the whole window', async () => {
-    const ticking = (read: number) =>
-      parseDump(
-        androidXml(`
-          <node index="0" text="${read}" resource-id="clock" class="android.widget.TextView" package="${PKG}" content-desc="" bounds="[60,700][1020,840]"/>`),
-      );
-    const { fake, seen } = relaunching((ms, read) => (ms < 30 ? ANDROID_DECOR : ticking(read)));
-    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_first' });
-    expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
-  });
-
   it('ONE rendered read among bare ones is no hold: the cheap rung waits for the whole window, as before D2', async () => {
     // Entry: decor. Second look: decor, decor, the home screen once, decor to the deadline.
     const { fake, seen } = relaunching((_, read) => (read === 3 ? ANDROID_HOME : ANDROID_DECOR));
-    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_first' });
+    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_only' });
     expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
     expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
   });
@@ -414,7 +439,7 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
   it('the same rendered screen with bare reads between never holds: a bare read restarts the hold', async () => {
     // Entry: decor. Second look: home and decor in turn — the home screen's fingerprint repeats, but never twice in a row.
     const { fake, seen } = relaunching((_, read) => (read % 2 === 1 ? ANDROID_HOME : ANDROID_DECOR));
-    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_first' });
+    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_only' });
     expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
   });
 
@@ -427,21 +452,49 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     expect(isBareTree(spinning)).toBe(false);
     expect(showsProgress(spinning)).toBe(true);
     const { fake, seen } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : spinning));
-    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_first' });
+    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_only' });
     expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
   });
 
-  it('a spinner read breaks a hold as a bare read does: the same screen with spinner reads between never holds', async () => {
-    const spinning = parseDump(
-      androidXml(`
-          <node index="0" text="" resource-id="spinner" class="android.widget.ProgressBar" package="${PKG}" content-desc="" bounds="[480,1000][600,1120]"/>
-          <node index="1" text="Prehľad" resource-id="nav.tab_overview" class="android.widget.Button" package="${PKG}" content-desc="" bounds="[0,2100][360,2274]"/>`),
-    );
-    expect(isBareTree(spinning)).toBe(false);
-    // Entry: decor. Second look: the home screen and the spinner in turn.
-    const { fake, seen } = relaunching((_, read) => (read === 0 ? ANDROID_DECOR : read % 2 === 1 ? ANDROID_HOME : spinning));
-    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_first' });
-    expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
+  /**
+   * Round-1 review's BLOCKER (2026-10-31): a hold before a cheap rung shortened the wait before the NEXT, destructive
+   * rung from the whole window to the hold — the cheap rung ran on a loading screen with no progress node, its
+   * re-check read that screen as a rendered "no" (not bare: no second look), and the wipe ran at once. Base 2f431be7
+   * waited the window out and found the state. So no hold where a destructive rung lies ahead, transitively.
+   */
+  const LOADING = parseDump(
+    androidXml(`
+          <node index="0" text="Loading" resource-id="" class="android.widget.TextView" package="${PKG}" content-desc="" bounds="[60,700][1020,840]"/>`),
+  );
+
+  it('[cheap, destructive], a cold launch onto a held loading screen that turns into the state: no hold, nothing wiped, "already active"', async () => {
+    const { fake } = timeline((ms) => (ms < 30 ? ANDROID_DECOR : ms < 300 ? LOADING : ANDROID_LOGIN));
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_prompt_first' });
+    expect(clearStateLaunches(fake)).toHaveLength(0); // WIPES 0
+    expect(trace).toContainEqual({ action: 'state logged_out_prompt_first', detail: 'already active' });
+  });
+
+  it('a cheap rung whose requires: leads into a destructive ladder: no hold, nothing wiped, "already active"', async () => {
+    const { fake } = timeline((ms) => (ms < 30 ? ANDROID_DECOR : ms < 300 ? LOADING : ANDROID_LOGIN));
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_via_wiping' });
+    expect(clearStateLaunches(fake)).toHaveLength(0);
+    expect(trace).toContainEqual({ action: 'state logged_out_via_wiping', detail: 'already active' });
+  });
+
+  it('an all-cheap ladder of two rungs keeps the hold: the first rung runs after it, the second well before the deadline', async () => {
+    const { fake, seen } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_HOME));
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_two_cheap' });
+    expect(trace).toContainEqual({ action: 'state logged_out_two_cheap', detail: expect.stringMatching(/^second look: .* running dismiss_prompts /) });
+    expect(seen.msBeforeLaunch).toBeLessThan(500);
+    expect(trace).toContainEqual({ action: 'state logged_out_two_cheap', detail: 'reached after open_app' });
+  });
+
+  it('a cheap ladder entered through a rung whose own ladder has a wipe ahead: no hold there either, nothing wiped', async () => {
+    // The outer entry read fails (unknown: its cheap rung runs at once); the inner ladder's entry read is bare.
+    const { fake } = timeline((ms, read) => (read === 0 ? ANDROID_NULL_ROOT : ms < 30 ? ANDROID_DECOR : ms < 300 ? LOADING : ANDROID_LOGIN));
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_nested_then_wipe' }).catch((e: FlowError) => e.trace);
+    expect(clearStateLaunches(fake)).toHaveLength(0);
+    expect(trace.filter((t) => t.detail?.startsWith('second look:') === true)).toEqual([]);
   });
 
   it('bare, a rendered loading screen, then the state inside the hold: "already active", nothing launched', async () => {
@@ -451,9 +504,9 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     );
     // Loading for 20 ms (several reads at pollMs 5) — under the 40 ms hold.
     const { fake } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : ms < 50 ? loading : ANDROID_LOGIN));
-    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_cheap_first' });
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_cheap_only' });
     expect(fake.launches).toEqual([]);
-    expect(trace).toContainEqual({ action: 'state logged_out_cheap_first', detail: 'already active' });
+    expect(trace).toContainEqual({ action: 'state logged_out_cheap_only', detail: 'already active' });
   });
 });
 

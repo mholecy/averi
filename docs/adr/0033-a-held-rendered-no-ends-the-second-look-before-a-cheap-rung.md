@@ -24,26 +24,38 @@ D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-
 
 ## Decision
 
-**Before a CHEAP (non-destructive) rung, the second look also ends — answering `no` — once a rendered tree outside the
-state has held the same `treeFingerprint` across fresh reads spanning at least `reachRecheckMs`. Then the rung runs.
-Before a DESTRUCTIVE rung the second look keeps its full window, exactly as before.**
+**The second look also ends — answering `no` — once a rendered tree outside the state has held the same
+`treeFingerprint` across fresh reads spanning at least `reachRecheckMs`, but only when NO WIPE LIES AHEAD: the rung
+about to run and every rung after it are non-destructive under the transitive predicate, and no enclosing ladder has a
+destructive rung after the rung that led into this one. Then the rung runs. Everywhere else the second look keeps its
+full window, exactly as before.**
 
-- The seam is `detects`' `hold` option, passed only at the second-look call site and only when the rung is not
-  destructive (`flowItselfIsDestructive`). Without it a `no` waits for the deadline as before.
-- The hold starts at the first rendered not-"yes" read with a given fingerprint and is checked on each later read: the
-  same fingerprint at least `hold` ms after it started ends the look. A different fingerprint starts a new hold; a BARE
-  read clears it (the screen went back to decor — it did not hold). A failed read between two equal ones neither breaks
-  it nor is counted as a read.
+- "No wipe ahead" (amended 2026-10-31 after the round-1 review, below) is two checks at the second-look call site:
+  - `!state.reach.slice(i).some(r => flowIsDestructive(cfg, r))` — `flow/config.ts#flowIsDestructive`, the recovery
+    pass's predicate, which follows a flow's `requires:` into the required state's whole ladder (and calls a cycle or
+    an unknown flow destructive). So a cheap rung whose `requires:` can reach a `clearState` login holds nothing.
+  - `wipeAhead === 0` — an engine counter raised while a rung runs whose own ladder has a destructive rung after it
+    (`state.reach.slice(i + 1)`, same predicate). A cheap ladder entered through that rung's `requires:` (`outer:
+    [via_inner, fresh_launch]`, `via_inner.requires: inner`, `inner: [cheap]`) would otherwise hold, fail its cheap
+    rung on a loading screen, and hand the outer ladder the same immediate wipe as below.
+- The hold is `flow/hold-tracker.ts#holdTracker(holdMs)`, a pure state machine shown each fresh not-"yes" read with a
+  timestamp (`observe(tree, nowMs)`, `reset()`); `detects` gets it through its `holdMs` option. The run starts at the
+  first rendered read with a given fingerprint; the same fingerprint at least `holdMs` after it started ends the look.
+  A different fingerprint starts a new run; a BARE read clears it (the screen went back to decor — it did not hold). A
+  failed read between two equal ones is not shown to it: it neither breaks the run nor counts as a read.
 - A rendered tree that shows a progress indicator (`ui-tree/read-tree.ts#showsProgress`: a `progress` node with area —
-  Android's ProgressBar, Compose's progress indicators) never starts or continues a hold: for the hold it is a bare
-  read, and clears it. It still counts as rendered — the look's answer at its deadline is `no`, as before. A spinner
-  keeps a fixed rect and no text, so its screen keeps one fingerprint while it loads; it is the one loading screen
-  that says so, and the rule costs nothing on a screen that does not. (The coordinator's decision before review,
-  2026-10-31.)
+  Android's ProgressBar, Compose's progress indicators, an iOS `ProgressIndicator`) never starts or continues a hold:
+  for the hold it is a bare read, and clears it. It still counts as rendered — the look's answer at its deadline is
+  `no`, as before. A spinner keeps a fixed rect and no text, so its screen keeps one fingerprint while it loads; it is
+  the one loading screen that says so, and the rule costs nothing on a screen that does not. (The coordinator's
+  decision before review, 2026-10-31.)
+  - The known gap, left for its own backlog row: on iOS through WDA an XCUI `ActivityIndicator` — React Native's
+    ActivityIndicator — is not in `adapters/ios-node.ts#IOS_ROLE_MAP` (which wda-source.ts extends), so it reads as
+    `other`, not `progress`, and does NOT stop a hold there.
 - A look the hold ended writes one trace line, right before the rung: `state <name>` — `second look: not detected, the
   screen held still <s> — running <rung> before the <ensureTimeoutMs> window's end`, so a rung that runs seconds
   before the deadline is not read as a look cut short for no reason. A `no` at the deadline writes none, as before.
-- A handed-on read (ADR 0030) never counts toward the hold: in `detects` it may answer `yes` and nothing else, as before.
+- A handed-on read (ADR 0030) is never shown to the hold: in `detects` it may answer `yes` and nothing else, as before.
   The second look is not handed a read today; the rule holds if it ever is.
 - Bare and unknown answers are unchanged: a look whose every tree was bare still answers `bare` at its deadline (a cheap
   rung then runs, a destructive one is refused), one that read no tree still answers `unknown`.
@@ -51,31 +63,55 @@ Before a DESTRUCTIVE rung the second look keeps its full window, exactly as befo
   as before.
 - The rung's re-detect after a rung (its grace window, `reachRecheckMs`) gets no hold: it is not a second look, and its
   window IS the hold, so a hold could never end it sooner. When it answers bare, the next turn of the loop gives the
-  next rung the second look — with the hold if that rung is cheap.
+  next rung the second look — with the hold if no wipe lies ahead of it.
 
-## Why destructive rungs keep the full window
+## Why the full window stays wherever a wipe lies ahead
 
 The second look exists because a wipe on a screen that is still drawing cannot be taken back (the 2026-10-06 incident:
 three of three runs wiped an app that was already logged out). A rendered loading screen keeps one fingerprint while it
 waits; the hold sets aside those that show a spinner (`read-tree.ts#showsProgress`), but a "Loading…" label or a
 skeleton says nothing a tree can read, so a 2 s hold cannot tell "settled outside the state" from "still loading, about
-to become the state". Before a rung that
-costs a wipe and a login, 20 s of polling is the cheaper mistake.
+to become the state". Before a rung that costs a wipe and a login, 20 s of polling is the cheaper mistake.
+
+The first version of this decision guarded only the destructive rung ITSELF (`flowItselfIsDestructive` of the rung
+about to run). The round-1 review (2026-10-31) reproduced the hole: `logged_in: reach: [dismiss_prompts (an optional
+tap), fresh_launch]`, a cold launch of decor → a rendered "Loading" label with no progress node → login_screen. The
+hold ended the look on the label, `dismiss_prompts` ran, and its re-check read the same label as a RENDERED "no" — not
+bare, so no second look follows — and `fresh_launch` wiped at once: WIPES 1, where 2f431be7 waited the window out and
+answered "already active", WIPES 0. A hold before a cheap rung shortens the wait before every rung after it, not only
+its own. The same holds for a cheap rung whose `requires:` reaches a destructive ladder, and for a cheap ladder entered
+from a rung whose own ladder has a wipe after it.
+
+Why this guard (static: "no destructive rung ahead") and not a time-based one (keep the destructive rung from running
+before the first second look's original deadline, whatever ran in between):
+- It is decided from the config alone, at the call site, by the predicate the recovery pass already trusts — no clock
+  carried across rungs, nested ladders, salvage and the recovery pass. A ladder-wide deadline threaded through every
+  window is the D11 shape the same analysis deferred for its blast radius.
+- A time guard still runs the cheap rung on the loading screen and then waits anyway; the ladders that would gain from
+  it are exactly those that end in a wipe, where the gain is a few seconds against a wipe if the guard has a gap.
+- The cost is plain and accepted: a ladder that can end in a wipe — transitively — gives up the gain and polls the full
+  window, exactly as before D2.
 
 ## Risk accepted
 
-A rendered loading screen WITHOUT a progress indicator — a "Loading…" label alone, a skeleton of placeholder boxes, a
-static splash drawn as a rendered screen, an indicator a tree source does not report as `progress` — that holds still
-for `reachRecheckMs` before a CHEAP rung ends the look as "no" (one with a spinner never holds, above): the rung runs
-on it — a wasted relaunch or tap — or fails, and the ladder judges its next rung as after any failed rung (the re-check
-first; the state reached there ends the call). This is the risk the entry probe already accepts on ONE read: a cold
-launch already rendered on a loading screen answers "no" at once and runs a cheap rung with no second look at all. The
-hold asks more of the screen than the entry probe does (reads spanning 2 s, one fingerprint), not less.
+With NO wipe ahead, a rendered loading screen WITHOUT a progress indicator — a "Loading…" label alone, a skeleton of
+placeholder boxes, a static splash drawn as a rendered screen, an indicator a tree source does not report as `progress`
+(a React Native ActivityIndicator through WDA, above) — that holds still for `reachRecheckMs` ends the look as "no"
+(one with a spinner never holds): the cheap rung runs on it — a wasted relaunch or tap — or fails, and the ladder
+escalates to its next rung, also cheap by construction, or ends in its final wait (`ensureTimeoutMs`). The worst case
+is therefore a wasted cheap rung or a failed call that a retry cures, never a wipe. It is NOT the same risk as the
+entry probe's "no" on one read for an escalation into a wipe — that is why the hold is refused wherever a wipe lies
+ahead (above).
 
 ## Consequences
 
 - A cold launch that settles on a rendered screen outside the state reaches its cheap rung ~`reachRecheckMs` after that
   screen appears, not at `ensureTimeoutMs` — up to ~18 s saved per such ensure (device-unmeasured; proven in fakes,
-  tests/flow/bare-tree-ladder.test.ts, "the second look before a CHEAP rung ends on a held rendered 'no' (D2)").
+  tests/flow/bare-tree-ladder.test.ts, "the second look before a CHEAP rung ends on a held rendered 'no' (D2)", and
+  tests/flow/hold-tracker.test.ts) — on ladders with no wipe ahead only. A ladder that ends in `clearState` (the common
+  `logged_in: [cheap, login]` shape, if its login wipes) keeps the 20 s.
+- On Android a read is a `uiautomator dump` (~2.3 s each, the D3 figure in the performance backlog), so a 2 s hold is met by two identical
+  consecutive reads: the read that starts the run and the next one, ~2.3 s later. On iOS (reads ~70–180 ms) it spans
+  many reads.
 - The second look's held "no" writes one trace line (above); a rendered "no" at the deadline still writes none.
 - Changing `reachRecheckMs` now changes two windows: the re-check after a rung and the hold before a cheap one.

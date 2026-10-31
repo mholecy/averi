@@ -15,8 +15,6 @@ import {
   pollTimeoutMessage,
   pollTree,
   readErrorLine,
-  showsProgress,
-  treeFingerprint,
   Undecided,
   type FirstSample,
 } from '../ui-tree/read-tree.js';
@@ -41,6 +39,7 @@ import {
   type TapSpec,
 } from './config.js';
 import { asksAbsence, describeCondition, evaluateCondition } from './condition.js';
+import { holdTracker } from './hold-tracker.js';
 import { launchApp, launchedLine, WIPE_LABEL, type EngineSession } from './launch.js';
 import { resolveCredentials, type Credentials, type EnvValues, type ResolvedValue } from './credentials.js';
 
@@ -273,7 +272,7 @@ const isTerminal = (e: unknown): boolean =>
  * tells them apart (ensureStateLadder). `readError` is set exactly when it is
  * unknown, `shape` exactly when it is bare. `heldMs` is set exactly when a
  * `no` ended the window early on a rendered tree that held still (D2,
- * `detects`' `hold`): how long that tree held, for the ladder's trace line.
+ * `detects`' `holdMs`): how long that tree held, for the ladder's trace line.
  */
 type Detection = { answer: 'yes' } | { answer: 'no'; heldMs?: number } | UnreadProbe;
 
@@ -464,6 +463,12 @@ export class FlowEngine {
   /** The session this run counts its wipes toward (EngineOptions.session). */
   private readonly session: EngineSession;
   private secrets = new Set<string>();
+  /**
+   * >0 while a rung runs whose ladder has a destructive rung after it (`flowIsDestructive`, transitive): every ladder
+   * that rung's `requires:` enters then has a wipe ahead of it too, so none of its second looks may end on a held "no"
+   * (D2 round-1 review, 2026-10-31, docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md).
+   */
+  private wipeAhead = 0;
   /** >0 while inside an `optional` block, whose failures are swallowed by design (see runStep). */
   private swallowDepth = 0;
   /** Errors that already produced a ✗ trace line — one per failure, however deep it propagates (see runStep). */
@@ -729,25 +734,36 @@ export class FlowEngine {
       // rung" used to mean "after the whole window" — the look ended only on
       // `yes`, so a cold launch whose decor turned into a settled screen
       // outside the state (a login screen for `logged_in`) polled the full
-      // 20 s before its cheap rung. Before a CHEAP rung the look now also
-      // ends, answering `no`, once one rendered tree outside the state has
-      // held the same fingerprint across reads spanning reachRecheckMs (2 s,
-      // the grace a rung's own re-check already gives a screen to land; see
-      // `detects`' `hold`). Before a DESTRUCTIVE rung the window stays whole
-      // (below): a loading screen that happens to hold still must not lead
-      // to a wipe. A tree that shows a spinner (read-tree.ts#showsProgress)
-      // never holds — it is a screen saying it still loads — and a held "no"
-      // says so in one `state` line before the rung. The accepted risk is
-      // the entry probe's on one read: a rendered loading screen WITHOUT a
-      // progress indicator that holds for 2 s before a cheap rung costs that
-      // rung, or an escalation to the next. Bare and unknown answers are
-      // unchanged — a bare read restarts the hold.
+      // 20 s before its cheap rung. Now the look also ends, answering `no`,
+      // once one rendered tree outside the state has held the same
+      // fingerprint across reads spanning reachRecheckMs (2 s, the grace a
+      // rung's own re-check already gives a screen to land; flow/hold-
+      // tracker.ts) — but only when NO wipe lies ahead: this rung and every
+      // rung after it are cheap under the TRANSITIVE predicate
+      // (`flowIsDestructive`, which follows `requires:` into other ladders),
+      // and no enclosing ladder has a destructive rung after the rung that
+      // led here (`wipeAhead`). A loading screen that happens to hold still
+      // must not lead to a wipe, and the round-1 review (2026-10-31) showed
+      // a wipe AFTER the cheap rung is led to as surely as one before it:
+      // `[dismiss_prompts, fresh_launch]` on a cold launch onto a "Loading"
+      // label — the hold ended the look, the cheap rung ran, its re-check read
+      // the same loading screen as a RENDERED "no" (no second look follows
+      // that) and fresh_launch wiped at once; 2f431be7 waited the window out
+      // and found the state. A ladder that ends in a wipe gives up the gain.
+      // A tree that shows a spinner (read-tree.ts#showsProgress) never holds
+      // — it is a screen saying it still loads — and a held "no" says so in
+      // one `state` line before the rung. The accepted risk, with no wipe
+      // anywhere ahead: a rendered loading screen WITHOUT a progress
+      // indicator (on iOS through WDA a React Native ActivityIndicator is
+      // one: its type reads `other`, not `progress`) that holds for 2 s costs
+      // a cheap rung run on it, or an escalation to the next cheap one. Bare
+      // and unknown answers are unchanged — a bare read restarts the hold.
       //
       // The rung's re-detect below (the grace window after a rung) gets no
       // hold: it is not a second look. Its window IS reachRecheckMs, so a
       // hold could never end it sooner; and when it answers bare, the next
       // turn of this loop gives the next rung this very second look — with
-      // the hold if that rung is cheap.
+      // the hold if no wipe lies ahead of it.
       if (probe.answer === 'bare' || (destructive && learnedNothing(probe))) {
         // The refusal's cause is what BOTH probes read (UnreadCause): a
         // bare entry read is still worth naming when every read of the
@@ -755,7 +771,7 @@ export class FlowEngine {
         const before = probe;
         probe = await this.detects(state.detect, this.ensureTimeoutMs, {
           look: 'second look',
-          ...(!destructive && { hold: this.reachRecheckMs }),
+          ...(this.wipeAhead === 0 && !state.reach.slice(i).some((r) => flowIsDestructive(this.cfg, r)) && { holdMs: this.reachRecheckMs }),
         });
         if (probe.answer === 'yes') {
           this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
@@ -816,8 +832,9 @@ export class FlowEngine {
         // rung, warning as usual (it polls to its deadline first, as every
         // detect window does — at most 20 s, only after a cold-launch probe,
         // in front of a rung that costs a wipe and a login; since 2026-10-31
-        // a look before a CHEAP rung ends on a held rendered "no" instead,
-        // ADR 0033, but this one keeps the whole window); one that still
+        // a look with no wipe ahead ends on a held rendered "no" instead,
+        // ADR 0033, but this one — and any before a cheap rung with a wipe
+        // after it — keeps the whole window); one that still
         // read nothing rendered is refused. It cannot outlast the measured
         // idb episode (minutes), so that is still refused; a transient longer
         // than the window is refused too, and retrying the call — or
@@ -831,7 +848,13 @@ export class FlowEngine {
         );
       }
       try {
-        await this.runFlowInner(flow);
+        const wipeAfter = state.reach.slice(i + 1).some((r) => flowIsDestructive(this.cfg, r));
+        if (wipeAfter) this.wipeAhead++;
+        try {
+          await this.runFlowInner(flow);
+        } finally {
+          if (wipeAfter) this.wipeAhead--;
+        }
       } catch (e) {
         // A setup mistake is not something the next rung can fix — and the
         // next rung is the destructive one. Measured: a prelude naming an
@@ -1062,25 +1085,24 @@ export class FlowEngine {
    * re-detect after a rung passes `handedFor`): it may answer `yes` and
    * nothing else, see below.
    *
-   * `hold` (since 2026-10-31, D2, docs/adr/0033-a-held-rendered-no-ends-the-
-   * second-look-before-a-cheap-rung.md; passed only by the second look before
-   * a CHEAP rung, as reachRecheckMs) ends the window early on a settled "no":
-   * once a RENDERED tree outside the condition has kept one `treeFingerprint`
-   * across consecutive fresh reads spanning at least `hold` ms, the probe
-   * answers `no` without polling to its deadline. A bare read restarts the
-   * hold, as does any change to the fingerprint, and so does a rendered tree
-   * that shows a progress indicator (`showsProgress`, the coordinator's
-   * decision before review, 2026-10-31) — it still counts as rendered, but a
-   * spinner keeps one fingerprint while it loads; a handed-on read never
-   * counts (it may only answer `yes`); a failed read between two equal ones
-   * does not break it — it read nothing, said nothing against the hold.
-   * Without `hold` a `no` still waits for the deadline. A held `no` carries
+   * `holdMs` (since 2026-10-31, D2, docs/adr/0033-a-held-rendered-no-ends-
+   * the-second-look-before-a-cheap-rung.md; passed only by the second look
+   * when no wipe lies ahead, as reachRecheckMs) ends the window early on a
+   * settled "no": every fresh read that is not `yes` goes to a
+   * `holdTracker(holdMs)` (flow/hold-tracker.ts — same fingerprint across
+   * reads spanning `holdMs`; a fingerprint change, a bare tree or a spinner
+   * starts it over), and once it says held the probe answers `no` without
+   * polling to its deadline. A spinner's or a bare tree's other counting is
+   * unchanged (a spinner tree still counts as rendered). A handed-on read is
+   * never shown to it (it may only answer `yes`); a failed read is not shown
+   * either — it read nothing, said nothing against the hold. Without
+   * `holdMs` a `no` still waits for the deadline. A held `no` carries
    * `heldMs`, how long its tree held, for the ladder's trace line.
    */
   private async detects(
     cond: Condition,
     windowMs: number,
-    { look, first, hold }: { look?: 'second look'; first?: FirstSample; hold?: number } = {},
+    { look, first, holdMs }: { look?: 'second look'; first?: FirstSample; holdMs?: number } = {},
   ): Promise<Detection> {
     const subject = `${describeCondition(cond)} treated as not detected${look === undefined ? '' : ` (${look} over ${formatSeconds(windowMs)})`}`;
     // Trees that held something rendered, and the last bare one's shape —
@@ -1096,8 +1118,7 @@ export class FlowEngine {
     // the side that never wipes.
     let rendered = 0;
     let lastBareTree: UiNode | undefined;
-    // The rendered tree the `hold` is timed on: its fingerprint, and when it was first read in this unbroken run.
-    let held: { fingerprint: string; since: number } | undefined;
+    const hold = holdMs === undefined ? undefined : holdTracker(holdMs);
     // A handed-on round (`first`, ADR 0030) may only answer `yes`: it never counts as rendered or bare, so the
     // probe's `no`, `bare` and `unknown` — the answers the ladder escalates and refuses a wipe on — rest on fresh
     // reads alone. And the probe produces: its reads may be handed to the next step.
@@ -1107,29 +1128,15 @@ export class FlowEngine {
         async (tree, { handedOn }) => {
           if ((await this.evaluate(cond, tree)) === 'yes') return 'yes' as const;
           if (handedOn) return undefined;
-          if (isBareTreeMemo(tree)) {
-            lastBareTree = tree;
-            held = undefined;
-            return undefined;
-          }
-          rendered++;
-          if (hold === undefined) return undefined;
-          // A spinner keeps one fingerprint while it waits (read-tree.ts#showsProgress): a screen saying it is still
-          // loading never holds, and breaks a hold as a bare read does.
-          if (showsProgress(tree)) {
-            held = undefined;
-            return undefined;
-          }
-          const fingerprint = treeFingerprint(tree);
-          const now = Date.now();
-          if (held?.fingerprint !== fingerprint) held = { fingerprint, since: now };
-          else if (now - held.since >= hold) return { heldMs: now - held.since };
-          return undefined;
+          if (isBareTreeMemo(tree)) lastBareTree = tree;
+          else rendered++;
+          const heldMs = hold?.observe(tree, Date.now());
+          return heldMs === undefined ? undefined : { heldMs };
         },
         { timeoutMs: windowMs, pollMs: this.pollMs, ...(first !== undefined && { first }) },
       ),
     );
-    // `yes`, or — with a `hold` — `no` on a rendered tree that held still (above), with how long it held.
+    // `yes`, or — with `holdMs` — `no` on a rendered tree that held still (above), with how long it held.
     if (!outcome.timedOut) return outcome.value === 'yes' ? { answer: 'yes' } : { answer: 'no', heldMs: outcome.value.heldMs };
     // Trees were read and none was rendered: the probe's answer is `bare`
     // (below), and its line says so — a read error on a later round is not
