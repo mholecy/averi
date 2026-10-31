@@ -40,7 +40,7 @@ measured before and after.
 | D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | done (4cd4825a); keyboard beside the tree: won't do (stale IME band → false "fully visible") |
 | D11 | One deadline per tool call that every window is clamped to | device | open |
 | D12 | `tools/list` is 73 KB (~18k tokens): shorten the tool descriptions | agent context | done (f8b62f5b) |
-| D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | open |
+| D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | done (02f78183): probe without getprop, ensure's health beside its frame; the rest won't do or measure later |
 | D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | open |
 | D15 | Two engines compiling the OCR helper at once share the `${binary}.${pid}` staging path (pre-existing; found in P6) | stability | open |
 | D16 | `tests/truth/calibration.test.ts` spawns a `git merge-base` per fix and times out (5 s) under load | tests | open |
@@ -153,6 +153,18 @@ unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 
 cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
+
+### D13 — per-call overhead
+Done in 02f78183. Figures (averi_lab API 33, 2026-10-31; cited from the code): `getprop ro.build.version.release` ≈30–35 ms
+per device per call, up to ~70 ms (30–33 ms in D13's run); `pidof` 44–48 ms in D3's run, 32–60 ms in D13's;
+`adb exec-out screencap` 312–352 ms per call in D3's live baseline, 347–365 ms in D13's.
+- `registry.get()` probes with `adb devices -l` only (`ListOpts.versions: false`); `listAll`/`select` keep versions;
+  `adb devices` is never cached (a stale "booted" would hand out a dead adapter). −1 device call on every tool call.
+- `ensure_state` asks the app's health beside its final frame (pidof hidden under the screencaps); a `verify` leg still
+  asks after its frame, so an app that dies while the frame settles reads dead.
+- Won't do: a config cache (`parseConfig` 0.2–8 ms), sharing the bands' and keyboard's `dumpsys` (once per launch), the
+  capture stability pair (its 300 ms spacing keeps a blinking caret from reading as motion). Measure with D18: fill's
+  350 ms focus sleep, `type_pin`'s 300 ms key delay.
 
 ### D6 — typing pace
 Done in 86505377: measured first (2026-10-31, averi_lab API 33; scripts and per-trial records kept outside the repo):
