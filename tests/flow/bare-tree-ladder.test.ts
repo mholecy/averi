@@ -13,6 +13,7 @@ import { FlowEngine, FlowError, type TraceEntry } from '../../src/flow/engine.js
 import { EngineSession } from '../../src/flow/launch.js';
 import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
+import { showsProgress } from '../../src/ui-tree/read-tree.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { parseDump } from '../helpers/android-dumps.js';
@@ -361,8 +362,27 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     expect(seen.msBeforeLaunch).toBeLessThan(500);
     expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
     expect(trace).toContainEqual({ action: 'state logged_out_cheap_first', detail: 'reached after open_app' });
-    // Only the entry probe was bare; the second look's held "no" says nothing of its own.
+    // Only the entry probe was bare.
     expect(actions(trace).filter((a) => a === '⚠ detect')).toHaveLength(1);
+  });
+
+  it('the held "no" writes one line, right before the rung, saying why the rung ran before the deadline', async () => {
+    const { fake } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_HOME));
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_cheap_first' });
+    const held = trace.filter((t) => t.detail?.startsWith('second look:') === true);
+    expect(held).toHaveLength(1);
+    expect(held[0]).toEqual({
+      action: 'state logged_out_cheap_first',
+      detail: expect.stringMatching(/^second look: not detected, the screen held still 0\.\d+ s — running open_app before the 1 s window's end$/),
+    });
+    const at = trace.indexOf(held[0]!);
+    expect(trace[at + 1]).toEqual({ action: 'flow open_app', detail: 'start' });
+  });
+
+  it('a "no" at the deadline writes no held line — before a destructive rung, the full window', async () => {
+    const { fake } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_HOME));
+    const trace = await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 150 }, { state: 'logged_out' });
+    expect(trace.filter((t) => t.detail?.startsWith('second look:') === true)).toEqual([]);
   });
   it('the same before a DESTRUCTIVE rung: the full window, as before D2 — a still loading screen must not lead to a wipe', async () => {
     const { fake, seen } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : ANDROID_HOME));
@@ -394,6 +414,32 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
   it('the same rendered screen with bare reads between never holds: a bare read restarts the hold', async () => {
     // Entry: decor. Second look: home and decor in turn — the home screen's fingerprint repeats, but never twice in a row.
     const { fake, seen } = relaunching((_, read) => (read % 2 === 1 ? ANDROID_HOME : ANDROID_DECOR));
+    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_first' });
+    expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
+  });
+
+  it('a rendered screen that shows a spinner never holds: the cheap rung waits for the whole window', async () => {
+    const spinning = parseDump(
+      androidXml(`
+          <node index="0" text="Načítava sa…" resource-id="loading" class="android.widget.TextView" package="${PKG}" content-desc="" bounds="[60,700][1020,840]"/>
+          <node index="1" text="" resource-id="spinner" class="android.widget.ProgressBar" package="${PKG}" content-desc="" bounds="[480,1000][600,1120]"/>`),
+    );
+    expect(isBareTree(spinning)).toBe(false);
+    expect(showsProgress(spinning)).toBe(true);
+    const { fake, seen } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : spinning));
+    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_first' });
+    expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
+  });
+
+  it('a spinner read breaks a hold as a bare read does: the same screen with spinner reads between never holds', async () => {
+    const spinning = parseDump(
+      androidXml(`
+          <node index="0" text="" resource-id="spinner" class="android.widget.ProgressBar" package="${PKG}" content-desc="" bounds="[480,1000][600,1120]"/>
+          <node index="1" text="Prehľad" resource-id="nav.tab_overview" class="android.widget.Button" package="${PKG}" content-desc="" bounds="[0,2100][360,2274]"/>`),
+    );
+    expect(isBareTree(spinning)).toBe(false);
+    // Entry: decor. Second look: the home screen and the spinner in turn.
+    const { fake, seen } = relaunching((_, read) => (read === 0 ? ANDROID_DECOR : read % 2 === 1 ? ANDROID_HOME : spinning));
     await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_first' });
     expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
   });

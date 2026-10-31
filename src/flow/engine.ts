@@ -15,6 +15,7 @@ import {
   pollTimeoutMessage,
   pollTree,
   readErrorLine,
+  showsProgress,
   treeFingerprint,
   Undecided,
   type FirstSample,
@@ -270,9 +271,11 @@ const isTerminal = (e: unknown): boolean =>
  * Callers that only need a boolean fold both into "not detected" by
  * comparing against `'yes'` (salvage, the recovery pass); the ladder alone
  * tells them apart (ensureStateLadder). `readError` is set exactly when it is
- * unknown, `shape` exactly when it is bare.
+ * unknown, `shape` exactly when it is bare. `heldMs` is set exactly when a
+ * `no` ended the window early on a rendered tree that held still (D2,
+ * `detects`' `hold`): how long that tree held, for the ladder's trace line.
  */
-type Detection = { answer: 'yes' | 'no' } | UnreadProbe;
+type Detection = { answer: 'yes' } | { answer: 'no'; heldMs?: number } | UnreadProbe;
 
 /** The answers on which the ladder will not run a destructive rung: the probe learned nothing about the screen. */
 const learnedNothing = (d: Detection): d is UnreadProbe => d.answer === 'unknown' || d.answer === 'bare';
@@ -732,10 +735,13 @@ export class FlowEngine {
       // the grace a rung's own re-check already gives a screen to land; see
       // `detects`' `hold`). Before a DESTRUCTIVE rung the window stays whole
       // (below): a loading screen that happens to hold still must not lead
-      // to a wipe. The accepted risk is the entry probe's on one read: a
-      // rendered loading screen that holds for 2 s before a cheap rung costs
-      // that rung, or an escalation to the next. Bare and unknown answers
-      // are unchanged — a bare read restarts the hold.
+      // to a wipe. A tree that shows a spinner (read-tree.ts#showsProgress)
+      // never holds — it is a screen saying it still loads — and a held "no"
+      // says so in one `state` line before the rung. The accepted risk is
+      // the entry probe's on one read: a rendered loading screen WITHOUT a
+      // progress indicator that holds for 2 s before a cheap rung costs that
+      // rung, or an escalation to the next. Bare and unknown answers are
+      // unchanged — a bare read restarts the hold.
       //
       // The rung's re-detect below (the grace window after a rung) gets no
       // hold: it is not a second look. Its window IS reachRecheckMs, so a
@@ -754,6 +760,14 @@ export class FlowEngine {
         if (probe.answer === 'yes') {
           this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
           return;
+        }
+        // A look the hold ended (D2, ADR 0033) says so: without the line, a rung that runs seconds before the window's
+        // end reads as a look cut short for no reason.
+        if (probe.answer === 'no' && probe.heldMs !== undefined) {
+          this.log(
+            `state ${name}`,
+            `second look: not detected, the screen held still ${formatSeconds(probe.heldMs)} — running ${flow} before the ${formatSeconds(this.ensureTimeoutMs)} window's end`,
+          );
         }
         if (destructive && learnedNothing(probe)) {
           const refusal = new UnreadTreeRefusal(name, flow, before, probe);
@@ -1054,10 +1068,14 @@ export class FlowEngine {
    * once a RENDERED tree outside the condition has kept one `treeFingerprint`
    * across consecutive fresh reads spanning at least `hold` ms, the probe
    * answers `no` without polling to its deadline. A bare read restarts the
-   * hold, as does any change to the fingerprint; a handed-on read never
+   * hold, as does any change to the fingerprint, and so does a rendered tree
+   * that shows a progress indicator (`showsProgress`, the coordinator's
+   * decision before review, 2026-10-31) — it still counts as rendered, but a
+   * spinner keeps one fingerprint while it loads; a handed-on read never
    * counts (it may only answer `yes`); a failed read between two equal ones
    * does not break it — it read nothing, said nothing against the hold.
-   * Without `hold` a `no` still waits for the deadline.
+   * Without `hold` a `no` still waits for the deadline. A held `no` carries
+   * `heldMs`, how long its tree held, for the ladder's trace line.
    */
   private async detects(
     cond: Condition,
@@ -1087,7 +1105,7 @@ export class FlowEngine {
       pollTree(
         this.adapter,
         async (tree, { handedOn }) => {
-          if ((await this.evaluate(cond, tree)) === 'yes') return 'yes';
+          if ((await this.evaluate(cond, tree)) === 'yes') return 'yes' as const;
           if (handedOn) return undefined;
           if (isBareTreeMemo(tree)) {
             lastBareTree = tree;
@@ -1096,17 +1114,23 @@ export class FlowEngine {
           }
           rendered++;
           if (hold === undefined) return undefined;
+          // A spinner keeps one fingerprint while it waits (read-tree.ts#showsProgress): a screen saying it is still
+          // loading never holds, and breaks a hold as a bare read does.
+          if (showsProgress(tree)) {
+            held = undefined;
+            return undefined;
+          }
           const fingerprint = treeFingerprint(tree);
           const now = Date.now();
           if (held?.fingerprint !== fingerprint) held = { fingerprint, since: now };
-          else if (now - held.since >= hold) return 'no';
+          else if (now - held.since >= hold) return { heldMs: now - held.since };
           return undefined;
         },
         { timeoutMs: windowMs, pollMs: this.pollMs, ...(first !== undefined && { first }) },
       ),
     );
-    // `yes`, or — with a `hold` — `no` on a rendered tree that held still (above).
-    if (!outcome.timedOut) return { answer: outcome.value };
+    // `yes`, or — with a `hold` — `no` on a rendered tree that held still (above), with how long it held.
+    if (!outcome.timedOut) return outcome.value === 'yes' ? { answer: 'yes' } : { answer: 'no', heldMs: outcome.value.heldMs };
     // Trees were read and none was rendered: the probe's answer is `bare`
     // (below), and its line says so — a read error on a later round is not
     // the answer then, so it gets no line of its own.
