@@ -38,7 +38,7 @@ measured before and after.
 | D8 | Fill re-reads after focus only for secure or unknown fields | device | done (1083523e; Android only, ADR 0028) |
 | D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | won't do — the second look guards a re-flow after the keyboard hides; iOS only, 0 in D0 |
 | D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | done (4cd4825a); keyboard beside the tree: won't do (stale IME band → false "fully visible") |
-| D11 | One deadline per tool call that every window is clamped to | device | open |
+| D11 | One deadline per tool call that every window is clamped to | device | deferred — no measured failure, no gain on a success path, a large blast radius; reopen if a client is seen cancelling a call ("### D2 and D11 analysed") |
 | D12 | `tools/list` is 73 KB (~18k tokens): shorten the tool descriptions | agent context | done (f8b62f5b) |
 | D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | done (02f78183): probe without getprop, ensure's health beside its frame; the rest won't do or measure later |
 | D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | done (71f6f0a0) |
@@ -397,6 +397,17 @@ companion-side 50 ms HIDDelay between the first key and the rest) 80/80 (148/204
 lands the rest: a HID delay inside one call as well as the second call's own ~90 ms round trip. Decision: FIRST_KEY_ALONE_MS 150 → 50 ms (−100 ms per typing into an app
 seen dropping a tail; 50 ms of margin over split:0: a bare 50 ms pause with no round trip, hid:50, landed
 80/80, so the sleep lands even if the helper's round trip shrank). hid:G (one call) would save ~90 ms more but needs a new helper verb carrying a delay — not now.
+
+### D2 and D11 analysed (2026-10-31)
+D2 is still real at HEAD: the second look before a rung (`detects` over `ensureTimeoutMs`, 20 s, engine.ts ~727) ends
+only on "yes", so a cold launch whose decor turns into a rendered screen that is not the state (a login screen for
+`logged_in`) polls the full 20 s before the rung runs (the code says so at ~775). D0 never hit it: the lab app renders
+fast and both ensure scenarios start on a rendered screen. Gain: ~15–17 s per such ensure on a fast app. Decision:
+variant A — before a CHEAP rung the second look also ends when a rendered not-"yes" tree has held the same fingerprint
+for `reachRecheckMs` (2 s); before a DESTRUCTIVE rung the full window stays (a still loading screen must not lead to a
+wipe); bare and unknown answers unchanged; handed-on reads never count (ADR 0030). A new ADR records the rule.
+D11 deferred: every window is already bounded, nothing measured a client cancelling a call, and a per-call deadline
+touches every window; reopen on evidence (MCP progress notifications would be the cheaper first answer).
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
