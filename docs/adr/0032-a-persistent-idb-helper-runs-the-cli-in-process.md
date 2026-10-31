@@ -73,6 +73,10 @@ What an agent reads must not change with the helper:
   is printed to stderr and is 1, as `sys.exit` does.
 - A helper that dies under a call (a read, idempotent) is retried once on the CLI; the CLI's result or error is the
   one returned.
+- Since D21 (2026-10-31) one caller reads a failure's text: `IdbTreeSource` turns a describe-all whose stderr says
+  "accessibility service named no frontmost application" into `IdbNoFrontmostError` (the simulator's wedged AX
+  service, cured only by a reboot). It reads the `ExecError`'s `stderr` field, which the helper's nonzero answer carries
+  as exec's does, so the CLI and the helper are matched alike.
 - The contract test (`tests/adapters/idb-helper-contract.test.ts`, the real fb-idb, no simulator) runs both on
   `--companion localhost:1 ui describe-all --json` (equal code and stderr) and on `ui describe-all --help` (equal
   stdout bytes, `usage: idb …`: the helper sets `sys.argv[0]` to idb's path for argparse), on `--companion

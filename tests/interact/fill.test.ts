@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
 import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField } from '../../src/interact/fill.js';
 import type { ReadBack } from '../../src/interact/fill-facts.js';
 import { judgeFill } from '../../src/interact/fill-verdict.js';
@@ -276,6 +276,21 @@ describe('fillField — focus, clear, type, verify', () => {
       'fill: could not re-read id:"amount_input" after focusing it — adb: device offline. The field was tapped and may hold partial text; ' +
         'check the device is still online (adb devices / xcrun simctl list), then retry with clear: true so the field is reset',
     );
+  });
+
+  // D21 code review: a read no wait cures (PersistentReadError — idb's wedged accessibility service) is not a
+  // FillValueFailure('reread-failed'): it passes through unchanged, so `optional:` does not take it for a fill whose
+  // value did not land, and the flow engine's isTerminal still sees its class.
+  it('a re-read that throws a PersistentReadError: thrown as it came, not a reread-failed FillValueFailure', async () => {
+    const fake = formFake();
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    const wedged = new PersistentReadError('wedged until a reboot');
+    fake.uiTree = async () => {
+      if (reads++ >= 2) throw wedged;
+      return real();
+    };
+    await expect(fillField(fake, { id: 'amount_input' }, '1', FAST)).rejects.toBe(wedged);
   });
 });
 

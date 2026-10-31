@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // every poll cadence collapses to one event-loop turn; deadlines are
 // Date.now-based and still fire.
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
-import type { ExecFn } from '../../src/adapters/exec.js';
+import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
 import { IdbTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { parseConfig } from '../../src/flow/config.js';
 import { FlowEngine, FlowError, type TraceEntry } from '../../src/flow/engine.js';
@@ -398,5 +398,149 @@ describe('waits and asserts on the stuck tree fail closed', () => {
     const error = await failure(FlowEngine.run(CFG, fake, FAST, { flow: 'wait_login_screen' }));
     expect(error.message).toMatch(/last UI tree read failed: idb returned an empty accessibility tree/);
     expect(error.message).not.toContain('no tree read contained');
+  });
+});
+
+// D21 (2026-10-31): idb's wedged accessibility service — every describe-all fails "named no frontmost application"
+// until the simulator reboots (re-front, relaunch, a new companion, 30 s of waiting: 0 of 5 each). Served by the REAL
+// IdbTreeSource over the CLI's failure, so the engine sees what the adapter throws: IdbNoFrontmostError, a
+// PersistentReadError. Nothing the flow engine can run cures it, so it is terminal: no poll waits it out, no
+// `optional:` skips it as an absent element, no ladder escalates past it or re-runs a rung on it.
+describe('a read error no wait cures (idb\'s wedged accessibility service) stops the flow at once', () => {
+  const noFrontmostExec: ExecFn = async (cmd, args) => {
+    if (cmd === 'idb') throw new ExecError(['idb', ...args].join(' '), 1, "The simulator's accessibility service named no frontmost application");
+    return { stdout: Buffer.alloc(0), stderr: '' };
+  };
+  /** The PIN screen while `wedged(readNo)` says no, the wedged idb after. */
+  function wedgedIdb(wedged: (read: number) => boolean) {
+    const fake = new FakeAdapter(screens(), 'pin');
+    fake.platform = 'ios';
+    const source = new IdbTreeSource({ udid: 'D34212DB', exec: noFrontmostExec });
+    const readable = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => (wedged(reads++) ? source.read() : readable());
+    return { fake, reads: () => reads };
+  }
+  const D21 = parseConfig(`
+app:
+  android: { package: com.example.app }
+  ios: { bundleId: com.example.app }
+states:
+  pin_login:
+    detect: { element: { text: "Enter your PIN to log in" } }
+  home:
+    detect: { element: { id: nav.tab_transactions } }
+    reach: [relaunch_and_wait, login]
+  home_two:
+    detect: { element: { id: nav.tab_transactions } }
+    reach: [relaunch, login]
+  home_assert_mid:
+    detect: { element: { id: nav.tab_transactions } }
+    reach: [relaunch_and_assert, login]
+  home_assert_last:
+    detect: { element: { id: nav.tab_transactions } }
+    reach: [relaunch, relaunch_and_assert]
+flows:
+  optional_assert_then_relaunch:
+    steps:
+      - optional:
+          - assert:
+              - { element: { id: promo_banner } }
+      - launch: { clearState: false }
+  relaunch_and_assert:
+    steps:
+      - launch: { clearState: false }
+      - assert:
+          - { element: { text: "Enter your PIN to log in" } }
+  skip_then_relaunch:
+    steps:
+      - optional:
+          - tap: { text: "SKIP" }
+      - launch: { clearState: false }
+  relaunch:
+    steps:
+      - launch: { clearState: false }
+  relaunch_and_wait:
+    steps:
+      - launch: { clearState: false }
+      - wait: { state: pin_login, timeout: 60 }
+  login:
+    steps:
+      - launch: { clearState: true }
+`);
+  const SLOW = { ...FAST, waitTimeoutMs: 60_000, ensureTimeoutMs: 60_000, optionalTimeoutMs: 60_000, reachRecheckMs: 60_000 };
+
+  it('a wait fails on the first read with the named error, not after its 60 s', async () => {
+    const { fake, reads } = wedgedIdb(always);
+    const error = await failure(FlowEngine.run(D21, fake, SLOW, { flow: 'relaunch_and_wait' }));
+    expect(error.message).toContain("idb cannot read the UI tree: the simulator's accessibility service named no frontmost application");
+    expect(error.message).toContain('reboot the simulator (`xcrun simctl shutdown D34212DB && xcrun simctl boot D34212DB`)');
+    expect(reads()).toBe(1);
+  });
+
+  it('`optional:` does not skip it as an absent element: the flow stops there, the step after it never runs', async () => {
+    const { fake } = wedgedIdb(always);
+    const error = await failure(FlowEngine.run(D21, fake, SLOW, { flow: 'skip_then_relaunch' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toEqual([]);
+  });
+
+  it('the ladder does not escalate past a rung it failed: the next rung never runs', async () => {
+    // The entry probe reads the PIN screen (not home); the wedge starts with the rung's wait.
+    const { fake } = wedgedIdb((read) => read >= 1);
+    const error = await failure(FlowEngine.run(D21, fake, SLOW, { state: 'home' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
+    expect(error.trace.some((t) => t.detail?.includes('escalating to') === true)).toBe(false);
+  });
+
+  // D21 review round 2: an `assert:` step is a flow step like a wait — the Verifier the engine builds keeps the
+  // default (persistentRead: 'throw'), so the named error, not a plain "flow asserts failed", reaches isTerminal.
+  it('`optional: - assert:` does not skip it: the flow stops there, the step after it never runs', async () => {
+    const { fake } = wedgedIdb(always);
+    const error = await failure(FlowEngine.run(D21, fake, SLOW, { flow: 'optional_assert_then_relaunch' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toEqual([]);
+  });
+
+  it('a middle rung ending in `assert:` is not escalated past', async () => {
+    const { fake } = wedgedIdb((read) => read >= 1);
+    const error = await failure(FlowEngine.run(D21, fake, SLOW, { state: 'home_assert_mid' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toHaveLength(1);
+    expect(error.trace.some((t) => t.detail?.includes('escalating to') === true)).toBe(false);
+  });
+
+  it('a last rung ending in `assert:` gets no salvage and no recovery pass: one launch per rung that ran', async () => {
+    // home_assert_last: [relaunch, relaunch_and_assert]. Every read reads the PIN screen until the last rung's launch.
+    let wedgeFrom = Infinity;
+    const { fake, reads } = wedgedIdb((read) => read >= wedgeFrom);
+    const launch = fake.launch.bind(fake);
+    fake.launch = async (appId, opts) => {
+      const outcome = await launch(appId, opts);
+      if (fake.launches.length === 2) wedgeFrom = reads();
+      return outcome;
+    };
+    const error = await failure(FlowEngine.run(D21, fake, FAST, { state: 'home_assert_last' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toHaveLength(2);
+    expect(actions(error.trace).some((a) => a.startsWith('⚠ salvage') || a.startsWith('↻ recovery'))).toBe(false);
+  });
+
+  it('the final wait\'s failure on it re-runs no rung (no recovery pass)', async () => {
+    // home_two: [relaunch, login]. Every probe reads the PIN screen; the wedge starts one read after the last rung's
+    // launch — that read is the probe after it, so the final wait is the first to meet it.
+    let wedgeFrom = Infinity;
+    const { fake, reads } = wedgedIdb((read) => read >= wedgeFrom);
+    const launch = fake.launch.bind(fake);
+    fake.launch = async (appId, opts) => {
+      const outcome = await launch(appId, opts);
+      if (opts?.clearState === true) wedgeFrom = reads() + 1;
+      return outcome;
+    };
+    const error = await failure(FlowEngine.run(D21, fake, FAST, { state: 'home_two' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toHaveLength(2);
+    expect(actions(error.trace).some((a) => a.startsWith('↻ recovery'))).toBe(false);
   });
 });

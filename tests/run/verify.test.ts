@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DeviceAdapter, Platform, UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type DeviceAdapter, type Platform, type UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
 import { EngineSession } from '../../src/flow/launch.js';
 import {
@@ -261,6 +261,27 @@ flows: {}
 
     expect(out.sections[0]).toContain('1/1 asserts FAILED');
     expect(out.sections[0]).toContain('FAIL  element id:"nope" exists');
+  });
+});
+
+// D21 review (2026-10-31): a tree read no wait cures (idb's wedged accessibility service) fails the leg's asserts,
+// each after one read, and the leg keeps its section, its frame's screenshot (idb's capture is unaffected by the wedge)
+// and its health line — it is not rejected whole.
+describe('a leg whose tree read no wait cures', () => {
+  it('keeps the assert results, the screenshot and the health line', async () => {
+    const ios = fake('ios');
+    ios.uiTree = async () => {
+      throw new PersistentReadError('idb cannot read the UI tree: wedged until a reboot');
+    };
+    const out = await runVerification(
+      request({ platforms: ['ios'], specs: [{ element: { id: 'card' } }, { element: { id: 'card' }, absent: true }] }),
+      async () => ios,
+    );
+    expect(out.sections[0]).toContain('## ios');
+    expect(out.sections[0]).toContain('2/2 asserts FAILED');
+    expect(out.sections[0]).toContain('idb cannot read the UI tree: wedged until a reboot');
+    expect(out.sections[0]).toContain('appAlive: true');
+    expect(out.screenshots).toHaveLength(1);
   });
 });
 

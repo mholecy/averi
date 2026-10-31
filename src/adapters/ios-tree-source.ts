@@ -1,4 +1,4 @@
-import { exec as defaultExec, type ExecFn } from './exec.js';
+import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { runIdb } from './idb.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { formatSeconds } from '../util/duration.js';
@@ -7,7 +7,7 @@ import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios
 import { WdaTreeSource } from './wda-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
 import type { IdbHelper } from './idb-helper.js';
-import { rectArea, rectIntersection, zeroRect, type Rect, type UiNode } from './types.js';
+import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type UiNode } from './types.js';
 import { countOf } from '../util/count.js';
 
 /**
@@ -320,6 +320,62 @@ const describeEmptyPayload = (types: readonly (string | undefined)[]): string =>
   return `${countOf(types.length, 'element')}, none with any area`;
 };
 
+/**
+ * idb's describe-all failed with "The simulator's accessibility service named no frontmost application" (D21,
+ * docs/plans/2026-10-30-performance-backlog.md, "D21 diag"). Measured 2026-10-31 by the owner on the lab simulator,
+ * raw simctl + idb, no averi: nine reboots, each with a fresh idb_companion started at one of three moments — right
+ * after `simctl boot` returned (2 of 3 wedged), right after `simctl bootstatus -b` (3 of 3) or bootstatus + 3 s
+ * (0 of 3). A wedged simulator stayed wedged for every read after it (230 failing reads, 277 ms median each): a
+ * re-front of the app (`simctl launch` of the running app — same pid, state kept), terminate + launch, a NEW companion
+ * on the same simulator and 30 s more of waiting each cured 0 of 5; only the next reboot did. HID was unaffected (an
+ * `idb ui swipe` 5/5 while wedged) and the companion's log said nothing. So the cause is an accessibility query made
+ * too soon after a boot — D20's device run started its companion right after the boot and met it on every read
+ * (133 in a 90 s `scroll_until`, 5 of 5 repeats); `ios-run.sh`, which starts it after bootstatus and 3 s, never did
+ * in 13 runs.
+ *
+ * Hence a PersistentReadError: no poll retries it (types.ts — before this, every waiting caller polled it to its
+ * deadline, which is all D20's 90 s were), and averi neither re-fronts the app, nor re-reads, nor reboots: nothing
+ * short of a reboot cures it, and averi does not boot simulators. The message says so and names the cure — the reboot
+ * (simulator-reboot.ts, the one owner of the command, with the bound UDID), a companion started a few seconds after
+ * the boot completes, or the WDA tree source, which does not read through idb.
+ *
+ * The first line carries the cause AND that it lasts until a reboot: a trace line, the launch's foreground note
+ * (ios-foreground.ts `headline`) and the flow engine's `readFailed` quote only the first line, and here the
+ * first line alone must already keep a reader from waiting it out. The measurement and the cure follow beneath it.
+ * Matched on idb's stderr — the CLI's and the helper's alike (runIdb throws the helper's nonzero answer as the same
+ * ExecError) — on the words of the measured message, not its first word's case; the ExecError is kept as `cause`.
+ * The stream and the exit status are fb-idb's, read from its source, not measured: the device run captured the CLI
+ * with `2>&1` and recorded neither. fb-idb's main.py prints an IdbException's text to stderr and exits 1
+ * (`print(e.args[0], file=sys.stderr); return 1`), and averi's D20 reply showed it as exec's
+ * `Command failed (exit 1): idb ui describe-all … \n<that text>`. A timed-out read is never this error, whatever its
+ * stderr held: a CLI killed at its budget says nothing about the accessibility service.
+ */
+export class IdbNoFrontmostError extends PersistentReadError {
+  /** The simulator the read was made on — the one the reboot advice names. */
+  readonly udid: string;
+
+  constructor(udid: string, opts: { cause?: unknown } = {}) {
+    super(
+      "idb cannot read the UI tree: the simulator's accessibility service named no frontmost application — " +
+        'it stays so until the simulator reboots, and averi does not retry the read\n' +
+        'Measured 2026-10-31 on a lab simulator (9 reboots): an accessibility query made too soon after a boot ' +
+        '(idb_companion started as the boot completed) leaves the accessibility service like this ' +
+        'for every read after it; re-fronting the app (launch_app on the running app), ' +
+        'terminate_app then launch_app, a new idb_companion and ' +
+        `30 s more of waiting each cured it 0 of 5 times. To cure it, ${rebootSimulatorAdvice(udid)}, ` +
+        `wait until the boot completes (\`xcrun simctl bootstatus ${udid} -b\`) ` +
+        'and start idb_companion a few seconds after that (3 s measured: 0 of 3 wedged); ' +
+        'or set app.ios.treeSource: wda in averi.yaml to read the tree through WebDriverAgent instead',
+      opts.cause === undefined ? undefined : { cause: opts.cause },
+    );
+    this.name = 'IdbNoFrontmostError';
+    this.udid = udid;
+  }
+}
+
+/** idb's words for the wedged accessibility service (IdbNoFrontmostError), as its stderr says them. */
+const NO_FRONTMOST = /accessibility service named no frontmost application/i;
+
 /** The budget uiTree() gave describe-all before the seam existed — a busy screen is slower than a tap. */
 export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 
@@ -365,10 +421,18 @@ export class IdbTreeSource implements IosTreeSource {
   }
 
   private async readOnce(): Promise<{ elements: IdbElement[]; tree: UiNode }> {
-    const { stdout } = await runIdb(this.exec, this.udid, ['ui', 'describe-all', '--json'], {
-      timeoutMs: DESCRIBE_ALL_TIMEOUT_MS,
-      helper: this.helper,
-    });
+    let stdout: Buffer;
+    try {
+      ({ stdout } = await runIdb(this.exec, this.udid, ['ui', 'describe-all', '--json'], {
+        timeoutMs: DESCRIBE_ALL_TIMEOUT_MS,
+        helper: this.helper,
+      }));
+    } catch (e) {
+      if (e instanceof ExecError && !e.timedOut && NO_FRONTMOST.test(e.stderr)) {
+        throw new IdbNoFrontmostError(this.udid, { cause: e });
+      }
+      throw e;
+    }
     const elements = idbElements(stdout.toString('utf8'));
     const tree = idbTree(elements);
     // Area on the NORMALIZED rects (rounded, a missing frame zeroed); the raw types only name the shape.

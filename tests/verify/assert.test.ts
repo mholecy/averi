@@ -5,7 +5,7 @@ import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { assertSpecSchema, scanForCrashes, Verifier } from '../../src/verify/assert.js';
 import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
-import { KEYBOARD_ROLE, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, PersistentReadError, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { findBySpec } from '../../src/ui-tree/selectors.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
@@ -61,6 +61,48 @@ function drawnAt(rect: Rect, hex: string, { width, height } = { width: 402, heig
     for (let y = rect.y; y < rect.y + rect.height; y++) for (let x = rect.x; x < rect.x + rect.width; x++) [p.data[(y * width + x) * 4], p.data[(y * width + x) * 4 + 1], p.data[(y * width + x) * 4 + 2]] = [r!, g!, b!];
   });
 }
+
+// D21 review (2026-10-31): a read error no wait cures (PersistentReadError — idb's wedged accessibility service).
+// Under persistentRead: 'fail' it fails THE assert, after its one read, with the error's message as the detail — what
+// a verify leg (whose frame, screenshot and health line a throw would lose) and the MCP assert tool ask for. By
+// default it is thrown as it came, after the one read: a flow's `assert:` step must reach the engine's isTerminal
+// with the named error (review round 2), not as a plain "flow asserts failed".
+describe('asserts on a tree read no wait cures', () => {
+  const wedgedFake = () => {
+    const fake = dashboardFake();
+    let reads = 0;
+    fake.uiTree = async () => {
+      reads++;
+      throw new PersistentReadError('wedged until a reboot\nthe cure');
+    };
+    return { fake, reads: () => reads };
+  };
+
+  it.each([
+    ['present', { element: { id: 'balance' } }],
+    ['absent', { element: { id: 'balance' }, absent: true }],
+    ['color', { element: { id: 'balance' }, color: { expected: '#FDFDFD' } }],
+  ] as const)('%s, under persistentRead: \'fail\': fails after one read, the detail the error\'s message, and the next assert still runs', async (_kind, spec) => {
+    const { fake, reads } = wedgedFake();
+    const results = await new Verifier(fake, { pollMs: 5, timeoutMs: 60_000, persistentRead: 'fail' }).assertAll([spec, spec]);
+    expect(results.map((r) => ({ pass: r.pass, detail: r.detail }))).toEqual([
+      { pass: false, detail: 'wedged until a reboot\nthe cure' },
+      { pass: false, detail: 'wedged until a reboot\nthe cure' },
+    ]);
+    expect(results[0]!.description).toMatch(/balance/);
+    expect(reads()).toBe(2);
+  });
+
+  it.each([
+    ['present', { element: { id: 'balance' } }],
+    ['absent', { element: { id: 'balance' }, absent: true }],
+    ['color', { element: { id: 'balance' }, color: { expected: '#FDFDFD' } }],
+  ] as const)('%s, by default: thrown as it came after one read', async (_kind, spec) => {
+    const { fake, reads } = wedgedFake();
+    await expect(new Verifier(fake, { pollMs: 5, timeoutMs: 60_000 }).assertAll([spec, spec])).rejects.toBeInstanceOf(PersistentReadError);
+    expect(reads()).toBe(1);
+  });
+});
 
 describe('element asserts', () => {
   it('exists passes and absent fails for a present element', async () => {

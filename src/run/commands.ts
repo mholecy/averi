@@ -161,7 +161,9 @@ export interface AssertCall {
  * its own and was not taken with this one (code review, 2026-10-08).
  */
 export async function runAsserts({ adapter, specs, baselineDir, cfg }: AssertCall): Promise<string> {
-  const results = await new Verifier(adapter, { baselineDir }).assertAll(specs);
+  // persistentRead: 'fail' — the reply IS the assert results: a read no wait cures (D21) is each assert's FAIL line,
+  // its message the detail, rather than an error result that drops the asserts and the health line (VerifierOptions).
+  const results = await new Verifier(adapter, { baselineDir, persistentRead: 'fail' }).assertAll(specs);
   let health = '';
   if (cfg !== undefined) {
     try {

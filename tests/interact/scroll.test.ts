@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
-import { type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type KeyboardWitness, type Point, type Rect, type SoftKeyboard, type UiNode } from '../../src/adapters/types.js';
 import { ElementNotFoundError } from '../../src/interact/resolve.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, scrollUntilVisible } from '../../src/interact/scroll.js';
@@ -100,6 +100,23 @@ describe('scrollUntilVisible — the result says what the scroll achieved', () =
     // No read read, so nothing was swiped: a swipe drawn blind could land on a sheet over the screen.
     expect(fake.swipes).toHaveLength(0);
     expect((error as Error).message).toMatch(/no swipe was sent; \d+ tree reads? took .*no UI tree read succeeded, and no swipe is drawn blind/);
+  });
+});
+
+describe('scrollUntilVisible — a read error no wait cures ends the scroll at once', () => {
+  // D21 (2026-10-31): D20's device run met idb's wedged accessibility service in a scroll_until and read it 133 times
+  // over the 90 s budget before failing. A PersistentReadError is thrown as it came, after the one read, nothing swiped.
+  it('a PersistentReadError is thrown after one read, with no swipe sent', async () => {
+    const fake = scrollingFake(3100);
+    const wedged = new PersistentReadError('wedged until a reboot');
+    let reads = 0;
+    fake.uiTree = async () => {
+      reads++;
+      throw wedged;
+    };
+    await expect(scrollUntilVisible(fake, 'id:submit_button', { maxSwipes: 4, timeoutMs: 60_000, settleMs: 1 })).rejects.toBe(wedged);
+    expect(reads).toBe(1);
+    expect(fake.swipes).toHaveLength(0);
   });
 });
 

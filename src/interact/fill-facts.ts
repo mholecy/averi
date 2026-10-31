@@ -232,7 +232,9 @@ export type ReadBack =
  * content: a value may be a credential.
  * - `reread-failed`: the tree could not be read mid-fill — a dead device,
  *   not a screen settling (fill.ts, `refetch`); `target` is the selector as
- *   the caller wrote it, `cause` the adapter's message.
+ *   the caller wrote it, `cause` the adapter's message. Except a
+ *   PersistentReadError (adapters/types.ts, D21), which `refetch` passes
+ *   through as it came, never as this failure.
  * - `clear-twice`: the delete rounds each CHANGED the field and none emptied
  *   it — deletes landing short — or a MASKED field the deletes did not
  *   change; `left` what it still shows, `rounds` how many were sent (2, or

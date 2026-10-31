@@ -1,11 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { createIosTreeSource, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { createIosTreeSource, IdbEmptyTreeError, IdbNoFrontmostError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
 import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
+import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
+import { PersistentReadError } from '../../src/adapters/types.js';
+import type { IdbHelper } from '../../src/adapters/idb-helper.js';
 import type { UiNode } from '../../src/adapters/types.js';
 
 /**
@@ -385,6 +387,84 @@ describe('IdbTreeSource — an empty tree is a read error, not a screen on which
 
   it('the parser itself stays pure: parseIdbDescribeAll still parses the stuck payload — only a READ refuses it', () => {
     expect(parseIdbDescribeAll(JSON.stringify([{ type: 'Application', frame: ZERO }])).children).toHaveLength(1);
+  });
+});
+
+// D21 (docs/plans/2026-10-30-performance-backlog.md, "D21 diag", 2026-10-31): an accessibility query made too soon
+// after a boot wedges the simulator's AX service, and every describe-all then fails with this stderr until a reboot —
+// a re-front, a relaunch, a new companion and 30 s of waiting each cured 0 of 5. The CLI's failure, as exec throws it.
+describe('IdbTreeSource — "named no frontmost application" is a named error that says only a reboot cures it', () => {
+  const NO_FRONTMOST = "The simulator's accessibility service named no frontmost application";
+  const failing = (stderr: string): ExecFn => async (cmd, args) => {
+    if (cmd === 'idb') throw new ExecError(['idb', ...args].join(' '), 1, stderr);
+    return { stdout: Buffer.alloc(0), stderr: '' };
+  };
+  const source = (udid: string, stderr = NO_FRONTMOST) => new IdbTreeSource({ udid, exec: failing(stderr) });
+
+  it('read() throws IdbNoFrontmostError — a PersistentReadError, so no poll retries it — with the cause, the measurement and the cure', async () => {
+    const error = await source('AAAA-1111').read().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(IdbNoFrontmostError);
+    expect(error).toBeInstanceOf(PersistentReadError);
+    expect((error as Error).message).toBe(
+      "idb cannot read the UI tree: the simulator's accessibility service named no frontmost application — " +
+        'it stays so until the simulator reboots, and averi does not retry the read\n' +
+        'Measured 2026-10-31 on a lab simulator (9 reboots): an accessibility query made too soon after a boot ' +
+        '(idb_companion started as the boot completed) leaves the accessibility service like this for every read after it; ' +
+        're-fronting the app (launch_app on the running app), terminate_app then launch_app, a new idb_companion and ' +
+        '30 s more of waiting each cured it 0 of 5 times. To cure it, ' +
+        'reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`), ' +
+        'wait until the boot completes (`xcrun simctl bootstatus AAAA-1111 -b`) and start idb_companion a few seconds ' +
+        'after that (3 s measured: 0 of 3 wedged); or set app.ios.treeSource: wda in averi.yaml to read the tree ' +
+        'through WebDriverAgent instead',
+    );
+  });
+
+  it('the reboot names the bound simulator through the one owner', async () => {
+    const error = (await source('BBBB-2222').read().catch((e: unknown) => e)) as Error;
+    expect(error.message).toContain(`To cure it, ${rebootSimulatorAdvice('BBBB-2222')}, `);
+  });
+
+  it('applicationLabel() throws it too — the same read', async () => {
+    await expect(source('AAAA-1111').applicationLabel()).rejects.toBeInstanceOf(IdbNoFrontmostError);
+  });
+
+  it('the original idb failure rides on it as its cause', async () => {
+    const error = (await source('AAAA-1111').read().catch((e: unknown) => e)) as Error;
+    expect(error.cause).toBeInstanceOf(ExecError);
+  });
+
+  // A timeout is not the wedge, whatever its stderr held: the CLI killed at its 15 s budget says nothing about the
+  // accessibility service, and a slow read may well succeed the next time.
+  it('a timed-out describe-all stays a plain ExecError, even with the words in its stderr', async () => {
+    const timedOut: ExecFn = async (cmd, args) => {
+      if (cmd === 'idb') throw new ExecError(['idb', ...args].join(' '), null, NO_FRONTMOST, true);
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const error = await new IdbTreeSource({ udid: 'AAAA-1111', exec: timedOut }).read().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ExecError);
+    expect(error).not.toBeInstanceOf(IdbNoFrontmostError);
+  });
+
+  // The helper path (D7a, ADR 0032): runIdb throws the helper's nonzero answer as the same ExecError the CLI's
+  // failure is, so the wedge is named alike whichever served the read.
+  it('through the idb helper: an answer of code 1 with the words is IdbNoFrontmostError too', async () => {
+    const helper = {
+      run: async () => ({ kind: 'answer' as const, code: 1, stdout: Buffer.alloc(0), stderr: NO_FRONTMOST + '\n' }),
+    } as unknown as IdbHelper;
+    const cliCalls: string[] = [];
+    const exec: ExecFn = async (cmd, args) => {
+      if (cmd === 'idb') cliCalls.push(args.join(' '));
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const error = await new IdbTreeSource({ udid: 'AAAA-1111', exec, helper }).read().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(IdbNoFrontmostError);
+    expect(cliCalls).toEqual([]); // the helper answered: no CLI read
+  });
+
+  it('any other idb failure is left as it was', async () => {
+    const error = await source('AAAA-1111', 'Target not found').read().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ExecError);
+    expect(error).not.toBeInstanceOf(PersistentReadError);
   });
 });
 

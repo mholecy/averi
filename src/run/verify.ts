@@ -556,7 +556,13 @@ export async function runVerification(
           { env, environment: req.environment, session: req.session, handOff },
           request,
         );
-    const results = await new Verifier(adapter, { baselineDir: req.baselineDir, ocr, handOff }).assertAll(specs);
+    // The asserts never reject the leg on a tree read either: with persistentRead: 'fail' a read no wait cures
+    // (adapters/types.ts#PersistentReadError, D21 — idb's wedged accessibility service) fails each assert after its
+    // one read, its message the detail (VerifierOptions.persistentRead), so the leg still captures its frame below —
+    // idb's screenshot works while its tree read is wedged — and asks its health line. Only this leg and the MCP
+    // `assert` tool ask for that; everywhere else, a flow's `assert:` step included, the error is thrown and terminal.
+    const verifier = new Verifier(adapter, { baselineDir: req.baselineDir, ocr, handOff, persistentRead: 'fail' });
+    const results = await verifier.assertAll(specs);
     // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
     // a bare screenshot, so the color and text tables could be fed the one
     // frame the color assert's own doc rules out: a mid-animation one. With a

@@ -1,4 +1,13 @@
-import { everyNode, rectArea, sameRectWithinPixel, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type UiNode } from '../adapters/types.js';
+import {
+  everyNode,
+  PersistentReadError,
+  rectArea,
+  sameRectWithinPixel,
+  STRUCTURAL_ROLES,
+  type DeviceAdapter,
+  type Point,
+  type UiNode,
+} from '../adapters/types.js';
 import { containsPoint, screenOf } from './geometry.js';
 import { fillsScreen } from './placed.js';
 import { isScrollViewOf, scrolls } from './scroll-containers.js';
@@ -82,7 +91,10 @@ export interface TreeRead {
  * The error is returned rather than swallowed because the other half of the
  * rule matters just as much: a genuinely broken device (adb gone, emulator
  * offline) must stay diagnosable, so every caller quotes the LAST read error
- * in its timeout message. `error` is set only when `tree` is not, so callers
+ * in its timeout message. The one read error that is NOT a miss — a
+ * PersistentReadError (adapters/types.ts, D21), which no wait cures — comes
+ * back as a value here too: this read stays one-shot, and the loops over it
+ * (pollTree, the scroll loop) throw it. `error` is set only when `tree` is not, so callers
  * can assign both each round and get the "clear on success" behaviour free.
  *
  * A free function rather than a method on each poller: the rule was written
@@ -328,6 +340,13 @@ export interface PollRound {
  * - Errors thrown by the predicate itself (an unknown state name, a viewport
  *   that cannot be read) propagate at once: they are the caller's bug or the
  *   device's, never a miss.
+ * - Except a read error no wait cures (adapters/types.ts#PersistentReadError,
+ *   since 2026-10-31 — D21, idb's wedged accessibility service): it is thrown
+ *   as it came, from the round that read it, whatever was read before. Polled
+ *   like a miss it only spent the budget — D20's device run made 133 failing
+ *   reads in a 90 s `scroll_until` — and its message, not a timeout's, is what
+ *   the reader needs. The callers let it propagate (the flow engine treats it
+ *   as terminal: engine.ts#isTerminal).
  * - The predicate is handed the poll's `deadline` (since 2026-10-05), for a
  *   predicate that itself waits — the color and ocr asserts capture a
  *   settled frame per round, up to 1.5 s — so it bounds ITS OWN wait: the
@@ -401,6 +420,9 @@ export async function pollTree<T>(
     const readStart = Date.now();
     const read = await readTreeOrError(adapter);
     const readMs = Date.now() - readStart;
+    // A read error no wait cures (adapters/types.ts#PersistentReadError — idb's wedged accessibility service, D21) is
+    // not a miss: thrown as it came, the next read would only say it again until the deadline.
+    if (read.error instanceof PersistentReadError) throw read.error;
     readError = read.error;
     if (read.tree !== undefined) {
       treesRead++;

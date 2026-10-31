@@ -1,4 +1,4 @@
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { PersistentReadError, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrError, type FirstSample } from '../ui-tree/read-tree.js';
@@ -313,6 +313,9 @@ export async function resolveSettled(
   // A run of one: the last tree read saw it, the one before it did not.
   if (run === 1) {
     const late = await readTreeOrError(adapter);
+    // A read no wait cures (adapters/types.ts#PersistentReadError, D21) is thrown as it came, as pollTree throws it:
+    // wrapped in this timeout it would read as a slow element, and an `optional:` would skip it as an absent one.
+    if (late.error instanceof PersistentReadError) throw late.error;
     readError = late.error; // the late read is now the last one
     const resolved = late.tree === undefined ? undefined : resolveNow(late.tree, target, opts);
     if (late.tree !== undefined && resolved !== undefined && JSON.stringify(resolved.node.rect) === lastRect) return { ...resolved, tree: late.tree };

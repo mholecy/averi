@@ -1,4 +1,14 @@
-import { everyNode, INPUT_ROLE, rectArea, rectIntersection, sameRect, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import {
+  everyNode,
+  INPUT_ROLE,
+  PersistentReadError,
+  rectArea,
+  rectIntersection,
+  sameRect,
+  type DeviceAdapter,
+  type Rect,
+  type UiNode,
+} from '../adapters/types.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
 import { soleIdOf } from '../ui-tree/selectors.js';
@@ -218,6 +228,9 @@ export async function fillField(
     try {
       tree = await adapter.uiTree();
     } catch (e) {
+      // A read no wait cures (adapters/types.ts#PersistentReadError, D21) passes through unchanged: it is no value that
+      // failed to land, and its class is what the loops above and the flow engine's isTerminal stop on.
+      if (e instanceof PersistentReadError) throw e;
       throw failure({ code: 'reread-failed', target: describeTarget(target), cause: errorMessage(e) });
     }
     lastTree = tree;

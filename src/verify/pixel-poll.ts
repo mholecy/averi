@@ -854,6 +854,8 @@ export async function pollPixels(
     // pollTree propagates the predicate's own errors; only a final miss — a
     // refused capture, or a verdict `measure` marked final — is ours to turn into the verdict.
     if (e instanceof FinalMiss) return e;
+    // Anything else propagates — a read no wait cures (adapters/types.ts#PersistentReadError, D21) included: whether
+    // it fails the assert or is thrown is the Verifier's (VerifierOptions.persistentRead), not the round's.
     throw e;
   });
   if (outcome instanceof FinalMiss) return { pass: false, detail: outcome.detail };

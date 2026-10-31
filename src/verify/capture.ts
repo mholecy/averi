@@ -1,4 +1,10 @@
-import type { DeviceAdapter, DeviceScreen, Rect, UiNode } from '../adapters/types.js';
+import {
+  PersistentReadError,
+  type DeviceAdapter,
+  type DeviceScreen,
+  type Rect,
+  type UiNode,
+} from '../adapters/types.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
@@ -933,6 +939,9 @@ function lastDecodeMemo(): { decode: (shot: Buffer) => DecodedPng | undefined; d
  * (uiautomator "null root node") — the same transient the polling asserts
  * absorb via readTreeOrError. Throws after the last attempt with the
  * underlying error in the message; `captureFrame` carries that on the frame.
+ * A PersistentReadError (adapters/types.ts, D21 — a read no wait cures)
+ * throws after its own attempt, its message whole: the next four would say
+ * it again.
  */
 async function readTreeWithRetry(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
@@ -944,6 +953,9 @@ async function readTreeWithRetry(
     try {
       return await adapter.uiTree();
     } catch (e) {
+      // A read error no wait cures (adapters/types.ts#PersistentReadError, D21) is not retried: the next four reads
+      // would say it again. Its message says why, so the frame's reason is that message, not an attempt count.
+      if (e instanceof PersistentReadError) throw new Error(`UI tree read failed: ${e.message}`, { cause: e });
       last = errorMessage(e);
     }
   }

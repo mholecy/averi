@@ -5,7 +5,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 import { readFile } from 'node:fs/promises';
-import type { UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { tapText } from '../../src/mcp/tool-text.js';
@@ -258,6 +258,15 @@ describe('resolveSettled — appear AND hold still', () => {
         'Timed out after 20ms waiting for element id:swift_payment.form.title to hold still (found once, but no second read came within the budget to confirm its position)',
         '  (last UI tree read failed: WDA session not created)',
       ]);
+    });
+
+    // D21 review: the late read is a read like pollTree's — a read no wait cures is thrown as it came, not wrapped in
+    // a plain timeout (which an `optional:` would skip as an absent element).
+    it('the late read meets a PersistentReadError: thrown as it came, not as a timeout', async () => {
+      const wedged = new PersistentReadError('wedged until a reboot');
+      const { fake, reads } = wdaStart(() => wedged);
+      await expect(resolveSettled(fake, 'id:swift_payment.form.title', BUDGET)).rejects.toBe(wedged);
+      expect(reads()).toBe(2);
     });
 
     it('the late read no longer finds it: said exactly — the one read after the budget did not find it again; no read error', async () => {
