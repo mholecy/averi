@@ -58,12 +58,12 @@ export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): bo
 /**
  * How long a typing into an app seen dropping a tail waits after its first character, before the rest in one burst
  * (D24, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment 2026-10-31; lowered 150 → 50 ms by D25, the same
- * ADR's D25 amendment). Measured 2026-10-31 on the lab simulator (iPhone 17, iOS 27.0), `Jan Novak Bratislava` and its
- * prefixes typed by raw `idb ui text` (one gRPC client per call, as averi's helper) into AveriLabRN's `rn-field` (React
- * Native 0.88's controlled single-line TextInput), read back from the app's state file (the scripts and the figures:
- * docs/plans/2026-10-30-performance-backlog.md, "### D7 and D24 measured" and "### D25 diag").
+ * ADR's D25 amendment). Measured 2026-10-31 on the lab simulator (iPhone 17, iOS 27.0), `Jan Novak Bratislava` or its
+ * prefixes typed into AveriLabRN's `rn-field` (React Native 0.88's controlled single-line TextInput), read back from
+ * the app's state file (the scripts and the figures: docs/plans/2026-10-30-performance-backlog.md, "### D7 and D24
+ * measured" and "### D25 diag").
  *
- * D24, 15 runs a mode, 20 characters:
+ * D24, 15 runs a mode, 20 characters, typed through the `idb ui text` CLI (a Python start-up on every call, ADR 0032):
  *
  * | typing                                       | whole  | time    |
  * |----------------------------------------------|--------|---------|
@@ -73,23 +73,27 @@ export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): bo
  * | chunks of 5                                  | 15/15  | 784 ms  |
  * | chunks of 1                                  | 15/15  | 3.8 s   |
  *
- * D25, 40 rounds, every combination once a round in a shuffled order; whole/40 by length:
+ * D25, 40 rounds, every combination once a round in a shuffled order, typed through fb-idb's gRPC client in-process,
+ * one client a call — as averi's helper does (a gen_main per request), never through `idb ui text`; whole/40 by length:
  *
  * | typing          | 1     | 2     | 3     | 4     | 5     | 6     | 8     | 12    | 20    |
  * |-----------------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
  * | one burst       | 40/40 | 36/40 | 36/40 | 37/40 | 40/40 | 33/40 | 35/40 | 10/40 | 4/40  |
  * | split, 150 ms   | —     | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 |
  *
- * A burst lands in ~93 ms, the 150 ms split in ~335 ms (+240 ms at every length). A burst already drops at 2 characters
- * (4 of 40 lost the second key), so splitting only above some length — D25's first idea, to spare short texts the split
- * — would leave drops in: there is no safe threshold. The gap is the lever instead: at 8 and 20 characters (40 rounds
- * each, 80 typings a mode) the split with 0 ms kept 80/80 (185 / 238 ms), with 50 ms 80/80 (235 / 292 ms), with 100 ms
- * 80/80, with 150 ms 80/80; one call with a companion-side 50 ms HID delay between the first key and the rest 80/80
- * (148 / 204 ms). So it is not the wait that lets the controlled input catch up after its first keystroke (whose JS
- * value round-trip is what the keys arriving behind it are dropped against — ADR 0023's measurement: the END of a
- * burst): the second idb call's own round trip already does. Why 50 and not 0: averi's in-process helper (ADR 0032) may
- * hand back its first call faster than the script's per-call client did, which would shorten that round trip; 50 ms
- * keeps a margin for it at −100 ms a typing against 150. Not done: the one-call variant with a companion-side delay
+ * A burst lands in ~93 ms, the 150 ms split in ~335 ms (+240 ms at lengths 2–8; +215–220 at 12 and 20, where the
+ * burst's drops skew its median). A burst already drops at 2 characters (4 of 40 lost the second key), so splitting
+ * only above some length — D25's first idea, to spare short texts the split — would leave drops in: there is no safe
+ * threshold. The gap is the lever instead: at 8 and 20 characters (40 rounds each, 80 typings a mode) the split with 0
+ * ms kept 80/80 (185 / 238 ms), with 50 ms 80/80 (235 / 292 ms), with 100 ms 80/80, with 150 ms 80/80; one call with a
+ * companion-side 50 ms HID delay between the first key and the rest 80/80 (148 / 204 ms). So any pause after the first
+ * key of at least ~50 ms appears to let the controlled input catch up after its first keystroke (whose JS value
+ * round-trip is what the keys arriving behind it are dropped against — ADR 0023's measurement: the END of a burst) and
+ * the rest land: 0, 50, 100 and 150 ms between two calls all landed, and so did one call with a bare 50 ms HID pause
+ * and no second round trip. The second call's own round trip (~90 ms) already gives such a pause, and 150 ms bought
+ * nothing over it. Why 50 and not 0: the margin is kept, and 50 ms is the pause measured to land on its own — hid:50
+ * had no round trip at all — so a 50 ms sleep lands the rest even if the second call's round trip through averi's
+ * helper shrank to nothing; −100 ms a typing against 150. Not done: the one-call variant with a companion-side delay
  * (~90 ms less again) — it needs a new helper verb carrying the delay. Not measured: other RN versions and fields,
  * multi-line inputs (which dropped nothing in ADR 0023's runs), the 50 ms gap through averi's helper (the device check
  * of D25), loaded hosts.

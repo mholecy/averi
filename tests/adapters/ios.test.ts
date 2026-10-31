@@ -643,7 +643,7 @@ describe('IosAdapter.screenshot — through idb on the idb tree source (D26b)', 
 // D24 (2026-10-31, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment): once a fill has seen an app's field
 // drop the tail of a typing (noteDroppedTail), later typings into that app send the first character alone, wait
 // FIRST_KEY_ALONE_MS, then the rest — measured 15/15 whole where one burst kept 5/15. The wait is pinned as a literal
-// (50 ms since the ADR's D25 amendment: the second call's round trip is what lands the rest; 150 ms bought nothing).
+// (50 ms since the ADR's D25 amendment: any pause of ~50 ms after the first key landed the rest; 150 bought nothing).
 describe('IosAdapter.typeText — the first key alone, on an app seen dropping a tail', () => {
   beforeEach(() => {
     resetSleeps();

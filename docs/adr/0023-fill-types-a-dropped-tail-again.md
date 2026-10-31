@@ -152,41 +152,45 @@ app for the adapter's life; an app never seen dropping a tail never pays.
   launched app's key — the split paid where it is not needed, or not paid where it is (the retype still catches it).
 - The split is measured on one field of one RN version (0.88's controlled single-line `TextInput`), one 20-character
   text, one simulator; other RN versions and fields, multi-line inputs (which dropped nothing in the 2026-10-19 runs),
-  and loaded hosts are unmeasured. Only the device can say whether 150 ms is enough everywhere. (D25, below: the
-  gap is not what makes it land; lowered to 50 ms.)
+  and loaded hosts are unmeasured. Only the device can say whether 150 ms is enough everywhere. (D25, below: any
+  pause of ~50 ms after the first key landed the rest; lowered to 50 ms.)
 
 ## Amendment: the gap after the first key is 50 ms, not 150 — and no length is spared the split (2026-10-31, D25)
 
-**Measured** (the owner, outside the sandbox, 2026-10-31; docs/plans/2026-10-30-performance-backlog.md, "### D25
-diag"): D24's split cost short texts that had never dropped (rn-fill `Jan` 2 155 → 2 341 ms: one idb call more and
-150 ms), so D25 asked from what length a burst drops, to split only above it. Raw `idb ui text` (one gRPC client a
-call, as averi's helper), prefixes of `Jan Novak Bratislava` into AveriLabRN's `rn-field` on the lab simulator (iPhone
-17, iOS 27.0), read back from the app's state file; 40 rounds, every combination once a round in a shuffled order. Whole
-of 40:
+**Measured** (the owner, outside the sandbox, 2026-10-31; docs/plans/2026-10-30-performance-backlog.md, "### D25 diag"):
+D24's split cost short texts that had never dropped (rn-fill `Jan` 2 155 → 2 341 ms: one idb call more and 150 ms), so
+D25 asked from what length a burst drops, to split only above it. Typed through fb-idb's gRPC client in-process, one
+client a call — as averi's helper does (a gen_main per request), never through the `idb ui text` CLI that D24 measured
+with (a Python start-up on every call, ADR 0032) — prefixes of `Jan Novak Bratislava` into AveriLabRN's `rn-field` on
+the lab simulator (iPhone 17, iOS 27.0), read back from the app's state file; 40 rounds, every combination once a round
+in a shuffled order. Whole of 40:
 
 | typing        | 1     | 2     | 3     | 4     | 5     | 6     | 8     | 12    | 20    |
 |---------------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 | one burst     | 40/40 | 36/40 | 36/40 | 37/40 | 40/40 | 33/40 | 35/40 | 10/40 | 4/40  |
 | split, 150 ms | —     | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 |
 
-A burst lands in ~93 ms (median), the 150 ms split in ~335 ms — +240 ms at every length. A burst already drops at 2
-characters (4 of 40 lost the second key), so the premise is refuted: no length threshold is safe. At 8 and 20
-characters the gap was varied (80 typings a mode): split with 0 ms 80/80 (185 / 238 ms), 50 ms 80/80 (235 / 292 ms),
-100 ms 80/80, 150 ms 80/80; one call with a companion-side 50 ms HID delay between the first key and the rest 80/80
-(148 / 204 ms). The wait is not what lets the controlled input catch up after its first keystroke: the second idb
-call's own round trip is.
+A burst lands in ~93 ms (median), the 150 ms split in ~335 ms — +240 ms at lengths 2–8 (+215–220 at 12 and 20, where the
+burst's drops skew its median). A burst already drops at 2 characters (4 of 40 lost the second key), so the premise is
+refuted: no length threshold is safe. At 8 and 20 characters the gap was varied (80 typings a mode): split with 0 ms
+80/80 (185 / 238 ms), 50 ms 80/80 (235 / 292 ms), 100 ms 80/80, 150 ms 80/80; one call with a companion-side 50 ms HID
+delay between the first key and the rest 80/80 (148 / 204 ms). Any pause after the first key of at least ~50 ms appears
+to land the rest: 0, 50, 100 and 150 ms between two calls all landed 80/80, and so did one call with a 50 ms HID delay
+and no second round trip. The second call's round trip (~90 ms) already gives such a pause, and 150 ms bought nothing
+over it.
 
 **Decision.** No length threshold: every typing of two or more characters into an app seen dropping a tail is split, as
-D24 decided. The wait is lowered: `ios.ts#FIRST_KEY_ALONE_MS` 150 → 50 ms, −100 ms on each such typing. Not 0: averi's
-in-process helper (ADR 0032) may return its first call faster than the script's per-call client did, which shortens the
-round trip that does the work; 50 ms is the margin for that. Everything else in the D24 amendment stands — who learns,
-who acts, the capped field, the grapheme, the retype as the safety net.
+D24 decided. The wait is lowered: `ios.ts#FIRST_KEY_ALONE_MS` 150 → 50 ms, −100 ms on each such typing. Not 0: a margin
+is kept, and 50 ms is the pause measured to land on its own — hid:50, a bare 50 ms pause with no round trip, landed
+80/80 — so a 50 ms sleep lands the rest even if the second call's round trip through averi's helper shrank to nothing.
+Everything else in the D24 amendment stands — who learns, who acts, the capped field, the grapheme, the retype as the
+safety net.
 
 **Not done.** The one-call variant (the companion's HID delay between the first key and the rest, ~90 ms less again):
 it needs a new helper verb carrying a delay; not worth one now.
 
 **Residuals.**
-- The 50 ms gap is measured through the script's per-call client, not through averi's helper; the device check of D25
-  (`ios-run.sh --app react-native`, rn-fill and rn-fill-20 on the helper) must confirm it lands whole first time.
+- The 50 ms gap is measured through the script's in-process client, not through averi's helper itself; the device check
+  of D25 (`ios-run.sh --app react-native`, rn-fill and rn-fill-20 on the helper) must confirm it lands whole first time.
 - Everything D24's residuals name is still unmeasured — other RN versions and fields, multi-line inputs, loaded hosts;
-  lengths 1–20 of one text are measured now.
+  lengths 1–6, 8, 12 and 20 of one text are measured now.

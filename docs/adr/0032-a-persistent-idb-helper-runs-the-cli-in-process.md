@@ -147,8 +147,8 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
   `FIRST_KEY_ALONE_MS` (150 ms, explicit, unchanged here; 50 ms since ADR 0023's D25 amendment), then
   `ui text <rest>`. Through the CLI the second call paid the Python start-up (~90 ms of D7's −122 on a tap; `ui text`
   unmeasured) between the wait and its first event; through
-  the helper it does not, so the gap between the first key and the rest shrinks by roughly that — the 150 ms itself
-  stays. D24's 15/15 was
+  the helper it does not, so the gap between the first key and the rest shrinks by roughly that — the wait itself
+  (FIRST_KEY_ALONE_MS) stays. D24's 15/15 was
   measured through the CLI (raw `idb ui text`); the owner's RN re-check (`ios-run.sh --app react-native`, rn-fill-20,
   helper on) must confirm the split still lands whole first time.
 - Tests: `tests/adapters/idb-helper.test.ts` (each HID argv to the helper; near-miss shapes and ill-formed texts to the
