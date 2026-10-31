@@ -66,6 +66,11 @@ the earlier notes.
   - On every tree source, not only `idb`: a `treeSource: wda` project's teardown is what poisons the simulator, and the
     next reader may be another project's averi on idb, or idb by hand. The write is idempotent and costs ≈0.27 s
     per key (device check I6: median 0.273 s, p90 0.282 s; ≈0.55 s per launch).
+    *Amended 2026-10-31 (D23, docs/plans/2026-10-30-performance-backlog.md):* the two calls now run together, not one
+    after the other — 445 → 250 ms median per launch on the lab simulator (iOS 27.0). One spawn for both keys is not
+    possible: the simulator runtime has no shell (`simctl spawn <udid> sh -c …` → ENOENT), and a whole-domain
+    `defaults write` would drop the domain's other keys. A failure still prints the same one line, naming the first
+    key (in the order above) that failed; both keys are now always tried.
   - **On by default, logged, not restored.** The suggestion above asked for the write to be opt-in "or at least
     logged". It is logged: the first successful write per adapter prints one stderr line saying the two keys were set
     to true on that simulator, that the change is simulator-wide and not restored. It is not opt-in, and there is no

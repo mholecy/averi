@@ -388,6 +388,32 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl openurl AAAA-1111 myapp://home']);
   });
 
+  // D23 (2026-10-31): the two spawns overlap rather than queue — 445 → 250 ms
+  // median on the lab simulator. One spawn is not possible: the runtime has
+  // no shell (`simctl spawn <udid> sh -c …` → ENOENT) and `defaults write`
+  // takes one key, or a whole domain that would replace the other keys.
+  it('the two writes are in flight together, not one after the other, and the launch waits for both', async () => {
+    const { fn, calls } = fakeExec({});
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const done: string[] = [];
+    const overlapping: ExecFn = async (cmd, args, opts) => {
+      if (!args.includes('defaults')) {
+        expect(done).toHaveLength(2); // the launch never starts before both writes finished
+        return fn(cmd, args, opts);
+      }
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      done.push(args.at(-3) as string);
+      return fn(cmd, args, opts);
+    };
+    await new IosAdapter({ udid: 'AAAA-1111', exec: overlapping, treeSource: NO_TREE }).launch('com.app');
+    expect(maxInFlight).toBe(2);
+    expect(simctlCalls(calls)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 com.app']);
+  });
+
   it('the simulator-wide write is announced on stderr once per adapter, not per launch', async () => {
     const { fn } = fakeExec({});
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
@@ -401,7 +427,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     );
   });
 
-  it('a failed write does not fail the launch: the second key is not tried, one stderr line naming the way out, the launch still runs', async () => {
+  it('a failed write does not fail the launch: both keys were tried (D23: together), one stderr line naming the first key and the way out, the launch still runs', async () => {
     const { fn, calls } = fakeExec({});
     const writes: string[] = [];
     const failing: ExecFn = (cmd, args, opts) => {
@@ -410,11 +436,27 @@ describe('IosAdapter re-enables accessibility automation before every launch and
       return Promise.reject(new Error('Command failed (exit 1): xcrun simctl spawn …\nUnable to boot'));
     };
     await new IosAdapter({ udid: 'AAAA-1111', exec: failing, treeSource: NO_TREE }).launch('com.app');
-    expect(writes).toHaveLength(1); // the first failure ends the pair
+    expect(writes).toHaveLength(2); // in flight together (D23), so both were tried — and still one line
     expect(simctlCalls(calls)).toEqual(['xcrun simctl launch AAAA-1111 com.app']);
     expect(stderr).toHaveBeenCalledTimes(1); // the failure line, and no success announcement
     expect(stderr.mock.calls[0]?.[0]).toBe(
       'averi: could not set com.apple.Accessibility AutomationEnabled on AAAA-1111 before launching com.app ' +
+        '(Command failed (exit 1): xcrun simctl spawn …) — idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
+        'if it does, reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`)',
+    );
+  });
+
+  it('only the second write fails: the one stderr line names ApplicationAccessibilityEnabled, no success announcement, the launch still runs', async () => {
+    const { fn, calls } = fakeExec({});
+    const failing: ExecFn = (cmd, args, opts) =>
+      args.includes('ApplicationAccessibilityEnabled')
+        ? Promise.reject(new Error('Command failed (exit 1): xcrun simctl spawn …\nUnable to write'))
+        : fn(cmd, args, opts);
+    await new IosAdapter({ udid: 'AAAA-1111', exec: failing, treeSource: NO_TREE }).launch('com.app');
+    expect(simctlCalls(calls)).toEqual([WRITES[0], 'xcrun simctl launch AAAA-1111 com.app']);
+    expect(stderr).toHaveBeenCalledTimes(1);
+    expect(stderr.mock.calls[0]?.[0]).toBe(
+      'averi: could not set com.apple.Accessibility ApplicationAccessibilityEnabled on AAAA-1111 before launching com.app ' +
         '(Command failed (exit 1): xcrun simctl spawn …) — idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
         'if it does, reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`)',
     );

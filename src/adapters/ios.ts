@@ -233,23 +233,38 @@ export class IosAdapter implements DeviceAdapter {
    * fails the launch that follows anyway, and should not hold it for a
    * minute first. A failed write never fails the launch — the app still
    * launches, idb may just read an empty tree — and stderr is the channel
-   * this adapter's layer already uses for a non-fatal note (wda.ts); the
-   * first failure ends the pair, since the second write would fail the same
-   * way and one line says it.
+   * this adapter's layer already uses for a non-fatal note (wda.ts); one
+   * line however many writes failed, naming the first key in this order
+   * that did (both failing usually means the same cause).
+   *
+   * The two calls run together, not one after the other (D23, 2026-10-31):
+   * each is one `simctl spawn`, and the spawn, not the write, is the cost —
+   * D0 on iOS measured 247 + 225 ms of ensure-cold in them; on the lab
+   * simulator (iPhone 17, iOS 27.0, 15 interleaved pairs) serial 445 ms
+   * median (415–462), together 250 ms (233–252). One spawn writing both keys
+   * was the plan and is not possible: the simulator runtime has no shell
+   * (`simctl spawn <udid> sh -c …` → ENOENT; RuntimeRoot/bin holds only `df`
+   * and `launchctl`), and `defaults write <domain> '{…}'` replaces the whole
+   * domain, dropping the dozen other keys com.apple.Accessibility holds
+   * there. Two `defaults write`s of different keys in one domain at once
+   * both land — cfprefsd applies each key on its own (20/20 on a scratch
+   * domain on the lab simulator, both keys read back) — and the launch
+   * still waits for both.
    */
   private async enableAccessibilityAutomation(what: string): Promise<void> {
-    for (const key of ['AutomationEnabled', 'ApplicationAccessibilityEnabled']) {
-      try {
-        await this.simctl(['spawn', this.udid, 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000);
-      } catch (e) {
-        const reason = errorMessage(e).split('\n')[0];
-        console.error(
-          `averi: could not set com.apple.Accessibility ${key} on ${this.udid} before ${what} (${reason}) — ` +
-            'idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
-            `if it does, ${rebootSimulatorAdvice(this.udid)}`,
-        );
-        return;
-      }
+    const keys = ['AutomationEnabled', 'ApplicationAccessibilityEnabled'] as const;
+    const writes = await Promise.allSettled(
+      keys.map((key) => this.simctl(['spawn', this.udid, 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000)),
+    );
+    const failed = writes.findIndex((w) => w.status === 'rejected');
+    if (failed !== -1) {
+      const reason = errorMessage((writes[failed] as PromiseRejectedResult).reason).split('\n')[0];
+      console.error(
+        `averi: could not set com.apple.Accessibility ${keys[failed]} on ${this.udid} before ${what} (${reason}) — ` +
+          'idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
+          `if it does, ${rebootSimulatorAdvice(this.udid)}`,
+      );
+      return;
     }
     if (!this.accessibilityAutomationAnnounced) {
       this.accessibilityAutomationAnnounced = true;
