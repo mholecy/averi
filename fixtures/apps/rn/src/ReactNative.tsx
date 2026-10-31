@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Dimensions, Keyboard, Pressable, StyleSheet, Text, TextInput, View, type HostInstance } from 'react-native';
+import { formatted, type FieldFormat } from './format';
 import type { Cell, Lab, Target } from './lab';
 
 // The react-native family (fixtures/apps/cells/react-native.json): React Native's own text fields, which neither
@@ -25,6 +26,10 @@ import type { Cell, Lab, Target } from './lab';
 //   press logs the target's `tap` and empties the field.
 // Every field reports its value and focus (the forms oracle, LabState.fields, by the target's tag), the keyboard its
 // frame — what the live golden's forms cases judge a fill by.
+//
+// `rn-format` (D18): two text targets laid as rn-field's N, each field's onChangeText reformatting what it is handed
+// (`format`, src/format.ts: G an IBAN grouped in fours, A an amount's thousands) — the model holds the formatted text,
+// set back into the controlled TextInput, as a banking app's React Native form does.
 //
 // `rn-banner` (round 9, lab note LR3: docs/bugs/2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-
 // in-draw-order.md): each target a coloured Pressable filling its slot (a press logs its `tap`), and after it, its LATER
@@ -82,8 +87,11 @@ export function ReactNativeScreen({ cell, lab }: { cell: Cell; lab: Lab }) {
   );
 }
 
-/** The model's side of a field: its value and focus reported, a focus logging the target's `tap` when `tapOnFocus`. */
-function useField(lab: Lab, tag: string, tapOnFocus: boolean) {
+/**
+ * The model's side of a field: its value and focus reported, a focus logging the target's `tap` when `tapOnFocus`; with
+ * a `format`, every change reformatted before the model takes it.
+ */
+function useField(lab: Lab, tag: string, tapOnFocus: boolean, format?: FieldFormat) {
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
   useEffect(() => lab.field(tag, value, focused), [lab, tag, value, focused]);
@@ -92,7 +100,7 @@ function useField(lab: Lab, tag: string, tapOnFocus: boolean) {
     clear: () => setValue(''),
     props: {
       value,
-      onChangeText: setValue,
+      onChangeText: (text: string) => setValue(formatted(format, text)),
       onFocus: () => {
         setFocused(true);
         lab.focused(tag);
@@ -111,7 +119,7 @@ function LabelledField({ cell, target, lab }: { cell: Cell; target: Target; lab:
   const id = `lab.${cell.id}.${target.tag}`;
   const box = useFrame(lab, `${target.tag}.box`);
   const label = useFrame(lab, target.tag);
-  const field = useField(lab, target.tag, true);
+  const field = useField(lab, target.tag, true, target.format);
   const multiline = target.tag === MULTILINE;
   return (
     <View testID={`${id}.box`} ref={box.ref} onLayout={box.onLayout} style={[styles.box, { backgroundColor: target.color }]}>

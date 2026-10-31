@@ -1,0 +1,165 @@
+{
+  "cell": "form-format",
+  "layer": "none",
+  "device": "averi_lab emulator, Android 13 (API 33)",
+  "screen": {
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "targets": [],
+  "navigation": "gesture",
+  "windows": "form-format.windows.txt",
+  "displays": "form-format.displays.txt",
+  "form": {
+    "fields": [
+      {
+        "tag": "iban",
+        "id": "lab.form-format.iban",
+        "kind": "iban",
+        "title": "IBAN – grouped as typed",
+        "titleId": "lab.form-format.iban.title",
+        "frame": {
+          "x": 55,
+          "y": 386,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 314,
+          "width": 404,
+          "height": 66
+        }
+      },
+      {
+        "tag": "amount",
+        "id": "lab.form-format.amount",
+        "kind": "amount",
+        "title": "Amount in EUR – thousands grouped",
+        "titleId": "lab.form-format.amount.title",
+        "frame": {
+          "x": 55,
+          "y": 568,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 496,
+          "width": 590,
+          "height": 66
+        }
+      },
+      {
+        "tag": "ibanShown",
+        "id": "lab.form-format.ibanShown",
+        "kind": "iban",
+        "title": "IBAN – grouped on screen only",
+        "titleId": "lab.form-format.ibanShown.title",
+        "frame": {
+          "x": 55,
+          "y": 750,
+          "width": 970,
+          "height": 99
+        },
+        "value": "",
+        "focused": false,
+        "error": null,
+        "titleFrame": {
+          "x": 55,
+          "y": 678,
+          "width": 499,
+          "height": 66
+        }
+      }
+    ],
+    "controls": [
+      {
+        "tag": "iban",
+        "id": "lab.form-format.iban",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 386,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,436"
+          }
+        ]
+      },
+      {
+        "tag": "amount",
+        "id": "lab.form-format.amount",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 568,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,618"
+          }
+        ]
+      },
+      {
+        "tag": "ibanShown",
+        "id": "lab.form-format.ibanShown",
+        "kind": "field",
+        "frame": {
+          "x": 55,
+          "y": 750,
+          "width": 970,
+          "height": 99
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,800"
+          }
+        ]
+      },
+      {
+        "tag": "submit",
+        "id": "lab.form-format.submit",
+        "kind": "button",
+        "frame": {
+          "x": 55,
+          "y": 882,
+          "width": 970,
+          "height": 132
+        },
+        "situation": "open",
+        "reached": true,
+        "probe": [
+          {
+            "kind": "touch",
+            "tag": "540,948"
+          }
+        ]
+      }
+    ],
+    "keyboard": null,
+    "screenError": null,
+    "submits": []
+  }
+}

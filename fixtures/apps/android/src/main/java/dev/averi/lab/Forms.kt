@@ -9,7 +9,11 @@ package dev.averi.lab
 // identifier it shows it under. A fill is judged by that, never by a tree.
 //
 // Nothing here transforms what is typed (no capitalisation, no autocorrection, no mask): a value that does not land as
-// typed is averi's or adb's doing, not the app's.
+// typed is averi's or adb's doing, not the app's — but for a field with a `format` (form-format, D18), which reformats
+// as a banking app's IBAN and amount fields do (schema.ts#FieldFormat, `formatted` below): the MODEL reformatted on
+// every change, the cursor put at the end whenever the text moved (a TextFieldValue — the String overload would keep
+// the cursor where it was and the next key would land before the separator), or with `formatIn: display` only what
+// the field SHOWS, by a VisualTransformation (the model the text as typed, whitespace dropped).
 //
 // The keyboard: the window gets the IME's insets (adjustResize under edge to edge: nothing is resized or panned) and
 // the form does NOT make room for it — the scroll column keeps its whole height, so the fields laid where the IME is
@@ -77,10 +81,15 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,6 +108,10 @@ internal data class FieldSpec(
     val placeholder: String,
     val prefill: String?,
     val error: Message?,
+    /** schema.ts#FieldFormat: `group4`, `thousands`, or none. */
+    val format: String?,
+    /** The format only shown (a VisualTransformation), the model as typed. */
+    val formatShownOnly: Boolean,
 )
 internal data class PickerRow(val code: String, val name: String)
 internal data class PickerSpec(val field: String, val title: String, val open: Boolean, val rows: List<PickerRow>)
@@ -123,7 +136,7 @@ internal fun formOf(o: JSONObject): FormSpec {
     val fs = o.optJSONArray("fields")
     val fields = (0 until (fs?.length() ?: 0)).map { i ->
         val f = fs!!.getJSONObject(i)
-        FieldSpec(f.optString("tag"), f.optString("kind"), f.optString("title"), f.str("titleId"), f.str("fieldId"), f.optString("placeholder"), f.str("prefill"), message(f.optJSONObject("error")))
+        FieldSpec(f.optString("tag"), f.optString("kind"), f.optString("title"), f.str("titleId"), f.str("fieldId"), f.optString("placeholder"), f.str("prefill"), message(f.optJSONObject("error")), f.str("format"), f.str("formatIn") == "display")
     }
     val s = o.optJSONObject("submit") ?: JSONObject()
     val picker = o.optJSONObject("picker")?.let { p ->
@@ -143,6 +156,32 @@ internal fun formOf(o: JSONObject): FormSpec {
         focus = o.str("focus"),
         picker = picker,
     )
+}
+
+// --- the formats (schema.ts#FieldFormat; the same rules as Forms.swift's and the React Native app's src/format.ts) ---
+
+private fun isGap(c: Char) = c == ' ' || c == '\u00A0' || c == '\u202F'
+
+/** `group4`: whitespace dropped, groups of four joined by a space; `thousands`: the whole part grouped in threes by a no-break space. */
+internal fun formatted(format: String?, text: String): String = when (format) {
+    "group4" -> text.filterNot(::isGap).chunked(4).joinToString(" ")
+    "thousands" -> {
+        val cut = text.indexOfFirst { it == ',' || it == '.' }
+        val whole = (if (cut < 0) text else text.substring(0, cut)).filterNot(::isGap)
+        whole.reversed().chunked(3).joinToString("\u00A0").reversed() + (if (cut < 0) "" else text.substring(cut))
+    }
+    else -> text
+}
+
+/** `group4` on the screen only: the model's text in groups of four, the cursor mapped across the spaces. */
+private object Group4Shown : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val n = text.text.length
+        return TransformedText(AnnotatedString(formatted("group4", text.text)), object : OffsetMapping {
+            override fun originalToTransformed(offset: Int) = if (offset == 0) 0 else offset + (offset - 1) / 4
+            override fun transformedToOriginal(offset: Int) = (offset - offset / 5).coerceIn(0, n)
+        })
+    }
 }
 
 @Composable
@@ -371,20 +410,43 @@ private fun Input(
         "pin" -> KeyboardType.NumberPassword
         else -> KeyboardType.Text
     }
+    val options = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = keyboardType)
+    val field = box.focusRequester(requester).onFocusChanged { onFocus(it.isFocused) }
+    val decoration: @Composable (@Composable () -> Unit) -> Unit = { inner ->
+        Box(Modifier.fillMaxSize().padding(horizontal = 8.dp), contentAlignment = Alignment.CenterStart) {
+            if (value.isEmpty()) Text(f.placeholder, fontSize = 16.sp, color = Color.LightGray)
+            inner()
+        }
+    }
+    if (f.format != null && !f.formatShownOnly) {
+        // The model reformatted on every change; whenever the text moved, the cursor goes to its end (the typing's
+        // place) — a selection change alone (the commit nudge's DPAD left/right) is kept.
+        var edited by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+        val current = if (edited.text == value) edited else TextFieldValue(value, TextRange(value.length))
+        BasicTextField(
+            value = current,
+            onValueChange = { next ->
+                val shown = formatted(f.format, next.text)
+                edited = if (shown == next.text) next else TextFieldValue(shown, TextRange(shown.length))
+                if (shown != value) onValue(shown)
+            },
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 16.sp),
+            keyboardOptions = options,
+            modifier = field,
+            decorationBox = decoration,
+        )
+        return
+    }
     BasicTextField(
         value = value,
-        onValueChange = onValue,
+        onValueChange = if (f.format != null) { next -> onValue(next.filterNot(::isGap)) } else onValue,
         singleLine = true,
         textStyle = TextStyle(fontSize = 16.sp),
-        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = keyboardType),
-        visualTransformation = if (f.kind == "pin") PasswordVisualTransformation() else VisualTransformation.None,
-        modifier = box.focusRequester(requester).onFocusChanged { onFocus(it.isFocused) },
-        decorationBox = { inner ->
-            Box(Modifier.fillMaxSize().padding(horizontal = 8.dp), contentAlignment = Alignment.CenterStart) {
-                if (value.isEmpty()) Text(f.placeholder, fontSize = 16.sp, color = Color.LightGray)
-                inner()
-            }
-        },
+        keyboardOptions = options,
+        visualTransformation = if (f.kind == "pin") PasswordVisualTransformation() else if (f.format == "group4") Group4Shown else VisualTransformation.None,
+        modifier = field,
+        decorationBox = decoration,
     )
 }
 

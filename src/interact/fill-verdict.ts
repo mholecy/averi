@@ -51,8 +51,11 @@
  *   typed, read-back `nothing-typed`) that stopped on unchanged deletes is
  *   therefore unverified: `cleared` in deletes, its reason the only one.
  * - `caveats` order: the not-an-input finding, then the masked-append
- *   warning (fill.ts never produces both: a masked-append needs an input
- *   that took the text, a not-input finding a read-back that did not land).
+ *   warning, then a reformat's added point. fill.ts never produces two of
+ *   them together: a not-input finding needs a read-back that did not land,
+ *   and the other two a landed one — a masked-append an input whose masked
+ *   reading took the text, a reformatted point a plain reading (a masked one
+ *   is never a reformat).
  *
  * The same module classifies a mismatch (`differenceOf`, below): what a
  * read-back that missed the value can be said to differ by, as a
@@ -68,7 +71,7 @@
  */
 
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
-import { heldText, type Difference, type FillResult, type LostWhy, type NearbyInput } from './fill-facts.js';
+import { hasPoint, heldText, type Difference, type FillResult, type LostWhy, type NearbyInput, type PointedReformat, type Reformat } from './fill-facts.js';
 
 /**
  * Why a fill is NOT verified — one code per reason, in render order:
@@ -119,10 +122,16 @@ export interface Sent {
  * - `masked-append`: a masked field held `held` characters after focus and
  *   clear was off — the length rule cannot tell the append from a correct
  *   fill (finportal 2026-09-17: backend `invalid_grant`).
+ * - `reformatted-point` (D18, the orchestrator's decision of review round 1):
+ *   the field showed the typing reformatted with an added `.` or `,` — a
+ *   thousands separator by its place, but the reading cannot tell it from a
+ *   decimal point (`1.234` for `1234`: de-DE, or a three-decimal mask). The
+ *   fill passes, the reformat said here instead of the aside.
  */
 export type Caveat =
   | { code: 'not-input'; role: string; typed: boolean; input: NearbyInput | 'none' | 'unread' }
-  | { code: 'masked-append'; held: number };
+  | { code: 'masked-append'; held: number }
+  | { code: 'reformatted-point'; reformat: PointedReformat };
 
 /** A fill, judged. Built only by `judgeFill`; its invariants are the module header's. */
 export interface FillVerdict {
@@ -137,6 +146,11 @@ export interface FillVerdict {
   caveats: Caveat[];
   /** The dropped tails typed again before the read-back landed, by length (FillResult.retyped); absent when none. */
   retyped?: number[];
+  /**
+   * The field showed the typing reformatted, separators of its own added (FillResult.reformatted, D18): still filled.
+   * Only a reformat without a `point` — one with is the `reformatted-point` caveat instead.
+   */
+  reformatted?: Reformat;
   /** The resolution note (resolve.ts#resolveNow), carried for the MCP reply; the flow line prints none. */
   note?: string;
 }
@@ -176,6 +190,8 @@ export function judgeFill(r: FillResult): FillVerdict {
   const caveats: Caveat[] = [];
   if (r.notInput !== undefined) caveats.push({ code: 'not-input', role, typed: readBack.kind !== 'nothing-typed', input: r.notInput.input });
   if (r.maskedAppend !== undefined) caveats.push({ code: 'masked-append', held: r.maskedAppend.held });
+  const { reformatted } = r;
+  if (reformatted !== undefined && hasPoint(reformatted)) caveats.push({ code: 'reformatted-point', reformat: reformatted });
   return {
     did: verified ? 'filled' : typed > 0 ? 'typed' : sent !== undefined ? 'cleared' : 'focused',
     typed,
@@ -183,6 +199,7 @@ export function judgeFill(r: FillResult): FillVerdict {
     reasons,
     caveats,
     ...(r.retyped !== undefined && r.retyped.length > 0 && { retyped: r.retyped }),
+    ...(reformatted !== undefined && !hasPoint(reformatted) && { reformatted }),
     note: r.note,
   };
 }

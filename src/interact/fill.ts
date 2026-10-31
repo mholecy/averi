@@ -361,6 +361,7 @@ export async function fillField(
   // (`clearPlaceholder`) and judged by judgeFill.
   let readBack: ReadBack = value === '' && clearEnd?.kind === 'lost' ? { kind: 'lost', why: clearEnd.why } : { kind: 'nothing-typed' };
   let retyped: number[] = [];
+  let reformatted: FillResult['reformatted'];
   // Not an input, and nothing shows the text landed in it: name the input
   // the caller probably meant. Warned, NOT refused (2026-10-08): on iOS idb a
   // floating label is a separate `text` node over its field, and a tap on it
@@ -430,7 +431,10 @@ export async function fillField(
         ...(typed.elsewhere !== undefined && { elsewhere: typed.elsewhere }),
       });
     }
-    if (typed.kind === 'landed') retyped = typed.again.flatMap((a) => (a.kind === 'tail' ? [a.length] : []));
+    if (typed.kind === 'landed') {
+      retyped = typed.again.flatMap((a) => (a.kind === 'tail' ? [a.length] : []));
+      reformatted = typed.reformatted;
+    }
     readBack =
       typed.kind === 'not-taken'
         ? { kind: 'not-taken' }
@@ -460,6 +464,7 @@ export async function fillField(
     clearPlaceholder: clearEnd?.kind === 'empty' ? clearEnd.placeholder : undefined,
     readBack,
     ...(retyped.length > 0 && { retyped }),
+    ...(reformatted !== undefined && { reformatted }),
     notInput: readBack.kind === 'landed' ? undefined : await notInput(),
   };
 }

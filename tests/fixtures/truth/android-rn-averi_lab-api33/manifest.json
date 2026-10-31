@@ -14,6 +14,17 @@
       },
       "screenshot": "rn-field.png",
       "truth": "rn-field.truth.json"
+    },
+    {
+      "file": "rn-format.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "rn-format.png",
+      "truth": "rn-format.truth.json"
     }
   ]
 }

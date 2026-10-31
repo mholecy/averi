@@ -53,7 +53,7 @@
 import { INPUT_ROLE } from '../adapters/types.js';
 import { rectText } from '../ui-tree/geometry.js';
 import { charactersText, countOf } from '../util/count.js';
-import type { Difference, FillFailure, FillResult, LostWhy, SentAgain } from './fill-facts.js';
+import type { Difference, FillFailure, FillResult, LostWhy, Reformat, SentAgain } from './fill-facts.js';
 import { judgeFill, type Caveat, type FillVerdict, type Reason, type Sent } from './fill-verdict.js';
 
 /** One flow trace line: the action column and its text. */
@@ -143,13 +143,13 @@ export function fillStepText(fill: FillResult, as: { step: string; shown: string
 
 /**
  * The clauses both media place — the verdict's wording, the aside (the
- * `sent` clause, then the `retyped` one, joined by `, `) in the caller's
+ * `sent` clause, then the `retyped` one, then the `reformatted` one, joined by `, `) in the caller's
  * brackets, the ` — NOT verified: …` tail — built in one place so the reply
  * and the trace line cannot spell them apart.
  */
 function clausesOf(v: FillVerdict): { w: FillWording; aside: (open: string, close: string) => string; unverified: string } {
   const w = wordingOf(v);
-  const parts = [w.sent, w.retyped].filter((p) => p !== undefined);
+  const parts = [w.sent, w.retyped, w.reformatted].filter((p) => p !== undefined);
   return {
     w,
     aside: (open, close) => (parts.length === 0 ? '' : `${open}${parts.join(', ')}${close}`),
@@ -165,6 +165,9 @@ function clausesOf(v: FillVerdict): { w: FillWording; aside: (open: string, clos
  * - `retyped`: `the last N characters typed again after the field dropped
  *   them` (`, then the last M` per further retype), present with the
  *   verdict's `retyped`;
+ * - `reformatted`: `the field shows them reformatted: N separator(s)
+ *   added[, M typed space(s) shown as another space]`, present with the
+ *   verdict's `reformatted` (D18);
  * - `unverified`: `NOT verified: ` and every reason's sentence joined by
  *   `; `, present ⇔ the verdict has reasons;
  * - `caveats`: one sentence per caveat, in the verdict's order.
@@ -173,6 +176,7 @@ export interface FillWording {
   typed: string;
   sent?: string;
   retyped?: string;
+  reformatted?: string;
   unverified?: string;
   caveats: string[];
 }
@@ -183,9 +187,23 @@ export function wordingOf(v: FillVerdict): FillWording {
     typed: charactersText(v.typed),
     sent: v.sent === undefined ? undefined : SENT_SENTENCE[v.sent.what](v.sent.n),
     retyped: v.retyped === undefined ? undefined : retypedText(v.retyped),
+    reformatted: v.reformatted === undefined ? undefined : reformattedText(v.reformatted),
     unverified: v.reasons.length === 0 ? undefined : `NOT verified: ${v.reasons.map(reasonText).join('; ')}`,
     caveats: v.caveats.map(caveatText),
   };
+}
+
+/**
+ * How the field reformatted the typing (FillResult.reformatted, D18), by
+ * count: `the field shows them reformatted: 2 separators added`, `, 1 typed
+ * space shown as another space` when it respaced one. Never which characters.
+ */
+export function reformattedText(r: Reformat): string {
+  const parts = [
+    r.added > 0 ? `${countOf(r.added, 'separator')} added` : undefined,
+    r.respaced > 0 ? `${countOf(r.respaced, 'typed space')} shown as another space` : undefined,
+  ].filter((p) => p !== undefined);
+  return `the field shows them reformatted: ${parts.join(', ')}`;
 }
 
 /**
@@ -253,6 +271,8 @@ const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
     );
   },
   'masked-append': ({ held }) => `masked field already held ${charactersText(held)} and clear is not set — typing APPENDS; pass clear: true to replace`,
+  'reformatted-point': ({ reformat }) =>
+    `${reformattedText(reformat)} — it added '${reformat.point}': check it is a thousands separator, not a decimal point`,
 };
 
 /**

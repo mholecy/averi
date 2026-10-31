@@ -49,6 +49,8 @@ export interface CatalogTarget {
   label?: string;
   /** The scroll view the target lies in: an id of LabState.scrollViews, whose clip the measured geometry cuts it by. */
   scrollView?: string;
+  /** A text target's field reformats its text as it is typed (FieldFormat) — the React Native app's rn-format (D18). */
+  format?: FieldFormat;
 }
 
 /**
@@ -138,6 +140,15 @@ export interface CellConfig {
 /** `amount` a decimal pad, `pin` a secure field on a number pad, `country` a button opening the form's picker sheet. */
 export type FieldKind = 'text' | 'email' | 'iban' | 'amount' | 'pin' | 'country';
 
+/**
+ * How a field reformats its text as it is typed (D18, docs/plans/2026-10-30-performance-backlog.md): `group4` an IBAN's
+ * — every whitespace dropped, the rest in groups of four joined by a space (`SK3112000000` → `SK31 1200 0000`);
+ * `thousands` an amount's — the whole part before the first `,` or `.` stripped of whitespace and grouped in threes from
+ * the right by a no-break space (U+00A0), the rest kept (`1234,56` → `1 234,56`). The lab apps each spell the same two
+ * rules (Forms.kt, Forms.swift, the React Native app's src/format.ts).
+ */
+export type FieldFormat = 'group4' | 'thousands';
+
 /** A message the app shows, and the accessibility identifier it carries — the convention averi pairs it by. */
 export interface Message {
   text: string;
@@ -158,6 +169,14 @@ export interface CatalogField {
   placeholder?: string;
   /** What a dev flavour puts in the field before the user does. */
   prefill?: string;
+  /** The field reformats its text as it is typed (D18): the app's model holds the formatted text, cursor at its end. */
+  format?: FieldFormat;
+  /**
+   * `display`: only what the field SHOWS is formatted, the model holds the text as typed, whitespace dropped (Compose's
+   * VisualTransformation; `group4` only — Forms.kt#Group4Shown). Compose only: SwiftUI and React Native have no
+   * display-only transform, so their apps format the model as without it.
+   */
+  formatIn?: 'display';
   /**
    * What the field shows when a submit finds it invalid; without it, `Required` identified `lab.<cell>.<tag>_error`.
    */

@@ -1,0 +1,77 @@
+{
+  "cell": "form-format",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "iban.title": {
+      "x": 55,
+      "y": 314,
+      "width": 404,
+      "height": 66
+    },
+    "iban": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+    },
+    "amount.title": {
+      "x": 55,
+      "y": 496,
+      "width": 590,
+      "height": 66
+    },
+    "amount": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+    },
+    "ibanShown.title": {
+      "x": 55,
+      "y": 678,
+      "width": 499,
+      "height": 66
+    },
+    "ibanShown": {
+      "x": 55,
+      "y": 750,
+      "width": 970,
+      "height": 99
+    },
+    "submit": {
+      "x": 55,
+      "y": 882,
+      "width": 970,
+      "height": 132
+    }
+  },
+  "events": [],
+  "fields": {
+    "iban": {
+      "value": "",
+      "focused": false,
+      "error": null
+    },
+    "amount": {
+      "value": "",
+      "focused": false,
+      "error": null
+    },
+    "ibanShown": {
+      "value": "",
+      "focused": false,
+      "error": null
+    }
+  },
+  "focus": null,
+  "keyboard": null,
+  "submits": []
+}

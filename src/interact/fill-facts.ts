@@ -143,6 +143,12 @@ export interface FillResult {
    */
   retyped?: number[];
   /**
+   * The read-back landed REFORMATTED (D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md): the
+   * field shows every typed character in order with separators of its own between them (an IBAN grouped in fours, an
+   * amount's thousands) — interact/fill-type.ts#reformatOf; absent when it shows the text exactly. Counts only.
+   */
+  reformatted?: Reformat;
+  /**
    * Set when the matched node is not an input (role ≠ INPUT_ROLE) AND the
    * read-back did not show the text in it — a node whose value took the
    * text is an input whatever its role (an iOS search field reads `other`).
@@ -152,6 +158,27 @@ export interface FillResult {
    */
   notInput?: { input: NearbyInput | 'none' | 'unread' };
 }
+
+/**
+ * How a field reformatted what was typed (FillResult.reformatted, measured by interact/fill-type.ts#reformatOf):
+ * `added` the separators it put between the typed characters, `respaced` the typed spaces it shows as another space
+ * (a no-break or narrow no-break space) — never both 0: reformatOf returns no Reformat for an exact reading. `point`:
+ * the added separator is `.` or `,`, which the reading cannot tell from a decimal point (FillVerdict's caveat). Counts
+ * only, never content: on a secret, `respaced` can only be measured in a field that shows it unmasked (a masked
+ * reading is never a reformat).
+ */
+export interface Reformat {
+  added: number;
+  respaced: number;
+  point?: Point;
+}
+
+/** An added separator the reading cannot tell from a decimal point (Reformat.point). */
+export type Point = '.' | ',';
+export const isPoint = (c: string | undefined): c is Point => c === '.' || c === ',';
+/** A Reformat whose added separator is a Point — FillVerdict's `reformatted-point` caveat. */
+export type PointedReformat = Reformat & { point: Point };
+export const hasPoint = (r: Reformat): r is PointedReformat => r.point !== undefined;
 
 /**
  * Which reading a clear that ended on EXACTLY the named placeholder came

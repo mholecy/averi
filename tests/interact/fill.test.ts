@@ -53,6 +53,23 @@ const appendBullets = (fake: FakeAdapter, drop = 0) => {
 };
 
 describe('fillField — focus, clear, type, verify', () => {
+  // D18 (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md): the lab's IBAN field groups what it is
+  // typed in fours — the model and the tree both show `SK31 1200 0000` for a typed `SK3112000000`.
+  it('a field that groups the typing in fours is filled, said reformatted — no wipe and retype, with clear or without', async () => {
+    for (const clear of [false, true]) {
+      const fake = formFake(clear ? 'CZ65' : null);
+      const origType = fake.typeText.bind(fake);
+      fake.typeText = async (text: string) => {
+        await origType(text);
+        if (fake.focused) fake.focused.value = ((fake.focused.value ?? '').replace(/ /g, '').match(/.{1,4}/g) ?? []).join(' ');
+      };
+      const result = await fillField(fake, { id: 'amount_input' }, 'SK3112000000', { ...FAST, clear });
+      expect(result).toMatchObject({ readBack: { kind: 'landed' }, reformatted: { added: 2, respaced: 0 } });
+      expect(fake.typed).toEqual(['SK3112000000']);
+      expect(fillReply(result, 'id:amount_input')).toContain('the field shows them reformatted: 2 separators added');
+    }
+  });
+
   it('taps the field then types; no clearing by default (pre-filled login fields must survive)', async () => {
     const fake = formFake('9.99');
     const result = await fillField(fake, { id: 'amount_input' }, '2.50', FAST);
@@ -1292,8 +1309,19 @@ describe('fillField — the mismatch error says what differs, without content (2
     );
   });
 
-  it('a length difference says the lengths alone, as before (a mask that inserts a space)', async () => {
-    const message = await failureOf(fillField(transforming(null, (s) => s.replace(/^(\d{4})(\d)/, '$1 $2')), { id: 'notes' }, '12345', FAST));
+  // D18 review round 1 (d): a de-DE thousands mark reads as a 3-decimal mask's point would — passed, with a ⚠ caveat.
+  it('a field that adds a `.` between thousands is filled, the point said as a caveat', async () => {
+    const result = await fillField(transforming(null, (s) => s.replace(/\./g, '').replace(/^(\d)(\d{3})$/, '$1.$2')), { id: 'notes' }, '1234', FAST);
+    expect(result).toMatchObject({ readBack: { kind: 'landed' }, reformatted: { added: 1, point: '.' } });
+    expect(fillReply(result, 'id:notes')).toBe(
+      "Filled id:notes (4 characters)\n⚠ the field shows them reformatted: 1 separator added — it added '.': check it is a thousands separator, not a decimal point",
+    );
+  });
+
+  // Until D18 the mask here inserted a space (`1234 5`) — a reformat that passes now (fill-type.ts#reformatOf). A cents
+  // mask's decimal point changes the amount, so it still fails.
+  it('a length difference says the lengths alone, as before (a cents mask that inserts a decimal point)', async () => {
+    const message = await failureOf(fillField(transforming(null, (s) => s.replace(/^(\d{3})(\d+)$/, '$1.$2')), { id: 'notes' }, '12345', FAST));
     expect(message).toBe('fill: typed 5 characters but the field shows 6 (content withheld from this error)');
   });
 });

@@ -383,6 +383,21 @@
       }
     },
     {
+      "id": "form-format",
+      "family": "forms",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "New payment",
+        "fields": [
+          { "tag": "iban", "kind": "iban", "title": "IBAN – grouped as typed", "placeholder": "SK00 0000 0000 …", "format": "group4" },
+          { "tag": "amount", "kind": "amount", "title": "Amount in EUR – thousands grouped", "placeholder": "0,00", "format": "thousands" },
+          { "tag": "ibanShown", "kind": "iban", "title": "IBAN – grouped on screen only", "placeholder": "SK00 0000 0000 …", "format": "group4", "formatIn": "display" }
+        ],
+        "submit": { "tag": "submit", "title": "Send payment" }
+      }
+    },
+    {
       "id": "scroll-bounded",
       "family": "edges",
       "layer": "none",
@@ -746,6 +761,15 @@
         { "tag": "T", "color": "#43A047", "slot": 0, "declared": "covered" },
         { "tag": "U", "color": "#8E24AA", "slot": 1, "declared": "covered" },
         { "tag": "C", "color": "#FB8C00", "slot": 2, "declared": "covered" }
+      ]
+    },
+    {
+      "id": "rn-format",
+      "family": "react-native",
+      "layer": "none",
+      "targets": [
+        { "tag": "G", "color": "#B2EBF2", "slot": 0, "declared": "open", "text": "IBAN", "format": "group4" },
+        { "tag": "A", "color": "#FFE0B2", "slot": 1, "declared": "open", "text": "Amount", "format": "thousands" }
       ]
     }
   ]

@@ -1,5 +1,6 @@
 import { Dimensions, NativeModules, PixelRatio, Platform } from 'react-native';
 import catalog from '../../cells.json';
+import type { FieldFormat } from './format';
 
 // The React Native lab app's model (README.md): the cell catalog the native lab apps bundle (fixtures/apps/cells.json,
 // read here at bundle time) and the state file the capture script and the live golden read
@@ -27,6 +28,8 @@ export interface Target {
   slot: number;
   text?: string;
   label?: string;
+  /** The field reformats as it is typed (src/format.ts). */
+  format?: FieldFormat;
 }
 
 export interface Cell {

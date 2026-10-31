@@ -24,6 +24,7 @@ export const reactNative: KnownFile = {
   ]),
   counts: {
     [`${ANDROID_RN}/rn-field.xml`]: 10,
+    [`${ANDROID_RN}/rn-format.xml`]: 8,
     [`${IOS_RN}/rn-field.idb.json`]: 10,
     [`${IOS_RN}/rn-field.wda.json`]: 10,
     [BANNER_IDB]: 6,
