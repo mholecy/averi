@@ -187,11 +187,12 @@ export const ASSERT_TIMEOUT_MS = 3_000;
  * frame that settled over the element's region only is measured on the NEXT
  * round, once a second read confirms the rect — two rounds on any screen
  * with a clock or a caret. Measured on the Android emulator (the bug note
- * below): one round is a 2.7 s uiautomator read plus two
- * 0.65 s screencaps 300 ms apart, ~4.3 s, so two rounds are ~8.6 s (~8.9 s
- * before 2026-10-31, when the 300 ms poll was slept on top of a read that
- * already outlasts it — pollTree, ADR 0029). With the shared 3 s these asserts could not pass
- * on that device even on a still screen: the 3 s only ever "worked" because
+ * below): one round is a 2.7 s uiautomator read plus two 0.65 s
+ * screencaps 300 ms apart, ~4.3 s, so two rounds and the 150 ms floor
+ * between them are ~8.75 s (~8.9 s before 2026-10-31, when the whole 300 ms
+ * poll was slept after a read that already outlasts it — pollTree, ADR
+ * 0029). With the shared 3 s these asserts could not pass on that device
+ * even on a still screen: the 3 s only ever "worked" because
  * the capture overran it, which the capture no longer does. 12 s covers two
  * rounds there with a margin for a slower emulator; a poll that passes
  * returns as soon as it does, so the larger budget costs only a failing

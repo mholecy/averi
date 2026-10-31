@@ -1678,9 +1678,9 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     const result = await new Verifier(fake).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(true);
     expect(fake.screenshots).toHaveLength(4);
-    // Two rounds of 2.7 s read + 0.65 + 0.3 + 0.65 s captures, and no pause between them: the 2.7 s read already
-    // outlasts the 300 ms poll (pollTree, ADR 0029 — 8900 before D1, when the whole 300 ms was slept on top).
-    expect(Date.now() - t0).toBe(8600);
+    // Two rounds of 2.7 s read + 0.65 + 0.3 + 0.65 s captures, and only the 150 ms floor between them: the 2.7 s
+    // read already outlasts the 300 ms poll (pollTree, ADR 0029 — 8900 before D1, when the whole 300 ms was slept).
+    expect(Date.now() - t0).toBe(8750);
   });
 
   it('an explicit budget smaller than one round still times out, and the sentence names what one round cost', async () => {
@@ -1729,9 +1729,10 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     const fake = deviceTimed(true);
     // Round 1: a 3 s read, then the settled pair (0.65 + 0.3 + 0.65) — 4.6 s,
-    // settled over the region only, so unconfirmed. Round 2 (no pause: the
-    // 3 s read outlasted the 300 ms poll — pollTree, ADR 0029): a 0.8 s read
-    // to 5.4 s, one screencap that crosses the 6 s deadline — cut, 1.45 s.
+    // settled over the region only, so unconfirmed. Round 2 (after the 150 ms
+    // floor alone: the 3 s read outlasted the 300 ms poll — pollTree, ADR
+    // 0029): a 0.8 s read to 5.55 s, one screencap that crosses the 6 s
+    // deadline — cut, 1.45 s.
     // The sentence must name 4600, not 1450.
     const reads = [3000, 800];
     const origTree = FakeAdapter.prototype.uiTree.bind(fake);

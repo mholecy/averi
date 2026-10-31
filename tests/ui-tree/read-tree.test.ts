@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import type { UiNode } from '../../src/adapters/types.js';
-import { PollMiss, pollTimeoutMessage, pollTree, readErrorLine, readTreeOrError, screenChangedUnder, screenIdentity, sheetDetent, showsProgress, treeFingerprint, type IdentifiedRead } from '../../src/ui-tree/read-tree.js';
+import { PollMiss, pollTimeoutMessage, pollTree, SETTLE_FLOOR_MS, readErrorLine, readTreeOrError, screenChangedUnder, screenIdentity, sheetDetent, showsProgress, treeFingerprint, type IdentifiedRead } from '../../src/ui-tree/read-tree.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 
 const tree: UiNode = {
@@ -229,8 +229,8 @@ describe('pollTree — the one deadline loop', () => {
         },
       };
       const outcome = await pollTree(adapter, (t) => (t.children.length > 0 ? 'found' : undefined), { timeoutMs: 2500, pollMs: 300 });
-      // Reads at 0, 1000 and 2000 (each 1 s, slower than the 300 ms poll, so no pause — D1, ADR 0029): the third
-      // starts inside the deadline, ends 500 ms past it, and finds it.
+      // Reads at 0, 1150 and 2300 (each 1 s, slower than the 300 ms poll, so only the 150 ms floor between them —
+      // D1, ADR 0029): the third starts inside the deadline, ends 800 ms past it, and finds it.
       expect(outcome).toEqual({ timedOut: false, value: 'found' });
       expect(reads).toBe(3);
     } finally {
@@ -308,7 +308,7 @@ describe('pollTree — the one deadline loop', () => {
       }
     });
 
-    it('a read slower than pollMs leaves no pause: the next read starts as soon as the round is done', async () => {
+    it('a read slower than pollMs leaves only the floor: two snapshots are never back to back', async () => {
       vi.useFakeTimers({ toFake: ['Date'] });
       resetSleeps();
       try {
@@ -316,8 +316,69 @@ describe('pollTree — the one deadline loop', () => {
         const { adapter, starts } = timedAdapter(2300); // one uiautomator dump
         const outcome = await pollTree(adapter, () => undefined, { timeoutMs: 5000, pollMs: 500 });
         expect(outcome.timedOut).toBe(true);
-        expect(sleeps).toEqual([0, 0]);
-        expect(starts.map((t) => t - start)).toEqual([0, 2300, 4600]);
+        expect(SETTLE_FLOOR_MS).toBe(150);
+        expect(sleeps).toEqual([SETTLE_FLOOR_MS, SETTLE_FLOOR_MS]);
+        expect(starts.map((t) => t - start)).toEqual([0, 2450, 4900]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a pollMs below the floor is slept whole, never more: the floor never lengthens the caller\'s cadence', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      resetSleeps();
+      try {
+        await pollTree(timedAdapter(0).adapter, () => undefined, { timeoutMs: 200, pollMs: 100 });
+        expect(sleeps).toEqual([100, 100]); // reads at 0, 100, 200 (the deadline)
+        resetSleeps();
+        await pollTree(timedAdapter(2300).adapter, () => undefined, { timeoutMs: 5000, pollMs: 100 });
+        expect(sleeps).toEqual([100, 100]); // reads at 0, 2400, 4800: the 100, not the 150 floor
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a clock that steps BACKWARDS during a read never lengthens the pause past pollMs', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      resetSleeps();
+      try {
+        let first = true;
+        const adapter = {
+          uiTree: async () => {
+            if (first) vi.setSystemTime(Date.now() - 1000); // the read "took" −1000 ms
+            first = false;
+            return tree;
+          },
+        };
+        await pollTree(adapter, () => undefined, { timeoutMs: 100, pollMs: 500 });
+        expect(sleeps).toEqual([500, 500, 500]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // ADR 0029, R2 — the ACCEPTED RESIDUAL. The deadline is checked after each round; under the old cadence the whole
+    // pause pushed the last read's start up to pollMs later, past where the denser cadence puts it, and an element
+    // appearing at 2.5 s of a 3 s budget behind 1 s reads was found by the read that pause happened to push to 2.6 s.
+    // Now the reads start at 0, 1150 and 2300; the third ends at 3300, past the deadline, and the poll times out.
+    // Neither cadence ever guaranteed finding an element that appears DURING the last read; the cure (always one read
+    // starting at or after the deadline) would cost a full read on every timeout, ensure_state's detect probe included.
+    it('accepted residual (R2): an element appearing at 2.5 s of a 3 s budget behind 1 s reads is no longer found by a read the pause pushed late', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        const start = Date.now();
+        const starts: number[] = [];
+        const adapter = {
+          uiTree: async () => {
+            const at = Date.now() - start;
+            starts.push(at);
+            vi.setSystemTime(Date.now() + 1000);
+            return { ...tree, children: at >= 2500 ? [tree] : [] };
+          },
+        };
+        const outcome = await pollTree(adapter, (t) => (t.children.length > 0 ? 'found' : undefined), { timeoutMs: 3000, pollMs: 300 });
+        expect(outcome.timedOut).toBe(true);
+        expect(starts).toEqual([0, 1150, 2300]);
       } finally {
         vi.useRealTimers();
       }

@@ -172,9 +172,10 @@ interface PixelPollSpec {
   element: ElementSpec;
   timeoutMs: number;
   /**
-   * The cadence of the rounds (pollTree sleeps what the read left of it, ADR 0029) and NOTHING else — never forwarded as the
-   * stability delay, which is capture.ts's constant (the "one budget"
-   * rule; see the header there for the 300-vs-500 split it closed).
+   * The cadence of the rounds (pollTree sleeps what the read left of it,
+   * ADR 0029) and NOTHING else — never forwarded as the stability delay,
+   * which is capture.ts's constant (the "one budget" rule; see the header
+   * there for the 300-vs-500 split it closed).
    */
   pollMs: number;
   /** The fail-closed noun for the two sentences this module words itself: a moving frame and an undecodable png. */
