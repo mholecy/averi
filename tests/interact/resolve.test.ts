@@ -1426,7 +1426,8 @@ describe('Android\'s navigation band', () => {
 });
 
 describe('resolveSettled — a handed-on first sample (ADR 0030)', () => {
-  const at = (y: number, extra: UiNode[] = []) => screen(node({ role: 'button', identifier: 'go', rect: { x: 0, y, width: 100, height: 40 } }), ...extra);
+  const at = (y: number, extra: UiNode[] = []) =>
+    screen(node({ role: 'button', identifier: 'go', rect: { x: 0, y, width: 100, height: 40 } }), ...extra);
   /** An adapter whose reads return `trees` in turn (the last one repeated), counting them. */
   const reading = (...trees: UiNode[]) => {
     let reads = 0;
@@ -1440,30 +1441,50 @@ describe('resolveSettled — a handed-on first sample (ADR 0030)', () => {
     return { take: () => (given ? undefined : ((given = true), { tree, startedAt: Date.now(), endedAt: Date.now() })) };
   };
 
-  it('a handed read and one fresh read at the same rect settle: exactly one device read, and the tree returned is the fresh one', async () => {
+  // Exactly one device read, and the tree returned is the fresh one.
+  it('a handed read and one fresh read at the same rect settle', async () => {
     const fresh = at(100, [node({ identifier: 'fresh-marker' })]);
     const { adapter, reads } = reading(fresh);
-    const settled = await resolveSettled(adapter, { id: 'go' }, { ambiguous: 'first', pollMs: 5, first: handing(at(100)) });
+    const settled = await resolveSettled(adapter, { id: 'go' }, {
+      ambiguous: 'first',
+      pollMs: 5,
+      first: handing(at(100)),
+    });
     expect(reads()).toBe(1);
     expect(settled.tree.children.some((c) => c.identifier === 'fresh-marker')).toBe(true);
   });
 
-  it('never settles on the hand-off alone: an element moving between the handed read and the fresh one needs a second fresh read', async () => {
+  // An element that moved between the handed read and the fresh one needs a second fresh read.
+  it('never settles on the hand-off alone', async () => {
     const { adapter, reads } = reading(at(140), at(140));
-    const settled = await resolveSettled(adapter, { id: 'go' }, { ambiguous: 'first', pollMs: 5, first: handing(at(100)) });
+    const settled = await resolveSettled(adapter, { id: 'go' }, {
+      ambiguous: 'first',
+      pollMs: 5,
+      first: handing(at(100)),
+    });
     expect(settled.node.rect.y).toBe(140);
     expect(reads()).toBe(2);
   });
 
-  it('a handed sighting is not a sighting: the target gone from every fresh read is not found, not "never held still"', async () => {
+  // The target gone from every fresh read is not found — not "never held still".
+  it('a handed sighting is not a sighting', async () => {
     const { adapter } = reading(screen());
-    await expect(resolveSettled(adapter, { id: 'go' }, { ambiguous: 'first', pollMs: 5, timeoutMs: 20, first: handing(at(100)) })).rejects.toBeInstanceOf(ElementNotFoundError);
+    const opts = { ambiguous: 'first', pollMs: 5, timeoutMs: 20, first: handing(at(100)) } as const;
+    const settling = resolveSettled(adapter, { id: 'go' }, opts);
+    await expect(settling).rejects.toBeInstanceOf(ElementNotFoundError);
   });
 
   it('an ambiguous handed tree refuses nothing: the fresh reads decide', async () => {
-    const twice = screen(node({ role: 'text', identifier: 'go', rect: { x: 0, y: 0, width: 10, height: 10 } }), node({ role: 'text', identifier: 'go', rect: { x: 0, y: 50, width: 10, height: 10 } }));
+    const twice = screen(
+      node({ role: 'text', identifier: 'go', rect: { x: 0, y: 0, width: 10, height: 10 } }),
+      node({ role: 'text', identifier: 'go', rect: { x: 0, y: 50, width: 10, height: 10 } }),
+    );
     const { adapter, reads } = reading(at(100), at(100));
-    const settled = await resolveSettled(adapter, { id: 'go' }, { ambiguous: 'refuse', pollMs: 5, first: handing(twice) });
+    const settled = await resolveSettled(adapter, { id: 'go' }, {
+      ambiguous: 'refuse',
+      pollMs: 5,
+      first: handing(twice),
+    });
     expect(settled.node.rect.y).toBe(100);
     expect(reads()).toBe(2);
   });

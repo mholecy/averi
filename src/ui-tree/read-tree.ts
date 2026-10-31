@@ -389,10 +389,13 @@ export async function pollTree<T>(
     } catch {
       verdict = undefined;
     }
-    if (verdict !== undefined && verdict !== Undecided && !(verdict instanceof PollMiss)) return { timedOut: false, value: verdict };
+    if (verdict !== undefined && verdict !== Undecided && !(verdict instanceof PollMiss)) {
+      return { timedOut: false, value: verdict };
+    }
     // The fresh read starts as if the handed read had been this poll's previous round: pauseAfterRead of its read,
     // less what has passed since it ended.
-    await sleep(Math.max(0, pauseAfterRead(opts.pollMs, handed.endedAt - handed.startedAt) - (Date.now() - handed.endedAt)));
+    const sinceEnded = Date.now() - handed.endedAt;
+    await sleep(Math.max(0, pauseAfterRead(opts.pollMs, handed.endedAt - handed.startedAt) - sinceEnded));
   }
   for (;;) {
     const readStart = Date.now();

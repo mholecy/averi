@@ -1444,7 +1444,8 @@ describe('runVerification — the read hand-off of a leg (ADR 0030)', () => {
     ].join('\n'),
   );
 
-  it("the state's detect that answered yes is the first element assert's read: the leg reads the tree once for both", async () => {
+  // The state's detect that answered yes is the first element assert's read.
+  it('a leg with a state and an element assert reads the tree once for both', async () => {
     const adapter = fake('android');
     let reads = 0;
     const real = adapter.uiTree.bind(adapter);

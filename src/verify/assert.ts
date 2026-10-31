@@ -265,12 +265,16 @@ export class Verifier {
    * once per process, shared by every Verifier's engine.
    */
   private ocr: OcrEngineChoice | undefined;
+  /**
+   * The hand-off of the last read (VerifierOptions.handOff, ADR 0030): every assert produces it, the element assert
+   * alone takes it (see `assert`).
+   */
   private readonly handOff: ReadHandOff;
+  /** The device, as `handOff` watches it: what an action through it would invalidate is never handed on. */
   private readonly adapter: DeviceAdapter;
 
   constructor(adapter: DeviceAdapter, opts: VerifierOptions = {}) {
-    this.handOff = opts.handOff ?? new ReadHandOff();
-    this.adapter = this.handOff.watch(adapter);
+    ({ handOff: this.handOff, adapter: this.adapter } = ReadHandOff.watching(adapter, opts.handOff));
     this.baselineDir = opts.baselineDir ?? DEFAULT_BASELINE_DIR;
     this.pollMs = opts.pollMs ?? 300;
     this.timeoutMs = opts.timeoutMs;

@@ -71,6 +71,16 @@ export class ReadHandOff implements FirstSample {
     return proxy;
   }
 
+  /**
+   * The pair a consumer holds — a hand-off and the adapter as it watches it — from the caller's hand-off when it
+   * shares one, else a new one. The one spelling for the flow engine and the Verifier, so neither can keep the
+   * hand-off and forget to watch the adapter it acts through.
+   */
+  static watching(adapter: DeviceAdapter, shared?: ReadHandOff): { handOff: ReadHandOff; adapter: DeviceAdapter } {
+    const handOff = shared ?? new ReadHandOff();
+    return { handOff, adapter: handOff.watch(adapter) };
+  }
+
   /** Run `fn` with its successful reads kept for the next `take` (nesting is fine). */
   async producing<T>(fn: () => Promise<T>): Promise<T> {
     this.depth++;
@@ -85,7 +95,8 @@ export class ReadHandOff implements FirstSample {
   take(): HandedRead | undefined {
     const kept = this.kept;
     this.kept = undefined;
-    if (kept === undefined || kept.epoch !== this.epoch || Date.now() - kept.endedAt > HANDOFF_MAX_AGE_MS) return undefined;
+    if (kept === undefined || kept.epoch !== this.epoch) return undefined;
+    if (Date.now() - kept.endedAt > HANDOFF_MAX_AGE_MS) return undefined;
     return { tree: kept.tree, startedAt: kept.startedAt, endedAt: kept.endedAt };
   }
 

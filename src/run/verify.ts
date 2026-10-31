@@ -550,7 +550,12 @@ export async function runVerification(
     const trace: TraceEntry[] =
       request === undefined ?
         []
-      : await FlowEngine.run(cfg, adapter, { env, environment: req.environment, session: req.session, handOff }, request);
+      : await FlowEngine.run(
+          cfg,
+          adapter,
+          { env, environment: req.environment, session: req.session, handOff },
+          request,
+        );
     const results = await new Verifier(adapter, { baselineDir: req.baselineDir, ocr, handOff }).assertAll(specs);
     // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
     // a bare screenshot, so the color and text tables could be fed the one

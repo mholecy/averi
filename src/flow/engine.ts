@@ -10,7 +10,14 @@ import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
 import { tapElement } from '../interact/tap.js';
 import { describeElementSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollOnVerdict, pollTimeoutMessage, pollTree, readErrorLine, Undecided, type FirstSample } from '../ui-tree/read-tree.js';
+import {
+  pollOnVerdict,
+  pollTimeoutMessage,
+  pollTree,
+  readErrorLine,
+  Undecided,
+  type FirstSample,
+} from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { BARE_TREE_CONTENTS, treeShape } from '../ui-tree/bare-tree.js';
@@ -475,15 +482,18 @@ export class FlowEngine {
    */
   private readonly acting: Omit<GuardOptions, 'timeoutMs'>;
   /**
-   * The run's hand-off of its last read (ui-tree/read-handoff.ts, ADR 0030), and the adapter as it watches it — every
-   * device call of the run goes through `adapter`, so every action invalidates what was kept. PRODUCERS here: the
-   * detect probe, a `wait:` step, an `assert:` step (its Verifier shares this hand-off). TAKERS, each only as the
-   * hand-off's rules allow: the ladder's re-detect after a rung (a positive verdict, and only on a detect that asks
-   * no absence), a flow's tap and fill (the settle's first sample), an `assert:` step's element asserts (a positive
-   * verdict). Nothing else is handed anything — the entry probe, the second look, a `wait:`, a `branch:`, an
-   * `optional:` probe and a scroll read fresh.
+   * The run's hand-off of its last read (ui-tree/read-handoff.ts, ADR 0030). PRODUCERS here: the detect probe, a
+   * `wait:` step, an `assert:` step (its Verifier shares this hand-off). TAKERS, each only as the hand-off's rules
+   * allow: the ladder's re-detect after a rung (a positive verdict, and only on a detect that asks no absence), a
+   * flow's tap and fill (the settle's first sample), an `assert:` step's element asserts (a positive verdict).
+   * Nothing else is handed anything — the entry probe, the second look, a `wait:`, a `branch:`, an `optional:` probe
+   * and a scroll read fresh.
    */
   private readonly handOff: ReadHandOff;
+  /**
+   * The device, as `handOff` watches it (ReadHandOff.watch): every device call of the run goes through it, so every
+   * action invalidates what was kept. The adapter the run was given is never used directly.
+   */
   private readonly adapter: DeviceAdapter;
 
   private constructor(
@@ -491,8 +501,7 @@ export class FlowEngine {
     adapter: DeviceAdapter,
     opts: EngineOptions,
   ) {
-    this.handOff = opts.handOff ?? new ReadHandOff();
-    this.adapter = this.handOff.watch(adapter);
+    ({ handOff: this.handOff, adapter: this.adapter } = ReadHandOff.watching(adapter, opts.handOff));
     // Resolved once per engine so a run cannot type one environment's username
     // and another's password; resolved before any STEP, so a bad name never
     // fails mid-login. The refusal BEFORE any device is the run layer's
@@ -507,7 +516,12 @@ export class FlowEngine {
     this.reachRecheckMs = opts.reachRecheckMs ?? 2_000;
     this.assertTimeoutMs = opts.assertTimeoutMs;
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
-    this.acting = { ambiguous: FLOW_AMBIGUITY, pollMs: this.pollMs, dismissals: keyboardDismissals(cfg), eyes: eyesOn(this.adapter) };
+    this.acting = {
+      ambiguous: FLOW_AMBIGUITY,
+      pollMs: this.pollMs,
+      dismissals: keyboardDismissals(cfg),
+      eyes: eyesOn(this.adapter),
+    };
     this.session = opts.session;
   }
 
@@ -701,7 +715,7 @@ export class FlowEngine {
         // bare entry read is still worth naming when every read of the
         // second look failed.
         const before = probe;
-        probe = await this.detects(state.detect, this.ensureTimeoutMs, 'second look');
+        probe = await this.detects(state.detect, this.ensureTimeoutMs, { look: 'second look' });
         if (probe.answer === 'yes') {
           this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);
           return;
@@ -814,7 +828,7 @@ export class FlowEngine {
       // The rung's last read may answer it (ADR 0030): a rung that ended in a `wait:` or an assert, with no action
       // since, read the screen it left — D0's cold ensure read the same screen again 2.2 s later. Taken only as a
       // `yes`, never on a detect that asks an absence; anything else reads fresh as before.
-      probe = await this.detects(state.detect, grace, undefined, this.handedFor(state.detect));
+      probe = await this.detects(state.detect, grace, { first: this.handedFor(state.detect) });
       if (probe.answer === 'yes') {
         this.log(`state ${name}`, `reached after ${flow}`);
         return;
@@ -986,8 +1000,16 @@ export class FlowEngine {
    * the window behind it (round-3 device check, 2026-10-08). Its line now
    * says `(second look over 20 s)` — the window it polled, which an
    * unanswered look spent whole.
+   *
+   * `first` is a read handed on to the probe (ADR 0030; the ladder's
+   * re-detect after a rung passes `handedFor`): it may answer `yes` and
+   * nothing else, see below.
    */
-  private async detects(cond: Condition, windowMs: number, look?: 'second look', first?: FirstSample): Promise<Detection> {
+  private async detects(
+    cond: Condition,
+    windowMs: number,
+    { look, first }: { look?: 'second look'; first?: FirstSample } = {},
+  ): Promise<Detection> {
     const subject = `${describeCondition(cond)} treated as not detected${look === undefined ? '' : ` (${look} over ${formatSeconds(windowMs)})`}`;
     // Trees that held something rendered, and the last bare one's shape —
     // asked only of a round that is not `yes`. Since 2026-10-08 `yes` is
@@ -1286,7 +1308,11 @@ export class FlowEngine {
   }
 
   private async runAssert(specs: StepPayload<'assert'>): Promise<void> {
-    const verifier = new Verifier(this.adapter, { pollMs: this.pollMs, timeoutMs: this.assertTimeoutMs, handOff: this.handOff });
+    const verifier = new Verifier(this.adapter, {
+      pollMs: this.pollMs,
+      timeoutMs: this.assertTimeoutMs,
+      handOff: this.handOff,
+    });
     const results = await verifier.assertAll(specs);
     for (const r of results) this.log(r.pass ? 'assert PASS' : 'assert FAIL', r.description + (r.detail ? ` — ${r.detail}` : ''));
     const failed = results.filter((r) => !r.pass);
@@ -1303,7 +1329,10 @@ export class FlowEngine {
     const cond: Condition = spec.element ? { element: spec.element } : { state: spec.state };
     // A producer of the hand-off (ADR 0030): the read that ended the wait is the screen the next step meets.
     await this.handOff.producing(() =>
-      this.waitFor(cond, timeoutMs, describeCondition(cond), { missing: missedElement(cond), say: (lastTree) => waitTimeoutHint(cond, lastTree) }),
+      this.waitFor(cond, timeoutMs, describeCondition(cond), {
+        missing: missedElement(cond),
+        say: (lastTree) => waitTimeoutHint(cond, lastTree),
+      }),
     );
     this.log('wait', describeCondition(cond));
   }

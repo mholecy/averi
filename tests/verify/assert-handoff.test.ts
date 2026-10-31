@@ -85,7 +85,12 @@ describe('Verifier — the read hand-off', () => {
       const { fake } = counted();
       const handOff = new ReadHandOff();
       const take = vi.spyOn(handOff, 'take');
-      const verifier = new Verifier(fake, { ...FAST, handOff, ocr: { engine: { recognize: async () => [] } }, baselineDir: '/nonexistent-averi-baselines' });
+      const verifier = new Verifier(fake, {
+        ...FAST,
+        handOff,
+        ocr: { engine: { recognize: async () => [] } },
+        baselineDir: '/nonexistent-averi-baselines',
+      });
       await verifier.assert(title);
       take.mockClear();
       await verifier.assert(spec).catch(() => undefined);

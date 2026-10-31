@@ -59,7 +59,8 @@ const OPTS = { pollMs: 5, tapTimeoutMs: 200, waitTimeoutMs: 300, ensureTimeoutMs
 
 /** A start screen with a `go` button that leads home, every read counted. */
 function counted() {
-  const label = (id: string, y: number) => node({ role: 'button', identifier: id, label: id, rect: { x: 0, y, width: 200, height: 40 } });
+  const label = (id: string, y: number) =>
+    node({ role: 'button', identifier: id, label: id, rect: { x: 0, y, width: 200, height: 40 } });
   const fake = new FakeAdapter(
     { start: screen(label('go', 100), label('other', 200)), home: screen(label('home', 100), label('other', 200)) },
     'start',
@@ -76,7 +77,8 @@ function counted() {
   return { fake, reads: () => reads };
 }
 
-const run = (fake: FakeAdapter, request: RunRequest) => FlowEngine.run(CFG, fake, { ...OPTS, session: new EngineSession() }, request);
+const run = (fake: FakeAdapter, request: RunRequest) =>
+  FlowEngine.run(CFG, fake, { ...OPTS, session: new EngineSession() }, request);
 
 describe('FlowEngine — the read hand-off', () => {
   // The entry probe is a producer too: the rung's tap takes its read as the settle's first sample, so the tap reads
