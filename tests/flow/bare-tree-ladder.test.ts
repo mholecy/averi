@@ -68,6 +68,9 @@ states:
   logged_out_nested_then_wipe:
     detect: { element: { id: login_screen } }
     reach: [via_cheap_ladder, fresh_launch]
+  logged_out_nested_then_requires_wipe:
+    detect: { element: { id: login_screen } }
+    reach: [via_cheap_ladder, via_wiping]
   cheap_inner:
     detect: { element: { id: nav.tab_overview } }
     reach: [tap_missing]
@@ -479,6 +482,13 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_via_wiping' });
     expect(clearStateLaunches(fake)).toHaveLength(0);
     expect(trace).toContainEqual({ action: 'state logged_out_via_wiping', detail: 'already active' });
+  });
+
+  it('the same when the wipe after is only through requires: — the later rung is destructive transitively, not by its own steps', async () => {
+    const { fake } = timeline((ms, read) => (read === 0 ? ANDROID_NULL_ROOT : ms < 30 ? ANDROID_DECOR : ms < 300 ? LOADING : ANDROID_LOGIN));
+    const trace = await FlowEngine.run(CFG, fake, FAST, { state: 'logged_out_nested_then_requires_wipe' }).catch((e: FlowError) => e.trace);
+    expect(clearStateLaunches(fake)).toHaveLength(0);
+    expect(trace.filter((t) => t.detail?.startsWith('second look:') === true)).toEqual([]);
   });
 
   it('an all-cheap ladder of two rungs keeps the hold: the first rung runs after it, the second well before the deadline', async () => {

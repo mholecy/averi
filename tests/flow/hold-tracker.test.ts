@@ -64,12 +64,4 @@ describe('holdTracker', () => {
     const spinning = holdTracker(2000);
     for (const at of [0, 1000, 2000, 3000, 9000]) expect(spinning.observe(SPINNER, at)).toBeUndefined();
   });
-
-  it('reset() starts it over', () => {
-    const t = holdTracker(2000);
-    t.observe(LOGIN, 0);
-    t.reset();
-    expect(t.observe(LOGIN, 2500)).toBeUndefined();
-    expect(t.observe(LOGIN, 4500)).toBe(2000);
-  });
 });

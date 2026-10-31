@@ -39,7 +39,7 @@ full window, exactly as before.**
     [via_inner, fresh_launch]`, `via_inner.requires: inner`, `inner: [cheap]`) would otherwise hold, fail its cheap
     rung on a loading screen, and hand the outer ladder the same immediate wipe as below.
 - The hold is `flow/hold-tracker.ts#holdTracker(holdMs)`, a pure state machine shown each fresh not-"yes" read with a
-  timestamp (`observe(tree, nowMs)`, `reset()`); `detects` gets it through its `holdMs` option. The run starts at the
+  timestamp (`observe(tree, nowMs)`); `detects` gets it through its `holdMs` option. The run starts at the
   first rendered read with a given fingerprint; the same fingerprint at least `holdMs` after it started ends the look.
   A different fingerprint starts a new run; a BARE read clears it (the screen went back to decor — it did not hold). A
   failed read between two equal ones is not shown to it: it neither breaks the run nor counts as a read.

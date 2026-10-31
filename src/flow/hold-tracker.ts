@@ -24,20 +24,15 @@ export interface HoldTracker {
    * it does not break a hold there. Left for its own backlog row (the coordinator, D2 round-1 review).
    */
   observe(tree: UiNode, nowMs: number): number | undefined;
-  /** Start over: the next rendered read begins a new run. */
-  reset(): void;
 }
 
 /** A `HoldTracker` that ends a run once it has held `holdMs` (the ladder passes reachRecheckMs). Pure: no clock, no device. */
 export function holdTracker(holdMs: number): HoldTracker {
   let run: { fingerprint: string; since: number } | undefined;
-  const reset = (): void => {
-    run = undefined;
-  };
   return {
     observe(tree, nowMs) {
       if (isBareTreeMemo(tree) || showsProgress(tree)) {
-        reset();
+        run = undefined;
         return undefined;
       }
       const fingerprint = treeFingerprint(tree);
@@ -48,6 +43,5 @@ export function holdTracker(holdMs: number): HoldTracker {
       const held = nowMs - run.since;
       return held >= holdMs ? held : undefined;
     },
-    reset,
   };
 }
