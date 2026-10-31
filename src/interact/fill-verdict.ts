@@ -68,7 +68,7 @@
  */
 
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
-import { heldText, type Difference, type FillResult, type LostWhy, type NearbyInput } from './fill-facts.js';
+import { heldText, type Difference, type FillResult, type LostWhy, type NearbyInput, type Reformat } from './fill-facts.js';
 
 /**
  * Why a fill is NOT verified — one code per reason, in render order:
@@ -137,6 +137,8 @@ export interface FillVerdict {
   caveats: Caveat[];
   /** The dropped tails typed again before the read-back landed, by length (FillResult.retyped); absent when none. */
   retyped?: number[];
+  /** The field showed the typing reformatted, separators of its own added (FillResult.reformatted, D18): still filled. */
+  reformatted?: Reformat;
   /** The resolution note (resolve.ts#resolveNow), carried for the MCP reply; the flow line prints none. */
   note?: string;
 }
@@ -183,6 +185,7 @@ export function judgeFill(r: FillResult): FillVerdict {
     reasons,
     caveats,
     ...(r.retyped !== undefined && r.retyped.length > 0 && { retyped: r.retyped }),
+    ...(r.reformatted !== undefined && { reformatted: r.reformatted }),
     note: r.note,
   };
 }

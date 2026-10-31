@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { droppedTail, MAX_TAIL_RETYPES, typeAndConfirm, type FieldIo, type TypingIntent } from '../../src/interact/fill-type.js';
+import { droppedTail, MAX_TAIL_RETYPES, reformatOf, typeAndConfirm, type FieldIo, type TypingIntent } from '../../src/interact/fill-type.js';
 import { node } from '../helpers/fake.js';
 
 vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => undefined }));
@@ -43,10 +43,67 @@ describe('droppedTail — a strict prefix with some of the typing in it, else no
 });
 
 /**
+ * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
+ * character, in order, with separators of its own between them — measured on the lab's Compose, React Native and
+ * VisualTransformation fields (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md). Tight: a field
+ * that dropped, reordered or changed a character never passes, nor one whose added `.`/`,` is no thousands separator.
+ */
+describe('reformatOf — the typed characters in order, only separators added', () => {
+  it('an IBAN grouped in fours, an amount grouped by thousands (a no-break space), a date and a phone', () => {
+    expect(reformatOf('SK31 1200 0000', 'SK3112000000')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('1 234 567,89', '1234567,89')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('1 234', '1234')).toEqual({ added: 1, respaced: 0 });
+    expect(reformatOf('1,234,567.89', '1234567.89')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('1.234,56', '1234,56')).toEqual({ added: 1, respaced: 0 });
+    expect(reformatOf('31/12/2026', '31122026')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('0905-123-456', '0905123456')).toEqual({ added: 2, respaced: 0 });
+  });
+
+  it('a typed space shown as a no-break space is respaced, not added; a trailing group separator is the field\'s', () => {
+    expect(reformatOf('1 234', '1 234')).toEqual({ added: 0, respaced: 1 });
+    expect(reformatOf('SK31 ', 'SK31')).toEqual({ added: 1, respaced: 0 });
+    expect(reformatOf('31/', '31')).toEqual({ added: 1, respaced: 0 });
+  });
+
+  it('exactly the typed text is no reformat (the exact rule passes it)', () => {
+    expect(reformatOf('SK31 1200', 'SK31 1200')).toBeUndefined();
+    expect(reformatOf('', '')).toBeUndefined();
+  });
+
+  it('a dropped, reordered, changed or added character never passes', () => {
+    expect(reformatOf('SK31 1200 000', 'SK3112000000')).toBeUndefined(); // dropped
+    expect(reformatOf('SK13 1200 0000', 'SK3112000000')).toBeUndefined(); // reordered
+    expect(reformatOf('sk31 1200 0000', 'SK3112000000')).toBeUndefined(); // case changed
+    expect(reformatOf('SK31 1200 0000 0', 'SK3112000000')).toBeUndefined(); // a character added
+    expect(reformatOf('1 234 €', '1234')).toBeUndefined(); // a currency the field adds is no separator
+    expect(reformatOf('0,25', '25')).toBeUndefined(); // nor a leading zero
+  });
+
+  it('a typed separator the field dropped never passes: `12,50` shown `1250` is another amount', () => {
+    expect(reformatOf('1250', '12,50')).toBeUndefined();
+    expect(reformatOf('SK311200', 'SK31 1200')).toBeUndefined();
+    expect(reformatOf('12 50', '12,50')).toBeUndefined(); // changed, not added
+  });
+
+  it('nothing added before the first typed character: a leading `-` is a sign', () => {
+    expect(reformatOf('-5', '5')).toBeUndefined();
+    expect(reformatOf(' 5', '5')).toBeUndefined();
+  });
+
+  it('an added `.` or `,` must be a thousands separator — three digits after it — never a decimal point a cents mask put in', () => {
+    expect(reformatOf('1.25', '125')).toBeUndefined();
+    expect(reformatOf('12,50', '1250')).toBeUndefined();
+    expect(reformatOf('125.00', '12500')).toBeUndefined();
+    expect(reformatOf('1.2345', '12345')).toBeUndefined(); // four digits after it
+    expect(reformatOf('12.', '12')).toBeUndefined(); // none after it
+  });
+});
+
+/**
  * A scripted field: `typeText` lands what `keep` lets through of each typing (in order), a read returns the field's
  * text, and the screen is the field and one other input whose value the script may change while typing.
  */
-function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string | null; grows?: boolean; moves?: boolean; otherHeld?: string } = {}) {
+function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string | null; grows?: boolean; moves?: boolean; otherHeld?: string; format?: (text: string) => string } = {}) {
   const keeps = [...(opts.keep ?? [])];
   const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: null });
   const other = node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: opts.otherHeld ?? null });
@@ -63,6 +120,7 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
       const keep = keeps.shift() ?? text.length;
       if (opts.grows) pending += text;
       else field.value = (field.value ?? '') + text.slice(0, keep);
+      if (opts.format) field.value = opts.format(field.value ?? '');
       if (opts.elsewhere) other.value = opts.elsewhere(text);
       if (opts.moves) other.rect = { ...other.rect, y: other.rect.y + 10 };
     },
@@ -205,4 +263,42 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect((await typeAndConfirm(io, { ...intent, delivery: 'may-arrive-late' })).kind).toBe('missed');
     expect(typed).toEqual(['Jan Novak']);
   });
+
+  // D18: the field groups what it is handed in fours, as the lab's IBAN fields do.
+  const group4 = (t: string) => (t.replace(/ /g, '').match(/.{1,4}/g) ?? []).join(' ');
+
+  it('a field that groups the typing in fours lands, said reformatted — nothing typed again, with clear or without', async () => {
+    for (const clear of [false, true]) {
+      const { io, intent, typed } = scripted({ format: group4 });
+      expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000', clear })).toEqual({
+        kind: 'landed',
+        observed: 'SK31 1200 0000',
+        again: [],
+        reformatted: { added: 2, respaced: 0 },
+      });
+      expect(typed).toEqual(['SK3112000000']);
+    }
+  });
+
+  it('without clear the field\'s earlier text comes first: the reformat is of it and the typing appended', async () => {
+    const { io, intent, field } = scripted({ format: group4 });
+    field.value = 'SK31 12';
+    expect(await typeAndConfirm(io, { ...intent, value: '000000', before: 'SK31 12' })).toMatchObject({ kind: 'landed', observed: 'SK31 1200 0000', reformatted: { added: 1 } });
+  });
+
+  it('a grouping field that dropped a character is no reformat: missed, and with clear wiped and typed again once', async () => {
+    const { io, intent, typed } = scripted({ format: group4, keep: [11, 11] });
+    expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000', clear: true })).toEqual({
+      kind: 'missed',
+      observed: 'SK31 1200 000',
+      again: [{ kind: 'whole', wiped: true }],
+    });
+    expect(typed).toEqual(['SK3112000000', 'SK3112000000']);
+  });
+
+  it('a non-input proves it took the text only by showing it exactly: no reformat there', async () => {
+    const { io, intent } = scripted({ format: group4 });
+    expect((await typeAndConfirm(io, { ...intent, value: 'SK3112000000', isInput: false })).kind).toBe('not-taken');
+  });
 });
+

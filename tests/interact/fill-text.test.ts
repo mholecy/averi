@@ -55,6 +55,20 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
     );
   });
 
+  // D18: a field that reformats as it is typed passes, its reformat said in the aside — counts, never content.
+  it('a reformatted read-back is said last in the aside, on both media: the separators added, the spaces respaced', () => {
+    expect(both('id:iban', fact({ typed: 12, readBack: landed, cleared: 14, reformatted: { added: 2, respaced: 0 } }), 'SK3112000000')).toEqual({
+      reply: 'Filled id:iban (12 characters, cleared 14 characters first, the field shows them reformatted: 2 separators added)',
+      flow: [['fill', 'id:iban = SK3112000000 (cleared 14 characters first, the field shows them reformatted: 2 separators added)']],
+    });
+    expect(both('id:amount', fact({ typed: 5, readBack: landed, reformatted: { added: 1, respaced: 1 } })).reply).toBe(
+      'Filled id:amount (5 characters, the field shows them reformatted: 1 separator added, 1 typed space shown as another space)',
+    );
+    expect(both('id:amount', fact({ typed: 5, readBack: landed, reformatted: { added: 0, respaced: 2 } })).reply).toBe(
+      'Filled id:amount (5 characters, the field shows them reformatted: 2 typed spaces shown as another space)',
+    );
+  });
+
   it('a clear that sent no delete says nothing of clearing, on either medium', () => {
     expect(both('id:amount', fact({ typed: 4, readBack: landed, cleared: 0 }), '2.50')).toEqual({
       reply: 'Filled id:amount (4 characters)',

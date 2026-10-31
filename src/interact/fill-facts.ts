@@ -143,6 +143,12 @@ export interface FillResult {
    */
   retyped?: number[];
   /**
+   * The read-back landed REFORMATTED (D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md): the
+   * field shows every typed character in order with separators of its own between them (an IBAN grouped in fours, an
+   * amount's thousands) — interact/fill-type.ts#reformatOf; absent when it shows the text exactly. Counts only.
+   */
+  reformatted?: Reformat;
+  /**
    * Set when the matched node is not an input (role ≠ INPUT_ROLE) AND the
    * read-back did not show the text in it — a node whose value took the
    * text is an input whatever its role (an iOS search field reads `other`).
@@ -151,6 +157,16 @@ export interface FillResult {
    * not a verdict: the fill does not fail for it).
    */
   notInput?: { input: NearbyInput | 'none' | 'unread' };
+}
+
+/**
+ * How a field reformatted what was typed (FillResult.reformatted, measured by interact/fill-type.ts#reformatOf):
+ * `added` the separators it put between the typed characters, `respaced` the typed spaces it shows as another space
+ * (a no-break or narrow no-break space). Counts only, never content.
+ */
+export interface Reformat {
+  added: number;
+  respaced: number;
 }
 
 /**

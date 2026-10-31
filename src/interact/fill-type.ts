@@ -60,7 +60,7 @@
 import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adapters/types.js';
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
 import { sleep } from '../util/sleep.js';
-import { heldText, type OtherInput, type SentAgain } from './fill-facts.js';
+import { heldText, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
 export interface FieldIo {
@@ -106,7 +106,8 @@ export interface TypingIntent {
 
 /**
  * What typing achieved, as facts:
- * - `landed`: a read showed the value (`observed`, the last reading);
+ * - `landed`: a read showed the value (`observed`, the last reading) — exactly, or `reformatted` (`reformatOf`: the field
+ *   added separators of its own as it was typed; absent when the reading is exact);
  * - `not-taken`: a non-input whose reading never took the text — not the field;
  * - `unread`: no reading to compare (the node withholds its text, or the last read did not find the field);
  * - `missed`: the last reading is not the value after everything was sent again; `elsewhere` when another input
@@ -114,7 +115,7 @@ export interface TypingIntent {
  * `again`: what was sent again, in the order sent (fill-facts.ts#SentAgain; empty: nothing).
  */
 export type Typed =
-  | { kind: 'landed'; observed: string; again: SentAgain[] }
+  | { kind: 'landed'; observed: string; again: SentAgain[]; reformatted?: Reformat }
   | { kind: 'not-taken'; observed: string }
   | { kind: 'unread' }
   | { kind: 'missed'; observed: string; again: SentAgain[]; elsewhere?: OtherInput };
@@ -149,17 +150,23 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     intent.isInput || (observed !== intent.resolvedValue && (isMaskedValue(observed) || observed.includes(value)));
   const landed = (observed: string) =>
     tookText(observed) &&
-    (isMaskedValue(observed)
-      ? clear
-        ? observed.length === value.length
-        : observed.length >= intent.maskedHeld + value.length
-      : clear
-        ? observed === value
-        : // A placeholder is not content: on an empty field showing
-          // `Search`, nothing typed must not pass for a typed `ear`.
-          // Raw equality first: a value equal to the placeholder is the
-          // one reading that cannot be told from it (see `fill-facts.ts#heldText`).
-          observed === value || heldText(observed, intent.placeholder).includes(value));
+    (reformatted(observed) !== undefined ||
+      (isMaskedValue(observed)
+        ? clear
+          ? observed.length === value.length
+          : observed.length >= intent.maskedHeld + value.length
+        : clear
+          ? observed === value
+          : // A placeholder is not content: on an empty field showing
+            // `Search`, nothing typed must not pass for a typed `ear`.
+            // Raw equality first: a value equal to the placeholder is the
+            // one reading that cannot be told from it (see `fill-facts.ts#heldText`).
+            observed === value || heldText(observed, intent.placeholder).includes(value)));
+  // D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows the typing with
+  // separators of its own (`reformatOf`): what it should hold — its earlier text, unless cleared, then the value —
+  // reformatted. A masked reading never is one (bullets are no typed characters), and a non-input still proves it took
+  // the text only by showing it (`tookText`, which a reformatted reading does not pass).
+  const reformatted = (observed: string): Reformat | undefined => reformatOf(heldText(observed, intent.placeholder), priorText(intent) + value);
 
   // What every other input held when typing began: the proof that the typing stayed in the field (`whereTyped`).
   const before = io.screen();
@@ -181,7 +188,8 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
       // (D24 review).
       if (tails() > 0) io.reportDroppedTail();
-      return { kind: 'landed', observed, again };
+      const reformat = reformatted(observed);
+      return { kind: 'landed', observed, again, ...(reformat !== undefined && { reformatted: reformat }) };
     }
     const where = whereTyped(others, io.screen(), missingOf(observed, intent));
     const tail =
@@ -204,6 +212,51 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     const prior = observed;
     read = { ...(await pollValue(io.read, landed, intent.pollMs)), prior };
   }
+}
+
+/** The spaces a field may show for one another: a space, a no-break space (U+00A0), a narrow no-break space (U+202F). */
+const SPACES = new Set([' ', '\u00A0', '\u202F']);
+/** What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. */
+const SEPARATORS = new Set([...SPACES, '.', ',', '-', '/']);
+/** An added `.` or `,` is a thousands separator only: exactly three digits after it, then no digit. */
+const THOUSANDS_AFTER = /^\d{3}(?!\d)/;
+
+/**
+ * The reading is `expected` — every character of it, in order — with separators the field added between them (an IBAN
+ * grouped in fours, an amount's thousands, a date's slashes) and nothing else: `Reformat`, else undefined (also for an
+ * exact reading, which the exact rule passes). D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md.
+ * Tight, since a wrong pass is worse than a false mismatch:
+ * - every expected character is shown, in order and unchanged — a typed space may be shown as another space
+ *   (`respaced`), nothing else may differ (letter case included);
+ * - only SEPARATORS are added, never before the first expected character (a leading `-` is a sign);
+ * - an added `.` or `,` is a thousands separator only (three digits after it, then none): a cents mask that shows
+ *   `125` as `1.25` changed the amount;
+ * - a separator that was typed must be shown: a field that dropped one (`12,50` → `1250`) changed the value.
+ * Greedy: a reading character equal to the next expected one is taken as that character. Taken as an added separator
+ * instead, the expected one would have to match a later, equal character — so matching first never rejects what
+ * skipping would pass, but under the thousands rule, where the miss is a false mismatch (the safe side). Pure,
+ * O(reading).
+ */
+export function reformatOf(observed: string, expected: string): Reformat | undefined {
+  if (observed === expected) return undefined;
+  let j = 0;
+  let added = 0;
+  let respaced = 0;
+  for (let i = 0; i < observed.length; i++) {
+    const c = observed[i];
+    const e = expected[j];
+    if (c === e) {
+      j++;
+    } else if (e !== undefined && SPACES.has(c) && SPACES.has(e)) {
+      j++;
+      respaced++;
+    } else if (SEPARATORS.has(c) && j > 0 && ((c !== '.' && c !== ',') || THOUSANDS_AFTER.test(observed.slice(i + 1)))) {
+      added++;
+    } else {
+      return undefined;
+    }
+  }
+  return j === expected.length ? { added, respaced } : undefined;
 }
 
 /** Every input on a screen but the field, by role, identifier and rect, with the value it shows. */

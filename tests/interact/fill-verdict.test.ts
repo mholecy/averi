@@ -16,6 +16,16 @@ const landed = { kind: 'landed' } as const;
 const nothingTyped = { kind: 'nothing-typed' } as const;
 
 describe('judgeFill — what the facts mean', () => {
+  it('a reformatted read-back (D18) is filled, the reformat carried for the words', () => {
+    expect(judgeFill(fact({ typed: 12, readBack: landed, reformatted: { added: 2, respaced: 0 } }))).toEqual({
+      did: 'filled',
+      typed: 12,
+      reasons: [],
+      caveats: [],
+      reformatted: { added: 2, respaced: 0 },
+    });
+  });
+
   it('a landed read-back is filled, with or without a clear that deleted something', () => {
     expect(judgeFill(fact({ typed: 4, readBack: landed }))).toEqual({ did: 'filled', typed: 4, reasons: [], caveats: [] });
     expect(judgeFill(fact({ typed: 4, readBack: landed, cleared: 7 }))).toMatchObject({ did: 'filled', sent: { what: 'characters', n: 7 }, reasons: [] });
