@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -240,8 +240,9 @@ const probeDidNotAnswer = (e: unknown): boolean =>
  * nothing about the compiler, so it is dropped and the next engine probes
  * again. The compile is NOT memoized here: its failures (a timeout, a killed
  * swiftc, a full disk) are not reliably told apart from a real compile error,
- * so they stay the failing engine's answer only (`VisionOcr#binary`), and the
- * next Verifier tries again.
+ * so they stay the answer of the engines that asked for that compile only
+ * (`VisionOcr#binary`, `VisionOcr#buildBinary`), and the next Verifier tries
+ * again.
  */
 const toolchainProbes = new WeakMap<ExecFn, Promise<string>>();
 
@@ -279,6 +280,46 @@ async function probeSwiftToolchain(exec: ExecFn): Promise<string> {
         `Tools (xcode-select --install), then restart averi. Underlying error: ${cause}`,
     );
   }
+}
+
+/**
+ * The compiles running in this process, by the binary they publish. Never a
+ * cache of answers: an entry lives exactly as long as its compile (see
+ * `VisionOcr#buildBinary`); the cache is the binary on disk.
+ */
+const compilesInFlight = new Map<string, Promise<string>>();
+
+async function compileRecognizer(exec: ExecFn, dir: string, binary: string): Promise<string> {
+  await mkdir(dir, { recursive: true });
+  // BOTH the source and the binary are per-BUILD until the compile is done.
+  // A shared source path is not merely untidy: a second averi process
+  // truncating and rewriting it mid-compile makes THIS process's swiftc fail
+  // with a spurious syntax error in a file that looks perfectly valid
+  // afterwards. The pid alone is not enough: it is reused across sandboxes
+  // and containers sharing a temp dir, so a random suffix makes every build
+  // its own. Rename is the only step that publishes anything.
+  const staging = `${binary}.${process.pid}.${randomUUID()}`;
+  const source = `${staging}.swift`;
+  try {
+    // Inside the try so a write that fails half-way (ENOSPC) removes its
+    // partial source too. It stays OUTSIDE the compile's catch: a source that
+    // could not be written says nothing about the compiler, so it is a plain
+    // error the engine forgets, not an OcrUnavailableError.
+    await writeFile(source, RECOGNIZER_SWIFT);
+    try {
+      await exec('swiftc', ['-O', '-o', staging, source], { timeoutMs: COMPILE_TIMEOUT_MS });
+      await rename(staging, binary);
+    } catch (e) {
+      // A swiftc killed mid-link or a rename that failed leaves the staging
+      // binary behind; nothing will ever publish it. A cleanup that fails must
+      // not replace the compile's answer.
+      await rm(staging, { force: true }).catch(() => {});
+      throw new OcrUnavailableError(`the OCR recognizer did not compile (swiftc -O): ${errorMessage(e)}`);
+    }
+  } finally {
+    await rm(source, { force: true }).catch(() => {});
+  }
+  return binary;
 }
 
 /**
@@ -336,7 +377,10 @@ export class VisionOcr implements OcrEngine {
    * on, so one Verifier's reads do not each pay a doomed compile. Any other
    * rejection is dropped and the next call builds again. A missing compiler is
    * also the process's answer (`swiftToolchain`); a failed compile is not, so
-   * the next Verifier's engine compiles afresh.
+   * the next Verifier's engine compiles afresh. Across engines, concurrent
+   * builds of one binary share ONE compile per process (`compilesInFlight`,
+   * D15): an engine that joined a compile that failed keeps that failure as
+   * its own answer, exactly as if it had compiled itself.
    */
   private binary(): Promise<string> {
     this.binaryPromise ??= this.buildBinary().catch((e: unknown) => {
@@ -356,23 +400,17 @@ export class VisionOcr implements OcrEngine {
     const binary = join(dir, `recognizer-${key}`);
     if (existsSync(binary)) return binary;
 
-    await mkdir(dir, { recursive: true });
-    // BOTH the source and the binary are per-process until the compile is done.
-    // A shared source path is not merely untidy: a second averi process
-    // truncating and rewriting it mid-compile makes THIS process's swiftc fail
-    // with a spurious syntax error in a file that looks perfectly valid
-    // afterwards. Rename is the only step that publishes anything.
-    const source = `${binary}.${process.pid}.swift`;
-    const staging = `${binary}.${process.pid}`;
-    await writeFile(source, RECOGNIZER_SWIFT);
-    try {
-      await this.exec('swiftc', ['-O', '-o', staging, source], { timeoutMs: COMPILE_TIMEOUT_MS });
-      await rename(staging, binary);
-    } catch (e) {
-      throw new OcrUnavailableError(`the OCR recognizer did not compile (swiftc -O): ${errorMessage(e)}`);
-    } finally {
-      await rm(source, { force: true });
+    // One compile per binary per process (D15): an engine that finds a build
+    // of the same binary in flight joins it. The entry is dropped when the
+    // build settles, so nothing outlives it — a failed compile is the answer
+    // of every engine that asked for it while it ran (each memoizes it in its
+    // own `binary()`, exactly as if it had compiled itself: the same source on
+    // the same toolchain), and the next engine to ask compiles afresh.
+    let build = compilesInFlight.get(binary);
+    if (build === undefined) {
+      build = compileRecognizer(this.exec, dir, binary).finally(() => compilesInFlight.delete(binary));
+      compilesInFlight.set(binary, build);
     }
-    return binary;
+    return build;
   }
 }
