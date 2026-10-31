@@ -1,9 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { rm, writeFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
 import { ocrEngineFor, OcrUnavailableError, ocrUnavailableReason, VisionOcr, type OcrEngine } from '../../src/verify/ocr.js';
+
+// Passthrough spies on the two filesystem calls the engine's build makes, so a
+// test can see an engine look for the cached binary (`existsSync`) and fail a
+// source write half-way (`writeFile`). Both behave as the real ones unless a
+// test says otherwise.
+vi.mock('node:fs', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:fs')>();
+  return { ...real, existsSync: vi.fn(real.existsSync) };
+});
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:fs/promises')>();
+  return { ...real, writeFile: vi.fn(real.writeFile) };
+});
 
 /**
  * The ONE engine-selection rule (2026-10-04). Until then the `ocr` assert and
@@ -237,7 +250,7 @@ describe('VisionOcr — the toolchain probe runs once per process, not once per 
       expect(calls).toEqual(['version', 'compile', 'compile']);
     }));
 
-  it('a binary the OS swept out of the temp dir is rebuilt by the next engine, not trusted from the shared probe', () =>
+  it('an engine that finds the binary on disk runs no compile; one the OS swept out is rebuilt by the next engine, not trusted from the shared probe', () =>
     onHost('darwin', async () => {
       const calls: string[] = [];
       const toolchain = `swift-driver test ${randomUUID()}`;
@@ -254,9 +267,12 @@ describe('VisionOcr — the toolchain probe runs once per process, not once per 
       };
       try {
         await new VisionOcr(exec).recognize(Buffer.from('png'), REGION);
+        // A fresh engine checks the disk: the binary is there, so it only runs it.
+        await new VisionOcr(exec).recognize(Buffer.from('png'), REGION);
+        expect(calls).toEqual(['version', 'compile', 'run', 'run']);
         await rm(binary!, { force: true });
         await new VisionOcr(exec).recognize(Buffer.from('png'), REGION);
-        expect(calls).toEqual(['version', 'compile', 'run', 'compile', 'run']);
+        expect(calls).toEqual(['version', 'compile', 'run', 'run', 'compile', 'run']);
       } finally {
         if (binary !== undefined) await rm(binary, { force: true });
       }
@@ -276,6 +292,28 @@ describe('VisionOcr — one compile per binary per process, on staging paths no 
   const REGION = [{ id: 'element', x: 0, y: 0, w: 10, h: 10 }];
   const read = (ocr: VisionOcr) => ocr.recognize(Buffer.from('png'), REGION).catch((e: unknown) => e);
   const settle = () => new Promise((r) => setImmediate(r));
+  /**
+   * Waits until the first compile has started AND both engines have looked for
+   * the binary and not found it. The join (or a second compile) is synchronous
+   * after that look, so on release neither engine can still be on its way —
+   * a late engine would find the published binary and make the "ONE compile"
+   * assertion pass vacuously.
+   */
+  const bothLookedAndMissed = async (compiles: { staging: string }[]) => {
+    for (;;) {
+      if (compiles.length > 0) {
+        const binary = binaryOf(compiles[0].staging);
+        const looks = vi.mocked(existsSync).mock.calls.flatMap((c, i) =>
+          c[0] === binary ? [vi.mocked(existsSync).mock.results[i]] : [],
+        );
+        if (looks.length >= 2) {
+          expect(looks.map((r) => r.value)).toEqual([false, false]);
+          return;
+        }
+      }
+      await settle();
+    }
+  };
 
   /** A fake swiftc whose compile waits for `release()`, then writes its staging output — or fails. */
   const gatedCompiler = (outcome: 'publish' | 'fail') => {
@@ -303,8 +341,7 @@ describe('VisionOcr — one compile per binary per process, on staging paths no 
       const { exec, calls, compiles, release } = gatedCompiler('publish');
       try {
         const reads = [read(new VisionOcr(exec)), read(new VisionOcr(exec))];
-        while (!calls.includes('compile')) await settle();
-        for (let i = 0; i < 10; i++) await settle();
+        await bothLookedAndMissed(compiles);
         release();
         expect(await Promise.all(reads)).toEqual([[], []]);
         expect(calls).toEqual(['version', 'compile', 'run', 'run']);
@@ -315,12 +352,11 @@ describe('VisionOcr — one compile per binary per process, on staging paths no 
 
   it('a shared compile that fails is both engines\' answer; a new engine compiles again', () =>
     onHost('darwin', async () => {
-      const { exec, calls, release } = gatedCompiler('fail');
+      const { exec, calls, compiles, release } = gatedCompiler('fail');
       const a = new VisionOcr(exec);
       const b = new VisionOcr(exec);
       const reads = [read(a), read(b)];
-      while (!calls.includes('compile')) await settle();
-      for (let i = 0; i < 10; i++) await settle();
+      await bothLookedAndMissed(compiles);
       release();
       const [first, second] = await Promise.all(reads);
       expect(first).toBeInstanceOf(OcrUnavailableError);
@@ -350,5 +386,29 @@ describe('VisionOcr — one compile per binary per process, on staging paths no 
         expect(existsSync(c.staging)).toBe(false);
         expect(existsSync(c.source)).toBe(false);
       }
+    }));
+
+  it('a source write that fails half-way (ENOSPC) leaves no partial source, and is forgotten: the next read builds again', () =>
+    onHost('darwin', async () => {
+      const { exec, calls, compiles, release } = gatedCompiler('fail');
+      release();
+      let source: string | undefined;
+      const real = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      vi.mocked(writeFile).mockImplementationOnce(async (path) => {
+        source = String(path);
+        await real.writeFile(source, 'import Foun');
+        throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
+      });
+      const ocr = new VisionOcr(exec);
+      const first = await read(ocr);
+      expect(first).not.toBeInstanceOf(OcrUnavailableError);
+      expect((first as Error).message).toMatch(/^ENOSPC/);
+      expect(source).toMatch(new RegExp(`\\.${process.pid}\\.[0-9a-f-]{36}\\.swift$`));
+      expect(existsSync(source!)).toBe(false);
+      expect(calls).toEqual(['version']);
+      // A disk that was full says nothing about the compiler: the same engine builds again.
+      expect(await read(ocr)).toBeInstanceOf(OcrUnavailableError);
+      expect(calls).toEqual(['version', 'compile']);
+      expect(compiles[0].source).not.toBe(source);
     }));
 });

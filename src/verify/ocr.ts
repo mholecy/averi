@@ -390,17 +390,24 @@ async function compileRecognizer(exec: ExecFn, dir: string, binary: string): Pro
   // its own. Rename is the only step that publishes anything.
   const staging = `${binary}.${process.pid}.${randomUUID()}`;
   const source = `${staging}.swift`;
-  await writeFile(source, RECOGNIZER_SWIFT);
   try {
-    await exec('swiftc', ['-O', '-o', staging, source], { timeoutMs: COMPILE_TIMEOUT_MS });
-    await rename(staging, binary);
-  } catch (e) {
-    // A swiftc killed mid-link or a rename that failed leaves the staging
-    // binary behind; nothing will ever publish it.
-    await rm(staging, { force: true });
-    throw new OcrUnavailableError(`the OCR recognizer did not compile (swiftc -O): ${errorMessage(e)}`);
+    // Inside the try so a write that fails half-way (ENOSPC) removes its
+    // partial source too. It stays OUTSIDE the compile's catch: a source that
+    // could not be written says nothing about the compiler, so it is a plain
+    // error the engine forgets, not an OcrUnavailableError.
+    await writeFile(source, RECOGNIZER_SWIFT);
+    try {
+      await exec('swiftc', ['-O', '-o', staging, source], { timeoutMs: COMPILE_TIMEOUT_MS });
+      await rename(staging, binary);
+    } catch (e) {
+      // A swiftc killed mid-link or a rename that failed leaves the staging
+      // binary behind; nothing will ever publish it. A cleanup that fails must
+      // not replace the compile's answer.
+      await rm(staging, { force: true }).catch(() => {});
+      throw new OcrUnavailableError(`the OCR recognizer did not compile (swiftc -O): ${errorMessage(e)}`);
+    }
   } finally {
-    await rm(source, { force: true });
+    await rm(source, { force: true }).catch(() => {});
   }
   return binary;
 }

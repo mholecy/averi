@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -76,13 +76,21 @@ export async function probeRecognizer(exec: HostExec, png: string): Promise<Prob
   try {
     if (!existsSync(binary)) {
       await mkdir(dir, { recursive: true });
-      const source = `${binary}.${process.pid}.swift`;
-      await writeFile(source, PROBE_SWIFT);
+      // Per-BUILD paths, as src/verify/ocr.ts#compileRecognizer: a pid is not unique across sandboxes sharing a temp
+      // dir, and two builds on one source truncate each other mid-compile. Rename is the only publishing step.
+      const staging = `${binary}.${process.pid}.${randomUUID()}`;
+      const source = `${staging}.swift`;
       try {
-        await exec('swiftc', ['-O', '-o', `${binary}.${process.pid}`, source]);
-        await rename(`${binary}.${process.pid}`, binary);
+        await writeFile(source, PROBE_SWIFT);
+        try {
+          await exec('swiftc', ['-O', '-o', staging, source]);
+          await rename(staging, binary);
+        } catch (e) {
+          await rm(staging, { force: true }).catch(() => {});
+          throw e;
+        }
       } finally {
-        await rm(source, { force: true });
+        await rm(source, { force: true }).catch(() => {});
       }
     }
     return { platform, toolchain, run: { stdout: (await exec(binary, [png])).stdout.toString('utf8') } };
