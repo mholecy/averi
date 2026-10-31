@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AdapterRegistry, defaultFactory, discoveryWith, type AdapterOpts, type DeviceDiscovery } from '../../src/mcp/registry.js';
+import { AdapterRegistry, defaultDiscovery, defaultFactory, defaultIosBooted, defaultRegistryDeps, discoveryWith, type AdapterOpts, type DeviceDiscovery } from '../../src/mcp/registry.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
@@ -289,6 +289,10 @@ describe('AdapterRegistry', () => {
       await registry.get('android');
       expect(probes).toEqual(['android', 'android']);
       expect(plistReads).toEqual([]);
+    });
+
+    it('the server\'s registry is built on the real factory, discovery AND proof', () => {
+      expect(defaultRegistryDeps).toEqual({ factory: defaultFactory, discovery: defaultDiscovery, iosBooted: defaultIosBooted });
     });
 
     it('a registry built with injected seams and no proof never proves: the bound iOS call lists', async () => {

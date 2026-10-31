@@ -100,6 +100,20 @@ function kindFor(platform: Platform, opts?: AdapterOpts): IosTreeSourceKind | un
   return platform === 'ios' ? opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE : undefined;
 }
 
+/** The registry's seams: the factory and discovery (both or neither), and D22's optional proof. */
+export interface RegistryDeps {
+  factory: AdapterFactory;
+  discovery: DeviceDiscovery;
+  iosBooted?: IosBootedProof;
+}
+
+/** What `new AdapterRegistry()` is built on — the server's wiring; exported so its tests can pin it. */
+export const defaultRegistryDeps: Readonly<RegistryDeps> = {
+  factory: defaultFactory,
+  discovery: defaultDiscovery,
+  iosBooted: defaultIosBooted,
+};
+
 /**
  * Dispose one adapter without letting its failure escape: the adapter is being
  * torn down either way, and a synchronous throw and a rejected promise are the
@@ -146,13 +160,7 @@ export class AdapterRegistry {
    * caller passing `defaultIosBooted`, as scripts/perf/baseline.ts does)
    * reads the device.plist.
    */
-  constructor(
-    deps: { factory: AdapterFactory; discovery: DeviceDiscovery; iosBooted?: IosBootedProof } = {
-      factory: defaultFactory,
-      discovery: defaultDiscovery,
-      iosBooted: defaultIosBooted,
-    },
-  ) {
+  constructor(deps: RegistryDeps = defaultRegistryDeps) {
     this.factory = deps.factory;
     this.discovery = deps.discovery;
     this.iosBooted = deps.iosBooted ?? (async () => false);
@@ -196,9 +204,13 @@ export class AdapterRegistry {
     const binding = this.bindings.get(platform);
     if (binding) {
       // iOS first asks the simulator's own device.plist (D22): proven booted,
-      // no listing is spawned (~110 ms of `simctl list devices` a call) — the
-      // only fact this path reads from a listing is "booted". Anything short
-      // of proof lists as before, so every refusal below keeps its wording.
+      // no listing is spawned (~110 ms of `simctl list devices` a call). This
+      // path reads two facts from a listing — the device is listed (simctl's
+      // listing drops a simulator whose runtime is unavailable) and it is
+      // booted — and the file proves only the second: a booted simulator
+      // whose runtime went away now gets its adapter, and the verb's own call
+      // fails with its own error (the residuals: discovery.ts#iosBootedFromDevicePlist).
+      // Anything short of proof lists as before, so every refusal below keeps its wording.
       const proven = platform === 'ios' && (await this.provenBooted(binding.deviceId));
       // Every entry with the serial: cheap phones can share one, and any
       // booted entry keeps the binding, as before the C5 refusals.

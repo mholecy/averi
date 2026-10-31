@@ -184,7 +184,16 @@ describe('iosBootedFromDevicePlist — the bound simulator\'s own record, before
     ['state 3 recorded for another UDID', plist('3', 'AAAA-1111')],
     ['state 3 on a deleted device', plist('3').replace('<key>isDeleted</key>\n\t<false/>', '<key>isDeleted</key>\n\t<true/>')],
     // A 3 in some other dict is not the device's own: not the flat shape read, so not believed.
-    ['a second state key, 3, beside the device\'s own 1', plist('1', UDID, '\n\t<key>state</key>\n\t<integer>3</integer>')],
+    ['a second state key, 3, before the device\'s own 1', plist('1', UDID, '\n\t<key>state</key>\n\t<integer>3</integer>')],
+    ['a second state key, 1, before a 3', plist('3', UDID, '\n\t<key>state</key>\n\t<integer>1</integer>')],
+    ['two state keys, both 3', plist('3', UDID, '\n\t<key>state</key>\n\t<integer>3</integer>')],
+    [
+      'state 3 only inside a nested dict, the device\'s own state missing',
+      plist('3')
+        .replace(/\t<key>state<\/key>\n\t<integer>3<\/integer>\n/, '')
+        .replace('<string>System</string>', '<string>System</string>\n\t<key>extra</key>\n\t<dict>\n\t\t<key>state</key>\n\t\t<integer>3</integer>\n\t</dict>'),
+    ],
+    ['state 3 on a deleted device, spelled <true />', plist('3').replace('<key>isDeleted</key>\n\t<false/>', '<key>isDeleted</key>\n\t<true />')],
     ['no state key', plist('3').replace(/\t<key>state<\/key>\n\t<integer>3<\/integer>\n/, '')],
     ['a binary plist', 'bplist00\u00d4\u0001\u0002state'],
     ['garbage', 'not a plist'],
