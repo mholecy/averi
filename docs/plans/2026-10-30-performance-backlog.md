@@ -27,7 +27,7 @@ measured before and after.
 | P6 | OCR toolchain probe memoised per module, not per `VisionOcr` | spawn | done (5731c309) |
 | P7 | Selector regexes compiled once in `parseSelector` | CPU | won't do — cosmetic |
 | T1 | Fake the settle/poll timers in the slowest test files | tests | deferred — after the D rows |
-| D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | Android done (0119d76d); iOS run by the owner |
+| D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | done — Android (0119d76d), iOS 2026-10-31 ("D0 on iOS") |
 | D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | done (0d551270; with a 150 ms floor, ADR 0029) |
 | D2 | `ensure_state`'s second look ends on a held "no" | device | open |
 | D3 | Per-call tree snapshot cache, invalidated by every action | device | done (8bdb8004; a one-shot hand-off, not a cache — ADR 0030) |
@@ -179,7 +179,35 @@ spread between sessions is several hundred ms, so compare per item in its own no
 | screenshot | 1080 | 1050 | −3 % |
 | tree | 2426 | 2336 | −4 % |
 
-What is left on Android is the `uiautomator dump` itself (~2.3 s per read) and the capture pair; iOS is unmeasured.
+What is left on Android is the `uiautomator dump` itself (~2.3 s per read) and the capture pair; iOS: see "D0 on iOS" below.
+
+### D0 on iOS (2026-10-31, 9c8ef1f2 / aaa12374)
+
+The averi-lab iPhone 17 simulator, iOS 27.0, 5 repeats, medians, run by the owner outside the sandbox with a fresh idb
+companion (see D0's pre-run recipe); load 2.5–5. Records: the session scratchpad's `d0-results/ios-*.json`.
+
+| scenario | native · idb | native · wda | RN · wda | Android (13bf3ca4) |
+| --- | ---: | ---: | ---: | ---: |
+| tree | 263 | 194 | 276 | 2 336 |
+| screenshot | 1 161 | 1 164 | — | 1 050 |
+| tap | 954 | 894 | — | 5 000 |
+| color assert | 1 580 | 1 544 | — | 3 520 |
+| ocr assert | 1 764 | 1 708 | — | unavailable |
+| fill (3) | 1 662 | 2 324 | 2 155 | 8 808 |
+| fill (20) | 1 680 | 2 370 | 5 925 | 11 951 |
+| scroll_until, 3 screens | failed ×5 (D20) | 6 908 | — | 17 616 |
+| ensure_state cold | 4 438 | 7 110 | — | 13 838 |
+| ensure_state warm | 1 285 | 1 199 | — | 3 368 |
+
+iOS is 2–7× faster than Android per verb (the screenshot is the exception): an idb read is ~150 ms, a WDA `/source` 35–90 ms warm. Where the time goes:
+- every call pays `simctl list devices` (~110 ms, the registry's probe) — on iOS that is 10–40 % of a verb (D13's
+  probe trim was Android-only);
+- a screenshot is two `simctl io screenshot` (~370 ms each) plus a 300 ms sleep (capture.ts:801, the stability pair):
+  ~1 s of every screenshot, colour and OCR assert, and of ensure_state's final frame;
+- `simctl spawn launchctl` (~235 ms, appHealth) in every assert and ensure_state;
+- WDA: ensure_state cold spends 4.9 s in five `/source` reads (the first after a launch is slow), RN fill-20 sleeps
+  2 s in fill-type.ts:304 (5 × 400 ms, the per-chunk pace) and its first tree read waits up to 23 s on WDA's start;
+- OCR's recognizer itself is 150–160 ms: D4's persistent helper would save little of that.
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
