@@ -293,6 +293,18 @@ whole first time — rn-fill-20 median 2 346 ms [2 326–5 383] against 5 925 in
 one 400 ms poll, no retype. The cost: rn-fill ("Jan", which never dropped) 2 155 → 2 341 ms — the split applies to
 every typing into a learned app (D25). rn-tree 276 → 166 ms (D22).
 
+### D7a device A/B (f2498c4a, 2026-10-31)
+
+The owner's `ios-run.sh` native · idb, 5 repeats, `AVERI_IDB_HELPER=off` then on (medians, ms): tree 175 → 111
+(−37 %), tap 842 → 779, fill 1 559 → 1 415, fill-20 1 578 → 1 452, scroll 8 977 → 8 577, color 1 531 → 1 480, ocr
+1 712 → 1 628, ensure-warm 1 225 → 1 155; ensure-cold 4 131 → 4 863. A describe-all through the helper is ~70–110 ms
+against ~170 ms (128 of 129 calls served by the helper; it started once, outside ensure-cold). Part of the read saving
+moves into D1's pause (`pauseAfterRead(500, readMs)`: the cadence stays ~500 ms). ensure-cold's +732 is
+`simctl io screenshot` stalling ~+1 000 ms (bimodal: ~400 or ~1 400 ms) in 4 of its 5 ON repeats against 1 of 5 OFF;
+the stall-free ON repeat took 3 872 ms (every OFF 4 053–4 140). Stalls across whole runs: ON 9/50 screenshots, OFF
+2/50, earlier CLI runs 7/100, WDA 0/50 (Fisher ON vs pooled CLI p ≈ 0.02 — weak). A second A/B (ON first, 10 repeats of
+the screenshot scenarios) decides whether the helper raises the stall rate before D7b.
+
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
 which ~230 ms PNG encode); raw `exec-out screencap` 979 ms — `exec-out` moves only ~11 MB/s here and a raw frame is
