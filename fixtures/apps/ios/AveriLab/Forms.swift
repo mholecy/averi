@@ -94,9 +94,12 @@ struct FormScreen: View {
     /// a fast burst (the HID typing of idb and WDA, one key per ~7 ms) — the @State held it, a submit read it, but no
     /// onChange followed, and the oracle kept the value one key short
     /// (docs/bugs/2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md).
-    private func binding(_ tag: String) -> Binding<String> {
+    /// A field with a `format` (form-format, D18) reformats in the same write, as a banking app's IBAN and amount fields
+    /// do: the model holds the formatted text and the TextField shows it (an `.onChange` would set it a write later —
+    /// the burst trap above).
+    private func binding(_ tag: String, format: String? = nil) -> Binding<String> {
         Binding(get: { values[tag, default: ""] }, set: {
-            values[tag] = $0
+            values[tag] = formatted(format, $0)
             report()
         })
     }
@@ -163,7 +166,7 @@ struct FormScreen: View {
             .buttonStyle(.plain)
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
         default:
-            TextField(placeholder, text: binding(f.tag))
+            TextField(placeholder, text: binding(f.tag, format: f.format))
                 .keyboardType(f.kind == "email" ? .emailAddress : f.kind == "amount" ? .decimalPad : .default)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -267,5 +270,35 @@ private struct ShortScroll: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+// --- the formats (scripts/truth/schema.ts#FieldFormat, D18; the same rules as Forms.kt's and the React Native app's
+// src/format.ts) ---
+
+private func isGap(_ c: Character) -> Bool { c == " " || c == "\u{00A0}" || c == "\u{202F}" }
+
+private func groups(_ s: String, _ n: Int) -> [String] {
+    var out: [String] = []
+    var rest = Substring(s)
+    while !rest.isEmpty {
+        out.append(String(rest.prefix(n)))
+        rest = rest.dropFirst(n)
+    }
+    return out
+}
+
+/// `group4`: whitespace dropped, groups of four joined by a space; `thousands`: the whole part before the first `,` or
+/// `.` grouped in threes from the right by a no-break space, the rest kept.
+func formatted(_ format: String?, _ text: String) -> String {
+    switch format {
+    case "group4":
+        return groups(text.filter { !isGap($0) }, 4).joined(separator: " ")
+    case "thousands":
+        let cut = text.firstIndex { $0 == "," || $0 == "." } ?? text.endIndex
+        let whole = String(text[..<cut].filter { !isGap($0) })
+        return groups(String(whole.reversed()), 3).map { String($0.reversed()) }.reversed().joined(separator: "\u{00A0}") + text[cut...]
+    default:
+        return text
     }
 }

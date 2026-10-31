@@ -41,6 +41,7 @@ describe('the cell catalog', () => {
       'forms/form-prefilled',
       'forms/form-picker',
       'forms/form-shared-id',
+      'forms/form-format',
       'edges/scroll-bounded',
       'edges/scroll-bounded-footer',
       'edges/scroll-sticky',
@@ -70,6 +71,7 @@ describe('the cell catalog', () => {
       'text/text-nav-cut',
       'react-native/rn-field',
       'react-native/rn-banner',
+      'react-native/rn-format',
     ]);
   });
 

@@ -16,7 +16,7 @@ import { knownEntry, knownLive } from './live-known.js';
 import { FLOATING_PANEL_EVIDENCE, holds, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, callReply, claimsTap, isError } from './replies.js';
-import { appOf, labSelector, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
+import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
 
 /**
  * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
@@ -162,6 +162,12 @@ const B = 'form-basic';
 const K = 'form-keyboard';
 const KF = 'form-keyboard-floating';
 const TITLE = { tap: { text: 'Transfer details' } };
+const F = 'form-format';
+const RF = 'rn-format';
+const NBSP = '\u00A0';
+/** A flow that taps a field and types into it with a `type:` step (blind: no read-back), or fills it with a `fill:` one. */
+const typeFlow = (cell: string, tag: string, value: string) => ({ type_it: { steps: [{ tap: { id: labId(cell, tag) } }, { type: { value } }] } });
+const fillFlow = (cell: string, tag: string, value: string) => ({ fill_it: { steps: [{ fill: { id: labId(cell, tag), value, clear: true } }] } });
 
 const FORMS: Omit<Case, 'group'>[] = [
   // The keyboard's cases first: once the simulator has seen HID typing (idb ui text) it shows no soft keyboard
@@ -443,6 +449,41 @@ const FORMS: Omit<Case, 'group'>[] = [
       return holds('I', '')(s, replies, source, launched);
     },
   },
+  // D18: fields that reformat as they are typed (form-format; schema.ts#FieldFormat) — the model holds the formatted
+  // text (iban grouped in fours, the amount's thousands by a no-break space), or, ibanShown on Compose, the text as
+  // typed with only the screen grouped (a VisualTransformation; elsewhere ibanShown formats its model as iban does).
+  { id: 'f1', cell: F, says: 'fill, no clear, an IBAN the field groups in fours', calls: [fill(F, 'iban', 'SK3112000000')], judge: holds('iban', 'SK31 1200 0000') },
+  { id: 'f2', cell: F, says: 'fill, clear, an IBAN the field groups in fours', calls: [fill(F, 'iban', 'SK3112000000', true)], judge: holds('iban', 'SK31 1200 0000') },
+  { id: 'f3', cell: F, says: 'fill, clear, an amount the field groups by thousands', calls: [fill(F, 'amount', '1234567,89', true)], judge: holds('amount', `1${NBSP}234${NBSP}567,89`) },
+  { id: 'f4', cell: F, platforms: ['android'], says: 'fill, clear, an IBAN grouped on the screen only (the model as typed)', calls: [fill(F, 'ibanShown', 'SK3112000000', true)], judge: holds('ibanShown', 'SK3112000000') },
+  { id: 'f5', cell: F, says: 'fill, no clear, an IBAN typed with its own spaces', calls: [fill(F, 'iban', 'SK31 1200 0000')], judge: holds('iban', 'SK31 1200 0000') },
+  {
+    id: 'f6',
+    cell: F,
+    says: 'fill an IBAN, then type_text without a selector types on into the grouping field',
+    calls: [fill(F, 'iban', 'SK31'), { tool: 'type_text', args: { text: '12000000' } }],
+    judge: holds('iban', 'SK31 1200 0000'),
+  },
+  {
+    id: 'f7',
+    cell: F,
+    says: 'a clear alone empties the grouping field, then a fill',
+    calls: [fill(F, 'iban', 'SK3112'), fill(F, 'iban', '', true), fill(F, 'iban', 'CZ6508000000')],
+    judge: holds('iban', 'CZ65 0800 0000'),
+  },
+  { id: 'f8', cell: F, says: "a flow's tap + `type:` into the grouping field", flows: typeFlow(F, 'iban', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('iban', 'SK31 1200 0000') },
+  { id: 'f9', cell: F, says: "a flow's `fill:` (clear) into the grouping field", flows: fillFlow(F, 'iban', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'fill_it' } }], judge: holds('iban', 'SK31 1200 0000') },
+  // The same on React Native (`--app react-native`): rn-format's fields, onChangeText reformatting (src/format.ts).
+  { id: 'rf1', cell: RF, says: 'fill, no clear, the RN field that groups an IBAN in fours', calls: [fill(RF, 'G.field', 'SK3112000000')], judge: holds('G', 'SK31 1200 0000') },
+  { id: 'rf2', cell: RF, says: 'fill, clear, the RN field that groups an amount by thousands', calls: [fill(RF, 'A.field', '1234567,89', true)], judge: holds('A', `1${NBSP}234${NBSP}567,89`) },
+  {
+    id: 'rf3',
+    cell: RF,
+    says: 'fill the RN grouping field, then type_text without a selector types on',
+    calls: [fill(RF, 'G.field', 'SK31'), { tool: 'type_text', args: { text: '12000000' } }],
+    judge: holds('G', 'SK31 1200 0000'),
+  },
+  { id: 'rf4', cell: RF, says: "a flow's tap + `type:` into the RN grouping field", flows: typeFlow(RF, 'G.field', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('G', 'SK31 1200 0000') },
 ];
 const CASES: Case[] = FORMS.map((c) => ({ ...c, group: 'forms' }));
 
