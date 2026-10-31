@@ -54,9 +54,10 @@ flows:
   field exposes its text — a clear-fill that lands wrong is wiped and retyped once; a no-clear
   fill never destroys existing content (it fails loudly instead). A field that reformats as it is
   typed (an IBAN grouped in fours, an amount's thousands) passes when it shows every typed character
-  in order with only separators added — spaces, `-`, `/`, and `.`/`,` as thousands separators — and
-  the reply says `the field shows them reformatted: N separators added`; a dropped, reordered or
-  changed character still fails (ADR 0034). Android types one character per
+  in order with one kind of separator added between groups — a space, `-`, `/`, or `.`/`,` where a
+  thousands separator sits — and the reply says `the field shows them reformatted: N separators
+  added` (for an added `.` or `,` as a ⚠ line: it reads like a decimal point); a dropped, reordered
+  or changed character still fails (ADR 0034). Android types one character per
   `input text` call: bulk injection races Compose's async state and drops most characters
   (measured 3 of 11 landing).
 - **Field errors**: on iOS `ui_snapshot` attaches `error` to an input by one of two rules, on idb
