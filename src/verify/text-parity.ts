@@ -510,7 +510,7 @@ async function measureTextLeg(
   try {
     const { regions, note } = ocrRegionsFor(contract, frame);
     if (regions.length === 0) return treeOnly;
-    const results = await engine.recognize(shot, regions);
+    const results = await engine.recognize(await shot.png(), regions);
     return {
       value: { tree: frame.tree, ocr: { byId: new Map(results.map((r) => [r.id, r])), pngWidth: frame.png.width } },
       notes: note === undefined ? [] : [`(${platform}: ${note})`],
@@ -1054,7 +1054,7 @@ export async function measureOcrAssert(
   if (region === undefined) return { pass: false, detail: failClosed(error, 'rendered text') };
   let read: OcrRegionResult | undefined;
   try {
-    [read] = await engine.recognize(shot, [region]);
+    [read] = await engine.recognize(await shot.png(), [region]);
   } catch (e) {
     const detail = failClosed(`OCR failed: ${errorMessage(e)}`, 'rendered text');
     return e instanceof OcrUnavailableError ? { pass: false, final: true, detail } : { pass: false, detail };

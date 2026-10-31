@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import { shellCommandLine, shellQuote } from '../../src/adapters/adb-shell.js';
 import { AndroidAdapter } from '../../src/adapters/android.js';
@@ -206,17 +207,24 @@ describe('AndroidAdapter — every user value reaches the device command as one 
   // literal quotes into the device command's argument. No caller sends a
   // non-plain word today; this pins the invariant for the first one that does.
   it('execOut: a non-plain word arrives once-quoted — adb escapes it, the adapter does not', async () => {
-    // screencap answers with a PNG signature: screenshot() refuses anything else (screenshot-bytes.ts).
-    const { fn, commands } = deviceShExec((argv) =>
-      argv[1] === 'screencap' ? { stdout: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) } : {},
-    );
+    const { fn, commands } = deviceShExec();
     const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn });
     await adapter['execOut'](['uiautomator', 'dump', "/sdcard/a b&c;'d'.xml"]);
-    await adapter.screenshot();
-    expect(commands).toEqual([
-      ['uiautomator', 'dump', "/sdcard/a b&c;'d'.xml"],
-      ['screencap', '-p'],
-    ]);
+    expect(commands).toEqual([['uiautomator', 'dump', "/sdcard/a b&c;'d'.xml"]]);
+  });
+
+  // D19: the capture is ONE exec-out word with a pipe in it — adb sends the first word unescaped, so the device's sh
+  // runs `screencap | gzip -1` as a pipe, not screencap with `|`, `gzip`, `-1` as its arguments.
+  it('the raw capture is a pipe on the device: screencap into gzip -1', async () => {
+    // A 1x1 RGBA_8888 frame, gzipped: what the pipe answers on a device (screenshot-bytes.ts#screencapRaw).
+    const head = Buffer.alloc(16);
+    [1, 1, 1, 1].forEach((v, i) => head.writeUInt32LE(v, i * 4));
+    const raw = gzipSync(Buffer.concat([head, Buffer.from([1, 2, 3, 255])]));
+    const { fn, commands } = deviceShExec((argv) => (argv[0] === 'exec-out' ? { stdout: raw } : {}));
+    await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).capture();
+    // screencap's own record went into the pipe, so only gzip's reaches stdout — which is what a pipe is. As words,
+    // screencap would be the one command, its arguments `|`, `gzip`, `-1`.
+    expect(commands).toEqual([['gzip', '-1']]);
   });
 
   it('the keyboard witness stays a rawShell line: its pipe runs on the device, not as words to dumpsys', async () => {

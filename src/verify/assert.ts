@@ -696,7 +696,7 @@ export class Verifier {
         return { description, pass: false, detail: `baseline not created: ${baselineRefusal(candidate)}` };
       }
       await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, candidate.shot);
+      await writeFile(path, await candidate.shot.png());
       return { description, pass: true, detail: `baseline created at ${path}` };
     }
     let frame: Frame;
@@ -705,12 +705,11 @@ export class Verifier {
     } catch (e) {
       return { description, pass: false, detail: screenshotFailed(captureRefusal(e), 'baseline match') };
     }
-    const current = frame.shot;
     const note = unsettledNote(frame);
     const withNote = (detail: string): string => (note === undefined ? detail : `${detail}\n${note}`);
 
     const a = decodePng(baseline);
-    const b = decodePng(current);
+    const b = frame.shot.decode();
     if (a.width !== b.width || a.height !== b.height) {
       return {
         description,

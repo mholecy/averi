@@ -4,6 +4,7 @@ import { missOf, withMissNote } from '../ui-tree/miss.js';
 import type { Target } from '../ui-tree/selectors.js';
 import { formatSeconds } from '../util/duration.js';
 import type { MeasuredFrame } from './capture.js';
+import type { Shot } from './shot.js';
 
 /**
  * The verifier's poll vocabulary, shared by `Verifier.poll` (the tree-only
@@ -57,8 +58,8 @@ export interface PixelMeasureInput {
    * the capture shows of it.
    */
   rect: Rect;
-  /** The settled screenshot bytes. */
-  shot: Buffer;
+  /** The settled screenshot (verify/shot.ts): its PNG for the OCR recognizer. */
+  shot: Shot;
   /** The decoded frame — never undecoded, never treeless. Its `scale` may still carry an error: the measurement's policy. */
   measured: MeasuredFrame;
 }

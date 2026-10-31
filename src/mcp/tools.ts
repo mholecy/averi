@@ -355,7 +355,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     async ({ platform: p }) => {
       const frame = await captureFrame(await registry.get(p));
       const unsettled = unsettledNote(frame);
-      return { content: unsettled === undefined ? [image(frame.shot)] : [...text(unsettled).content, image(frame.shot)] };
+      const shot = image(await frame.shot.png());
+      return { content: unsettled === undefined ? [shot] : [...text(unsettled).content, shot] };
     },
   );
 

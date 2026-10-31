@@ -20,6 +20,7 @@ import type { LayoutContract } from '../../src/verify/layout-contract.js';
 import { ocrEngineFor, ocrUnavailableReason, type OcrEngine } from '../../src/verify/ocr.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { Shot } from '../../src/verify/shot.js';
 
 /**
  * These cover the `verify` orchestration, which until this refactor lived
@@ -930,7 +931,7 @@ describe('paritySection — the containment every table shares', () => {
    */
   const leg = (platform: Platform): Parameters<typeof paritySection>[2][number] => ({
     status: 'fulfilled',
-    value: { trace: [], results: [], frame: { shot: whitePng(), stability: 'settled', captures: 2 }, health: `\n${platform}` },
+    value: { trace: [], results: [], frame: { shot: Shot.ofPng(whitePng()), stability: 'settled', captures: 2 }, health: `\n${platform}` },
   });
 
   it('a collector that throws for one leg degrades that leg to a note and compares the other', async () => {

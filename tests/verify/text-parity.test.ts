@@ -24,6 +24,7 @@ import {
   validateTextContract,
   type TextCapture,
 } from '../../src/verify/text-parity.js';
+import { Shot } from '../../src/verify/shot.js';
 
 /**
  * Every fixture here is the SHAPE MEASURED on the live payment form on
@@ -698,7 +699,7 @@ describe('textMeasurement(...).measure — the text table\'s per-leg measurement
    */
   const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
   const ios = root(402, [n({ identifier: 'cta', label: 'CONTINUE', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
-  const shot = Buffer.from('png bytes');
+  const shot = Shot.ofPng(Buffer.from('png bytes'));
   /** A leg's frame as the run hands it over: the settled bytes plus what the capture concluded (capture.ts#TreeFrame). */
   const leg = (measured: MeasuredFrame | Undecoded): TreeFrame => ({ shot, stability: 'settled', captures: 2, measured });
   const recording = (byId: Record<string, OcrLine[]> = { cta: [line('CONTINUE', 36)] }) => {
@@ -794,7 +795,7 @@ describe('textMeasurement — the text table\'s one run-level decision', () => {
   };
   const c = contract([{ id: 'cta', text: 'CONTINUE' }]);
   const ios = root(402, [n({ identifier: 'cta', label: 'CONTINUE', rect: { x: 24, y: 780, width: 354, height: 44 } })]);
-  const leg = (measured: MeasuredFrame): TreeFrame => ({ shot: Buffer.from('png bytes'), stability: 'settled', captures: 2, measured });
+  const leg = (measured: MeasuredFrame): TreeFrame => ({ shot: Shot.ofPng(Buffer.from('png bytes')), stability: 'settled', captures: 2, measured });
 
   it('a supplied engine is used as given, with no caveat, and `measure` recognizes with it', async () => {
     const calls: OcrRegion[][] = [];
@@ -1248,7 +1249,7 @@ describe('measureOcrAssert — the ocr assert\'s one measurement, every "not rea
    * with no poll around it.
    */
   const cta = n({ identifier: 'cta', rect: { x: 24, y: 780, width: 354, height: 44 } });
-  const input = (f = frame(root(402, [cta], 874), 402, 874, { width: 402, height: 874 })) => ({ rect: cta.rect, shot: Buffer.from('png bytes'), measured: f });
+  const input = (f = frame(root(402, [cta], 874), 402, 874, { width: 402, height: 874 })) => ({ rect: cta.rect, shot: Shot.ofPng(Buffer.from('png bytes')), measured: f });
   const reading = (result: Omit<OcrRegionResult, 'id'>): OcrEngine => ({
     recognize: async (_png, regions) => regions.map((r) => ({ id: r.id, ...result })),
   });
@@ -1334,7 +1335,7 @@ describe('measureOcrAssert — the ocr assert\'s one measurement, every "not rea
     const f = frame(tree, 200, 400, { width: 200, height: 400 });
     const note = f.scale.note!;
     expect(note).toMatch(/DEVICE screen/);
-    const at = { rect: { x: 10, y: 10, width: 40, height: 10 }, shot: Buffer.from('png bytes'), measured: f };
+    const at = { rect: { x: 10, y: 10, width: 40, height: 10 }, shot: Shot.ofPng(Buffer.from('png bytes')), measured: f };
     const twoLines = reading({ lines: [line('one', 10), line('two', 10)] });
     expect((await measureOcrAssert(twoLines, at, { text: 'one two', heightPct: 5 })).detail).toBe(
       `read "one two"; vs expected "one two" =; ${note}; 2 lines recognized — ink height is single-line only ` +

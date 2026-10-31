@@ -1013,6 +1013,14 @@ export interface DeviceAdapter {
    */
   screenshot(): Promise<Buffer>;
   /**
+   * The screen as pixels, for a caller that compares or measures them and hands no PNG on — D19
+   * (docs/adr/0035-android-captures-raw-pixels.md). Optional: an adapter without it is captured with `screenshot()`
+   * and decoded (verify/shot.ts). Android's: `screencap | gzip -1`, the raw frame (adapters/screenshot-bytes.ts#screencapRaw),
+   * or — on a device the raw path refuses — `screencap -p`'s PNG, as it is. `screenshot()` is then this capture,
+   * encoded on the host when it is pixels. Throws as `screenshot()` does: a capture is a frame or a transport error.
+   */
+  capture?(): Promise<ScreenCapture>;
+  /**
    * `settle`: a one-shot caller (an MCP tool, not a poller) may ask for one
    * bounded retry when the device answers "no window yet" right after a launch.
    * Pollers leave it off — their interval already is the retry.
@@ -1190,3 +1198,22 @@ export interface DeviceAdapter {
    */
   dispose?(): void | Promise<void>;
 }
+
+/**
+ * A decoded screenshot — what every pixel reader reads: 8-bit RGBA, row-major, `width * height * 4` bytes (every PNG
+ * variant is normalized to this). Here, at the bottom of the layers, because an adapter's capture (`capture()`, D19)
+ * is one; verify/png.ts, its decoder, re-exports it.
+ */
+export interface RgbaImage {
+  width: number;
+  height: number;
+  data: Buffer | Uint8Array;
+}
+
+/** An `RgbaImage` whose bytes are a Buffer (pixelmatch, `Buffer.compare`) — a decoded PNG's, a raw capture's. */
+export interface RawImage extends RgbaImage {
+  data: Buffer;
+}
+
+/** What `DeviceAdapter.capture()` hands back: pixels, or a PNG when the device gave one (Android's `-p` fallback). */
+export type ScreenCapture = { kind: 'rgba'; image: RawImage } | { kind: 'png'; bytes: Buffer };

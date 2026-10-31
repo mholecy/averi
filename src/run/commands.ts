@@ -114,7 +114,7 @@ export async function runEnsureState(
   const text = trace + health;
   if (frame === undefined) return { text: `${text}\n${screenshotFailedLine(failed)}` };
   const unsettled = unsettledNote(frame);
-  return { text: unsettled === undefined ? text : `${text}\n${unsettled}`, shot: frame.shot };
+  return { text: unsettled === undefined ? text : `${text}\n${unsettled}`, shot: await frame.shot.png() };
 }
 
 /** `run_flow`: the trace and health line. */

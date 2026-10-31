@@ -3,6 +3,7 @@
 // not start. Through the namespace it is only `undefined`, and the fast path steps aside.
 import * as zlib from 'node:zlib';
 import { PNG } from 'pngjs';
+import type { RawImage } from '../adapters/types.js';
 
 /**
  * THE ONE PNG DECODER of the pixel readers (capture's frame and stability wait,
@@ -22,22 +23,11 @@ import { PNG } from 'pngjs';
  * were weighed and rejected: a per-platform binary breaks the `npx` install.
  */
 
-/**
- * A decoded RGBA screenshot — what every pixel reader reads. Defined here, beside
- * its decoder, so the dependency runs one way (capture.ts imports this module and
- * re-exports the type); readers that only index the bytes accept any Uint8Array.
- */
-export interface RgbaImage {
-  width: number;
-  height: number;
-  /** 8-bit RGBA, row-major, `width * height * 4` bytes (every PNG variant is normalized to this). */
-  data: Buffer | Uint8Array;
-}
+/** The decoded screenshot every pixel reader reads (adapters/types.ts#RgbaImage, D19: an adapter's capture is one). */
+export type { RgbaImage } from '../adapters/types.js';
 
 /** `decodePng`'s answer: an `RgbaImage` whose bytes are a Buffer (pixelmatch, `Buffer.compare`). */
-export interface DecodedPng extends RgbaImage {
-  data: Buffer;
-}
+export type DecodedPng = RawImage;
 
 /**
  * Decodes `bytes` as pngjs would: the fast path when it takes the input, pngjs

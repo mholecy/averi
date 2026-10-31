@@ -14,6 +14,7 @@ import {
 } from '../../src/verify/capture.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { Shot } from '../../src/verify/shot.js';
 
 /**
  * verify/capture.ts is the one owner of frame stability and of the png
@@ -67,7 +68,7 @@ describe('captureFrame — the stability wait', () => {
   it('returns the first frame that repeats, and nothing captured before it', async () => {
     const fake = device([frame('a'), frame('b'), frame('b'), frame('c')]);
     const { shot } = await captureFrame(fake);
-    expect(shot.equals(frame('b'))).toBe(true);
+    expect(shot.equals(Shot.ofPng(frame('b')))).toBe(true);
     // a, b, b — the capture that confirmed stability is the one returned.
     expect(fake.screenshots).toHaveLength(3);
   });
@@ -76,7 +77,7 @@ describe('captureFrame — the stability wait', () => {
     const fake = device(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(frame));
     const got = await captureFrame(fake);
     expect(fake.screenshots).toHaveLength(6);
-    expect(got.shot.equals(frame('f'))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(frame('f')))).toBe(true);
     expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
     // Until 2026-10-05 this frame was indistinguishable from a settled one.
     expect(got.stability).toBe('moving');
@@ -118,7 +119,7 @@ describe('captureFrame — the stability wait', () => {
     const got = await captureFrame(fake, { deadline: Date.now() + 450 });
     expect(fake.screenshots).toHaveLength(2);
     expect(sleeps).toEqual([300]);
-    expect(got.shot.equals(frame('b'))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(frame('b')))).toBe(true);
     expect(got).toMatchObject({ stability: 'moving', captures: 2 });
   });
 
@@ -169,7 +170,7 @@ describe('captureFrame — stability over the caller\'s region', () => {
     expect(got).toMatchObject({ stability: 'settled', settledOver: 'region', captures: 2 });
     expect(sleeps).toEqual([STABILITY_DELAY_MS]);
     // The capture that confirmed stability — the later of the pair — is the frame, and it is what gets measured.
-    expect(got.shot.equals(clock(2))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(clock(2)))).toBe(true);
     expect(got.measured.png?.data[0]).toBe(2);
     expect(got.measured.scale).toMatchObject({ scale: 0.1 });
   });
@@ -180,7 +181,7 @@ describe('captureFrame — stability over the caller\'s region', () => {
     expect(got).toMatchObject({ stability: 'moving', captures: 6 });
     expect(fake.screenshots).toHaveLength(6);
     expect(sleeps).toEqual(Array(5).fill(STABILITY_DELAY_MS));
-    expect(got.shot.equals(spinner(6))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(spinner(6)))).toBe(true);
     // Only a settled frame says how it settled.
     expect(got.settledOver).toBeUndefined();
   });
@@ -317,7 +318,7 @@ describe('captureBaselineFrame — the confirmation window a baseline must hold 
     const fake = device([frame('a')]);
     const got = await captureBaselineFrame(fake);
     expect(got).toMatchObject({ stability: 'settled', settledOver: 'screen', confirmed: true, captures: 6 });
-    expect(got.shot.equals(frame('a'))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(frame('a')))).toBe(true);
     expect(fake.screenshots).toHaveLength(6);
     // A zero in the schedule is no sleep at all, not a recorded sleep(0).
     expect(BASELINE_CONFIRMATION_DELAYS_MS).toEqual([300, 0, 0, 0]);
@@ -332,7 +333,7 @@ describe('captureBaselineFrame — the confirmation window a baseline must hold 
     // Stops at the differing capture: nothing taken after it.
     expect(fake.screenshots).toHaveLength(5);
     expect(sleeps).toEqual([STABILITY_DELAY_MS, 300]);
-    expect(got.shot.equals(frame('a'))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(frame('a')))).toBe(true);
     expect(unconfirmedReason(got)).toBe(
       'the screen did not settle: 5 captures — two consecutive ones matched, then a later confirming capture differed from them — a periodic change such as a blinking caret or a ticking clock, which a matching pair can land in phase with; hide or stop it (unfocus the field, freeze the clock) and re-run',
     );
@@ -357,7 +358,7 @@ describe('captureBaselineFrame — the confirmation window a baseline must hold 
     const fake = device(['x', 'y', 'a', 'a'].map(frame));
     const got = await captureBaselineFrame(fake);
     expect(got).toMatchObject({ stability: 'settled', confirmed: true, captures: 8 });
-    expect(got.shot.equals(frame('a'))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(frame('a')))).toBe(true);
     expect(sleeps).toEqual([STABILITY_DELAY_MS, STABILITY_DELAY_MS, STABILITY_DELAY_MS, 300]);
   });
 });
@@ -372,7 +373,7 @@ describe('captureFrame — the tree beside the png', () => {
       throw new Error('the capture must not read the device unasked');
     };
     const got = await captureFrame(fake);
-    expect(got.shot.equals(Buffer.from('not a png'))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(Buffer.from('not a png')))).toBe(true);
     // A png-only frame reports nothing about a tree — not even a reason: it
     // asked for nothing more. It still says whether it settled.
     expect(got.measured).toBeUndefined();
@@ -410,7 +411,7 @@ describe('captureFrame — the tree beside the png', () => {
     };
     const got = await captureFrame(fake, { readTree: true });
     expect(reads).toBe(1);
-    expect(got.shot.equals(png(1000, 2000))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(png(1000, 2000)))).toBe(true);
     expect(got.measured.error).toBe('UI tree read failed: wedged until a reboot\nthe cure');
     expect(sleeps).toEqual([300]); // the stability wait alone
   });
@@ -421,7 +422,7 @@ describe('captureFrame — the tree beside the png', () => {
       throw new Error('null root node');
     };
     const got = await captureFrame(fake, { readTree: true });
-    expect(got.shot.equals(png(1000, 2000))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(png(1000, 2000)))).toBe(true);
     expect(got.measured.tree).toBeUndefined();
     expect(got.measured.error).toMatch(/^UI tree read failed after 5 attempts: null root node$/);
     expect(got.measured.png).toBeUndefined();
@@ -492,7 +493,7 @@ describe('captureFrame — the one scale', () => {
     // contained.
     const malformed = { ...node({ rect: { x: 0, y: 0, width: 0, height: 0 } }), children: undefined as unknown as UiNode[] };
     const got = await captureFrame(fake, { tree: malformed });
-    expect(got.shot.equals(png(1000, 2000))).toBe(true);
+    expect(got.shot.equals(Shot.ofPng(png(1000, 2000)))).toBe(true);
     expect(got.measured.tree).toBe(malformed);
     expect(got.measured.scale?.error).toMatch(/^the png scale could not be derived from this tree: .* — the tree is not well-formed; dump it with ui_snapshot and re-run/);
   });

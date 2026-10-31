@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BaselineFrame } from '../../src/verify/capture.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
+import { Shot } from '../../src/verify/shot.js';
 
 /**
  * Baseline creation fails CLOSED (review 2026-10-06): only a confirmed
@@ -31,7 +32,7 @@ describe('screenshot baseline creation fails closed on a frame the window did no
   });
 
   it('an `unjudged` frame (one capture, no window) is refused, worded as not judged, and nothing is written', async () => {
-    const unjudged: BaselineFrame = { shot: Buffer.from('one look'), stability: 'unjudged', captures: 1 };
+    const unjudged: BaselineFrame = { shot: Shot.ofPng(Buffer.from('one look')), stability: 'unjudged', captures: 1 };
     next.frame = unjudged;
     const fake = new FakeAdapter({ s: node({ role: 'container' }) }, 's');
     const result = await new Verifier(fake, { pollMs: 5, timeoutMs: 100, baselineDir: dir }).assert({

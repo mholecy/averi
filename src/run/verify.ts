@@ -591,7 +591,8 @@ export async function runVerification(
   const runs = await Promise.allSettled(platforms.map(runOne));
 
   const sections: string[] = [];
-  const screenshots: Buffer[] = [];
+  // PNGs, encoded on the host when a leg's capture was raw pixels (D19, verify/shot.ts) — awaited below, together.
+  const screenshots: Promise<Buffer>[] = [];
   platforms.forEach((p, i) => {
     const run = runs[i];
     if (run.status === 'rejected') {
@@ -606,7 +607,7 @@ export async function runVerification(
     const note = frame === undefined ? screenshotFailedLine(failed) : unsettledNote(frame);
     const frameLine = note === undefined ? '' : `\n${note}`;
     sections.push(`## ${p}\n${formatTrace(trace)}${verdict}\n${formatAsserts(results)}${frameLine}${health}`);
-    if (frame !== undefined) screenshots.push(frame.shot);
+    if (frame !== undefined) screenshots.push(frame.shot.png());
   });
 
   if (contract !== undefined) {
@@ -652,7 +653,7 @@ export async function runVerification(
     }
   }
 
-  return { sections, screenshots };
+  return { sections, screenshots: await Promise.all(screenshots) };
 }
 
 /** How ONE parity table is built from the legs — handed to `paritySection` at the call that builds it. */

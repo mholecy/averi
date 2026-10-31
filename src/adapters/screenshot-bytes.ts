@@ -31,6 +31,10 @@
  * for every call — out of scope for this change.
  */
 
+import * as zlib from 'node:zlib';
+import { errorMessage } from '../util/error-message.js';
+import type { RawImage } from './types.js';
+
 /** Every PNG starts with these 8 bytes (PNG spec §5.2). */
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -52,11 +56,71 @@ export function screenshotPng(bytes: Buffer, source: ScreenshotSource): Buffer {
   if (bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
     return bytes;
   }
-  throw new Error(
-    `\`${source.command}\` on ${source.device} returned ${described(bytes)} — not a PNG, though the command reported success: ` +
+  throw transportError(source, described(bytes), 'a PNG');
+}
+
+/** The one wording of "the command succeeded and handed back no screenshot": what came back, and the remedy. */
+function transportError(source: ScreenshotSource, what: string, notA: string): Error {
+  return new Error(
+    `\`${source.command}\` on ${source.device} returned ${what} — not ${notA}, though the command reported success: ` +
       `the device transport failed (a dying or hung emulator / simulator), not the app's screen. ${source.remedy}`,
   );
 }
+
+/**
+ * D19 (docs/adr/0035-android-captures-raw-pixels.md): Android's capture is `screencap | gzip -1` on the device — the
+ * raw frame, gzipped where it is made, so neither the device's PNG encode (~230 ms on a lab screen, over a second on a
+ * photo) nor the 9.6 MB raw transfer over exec-out (~11–30 MB/s) is paid. This judges what came back, three ways:
+ *
+ * - a frame: the gunzipped stream is a header and `width × height × 4` bytes of RGBA_8888 — the header 16 bytes
+ *   (API 28+: width, height, format, colour space) or 12 (before: no colour space), told apart by the length, which
+ *   must be exactly one of the two. Its pixels are the device's `screencap -p` decoded, byte for byte (pinned on a real
+ *   pair: tests/adapters/screenshot-raw.test.ts). The image is a view of the stream, not a copy;
+ * - `refused`: the raw path cannot give a frame on this device, though the device answered — the answer is not a gzip
+ *   stream (no `gzip` on the device: the shell says so on stdout), or the format is not RGBA_8888 (RGBX_8888's alpha
+ *   is undefined, RGB_565 is another layout). The adapter then captures with `screencap -p`, whose own check decides
+ *   whether the device is alive (`screenshotPng`);
+ * - a transport error, worded as `screenshotPng`'s: nothing at all came back, a gzip stream that breaks, an empty
+ *   frame (screencap failed and gzip compressed nothing), or a length that is not the header plus the pixels — the
+ *   raw counterpart of the signature check, and stronger. A stream cut in transit already fails gunzip (its trailer
+ *   holds the length and a CRC); the length check catches screencap itself writing short. One shape it cannot tell: a
+ *   16-byte-header frame exactly 4 bytes short reads as a 12-byte-header one, its pixels shifted by one.
+ */
+export function screencapRaw(bytes: Buffer, source: ScreenshotSource): { image: RawImage } | { refused: string } {
+  if (bytes.length === 0) throw transportError(source, '0 bytes', 'a screenshot');
+  if (bytes[0] !== GZIP_MAGIC[0] || bytes[1] !== GZIP_MAGIC[1]) return { refused: `the device answered ${described(bytes)}, not a gzip stream` };
+  let frame: Buffer;
+  try {
+    // Sync: 1–2 ms for a 9.6 MB frame, where the thread pool's chunked inflate took 6–8 (2026-10-31).
+    frame = zlib.gunzipSync(bytes);
+  } catch (e) {
+    throw transportError(source, `a damaged gzip stream (${bytes.length} bytes: ${errorMessage(e)})`, 'a screenshot');
+  }
+  if (frame.length === 0) throw transportError(source, 'an empty frame (0 bytes after gunzip)', 'a screenshot');
+  if (frame.length < LEGACY_HEADER_BYTES) throw transportError(source, `a frame of ${frame.length} bytes, shorter than its header`, 'a screenshot');
+  const width = frame.readUInt32LE(0);
+  const height = frame.readUInt32LE(4);
+  const format = frame.readUInt32LE(8);
+  // Before the length: a format's bytes per pixel are its own (RGB_565: 2), and the adapter's fallback decides then.
+  if (format !== RGBA_8888) return { refused: `screencap wrote pixel format ${format}, not RGBA_8888 (${RGBA_8888})` };
+  const pixelBytes = width * height * 4;
+  const header = [HEADER_BYTES, LEGACY_HEADER_BYTES].find((h) => frame.length === h + pixelBytes);
+  if (width === 0 || height === 0 || header === undefined) {
+    throw transportError(
+      source,
+      `a ${width}x${height} frame of ${frame.length} bytes, not the ${HEADER_BYTES}- or ${LEGACY_HEADER_BYTES}-byte header plus ${pixelBytes} pixel bytes`,
+      'a screenshot',
+    );
+  }
+  return { image: { width, height, data: frame.subarray(header) } };
+}
+
+const GZIP_MAGIC = [0x1f, 0x8b] as const;
+/** screencap's raw header since API 28 (width, height, format, colour space) and before it (no colour space). */
+const HEADER_BYTES = 16;
+const LEGACY_HEADER_BYTES = 12;
+/** android.graphics.PixelFormat.RGBA_8888 — the one format whose bytes are the PNG's pixels as they are. */
+const RGBA_8888 = 1;
 
 /** "0 bytes", or the size and up to 60 characters of the start, non-printables as `.`. */
 function described(bytes: Buffer): string {
