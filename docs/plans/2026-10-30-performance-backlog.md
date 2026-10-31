@@ -32,7 +32,7 @@ measured before and after.
 | D2 | `ensure_state`'s second look ends on a held "no" | device | open |
 | D3 | Per-call tree snapshot cache, invalidated by every action | device | done (8bdb8004; a one-shot hand-off, not a cache — ADR 0030) |
 | D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | open |
-| D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | open |
+| D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | won't do — raw over exec-out is ~610 ms slower (see D19) |
 | D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | done (86505377; pace 250 → 100 ms; the script and clearText not worth it) |
 | D7 | iOS: persistent idb gRPC client; WDA `excluded_attributes`; no `/status` before `/source`; parallel `defaults write`; one key-sequence in `clearText` | device | open |
 | D8 | Fill re-reads after focus only for secure or unknown fields | device | done (1083523e; Android only, ADR 0028) |
@@ -46,6 +46,7 @@ measured before and after.
 | D16 | `tests/truth/calibration.test.ts` spawns a `git merge-base` per fix and times out (5 s) under load | tests | open |
 | D17 | uiautomator cuts a sideways carousel item's bounds at the screen edge, so its true centre is unknown and "CLIPPED 88 %" can name an item whose centre is past the carousel edge (pre-existing; found in D10's live run, `carousel-in-list.C`) | correctness | open |
 | D18 | No lab field reformats as it is typed into (IBAN grouping, amount separators): the typing pace and a fill's read-back are unproven there, and `type_text` without a selector, flow `type:` and `type_pin` type blind (found in D6's review) | stability | open |
+| D19 | Android capture by `shell screencap <file>` + `adb pull` (raw RGBA, PNG encoded on the host only when returned/stored): −80…110 ms per capture on lab screens, −1.3 s on photo-heavy ones; changes the `screenshot()` contract | device | open |
 
 ## Notes
 
@@ -153,6 +154,15 @@ unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 
 cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
+
+### D5 — raw screencap (measured, won't do)
+Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
+which ~230 ms PNG encode); raw `exec-out screencap` 979 ms — `exec-out` moves only ~11 MB/s here and a raw frame is
+9.6 MB. The raw format on API 33: a 16-byte header (w, h, format 1 RGBA_8888, colour space 1 sRGB), rows unpadded; its
+pixels equal `decodePng` of the PNG byte for byte on 6 lab screens. Faster ways to the same bytes: `shell screencap
+<file>` + `adb pull` (280–286 ms on every screen; pull ~170–195 MB/s) and `exec-out 'screencap | gzip -1'` (226 ms
+on a lab cell, grows with content). On a photo-heavy screen `-p` costs 1.57 s. That is D19. Host PNG encode when bytes
+are still needed: zlib filter None level 1, 8–40 ms per frame.
 
 ### D13 — per-call overhead
 Done in 02f78183. Figures (averi_lab API 33, 2026-10-31; cited from the code): `getprop ro.build.version.release` ≈30–35 ms
