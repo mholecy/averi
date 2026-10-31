@@ -275,8 +275,8 @@ export function overallStalls(windows: readonly Window[]): OverallStalls {
   const shots = windows.flatMap(screenshots);
   const byLabel: OverallStalls['byLabel'] = {};
   for (const label of SCREENSHOT_LABELS) {
-    const of = shots.filter((c) => c.label === label);
-    if (of.length > 0) byLabel[label] = stallCounts(of);
+    const counts = shots.filter((c) => c.label === label);
+    if (counts.length > 0) byLabel[label] = stallCounts(counts);
   }
   return { thresholdMs: SCREENSHOT_STALL_MS, ...stallCounts(shots), byLabel };
 }

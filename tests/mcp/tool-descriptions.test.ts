@@ -261,6 +261,12 @@ describe('tool descriptions on idb\'s keyboard band', () => {
     expect(description('scroll_until')).toContain('With the soft keyboard up the viewport is the screen above it');
   });
 
+  it('a baseline diff leaves the iOS status band out (D26b, verify/assert.ts#iosBandRows) — the description and the reference alike', () => {
+    const clause = 'on iOS the status band (top safe area) is left out of a baseline diff';
+    expect(description('assert')).toContain(clause);
+    expect(full('assert')).toContain(clause);
+  });
+
   it('a color/ocr assert counts the band as covering', () => {
     expect(full('assert')).toContain('one under the soft keyboard (Android; iOS with treeSource: wda, or idb\'s band read by its shape)');
     expect(description('assert')).toContain('A color/ocr assert never measures what covers its element: under the soft keyboard');

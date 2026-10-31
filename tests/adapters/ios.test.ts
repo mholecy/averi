@@ -593,7 +593,7 @@ describe('IosAdapter.screenshot — through idb on the idb tree source (D26b)', 
     await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(
       '`idb screenshot - --udid AAAA-1111` on simulator AAAA-1111 returned 0 bytes — not a PNG, though the command ' +
         'reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s screen. ' +
-        'Re-check that `idb list-targets` lists the simulator as Booted and that its idb companion is running, and retry; ' +
+        'Check that its idb companion (idb_companion) is running and that `idb list-targets` lists the simulator as Booted; ' +
         'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl, or ' +
         'reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`).',
     );
@@ -613,7 +613,7 @@ describe('IosAdapter.screenshot — through idb on the idb tree source (D26b)', 
     const failed = both(new ExecError('idb screenshot - --udid AAAA-1111', 1, 'Failed to connect to companion'));
     const got = await new IosAdapter({ udid: 'AAAA-1111', exec: failed.exec, treeSource: NO_TREE }).screenshot().catch((e: unknown) => e);
     const remedy =
-      ' — is its idb companion (idb_companion) running? `idb list-targets` must list the simulator as Booted; ' +
+      ' — check that its idb companion (idb_companion) is running and that `idb list-targets` lists the simulator as Booted; ' +
       'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl';
     expect(captureRefusal(got)).toBe('Command failed (exit 1): idb screenshot - --udid AAAA-1111' + remedy);
     expect((got as Error).message).toBe('Command failed (exit 1): idb screenshot - --udid AAAA-1111' + remedy + '\nFailed to connect to companion');

@@ -321,7 +321,7 @@ const describeEmptyPayload = (types: readonly (string | undefined)[]): string =>
 };
 
 /** The budget uiTree() gave describe-all before the seam existed — a busy screen is slower than a tap. */
-const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
+export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 
 /**
  * The default tree source: one `idb ui describe-all --json` per read, nothing

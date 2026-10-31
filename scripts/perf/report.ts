@@ -35,8 +35,8 @@ export function stallLine(o: StallCounts, thresholdMs: number, label: string): s
  */
 export function stallLines(o: OverallStalls): string[] {
   const lines = SCREENSHOT_LABELS.flatMap((label) => {
-    const of = o.byLabel[label];
-    return of === undefined ? [] : [stallLine(of, o.thresholdMs, label)];
+    const counts = o.byLabel[label];
+    return counts === undefined ? [] : [stallLine(counts, o.thresholdMs, label)];
   });
   return lines.length > 0 ? lines : [`${SCREENSHOT_LABELS.join(' / ')}: none taken`];
 }

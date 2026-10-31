@@ -181,15 +181,18 @@ it; it is a ~1 s wait inside CoreSimulator, worst beside a `simctl spawn launchc
 - **No simctl fallback at run time.** idb draws the Dynamic Island (a black pill, 378×112 px at the top centre of the
   1206×2622 frame) where simctl shows the app's background, and 16 corner pixels differ; the rest is equal (same size,
   same sRGB). The stability wait (`verify/capture.ts`) compares a pair of captures byte for byte: one from each source
-  reads as a moving screen. So an idb failure is the answer — exec's error, or, for bytes that are no PNG, the
-  transport error naming `idb screenshot - --udid U`, `idb list-targets`, the companion, the kill switch and the reboot.
+  reads as a moving screen. So an idb failure is the answer — a plain Error whose first line is exec's (the command,
+  or its timeout) with the remedy after it (the companion, `idb list-targets`, the kill switch), exec's ExecError as
+  its `cause`: the remedy must sit on the line `captureRefusal` quotes; or, for bytes that are no PNG, the transport
+  error naming `idb screenshot - --udid U` with the same remedy and the reboot.
 - **Baselines.** A stored baseline from simctl (every one before D26b), or one written by an adapter on the other tree
   source of the same simulator, differs from an idb capture in the island alone: 1.219 % of the lab frame, over the
   1 % default threshold. The iOS baseline diff (`verify/assert.ts#iosBandRows`) therefore leaves the status band —
   `viewport().statusBand` × the png's scale, 62 pt = 186 rows there — out of both images, and says `status band
   excluded` in the detail. This loosens a check, held to exactly that: iOS only, the band's rows only; a png that is
   not the viewport at one scale is compared whole (defensive; whether a rotated simulator's capture is ever landscape
-  is unmeasured), and so is one whose viewport cannot be read, as before; a
+  is unmeasured), and so is one whose viewport cannot be read, as before. It applies on the WDA tree source too, on
+  purpose: a stored baseline may have been taken under either source, so either may meet the island; a
   difference in the first row under the band still fails (tests/verify/assert.test.ts). The band is the status bar's
   and the island's, never the app's to assert on — the same band a tap counts as off the screen.
 - **D0** counts both captures (`SCREENSHOT_LABELS` in `scripts/perf/stats.ts`): the totals as before, `stalls.byLabel` in

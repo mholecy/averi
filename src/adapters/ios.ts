@@ -8,7 +8,7 @@ import type { IdbHelper } from './idb-helper.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
-import { IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
+import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
 import { awaitForeground } from './ios-foreground.js';
 import { appInfoNames } from './simctl-appinfo.js';
@@ -31,16 +31,21 @@ import { sleep } from '../util/sleep.js';
 export const IDB_EMPTY_RETRY_MS = 1_000;
 
 /**
- * The budget of `idb screenshot -` (D26b): describe-all's (ios-tree-source.ts, 15 s), the other read the helper serves.
+ * The budget of `idb screenshot -` (D26b): describe-all's (ios-tree-source.ts#DESCRIBE_ALL_TIMEOUT_MS, 15 s), the other read the helper serves.
  * The capture took 77 ms through a persistent fb-idb client and 168 ms through the CLI on the lab simulator (backlog
  * "### D26 diag"), so 15 s is a stuck companion, not a slow frame.
  */
-export const IDB_SCREENSHOT_TIMEOUT_MS = 15_000;
+export const IDB_SCREENSHOT_TIMEOUT_MS = DESCRIBE_ALL_TIMEOUT_MS;
 
-/** What a failed `idb screenshot` adds to its first line (IosAdapter#idbScreenshot). */
-const IDB_CAPTURE_REMEDY =
-  'is its idb companion (idb_companion) running? `idb list-targets` must list the simulator as Booted; ' +
-  'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl';
+/**
+ * What to do about a failed `idb screenshot` (IosAdapter#idbScreenshot), the one text both failures say: a failed or
+ * timed-out call after its first line's command, and bytes that are no PNG — that one with the reboot advice added.
+ */
+const idbCaptureRemedy = (reboot?: string): string =>
+  'check that its idb companion (idb_companion) is running and that `idb list-targets` lists the simulator as Booted; ' +
+  'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl' +
+  (reboot === undefined ? '' : `, or ${reboot}`);
+const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
  * `AVERI_IOS_SCREENSHOT=simctl`: every iOS screenshot through `simctl io screenshot`, as before D26b, whatever the tree
@@ -432,15 +437,14 @@ export class IosAdapter implements DeviceAdapter {
       ({ stdout } = await this.idb(['screenshot', '-'], IDB_SCREENSHOT_TIMEOUT_MS));
     } catch (e) {
       if (!(e instanceof ExecError)) throw e;
+      // A plain Error, the ExecError as `cause`: the remedy must sit on the first line, the one captureRefusal quotes.
       const [first, ...rest] = e.message.split('\n');
-      throw new Error([`${first} — ${IDB_CAPTURE_REMEDY}`, ...rest].join('\n'), { cause: e });
+      throw new Error([`${first} — ${idbCaptureRemedy()}`, ...rest].join('\n'), { cause: e });
     }
     return screenshotPng(stdout, {
       device: `simulator ${this.udid}`,
       command: `idb screenshot - --udid ${this.udid}`,
-      remedy:
-        `Re-check that \`idb list-targets\` lists the simulator as Booted and that its idb companion is running, and retry; ` +
-        `if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl, or ${rebootSimulatorAdvice(this.udid)}.`,
+      remedy: `${capitalized(idbCaptureRemedy(rebootSimulatorAdvice(this.udid)))}.`,
     });
   }
 
