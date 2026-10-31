@@ -382,7 +382,7 @@ reboot and a companion started a few seconds after the boot completes, or `treeS
 
 ### D25 diag (owner's run 2026-10-31, `scratchpad/d21-d25/d25-typing.sh 40`)
 AveriLabRN's `rn-field` (RN 0.88 controlled single-line TextInput), prefixes of `Jan Novak Bratislava`, raw idb
-through one gRPC client per call (as averi's helper), read back from the app's state file; 40 rounds, every combo once
+through fb-idb's gRPC client in-process, one client per call (as averi's helper), read back from the app's state file; 40 rounds, every combo once
 a round in a shuffled order. Whole/40 and landing median:
 
 | mode | 1 | 2 | 3 | 4 | 5 | 6 | 8 | 12 | 20 |
@@ -390,13 +390,13 @@ a round in a shuffled order. Whole/40 and landing median:
 | burst | 40/40 | 36/40 | 36/40 | 37/40 | 40/40 | 33/40 | 35/40 | 10/40 | 4/40 |
 | split:150 (D24) | — | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 |
 
-Burst ~93 ms, split:150 ~335 ms (+240 at every length). A burst already drops at length 2 (4/40, the second key lost),
+Burst ~93 ms, split:150 ~335 ms (+240 at lengths 2–8; +215–220 at 12 and 20, where the burst's drops skew its median). A burst already drops at length 2 (4/40, the second key lost),
 so no length threshold is safe: D25's premise ("split only above a length") is refuted. The gap is the lever: at 8 and
 20 characters split:0 kept 80/80 (185/238 ms), split:50 80/80 (235/292), split:100 80/80, hid:50 (one call with a
-companion-side 50 ms HIDDelay between the first key and the rest) 80/80 (148/204). The second idb call's own round trip
-is what lets the controlled input catch up. Decision: FIRST_KEY_ALONE_MS 150 → 50 ms (−100 ms per typing into an app
-seen dropping a tail; 50 ms of margin over split:0 because averi's in-process helper call may return faster than the
-script's client did). hid:G (one call) would save ~90 ms more but needs a new helper verb carrying a delay — not now.
+companion-side 50 ms HIDDelay between the first key and the rest) 80/80 (148/204). Any pause after the first key of ~50 ms or more
+lands the rest: a HID delay inside one call as well as the second call's own ~90 ms round trip. Decision: FIRST_KEY_ALONE_MS 150 → 50 ms (−100 ms per typing into an app
+seen dropping a tail; 50 ms of margin over split:0: a bare 50 ms pause with no round trip, hid:50, landed
+80/80, so the sleep lands even if the helper's round trip shrank). hid:G (one call) would save ~90 ms more but needs a new helper verb carrying a delay — not now.
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
