@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AdapterRegistry, defaultFactory, discoveryWith, type AdapterOpts, type DeviceDiscovery } from '../../src/mcp/registry.js';
+import { AdapterRegistry, defaultDiscovery, defaultFactory, defaultIosBooted, defaultRegistryDeps, discoveryWith, type AdapterOpts, type DeviceDiscovery } from '../../src/mcp/registry.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
@@ -13,8 +13,11 @@ import { FakeAdapter } from '../helpers/fake.js';
  * ask it. `onProbe` gates the listing — lets a test freeze a probe
  * mid-flight. `probes` counts listings per platform; `versions` records, per
  * listing, whether it asked for OS versions (a discovery's default: yes).
+ * `iosBooted` is the D22 seam (the bound simulator's device.plist): left
+ * out, the registry is built without it, as every caller that injects its
+ * seams is; `plistReads` records each udid it was asked about.
  */
-function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void) {
+function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void, iosBooted?: (udid: string) => Promise<boolean>) {
   const bound: string[] = [];
   const created: FakeAdapter[] = [];
   const probes: Platform[] = [];
@@ -34,7 +37,13 @@ function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void) {
     await onProbe?.();
     return devices.filter((d) => d.platform === platform);
   };
-  return { registry: new AdapterRegistry({ factory, discovery }), bound, created, devices, probes, versions };
+  const plistReads: string[] = [];
+  const registry = new AdapterRegistry(
+    iosBooted === undefined
+      ? { factory, discovery }
+      : { factory, discovery, iosBooted: (udid) => (plistReads.push(udid), iosBooted(udid)) },
+  );
+  return { registry, bound, created, devices, probes, versions, plistReads };
 }
 
 const device = (id: string, state: Device['state'] = 'booted', platform: Platform = 'android'): Device => ({
@@ -229,6 +238,90 @@ describe('AdapterRegistry', () => {
     it('iOS keeps its wording: a shut-down simulator is "boot it first"', async () => {
       const { registry } = makeRegistry([device('sim', 'offline', 'ios')]);
       await expect(registry.select('ios', 'sim')).rejects.toThrow('Device "sim" is offline — boot it first');
+    });
+  });
+
+  // D22 (2026-10-31): on iOS the still-booted check was `simctl list devices` (~110 ms) on every tool call.
+  describe('the bound simulator proven booted from its device.plist (D22)', () => {
+    it('proven booted: no listing, the same cached adapter, bound to the same simulator', async () => {
+      const { registry, probes, bound, plistReads } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => true);
+      const adapter = await registry.get('ios'); // unbound: the auto-pick lists, and asks no file
+      expect(probes).toEqual(['ios']);
+      expect(plistReads).toEqual([]);
+      expect(await registry.get('ios')).toBe(adapter);
+      expect(probes).toEqual(['ios']); // the bound call listed nothing
+      expect(plistReads).toEqual(['sim']);
+      expect(bound).toEqual(['sim+idb']);
+    });
+
+    it('a PINNED simulator proven booted lists only for select_device, not for each call', async () => {
+      const { registry, probes, plistReads } = makeRegistry([device('a', 'booted', 'ios'), device('b', 'booted', 'ios')], undefined, async () => true);
+      await registry.select('ios', 'b');
+      await registry.get('ios');
+      await registry.get('ios', { treeSource: 'wda' });
+      expect(probes).toEqual(['ios']);
+      expect(plistReads).toEqual(['b', 'b']);
+    });
+
+    // Not proven is "ask simctl", never "shut down": the listing decides, with the same options and the same wording.
+    it.each([
+      ['not proven', async () => false],
+      ['a proof that rejects', async () => Promise.reject(new Error('EACCES'))],
+      ['a proof that throws synchronously', (() => { throw new Error('boom'); }) as unknown as (udid: string) => Promise<boolean>],
+    ])('%s: the bound call lists exactly as before, and a shut-down pin keeps its wording', async (_why, proof) => {
+      const { registry, devices, probes, versions, plistReads } = makeRegistry([device('sim', 'booted', 'ios')], undefined, proof);
+      await registry.select('ios', 'sim');
+      const adapter = await registry.get('ios');
+      expect(probes).toEqual(['ios', 'ios']);
+      expect(versions).toEqual([true, false]); // select's listing, then the still-booted check's
+      expect(plistReads).toEqual(['sim']);
+      expect(await registry.get('ios')).toBe(adapter);
+      devices[0] = device('sim', 'offline', 'ios');
+      await expect(registry.get('ios')).rejects.toThrow(
+        'Selected ios device "sim" is no longer booted — reboot it or select_device another one',
+      );
+      expect(probes).toEqual(['ios', 'ios', 'ios', 'ios']);
+    });
+
+    it('Android never asks the proof: its bound call lists with adb, as before', async () => {
+      const { registry, probes, plistReads } = makeRegistry([device('phone')], undefined, async () => true);
+      await registry.get('android');
+      await registry.get('android');
+      expect(probes).toEqual(['android', 'android']);
+      expect(plistReads).toEqual([]);
+    });
+
+    it('the server\'s registry is built on the real factory, discovery AND proof', () => {
+      expect(defaultRegistryDeps).toEqual({ factory: defaultFactory, discovery: defaultDiscovery, iosBooted: defaultIosBooted });
+    });
+
+    it('a registry built with injected seams and no proof never proves: the bound iOS call lists', async () => {
+      const { registry, probes } = makeRegistry([device('sim', 'booted', 'ios')]);
+      await registry.get('ios');
+      await registry.get('ios');
+      expect(probes).toEqual(['ios', 'ios']);
+    });
+
+    it('a select() landing while the proof is read wins: get() starts over against the new binding', async () => {
+      let gate: Promise<void> | undefined;
+      const { registry, bound, created } = makeRegistry(
+        [device('a', 'booted', 'ios'), device('b', 'booted', 'ios')],
+        undefined,
+        async () => (await gate, true),
+      );
+      const first = (await registry.get('ios')) as FakeAdapter; // auto-binds a
+      let release!: () => void;
+      gate = new Promise((r) => { release = r; });
+      const racing = registry.get('ios'); // bound to a, frozen on a's proof
+      await Promise.resolve();
+      gate = undefined;
+      await registry.select('ios', 'b'); // evicts a, binds b
+      release();
+      const adapter = await racing;
+      expect(bound).toEqual(['a+idb', 'b+idb']);
+      expect(adapter).toBe(created[1]);
+      expect(adapter).not.toBe(first);
+      expect(registry.boundId('ios')).toBe('b');
     });
   });
 

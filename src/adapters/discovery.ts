@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { adbShellArgv } from './adb-shell.js';
 import { simctl } from './xcode-env.js';
@@ -161,4 +164,88 @@ export async function listIosDevices(exec: ExecFn = defaultExec): Promise<Device
     }
   }
   return devices;
+}
+
+/** Reads one file as UTF-8 text — the seam `iosBootedFromDevicePlist`'s tests fake; a missing file rejects. */
+export type ReadText = (path: string) => Promise<string>;
+
+const readText: ReadText = (path) => readFile(path, 'utf8');
+
+/**
+ * device.plist's `state` while the simulator is booted (simctl lists it
+ * `Booted`); 1 is `Shutdown`. Read on the lab simulator, CoreSimulator-1174.9.2
+ * (2026-10-31) — CoreSimulator's private numbering, see iosBootedFromDevicePlist.
+ */
+const DEVICE_PLIST_BOOTED_STATE = '3';
+
+/**
+ * Whether the simulator `udid` is booted, read from its own record in the
+ * default device set — `~/Library/Developer/CoreSimulator/Devices/<udid>/device.plist`
+ * — without spawning simctl. `true` only when that file says so; `false`
+ * means "cannot tell from the file", NOT "shut down": the caller then asks
+ * simctl (`listIosDevices`), which words every refusal as before (D22).
+ *
+ * Why (D22, docs/plans/2026-10-30-performance-backlog.md, "iOS per-call
+ * costs"): the registry proves the bound device is still booted on EVERY
+ * tool call (mcp/registry.ts#get), and on iOS that was `xcrun simctl list
+ * devices --json` — ~110 ms in the D0 windows on the lab iPhone 17
+ * (iOS 27.0), 80 ms timed alone on an idle host (2026-10-31) — for one bit.
+ * This read and parse: 0.045 ms median, 0.09 ms p95, ~0.4 ms cold, over
+ * 3 × 200 reads of the lab simulator's 701-byte file (2026-10-31, Node 22).
+ *
+ * The file is CoreSimulator's private, undocumented format. What is relied
+ * on was read on this machine (CoreSimulator-1174.9.2, Xcode 27): an XML
+ * plist, one flat `<dict>`, with `UDID` (the directory's own name), `state`
+ * an integer — 3 while booted, 1 shut down (simctl's own `Booted` /
+ * `Shutdown` at the same moment) — and `isDeleted`. So the file must say
+ * all of this, or it is not believed: it is XML (a binary plist, `bplist00…`,
+ * matches nothing) with exactly one `<dict>` (a nested dict is not the flat
+ * shape read: its `state` would not be the device's), `UDID` and `state`
+ * each appear exactly once, the UDID is the one asked for, the state is
+ * exactly `3`, and `isDeleted` is not true (`<true/>`, `<true />`). Anything
+ * else — another state (Booting, Shutting Down), a missing or unreadable
+ * file, garbage, another UDID — returns false, and
+ * the cost is simctl's, as before. A future Xcode that changes the format
+ * therefore costs time, not correctness.
+ *
+ * The device set: averi never passes simctl `--set`, and neither simctl nor
+ * CoreSimulator (strings of both, 2026-10-31) reads a device-set override
+ * from the environment, so simctl's set is the default one under the home
+ * directory; `home` is `os.homedir()` ($HOME). CoreSimulator's own home
+ * can differ from it (CFFIXED_USER_HOME, or a $HOME that is not the
+ * user's); then no file, or a file for no such UDID, is found and the
+ * listing decides — harmless, only slower.
+ *
+ * The residuals: the file is CoreSimulator's record of the state it last
+ * wrote, not a live probe, and it says nothing of the device's runtime.
+ * - A CoreSimulatorService that crashed can leave a stale 3 behind for a
+ *   device that is not running; simctl list would have told the truth (it
+ *   asks the service, which reconciles on start).
+ * - A booted simulator whose runtime became unavailable (the runtime
+ *   deleted, or an xcode-select / DEVELOPER_DIR switch to an Xcode without
+ *   it) still reads 3 here, where `listIosDevices` drops it
+ *   (`isAvailable: false`) and the registry said "no longer booted".
+ * In both the verb's own simctl or idb call fails with its own error, as
+ * when a device dies mid-call today — the registry's "no longer booted"
+ * wording is not given for it. That is the trade.
+ *
+ * The decision and its trade: docs/adr/0031-the-bound-simulator-is-proven-booted-from-its-own-record.md.
+ */
+export async function iosBootedFromDevicePlist(udid: string, read: ReadText = readText, home: string = homedir()): Promise<boolean> {
+  let text: string;
+  try {
+    text = await read(join(home, 'Library', 'Developer', 'CoreSimulator', 'Devices', udid, 'device.plist'));
+  } catch {
+    return false;
+  }
+  const one = (pattern: RegExp): string | undefined => {
+    const all = [...text.matchAll(pattern)];
+    return all.length === 1 ? all[0][1] : undefined;
+  };
+  return (
+    (text.match(/<dict\b/g) ?? []).length === 1 &&
+    one(/<key>UDID<\/key>\s*<string>([^<]*)<\/string>/g) === udid &&
+    one(/<key>state<\/key>\s*<integer>([^<]*)<\/integer>/g) === DEVICE_PLIST_BOOTED_STATE &&
+    !/<key>isDeleted<\/key>\s*<true\s*\/>/.test(text)
+  );
 }
