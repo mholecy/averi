@@ -28,7 +28,7 @@ measured before and after.
 | P7 | Selector regexes compiled once in `parseSelector` | CPU | won't do — cosmetic |
 | T1 | Fake the settle/poll timers in the slowest test files | tests | deferred — after the D rows |
 | D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | Android done (0119d76d); iOS run by the owner |
-| D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | open |
+| D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | done (0d551270; with a 150 ms floor, ADR 0029) |
 | D2 | `ensure_state`'s second look ends on a held "no" | device | open |
 | D3 | Per-call tree snapshot cache, invalidated by every action | device | open |
 | D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | open |
@@ -152,6 +152,22 @@ unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 
 cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
+
+### D1 — poll cadence
+Done in 0d551270 (ADR 0029): `pollTree` sleeps `min(pollMs, max(150, pollMs − read))` — reads start ≥ pollMs apart and
+the settle proof's two snapshots are never back to back (the floor covers WDA's slow-then-fast pair). Android tap
+5.2 → 5.0 s, fill and cold ensure −0.25…0.31 s; live forms 32/32 identical. Accepted R2: the last read before a
+deadline is no longer pushed past it by chance. 17 tests that pinned the pause on a real clock now fake Date.
+
+### Next (decided 2026-10-31 from an analysis of D3, D5, D6)
+- D3 as an explicit one-shot hand-off of the last read, never a transparent cache: used only as a first sample or a
+  positive verdict (the ladder's post-rung detect, element asserts after an assert, a tap's first sample after a
+  wait/assert step), never as a stability proof, pixel locator, absence or across tool calls; age ≤ 1 s; every
+  non-read adapter method invalidates it. Saves 2.3 s per redundant Android read (cold ensure 14.0 → ~11.8 s).
+- D6: measure the 250 ms typing pacing first (M6: delays 250/150/100/50 ms, 0 drops in 400+ chars to accept);
+  the one-script part alone is ~4 % of fill-20.
+- D5: measure raw `screencap` first (M5), emulator only; ~0.4 s per frame if confirmed.
+- New candidates: the capture stability pair (300 ms + a second screencap per frame); fill's 350 ms focus sleep.
 
 ### D8 — fill re-read
 Done in 1083523e (ADR 0028): parsers report `UiNode.secure`; the post-focus re-read is skipped only for an empty plain
