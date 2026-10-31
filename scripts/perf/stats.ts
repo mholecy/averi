@@ -105,6 +105,8 @@ export function median(xs: readonly number[]): number {
 }
 
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
+/** The median and range of the numbers; undefined for none. */
+const spread = (xs: readonly number[]): Spread | undefined => (xs.length === 0 ? undefined : { median: median(xs), min: Math.min(...xs), max: Math.max(...xs) });
 const length = (c: { startMs: number; endMs: number }) => c.endMs - c.startMs;
 
 /** One window, the tool call's round trip as the client measured it, and the process's CPU over it. */
@@ -138,10 +140,9 @@ export function summarize(runs: readonly (Measured & { status: Status })[]): Sum
   for (const r of runs) statuses[r.status] = (statuses[r.status] ?? 0) + 1;
   const ok = runs.filter((r) => r.status === 'ok');
   const summary: Summary = { runs: runs.length, statuses };
-  if (ok.length === 0) return summary;
   for (const key of NUMBERS) {
-    const xs = ok.map((r) => r[key]);
-    summary[key] = { median: median(xs), min: Math.min(...xs), max: Math.max(...xs) };
+    const s = spread(ok.map((r) => r[key]));
+    if (s !== undefined) summary[key] = s;
   }
   return summary;
 }
@@ -173,4 +174,84 @@ export function breakdown(windows: readonly Window[]): Breakdown {
   const perRun = <T extends { count: number; ms: number }>(rows: Iterable<T>) =>
     [...rows].map((r) => ({ ...r, count: r.count / n, ms: r.ms / n })).sort((a, b) => b.ms - a.ms);
   return { calls: perRun(calls.values()), sleeps: perRun(sleeps.values()) };
+}
+
+// --- D26: simctl screenshot stalls ---
+
+/**
+ * How instrument.ts#classify labels `xcrun simctl io <udid> screenshot …`. If averi's screenshots move to
+ * `idb screenshot` (a later D26 step), these counts read 0/0 and the label must follow the new call.
+ */
+export const SCREENSHOT_LABEL = 'simctl io screenshot';
+
+/**
+ * A `simctl io screenshot` longer than this stalled (D26). The call is bimodal with nothing between the modes: across
+ * the 15 D0 results JSON of 2026-10-30/31 (42 stalls in 461 calls, all in the 8 iOS ones that took screenshots:
+ * ios-native, ios-native-probe, ios-native-wda, ios-after-d22-d23, ios-d7a-on/off and ios-d7a-on2/off2) the ok calls
+ * took 336–451 ms and the stalls 1 366–1 415 ms — the ok time plus ~1 000 ms. 900 ms sits near the middle of that ~900 ms gap, ~450 ms from either mode, so neither a
+ * slow ok call on a loaded host nor a slightly short stall falls on the wrong side.
+ */
+export const SCREENSHOT_STALL_MS = 900;
+
+/** A completed screenshot over the threshold. A failed or pending one ended for another reason: it is `failed`, not timed. */
+export function isScreenshotStall(c: DeviceCall): boolean {
+  return c.label === SCREENSHOT_LABEL && completed(c) && length(c) > SCREENSHOT_STALL_MS;
+}
+
+const completed = (c: DeviceCall) => c.ok && c.pending !== true;
+
+/** One scenario's screenshots and stalls, and its wall clock over the ok runs where no screenshot stalled. */
+export interface ScenarioStalls {
+  /** Over every run, whatever its status: the stall is simctl's, not the scenario's. */
+  screenshots: number;
+  stalls: number;
+  /** Screenshots that failed or were still pending when the window closed: in `screenshots`, never a stall. */
+  failed: number;
+  /** The ok runs with no stall and no failed screenshot. */
+  stallFreeRuns: number;
+  /** Their wall clock; undefined when every ok run stalled (or none was ok). */
+  stallFreeWallMs?: Spread;
+}
+
+const screenshots = (w: Window) => w.calls.filter((c) => c.label === SCREENSHOT_LABEL);
+
+/** A run as the stall arithmetic reads it: how it ended, its wall clock, and its recorded window. */
+export interface TimedRun {
+  status: Status;
+  wallMs: number;
+  window: Window;
+}
+
+/**
+ * Stall-free: an ok run whose every screenshot completed and none stalled. One that failed or was pending is untimed —
+ * it may have been a stall cut short — so its run is not counted stall-free either.
+ */
+export function scenarioStalls(runs: readonly TimedRun[]): ScenarioStalls {
+  const shots = runs.flatMap((r) => screenshots(r.window));
+  const free = runs.filter((r) => r.status === 'ok' && screenshots(r.window).every((c) => completed(c) && !isScreenshotStall(c)));
+  const wall = spread(free.map((r) => r.wallMs));
+  return { screenshots: shots.length, stalls: shots.filter(isScreenshotStall).length, failed: shots.filter((c) => !completed(c)).length, stallFreeRuns: free.length, ...(wall ? { stallFreeWallMs: wall } : {}) };
+}
+
+/** The whole run's screenshots and stalls, and how long each mode took. */
+export interface OverallStalls {
+  thresholdMs: number;
+  screenshots: number;
+  stalls: number;
+  /** Failed or pending: in `screenshots`, in neither length below. */
+  failed: number;
+  /** The completed calls that did not stall; undefined when there were none. */
+  okMs?: Spread;
+  /** The stalls; undefined when there were none. */
+  stallMs?: Spread;
+}
+
+export function overallStalls(windows: readonly Window[]): OverallStalls {
+  const shots = windows.flatMap(screenshots);
+  const stalled = shots.filter(isScreenshotStall);
+  const timed = shots.filter(completed);
+  const okMs = spread(timed.filter((c) => !isScreenshotStall(c)).map(length));
+  const stallMs = spread(stalled.map(length));
+  const failed = shots.length - timed.length;
+  return { thresholdMs: SCREENSHOT_STALL_MS, screenshots: shots.length, stalls: stalled.length, failed, ...(okMs ? { okMs } : {}), ...(stallMs ? { stallMs } : {}) };
 }

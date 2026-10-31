@@ -14,7 +14,20 @@ import { AndroidLab, IosLab, LAB_APP, LAB_WDA_DERIVED_DATA } from '../truth/lab-
 import { allPassed, callReply, claimsDone, claimsTap, claimsVisible, isError, OCR_FAILED_CLOSED } from '../truth/replies.js';
 import { labId, labSelector, parseLabApp, type LabApp } from '../truth/schema.js';
 import { installRecorder, Recorder } from './instrument.js';
-import { breakdown, measure, summarize, type Breakdown, type Measured, type Status, type Summary, type Window } from './stats.js';
+import { fmtMs, reportTable } from './report.js';
+import {
+  breakdown,
+  measure,
+  overallStalls,
+  scenarioStalls,
+  summarize,
+  type Breakdown,
+  type Measured,
+  type ScenarioStalls,
+  type Status,
+  type Summary,
+  type Window,
+} from './stats.js';
 
 /**
  * The performance baseline (docs/plans/2026-10-30-performance-backlog.md, D0): averi driven the way an agent drives it —
@@ -59,6 +72,11 @@ import { breakdown, measure, summarize, type Breakdown, type Measured, type Stat
  * Output: the JSON (`--out`; default `$TMPDIR/averi-perf-<platform>-<app>-<time>.json`) holds the meta (commit, device,
  * load), and per scenario the summary, the breakdown (which commands and which sleep callers the time went to, per run)
  * and every run's window (each call and sleep with its times) and reply; a table goes to stdout.
+ * D26: `simctl io screenshot` stalls ~+1 000 ms in ~10 % of calls, which makes a median of a few runs noisy — so the
+ * JSON always carries `stalls`: per scenario (after its `runs`) its screenshots, stalls and wall clock over the
+ * stall-free ok runs, and at the root the whole run's (stats.ts#SCREENSHOT_STALL_MS says what a stall is). Only the
+ * table depends on screenshots: when the run took any, two more columns and the stall line under it (report.ts).
+ * scripts/perf/stalls.ts recomputes the same from a JSON written before.
  * Not a vitest test: it needs the device. Its arithmetic and wrappers are tested in tests/perf/.
  */
 
@@ -286,7 +304,7 @@ try {
       const run = await runOnce(s, r);
       runs.get(s.id)!.push(run);
       console.error(
-        `  ${s.id.padEnd(12)} ${run.status.padEnd(11)} ${ms(run.wallMs).padStart(7)} ms, ${run.deviceCalls} device calls, slept ${ms(run.sleptMs)} ms` +
+        `  ${s.id.padEnd(12)} ${run.status.padEnd(11)} ${fmtMs(run.wallMs).padStart(7)} ms, ${run.deviceCalls} device calls, slept ${fmtMs(run.sleptMs)} ms` +
           (run.status === 'ok' ? '' : ` — ${firstLine(run.reply)}`),
       );
     }
@@ -303,9 +321,6 @@ try {
   await report();
 }
 
-function ms(x: number): string {
-  return Math.round(x).toString();
-}
 function firstLine(reply: string): string {
   return reply.split('\n')[0].slice(0, 160);
 }
@@ -320,14 +335,26 @@ interface ScenarioReport {
   summary: Summary;
   breakdown: Breakdown;
   runs: Run[];
+  /** D26: the scenario's screenshots, stalls and stall-free wall clock — after `runs`, so older fields keep their order. */
+  stalls: ScenarioStalls;
 }
 
 /** The JSON, and the table on stdout: of the runs there are, however the run ended. */
 async function report(): Promise<void> {
   const reports: ScenarioReport[] = scenarios.map((s) => {
     const rs = runs.get(s.id)!;
-    return { id: s.id, says: s.says, tool: s.tool, args: s.args, summary: summarize(rs), breakdown: breakdown(rs.filter((r) => r.status === 'ok').map((r) => r.window)), runs: rs };
+    return {
+      id: s.id,
+      says: s.says,
+      tool: s.tool,
+      args: s.args,
+      summary: summarize(rs),
+      breakdown: breakdown(rs.filter((r) => r.status === 'ok').map((r) => r.window)),
+      runs: rs,
+      stalls: scenarioStalls(rs),
+    };
   });
+  const stalls = overallStalls(reports.flatMap((r) => r.runs.map((run) => run.window)));
 
   const out = values.out ?? join(tmpdir(), `averi-perf-${platform}-${app}-${started.toISOString().replace(/[:.]/g, '-')}.json`);
   await mkdir(dirname(out), { recursive: true });
@@ -350,31 +377,20 @@ async function report(): Promise<void> {
           loads,
         },
         scenarios: reports,
+        stalls,
       },
       null,
       1,
     ) + '\n',
   );
 
-  const spread = (s: { median: number; min: number; max: number } | undefined) => (s === undefined ? '—' : `${ms(s.median)} [${ms(s.min)}–${ms(s.max)}]`);
-  const med = (s: { median: number } | undefined) => (s === undefined ? '—' : ms(s.median));
-
-  const head = ['scenario', 'ok/runs', 'wall ms med [min–max]', 'dev calls', 'dev ms', 'dev busy', 'slept ms', 'sleeps', 'host ms', 'cpu ms'];
-  const rows = reports.map((r) => {
-    const s = r.summary;
-    const other = Object.entries(s.statuses).filter(([k]) => k !== 'ok').map(([k, n]) => ` ${n} ${k}`).join('');
-    return [r.id, `${s.statuses.ok ?? 0}/${s.runs}${other}`, spread(s.wallMs), med(s.deviceCalls), med(s.deviceMs), med(s.deviceBusyMs), med(s.sleptMs), med(s.sleeps), med(s.hostMs), med(s.cpuMs)];
-  });
-  const widths = head.map((h, i) => Math.max(h.length, ...rows.map((row) => row[i].length)));
-  const line = (cells: string[]) => cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ');
   console.log(`\n${described} · ${app}${platform === 'ios' ? ` · ${treeSource}` : ''} · ${repeat} repeats · ${commit?.head.slice(0, 8) ?? '?'}${commit?.dirty === true ? '+dirty' : ''}`);
-  console.log(line(head));
-  for (const row of rows) console.log(line(row));
+  for (const l of reportTable(reports, stalls)) console.log(l);
   console.log('\nwhere the time goes (per ok run):');
   for (const r of reports) {
     const top = [
-      ...r.breakdown.calls.slice(0, 4).map((c) => `${c.label} ×${+c.count.toFixed(1)} ${ms(c.ms)} ms`),
-      ...r.breakdown.sleeps.slice(0, 3).map((s) => `sleep ${s.caller} ×${+s.count.toFixed(1)} ${ms(s.ms)} ms`),
+      ...r.breakdown.calls.slice(0, 4).map((c) => `${c.label} ×${+c.count.toFixed(1)} ${fmtMs(c.ms)} ms`),
+      ...r.breakdown.sleeps.slice(0, 3).map((s) => `sleep ${s.caller} ×${+s.count.toFixed(1)} ${fmtMs(s.ms)} ms`),
     ];
     console.log(`  ${r.id}: ${top.join(' · ') || '—'}`);
   }

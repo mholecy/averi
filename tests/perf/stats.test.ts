@@ -87,6 +87,7 @@ describe('summarize — N repeats of one scenario', () => {
     const s = summarize([{ ...run(30, 0, 0), status: 'unavailable' }]);
     expect(s.statuses).toEqual({ unavailable: 1 });
     expect(s.wallMs).toBeUndefined();
+    expect(Object.keys(s)).toEqual(['runs', 'statuses']);
   });
 });
 
