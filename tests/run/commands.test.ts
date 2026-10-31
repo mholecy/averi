@@ -133,6 +133,53 @@ describe('runEnsureState', () => {
   });
 
 
+  // D13 (2026-10-31): neither is an action and neither reads the other's
+  // result, so the health line's `isAppRunning` (a pidof, 44–48 ms on the
+  // lab emulator) and the final frame (its settle sleep and screencaps) are
+  // out at once. The answer is held until the capture starts — or, run one
+  // after the other, until a timeout gives up waiting for it — so the
+  // events say whether the two overlapped.
+  it('the health check and the final capture are out at once — the app is asked beside the frame', async () => {
+    const fake = home();
+    const events: string[] = [];
+    let captureStarted!: () => void;
+    const started = new Promise<void>((r) => (captureStarted = r));
+    fake.isAppRunning = async () => {
+      events.push('asked');
+      await Promise.race([started, new Promise((r) => setTimeout(r, 100))]);
+      events.push('answered');
+      return true;
+    };
+    fake.screenshot = async () => {
+      captureStarted();
+      events.push('capture');
+      fake.screenshots.push(frame('s'));
+      return frame('s');
+    };
+    const { text, shot } = await runEnsureState({ session: new EngineSession(), state: 'home', project: await validProject() }, resolver(fake).resolve);
+    // Out at once: asked before the frame's last capture, answered after its first.
+    expect(events.indexOf('asked')).toBeGreaterThanOrEqual(0);
+    expect(events.indexOf('asked')).toBeLessThan(events.lastIndexOf('capture'));
+    expect(events.indexOf('capture')).toBeLessThan(events.indexOf('answered'));
+    // The reply is the one the sequence gave: trace, then the health line.
+    expect(text).toMatch(/home[\s\S]*\nappAlive: true$/);
+    expect(shot).toEqual(frame('s'));
+  });
+
+  // Beside the frame, the health check still decides the call as it did
+  // after it: one that throws fails ensure_state (it is not degraded to a
+  // missing line the way `assert` degrades it). appHealth guards the
+  // question and a rejected log read itself, so the throw is made where it
+  // does not guard — a log read that answers with something it cannot scan.
+  it('a health check that throws still fails the call, frame or no frame', async () => {
+    const fake = home();
+    fake.appRunning = false;
+    fake.logs = async () => null as unknown as string[];
+    await expect(
+      runEnsureState({ session: new EngineSession(), state: 'home', project: await validProject() }, resolver(fake).resolve),
+    ).rejects.toThrow(TypeError);
+  });
+
   it('an unknown state is the engine\'s error, and no frame is captured for it', async () => {
     const fake = home();
     await expect(

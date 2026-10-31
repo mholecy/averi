@@ -568,8 +568,16 @@ export async function runVerification(
     // reasons the tables quote.
     // The capture itself throwing (a dead device's refused screenshot) is
     // caught the same way, by finalFrame: no image, one ⚠ line, the rest kept.
-    const final = await finalFrame(adapter, { readTree: contract !== undefined });
-    const health = await appHealth(adapter, cfg);
+    // The health check runs beside it (D13, 2026-10-31): neither is an action,
+    // neither reads the other, and both use the raw adapter after the leg's
+    // read hand-off has had its last consumer (the asserts above) — so the
+    // pidof (44–48 ms on the lab emulator) hides under the frame's settle
+    // sleep and screencaps. `Promise.all`: a health check that throws still
+    // fails the leg, as it did when it ran after the frame.
+    const [health, final] = await Promise.all([
+      appHealth(adapter, cfg),
+      finalFrame(adapter, { readTree: contract !== undefined }),
+    ]);
     return { trace, results, health, ...final };
   };
 
