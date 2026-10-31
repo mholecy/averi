@@ -2,8 +2,9 @@
 
 Status: accepted 2026-10-31 (performance backlog row D3, docs/plans/2026-10-30-performance-backlog.md, "Next (decided
 2026-10-31 …)"; the orchestrator's decision on the owner's standing: fast AND stable — acting on a stale or still-moving
-tree is unacceptable). Implemented on `perf/d3-read-handoff`;
-device measurement follows.
+tree is unacceptable). Implemented on `perf/d3-read-handoff`: `844076de`
+(the hand-off, `pollTree`'s first round, the settle's first sample), `a77c1451` (the asserts), `9461eee8` (the engine,
+the `verify` leg, ARCHITECTURE.md §8); the device measurement follows.
 
 ## Context
 
@@ -20,7 +21,7 @@ device measurement follows.
 ## Decision
 
 **A read is handed on only as a first sample or a positive verdict — never as a stability proof, a pixel locator or
-an absence.** `ReadHandOff` (ui-tree/read-handoff.ts) keeps the last read; a poll asks for it by name, once.
+an absence.** `ui-tree/read-handoff.ts#ReadHandOff` keeps the last read; a poll asks for it by name, once.
 
 - **Eligible read**, all of: taken inside a PRODUCER (`ReadHandOff.producing`: the engine's detect probe, a `wait:`
   step, every `Verifier` assert); no action since the read STARTED; at most `HANDOFF_MAX_AGE_MS` (1 s) since it ENDED
@@ -42,7 +43,7 @@ an absence.** `ReadHandOff` (ui-tree/read-handoff.ts) keeps the last read; a pol
   round out of it.
 - **Takers**:
   1. The ladder's re-detect after a rung (`detects(state.detect, grace)`), as a `yes` only, and only when the
-     detect asks no absence (`asksAbsence` in flow/condition.ts, through the states it names). The handed round never
+     detect asks no absence (`flow/condition.ts#asksAbsence`, through the states it names). The handed round never
      counts as rendered or bare, so the probe's `no`/`bare`/`unknown` — what the ladder escalates and refuses a wipe
      on — rest on fresh reads.
   2. A `Verifier` element assert (present, with or without `text`/`match`/`error`), as a pass only. Never `absent`,
