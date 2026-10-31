@@ -568,6 +568,15 @@ export async function runVerification(
     // reasons the tables quote.
     // The capture itself throwing (a dead device's refused screenshot) is
     // caught the same way, by finalFrame: no image, one ⚠ line, the rest kept.
+    // The health check comes AFTER the frame, on purpose — not beside it, as
+    // ensure_state's does (run/commands.ts, D13 2026-10-31). A leg's
+    // health line is read as the app's state at the END of the frame's
+    // settle: an app that dies while the frame settles must read dead here.
+    // Run side by side, the question would be answered at the frame's start
+    // and could say `true` about an app gone by the time the picture was
+    // taken. ensure_state always asked before its frame, so overlapping
+    // there changed nothing it promised; here it would, for one pidof a leg
+    // (its cost on run/commands.ts#runOnEngine).
     const final = await finalFrame(adapter, { readTree: contract !== undefined });
     const health = await appHealth(adapter, cfg);
     return { trace, results, health, ...final };

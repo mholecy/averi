@@ -142,13 +142,18 @@ import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.
  * A known blind spot of "two identical captures", measured 2026-10-06 and
  * closed for BASELINE CREATION only (`captureBaselineFrame`): the pair is
  * STABILITY_DELAY_MS plus one capture time apart, ≈0.95 s on the Android
- * emulator and ≈0.8 s on the iOS simulator, so a ≈1 s caret blink usually
- * lands in phase and the pair compares equal. Every other consumer keeps
- * the pair as its rule — a tool's `⚠ frame:` note therefore stays silent on
- * a caret screen on those devices (its absence does not prove a still
- * screen), and a polling assert still judges per round, its region and
- * deadline unchanged. A baseline is the one frame stored and read for every
- * later run, so it alone pays the confirmation window
+ * emulator and ≈0.8 s on the iOS simulator when measured, so a ≈1 s caret
+ * blink usually lands in phase and the pair compares equal. The lab
+ * emulator's capture has since measured faster — `adb exec-out screencap`
+ * 312–352 ms per call (docs/plans/2026-10-30-performance-backlog.md, D13
+ * note (2026-10-31, averi_lab API 33)), a pair ≈0.64 s apart; the blind
+ * spot is the pair's whatever its spacing, and the baseline's window below
+ * was chosen over a grid of capture times that spans both. Every other
+ * consumer keeps the pair as its rule — a tool's `⚠ frame:` note therefore
+ * stays silent on a caret screen on those devices (its absence does not
+ * prove a still screen), and a polling assert still judges per round, its
+ * region and deadline unchanged. A baseline is the one frame stored and read
+ * for every later run, so it alone pays the confirmation window
  * (docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-caret.md).
  */
 
@@ -311,7 +316,10 @@ export const unsettledNote = (frame: Pick<Frame, 'stability' | 'captures'>): str
  *
  * Why a window at all. "Settled" is two identical captures STABILITY_DELAY_MS
  * apart, and the real spacing is that delay PLUS the device's capture time c:
- * ≈0.95 s on the Android emulator (c ≈ 0.65 s), ≈0.8 s on the iOS simulator.
+ * ≈0.95 s on the Android emulator (c ≈ 0.65 s), ≈0.8 s on the iOS simulator,
+ * as measured 2026-10-06 — the figures the schedule below was chosen on.
+ * The lab emulator's c has since measured faster (the module header's
+ * blind-spot paragraph has the figure); the simulation's grid below spans it.
  * A text caret blinks with a ≈1 s period at ≈50% duty, so the pair usually
  * lands one period apart, in the same phase, and compares equal — measured
  * 2026-10-06 on both devices: no `⚠ frame:` on a caret screen, and a

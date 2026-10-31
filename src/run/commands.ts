@@ -60,23 +60,35 @@ interface EngineCall extends EngineContext {
 /**
  * The sequence ensure_state and run_flow share: the loaded config, the environment
  * pre-flight (`refuseUnknownEnvironment`), adapter, ONE engine run, the
- * trace, then the health line — in that order, each step only if the one
- * before it succeeded (a failing flow throws its own trace; there is no
- * health line on a failure, as there never was). The run is handed in as
- * what to run, not as a callback over an engine (2026-10-07): the engine
- * has one entry, and every tool that runs it — these two and verify's legs
- * — names a state, a flow or both.
+ * trace — in that order, each step only if the one before it succeeded (a
+ * failing flow throws its own trace; there is no health line on a failure,
+ * as there never was). The run is handed in as what to run, not as a
+ * callback over an engine (2026-10-07): the engine has one entry, and every
+ * tool that runs it — these two and verify's legs — names a state, a flow or
+ * both.
+ *
+ * The health line is the callers' since D13 (2026-10-31): until then it was
+ * computed here, so ensure_state asked the app's health and only THEN took
+ * its final frame. Neither is an action and neither reads the other —
+ * `appHealth` asks `isAppRunning` (and, for a dead app, the logs);
+ * `finalFrame` reads the raw adapter, outside the engine's read hand-off
+ * (docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md),
+ * which dies with the run — so ensure_state now runs them side by side, and
+ * the pidof (44–48 ms; docs/plans/2026-10-30-performance-backlog.md, D13
+ * note (2026-10-31, averi_lab API 33)) hides under the frame's settle sleep
+ * and screencaps. run_flow takes no frame and asks the health alone. A
+ * verify leg keeps them in sequence (run/verify.ts).
  */
 async function runOnEngine(
   call: EngineCall,
   resolveAdapter: ResolveAdapterFor,
   request: RunRequest,
-): Promise<{ adapter: DeviceAdapter; text: string }> {
+): Promise<{ adapter: DeviceAdapter; trace: string }> {
   const { cfg, env } = call.project;
   refuseUnknownEnvironment(cfg, env, call.environment);
   const adapter = await resolveAdapter(cfg);
   const trace = await FlowEngine.run(cfg, adapter, { env, environment: call.environment, session: call.session }, request);
-  return { adapter, text: formatTrace(trace) + (await appHealth(adapter, cfg)) };
+  return { adapter, trace: formatTrace(trace) };
 }
 
 /**
@@ -84,13 +96,22 @@ async function runOnEngine(
  * in — settled, as `screenshot` settles it. No `shot` when the capture itself
  * failed (2026-10-08, run/verify.ts#finalFrame): the state WAS ensured, so the
  * trace stands, with one `⚠ screenshot:` line where an unsettled frame's note goes.
+ *
+ * The health check and the capture run together (D13, see runOnEngine); the
+ * reply is laid out as before — trace, health line, then the frame's one
+ * note line, if any. A health check that throws still fails the call, as it
+ * did when it ran first: `Promise.all`, not a settle-all. (finalFrame
+ * catches its own capture failure, so it cannot be the one to reject.)
  */
 export async function runEnsureState(
   call: EngineCall & { state: string },
   resolveAdapter: ResolveAdapterFor,
 ): Promise<{ text: string; shot?: Buffer }> {
-  const { adapter, text } = await runOnEngine(call, resolveAdapter, { state: call.state });
-  const { frame, failed } = await finalFrame(adapter);
+  const { adapter, trace } = await runOnEngine(call, resolveAdapter, { state: call.state });
+  const { cfg } = call.project;
+  // On an appHealth throw the frame's reads finish unawaited — harmless: reads only, and finalFrame never rejects.
+  const [health, { frame, failed }] = await Promise.all([appHealth(adapter, cfg), finalFrame(adapter)]);
+  const text = trace + health;
   if (frame === undefined) return { text: `${text}\n${screenshotFailedLine(failed)}` };
   const unsettled = unsettledNote(frame);
   return { text: unsettled === undefined ? text : `${text}\n${unsettled}`, shot: frame.shot };
@@ -101,7 +122,8 @@ export async function runNamedFlow(
   call: EngineCall & { flow: string },
   resolveAdapter: ResolveAdapterFor,
 ): Promise<string> {
-  return (await runOnEngine(call, resolveAdapter, { flow: call.flow })).text;
+  const { adapter, trace } = await runOnEngine(call, resolveAdapter, { flow: call.flow });
+  return trace + (await appHealth(adapter, call.project.cfg));
 }
 
 export interface AssertCall {

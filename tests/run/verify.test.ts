@@ -157,6 +157,49 @@ describe('runVerification legs', () => {
     expect(settledOut.sections[0]).not.toContain('⚠ frame');
   });
 
+  // The leg's health line speaks for the app at the END of its final frame's
+  // settle (an app that dies while the frame settles reads dead), so the
+  // question is asked only once the last capture is in — unlike
+  // ensure_state's, which runs beside its frame (D13, 2026-10-31,
+  // tests/run/commands.test.ts). The answer is held until a capture starts,
+  // or a timeout, so a health check run beside the frame would show.
+  it('the leg asks whether the app runs only after its final frame is in — the health line speaks for the settled screen', async () => {
+    const adapter = fake('android');
+    const events: string[] = [];
+    let captureStarted!: () => void;
+    const started = new Promise<void>((r) => (captureStarted = r));
+    adapter.isAppRunning = async () => {
+      events.push('asked');
+      await Promise.race([started, new Promise((r) => setTimeout(r, 100))]);
+      events.push('answered');
+      return true;
+    };
+    adapter.screenshot = async () => {
+      captureStarted();
+      events.push('capture');
+      adapter.screenshots.push(adapter.nextScreenshot);
+      return adapter.nextScreenshot;
+    };
+    const out = await runVerification(request({ platforms: ['android'] }), async () => adapter);
+    expect(events.filter((e) => e === 'capture').length).toBeGreaterThan(0);
+    expect(events.indexOf('asked')).toBeGreaterThan(events.lastIndexOf('capture'));
+    expect(out.sections[0]).toMatch(/\nappAlive: true$/);
+    expect(out.screenshots).toHaveLength(1);
+  });
+
+  // A health check that throws fails its leg, and only its leg. appHealth
+  // guards the question and a rejected log read, so the throw is made where
+  // it does not guard: a log read that answers with something it cannot scan.
+  it('a health check that throws still fails its leg, and only its leg', async () => {
+    const android = fake('android');
+    android.appRunning = false;
+    android.logs = async () => null as unknown as string[];
+    const out = await runVerification(request(), async (p) => (p === 'android' ? android : fake('ios')));
+    expect(out.sections[0]).toMatch(/^## android\nFAILED: /);
+    expect(out.sections[1]).toContain('appAlive: true');
+    expect(out.screenshots).toHaveLength(1);
+  });
+
   // The same gap the single-platform tools had (review 2026-10-03): nothing
   // checked that the request's environment reaches the leg's engine.
   it('runs each leg in the environment the request names: the trace opens with it; without one it names none', async () => {

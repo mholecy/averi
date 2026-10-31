@@ -11,12 +11,14 @@ import { FakeAdapter } from '../helpers/fake.js';
  * A registry over a device list that is mutable mid-test (devices boot and
  * vanish) — the discovery seam is the list itself, no adapter is built to
  * ask it. `onProbe` gates the listing — lets a test freeze a probe
- * mid-flight. `probes` counts listings per platform.
+ * mid-flight. `probes` counts listings per platform; `versions` records, per
+ * listing, whether it asked for OS versions (a discovery's default: yes).
  */
 function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void) {
   const bound: string[] = [];
   const created: FakeAdapter[] = [];
   const probes: Platform[] = [];
+  const versions: boolean[] = [];
   // Records what the registry asked for: `id+kind` on ios (the registry
   // resolves the kind before calling, so the default is spelled out), a bare
   // id on android (no tree source there).
@@ -26,12 +28,13 @@ function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void) {
     created.push(adapter);
     return adapter;
   };
-  const discovery: DeviceDiscovery = async (platform) => {
+  const discovery: DeviceDiscovery = async (platform, opts) => {
     probes.push(platform);
+    versions.push(opts?.versions ?? true);
     await onProbe?.();
     return devices.filter((d) => d.platform === platform);
   };
-  return { registry: new AdapterRegistry({ factory, discovery }), bound, created, devices, probes };
+  return { registry: new AdapterRegistry({ factory, discovery }), bound, created, devices, probes, versions };
 }
 
 const device = (id: string, state: Device['state'] = 'booted', platform: Platform = 'android'): Device => ({
@@ -81,6 +84,21 @@ describe('AdapterRegistry', () => {
     expect(probes).toEqual(['android']);
     expect(await registry.get('android')).toBe(adapter); // cached, but the binding is re-checked
     expect(probes).toEqual(['android', 'android']);
+  });
+
+  // D13 (2026-10-31): get() runs on every tool call, and reads nothing but
+  // ids and states — on Android a version is a getprop per attached device.
+  it('get() lists without OS versions, on both its paths; select() and listAll() still ask for them', async () => {
+    const { registry, versions } = makeRegistry([device('phone'), device('sim', 'booted', 'ios')]);
+    await registry.get('android'); // unbound: the auto-pick's listing
+    await registry.get('android'); // bound: the still-booted check
+    expect(versions).toEqual([false, false]);
+    versions.length = 0;
+    await registry.select('android', 'phone');
+    expect(versions).toEqual([true]);
+    versions.length = 0;
+    await registry.listAll();
+    expect(versions).toEqual([true, true]);
   });
 
   it('binds to the first booted device when nothing is selected', async () => {
@@ -433,6 +451,18 @@ describe('defaultFactory — the wiring the injected factories above never see',
     expect(await discover('ios')).toEqual([]);
     expect(calls).toContain('xcrun simctl list devices --json');
     expect(calls.some((c) => c.startsWith('adb'))).toBe(false);
+  });
+
+  it('the default discovery hands the listing its options — `versions: false` reaches adb as no getprop', async () => {
+    const calls: string[] = [];
+    const exec: ExecFn = async (cmd, args) => {
+      calls.push([cmd, ...args].join(' '));
+      return { stdout: Buffer.from(args[0] === 'devices' ? 'List of devices attached\nemulator-5554 device\n' : '14\n'), stderr: '' };
+    };
+    const discover = discoveryWith(exec);
+    expect((await discover('android', { versions: false })).map((d) => d.osVersion)).toEqual(['unknown']);
+    expect(calls).toEqual(['adb devices -l']);
+    expect((await discover('android')).map((d) => d.osVersion)).toEqual(['14']);
   });
 
   it('android gets an AndroidAdapter, whatever the kind says; ios an IosAdapter', () => {

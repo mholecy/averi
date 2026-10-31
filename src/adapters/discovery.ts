@@ -57,11 +57,33 @@ type AdbState = keyof typeof ADB_STATES;
 const ADB_LINE = new RegExp(`^(\\S+)\\s+(${Object.keys(ADB_STATES).join('|')})\\b`);
 
 /**
+ * What a listing is asked for beyond which devices exist and in what state.
+ * `versions: false` leaves every OS version `unknown` — on Android it skips
+ * the getprop per attached device; on iOS the version comes free with the
+ * listing (the runtime key), so the flag changes nothing there. Default: the
+ * versions are read.
+ *
+ * Why the flag (D13, 2026-10-31): the registry's per-call probe
+ * (mcp/registry.ts#get) asks only "is the bound device still booted?", and
+ * a getprop is a full `adb shell` round trip — ≈30–35 ms, up to ~70 ms, per
+ * attached device, on every tool call
+ * (docs/plans/2026-10-30-performance-backlog.md, D13 note (2026-10-31,
+ * averi_lab API 33)) — for a version only select_device's reply and the
+ * device listing show. Those two still ask for it.
+ */
+export interface ListOpts {
+  versions?: boolean;
+}
+
+/**
  * `adb devices -l`, then `getprop ro.build.version.release` on each device
  * adb calls `device` (an offline or unauthorized one cannot answer; its
  * version is `unknown`). The getprop's argv is adb-shell.ts#adbShellArgv's,
  * the one builder AndroidAdapter's `shell` uses too — every word quoted, even
  * words that need no quoting.
+ *
+ * `versions: false` (D13, 2026-10-31) lists from `adb devices -l` alone —
+ * why, and what it saves, is on `ListOpts`.
  *
  * `unauthorized` is listed since 2026-10-09 (C5): until then its line did not
  * match, so a phone waiting on its "Allow USB debugging?" prompt vanished and
@@ -71,7 +93,8 @@ const ADB_LINE = new RegExp(`^(\\S+)\\s+(${Object.keys(ADB_STATES).join('|')})\\
  * `connecting`, `no permissions (…)`, `recovery`, `sideload`, `bootloader`,
  * …) are still left out — unmeasured, and not asked for.
  */
-export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<Device[]> {
+export async function listAndroidDevices(exec: ExecFn = defaultExec, opts: ListOpts = {}): Promise<Device[]> {
+  const versions = opts.versions ?? true;
   const { stdout } = await exec('adb', ['devices', '-l']);
   const devices: Device[] = [];
   for (const line of stdout.toString('utf8').split('\n').slice(1)) {
@@ -81,7 +104,7 @@ export async function listAndroidDevices(exec: ExecFn = defaultExec): Promise<De
     const state = adbState as AdbState;
     const model = line.match(/model:(\S+)/)?.[1] ?? id;
     let osVersion = 'unknown';
-    if (state === 'device') {
+    if (versions && state === 'device') {
       const prop = await exec('adb', adbShellArgv(id, ['getprop', 'ro.build.version.release']));
       osVersion = prop.stdout.toString('utf8').trim() || 'unknown';
     }
