@@ -411,8 +411,9 @@ test 3.0 s cold and 5.06–5.17 s (timed out, 8 of 8) with 8 copies in parallel.
 in one `cat-file --batch-check` (`<name>^{commit}`, so a missing or ambiguous name or a non-commit is none, as
 `cat-file -e` said), HEAD's history is read once by `rev-list HEAD` into a Set, and a fix is in HEAD when its SHA is in
 it (`notInHead`, pure; a fix that names no commit is reported as not in HEAD, as before). A shallow clone behaves as
-before: a commit beyond the boundary is no object, so it resolves to none. One `gitParentOf` serves the three tests;
-its spawn per distinct commit (57) is calibrate's production cache and stays. 66 processes per run; cold 6.6 → 1.5 s
+before: a commit beyond the boundary is no object, so it resolves to none. One `gitParentOf` serves the three tests.
+Decided: it stays one spawn per distinct commit (57, once per run, through the shared cache), because the withSides and
+report tests check calibrate's production derivation itself; accepted as is. 66 processes per run; cold 6.6 → 1.5 s
 for the file; under 8× load the ancestor test takes 66–73 ms and the withSides test 0.71 s (was 3.05 s), 8 of 8 green.
 Tested on a throwaway repo with a side branch (its commit exists, is not in HEAD), so `rev-list --all` fails a test.
 Review round 1: a derived side no lookup resolved no longer passes as equal to an unresolved parent (both undefined);
