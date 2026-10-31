@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
@@ -1074,6 +1074,70 @@ describe('screenshot baseline asserts', () => {
     const second = await verifier.assert({ screenshot: { baseline: 'dash' } });
     expect(second).toMatchObject({ pass: true, detail: '0.00% of pixels differ' });
     expect(fake.screenshots).toHaveLength(10);
+  });
+});
+
+/**
+ * D26b: on iOS the baseline diff leaves the status band out of both images (viewport().statusBand × the png's scale) —
+ * idb draws the Dynamic Island there where simctl shows the app's background (backlog "### D26 diag": 1.219 % of the
+ * lab simulator's frame, over the 1 % default), so a baseline stored from simctl, or by an adapter on the other tree
+ * source, would fail on the island alone. It LOOSENS the check, so only there: iOS, and the band's rows.
+ */
+describe('screenshot baseline asserts — the iOS status band is left out of the diff (D26b)', () => {
+  let dir: string;
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'averi-baselines-'));
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  // 50x100 pt at scale 2: a 100x200 png whose top 20 rows are the 10-pt band.
+  const VIEWPORT = { width: 50, height: 100, statusBand: 10 };
+  /** A black pill in the band's rows, 60 px wide in rows 2–19: 1 080 of 20 000 pixels, 5.4 % — the island where the baseline has none. */
+  const island = (p: PNG) => {
+    for (let y = 2; y < 20; y++) for (let x = 20; x < 80; x++) p.data.fill(0, (y * 100 + x) * 4, (y * 100 + x) * 4 + 3);
+  };
+  /** One whole row black, the first under the band: 100 of the 18 000 pixels compared, 0.56 %. */
+  const rowBelow = (p: PNG) => p.data.fill(0, 20 * 100 * 4, 21 * 100 * 4);
+
+  async function diffOn(platform: 'ios' | 'android', paint: (p: PNG) => void, opts: { threshold?: number; viewport?: 'fails' } = {}) {
+    const fake = dashboardFake();
+    fake.platform = platform;
+    fake.viewportSize = VIEWPORT;
+    if (opts.viewport === 'fails') fake.viewport = async () => Promise.reject(new Error('idb describe failed'));
+    await mkdir(join(dir, platform), { recursive: true });
+    await writeFile(join(dir, platform, 'dash.png'), png(100, 200));
+    fake.nextScreenshot = png(100, 200, paint);
+    return new Verifier(fake, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash', ...(opts.threshold !== undefined && { threshold: opts.threshold }) } });
+  }
+
+  it('passes an iOS frame that differs from its baseline only in the band — the Dynamic Island — and says the band was left out', async () => {
+    expect(await diffOn('ios', island)).toMatchObject({ pass: true, detail: '0.00% of pixels differ (status band excluded: the top 20 px rows)' });
+  });
+
+  it('still fails a difference in the first row under the band', async () => {
+    const result = await diffOn('ios', rowBelow, { threshold: 0.005 });
+    expect(result).toMatchObject({ pass: false, detail: '0.56% of pixels differ (status band excluded: the top 20 px rows)' });
+  });
+
+  it('leaves Android as it was: the whole frame, the band included', async () => {
+    expect(await diffOn('android', island)).toMatchObject({ pass: false, detail: '5.40% of pixels differ' });
+  });
+
+  it('diffs the whole iOS frame, as before, when the viewport cannot be read', async () => {
+    expect(await diffOn('ios', island, { viewport: 'fails' })).toMatchObject({ pass: false, detail: '5.40% of pixels differ' });
+  });
+
+  it('diffs the whole iOS frame when the png is not the viewport at one scale (a turned frame): no band to place', async () => {
+    const fake = dashboardFake();
+    fake.platform = 'ios';
+    fake.viewportSize = { width: 100, height: 50, statusBand: 10 };
+    await mkdir(join(dir, 'ios'), { recursive: true });
+    await writeFile(join(dir, 'ios', 'dash.png'), png(100, 200));
+    fake.nextScreenshot = png(100, 200, island);
+    const result = await new Verifier(fake, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
+    expect(result).toMatchObject({ pass: false, detail: '5.40% of pixels differ' });
   });
 });
 
