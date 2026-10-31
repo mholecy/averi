@@ -64,6 +64,11 @@ describe('IosAdapter interactions', () => {
     expect(adapter.dragSpeed).toBeUndefined();
   });
 
+  it('its tree read does not wait for the screen at rest (types.ts#treeReadSettles): neither WDA nor idb waits, so the read after a stroke is still confirmed', () => {
+    const adapter: DeviceAdapter = new IosAdapter({ udid: 'AAAA-1111', exec: fakeExec({}).fn, treeSource: NO_TREE });
+    expect(adapter.treeReadSettles).toBeUndefined();
+  });
+
   it('rejects activity/intent launches with Android-only guidance', async () => {
     const { fn } = fakeExec({});
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
