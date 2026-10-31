@@ -47,6 +47,7 @@ measured before and after.
 | D17 | uiautomator cuts a sideways carousel item's bounds at the screen edge, so its true centre is unknown and "CLIPPED 88 %" can name an item whose centre is past the carousel edge (pre-existing; found in D10's live run, `carousel-in-list.C`) | correctness | open |
 | D18 | No lab field reformats as it is typed into (IBAN grouping, amount separators): the typing pace and a fill's read-back are unproven there, and `type_text` without a selector, flow `type:` and `type_pin` type blind (found in D6's review) | stability | open |
 | D19 | Android capture by `shell screencap <file>` + `adb pull` (raw RGBA, PNG encoded on the host only when returned/stored): −80…110 ms per capture on lab screens, −1.3 s on photo-heavy ones; changes the `screenshot()` contract | device | open |
+| D20 | iOS idb: `scroll_until` on form-picker's 45-row sheet stops "the swipe CHANGED THE SCREEN" after its first stroke (524 pt / 300 ms) — every repeat of the D0 probe 2026-10-31; suspected a fling past all 15 listed rows (idb's flat tree keeps no anchor), not a dismissal — to be proven on the device | stability | open |
 
 ## Notes
 
