@@ -390,6 +390,15 @@ them; the full former text is `skill/references/tools.md` (linked by version fro
 owners. A budget test holds the total ≤ 31,000 B and each description ≤ 4,096 chars (Claude Code's default cut, which
 had been truncating the old tap, scroll_until, ui_snapshot and assert).
 
+### D15 — OCR compile staging
+Done in c0e38019: concurrent builds of one recognizer binary in a process share ONE compile, through a module-level
+in-flight map (`compilesInFlight`, verify/ocr.ts) keyed by the binary path and dropped when the build settles. A failed
+shared compile is the sticky answer of every engine that joined it, as if each had compiled itself (same source, same
+toolchain), and the next engine compiles afresh. A missing swiftc still sticks process-wide and transient errors are still
+forgotten (P6). Source and staging paths are `${binary}.${pid}.${uuid}`, so they are unique per build, also when a pid
+is reused across sandboxes. A failed compile now removes its staging binary, which it did not before (a red run left
+`recognizer-*.<pid>` files behind). Rename stays the only publishing step.
+
 ### D1–D13
 Sources and estimates are in the artifact. Before each: measure on D0's scenario; after: the same run, golden and
 calibrate as the loop asks. D2 and D10 change documented policy (engine.ts:732's rule; ADR 0021) — amend the ADR in
