@@ -41,7 +41,7 @@ measured before and after.
 | D11 | One deadline per tool call that every window is clamped to | device | open |
 | D12 | `tools/list` is 73 KB (~18k tokens): shorten the tool descriptions | agent context | done (f8b62f5b) |
 | D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | done (02f78183): probe without getprop, ensure's health beside its frame; the rest won't do or measure later |
-| D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | open |
+| D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | done (71f6f0a0) |
 | D15 | Two engines compiling the OCR helper at once share the `${binary}.${pid}` staging path (pre-existing; found in P6) | stability | done (65900f1f) |
 | D16 | `tests/truth/calibration.test.ts` spawns a `git merge-base` per fix and times out (5 s) under load | tests | done (b5b40276) |
 | D17 | uiautomator cuts a sideways carousel item's bounds at the screen edge, so its true centre is unknown and "CLIPPED 88 %" can name an item whose centre is past the carousel edge (pre-existing; found in D10's live run, `carousel-in-list.C`) | correctness | open |
