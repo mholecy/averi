@@ -408,7 +408,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
       maxInFlight = Math.max(maxInFlight, inFlight);
       await new Promise((resolve) => setTimeout(resolve, 5));
       inFlight -= 1;
-      done.push(args.at(-3) as string);
+      done.push(args.find((a) => a.endsWith('Enabled')) ?? '');
       return fn(cmd, args, opts);
     };
     await new IosAdapter({ udid: 'AAAA-1111', exec: overlapping, treeSource: NO_TREE }).launch('com.app');
@@ -446,6 +446,22 @@ describe('IosAdapter re-enables accessibility automation before every launch and
     expect(stderr.mock.calls[0]?.[0]).toBe(
       'averi: could not set com.apple.Accessibility AutomationEnabled on AAAA-1111 before launching com.app ' +
         '(Command failed (exit 1): xcrun simctl spawn …) — idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
+        'if it does, reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`)',
+    );
+  });
+
+  it('only the first write fails: the one stderr line names AutomationEnabled with its own reason, no success announcement, the launch still runs', async () => {
+    const { fn, calls } = fakeExec({});
+    const failing: ExecFn = (cmd, args, opts) =>
+      args.includes('AutomationEnabled')
+        ? Promise.reject(new Error('Command failed (exit 1): xcrun simctl spawn … (first)\nUnable to write'))
+        : fn(cmd, args, opts);
+    await new IosAdapter({ udid: 'AAAA-1111', exec: failing, treeSource: NO_TREE }).launch('com.app');
+    expect(simctlCalls(calls)).toEqual([WRITES[1], 'xcrun simctl launch AAAA-1111 com.app']);
+    expect(stderr).toHaveBeenCalledTimes(1);
+    expect(stderr.mock.calls[0]?.[0]).toBe(
+      'averi: could not set com.apple.Accessibility AutomationEnabled on AAAA-1111 before launching com.app ' +
+        '(Command failed (exit 1): xcrun simctl spawn … (first)) — idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
         'if it does, reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`)',
     );
   });

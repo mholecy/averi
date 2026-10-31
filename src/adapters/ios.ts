@@ -219,9 +219,10 @@ export class IosAdapter implements DeviceAdapter {
    * Regardless of the source because a `treeSource: wda` project's teardown
    * poisons idb for every other reader of the same simulator (another
    * project's averi on idb, idb by hand), and the write is idempotent and
-   * ≈0.27 s per key (device check I6). Every launch, not once: every WDA
-   * teardown writes 0 again (read back in device check I4). A deep link that cold-starts
-   * the app (`openDeepLink`) is a launch too, so it writes first as well.
+   * ≈0.27 s per key (device check I6, when the two ran in series — see D23
+   * below). Every launch, not once: every WDA teardown writes 0 again (read
+   * back in device check I4). A deep link that cold-starts the app
+   * (`openDeepLink`) is a launch too, so it writes first as well.
    *
    * The keys are simulator-wide and averi never restores them, so the first
    * successful write per adapter says so on stderr — the finding asked for
@@ -241,12 +242,12 @@ export class IosAdapter implements DeviceAdapter {
    * each is one `simctl spawn`, and the spawn, not the write, is the cost —
    * timed with simctl from the host on the lab simulator (averi-lab iPhone
    * 17, iOS 27.0, 2026-10-31, 15 interleaved pairs of these same writes):
-   * serial 445 ms median (415–462), together 250 ms (233–252). One spawn writing both keys
-   * was the plan and is not possible: the simulator runtime has no shell
-   * (`simctl spawn <udid> sh -c …` → ENOENT; RuntimeRoot/bin holds only `df`
-   * and `launchctl`), and `defaults write <domain> '{…}'` replaces the whole
-   * domain, dropping the dozen other keys com.apple.Accessibility holds
-   * there. Two `defaults write`s of different keys in one domain at once
+   * serial 445 ms median (415–462), together 250 ms (233–252). One spawn
+   * writing both keys was the plan and is not possible: the simulator
+   * runtime has no shell (`simctl spawn <udid> sh -c …` → ENOENT;
+   * RuntimeRoot/bin holds only `df` and `launchctl`), and `defaults write
+   * <domain> '{…}'` replaces the whole domain, dropping the dozen other keys
+   * com.apple.Accessibility holds there. Two `defaults write`s of different keys in one domain at once
    * both land — cfprefsd applies each key on its own (20/20 on a scratch
    * domain on the lab simulator, both keys read back) — and the launch
    * still waits for both.
@@ -257,8 +258,9 @@ export class IosAdapter implements DeviceAdapter {
       keys.map((key) => this.simctl(['spawn', this.udid, 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000)),
     );
     const failed = writes.findIndex((w) => w.status === 'rejected');
-    if (failed !== -1) {
-      const reason = errorMessage((writes[failed] as PromiseRejectedResult).reason).split('\n')[0];
+    const write = writes[failed];
+    if (write?.status === 'rejected') {
+      const reason = errorMessage(write.reason).split('\n')[0];
       console.error(
         `averi: could not set com.apple.Accessibility ${keys[failed]} on ${this.udid} before ${what} (${reason}) — ` +
           'idb may read an empty tree after an earlier WebDriverAgent session on this simulator; ' +
