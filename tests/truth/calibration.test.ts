@@ -127,14 +127,13 @@ describe('calibration.json', () => {
   // The commits against the history: each exists and each fix is in this branch — a typo'd SHA is caught here, not by a
   // run that reads green. The sides withSides derives from it are the first parents, in the table's short form; a
   // `before` the table gives is an override, never the parent it would derive anyway.
-  const gitIn = (repo: string, ...args: string[]): string | undefined => {
+  const git = (...args: string[]): string | undefined => {
     try {
-      return execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      return execFileSync('git', ['-C', ROOT, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     } catch {
       return undefined;
     }
   };
-  const git = (...args: string[]) => gitIn(ROOT, ...args);
   const history = git('rev-parse', '--verify', 'HEAD') !== undefined && git('cat-file', '-e', 'b7c44de^{commit}') !== undefined;
   // A fixed number of git processes for the whole table, not one per commit (a process each timed the test out under
   // load, D16): every name resolved in one `cat-file --batch-check`, HEAD's history read once by `rev-list`.
@@ -146,7 +145,9 @@ describe('calibration.json', () => {
     return new Map(asked.map((n, i) => [n, /^[0-9a-f]{40,64}$/.exec(lines[i])?.[0]]));
   };
   /** Every commit HEAD reaches, as full SHAs: an ancestor of HEAD (or HEAD itself) is in it, as `merge-base --is-ancestor` decides. */
-  const reachableFromHead = (repo = ROOT): Set<string> => new Set(gitIn(repo, 'rev-list', 'HEAD')?.split('\n'));
+  const reachableFromHead = (repo = ROOT): Set<string> =>
+    // throws, never an empty Set: a failed rev-list (or one past its buffer, ENOBUFS) must not read as "no fix in HEAD"
+    new Set(execFileSync('git', ['-C', repo, 'rev-list', 'HEAD'], { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n'));
   /** One first-parent cache for the tests below: each commit's parent asked of git once, not once per test. */
   const parentOf = history ? gitParentOf(ROOT) : parentNamed;
 
@@ -158,8 +159,10 @@ describe('calibration.json', () => {
   });
   it.skipIf(!history)('commitsOf and reachableFromHead: an abbreviation resolves to its full SHA, a name of no commit to none; HEAD reaches its parent, not a commit it lacks', () => {
     const full = git('rev-parse', 'HEAD^')!;
-    const commits = commitsOf([full.slice(0, 7), 'HEAD^', '0000000', 'no-such-ref', 'HEAD^{tree}']);
-    expect([...commits]).toEqual([[full.slice(0, 7), full], ['HEAD^', full], ['0000000', undefined], ['no-such-ref', undefined], ['HEAD^{tree}', undefined]]);
+    // a name with a newline would be two lines of the batch: it is none, and the names after it stay aligned
+    const commits = commitsOf([full.slice(0, 7), 'a\nb', 'HEAD^', '0000000', 'no-such-ref', 'HEAD^{tree}']);
+    expect(commits.get('a\nb')).toBeUndefined();
+    expect([...commits].filter(([n]) => n !== 'a\nb')).toEqual([[full.slice(0, 7), full], ['HEAD^', full], ['0000000', undefined], ['no-such-ref', undefined], ['HEAD^{tree}', undefined]]);
     const head = reachableFromHead();
     expect(head.has(full) && head.has(git('rev-parse', 'HEAD')!)).toBe(true);
     expect(notInHead([full.slice(0, 7), '0000000'], commits, head)).toEqual(['0000000']);
@@ -169,15 +172,17 @@ describe('calibration.json', () => {
   it('commitsOf and reachableFromHead on a repo with a side branch: its commit exists and is not in HEAD', () => {
     const repo = mkdtempSync(join(tmpdir(), 'averi-cal-git-'));
     try {
-      const commit = (msg: string) => gitIn(repo, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', 'commit', '-q', '--allow-empty', '-m', msg);
-      gitIn(repo, 'init', '-q', '-b', 'main');
+      // throws: a failed init or commit fails the test here, not as a wrong answer below
+      const g = (...args: string[]) => execFileSync('git', ['-C', repo, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      const commit = (msg: string) => g('commit', '-q', '--allow-empty', '-m', msg);
+      g('init', '-q', '-b', 'main');
       commit('base');
-      gitIn(repo, 'checkout', '-q', '-b', 'side');
+      g('checkout', '-q', '-b', 'side');
       commit('off HEAD');
-      const side = gitIn(repo, 'rev-parse', 'HEAD')!;
-      gitIn(repo, 'checkout', '-q', 'main');
+      const side = g('rev-parse', 'HEAD');
+      g('checkout', '-q', 'main');
       commit('on HEAD');
-      const [base, tip] = [gitIn(repo, 'rev-parse', 'HEAD^')!, gitIn(repo, 'rev-parse', 'HEAD')!];
+      const [base, tip] = [g('rev-parse', 'HEAD^'), g('rev-parse', 'HEAD')];
       const names = [base.slice(0, 7), tip.slice(0, 7), side.slice(0, 7)];
       const commits = commitsOf(names, repo);
       expect(names.map((n) => commits.get(n))).toEqual([base, tip, side]);
@@ -217,7 +222,7 @@ describe('calibration.json', () => {
         .filter((s): s is string => s !== undefined),
     );
     const parentProblem = (what: string, side: string | undefined, of: string): string[] =>
-      side !== undefined && SHA.test(side) && commits.get(side) === commits.get(`${of}^1`) ? [] : [`${what}: before ${side} is not a short SHA of ${of}'s first parent`];
+      side !== undefined && SHA.test(side) && commits.get(side) !== undefined && commits.get(side) === commits.get(`${of}^1`) ? [] : [`${what}: before ${side} is not a short SHA of ${of}'s first parent`];
     const bad = derived.flatMap(([e, sides]) => {
       return [
         ...(e.before === undefined ? parentProblem(e.n, sides.before, e.fix![0]) : []),

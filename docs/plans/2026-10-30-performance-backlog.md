@@ -415,6 +415,9 @@ before: a commit beyond the boundary is no object, so it resolves to none. One `
 its spawn per distinct commit (57) is calibrate's production cache and stays. 66 processes per run; cold 6.6 → 1.5 s
 for the file; under 8× load the ancestor test takes 66–73 ms and the withSides test 0.71 s (was 3.05 s), 8 of 8 green.
 Tested on a throwaway repo with a side branch (its commit exists, is not in HEAD), so `rev-list --all` fails a test.
+Review round 1: a derived side no lookup resolved no longer passes as equal to an unresolved parent (both undefined);
+`rev-list HEAD` throws rather than read as an empty history (64 MB buffer); the throwaway repo is built by a throwing
+git; a name with a newline resolves to none.
 
 ### D1–D13
 Sources and estimates are in the artifact. Before each: measure on D0's scenario; after: the same run, golden and
