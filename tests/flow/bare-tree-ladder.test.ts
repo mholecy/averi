@@ -377,12 +377,12 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
  */
 describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)', () => {
   /**
-   * The device after `at` until a launch, ANDROID_LOGIN after it; `msBeforeLaunch` is when the (first) launch began,
-   * counted from the run's start.
+   * The device after `at` until a launch, `after` (ANDROID_LOGIN by default) after it, on `platform` (Android by
+   * default); `msBeforeLaunch` is when the (first) launch began, counted from the run's start.
    */
-  function relaunching(at: (ms: number, read: number) => UiNode | Error) {
+  function relaunching(at: (ms: number, read: number) => UiNode | Error, platform: 'android' | 'ios' = 'android', after: UiNode = ANDROID_LOGIN) {
     let relaunched = false;
-    const { fake, state } = timeline((ms, read) => (relaunched ? ANDROID_LOGIN : at(ms, read)));
+    const { fake, state } = timeline((ms, read) => (relaunched ? after : at(ms, read)), platform);
     const launch = fake.launch.bind(fake);
     const seen = { msBeforeLaunch: -1, started: Date.now() };
     fake.launch = async (appId, opts) => {
@@ -465,6 +465,26 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     const { fake, seen } = relaunching((ms) => (ms < 30 ? ANDROID_DECOR : spinning));
     await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_only' });
     expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
+  });
+
+  it('the same through WDA: a React Native ActivityIndicator is a spinner, so its screen never holds (D27)', async () => {
+    // RN's <ActivityIndicator> is a UIActivityIndicatorView: XCUIElementTypeActivityIndicator, `ActivityIndicator` in WDA's /source.
+    const spinning = parseWdaSourceValue({
+      type: 'Application', label: 'MyPort', rawIdentifier: null, rect: FULL,
+      children: [{
+        type: 'Window', rect: FULL,
+        children: [other([
+          { type: 'StaticText', label: 'Načítava sa…', rawIdentifier: 'loading', rect: { x: 24, y: 360, width: 354, height: 24 }, children: [] },
+          { type: 'ActivityIndicator', label: null, rawIdentifier: null, rect: { x: 181, y: 417, width: 40, height: 40 }, children: [] },
+        ])],
+      }],
+    });
+    expect(isBareTree(spinning)).toBe(false);
+    expect(showsProgress(spinning)).toBe(true);
+    const { fake, seen } = relaunching((ms) => (ms < 30 ? WDA_SPLASH : spinning), 'ios', WDA_LOGIN);
+    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_only' });
+    expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
+    expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
   });
 
   /**

@@ -61,6 +61,24 @@ const ROLE_MAP: Record<string, string> = {
   // seen to carry a Toolbar (it does carry the keyboard on iOS 27 — the
   // keys as plain buttons, the band as `other` — but nothing marks them).
   Toolbar: 'toolbar',
+  // `ActivityIndicator` is `progress` (D27, 2026-10-31): XCUIElementTypeActivityIndicator, a UIActivityIndicatorView —
+  // React Native's <ActivityIndicator> — is a spinner, so ui-tree/read-tree.ts#showsProgress must see it: a loading
+  // screen then never holds (flow/hold-tracker.ts, ADR 0033) and a scroll does not call it exhausted
+  // (interact/scroll-read.ts `loading`). Until then the type fell through to `other`, a structural role. The spelling
+  // is XCUI's enum name less the prefix, which WDA strips (above) — no capture holds one yet. Here and not in the
+  // shared IOS_ROLE_MAP: no idb capture shows what describe-all names a UIActivityIndicatorView, so its spelling
+  // there is unknown (`ProgressIndicator`, already shared, is XCUI's other progress type).
+  // Leaving `other` (structural) changes, beside showsProgress: an unlabelled spinner now covers its rect in
+  // ui-tree/draw-order.ts (a structural leaf did not); in ui-tree/bare-tree.ts `progress` is decoration, counted only
+  // when LABELLED — so a spinner with a value and no label now counts toward bare, and a labelled screen-sized one
+  // counts as content (as `other` it was a wrapper by size); one `isVisible`/`isAccessible` 0/0 can root a hidden
+  // subtree (hiddenRoots, below); `role:other` no longer matches it, `role:progress` does.
+  // Residual, by decision (D27 review, 2026-10-31): showsProgress counts EVERY progress node with area, so an
+  // invisible spinner (a covered layer, 0/0) or an off-screen one (a FlatList footer spinner below the viewport) also
+  // reads as loading — not filtered, since a footer spinner below the fold means the list is still loading a page.
+  // The safe direction: the hold falls back to the whole ensureTimeoutMs window, scroll_until to its maxSwipes /
+  // timeoutMs bound, instead of "exhausted".
+  ActivityIndicator: 'progress',
 };
 
 /**

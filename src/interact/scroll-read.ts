@@ -133,7 +133,8 @@ export interface TreeFacts extends Look<Pick<RoundRead, 'ofKeyboard'>> {
   /**
    * The tree shows a progress indicator (ui-tree/read-tree.ts#showsProgress:
    * a `progress` node with area — Android's ProgressBar, which a Compose
-   * progress indicator also dumps as) — the screen may be loading, so an
+   * progress indicator also dumps as; through WDA an iOS ActivityIndicator
+   * since D27, 2026-10-31) — the screen may be loading, so an
    * unchanged fingerprint does not say the content is exhausted.
    */
   loading: boolean;

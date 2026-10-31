@@ -2,7 +2,9 @@
 
 Status: accepted 2026-10-31 (performance backlog row D2, docs/plans/2026-10-30-performance-backlog.md, section "D2 and
 D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-held-no`
-(938a8426, 3ab677f3, 52cb2e41, 04ec6000, d0efd6f0, a883e09a), merged 11cb9064.
+(938a8426, 3ab677f3, 52cb2e41, 04ec6000, d0efd6f0, a883e09a), merged 11cb9064. Amended 2026-10-31 (D27: WDA
+`ActivityIndicator` → `progress`, so a React Native spinner stops a hold — the D27 sub-bullet below; commits 4b5e254f,
+8a4efe1b and the D27 branch's last, on `fix/d27-wda-activity-indicator`).
 
 ## Context
 
@@ -48,14 +50,19 @@ full window, exactly as before.**
   that each saw it). `pollTree` never shows its predicate a failed read, so with a hold `detects` reads through a thin
   wrapper of the adapter that shows the tracker each read that threw.
 - A rendered tree that shows a progress indicator (`ui-tree/read-tree.ts#showsProgress`: a `progress` node with area —
-  Android's ProgressBar, Compose's progress indicators, an iOS `ProgressIndicator`) never starts or continues a hold:
+  Android's ProgressBar, Compose's progress indicators, an iOS `ProgressIndicator`, and through WDA an iOS
+  `ActivityIndicator` since D27) never starts or continues a hold:
   for the hold it is a bare read, and clears it. It still counts as rendered — the look's answer at its deadline is
   `no`, as before. A spinner keeps a fixed rect and no text, so its screen keeps one fingerprint while it loads; it is
   the one loading screen that says so, and the rule costs nothing on a screen that does not. (The coordinator's
   decision before review, 2026-10-31.)
-  - The known gap, backlog row D27: on iOS through WDA an XCUI `ActivityIndicator` — React Native's
-    ActivityIndicator — is not in `adapters/ios-node.ts#IOS_ROLE_MAP` (which wda-source.ts extends), so it reads as
-    `other`, not `progress`, and does NOT stop a hold there.
+  - The gap this decision shipped with, backlog row D27 — closed 2026-10-31: on iOS through WDA an XCUI
+    `ActivityIndicator` — React Native's ActivityIndicator — read as `other`, not `progress`, and did NOT stop a hold
+    there. `adapters/wda-source.ts`'s role map now makes it `progress` (WDA only: no idb capture shows idb's spelling
+    of a UIActivityIndicatorView, so through idb it may still read `other`).
+    Residual, by decision (D27 review): an invisible or off-screen spinner also counts as loading — a covered layer's
+    0/0 indicator, a list footer's spinner below the viewport — safe direction, bounded by `ensureTimeoutMs` /
+    `maxSwipes`.
 - A look the hold ended writes one trace line, right before the rung: `state <name>` — `second look: not detected, the
   screen held still <s> — running <rung> before the <ensureTimeoutMs> window's end`, so a rung that runs seconds
   before the deadline is not read as a look cut short for no reason. A `no` at the deadline writes none, as before.
@@ -100,7 +107,8 @@ before the first second look's original deadline, whatever ran in between):
 
 With NO wipe ahead, a rendered loading screen WITHOUT a progress indicator — a "Loading…" label alone, a skeleton of
 placeholder boxes, a static splash drawn as a rendered screen, an indicator a tree source does not report as `progress`
-(a React Native ActivityIndicator through WDA, backlog row D27, above) — that holds still for `reachRecheckMs` ends
+(a React Native ActivityIndicator through WDA was one until D27 closed it, 2026-10-31, above; through idb its spelling is
+unmeasured) — that holds still for `reachRecheckMs` ends
 the look as "no" (one with a spinner never holds): the cheap rung runs on it — a wasted relaunch or tap — or fails,
 and the ladder escalates to its next rung, also cheap by construction, or ends in its final wait (`ensureTimeoutMs`).
 The worst case is therefore a wasted cheap rung or a failed call that a retry cures, never a wipe. It is NOT the same

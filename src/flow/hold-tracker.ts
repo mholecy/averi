@@ -19,10 +19,9 @@ export interface HoldTracker {
    *
    * Not shown, and so not counted either way: a handed-on read (ADR 0030 — the probe asks it `yes` alone).
    *
-   * The known gap, backlog row D27: a loading screen whose indicator a tree source does not report as `progress`
-   * holds like any other. On iOS through WDA an XCUI ActivityIndicator — React Native's ActivityIndicator — maps to
-   * `other` (the type is not in adapters/ios-node.ts#IOS_ROLE_MAP, which wda-source.ts extends; only
-   * ProgressIndicator is `progress`), so it does not break a hold there.
+   * A loading screen whose indicator a tree source does not report as `progress` holds like any other. On iOS
+   * through WDA an XCUI ActivityIndicator — React Native's ActivityIndicator — read `other` until backlog row D27
+   * (2026-10-31) mapped it to `progress` (adapters/wda-source.ts's role map); through idb its spelling is unmeasured.
    */
   observe(tree: UiNode | undefined, nowMs: number): number | undefined;
 }
