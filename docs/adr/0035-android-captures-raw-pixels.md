@@ -48,8 +48,8 @@ pixels. A PNG is encoded on the host only where one leaves the process.**
 - `png()` is called by the `screenshot` tool, `ensure_state` and a `verify` leg (the image), a created baseline (the
   file), and the OCR recognizer (its input file). adapters/png-encode.ts is the one encoder, async on the thread pool:
   a UI screen at level 6 with each row None or Up by its content — Up for a row identical to the one above or one
-  where more than a quarter of the pixels differ from their left neighbour (a photo strip), None otherwise — 17–21 ms,
-  0.76–0.93× the device's PNG on lab frames, and 0.57–0.99× zlib 6 with pngjs's adaptive filters on lab frames with
+  where more than a quarter of the pixels differ from their left neighbour (a photo strip), None otherwise — about
+  18–21 ms, 0.76–0.93× the device's PNG on lab frames, and 0.57–0.99× zlib 6 with pngjs's adaptive filters on lab frames with
   0, 150 or 400 rows of a photo pasted in (45–85 ms with them). Round 1 had every UI row unfiltered: up to 1.30× (the
   reviewer measured ~1.4×) on a UI screen with a photo region. A whole photo is Up-filtered with `Z_RLE` at level 1
   (41 ms; 1.12× the device's), chosen by a sampled deflate ratio (every 16th row at level 1: UI ≤ 0.02, photo 0.25;
@@ -70,9 +70,9 @@ pixels. A PNG is encoded on the host only where one leaves the process.**
   (3 → 37), +119 ms on the photo (16 → 135); baseline.ts's `screenshot` call on the lab `open` cell, which takes 4
   captures, 14 → 159 ms, the instrumented MCP server's figure.
 - The PNG an agent receives from Android is averi's, not the device's: the same pixels; on lab UI frames smaller
-  than the device's (0.76–0.93×), on a full photo 1.12×. Pinned by tests/verify/baseline-raw-compat.test.ts: a
-  device-PNG baseline equals a raw capture of the same frame at threshold 0. Stored baselines are averi's PNGs; ones stored before compare by pixels, as
-  every baseline always did.
+  than the device's (0.76–0.93×), on a full photo 1.12×. Stored baselines are averi's PNGs; ones stored before
+  compare by pixels, as every baseline always did — pinned by tests/verify/baseline-raw-compat.test.ts: a device-PNG
+  baseline equals a raw capture of the same frame at threshold 0.
 - `gzip` is toybox's (Android 9+ ships it; older images may not): a device without it falls back once, then stays on
   `-p`. RGBX_8888 and RGB_565 devices fall back the same way — not measured, no lab device has them.
 - adapters depends on nothing above it: the encoder and the `RgbaImage` type live in adapters/ (verify/png.ts

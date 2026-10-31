@@ -14,7 +14,7 @@ import type { RgbaImage } from './types.js';
  * references are the device's own `screencap -p` — zlib level 6, adaptive filters, ~230 ms on the device — and pngjs
  * at zlib level 6 with adaptive filters):
  * - a UI screen (flat colour, text — and a photo region inside one): each row None or Up by its content
- *   (`rowFiltered`), level 6 — 21–24 ms on a plain UI frame, 0.57–0.99× the pngjs reference on three lab frames with
+ *   (`rowFiltered`), level 6 — about 18–21 ms on a plain UI frame, 0.57–0.99× the pngjs reference on three lab frames with
  *   0, 150 and 400 rows of a photo pasted in (45–85 ms with the photo rows); all-None was 16–19 ms but up to 1.30×
  *   with a photo strip. Against the device: bands 19.4 vs 20.9 KB, text-sample and form-errors ~0.6×;
  * - a photo (a wallpaper behind the launcher): Up, `Z_RLE`, level 1 — 39 ms, 1.12× the device's 1.33 MB. No filter at
@@ -64,8 +64,8 @@ async function compressedRatio(data: Buffer, width: number, height: number): Pro
  * - every other row (text, edges, flat runs) is None: deflate finds its runs and repeats as they are, and Up would
  *   only turn them into scattered differences.
  * Measured 2026-10-31 against zlib level 6 with pngjs's adaptive filters (every filter tried per row) on three lab
- * frames with 0, 150 and 400 rows of the launcher's photo pasted in: 0.57–0.99× its size, 21–24 ms on a plain UI
- * frame (all None was 0.57–1.30×, 16–19 ms).
+ * frames with 0, 150 and 400 rows of the launcher's photo pasted in: 0.57–0.99× its size, about 18–21 ms on a plain
+ * UI frame (all None was 0.57–1.30×, 16–19 ms).
  */
 function rowFiltered(data: Buffer, width: number, height: number): Buffer {
   const rowBytes = width * 4;
