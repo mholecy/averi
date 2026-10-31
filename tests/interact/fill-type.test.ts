@@ -43,6 +43,52 @@ describe('droppedTail — a strict prefix with some of the typing in it, else no
 });
 
 /**
+ * D28 (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md, its amendment): a field that groups as it
+ * is typed and dropped the end of the typing shows a REFORMATTED strict prefix — iOS React Native's rf2 held
+ * `1 234 567,` for `1234567,89`. The prefix must be exact by typed characters, with only grouping added, under
+ * `reformatOf`'s rules judged over the WHOLE typing (one separator kind, letters split only in a code, thousands).
+ */
+describe('droppedTail — a reformatted strict prefix (D28)', () => {
+  it('an amount grouped by thousands, an IBAN grouped in fours: the rest of the typing', () => {
+    expect(droppedTail('1 234 567,', intent('1234567,89', null, true))).toBe('89');
+    expect(droppedTail('SK31 1200 0', intent('SK3112000000'))).toBe('000');
+    expect(droppedTail('SK31 1200', intent('SK3112000000'))).toBe('0000');
+  });
+
+  it('Android-shaped readings: a no-break or narrow no-break space as the grouping', () => {
+    expect(droppedTail('1\u00A0234\u00A0567', intent('1234567,89', null, true))).toBe(',89');
+    expect(droppedTail('12\u202F345', intent('1234567'))).toBe('67');
+  });
+
+  it('without clear: the earlier text first, and some of the typing in the prefix', () => {
+    expect(droppedTail('SK31 1200', intent('12000000', 'SK31'))).toBe('0000');
+    expect(droppedTail('SK31', intent('12000000', 'SK31'))).toBeUndefined(); // nothing of the typing landed
+  });
+
+  it('only grouping added: a trailing mark, a changed character, two separator kinds, a lone grouping — nothing', () => {
+    expect(droppedTail('SK31 1200 ', intent('SK3112000000'))).toBeUndefined(); // an eager trailing mark
+    expect(droppedTail('SK31 1300', intent('SK3112000000'))).toBeUndefined();
+    expect(droppedTail('1 234.567', intent('12345678'))).toBeUndefined();
+    expect(droppedTail('1-2', intent('1234'))).toBeUndefined(); // groups of one
+    expect(droppedTail('1 2', intent('1234'))).toBeUndefined();
+    expect(droppedTail('••• •', intent('12345'))).toBeUndefined(); // bullets
+    expect(droppedTail('SK31 1200 0000', intent('SK3112000000'))).toBeUndefined(); // the whole typing: no tail
+  });
+
+  it('a typed space the field shows as a no-break space is part of the prefix (respaced)', () => {
+    expect(droppedTail('1\u00A0234', intent('1 23456'))).toBe('56');
+  });
+
+  it('the rules are the whole typing\'s: a letter split is a code\'s only when the WHOLE typing is one, and a `.`/`,` it holds is never a thousands mark', () => {
+    expect(droppedTail('a1bc de', intent('a1bcde f'))).toBeUndefined(); // the prefix is a code, the typing (a typed space) is not
+    expect(droppedTail('a1bc de', intent('a1bcdefg'))).toBe('fg');
+    expect(droppedTail('1,234', intent('1234,5'))).toBeUndefined(); // the typing's own `,` is its decimal point
+    expect(droppedTail('1.234', intent('1234,5'))).toBe(',5');
+    expect(droppedTail('a lot', intent('alotmore'))).toBeUndefined(); // prose: autocorrect, not a format
+  });
+});
+
+/**
  * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
  * character, in order, with separators of its own between them — measured on the lab's Compose, React Native and
  * VisualTransformation fields (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md). Tight: a field
@@ -343,11 +389,70 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(await typeAndConfirm(io, { ...intent, value: '000000', before: 'SK31 12' })).toMatchObject({ kind: 'landed', observed: 'SK31 1200 0000', reformatted: { added: 1 } });
   });
 
-  it('a grouping field that dropped a character is no reformat: missed, and with clear wiped and typed again once', async () => {
-    const { io, intent, typed } = scripted({ format: group4, keep: [11, 11] });
+  // D28: iOS React Native's rf2 held `1 234 567,` for `1234567,89` — a dropped tail on a grouping field. Only the tail
+  // is typed (no wipe), the drop is reported (D24's first-key-alone split), and the read-back lands reformatted.
+  it('a grouping field that dropped the tail gets the tail alone, reported, and lands reformatted — with clear or without', async () => {
+    for (const clear of [false, true]) {
+      const { io, intent, typed, dropped } = scripted({ format: group4, keep: [11] });
+      expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000', clear })).toEqual({
+        kind: 'landed',
+        observed: 'SK31 1200 0000',
+        again: [{ kind: 'tail', length: 1 }],
+        reformatted: { added: 2, respaced: 0 },
+      });
+      expect(typed).toEqual(['SK3112000000', '0']);
+      expect(dropped).toEqual([2]);
+    }
+  });
+
+  it('a reformatted prefix whose missing part another input gained: the typing left the field — nothing sent again', async () => {
+    for (const clear of [false, true]) {
+      const { io, intent, typed } = scripted({ format: group4, keep: [10], elsewhere: () => '00' });
+      expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000', clear })).toMatchObject({ kind: 'missed', observed: 'SK31 1200 00', again: [], elsewhere: { identifier: 'o' } });
+      expect(typed).toEqual(['SK3112000000']);
+    }
+  });
+
+  // An Android-shaped amount (a no-break space between thousands, ADR 0034's f3), dropped from its `,`.
+  const thousandsNbsp = (t: string) => {
+    const [whole, ...fraction] = t.replace(/\u00A0/g, '').split(',');
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+    return fraction.length === 0 ? grouped : `${grouped},${fraction.join(',')}`;
+  };
+
+  it('an amount grouped by thousands that dropped `89` gets `89` typed again, nothing wiped', async () => {
+    const { io, intent, typed, dropped } = scripted({ format: thousandsNbsp, keep: [8] });
+    expect(await typeAndConfirm(io, { ...intent, value: '1234567,89', clear: true })).toEqual({
+      kind: 'landed',
+      observed: '1\u00A0234\u00A0567,89',
+      again: [{ kind: 'tail', length: 2 }],
+      reformatted: { added: 2, respaced: 0 },
+    });
+    expect(typed).toEqual(['1234567,89', '89']);
+    expect(dropped).toEqual([2]);
+  });
+
+  it('a grouping field that keeps its prefix for good (capped): the tail once, then with clear the wipe and retype — missed, not reported', async () => {
+    const capped = (t: string) => group4(t.replace(/ /g, '').slice(0, 11));
+    const { io, intent, typed, dropped } = scripted({ format: capped });
     expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000', clear: true })).toEqual({
       kind: 'missed',
       observed: 'SK31 1200 000',
+      again: [
+        { kind: 'tail', length: 1 },
+        { kind: 'whole', wiped: true },
+      ],
+    });
+    expect(typed).toEqual(['SK3112000000', '0', 'SK3112000000']);
+    expect(dropped).toEqual([]);
+  });
+
+  it('a grouping field that changed a character is no prefix: no tail, with clear wiped and typed again once', async () => {
+    const swapped = (t: string) => group4(t.replace(/ /g, '').replace('SK31', 'SK13'));
+    const { io, intent, typed } = scripted({ format: swapped });
+    expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000', clear: true })).toEqual({
+      kind: 'missed',
+      observed: 'SK13 1200 0000',
       again: [{ kind: 'whole', wiped: true }],
     });
     expect(typed).toEqual(['SK3112000000', 'SK3112000000']);

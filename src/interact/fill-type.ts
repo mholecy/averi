@@ -36,7 +36,15 @@
  *      in the field (`whereTyped`: every other input the screen showed before
  *      the typing is there with its value — an auto-advancing code box that
  *      moved the focus would get the tail too; a sibling the app recomputed
- *      proves nothing either way, and stops the tail too). Only the missing tail is typed, up to
+ *      proves nothing either way, and stops the tail too). Since D28 the
+ *      prefix may be REFORMATTED (`tailOf`): a field that groups as it is
+ *      typed shows `1 234 567,` for a typed `1234567,89` that lost `89` —
+ *      exact by typed characters, only grouping added, `reformatOf`'s rules
+ *      judged over the whole typing (iOS React Native, rf2, 2026-10-31: the
+ *      wipe and retype it got instead dropped the tail again). The tail is
+ *      typed at the caret, which the field keeps at the end as it regroups
+ *      (React Native's controlled TextInput, ADR 0034; rf3's typing on after
+ *      a reformatting fill landed in order on iOS). Only the missing tail is typed, up to
  *      `MAX_TAIL_RETYPES` times, and again only while each retype moved the
  *      field. Never on a reading with a bullet (a masked field's content
  *      cannot be compared, so a prefix cannot be seen), never when nothing of
@@ -201,7 +209,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       const { reformatted } = read.landed;
       return { kind: 'landed', observed, again, ...(reformatted !== undefined && { reformatted }) };
     }
-    const where = whereTyped(others, io.screen(), missingOf(observed, intent));
+    const where = whereTyped(others, io.screen(), tailOf(observed, intent)?.missing);
     const tail =
       intent.delivery === 'on-return' && where.kind === 'field' && read.steady && tails() < MAX_TAIL_RETYPES
         ? droppedTail(observed, intent)
@@ -257,12 +265,17 @@ const DIGITS = /^\d+$/;
  * instead, the expected one would have to match a later, equal character — so matching first never rejects what
  * skipping would pass but under the grouping rules, where the miss is a false mismatch (the safe side). Pure,
  * O(reading).
+ *
+ * `typing` (D28): the whole typing whose character classes decide the code rule and the thousands rule — `expected`
+ * itself, unless the reading is judged as a PREFIX of a typing (`prefixOf`): the prefix of a typing that holds a space
+ * or a `,` must not pass what the whole typing would refuse.
  */
-export function reformatOf(observed: string, expected: string): Reformat | undefined {
+export function reformatOf(observed: string, expected: string, typing: string = expected): Reformat | undefined {
   // Code points on both sides (an astral letter is one character, not two UTF-16 units).
   const expectedChars = [...expected];
+  const typingChars = [...typing];
   // A code: digits in it and no typed space (an IBAN, a card number) — the one typing whose letters a field may split.
-  const code = expectedChars.some((c) => DIGIT.test(c)) && !expectedChars.some((c) => SPACES.has(c));
+  const code = typingChars.some((c) => DIGIT.test(c)) && !typingChars.some((c) => SPACES.has(c));
   // The reading as tokens: each an expected character shown (its index) or an added separator (-1).
   const tokens: number[] = [];
   let j = 0;
@@ -302,16 +315,16 @@ export function reformatOf(observed: string, expected: string): Reformat | undef
   const atAnEnd = (k: number) => k === 0 || k === groups.length - 1;
   if (singles.length > 1 || (singles.length === 1 && !atAnEnd(singles[0]))) return undefined;
   const point = isPoint(sep) ? sep : undefined;
-  if (point !== undefined && !thousands(chars, tokens, expected, point)) return undefined;
+  if (point !== undefined && !thousands(chars, tokens, typing, point)) return undefined;
   const count = groups.length - 1;
   if (count + respaced === 0) return undefined;
   return { added: count, respaced, ...(point !== undefined && { point }) };
 }
 
-/** An added `.` or `,` groups digits by thousands (see `reformatOf`). */
-function thousands(chars: string[], tokens: number[], expected: string, point: string): boolean {
+/** An added `.` or `,` groups digits by thousands (see `reformatOf`); `typing` the whole typing. */
+function thousands(chars: string[], tokens: number[], typing: string, point: string): boolean {
   // The typing holds this character itself (its decimal point, or its own grouping): an added one is no thousands mark.
-  if (expected.includes(point)) return false;
+  if (typing.includes(point)) return false;
   const marks = tokens.flatMap((t, k) => (t === -1 ? [k] : []));
   let start = marks[0] - 1;
   while (start >= 0 && DIGIT.test(chars[start])) start--;
@@ -383,26 +396,56 @@ function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined, mi
 const priorText = (intent: Pick<TypingIntent, 'clear' | 'before' | 'placeholder'>): string => (intent.clear ? '' : heldText(intent.before, intent.placeholder));
 
 /**
- * What the field is missing of what it should hold (its text before the typing, unless cleared, then the value),
- * when its reading is a prefix of that and shows no bullet — else undefined. Pure.
+ * The strict prefix of `whole` a reading shows: exactly, or — D28 — REFORMATTED (`reformatOf` of the prefix, its
+ * rules judged over the whole typing: one separator kind, letters split only in a code, an added `.`/`,` only as a
+ * thousands mark the typing does not hold itself). The prefix is the typed characters the reading shows, in order —
+ * the same greedy walk as `reformatOf`'s, every other reading character an added separator; nothing else may differ.
+ * Undefined when the reading is no strict prefix (the whole of it, more, or other text). Pure, O(reading).
  */
-function missingOf(observed: string, intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>): string | undefined {
+function prefixOf(held: string, whole: string): { prefix: string; reformatted?: Reformat } | undefined {
+  if (held.length < whole.length && whole.startsWith(held)) return { prefix: held };
+  const wholeChars = [...whole];
+  let j = 0;
+  for (const c of held) {
+    const next = wholeChars[j];
+    if (c === next || (next !== undefined && SPACES.has(c) && SPACES.has(next))) j++;
+    else if (!SEPARATORS.has(c)) return undefined;
+  }
+  if (j >= wholeChars.length) return undefined;
+  const prefix = wholeChars.slice(0, j).join('');
+  const reformatted = reformatOf(held, prefix, whole);
+  return reformatted === undefined ? undefined : { prefix, reformatted };
+}
+
+/**
+ * What the field is missing of what it should hold (its text before the typing, unless cleared, then the value),
+ * when its reading is a strict prefix of that — exactly or reformatted (`prefixOf`, D28) — and shows no bullet:
+ * `missing` the rest, `landed` how many characters of the TYPING the prefix holds (UTF-16 units, as a value's length
+ * is counted), `reformatted` when the field grouped the prefix. Else undefined. Pure.
+ */
+export function tailOf(
+  observed: string,
+  intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>,
+): { missing: string; landed: number; reformatted?: Reformat } | undefined {
   const held = heldText(observed, intent.placeholder);
   const prior = priorText(intent);
+  if (hasBullet(held) || hasBullet(prior)) return undefined;
   const whole = prior + intent.value;
-  if (hasBullet(held) || hasBullet(prior) || held.length >= whole.length || !whole.startsWith(held)) return undefined;
-  return whole.slice(held.length);
+  const shown = prefixOf(held, whole);
+  if (shown === undefined) return undefined;
+  const { prefix, reformatted } = shown;
+  return { missing: whole.slice(prefix.length), landed: prefix.length - prior.length, ...(reformatted !== undefined && { reformatted }) };
 }
 
 /**
  * The characters the field dropped from the END of the typing, or undefined when its reading does not prove that:
- * the field must hold a STRICT prefix of what it should (its text before typing, unless cleared, then the value),
- * longer than that earlier text — some typed character landed — and no bullet (a masked reading has no comparable
- * content). Pure.
+ * the field must hold a STRICT prefix of what it should (its text before typing, unless cleared, then the value) —
+ * exactly, or grouped by the field as it was typed (D28, `tailOf`) — longer than that earlier text — some typed
+ * character landed — and no bullet (a masked reading has no comparable content). Pure.
  */
 export function droppedTail(observed: string, intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>): string | undefined {
-  if (heldText(observed, intent.placeholder).length <= priorText(intent).length) return undefined;
-  return missingOf(observed, intent);
+  const tail = tailOf(observed, intent);
+  return tail !== undefined && tail.landed > 0 ? tail.missing : undefined;
 }
 
 /**
