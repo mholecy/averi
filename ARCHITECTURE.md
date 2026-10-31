@@ -125,7 +125,10 @@ spelling of a simctl call — `xcrun simctl` under the DEVELOPER_DIR probe — w
 `IosAdapter`'s simctl calls go through too). The registry takes it as its second dependency beside the adapter
 factory (`DeviceDiscovery`, `mcp/registry.ts` — both injected or neither, so a test
 with a fake factory cannot list the host's real devices) and asks it on every
-`get()`, as it asked a probe adapter before. Until then `listDevices()` was an adapter
+`get()`, as it asked a probe adapter before — since D13 (2026-10-31) with
+`versions: false`, so the per-call probe on Android is `adb devices -l` alone (the
+getprop per online device, 31–36 ms each, is asked only by `select()` and `listAll()`,
+whose replies show a version). Until then `listDevices()` was an adapter
 member, so both adapters carried an unbound mode the registry used for nothing else —
 an `IosAdapter` without a UDID (simctl's `booted` alias, a lazily resolved UDID for
 idb, a `uiTree()` that refused) and an `AndroidAdapter` without a serial (adb without

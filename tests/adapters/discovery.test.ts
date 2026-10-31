@@ -46,6 +46,22 @@ emulator-5556          offline transport_id:2
     ]);
   });
 
+  // D13 (2026-10-31): the registry's per-call probe (mcp/registry.ts#get)
+  // asks only which devices are booted — the getprop per attached device
+  // (31–36 ms each on the lab emulator) was paid on every tool call for a
+  // version nothing on that path reads.
+  it('without versions, lists from `adb devices -l` alone — no getprop, every version `unknown`', async () => {
+    const { fn, calls } = fakeExec({
+      'adb devices -l': DEVICES_OUTPUT,
+      'adb -s emulator-5554 shell getprop ro.build.version.release': '14\n',
+    });
+    expect(await listAndroidDevices(fn, { versions: false })).toEqual([
+      { id: 'emulator-5554', platform: 'android', name: 'sdk_gphone64_arm64', osVersion: 'unknown', state: 'booted' },
+      { id: 'emulator-5556', platform: 'android', name: 'emulator-5556', osVersion: 'unknown', state: 'offline' },
+    ]);
+    expect(calls).toEqual(['adb devices -l']);
+  });
+
   // C5 (2026-10-09): an `unauthorized` line did not match the parser, so a
   // phone waiting on its RSA prompt vanished from the listing and every tool
   // said "No booted Android emulator/device found". The line shapes are adb's

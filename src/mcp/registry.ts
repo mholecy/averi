@@ -2,7 +2,7 @@ import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
 import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import { createIosTreeSource } from '../adapters/ios-tree-source.js';
-import { androidUnusable, listAndroidDevices, listIosDevices } from '../adapters/discovery.js';
+import { androidUnusable, listAndroidDevices, listIosDevices, type ListOpts } from '../adapters/discovery.js';
 import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
 import { drawnOverStrip } from '../ui-tree/draw-order.js';
@@ -45,12 +45,16 @@ export type AdapterFactory = (
  * candidate 1). A platform question, so it is not a member of the bound
  * adapter; adapters/discovery.ts holds the adb and simctl listings, and the
  * registry's tests hand in a list.
+ *
+ * `opts.versions: false` (D13) says the caller reads no OS version — the
+ * listing may leave them `unknown` (adapters/discovery.ts#ListOpts); omitted,
+ * the versions are read.
  */
-export type DeviceDiscovery = (platform: Platform) => Promise<Device[]>;
+export type DeviceDiscovery = (platform: Platform, opts?: ListOpts) => Promise<Device[]>;
 
 /** The platform → listing wiring over one exec — exported so its tests can hand in a fake exec. */
-export const discoveryWith = (exec: ExecFn = defaultExec): DeviceDiscovery => (platform) =>
-  platform === 'android' ? listAndroidDevices(exec) : listIosDevices(exec);
+export const discoveryWith = (exec: ExecFn = defaultExec): DeviceDiscovery => (platform, opts) =>
+  platform === 'android' ? listAndroidDevices(exec, opts) : listIosDevices(exec);
 
 export const defaultDiscovery: DeviceDiscovery = discoveryWith();
 
@@ -167,7 +171,7 @@ export class AdapterRegistry {
     if (binding) {
       // Every entry with the serial: cheap phones can share one, and any
       // booted entry keeps the binding, as before the C5 refusals.
-      const matches = (await this.probe(platform)).filter((d) => d.id === binding.deviceId);
+      const matches = (await this.probe(platform, { versions: false })).filter((d) => d.id === binding.deviceId);
       const stillBooted = matches.some((d) => d.state === 'booted');
       const listed = matches[0];
       // A select() may have rebound the platform while we awaited the probe.
@@ -190,7 +194,7 @@ export class AdapterRegistry {
       this.evict(platform, binding.deviceId);
     }
 
-    const devices = await this.probe(platform);
+    const devices = await this.probe(platform, { versions: false });
     const booted = devices.filter((d) => d.state === 'booted');
     // Same race on the unbound path: a select() that landed during this probe
     // owns the binding now — honor it instead of auto-picking over it.
@@ -265,14 +269,20 @@ export class AdapterRegistry {
 
   /**
    * One listing per call, as before discovery left the adapter: get() asks on
-   * EVERY tool call (that is how a vanished device is noticed), which on
-   * Android is `adb devices -l` plus one `getprop` per attached device.
+   * EVERY tool call (that is how a vanished device is noticed). get() reads
+   * only ids and states, so it asks with `versions: false` (D13, 2026-10-31):
+   * on Android that is `adb devices -l` alone, where it was `adb devices -l`
+   * plus one `getprop` per attached device — 31–36 ms each on the lab
+   * emulator, on every tool call, for a version nothing on that path shows.
+   * select() and listAll() keep the versions: select_device's reply and the
+   * device listing are where a version is read.
+   *
    * Not cached here — a stale "still booted" would hand out an adapter for a
    * device that is gone. Async, so a discovery that throws synchronously is
    * the same event as one that rejects (the rule disposeQuietly states) —
    * listAll's per-platform catch must see both.
    */
-  private async probe(platform: Platform): Promise<Device[]> {
-    return this.discovery(platform);
+  private async probe(platform: Platform, opts?: ListOpts): Promise<Device[]> {
+    return this.discovery(platform, opts);
   }
 }
