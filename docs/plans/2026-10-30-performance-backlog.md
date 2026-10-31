@@ -358,6 +358,46 @@ verb is now `simctl spawn launchctl` (appHealth, ~235 ms) and the 300 ms pair ga
 poll (`fill-type.ts:325`, one extra 400 ms round in 2 of 4 non-learning runs: the WDA source read the text late), not
 from a drop — no screenshot is on that path. D26 done.
 
+### D21 diag (owner's run 2026-10-31, `scratchpad/d21-d25/d21-frontmost.sh 9`)
+Nine reboots of the lab simulator, each with a fresh companion started at one of three moments (round-robin): *early*
+(right after `simctl boot` returns), *zero* (right after `simctl bootstatus -b`), *late* (bootstatus + 3 s); the first
+`idb ui describe-all` about 1 s after that. Raw simctl + idb, no averi.
+
+| start | wedged | first read |
+|-------|--------|------------|
+| early | 2/3 | ok 3.7 s once, else "no frontmost application" |
+| zero  | 3/3 | "no frontmost application" every time |
+| late  | 0/3 | ok (0.9–1.7 s, the AX service warming) |
+
+A wedged simulator stays wedged for every read that follows (230 failing reads, 277 ms median each): a re-front
+(`simctl launch` of the running app: same pid, state kept), terminate + launch, a NEW companion on the same simulator
+and 30 s more of waiting each cured 0 of 5. Only a reboot did (the next cycle). HID was unaffected (`idb ui swipe` 5/5
+ok while wedged). Side findings: a re-front of a running app keeps its pid and state and brings it over another app
+(Settings → AveriLab); a re-front of a stopped app cold-starts it; SpringBoard never restarted; the companion log
+showed nothing. So the D20 failure was the pre-run recipe's companion start right after boot, not the app: an
+accessibility query too early after boot wedges the simulator's AX service until the next reboot, and
+`ios-run.sh` (companion after bootstatus, 3 s, then a launch) never hit it in 13 runs. Decision: no automatic re-front
+or retry (nothing short of a reboot cures it, and averi does not boot simulators); a named error whose remedy is a
+reboot and a companion started a few seconds after the boot completes, or `treeSource: wda`.
+
+### D25 diag (owner's run 2026-10-31, `scratchpad/d21-d25/d25-typing.sh 40`)
+AveriLabRN's `rn-field` (RN 0.88 controlled single-line TextInput), prefixes of `Jan Novak Bratislava`, raw idb
+through one gRPC client per call (as averi's helper), read back from the app's state file; 40 rounds, every combo once
+a round in a shuffled order. Whole/40 and landing median:
+
+| mode | 1 | 2 | 3 | 4 | 5 | 6 | 8 | 12 | 20 |
+|------|---|---|---|---|---|---|---|----|----|
+| burst | 40/40 | 36/40 | 36/40 | 37/40 | 40/40 | 33/40 | 35/40 | 10/40 | 4/40 |
+| split:150 (D24) | — | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 |
+
+Burst ~93 ms, split:150 ~335 ms (+240 at every length). A burst already drops at length 2 (4/40, the second key lost),
+so no length threshold is safe: D25's premise ("split only above a length") is refuted. The gap is the lever: at 8 and
+20 characters split:0 kept 80/80 (185/238 ms), split:50 80/80 (235/292), split:100 80/80, hid:50 (one call with a
+companion-side 50 ms HIDDelay between the first key and the rest) 80/80 (148/204). The second idb call's own round trip
+is what lets the controlled input catch up. Decision: FIRST_KEY_ALONE_MS 150 → 50 ms (−100 ms per typing into an app
+seen dropping a tail; 50 ms of margin over split:0 because averi's in-process helper call may return faster than the
+script's client did). hid:G (one call) would save ~90 ms more but needs a new helper verb carrying a delay — not now.
+
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
 which ~230 ms PNG encode); raw `exec-out screencap` 979 ms — `exec-out` moves only ~11 MB/s here and a raw frame is
