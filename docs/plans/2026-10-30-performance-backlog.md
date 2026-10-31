@@ -50,7 +50,7 @@ measured before and after.
 | D20 | iOS idb: `scroll_until` on a flinging list stopped "the swipe CHANGED THE SCREEN" after one stroke | stability | done (7e32f1d3; idb full strokes paced at 349 pt/s, ADR 0018 Decision 4; device-checked 5/5, 9.0 s) |
 | D21 | iOS idb: right after a simulator boot with a fresh companion every `idb ui describe-all` fails "The simulator's accessibility service named no frontmost application" for the whole call (D20's device check 2026-10-31: 133 reads in 90 s, 5 of 5 repeats); a hand launch + read before the run cured it once. Find the cause and what averi can do (re-front the app? a named recovery in the reply?) — needs the device | stability | open |
 | D22 | iOS registry probe: read the bound simulator's `device.plist` (state 3 = booted, < 1 ms) before `simctl list devices` (~110 ms, every verb); anything else falls back to simctl | device | open |
-| D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) as one spawn — −225 ms a launch | device | open |
+| D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) together, not in series | device | done (fa334d35; not one spawn — the iOS 27 runtime has no shell; 445 → 250 ms a launch on the lab simulator) |
 | D24 | iOS RN: `idb ui text` drops the last 5–7 characters into rn-field in every fill-20 (D0 on iOS), so fill polls 5 × 400 ms and retypes (~2.6 s of 5.9 s) — find why, then pace | stability | open |
 
 ## Notes
@@ -240,7 +240,7 @@ stays unmeasured — the next saving, if this scroll matters.
 ### iOS per-call costs (analysed 2026-10-31, from D0 on iOS)
 
 Decided from an analysis of the D0 windows (and simctl timed on the lab simulator): D22 (probe from device.plist), D23
-(one `defaults write` spawn), D7 narrowed to the idb client (measure first), D24 (RN dropped tail, stability). Won't do:
+(the `defaults write`s together — done in fa334d35, two concurrent spawns: the simulator has no shell), D7 narrowed to the idb client (measure first), D24 (RN dropped tail, stability). Won't do:
 dropping the capture pair or its 300 ms spacing on iOS — docs/bugs/2026-10-06-whole-screen-stability-aliases-a-blinking-
 caret.md measured the iOS caret blinking too, and without the sleep an equal pair on a caret screen falls from ~38 % to
 ~22 % of tries (estimate), so a settled verdict would cost more captures or come back `moving`; PNG vs TIFF/BMP (no gain);
