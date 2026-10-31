@@ -345,7 +345,8 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
     'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
   'dropped-tail': ({ landed, dropped }) =>
     ` — the first ${landed === 1 ? '1 typed character is' : `${landed} typed characters are`} there, grouped by the field ` +
-    `(separators of its own added), the last ${dropped} did not land: a dropped tail, not a transformed input; content withheld from this error`,
+    `(separators of its own added), the last ${dropped} did not land: dropped, or refused by the field (a length cap, a character it does not take) — ` +
+    'not a transformed input; content withheld from this error',
   unchanged: () => ' — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
   length: () => ' (content withheld from this error)',
 };

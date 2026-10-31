@@ -355,7 +355,8 @@ describe('fillFailureText — every error a fill throws', () => {
   it('a mismatch on a reformatted prefix says the tail dropped, not that the input was transformed', () => {
     expect(fillFailureText({ code: 'mismatch', typed: 10, shows: 10, differs: { kind: 'dropped-tail', landed: 8, dropped: 2 }, again: [{ kind: 'whole', wiped: true }] })).toBe(
       'fill: typed 10 characters (after one wipe and retype) but the field shows 10 — the first 8 typed characters are there, grouped by the field ' +
-        '(separators of its own added), the last 2 did not land: a dropped tail, not a transformed input; content withheld from this error',
+        '(separators of its own added), the last 2 did not land: dropped, or refused by the field (a length cap, a character it does not take) — ' +
+        'not a transformed input; content withheld from this error',
     );
     expect(mismatch({ kind: 'dropped-tail', landed: 1, dropped: 1 }, 2, 2)).toMatch(/the first 1 typed character is there, .* the last 1 did not land/);
   });

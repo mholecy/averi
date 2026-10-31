@@ -51,7 +51,7 @@ failure was the read-back, and with `clear` it cost a wipe and a retype of the w
 
 **A read-back that shows every character it should, in order, with only separators of the field's own added, has
 landed — `reformatted` — and the reply says so: `Filled … (12 characters, the field shows them reformatted: 2
-separators added)`.** One pure rule, `fill-type.ts#reformatOf(reading, expected)`, where `expected` is the value with
+separators added)`.** One pure rule, `fill-reformat.ts#reformatOf(reading, expected)`, where `expected` is the value with
 `clear`, else the field's earlier text and the value after it:
 
 - every expected character is shown, in order and unchanged (letter case included); a typed space may be shown as a
@@ -149,7 +149,7 @@ Three findings:
 
 **Decision.**
 - **A reading that is `reformatOf` a strict prefix of what the field should hold, some of the typing in it, is a
-  dropped tail** (`fill-type.ts#tailOf`, shared by `droppedTail` and `whereTyped`): the tail alone is typed again at
+  dropped tail** (`fill-reformat.ts#tailOf`, shared by `droppedTail` and `whereTyped`): the tail alone is typed again at
   the end — no wipe — under every condition ADR 0023 sets (`on-return` delivery, a steady reading, the typing provably
   in the field, at most `MAX_TAIL_RETYPES`, again only when a retype moved the field), the drop is reported once it
   landed whole (`reportDroppedTail` → D24's split), and the read-back then passes as `reformatted`. Tight: the prefix
@@ -162,11 +162,23 @@ Three findings:
   end as it regroups (Context above; on iOS rf3's typing on after a reformatting fill landed in order), and averi
   sends nothing to move it. A field that moved the caret elsewhere would put the tail in the middle: the read-back
   then fails (no reformat of the value), the safe side. Android never retypes a tail (`may-arrive-late`), so there
-  the change is the diagnosis alone.
+  the change is the diagnosis and the `elsewhere` proof below.
 - **The diagnosis.** A mismatch whose reading is such a prefix is `Difference` `dropped-tail` (`fill-verdict.ts#
   differenceOf`, before the case and same-length comparisons): `… but the field shows 10 — the first 8 typed
-  characters are there, grouped by the field (separators of its own added), the last 2 did not land: a dropped tail,
-  not a transformed input; content withheld from this error`. An exact prefix keeps its old `length` wording.
+  characters are there, grouped by the field (separators of its own added), the last 2 did not land: dropped, or
+  refused by the field (a length cap, a character it does not take) — not a transformed input; content withheld from
+  this error`. The reading cannot tell a drop from a refusal (review round 1, MINOR-1: a grouping field with a
+  maxLength, an integer-only amount that ignores `,`), so the error names both; on iOS the tail was typed again
+  first, so a fill failing the same way twice is a field refusing the rest. An exact prefix keeps its old `length`
+  wording.
+- **The rules live in a pure leaf** (review round 1, MINOR-2): `reformatOf`, `prefixOf`, `tailOf` and the separator
+  sets are `interact/fill-reformat.ts`'s; the typing (`fill-type.ts`) and the judge (`fill-verdict.ts`) both import
+  it, and neither imports the other.
+- **Android** (review round 1, NIT-2). No tail is typed again there, but `whereTyped`'s missing text now comes from
+  `tailOf` on every platform: an Android clear-fill whose reading is a reformatted prefix, and whose sibling input
+  GAINED a part of the missing text, reads `elsewhere` — the typing left the field — and skips the wipe and retype,
+  failing loudly instead. Before, such a reading proved nothing (`unproven`) and the wipe and retype ran. The safe
+  direction: deletes and a retype sent where the focus went would land in that sibling.
 - **The lab (SwiftUI).** `Forms.swift`'s formatting fields are a UIKit field now (`FormattingTextField`, a
   `UIViewRepresentable`): `textField(_:shouldChangeCharactersIn:replacementString:)` applies each key to the field's
   text, formats it, shows it, puts the caret at the end and writes the model in that one call — the screen and the

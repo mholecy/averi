@@ -145,7 +145,7 @@ export interface FillResult {
   /**
    * The read-back landed REFORMATTED (D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md): the
    * field shows every typed character in order with separators of its own between them (an IBAN grouped in fours, an
-   * amount's thousands) — interact/fill-type.ts#reformatOf; absent when it shows the text exactly. Counts only.
+   * amount's thousands) — interact/fill-reformat.ts#reformatOf; absent when it shows the text exactly. Counts only.
    */
   reformatted?: Reformat;
   /**
@@ -160,7 +160,7 @@ export interface FillResult {
 }
 
 /**
- * How a field reformatted what was typed (FillResult.reformatted, measured by interact/fill-type.ts#reformatOf):
+ * How a field reformatted what was typed (FillResult.reformatted, measured by interact/fill-reformat.ts#reformatOf):
  * `added` the separators it put between the typed characters, `respaced` the typed spaces it shows as another space
  * (a no-break or narrow no-break space) — never both 0: reformatOf returns no Reformat for an exact reading. `point`:
  * the added separator is `.` or `,`, which the reading cannot tell from a decimal point (FillVerdict's caveat). Counts
@@ -315,7 +315,7 @@ export interface OtherInput {
 /**
  * What differs between the typed value and a read-back that did not match
  * it, without carrying either string — classified by ONE function,
- * interact/fill-verdict.ts#differenceOf, all five kinds (until 2026-10-09
+ * interact/fill-verdict.ts#differenceOf, all six kinds (until 2026-10-09
  * fill.ts chose `unchanged`, `masked` and a partly masked `length` in a
  * ternary at the throw, and a helper of its own the rest):
  * - `masked`: the field shows bullets, compared by length only; `held` the
@@ -342,8 +342,9 @@ export interface OtherInput {
  *   the input".
  * - `dropped-tail` (D28): the field holds the first `landed` characters of
  *   the typing, GROUPED by separators of its own (a reformatting field:
- *   interact/fill-type.ts#tailOf), and not the last `dropped` — a tail the
- *   field dropped, not an input it transformed. iOS React Native's rf2 held
+ *   interact/fill-reformat.ts#tailOf), and not the last `dropped` — a tail the
+ *   field dropped or refused (a length cap, a character it does not take:
+ *   the reading cannot tell which), not an input it transformed. iOS React Native's rf2 held
  *   `1 234 567,` for `1234567,89` and was told "as many characters as were
  *   typed, 9 differing: the app transformed the input" (2026-10-31). An
  *   EXACT prefix stays `length`, as it always was.
