@@ -34,7 +34,7 @@ measured before and after.
 | D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | won't do — the recognizer is 150–160 ms on iOS (D0 on iOS); a persistent helper saves ≤ 50–80 ms on OCR asserts only |
 | D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | won't do — raw over exec-out is ~610 ms slower (see D19) |
 | D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | done (86505377; pace 250 → 100 ms; the script and clearText not worth it) |
-| D7 | iOS: a persistent idb client (the `idb` CLI's Python start-up ~90 ms of every idb call) — narrowed 2026-10-31; measure a one-shot helper against the CLI first | device | open |
+| D7 | iOS: a persistent idb helper per simulator — measured −90 ms a `describe-all`, −122 ms a `tap` (the CLI's Python start-up) | device | open — next after D24 |
 | D8 | Fill re-reads after focus only for secure or unknown fields | device | done (1083523e; Android only, ADR 0028) |
 | D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | won't do — the second look guards a re-flow after the keyboard hides; iOS only, 0 in D0 |
 | D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | done (4cd4825a); keyboard beside the tree: won't do (stale IME band → false "fully visible") |
@@ -51,7 +51,7 @@ measured before and after.
 | D21 | iOS idb: right after a simulator boot with a fresh companion every `idb ui describe-all` fails "The simulator's accessibility service named no frontmost application" for the whole call (D20's device check 2026-10-31: 133 reads in 90 s, 5 of 5 repeats); a hand launch + read before the run cured it once. Find the cause and what averi can do (re-front the app? a named recovery in the reply?) — needs the device | stability | open |
 | D22 | iOS registry probe: the bound simulator proven booted from its `device.plist` (0.05 ms) before `simctl list devices` (~80–110 ms, every verb); anything else falls back to simctl | device | done (3574d5b2; ADR 0031) — device-checked: tree −32 %, tap −12 % |
 | D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) together, not in series | device | done (fa334d35; not one spawn — the iOS 27 runtime has no shell; 445 → 250 ms a launch on the lab simulator) |
-| D24 | iOS RN: `idb ui text` drops the last 5–7 characters into rn-field in every fill-20 (D0 on iOS), so fill polls 5 × 400 ms and retypes (~2.6 s of 5.9 s) — find why, then pace | stability | open |
+| D24 | iOS RN: `idb ui text` drops the last 5–7 characters into rn-field in every fill-20 (D0 on iOS), so fill polls 5 × 400 ms and retypes (~2.6 s of 5.9 s) — measured ("D7 and D24 measured"): the first key alone, 150 ms, then the rest, sticky per app after a loss | stability | open |
 
 ## Notes
 
@@ -267,6 +267,22 @@ The owner's run through `ios-run.sh`, native · idb, 5 repeats, medians (ms), ag
 `simctl list devices` is gone from every window (D22); ensure-cold's two `defaults write` overlap (device busy 459 ms
 under the summed call time, D23). What is left per verb is idb itself (`describe-all` 140–180 ms, `ui tap` ~185 ms,
 `ui text` ~220 ms — about 90 ms of each the CLI's Python start-up: D7), the capture pair (kept) and appHealth (deferred).
+
+### D7 and D24 measured (2026-10-31, the owner outside the sandbox)
+
+D7 (`scratchpad/d7/d7-measure.py`, n = 20, the lab simulator, a fresh companion): a persistent fb-idb client in one
+process against averi's exact CLI argv — `describe-all` 114.3 → 24.7 ms (−90), `ui tap` 219.0 → 96.5 ms (−122); a
+fresh `Client.build` per call costs the same as the persistent one (connect 8.5 ms), so the saving is the CLI's Python
+start-up (`idb --help` alone 91.6 ms). `ui text` not measured (idb refuses an empty string). Decision: a persistent idb
+helper per simulator is worth building (≥ 60 ms on every verb) — the next loop after D24, analysis first (process
+lifecycle, a companion that dies, D21).
+
+D24 (`scratchpad/d24/rn-typing-diag.sh`, 15 runs a mode, "Jan Novak Bratislava" into AveriLabRN's rn-field via raw idb,
+read back from the app's state file): one burst (averi today) kept all 20 characters 5/15; the first character alone,
+150 ms, then the rest in one burst 15/15 (614 ms); one call with 10 ms after each key 15/15 (705 ms); chunks of 5 15/15
+(784 ms); chunks of 1 15/15 (3.8 s). ADR 0023's chunks-of-3 losing mid-text (14–15/25) did not reproduce here.
+Decision: after a fill on an app has seen its tail dropped, later iOS fills on that app send the first character alone,
+wait 150 ms, then the rest (sticky per app; native fills never pay); ADR 0023's tail retype stays the safety net.
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
