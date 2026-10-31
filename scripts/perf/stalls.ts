@@ -1,0 +1,43 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { overallStalls, scenarioStalls, stallCells, stallLine, type Spread, type Status, type Window } from './stats.js';
+
+/**
+ * D26's stall summary recomputed from D0 results JSON (baseline.ts `--out`) — for files written before the report
+ * carried it, from each run's recorded window: per scenario its `simctl io screenshot` calls/stalls, its wall median and
+ * its stall-free one, then the overall line; with several files, the pooled line last.
+ *
+ *   node --import tsx scripts/perf/stalls.ts <result.json> [<result.json> …]
+ */
+
+/** The part of a results JSON this reads. */
+export interface Result {
+  meta?: { described?: string };
+  scenarios: { id: string; summary: { wallMs?: Spread }; runs: { status: Status; wallMs: number; window: Window }[] }[];
+}
+
+export function stallReport(result: Result): { lines: string[]; windows: Window[] } {
+  const width = Math.max(0, ...result.scenarios.map((s) => s.id.length));
+  const lines = result.scenarios.map((s) => {
+    const [shots, free] = stallCells(scenarioStalls(s.runs));
+    const wall = s.summary.wallMs === undefined ? '—' : Math.round(s.summary.wallMs.median).toString();
+    return `  ${s.id.padEnd(width)}  ${shots}  wall med ${wall}  stall-free ${free}`;
+  });
+  const windows = result.scenarios.flatMap((s) => s.runs.map((r) => r.window));
+  return { lines: [...lines, `  ${stallLine(overallStalls(windows))}`], windows };
+}
+
+async function main(files: string[]): Promise<void> {
+  if (files.length === 0) throw new Error('usage: stalls.ts <result.json> [<result.json> …]');
+  const pooled: Window[] = [];
+  for (const file of files) {
+    const { lines, windows } = stallReport(JSON.parse(await readFile(file, 'utf8')) as Result);
+    console.log(file);
+    for (const l of lines) console.log(l);
+    pooled.push(...windows);
+  }
+  if (files.length > 1) console.log(`pooled, ${files.length} files: ${stallLine(overallStalls(pooled))}`);
+}
+
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main(process.argv.slice(2));
