@@ -579,6 +579,21 @@ export interface UiNode {
    */
   heading?: true;
   /**
+   * On an INPUT (`role` INPUT_ROLE), whether its source marks it a SECURE field — one that masks what it holds:
+   * uiautomator's `password` attribute (`"true"`/`"false"` on every node it dumps; read on text inputs only,
+   * adapters/android.ts#normalizeNode), WDA's element type (`SecureTextField` → true, `TextField`/`TextView` → false,
+   * adapters/wda-source.ts#toUiNode), and on idb's `TextField`/`TextView` only, its `traits` naming `SecureTextField`
+   * or its `subrole` `AXSecureTextField` → true, traits printed naming neither → false (idb types a secure field
+   * `TextField` too: the lab's `lab.form-basic.pin`, adapters/ios-tree-source.ts#idbSecure). ABSENT is unknown, never
+   * plain: a node of another role, an input-like node of another one (an iOS search field reads `other`), a source or
+   * a dump that did not print it. The one reader: an Android fill's post-focus re-read is skipped for an empty input
+   * that says `false` (interact/fill.ts,
+   * docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md), and a field said plain that
+   * reads as bullets then fails unless it shows exactly the typed length. A mark of the source, like `heading`:
+   * ui-tree knows no platform. Printed by `ui_snapshot` only when `true` (mcp/tools.ts#snapshotJson).
+   */
+  secure?: boolean;
+  /**
    * Set on every node of a HIDDEN SUBTREE of a WDA tree (adapters/wda-source.ts#hiddenRoots): a node of no structural
    * role (`STRUCTURAL_ROLES`: not WDA's `Other`, `Cell`, `Window`, … — a control, an image, a text, a scroll view, a
    * toolbar) that WDA reports `isVisible="0"` AND `isAccessible="0"`, whose every descendant is `isVisible="0"`, roots
@@ -1084,6 +1099,22 @@ export interface DeviceAdapter {
    * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
    */
   readonly dragSpeed?: number;
+  /**
+   * The tree read waits for the screen at rest: `uiTree` returns a snapshot taken only once the app has been quiet,
+   * so the read after a stroke shows where the stroke left the content, not a frame of it still moving. `scroll_until`
+   * then takes that read as the settled one (interact/scroll-rounds.ts#RoundRules.readSettles, ADR 0021 decision 7):
+   * a stop judged on it is reported at once, with no confirming read, and no settle pause is spent between the stroke
+   * and the read (interact/scroll.ts). A platform fact, so the adapter's — which tree source waits and how long the
+   * platform's strokes carry on are the platform's; the scroll is platform-agnostic.
+   *
+   * Set by Android only: `uiautomator dump` snapshots only once the app has been quiet, and its strokes are drags
+   * (`dragSpeed`) — the source, the measurements and the residual are adapters/android.ts#treeReadSettles's and ADR
+   * 0021 decision 7's. Absent on iOS: neither WDA's /source nor idb's describe-all waits (SETTLE_CONFIRM_READS has the
+   * fling a WDA read caught). A tree source that snapshots at once — a
+   * persistent accessibility service answering from its cache — must not set it, whatever the platform: the read
+   * after its stroke is any frame of the motion.
+   */
+  readonly treeReadSettles?: true;
   /**
    * When text sent by `typeText` has reached the focused field
    * (`TypingDelivery`) — the platform fact the fill's retype of a dropped

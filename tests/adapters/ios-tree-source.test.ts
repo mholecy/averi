@@ -29,7 +29,11 @@ const viaIdb = (r: RawIosElement): UiNode => parseIdbDescribeAll(JSON.stringify(
 // normalization), while any node below it is normalized like idb's.
 const viaWda = (r: RawIosElement): UiNode => parseWdaSourceValue({ type: 'Window', children: [asWda(r)] }).children[0];
 
-const CASES: { name: string; raw: RawIosElement; expected: Omit<UiNode, 'children'> }[] = [
+/**
+ * `wda`: what WDA's node says beyond the shared vocabulary. The one such fact is `secure` (types.ts#UiNode.secure):
+ * WDA's type says it (a `TextField` is plain), while idb's says nothing without the traits `asIdb` does not spell.
+ */
+const CASES: { name: string; raw: RawIosElement; expected: Omit<UiNode, 'children'>; wda?: Partial<UiNode> }[] = [
   {
     name: 'every field set, fractional frame → rounded integer points',
     raw: {
@@ -47,6 +51,7 @@ const CASES: { name: string; raw: RawIosElement; expected: Omit<UiNode, 'childre
     name: 'nulls are null',
     raw: { type: 'TextField', label: null, identifier: null, value: null, rect: { x: 1, y: 2, width: 3, height: 4 } },
     expected: { role: 'textfield', label: null, identifier: null, value: null, rect: { x: 1, y: 2, width: 3, height: 4 } },
+    wda: { secure: false },
   },
   {
     name: 'absent fields are null and a missing rect is the zero rect',
@@ -79,12 +84,12 @@ const CASES: { name: string; raw: RawIosElement; expected: Omit<UiNode, 'childre
 ];
 
 describe('iOS node normalization — one owner, pinned through BOTH tree sources', () => {
-  for (const { name, raw, expected } of CASES) {
+  for (const { name, raw, expected, wda } of CASES) {
     it(`idb: ${name}`, () => {
       expect(viaIdb(raw)).toEqual({ ...expected, children: [] });
     });
     it(`wda: ${name}`, () => {
-      expect(viaWda(raw)).toEqual({ ...expected, children: [] });
+      expect(viaWda(raw)).toEqual({ ...expected, ...wda, children: [] });
     });
   }
 

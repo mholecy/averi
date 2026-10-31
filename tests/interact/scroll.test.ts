@@ -470,6 +470,30 @@ describe('scrollUntilVisible — after the device check', () => {
     }
     expect(events).toEqual(['read', 'swipe', 'sleep:7', 'read', 'sleep:7', 'read']); // the stroke's round, the stop at 300, its confirmation
   });
+
+  it('where the tree read waits for the screen at rest (treeReadSettles): no settle pause after a stroke, and the stop is that read\'s — a confirming read still gets its pause', async () => {
+    const fake = Object.assign(wdaForm(681, () => [300, 300]), { treeReadSettles: true as const });
+    const events: string[] = [];
+    const read = fake.uiTree.bind(fake);
+    const swipe = fake.swipe.bind(fake);
+    let failFirst = true; // the call's first read fails: read again after a pause, never stroked blind (a confirm step)
+    fake.uiTree = async () => {
+      events.push('read');
+      if (failFirst) {
+        failFirst = false;
+        throw new Error('uiautomator dump returned no XML: ERROR: could not get idle state.');
+      }
+      return read();
+    };
+    fake.swipe = async (from, to) => (events.push('swipe'), swipe(from, to));
+    pauses.onSleep = (ms) => events.push(`sleep:${ms}`);
+    try {
+      expect(await scrollUntilVisible(fake, 'id:row', { ...FAST, fully: true, settleMs: 7 })).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    } finally {
+      pauses.onSleep = undefined;
+    }
+    expect(events).toEqual(['read', 'sleep:7', 'read', 'swipe', 'read']); // the failed read's confirm, the stroke's round, the stop at 300 on the read after it
+  });
 });
 
 describe('scrollUntilVisible — a list\'s end that rebounds (docs/bugs/2026-10-12-ios-scroll-until-never-reads-a-bouncing-list-end-as-exhausted.md)', () => {

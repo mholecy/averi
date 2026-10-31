@@ -673,6 +673,29 @@ export class AndroidAdapter implements DeviceAdapter {
    * tree read.
    */
   readonly dragSpeed = 0.45;
+  /**
+   * The read after a stroke is the settled read (types.ts#DeviceAdapter.treeReadSettles, ADR 0021 decision 7).
+   *
+   * `uiautomator dump` waits before it snapshots: AOSP's DumpCommand#run calls `uiAutomation.waitForIdle(1000,
+   * 1000 * 10)` — UiAutomation#waitForIdle returns once no accessibility event has arrived for 1 s, and throws after
+   * 10 s, upon which the command prints `ERROR: could not get idle state.` and dumps nothing (a read that fails, read
+   * again like any other) — frameworks/base cmds/uiautomator/cmds/uiautomator/src/com/android/commands/uiautomator/
+   * DumpCommand.java, android13-release (the lab AVD's API 33; the same call on `main`). A scroll view emits
+   * TYPE_VIEW_SCROLLED and TYPE_WINDOW_CONTENT_CHANGED while its content moves, so a dump's snapshot is taken after the content has been
+   * still for that second. And `input swipe` returns once the finger has lifted.
+   *
+   * Measured (lab AVD, API 33, 2026-10-30; `input swipe`, then a dump at once and a second right after it, compared):
+   * the Compose picker (`form-picker`) 6 of 6 the same at the drag speed, 4 of 4 after a 300 ms fling; the Views list
+   * of `scroll-collapsing` (a NestedScrollView under a collapsing AppBarLayout), whole dumps byte for byte, 6 of 6 at
+   * the drag speed, 6 of 6 after a 300 ms fling, 4 of 4 after a 100 ms one; the Compose carousel of
+   * `carousel-in-list`, stroked sideways as the scroll strokes it, 5 of 5 at the drag speed and 4 of 4 after a 150 ms
+   * fling — the content had moved each time.
+   *
+   * Residual: content that goes on moving while it raises no accessibility event (a canvas animation, a view moved
+   * without telling the framework, a fling still running after a second of silence) can be read mid-motion — the
+   * same exposure as a stop at 0 swipes, which no read confirms either.
+   */
+  readonly treeReadSettles = true as const;
   /** `input text` hands keys to the IME's queue, which may still deliver them after the call (types.ts#TypingDelivery). */
   readonly typingDelivery = 'may-arrive-late' as const;
 
@@ -1366,6 +1389,8 @@ interface RawNode {
   clickable?: string;
   /** "true" on a node that scrolls now — its descendants' bounds are clipped to it (types.ts#UiNode.clipsDescendants). */
   scrollable?: string;
+  /** "true"/"false" on every node of the API 33 dump (measured: the lab's form PIN "true") — read on text inputs only (types.ts#UiNode.secure). */
+  password?: string;
   bounds?: string;
   node?: RawNode | RawNode[];
 }
@@ -1588,6 +1613,9 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md
   const hint = isTextInput ? emptyToNull(raw.hint) : null;
   if (hint !== null) node.placeholder = hint;
+  // Masked or not, as the dump says it (types.ts#UiNode.secure) — on a text input only: what a container or a label
+  // says of itself is not what the field in it does, and a missing attribute stays unknown.
+  if (isTextInput && (raw.password === 'true' || raw.password === 'false')) node.secure = raw.password === 'true';
   if (whole !== undefined) around.grown.set(node, whole);
   return node;
 }

@@ -653,6 +653,7 @@ describe('every description keeps the rules an agent must not break', () => {
     ['tap', 'In tree units: px on Android, pt on iOS'],
     ['ui_snapshot', 'Rects are in tree units (px on Android, pt on iOS).'],
     ['ui_snapshot', '"heading": true (iOS) — drawn over the nodes listed after it that it overlaps (a pinned section header)'],
+    ['ui_snapshot', '"secure": true — a masked input, its value bullets'],
     ['instructions', 'Coordinates and rects are in tree units: pixels on Android, points on iOS.'],
     ['instructions', 'follow it rather than retrying unchanged'],
   ];

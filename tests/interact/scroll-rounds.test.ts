@@ -666,6 +666,16 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] }); // no flush left: the row is whole
   });
 
+  it('where the read after a stroke is the settled read (readSettles), the read after the PROBE is still confirmed when the probe moved the row; a flush row the read after a scroll stroke found is probed at once, with no confirming read before the probe', () => {
+    const SETTLES: Rules = { ...FULLY_ANDROID, readSettles: true };
+    expect(play(SETTLES, [formRead(242, 92), formRead(451), formRead(451)]).steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
+    // A confirming read is no read after a stroke: one that finds the row moved again (451 → 460) is confirmed in turn.
+    expect(play(SETTLES, [formRead(242, 92), formRead(451), formRead(460), formRead(460)]).steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'confirm', 'stop']);
+    const stroked = play({ ...SETTLES, maxSwipes: 6 }, [formRead(2400), formRead(1846, 132), formRead(1586), formRead(1586)]);
+    expect(stroked.steps.map((s) => (s.do === 'stroke' && s.probe === true ? 'probe' : s.do))).toEqual(['stroke', 'probe', 'confirm', 'stop']);
+    expect(play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(2400), formRead(1846, 132), formRead(1846, 132), formRead(1586), formRead(1586)]).steps.map((s) => (s.do === 'stroke' && s.probe === true ? 'probe' : s.do))).toEqual(['stroke', 'confirm', 'probe', 'confirm', 'stop']);
+  });
+
   it('the measured Priority row, cut by CONTINUE to {y:1846, height:132}: probed toward the bottom edge (content down)', () => {
     const played = play(FULLY_ANDROID, [formRead(1846, 132), formRead(1586), formRead(1586)]);
     expect(probeOf(played).map(decided)).toEqual([{ do: 'stroke', kind: 'full', toward: 'down', reach: 0.25, box: FORM, probe: true, maxTravel: 177 }]);
@@ -1919,6 +1929,22 @@ describe('round — a target under a screen presented over it (docs/adr/0018-a-l
     expect(failureOf(played, 'id:lang_sk').message).toMatch(/^scroll_until id:lang_sk stopped after 1 swipe, without swiping further — .*, and a swipe on it may dismiss it, so no further swipe was sent\. Last rect /);
   });
 
+  it('where the read after a stroke is the settled read (readSettles), the presented hold still takes its own confirming read — and one that fails is read again', () => {
+    const login = rowOf('finportalLogin', 'lang_sk');
+    const forgot = rowOf('finportalForgot', 'lang_sk');
+    const SETTLES = { ...IPHONE, readSettles: true };
+    const held = play(SETTLES, [{ tree: login.tree, found: [] }, forgot, forgot]);
+    expect(held.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'stop']);
+    expect(held.outcome).toMatchObject({ kind: 'presented', swipes: 1 });
+    const failing = play(SETTLES, [{ tree: login.tree, found: [] }, forgot, { error: 'uiautomator dump returned no XML' }, forgot]);
+    expect(failing.steps.map((st) => st.do)).toEqual(['stroke', 'confirm', 'confirm', 'stop']);
+    expect(failing.outcome).toMatchObject({ kind: 'presented', swipes: 1 });
+    // …and found clear on the read after the stroke, the stop is that read's, settled.
+    const clear = play(SETTLES, [{ tree: login.tree, found: [] }, login]);
+    expect(clear.steps.map((st) => st.do)).toEqual(['stroke', 'stop']);
+    expect(clear.outcome).toMatchObject({ kind: 'visible', swipes: 1, settled: true });
+  });
+
   it('no confirm left — the deadline reached on the first presented read: the stop comes at once, still with no stroke', () => {
     const played = play(IPHONE, [{ ...rowOf('finportalForgot', 'lang_sk'), elapsedMs: IPHONE.timeoutMs }]);
     expect(played.steps.map((st) => st.do)).toEqual(['stop']);
@@ -2808,5 +2834,30 @@ describe('round — a read that lists none of the stroked scroll view\'s content
     const flat = (rest: string): Row => ({ found: [], rest, flatList: true });
     const played = play({ ...DEFAULTS, screen: { width: 402, height: 874 } }, [flat('a'), flat('b'), flat('b'), flat('b')]);
     expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', unchanged: 'tree' } });
+  });
+});
+
+/**
+ * Where the tree read waits for the screen at rest (`RoundRules.readSettles`, ADR 0021 decision 7 — Android, whose
+ * `uiautomator dump` snapshots only after a second with no accessibility event), the read after a stroke IS the settled
+ * read: a stop judged on it is reported at once, settled, no confirming read. What confirms for another reason still
+ * does: a presented hold (ADR 0018), a confirming read that failed, the read after the flush check's probe. Without
+ * the rule (every other test in this file), the read after a stroke is confirmed as before.
+ */
+describe('round — a tree read that waits for the screen at rest (readSettles)', () => {
+  const SETTLES: Rules = { ...ANDROID, readSettles: true };
+
+  it('a stop after a stroke is reported on that read, settled — no confirming read; without the rule the same reads confirm it', () => {
+    const played = play(SETTLES, reads([2900, 500], formRow));
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stop']);
+    expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+    expect(play(ANDROID, reads([2900, 500, 500], formRow)).steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
+  });
+
+  it('a stop after a turn, too: every stroke\'s read is its settled read', () => {
+    const played = play({ ...SETTLES, maxSwipes: 6 }, reads([2900, -400, 500], formRow));
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stop']);
+    expect(strokesToward(played)).toEqual(['down', 'up']);
+    expect(resultOf(played)).toEqual({ swipes: 2, visible: 1, clipped: [] });
   });
 });

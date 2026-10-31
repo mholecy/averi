@@ -19,6 +19,8 @@ turn after one stroke; the carry model cuts a first stroke over each scroll view
 the read a fling comes to rest in (decision 5).
 Round 9 (2026-10-25, the owner): decision 6 (a rebound read settled, the tree unmoved within a point where strokes
 fling) and residual 2 (the WDA plain stop on a centre a fraction of a point out) accepted.
+2026-10-30 (the owner, performance backlog D10): decision 7 (where the tree read waits for the screen at rest, the
+read after a stroke is the settled read) accepted (1a51687b, cf5c0ac0; merged 4cd4825a).
 
 ## Context
 
@@ -139,6 +141,66 @@ fling) and residual 2 (the WDA plain stop on a centre a fraction of a point out)
    moved — the strokes run on as before, and a list that never moved may name the side never stroked; a content that
    genuinely moves a unit per stroke where strokes fling reads unmoved (no stroke moves content that little); a screen
    whose content moves on its own by less than a stroke between reads takes the extra read too, and is judged as before.
+7. **Where the tree read waits for the screen at rest, the read after a stroke is the settled read** (owner,
+   2026-10-30, performance backlog D10; `adapters/types.ts#DeviceAdapter.treeReadSettles`,
+   `scroll-rounds.ts#RoundRules.readSettles`): decision 5's two agreeing reads were made for a read that snapshots at
+   once — WDA's, measured carrying a flung row 730–800 pt on after it (6f4f0baa, `SETTLE_CONFIRM_READS`). Android's
+   does not: AOSP's `DumpCommand#run` (frameworks/base, cmds/uiautomator/cmds/uiautomator/src/com/android/commands/
+   uiautomator/DumpCommand.java, android13-release — the lab AVD's API 33; the aosp-mirror `main` branch has the
+   same call, read 2026-10-31) calls `uiAutomation.waitForIdle(1000, 1000 * 10)` before it snapshots: no
+   accessibility event for 1 s, or after 10 s `ERROR: could not get idle state.` and no dump at all (a failed read,
+   read again as any other). A scroll view raises scroll and content-changed events
+   while its content moves, so the dump is taken after a second of stillness; and averi's Android strokes are drags
+   (`dragSpeed`, ≈ 90 px of fling by AOSP's spline). Measured on the lab AVD (2026-10-30; `input swipe`, then a
+   dump at once and a second dump right after, compared): the Compose picker (`form-picker`) 6 of 6 the same at the drag
+   speed and 4 of 4 after a 300 ms fling; the Views list of `scroll-collapsing` (a NestedScrollView under a collapsing
+   AppBarLayout), whole dumps byte for byte, 6 of 6 at the drag speed, 6 of 6 after a 300 ms fling and 4 of 4 after a
+   100 ms one; the Compose carousel of `carousel-in-list`, stroked sideways from (824,497) as the scroll strokes it,
+   5 of 5 at the drag speed and 4 of 4 after a 150 ms fling — the content moved each time (35 of 35). Unmeasured: a
+   list that SNAPS after the finger lifts (a pager, a LazyRow with a snap fling behaviour) — the carousel measured is
+   a plain horizontalScroll; a snap animates the offset and raises scroll events as it does, so the dump's wait
+   should cover it too — plausible, not measured. The confirming
+   read compared two equal trees, at the price of a 400 ms settle and a ≈ 2.3 s dump on every stop after a stroke,
+   and a settle before every read after a stroke.
+   So an adapter whose tree read waits for rest says so (`treeReadSettles`, Android only), and the scroll then
+   (a) reports a stop judged on the read after a scroll stroke at once, settled, with no confirming read — and under
+   `fully: true` probes a row it finds flush with its scroll view on that read at once, with no confirming read
+   before the probe; and (b) sends
+   no settle pause between a stroke — a probe's included, its read being a dump too — and the read after it.
+   Unchanged: a presented hold (ADR 0018) still takes its confirming read — it awaits the presented screen, not the
+   stroke's motion; a confirming read that failed is read
+   again; the read after the flush check's probe settles only as before (`FlushSeen.settles`, else confirmed); a
+   confirming read still follows its settle pause; a stop at 0 swipes, the rebound rule (decision 6, `fling` only)
+   and `UNMOVED_STROKES_EXHAUST`'s end are untouched. The fact is the adapter's, not keyed on `strokes: 'drag'`: what
+   makes the read settled is the tree source's wait, and the drag only keeps what moves after the finger lifts short.
+   A tree source that answers at once — a persistent accessibility service reading its own cache — must not set it,
+   whatever the platform, and iOS (WDA, idb: neither waits) does not.
+   Cost and gain: measured with scripts/perf/baseline.ts (`--scenarios scroll --repeat 5`, the 45-row picker's last
+   row, 4 swipes): 19 341 ms median [19 298–19 484] at 23fc5f97, 15 084 ms [14 886–15 318] with it (−22 %) — one
+   dump (6 → 5, 12.1 → 10.0 s) and five 400 ms settles fewer, the same reply in every run ("fully visible after 4
+   swipes"). Live (scripts/truth/live.ts `--groups forms,visibility` on the lab AVD, 185 cases, before and after):
+   184 cases the same verdict; no reply says a stop is unsettled in either run. Where the replies differ with the
+   verdict kept: scroll-bounded's O and F reach `maxSwipes` (6) where they ran out the 15 s at 5, honest LOUD either
+   way; tabbar-floating's F still the deadline at 4 swipes (15.7 s, was 17.0); `blank:tabbar-floating.F` ok both
+   times, "visible after 5 swipes — PARTLY UNDER other "more" … 53 % of it shows" before and "fully visible after 6
+   swipes" after — the strokes' carry differs run to run (664–849 px against ≈ 850), from the first stroke on, before
+   any changed code runs. The one verdict that moved, `scroll:carousel-in-list.C` ok → MISMATCH (a stop claimed on C
+   with its centre 2 px past the carousel's edge),
+   is the stroke's own spread, not the read: one sideways drag carries the carousel 472–622 px from run to run, before
+   and after alike (three more runs each, all ok), the bare drag above left C at x 410–555 with no read moving it,
+   and the run that missed rested at 472 (C at x 542, its centre at 1016 past the carousel's 1014) — a dump at rest.
+   uiautomator dumps C's bounds cut at the screen's edge (`[542,380][1080,614]`, C 948 wide), so the round takes
+   542–1080 for C, 88 % of it inside the carousel and its centre at 811, and cannot tell where C's true centre lies —
+   the same claim at 491 and at 472; a pre-existing gap of the dump (the LE1 note's shape), outside this decision.
+   Residual: content that goes on moving while it raises no accessibility event (a canvas or a view moved without
+   telling the framework), or whose motion outlasts a second of silence, is read mid-motion and the stop claimed on
+   it — the exposure a stop at 0 swipes always had, which no read confirms either.
+   Not done with it (proposed alongside, rejected): reading the keyboard's window state beside the dump, in parallel.
+   The dump returns ≈ 2 s after it is asked for, when its second of quiet is over; a `dumpsys` asked beside it answers
+   at once, so the band the round applies would be the keyboard of ≈ 2 s before the snapshot — a keyboard that hid
+   in between would still clip the target or score it 0 (a stroke for nothing), and one that came up in between
+   (a screen that auto-focuses a field) would be missed and a target under it claimed "fully visible". The reading
+   stays after the tree, as ui-tree/keyboard-cover.ts orders it.
 
 ## Where it applies, and where not
 
