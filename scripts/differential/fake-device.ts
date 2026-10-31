@@ -308,6 +308,11 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
       if (profile.screen === undefined) throw new CommandError('differential: idb describe answered nothing', 1);
       return JSON.stringify({ screen_dimensions: { width_points: profile.screen.width, height_points: profile.screen.height } });
     }
+    // D26b: the idb tree source's capture — the same frame simctl's file holds, on stdout.
+    if (line === 'screenshot -') {
+      device.calls.push('idb screenshot');
+      return frame(profile.frame, device.paint, profile.screenshot);
+    }
     if (line === 'ui describe-all --json') {
       device.calls.push(`idb ${line}`);
       if (profile.idbPayload === undefined) throw new CommandError('differential: no idb payload recorded', 1);

@@ -41,6 +41,9 @@ const NO_TREE: IosTreeSource = {
   dispose: () => Promise.resolve(),
 };
 
+/** NO_TREE of the WDA kind: screenshots there stay `simctl io screenshot` (D26b). */
+const WDA_NO_TREE: IosTreeSource = { ...NO_TREE, kind: 'wda' };
+
 const IDB_DESCRIBE_ALL = JSON.stringify([
   {
     type: 'Button', AXLabel: 'Log in', AXUniqueId: 'login_button', AXValue: '',
@@ -490,7 +493,7 @@ describe('IosAdapter re-enables accessibility automation before every launch and
  * (2026-10-08, adapters/screenshot-bytes.ts): an empty or non-PNG file is a
  * transport error naming the simulator and the command, as on Android.
  */
-describe('IosAdapter.screenshot — the file is a PNG or the call fails', () => {
+describe('IosAdapter.screenshot — the file is a PNG or the call fails (simctl: the WDA tree source)', () => {
   /** simctl's stand-in: writes `bytes` to the path it is given, as `simctl io <udid> screenshot <file>` does. */
   function writesScreenshot(bytes: Buffer): ExecFn {
     return async (cmd, args): Promise<ExecResult> => {
@@ -501,12 +504,12 @@ describe('IosAdapter.screenshot — the file is a PNG or the call fails', () => 
 
   it('passes a file that starts with the PNG signature through unchanged', async () => {
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
-    const shot = await new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(png), treeSource: NO_TREE }).screenshot();
+    const shot = await new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(png), treeSource: WDA_NO_TREE }).screenshot();
     expect(shot.equals(png)).toBe(true);
   });
 
   it('an empty file is a transport error naming the simulator, the command and the reboot', async () => {
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(Buffer.alloc(0)), treeSource: NO_TREE }).screenshot()).rejects.toThrow(
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: writesScreenshot(Buffer.alloc(0)), treeSource: WDA_NO_TREE }).screenshot()).rejects.toThrow(
       '`xcrun simctl io AAAA-1111 screenshot <file>` on simulator AAAA-1111 returned 0 bytes — not a PNG, though the ' +
         'command reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s ' +
         'screen. Re-check `xcrun simctl list devices booted` and retry; if it repeats, reboot the simulator ' +
@@ -516,7 +519,109 @@ describe('IosAdapter.screenshot — the file is a PNG or the call fails', () => 
 
   it('a file that is not a PNG is refused too, quoting its start', async () => {
     const exec = writesScreenshot(Buffer.from('JFIF not a png'));
-    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(/returned 14 bytes starting "JFIF not a png" — not a PNG/);
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: WDA_NO_TREE }).screenshot()).rejects.toThrow(/returned 14 bytes starting "JFIF not a png" — not a PNG/);
+  });
+});
+
+/**
+ * D26b (docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md, "D26b"): on the idb tree source the
+ * screenshot is `idb screenshot -` — through runIdb, so the helper first and the idb CLI as its fallback — never
+ * `simctl io screenshot`, which stalls ~+1 000 ms in ~7 % of calls (backlog "### D26 diag"). No simctl fallback at run
+ * time: a capture pair from two sources compares two different images (the Dynamic Island) and reads as moving.
+ */
+describe('IosAdapter.screenshot — through idb on the idb tree source (D26b)', () => {
+  const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x0a, 0xff]);
+  let saved: string | undefined;
+  beforeEach(() => {
+    saved = process.env.AVERI_IOS_SCREENSHOT;
+    delete process.env.AVERI_IOS_SCREENSHOT;
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.AVERI_IOS_SCREENSHOT;
+    else process.env.AVERI_IOS_SCREENSHOT = saved;
+  });
+
+  /** Answers `idb screenshot -` with `idb`, writes `simctl` to simctl's file; logs every call but the Xcode probe. */
+  function both(idb: Buffer | Error, simctlBytes: Buffer = PNG_BYTES) {
+    const calls: string[] = [];
+    const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
+      if (cmd === 'xcrun' && args[0] === '--find') return { stdout: Buffer.from('/x/simctl\n'), stderr: '' };
+      calls.push([cmd, ...args].join(' '));
+      if (cmd === 'idb') {
+        if (idb instanceof Error) throw idb;
+        return { stdout: idb, stderr: '' };
+      }
+      if (cmd === 'xcrun' && args[1] === 'io') await writeFile(args.at(-1) as string, simctlBytes);
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    return { exec, calls };
+  }
+
+  it('sends `idb screenshot - --udid U` and returns its stdout as it came', async () => {
+    const { exec, calls } = both(PNG_BYTES);
+    const shot = await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot();
+    expect(shot.equals(PNG_BYTES)).toBe(true);
+    expect(calls).toEqual(['idb screenshot - --udid AAAA-1111']);
+  });
+
+  it('keeps `simctl io screenshot` on the WDA tree source', async () => {
+    const { exec, calls } = both(PNG_BYTES);
+    await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: WDA_NO_TREE }).screenshot();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/^xcrun simctl io AAAA-1111 screenshot \S+screen\.png$/);
+  });
+
+  it('keeps `simctl io screenshot` with AVERI_IOS_SCREENSHOT=simctl — read once, when the adapter is made', async () => {
+    process.env.AVERI_IOS_SCREENSHOT = 'simctl';
+    const { exec, calls } = both(PNG_BYTES);
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE });
+    delete process.env.AVERI_IOS_SCREENSHOT;
+    await adapter.screenshot();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/^xcrun simctl io AAAA-1111 screenshot /);
+    // …and set after an adapter is made, it changes nothing for that adapter: one source for its whole life.
+    const later = both(PNG_BYTES);
+    const made = new IosAdapter({ udid: 'AAAA-1111', exec: later.exec, treeSource: NO_TREE });
+    process.env.AVERI_IOS_SCREENSHOT = 'simctl';
+    await made.screenshot();
+    expect(later.calls).toEqual(['idb screenshot - --udid AAAA-1111']);
+  });
+
+  it('refuses bytes that are no PNG, naming the idb command, the companion and `idb list-targets`', async () => {
+    const { exec } = both(Buffer.alloc(0));
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(
+      '`idb screenshot - --udid AAAA-1111` on simulator AAAA-1111 returned 0 bytes — not a PNG, though the command ' +
+        'reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s screen. ' +
+        'Re-check that `idb list-targets` lists the simulator as Booted and that its idb companion is running, and retry; ' +
+        'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl, or ' +
+        'reboot the simulator (`xcrun simctl shutdown AAAA-1111 && xcrun simctl boot AAAA-1111`).',
+    );
+    const foreign = both(Buffer.from('Traceback (most recent call last)'));
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: foreign.exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(
+      /^`idb screenshot - --udid AAAA-1111` on simulator AAAA-1111 returned 33 bytes starting "Traceback/,
+    );
+  });
+
+  it('does NOT fall back to simctl when idb fails — the idb error is the answer', async () => {
+    const { exec, calls } = both(new Error('Command failed (exit 1): idb screenshot - --udid AAAA-1111\nFailed to connect to companion'));
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(/Failed to connect to companion/);
+    expect(calls).toEqual(['idb screenshot - --udid AAAA-1111']);
+  });
+
+  it('nor when idb answers bytes that are no PNG', async () => {
+    const { exec, calls } = both(Buffer.from('nope'));
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(/not a PNG/);
+    expect(calls).toEqual(['idb screenshot - --udid AAAA-1111']);
+  });
+
+  it('gives the capture 15 s, as describe-all', async () => {
+    const timeouts: (number | undefined)[] = [];
+    const exec: ExecFn = async (cmd, args, opts): Promise<ExecResult> => {
+      if (cmd === 'idb') timeouts.push(opts?.timeoutMs);
+      return { stdout: cmd === 'idb' ? PNG_BYTES : Buffer.alloc(0), stderr: '' };
+    };
+    await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot();
+    expect(timeouts).toEqual([15_000]);
   });
 });
 

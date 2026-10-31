@@ -15,6 +15,10 @@ type Word = string | RegExp | typeof NUMS;
 /**
  * The idb calls the helper may serve, word by word, the `--udid` excluded (runIdb appends it last, as for the CLI):
  * - D7a: the tree read, `ui describe-all --json`. A read: a helper that dies under one is retried on the CLI.
+ * - D26b: the screenshot on the idb tree source, `screenshot -` (the PNG on stdout, carried as base64 of its bytes —
+ *   idb-helper-script.ts). A read too: it changes nothing on the simulator, so a death under it is retried on the CLI;
+ *   its timeout is the caller's (ios.ts, 15 s as describe-all's) and counts toward TIMEOUTS_IN_A_ROW like any other.
+ *   `screenshot <file>` (or none) is the CLI's: averi never sends it.
  * - D7b: every HID argv IosAdapter sends (ios.ts) — tap, longPress (`tap … --duration`), swipe, typeText (D24's split
  *   included: two `ui text`), clearText (`key-sequence` 42… then 76…), pressKey (`key 40`, `button HOME`). Input: a
  *   helper that dies under one is NOT retried — the event may have reached the simulator (HID_ARGV, runIdb).
@@ -22,7 +26,10 @@ type Word = string | RegExp | typeof NUMS;
  * no plain decimal, another button), is the CLI's, as before D7. `describe --json` (the memoized viewport, one call an
  * adapter) stays on the CLI: not worth a shape.
  */
-const READ_ARGV: readonly (readonly Word[])[] = [['ui', 'describe-all', '--json']];
+const READ_ARGV: readonly (readonly Word[])[] = [
+  ['ui', 'describe-all', '--json'],
+  ['screenshot', '-'],
+];
 const HID_ARGV: readonly (readonly Word[])[] = [
   ['ui', 'tap', NUM, NUM],
   ['ui', 'tap', NUM, NUM, '--duration', NUM],
