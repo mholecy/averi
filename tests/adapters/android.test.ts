@@ -1798,8 +1798,9 @@ describe('AndroidAdapter.capture — the raw frame, `screencap -p` where the dev
   it('any other answer that is not gzip, on a live device, costs that call a `-p` and pins nothing (MINOR-1)', async () => {
     const said = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      for (const answer of ["/system/bin/sh: can't fork: Try again\n", 'Killed\n', '\x1f']) {
-        const { fn, calls } = fakeExec({ [RAW]: Buffer.from(answer, 'latin1'), [PNG]: devicePng });
+      for (const answer of ["/system/bin/sh: can't fork: Try again\n", 'Killed\n', '\x1f', gzipSync(Buffer.alloc(0))]) {
+        const raw = Buffer.isBuffer(answer) ? answer : Buffer.from(answer, 'latin1');
+        const { fn, calls } = fakeExec({ [RAW]: raw, [PNG]: devicePng });
         const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
         expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
         expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
@@ -1817,6 +1818,14 @@ describe('AndroidAdapter.capture — the raw frame, `screencap -p` where the dev
     await expect(adapter.capture()).rejects.toThrow(/exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG/);
     await expect(adapter.capture()).rejects.toThrow(/returned 0 bytes/);
     expect(calls).toEqual([RAW, PNG, RAW, PNG]);
+  });
+
+  it("a failing screencap (an empty gzip stream: its words went to /dev/null) is told by `-p`: the device's own message", async () => {
+    const { fn, calls } = fakeExec({ [RAW]: gzipSync(Buffer.alloc(0)), [PNG]: 'Capturing failed.\n' });
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).capture()).rejects.toThrow(
+      /^`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 18 bytes starting "Capturing failed\." — not a PNG/,
+    );
+    expect(calls).toEqual([RAW, PNG]);
   });
 
   it('an empty raw answer is a transport error naming the raw command, with no `-p` after it', async () => {

@@ -1018,8 +1018,9 @@ export interface DeviceAdapter {
    * The screen as pixels, for a caller that compares or measures them and hands no PNG on — D19
    * (docs/adr/0035-android-captures-raw-pixels.md). Optional: an adapter without it is captured with `screenshot()`
    * and decoded (verify/shot.ts). Android's: `screencap 2>/dev/null | gzip -1`, the raw frame
-   * (adapters/screenshot-bytes.ts#screencapRaw), or — on a device the raw path refuses — `screencap -p`'s PNG, as it is. `screenshot()` is then this capture,
-   * encoded on the host when it is pixels. Throws as `screenshot()` does: a capture is a frame or a transport error.
+   * (adapters/screenshot-bytes.ts#screencapRaw), or — on a device the raw path refuses — `screencap -p`'s PNG, as it
+   * is. `screenshot()` is then this capture, encoded on the host when it is pixels. Throws as `screenshot()` does: a
+   * capture is a frame or a transport error.
    */
   capture?(): Promise<ScreenCapture>;
   /**

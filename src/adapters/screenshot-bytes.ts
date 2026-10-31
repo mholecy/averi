@@ -73,25 +73,28 @@ function transportError(source: ScreenshotSource, what: string, expected = 'a sc
 /**
  * D19 (docs/adr/0035-android-captures-raw-pixels.md): Android's capture is `screencap 2>/dev/null | gzip -1` on the
  * device — the raw frame, gzipped where it is made, so neither the device's PNG encode (~230 ms on a lab screen, over
- * a second on a photo) nor the 9.6 MB raw transfer over exec-out (~11–30 MB/s) is paid. This judges what came back, three ways:
+ * a second on a photo) nor the 9.6 MB raw transfer over exec-out (~11–30 MB/s) is paid. This judges what came back,
+ * three ways:
  *
  * - a frame: the gunzipped stream is a header and `width × height × 4` bytes of RGBA_8888 — the header 16 bytes
  *   (API 28+: width, height, format, colour space) or 12 (before: no colour space), told apart by the length, which
- *   must be exactly one of the two. Its pixels are the device's `screencap -p` decoded, byte for byte (pinned on a real
- *   pair: tests/adapters/screenshot-raw.test.ts). The image is a view of the stream, not a copy;
+ *   must be exactly one of the two. Its pixels are the device's `screencap -p` decoded, byte for byte (pinned on a
+ *   real pair: tests/adapters/screenshot-raw.test.ts). The image is a view of the stream, not a copy;
  * - `refused`: the raw path gave no frame this time, though the device answered. `lasting` says whether it never
- *   will on this device — only on positive evidence (the D19 review, MINOR-1): the shell's word that there is no gzip
- *   (`gzip: not found`, `inaccessible or not found`), or a format other than RGBA_8888 (RGBX_8888's alpha is
- *   undefined, RGB_565 is another layout). What else can come back that is not a gzip stream: screencap's stdout is
- *   gzip's input and its stderr goes to /dev/null, so anything ahead of the stream is the device shell's own (exec-out
- *   merges its stderr) — `Killed` on a dying guest, a shell that could not fork — or a stream cut before its second
- *   byte. Those are refused for this call only. Either way the adapter captures with `screencap -p`, whose own check
- *   decides whether the device is alive (`screenshotPng`);
- * - a transport error, worded as `screenshotPng`'s: nothing at all came back, a gzip stream that breaks, an empty
- *   frame (screencap failed — its "Capturing failed." went to /dev/null — and gzip compressed nothing), or a length
- *   that is not the header plus the pixels — the raw counterpart of the signature check, and stronger. A stream cut in transit already fails gunzip (its trailer
- *   holds the length and a CRC); the length check catches screencap itself writing short. One shape it cannot tell: a
- *   16-byte-header frame exactly 4 bytes short reads as a 12-byte-header one, its pixels shifted by one.
+ *   will on this device — only on positive evidence (the D19 review, MINOR-1): the shell's word that there is no
+ *   gzip (`gzip: not found`, `inaccessible or not found`), or a format other than RGBA_8888 (RGBX_8888's alpha is
+ *   undefined, RGB_565 is another layout). Refused for this call only: an answer that is not a gzip stream otherwise —
+ *   screencap's stdout is gzip's input and its stderr goes to /dev/null, so what comes ahead of the stream is the
+ *   device shell's own (exec-out merges its stderr): `Killed` on a dying guest, a shell that could not fork — or a
+ *   stream cut before its second byte; and an EMPTY frame — screencap failed, its own words ("Capturing failed.")
+ *   went to /dev/null, and gzip compressed nothing (round 3, NIT-1). Either way the adapter captures with
+ *   `screencap -p`, whose own check decides whether the device is alive (`screenshotPng`) — and for a failing
+ *   screencap, `-p` hands back the device's message that the redirection dropped;
+ * - a transport error, worded as `screenshotPng`'s: nothing at all came back, a gzip stream that breaks, or a length
+ *   that is not the header plus the pixels — the raw counterpart of the signature check, and stronger. A stream cut
+ *   in transit already fails gunzip (its trailer holds the length and a CRC); the length check catches screencap
+ *   itself writing short. One shape it cannot tell: a 16-byte-header frame exactly 4 bytes short reads as a
+ *   12-byte-header one, its pixels shifted by one.
  */
 export function screencapRaw(bytes: Buffer, source: ScreenshotSource): RawVerdict {
   if (bytes.length === 0) throw transportError(source, '0 bytes');
@@ -106,7 +109,7 @@ export function screencapRaw(bytes: Buffer, source: ScreenshotSource): RawVerdic
   } catch (e) {
     throw transportError(source, `a damaged gzip stream (${bytes.length} bytes: ${errorMessage(e)})`);
   }
-  if (frame.length === 0) throw transportError(source, 'an empty frame (0 bytes after gunzip)');
+  if (frame.length === 0) return { refused: 'screencap wrote an empty frame (0 bytes after gunzip)', lasting: false };
   if (frame.length < LEGACY_HEADER_BYTES) throw transportError(source, `a frame of ${frame.length} bytes, shorter than its header`);
   const width = frame.readUInt32LE(0);
   const height = frame.readUInt32LE(4);

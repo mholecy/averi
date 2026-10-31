@@ -39,14 +39,15 @@ keeps it as pixels. A PNG is encoded on the host only where one leaves the proce
   encoded on the host when it is pixels. iOS and every fake keep `screenshot()` alone.
 - adapters/screenshot-bytes.ts#screencapRaw judges the answer, as `screenshotPng` judges a PNG: a frame (header 16
   bytes on API 28+, 12 before, told apart by the length, which must be exactly header + w·h·4); a REFUSAL (not a gzip
-  stream; a format other than RGBA_8888); or a transport error (0 bytes, a damaged gzip stream, an empty frame, a
+  stream; a format other than RGBA_8888; an empty frame); or a transport error (0 bytes, a damaged gzip stream, a
   wrong length). On a refusal the adapter captures with `screencap -p`, whose check decides whether the device is
   alive. Only a LASTING refusal — positive evidence that the raw path never works on this device: the shell's
   `gzip: not found` / `inaccessible or not found`, or a format other than RGBA_8888 — pins the adapter to `-p`, once
   `-p` has succeeded, and says so once on stderr with its reason (of two captures refused at once, one pins). Any
   other non-gzip answer (the shell's `Killed` or another word of its own, a stream cut after one byte) costs that
   call a `-p` and pins nothing (amended after review round 1, MINOR-1: the first cut pinned on any of them). A
-  failed screencap is an empty gzip stream: a transport error. So a device without gzip pays today's cost, never
+  failed screencap is an empty gzip stream — its words went to /dev/null — so it too costs that call a `-p`, never
+  a pin, and a dead device's `-p` transport error carries the device's own message (round 3, NIT-1). So a device without gzip pays today's cost, never
   more, and a dying one says what it said before.
 - verify/shot.ts#Shot is one capture in either form, the other made on demand once: `equals` (two raw captures by
   pixels, two PNGs by bytes), `decode()`, `png()`. `Frame.shot` is a Shot. The stability wait, the baseline
