@@ -451,7 +451,7 @@ export type Shortfall =
  * .treeReadSettles — Android; ADR 0021 decision 7) the read after a stroke is the settled read and spends none of
  * them: `uiautomator dump` snapshots only once the app has raised no accessibility event for a second, so the read
  * the confirming read would compare it with is the same tree (measured: a dump right after `input swipe` equalled the
- * next 26 of 26 times, Compose and Views, drags and flings — adapters/android.ts#treeReadSettles). The confirming
+ * next 35 of 35 times, Compose and Views, lists and a carousel, drags and flings — adapters/android.ts#treeReadSettles). The confirming
  * read cost a settle and a 2.3 s dump on every stop after a stroke. What still confirms there: a presented hold
  * (ADR 0018, awaiting the presented screen, not the stroke's motion), a confirming read that failed, and the read
  * after the flush check's probe when the probe moved the target (flush-check.ts keeps its own evidence). Residual:

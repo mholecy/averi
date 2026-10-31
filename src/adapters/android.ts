@@ -687,7 +687,9 @@ export class AndroidAdapter implements DeviceAdapter {
    * Measured (lab AVD, API 33, 2026-10-30; `input swipe`, then a dump at once and a second right after it, compared):
    * the Compose picker (`form-picker`) 6 of 6 the same at the drag speed, 4 of 4 after a 300 ms fling; the Views list
    * of `scroll-collapsing` (a NestedScrollView under a collapsing AppBarLayout), whole dumps byte for byte, 6 of 6 at
-   * the drag speed, 6 of 6 after a 300 ms fling, 4 of 4 after a 100 ms one — the content had moved each time.
+   * the drag speed, 6 of 6 after a 300 ms fling, 4 of 4 after a 100 ms one; the Compose carousel of
+   * `carousel-in-list`, stroked sideways as the scroll strokes it, 5 of 5 at the drag speed and 4 of 4 after a 150 ms
+   * fling — the content had moved each time.
    *
    * Residual: content that goes on moving while it raises no accessibility event (a canvas animation, a view moved
    * without telling the framework, a fling still running after a second of silence) can be read mid-motion — the
