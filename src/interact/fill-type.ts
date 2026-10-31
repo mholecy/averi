@@ -42,6 +42,10 @@
  *      controlled single-line TextInput under `idb ui text`: 6 of 12 fills
  *      kept a prefix (up to 6 of 9 characters lost), the field itself holding
  *      the short value; the measurements that chose this remedy over chunked typing are the ADR's.
+ *      The first tail typed again is reported (`FieldIo.dropped`), so the
+ *      adapter can type into that app differently from then on — on iOS the
+ *      first key alone, 150 ms, then the rest (D24, the ADR's amendment of
+ *      2026-10-31); this retype stays the safety net, unchanged.
  *   2. With clear only: one wipe of what the field holds and a retype of the
  *      whole value — the content is ours (since 2026-08-05: Compose async
  *      state swallowing synthetic input). Not when another input provably
@@ -65,6 +69,13 @@ export interface FieldIo {
   read(): Promise<string | undefined>;
   /** The newest tree read — before the typing, the screen it starts on; after it, the read-back's. undefined: none yet. */
   screen(): UiNode | undefined;
+  /**
+   * The field dropped the tail of a typing and the tail was typed again (DeviceAdapter.noteDroppedTail): said once a
+   * fill, after the first tail is sent, so the adapter may type into this app differently from then on (D24 — iOS sends
+   * the first key alone). The tail retype of this fill is typed as before (ADR 0023: a retyped tail lands whole, 45 of
+   * 45); the fill's own rules do not change.
+   */
+  dropped(): void;
 }
 
 /** What the field should hold, and how it is compared. */
@@ -169,6 +180,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
         : undefined;
     if (tail !== undefined && (tails() === 0 || observed !== read.prior)) {
       await io.type(tail);
+      if (tails() === 0) io.dropped();
       again.push({ kind: 'tail', length: tail.length });
     } else if (clear && !again.some((a) => a.kind === 'whole') && where.kind !== 'elsewhere') {
       // What the field holds: a field showing only its placeholder (the typing never landed) gets no deletes. Not when

@@ -105,6 +105,8 @@ export class FakeAdapter implements DeviceAdapter {
   platform: 'android' | 'ios' = 'android';
   /** Assignable: the fake's typing lands when typeText returns (types.ts#TypingDelivery); a test of Android's queue sets `may-arrive-late`. */
   typingDelivery: TypingDelivery = 'on-return';
+  /** Each DeviceAdapter.noteDroppedTail a fill sent, in order with the typing: the index into `typed` it came after. */
+  droppedTails: number[] = [];
   current: string;
   taps: string[] = [];
   typed: string[] = [];
@@ -220,6 +222,10 @@ export class FakeAdapter implements DeviceAdapter {
 
   /** Last tapped textfield — typeText/clearText mutate its value like a real field. */
   focused: UiNode | undefined;
+
+  noteDroppedTail(): void {
+    this.droppedTails.push(this.typed.length);
+  }
 
   async typeText(text: string): Promise<void> {
     this.typed.push(text);

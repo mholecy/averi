@@ -30,6 +30,29 @@ import { sleep } from '../util/sleep.js';
 export const IDB_EMPTY_RETRY_MS = 1_000;
 
 /**
+ * How long a typing into an app seen dropping a tail waits after its first character, before the rest in one burst
+ * (D24, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment 2026-10-31). Measured 2026-10-31 on the lab
+ * simulator (iPhone 17, iOS 27.0), 15 runs a mode, `Jan Novak Bratislava` (20 characters) typed by raw `idb ui text`
+ * into AveriLabRN's `rn-field` (React Native 0.88's controlled single-line TextInput), read back from the app's state
+ * file (the script: scratchpad/d24/rn-typing-diag.sh, outside the repo; the figures:
+ * docs/plans/2026-10-30-performance-backlog.md, "D7 and D24 measured"):
+ *
+ * | typing                                       | whole  | time    |
+ * |----------------------------------------------|--------|---------|
+ * | one burst (averi until D24)                  | 5/15   | —       |
+ * | first character, 150 ms, the rest in a burst | 15/15  | 614 ms  |
+ * | one call, 10 ms after each key               | 15/15  | 705 ms  |
+ * | chunks of 5                                  | 15/15  | 784 ms  |
+ * | chunks of 1                                  | 15/15  | 3.8 s   |
+ *
+ * The cheapest whole mode: the controlled input's first keystroke starts its JS value round-trip, and keys that arrive
+ * while that is behind are the ones dropped (ADR 0023's measurement: the END of a burst); 150 ms lets it catch up once,
+ * and the rest of the burst then lands. Not measured: other RN versions and fields, multi-line inputs (which dropped
+ * nothing in ADR 0023's runs), other lengths than 20.
+ */
+export const FIRST_KEY_ALONE_MS = 150;
+
+/**
  * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input, and
  * an injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
  * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
@@ -45,6 +68,18 @@ export class IosAdapter implements DeviceAdapter {
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;
+  /**
+   * The bundle this adapter last launched — the app the typing goes into, as far as the adapter knows; undefined before
+   * any launch (an app opened by hand, or before the server started). A deep link that brings another app forward,
+   * or a tap that does, is not seen: the key stays the launched app's.
+   */
+  private launched: string | undefined;
+  /**
+   * The apps (by `launched`) whose field a fill saw drop the tail of a typing (noteDroppedTail) — sticky for this
+   * adapter's life, so typeText sends their first key alone (FIRST_KEY_ALONE_MS). `undefined` is the app in front before
+   * any launch: whatever it is, it is the one that dropped.
+   */
+  private readonly dropsTail = new Set<string | undefined>();
 
   constructor(opts: {
     /**
@@ -155,6 +190,7 @@ export class IosAdapter implements DeviceAdapter {
     if (opts.clearState) await this.clearAppData(bundleId);
     await this.enableAccessibilityAutomation(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
+    this.launched = bundleId;
     // `simctl launch` returns before the app is in front: for ~1–2 s idb can
     // still hand out the previous app's (or SpringBoard's) tree, complete and
     // labelled, which no reader doubts. Wait here — the one place both
@@ -374,7 +410,30 @@ export class IosAdapter implements DeviceAdapter {
     // Guarded here, once, because the refusal is idb's, a platform fact no
     // caller owns, and every caller hands its text through unexamined.
     if (text === '') return;
+    // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
+    // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
+    // split between two idb calls. A one-character text has no rest: one call, no wait.
+    if (this.dropsTail.has(this.launched)) {
+      const [first] = new Intl.Segmenter().segment(text);
+      if (first !== undefined && first.segment.length < text.length) {
+        await this.idbUi(['text', first.segment]);
+        await sleep(FIRST_KEY_ALONE_MS);
+        await this.idbUi(['text', text.slice(first.segment.length)]);
+        return;
+      }
+    }
     await this.idbUi(['text', text]);
+  }
+
+  /**
+   * A fill saw the field keep a strict prefix of its typing and typed the tail again (interact/fill-type.ts, ADR 0023):
+   * the app in front drops the end of a burst. Its later typings through this adapter send the first key alone
+   * (typeText, FIRST_KEY_ALONE_MS) — a platform remedy, measured on iOS only, so it is this adapter's and the fill only
+   * reports what it saw. Sticky: an app that dropped once is an RN controlled field's app, and the split costs 150 ms
+   * where a drop costs a poll of up to 5 × 400 ms and a retype; apps never seen dropping never pay. No device call.
+   */
+  noteDroppedTail(): void {
+    this.dropsTail.add(this.launched);
   }
 
   async clearText(count: number): Promise<void> {

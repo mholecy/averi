@@ -1129,6 +1129,14 @@ export interface DeviceAdapter {
    * tail-again.md). Absent: `may-arrive-late`, the retype never sent.
    */
   readonly typingDelivery?: TypingDelivery;
+  /**
+   * What a fill tells the adapter after it typed a dropped tail again (interact/fill-type.ts, docs/adr/0023-fill-
+   * types-a-dropped-tail-again.md): the field kept a strict prefix of a typing whose delivery is `on-return` — the app
+   * in front drops the end of a burst. The adapter may change how it types into that app from then on; what it does is
+   * its platform's fact (iOS: the first key alone, then 150 ms, then the rest — adapters/ios.ts#FIRST_KEY_ALONE_MS,
+   * D24). No device call. Absent (Android): nothing is learned, the typing unchanged.
+   */
+  noteDroppedTail?(): void;
 
   /**
    * The window manager's word on the window that has focus (`FocusedWindow`) — present where the tree lists the active
