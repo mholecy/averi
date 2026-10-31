@@ -155,6 +155,24 @@ cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s o
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
 
+### After the loops (7a05e9fb, 2026-10-31)
+The same D0 run on main after P1–P6, D1, D3, D6, D8, D10, D12, D13 (5 repeats, medians, one session — the emulator's own
+spread between sessions is several hundred ms, so compare per item in its own note, not across sessions):
+
+| scenario | D0 (2026-10-30) | now | |
+|---|---|---|---|
+| tap | 5336 | 4997 | −6 % |
+| fill, 3 chars | 11627 | 8808 | −24 % |
+| fill, 20 chars | 17330 | 11951 | −31 % |
+| scroll_until, ~3 screens | 21226 | 17616 | −17 % |
+| ensure_state cold | 14280 | 13838 | −3 % (D3's own A/B: −2.4 s) |
+| ensure_state warm | 3390 | 3368 | 0 |
+| color assert | 3591 | 3520 | −2 % |
+| screenshot | 1080 | 1050 | −3 % |
+| tree | 2426 | 2336 | −4 % |
+
+What is left on Android is the `uiautomator dump` itself (~2.3 s per read) and the capture pair; iOS is unmeasured.
+
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
 which ~230 ms PNG encode); raw `exec-out screencap` 979 ms — `exec-out` moves only ~11 MB/s here and a raw frame is
