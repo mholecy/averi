@@ -1,7 +1,8 @@
 # 34. A fill passes a field that reformats as it is typed — separators added, nothing else
 
 Status: accepted 2026-10-31 (performance backlog row D18, docs/plans/2026-10-30-performance-backlog.md; the
-orchestrator's proposal, tightened). Implemented on `perf/d18-reformatting-field`.
+orchestrator's proposal, tightened; tightened again in review round 1 — MAJOR-1 — with the orchestrator's decision on
+an added `.` or `,`). Implemented on `perf/d18-reformatting-field`.
 
 ## Context
 
@@ -31,6 +32,9 @@ orchestrator's proposal, tightened). Implemented on `perf/d18-reformatting-field
 | rf1–rf2 React Native, as f1 and f3 | grouped | ERROR | Filled |
 | rf3–rf4 React Native, `type_text` / `type:` | grouped | ok (blind) | same |
 
+`type_pin` (f10, rf5: a flow's tap and `type_pin` of `1234567` into the amount fields): NOT YET MEASURED — the cases
+are written; their run, and the forms groups' summary lines, follow once the device is free.
+
 Typing was never garbled: one `input text` per character at 100 ms (D6) lands every character in order in each of
 the four fields — the Compose model field puts the cursor at the end on every reformat, the VisualTransformation maps
 it, React Native's controlled `TextInput` keeps it at the end; the commit nudge (DPAD left/right) moves nothing. Every
@@ -44,16 +48,26 @@ separators added)`.** One pure rule, `fill-type.ts#reformatOf(reading, expected)
 `clear`, else the field's earlier text and the value after it:
 
 - every expected character is shown, in order and unchanged (letter case included); a typed space may be shown as a
-  no-break or narrow no-break space (`respaced`);
-- the only characters added are separators — a space, U+00A0, U+202F, `-`, `/`, and `.` or `,` — never before the
-  first expected character (a leading `-` is a sign);
-- an added `.` or `,` must be a thousands separator: exactly three digits after it, then no digit — a cents mask that
-  shows `125` as `1.25` changed the amount and still fails;
-- a separator that was typed must be shown: `12,50` read back as `1250` still fails.
+  no-break or narrow no-break space (`respaced`); a separator that was typed must be shown: `12,50` read back as
+  `1250` still fails;
+- the added characters are ONE separator character — a space, U+00A0, U+202F, `-`, `/`, `.` or `,` — and each sits
+  between two typed letters or digits: none leading (a `-` there is a sign), trailing, next to another, or after
+  typed punctuation (`Hello, world` for `Hello,world` is an edit);
+- they cut the typing into groups of two or more characters, but for one single-character group at either end
+  (`1 234`, an IBAN's last `1`): `1-5` for `15` or `1/2` for `12` is no grouping;
+- an added `.` or `,` must be a thousands separator: not a character the typing holds itself, 1–3 digits before the
+  first and not a lone `0`, exactly three digits between two of them and after the last, then no digit. A cents mask
+  that shows `125` as `1.25`, `0.123` for `0123` or `1234.567` for `1234567` still fail.
 
-It is a pass, so it is part of `landed`: the poll stops on it and nothing is typed again. A non-input still proves it
-took the text only by showing it exactly (`tookText`), and a masked reading never is a reformat. The verdict carries
-it (`FillVerdict.reformatted`, beside `retyped`), counts only — a value may be a credential.
+What the rule cannot tell: `1.234` for `1234` is de-DE's thousands or a three-decimal mask's point. **The
+orchestrator's decision (review round 1): a reformat whose added separator is `.` or `,` passes with a ⚠ caveat, not
+the aside** — `the field shows them reformatted: 1 separator added — it added '.': check it is a thousands separator,
+not a decimal point`. Spaces, `-` and `/` stay in the aside.
+
+It is a pass, so it is part of the landing (`typeAndConfirm`'s `landing`, computed once per reading): the poll stops
+on it and nothing is typed again. `tookText` gates it as it gates the exact rule (a non-input must have changed to show
+the value itself), and a masked reading never is a reformat. The verdict carries it (`FillVerdict.reformatted`,
+beside `retyped`, or the `reformatted-point` caveat), counts only — a value may be a credential.
 
 ## Consequences
 
@@ -61,13 +75,20 @@ it (`FillVerdict.reformatted`, beside `retyped`), counts only — a value may be
   before: a field that MOVES a typed separator (`12 34` regrouped `1 234`), a no-clear fill whose earlier text the
   field regroups (`1 234` + `5` → `12 345`), a no-clear fill typed into the middle of the text, a `.`/`,` grouping that
   is not by thousands (Indian lakh grouping), a field that adds a prefix or suffix (`€`).
-- A dropped tail on a reformatting field is not typed again (ADR 0023): only an exact strict prefix proves which
-  characters are missing. With `clear` the wipe and retype still runs; without it the fill fails as before. Not seen:
+- **Residual (review round 1, MINOR-3; a backlog row of its own): a dropped tail on a reformatting field is neither
+  typed again nor reported.** ADR 0023's retype needs the reading to be an EXACT strict prefix of what the field
+  should hold, and a reformatted partial reading (`SK31 12` for `SK311200…`) is none — so the tail is not retyped,
+  and `reportDroppedTail` is never said, so D24's first-key-alone split never starts for that app. With `clear` the
+  wipe and retype of the whole value still runs; without it the fill fails as before. Not seen on Android (no drop);
   the drop is iOS React Native's (`idb ui text`), and the iOS check of these fields is the owner's (below).
-- `type_text` without a selector, a flow's `type:` and `type_pin` stay blind (no read-back, as designed); they typed
-  every character into the reformatting fields.
+- `type_text` without a selector and a flow's `type:` stay blind (no read-back, as designed); they typed every
+  character into the reformatting fields (f6, f8, rf3, rf4). `type_pin`: see the measurement below.
 - The ibanShown case shows the uiautomator dump reads a Compose `VisualTransformation`'s SHOWN text, not the model's:
   the read-back cannot tell a display-only format from a model one — both are the same pass.
 - Not device-checked on iOS: the SwiftUI `Forms.swift` change (the binding's setter formats) is source only — this
-  sandbox cannot build SwiftUI (swiftc's macro plugin) — and the React Native iOS build was not made either. The owner
-  builds both and runs `live.ts --udid … --cases f1,f2,f3,f5,f6,f7,f8,f9` and `--app react-native --cases rf1,rf2,rf3,rf4`.
+  sandbox cannot build SwiftUI (swiftc's macro plugin) — and the React Native iOS build was not made either. A
+  SwiftUI binding whose setter writes back a DIFFERENT string is a known pitfall: the TextField may keep showing what
+  was typed while the model holds the formatted text, so the screen and the model can diverge. f1–f3 therefore assert
+  the tree's text against the model's after the fill (`holdsShown` in `scripts/truth/live.ts`): a divergence is a MISMATCH even when the
+  fill passed. The owner builds both apps and runs `live.ts --udid … --cases f1,f2,f3,f5,f6,f7,f8,f9,f10` and
+  `--app react-native --cases rf1,rf2,rf3,rf4,rf5`.

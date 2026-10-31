@@ -168,6 +168,24 @@ const NBSP = '\u00A0';
 /** A flow that taps a field and types into it with a `type:` step (blind: no read-back), or fills it with a `fill:` one. */
 const typeFlow = (cell: string, tag: string, value: string) => ({ type_it: { steps: [{ tap: { id: labId(cell, tag) } }, { type: { value } }] } });
 const fillFlow = (cell: string, tag: string, value: string) => ({ fill_it: { steps: [{ fill: { id: labId(cell, tag), value, clear: true } }] } });
+/** A flow that taps a field and types digits into it with a `type_pin:` step (blind, one keystroke a digit). */
+const pinFlow = (cell: string, tag: string, value: string) => ({ pin_it: { steps: [{ tap: { id: labId(cell, tag) } }, { type_pin: { value } }] } });
+/** An assert that the field's text in the tree reads `text` — what the screen shows, beside the model the judge reads. */
+const shows = (cell: string, tag: string, text: string): Call => ({ tool: 'assert', args: { asserts: [{ element: { id: labId(cell, tag) }, text, timeout: 2_000 }] } });
+/**
+ * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds), AND the tree shows the same text (the
+ * `shows` assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's binding setter
+ * may leave the TextField showing what was typed), is a MISMATCH here even when the fill passed.
+ */
+const holdsShown =
+  (tag: string, want: string) =>
+  (s: LabState, replies: string[], source: Source, launched: LabState): LiveVerdict => {
+    const v = holds(tag, want)(s, replies.slice(0, 1), source, launched);
+    if (v.outcome !== 'ok') return v;
+    return allPassed(replies[1])
+      ? { outcome: 'ok', why: `${v.why}; the tree shows the model's text` }
+      : { outcome: 'MISMATCH', why: `the model holds ${JSON.stringify(want)}, the tree does not show it: ${short(replies[1])}` };
+  };
 
 const FORMS: Omit<Case, 'group'>[] = [
   // The keyboard's cases first: once the simulator has seen HID typing (idb ui text) it shows no soft keyboard
@@ -452,9 +470,9 @@ const FORMS: Omit<Case, 'group'>[] = [
   // D18: fields that reformat as they are typed (form-format; schema.ts#FieldFormat) — the model holds the formatted
   // text (iban grouped in fours, the amount's thousands by a no-break space), or, ibanShown on Compose, the text as
   // typed with only the screen grouped (a VisualTransformation; elsewhere ibanShown formats its model as iban does).
-  { id: 'f1', cell: F, says: 'fill, no clear, an IBAN the field groups in fours', calls: [fill(F, 'iban', 'SK3112000000')], judge: holds('iban', 'SK31 1200 0000') },
-  { id: 'f2', cell: F, says: 'fill, clear, an IBAN the field groups in fours', calls: [fill(F, 'iban', 'SK3112000000', true)], judge: holds('iban', 'SK31 1200 0000') },
-  { id: 'f3', cell: F, says: 'fill, clear, an amount the field groups by thousands', calls: [fill(F, 'amount', '1234567,89', true)], judge: holds('amount', `1${NBSP}234${NBSP}567,89`) },
+  { id: 'f1', cell: F, says: 'fill, no clear, an IBAN the field groups in fours', calls: [fill(F, 'iban', 'SK3112000000'), shows(F, 'iban', 'SK31 1200 0000')], judge: holdsShown('iban', 'SK31 1200 0000') },
+  { id: 'f2', cell: F, says: 'fill, clear, an IBAN the field groups in fours', calls: [fill(F, 'iban', 'SK3112000000', true), shows(F, 'iban', 'SK31 1200 0000')], judge: holdsShown('iban', 'SK31 1200 0000') },
+  { id: 'f3', cell: F, says: 'fill, clear, an amount the field groups by thousands', calls: [fill(F, 'amount', '1234567,89', true), shows(F, 'amount', `1${NBSP}234${NBSP}567,89`)], judge: holdsShown('amount', `1${NBSP}234${NBSP}567,89`) },
   { id: 'f4', cell: F, platforms: ['android'], says: 'fill, clear, an IBAN grouped on the screen only (the model as typed)', calls: [fill(F, 'ibanShown', 'SK3112000000', true)], judge: holds('ibanShown', 'SK3112000000') },
   { id: 'f5', cell: F, says: 'fill, no clear, an IBAN typed with its own spaces', calls: [fill(F, 'iban', 'SK31 1200 0000')], judge: holds('iban', 'SK31 1200 0000') },
   {
@@ -473,6 +491,7 @@ const FORMS: Omit<Case, 'group'>[] = [
   },
   { id: 'f8', cell: F, says: "a flow's tap + `type:` into the grouping field", flows: typeFlow(F, 'iban', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('iban', 'SK31 1200 0000') },
   { id: 'f9', cell: F, says: "a flow's `fill:` (clear) into the grouping field", flows: fillFlow(F, 'iban', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'fill_it' } }], judge: holds('iban', 'SK31 1200 0000') },
+  { id: 'f10', cell: F, says: "a flow's tap + `type_pin:` into the amount field that groups by thousands", flows: pinFlow(F, 'amount', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('amount', `1${NBSP}234${NBSP}567`) },
   // The same on React Native (`--app react-native`): rn-format's fields, onChangeText reformatting (src/format.ts).
   { id: 'rf1', cell: RF, says: 'fill, no clear, the RN field that groups an IBAN in fours', calls: [fill(RF, 'G.field', 'SK3112000000')], judge: holds('G', 'SK31 1200 0000') },
   { id: 'rf2', cell: RF, says: 'fill, clear, the RN field that groups an amount by thousands', calls: [fill(RF, 'A.field', '1234567,89', true)], judge: holds('A', `1${NBSP}234${NBSP}567,89`) },
@@ -483,6 +502,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [fill(RF, 'G.field', 'SK31'), { tool: 'type_text', args: { text: '12000000' } }],
     judge: holds('G', 'SK31 1200 0000'),
   },
+  { id: 'rf5', cell: RF, says: "a flow's tap + `type_pin:` into the RN amount field", flows: pinFlow(RF, 'A.field', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('A', `1${NBSP}234${NBSP}567`) },
   { id: 'rf4', cell: RF, says: "a flow's tap + `type:` into the RN grouping field", flows: typeFlow(RF, 'G.field', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('G', 'SK31 1200 0000') },
 ];
 const CASES: Case[] = FORMS.map((c) => ({ ...c, group: 'forms' }));
