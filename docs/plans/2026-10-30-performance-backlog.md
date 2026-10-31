@@ -209,6 +209,18 @@ iOS is 2–7× faster than Android per verb (the screenshot is the exception): a
   2 s in fill-type.ts:304 (5 × 400 ms, the per-chunk pace) and its first tree read waits up to 23 s on WDA's start;
 - OCR's recognizer itself is 150–160 ms: D4's persistent helper would save little of that.
 
+### D20 — iOS idb scroll_until on a list that flings (diagnosed 2026-10-31)
+
+D0 on iOS: `scroll_until id:"lab.form-picker.country.GB" direction:down` on the lab's 45-row picker sheet failed in all
+5 repeats under idb, "the swipe CHANGED THE SCREEN: none of the 15 elements the read before it listed by id …" after 1
+(once 2) strokes; under WDA the same call passes (2 strokes, 6.9 s). The owner's diagnostic outside the sandbox
+(scratchpad `d0-results/ios-scroll-diag.sh`, screenshots 0.4 s and 2.4 s after one stroke from (201,699), 3 runs each,
+rows 52 pt): the sheet stays up in every run; the full stroke 524 pt / 300 ms carried the list ~20 rows (~1 040 pt,
+Albania → Italy at the top, still moving at 0.4 s) — past every row of the read before it, so idb's flat tree keeps no
+anchor and `screenChangedUnder` names a dismissal that did not happen; 524 pt / 1.5 s carried ~11 rows (~570 pt, the
+stroke plus a little) and kept two rows of the read before; 160 pt / 600 ms (the feeler) ~3 rows. So on idb a full
+stroke flings about twice its length on a SwiftUI List and loses the overlap the changed-screen judgement relies on.
+
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
 which ~230 ms PNG encode); raw `exec-out screencap` 979 ms — `exec-out` moves only ~11 MB/s here and a raw frame is
