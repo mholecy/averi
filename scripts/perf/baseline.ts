@@ -14,11 +14,11 @@ import { AndroidLab, IosLab, LAB_APP, LAB_WDA_DERIVED_DATA } from '../truth/lab-
 import { allPassed, callReply, claimsDone, claimsTap, claimsVisible, isError, OCR_FAILED_CLOSED } from '../truth/replies.js';
 import { labId, labSelector, parseLabApp, type LabApp } from '../truth/schema.js';
 import { installRecorder, Recorder } from './instrument.js';
+import { fmtMs, reportTable } from './report.js';
 import {
   breakdown,
   measure,
   overallStalls,
-  reportTable,
   scenarioStalls,
   summarize,
   type Breakdown,
@@ -72,10 +72,11 @@ import {
  * Output: the JSON (`--out`; default `$TMPDIR/averi-perf-<platform>-<app>-<time>.json`) holds the meta (commit, device,
  * load), and per scenario the summary, the breakdown (which commands and which sleep callers the time went to, per run)
  * and every run's window (each call and sleep with its times) and reply; a table goes to stdout.
- * D26: `simctl io screenshot` stalls ~+1 000 ms in ~10 % of calls, which makes a median of a few runs noisy — so where
- * the run took any, each scenario also carries its screenshots and stalls and its wall clock over the stall-free ok runs
- * (`stalls`: two more table columns), and the JSON's root `stalls` and a line under the table the whole run's
- * (stats.ts#SCREENSHOT_STALL_MS says what a stall is). scripts/perf/stalls.ts recomputes them from a written JSON.
+ * D26: `simctl io screenshot` stalls ~+1 000 ms in ~10 % of calls, which makes a median of a few runs noisy — so the
+ * JSON always carries `stalls`: per scenario (after its `runs`) its screenshots, stalls and wall clock over the
+ * stall-free ok runs, and at the root the whole run's (stats.ts#SCREENSHOT_STALL_MS says what a stall is). Only the
+ * table depends on screenshots: when the run took any, two more columns and the stall line under it (report.ts).
+ * scripts/perf/stalls.ts recomputes the same from a JSON written before.
  * Not a vitest test: it needs the device. Its arithmetic and wrappers are tested in tests/perf/.
  */
 
@@ -303,7 +304,7 @@ try {
       const run = await runOnce(s, r);
       runs.get(s.id)!.push(run);
       console.error(
-        `  ${s.id.padEnd(12)} ${run.status.padEnd(11)} ${ms(run.wallMs).padStart(7)} ms, ${run.deviceCalls} device calls, slept ${ms(run.sleptMs)} ms` +
+        `  ${s.id.padEnd(12)} ${run.status.padEnd(11)} ${fmtMs(run.wallMs).padStart(7)} ms, ${run.deviceCalls} device calls, slept ${fmtMs(run.sleptMs)} ms` +
           (run.status === 'ok' ? '' : ` — ${firstLine(run.reply)}`),
       );
     }
@@ -320,9 +321,6 @@ try {
   await report();
 }
 
-function ms(x: number): string {
-  return Math.round(x).toString();
-}
 function firstLine(reply: string): string {
   return reply.split('\n')[0].slice(0, 160);
 }
@@ -336,9 +334,9 @@ interface ScenarioReport {
   args: Record<string, unknown>;
   summary: Summary;
   breakdown: Breakdown;
-  /** D26: the scenario's screenshots, stalls and stall-free wall clock. */
-  stalls: ScenarioStalls;
   runs: Run[];
+  /** D26: the scenario's screenshots, stalls and stall-free wall clock — after `runs`, so older fields keep their order. */
+  stalls: ScenarioStalls;
 }
 
 /** The JSON, and the table on stdout: of the runs there are, however the run ended. */
@@ -352,8 +350,8 @@ async function report(): Promise<void> {
       args: s.args,
       summary: summarize(rs),
       breakdown: breakdown(rs.filter((r) => r.status === 'ok').map((r) => r.window)),
-      stalls: scenarioStalls(rs),
       runs: rs,
+      stalls: scenarioStalls(rs),
     };
   });
   const stalls = overallStalls(reports.flatMap((r) => r.runs.map((run) => run.window)));
@@ -391,8 +389,8 @@ async function report(): Promise<void> {
   console.log('\nwhere the time goes (per ok run):');
   for (const r of reports) {
     const top = [
-      ...r.breakdown.calls.slice(0, 4).map((c) => `${c.label} ×${+c.count.toFixed(1)} ${ms(c.ms)} ms`),
-      ...r.breakdown.sleeps.slice(0, 3).map((s) => `sleep ${s.caller} ×${+s.count.toFixed(1)} ${ms(s.ms)} ms`),
+      ...r.breakdown.calls.slice(0, 4).map((c) => `${c.label} ×${+c.count.toFixed(1)} ${fmtMs(c.ms)} ms`),
+      ...r.breakdown.sleeps.slice(0, 3).map((s) => `sleep ${s.caller} ×${+s.count.toFixed(1)} ${fmtMs(s.ms)} ms`),
     ];
     console.log(`  ${r.id}: ${top.join(' · ') || '—'}`);
   }

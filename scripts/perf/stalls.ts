@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { overallStalls, scenarioStalls, stallCells, stallLine, type Spread, type Status, type Window } from './stats.js';
+import { fmtMs, stallCells, stallLine } from './report.js';
+import { overallStalls, scenarioStalls, type Spread, type TimedRun, type Window } from './stats.js';
 
 /**
  * D26's stall summary recomputed from D0 results JSON (baseline.ts `--out`) — for files written before the report
@@ -12,12 +13,12 @@ import { overallStalls, scenarioStalls, stallCells, stallLine, type Spread, type
  */
 
 /** The part of a results JSON this reads. */
-export interface Result {
-  scenarios: { id: string; summary: { wallMs?: Spread }; runs: { status: Status; wallMs: number; window: Window }[] }[];
+export interface ResultsJson {
+  scenarios: { id: string; summary: { wallMs?: Spread }; runs: TimedRun[] }[];
 }
 
 /** Per file its name, a line per scenario and the overall line; with several files, the pooled line last. */
-export function stallReport(files: readonly { file: string; result: Result }[]): string[] {
+export function stallReport(files: readonly { file: string; result: ResultsJson }[]): string[] {
   const out: string[] = [];
   const pooled: Window[] = [];
   for (const { file, result } of files) {
@@ -29,11 +30,11 @@ export function stallReport(files: readonly { file: string; result: Result }[]):
   return out;
 }
 
-function oneFile(result: Result): { lines: string[]; windows: Window[] } {
+function oneFile(result: ResultsJson): { lines: string[]; windows: Window[] } {
   const width = Math.max(0, ...result.scenarios.map((s) => s.id.length));
   const lines = result.scenarios.map((s) => {
     const [shots, free] = stallCells(scenarioStalls(s.runs));
-    const wall = s.summary.wallMs === undefined ? '—' : Math.round(s.summary.wallMs.median).toString();
+    const wall = s.summary.wallMs === undefined ? '—' : fmtMs(s.summary.wallMs.median);
     return `  ${s.id.padEnd(width)}  ${shots}  wall med ${wall}  stall-free ${free}`;
   });
   const windows = result.scenarios.flatMap((s) => s.runs.map((r) => r.window));
@@ -42,7 +43,7 @@ function oneFile(result: Result): { lines: string[]; windows: Window[] } {
 
 async function main(files: string[]): Promise<void> {
   if (files.length === 0) throw new Error('usage: stalls.ts <result.json> [<result.json> …]');
-  const read = await Promise.all(files.map(async (file) => ({ file, result: JSON.parse(await readFile(file, 'utf8')) as Result })));
+  const read = await Promise.all(files.map(async (file) => ({ file, result: JSON.parse(await readFile(file, 'utf8')) as ResultsJson })));
   for (const l of stallReport(read)) console.log(l);
 }
 

@@ -1,195 +1,48 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isScreenshotStall,
-  overallStalls,
-  reportTable,
-  scenarioStalls,
-  SCREENSHOT_LABEL,
-  SCREENSHOT_STALL_MS,
-  stallCells,
-  stallLine,
-  type DeviceCall,
-  type Summary,
-  type Status,
-  type Window,
-} from '../../scripts/perf/stats.js';
+import { stallReport, type ResultsJson } from '../../scripts/perf/stalls.js';
+import { SCREENSHOT_LABEL, type DeviceCall } from '../../scripts/perf/stats.js';
 
-// D26: `simctl io screenshot` is bimodal (~400 ms, or ~1 400 ms when it stalls). The D0 report counts the screenshots
-// and the stalls apart, and gives each scenario's wall clock over its stall-free runs. Numbers worked by hand.
+// scripts/perf/stalls.ts: the D26 stall summary recomputed from D0 results JSON written before the report carried it
+// — from each run's recorded window, not from anything the old file summarised.
 
-const shot = (startMs: number, ms: number): DeviceCall => ({ kind: 'simctl', label: SCREENSHOT_LABEL, startMs, endMs: startMs + ms, ok: true });
-const other = (ms: number): DeviceCall => ({ kind: 'idb', label: 'idb ui describe-all', startMs: 0, endMs: ms, ok: true });
-const win = (...calls: DeviceCall[]): Window => ({ calls, sleeps: [] });
-const run = (wallMs: number, window: Window, status: Status = 'ok') => ({ status, wallMs, window });
+const shot = (ms: number): DeviceCall => ({ kind: 'simctl', label: SCREENSHOT_LABEL, startMs: 10, endMs: 10 + ms, ok: true });
+/** Three ok screenshot runs (one stalled), a failed run that stalled, and a tree read with no screenshot. */
+const oneStallOkOneStallFailed: ResultsJson = {
+  scenarios: [
+    {
+      id: 'screenshot',
+      summary: { wallMs: { median: 1100, min: 1000, max: 2100 } },
+      runs: [
+        { status: 'ok', wallMs: 1000, window: { calls: [shot(400)], sleeps: [] } },
+        { status: 'ok', wallMs: 2100, window: { calls: [shot(1400)], sleeps: [] } },
+        { status: 'ok', wallMs: 1100, window: { calls: [shot(380)], sleeps: [] } },
+        // A failed run's stall is simctl's all the same: it is in the overall and the pooled line.
+        { status: 'failed', wallMs: 9000, window: { calls: [shot(1380)], sleeps: [] } },
+      ],
+    },
+    { id: 'tree', summary: { wallMs: { median: 110, min: 100, max: 120 } }, runs: [{ status: 'ok', wallMs: 110, window: { calls: [], sleeps: [] } }] },
+  ],
+};
+/** One ok screenshot run, no stall. */
+const noStall: ResultsJson = {
+  scenarios: [{ id: 'screenshot', summary: { wallMs: { median: 1000, min: 1000, max: 1000 } }, runs: [{ status: 'ok', wallMs: 1000, window: { calls: [shot(420)], sleeps: [] } }] }],
+};
 
-describe('isScreenshotStall — a simctl screenshot over the threshold', () => {
-  it('sits between the modes: 900 ms', () => {
-    expect(SCREENSHOT_STALL_MS).toBe(900);
-  });
-  it('is a stall over the threshold, not at it', () => {
-    expect(isScreenshotStall(shot(0, 1400))).toBe(true);
-    expect(isScreenshotStall(shot(0, 901))).toBe(true);
-    expect(isScreenshotStall(shot(0, 900))).toBe(false);
-    expect(isScreenshotStall(shot(0, 400))).toBe(false);
-  });
-  it('is only a screenshot that completed: a failed or pending one is no stall, however long', () => {
-    expect(isScreenshotStall({ ...shot(0, 1400), ok: false })).toBe(false);
-    expect(isScreenshotStall({ ...shot(0, 1400), ok: false, pending: true })).toBe(false);
-    // Recorder.end marks a pending call not ok; the type does not, and pending alone is enough.
-    expect(isScreenshotStall({ ...shot(0, 1400), pending: true })).toBe(false);
-  });
-  it('is only ever a simctl screenshot: a slow call of any other command is not one', () => {
-    expect(isScreenshotStall(other(5000))).toBe(false);
-    expect(isScreenshotStall({ ...shot(0, 1400), label: 'simctl io recordVideo' })).toBe(false);
-  });
-});
-
-describe('scenarioStalls — one scenario\'s screenshots, stalls, and wall clock without them', () => {
-  it('counts screenshots and stalls over every run, and the wall clock over the ok runs with no stall', () => {
-    const s = scenarioStalls([
-      run(1100, win(shot(0, 400), other(200))),
-      // Two stalls in one run are two stalls, not one stalled run.
-      run(3500, win(shot(0, 1400), shot(1500, 1380))),
-      run(1000, win(shot(0, 380), shot(500, 390))),
-      run(1300, win(shot(0, 410))),
-      // A failed run's screenshots are counted (the stall is simctl's, not the scenario's), its wall clock is not.
-      run(9000, win(shot(0, 1390)), 'failed'),
-      // …and a failed run that did not stall is still not a stall-free ok run.
-      run(30, win(shot(0, 400)), 'failed'),
-    ]);
-    expect(s).toEqual({ screenshots: 8, stalls: 3, failed: 0, stallFreeRuns: 3, stallFreeWallMs: { median: 1100, min: 1000, max: 1300 } });
-  });
-  it('has no stall-free wall clock when every ok run stalled', () => {
-    expect(scenarioStalls([run(2000, win(shot(0, 1400)))])).toEqual({ screenshots: 1, stalls: 1, failed: 0, stallFreeRuns: 0 });
-  });
-  it('counts a failed or pending screenshot as failed, not as a stall, and its run stays stall-free', () => {
-    expect(scenarioStalls([run(5000, win({ ...shot(0, 4000), ok: false }, { ...shot(4000, 1000), ok: false, pending: true }))])).toEqual({
-      screenshots: 2,
-      stalls: 0,
-      failed: 2,
-      stallFreeRuns: 1,
-      stallFreeWallMs: { median: 5000, min: 5000, max: 5000 },
-    });
-  });
-  it('is zero screenshots for a scenario that took none, and every ok run is stall-free', () => {
-    expect(scenarioStalls([run(150, win(other(100))), run(170, win())])).toEqual({
-      screenshots: 0,
-      stalls: 0,
-      failed: 0,
-      stallFreeRuns: 2,
-      stallFreeWallMs: { median: 160, min: 150, max: 170 },
-    });
-  });
-});
-
-describe('overallStalls — the whole run\'s screenshots, and each mode\'s length', () => {
-  it('pools every window, and gives the ok calls\' and the stalls\' length apart', () => {
-    const o = overallStalls([win(shot(0, 400), other(3000)), win(shot(0, 1400), shot(2000, 350)), win(shot(0, 1380))]);
-    expect(o).toEqual({
-      thresholdMs: 900,
-      screenshots: 4,
-      stalls: 2,
-      failed: 0,
-      okMs: { median: 375, min: 350, max: 400 },
-      stallMs: { median: 1390, min: 1380, max: 1400 },
-    });
-  });
-  it('is zero, with no lengths, when no screenshot was taken', () => {
-    expect(overallStalls([win(other(100))])).toEqual({ thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0 });
-  });
-  it('keeps a failed or pending screenshot out of the stalls and out of both lengths, and counts it apart', () => {
-    expect(overallStalls([win(shot(0, 400), { ...shot(500, 1500), ok: false }, { ...shot(2000, 50), ok: false, pending: true }, shot(3000, 1400))])).toEqual({
-      thresholdMs: 900,
-      screenshots: 4,
-      stalls: 1,
-      failed: 2,
-      okMs: { median: 400, min: 400, max: 400 },
-      stallMs: { median: 1400, min: 1400, max: 1400 },
-    });
-  });
-});
-
-describe('stallLine — the overall stall line of the text report', () => {
-  it('says the count, the share and both modes', () => {
-    expect(
-      stallLine({ thresholdMs: 900, screenshots: 201, stalls: 24, failed: 0, okMs: { median: 382.4, min: 336, max: 451 }, stallMs: { median: 1390, min: 1366, max: 1415 } }),
-    ).toBe('simctl io screenshot: 24 stalls (> 900 ms) in 201 calls, 11.9 % · ok calls 382 [336–451] ms · stalls 1390 [1366–1415] ms');
-  });
-  it('says none stalled without a stall length', () => {
-    expect(stallLine({ thresholdMs: 900, screenshots: 50, stalls: 0, failed: 0, okMs: { median: 260, min: 240, max: 300 } })).toBe(
-      'simctl io screenshot: 0 stalls (> 900 ms) in 50 calls, 0.0 % · ok calls 260 [240–300] ms',
-    );
-  });
-  it('says how many failed, and gives the share over the calls that completed', () => {
-    expect(stallLine({ thresholdMs: 900, screenshots: 10, stalls: 2, failed: 1, okMs: { median: 400, min: 380, max: 420 }, stallMs: { median: 1400, min: 1390, max: 1410 } })).toBe(
-      'simctl io screenshot: 2 stalls (> 900 ms) in 10 calls (1 failed, not timed), 22.2 % · ok calls 400 [380–420] ms · stalls 1400 [1390–1410] ms',
-    );
-  });
-  it('says none were taken', () => {
-    expect(stallLine({ thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0 })).toBe('simctl io screenshot: none taken');
-  });
-});
-
-describe('stallCells — a scenario\'s two stall columns of the text table', () => {
-  it('gives screenshots/stalls, and the stall-free median with how many runs it is over', () => {
-    expect(stallCells({ screenshots: 10, stalls: 4, failed: 0, stallFreeRuns: 1, stallFreeWallMs: { median: 3872.4, min: 3872.4, max: 3872.4 } })).toEqual(['10/4', '3872 (1)']);
-  });
-  it('dashes a median it has no run for', () => {
-    expect(stallCells({ screenshots: 5, stalls: 5, failed: 0, stallFreeRuns: 0 })).toEqual(['5/5', '—']);
-  });
-});
-
-describe('reportTable — the text table under the run\'s header line', () => {
-  const sp = (median: number, min = median, max = median) => ({ median, min, max });
-  const tap: Summary = {
-    runs: 2,
-    statuses: { ok: 1, failed: 1 },
-    wallMs: sp(1000, 900, 1100),
-    cpuMs: sp(50),
-    deviceCalls: sp(3),
-    deviceMs: sp(600),
-    deviceBusyMs: sp(500),
-    hostCalls: sp(0),
-    hostMs: sp(0),
-    sleeps: sp(1),
-    sleptMs: sp(300),
-  };
-  const ocr: Summary = { runs: 1, statuses: { unavailable: 1 } };
-  const none = { screenshots: 0, stalls: 0, failed: 0, stallFreeRuns: 1 };
-
-  it('with no simctl screenshot taken is the columns it always had, and no stall line', () => {
-    expect(
-      reportTable(
-        [
-          { id: 'tap', summary: tap, stalls: none },
-          { id: 'ocr', summary: ocr, stalls: { ...none, stallFreeRuns: 0 } },
-        ],
-        { thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0 },
-      ),
-    ).toEqual([
-      'scenario            ok/runs  wall ms med [min–max]  dev calls  dev ms  dev busy  slept ms  sleeps  host ms  cpu ms',
-      'tap            1/2 1 failed        1000 [900–1100]          3     600       500       300       1        0      50',
-      'ocr       0/1 1 unavailable                      —          —       —         —         —       —        —       —',
+describe('stallReport — results JSON\'s stalls, recomputed', () => {
+  it('gives per file a line per scenario (screenshots/stalls, the wall median, the stall-free one) and the overall line', () => {
+    expect(stallReport([{ file: 'on.json', result: oneStallOkOneStallFailed }])).toEqual([
+      'on.json',
+      '  screenshot  4/2  wall med 1100  stall-free 1050 (2)',
+      '  tree        0/0  wall med 110  stall-free 110 (1)',
+      '  simctl io screenshot: 2 stalls (> 900 ms) in 4 calls, 50.0 % · ok calls 390 [380–400] ms · stalls 1390 [1380–1400] ms',
     ]);
   });
-  it('adds the stall columns when screenshots were taken, even with no stall', () => {
-    const [head] = reportTable([{ id: 'screenshot', summary: tap, stalls: { ...none, screenshots: 3 } }], { thresholdMs: 900, screenshots: 3, stalls: 0, failed: 0 });
-    expect(head).toMatch(/shots\/stalls  stall-free wall med \(runs\)$/);
-  });
-  it('with one adds the two stall columns and the stall line', () => {
-    expect(
-      reportTable([{ id: 'screenshot', summary: tap, stalls: { screenshots: 10, stalls: 2, failed: 0, stallFreeRuns: 3, stallFreeWallMs: sp(950, 900, 1000) } }], {
-        thresholdMs: 900,
-        screenshots: 10,
-        stalls: 2,
-        failed: 0,
-        okMs: sp(400, 380, 420),
-        stallMs: sp(1400, 1390, 1410),
-      }),
-    ).toEqual([
-      'scenario         ok/runs  wall ms med [min–max]  dev calls  dev ms  dev busy  slept ms  sleeps  host ms  cpu ms  shots/stalls  stall-free wall med (runs)',
-      'screenshot  1/2 1 failed        1000 [900–1100]          3     600       500       300       1        0      50          10/2                     950 (3)',
-      'simctl io screenshot: 2 stalls (> 900 ms) in 10 calls, 20.0 % · ok calls 400 [380–420] ms · stalls 1400 [1390–1410] ms',
+  it('pools several files in a last line', () => {
+    expect(stallReport([{ file: 'on.json', result: oneStallOkOneStallFailed }, { file: 'off.json', result: noStall }]).slice(-4)).toEqual([
+      'off.json',
+      '  screenshot  1/0  wall med 1000  stall-free 1000 (1)',
+      '  simctl io screenshot: 0 stalls (> 900 ms) in 1 calls, 0.0 % · ok calls 420 [420–420] ms',
+      'pooled, 2 files: simctl io screenshot: 2 stalls (> 900 ms) in 5 calls, 40.0 % · ok calls 400 [380–420] ms · stalls 1390 [1380–1400] ms',
     ]);
   });
 });

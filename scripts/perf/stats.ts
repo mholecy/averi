@@ -186,8 +186,9 @@ export const SCREENSHOT_LABEL = 'simctl io screenshot';
 
 /**
  * A `simctl io screenshot` longer than this stalled (D26). The call is bimodal with nothing between the modes: across
- * the recorded iOS D0 runs (2026-10-30/31; 42 stalls in ~460 calls) the ok calls took 336–451 ms and the stalls 1 366–1 415 ms —
- * the ok time plus ~1 000 ms. 900 ms sits near the middle of that ~900 ms gap, ~450 ms from either mode, so neither a
+ * the 15 D0 results JSON of 2026-10-30/31 (42 stalls in 461 calls, all in the 8 iOS ones that took screenshots:
+ * ios-native, ios-native-probe, ios-native-wda, ios-after-d22-d23, ios-d7a-on/off and ios-d7a-on2/off2) the ok calls
+ * took 336–451 ms and the stalls 1 366–1 415 ms — the ok time plus ~1 000 ms. 900 ms sits near the middle of that ~900 ms gap, ~450 ms from either mode, so neither a
  * slow ok call on a loaded host nor a slightly short stall falls on the wrong side.
  */
 export const SCREENSHOT_STALL_MS = 900;
@@ -206,7 +207,7 @@ export interface ScenarioStalls {
   stalls: number;
   /** Screenshots that failed or were still pending when the window closed: in `screenshots`, never a stall. */
   failed: number;
-  /** The ok runs with no stall. */
+  /** The ok runs with no stall and no failed screenshot. */
   stallFreeRuns: number;
   /** Their wall clock; undefined when every ok run stalled (or none was ok). */
   stallFreeWallMs?: Spread;
@@ -214,9 +215,20 @@ export interface ScenarioStalls {
 
 const screenshots = (w: Window) => w.calls.filter((c) => c.label === SCREENSHOT_LABEL);
 
-export function scenarioStalls(runs: readonly { status: Status; wallMs: number; window: Window }[]): ScenarioStalls {
+/** A run as the stall arithmetic reads it: how it ended, its wall clock, and its recorded window. */
+export interface TimedRun {
+  status: Status;
+  wallMs: number;
+  window: Window;
+}
+
+/**
+ * Stall-free: an ok run whose every screenshot completed and none stalled. One that failed or was pending is untimed —
+ * it may have been a stall cut short — so its run is not counted stall-free either.
+ */
+export function scenarioStalls(runs: readonly TimedRun[]): ScenarioStalls {
   const shots = runs.flatMap((r) => screenshots(r.window));
-  const free = runs.filter((r) => r.status === 'ok' && !r.window.calls.some(isScreenshotStall));
+  const free = runs.filter((r) => r.status === 'ok' && screenshots(r.window).every((c) => completed(c) && !isScreenshotStall(c)));
   const wall = spread(free.map((r) => r.wallMs));
   return { screenshots: shots.length, stalls: shots.filter(isScreenshotStall).length, failed: shots.filter((c) => !completed(c)).length, stallFreeRuns: free.length, ...(wall ? { stallFreeWallMs: wall } : {}) };
 }
@@ -242,43 +254,4 @@ export function overallStalls(windows: readonly Window[]): OverallStalls {
   const stallMs = spread(stalled.map(length));
   const failed = shots.length - timed.length;
   return { thresholdMs: SCREENSHOT_STALL_MS, screenshots: shots.length, stalls: stalled.length, failed, ...(okMs ? { okMs } : {}), ...(stallMs ? { stallMs } : {}) };
-}
-
-/** The overall stall line of the text report: the share is of the screenshots that completed. */
-export function stallLine(o: OverallStalls): string {
-  if (o.screenshots === 0) return `${SCREENSHOT_LABEL}: none taken`;
-  const ms = (s: Spread) => `${Math.round(s.median)} [${Math.round(s.min)}–${Math.round(s.max)}] ms`;
-  return [
-    `${SCREENSHOT_LABEL}: ${o.stalls} stalls (> ${o.thresholdMs} ms) in ${o.screenshots} calls` +
-      (o.failed > 0 ? ` (${o.failed} failed, not timed)` : '') +
-      `, ${o.screenshots > o.failed ? ((100 * o.stalls) / (o.screenshots - o.failed)).toFixed(1) : '—'} %`,
-    ...(o.okMs ? [`ok calls ${ms(o.okMs)}`] : []),
-    ...(o.stallMs ? [`stalls ${ms(o.stallMs)}`] : []),
-  ].join(' · ');
-}
-
-/** A scenario's two stall columns of the text table: `screenshots/stalls`, and the stall-free wall median `(runs)`. */
-export function stallCells(s: ScenarioStalls): [string, string] {
-  return [`${s.screenshots}/${s.stalls}`, s.stallFreeWallMs === undefined ? '—' : `${Math.round(s.stallFreeWallMs.median)} (${s.stallFreeRuns})`];
-}
-
-/**
- * The text table under the run's header line: a row per scenario, the median and range of the wall clock and the
- * medians of the rest. When the run took any simctl screenshot (D26), two more columns — screenshots/stalls and the
- * stall-free wall median — and the overall stall line under the table; otherwise the columns it always had.
- */
-export function reportTable(reports: readonly { id: string; summary: Summary; stalls: ScenarioStalls }[], stalls: OverallStalls): string[] {
-  const ms = (x: number) => Math.round(x).toString();
-  const range = (s: Spread | undefined) => (s === undefined ? '—' : `${ms(s.median)} [${ms(s.min)}–${ms(s.max)}]`);
-  const med = (s: Spread | undefined) => (s === undefined ? '—' : ms(s.median));
-  const shots = stalls.screenshots > 0;
-  const head = ['scenario', 'ok/runs', 'wall ms med [min–max]', 'dev calls', 'dev ms', 'dev busy', 'slept ms', 'sleeps', 'host ms', 'cpu ms', ...(shots ? ['shots/stalls', 'stall-free wall med (runs)'] : [])];
-  const rows = reports.map((r) => {
-    const s = r.summary;
-    const other = Object.entries(s.statuses).filter(([k]) => k !== 'ok').map(([k, n]) => ` ${n} ${k}`).join('');
-    return [r.id, `${s.statuses.ok ?? 0}/${s.runs}${other}`, range(s.wallMs), med(s.deviceCalls), med(s.deviceMs), med(s.deviceBusyMs), med(s.sleptMs), med(s.sleeps), med(s.hostMs), med(s.cpuMs), ...(shots ? stallCells(r.stalls) : [])];
-  });
-  const widths = head.map((h, i) => Math.max(h.length, ...rows.map((row) => row[i].length)));
-  const line = (cells: string[]) => cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ');
-  return [line(head), ...rows.map(line), ...(shots ? [stallLine(stalls)] : [])];
 }
