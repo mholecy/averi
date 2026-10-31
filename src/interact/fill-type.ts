@@ -17,7 +17,10 @@
  *   reading is compared by length (bullets only); a non-input proves it took
  *   the text only by CHANGING to show it (`tookText`). The history of each
  *   clause is in the comments below; they moved here unchanged from fill.ts
- *   (2026-10-19).
+ *   (2026-10-19). Since D18 an input also lands REFORMATTED: every
+ *   character it should hold, in order, with only separators of its own
+ *   added (`reformatOf`; docs/adr/0034-a-fill-passes-a-field-that-reformats-
+ *   as-it-is-typed.md).
  * - the poll: READ_BACK_POLLS (five) reads at `pollMs` until the reading lands, never stopping
  *   early on an unchanged mismatch (`pollValue`).
  * - what is sent again, bounded, in this order:
