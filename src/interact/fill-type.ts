@@ -43,10 +43,11 @@
  *      kept a prefix (up to 6 of 9 characters lost), the field itself holding
  *      the short value; the measurements that chose this remedy over chunked typing are the ADR's.
  *      A typing that LANDED through a tail typed again is reported
- *      (`FieldIo.dropped`; a capped field whose retype moves nothing, never),
- *      so the adapter can type into that app differently from then on — on iOS the
- *      first key alone, 150 ms, then the rest (D24, the ADR's amendment of
- *      2026-10-31); this retype stays the safety net, unchanged.
+ *      (`FieldIo.reportDroppedTail`; a capped field whose retype moves
+ *      nothing, never), so the adapter can type into that app differently
+ *      from then on — on iOS the first key alone, a wait of
+ *      adapters/ios.ts#FIRST_KEY_ALONE_MS, then the rest (D24, the ADR's
+ *      amendment of 2026-10-31); this retype stays the safety net, unchanged.
  *   2. With clear only: one wipe of what the field holds and a retype of the
  *      whole value — the content is ours (since 2026-08-05: Compose async
  *      state swallowing synthetic input). Not when another input provably
@@ -77,7 +78,7 @@ export interface FieldIo {
    * iOS sends the first key alone). The tail retypes of this fill are typed as before (ADR 0023: a retyped tail lands
    * whole, 45 of 45); the fill's own rules do not change.
    */
-  dropped(): void;
+  reportDroppedTail(): void;
 }
 
 /** What the field should hold, and how it is compared. */
@@ -175,10 +176,11 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     // retyped. Asked of the first reading only, as it always was: after a retry the last reading is a mismatch.
     if (again.length === 0 && !tookText(observed)) return { kind: 'not-taken', observed };
     if (landed(observed)) {
-      // A drop is proven only by its repair: the typing landed whole through a tail typed again. A capped or trimming
-      // field (maxLength, an IBAN or phone mask) keeps its strict prefix for good — its retype moves nothing and the
-      // fill fails — and is no drop: reported, it would make every later typing into that app pay the split (D24 review).
-      if (tails() > 0) io.dropped();
+      // A drop is proven only by its repair: the typing landed whole through a tail typed again. A capped or
+      // trimming field (maxLength, an IBAN or phone mask) keeps its strict prefix for good — its retype moves nothing
+      // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
+      // (D24 review).
+      if (tails() > 0) io.reportDroppedTail();
       return { kind: 'landed', observed, again };
     }
     const where = whereTyped(others, io.screen(), missingOf(observed, intent));

@@ -383,7 +383,7 @@ export async function fillField(
         screen: () => lastTree ?? resolvedIn,
         // What the field showed is the adapter's to act on (iOS: the first key alone into this app from now on, D24);
         // an adapter without the method learns nothing.
-        dropped: () => adapter.noteDroppedTail?.(),
+        reportDroppedTail: () => adapter.noteDroppedTail?.(),
       },
       {
         value,

@@ -106,33 +106,34 @@ at ~220 ms a character on every iOS fill.
 
 ## Amendment: the first key alone, after an app dropped a tail (2026-10-31, D24)
 
-**Measured** (the owner, outside the sandbox; docs/plans/2026-10-30-performance-backlog.md, "D7 and D24 measured"):
-D0's iOS fill-20 lost the last 5–7 characters into `rn-field` in every run, so each fill polled 5 × 400 ms and retyped
-its tail (~2.6 s of 5.9 s). Raw `idb ui text`, 15 runs a mode, `Jan Novak Bratislava` (20 characters) into AveriLabRN's
-`rn-field` on the lab simulator (iPhone 17, iOS 27.0), read back from the app's state file: one burst (averi until
-now) whole 5/15; **the first character alone, 150 ms, then the rest in one burst 15/15 (614 ms)**; one call with 10 ms
-after each key 15/15 (705 ms); chunks of 5 15/15 (784 ms); chunks of 1 15/15 (3.8 s). The chunks-of-3 hole measured
-above (14–15 of 25) did not reproduce in this run.
+**Measured** (the owner, outside the sandbox; docs/plans/2026-10-30-performance-backlog.md, "D7 and D24 measured"): D0's
+iOS fill-20 lost the last 5–7 characters into `rn-field` in every run, so each fill polled 5 × 400 ms and retyped its
+tail (~2.6 s of 5.9 s). Raw `idb ui text`, 15 runs a mode, `Jan Novak Bratislava` (20 characters) into AveriLabRN's
+`rn-field` on the lab simulator (iPhone 17, iOS 27.0), read back from the app's state file: one burst (averi until now)
+whole 5/15; **the first character alone, 150 ms, then the rest in one burst 15/15 (614 ms)**; one call with 10 ms after
+each key 15/15 (705 ms); chunks of 5 15/15 (784 ms); chunks of 1 15/15 (3.8 s). The chunks-of-3 hole measured above
+(14–15 of 25) did not reproduce in this run.
 
 **Decision.** "Not done: chunked or paced typing on iOS" (Consequences) stands for every app but one that has shown a
 drop: after a fill has typed a dropped tail again (decision 1 — the field kept a strict prefix) and the typing then
-LANDED whole, later typings into that SAME app send the first character alone, wait 150 ms, then the rest. Sticky per app for the adapter's life; an app
-never seen dropping a tail never pays.
+LANDED whole, later typings into that SAME app send the first character alone, wait 150 ms, then the rest. Sticky per
+app for the adapter's life; an app never seen dropping a tail never pays.
 
-- **Who learns, who acts.** The fill reports what it saw, nothing more: `fill-type.ts` calls `FieldIo.dropped` once a
-  fill, when the typing has landed through a tail typed again, which `fill.ts` hands to `DeviceAdapter.noteDroppedTail` (optional; no device
-  call; `read-handoff.ts` classes it `reads` — it touches no screen). The remedy is a platform fact, measured on iOS
-  only, so it is the adapter's: `IosAdapter` keys the memory by the bundle it last launched (`launched`; before any
-  launch, `undefined` — the app in front, whatever it is; after `terminate` of that bundle, not known: nothing split,
-  nothing learned until the next launch) and `typeText` splits for a key it holds
-  (`ios.ts#FIRST_KEY_ALONE_MS`, the wait through `util/sleep.ts`). interact/ stays platform-agnostic, and since the
-  split lives in `typeText`, every typing into that app gets it — a flow's `type:` step and `type_text` without a
-  selector too, which read nothing back. Android has no `noteDroppedTail`: its typing (paced by D6) is unchanged.
-- **A capped field is no drop** (review of this branch). A field that keeps a strict prefix for good — its maxLength,
-  an IBAN or phone mask trimming the typing — gets its one retype that moves nothing and the mismatch error
-  (Consequences above); reported at the retype, one such fill would have marked a native app and made every later
-  typing into it pay the split (~370 ms with the extra idb call). Only the repair proves the drop, so only a typing
-  that landed through a tail retype is reported; one whose retypes moved the field and still missed is not either.
+- **Who learns, who acts.** The fill reports what it saw, nothing more: `fill-type.ts` calls `FieldIo.reportDroppedTail`
+  once a fill, when the typing has landed through a tail typed again, which `fill.ts` hands to
+  `DeviceAdapter.noteDroppedTail` (optional; no device call; `read-handoff.ts` classes it `reads` — it touches no
+  screen). The remedy is a platform fact, measured on iOS only, so it is the adapter's: `IosAdapter` keys the memory by
+  the app in front as it knows it (`ios.ts#FrontApp`: the bundle it last launched; before any launch, `unlaunched` — the
+  app in front, whatever it is; after `terminate` of that bundle, `forgotten` — not known: nothing split, nothing
+  learned until the next launch) and `typeText` splits for a key it holds (`ios.ts#FIRST_KEY_ALONE_MS`, the wait through
+  `util/sleep.ts`). interact/ stays platform-agnostic, and since the split lives in `typeText`, every typing into that
+  app gets it — a flow's `type:` step and `type_text` without a selector too, which read nothing back. Android has no
+  `noteDroppedTail`: its typing (paced by D6) is unchanged.
+- **A capped field is no drop** (D24 review). A field that keeps a strict prefix for good — its maxLength, an IBAN or
+  phone mask trimming the typing — gets its one retype that moves nothing and the mismatch error (Consequences above);
+  reported at the retype, one such fill would have marked a native app and made every later typing into it pay the split
+  (~370 ms with the extra idb call). Only the repair proves the drop, so only a typing that landed through a tail retype
+  is reported; one whose retypes moved the field and still missed is not either.
 - **The first character is a grapheme** (`Intl.Segmenter`): a surrogate pair or a combining mark is never cut between
   two idb calls. A text of one character is one call, with no wait.
 - **The retype stays the safety net, unchanged.** Decision 1–3 are as they were. The first fill's own tail retypes are
@@ -140,8 +141,8 @@ never seen dropping a tail never pays.
   still drops gets its tail typed again, the tail itself split like every typing into that app (+150 ms).
 
 **Residuals.**
-- An RN fill that drops and is still short after both retypes is not reported, so its app is not marked; the next
-  fill that lands through a retype marks it.
+- An RN fill that drops and is still short after both retypes is not reported, so its app is not marked; the next fill
+  that lands through a retype marks it.
 - The first fill into an RN app still pays the drop: the full poll (5 × 400 ms) and the retype — the memory is learned,
   not configured, and lives as long as the adapter (a server restart, or the other tree-source kind's adapter, learns
   again).

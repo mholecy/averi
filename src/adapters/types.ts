@@ -1130,11 +1130,13 @@ export interface DeviceAdapter {
    */
   readonly typingDelivery?: TypingDelivery;
   /**
-   * What a fill tells the adapter after it typed a dropped tail again (interact/fill-type.ts, docs/adr/0023-fill-
-   * types-a-dropped-tail-again.md): the field kept a strict prefix of a typing whose delivery is `on-return` — the app
-   * in front drops the end of a burst. The adapter may change how it types into that app from then on; what it does is
-   * its platform's fact (iOS: the first key alone, then 150 ms, then the rest — adapters/ios.ts#FIRST_KEY_ALONE_MS,
-   * D24). No device call. Absent (Android): nothing is learned, the typing unchanged.
+   * What a fill tells the adapter after a REPAIRED drop (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-
+   * tail-again.md, its D24 amendment): the field kept a strict prefix of a typing whose delivery is `on-return`, the
+   * tail was typed again, and the typing then LANDED whole — the app in front drops the end of a burst. Never for a
+   * capped or trimming field (its retype moves nothing and the fill fails), nor for a fill still short after its
+   * retypes. The adapter may change how it types into that app from then on; what it does is its platform's fact
+   * (iOS: the first key alone, a wait of adapters/ios.ts#FIRST_KEY_ALONE_MS, then the rest). No device call. Absent
+   * (Android): nothing is learned, the typing unchanged.
    */
   noteDroppedTail?(): void;
 

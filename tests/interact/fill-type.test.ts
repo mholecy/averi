@@ -52,7 +52,7 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
   const other = node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: opts.otherHeld ?? null });
   const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field, other] });
   const typed: string[] = [];
-  /** Each `dropped` report, as the count of typings sent before it (D24). */
+  /** Each `reportDroppedTail`, as the count of typings sent before it (D24). */
   const dropped: number[] = [];
   let pending = ''; // `grows`: one more character of the typing arrives per read
   const snapshot = (): UiNode => structuredClone(tree);
@@ -78,7 +78,7 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
       return field.value ?? '';
     },
     screen: () => last,
-    dropped: () => dropped.push(typed.length),
+    reportDroppedTail: () => dropped.push(typed.length),
   };
   const intent: TypingIntent = {
     value: 'Jan Novak',
