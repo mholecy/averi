@@ -351,6 +351,21 @@ describe('fillFailureText — every error a fill throws', () => {
     expect(mismatch({ kind: 'length' }, 1, 4)).toBe('fill: typed 1 character but the field shows 4 (content withheld from this error)');
   });
 
+  // D28: iOS React Native's rf2 held `1 234 567,` for `1234567,89` and was told "the app transformed the input".
+  it('a mismatch on a reformatted prefix says the tail dropped, not that the input was transformed', () => {
+    expect(fillFailureText({ code: 'mismatch', typed: 10, shows: 10, differs: { kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true }, again: [{ kind: 'whole', wiped: true }] })).toBe(
+      'fill: typed 10 characters (after one wipe and retype) but the field shows 10 — the first 8 typed characters are there, grouped by the field ' +
+        '(separators of its own added), the last 2 did not land: dropped, or refused by the field (a length cap, a character it does not take) — ' +
+        'not a transformed input; content withheld from this error',
+    );
+    expect(mismatch({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }, 2, 2)).toMatch(/the first 1 typed character is there, .* the last 1 did not land/);
+    // D28 code review: nothing added, only a typed space shown as another space — never "grouped".
+    expect(mismatch({ kind: 'dropped-tail', landed: 4, dropped: 5, grouped: false }, 9, 4)).toBe(
+      'fill: typed 9 characters but the field shows 4 — the first 4 typed characters are there, its spaces shown as another kind of space, ' +
+        'the last 5 did not land: dropped, or refused by the field (a length cap, a character it does not take) — not a transformed input; content withheld from this error',
+    );
+  });
+
   it('a mismatch after the clear-fill\'s one retry says so — a wipe and a retype, or a retype alone when the field held nothing (round 8\'s D3 nit: "typed 3 but shows 4" read as the first typing)', () => {
     expect(fillFailureText({ code: 'mismatch', typed: 3, shows: 4, differs: { kind: 'length' }, again: [{ kind: 'whole', wiped: true }] })).toBe(
       'fill: typed 3 characters (after one wipe and retype) but the field shows 4 (content withheld from this error)',

@@ -237,6 +237,7 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['no clear onto held text: only the run after it is compared', { observed: 'NOTE: HI THERE', before: 'Note: ', value: 'hi there' }, { kind: 'case', positions: 7 }],
     ['no clear: of several runs that match but for case, the closest counts — not the first', { observed: 'HELLO Hello', value: 'hello' }, { kind: 'case', positions: 1 }],
     ['no clear, the held text changed too: compared whole, closest run', { observed: 'NOTE: HI THERE', before: 'xyz', value: 'hi there' }, { kind: 'case', positions: 7 }],
+    ['with clear the earlier text is gone: the whole reading is the typing (`priorText`)', { observed: 'abXY', before: 'ab', value: 'abxy', clear: true }, { kind: 'case', positions: 2 }],
     ['with clear the field must EQUAL the value: longer but for case is a length', { observed: 'Re: Hello', value: 'hello', clear: true }, { kind: 'length' }],
     ['autocorrect `teh` → `the`: same length, how many differ', { observed: 'the', value: 'teh' }, { kind: 'same-length', positions: 2 }],
     ['held `HELLo` is not the typing: only `hxllo` after it is compared', { observed: 'HELLohxllo', before: 'HELLo', value: 'hello' }, { kind: 'same-length', positions: 1 }],
@@ -245,6 +246,14 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length' }],
     ['a pair equal only upper-cased (dotless `ı`, `i`) is case too', { observed: 'ıd', value: 'id', clear: true }, { kind: 'case', positions: 1 }],
     ['`ß`/`SS` differ in length: a plain difference, never case', { observed: 'SS', value: 'ß', clear: true }, { kind: 'length' }],
+    // D28: a reformatted strict prefix is a dropped tail — iOS React Native's rf2 read "transformed the input"
+    ['a grouping field that dropped the tail (rf2): a dropped tail, not a transformed input', { observed: '1 234 567,', value: '1234567,89', clear: true }, { kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true }],
+    ['the same on Android (no-break spaces), no clear onto held text', { observed: 'SK31\u00A01200\u00A00', before: 'SK31', value: '12000000' }, { kind: 'dropped-tail', landed: 5, dropped: 3, grouped: true }],
+    // D28 code review: a prefix only RESPACED (a typed space shown as a no-break space), nothing added, is not grouped
+    ['a respaced-only prefix (`Jan\u00A0` for `Jan Novak`): a dropped tail, not grouped', { observed: 'Jan\u00A0', value: 'Jan Novak', clear: true }, { kind: 'dropped-tail', landed: 4, dropped: 5, grouped: false }],
+    ['an exact prefix stays a length (the field grouped nothing)', { observed: '12345', value: '1234567', clear: true }, { kind: 'length' }],
+    ['a grouped reading with a changed character is no prefix', { observed: '1 235 5', value: '1234567', clear: true }, { kind: 'same-length', positions: 5 }],
+    ['a grouped reading that holds nothing of the typing is no dropped tail', { observed: '1 234', before: '1234', value: '5' }, { kind: 'length' }],
   ];
   for (const [shape, f, kind] of rows) it(shape, () => expect(differenceOf(m(f))).toEqual(kind));
 });

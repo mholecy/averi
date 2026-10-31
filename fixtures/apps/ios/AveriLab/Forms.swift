@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // The forms family (fixtures/apps/cells/forms.json). A form cell (phase 1b of
 // docs/plans/2026-10-15-ground-truth-lab-app.md): the fields of a payment form, a submit, maybe a country picker sheet
@@ -22,6 +23,11 @@ struct FormScreen: View {
     @State private var dirty = false
     @State private var picker = false
     @FocusState private var focus: String?
+    /// The formatting field (FormattingTextField, a UIKit field) that has the focus: @FocusState cannot follow a
+    /// UIViewRepresentable, so its delegate says so here.
+    @State private var editing: String?
+    /// The field the oracle is told has the focus: a SwiftUI field's, else a formatting field's.
+    private var focused: String? { focus ?? editing }
 
     var body: some View {
         NavigationStack {
@@ -70,7 +76,11 @@ struct FormScreen: View {
         }
         .onChange(of: dirty) { report() }
         .onChange(of: focus) {
-            lab.focused(focus)
+            lab.focused(focused)
+            report()
+        }
+        .onChange(of: editing) {
+            lab.focused(focused)
             report()
         }
         .task {
@@ -94,12 +104,13 @@ struct FormScreen: View {
     /// a fast burst (the HID typing of idb and WDA, one key per ~7 ms) — the @State held it, a submit read it, but no
     /// onChange followed, and the oracle kept the value one key short
     /// (docs/bugs/2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md).
-    /// A field with a `format` (form-format, D18) reformats in the same write, as a banking app's IBAN and amount fields
-    /// do: the model holds the formatted text and the TextField shows it (an `.onChange` would set it a write later —
-    /// the burst trap above).
-    private func binding(_ tag: String, format: String? = nil) -> Binding<String> {
+    /// A field with a `format` (form-format, D18) is a FormattingTextField: it formats each key before it writes here,
+    /// so the model holds the formatted text in the same write (an `.onChange` would set it a write later — the burst
+    /// trap above), and the screen shows it. Not a SwiftUI TextField whose setter formats: one that writes back a
+    /// DIFFERENT string kept showing what was typed (D28, the owner's iOS run of D18).
+    private func binding(_ tag: String) -> Binding<String> {
         Binding(get: { values[tag, default: ""] }, set: {
-            values[tag] = formatted(format, $0)
+            values[tag] = $0
             report()
         })
     }
@@ -111,7 +122,6 @@ struct FormScreen: View {
                 // two overlapping by a few points — the title reaches into the field's frame.
                 ZStack(alignment: .topLeading) {
                     input(f)
-                        .accessibilityIdentifier(fieldID(f))
                         .reportFrame(f.tag, to: lab)
                         .padding(.top, 10)
                     Text(f.title)
@@ -128,7 +138,6 @@ struct FormScreen: View {
                     .accessibilityIdentifier(f.titleId ?? "\(fieldID(f)).title")
                     .reportFrame("\(f.tag).title", to: lab)
                 input(f)
-                    .accessibilityIdentifier(fieldID(f))
                     .reportFrame(f.tag, to: lab)
             }
             if let e = shownError(f) {
@@ -141,8 +150,27 @@ struct FormScreen: View {
         }
     }
 
+    /// The field's input, under its identifier (fieldID) — a formatting field's set on its UITextField itself, so the tree
+    /// holds one element by that identifier, the text field, as a SwiftUI field's does.
     @ViewBuilder private func input(_ f: FieldSpec) -> some View {
         let placeholder = f.placeholder ?? ""
+        if f.format != nil, f.kind != "pin", f.kind != "country" {
+            FormattingTextField(
+                id: fieldID(f),
+                placeholder: placeholder,
+                format: f.format,
+                keyboard: f.kind == "amount" ? .decimalPad : .default,
+                text: binding(f.tag)
+            ) { on in
+                if on { editing = f.tag } else if editing == f.tag { editing = nil }
+            }
+            .frame(maxWidth: .infinity, minHeight: 34)
+        } else {
+            plainInput(f, placeholder).accessibilityIdentifier(fieldID(f))
+        }
+    }
+
+    @ViewBuilder private func plainInput(_ f: FieldSpec, _ placeholder: String) -> some View {
         switch f.kind {
         case "pin":
             SecureField(placeholder, text: binding(f.tag))
@@ -166,7 +194,7 @@ struct FormScreen: View {
             .buttonStyle(.plain)
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
         default:
-            TextField(placeholder, text: binding(f.tag, format: f.format))
+            TextField(placeholder, text: binding(f.tag))
                 .keyboardType(f.kind == "email" ? .emailAddress : f.kind == "amount" ? .decimalPad : .default)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -217,7 +245,78 @@ struct FormScreen: View {
 
     private func report() {
         for f in form.fields {
-            lab.field(f.tag, FieldState(value: values[f.tag, default: ""], focused: focus == f.tag, error: shownError(f)))
+            lab.field(f.tag, FieldState(value: values[f.tag, default: ""], focused: focused == f.tag, error: shownError(f)))
+        }
+    }
+}
+
+/// A text field that formats as it is typed — on the screen and in the model alike (D28). The owner's iOS run of D18
+/// (2026-10-31, iPhone 17, iOS 27) found a SwiftUI TextField whose binding setter writes back a DIFFERENT string keeps
+/// showing what was typed: f1–f3 read `SK3112000000` on the screen while the model held `SK31 1200 0000`. UIKit's
+/// delegate sees every key, one at a time, BEFORE the field changes (the HID typing of idb and WDA, a key per ~7 ms,
+/// included): the edit is applied to the field's text, formatted, shown, the caret put at the end, and written to the
+/// model in that one call — a burst cannot leave the screen and the model a key apart (the trap `binding` names), and
+/// the field reformats as a banking app's IBAN field does, the caret staying at the end for the next key.
+/// Not followed: FormScreen's @FocusState (a programmatic `form.focus`, a title tap's `focus = nil`) — no formatting
+/// cell uses either.
+struct FormattingTextField: UIViewRepresentable {
+    let id: String
+    let placeholder: String
+    let format: String?
+    let keyboard: UIKeyboardType
+    @Binding var text: String
+    /// The field took (true) or lost (false) the focus.
+    let editing: (Bool) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.accessibilityIdentifier = id
+        field.placeholder = placeholder
+        field.borderStyle = .roundedRect
+        field.keyboardType = keyboard
+        field.autocorrectionType = .no
+        field.autocapitalizationType = .none
+        field.spellCheckingType = .no
+        field.smartQuotesType = .no
+        field.smartDashesType = .no
+        field.smartInsertDeleteType = .no
+        field.text = text
+        field.delegate = context.coordinator
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        context.coordinator.parent = self
+        // A change from outside (a prefill) is shown; the field's own writes come back equal and move nothing — the caret
+        // stays where the delegate put it.
+        if field.text != text { field.text = text }
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: FormattingTextField
+        init(_ parent: FormattingTextField) { self.parent = parent }
+
+        func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+            let edited = ((field.text ?? "") as NSString).replacingCharacters(in: range, with: string)
+            let shown = formatted(parent.format, edited)
+            field.text = shown
+            let end = field.endOfDocument
+            field.selectedTextRange = field.textRange(from: end, to: end)
+            parent.text = shown
+            // The field was set here; UIKit must not apply the edit a second time.
+            return false
+        }
+
+        func textFieldDidBeginEditing(_ field: UITextField) { parent.editing(true) }
+        func textFieldDidEndEditing(_ field: UITextField) { parent.editing(false) }
+
+        func textFieldShouldReturn(_ field: UITextField) -> Bool {
+            field.resignFirstResponder()
+            return true
         }
     }
 }

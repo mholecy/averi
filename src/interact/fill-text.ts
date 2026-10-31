@@ -343,6 +343,11 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
   'same-length': ({ positions }) =>
     ` — as many characters as were typed, ${positions} differing: ` +
     'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
+  'dropped-tail': ({ landed, dropped, grouped }) =>
+    ` — the first ${landed === 1 ? '1 typed character is' : `${landed} typed characters are`} there, ` +
+    (grouped ? 'grouped by the field (separators of its own added)' : 'its spaces shown as another kind of space') +
+    `, the last ${dropped} did not land: dropped, or refused by the field (a length cap, a character it does not take) — ` +
+    'not a transformed input; content withheld from this error',
   unchanged: () => ' — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
   length: () => ' (content withheld from this error)',
 };

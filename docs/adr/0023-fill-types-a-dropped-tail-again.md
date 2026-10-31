@@ -3,6 +3,9 @@
 Status: accepted 2026-10-19 (orchestrator's decision for round 7, task A9, on the owner's standing: averi's fill must
 deliver the whole text reliably, the agent's hands needing no retries). Implemented on `arch/r23-fill-tail`.
 
+Widened 2026-10-31 by D28 (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md, its amendment): the
+strict prefix this ADR retypes may be REFORMATTED — exact by typed characters, only the field's grouping added.
+
 ## Context
 
 - docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md: on the

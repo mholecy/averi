@@ -21,7 +21,8 @@
  *   character it should hold, in order, with ONE separator character of its
  *   own added between groups of typed letters or digits — between two
  *   letters only in a code, an added `.` or `,` only where a thousands mark
- *   sits (`reformatOf` has every rule; docs/adr/0034-a-fill-passes-a-field-
+ *   sits (`reformatOf`, interact/fill-reformat.ts — a pure leaf the verdict
+ *   asks too — has every rule; docs/adr/0034-a-fill-passes-a-field-
  *   that-reformats-as-it-is-typed.md).
  * - the poll: READ_BACK_POLLS (five) reads at `pollMs` until the reading lands, never stopping
  *   early on an unchanged mismatch (`pollValue`).
@@ -36,7 +37,15 @@
  *      in the field (`whereTyped`: every other input the screen showed before
  *      the typing is there with its value — an auto-advancing code box that
  *      moved the focus would get the tail too; a sibling the app recomputed
- *      proves nothing either way, and stops the tail too). Only the missing tail is typed, up to
+ *      proves nothing either way, and stops the tail too). Since D28 the
+ *      prefix may be REFORMATTED (fill-reformat.ts#tailOf): a field that groups as it is
+ *      typed shows `1 234 567,` for a typed `1234567,89` that lost `89` —
+ *      exact by typed characters, only grouping added, `reformatOf`'s rules
+ *      judged over the whole typing (iOS React Native, rf2, 2026-10-31: the
+ *      wipe and retype it got instead dropped the tail again). The tail is
+ *      typed at the caret, which the field keeps at the end as it regroups
+ *      (React Native's controlled TextInput, ADR 0034; rf3's typing on after
+ *      a reformatting fill landed in order on iOS). Only the missing tail is typed, up to
  *      `MAX_TAIL_RETYPES` times, and again only while each retype moved the
  *      field. Never on a reading with a bullet (a masked field's content
  *      cannot be compared, so a prefix cannot be seen), never when nothing of
@@ -63,9 +72,10 @@
  */
 
 import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adapters/types.js';
-import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
+import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { sleep } from '../util/sleep.js';
-import { heldText, isPoint, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
+import { heldText, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
+import { landedSome, priorText, reformatOf, tailOf, type Expectation } from './fill-reformat.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
 export interface FieldIo {
@@ -201,7 +211,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       const { reformatted } = read.landed;
       return { kind: 'landed', observed, again, ...(reformatted !== undefined && { reformatted }) };
     }
-    const where = whereTyped(others, io.screen(), missingOf(observed, intent));
+    const where = whereTyped(others, io.screen(), tailOf(observed, intent)?.missing);
     const tail =
       intent.delivery === 'on-return' && where.kind === 'field' && read.steady && tails() < MAX_TAIL_RETYPES
         ? droppedTail(observed, intent)
@@ -222,110 +232,6 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     const prior = observed;
     read = { ...(await pollValue(io.read, landing, intent.pollMs)), prior };
   }
-}
-
-/** The spaces a field may show for one another: a space, a no-break (U+00A0) and a narrow no-break (U+202F) space. */
-const SPACES = new Set([' ', '\u00A0', '\u202F']);
-/** What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. */
-const SEPARATORS = new Set([...SPACES, '.', ',', '-', '/']);
-const ALNUM = /^[\p{L}\p{N}]$/u;
-const DIGIT = /\d/;
-const LETTER = /^\p{L}$/u;
-const DIGITS = /^\d+$/;
-
-/**
- * The reading is `expected` — every character of it, in order — with ONE separator character the field added between
- * them (an IBAN grouped in fours, an amount's thousands, a date's slashes) and nothing else: `Reformat`, else undefined
- * (also for an exact reading, which the exact rule passes — a Reformat always counts at least one change). D18,
- * docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md. Tight, since a wrong pass is worse than a false
- * mismatch:
- * - every expected character is shown, in order and unchanged — a typed space may be shown as another space
- *   (`respaced`), nothing else may differ (letter case included); a separator that was typed must be shown: a field
- *   that dropped one (`12,50` → `1250`) changed the value;
- * - the added separators are all one character of SEPARATORS, each between two typed letters or digits: none
- *   leading (a `-` there is a sign), trailing, next to another, or after typed punctuation (`Hello, world` for
- *   `Hello,world` is an edit, not a format); between two LETTERS only when the typing is a code — digits in it and
- *   no typed space (an IBAN's `MALT MTLC`): in prose that is autocorrect splitting a word (`a lot` for `alot`);
- * - they cut the typing into groups of two or more characters, but for ONE single-character group at either end
- *   (`1 234`, an IBAN's last `1`): `1-5` for `15` is no grouping;
- * - an added `.` or `,` is a thousands separator: never a character the typing itself holds as `.` or `,`, the digits
- *   before the first one 1–3, not a lone `0` and not after a typed `.` or `,` (a fraction), exactly three between two
- *   of them and after the last (then no digit). That rules out a cents mask's `1.25` for `125` and `0.123` for `0123`, but not every decimal point: `1.234`
- *   for `1234` is de-DE's thousands or a three-decimal mask, which the reading cannot tell — so the verdict passes it
- *   with a caveat (`point`), not silently.
- * Greedy: a reading character equal to the next expected one is taken as that character. Taken as an added separator
- * instead, the expected one would have to match a later, equal character — so matching first never rejects what
- * skipping would pass but under the grouping rules, where the miss is a false mismatch (the safe side). Pure,
- * O(reading).
- */
-export function reformatOf(observed: string, expected: string): Reformat | undefined {
-  // Code points on both sides (an astral letter is one character, not two UTF-16 units).
-  const expectedChars = [...expected];
-  // A code: digits in it and no typed space (an IBAN, a card number) — the one typing whose letters a field may split.
-  const code = expectedChars.some((c) => DIGIT.test(c)) && !expectedChars.some((c) => SPACES.has(c));
-  // The reading as tokens: each an expected character shown (its index) or an added separator (-1).
-  const tokens: number[] = [];
-  let j = 0;
-  let respaced = 0;
-  for (const c of observed) {
-    const next = expectedChars[j];
-    if (c === next) tokens.push(j++);
-    else if (next !== undefined && SPACES.has(c) && SPACES.has(next)) {
-      tokens.push(j++);
-      respaced++;
-    } else if (SEPARATORS.has(c)) tokens.push(-1);
-    else return undefined;
-  }
-  if (j !== expectedChars.length) return undefined;
-  const chars = [...observed];
-  const added = new Set(chars.filter((_, k) => tokens[k] === -1));
-  if (added.size > 1) return undefined;
-  const sep = [...added][0];
-  // Each added separator between two typed letters or digits; the groups between them.
-  const groups: number[] = [0];
-  for (let k = 0; k < tokens.length; k++) {
-    if (tokens[k] !== -1) {
-      groups[groups.length - 1]++;
-      continue;
-    }
-    // Both neighbours typed letters or digits: none leading or trailing (no neighbour), none next to another added
-    // one (-1), none after typed punctuation.
-    const typedAlnum = (t: number | undefined) => t !== undefined && t !== -1 && ALNUM.test(expectedChars[t]);
-    if (!typedAlnum(tokens[k - 1]) || !typedAlnum(tokens[k + 1])) return undefined;
-    // Between two LETTERS only in a code (round 2, MAJOR-A): in prose a space or `-` added there is autocorrect
-    // splitting a word (`a lot` for `alot`, `jo-hn@x.com`), not a format; an IBAN's `MALT MTLC` is.
-    const letter = (t: number) => LETTER.test(expectedChars[t]);
-    if (!code && letter(tokens[k - 1]) && letter(tokens[k + 1])) return undefined;
-    groups.push(0);
-  }
-  const singles = groups.map((n, k) => (n < 2 ? k : -1)).filter((k) => k !== -1);
-  const atAnEnd = (k: number) => k === 0 || k === groups.length - 1;
-  if (singles.length > 1 || (singles.length === 1 && !atAnEnd(singles[0]))) return undefined;
-  const point = isPoint(sep) ? sep : undefined;
-  if (point !== undefined && !thousands(chars, tokens, expected, point)) return undefined;
-  const count = groups.length - 1;
-  if (count + respaced === 0) return undefined;
-  return { added: count, respaced, ...(point !== undefined && { point }) };
-}
-
-/** An added `.` or `,` groups digits by thousands (see `reformatOf`). */
-function thousands(chars: string[], tokens: number[], expected: string, point: string): boolean {
-  // The typing holds this character itself (its decimal point, or its own grouping): an added one is no thousands mark.
-  if (expected.includes(point)) return false;
-  const marks = tokens.flatMap((t, k) => (t === -1 ? [k] : []));
-  let start = marks[0] - 1;
-  while (start >= 0 && DIGIT.test(chars[start])) start--;
-  // The digits before the first mark are a whole part, not a fraction after a typed point (`0,12.345`; round 2).
-  if (start >= 0 && isPoint(chars[start])) return false;
-  const lead = chars.slice(start + 1, marks[0]).join('');
-  if (!DIGITS.test(lead) || lead.length > 3 || lead === '0') return false;
-  for (let n = 0; n < marks.length; n++) {
-    const end = n + 1 < marks.length ? marks[n + 1] : marks[n] + 4;
-    const run = chars.slice(marks[n] + 1, end).join('');
-    if (run.length !== 3 || !DIGITS.test(run)) return false;
-    if (n + 1 === marks.length && chars[end] !== undefined && DIGIT.test(chars[end])) return false;
-  }
-  return true;
 }
 
 /** Every input on a screen but the field, by role, identifier and rect, with the value it shows. */
@@ -379,30 +285,15 @@ function whereTyped(before: OtherInputs | undefined, now: UiNode | undefined, mi
   return unproven ? { kind: 'unproven' } : { kind: 'field' };
 }
 
-/** The text the typing lands after: the field's text before the typing (its placeholder aside), or none once cleared. */
-const priorText = (intent: Pick<TypingIntent, 'clear' | 'before' | 'placeholder'>): string => (intent.clear ? '' : heldText(intent.before, intent.placeholder));
-
-/**
- * What the field is missing of what it should hold (its text before the typing, unless cleared, then the value),
- * when its reading is a prefix of that and shows no bullet — else undefined. Pure.
- */
-function missingOf(observed: string, intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>): string | undefined {
-  const held = heldText(observed, intent.placeholder);
-  const prior = priorText(intent);
-  const whole = prior + intent.value;
-  if (hasBullet(held) || hasBullet(prior) || held.length >= whole.length || !whole.startsWith(held)) return undefined;
-  return whole.slice(held.length);
-}
-
 /**
  * The characters the field dropped from the END of the typing, or undefined when its reading does not prove that:
- * the field must hold a STRICT prefix of what it should (its text before typing, unless cleared, then the value),
- * longer than that earlier text — some typed character landed — and no bullet (a masked reading has no comparable
- * content). Pure.
+ * the field must hold a STRICT prefix of what it should (its text before typing, unless cleared, then the value) —
+ * exactly, or grouped by the field as it was typed (D28, `tailOf`) — longer than that earlier text — some typed
+ * character landed — and no bullet (a masked reading has no comparable content). Pure.
  */
-export function droppedTail(observed: string, intent: Pick<TypingIntent, 'value' | 'clear' | 'before' | 'placeholder'>): string | undefined {
-  if (heldText(observed, intent.placeholder).length <= priorText(intent).length) return undefined;
-  return missingOf(observed, intent);
+export function droppedTail(observed: string, intent: Expectation): string | undefined {
+  const tail = tailOf(observed, intent);
+  return landedSome(tail) ? tail.missing : undefined;
 }
 
 /**

@@ -58,7 +58,9 @@ flows:
   thousands separator sits — and the reply says `the field shows them reformatted: N separators
   added` (for an added `.` or `,` as a ⚠ line: it reads like a decimal point); a dropped, reordered
   or changed character still fails — the one accepted change is a typed space shown as a no-break
-  or narrow no-break space (`respaced`), which is formatting (ADR 0034). Android types one character per
+  or narrow no-break space (`respaced`), which is formatting (ADR 0034). A field that grouped
+  what landed and dropped the end (`1 234 567,` for `1234567,89`) gets the tail alone typed again
+  on iOS, as an exact prefix does (ADR 0034's D28 amendment). Android types one character per
   `input text` call: bulk injection races Compose's async state and drops most characters
   (measured 3 of 11 landing).
 - **Field errors**: on iOS `ui_snapshot` attaches `error` to an input by one of two rules, on idb

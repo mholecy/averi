@@ -1318,7 +1318,7 @@ describe('fillField — the mismatch error says what differs, without content (2
     );
   });
 
-  // Until D18 the mask here inserted a space (`1234 5`) — a reformat that passes now (fill-type.ts#reformatOf). A cents
+  // Until D18 the mask here inserted a space (`1234 5`) — a reformat that passes now (fill-reformat.ts#reformatOf). A cents
   // mask's decimal point changes the amount, so it still fails.
   it('a length difference says the lengths alone, as before (a cents mask that inserts a decimal point)', async () => {
     const message = await failureOf(fillField(transforming(null, (s) => s.replace(/^(\d{3})(\d+)$/, '$1.$2')), { id: 'notes' }, '12345', FAST));
@@ -1615,6 +1615,46 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     await fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST);
     expect(fake.typed).toEqual(['Jan Novak', ' Novak', 'vak']);
     expect(fake.droppedTails).toEqual([3]);
+  });
+
+  // D28 (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md, amendment): iOS React Native's rf2 —
+  // the amount field groups by thousands and the burst dropped `89`, leaving `1 234 567,`. Only `89` is typed again,
+  // nothing wiped, the drop reported, and the reply says both.
+  const groupingAmount = (fake: FakeAdapter, keeps: number[], space = ' ') => {
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (!fake.focused) return;
+      const keep = keeps.shift() ?? text.length;
+      const raw = (fake.focused.value ?? '').replace(/[ \u00A0]/g, '') + text.slice(0, keep);
+      const [whole, ...fraction] = raw.split(',');
+      const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, space);
+      fake.focused.value = fraction.length === 0 ? grouped : `${grouped},${fraction.join(',')}`;
+    };
+  };
+
+  it('a grouping field that dropped its tail gets the tail alone, and tells the adapter (D28)', async () => {
+    const fake = formFake(null);
+    groupingAmount(fake, [8]);
+    const result = await fillField(fake, { id: 'amount_input' }, '1234567,89', { ...FAST, clear: true });
+    expect(fake.typed).toEqual(['1234567,89', '89']);
+    expect(fake.deletes).toEqual([]);
+    expect(fake.focused?.value).toBe('1 234 567,89');
+    expect(fake.droppedTails).toEqual([2]);
+    expect(fillReply(result, 'id:amount_input')).toBe(
+      'Filled id:amount_input (10 characters, the last 2 characters typed again after the field dropped them, the field shows them reformatted: 2 separators added)',
+    );
+  });
+
+  it('a grouping field whose tail stays dropped (Android: no retype) fails saying the tail dropped, not "transformed" (D28)', async () => {
+    const fake = formFake(null);
+    fake.typingDelivery = 'may-arrive-late';
+    groupingAmount(fake, [8, 8], '\u00A0');
+    await expect(fillField(fake, { id: 'amount_input' }, '1234567,89', { ...FAST, clear: true })).rejects.toThrow(
+      'fill: typed 10 characters (after one wipe and retype) but the field shows 10 — the first 8 typed characters are there, grouped by the field ' +
+        '(separators of its own added), the last 2 did not land: dropped, or refused by the field (a length cap, a character it does not take) — ' +
+        'not a transformed input; content withheld from this error',
+    );
+    expect(fake.droppedTails).toEqual([]);
   });
 
   it('a capped field (maxLength: the retype moves nothing, the fill fails) tells the adapter nothing', async () => {
