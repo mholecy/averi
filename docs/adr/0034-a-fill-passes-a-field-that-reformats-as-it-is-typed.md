@@ -32,8 +32,15 @@ an added `.` or `,`). Implemented on `perf/d18-reformatting-field`.
 | rf1–rf2 React Native, as f1 and f3 | grouped | ERROR | Filled |
 | rf3–rf4 React Native, `type_text` / `type:` | grouped | ok (blind) | same |
 
-`type_pin` (f10, rf5: a flow's tap and `type_pin` of `1234567` into the amount fields): NOT YET MEASURED — the cases
-are written; their run, and the forms groups' summary lines, follow once the device is free.
+`type_pin` (f10, rf5: a flow's tap and `type_pin` of `1234567` into the amount fields; measured 2026-10-31 after
+review round 3): both models hold `1 234 567` (no-break spaces) — every digit landed in order, one keystroke a digit,
+blind as designed. f1–f3 also asserted the tree's text against the model's (`holdsShown`): equal on Compose.
+
+The forms groups at 56e71bce, every case of `live.ts --groups forms`:
+- native: `# Live golden: 42 cases, 37 ok, 2 loud, 0 mismatches (0 not known), 3 skipped` — the 32 cases from before
+  D18 and f1–f10; the two LOUD are b1d and b7 (adb's `input text` refuses `Š` and `’`, known), the three skipped kf1–kf3
+  (the floating-keyboard cases, Gboard docked);
+- React Native: `# Live golden: 11 cases, 11 ok, 0 loud, 0 mismatches (0 not known), 0 skipped` (rn1–rn6, rf1–rf5).
 
 Typing was never garbled: one `input text` per character at 100 ms (D6) lands every character in order in each of
 the four fields — the Compose model field puts the cursor at the end on every reformat, the VisualTransformation maps
@@ -101,7 +108,7 @@ beside `retyped`, or the `reformatted-point` caveat), counts only — a value ma
   wipe and retype of the whole value still runs; without it the fill fails as before. Not seen on Android (no drop);
   the drop is iOS React Native's (`idb ui text`), and the iOS check of these fields is the owner's (below).
 - `type_text` without a selector and a flow's `type:` stay blind (no read-back, as designed); they typed every
-  character into the reformatting fields (f6, f8, rf3, rf4). `type_pin`: see "Measured" above.
+  character into the reformatting fields (f6, f8, rf3, rf4). `type_pin` typed every digit too (f10, rf5; "Measured" above).
 - The ibanShown case shows the uiautomator dump reads a Compose `VisualTransformation`'s SHOWN text, not the model's:
   the read-back cannot tell a display-only format from a model one — both are the same pass.
 - Not device-checked on iOS: the SwiftUI `Forms.swift` change (the binding's setter formats) is source only — this
