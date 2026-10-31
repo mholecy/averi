@@ -19,9 +19,10 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 //
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (as in
 // fill.test.ts): the hide delay is asserted as a delay in a sequence.
-// Date is faked (Date ONLY) and each recorded sleep moves it by its own length, so every read takes exactly 0 ms:
-// the settle poll's pause is `pollMs` less the read's own duration (ui-tree/read-tree.ts#pollTree, ADR 0029), and on
-// a real clock a fake read that straddled a millisecond tick would turn the pinned 2 into a 1 (D1, 2026-10-31).
+// Date is faked (Date ONLY) and each recorded sleep moves it by its own length (tests/helpers/sleep-recorder.ts's
+// clock rule), so every fake read takes exactly 0 ms and the settle pause is `pauseAfterRead` of it
+// (ui-tree/read-tree.ts, ADR 0029) whatever pollMs a test passes: on a real clock one at or above the floor would
+// lose a millisecond whenever a fake read straddled a tick.
 const { sleeps } = vi.hoisted(() => ({ sleeps: [] as number[] }));
 vi.mock('../../src/util/sleep.js', () => ({
   sleep: async (ms: number) => {

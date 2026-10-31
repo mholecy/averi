@@ -1679,7 +1679,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
     expect(result.pass).toBe(true);
     expect(fake.screenshots).toHaveLength(4);
     // Two rounds of 2.7 s read + 0.65 + 0.3 + 0.65 s captures, and only the 150 ms floor between them: the 2.7 s
-    // read already outlasts the 300 ms poll (pollTree, ADR 0029 — 8900 before D1, when the whole 300 ms was slept).
+    // read already outlasts the 300 ms poll (pollTree, ADR 0029 — 8900 before it, when the whole 300 ms was slept).
     expect(Date.now() - t0).toBe(8750);
   });
 

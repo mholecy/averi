@@ -230,7 +230,7 @@ describe('pollTree — the one deadline loop', () => {
       };
       const outcome = await pollTree(adapter, (t) => (t.children.length > 0 ? 'found' : undefined), { timeoutMs: 2500, pollMs: 300 });
       // Reads at 0, 1150 and 2300 (each 1 s, slower than the 300 ms poll, so only the 150 ms floor between them —
-      // D1, ADR 0029): the third starts inside the deadline, ends 800 ms past it, and finds it.
+      // pauseAfterRead, ADR 0029): the third starts inside the deadline, ends 800 ms past it, and finds it.
       expect(outcome).toEqual({ timedOut: false, value: 'found' });
       expect(reads).toBe(3);
     } finally {
@@ -272,11 +272,9 @@ describe('pollTree — the one deadline loop', () => {
     expect(reads).toBe(1);
   });
 
-  // D1 (2026-10-31, docs/adr/0029-poll-cadence-counts-the-read.md): the pause between rounds is what is LEFT of
-  // pollMs after the read itself, so consecutive reads START at least pollMs apart. Before, the loop slept the whole
-  // pollMs after every read, and a read's own cost was added to the cadence on top of it (idb's ~167 ms read made a
-  // 500 ms poll a ~667 ms one; Android's 2.2–2.5 s dump made it ~3 s).
-  describe('the cadence counts the read (D1)', () => {
+  // docs/adr/0029-poll-cadence-counts-the-read.md (2026-10-31): the pause after a round is `pauseAfterRead` of the
+  // round's read — the rule, its floor and why are documented there, on ui-tree/read-tree.ts.
+  describe('the cadence counts the read (ADR 0029)', () => {
     /** A fake device whose every read costs `readMs` of the faked Date, and the starts of its reads. */
     const timedAdapter = (readMs: number) => {
       const starts: number[] = [];
