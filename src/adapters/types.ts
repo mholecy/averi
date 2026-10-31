@@ -1016,6 +1016,13 @@ export interface DeviceAdapter {
    * `settle`: a one-shot caller (an MCP tool, not a poller) may ask for one
    * bounded retry when the device answers "no window yet" right after a launch.
    * Pollers leave it off — their interval already is the retry.
+   *
+   * A failed read throws; the read loops above treat that as a miss and read
+   * again (ui-tree/read-tree.ts#readTreeOrError) — except a PersistentReadError
+   * (above, D21: a failure no wait cures, idb's wedged accessibility service),
+   * on which every read loop stops at once and which the flow engine treats as
+   * terminal. An adapter throws one only for a state that a re-read, a relaunch
+   * or a re-run reach flow cannot end.
    */
   uiTree(opts?: { settle?: boolean }): Promise<UiNode>;
 

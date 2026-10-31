@@ -994,7 +994,11 @@ export class FlowEngine {
    *
    * An unreadable tree is not "in this state", and must not throw either:
    * right after a cold launch/reinstall (no window yet) is exactly when the
-   * reach flows are needed. But it is not "not in this state" either: a
+   * reach flows are needed. The one exception, since 2026-10-31 (D21): a read
+   * no wait cures (adapters/types.ts#PersistentReadError — idb's wedged
+   * accessibility service) throws out of the probe, from pollTree's first
+   * round that met it — no reach flow can cure it, and `isTerminal` stops
+   * the ladder on it. But it is not "not in this state" either: a
    * probe that never read a tree answers `unknown` (Detection), and one
    * that read only bare trees answers `bare` — the ladder alone tells either
    * from `no`, and refuses a destructive rung on them. The window is a

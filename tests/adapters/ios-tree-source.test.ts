@@ -7,6 +7,7 @@ import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { PersistentReadError } from '../../src/adapters/types.js';
+import type { IdbHelper } from '../../src/adapters/idb-helper.js';
 import type { UiNode } from '../../src/adapters/types.js';
 
 /**
@@ -430,6 +431,34 @@ describe('IdbTreeSource — "named no frontmost application" is a named error th
   it('the original idb failure rides on it as its cause', async () => {
     const error = (await source('AAAA-1111').read().catch((e: unknown) => e)) as Error;
     expect(error.cause).toBeInstanceOf(ExecError);
+  });
+
+  // A timeout is not the wedge, whatever its stderr held: the CLI killed at its 15 s budget says nothing about the
+  // accessibility service, and a slow read may well succeed the next time.
+  it('a timed-out describe-all stays a plain ExecError, even with the words in its stderr', async () => {
+    const timedOut: ExecFn = async (cmd, args) => {
+      if (cmd === 'idb') throw new ExecError(['idb', ...args].join(' '), null, NO_FRONTMOST, true);
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const error = await new IdbTreeSource({ udid: 'AAAA-1111', exec: timedOut }).read().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ExecError);
+    expect(error).not.toBeInstanceOf(IdbNoFrontmostError);
+  });
+
+  // The helper path (D7a, ADR 0032): runIdb throws the helper's nonzero answer as the same ExecError the CLI's
+  // failure is, so the wedge is named alike whichever served the read.
+  it('through the idb helper: an answer of code 1 with the words is IdbNoFrontmostError too', async () => {
+    const helper = {
+      run: async () => ({ kind: 'answer' as const, code: 1, stdout: Buffer.alloc(0), stderr: NO_FRONTMOST + '\n' }),
+    } as unknown as IdbHelper;
+    const cliCalls: string[] = [];
+    const exec: ExecFn = async (cmd, args) => {
+      if (cmd === 'idb') cliCalls.push(args.join(' '));
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const error = await new IdbTreeSource({ udid: 'AAAA-1111', exec, helper }).read().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(IdbNoFrontmostError);
+    expect(cliCalls).toEqual([]); // the helper answered: no CLI read
   });
 
   it('any other idb failure is left as it was', async () => {

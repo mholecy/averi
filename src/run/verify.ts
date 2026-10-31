@@ -556,6 +556,10 @@ export async function runVerification(
           { env, environment: req.environment, session: req.session, handOff },
           request,
         );
+    // The asserts never reject the leg on a tree read either: a read no wait cures (adapters/types.ts#
+    // PersistentReadError, D21 — idb's wedged accessibility service) fails each assert after its one read, its message
+    // the detail (Verifier.poll, pixel-poll.ts), so the leg still captures its frame below — idb's screenshot works
+    // while its tree read is wedged — and asks its health line.
     const results = await new Verifier(adapter, { baselineDir: req.baselineDir, ocr, handOff }).assertAll(specs);
     // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
     // a bare screenshot, so the color and text tables could be fed the one

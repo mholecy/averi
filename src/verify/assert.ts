@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import pixelmatch from 'pixelmatch';
 import { z } from 'zod';
-import type { DeviceAdapter, UiNode } from '../adapters/types.js';
+import { PersistentReadError, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
 import { pollOnVerdict, pollTree, Undecided, type FirstSample } from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
@@ -539,14 +539,23 @@ export class Verifier {
     spec: PollSpec,
   ): Promise<AssertResult> {
     const { description, timeoutMs } = spec;
-    const outcome = await pollTree(this.adapter, async (tree) => {
-      const verdict = await evaluate(tree);
-      return verdict === Undecided ? Undecided : verdictToPoll(verdict);
-    }, {
-      timeoutMs,
-      pollMs: this.pollMs,
-      ...(spec.first !== undefined && { first: spec.first }),
-    });
+    let outcome;
+    try {
+      outcome = await pollTree(this.adapter, async (tree) => {
+        const verdict = await evaluate(tree);
+        return verdict === Undecided ? Undecided : verdictToPoll(verdict);
+      }, {
+        timeoutMs,
+        pollMs: this.pollMs,
+        ...(spec.first !== undefined && { first: spec.first }),
+      });
+    } catch (e) {
+      // A read no wait cures (adapters/types.ts#PersistentReadError, D21) ends the poll at once (pollTree) and fails
+      // THIS assert with its message — it does not throw: a verify leg would lose its frame, screenshot and health
+      // line with the rejected assert (run/verify.ts), and the asserts after it each fail after their own one read.
+      if (e instanceof PersistentReadError) return { description, pass: false, detail: e.message };
+      throw e;
+    }
     if (!outcome.timedOut) return { description, pass: true, detail: outcome.value.detail };
     // The window manager's word on the last tree's window, asked now the poll has given up on a target it never found
     // (ui-tree/window-mark.ts): a detail is the finding, and no not-found is worded beside it.

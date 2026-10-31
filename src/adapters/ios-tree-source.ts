@@ -344,6 +344,11 @@ const describeEmptyPayload = (types: readonly (string | undefined)[]): string =>
  * first line alone must already keep a reader from waiting it out. The measurement and the cure follow beneath it.
  * Matched on idb's stderr — the CLI's and the helper's alike (runIdb throws the helper's nonzero answer as the same
  * ExecError) — on the words of the measured message, not its first word's case; the ExecError is kept as `cause`.
+ * The stream and the exit status are fb-idb's, read from its source, not measured: the device run captured the CLI
+ * with `2>&1` and recorded neither. fb-idb's main.py prints an IdbException's text to stderr and exits 1
+ * (`print(e.args[0], file=sys.stderr); return 1`), and averi's D20 reply showed it as exec's
+ * `Command failed (exit 1): idb ui describe-all … \n<that text>`. A timed-out read is never this error, whatever its
+ * stderr held: a CLI killed at its budget says nothing about the accessibility service.
  */
 export class IdbNoFrontmostError extends PersistentReadError {
   /** The simulator the read was made on — the one the reboot advice names. */
