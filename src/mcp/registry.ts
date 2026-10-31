@@ -2,6 +2,7 @@ import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
 import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import { createIosTreeSource } from '../adapters/ios-tree-source.js';
+import { IdbHelper } from '../adapters/idb-helper.js';
 import { androidUnusable, iosBootedFromDevicePlist, listAndroidDevices, listIosDevices, type ListOpts } from '../adapters/discovery.js';
 import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
@@ -81,9 +82,13 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
   if (platform === 'android') return new AndroidAdapter({ serial: deviceId, drawnOverStrip });
   // The registry hands over the resolved kind (kindFor); the fallback only
   // serves a direct caller of the factory, and names the same default.
+  // One idb helper per simulator (D7a), shared like `exec` by the adapter and its tree source; it starts on the first
+  // call it could serve, so a wda-backed adapter never starts one.
+  const idbHelper = new IdbHelper();
   return new IosAdapter({
     udid: deviceId,
-    treeSource: createIosTreeSource(opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE, deviceId),
+    treeSource: createIosTreeSource(opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE, deviceId, { idbHelper }),
+    idbHelper,
   });
 };
 

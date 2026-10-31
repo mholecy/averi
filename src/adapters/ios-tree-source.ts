@@ -6,6 +6,7 @@ import { attachFieldErrors } from './field-errors.js';
 import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios-node.js';
 import { WdaTreeSource } from './wda-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
+import type { IdbHelper } from './idb-helper.js';
 import { rectArea, rectIntersection, zeroRect, type Rect, type UiNode } from './types.js';
 import { countOf } from '../util/count.js';
 
@@ -80,7 +81,10 @@ export type ApplicationLabel = { kind: 'label'; label: string } | { kind: 'unlab
  * and DerivedData. One optional object, never a DI layer — the registry
  * passes none and gets the real backends.
  */
-export type IosTreeSourceDeps = Omit<WdaServerOptions, 'udid'>;
+export type IosTreeSourceDeps = Omit<WdaServerOptions, 'udid'> & {
+  /** The simulator's idb helper (D7a, idb-helper.ts), shared with the IosAdapter — idb's alone; wda ignores it. */
+  idbHelper?: IdbHelper;
+};
 
 /**
  * The adapter for a configured kind, bound to one simulator. Lives with the
@@ -91,8 +95,8 @@ export type IosTreeSourceDeps = Omit<WdaServerOptions, 'udid'>;
  * mcp/registry.ts on review 2026-10-03).
  */
 const constructors: Record<IosTreeSourceKind, (udid: string, deps: IosTreeSourceDeps) => IosTreeSource> = {
-  idb: (udid, deps) => new IdbTreeSource({ udid, exec: deps.exec }),
-  wda: (udid, deps) => new WdaTreeSource({ ...deps, udid }),
+  idb: (udid, deps) => new IdbTreeSource({ udid, exec: deps.exec, helper: deps.idbHelper }),
+  wda: (udid, { idbHelper: _idb, ...deps }) => new WdaTreeSource({ ...deps, udid }),
 };
 
 export function createIosTreeSource(kind: IosTreeSourceKind, udid: string, deps: IosTreeSourceDeps = {}): IosTreeSource {
@@ -329,10 +333,16 @@ export class IdbTreeSource implements IosTreeSource {
   readonly kind = 'idb' as const;
   private readonly udid: string;
   private readonly exec: ExecFn;
+  /**
+   * The simulator's idb helper (D7a): the read goes to it when it is ready and idle, and to the CLI otherwise (runIdb).
+   * Not this source's to dispose — the IosAdapter it was handed with owns it.
+   */
+  private readonly helper: IdbHelper | undefined;
 
-  constructor(opts: { udid: string; exec?: ExecFn }) {
+  constructor(opts: { udid: string; exec?: ExecFn; helper?: IdbHelper }) {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
+    this.helper = opts.helper;
   }
 
   async read(): Promise<UiNode> {
@@ -354,7 +364,10 @@ export class IdbTreeSource implements IosTreeSource {
   }
 
   private async readOnce(): Promise<{ elements: IdbElement[]; tree: UiNode }> {
-    const { stdout } = await runIdb(this.exec, this.udid, ['ui', 'describe-all', '--json'], { timeoutMs: DESCRIBE_ALL_TIMEOUT_MS });
+    const { stdout } = await runIdb(this.exec, this.udid, ['ui', 'describe-all', '--json'], {
+      timeoutMs: DESCRIBE_ALL_TIMEOUT_MS,
+      helper: this.helper,
+    });
     const elements = idbElements(stdout.toString('utf8'));
     const tree = idbTree(elements);
     // Area on the NORMALIZED rects (rounded, a missing frame zeroed); the raw types only name the shape.

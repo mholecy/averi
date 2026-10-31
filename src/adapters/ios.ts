@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { simctl } from './xcode-env.js';
 import { runIdb } from './idb.js';
+import type { IdbHelper } from './idb-helper.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
@@ -95,6 +96,8 @@ export class IosAdapter implements DeviceAdapter {
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;
+  /** The simulator's idb helper (D7a, idb-helper.ts) — owned here: dispose() kills it. */
+  private readonly idbHelper: IdbHelper | undefined;
   /** The app the typing goes into, as far as this adapter knows (FrontApp). */
   private front: FrontApp = { kind: 'unlaunched' };
   /**
@@ -119,10 +122,16 @@ export class IosAdapter implements DeviceAdapter {
      * `-destination id=`), and the registry is the one caller that has it.
      */
     treeSource: IosTreeSource;
+    /**
+     * The simulator's idb helper (D7a), the same one the tree source was handed. Every idb call is offered to it
+     * (runIdb decides which it serves: `ui describe-all` alone until D7b); this adapter owns it and disposes it.
+     */
+    idbHelper?: IdbHelper;
   }) {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
+    this.idbHelper = opts.idbHelper;
   }
 
   /** `xcrun simctl` under the DEVELOPER_DIR probe shared with WdaServer — see xcode-env.ts. */
@@ -133,7 +142,7 @@ export class IosAdapter implements DeviceAdapter {
   // --- idb boundary (input only — the tree read is the source's) ---
 
   private idb(args: string[], timeoutMs?: number) {
-    return runIdb(this.exec, this.udid, args, { timeoutMs });
+    return runIdb(this.exec, this.udid, args, { timeoutMs, helper: this.idbHelper });
   }
 
   private idbUi(args: string[]) {
@@ -191,9 +200,10 @@ export class IosAdapter implements DeviceAdapter {
    * docs/bugs/2026-09-18-wda-orphan-after-server-restart.md. Idempotency is
    * the source's contract (an idb source has nothing to release; the WDA
    * source's WdaServer.shutdown() is terminal and a second call is a no-op).
+   * The idb helper (D7a) is killed beside it: this adapter owns it, the source only borrows it.
    */
   dispose(): Promise<void> {
-    return this.treeSource.dispose();
+    return Promise.all([this.treeSource.dispose(), this.idbHelper?.dispose()]).then(() => undefined);
   }
 
   // --- simctl-backed lifecycle ---

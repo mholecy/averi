@@ -7,6 +7,7 @@ import { parseArgs } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
+import { IdbHelper } from '../../src/adapters/idb-helper.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { Platform } from '../../src/adapters/types.js';
@@ -222,10 +223,14 @@ installRecorder(recorder);
 const registry = new AdapterRegistry({
   // Android: the registry's own adapter. iOS: the registry's own wiring, with WDA (when asked) on the lab's port and
   // derived data rather than 8100, which another session's WebDriverAgent may hold.
-  factory: (p, deviceId, opts) =>
-    p === 'android'
-      ? defaultFactory(p, deviceId, opts)
-      : new IosAdapter({ udid: deviceId, treeSource: createIosTreeSource(opts?.treeSource ?? treeSource, deviceId, { port: wdaPort, derivedDataPath: LAB_WDA_DERIVED_DATA }) }),
+  // The idb helper (D7a) as the registry wires it — one per simulator, shared by the adapter and its source; its calls
+  // reach the recorder through instrument.ts#recordHelperCalls, `AVERI_IDB_HELPER=off` measures the CLI.
+  factory: (p, deviceId, opts) => {
+    if (p === 'android') return defaultFactory(p, deviceId, opts);
+    const idbHelper = new IdbHelper();
+    const source = createIosTreeSource(opts?.treeSource ?? treeSource, deviceId, { port: wdaPort, derivedDataPath: LAB_WDA_DERIVED_DATA, idbHelper });
+    return new IosAdapter({ udid: deviceId, treeSource: source, idbHelper });
+  },
   discovery: defaultDiscovery,
   // The server's own proof (D22): a bound simulator proven booted from its device.plist, as `new AdapterRegistry()` does.
   iosBooted: defaultIosBooted,

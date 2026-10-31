@@ -1,4 +1,5 @@
 import type { execFile as ExecFileFn } from 'node:child_process';
+import { IDB_HELPER_CALL_END, IDB_HELPER_CALL_START, type IdbHelperCall } from '../../src/adapters/idb.js';
 import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
@@ -6,8 +7,9 @@ import { SLEEP_OWNER } from '../differential/clock.js';
 import type { DeviceCall, Sleep, Window } from './stats.js';
 
 /**
- * What the performance baseline (baseline.ts) counts, and how it sees it without a line of src/ changed: averi reaches
- * the device through three doors, and the harness stands in each for the length of one tool call.
+ * What the performance baseline (baseline.ts) counts, and how it sees it with nothing in src/ injected: averi reaches
+ * the device through three doors, and the harness stands in each for the length of one tool call — and a fourth, the
+ * idb helper, publishes its calls itself.
  *
  * - Processes: every adb, simctl, idb (and the OCR recognizer, swiftc, lsof) goes through `child_process.execFile` —
  *   src/adapters/exec.ts is its one caller. `recordingExecFile` wraps it, and `installRecorder` puts the wrapper into the
@@ -16,6 +18,9 @@ import type { DeviceCall, Sleep, Window } from './stats.js';
  * - WebDriverAgent: its HTTP goes through the global `fetch` (src/adapters/wda.ts#defaultFetch reads it per call);
  *   `recordingFetch` wraps that. The xcodebuild that serves WDA is a long-running `spawn`, a server and not a call, and
  *   is not counted.
+ * - The idb helper (D7a): a call it serves is no process — it is published on src/adapters/idb.ts's diagnostics
+ *   channels, and `recordHelperCalls` records it as the `idb` call it stands for (`idb ui describe-all`, `via: helper`),
+ *   so a breakdown still names it. The helper's own start is a server, as WDA's xcodebuild is, and is not counted.
  * - Sleeps: averi has one sleep owner, src/util/sleep.ts ("waits, not sleeps"), and it is the only `setTimeout` in src/
  *   outside the process shutdown. `recordingSetTimeout` tells its timers from every other one (the MCP SDK's, node's)
  *   by the stack, as scripts/differential/clock.ts does, and records each with the file:line that called `sleep` — the
@@ -62,9 +67,9 @@ export class Recorder {
   }
 
   /** A call begins; the returned function ends it. Outside a window both do nothing. */
-  call(kind: string, label: string): (ok: boolean) => void {
+  call(kind: string, label: string, via?: 'helper'): (ok: boolean) => void {
     if (!this.open) return () => undefined;
-    const entry: OpenCall = { kind, label, startMs: this.now() };
+    const entry: OpenCall = { kind, label, startMs: this.now(), ...(via ? { via } : {}) };
     this.calls.push(entry);
     return (ok) => {
       if (entry.endMs !== undefined) return;
@@ -135,6 +140,25 @@ export function recordingExecFile(original: typeof ExecFileFn, rec: Recorder): t
   return wrapped as unknown as typeof ExecFileFn;
 }
 
+/**
+ * Record each call the idb helper serves (D7a), labelled as the CLI call would be (classify) and marked `via: helper`;
+ * returns the unsubscribe. The end is published with the start's own object, so that object keys the record.
+ */
+export function recordHelperCalls(rec: Recorder): () => void {
+  const open = new WeakMap<object, (ok: boolean) => void>();
+  const onStart = (m: unknown) => {
+    const { kind, label } = classify('idb', (m as IdbHelperCall).argv);
+    open.set(m as object, rec.call(kind, label, 'helper'));
+  };
+  const onEnd = (m: unknown) => open.get(m as object)?.((m as IdbHelperCall).ok === true);
+  IDB_HELPER_CALL_START.subscribe(onStart);
+  IDB_HELPER_CALL_END.subscribe(onEnd);
+  return () => {
+    IDB_HELPER_CALL_START.unsubscribe(onStart);
+    IDB_HELPER_CALL_END.unsubscribe(onEnd);
+  };
+}
+
 /** `wda GET /session/:id/source`: the method and the path, session and element ids and the query dropped. */
 function fetchLabel(input: unknown, init?: { method?: string }): string {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url;
@@ -189,8 +213,8 @@ export function recordingSetTimeout(original: typeof setTimeout, rec: Recorder, 
 }
 
 /**
- * Put the three wrappers in for the rest of the process. Called after the harness's own imports: scripts/truth/
- * lab-device.ts binds `promisify(execFile)` at load, and stays on the original.
+ * Put the three wrappers in, and the idb helper's subscriber, for the rest of the process. Called after the harness's
+ * own imports: scripts/truth/lab-device.ts binds `promisify(execFile)` at load, and stays on the original.
  */
 export function installRecorder(rec: Recorder): void {
   const cp = createRequire(import.meta.url)('node:child_process') as { execFile: typeof ExecFileFn };
@@ -198,4 +222,5 @@ export function installRecorder(rec: Recorder): void {
   syncBuiltinESMExports();
   globalThis.fetch = recordingFetch(globalThis.fetch, rec);
   globalThis.setTimeout = recordingSetTimeout(globalThis.setTimeout, rec);
+  recordHelperCalls(rec);
 }
