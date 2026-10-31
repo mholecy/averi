@@ -336,6 +336,16 @@ retry: 8 of 180 killed, no retry stalled — but the kill costs 800 ms, so it sa
 Decision: D26b = screenshots through idb on the idb tree source (helper first, the `idb screenshot` CLI as its fallback,
 so the image never mixes sources within a capture pair); simctl stays for WDA and when idb is unusable.
 
+### D26b (implemented on `perf/d26b-idb-screenshot`, 2026-10-31; waits for the owner's device check)
+On the idb tree source `IosAdapter.screenshot` is `idb screenshot - --udid U` through runIdb (the helper, the CLI as
+its fallback; `screenshot -` a helper read, 15 s, retried on the CLI after a death); WDA keeps `simctl io screenshot`;
+`AVERI_IOS_SCREENSHOT=simctl` forces simctl (read once per adapter). No simctl fallback at run time (a mixed capture
+pair reads as moving). The iOS baseline diff leaves the status band out of both images (the Dynamic Island: 1.219 % >
+1 %), iOS and the band only. D0 counts both captures (`SCREENSHOT_LABELS`, `stalls.byLabel`, a line per capture).
+ADR 0032 "D26b". Device check: `ios-run.sh` native (idb), `--repeat 5`, `AVERI_IOS_SCREENSHOT=simctl` vs unset —
+screenshot/color/ocr/ensure-warm/ensure-cold walls and the idb screenshot stall line; one stored simctl baseline
+re-diffed under idb.
+
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
 which ~230 ms PNG encode); raw `exec-out screencap` 979 ms — `exec-out` moves only ~11 MB/s here and a raw frame is
