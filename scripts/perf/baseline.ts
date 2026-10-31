@@ -18,9 +18,8 @@ import {
   breakdown,
   measure,
   overallStalls,
+  reportTable,
   scenarioStalls,
-  stallCells,
-  stallLine,
   summarize,
   type Breakdown,
   type Measured,
@@ -358,7 +357,6 @@ async function report(): Promise<void> {
     };
   });
   const stalls = overallStalls(reports.flatMap((r) => r.runs.map((run) => run.window)));
-  const shots = stalls.screenshots > 0;
 
   const out = values.out ?? join(tmpdir(), `averi-perf-${platform}-${app}-${started.toISOString().replace(/[:.]/g, '-')}.json`);
   await mkdir(dirname(out), { recursive: true });
@@ -388,21 +386,8 @@ async function report(): Promise<void> {
     ) + '\n',
   );
 
-  const spread = (s: { median: number; min: number; max: number } | undefined) => (s === undefined ? '—' : `${ms(s.median)} [${ms(s.min)}–${ms(s.max)}]`);
-  const med = (s: { median: number } | undefined) => (s === undefined ? '—' : ms(s.median));
-
-  const head = ['scenario', 'ok/runs', 'wall ms med [min–max]', 'dev calls', 'dev ms', 'dev busy', 'slept ms', 'sleeps', 'host ms', 'cpu ms', ...(shots ? ['shots/stalls', 'stall-free wall med (runs)'] : [])];
-  const rows = reports.map((r) => {
-    const s = r.summary;
-    const other = Object.entries(s.statuses).filter(([k]) => k !== 'ok').map(([k, n]) => ` ${n} ${k}`).join('');
-    return [r.id, `${s.statuses.ok ?? 0}/${s.runs}${other}`, spread(s.wallMs), med(s.deviceCalls), med(s.deviceMs), med(s.deviceBusyMs), med(s.sleptMs), med(s.sleeps), med(s.hostMs), med(s.cpuMs), ...(shots ? stallCells(r.stalls) : [])];
-  });
-  const widths = head.map((h, i) => Math.max(h.length, ...rows.map((row) => row[i].length)));
-  const line = (cells: string[]) => cells.map((c, i) => (i === 0 ? c.padEnd(widths[i]) : c.padStart(widths[i]))).join('  ');
   console.log(`\n${described} · ${app}${platform === 'ios' ? ` · ${treeSource}` : ''} · ${repeat} repeats · ${commit?.head.slice(0, 8) ?? '?'}${commit?.dirty === true ? '+dirty' : ''}`);
-  console.log(line(head));
-  for (const row of rows) console.log(line(row));
-  if (shots) console.log(stallLine(stalls));
+  for (const l of reportTable(reports, stalls)) console.log(l);
   console.log('\nwhere the time goes (per ok run):');
   for (const r of reports) {
     const top = [

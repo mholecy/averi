@@ -13,11 +13,23 @@ import { overallStalls, scenarioStalls, stallCells, stallLine, type Spread, type
 
 /** The part of a results JSON this reads. */
 export interface Result {
-  meta?: { described?: string };
   scenarios: { id: string; summary: { wallMs?: Spread }; runs: { status: Status; wallMs: number; window: Window }[] }[];
 }
 
-export function stallReport(result: Result): { lines: string[]; windows: Window[] } {
+/** Per file its name, a line per scenario and the overall line; with several files, the pooled line last. */
+export function stallReport(files: readonly { file: string; result: Result }[]): string[] {
+  const out: string[] = [];
+  const pooled: Window[] = [];
+  for (const { file, result } of files) {
+    const { lines, windows } = oneFile(result);
+    out.push(file, ...lines);
+    pooled.push(...windows);
+  }
+  if (files.length > 1) out.push(`pooled, ${files.length} files: ${stallLine(overallStalls(pooled))}`);
+  return out;
+}
+
+function oneFile(result: Result): { lines: string[]; windows: Window[] } {
   const width = Math.max(0, ...result.scenarios.map((s) => s.id.length));
   const lines = result.scenarios.map((s) => {
     const [shots, free] = stallCells(scenarioStalls(s.runs));
@@ -30,14 +42,8 @@ export function stallReport(result: Result): { lines: string[]; windows: Window[
 
 async function main(files: string[]): Promise<void> {
   if (files.length === 0) throw new Error('usage: stalls.ts <result.json> [<result.json> …]');
-  const pooled: Window[] = [];
-  for (const file of files) {
-    const { lines, windows } = stallReport(JSON.parse(await readFile(file, 'utf8')) as Result);
-    console.log(file);
-    for (const l of lines) console.log(l);
-    pooled.push(...windows);
-  }
-  if (files.length > 1) console.log(`pooled, ${files.length} files: ${stallLine(overallStalls(pooled))}`);
+  const read = await Promise.all(files.map(async (file) => ({ file, result: JSON.parse(await readFile(file, 'utf8')) as Result })));
+  for (const l of stallReport(read)) console.log(l);
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main(process.argv.slice(2));
