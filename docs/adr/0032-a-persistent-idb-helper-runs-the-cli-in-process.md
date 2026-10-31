@@ -2,7 +2,8 @@
 
 Status: accepted 2026-10-31 (performance backlog row D7, docs/plans/2026-10-30-performance-backlog.md, section "### D7
 and D24 measured"; the orchestrator's design from the D7 analysis). Part a (reads) implemented on
-`perf/d7a-idb-helper-reads`; part b (input) is D7b.
+`perf/d7a-idb-helper-reads` (e1bd812f, ca108196, efa53625, 138025ed, 4d0d4d07, 13478551), merged 5fb79290; part b
+(input) is D7b.
 
 ## Context
 
