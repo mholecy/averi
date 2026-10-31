@@ -33,6 +33,11 @@ keeps it as pixels. A PNG is encoded on the host only where one leaves the proce
   multi-display warning) goes to /dev/null (code review). What can arrive ahead of the stream is the device shell's
   own stderr, which exec-out merges: `gzip: not found` — sh's, not screencap's, so the redirection leaves it — or
   `Killed`.
+- Checked live after the code review (2026-11-01, the same AVD, an emulator ~3× slower that day across the board):
+  3 captures each on text-sample and the launcher matched `-p`'s pixels byte for byte; the redirection costs nothing
+  (launcher, n=5 interleaved: 509 ms with it, 507 without, `-p` 1609); raw vs `-p` held its ratio (text-sample 242
+  vs 390, launcher 544 vs 1601). On the device's own sh, `screencap 2>/dev/null | gzipx -1` answers
+  `/system/bin/sh: gzipx: inaccessible or not found` — the shell's word comes through.
 
 - `DeviceAdapter.capture?(): Promise<ScreenCapture>` — optional, Android's: `{ kind: 'rgba', image }`, or
   `{ kind: 'png', bytes }` on a device that refuses the raw path. `screenshot()` stays a PNG Buffer: the capture,
