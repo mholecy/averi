@@ -148,6 +148,17 @@
       "truth": "form-shared-id.truth.json"
     },
     {
+      "file": "form-format.xml",
+      "source": "uiautomator",
+      "form": "raw",
+      "screen": {
+        "width": 1080,
+        "height": 2220
+      },
+      "screenshot": "form-format.png",
+      "truth": "form-format.truth.json"
+    },
+    {
       "file": "scroll-bounded.xml",
       "source": "uiautomator",
       "form": "raw",
