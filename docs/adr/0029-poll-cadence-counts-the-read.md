@@ -1,7 +1,9 @@
 # 29. The poll cadence counts the read
 
 Status: accepted 2026-10-31 (performance backlog row D1, docs/plans/2026-10-30-performance-backlog.md; the
-orchestrator's decision on the owner's standing: fast AND stable). Implemented on `perf/d1-poll-cadence`.
+orchestrator's decision on the owner's standing: fast AND stable). Implemented on `perf/d1-poll-cadence`: `220b4eca`
+(the read counted), `3e551237` (the 150 ms floor, R2 pinned), `57017e11` (the rule named `pauseAfterRead`); this
+record `bbfb0244`, `fa1cdedf` and the measurement below.
 
 ## Context
 
@@ -79,5 +81,25 @@ and its captures run inside the predicate, so they are not counted against the p
 
 ## Device measurement
 
-Follows: before/after on the D0 harness (`scripts/perf/baseline.ts`, Android, averi_lab API 33; tap, fill,
-`ensure_state` cold and warm, color assert; 5 repeats), main against this branch.
+2026-10-31, averi_lab AVD (Android 13, API 33), native app, `scripts/perf/baseline.ts --platform android --device
+emulator-5554 --scenarios tap,fill,ensure-cold,ensure-warm,color --repeat 5`, the branch's base `429da60d` against
+`57017e11` (D1 alone). Medians, ms (host load 2.6–4.1 on the base run, 1.7–3.0 on the branch's):
+
+| scenario | wall before | wall after | Δ wall | slept before | slept after | uiautomator dumps |
+|---|---|---|---|---|---|---|
+| tap | 5243 | 4976 | −267 | 502 | 152 | 2 → 2 |
+| fill, 3 chars | 11706 | 11455 | −251 | 1761 | 1412 | 4 → 4 |
+| ensure_state cold | 14291 | 13979 | −312 | 804 | 454 | 5 → 5 |
+| ensure_state warm | 3383 | 3456 | +73 | 302 | 302 | 1 → 1 |
+| color assert | 3381 | 3621 | +240 | 302 | 302 | 1 → 1 |
+
+- Every scenario whose settle polls a second read saves the 350 ms the rule predicts (`read-tree.ts`'s sleep 500 →
+  150 ms, once per call); its wall moves by −250 to −310 ms, within the dumps' own spread (±100–200 ms a dump).
+- The color assert and the warm `ensure_state` read the tree once and never pause in `pollTree`: their sleeps are
+  identical, and their wall difference is the device's (dump ms 2251 → 2375 and 2270 → 2290), not the rule's.
+- The device calls are the same in number on every scenario: no extra read, no read lost.
+- Live golden, `scripts/truth/live.ts --serial emulator-5554` (the `forms` group), base and branch: 32 cases each,
+  27 ok, 2 LOUD (b1d, b7: `adb input text` refuses the non-ASCII characters, known), 3 SKIP (kf1–kf3: Gboard came up
+  docked), 0 mismatches — every verdict the same case for case.
+
+Raw runs: the session's `scratchpad/d1-live/` (baseline-base/branch .json and .log, live-base/branch .log).
