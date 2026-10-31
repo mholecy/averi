@@ -34,7 +34,7 @@ measured before and after.
 | D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | won't do — the recognizer is 150–160 ms on iOS (D0 on iOS); a persistent helper saves ≤ 50–80 ms on OCR asserts only |
 | D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | won't do — raw over exec-out is ~610 ms slower (see D19) |
 | D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | done (86505377; pace 250 → 100 ms; the script and clearText not worth it) |
-| D7 | iOS: a persistent idb helper per simulator — measured −90 ms a `describe-all`, −122 ms a `tap` (the CLI's Python start-up) | device | open — next after D24 |
+| D7 | iOS: a persistent idb helper per simulator — measured −90 ms a `describe-all`, −122 ms a `tap` (the CLI's Python start-up). Designed 2026-10-31: a Python helper running fb-idb's own `gen_main(argv)` in one process (same companion resolution, same errors), the CLI as fallback, `AVERI_IDB_HELPER=off`; D7a = the helper + `ui describe-all`, D7b = the HID verbs (no retry after a helper death) | device | D7a in progress |
 | D8 | Fill re-reads after focus only for secure or unknown fields | device | done (1083523e; Android only, ADR 0028) |
 | D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | won't do — the second look guards a re-flow after the keyboard hides; iOS only, 0 in D0 |
 | D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | done (4cd4825a); keyboard beside the tree: won't do (stale IME band → false "fully visible") |
