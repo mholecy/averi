@@ -1,14 +1,14 @@
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exec as defaultExec, type ExecFn } from './exec.js';
+import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { simctl } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import type { IdbHelper } from './idb-helper.js';
 import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
-import { IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
+import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
 import { awaitForeground } from './ios-foreground.js';
 import { appInfoNames } from './simctl-appinfo.js';
@@ -29,6 +29,31 @@ import { sleep } from '../util/sleep.js';
  * measurement, not by copying it.
  */
 export const IDB_EMPTY_RETRY_MS = 1_000;
+
+/**
+ * The budget of `idb screenshot -` (D26b): describe-all's (ios-tree-source.ts#DESCRIBE_ALL_TIMEOUT_MS, 15 s), the other read the helper serves.
+ * The capture took 77 ms through a persistent fb-idb client and 168 ms through the CLI on the lab simulator (backlog
+ * "### D26 diag"), so 15 s is a stuck companion, not a slow frame.
+ */
+export const IDB_SCREENSHOT_TIMEOUT_MS = DESCRIBE_ALL_TIMEOUT_MS;
+
+/**
+ * What to do about a failed `idb screenshot` (IosAdapter#idbScreenshot), the one text both failures say: a failed or
+ * timed-out call after its first line's command, and bytes that are no PNG — that one with the reboot advice added.
+ */
+const idbCaptureRemedy = (reboot?: string): string =>
+  'check that its idb companion (idb_companion) is running and that `idb list-targets` lists the simulator as Booted; ' +
+  'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl' +
+  (reboot === undefined ? '' : `, or ${reboot}`);
+const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/**
+ * `AVERI_IOS_SCREENSHOT=simctl`: every iOS screenshot through `simctl io screenshot`, as before D26b, whatever the tree
+ * source (SETUP.md, troubleshooting). Read once per adapter, when it is made.
+ */
+export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.AVERI_IOS_SCREENSHOT === 'simctl';
+}
 
 /**
  * How long a typing into an app seen dropping a tail waits after its first character, before the rest in one burst
@@ -81,7 +106,7 @@ function appKey(front: FrontApp): AppKey | undefined {
 }
 
 /**
- * iOS adapter: `xcrun simctl` for lifecycle/screenshots, `idb` for input, and
+ * iOS adapter: `xcrun simctl` for lifecycle (and screenshots on WDA), `idb` for input (and screenshots on idb, D26b), and
  * an injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
  * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
  * averi.yaml). Everything idb-specific for INPUT stays in the `idb*` methods;
@@ -98,6 +123,12 @@ export class IosAdapter implements DeviceAdapter {
   private readonly treeSource: IosTreeSource;
   /** The simulator's idb helper (D7a, idb-helper.ts) — owned here: dispose() kills it. */
   private readonly idbHelper: IdbHelper | undefined;
+  /**
+   * Where screenshot() captures (D26b): `idb` on the idb tree source — the helper first, the `idb` CLI as its fallback —
+   * and `simctl` on the WDA one or under AVERI_IOS_SCREENSHOT=simctl. Fixed for the adapter's life: one source for every
+   * frame, so a capture pair never compares two (screenshot()).
+   */
+  private readonly screenshotVia: 'idb' | 'simctl';
   /** The app the typing goes into, as far as this adapter knows (FrontApp). */
   private front: FrontApp = { kind: 'unlaunched' };
   /**
@@ -133,6 +164,7 @@ export class IosAdapter implements DeviceAdapter {
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
     this.idbHelper = opts.idbHelper;
+    this.screenshotVia = this.treeSource.kind === 'idb' && !iosScreenshotViaSimctl() ? 'idb' : 'simctl';
   }
 
   /** `xcrun simctl` under the DEVELOPER_DIR probe shared with WdaServer — see xcode-env.ts. */
@@ -360,7 +392,22 @@ export class IosAdapter implements DeviceAdapter {
     await this.simctl(['openurl', this.udid, url]);
   }
 
+  /**
+   * One frame, as a PNG — from the one source this adapter captures with (screenshotVia):
+   * - idb (D26b, the idb tree source): `idb screenshot - --udid U`, the PNG on stdout, through runIdb — the helper when
+   *   it is ready and idle, the `idb` CLI otherwise, and the CLI again when the helper dies under it (a read). Measured
+   *   on the lab simulator, 120 interleaved rounds each (backlog "### D26 diag"): through a persistent fb-idb client 77
+   *   ms p50 / 88 p90 and no stall, the CLI 168 / 179 and no stall, where `simctl io screenshot` took 398 / 417 and
+   *   stalled ~+1 000 ms in 8 of 120 (no simctl variant avoided it). No simctl fallback when idb fails: idb draws the
+   *   Dynamic Island where simctl shows the app's background, so a stability pair of one frame from each compares two
+   *   different images and reads as moving (verify/capture.ts) — the idb error is the answer, and the kill switch is
+   *   the way back (AVERI_IOS_SCREENSHOT=simctl).
+   * - simctl (the WDA tree source, or the kill switch): `xcrun simctl io <udid> screenshot <file>`, as before D26b.
+   * Either way the bytes are judged here (screenshot-bytes.ts): a command that succeeds with an empty or foreign answer
+   * is a transport error naming that command.
+   */
   async screenshot(): Promise<Buffer> {
+    if (this.screenshotVia === 'idb') return this.idbScreenshot();
     const dir = await mkdtemp(join(tmpdir(), 'averi-'));
     const file = join(dir, 'screen.png');
     try {
@@ -375,6 +422,30 @@ export class IosAdapter implements DeviceAdapter {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * `idb screenshot -`, judged. A failed or timed-out call is exec's error (or runIdb's, alike) with the remedy put on
+   * its FIRST line, after the command: that line is all a capture's callers quote (verify/capture.ts#captureRefusal —
+   * the pixel and baseline asserts' fail-closed reason, a run's `⚠ screenshot:` line), and without it an agent would
+   * read only `Command failed (exit 1): idb screenshot - --udid U`, the companion's stderr below it unseen. The rest of
+   * the message (the stderr) follows as before, and the ExecError is the `cause`.
+   */
+  private async idbScreenshot(): Promise<Buffer> {
+    let stdout: Buffer;
+    try {
+      ({ stdout } = await this.idb(['screenshot', '-'], IDB_SCREENSHOT_TIMEOUT_MS));
+    } catch (e) {
+      if (!(e instanceof ExecError)) throw e;
+      // A plain Error, the ExecError as `cause`: the remedy must sit on the first line, the one captureRefusal quotes.
+      const [first, ...rest] = e.message.split('\n');
+      throw new Error([`${first} — ${idbCaptureRemedy()}`, ...rest].join('\n'), { cause: e });
+    }
+    return screenshotPng(stdout, {
+      device: `simulator ${this.udid}`,
+      command: `idb screenshot - --udid ${this.udid}`,
+      remedy: `${capitalized(idbCaptureRemedy(rebootSimulatorAdvice(this.udid)))}.`,
+    });
   }
 
   // --- input (idb) ---

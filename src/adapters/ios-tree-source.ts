@@ -41,7 +41,8 @@ import { countOf } from '../util/count.js';
 export interface IosTreeSource {
   /**
    * The configured kind this source serves (mcp/registry.ts wires it). No reader above the adapter dispatches on it: a
-   * tree says its own source by its marks (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts).
+   * tree says its own source by its marks (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts). The
+   * adapter reads it once, for where its screenshots come from (ios.ts#screenshot, D26b: idb on idb, simctl on WDA).
    */
   readonly kind: IosTreeSourceKind;
   read(): Promise<UiNode>;
@@ -320,7 +321,7 @@ const describeEmptyPayload = (types: readonly (string | undefined)[]): string =>
 };
 
 /** The budget uiTree() gave describe-all before the seam existed — a busy screen is slower than a tap. */
-const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
+export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 
 /**
  * The default tree source: one `idb ui describe-all --json` per read, nothing

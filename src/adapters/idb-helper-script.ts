@@ -32,7 +32,8 @@
  * a BytesIO, in the encoding and error handler of the helper's own stdout/stderr — what the CLI's would have under the
  * same locale (D7b, ADR 0032 NIT-2): a command that writes bytes to `sys.stdout.buffer` (fb-idb's `screenshot -`,
  * `file pull … -`, `video`) runs here as in the CLI, and the reply carries both streams as base64 of their bytes, which
- * node decodes as exec does (stdout a Buffer, stderr utf-8). The HID verbs D7b serves print nothing on stdout. It
+ * node decodes as exec does (stdout a Buffer, stderr utf-8). The HID verbs D7b serves print nothing on stdout; D26b's
+ * `screenshot -` prints the PNG there (a few hundred KB, base64 on one fd 3 line). It
  * exits on stdin's EOF — the end node gives it on dispose, and the one the kernel gives it when node dies — so it
  * cannot outlive the server by more than its current request.
  */

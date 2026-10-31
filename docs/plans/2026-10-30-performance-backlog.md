@@ -53,7 +53,7 @@ measured before and after.
 | D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) together, not in series | device | done (fa334d35; not one spawn — the iOS 27 runtime has no shell; 445 → 250 ms a launch on the lab simulator) |
 | D24 | iOS RN: a burst from `idb ui text` drops a controlled field's tail — after a repaired drop (ADR 0023's retype landed it), later typings into that app send the first key alone, 150 ms, then the rest | stability | done (ffec743d; ADR 0023 D24 amendment) — device-checked: rn-fill-20 5 925 → 2 346 ms (−60 %) |
 | D25 | iOS RN: the D24 split also costs short texts that never dropped (rn-fill "Jan" 2 155 → 2 341 ms, +1 idb call + 150 ms) — measure from what length a burst drops, split only above it | device | open |
-| D26 | iOS: `simctl io screenshot` stalls ~+1 000 ms (bimodal ~400 / ~1 400 ms) in ~10 % of calls (D7a A/B: 24/201), with or without the idb helper, never under WDA-only runs' tree reads — every screenshot, colour/OCR assert and ensure_state frame can pay it; find the cause (a frame/IOSurface wait?), try `idb screenshot` through the helper or a timeout-and-retry, and count stalls separately in the D0 report | device | D26a done (aa676f9e: the D0 report and `scripts/perf/stalls.ts` count stalls > 900 ms apart, with a stall-free median); the cause and a capture fix wait on the owner's `scratchpad/d26/d26-diag.sh` run |
+| D26 | iOS: `simctl io screenshot` stalls ~+1 000 ms (bimodal ~400 / ~1 400 ms) in ~10 % of calls (D7a A/B: 24/201), with or without the idb helper, never under WDA-only runs' tree reads — every screenshot, colour/OCR assert and ensure_state frame can pay it; find the cause (a frame/IOSurface wait?), try `idb screenshot` through the helper or a timeout-and-retry, and count stalls separately in the D0 report | device | D26a done (aa676f9e: the D0 report and `scripts/perf/stalls.ts` count stalls > 900 ms apart, with a stall-free median); D26b (idb screenshot on the idb tree source) on `perf/d26b-idb-screenshot`, device check pending |
 
 ## Notes
 
@@ -335,6 +335,17 @@ retry: 8 of 180 killed, no retry stalled — but the kill costs 800 ms, so it sa
 (a black pill, 378×112 px at the top centre) where simctl shows the app's background, and 16 corner pixels differ.
 Decision: D26b = screenshots through idb on the idb tree source (helper first, the `idb screenshot` CLI as its fallback,
 so the image never mixes sources within a capture pair); simctl stays for WDA and when idb is unusable.
+
+### D26b (implemented on `perf/d26b-idb-screenshot`, 2026-10-31; waits for the owner's device check)
+On the idb tree source `IosAdapter.screenshot` is `idb screenshot - --udid U` through runIdb (the helper, the CLI as
+its fallback; `screenshot -` a helper read, 15 s, retried on the CLI after a death); WDA keeps `simctl io screenshot`;
+`AVERI_IOS_SCREENSHOT=simctl` forces simctl (read once per adapter). No simctl fallback at run time (a mixed capture
+pair reads as moving). The iOS baseline diff leaves the status band out of both images (the Dynamic Island: 1.219 % >
+1 %), iOS and the band only. D0 counts both captures (`SCREENSHOT_LABELS`, `stalls.byLabel`, a line per capture).
+ADR 0032 "D26b". The `idb screenshot` ok-call times will be bimodal by who served them (helper ~77 ms, CLI ~168 ms
+in the diag), so its okMs spread is not one mode. Device check: `ios-run.sh` native (idb), `--repeat 5`, `AVERI_IOS_SCREENSHOT=simctl` vs unset —
+screenshot/color/ocr/ensure-warm/ensure-cold walls and the idb screenshot stall line; one stored simctl baseline
+re-diffed under idb.
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of

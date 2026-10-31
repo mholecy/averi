@@ -11,7 +11,8 @@ Verification is tiered, cheapest first:
 2. **Screenshots** — for the agent's own visual judgment.
 3. **Pixel-diff** against stored baselines (auto-created as `.averi/baselines/<platform>/<name>.png`
    beside averi.yaml on first use — refused, not created, while the screen, a blinking caret or a
-   clock included, is still changing; delete the file to re-baseline).
+   clock included, is still changing; delete the file to re-baseline). On iOS the status band (top safe area) is left out
+   of a baseline diff.
 4. **Numbers, never impressions, for geometry and fills**: `rect` asserts against Figma-frame
    values, `color` asserts against an expected hex (CIEDE2000), `ocr` asserts reading back the
    text an element actually renders, and `verify` with a layout contract printing per-anchor

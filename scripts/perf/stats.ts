@@ -176,33 +176,40 @@ export function breakdown(windows: readonly Window[]): Breakdown {
   return { calls: perRun(calls.values()), sleeps: perRun(sleeps.values()) };
 }
 
-// --- D26: simctl screenshot stalls ---
+// --- D26: screenshot stalls ---
 
 /**
- * How instrument.ts#classify labels `xcrun simctl io <udid> screenshot …`. If averi's screenshots move to
- * `idb screenshot` (a later D26 step), these counts read 0/0 and the label must follow the new call.
+ * How instrument.ts#classify labels the screenshots averi takes, the CLI's and the idb helper's alike (D26b):
+ * `xcrun simctl io <udid> screenshot …` (Android's `adb exec-out screencap` is not one: D26 is iOS's), and since D26b
+ * `idb screenshot - --udid U` — the capture on the idb tree source, simctl's on WDA or under AVERI_IOS_SCREENSHOT=simctl.
+ * Both are counted, in the totals and apart (OverallStalls.byLabel): a run on the idb source that read 0/0 here would
+ * hide its screenshots. A new capture command must be added here, or its stalls go uncounted.
  */
-export const SCREENSHOT_LABEL = 'simctl io screenshot';
+export const SCREENSHOT_LABELS = ['simctl io screenshot', 'idb screenshot'] as const;
+export type ScreenshotLabel = (typeof SCREENSHOT_LABELS)[number];
+const isScreenshot = (c: DeviceCall) => (SCREENSHOT_LABELS as readonly string[]).includes(c.label);
 
 /**
- * A `simctl io screenshot` longer than this stalled (D26). The call is bimodal with nothing between the modes: across
+ * A screenshot longer than this stalled (D26). `simctl io screenshot` is bimodal with nothing between the modes: across
  * the 15 D0 results JSON of 2026-10-30/31 (42 stalls in 461 calls, all in the 8 iOS ones that took screenshots:
  * ios-native, ios-native-probe, ios-native-wda, ios-after-d22-d23, ios-d7a-on/off and ios-d7a-on2/off2) the ok calls
  * took 336–451 ms and the stalls 1 366–1 415 ms — the ok time plus ~1 000 ms. 900 ms sits near the middle of that ~900 ms gap, ~450 ms from either mode, so neither a
- * slow ok call on a loaded host nor a slightly short stall falls on the wrong side.
+ * slow ok call on a loaded host nor a slightly short stall falls on the wrong side. `idb screenshot` uses the same
+ * line: it took 77 ms (helper-like client) or 168 ms (CLI) p50 and never stalled in 120 rounds (backlog "### D26
+ * diag"), so a call past 900 ms is the same ~+1 000 ms wait, if it ever shows there.
  */
 export const SCREENSHOT_STALL_MS = 900;
 
 /** A completed screenshot over the threshold. A failed or pending one ended for another reason: it is `failed`, not timed. */
 export function isScreenshotStall(c: DeviceCall): boolean {
-  return c.label === SCREENSHOT_LABEL && completed(c) && length(c) > SCREENSHOT_STALL_MS;
+  return isScreenshot(c) && completed(c) && length(c) > SCREENSHOT_STALL_MS;
 }
 
 const completed = (c: DeviceCall) => c.ok && c.pending !== true;
 
 /** One scenario's screenshots and stalls, and its wall clock over the ok runs where no screenshot stalled. */
 export interface ScenarioStalls {
-  /** Over every run, whatever its status: the stall is simctl's, not the scenario's. */
+  /** Over every run, whatever its status: the stall is the capture's, not the scenario's. Both labels (SCREENSHOT_LABELS). */
   screenshots: number;
   stalls: number;
   /** Screenshots that failed or were still pending when the window closed: in `screenshots`, never a stall. */
@@ -213,7 +220,7 @@ export interface ScenarioStalls {
   stallFreeWallMs?: Spread;
 }
 
-const screenshots = (w: Window) => w.calls.filter((c) => c.label === SCREENSHOT_LABEL);
+const screenshots = (w: Window) => w.calls.filter(isScreenshot);
 
 /** A run as the stall arithmetic reads it: how it ended, its wall clock, and its recorded window. */
 export interface TimedRun {
@@ -233,9 +240,8 @@ export function scenarioStalls(runs: readonly TimedRun[]): ScenarioStalls {
   return { screenshots: shots.length, stalls: shots.filter(isScreenshotStall).length, failed: shots.filter((c) => !completed(c)).length, stallFreeRuns: free.length, ...(wall ? { stallFreeWallMs: wall } : {}) };
 }
 
-/** The whole run's screenshots and stalls, and how long each mode took. */
-export interface OverallStalls {
-  thresholdMs: number;
+/** Some screenshots' count, stalls and how long each mode took — the whole run's, or one label's (OverallStalls.byLabel). */
+export interface StallCounts {
   screenshots: number;
   stalls: number;
   /** Failed or pending: in `screenshots`, in neither length below. */
@@ -246,12 +252,31 @@ export interface OverallStalls {
   stallMs?: Spread;
 }
 
-export function overallStalls(windows: readonly Window[]): OverallStalls {
-  const shots = windows.flatMap(screenshots);
+/** The whole run's screenshots and stalls, both labels together, and (D26b) each label's apart. */
+export interface OverallStalls extends StallCounts {
+  thresholdMs: number;
+  /**
+   * D26b: the same per label, for each label the run took any of — `{}` when it took none. Added after the fields
+   * above, which keep their meaning (both labels counted): the JSON only grew.
+   */
+  byLabel: Partial<Record<ScreenshotLabel, StallCounts>>;
+}
+
+function stallCounts(shots: readonly DeviceCall[]): StallCounts {
   const stalled = shots.filter(isScreenshotStall);
   const timed = shots.filter(completed);
   const okMs = spread(timed.filter((c) => !isScreenshotStall(c)).map(length));
   const stallMs = spread(stalled.map(length));
   const failed = shots.length - timed.length;
-  return { thresholdMs: SCREENSHOT_STALL_MS, screenshots: shots.length, stalls: stalled.length, failed, ...(okMs ? { okMs } : {}), ...(stallMs ? { stallMs } : {}) };
+  return { screenshots: shots.length, stalls: stalled.length, failed, ...(okMs ? { okMs } : {}), ...(stallMs ? { stallMs } : {}) };
+}
+
+export function overallStalls(windows: readonly Window[]): OverallStalls {
+  const shots = windows.flatMap(screenshots);
+  const byLabel: OverallStalls['byLabel'] = {};
+  for (const label of SCREENSHOT_LABELS) {
+    const counts = shots.filter((c) => c.label === label);
+    if (counts.length > 0) byLabel[label] = stallCounts(counts);
+  }
+  return { thresholdMs: SCREENSHOT_STALL_MS, ...stallCounts(shots), byLabel };
 }

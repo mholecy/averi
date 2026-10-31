@@ -29,7 +29,9 @@ import { WINDOW_MANAGER_WORD, type ImeCapture } from '../truth/schema.js';
  * What it answers:
  *  - iOS: `idb describe --json` the screen in points (no screen: it fails),
  *    `idb ui describe-all --json` the recording's raw idb payload, `xcrun
- *    simctl io … screenshot <file>` the frame written to the file, every `idb
+ *    simctl io … screenshot <file>` the frame written to the file and `idb
+ *    screenshot -` the same frame on stdout (D26b — simctl's frame for both:
+ *    no Dynamic Island), every `idb
  *    ui` input accepted; `simctl launch`, `terminate`, the accessibility
  *    `defaults write`, `appinfo` (the recording's app as its display name),
  *    the app running (`launchctl list`), no log.
@@ -307,6 +309,11 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
       device.calls.push(`idb ${line}`);
       if (profile.screen === undefined) throw new CommandError('differential: idb describe answered nothing', 1);
       return JSON.stringify({ screen_dimensions: { width_points: profile.screen.width, height_points: profile.screen.height } });
+    }
+    // D26b: the idb tree source's capture — the same frame simctl's file holds, on stdout.
+    if (line === 'screenshot -') {
+      device.calls.push('idb screenshot');
+      return frame(profile.frame, device.paint, profile.screenshot);
     }
     if (line === 'ui describe-all --json') {
       device.calls.push(`idb ${line}`);

@@ -364,6 +364,14 @@ one happens by itself.
   under is reported, not repeated: look at the screen before you repeat the step). To rule it out, set
   `AVERI_IDB_HELPER=off` in the environment the MCP host starts the server with (an `env` block in its server entry)
   and reconnect: every idb call is then the `idb` CLI.
+- **iOS screenshots, color/OCR asserts or `ensure_state` fail with `idb screenshot - --udid …`, or an iOS screenshot
+  baseline fails where it passed before** — on `treeSource: idb` averi captures the screen with `idb screenshot`
+  (through the same helper, or the `idb` CLI); on `treeSource: wda` with `xcrun simctl io <udid> screenshot`, as
+  before. It does not switch to simctl by itself when idb fails. Check that `idb list-targets` lists the simulator as
+  Booted with its companion; to capture through simctl instead, set `AVERI_IOS_SCREENSHOT=simctl` in the environment
+  the MCP host starts the server with (an `env` block in its server entry) and reconnect. idb's capture draws the
+  Dynamic Island where simctl's shows the app: an iOS baseline diff leaves the status band out of both images for that
+  reason (`status band excluded` in its detail), so a baseline stored before still matches.
 - **Launch opens LeakCanary instead of the app** — set `app.android.activity` (see step 4 skeleton).
 - **iOS `id:` selectors find nothing on a React Native app, or a `wait:` on a SwiftUI container id
   (`.accessibilityElement(children: .contain)`) times out while the screen is showing** — idb never

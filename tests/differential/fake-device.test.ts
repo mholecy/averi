@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { PNG } from 'pngjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { installFakeDevice, pngSize, useDevice } from '../../scripts/differential/fake-device.js';
+import { deviceCalls, installFakeDevice, pngSize, useDevice } from '../../scripts/differential/fake-device.js';
 
 // The fake device serving a ground-truth capture's screenshot (golden mode): the PNG the device showed, as it is, on
 // both platforms' screenshot commands — and never one whose size the profile does not say.
@@ -38,6 +38,13 @@ describe('the fake device serving a captured screenshot', () => {
     const file = join(dir, 'shot.png');
     await execFile('xcrun', ['simctl', 'io', 'booted', 'screenshot', file]);
     expect((await readFile(file)).equals(shot)).toBe(true);
+  });
+
+  it('iOS: `idb screenshot -` answers the same captured PNG on stdout, byte for byte — the idb tree source\'s capture (D26b)', async () => {
+    const shot = png(30, 60);
+    useDevice({ platform: 'ios', screen: { width: 10, height: 20 }, frame: { width: 30, height: 60 }, screenshot: shot });
+    expect((await execFile('idb', ['screenshot', '-', '--udid', 'AAAA-1111'])).equals(shot)).toBe(true);
+    expect(deviceCalls()).toEqual(['idb screenshot']);
   });
 
   it('Android: screencap answers the captured PNG, byte for byte', async () => {

@@ -112,6 +112,29 @@ describe.skipIf(found === undefined)('the idb helper against the idb CLI (real f
     expect(byHelper.stdout.toString()).toMatch(/^usage: idb ui tap/);
   }, 60_000);
 
+  // D26b: the idb tree source's screenshot, `screenshot -` — a read the helper serves.
+  it('fails `screenshot -` with the same code and stderr as the CLI (D26b)', async () => {
+    const argv = ['--companion', 'localhost:1', 'screenshot', '-', '--udid', UDID];
+    const [byHelper, byCli] = [await viaHelper(argv), await cli(argv)];
+    expect(byHelper.kind).toBe('answer');
+    if (byHelper.kind !== 'answer') return;
+    expect(byCli.code).not.toBe(0);
+    expect(byHelper.code).toBe(byCli.code);
+    expect(byHelper.stderr).toBe(byCli.stderr);
+    expect(byHelper.stdout.equals(byCli.stdout)).toBe(true);
+    expect(byHelper.stderr).toMatch(/companion/);
+  }, 60_000);
+
+  it('prints the same stdout bytes for `screenshot --help` (D26b)', async () => {
+    const argv = ['screenshot', '--help'];
+    const [byHelper, byCli] = [await viaHelper(argv), await cli(argv)];
+    expect(byHelper).toMatchObject({ kind: 'answer', code: 0 });
+    if (byHelper.kind !== 'answer') return;
+    expect(byCli.code).toBe(0);
+    expect(byHelper.stdout.equals(byCli.stdout)).toBe(true);
+    expect(byHelper.stdout.toString()).toMatch(/^usage: idb screenshot/);
+  }, 60_000);
+
   it('answers 50 requests in a row alike — one event loop per request leaves nothing behind', async () => {
     const argv = ['--companion', 'localhost:1', 'ui', 'describe-all', '--json', '--udid', UDID];
     const byCli = await cli(argv);
@@ -145,6 +168,10 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
     '        sys.stdout.flush()',
     "        sys.stdout.buffer.write(bytes([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x0a]))",
     "        sys.stderr.buffer.write(b'raw \\xff\\n')",
+    '        return 0',
+    // D26b: a screenshot's size of binary — 5 MB of NUL, newline, 0xFF and CR — written as fb-idb's `screenshot -` does.
+    "    if argv[0] == 'big':",
+    '        sys.stdout.buffer.write(bytes([0x00, 0x0a, 0xff, 0x0d, 0x89, 0x50]) * (5 * 1024 * 1024 // 6))',
     '        return 0',
     // A surrogate escape (an undecodable byte of an argv or a file name) printed as text: stderr's error handler.
     // A helper that dies inside gen_main — after it acknowledged the request (D7b).
@@ -200,6 +227,16 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
     if (r.kind !== 'answer') return;
     expect(r.stdout.equals(Buffer.concat([Buffer.from('text first, é\n'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x0a])]))).toBe(true);
     expect(r.stderr).toBe('raw \uFFFD\n'); // exec: stderr.toString('utf8')
+  }, 30_000);
+
+  it('carries a 5 MB binary stdout back byte-equal — the size of a large screenshot, every byte value a text protocol trips on (D26b)', async () => {
+    const r = await untilReady(helper, ['big']);
+    expect(r).toMatchObject({ kind: 'answer', code: 0 });
+    if (r.kind !== 'answer') return;
+    const want = Buffer.alloc(Math.floor((5 * 1024 * 1024) / 6) * 6);
+    for (let i = 0; i < want.length; i++) want[i] = [0x00, 0x0a, 0xff, 0x0d, 0x89, 0x50][i % 6];
+    expect(r.stdout.length).toBe(want.length);
+    expect(r.stdout.equals(want)).toBe(true);
   }, 30_000);
 
   it('prints a surrogate escape to stderr as the fake\'s own process does — the stream\'s error handler, not strict', async () => {

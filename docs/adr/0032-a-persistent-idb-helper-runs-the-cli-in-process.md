@@ -4,7 +4,8 @@ Status: accepted 2026-10-31 (performance backlog row D7, docs/plans/2026-10-30-p
 and D24 measured"; the orchestrator's design from the D7 analysis). Part a (reads) implemented on
 `perf/d7a-idb-helper-reads` (e1bd812f, ca108196, efa53625, 138025ed, 4d0d4d07, 13478551), merged 5fb79290; part b
 (input, D7b) implemented on `perf/d7b-idb-helper-hid` (c1afc5e0, acc106c2, 90995f24, a8609ac2), merged a4746de9 —
-section "D7b" below.
+section "D7b" below. D26b (screenshots through idb on the idb tree source, `perf/d26b-idb-screenshot`) — section
+"D26b" below.
 
 ## Context
 
@@ -158,6 +159,57 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
   to the CLI; a fake fb-idb writing to `sys.stdout.buffer`, printing a surrogate escape to stderr, and dying inside
   `gen_main` — `died` five times in five, the real ack read), `tests/perf/instrument.test.ts` (D0 labels each HID
   helper call as its CLI call, `via: helper`).
+
+### D26b — screenshots through idb on the idb tree source (2026-10-31, `perf/d26b-idb-screenshot`)
+
+`simctl io screenshot` stalls ~+1 000 ms in ~7 % of calls with or without the helper (backlog row D26, "### D26 diag":
+120 interleaved rounds on the lab simulator — simctl png 398 / 417 ms p50 / p90 and 8 stalls; no simctl variant avoids
+it; it is a ~1 s wait inside CoreSimulator, worst beside a `simctl spawn launchctl` at 38 %). `idb screenshot` took
+168 / 179 ms through the CLI and 77 / 88 ms through a persistent fb-idb client, 0 stalls in 120 each.
+
+- **On the idb tree source `IosAdapter.screenshot` is `idb screenshot - --udid U`**, through `runIdb`: the helper when
+  it is ready and idle, the `idb` CLI otherwise. `['screenshot', '-']` is on `READ_ARGV` — it changes nothing on the
+  simulator, so a helper that dies under it is retried on the CLI; its budget is describe-all's 15 s
+  (`ios.ts#IDB_SCREENSHOT_TIMEOUT_MS`), and a timeout counts toward `TIMEOUTS_IN_A_ROW` with the tree reads.
+  `screenshot <file>`, `screenshot` alone and any flag more are the CLI's. The PNG travels as base64 of
+  `sys.stdout.buffer`'s bytes (D7b made the streams bytes); the contract test checks `screenshot -` against
+  `--companion localhost:1` and `screenshot --help` (same code, stderr and stdout bytes as the CLI) and 5 MB of binary
+  stdout from a fake fb-idb, byte-equal.
+- **The WDA tree source keeps `simctl io screenshot` exactly as before**, and `AVERI_IOS_SCREENSHOT=simctl` forces it
+  on the idb source too (SETUP.md, troubleshooting). Both are fixed when the adapter is made — the kill switch is read
+  once per adapter — so an adapter captures every frame from one source.
+- **No simctl fallback at run time.** idb draws the Dynamic Island (a black pill, 378×112 px at the top centre of the
+  1206×2622 frame) where simctl shows the app's background, and 16 corner pixels differ; the rest is equal (same size,
+  same sRGB). The stability wait (`verify/capture.ts`) compares a pair of captures byte for byte: one from each source
+  reads as a moving screen. So an idb failure is the answer — a plain Error whose first line is exec's (the command,
+  or its timeout) with the remedy after it (the companion, `idb list-targets`, the kill switch), exec's ExecError as
+  its `cause`: the remedy must sit on the line `captureRefusal` quotes; or, for bytes that are no PNG, the transport
+  error naming `idb screenshot - --udid U` with the same remedy and the reboot.
+- **Baselines.** A stored baseline from simctl (every one before D26b), or one written by an adapter on the other tree
+  source of the same simulator, differs from an idb capture in the island alone: 1.219 % of the lab frame, over the
+  1 % default threshold. The iOS baseline diff (`verify/assert.ts#iosBandRows`) therefore leaves the status band —
+  `viewport().statusBand` × the png's scale, 62 pt = 186 rows there — out of both images, and says `status band
+  excluded` in the detail. This loosens a check, held to exactly that: iOS only, the band's rows only; a png that is
+  not the viewport at one scale is compared whole (defensive; whether a rotated simulator's capture is ever landscape
+  is unmeasured), and so is one whose viewport cannot be read, as before. It applies on the WDA tree source too, on
+  purpose: a stored baseline may have been taken under either source, so either may meet the island; a
+  difference in the first row under the band still fails (tests/verify/assert.test.ts). The band is the status bar's
+  and the island's, never the app's to assert on — the same band a tap counts as off the screen.
+- **D0** counts both captures (`SCREENSHOT_LABELS` in `scripts/perf/stats.ts`): the totals as before, `stalls.byLabel` in
+  the JSON (added, nothing changed), a stall line per capture in the text.
+- The differential's fake device answers `idb screenshot -` with the same frame as simctl's file: the replay serves the
+  truth capture's frames (taken with simctl) for both commands, so golden cannot see the island or any other
+  idb-vs-simctl pixel difference; the truth capture itself is unchanged.
+- Residuals:
+  - The companion's own screenshot path under load is measured only by the diag (120 rounds, one simulator); a
+    long-lived helper serving ~5 MB replies is unmeasured for memory; the owner's device check (backlog, "### D26b") is
+    still to come.
+  - An app that hides the status bar (a full-screen player, a game, a splash, a hero image under the bar) has its top
+    62 pt no longer compared in a baseline diff. Accepted: averi's baselines target app UI, and the island makes that
+    strip depend on the capture's source.
+  - An island device missing from `IOS_SAFE_AREA_TOPS` (adapters/ios-status-band.ts — the iPhone Air, 420x912) gets
+    the 20 pt fallback band, which does not cover the island: an old simctl baseline can still fail there on the
+    island alone — a false failure, not a hidden regression.
 
 ## Why Python and `gen_main`, not a node gRPC client
 

@@ -426,6 +426,71 @@ describe('runIdb with an IdbHelper', () => {
   });
 });
 
+// D26b: `idb screenshot -` (the PNG on stdout) is a read — served by the helper, its bytes base64 on fd 3, and a
+// helper that dies under it is retried on the CLI. Only that one argv: a file destination, or none, is the CLI's.
+describe('runIdb with an IdbHelper — screenshot (D26b)', () => {
+  const SHOT = ['screenshot', '-'];
+
+  /** Bytes a PNG may hold and a text protocol would mangle: NUL, newlines, 0xFF, a lone CR — 5 MB of them. */
+  function binary(size: number): Buffer {
+    const b = Buffer.alloc(size);
+    for (let i = 0; i < size; i++) b[i] = [0x00, 0x0a, 0xff, 0x0d, 0x89, i & 0xff][i % 6];
+    return b;
+  }
+
+  it.each([
+    ['a ~170 KB PNG-sized payload', 170_000],
+    ['a 5 MB payload', 5 * 1024 * 1024],
+  ])('serves `screenshot -` from the helper and hands its stdout back byte-equal — %s', async (_, size) => {
+    const { helper, s, cli } = await readyHelper();
+    const bytes = binary(size);
+    const call = runIdb(cli.exec, UDID, SHOT, { helper });
+    await settle();
+    expect(s.children[0].requests).toEqual([{ id: 1, argv: [...SHOT, '--udid', UDID] }]);
+    const { id } = s.children[0].requests[0];
+    s.children[0].fd3.write(JSON.stringify({ id, code: 0, stdout: bytes.toString('base64'), stderr: '' }) + '\n');
+    expect((await call).stdout.equals(bytes)).toBe(true);
+    expect(cli.idbCalls).toEqual([CLI_ARGV]); // the starting call only
+  });
+
+  it.each([
+    ['a file destination', ['screenshot', '/tmp/x']],
+    ['no destination', ['screenshot']],
+    ['a flag more', ['screenshot', '-', '--json']],
+  ])('sends a screenshot argv it does not allowlist to the CLI — %s', async (_, args) => {
+    const { helper, s, cli } = await readyHelper();
+    await runIdb(cli.exec, UDID, args, { helper });
+    expect(cli.idbCalls.at(-1)).toEqual([...args, '--udid', UDID]);
+    expect(s.children[0].requests).toEqual([]);
+  });
+
+  it('retries `screenshot -` on the CLI when the helper dies under it, even after it took it — a read', async () => {
+    const { helper, s, cli } = await readyHelper();
+    const call = runIdb(cli.exec, UDID, SHOT, { helper });
+    await settle();
+    s.children[0].ack();
+    await settle();
+    s.children[0].die();
+    expect((await call).stdout.toString()).toBe('cli');
+    expect(cli.idbCalls).toEqual([CLI_ARGV, [...SHOT, '--udid', UDID]]);
+  });
+
+  it('counts a `screenshot -` timeout toward TIMEOUTS_IN_A_ROW with the reads', async () => {
+    const h = await readyHelper();
+    const first = await runIdb(h.cli.exec, UDID, SHOT, { helper: h.helper, timeoutMs: 10 }).catch((e: unknown) => e);
+    expect((first as ExecError).timedOut).toBe(true);
+    expect((first as ExecError).message).toBe(`Command timed out: idb screenshot - --udid ${UDID}`);
+    await settle();
+    await runIdb(h.cli.exec, UDID, READ, { helper: h.helper }); // starts the next
+    await settle();
+    h.s.children.at(-1)!.ready();
+    await settle();
+    await runIdb(h.cli.exec, UDID, READ, { helper: h.helper, timeoutMs: 10 }).catch(() => undefined);
+    await settle();
+    expect(logged).toEqual(['averi: idb helper off for this process (2 requests in a row timed out) — the idb CLI serves every call']);
+  });
+});
+
 /**
  * Every HID argv IosAdapter sends (D7b, src/adapters/ios.ts — tap, longPress, swipe, typeText and D24's split, clearText,
  * pressKey), as the adapter builds it.
