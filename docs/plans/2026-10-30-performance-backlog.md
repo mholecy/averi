@@ -342,7 +342,8 @@ its fallback; `screenshot -` a helper read, 15 s, retried on the CLI after a dea
 `AVERI_IOS_SCREENSHOT=simctl` forces simctl (read once per adapter). No simctl fallback at run time (a mixed capture
 pair reads as moving). The iOS baseline diff leaves the status band out of both images (the Dynamic Island: 1.219 % >
 1 %), iOS and the band only. D0 counts both captures (`SCREENSHOT_LABELS`, `stalls.byLabel`, a line per capture).
-ADR 0032 "D26b". Device check: `ios-run.sh` native (idb), `--repeat 5`, `AVERI_IOS_SCREENSHOT=simctl` vs unset —
+ADR 0032 "D26b". The `idb screenshot` ok-call times will be bimodal by who served them (helper ~77 ms, CLI ~168 ms
+in the diag), so its okMs spread is not one mode. Device check: `ios-run.sh` native (idb), `--repeat 5`, `AVERI_IOS_SCREENSHOT=simctl` vs unset —
 screenshot/color/ocr/ensure-warm/ensure-cold walls and the idb screenshot stall line; one stored simctl baseline
 re-diffed under idb.
 

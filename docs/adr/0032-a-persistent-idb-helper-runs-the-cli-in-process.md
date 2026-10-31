@@ -187,15 +187,26 @@ it; it is a ~1 s wait inside CoreSimulator, worst beside a `simctl spawn launchc
   source of the same simulator, differs from an idb capture in the island alone: 1.219 % of the lab frame, over the
   1 % default threshold. The iOS baseline diff (`verify/assert.ts#iosBandRows`) therefore leaves the status band —
   `viewport().statusBand` × the png's scale, 62 pt = 186 rows there — out of both images, and says `status band
-  excluded` in the detail. This loosens a check, held to exactly that: iOS only, the band's rows only, a frame that is
-  not the viewport at one scale (a turned one) or a viewport that cannot be read compared whole as before; a
+  excluded` in the detail. This loosens a check, held to exactly that: iOS only, the band's rows only; a png that is
+  not the viewport at one scale is compared whole (defensive; whether a rotated simulator's capture is ever landscape
+  is unmeasured), and so is one whose viewport cannot be read, as before; a
   difference in the first row under the band still fails (tests/verify/assert.test.ts). The band is the status bar's
   and the island's, never the app's to assert on — the same band a tap counts as off the screen.
 - **D0** counts both captures (`SCREENSHOT_LABELS` in `scripts/perf/stats.ts`): the totals as before, `stalls.byLabel` in
   the JSON (added, nothing changed), a stall line per capture in the text.
-- The differential's fake device answers `idb screenshot -` with the same frame as simctl's file.
-- Residuals: the companion's own screenshot path under load is measured only by the diag (120 rounds, one simulator);
-  a long-lived helper serving ~5 MB replies is unmeasured for memory; the owner's device check (backlog, "### D26b") is still to come.
+- The differential's fake device answers `idb screenshot -` with the same frame as simctl's file: the replay serves the
+  truth capture's frames (taken with simctl) for both commands, so golden cannot see the island or any other
+  idb-vs-simctl pixel difference; the truth capture itself is unchanged.
+- Residuals:
+  - The companion's own screenshot path under load is measured only by the diag (120 rounds, one simulator); a
+    long-lived helper serving ~5 MB replies is unmeasured for memory; the owner's device check (backlog, "### D26b") is
+    still to come.
+  - An app that hides the status bar (a full-screen player, a game, a splash, a hero image under the bar) has its top
+    62 pt no longer compared in a baseline diff. Accepted: averi's baselines target app UI, and the island makes that
+    strip depend on the capture's source.
+  - An island device missing from `IOS_SAFE_AREA_TOPS` (adapters/ios-status-band.ts — the iPhone Air, 420x912) gets
+    the 20 pt fallback band, which does not cover the island: an old simctl baseline can still fail there on the
+    island alone — a false failure, not a hidden regression.
 
 ## Why Python and `gen_main`, not a node gRPC client
 

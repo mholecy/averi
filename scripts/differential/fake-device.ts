@@ -29,7 +29,9 @@ import { WINDOW_MANAGER_WORD, type ImeCapture } from '../truth/schema.js';
  * What it answers:
  *  - iOS: `idb describe --json` the screen in points (no screen: it fails),
  *    `idb ui describe-all --json` the recording's raw idb payload, `xcrun
- *    simctl io … screenshot <file>` the frame written to the file, every `idb
+ *    simctl io … screenshot <file>` the frame written to the file and `idb
+ *    screenshot -` the same frame on stdout (D26b — simctl's frame for both:
+ *    no Dynamic Island), every `idb
  *    ui` input accepted; `simctl launch`, `terminate`, the accessibility
  *    `defaults write`, `appinfo` (the recording's app as its display name),
  *    the app running (`launchctl list`), no log.

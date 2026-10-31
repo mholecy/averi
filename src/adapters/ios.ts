@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exec as defaultExec, type ExecFn } from './exec.js';
+import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { simctl } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import type { IdbHelper } from './idb-helper.js';
@@ -36,6 +36,11 @@ export const IDB_EMPTY_RETRY_MS = 1_000;
  * "### D26 diag"), so 15 s is a stuck companion, not a slow frame.
  */
 export const IDB_SCREENSHOT_TIMEOUT_MS = 15_000;
+
+/** What a failed `idb screenshot` adds to its first line (IosAdapter#idbScreenshot). */
+const IDB_CAPTURE_REMEDY =
+  'is its idb companion (idb_companion) running? `idb list-targets` must list the simulator as Booted; ' +
+  'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl';
 
 /**
  * `AVERI_IOS_SCREENSHOT=simctl`: every iOS screenshot through `simctl io screenshot`, as before D26b, whatever the tree
@@ -414,8 +419,22 @@ export class IosAdapter implements DeviceAdapter {
     }
   }
 
+  /**
+   * `idb screenshot -`, judged. A failed or timed-out call is exec's error (or runIdb's, alike) with the remedy put on
+   * its FIRST line, after the command: that line is all a capture's callers quote (verify/capture.ts#captureRefusal —
+   * the pixel and baseline asserts' fail-closed reason, a run's `⚠ screenshot:` line), and without it an agent would
+   * read only `Command failed (exit 1): idb screenshot - --udid U`, the companion's stderr below it unseen. The rest of
+   * the message (the stderr) follows as before, and the ExecError is the `cause`.
+   */
   private async idbScreenshot(): Promise<Buffer> {
-    const { stdout } = await this.idb(['screenshot', '-'], IDB_SCREENSHOT_TIMEOUT_MS);
+    let stdout: Buffer;
+    try {
+      ({ stdout } = await this.idb(['screenshot', '-'], IDB_SCREENSHOT_TIMEOUT_MS));
+    } catch (e) {
+      if (!(e instanceof ExecError)) throw e;
+      const [first, ...rest] = e.message.split('\n');
+      throw new Error([`${first} — ${IDB_CAPTURE_REMEDY}`, ...rest].join('\n'), { cause: e });
+    }
     return screenshotPng(stdout, {
       device: `simulator ${this.udid}`,
       command: `idb screenshot - --udid ${this.udid}`,

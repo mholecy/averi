@@ -711,9 +711,9 @@ export class Verifier {
  * and the island's, never the app's to assert on — the same band a tap counts as off the screen.
  *
  * This LOOSENS the check, so it is held to exactly that: iOS only (Android's captures have one source), the band's
- * rows only — `ceil(statusBand × scale)`, the scale the png's width over the viewport's — and only where the png is the
- * viewport at one scale on both axes (within 2 %): a frame that is not (a turned one) has no band this can place, and is
- * compared whole. A viewport that cannot be read is compared whole too, as before D26b — the diff never fails on it.
+ * rows only — `ceil(statusBand × scale)`, the scale the png's width over the viewport's. A png that is not the viewport
+ * at one scale (both axes within 2 %) is compared whole (defensive; whether a rotated simulator's capture is ever
+ * landscape is unmeasured). A viewport that cannot be read is compared whole too, as before D26b — the diff never fails on it.
  */
 async function iosBandRows(adapter: DeviceAdapter, width: number, height: number): Promise<number> {
   let viewport;

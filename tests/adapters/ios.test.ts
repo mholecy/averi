@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
 import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter } from '../../src/adapters/ios.js';
 import { IdbEmptyTreeError, IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
+import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
+import { captureRefusal } from '../../src/verify/capture.js';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { fillField } from '../../src/interact/fill.js';
@@ -606,6 +607,20 @@ describe('IosAdapter.screenshot — through idb on the idb tree source (D26b)', 
     const { exec, calls } = both(new Error('Command failed (exit 1): idb screenshot - --udid AAAA-1111\nFailed to connect to companion'));
     await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(/Failed to connect to companion/);
     expect(calls).toEqual(['idb screenshot - --udid AAAA-1111']);
+  });
+
+  it('puts the remedy on the FIRST line of a failed or timed-out idb capture — the line every capture caller quotes', async () => {
+    const failed = both(new ExecError('idb screenshot - --udid AAAA-1111', 1, 'Failed to connect to companion'));
+    const got = await new IosAdapter({ udid: 'AAAA-1111', exec: failed.exec, treeSource: NO_TREE }).screenshot().catch((e: unknown) => e);
+    const remedy =
+      ' — is its idb companion (idb_companion) running? `idb list-targets` must list the simulator as Booted; ' +
+      'if it repeats, set AVERI_IOS_SCREENSHOT=simctl to capture through simctl';
+    expect(captureRefusal(got)).toBe('Command failed (exit 1): idb screenshot - --udid AAAA-1111' + remedy);
+    expect((got as Error).message).toBe('Command failed (exit 1): idb screenshot - --udid AAAA-1111' + remedy + '\nFailed to connect to companion');
+    expect((got as Error).cause).toBeInstanceOf(ExecError);
+    const timedOut = both(new ExecError('idb screenshot - --udid AAAA-1111', null, '', true));
+    const late = await new IosAdapter({ udid: 'AAAA-1111', exec: timedOut.exec, treeSource: NO_TREE }).screenshot().catch((e: unknown) => e);
+    expect(captureRefusal(late)).toBe('Command timed out: idb screenshot - --udid AAAA-1111' + remedy);
   });
 
   it('nor when idb answers bytes that are no PNG', async () => {
