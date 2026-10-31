@@ -357,10 +357,13 @@ one happens by itself.
 ## Troubleshooting
 
 - **`idb` install fails** — fb-idb requires Python ≤ 3.13: `pipx install fb-idb --python python3.13`.
-- **An iOS tree read behaves differently than `idb ui describe-all --json` run by hand** — averi reads the iOS tree through
-  a persistent idb helper (one Python process per simulator, running idb's own CLI; it falls back to the `idb` CLI by
-  itself when it cannot start or dies). To rule it out, set `AVERI_IDB_HELPER=off` in the environment the MCP host
-  starts the server with (an `env` block in its server entry) and reconnect: every idb call is then the `idb` CLI.
+- **An iOS tree read or input behaves differently than `idb ui describe-all --json` / `idb ui tap …` run by hand, or a
+  step fails with `the idb helper exited during this input; it may or may not have reached the simulator`** — averi reads the
+  iOS tree and sends taps, swipes, text and keys through a persistent idb helper (one Python process per simulator,
+  running idb's own CLI; it falls back to the `idb` CLI by itself when it cannot start or dies — but an input it died
+  under is reported, not repeated: look at the screen before you repeat the step). To rule it out, set
+  `AVERI_IDB_HELPER=off` in the environment the MCP host starts the server with (an `env` block in its server entry)
+  and reconnect: every idb call is then the `idb` CLI.
 - **Launch opens LeakCanary instead of the app** — set `app.android.activity` (see step 4 skeleton).
 - **iOS `id:` selectors find nothing on a React Native app, or a `wait:` on a SwiftUI container id
   (`.accessibilityElement(children: .contain)`) times out while the screen is showing** — idb never

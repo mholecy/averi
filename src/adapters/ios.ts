@@ -124,7 +124,8 @@ export class IosAdapter implements DeviceAdapter {
     treeSource: IosTreeSource;
     /**
      * The simulator's idb helper (D7a), the same one the tree source was handed. Every idb call is offered to it
-     * (runIdb decides which it serves: `ui describe-all` alone until D7b); this adapter owns it and disposes it.
+     * (runIdb decides which it serves: `ui describe-all`, and since D7b every HID argv this adapter sends — a death under
+     * an input is reported, not retried); this adapter owns it and disposes it.
      */
     idbHelper?: IdbHelper;
   }) {

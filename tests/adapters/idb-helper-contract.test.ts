@@ -80,6 +80,38 @@ describe.skipIf(found === undefined)('the idb helper against the idb CLI (real f
     expect(byHelper.stderr).toMatch(/\[ERROR\] - root - Exception thrown in main\n[\s\S]*ValueError: invalid literal for int/);
   }, 60_000);
 
+  // D7b: every HID argv IosAdapter sends (ios.ts), against a companion that is not there — the same failure, the same
+  // code and stderr as the CLI. A text that starts with a dash is argparse's error in both (exit 2, the usage).
+  it.each([
+    ['ui', 'tap', '1', '1'],
+    ['ui', 'tap', '1', '1', '--duration', '0.8'],
+    ['ui', 'swipe', '200', '700', '200', '176', '--duration', '0.3'],
+    ['ui', 'text', 'a'],
+    ['ui', 'text', 'Jan Nováček 😀'],
+    ['ui', 'text', '-x'],
+    ['ui', 'key', '4'],
+    ['ui', 'key-sequence', '42', '42', '76'],
+    ['ui', 'button', 'HOME'],
+  ].map((a) => [a.join(' '), a]))('fails `%s` with the same code and stderr as the CLI', async (_, args) => {
+    const argv = ['--companion', 'localhost:1', ...args, '--udid', UDID];
+    const [byHelper, byCli] = [await viaHelper(argv), await cli(argv)];
+    expect(byHelper.kind).toBe('answer');
+    if (byHelper.kind !== 'answer') return;
+    expect(byCli.code).not.toBe(0);
+    expect(byHelper.code).toBe(byCli.code);
+    expect(byHelper.stderr).toBe(byCli.stderr);
+    expect(byHelper.stdout.equals(byCli.stdout)).toBe(true);
+  }, 60_000);
+
+  it('prints the same stdout bytes for `ui tap --help`', async () => {
+    const argv = ['ui', 'tap', '--help'];
+    const [byHelper, byCli] = [await viaHelper(argv), await cli(argv)];
+    expect(byHelper).toMatchObject({ kind: 'answer', code: 0 });
+    if (byHelper.kind !== 'answer') return;
+    expect(byHelper.stdout.equals(byCli.stdout)).toBe(true);
+    expect(byHelper.stdout.toString()).toMatch(/^usage: idb ui tap/);
+  }, 60_000);
+
   it('answers 50 requests in a row alike — one event loop per request leaves nothing behind', async () => {
     const argv = ['--companion', 'localhost:1', 'ui', 'describe-all', '--json', '--udid', UDID];
     const byCli = await cli(argv);
@@ -107,6 +139,21 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
     "    if argv[0] == 'log':",
     "        logging.getLogger().error('through the handler')",
     '        return 0',
+    // fb-idb's `screenshot -`, `file pull … -` and `video` write bytes to sys.stdout.buffer (D7b, ADR 0032 NIT-2).
+    "    if argv[0] == 'bytes':",
+    "        print('text first, é')",
+    '        sys.stdout.flush()',
+    "        sys.stdout.buffer.write(bytes([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x0a]))",
+    "        sys.stderr.buffer.write(b'raw \\xff\\n')",
+    '        return 0',
+    // A surrogate escape (an undecodable byte of an argv or a file name) printed as text: stderr's error handler.
+    // A helper that dies inside gen_main — after it acknowledged the request (D7b).
+    "    if argv[0] == 'exit':",
+    '        import os',
+    '        os._exit(9)',
+    "    if argv[0] == 'surrogate':",
+    "        print('\\udcff', file=sys.stderr)",
+    '        return 0',
     '',
   ].join('\n');
   async function fakeIdb(root: string, who: string) {
@@ -118,7 +165,11 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
   beforeAll(async () => {
     dir = await mkdtemp(join(tmpdir(), 'averi-idb-bootstrap-'));
     await fakeIdb(join(dir, 'tool'), 'beside the script');
-    await writeFile(join(dir, 'tool', 'idb-script'), '#!/usr/bin/env python3\n');
+    // Runnable as the CLI is: the fake's own `idb` process, for what the real stderr does.
+    await writeFile(
+      join(dir, 'tool', 'idb-script'),
+      '#!/usr/bin/env python3\nimport asyncio, sys\nfrom idb.cli.main import gen_main\nsys.exit(asyncio.run(gen_main(sys.argv[1:])))\n',
+    );
     await mkdir(join(dir, 'bin'));
     await symlink(join(dir, 'tool', 'idb-script'), join(dir, 'bin', 'idb'));
     await fakeIdb(join(dir, 'cwd'), 'planted in the cwd');
@@ -142,6 +193,35 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
     expect(await untilReady(helper, ['code', '259'])).toMatchObject({ kind: 'answer', code: 3 });
     expect(await untilReady(helper, ['code', '-1'])).toMatchObject({ kind: 'answer', code: 255 });
   }, 30_000);
+
+  it('carries what a command writes to sys.stdout.buffer byte for byte — and stderr\'s bytes decoded as exec decodes them', async () => {
+    const r = await untilReady(helper, ['bytes']);
+    expect(r).toMatchObject({ kind: 'answer', code: 0 });
+    if (r.kind !== 'answer') return;
+    expect(r.stdout.equals(Buffer.concat([Buffer.from('text first, é\n'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x0a])]))).toBe(true);
+    expect(r.stderr).toBe('raw \uFFFD\n'); // exec: stderr.toString('utf8')
+  }, 30_000);
+
+  it('prints a surrogate escape to stderr as the fake\'s own process does — the stream\'s error handler, not strict', async () => {
+    const r = await untilReady(helper, ['surrogate']);
+    const byProcess = await exec(found!.python, [join(dir, 'bin', 'idb'), 'surrogate'], { timeoutMs: 20_000 });
+    expect(r).toMatchObject({ kind: 'answer', code: 0 });
+    if (r.kind !== 'answer') return;
+    expect(r.stderr).toBe(byProcess.stderr);
+    expect(r.stderr).toBe('\\udcff\n'); // backslashreplace, Python's stderr handler
+  }, 30_000);
+
+  it('answers `died`, not `unsent`, for a request gen_main was running when the process died — the ack is read', async () => {
+    // A helper of its own each time: one that dies before its first answer counts as a failed start (two turn it off).
+    for (let i = 0; i < 5; i++) {
+      const dying = new IdbHelper({ interpreter: async () => ({ python: found!.python, idb: join(dir, 'bin', 'idb') }) });
+      try {
+        expect(await untilReady(dying, ['exit'])).toEqual({ kind: 'died' });
+      } finally {
+        await dying.dispose();
+      }
+    }
+  }, 60_000);
 
   it('captures what a logging handler writes into the reply\'s stderr', async () => {
     expect(await untilReady(helper, ['log'])).toMatchObject({ kind: 'answer', code: 0, stderr: 'ERROR through the handler\n' });

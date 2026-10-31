@@ -9,9 +9,11 @@
  * `idb.cli.main.main` runs) on an event loop of its own, created and closed per request as the CLI's one per process
  * is, with `sys.stdout`/`sys.stderr` and the stream of every logging handler on the root logger (main.py's
  * `basicConfig` puts one on the stderr of import time; `logger.exception` writes the CLI's tracebacks through it)
- * pointed at buffers. The reply, `{"id", "code", "stdout", "stderr"}`, goes out on fd 3 — a pipe of its own, so a stray
- * `print` of a plugin or of the import cannot corrupt the protocol. The first line on fd 3 is `{"ready": <pid>}`,
- * written only after the import succeeded: an fb-idb without `gen_main`, or an interpreter that cannot import it, exits
+ * pointed at buffers. The reply, `{"id", "code", "stdout", "stderr"}` (the streams base64), goes out on fd 3 — a pipe
+ * of its own, so a stray `print` of a plugin or of the import cannot corrupt the protocol. Before it runs a request it
+ * says `{"got": id}` there (D7b): node then knows the line left stdin, and a death before the ack runs an input on the
+ * CLI — gen_main never saw it — where a death after it is reported (idb.ts#inputLost). The first line on fd 3 is
+ * `{"ready": <pid>}`, written only after the import succeeded: an fb-idb without `gen_main`, or an interpreter that cannot import it, exits
  * before it, and node reads that as a failed start.
  *
  * The import sees what the shebang'd CLI sees (review 2026-10-31, MINOR-5): no `-I`, so `PYTHONPATH` and the user
@@ -26,18 +28,23 @@
  * fb-idb): `sys.argv[0]` is idb's own path, as the shebang'd script sees it, so argparse names itself `idb` in usage
  * and help; the exit code is the CLI's — `gen_main`'s int, a `SystemExit`'s code (argparse: 2 on a bad argv, 0 after
  * `--help`), masked `& 0xff` as the process status is, a non-int code printed to stderr as code 1, as `sys.exit` does;
- * an exception that escapes `gen_main` is printed as Python would print it, code 1. stdout is TEXT: a command that
- * writes bytes to `sys.stdout.buffer` (`idb screenshot -`) cannot run here — D7b must solve that before the allowlist
- * grows. It exits on stdin's EOF — the end node gives it on dispose, and the one the kernel gives it when node dies —
- * so it cannot outlive the server by more than its current request.
+ * an exception that escapes `gen_main` is printed as Python would print it, code 1. Each stream is a TextIOWrapper over
+ * a BytesIO, in the encoding and error handler of the helper's own stdout/stderr — what the CLI's would have under the
+ * same locale (D7b, ADR 0032 NIT-2): a command that writes bytes to `sys.stdout.buffer` (fb-idb's `screenshot -`,
+ * `file pull … -`, `video`) runs here as in the CLI, and the reply carries both streams as base64 of their bytes, which
+ * node decodes as exec does (stdout a Buffer, stderr utf-8). The HID verbs D7b serves print nothing on stdout. It
+ * exits on stdin's EOF — the end node gives it on dispose, and the one the kernel gives it when node dies — so it
+ * cannot outlive the server by more than its current request.
  */
 export const IDB_HELPER_SCRIPT = String.raw`
 import sys, os
 if sys.path and sys.path[0] == '':
     sys.path[0] = os.path.dirname(os.path.realpath(sys.argv[1]))
 argv0 = sys.argv[1]
-import asyncio, io, json, logging, traceback
+import asyncio, base64, io, json, logging, traceback
 proto = os.fdopen(3, 'w', encoding='utf-8', buffering=1)
+def b64(buf):
+    return base64.b64encode(buf.getvalue()).decode('ascii')
 def reply(obj):
     proto.write(json.dumps(obj) + '\n')
     proto.flush()
@@ -47,7 +54,10 @@ reply({'ready': os.getpid()})
 real_out, real_err = sys.stdout, sys.stderr
 for line in sys.stdin:
     req = json.loads(line)
-    out, err = io.StringIO(), io.StringIO()
+    reply({'got': req['id']})
+    out_b, err_b = io.BytesIO(), io.BytesIO()
+    out = io.TextIOWrapper(out_b, encoding=real_out.encoding, errors=real_out.errors, write_through=True)
+    err = io.TextIOWrapper(err_b, encoding=real_err.encoding, errors=real_err.errors, write_through=True)
     handlers = [h for h in logging.getLogger().handlers if isinstance(h, logging.StreamHandler)]
     saved = [h.setStream(err) for h in handlers]
     sys.stdout, sys.stderr = out, err
@@ -76,5 +86,10 @@ for line in sys.stdin:
     else:
         err.write(str(code) + '\n')
         code = 1
-    reply({'id': req['id'], 'code': code, 'stdout': out.getvalue(), 'stderr': err.getvalue()})
+    for s in (out, err):
+        try:
+            s.flush()
+        except BaseException:
+            pass
+    reply({'id': req['id'], 'code': code, 'stdout': b64(out_b), 'stderr': b64(err_b)})
 `;

@@ -3,14 +3,80 @@ import { DEFAULT_TIMEOUT_MS, ExecError, type ExecFn, type ExecResult } from './e
 import { IdbHelperTimeout, type IdbHelper } from './idb-helper.js';
 import { detectXcodeEnv } from './xcode-env.js';
 
-/**
- * The idb calls the helper may serve (D7a): reads alone, so a helper that dies under one can be retried on the CLI —
- * a read twice is still one read. Input (tap, text, swipe, key) stays on the CLI until D7b decides what a helper that
- * dies under a HID event means (it may have been delivered).
- */
-const HELPER_ARGV: readonly (readonly string[])[] = [['ui', 'describe-all', '--json']];
+/** A number as IosAdapter writes one into an argv (`String(x)`, `String(ms / 1000)`). */
+const NUM = /^-?\d+(\.\d+)?$/;
+/** Any one string — `ui text`'s text (what the CLI and the helper would both receive alike: sameForBoth). */
+const ANY = /^[\s\S]*$/;
+/** One or more numbers, to the end of the argv — `ui key-sequence`'s codes (clearText sends `count` of them). Last only. */
+const NUMS = Symbol('one or more numbers');
+/** A word of an allowlisted shape: a literal, a pattern (NUM, ANY), or NUMS as the last word. */
+type Word = string | RegExp | typeof NUMS;
 
-const helperServes = (args: readonly string[]) => HELPER_ARGV.some((a) => a.length === args.length && a.every((w, i) => w === args[i]));
+/**
+ * The idb calls the helper may serve, word by word, the `--udid` excluded (runIdb appends it last, as for the CLI):
+ * - D7a: the tree read, `ui describe-all --json`. A read: a helper that dies under one is retried on the CLI.
+ * - D7b: every HID argv IosAdapter sends (ios.ts) — tap, longPress (`tap … --duration`), swipe, typeText (D24's split
+ *   included: two `ui text`), clearText (`key-sequence` 42… then 76…), pressKey (`key 40`, `button HOME`). Input: a
+ *   helper that dies under one is NOT retried — the event may have reached the simulator (HID_ARGV, runIdb).
+ * Exactly these shapes and nothing near them: an argv averi does not send, or a word out of shape (a number that is
+ * no plain decimal, another button), is the CLI's, as before D7. `describe --json` (the memoized viewport, one call an
+ * adapter) stays on the CLI: not worth a shape.
+ */
+const READ_ARGV: readonly (readonly Word[])[] = [['ui', 'describe-all', '--json']];
+const HID_ARGV: readonly (readonly Word[])[] = [
+  ['ui', 'tap', NUM, NUM],
+  ['ui', 'tap', NUM, NUM, '--duration', NUM],
+  ['ui', 'swipe', NUM, NUM, NUM, NUM, '--duration', NUM],
+  ['ui', 'text', ANY],
+  ['ui', 'key-sequence', NUMS],
+  ['ui', 'key', NUM],
+  ['ui', 'button', 'HOME'],
+];
+
+/** Whether an argv is of a shape: as many words as it has (or, ending in NUMS, at least one more), each fitting. */
+function fits(shape: readonly Word[], args: readonly string[]): boolean {
+  const variadic = shape.at(-1) === NUMS;
+  const fixed = (variadic ? shape.slice(0, -1) : shape) as readonly (string | RegExp)[];
+  if (variadic ? args.length <= fixed.length : args.length !== fixed.length) return false;
+  return args.every((a, i) => {
+    const w = i < fixed.length ? fixed[i] : NUM;
+    return typeof w === 'string' ? w === a : w.test(a);
+  });
+}
+
+/**
+ * A word the CLI and the helper would receive differently (D7b, `ui text` takes any string): a lone surrogate reaches
+ * the CLI's argv as U+FFFD (node encodes it so) but the helper's JSON as the surrogate itself, which fb-idb's gRPC
+ * cannot encode; a NUL makes execFile refuse the call where the helper would type it. Measured 2026-10-31 (node 22).
+ * Such an argv is the CLI's, so either way the outcome is what it was before D7.
+ */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+const sameForBoth = (args: readonly string[]) => args.every((w) => !w.includes('\0') && !LONE_SURROGATE.test(w));
+
+/** Which allowlist an argv is on, or none: the CLI's alone. */
+function helperKind(args: readonly string[]): 'read' | 'input' | undefined {
+  if (!sameForBoth(args)) return undefined;
+  if (READ_ARGV.some((s) => fits(s, args))) return 'read';
+  if (HID_ARGV.some((s) => fits(s, args))) return 'input';
+  return undefined;
+}
+
+/**
+ * The helper died with an input request it had taken (D7b): it acknowledged the line (`{"got": id}`, idb-helper.ts),
+ * so gen_main was running it, and the HID event may or may not have reached the simulator — fb-idb sends it over the
+ * companion's gRPC before it answers, and a death between the two is indistinguishable from one before. Not retried:
+ * a tap repeated is two taps, a `ui text` repeated types the text twice. (A request the helper never took is `unsent`
+ * and runs on the CLI.) Thrown in exec's shape — an ExecError, exit `null` as a CLI killed by a signal reads, not
+ * timed out — so the first line is exec's, `Command failed (exit null): idb ui tap 120 640 --udid U`, and INPUT_LOST
+ * stands where the CLI's stderr would. The one error text the helper adds (ADR 0032, D7b); nothing in averi matches
+ * idb's input errors by text (grep 2026-10-31: only ExecError.timedOut is read, by OCR and Android).
+ */
+export const INPUT_LOST =
+  'the idb helper exited during this input; it may or may not have reached the simulator — look at the screen before repeating it';
+
+export function inputLost(command: string): ExecError {
+  return new ExecError(command, null, INPUT_LOST);
+}
 
 /**
  * A helper call, as the D0 harness sees it (scripts/perf/instrument.ts): it is no process, so the execFile wrapper
@@ -35,12 +101,14 @@ export interface IdbHelperCall {
  * also routes to the idb helper (idb-helper.ts) and publishes the helper's
  * calls on the diagnostics channels above.
  *
- * With a `helper` (D7a, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md) an argv of HELPER_ARGV is
- * offered to it first; when it takes the call, the answer is the CLI's, to the byte of the error an agent reads: a
- * nonzero code throws the ExecError exec builds for the same failure (`Command failed (exit N): idb <argv> --udid U`
- * and the stderr — exec.ts), a timeout the same `Command timed out: idb …`; a helper that died under the call (it is
- * a read) is retried once on the CLI, whose answer or error is the one returned. When it does not take the call (not
- * ready yet, busy, off), the CLI runs as before.
+ * With a `helper` (D7a, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md) an argv on READ_ARGV or
+ * HID_ARGV (helperKind) is offered to it first; when it takes the call, the answer is the CLI's, to the byte of the
+ * error an agent reads: a nonzero code throws the ExecError exec builds for the same failure (`Command failed (exit
+ * N): idb <argv> --udid U` and the stderr — exec.ts), a timeout the same `Command timed out: idb …`; a helper that
+ * died under a read is retried once on the CLI, whose answer or error is the one returned — under an input it had
+ * taken (D7b) it is not: inputLost says the event may or may not have landed. A request the helper never took
+ * (`unsent`: the write failed, or it died before it acknowledged the line) runs on the CLI either way. When the helper
+ * does not take the call (not ready yet, busy, off), the CLI runs as before.
  */
 export async function runIdb(
   exec: ExecFn,
@@ -50,7 +118,8 @@ export async function runIdb(
 ): Promise<ExecResult> {
   const env = await detectXcodeEnv(exec);
   const argv = [...args, '--udid', udid];
-  const pending = opts.helper !== undefined && helperServes(args) ? opts.helper.run(argv, { env, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS }) : undefined;
+  const kind = helperKind(args);
+  const pending = opts.helper !== undefined && kind !== undefined ? opts.helper.run(argv, { env, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS }) : undefined;
   if (pending !== undefined) {
     const command = ['idb', ...argv].join(' ');
     const call: IdbHelperCall = { argv };
@@ -73,6 +142,9 @@ export async function runIdb(
       if (reply.code !== 0) throw new ExecError(command, reply.code, reply.stderr || `Command failed: ${command}\n`, false, reply.stdout);
       return { stdout: reply.stdout, stderr: reply.stderr };
     }
+    // `unsent` never reached the helper: the CLI runs it below, input or not. A read the helper died under is retried
+    // there too; an input it died under may already have reached the simulator.
+    if (reply.kind === 'died' && kind === 'input') throw inputLost(command);
   }
   return exec('idb', argv, { env, ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}) });
 }
