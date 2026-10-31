@@ -48,6 +48,7 @@ measured before and after.
 | D18 | No lab field reformats as it is typed into (IBAN grouping, amount separators): the typing pace and a fill's read-back are unproven there, and `type_text` without a selector, flow `type:` and `type_pin` type blind (found in D6's review) | stability | open |
 | D19 | Android capture by `shell screencap <file>` + `adb pull` (raw RGBA, PNG encoded on the host only when returned/stored): −80…110 ms per capture on lab screens, −1.3 s on photo-heavy ones; changes the `screenshot()` contract | device | open |
 | D20 | iOS idb: `scroll_until` on form-picker's 45-row sheet stops "the swipe CHANGED THE SCREEN" after its first stroke (524 pt / 300 ms) — every repeat of the D0 probe 2026-10-31; suspected a fling past all 15 listed rows (idb's flat tree keeps no anchor), not a dismissal — to be proven on the device | stability | done in code (7e32f1d3; idb full strokes paced at 349 pt/s, ADR 0018 Decision 4) — the owner's iOS device check pending |
+| D21 | iOS idb: right after a simulator boot with a fresh companion every `idb ui describe-all` fails "The simulator's accessibility service named no frontmost application" for the whole call (D20's device check 2026-10-31: 133 reads in 90 s, 5 of 5 repeats); a hand launch + read before the run cured it once. Find the cause and what averi can do (re-front the app? a named recovery in the reply?) — needs the device | stability | open |
 
 ## Notes
 
