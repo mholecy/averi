@@ -58,12 +58,13 @@ separators added)`.** One pure rule, `fill-type.ts#reformatOf(reading, expected)
 - an added separator between two LETTERS passes only when the typing is a code — a digit in it and no typed space
   (review round 2: autocorrect's `a lot` for `alot` is no format; an MT IBAN's `MALT MTLC` is);
 - an added `.` or `,` must be a thousands separator: not a character the typing holds itself, 1–3 digits before the
-  first, not a lone `0` and not after a typed `.` or `,` (`0,12.345` is a fraction), exactly three digits between two of them and after the last, then no digit. A cents mask
-  that shows `125` as `1.25`, `0.123` for `0123` or `1234.567` for `1234567` still fail.
+  first, not a lone `0` and not after a typed `.` or `,` (`0,12.345` is a fraction), exactly three digits between two
+  of them and after the last, then no digit. A cents mask that shows `125` as `1.25`, `0.123` for `0123` or `1234.567`
+  for `1234567` still fail.
 
 What the rule cannot tell: `1.234` for `1234` is de-DE's thousands or a three-decimal mask's point. **The
-orchestrator's decision (review round 1): a reformat whose added separator is `.` or `,` passes with a ⚠ caveat, not
-the aside** — `the field shows them reformatted: 1 separator added — it added '.': check it is a thousands separator,
+orchestrator's decision (review round 1): an added `.` or `,` in thousands position passes with a ⚠ caveat, not the
+aside; elsewhere it fails** (the rule above) — `the field shows them reformatted: 1 separator added — it added '.': check it is a thousands separator,
 not a decimal point`. Spaces, `-` and `/` stay in the aside.
 
 It is a pass, so it is part of the landing (`typeAndConfirm`'s `landing`, computed once per reading): the poll stops
@@ -100,13 +101,13 @@ beside `retyped`, or the `reformatted-point` caveat), counts only — a value ma
   wipe and retype of the whole value still runs; without it the fill fails as before. Not seen on Android (no drop);
   the drop is iOS React Native's (`idb ui text`), and the iOS check of these fields is the owner's (below).
 - `type_text` without a selector and a flow's `type:` stay blind (no read-back, as designed); they typed every
-  character into the reformatting fields (f6, f8, rf3, rf4). `type_pin`: see the measurement below.
+  character into the reformatting fields (f6, f8, rf3, rf4). `type_pin`: see "Measured" above.
 - The ibanShown case shows the uiautomator dump reads a Compose `VisualTransformation`'s SHOWN text, not the model's:
   the read-back cannot tell a display-only format from a model one — both are the same pass.
 - Not device-checked on iOS: the SwiftUI `Forms.swift` change (the binding's setter formats) is source only — this
   sandbox cannot build SwiftUI (swiftc's macro plugin) — and the React Native iOS build was not made either. A
   SwiftUI binding whose setter writes back a DIFFERENT string is a known pitfall: the TextField may keep showing what
   was typed while the model holds the formatted text, so the screen and the model can diverge. f1–f3 therefore assert
-  the tree's text against the model's after the fill (`holdsShown` in `scripts/truth/live.ts`): a divergence is a MISMATCH even when the
-  fill passed. The owner builds both apps and runs `live.ts --udid … --cases f1,f2,f3,f5,f6,f7,f8,f9,f10` and
+  the tree's text against the model's after the fill (`holdsShown` in `scripts/truth/live.ts`): a divergence is a
+  MISMATCH even when the fill passed. The owner builds both apps and runs `live.ts --udid … --cases f1,f2,f3,f5,f6,f7,f8,f9,f10` and
   `--app react-native --cases rf1,rf2,rf3,rf4,rf5`.

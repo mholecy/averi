@@ -65,7 +65,7 @@
 import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adapters/types.js';
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
 import { sleep } from '../util/sleep.js';
-import { heldText, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
+import { heldText, isPoint, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
 export interface FieldIo {
@@ -153,24 +153,24 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
   // them the change alone is the proof, as their length is for inputs.
   const tookText = (observed: string) =>
     intent.isInput || (observed !== intent.resolvedValue && (isMaskedValue(observed) || observed.includes(value)));
-  // What a reading that landed is: exact (`{}`), or reformatted — computed once per reading, by the poll (`landing`).
   const exactly = (observed: string) =>
     isMaskedValue(observed)
-        ? clear
-          ? observed.length === value.length
-          : observed.length >= intent.maskedHeld + value.length
-        : clear
-          ? observed === value
-          : // A placeholder is not content: on an empty field showing
-            // `Search`, nothing typed must not pass for a typed `ear`.
-            // Raw equality first: a value equal to the placeholder is the
-            // one reading that cannot be told from it (see `fill-facts.ts#heldText`).
-            observed === value || heldText(observed, intent.placeholder).includes(value);
+      ? clear
+        ? observed.length === value.length
+        : observed.length >= intent.maskedHeld + value.length
+      : clear
+        ? observed === value
+        : // A placeholder is not content: on an empty field showing
+          // `Search`, nothing typed must not pass for a typed `ear`.
+          // Raw equality first: a value equal to the placeholder is the
+          // one reading that cannot be told from it (see `fill-facts.ts#heldText`).
+          observed === value || heldText(observed, intent.placeholder).includes(value);
   // D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows the typing with
   // separators of its own (`reformatOf`): what it should hold — its earlier text, unless cleared, then the value —
   // reformatted. A masked reading never is one (bullets are no typed characters). `tookText` gates this rule as it
   // gates the exact one: a non-input must still have changed to show the value itself, which a reformatted reading
   // (the value split by separators) never contains.
+  // What a reading that landed is: exact (`{}`), or reformatted — computed once per reading, by the poll.
   const landing = (observed: string): Landing | undefined => {
     if (!tookText(observed)) return undefined;
     const reformatted = reformatOf(heldText(observed, intent.placeholder), priorText(intent) + value);
@@ -224,13 +224,12 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
   }
 }
 
-/** The spaces a field may show for one another: a space, a no-break space (U+00A0), a narrow no-break space (U+202F). */
+/** The spaces a field may show for one another: a space, a no-break (U+00A0) and a narrow no-break (U+202F) space. */
 const SPACES = new Set([' ', '\u00A0', '\u202F']);
 /** What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. */
 const SEPARATORS = new Set([...SPACES, '.', ',', '-', '/']);
-/** The added separators that could be a decimal point: said as a caveat, never passed silently (FillVerdict). */
-const POINTS = new Set(['.', ',']);
 const ALNUM = /^[\p{L}\p{N}]$/u;
+const DIGIT = /\d/;
 const LETTER = /^\p{L}$/u;
 const DIGITS = /^\d+$/;
 
@@ -250,8 +249,8 @@ const DIGITS = /^\d+$/;
  * - they cut the typing into groups of two or more characters, but for ONE single-character group at either end
  *   (`1 234`, an IBAN's last `1`): `1-5` for `15` is no grouping;
  * - an added `.` or `,` is a thousands separator: never a character the typing itself holds as `.` or `,`, the digits
- *   before the first one 1–3, not a lone `0` and not after a typed `.` or `,` (a fraction), exactly three between two of them and after the last (then no
- *   digit). That rules out a cents mask's `1.25` for `125` and `0.123` for `0123`, but not every decimal point: `1.234`
+ *   before the first one 1–3, not a lone `0` and not after a typed `.` or `,` (a fraction), exactly three between two
+ *   of them and after the last (then no digit). That rules out a cents mask's `1.25` for `125` and `0.123` for `0123`, but not every decimal point: `1.234`
  *   for `1234` is de-DE's thousands or a three-decimal mask, which the reading cannot tell — so the verdict passes it
  *   with a caveat (`point`), not silently.
  * Greedy: a reading character equal to the next expected one is taken as that character. Taken as an added separator
@@ -261,23 +260,23 @@ const DIGITS = /^\d+$/;
  */
 export function reformatOf(observed: string, expected: string): Reformat | undefined {
   // Code points on both sides (an astral letter is one character, not two UTF-16 units).
-  const typed = [...expected];
-  // A code: digits in it and no typed space (an IBAN, a card number) — the one typing whose letters a field may group.
-  const code = typed.some((c) => /\d/.test(c)) && !typed.some((c) => SPACES.has(c));
+  const expectedChars = [...expected];
+  // A code: digits in it and no typed space (an IBAN, a card number) — the one typing whose letters a field may split.
+  const code = expectedChars.some((c) => DIGIT.test(c)) && !expectedChars.some((c) => SPACES.has(c));
   // The reading as tokens: each an expected character shown (its index) or an added separator (-1).
   const tokens: number[] = [];
   let j = 0;
   let respaced = 0;
   for (const c of observed) {
-    const e = typed[j];
-    if (c === e) tokens.push(j++);
-    else if (e !== undefined && SPACES.has(c) && SPACES.has(e)) {
+    const next = expectedChars[j];
+    if (c === next) tokens.push(j++);
+    else if (next !== undefined && SPACES.has(c) && SPACES.has(next)) {
       tokens.push(j++);
       respaced++;
     } else if (SEPARATORS.has(c)) tokens.push(-1);
     else return undefined;
   }
-  if (j !== typed.length) return undefined;
+  if (j !== expectedChars.length) return undefined;
   const chars = [...observed];
   const added = new Set(chars.filter((_, k) => tokens[k] === -1));
   if (added.size > 1) return undefined;
@@ -291,38 +290,40 @@ export function reformatOf(observed: string, expected: string): Reformat | undef
     }
     // Both neighbours typed letters or digits: none leading or trailing (no neighbour), none next to another added
     // one (-1), none after typed punctuation.
-    const typedAlnum = (t: number | undefined) => t !== undefined && t !== -1 && ALNUM.test(typed[t]);
+    const typedAlnum = (t: number | undefined) => t !== undefined && t !== -1 && ALNUM.test(expectedChars[t]);
     if (!typedAlnum(tokens[k - 1]) || !typedAlnum(tokens[k + 1])) return undefined;
     // Between two LETTERS only in a code (round 2, MAJOR-A): in prose a space or `-` added there is autocorrect
     // splitting a word (`a lot` for `alot`, `jo-hn@x.com`), not a format; an IBAN's `MALT MTLC` is.
-    const letter = (t: number) => LETTER.test(typed[t]);
+    const letter = (t: number) => LETTER.test(expectedChars[t]);
     if (!code && letter(tokens[k - 1]) && letter(tokens[k + 1])) return undefined;
     groups.push(0);
   }
-  const short = groups.map((n, k) => (n < 2 ? k : -1)).filter((k) => k !== -1);
-  if (short.length > 1 || (short.length === 1 && short[0] !== 0 && short[0] !== groups.length - 1)) return undefined;
-  if (sep !== undefined && POINTS.has(sep) && !thousands(chars, tokens, expected, sep)) return undefined;
+  const singles = groups.map((n, k) => (n < 2 ? k : -1)).filter((k) => k !== -1);
+  const atAnEnd = (k: number) => k === 0 || k === groups.length - 1;
+  if (singles.length > 1 || (singles.length === 1 && !atAnEnd(singles[0]))) return undefined;
+  const point = isPoint(sep) ? sep : undefined;
+  if (point !== undefined && !thousands(chars, tokens, expected, point)) return undefined;
   const count = groups.length - 1;
   if (count + respaced === 0) return undefined;
-  return { added: count, respaced, ...(sep !== undefined && POINTS.has(sep) && { point: sep as '.' | ',' }) };
+  return { added: count, respaced, ...(point !== undefined && { point }) };
 }
 
 /** An added `.` or `,` groups digits by thousands (see `reformatOf`). */
-function thousands(chars: string[], tokens: number[], expected: string, sep: string): boolean {
+function thousands(chars: string[], tokens: number[], expected: string, point: string): boolean {
   // The typing holds this character itself (its decimal point, or its own grouping): an added one is no thousands mark.
-  if (expected.includes(sep)) return false;
-  const at = tokens.flatMap((t, k) => (t === -1 ? [k] : []));
-  let start = at[0] - 1;
-  while (start >= 0 && /\d/.test(chars[start])) start--;
-  // The digits before the first mark are a whole part: not a fraction after a typed point (`0,12.345`; round 2, MINOR-B).
-  if (start >= 0 && POINTS.has(chars[start])) return false;
-  const lead = chars.slice(start + 1, at[0]).join('');
+  if (expected.includes(point)) return false;
+  const marks = tokens.flatMap((t, k) => (t === -1 ? [k] : []));
+  let start = marks[0] - 1;
+  while (start >= 0 && DIGIT.test(chars[start])) start--;
+  // The digits before the first mark are a whole part, not a fraction after a typed point (`0,12.345`; round 2).
+  if (start >= 0 && isPoint(chars[start])) return false;
+  const lead = chars.slice(start + 1, marks[0]).join('');
   if (!DIGITS.test(lead) || lead.length > 3 || lead === '0') return false;
-  for (let n = 0; n < at.length; n++) {
-    const end = n + 1 < at.length ? at[n + 1] : at[n] + 4;
-    const run = chars.slice(at[n] + 1, end).join('');
+  for (let n = 0; n < marks.length; n++) {
+    const end = n + 1 < marks.length ? marks[n + 1] : marks[n] + 4;
+    const run = chars.slice(marks[n] + 1, end).join('');
     if (run.length !== 3 || !DIGITS.test(run)) return false;
-    if (n + 1 === at.length && chars[end] !== undefined && /\d/.test(chars[end])) return false;
+    if (n + 1 === marks.length && chars[end] !== undefined && DIGIT.test(chars[end])) return false;
   }
   return true;
 }

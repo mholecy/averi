@@ -71,7 +71,7 @@
  */
 
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
-import { heldText, type Difference, type FillResult, type LostWhy, type NearbyInput, type Reformat } from './fill-facts.js';
+import { hasPoint, heldText, type Difference, type FillResult, type LostWhy, type NearbyInput, type PointedReformat, type Reformat } from './fill-facts.js';
 
 /**
  * Why a fill is NOT verified — one code per reason, in render order:
@@ -131,7 +131,7 @@ export interface Sent {
 export type Caveat =
   | { code: 'not-input'; role: string; typed: boolean; input: NearbyInput | 'none' | 'unread' }
   | { code: 'masked-append'; held: number }
-  | { code: 'reformatted-point'; reformat: Reformat & { point: '.' | ',' } };
+  | { code: 'reformatted-point'; reformat: PointedReformat };
 
 /** A fill, judged. Built only by `judgeFill`; its invariants are the module header's. */
 export interface FillVerdict {
@@ -191,7 +191,7 @@ export function judgeFill(r: FillResult): FillVerdict {
   if (r.notInput !== undefined) caveats.push({ code: 'not-input', role, typed: readBack.kind !== 'nothing-typed', input: r.notInput.input });
   if (r.maskedAppend !== undefined) caveats.push({ code: 'masked-append', held: r.maskedAppend.held });
   const { reformatted } = r;
-  if (reformatted?.point !== undefined) caveats.push({ code: 'reformatted-point', reformat: { ...reformatted, point: reformatted.point } });
+  if (reformatted !== undefined && hasPoint(reformatted)) caveats.push({ code: 'reformatted-point', reformat: reformatted });
   return {
     did: verified ? 'filled' : typed > 0 ? 'typed' : sent !== undefined ? 'cleared' : 'focused',
     typed,
@@ -199,7 +199,7 @@ export function judgeFill(r: FillResult): FillVerdict {
     reasons,
     caveats,
     ...(r.retyped !== undefined && r.retyped.length > 0 && { retyped: r.retyped }),
-    ...(reformatted !== undefined && reformatted.point === undefined && { reformatted }),
+    ...(reformatted !== undefined && !hasPoint(reformatted) && { reformatted }),
     note: r.note,
   };
 }

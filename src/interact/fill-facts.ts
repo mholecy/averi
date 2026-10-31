@@ -170,8 +170,15 @@ export interface FillResult {
 export interface Reformat {
   added: number;
   respaced: number;
-  point?: '.' | ',';
+  point?: Point;
 }
+
+/** An added separator the reading cannot tell from a decimal point (Reformat.point). */
+export type Point = '.' | ',';
+export const isPoint = (c: string | undefined): c is Point => c === '.' || c === ',';
+/** A Reformat whose added separator is a Point — FillVerdict's `reformatted-point` caveat. */
+export type PointedReformat = Reformat & { point: Point };
+export const hasPoint = (r: Reformat): r is PointedReformat => r.point !== undefined;
 
 /**
  * Which reading a clear that ended on EXACTLY the named placeholder came
