@@ -1566,12 +1566,20 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
 
   // D24 (docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment 2026-10-31): the fill tells the adapter what it
   // saw — once, after the first tail typed again — and the adapter decides how it types into that app from then on.
-  it('tells the adapter the field dropped a tail (noteDroppedTail), once, after the tail is typed again', async () => {
+  it('tells the adapter the field dropped a tail (noteDroppedTail), once, when the typing landed through the tails typed again', async () => {
     const fake = formFake(null);
     dropping(fake, 3, 3);
     await fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST);
     expect(fake.typed).toEqual(['Jan Novak', ' Novak', 'vak']);
-    expect(fake.droppedTails).toEqual([2]);
+    expect(fake.droppedTails).toEqual([3]);
+  });
+
+  it('a capped field (maxLength: the retype moves nothing, the fill fails) tells the adapter nothing', async () => {
+    const fake = formFake(null);
+    dropping(fake, 5, 0);
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow(/but the field shows 5/);
+    expect(fake.typed).toEqual(['Jan Novak', 'ovak']);
+    expect(fake.droppedTails).toEqual([]);
   });
 
   it('a fill that lands whole tells the adapter nothing', async () => {

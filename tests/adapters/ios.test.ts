@@ -569,6 +569,26 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
   });
 
+  it('terminating the launched app forgets which app is in front: no split, and nothing learned, until the next launch', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
+    adapter.noteDroppedTail(); // the app in front before any launch dropped a tail
+    await adapter.launch('com.lab.rn');
+    adapter.noteDroppedTail();
+    await adapter.terminate('com.lab.other'); // another bundle: the key stays
+    resetSleeps();
+    await adapter.typeText('Jan');
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
+    await adapter.terminate('com.lab.rn');
+    adapter.noteDroppedTail(); // not known what is in front: nothing to learn
+    await adapter.typeText('Jan');
+    expect(log()).toEqual(['idb ui text Jan --udid AAAA-1111']);
+    await adapter.launch('com.lab.rn');
+    resetSleeps();
+    await adapter.typeText('Jan');
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
+  });
+
   it('an app never seen dropping a tail types in one burst, with no wait — native apps never pay', async () => {
     const { fn, log } = typingLog();
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
@@ -658,6 +678,17 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
     expect(second.retyped).toEqual([4]);
     // The split's rest kept 4 of 8 (`an N`): the tail `ovak` typed again — itself split, as every typing into this app.
     expect(typed()).toEqual(['J', FIRST_KEY_ALONE_MS, 'an Novak', 'o', FIRST_KEY_ALONE_MS, 'vak']);
+  });
+
+  // D24 review: a native field capped at 5 characters keeps `Jan N` for good; its fill fails after one retype that
+  // moved nothing, and the app is not marked — the next fill is one burst.
+  it('a capped field\'s failed fill marks nothing: the next fill into that app is one burst', async () => {
+    const { adapter, typed } = rnLab(5, 0);
+    await adapter.launch('com.lab.native');
+    await expect(fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST)).rejects.toThrow(/but the field shows 5/);
+    expect(typed()).toEqual(['Jan Novak', 'ovak']);
+    await fillField(adapter, { id: 'rn-field' }, 'Jan', FAST);
+    expect(typed()).toEqual(['Jan']);
   });
 
   it('a fill into another app after the drop types in one burst', async () => {

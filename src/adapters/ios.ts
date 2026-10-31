@@ -70,10 +70,12 @@ export class IosAdapter implements DeviceAdapter {
   private readonly treeSource: IosTreeSource;
   /**
    * The bundle this adapter last launched — the app the typing goes into, as far as the adapter knows; undefined before
-   * any launch (an app opened by hand, or before the server started). A deep link that brings another app forward,
-   * or a tap that does, is not seen: the key stays the launched app's.
+   * any launch (an app opened by hand, or before the server started: whatever is in front); null once that bundle was
+   * terminated through this adapter — NOT known, so nothing is split and nothing learned until the next launch (D24
+   * review: a key must not outlive its app). A deep link that brings another app forward, or a tap that does, is not
+   * seen: the key stays the launched app's.
    */
-  private launched: string | undefined;
+  private launched: string | undefined | null;
   /**
    * The apps (by `launched`) whose field a fill saw drop the tail of a typing (noteDroppedTail) — sticky for this
    * adapter's life, so typeText sends their first key alone (FIRST_KEY_ALONE_MS). `undefined` is the app in front before
@@ -316,6 +318,7 @@ export class IosAdapter implements DeviceAdapter {
   async terminate(bundleId: string): Promise<void> {
     // simctl terminate fails if the app is not running — that's fine.
     await this.simctl(['terminate', this.udid, bundleId]).catch(() => undefined);
+    if (bundleId === this.launched) this.launched = null;
   }
 
   async openDeepLink(url: string): Promise<void> {
@@ -413,7 +416,7 @@ export class IosAdapter implements DeviceAdapter {
     // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
     // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
     // split between two idb calls. A one-character text has no rest: one call, no wait.
-    if (this.dropsTail.has(this.launched)) {
+    if (this.launched !== null && this.dropsTail.has(this.launched)) {
       const [first] = new Intl.Segmenter().segment(text);
       if (first !== undefined && first.segment.length < text.length) {
         await this.idbUi(['text', first.segment]);
@@ -426,14 +429,15 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   /**
-   * A fill saw the field keep a strict prefix of its typing and typed the tail again (interact/fill-type.ts, ADR 0023):
-   * the app in front drops the end of a burst. Its later typings through this adapter send the first key alone
+   * A fill saw the field keep a strict prefix of its typing, typed the tail again, and the typing then landed whole
+   * (interact/fill-type.ts, ADR 0023 — a capped field whose retype moves nothing is never reported): the app in front
+   * drops the end of a burst. Learned for the launched app's bundle (`launched`); nothing when that is not known. Its later typings through this adapter send the first key alone
    * (typeText, FIRST_KEY_ALONE_MS) — a platform remedy, measured on iOS only, so it is this adapter's and the fill only
    * reports what it saw. Sticky: an app that dropped once is an RN controlled field's app, and the split costs 150 ms
    * where a drop costs a poll of up to 5 × 400 ms and a retype; apps never seen dropping never pay. No device call.
    */
   noteDroppedTail(): void {
-    this.dropsTail.add(this.launched);
+    if (this.launched !== null) this.dropsTail.add(this.launched);
   }
 
   async clearText(count: number): Promise<void> {
