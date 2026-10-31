@@ -143,6 +143,24 @@ export interface PollOptions {
    * Owned by the caller: the engine and the verifier each have their own cadence.
    */
   pollMs: number;
+  /**
+   * A read handed on from before this poll (ui-tree/read-handoff.ts, docs/adr/0030-a-read-is-handed-on-only-as-a-
+   * first-sample-or-a-positive-verdict.md), asked once, before the first device read. What a handed round may
+   * decide is `pollTree`'s rule: only a value ends the poll on it.
+   */
+  first?: FirstSample;
+}
+
+/** A tree read handed on to a later poll, with when its read started and ended (`Date.now()`). */
+export interface HandedRead {
+  tree: UiNode;
+  startedAt: number;
+  endedAt: number;
+}
+
+/** Where a poll asks for a handed-on read: once, and an answer of `undefined` means read fresh. */
+export interface FirstSample {
+  take(): HandedRead | undefined;
 }
 
 /** How a poll ended: the predicate's value, or the deadline with what the last rounds knew. */
@@ -277,6 +295,16 @@ export const pauseAfterRead = (pollMs: number, readMs: number): number =>
   Math.min(pollMs, Math.max(SETTLE_FLOOR_MS, pollMs - readMs));
 
 /**
+ * What a predicate is told of its round: the poll's `deadline`, and `handedOn` when the tree is a handed-on read
+ * (`PollOptions.first`) rather than one this poll took — a predicate that keeps a tally across rounds (the ladder's
+ * rendered count, the settle's sightings) keeps the handed round out of it, so nothing but its value can count.
+ */
+export interface PollRound {
+  deadline: number;
+  handedOn?: true;
+}
+
+/**
  * Poll the UI tree until the predicate returns a value, or the deadline
  * passes. The one owner of the deadline loop (ARCHITECTURE.md §8, "waits,
  * not sleeps"): before 2026-10-03 it was written out in `Verifier.poll`,
@@ -323,6 +351,17 @@ export const pauseAfterRead = (pollMs: number, readMs: number): number =>
  *   where the last read starts relative to it (ADR 0029's R2, the accepted
  *   residual pinned in read-tree.test.ts).
  *
+ * - A handed-on read (`opts.first`, since 2026-10-31: docs/adr/0030-a-read-
+ *   is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md) is round
+ *   zero, asked before any device read. It may only END the poll: a value
+ *   returns it; anything else — a miss, a PollMiss (its detail is not kept),
+ *   `Undecided`, a predicate's throw — is discarded, nothing of it reaches the
+ *   outcome (`treesRead`, `lastTree`, `undecidedTree` count fresh reads only),
+ *   the deadline is not checked, and the first fresh read follows the pause
+ *   `pauseAfterRead` gives after the handed read, counted from when it ended.
+ *   So a handed read is a positive verdict or a first sample, never an absence
+ *   and never the sole evidence of a timeout.
+ *
  * Returns an outcome rather than throwing on timeout because the callers
  * disagree about what a timeout IS: a flow wait throws, an assert returns a
  * failing result, a detect probe answers false. Each words it; this decides
@@ -332,7 +371,7 @@ export async function pollTree<T>(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
   predicate: (
     tree: UiNode,
-    round: { deadline: number },
+    round: PollRound,
   ) => Promise<T | PollMiss | typeof Undecided | undefined> | T | PollMiss | typeof Undecided | undefined,
   opts: PollOptions,
 ): Promise<PollOutcome<T>> {
@@ -342,6 +381,19 @@ export async function pollTree<T>(
   let treesRead = 0;
   let undecidedTree: UiNode | undefined;
   let lastTree: UiNode | undefined;
+  const handed = opts.first?.take();
+  if (handed !== undefined) {
+    let verdict: T | PollMiss | typeof Undecided | undefined;
+    try {
+      verdict = await predicate(handed.tree, { deadline, handedOn: true });
+    } catch {
+      verdict = undefined;
+    }
+    if (verdict !== undefined && verdict !== Undecided && !(verdict instanceof PollMiss)) return { timedOut: false, value: verdict };
+    // The fresh read starts as if the handed read had been this poll's previous round: pauseAfterRead of its read,
+    // less what has passed since it ended.
+    await sleep(Math.max(0, pauseAfterRead(opts.pollMs, handed.endedAt - handed.startedAt) - (Date.now() - handed.endedAt)));
+  }
   for (;;) {
     const readStart = Date.now();
     const read = await readTreeOrError(adapter);
