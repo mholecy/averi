@@ -87,8 +87,9 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
 
 /**
  * The iOS adapter's wiring, in one place (review round 2 of D7a): one idb helper per adapter, shared like `exec` by
- * the adapter (which owns and disposes it) and its tree source. It starts on the first call it could serve, so a
- * wda-backed adapter never starts one — at most one live helper per simulator. `deps` reach the tree source: the
+ * the adapter (which owns and disposes it) and its tree source. It starts on the first call it could serve — since D7b
+ * an input too, so a wda-backed adapter starts one as well (its input is idb's): a simulator served under both tree
+ * sources at once runs two (ADR 0032, section "D7b"). `deps` reach the tree source: the
  * server passes none; scripts/perf/baseline.ts passes its lab WebDriverAgent's port and derived data.
  */
 export function iosAdapterFor(udid: string, kind: IosTreeSourceKind, deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {}): IosAdapter {

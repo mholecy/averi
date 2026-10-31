@@ -8,10 +8,14 @@ import { IDB_HELPER_SCRIPT } from './idb-helper-script.js';
 
 /**
  * What the helper answered for one argv: the CLI's exit code and its two streams, as the `idb` process would have
- * printed them — or `died`: the helper went away before it answered (crashed, was killed, or failed to start under the
- * call), and the caller runs the CLI instead. A timeout is neither: it rejects (IdbHelperTimeout).
+ * printed them — or why it did not:
+ * - `died`: the helper went away with the request written to it (crashed, was killed, disposed). It may have run it —
+ *   a read is retried on the CLI, an input is not (D7b, runIdb: the HID event may have reached the simulator).
+ * - `unsent`: writing the request failed (a pipe with no reader — the helper had exited): it never reached the helper,
+ *   and the caller runs the CLI, input or not.
+ * A timeout is neither: it rejects (IdbHelperTimeout).
  */
-export type IdbHelperReply = { kind: 'answer'; code: number; stdout: Buffer; stderr: string } | { kind: 'died' };
+export type IdbHelperReply = { kind: 'answer'; code: number; stdout: Buffer; stderr: string } | { kind: 'died' } | { kind: 'unsent' };
 
 /** The caller's timeout ran out with the request in the helper: the helper was killed, and nothing is retried. */
 export class IdbHelperTimeout extends Error {
@@ -165,7 +169,9 @@ interface Pending {
  *   iOS leg), off (the kill switch, MAX_FAILURES_IN_A_ROW failures or TIMEOUTS_IN_A_ROW timeouts in a row, no
  *   interpreter, disposed). Turning itself off writes one line to the server's stderr, with the tail of the helper's
  *   own.
- * - A helper that dies under a request answers `died`; the caller runs the CLI. The next call starts a new one.
+ * - A helper that dies under a request answers `died` — the caller retries a read on the CLI and reports an input
+ *   (D7b, idb.ts#inputLost); one whose request could not be written answers `unsent`, and the caller runs the CLI. The
+ *   next call starts a new one.
  * - The caller's timeout kills it (SIGKILL) and rejects with IdbHelperTimeout; the caller throws the CLI's timeout.
  * - No orphans: the child and its pipes are unref'd (the server stays free to exit), it exits on stdin's EOF (dispose,
  *   or node's death closing the pipe), dispose() kills it, and one `process.once('exit')` hook for all helpers
@@ -207,6 +213,8 @@ export class IdbHelper {
     }
     if (this.state !== 'ready' || this.child === undefined) return undefined;
     const child = this.child;
+    // Exited, its 'exit' not run yet (D7b): nothing is sent, the CLI serves; gone() restarts it on the next call.
+    if (child.exitCode != null || child.signalCode != null || child.stdin?.writable !== true) return undefined;
     this.state = 'busy';
     const id = this.nextId++;
     return new Promise<IdbHelperReply>((resolve, reject) => {
@@ -218,7 +226,16 @@ export class IdbHelper {
         reject(new IdbHelperTimeout(argv));
       }, opts.timeoutMs);
       this.pending = { id, resolve, reject, timer };
-      (child.stdin as Writable).write(JSON.stringify({ id, argv }) + '\n');
+      // A failed write never reached the helper: `unsent` (D7b — an input then runs on the CLI). The helper is killed,
+      // if it is not gone already; its exit finds no pending request. A write that succeeded only says the line is in
+      // the pipe: a death after it is `died` (gone()), however far the helper got.
+      (child.stdin as Writable).write(JSON.stringify({ id, argv }) + '\n', (err) => {
+        if (err == null || this.pending?.id !== id) return;
+        clearTimeout(timer);
+        this.pending = undefined;
+        this.kill(child);
+        resolve({ kind: 'unsent' });
+      });
     });
   }
 
@@ -305,7 +322,8 @@ export class IdbHelper {
       this.failures = 0;
       this.timeoutsInARow = 0;
       if (this.state === 'busy') this.state = 'ready';
-      p.resolve({ kind: 'answer', code: msg.code ?? 1, stdout: Buffer.from(msg.stdout ?? '', 'utf8'), stderr: msg.stderr ?? '' });
+      // The streams come as base64 of their bytes (idb-helper-script.ts): stdout a Buffer, stderr utf-8 — exec's decoding.
+      p.resolve({ kind: 'answer', code: msg.code ?? 1, stdout: Buffer.from(msg.stdout ?? '', 'base64'), stderr: Buffer.from(msg.stderr ?? '', 'base64').toString('utf8') });
     });
   }
 

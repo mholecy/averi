@@ -80,6 +80,38 @@ describe.skipIf(found === undefined)('the idb helper against the idb CLI (real f
     expect(byHelper.stderr).toMatch(/\[ERROR\] - root - Exception thrown in main\n[\s\S]*ValueError: invalid literal for int/);
   }, 60_000);
 
+  // D7b: every HID argv IosAdapter sends (ios.ts), against a companion that is not there — the same failure, the same
+  // code and stderr as the CLI. A text that starts with a dash is argparse's error in both (exit 2, the usage).
+  it.each([
+    ['ui', 'tap', '1', '1'],
+    ['ui', 'tap', '1', '1', '--duration', '0.8'],
+    ['ui', 'swipe', '200', '700', '200', '176', '--duration', '0.3'],
+    ['ui', 'text', 'a'],
+    ['ui', 'text', 'Jan Nováček 😀'],
+    ['ui', 'text', '-x'],
+    ['ui', 'key', '4'],
+    ['ui', 'key-sequence', '42', '42', '76'],
+    ['ui', 'button', 'HOME'],
+  ].map((a) => [a.join(' '), a]))('fails `%s` with the same code and stderr as the CLI', async (_, args) => {
+    const argv = ['--companion', 'localhost:1', ...args, '--udid', UDID];
+    const [byHelper, byCli] = [await viaHelper(argv), await cli(argv)];
+    expect(byHelper.kind).toBe('answer');
+    if (byHelper.kind !== 'answer') return;
+    expect(byCli.code).not.toBe(0);
+    expect(byHelper.code).toBe(byCli.code);
+    expect(byHelper.stderr).toBe(byCli.stderr);
+    expect(byHelper.stdout.equals(byCli.stdout)).toBe(true);
+  }, 60_000);
+
+  it('prints the same stdout bytes for `ui tap --help`', async () => {
+    const argv = ['ui', 'tap', '--help'];
+    const [byHelper, byCli] = [await viaHelper(argv), await cli(argv)];
+    expect(byHelper).toMatchObject({ kind: 'answer', code: 0 });
+    if (byHelper.kind !== 'answer') return;
+    expect(byHelper.stdout.equals(byCli.stdout)).toBe(true);
+    expect(byHelper.stdout.toString()).toMatch(/^usage: idb ui tap/);
+  }, 60_000);
+
   it('answers 50 requests in a row alike — one event loop per request leaves nothing behind', async () => {
     const argv = ['--companion', 'localhost:1', 'ui', 'describe-all', '--json', '--udid', UDID];
     const byCli = await cli(argv);
@@ -106,6 +138,13 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
     '        return int(argv[1])',
     "    if argv[0] == 'log':",
     "        logging.getLogger().error('through the handler')",
+    '        return 0',
+    // fb-idb's `screenshot -`, `file pull … -` and `video` write bytes to sys.stdout.buffer (D7b, ADR 0032 NIT-2).
+    "    if argv[0] == 'bytes':",
+    "        print('text first, é')",
+    '        sys.stdout.flush()',
+    "        sys.stdout.buffer.write(bytes([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x0a]))",
+    "        sys.stderr.buffer.write(b'raw \\xff\\n')",
     '        return 0',
     '',
   ].join('\n');
@@ -141,6 +180,14 @@ describe.skipIf(found === undefined)('the helper\'s bootstrap — what it import
   it('masks the exit code to a byte, as the process status does', async () => {
     expect(await untilReady(helper, ['code', '259'])).toMatchObject({ kind: 'answer', code: 3 });
     expect(await untilReady(helper, ['code', '-1'])).toMatchObject({ kind: 'answer', code: 255 });
+  }, 30_000);
+
+  it('carries what a command writes to sys.stdout.buffer byte for byte — and stderr\'s bytes decoded as exec decodes them', async () => {
+    const r = await untilReady(helper, ['bytes']);
+    expect(r).toMatchObject({ kind: 'answer', code: 0 });
+    if (r.kind !== 'answer') return;
+    expect(r.stdout.equals(Buffer.concat([Buffer.from('text first, é\n'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x0a])]))).toBe(true);
+    expect(r.stderr).toBe('raw \uFFFD\n'); // exec: stderr.toString('utf8')
   }, 30_000);
 
   it('captures what a logging handler writes into the reply\'s stderr', async () => {

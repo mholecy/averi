@@ -220,4 +220,38 @@ describe('recordHelperCalls — a call the idb helper serves is no process, and 
       else process.env.DEVELOPER_DIR = saved;
     }
   });
+
+  it('labels each HID call the helper serves (D7b) as its CLI call would be, and a death under one as not ok', async () => {
+    const saved = process.env.DEVELOPER_DIR;
+    process.env.DEVELOPER_DIR = '/fake/Developer';
+    const rec = new Recorder(clock().now);
+    const stop = recordHelperCalls(rec);
+    try {
+      const answer = { kind: 'answer' as const, code: 0, stdout: Buffer.alloc(0), stderr: '' };
+      const helper = { run: () => Promise.resolve(answer) } as unknown as IdbHelper;
+      const exec: ExecFn = async () => ({ stdout: Buffer.from('cli'), stderr: '' });
+      const udid = 'D8DACDE6-6352-437C-AA22-86FB06275C3F';
+      rec.begin();
+      for (const args of [['ui', 'tap', '1', '2'], ['ui', 'tap', '1', '2', '--duration', '0.8'], ['ui', 'swipe', '1', '2', '3', '4', '--duration', '0.3'],
+        ['ui', 'text', 'Jan Novak'], ['ui', 'key', '40'], ['ui', 'key-sequence', '42', '42'], ['ui', 'button', 'HOME']]) {
+        await runIdb(exec, udid, args, { helper });
+      }
+      const died = { run: () => Promise.resolve({ kind: 'died' }) } as unknown as IdbHelper;
+      await runIdb(exec, udid, ['ui', 'tap', '1', '2'], { helper: died }).catch(() => undefined);
+      expect(rec.end().calls.map((c) => [c.label, c.via, c.ok])).toEqual([
+        ['idb ui tap', 'helper', true],
+        ['idb ui tap', 'helper', true],
+        ['idb ui swipe', 'helper', true],
+        ['idb ui text', 'helper', true],
+        ['idb ui key', 'helper', true],
+        ['idb ui key-sequence', 'helper', true],
+        ['idb ui button', 'helper', true],
+        ['idb ui tap', 'helper', false],
+      ]);
+    } finally {
+      stop();
+      if (saved === undefined) delete process.env.DEVELOPER_DIR;
+      else process.env.DEVELOPER_DIR = saved;
+    }
+  });
 });
