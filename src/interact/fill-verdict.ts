@@ -63,14 +63,18 @@
  * fill.ts, which hands it the strings and throws what comes back.
  *
  * Its imports are the facts (interact/fill-facts.ts, a leaf: the types and
- * `heldText`) and the mask characters (ui-tree/masked-value.ts): it imports
- * neither fill.ts, which measures, nor fill-text.ts, which reads the verdict
- * — the graph is fill.ts → fill-facts.ts ← fill-verdict.ts ← fill-text.ts,
- * fill.ts → fill-verdict.ts for `differenceOf`, and fill.ts → fill-text.ts
- * for its errors' words.
+ * `heldText`), the mask characters (ui-tree/masked-value.ts) and, since D28,
+ * fill-type.ts's pure `tailOf` — the one definition of a (reformatted)
+ * prefix, so the retype and the error judge a dropped tail alike; fill-type.ts
+ * imports nothing of this module. It imports neither fill.ts, which
+ * measures, nor fill-text.ts, which reads the verdict — the graph is
+ * fill.ts → fill-facts.ts ← fill-verdict.ts ← fill-text.ts, fill.ts →
+ * fill-verdict.ts for `differenceOf`, fill-verdict.ts → fill-type.ts for
+ * `tailOf`, and fill.ts → fill-text.ts for its errors' words.
  */
 
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
+import { tailOf } from './fill-type.js';
 import { hasPoint, heldText, type Difference, type FillResult, type LostWhy, type NearbyInput, type PointedReformat, type Reformat } from './fill-facts.js';
 
 /**
@@ -250,7 +254,10 @@ export interface Mismatch {
  * 3. `length` of a PARTLY masked reading (Android's show-the-last-character
  *    password field, `•••••t`): its content is not comparable either
  *    (hasBullet: • and ● only — `*` and `·` are ordinary text too).
- * 4. Otherwise the HELD text is compared (a named placeholder is no text):
+ * 4. `dropped-tail` (D28): the held text is a strict prefix of what the
+ *    field should hold, grouped by the field (interact/fill-type.ts#tailOf),
+ *    with some of the typing in it — the tail dropped.
+ * 5. Otherwise the HELD text is compared (a named placeholder is no text):
  *    with clear the field must EQUAL the value, so the two are compared
  *    whole; without, it must CONTAIN it, so every run of the new text (what
  *    came after `before`'s held text, when the field still starts with it)
@@ -268,6 +275,9 @@ export function differenceOf(m: Mismatch): Difference {
   if (observed === m.before) return { kind: 'unchanged' };
   if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : m.maskedHeld };
   if (hasBullet(observed)) return { kind: 'length' };
+  // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
+  const tail = tailOf(observed, { value, clear, before: m.before, placeholder: m.placeholder });
+  if (tail?.reformatted !== undefined && tail.landed > 0) return { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed };
   const shown = heldText(observed, m.placeholder);
   const prior = clear ? '' : heldText(m.before, m.placeholder);
   // Without clear the field may hold text from before the typing; only what

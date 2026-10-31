@@ -340,6 +340,13 @@ export interface OtherInput {
  *   ignores input), or the field refused it (already at its maxLength).
  *   Review of this branch: probes D and D2 were told "the app transformed
  *   the input".
+ * - `dropped-tail` (D28): the field holds the first `landed` characters of
+ *   the typing, GROUPED by separators of its own (a reformatting field:
+ *   interact/fill-type.ts#tailOf), and not the last `dropped` — a tail the
+ *   field dropped, not an input it transformed. iOS React Native's rf2 held
+ *   `1 234 567,` for `1234567,89` and was told "as many characters as were
+ *   typed, 9 differing: the app transformed the input" (2026-10-31). An
+ *   EXACT prefix stays `length`, as it always was.
  * - `length`: none of these — the lengths are all that can be said (also
  *   a partly masked reading, `•••••t`, whose content is not comparable).
  * Still a FAILURE in every case: a field that shows `Hello` for `hello` does
@@ -352,4 +359,5 @@ export type Difference =
   | { kind: 'case'; positions: number }
   | { kind: 'same-length'; positions: number }
   | { kind: 'unchanged' }
+  | { kind: 'dropped-tail'; landed: number; dropped: number }
   | { kind: 'length' };
