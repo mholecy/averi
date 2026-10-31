@@ -4,7 +4,8 @@ import pixelmatch from 'pixelmatch';
 import { z } from 'zod';
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollOnVerdict, pollTree, Undecided } from '../ui-tree/read-tree.js';
+import { pollOnVerdict, pollTree, Undecided, type FirstSample } from '../ui-tree/read-tree.js';
+import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
 import { regexSource } from '../util/regex.js';
@@ -218,6 +219,14 @@ export interface VerifierOptions {
    * for the Verifier's life.
    */
   ocr?: OcrEngineChoice;
+  /**
+   * The hand-off of the last read (ui-tree/read-handoff.ts, docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-
+   * or-a-positive-verdict.md) this Verifier shares with whoever ran before it in the same call: the flow engine
+   * passes its own to a flow's `assert:` step, the `verify` tool's leg one hand-off to its engine run and its
+   * Verifier. Unset, the Verifier has one of its own — so the asserts of one `assert` call hand on to each other, and
+   * nothing reaches the next call.
+   */
+  handOff?: ReadHandOff;
 }
 
 interface PollSpec {
@@ -239,6 +248,8 @@ interface PollSpec {
    * not-found (`absent`: "still visible").
    */
   missing?: ElementSpec;
+  /** Where this assert may take a handed-on read as its first round — the element assert only (see `assert`). */
+  first?: FirstSample;
 }
 
 export class Verifier {
@@ -254,11 +265,12 @@ export class Verifier {
    * once per process, shared by every Verifier's engine.
    */
   private ocr: OcrEngineChoice | undefined;
+  private readonly handOff: ReadHandOff;
+  private readonly adapter: DeviceAdapter;
 
-  constructor(
-    private readonly adapter: DeviceAdapter,
-    opts: VerifierOptions = {},
-  ) {
+  constructor(adapter: DeviceAdapter, opts: VerifierOptions = {}) {
+    this.handOff = opts.handOff ?? new ReadHandOff();
+    this.adapter = this.handOff.watch(adapter);
     this.baselineDir = opts.baselineDir ?? DEFAULT_BASELINE_DIR;
     this.pollMs = opts.pollMs ?? 300;
     this.timeoutMs = opts.timeoutMs;
@@ -271,7 +283,19 @@ export class Verifier {
     return results;
   }
 
+  /**
+   * One assert. Every assert is a PRODUCER of the hand-off (ADR 0030): its tree reads are a look at a screen nothing
+   * touched, so the last of them may be handed to the next assert, or — in a flow — to the next tap's first sample.
+   * Only the element assert (present, with or without text/match/error) TAKES one, and only as a positive verdict: a
+   * pass on the handed tree passes; anything else reads fresh (pollTree's handed-round rule). The others never take:
+   * an `absent` assert would turn an old tree's absence into a pass, a rect assert measures a position, and the color,
+   * ocr and screenshot asserts locate pixels in a frame of their own.
+   */
   async assert(spec: AssertSpec): Promise<AssertResult> {
+    return this.handOff.producing(() => this.assertOne(spec));
+  }
+
+  private async assertOne(spec: AssertSpec): Promise<AssertResult> {
     if ('screenshot' in spec) {
       return this.assertScreenshot(spec.screenshot.baseline, spec.screenshot.threshold ?? 0.01);
     }
@@ -339,6 +363,7 @@ export class Verifier {
         description,
         timeoutMs,
         missing: element,
+        first: this.handOff,
         timeoutDetail: ({ detail, readError, lastTree }) => {
           if (readError !== undefined) return notFound(timeoutMs, { readError }, element);
           const base =
@@ -516,6 +541,7 @@ export class Verifier {
     }, {
       timeoutMs,
       pollMs: this.pollMs,
+      ...(spec.first !== undefined && { first: spec.first }),
     });
     if (!outcome.timedOut) return { description, pass: true, detail: outcome.value.detail };
     // The window manager's word on the last tree's window, asked now the poll has given up on a target it never found
