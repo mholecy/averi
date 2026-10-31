@@ -146,16 +146,20 @@ read after a stroke is the settled read) accepted.
    `scroll-rounds.ts#RoundRules.readSettles`): decision 5's two agreeing reads were made for a read that snapshots at
    once — WDA's, measured carrying a flung row 730–800 pt on after it (6f4f0baa, `SETTLE_CONFIRM_READS`). Android's
    does not: AOSP's `DumpCommand#run` (frameworks/base, cmds/uiautomator/cmds/uiautomator/src/com/android/commands/
-   uiautomator/DumpCommand.java, android13-release — the lab AVD's API 33) calls `uiAutomation.waitForIdle(1000,
-   1000 * 10)` before it snapshots: no accessibility event for 1 s, or after 10 s `ERROR: could not get idle state.`
-   and no dump at all (a failed read, read again as any other). A scroll view raises scroll and content-changed events
+   uiautomator/DumpCommand.java, android13-release — the lab AVD's API 33; the aosp-mirror `main` branch has the
+   same call, read 2026-10-31) calls `uiAutomation.waitForIdle(1000, 1000 * 10)` before it snapshots: no
+   accessibility event for 1 s, or after 10 s `ERROR: could not get idle state.` and no dump at all (a failed read,
+   read again as any other). A scroll view raises scroll and content-changed events
    while its content moves, so the dump is taken after a second of stillness; and averi's Android strokes are drags
-   (`dragSpeed`, ≈ 90 px of fling by AOSP's spline). Measured on the lab AVD (2026-10-30; `input swipe`, then a dump at
-   once and a second dump right after, compared): the Compose picker (`form-picker`) 6 of 6 the same at the drag
+   (`dragSpeed`, ≈ 90 px of fling by AOSP's spline). Measured on the lab AVD (2026-10-30; `input swipe`, then a
+   dump at once and a second dump right after, compared): the Compose picker (`form-picker`) 6 of 6 the same at the drag
    speed and 4 of 4 after a 300 ms fling; the Views list of `scroll-collapsing` (a NestedScrollView under a collapsing
    AppBarLayout), whole dumps byte for byte, 6 of 6 at the drag speed, 6 of 6 after a 300 ms fling and 4 of 4 after a
    100 ms one; the Compose carousel of `carousel-in-list`, stroked sideways from (824,497) as the scroll strokes it,
-   5 of 5 at the drag speed and 4 of 4 after a 150 ms fling — the content moved each time (35 of 35). The confirming
+   5 of 5 at the drag speed and 4 of 4 after a 150 ms fling — the content moved each time (35 of 35). Unmeasured: a
+   list that SNAPS after the finger lifts (a pager, a LazyRow with a snap fling behaviour) — the carousel measured is
+   a plain horizontalScroll; a snap animates the offset and raises scroll events as it does, so the dump's wait
+   should cover it too — plausible, not measured. The confirming
    read compared two equal trees, at the price of a 400 ms settle and a ≈ 2.3 s dump on every stop after a stroke,
    and a settle before every read after a stroke.
    So an adapter whose tree read waits for rest says so (`treeReadSettles`, Android only), and the scroll then
@@ -173,10 +177,13 @@ read after a stroke is the settled read) accepted.
    row, 4 swipes): 19 341 ms median [19 298–19 484] at 23fc5f97, 15 084 ms [14 886–15 318] with it (−22 %) — one
    dump (6 → 5, 12.1 → 10.0 s) and five 400 ms settles fewer, the same reply in every run ("fully visible after 4
    swipes"). Live (scripts/truth/live.ts `--groups forms,visibility` on the lab AVD, 185 cases, before and after):
-   184 cases the same verdict; no reply says a stop is unsettled in either run. The rounds a stroke's read now ends
-   sooner show only in the time: scroll-bounded's O and F reach `maxSwipes` (6) where they ran out the 15 s at 5,
-   honest LOUD either way; tabbar-floating's F still the deadline at 4 swipes (15.7 s, was 17.0). The one verdict that
-   moved, `scroll:carousel-in-list.C` ok → MISMATCH (a stop claimed on C with its centre 2 px past the carousel's edge),
+   184 cases the same verdict; no reply says a stop is unsettled in either run. Where the replies differ with the
+   verdict kept: scroll-bounded's O and F reach `maxSwipes` (6) where they ran out the 15 s at 5, honest LOUD either
+   way; tabbar-floating's F still the deadline at 4 swipes (15.7 s, was 17.0); `blank:tabbar-floating.F` ok both
+   times, "visible after 5 swipes — PARTLY UNDER other "more" … 53 % of it shows" before and "fully visible after 6
+   swipes" after — the strokes' carry differs run to run (664–849 px against ≈ 850), from the first stroke on, before
+   any changed code runs. The one verdict that moved, `scroll:carousel-in-list.C` ok → MISMATCH (a stop claimed on C
+   with its centre 2 px past the carousel's edge),
    is the stroke's own spread, not the read: one sideways drag carries the carousel 472–622 px from run to run, before
    and after alike (three more runs each, all ok), the bare drag above left C at x 410–555 with no read moving it,
    and the run that missed rested at 472 (C at x 542, its centre at 1016 past the carousel's 1014) — a dump at rest.

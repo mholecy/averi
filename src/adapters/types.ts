@@ -1093,8 +1093,8 @@ export interface DeviceAdapter {
    * platform's strokes carry on are the platform's; the scroll is platform-agnostic.
    *
    * Set by Android only, for two reasons that hold together: `uiautomator dump` waits for the accessibility
-   * framework to fall idle — 1 s with no accessibility event, up to 10 s, and no snapshot at all when it never does —
-   * before it snapshots (adapters/android.ts#treeReadSettles has the AOSP source and the measurement); and its
+   * framework to fall idle — 1 s with no accessibility event, up to 10 s, and no snapshot at all when it never
+   * does — before it snapshots (adapters/android.ts#treeReadSettles has the AOSP source and the measurement); and its
    * strokes are drags (`dragSpeed`), which leave little to carry on once the finger lifts (≈ 90 px of fling by AOSP's
    * spline at the drag speed, android.ts#dragSpeed) — over within the dump's own second of quiet.
    * Absent on iOS: neither WDA's /source nor idb's describe-all waits for anything, and the read after a WDA fling

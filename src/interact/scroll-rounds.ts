@@ -451,8 +451,9 @@ export type Shortfall =
  * .treeReadSettles — Android; ADR 0021 decision 7) the read after a stroke is the settled read and spends none of
  * them: `uiautomator dump` snapshots only once the app has raised no accessibility event for a second, so the read
  * the confirming read would compare it with is the same tree (measured: a dump right after `input swipe` equalled the
- * next 35 of 35 times, Compose and Views, lists and a carousel, drags and flings — adapters/android.ts#treeReadSettles). The confirming
- * read cost a settle and a 2.3 s dump on every stop after a stroke. What still confirms there: a presented hold
+ * next 35 of 35 times, Compose and Views, lists and a carousel, drags and flings —
+ * adapters/android.ts#treeReadSettles). The confirming read cost a settle and a 2.3 s dump on every stop after a
+ * stroke. What still confirms there: a presented hold
  * (ADR 0018, awaiting the presented screen, not the stroke's motion), a confirming read that failed, and the read
  * after the flush check's probe when the probe moved the target (flush-check.ts keeps its own evidence). Residual:
  * content that goes on moving while it raises no accessibility event is read mid-motion — the exposure a stop at 0
@@ -959,7 +960,11 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       // after a scroll stroke where that read waits for the screen at rest
       // (`RoundRules.readSettles`): it is the settled read — but not the
       // read after a probe, which keeps the flush check's own rule.
-      const settled = s.swipes === 0 || flush.settles || (current === 'settle' && observed.bestUnmoved) || (s.rules.readSettles === true && current === 'stroke' && !afterProbe);
+      const settled =
+        s.swipes === 0 ||
+        flush.settles ||
+        (current === 'settle' && observed.bestUnmoved) ||
+        (s.rules.readSettles === true && current === 'stroke' && !afterProbe);
       // A fling still slowing is waited out, spending none of the budget (SETTLE_CONFIRM_READS): the stop is judged on
       // the read it comes to rest in, not on one it is still carrying the target through. Neither on a cut a probe
       // proved (`FlushSeen.waits`): the next stroke reveals the rest, at once.

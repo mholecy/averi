@@ -669,6 +669,8 @@ describe('round — a fully: true stop flush with its clipping scroll container 
   it('where the read after a stroke is the settled read (readSettles), the read after the PROBE is still confirmed when the probe moved the row; a flush row the read after a scroll stroke found is probed at once, with no confirming read before the probe', () => {
     const SETTLES: Rules = { ...FULLY_ANDROID, readSettles: true };
     expect(play(SETTLES, [formRead(242, 92), formRead(451), formRead(451)]).steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
+    // A confirming read is no read after a stroke: one that finds the row moved again (451 → 460) is confirmed in turn.
+    expect(play(SETTLES, [formRead(242, 92), formRead(451), formRead(460), formRead(460)]).steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'confirm', 'stop']);
     const stroked = play({ ...SETTLES, maxSwipes: 6 }, [formRead(2400), formRead(1846, 132), formRead(1586), formRead(1586)]);
     expect(stroked.steps.map((s) => (s.do === 'stroke' && s.probe === true ? 'probe' : s.do))).toEqual(['stroke', 'probe', 'confirm', 'stop']);
     expect(play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(2400), formRead(1846, 132), formRead(1846, 132), formRead(1586), formRead(1586)]).steps.map((s) => (s.do === 'stroke' && s.probe === true ? 'probe' : s.do))).toEqual(['stroke', 'confirm', 'probe', 'confirm', 'stop']);

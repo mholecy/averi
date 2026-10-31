@@ -26,7 +26,10 @@ export interface ScrollOptions {
   fully?: boolean;
   /** Default DEFAULT_SCROLL_TIMEOUT_MS. The flow engine converts its `timeout: 2s` before calling. */
   timeoutMs?: number;
-  /** Pause before a read that follows a swipe or a confirming step. Default 400. Not spent after a swipe where the adapter's tree read waits for the screen at rest (DeviceAdapter.treeReadSettles). */
+  /**
+   * Pause before a read that follows a swipe or a confirming step. Default 400. Not spent after a swipe where the
+   * adapter's tree read waits for the screen at rest (DeviceAdapter.treeReadSettles).
+   */
   settleMs?: number;
   /**
    * The eyes a `fully visible` claim is confirmed with (ui-tree/eyes.ts; verify/eyes.ts#eyesOn, which the composition
@@ -38,13 +41,17 @@ export interface ScrollOptions {
 
 /**
  * What a scroll needs of a device: the tree, the screen's size,
- * the stroke and how fast it may be drawn (`dragSpeed`), whether its read waits for the screen at rest (`treeReadSettles`), and the keyboard's oracle and advice for the round's reading
+ * the stroke and how fast it may be drawn (`dragSpeed`), whether its read waits for the screen at rest
+ * (`treeReadSettles`), and the keyboard's oracle and advice for the round's reading
  * (`readKeyboard`) — nothing it does not use, so a caller with a narrower
  * adapter can scroll, and a reader sees what a scroll can touch. Every
  * reader the driver hands it to takes a `Pick` of its own
  * (`readTreeOrError`, `screenBox`, `readKeyboard`).
  */
-export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed' | 'treeReadSettles' | 'focusedWindow'>;
+export type ScrollAdapter = Pick<
+  DeviceAdapter,
+  'uiTree' | 'viewport' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'dragSpeed' | 'treeReadSettles' | 'focusedWindow'
+>;
 
 /**
  * Swipe until the element is present AND visibly inside the viewport
@@ -138,10 +145,12 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  * it is. The rounds — strokes and confirming reads alike — number at most
  * 1 + (1 + SETTLE_CONFIRM_READS) × `maxSwipes`, 25 at the defaults, besides a
  * slowing fling's reads (scroll-rounds.ts#SETTLE_CONFIRM_READS), bounded by the
- * deadline; where the tree read waits for the screen at rest (Android,
- * `DeviceAdapter.treeReadSettles`) a stroke's read confirms nothing of its
- * motion, and the confirming reads left are a presented screen's hold, a read
- * that failed and a probe's read that moved — and stop at the deadline whichever comes first. A failed or `fully: true`
+ * deadline — and stop at the bound or the deadline, whichever comes first.
+ * Where the tree read waits for the screen at rest (Android,
+ * `DeviceAdapter.treeReadSettles`) the bound is the same and seldom
+ * approached: a stroke's read confirms nothing of its motion, and the
+ * confirming reads left are a presented screen's hold, a read that failed and
+ * a probe's read that moved. A failed or `fully: true`
  * stop may add one more query, the `unlocated` row's (below). A band that does not change the round is not reported
  * either: the result carries `keyboard: shown` only when the stop was
  * judged under one this round — a clip at its edge, or another of several
@@ -184,7 +193,8 @@ export type ScrollAdapter = Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe' 
  *   `settled: false`. Where the tree read itself waits for the screen at
  *   rest (`DeviceAdapter.treeReadSettles`: uiautomator dump's second of
  *   quiet, ADR 0021 decision 7) the read after the stroke IS that further
- *   read: the stop is reported on it, and no settle pause comes between. A fling that carried the target across the frame —
+ *   read: the stop is reported on it, and no settle pause comes between.
+ *   A fling that carried the target across the frame —
  *   beyond its far edge, after a read saw it short of that — turns the next
  *   stroke round (course.ts#nextStroke), instead of swiping on into
  *   exhausted content (measured: 613 → -357, then five swipes down that
