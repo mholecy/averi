@@ -116,7 +116,8 @@ each key 15/15 (705 ms); chunks of 5 15/15 (784 ms); chunks of 1 15/15 (3.8 s). 
 
 **Decision.** "Not done: chunked or paced typing on iOS" (Consequences) stands for every app but one that has shown a
 drop: after a fill has typed a dropped tail again (decision 1 — the field kept a strict prefix) and the typing then
-LANDED whole, later typings into that SAME app send the first character alone, wait 150 ms, then the rest. Sticky per
+LANDED whole, later typings into that SAME app send the first character alone, wait 150 ms (50 ms since the D25
+amendment below), then the rest. Sticky per
 app for the adapter's life; an app never seen dropping a tail never pays.
 
 - **Who learns, who acts.** The fill reports what it saw, nothing more: `fill-type.ts` calls `FieldIo.reportDroppedTail`
@@ -132,13 +133,14 @@ app for the adapter's life; an app never seen dropping a tail never pays.
 - **A capped field is no drop** (D24 review). A field that keeps a strict prefix for good — its maxLength, an IBAN or
   phone mask trimming the typing — gets its one retype that moves nothing and the mismatch error (Consequences above);
   reported at the retype, one such fill would have marked a native app and made every later typing into it pay the split
-  (~370 ms with the extra idb call). Only the repair proves the drop, so only a typing that landed through a tail retype
-  is reported; one whose retypes moved the field and still missed is not either.
+  (~370 ms with the extra idb call; ~270 ms since D25). Only the repair proves the drop, so only a typing that landed
+  through a tail retype is reported; one whose retypes moved the field and still missed is not either.
 - **The first character is a grapheme** (`Intl.Segmenter`): a surrogate pair or a combining mark is never cut between
   two idb calls. A text of one character is one call, with no wait.
 - **The retype stays the safety net, unchanged.** Decision 1–3 are as they were. The first fill's own tail retypes are
   sent before the report, so they are typed exactly as before (a retyped tail landed whole 45 of 45); a later fill that
-  still drops gets its tail typed again, the tail itself split like every typing into that app (+150 ms).
+  still drops gets its tail typed again, the tail itself split like every typing into that app (+150 ms; +50 ms since
+  D25).
 
 **Residuals.**
 - An RN fill that drops and is still short after both retypes is not reported, so its app is not marked; the next fill
@@ -150,4 +152,41 @@ app for the adapter's life; an app never seen dropping a tail never pays.
   launched app's key — the split paid where it is not needed, or not paid where it is (the retype still catches it).
 - The split is measured on one field of one RN version (0.88's controlled single-line `TextInput`), one 20-character
   text, one simulator; other RN versions and fields, multi-line inputs (which dropped nothing in the 2026-10-19 runs),
-  and loaded hosts are unmeasured. Only the device can say whether 150 ms is enough everywhere.
+  and loaded hosts are unmeasured. Only the device can say whether 150 ms is enough everywhere. (D25, below: the
+  gap is not what makes it land; lowered to 50 ms.)
+
+## Amendment: the gap after the first key is 50 ms, not 150 — and no length is spared the split (2026-10-31, D25)
+
+**Measured** (the owner, outside the sandbox, 2026-10-31; docs/plans/2026-10-30-performance-backlog.md, "### D25
+diag"): D24's split cost short texts that had never dropped (rn-fill `Jan` 2 155 → 2 341 ms: one idb call more and
+150 ms), so D25 asked from what length a burst drops, to split only above it. Raw `idb ui text` (one gRPC client a
+call, as averi's helper), prefixes of `Jan Novak Bratislava` into AveriLabRN's `rn-field` on the lab simulator (iPhone
+17, iOS 27.0), read back from the app's state file; 40 rounds, every combination once a round in a shuffled order. Whole
+of 40:
+
+| typing        | 1     | 2     | 3     | 4     | 5     | 6     | 8     | 12    | 20    |
+|---------------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+| one burst     | 40/40 | 36/40 | 36/40 | 37/40 | 40/40 | 33/40 | 35/40 | 10/40 | 4/40  |
+| split, 150 ms | —     | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 | 40/40 |
+
+A burst lands in ~93 ms (median), the 150 ms split in ~335 ms — +240 ms at every length. A burst already drops at 2
+characters (4 of 40 lost the second key), so the premise is refuted: no length threshold is safe. At 8 and 20
+characters the gap was varied (80 typings a mode): split with 0 ms 80/80 (185 / 238 ms), 50 ms 80/80 (235 / 292 ms),
+100 ms 80/80, 150 ms 80/80; one call with a companion-side 50 ms HID delay between the first key and the rest 80/80
+(148 / 204 ms). The wait is not what lets the controlled input catch up after its first keystroke: the second idb
+call's own round trip is.
+
+**Decision.** No length threshold: every typing of two or more characters into an app seen dropping a tail is split, as
+D24 decided. The wait is lowered: `ios.ts#FIRST_KEY_ALONE_MS` 150 → 50 ms, −100 ms on each such typing. Not 0: averi's
+in-process helper (ADR 0032) may return its first call faster than the script's per-call client did, which shortens the
+round trip that does the work; 50 ms is the margin for that. Everything else in the D24 amendment stands — who learns,
+who acts, the capped field, the grapheme, the retype as the safety net.
+
+**Not done.** The one-call variant (the companion's HID delay between the first key and the rest, ~90 ms less again):
+it needs a new helper verb carrying a delay; not worth one now.
+
+**Residuals.**
+- The 50 ms gap is measured through the script's per-call client, not through averi's helper; the device check of D25
+  (`ios-run.sh --app react-native`, rn-fill and rn-fill-20 on the helper) must confirm it lands whole first time.
+- Everything D24's residuals name is still unmeasured — other RN versions and fields, multi-line inputs, loaded hosts;
+  lengths 1–20 of one text are measured now.

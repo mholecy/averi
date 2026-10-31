@@ -642,7 +642,8 @@ describe('IosAdapter.screenshot — through idb on the idb tree source (D26b)', 
 
 // D24 (2026-10-31, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment): once a fill has seen an app's field
 // drop the tail of a typing (noteDroppedTail), later typings into that app send the first character alone, wait
-// FIRST_KEY_ALONE_MS, then the rest — measured 15/15 whole where one burst kept 5/15.
+// FIRST_KEY_ALONE_MS, then the rest — measured 15/15 whole where one burst kept 5/15. The wait is pinned as a literal
+// (50 ms since the ADR's D25 amendment: the second call's round trip is what lands the rest; 150 ms bought nothing).
 describe('IosAdapter.typeText — the first key alone, on an app seen dropping a tail', () => {
   beforeEach(() => {
     resetSleeps();
@@ -663,15 +664,15 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     return { fn, log: () => [...log.splice(0), ...sleeps.splice(0)] };
   }
 
-  it('after a dropped tail in the launched app, the next typing sends the first character, waits 150 ms, then the rest', async () => {
+  it('after a dropped tail in the launched app, the next typing sends the first character, waits 50 ms, then the rest', async () => {
     const { fn, log } = typingLog();
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     await adapter.launch('com.lab.rn');
     resetSleeps();
     adapter.noteDroppedTail();
     await adapter.typeText('Jan Novak');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an Novak --udid AAAA-1111']);
-    expect(FIRST_KEY_ALONE_MS).toBe(150);
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 50, 'idb ui text an Novak --udid AAAA-1111']);
+    expect(FIRST_KEY_ALONE_MS).toBe(50);
   });
 
   it('sticky per app: another app launched after the drop types in one burst; back in the app that dropped, it splits again', async () => {
@@ -686,7 +687,7 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     await adapter.launch('com.lab.rn');
     resetSleeps();
     await adapter.typeText('Jan');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 50, 'idb ui text an --udid AAAA-1111']);
   });
 
   it('terminating the launched app forgets which app is in front: no split, and nothing learned, until the next launch', async () => {
@@ -698,7 +699,7 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     await adapter.terminate('com.lab.other'); // another bundle: the key stays
     resetSleeps();
     await adapter.typeText('Jan');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 50, 'idb ui text an --udid AAAA-1111']);
     await adapter.terminate('com.lab.rn');
     adapter.noteDroppedTail(); // not known what is in front: nothing to learn
     await adapter.typeText('Jan');
@@ -706,7 +707,7 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     await adapter.launch('com.lab.rn');
     resetSleeps();
     await adapter.typeText('Jan');
-    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 50, 'idb ui text an --udid AAAA-1111']);
   });
 
   it('an app never seen dropping a tail types in one burst, with no wait — native apps never pay', async () => {
@@ -734,7 +735,7 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
     adapter.noteDroppedTail(); // before any launch: the app in front, whichever it is
     await adapter.typeText('👍ok');
-    expect(log()).toEqual(['idb ui text 👍 --udid AAAA-1111', 150, 'idb ui text ok --udid AAAA-1111']);
+    expect(log()).toEqual(['idb ui text 👍 --udid AAAA-1111', 50, 'idb ui text ok --udid AAAA-1111']);
   });
 });
 
@@ -769,7 +770,7 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
       dispose: () => Promise.resolve(),
     };
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source });
-    /** The texts idb typed since the last call, with the 150-ms first-key wait where it fell; then the field emptied. */
+    /** The texts idb typed since the last call, with the 50-ms first-key wait where it fell; then the field emptied. */
     const typed = () => {
       const out = texts.splice(0);
       field.value = null;
@@ -778,7 +779,7 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
     return { adapter, typed };
   }
 
-  it('fill 1 keeps a prefix and gets its tail typed again; fill 2 into the same app: the first character, 150 ms, the rest', async () => {
+  it('fill 1 keeps a prefix and gets its tail typed again; fill 2 into the same app: the first character, 50 ms, the rest', async () => {
     const { adapter, typed } = rnLab(3);
     await adapter.launch('com.lab.rn');
     const first = await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
