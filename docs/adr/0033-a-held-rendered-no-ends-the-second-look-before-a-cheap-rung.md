@@ -4,7 +4,7 @@ Status: accepted 2026-10-31 (performance backlog row D2, docs/plans/2026-10-30-p
 D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-held-no`
 (938a8426, 3ab677f3, 52cb2e41, 04ec6000, d0efd6f0, a883e09a), merged 11cb9064. Amended 2026-10-31 (D27: WDA
 `ActivityIndicator` → `progress`, so a React Native spinner stops a hold — the D27 sub-bullet below; commits 4b5e254f,
-8a4efe1b and the D27 branch's last, on `fix/d27-wda-activity-indicator`).
+8a4efe1b, 021fade0 and 8999f3ff, merged e26fa898).
 
 ## Context
 
