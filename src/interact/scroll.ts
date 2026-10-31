@@ -223,8 +223,9 @@ export type ScrollAdapter = Pick<
  *   D20) — estimated, not measured: a round ≈ 2.2–2.5 s (the stroke, the
  *   400 ms settle, an idb read, overhead) against ~1 s before, so six
  *   rounds ≈ 13–15 s and the 15 s timeout may fire before `maxSwipes`; a
- *   stroke may overrun the timeout by up to 1.5 s (judged before it is
- *   sent); and six paced strokes reach ~3 400 pt, not the ~6 200 pt the
+ *   call may end up to ~2.2 s past the timeout (judged before a stroke:
+ *   the stroke, the settle and the read after it), ~1.2 s more than
+ *   before; and six paced strokes reach ~3 400 pt, not the ~6 200 pt the
  *   fling did (ADR 0018, "idb's presented layer", Decision 4). The
  *   limits are unchanged until the owner's device run.
  * - Exhausted (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST): a

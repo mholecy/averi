@@ -1055,7 +1055,7 @@ strokes now reach ~3 400 pt rather than ~6 200 pt — a target four or more scre
 (`readSettles` false), so a round is ~1.5 s of stroke + the 400 ms settle + an idb read (150–260 ms) + per-call
 overhead ≈ 2.2–2.5 s, against ~1 s before; six rounds ≈ 13–15 s, so the timeout may now fire before `maxSwipes`; a
 flow step's `timeout: 2s` fits about one paced stroke; and since the timeout is judged before a stroke is sent, a
-stroke can overrun it by up to 1.5 s. Both go on the owner's device check with the unmeasured points above.
+call may end up to ~2.2 s past it (the stroke, the settle, the read after), ~1.2 s more than before. Both go on the owner's device check with the unmeasured points above.
 
 ## Amendment: an in-window backdrop (2026-10-22)
 

@@ -321,7 +321,9 @@ export class IosAdapter implements DeviceAdapter {
   /**
    * The stroke's duration defaults to 300 ms, and `scroll_until` passes
    * a feeler's (interact/stroke-plan.ts#FEELER, 600 ms) and, on idb's flat
-   * list, a paced full stroke's (#PACED, 349 pt/s: 524 pt in 1502 ms) —
+   * list, a paced full stroke's (interact/stroke-plan.ts#PACED, 349 pt/s:
+   * 524 pt in 1502 ms; its `minDurationMs` floor is this 300 ms default —
+   * keep the two in step) —
    * on a WDA tree none: this adapter sets no `dragSpeed` (types.ts#DeviceAdapter
    * .dragSpeed; decided 2026-10-09 with the Android one), which would pace
    * WDA's strokes too and switch the motion ledger to drag rules. A
