@@ -376,7 +376,15 @@ export async function fillField(
     // clear's one wipe and retype. Here the outcome becomes the read-back fact
     // or the mismatch error.
     const typed = await typeAndConfirm(
-      { type: startTyping, wipe: (count) => adapter.clearText(count), read: refetchValue, screen: () => lastTree ?? resolvedIn },
+      {
+        type: startTyping,
+        wipe: (count) => adapter.clearText(count),
+        read: refetchValue,
+        screen: () => lastTree ?? resolvedIn,
+        // What the field showed is the adapter's to act on (iOS: the first key alone into this app from now on, D24);
+        // an adapter without the method learns nothing.
+        reportDroppedTail: () => adapter.noteDroppedTail?.(),
+      },
       {
         value,
         clear: clear === true,

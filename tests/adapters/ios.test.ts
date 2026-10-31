@@ -3,11 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
-import { IDB_EMPTY_RETRY_MS, IosAdapter } from '../../src/adapters/ios.js';
+import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter } from '../../src/adapters/ios.js';
 import { IdbEmptyTreeError, IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { fillField } from '../../src/interact/fill.js';
+import { el, FAST, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner, recorded and not waited on: uiTree's settle re-read
 // waits IDB_EMPTY_RETRY_MS, pinned by value rather than spent in real time.
@@ -515,5 +517,187 @@ describe('IosAdapter.screenshot — the file is a PNG or the call fails', () => 
   it('a file that is not a PNG is refused too, quoting its start', async () => {
     const exec = writesScreenshot(Buffer.from('JFIF not a png'));
     await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).screenshot()).rejects.toThrow(/returned 14 bytes starting "JFIF not a png" — not a PNG/);
+  });
+});
+
+// D24 (2026-10-31, docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment): once a fill has seen an app's field
+// drop the tail of a typing (noteDroppedTail), later typings into that app send the first character alone, wait
+// FIRST_KEY_ALONE_MS, then the rest — measured 15/15 whole where one burst kept 5/15.
+describe('IosAdapter.typeText — the first key alone, on an app seen dropping a tail', () => {
+  beforeEach(() => {
+    resetSleeps();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  /** The idb text calls, each after the sleeps recorded before it — the order of keys and waits; `log()` drains it. */
+  function typingLog() {
+    const log: (string | number)[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.startsWith('idb ui text')) {
+        log.push(...sleeps.splice(0), full);
+      }
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    return { fn, log: () => [...log.splice(0), ...sleeps.splice(0)] };
+  }
+
+  it('after a dropped tail in the launched app, the next typing sends the first character, waits 150 ms, then the rest', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
+    await adapter.launch('com.lab.rn');
+    resetSleeps();
+    adapter.noteDroppedTail();
+    await adapter.typeText('Jan Novak');
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an Novak --udid AAAA-1111']);
+    expect(FIRST_KEY_ALONE_MS).toBe(150);
+  });
+
+  it('sticky per app: another app launched after the drop types in one burst; back in the app that dropped, it splits again', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
+    await adapter.launch('com.lab.rn');
+    adapter.noteDroppedTail();
+    await adapter.launch('com.lab.native');
+    resetSleeps();
+    await adapter.typeText('Jan');
+    expect(log()).toEqual(['idb ui text Jan --udid AAAA-1111']);
+    await adapter.launch('com.lab.rn');
+    resetSleeps();
+    await adapter.typeText('Jan');
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
+  });
+
+  it('terminating the launched app forgets which app is in front: no split, and nothing learned, until the next launch', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
+    adapter.noteDroppedTail(); // the app in front before any launch dropped a tail
+    await adapter.launch('com.lab.rn');
+    adapter.noteDroppedTail();
+    await adapter.terminate('com.lab.other'); // another bundle: the key stays
+    resetSleeps();
+    await adapter.typeText('Jan');
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
+    await adapter.terminate('com.lab.rn');
+    adapter.noteDroppedTail(); // not known what is in front: nothing to learn
+    await adapter.typeText('Jan');
+    expect(log()).toEqual(['idb ui text Jan --udid AAAA-1111']);
+    await adapter.launch('com.lab.rn');
+    resetSleeps();
+    await adapter.typeText('Jan');
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 150, 'idb ui text an --udid AAAA-1111']);
+  });
+
+  it('an app never seen dropping a tail types in one burst, with no wait — native apps never pay', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
+    await adapter.launch('com.lab.rn');
+    resetSleeps();
+    await adapter.typeText('Jan Novak');
+    expect(log()).toEqual(['idb ui text Jan Novak --udid AAAA-1111']);
+  });
+
+  it('a one-character text has no rest: one call, no wait, even in an app that dropped', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
+    await adapter.launch('com.lab.rn');
+    adapter.noteDroppedTail();
+    resetSleeps();
+    await adapter.typeText('J');
+    await adapter.typeText('👍');
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', 'idb ui text 👍 --udid AAAA-1111']);
+  });
+
+  it('the first key is a whole character: a surrogate pair is never cut between the two calls', async () => {
+    const { fn, log } = typingLog();
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: NO_TREE });
+    adapter.noteDroppedTail(); // before any launch: the app in front, whichever it is
+    await adapter.typeText('👍ok');
+    expect(log()).toEqual(['idb ui text 👍 --udid AAAA-1111', 150, 'idb ui text ok --udid AAAA-1111']);
+  });
+});
+
+// D24 end to end: interact/fill.ts reports what the field showed, the adapter decides how it types — through the real
+// IosAdapter, idb faked: an RN-like field that keeps only the first `keep` characters of each `idb ui text` burst.
+describe('IosAdapter + fillField — a dropped tail on one fill makes the next fill into that app send its first key alone', () => {
+  beforeEach(() => {
+    resetSleeps();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  /** The lab's rn-field on a fake simulator: each `idb ui text` lands the first keeps.shift() characters (all, when none is left). */
+  function rnLab(...keeps: number[]) {
+    resetLayout();
+    const field = el({ role: 'textfield', identifier: 'rn-field', value: null });
+    const tree = screen(field);
+    const texts: (string | number)[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.startsWith('idb ui text ')) {
+        const text = args[args.indexOf('text') + 1]!;
+        texts.push(...sleeps.splice(0).filter((ms) => ms === FIRST_KEY_ALONE_MS), text);
+        field.value = (field.value ?? '') + text.slice(0, keeps.shift() ?? text.length);
+      }
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const source: IosTreeSource = {
+      kind: 'idb',
+      read: async () => structuredClone(tree),
+      applicationLabel: async () => ({ kind: 'declined' }),
+      dispose: () => Promise.resolve(),
+    };
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source });
+    /** The texts idb typed since the last call, with the 150-ms first-key wait where it fell; then the field emptied. */
+    const typed = () => {
+      const out = texts.splice(0);
+      field.value = null;
+      return out;
+    };
+    return { adapter, typed };
+  }
+
+  it('fill 1 keeps a prefix and gets its tail typed again; fill 2 into the same app: the first character, 150 ms, the rest', async () => {
+    const { adapter, typed } = rnLab(3);
+    await adapter.launch('com.lab.rn');
+    const first = await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
+    expect(first.retyped).toEqual([6]);
+    expect(typed()).toEqual(['Jan Novak', ' Novak']); // fill 1 as before D24: one burst, then the tail
+    const second = await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
+    expect(second.retyped).toBeUndefined();
+    expect(typed()).toEqual(['J', FIRST_KEY_ALONE_MS, 'an Novak']);
+  });
+
+  it('a split fill that still drops still gets its tail typed again — ADR 0023\'s retype stays the safety net', async () => {
+    const { adapter, typed } = rnLab(3, 6, 1, 4); // fill 1: `Jan`, its tail whole; fill 2: `J`, then 4 of the rest
+    await adapter.launch('com.lab.rn');
+    await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
+    typed();
+    const second = await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
+    expect(second.retyped).toEqual([4]);
+    // The split's rest kept 4 of 8 (`an N`): the tail `ovak` typed again — itself split, as every typing into this app.
+    expect(typed()).toEqual(['J', FIRST_KEY_ALONE_MS, 'an Novak', 'o', FIRST_KEY_ALONE_MS, 'vak']);
+  });
+
+  // D24 review: a native field capped at 5 characters keeps `Jan N` for good; its fill fails after one retype that
+  // moved nothing, and the app is not marked — the next fill is one burst.
+  it('a capped field\'s failed fill marks nothing: the next fill into that app is one burst', async () => {
+    const { adapter, typed } = rnLab(5, 0);
+    await adapter.launch('com.lab.native');
+    await expect(fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST)).rejects.toThrow(/but the field shows 5/);
+    expect(typed()).toEqual(['Jan Novak', 'ovak']);
+    await fillField(adapter, { id: 'rn-field' }, 'Jan', FAST);
+    expect(typed()).toEqual(['Jan']);
+  });
+
+  it('a fill into another app after the drop types in one burst', async () => {
+    const { adapter, typed } = rnLab(3);
+    await adapter.launch('com.lab.rn');
+    await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
+    typed();
+    await adapter.launch('com.lab.native');
+    await fillField(adapter, { id: 'rn-field' }, 'Jan Novak', FAST);
+    expect(typed()).toEqual(['Jan Novak']);
   });
 });

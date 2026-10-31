@@ -52,6 +52,8 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
   const other = node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: opts.otherHeld ?? null });
   const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field, other] });
   const typed: string[] = [];
+  /** Each `reportDroppedTail`, as the count of typings sent before it (D24). */
+  const dropped: number[] = [];
   let pending = ''; // `grows`: one more character of the typing arrives per read
   const snapshot = (): UiNode => structuredClone(tree);
   let last: UiNode | undefined = snapshot();
@@ -76,6 +78,7 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
       return field.value ?? '';
     },
     screen: () => last,
+    reportDroppedTail: () => dropped.push(typed.length),
   };
   const intent: TypingIntent = {
     value: 'Jan Novak',
@@ -89,18 +92,19 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
     field,
     delivery: 'on-return',
   };
-  return { io, intent, typed, field };
+  return { io, intent, typed, field, dropped };
 }
 
 describe('typeAndConfirm — type, confirm, and send again only what the field provably dropped', () => {
   it('a landed typing sends nothing again', async () => {
-    const { io, intent, typed } = scripted();
+    const { io, intent, typed, dropped } = scripted();
     expect(await typeAndConfirm(io, intent)).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });
     expect(typed).toEqual(['Jan Novak']);
+    expect(dropped).toEqual([]);
   });
 
   it('a dropped tail is typed again, and every retype is in `again`, in order', async () => {
-    const { io, intent, typed } = scripted({ keep: [3, 3] });
+    const { io, intent, typed, dropped } = scripted({ keep: [3, 3] });
     expect(await typeAndConfirm(io, intent)).toEqual({
       kind: 'landed',
       observed: 'Jan Novak',
@@ -110,6 +114,24 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
       ],
     });
     expect(typed).toEqual(['Jan Novak', ' Novak', 'vak']);
+    // D24: the drop is reported once, after the typing landed whole through a tail typed again — the adapter's to act on
+    // in later typings.
+    expect(dropped).toEqual([3]);
+  });
+
+  // D24 review: a capped or trimming field (maxLength, an IBAN or phone mask) keeps a strict prefix for good. Its one
+  // retype changes nothing, the fill fails (ADR 0023), and that is no drop: the app must not be marked for it.
+  it('a capped field (its retype moves nothing) is not reported as a drop', async () => {
+    const { io, intent, typed, dropped } = scripted({ keep: [5, 0] });
+    expect((await typeAndConfirm(io, intent)).kind).toBe('missed');
+    expect(typed).toEqual(['Jan Novak', 'ovak']);
+    expect(dropped).toEqual([]);
+  });
+
+  it('a tail retype that moved the field but never landed it whole is not reported either', async () => {
+    const { io, intent, dropped } = scripted({ keep: [3, 3, 0] });
+    expect((await typeAndConfirm(io, intent)).kind).toBe('missed');
+    expect(dropped).toEqual([]);
   });
 
   it(`at most ${MAX_TAIL_RETYPES} tails; then, with clear, the one wipe and retype — still in the order sent`, async () => {

@@ -1564,6 +1564,41 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     );
   });
 
+  // D24 (docs/adr/0023-fill-types-a-dropped-tail-again.md, amendment 2026-10-31): the fill tells the adapter what it
+  // saw — once, after the first tail typed again — and the adapter decides how it types into that app from then on.
+  it('tells the adapter the field dropped a tail (noteDroppedTail), once, when the typing landed through the tails typed again', async () => {
+    const fake = formFake(null);
+    dropping(fake, 3, 3);
+    await fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST);
+    expect(fake.typed).toEqual(['Jan Novak', ' Novak', 'vak']);
+    expect(fake.droppedTails).toEqual([3]);
+  });
+
+  it('a capped field (maxLength: the retype moves nothing, the fill fails) tells the adapter nothing', async () => {
+    const fake = formFake(null);
+    dropping(fake, 5, 0);
+    await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow(/but the field shows 5/);
+    expect(fake.typed).toEqual(['Jan Novak', 'ovak']);
+    expect(fake.droppedTails).toEqual([]);
+  });
+
+  it('a fill that lands whole tells the adapter nothing', async () => {
+    const fake = formFake(null);
+    await fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST);
+    expect(fake.droppedTails).toEqual([]);
+  });
+
+  it('a clear fill wiped and retyped whole (no prefix kept) tells the adapter nothing: only a dropped tail is reported', async () => {
+    const fake = formFake('9.99');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = fake.typed.length === 1 ? 'x' : text;
+    };
+    await fillField(fake, { id: 'amount_input' }, '12.34', { ...FAST, clear: true });
+    expect(fake.typed).toEqual(['12.34', '12.34']);
+    expect(fake.droppedTails).toEqual([]);
+  });
+
   it('a retyped tail that loses its own end is typed again once more — never past the bound', async () => {
     const fake = formFake(null);
     dropping(fake, 3, 3);
@@ -1638,6 +1673,7 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     dropping(fake, 3);
     await expect(fillField(fake, { id: 'amount_input' }, 'Jan Novak', FAST)).rejects.toThrow('fill: typed 9 characters but the field shows 3 (content withheld from this error)');
     expect(fake.typed).toEqual(['Jan Novak']);
+    expect(fake.droppedTails).toEqual([]); // nothing learned: Android's typing stays as it is (D24)
   });
 
   /** Two auto-advancing one-digit code boxes and a note under them: a box that has its digit moves the focus on. */
