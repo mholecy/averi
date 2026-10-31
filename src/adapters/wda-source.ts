@@ -198,6 +198,16 @@ interface CellPlace {
   in: Rect | undefined;
 }
 
+/**
+ * WDA's input types and whether each masks what it holds (UiNode.secure); any other type says nothing. A Map, not an
+ * object literal: a type named like a prototype key (`constructor`) must find nothing.
+ */
+const SECURE_BY_TYPE: ReadonlyMap<string, boolean> = new Map([
+  ['SecureTextField', true],
+  ['TextField', false],
+  ['TextView', false],
+]);
+
 /** WDA's scroll-view types (`parkedIn`): the ones the role map makes `scrollable`. */
 const SCROLL_TYPES: ReadonlySet<string> = new Set(['Table', 'CollectionView', 'ScrollView']);
 
@@ -213,6 +223,9 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
   );
   if (hidden) node.hidden = true;
   if (/\bHeader\b/.test(el.traits ?? '')) node.heading = true;
+  // WDA names a secure field by its type (types.ts#UiNode.secure): the lab's PIN is a `SecureTextField`.
+  const secure = el.type === undefined ? undefined : SECURE_BY_TYPE.get(el.type);
+  if (secure !== undefined) node.secure = secure;
   // A table scrolls vertically only (UITableView); a `ScrollView` or `CollectionView` may scroll either way, and its
   // type says nothing — its content's extent may (types.ts#UiNode.scrollAxis, ui-tree/scroll-containers.ts#scrollAxis).
   if (el.type === 'Table') node.scrollAxis = 'vertical';

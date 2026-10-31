@@ -1389,6 +1389,8 @@ interface RawNode {
   clickable?: string;
   /** "true" on a node that scrolls now — its descendants' bounds are clipped to it (types.ts#UiNode.clipsDescendants). */
   scrollable?: string;
+  /** "true"/"false" on every node of the API 33 dump (measured: the lab's form PIN "true") — read on text inputs only (types.ts#UiNode.secure). */
+  password?: string;
   bounds?: string;
   node?: RawNode | RawNode[];
 }
@@ -1611,6 +1613,9 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
   // docs/bugs/2026-10-09-android-clear-reads-edittext-hint-as-content.md
   const hint = isTextInput ? emptyToNull(raw.hint) : null;
   if (hint !== null) node.placeholder = hint;
+  // Masked or not, as the dump says it (types.ts#UiNode.secure) — on a text input only: what a container or a label
+  // says of itself is not what the field in it does, and a missing attribute stays unknown.
+  if (isTextInput && (raw.password === 'true' || raw.password === 'false')) node.secure = raw.password === 'true';
   if (whole !== undefined) around.grown.set(node, whole);
   return node;
 }

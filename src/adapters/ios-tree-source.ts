@@ -109,6 +109,8 @@ interface IdbElement {
   frame?: Rect;
   /** idb's accessibility traits (`["StaticText", "Header", "Scrollable"]`): read for `Header` alone (UiNode.heading). */
   traits?: string[] | null;
+  /** idb's AX subrole — `AXSecureTextField` on a secure field (UiNode.secure), null elsewhere in the lab's captures. */
+  subrole?: string | null;
 }
 
 /**
@@ -150,6 +152,8 @@ function idbTree(elements: IdbElement[]): UiNode {
       [],
     );
     if (el.traits?.includes('Header') === true) node.heading = true;
+    const secure = idbSecure(el);
+    if (secure !== undefined) node.secure = secure;
     return node;
   });
   attachFieldErrors(children);
@@ -162,6 +166,19 @@ function idbTree(elements: IdbElement[]): UiNode {
     children,
     ...(listsPresentedLayer(elements) && { presentation: 'screen' as const }),
   });
+}
+
+/**
+ * Whether idb marks the element a SECURE field (types.ts#UiNode.secure). idb types the lab's PIN `TextField`, like
+ * the plain fields (tests/fixtures/truth/ios-iphone17-ios27/form-basic.idb.json); what tells it apart is its traits
+ * (`SecureTextField`) and its subrole (`AXSecureTextField`). On a `TextField` or `TextView` only: either says true;
+ * one whose traits were printed and that says neither is plain; without traits — an idb that did not print them —
+ * nothing is known, and nothing is of any other type (an input-like `other`, a search field, stays unknown).
+ */
+function idbSecure(el: IdbElement): boolean | undefined {
+  if (el.type !== 'TextField' && el.type !== 'TextView') return undefined;
+  if (el.traits?.includes('SecureTextField') === true || el.subrole === 'AXSecureTextField') return true;
+  return Array.isArray(el.traits) ? false : undefined;
 }
 
 /** The identifier UIKit gives the dimming view it lays under a sheet or a popover presented over a screen (idb's `AXUniqueId`, WDA's `name`). */
