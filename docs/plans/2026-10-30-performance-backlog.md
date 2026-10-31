@@ -443,6 +443,22 @@ Review round 1: a derived side no lookup resolved no longer passes as equal to a
 `rev-list HEAD` throws rather than read as an empty history (64 MB buffer); the throwaway repo is built by a throwing
 git; a name with a newline resolves to none.
 
+### D14 — golden and `framesOnly`
+Golden is not blind to it, only to its depth. Of four mutations of `framesOnly` itself, golden changes 3 checks for
+"always true" and 23 each for "always false" and `some`, but 0 for "no recursion" (children only); the unit suite fails
+all four (10–30 tests). Why: in the truth corpus no node where the deep and the shallow answer differ decides an
+outcome. There are many (nodes whose children are empty frames but a grandchild is content), but each is a window,
+sheet or form wrapper `holdsWhole` already excuses, or a cell whose content is itself judged and covers at the same
+place; the corpus's 4 deep≠shallow toolbars are in repo fixtures, not truth captures. Not dead code: the shallow
+mutation fails unit tests through the structural row and through `itemless`. Mutating each call site alone
+(true / false / shallow) found the real gap: draw-order's `scrollIndicator` row with `framesOnly` → `true` or shallow
+failed nothing, unit or golden — the row's `framesOnly` matters only for a LABELLED or valued container (an unlabelled
+one is already decided the same way by `structural`), and no fixture has a labelled indicator with content. A
+synthetic truth capture would be fabricated evidence (ADR 0020); a real one needs a lab cell and a device. So a unit
+test in `tests/ui-tree/draw-order.test.ts` pins it: a labelled indicator of empty frames at any depth is excused; one
+with a drawable descendant as a child, under a frame, or three frames down covers as itself. Every one of the 4
+function and 9 call-site mutations now fails at least one test; golden unchanged (0 changed).
+
 ### D1–D13
 Sources and estimates are in the artifact. Before each: measure on D0's scenario; after: the same run, golden and
 calibrate as the loop asks. D2 and D10 change documented policy (engine.ts:732's rule; ADR 0021) — amend the ADR in
