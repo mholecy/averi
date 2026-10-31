@@ -178,7 +178,9 @@ const passedOver = (skipped: readonly string[]): string => (skipped.length === 0
  * THE wrap for a look that failed after a dismissal move — the one owner of "a read after the dismissal failed", for
  * both protocols that move: the guard's confirming looks (`Hiding.failed`, the target not coming back or coming back
  * ambiguous) and the post-fill dismissal's confirming reads (a tree read that throws — WDA or idb gone between the move
- * and the read). Both are wrapped: a read's own error left raw is not a KeyboardGuardError, so the flow engine's
+ * and the read). Both are wrapped — except a PersistentReadError (adapters/types.ts, D21), which the dismissal's read
+ * passes through as it came, so the read loops and the flow engine's isTerminal see its class: a read's own error
+ * left raw is not a KeyboardGuardError, so the flow engine's
  * `tracingGuardFailure` would log no `⚠ fill` line and the `✗` line would never say a move had been sent. `did` is the
  * moves as both sentences name them (`tapping <strategy> at (x,y) to hide the soft keyboard …`); `traceLine` is the
  * caller's, since each protocol's trace sentence starts from its own fact. The message is `failedLookMessage`'s shape
