@@ -227,6 +227,17 @@ export interface VerifierOptions {
    * nothing reaches the next call.
    */
   handOff?: ReadHandOff;
+  /**
+   * What an assert does on a tree read no wait cures (adapters/types.ts#PersistentReadError, D21 — idb's wedged
+   * accessibility service). `throw` (the default, safe): the error propagates as it came, after the assert's one
+   * read — so a flow's `assert:` step stops the flow on the named error, which the engine's `isTerminal` holds
+   * (`optional:` does not skip it, the ladder neither escalates past it nor salvages it). `fail`: the assert fails,
+   * its message the detail, and the next assert runs — asked only by the two callers whose reply is the assert
+   * results themselves: a `verify` leg (run/verify.ts — a throw would lose its frame, screenshot and health line) and
+   * the MCP `assert` tool (run/commands.ts#runAsserts). D21 review round 2: a failing result everywhere turned a
+   * flow's wedged assert into a plain "flow asserts failed" that `optional:` skipped and the ladder escalated past.
+   */
+  persistentRead?: 'throw' | 'fail';
 }
 
 interface PollSpec {
@@ -272,8 +283,11 @@ export class Verifier {
   private readonly handOff: ReadHandOff;
   /** The device, as `handOff` watches it: what an action through it would invalidate is never handed on. */
   private readonly adapter: DeviceAdapter;
+  /** VerifierOptions.persistentRead: whether a read no wait cures fails the assert or is thrown. */
+  private readonly persistentRead: 'throw' | 'fail';
 
   constructor(adapter: DeviceAdapter, opts: VerifierOptions = {}) {
+    this.persistentRead = opts.persistentRead ?? 'throw';
     ({ handOff: this.handOff, adapter: this.adapter } = ReadHandOff.watching(adapter, opts.handOff));
     this.baselineDir = opts.baselineDir ?? DEFAULT_BASELINE_DIR;
     this.pollMs = opts.pollMs ?? 300;
@@ -461,7 +475,7 @@ export class Verifier {
       unchecked: 'rendered text',
       glyphs: true,
       measure: (input) => measureOcrAssert(engine, input, expectation),
-    });
+    }).catch((e: unknown) => this.failedOnPersistentRead(description, e));
     return { description, ...result };
   }
 
@@ -491,8 +505,18 @@ export class Verifier {
       unchecked: 'color',
       reads: colorSampleRect,
       measure: ({ rect, measured }) => evaluateColorAssert(rect, expectation, measured),
-    });
+    }).catch((e: unknown) => this.failedOnPersistentRead(description, e));
     return { description, ...result };
+  }
+
+  /**
+   * A poll's error, as this Verifier answers it (VerifierOptions.persistentRead): a PersistentReadError (D21 — a read
+   * no wait cures, which pollTree throws at once) is the assert's failing result under `fail`, its message the detail;
+   * under `throw`, and for any other error, it propagates as it came.
+   */
+  private failedOnPersistentRead(description: string, e: unknown): AssertResult {
+    if (this.persistentRead === 'fail' && e instanceof PersistentReadError) return { description, pass: false, detail: e.message };
+    throw e;
   }
 
   /**
@@ -550,11 +574,7 @@ export class Verifier {
         ...(spec.first !== undefined && { first: spec.first }),
       });
     } catch (e) {
-      // A read no wait cures (adapters/types.ts#PersistentReadError, D21) ends the poll at once (pollTree) and fails
-      // THIS assert with its message — it does not throw: a verify leg would lose its frame, screenshot and health
-      // line with the rejected assert (run/verify.ts), and the asserts after it each fail after their own one read.
-      if (e instanceof PersistentReadError) return { description, pass: false, detail: e.message };
-      throw e;
+      return this.failedOnPersistentRead(description, e);
     }
     if (!outcome.timedOut) return { description, pass: true, detail: outcome.value.detail };
     // The window manager's word on the last tree's window, asked now the poll has given up on a target it never found

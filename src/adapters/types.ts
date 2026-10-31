@@ -1020,9 +1020,13 @@ export interface DeviceAdapter {
    * A failed read throws; the read loops above treat that as a miss and read
    * again (ui-tree/read-tree.ts#readTreeOrError) — except a PersistentReadError
    * (above, D21: a failure no wait cures, idb's wedged accessibility service),
-   * on which every read loop stops at once and which the flow engine treats as
-   * terminal. An adapter throws one only for a state that a re-read, a relaunch
-   * or a re-run reach flow cannot end.
+   * on which every read loop stops at once, throwing it on, and which the flow
+   * engine treats as terminal — a flow's `assert:` step included. The one
+   * place it becomes a value is an assert whose caller asked for that
+   * (VerifierOptions.persistentRead: 'fail' — a `verify` leg and the MCP
+   * `assert` tool only): a failing result with its message. An adapter throws
+   * one only for a state that a re-read, a relaunch or a re-run reach flow
+   * cannot end.
    */
   uiTree(opts?: { settle?: boolean }): Promise<UiNode>;
 

@@ -1,4 +1,4 @@
-import { PersistentReadError, type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
+import { type DeviceAdapter, type Rect, type UiNode } from '../adapters/types.js';
 import type { ElementSpec } from '../ui-tree/element-spec.js';
 import { coverText, isUntold, nodeText, rectText, sameRect } from '../ui-tree/geometry.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
@@ -854,9 +854,8 @@ export async function pollPixels(
     // pollTree propagates the predicate's own errors; only a final miss — a
     // refused capture, or a verdict `measure` marked final — is ours to turn into the verdict.
     if (e instanceof FinalMiss) return e;
-    // A read no wait cures (adapters/types.ts#PersistentReadError, D21) is a final miss too: the assert fails with
-    // its message rather than throwing, as Verifier.poll's tree asserts do (a verify leg keeps its frame).
-    if (e instanceof PersistentReadError) return new FinalMiss(e.message);
+    // Anything else propagates — a read no wait cures (adapters/types.ts#PersistentReadError, D21) included: whether
+    // it fails the assert or is thrown is the Verifier's (VerifierOptions.persistentRead), not the round's.
     throw e;
   });
   if (outcome instanceof FinalMiss) return { pass: false, detail: outcome.detail };

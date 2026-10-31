@@ -903,6 +903,23 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(result.text).toContain('app.ios.treeSource: wda');
   });
 
+  // D21 review round 2: the `assert` tool is one of the two callers that ask for a FAILING result on a read no wait
+  // cures (persistentRead: 'fail'): the reply is the assert's FAIL line with the error's message, after one read.
+  it('assert: idb\'s wedged accessibility service fails the assert after one read — a result, not an error', async () => {
+    const wedged = new FakeAdapter({}, 'none');
+    let reads = 0;
+    wedged.uiTree = async () => {
+      reads++;
+      throw new IdbNoFrontmostError('AAAA-1111');
+    };
+    const { call } = await connect({ ios: wedged, android: home() });
+    const result = await call('assert', { platform: 'ios', asserts: [{ element: { id: 'login_submit' } }], configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(reads).toBe(1);
+    expect(result.text).toContain('FAIL');
+    expect(result.text).toContain("idb cannot read the UI tree: the simulator's accessibility service named no frontmost application");
+  });
+
   // 2026-10-08 (docs/plans/2026-10-08-round3-phase2-device-check.md, finding
   // 5): ui_snapshot is the one-shot read that asks the adapter to wait out a
   // launch transient — Android's null root, iOS idb's empty tree — so it must

@@ -434,7 +434,24 @@ states:
   home_two:
     detect: { element: { id: nav.tab_transactions } }
     reach: [relaunch, login]
+  home_assert_mid:
+    detect: { element: { id: nav.tab_transactions } }
+    reach: [relaunch_and_assert, login]
+  home_assert_last:
+    detect: { element: { id: nav.tab_transactions } }
+    reach: [relaunch, relaunch_and_assert]
 flows:
+  optional_assert_then_relaunch:
+    steps:
+      - optional:
+          - assert:
+              - { element: { id: promo_banner } }
+      - launch: { clearState: false }
+  relaunch_and_assert:
+    steps:
+      - launch: { clearState: false }
+      - assert:
+          - { element: { text: "Enter your PIN to log in" } }
   skip_then_relaunch:
     steps:
       - optional:
@@ -475,6 +492,39 @@ flows:
     expect(error.message).toContain('named no frontmost application');
     expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
     expect(error.trace.some((t) => t.detail?.includes('escalating to') === true)).toBe(false);
+  });
+
+  // D21 review round 2: an `assert:` step is a flow step like a wait — the Verifier the engine builds keeps the
+  // default (persistentRead: 'throw'), so the named error, not a plain "flow asserts failed", reaches isTerminal.
+  it('`optional: - assert:` does not skip it: the flow stops there, the step after it never runs', async () => {
+    const { fake } = wedgedIdb(always);
+    const error = await failure(FlowEngine.run(D21, fake, SLOW, { flow: 'optional_assert_then_relaunch' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toEqual([]);
+  });
+
+  it('a middle rung ending in `assert:` is not escalated past', async () => {
+    const { fake } = wedgedIdb((read) => read >= 1);
+    const error = await failure(FlowEngine.run(D21, fake, SLOW, { state: 'home_assert_mid' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toHaveLength(1);
+    expect(error.trace.some((t) => t.detail?.includes('escalating to') === true)).toBe(false);
+  });
+
+  it('a last rung ending in `assert:` gets no salvage and no recovery pass: one launch per rung that ran', async () => {
+    // home_assert_last: [relaunch, relaunch_and_assert]. Every read reads the PIN screen until the last rung's launch.
+    let wedgeFrom = Infinity;
+    const { fake, reads } = wedgedIdb((read) => read >= wedgeFrom);
+    const launch = fake.launch.bind(fake);
+    fake.launch = async (appId, opts) => {
+      const outcome = await launch(appId, opts);
+      if (fake.launches.length === 2) wedgeFrom = reads();
+      return outcome;
+    };
+    const error = await failure(FlowEngine.run(D21, fake, FAST, { state: 'home_assert_last' }));
+    expect(error.message).toContain('named no frontmost application');
+    expect(fake.launches).toHaveLength(2);
+    expect(actions(error.trace).some((a) => a.startsWith('⚠ salvage') || a.startsWith('↻ recovery'))).toBe(false);
   });
 
   it('the final wait\'s failure on it re-runs no rung (no recovery pass)', async () => {
