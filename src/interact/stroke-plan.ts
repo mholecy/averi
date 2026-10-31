@@ -101,7 +101,8 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * (`PlannedStroke.durationMs`, which the driver sends instead of the adapter's own), so a sheet the tree does not list
  * springs back (docs/adr/0018-a-later-stacked-screen-layer-covers-the-screen-beneath.md, "idb's presented layer",
  * Decision 3, with the measurement). When to ask for one is the round's (scroll-rounds.ts#CallEvidence, `unfelt`);
- * how long and how slow a feeler is, the plan's.
+ * how long and how slow a feeler is, the plan's. A PACED stroke (`PACED`) the same way: a full stroke on idb's flat
+ * list, given the time its travel takes at 349 pt/s (ADR 0018, "idb's presented layer", Decision 4; D20).
  *
  * Pure: no adapter, no clock, no I/O.
  */

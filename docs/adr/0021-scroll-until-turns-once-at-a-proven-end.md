@@ -293,7 +293,9 @@ read after a stroke is the settled read) accepted (1a51687b, cf5c0ac0; merged 4c
       clause's first wording, at `bd1c1107`; at `770344ae` its final one, above, the same 4 of 5), no unchanged claim; `turn:scroll-bounded.F` unchanged (2 unmoved, `upper` listing W and P).
 - **idb**: its flat list lists no scroll view (lab note LE2): no proof, no window; unchanged. The turn's stroke under
   idb goes over the region the target's motion showed once two reads saw it carried, when it carries content back the other way from how it was first seen moving (2026-10-21, lab note LV3: ADR
-  0010's residual 6, refined) — the turn itself is decided as before.
+  0010's residual 6, refined) — the turn itself is decided as before. Its full strokes are paced at 349 pt/s since
+  2026-10-31 (D20; ADR 0018, "idb's presented layer", Decision 4): a 300 ms stroke flung a SwiftUI List past every row
+  the read before listed; the turn and the stop are unchanged.
 
 ## Consequences and residuals
 

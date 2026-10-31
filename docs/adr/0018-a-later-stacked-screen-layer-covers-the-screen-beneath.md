@@ -54,7 +54,9 @@ that lists no identifier" below; residual 20). Amended again 2026-10-24 (round 1
 uiautomator root the parser left unmarked is typed by the window manager's word on the focused window — a Dialog's
 window at the root's bounds is presented, the activity's own window alone drops the active-window hint (see
 "Amendment: Android's window by the window manager's word" below; residual 19 closed for such windows, residual 18
-narrowed).
+narrowed). Amended again 2026-10-31 (performance backlog D20): on idb's flat list every full `scroll_until` stroke is
+PACED at 349 pt/s, so a SwiftUI List no longer flings past every row the read before listed and Decision 2's
+changed-screen stop no longer fires on a list that only scrolled (see "Amendment: idb's presented layer", Decision 4).
 
 ## Context
 
@@ -1018,6 +1020,33 @@ and no swipe is drawn blind …" with the last error; once a read has read, a fa
 Android and under WDA too a call whose reads all fail sends no swipe and says so at the deadline (a reply that read
 "1 swipe sent" after a failed first read now reads "no swipe was sent"). The reads before the first that reads spend no
 confirming read (final code review, N1): a target that read finds under a presented screen still gets its own.
+
+**Decision 4 — paced full strokes (2026-10-31, performance backlog D20; docs/plans/2026-10-30-performance-backlog.md).**
+D0 on iOS: `scroll_until id:"lab.form-picker.country.GB" direction:down` on the lab's 45-row form-picker sheet (a
+SwiftUI List, rows 52 pt) failed in all 5 repeats under idb — "the swipe CHANGED THE SCREEN: none of the 15 elements
+the read before it listed by id …" after one stroke (once two) — and passed under WDA (2 strokes, 6.9 s). The owner's
+diagnostic outside the sandbox (one stroke from (201,699), screenshots 0.4 s and 2.4 s after it, three runs each): the
+sheet stayed up every run; the full stroke, 524 pt in 300 ms, carried the list ~20 rows (~1 040 pt, Albania → Italy
+at the top, still moving at 0.4 s); 524 pt in 1.5 s ~11 rows (~570 pt) and kept two rows of the read before; the
+feeler, 160 pt in 600 ms, ~3 rows. So on idb a full stroke flings about twice its length, past every identified row
+the read before listed; idb's flat list keeps no scroll view's rect to excuse the fling with, and Decision 2 read a
+dismissal that did not happen — the residual ui-tree/read-tree.ts#ScreenChange states as RECYCLED ROWS, met on the
+first real list. Now a full stroke planned on a tree whose source lists only the top layer
+(ui-tree/miss.ts#topLayerOnlySource — judged on the last read's tree, not on the call's evidence: the strokes after
+the first are `felt` and still idb's) is `paced` (interact/scroll-rounds.ts#strokeKind,
+interact/stroke-plan.ts#PACED): sent over `max(300, ceil(travel / 349 pt/s × 1000))` ms — 524 pt in 1502 ms, 354 pt
+above the keyboard in 1015 ms — through the same `PlannedStroke.durationMs` the feeler uses; no adapter changes. The
+feeler keeps precedence (Decision 3, unchanged). `IosAdapter.dragSpeed` stays unset: it would pace WDA's strokes too and
+switch the motion ledger to drag rules (interact/scroll.ts, `rules.strokes`); WDA and Android are byte-identical.
+Golden: the pinned idb `scroll_until` calls change in their `--duration` alone, no verdict changes.
+**Residuals of Decision 4.** Decision 3's dismissal residual is UNCHANGED: a slow pull-down is still a pull-down — a
+524 pt stroke at a list's top on a large sheet still exceeds the 350–400 pt distance that dismissed it at 900 ms, so
+the feeler stays, and a large sheet holding a list is still dismissed once the list reaches its top (the loud stop).
+Unmeasured, for the owner's device check after the merge: strokes between 300 ms and 1.5 s (a quicker pace may keep
+the overlap too, and save ~1.2 s a stroke); idb on a UIKit table and on sheet-long-list; a horizontal stroke (a
+carousel's sideways stroke is paced too, 242 pt in 694 ms); whether a 1.5 s stroke can register as a long press or a
+row's selection; the fling at 349 pt/s on a list with taller or shorter rows than 52 pt. Cost: ~1.2 s more a full
+stroke under idb (scroll_until over ~3 screens: a few seconds), against a call that failed.
 
 ## Amendment: an in-window backdrop (2026-10-22)
 
