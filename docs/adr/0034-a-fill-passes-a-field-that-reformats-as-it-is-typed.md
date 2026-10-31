@@ -55,8 +55,10 @@ separators added)`.** One pure rule, `fill-type.ts#reformatOf(reading, expected)
   typed punctuation (`Hello, world` for `Hello,world` is an edit);
 - they cut the typing into groups of two or more characters, but for one single-character group at either end
   (`1 234`, an IBAN's last `1`): `1-5` for `15` or `1/2` for `12` is no grouping;
+- an added separator between two LETTERS passes only when the typing is a code — a digit in it and no typed space
+  (review round 2: autocorrect's `a lot` for `alot` is no format; an MT IBAN's `MALT MTLC` is);
 - an added `.` or `,` must be a thousands separator: not a character the typing holds itself, 1–3 digits before the
-  first and not a lone `0`, exactly three digits between two of them and after the last, then no digit. A cents mask
+  first, not a lone `0` and not after a typed `.` or `,` (`0,12.345` is a fraction), exactly three digits between two of them and after the last, then no digit. A cents mask
   that shows `125` as `1.25`, `0.123` for `0123` or `1234.567` for `1234567` still fail.
 
 What the rule cannot tell: `1.234` for `1234` is de-DE's thousands or a three-decimal mask's point. **The
@@ -71,10 +73,21 @@ beside `retyped`, or the `reformatted-point` caveat), counts only — a value ma
 
 ## Consequences
 
-- A wrong "ok" is worse than a false mismatch, so the rule is kept tight; its false mismatches, all failing loudly as
-  before: a field that MOVES a typed separator (`12 34` regrouped `1 234`), a no-clear fill whose earlier text the
-  field regroups (`1 234` + `5` → `12 345`), a no-clear fill typed into the middle of the text, a `.`/`,` grouping that
-  is not by thousands (Indian lakh grouping), a field that adds a prefix or suffix (`€`).
+- A wrong "ok" is worse than a false mismatch, so the rule is kept tight. Its false mismatches, all failing loudly as
+  before — for each, type the value as the field shows it:
+  - a field that MOVES a typed separator (`12 34` regrouped `1 234`);
+  - a no-clear fill whose earlier text the field regroups (`1 234` + `5` → `12 345`), or one typed into the middle of
+    the text;
+  - a `.`/`,` grouping that is not by thousands (Indian lakh grouping), and a dotted date (`31.12.2026` for
+    `31122026`: its `.` groups are no thousands);
+  - mixed separators (`+421 900-123-456`: one separator character per reading);
+  - an eager trailing mark (`SK31 ` after four characters, `31/`);
+  - spaced single characters (`1 2 3 4`: groups of one);
+  - a separator outside the set (`12:30` for `1230`), a prefix or a suffix (`€`);
+  - a letter split by a separator in prose (`a lot` for `alot` — autocorrect; review round 2, MAJOR-A): between two
+    letters a separator passes only in a code, digits and no typed space (an IBAN's `MALT MTLC`).
+  Astral characters (`𝐀𝐁𝐂𝐃 1234`) were one until review round 2 (NIT-B): the rule now reads code points on both
+  sides, and they pass.
 - **Residual (review round 1, MINOR-3; a backlog row of its own): a dropped tail on a reformatting field is neither
   typed again nor reported.** ADR 0023's retype needs the reading to be an EXACT strict prefix of what the field
   should hold, and a reformatted partial reading (`SK31 12` for `SK311200…`) is none — so the tail is not retyped,

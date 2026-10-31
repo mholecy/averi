@@ -102,6 +102,34 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('end. Start', 'end.Start')).toBeUndefined();
   });
 
+  // Round 2, MAJOR-A: autocorrect splitting a word reads as a separator between two letters.
+  it('a separator between two letters passes only in a code (digits, no typed space): an IBAN, never prose', () => {
+    expect(reformatOf('a lot', 'alot')).toBeUndefined();
+    expect(reformatOf('in fact is', 'infact is')).toBeUndefined();
+    expect(reformatOf('john doe', 'johndoe')).toBeUndefined();
+    expect(reformatOf('jo-hn@x.com', 'john@x.com')).toBeUndefined();
+    expect(reformatOf('in fact 2', 'infact 2')).toBeUndefined(); // digits, but a typed space: prose
+    expect(reformatOf('Flat A 12', 'Flat A12')).toEqual({ added: 1, respaced: 0 }); // a letter and a digit: no word split
+    expect(reformatOf('MT84 MALT 0110 0001 2345 MTLC AST0 01S', 'MT84MALT011000012345MTLCAST001S')).toEqual({ added: 7, respaced: 0 });
+    expect(reformatOf('GB29 NWBK 6016 1331 9268 19', 'GB29NWBK60161331926819')).toEqual({ added: 5, respaced: 0 });
+    expect(reformatOf('FR14 2004 1010 0505 0001 3M02 606', 'FR1420041010050500013M02606')).toEqual({ added: 6, respaced: 0 });
+    expect(reformatOf('LC55 HEMM 0001 0001 0012 0001 2', 'LC55HEMM00010001001200012')).toEqual({ added: 6, respaced: 0 });
+  });
+
+  // Round 2, MINOR-C: the false mismatches ADR 0034 lists — each fails loudly; the remedy is to type it as shown.
+  it('the false mismatches ADR 0034 names stay mismatches', () => {
+    expect(reformatOf('31.12.2026', '31122026')).toBeUndefined();
+    expect(reformatOf('+421 900-123-456', '+421900123456')).toBeUndefined();
+    expect(reformatOf('1 2 3 4', '1234')).toBeUndefined();
+    expect(reformatOf('12:30', '1230')).toBeUndefined();
+    expect(reformatOf('1 234', '12 34')).toBeUndefined();
+  });
+
+  // Round 2, NIT-B: code points on both sides.
+  it('an astral letter is one character on both sides', () => {
+    expect(reformatOf('𝐀𝐁𝐂𝐃 1234', '𝐀𝐁𝐂𝐃1234')).toEqual({ added: 1, respaced: 0 });
+  });
+
   it('groups of one on both sides, or one inside, are no grouping', () => {
     expect(reformatOf('1-5', '15')).toBeUndefined();
     expect(reformatOf('1/2', '12')).toBeUndefined();
@@ -124,6 +152,7 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('1.234.5', '12345')).toBeUndefined(); // one digit after the last
     expect(reformatOf('1.234.5', '1234.5')).toBeUndefined(); // the typing's own point
     expect(reformatOf('1,234,5', '1234,5')).toBeUndefined();
+    expect(reformatOf('0,12.345', '0,12345')).toBeUndefined(); // round 2, MINOR-B: a fraction is no whole part
   });
 });
 

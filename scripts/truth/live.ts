@@ -502,8 +502,8 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [fill(RF, 'G.field', 'SK31'), { tool: 'type_text', args: { text: '12000000' } }],
     judge: holds('G', 'SK31 1200 0000'),
   },
-  { id: 'rf5', cell: RF, says: "a flow's tap + `type_pin:` into the RN amount field", flows: pinFlow(RF, 'A.field', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('A', `1${NBSP}234${NBSP}567`) },
   { id: 'rf4', cell: RF, says: "a flow's tap + `type:` into the RN grouping field", flows: typeFlow(RF, 'G.field', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('G', 'SK31 1200 0000') },
+  { id: 'rf5', cell: RF, says: "a flow's tap + `type_pin:` into the RN amount field", flows: pinFlow(RF, 'A.field', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('A', `1${NBSP}234${NBSP}567`) },
 ];
 const CASES: Case[] = FORMS.map((c) => ({ ...c, group: 'forms' }));
 

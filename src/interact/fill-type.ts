@@ -229,6 +229,7 @@ const SEPARATORS = new Set([...SPACES, '.', ',', '-', '/']);
 /** The added separators that could be a decimal point: said as a caveat, never passed silently (FillVerdict). */
 const POINTS = new Set(['.', ',']);
 const ALNUM = /^[\p{L}\p{N}]$/u;
+const LETTER = /^\p{L}$/u;
 const DIGITS = /^\d+$/;
 
 /**
@@ -242,11 +243,12 @@ const DIGITS = /^\d+$/;
  *   that dropped one (`12,50` → `1250`) changed the value;
  * - the added separators are all one character of SEPARATORS, each between two typed letters or digits: none
  *   leading (a `-` there is a sign), trailing, next to another, or after typed punctuation (`Hello, world` for
- *   `Hello,world` is an edit, not a format);
+ *   `Hello,world` is an edit, not a format); between two LETTERS only when the typing is a code — digits in it and
+ *   no typed space (an IBAN's `MALT MTLC`): in prose that is autocorrect splitting a word (`a lot` for `alot`);
  * - they cut the typing into groups of two or more characters, but for ONE single-character group at either end
  *   (`1 234`, an IBAN's last `1`): `1-5` for `15` is no grouping;
  * - an added `.` or `,` is a thousands separator: never a character the typing itself holds as `.` or `,`, the digits
- *   before the first one 1–3 and not a lone `0`, exactly three between two of them and after the last (then no
+ *   before the first one 1–3, not a lone `0` and not after a typed `.` or `,` (a fraction), exactly three between two of them and after the last (then no
  *   digit). That rules out a cents mask's `1.25` for `125` and `0.123` for `0123`, but not every decimal point: `1.234`
  *   for `1234` is de-DE's thousands or a three-decimal mask, which the reading cannot tell — so the verdict passes it
  *   with a caveat (`point`), not silently.
@@ -256,12 +258,16 @@ const DIGITS = /^\d+$/;
  * O(reading).
  */
 export function reformatOf(observed: string, expected: string): Reformat | undefined {
+  // Code points on both sides (an astral letter is one character, not two UTF-16 units).
+  const typed = [...expected];
+  // A code: digits in it and no typed space (an IBAN, a card number) — the one typing whose letters a field may group.
+  const code = typed.some((c) => /\d/.test(c)) && !typed.some((c) => SPACES.has(c));
   // The reading as tokens: each an expected character shown (its index) or an added separator (-1).
   const tokens: number[] = [];
   let j = 0;
   let respaced = 0;
   for (const c of observed) {
-    const e = expected[j];
+    const e = typed[j];
     if (c === e) tokens.push(j++);
     else if (e !== undefined && SPACES.has(c) && SPACES.has(e)) {
       tokens.push(j++);
@@ -269,7 +275,7 @@ export function reformatOf(observed: string, expected: string): Reformat | undef
     } else if (SEPARATORS.has(c)) tokens.push(-1);
     else return undefined;
   }
-  if (j !== expected.length) return undefined;
+  if (j !== typed.length) return undefined;
   const chars = [...observed];
   const added = new Set(chars.filter((_, k) => tokens[k] === -1));
   if (added.size > 1) return undefined;
@@ -283,8 +289,12 @@ export function reformatOf(observed: string, expected: string): Reformat | undef
     }
     // Both neighbours typed letters or digits: none leading or trailing (no neighbour), none next to another added
     // one (-1), none after typed punctuation.
-    const typedAlnum = (t: number | undefined) => t !== undefined && t !== -1 && ALNUM.test(expected[t]);
+    const typedAlnum = (t: number | undefined) => t !== undefined && t !== -1 && ALNUM.test(typed[t]);
     if (!typedAlnum(tokens[k - 1]) || !typedAlnum(tokens[k + 1])) return undefined;
+    // Between two LETTERS only in a code (round 2, MAJOR-A): in prose a space or `-` added there is autocorrect
+    // splitting a word (`a lot` for `alot`, `jo-hn@x.com`), not a format; an IBAN's `MALT MTLC` is.
+    const letter = (t: number) => LETTER.test(typed[t]);
+    if (!code && letter(tokens[k - 1]) && letter(tokens[k + 1])) return undefined;
     groups.push(0);
   }
   const short = groups.map((n, k) => (n < 2 ? k : -1)).filter((k) => k !== -1);
@@ -302,6 +312,8 @@ function thousands(chars: string[], tokens: number[], expected: string, sep: str
   const at = tokens.flatMap((t, k) => (t === -1 ? [k] : []));
   let start = at[0] - 1;
   while (start >= 0 && /\d/.test(chars[start])) start--;
+  // The digits before the first mark are a whole part: not a fraction after a typed point (`0,12.345`; round 2, MINOR-B).
+  if (start >= 0 && POINTS.has(chars[start])) return false;
   const lead = chars.slice(start + 1, at[0]).join('');
   if (!DIGITS.test(lead) || lead.length > 3 || lead === '0') return false;
   for (let n = 0; n < at.length; n++) {

@@ -51,8 +51,11 @@
  *   typed, read-back `nothing-typed`) that stopped on unchanged deletes is
  *   therefore unverified: `cleared` in deletes, its reason the only one.
  * - `caveats` order: the not-an-input finding, then the masked-append
- *   warning, then a reformat's added point (fill.ts never produces both: a masked-append needs an input
- *   that took the text, a not-input finding a read-back that did not land).
+ *   warning, then a reformat's added point. fill.ts never produces two of
+ *   them together: a not-input finding needs a read-back that did not land,
+ *   and the other two a landed one — a masked-append an input whose masked
+ *   reading took the text, a reformatted point a plain reading (a masked one
+ *   is never a reformat).
  *
  * The same module classifies a mismatch (`differenceOf`, below): what a
  * read-back that missed the value can be said to differ by, as a
