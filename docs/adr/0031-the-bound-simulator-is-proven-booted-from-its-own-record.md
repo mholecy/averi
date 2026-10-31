@@ -1,7 +1,7 @@
 # 31. The bound simulator is proven booted from its own record
 
 Status: accepted 2026-10-31 (performance backlog row D22, docs/plans/2026-10-30-performance-backlog.md, section "iOS
-per-call costs"; the orchestrator's decision from the D0 iOS windows). Implemented on `perf/d22-ios-probe-plist`.
+per-call costs"; the orchestrator's decision from the D0 iOS windows). Implemented on `perf/d22-ios-probe-plist` (51bf3d9b, 85f7de99, 70d3b61c), merged 3574d5b2.
 
 ## Context
 
