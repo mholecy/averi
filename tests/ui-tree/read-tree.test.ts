@@ -4,7 +4,22 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import type { UiNode } from '../../src/adapters/types.js';
-import { PollMiss, pollTimeoutMessage, pollTree, SETTLE_FLOOR_MS, readErrorLine, readTreeOrError, screenChangedUnder, screenIdentity, sheetDetent, showsProgress, treeFingerprint, type IdentifiedRead } from '../../src/ui-tree/read-tree.js';
+import {
+  PollMiss,
+  Undecided,
+  type HandedRead,
+  pollTimeoutMessage,
+  pollTree,
+  SETTLE_FLOOR_MS,
+  readErrorLine,
+  readTreeOrError,
+  screenChangedUnder,
+  screenIdentity,
+  sheetDetent,
+  showsProgress,
+  treeFingerprint,
+  type IdentifiedRead,
+} from '../../src/ui-tree/read-tree.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 
 const tree: UiNode = {
@@ -423,6 +438,97 @@ describe('pollTree — the one deadline loop', () => {
         vi.useRealTimers();
       }
     });
+  });
+});
+
+describe('pollTree — a handed-on first sample (ADR 0030)', () => {
+  const marked = (id: string): UiNode => ({ ...tree, identifier: id });
+  const handing = (read: HandedRead | undefined) => {
+    let asked = 0;
+    return {
+      first: {
+        take: () => {
+          asked++;
+          return read;
+        },
+      },
+      asked: () => asked,
+    };
+  };
+  const counting = (t: UiNode = marked('fresh')) => {
+    let reads = 0;
+    return { adapter: { uiTree: async () => (reads++, t) }, reads: () => reads };
+  };
+
+  it('a value on the handed tree ends the poll with no device read', async () => {
+    const { adapter, reads } = counting();
+    const h = handing({ tree: marked('handed'), startedAt: Date.now(), endedAt: Date.now() });
+    const predicate = (t: UiNode) => (t.identifier === 'handed' ? 'yes' : undefined);
+    const outcome = await pollTree(adapter, predicate, { timeoutMs: 0, pollMs: 5, first: h.first });
+    expect(outcome).toEqual({ timedOut: false, value: 'yes' });
+    expect(reads()).toBe(0);
+    expect(h.asked()).toBe(1);
+  });
+
+  // A 0 ms budget still reads the device once, and the outcome counts that read only.
+  it('a miss on the handed tree never ends the poll', async () => {
+    const { adapter, reads } = counting();
+    const seen: (string | null)[] = [];
+    const h = handing({ tree: marked('handed'), startedAt: Date.now(), endedAt: Date.now() });
+    const outcome = await pollTree(
+      adapter,
+      (t, round) => (seen.push(`${t.identifier}${round.handedOn ? '*' : ''}`), undefined),
+      { timeoutMs: 0, pollMs: 5, first: h.first },
+    );
+    expect(seen).toEqual(['handed*', 'fresh']);
+    expect(reads()).toBe(1);
+    expect(outcome).toMatchObject({ timedOut: true, treesRead: 1 });
+    expect(outcome.timedOut && outcome.lastTree?.identifier).toBe('fresh');
+    expect(h.asked()).toBe(1); // asked once, never again on later rounds
+  });
+
+  it('a PollMiss, an Undecided or a throw on the handed tree leaves nothing in the outcome', async () => {
+    const { adapter } = counting();
+    const now = Date.now();
+    const throwing = () => {
+      throw new Error('handed throw');
+    };
+    for (const handedSays of [() => new PollMiss('handed detail'), () => Undecided, throwing]) {
+      const outcome = await pollTree(adapter, (_t, round) => (round.handedOn ? handedSays() : undefined), {
+        timeoutMs: 0,
+        pollMs: 5,
+        first: handing({ tree: marked('handed'), startedAt: now, endedAt: now }).first,
+      });
+      expect(outcome).toMatchObject({ timedOut: true, treesRead: 1 });
+      expect(outcome.timedOut && outcome.detail).toBeUndefined();
+      expect(outcome.timedOut && outcome.undecidedTree).toBeUndefined();
+    }
+  });
+
+  // A 2300 ms handed read is followed by the floor, less what has passed since it ended.
+  it('the fresh read starts as after this poll\'s own previous round', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    resetSleeps();
+    try {
+      const now = Date.now();
+      const dumped = handing({ tree, startedAt: now - 2340, endedAt: now - 40 });
+      await pollTree(counting().adapter, () => undefined, { timeoutMs: 0, pollMs: 500, first: dumped.first });
+      expect(sleeps).toEqual([SETTLE_FLOOR_MS - 40]);
+      resetSleeps();
+      // A 100 ms handed read under a 500 ms poll that ended 50 ms ago: 400 − 50.
+      const described = handing({ tree, startedAt: Date.now() - 150, endedAt: Date.now() - 50 });
+      await pollTree(counting().adapter, () => undefined, { timeoutMs: 0, pollMs: 500, first: described.first });
+      expect(sleeps).toEqual([350]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('nothing handed: the poll is the poll it always was', async () => {
+    const { adapter, reads } = counting();
+    const outcome = await pollTree(adapter, () => 'yes', { timeoutMs: 0, pollMs: 5, first: handing(undefined).first });
+    expect(outcome).toEqual({ timedOut: false, value: 'yes' });
+    expect(reads()).toBe(1);
   });
 });
 

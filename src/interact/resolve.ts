@@ -1,7 +1,7 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { MissedError, missNote, missOf, presentedAloneHeadline, type Miss } from '../ui-tree/miss.js';
-import { pollTimeoutMessage, pollTree, readTreeOrError } from '../ui-tree/read-tree.js';
+import { pollTimeoutMessage, pollTree, readTreeOrError, type FirstSample } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 
@@ -164,6 +164,13 @@ export interface SettleOptions extends ResolveOptions {
   timeoutMs?: number;
   /** Pause between tree reads. Default DEFAULT_POLL_MS. */
   pollMs?: number;
+  /**
+   * A read handed on from the step before (ui-tree/read-handoff.ts; the flow engine's taps and fills after a `wait:`,
+   * an assert or a detect, docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md). Asked
+   * once, by resolveSettled only, as the FIRST of the two samples the settle compares: the second is always a fresh
+   * read. resolvePresent ignores it.
+   */
+  first?: FirstSample;
 }
 
 /**
@@ -257,6 +264,15 @@ export interface ResolvedSettled extends Resolved {
  *   had seen it too.
  * The read error, when the last round could not read a tree, rides beneath
  * either so a dead device never looks like a slow screen.
+ *
+ * `opts.first` (since 2026-10-31, ADR 0030): a handed-on read is the first
+ * sample and nothing else. Its rect is the one the first fresh read must
+ * match; it is not a sighting, not a run and never the tree returned — so
+ * the settle needs one fresh read that agrees with it, a handed read that
+ * did not resolve the target costs nothing but its round, and every wording
+ * above (a not-found, a run of one) is about the fresh reads alone.
+ * Ambiguity in the handed tree throws nothing: pollTree discards a handed
+ * round's throw, and the fresh read refuses for itself.
  * docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md
  */
 export async function resolveSettled(
@@ -271,8 +287,12 @@ export async function resolveSettled(
   let run = 0; // consecutive rounds that resolved it, up to the last tree read
   const outcome = await pollTree(
     adapter,
-    (tree) => {
+    (tree, { handedOn }) => {
       const resolved = resolveNow(tree, target, opts);
+      if (handedOn) {
+        lastRect = resolved === undefined ? undefined : JSON.stringify(resolved.node.rect);
+        return undefined;
+      }
       if (resolved === undefined) {
         lastRect = undefined;
         run = 0;
@@ -286,7 +306,7 @@ export async function resolveSettled(
       lastRect = rect;
       return undefined;
     },
-    { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS },
+    { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS, ...(opts.first !== undefined && { first: opts.first }) },
   );
   if (!outcome.timedOut) return outcome.value;
   let { readError } = outcome;

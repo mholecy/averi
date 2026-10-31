@@ -1432,3 +1432,33 @@ describe('a leg whose final screenshot is refused', () => {
     expect(rect).toContain(`(android: no screenshot — ${REFUSAL} — compared without it)`);
   });
 });
+
+describe('runVerification — the read hand-off of a leg (ADR 0030)', () => {
+  const STATEFUL = parseConfig(
+    [
+      'app:',
+      '  android: { package: com.example.app }',
+      'states:',
+      '  on_card:',
+      '    detect: { element: { id: card } }',
+    ].join('\n'),
+  );
+
+  // The state's detect that answered yes is the first element assert's read.
+  it('a leg with a state and an element assert reads the tree once for both', async () => {
+    const adapter = fake('android');
+    let reads = 0;
+    const real = adapter.uiTree.bind(adapter);
+    adapter.uiTree = async () => {
+      reads++;
+      return real();
+    };
+    const out = await runVerification(
+      request({ platforms: ['android'], cfg: STATEFUL, state: 'on_card', specs: [{ element: { id: 'card' } }] }),
+      async () => adapter,
+    );
+    expect(out.sections[0]).toContain('PASS');
+    expect(reads).toBe(1);
+  });
+
+});
