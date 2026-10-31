@@ -1005,18 +1005,20 @@ export interface DeviceAdapter {
   openDeepLink(url: string): Promise<void>;
 
   /**
-   * PNG bytes. Throws rather than returning anything else: a capture command
-   * that exits 0 with no bytes, or with text (`Killed` on a dying emulator), is
-   * a transport error naming the device and command — screenshot-bytes.ts.
-   * verify/capture.ts relies on it (an empty buffer equals
-   * an empty buffer, which its stability wait would read as settled).
+   * PNG bytes — the device's own, or on Android (D19) a PNG encoded on the host
+   * from `capture()`'s raw frame (adapters/png-encode.ts). Throws rather than
+   * returning anything else: a capture command that exits 0 with no bytes, or
+   * with text (`Killed` on a dying emulator), is a transport error naming the
+   * device and command — screenshot-bytes.ts. verify/shot.ts#captureShot keeps
+   * a floor under it (an empty buffer equals an empty buffer, which the
+   * stability wait would read as settled).
    */
   screenshot(): Promise<Buffer>;
   /**
    * The screen as pixels, for a caller that compares or measures them and hands no PNG on — D19
    * (docs/adr/0035-android-captures-raw-pixels.md). Optional: an adapter without it is captured with `screenshot()`
-   * and decoded (verify/shot.ts). Android's: `screencap | gzip -1`, the raw frame (adapters/screenshot-bytes.ts#screencapRaw),
-   * or — on a device the raw path refuses — `screencap -p`'s PNG, as it is. `screenshot()` is then this capture,
+   * and decoded (verify/shot.ts). Android's: `screencap 2>/dev/null | gzip -1`, the raw frame
+   * (adapters/screenshot-bytes.ts#screencapRaw), or — on a device the raw path refuses — `screencap -p`'s PNG, as it is. `screenshot()` is then this capture,
    * encoded on the host when it is pixels. Throws as `screenshot()` does: a capture is a frame or a transport error.
    */
   capture?(): Promise<ScreenCapture>;

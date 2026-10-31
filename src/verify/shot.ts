@@ -4,8 +4,8 @@ import { decodePng, type DecodedPng } from './png.js';
 
 /**
  * ONE CAPTURE of the screen, as the pixel readers hold it (D19, docs/adr/0035-android-captures-raw-pixels.md): the
- * device's PNG (iOS; Android where the raw path is refused) or its raw pixels (Android's `screencap | gzip -1`), with
- * the other form made on demand, once:
+ * device's PNG (iOS; Android where the raw path is refused) or its raw pixels (Android's
+ * `screencap 2>/dev/null | gzip -1`), with the other form made on demand, once:
  * - `decode()` — the pixels: a raw capture's as they are, a PNG's through verify/png.ts#decodePng, which throws on a
  *   damaged one (the caller words it). Memoized, the throw too: the region check and the frame's measurement decode a
  *   capture once between them, as a last-decode memo in capture.ts made sure before D19;
@@ -24,11 +24,12 @@ export class Shot {
 
   private constructor(private readonly capture: ScreenCapture) {}
 
+  /** A shot of whatever the adapter captured: its raw frame, or a PNG. */
   static of(capture: ScreenCapture): Shot {
     return new Shot(capture);
   }
 
-  /** A shot of PNG bytes — what an adapter without `capture()` hands back, and what a test fake serves. */
+  /** A shot of PNG bytes: `screenshot()` of an adapter without `capture()` (iOS, the test fakes), or `capture()`'s `-p` fallback. */
   static ofPng(bytes: Buffer): Shot {
     return new Shot({ kind: 'png', bytes });
   }
@@ -54,8 +55,8 @@ export class Shot {
     return this.#decoded.image;
   }
 
-  /** The pixels, or undefined when the PNG does not decode. */
-  decoded(): DecodedPng | undefined {
+  /** The pixels, or undefined when the PNG does not decode (`decode()` without the throw). */
+  tryDecode(): DecodedPng | undefined {
     try {
       return this.decode();
     } catch {
@@ -67,7 +68,7 @@ export class Shot {
   equals(other: Shot): boolean {
     const [a, b] = [this.capture, other.capture];
     if (a.kind === 'png' && b.kind === 'png') return a.bytes.equals(b.bytes);
-    const [x, y] = [this.decoded(), other.decoded()];
+    const [x, y] = [this.tryDecode(), other.tryDecode()];
     return x !== undefined && y !== undefined && x.width === y.width && x.height === y.height && x.data.equals(y.data);
   }
 }
@@ -85,12 +86,18 @@ export class Shot {
  * and a non-PNG that reaches a measuring caller already fails its decode, with its own wording, in `captureFrame`.
  */
 export async function captureShot(adapter: Pick<DeviceAdapter, 'screenshot' | 'capture'>): Promise<Shot> {
-  const shot = adapter.capture !== undefined ? await adapter.capture() : ({ kind: 'png', bytes: await adapter.screenshot() } as const);
-  if (shot.kind === 'png' && shot.bytes.length === 0) {
+  if (adapter.capture === undefined) return Shot.ofPng(nonEmpty(await adapter.screenshot()));
+  const shot = await adapter.capture();
+  return shot.kind === 'png' ? Shot.ofPng(nonEmpty(shot.bytes)) : Shot.of(shot);
+}
+
+/** `bytes`, unless there are none (`captureShot`'s floor). */
+function nonEmpty(bytes: Buffer): Buffer {
+  if (bytes.length === 0) {
     throw new Error(
       'the device adapter returned an empty screenshot (0 bytes) — no frame can settle on nothing; ' +
         'DeviceAdapter.screenshot must throw on a failed capture instead (adapters/screenshot-bytes.ts)',
     );
   }
-  return Shot.of(shot);
+  return bytes;
 }

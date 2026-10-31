@@ -199,7 +199,7 @@ export const STABILITY_DELAY_MS = 300;
 const TREE_READ_ATTEMPTS = 5;
 const TREE_READ_DELAY_MS = 300;
 
-/** Defined beside its decoder (verify/png.ts imports nothing from here); re-exported for the pixel readers that import their frame types from capture. */
+/** Defined in adapters/types.ts (an adapter's capture is one, D19), re-exported by verify/png.ts and here for the pixel readers that import their frame types from capture. */
 export type { RgbaImage } from './png.js';
 
 /**
@@ -813,7 +813,7 @@ async function stableScreenshot(
     captures += 1;
     if (current.equals(previous)) return { shot: current, stability: 'settled', settledOver: 'screen', captures };
     if (region !== undefined) {
-      if (await regionSettled(adapter, region, previous.decoded(), current.decoded())) {
+      if (await regionSettled(adapter, region, previous.tryDecode(), current.tryDecode())) {
         return { shot: current, stability: 'settled', settledOver: 'region', captures };
       }
     }

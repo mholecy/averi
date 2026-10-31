@@ -6,7 +6,7 @@ import { screencapRaw, type ScreenshotSource } from '../../src/adapters/screensh
 import { decodePng } from '../../src/verify/png.js';
 
 /**
- * D19: Android captures with `screencap | gzip -1` — the raw frame, gzipped on the device — and screenshot-bytes.ts
+ * D19: Android captures with `screencap 2>/dev/null | gzip -1` — the raw frame, gzipped on the device — and screenshot-bytes.ts
  * judges what came back: a frame, a refusal of the raw path (the adapter then asks `screencap -p`), or a transport
  * error, the same one an empty `screencap -p` gives.
  */
@@ -18,7 +18,7 @@ const DEVICE_PNG = readFileSync(`${FIXTURES}android-lab-bands-api33.png`);
 
 const SOURCE: ScreenshotSource = {
   device: 'device emulator-5554',
-  command: "adb -s emulator-5554 exec-out 'screencap | gzip -1'",
+  command: "adb -s emulator-5554 exec-out 'screencap 2>/dev/null | gzip -1'",
   remedy: 'Re-check `adb devices` and retry.',
 };
 
@@ -66,15 +66,17 @@ describe('screencapRaw — the raw frame, or why not', () => {
     expect(screencapRaw(Buffer.from('sh: gzip: not found\n'), SOURCE)).toMatchObject({ lasting: true });
   });
 
+  // screencap's stderr goes to /dev/null and its stdout into gzip, so what can come ahead of the stream is the shell's
+  // own word (exec-out merges its stderr), or a stream cut short.
   it('any other answer that is not gzip is refused for this call only: no evidence the device lacks gzip (MINOR-1)', () => {
-    for (const answer of ['Killed\n', 'Capturing failed.\n', '[Warning] Multiple displays were found, but no display id was specified!\n', '\x1f']) {
+    for (const answer of ['Killed\n', "/system/bin/sh: can't fork: Try again\n", '\x1f']) {
       expect(screencapRaw(Buffer.from(answer, 'latin1'), SOURCE), JSON.stringify(answer)).toMatchObject({ lasting: false });
     }
   });
 
   it('an empty answer is the transport error an empty `screencap -p` gives', () => {
     expect(() => screencapRaw(Buffer.alloc(0), SOURCE)).toThrow(
-      "`adb -s emulator-5554 exec-out 'screencap | gzip -1'` on device emulator-5554 returned 0 bytes — not a screenshot, " +
+      "`adb -s emulator-5554 exec-out 'screencap 2>/dev/null | gzip -1'` on device emulator-5554 returned 0 bytes — not a screenshot, " +
         'though the command reported success: the device transport failed (a dying or hung emulator / simulator), ' +
         "not the app's screen. Re-check `adb devices` and retry.",
     );

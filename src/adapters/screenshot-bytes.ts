@@ -59,18 +59,21 @@ export function screenshotPng(bytes: Buffer, source: ScreenshotSource): Buffer {
   throw transportError(source, described(bytes), 'a PNG');
 }
 
-/** The one wording of "the command succeeded and handed back no screenshot": what came back, and the remedy. */
-function transportError(source: ScreenshotSource, what: string, notA: string): Error {
+/**
+ * The one wording of "the command succeeded and handed back no screenshot": what came back, what it should have been
+ * (`expected`: a PNG from `screencap -p` / simctl / idb, a screenshot from the raw capture), and the remedy.
+ */
+function transportError(source: ScreenshotSource, what: string, expected = 'a screenshot'): Error {
   return new Error(
-    `\`${source.command}\` on ${source.device} returned ${what} — not ${notA}, though the command reported success: ` +
+    `\`${source.command}\` on ${source.device} returned ${what} — not ${expected}, though the command reported success: ` +
       `the device transport failed (a dying or hung emulator / simulator), not the app's screen. ${source.remedy}`,
   );
 }
 
 /**
- * D19 (docs/adr/0035-android-captures-raw-pixels.md): Android's capture is `screencap | gzip -1` on the device — the
- * raw frame, gzipped where it is made, so neither the device's PNG encode (~230 ms on a lab screen, over a second on a
- * photo) nor the 9.6 MB raw transfer over exec-out (~11–30 MB/s) is paid. This judges what came back, three ways:
+ * D19 (docs/adr/0035-android-captures-raw-pixels.md): Android's capture is `screencap 2>/dev/null | gzip -1` on the
+ * device — the raw frame, gzipped where it is made, so neither the device's PNG encode (~230 ms on a lab screen, over
+ * a second on a photo) nor the 9.6 MB raw transfer over exec-out (~11–30 MB/s) is paid. This judges what came back, three ways:
  *
  * - a frame: the gunzipped stream is a header and `width × height × 4` bytes of RGBA_8888 — the header 16 bytes
  *   (API 28+: width, height, format, colour space) or 12 (before: no colour space), told apart by the length, which
@@ -79,18 +82,19 @@ function transportError(source: ScreenshotSource, what: string, notA: string): E
  * - `refused`: the raw path gave no frame this time, though the device answered. `lasting` says whether it never
  *   will on this device — only on positive evidence (the D19 review, MINOR-1): the shell's word that there is no gzip
  *   (`gzip: not found`, `inaccessible or not found`), or a format other than RGBA_8888 (RGBX_8888's alpha is
- *   undefined, RGB_565 is another layout). Any other answer that is not a gzip stream — `Killed`, screencap's
- *   "Capturing failed." or a multi-display warning on stdout, a stream cut before its second byte — is refused for
- *   this call only. Either way the adapter captures with `screencap -p`, whose own check decides whether the device
- *   is alive (`screenshotPng`);
+ *   undefined, RGB_565 is another layout). What else can come back that is not a gzip stream: screencap's stdout is
+ *   gzip's input and its stderr goes to /dev/null, so anything ahead of the stream is the device shell's own (exec-out
+ *   merges its stderr) — `Killed` on a dying guest, a shell that could not fork — or a stream cut before its second
+ *   byte. Those are refused for this call only. Either way the adapter captures with `screencap -p`, whose own check
+ *   decides whether the device is alive (`screenshotPng`);
  * - a transport error, worded as `screenshotPng`'s: nothing at all came back, a gzip stream that breaks, an empty
- *   frame (screencap failed and gzip compressed nothing), or a length that is not the header plus the pixels — the
- *   raw counterpart of the signature check, and stronger. A stream cut in transit already fails gunzip (its trailer
+ *   frame (screencap failed — its "Capturing failed." went to /dev/null — and gzip compressed nothing), or a length
+ *   that is not the header plus the pixels — the raw counterpart of the signature check, and stronger. A stream cut in transit already fails gunzip (its trailer
  *   holds the length and a CRC); the length check catches screencap itself writing short. One shape it cannot tell: a
  *   16-byte-header frame exactly 4 bytes short reads as a 12-byte-header one, its pixels shifted by one.
  */
-export function screencapRaw(bytes: Buffer, source: ScreenshotSource): { image: RawImage } | { refused: string; lasting: boolean } {
-  if (bytes.length === 0) throw transportError(source, '0 bytes', 'a screenshot');
+export function screencapRaw(bytes: Buffer, source: ScreenshotSource): RawVerdict {
+  if (bytes.length === 0) throw transportError(source, '0 bytes');
   if (bytes[0] !== GZIP_MAGIC[0] || bytes[1] !== GZIP_MAGIC[1]) {
     return { refused: `the device answered ${described(bytes)}, not a gzip stream`, lasting: NO_GZIP.test(bytes.toString('latin1')) };
   }
@@ -100,10 +104,10 @@ export function screencapRaw(bytes: Buffer, source: ScreenshotSource): { image: 
     // pool's chunked inflate took 6–8 ms and ~4× the CPU on a UI frame (2026-10-31).
     frame = zlib.gunzipSync(bytes);
   } catch (e) {
-    throw transportError(source, `a damaged gzip stream (${bytes.length} bytes: ${errorMessage(e)})`, 'a screenshot');
+    throw transportError(source, `a damaged gzip stream (${bytes.length} bytes: ${errorMessage(e)})`);
   }
-  if (frame.length === 0) throw transportError(source, 'an empty frame (0 bytes after gunzip)', 'a screenshot');
-  if (frame.length < LEGACY_HEADER_BYTES) throw transportError(source, `a frame of ${frame.length} bytes, shorter than its header`, 'a screenshot');
+  if (frame.length === 0) throw transportError(source, 'an empty frame (0 bytes after gunzip)');
+  if (frame.length < LEGACY_HEADER_BYTES) throw transportError(source, `a frame of ${frame.length} bytes, shorter than its header`);
   const width = frame.readUInt32LE(0);
   const height = frame.readUInt32LE(4);
   const format = frame.readUInt32LE(8);
@@ -115,11 +119,13 @@ export function screencapRaw(bytes: Buffer, source: ScreenshotSource): { image: 
     throw transportError(
       source,
       `a ${width}x${height} frame of ${frame.length} bytes, not the ${HEADER_BYTES}- or ${LEGACY_HEADER_BYTES}-byte header plus ${pixelBytes} pixel bytes`,
-      'a screenshot',
     );
   }
   return { image: { width, height, data: frame.subarray(header) } };
 }
+
+/** What `screencapRaw` makes of an answer that is not a transport error: a frame, or why not and whether for good. */
+export type RawVerdict = { image: RawImage } | { refused: string; lasting: boolean };
 
 const GZIP_MAGIC = [0x1f, 0x8b] as const;
 /** The device's shell saying there is no gzip to run: toybox's sh (`inaccessible or not found`), mksh and others (`not found`). */

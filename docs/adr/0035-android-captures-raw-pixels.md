@@ -25,8 +25,14 @@ measurements). Implemented on `perf/d19-raw-capture`.
 
 ## Decision
 
-**Android captures with `exec-out 'screencap | gzip -1'` — raw RGBA, gzipped on the device, no file — and keeps it as
-pixels. A PNG is encoded on the host only where one leaves the process.**
+**Android captures with `exec-out 'screencap 2>/dev/null | gzip -1'` — raw RGBA, gzipped on the device, no file — and
+keeps it as pixels. A PNG is encoded on the host only where one leaves the process.**
+
+- The command (android.ts#RAW_SCREENCAP; the measurements above ran it without the redirection): screencap's stdout
+  is gzip's input, so anything it printed there would land inside the stream; its stderr ("Capturing failed.", a
+  multi-display warning) goes to /dev/null (code review). What can arrive ahead of the stream is the device shell's
+  own stderr, which exec-out merges: `gzip: not found` — sh's, not screencap's, so the redirection leaves it — or
+  `Killed`.
 
 - `DeviceAdapter.capture?(): Promise<ScreenCapture>` — optional, Android's: `{ kind: 'rgba', image }`, or
   `{ kind: 'png', bytes }` on a device that refuses the raw path. `screenshot()` stays a PNG Buffer: the capture,
@@ -37,10 +43,11 @@ pixels. A PNG is encoded on the host only where one leaves the process.**
   wrong length). On a refusal the adapter captures with `screencap -p`, whose check decides whether the device is
   alive. Only a LASTING refusal — positive evidence that the raw path never works on this device: the shell's
   `gzip: not found` / `inaccessible or not found`, or a format other than RGBA_8888 — pins the adapter to `-p`, once
-  `-p` has succeeded, and says so once on stderr with its reason. Any other non-gzip answer (`Killed`, screencap's
-  "Capturing failed." or a multi-display warning on stdout, a stream cut after one byte) costs that call a `-p` and
-  pins nothing (amended after review round 1, MINOR-1: the first cut pinned on any of them). So a device without
-  gzip pays today's cost, never more, and a dying one says what it said before.
+  `-p` has succeeded, and says so once on stderr with its reason (of two captures refused at once, one pins). Any
+  other non-gzip answer (the shell's `Killed` or another word of its own, a stream cut after one byte) costs that
+  call a `-p` and pins nothing (amended after review round 1, MINOR-1: the first cut pinned on any of them). A
+  failed screencap is an empty gzip stream: a transport error. So a device without gzip pays today's cost, never
+  more, and a dying one says what it said before.
 - verify/shot.ts#Shot is one capture in either form, the other made on demand once: `equals` (two raw captures by
   pixels, two PNGs by bytes), `decode()`, `png()`. `Frame.shot` is a Shot. The stability wait, the baseline
   confirmations and the eyes capture through `captureShot` (the adapter's `capture()` when it has one) and never
@@ -49,16 +56,17 @@ pixels. A PNG is encoded on the host only where one leaves the process.**
   file), and the OCR recognizer (its input file). adapters/png-encode.ts is the one encoder, async on the thread pool:
   a UI screen at level 6 with each row None or Up by its content — Up for a row identical to the one above or one
   where more than a quarter of the pixels differ from their left neighbour (a photo strip), None otherwise — about
-  18–21 ms, 0.76–0.93× the device's PNG on lab frames, and 0.57–0.99× zlib 6 with pngjs's adaptive filters on lab frames with
-  0, 150 or 400 rows of a photo pasted in (45–85 ms with them). Round 1 had every UI row unfiltered: up to 1.30× (the
-  reviewer measured ~1.4×) on a UI screen with a photo region. A whole photo is Up-filtered with `Z_RLE` at level 1
+  18–21 ms, 0.76–0.93× the device's PNG on lab frames; with a photo strip within about 1.1× of zlib 6 with pngjs's
+  adaptive filters (0.57–0.99× on lab frames with 0, 150 or 400 rows of the launcher's photo pasted in; 46–87 ms
+  with them). Round 1 had every UI row unfiltered: up to 1.30× (the reviewer measured ~1.4×) on a UI screen with a
+  photo region. A whole photo is Up-filtered with `Z_RLE` at level 1
   (41 ms; 1.12× the device's), chosen by a sampled deflate ratio (every 16th row at level 1: UI ≤ 0.02, photo 0.25;
   the line at 0.08). Matching the device's size on a photo costs 250–330 ms, which is what the raw path saved.
 
 ## Consequences
 
 - Per capture, lab screens: −22…27 ms; photo screens: −275 ms. A frame that is measured skips its decode (5–8 ms),
-  and the one PNG a tool returns costs 17–41 ms on the host. The gunzip is synchronous: 1–2 ms for a UI frame's
+  and the one PNG a tool returns costs 18–41 ms on the host. The gunzip is synchronous: 1–2 ms for a UI frame's
   9.6 MB, 7 ms for the launcher's photo (the reviewer measured ~22 under load), where the thread pool's chunked
   inflate took 6–8 ms and ~4× the CPU on a UI frame (it ate the lab-screen gain in the first A/B).
 - A settled two-capture frame plus its PNG (captureFrame + `png()`, n=10 interleaved, medians): the launcher's photo

@@ -5,8 +5,8 @@ import type { RgbaImage } from './types.js';
 
 /**
  * THE ONE PNG ENCODER (D19, docs/adr/0035-android-captures-raw-pixels.md): a raw capture (Android's
- * `screencap | gzip -1`) becomes a PNG on the host only where a PNG leaves the process — the `screenshot` tool's image,
- * `ensure_state`'s and a `verify` leg's final frame, a stored baseline, the OCR recognizer's input — and
+ * `screencap 2>/dev/null | gzip -1`) becomes a PNG on the host only where a PNG leaves the process — the `screenshot`
+ * tool's image, `ensure_state`'s and a `verify` leg's final frame, a stored baseline, the OCR recognizer's input — and
  * `DeviceAdapter.screenshot()` (types.ts). An 8-bit RGBA PNG (colour type 6), one IDAT: verify/png.ts decodes it on its
  * fast path to the same bytes.
  *
@@ -14,10 +14,11 @@ import type { RgbaImage } from './types.js';
  * references are the device's own `screencap -p` — zlib level 6, adaptive filters, ~230 ms on the device — and pngjs
  * at zlib level 6 with adaptive filters):
  * - a UI screen (flat colour, text — and a photo region inside one): each row None or Up by its content
- *   (`rowFiltered`), level 6 — about 18–21 ms on a plain UI frame, 0.57–0.99× the pngjs reference on three lab frames with
- *   0, 150 and 400 rows of a photo pasted in (45–85 ms with the photo rows); all-None was 16–19 ms but up to 1.30×
- *   with a photo strip. Against the device: bands 19.4 vs 20.9 KB, text-sample and form-errors ~0.6×;
- * - a photo (a wallpaper behind the launcher): Up, `Z_RLE`, level 1 — 39 ms, 1.12× the device's 1.33 MB. No filter at
+ *   (`scanlines`), level 6 — about 18–21 ms on a plain UI frame, 0.76–0.93× the device's PNG (bands 19.4 vs
+ *   20.9 KB, text-sample 76 vs 100 KB, form-errors 102 vs 132 KB). With a photo strip, within about 1.1× of the pngjs
+ *   reference (0.57–0.99× on three lab frames with 0, 150 and 400 rows of the launcher's photo pasted in; 46–87 ms
+ *   with the photo rows); all-None was 16–19 ms but up to 1.30× with a photo strip;
+ * - a photo (a wallpaper behind the launcher): Up, `Z_RLE`, level 1 — 41 ms, 1.12× the device's 1.33 MB. No filter at
  *   level 6 is 1.19× but 255 ms, Up at level 6 1.02× but 330 ms: the device's size costs what the raw path saved.
  * Which one: a sample of every 16th row deflated at level 1 (~0.6 ms on a UI screen, ~3 on a photo); under
  * `PHOTO_RATIO` it is a UI screen. Measured: UI screens 0.006–0.019, the launcher's photo 0.248.
@@ -31,7 +32,7 @@ export async function encodePng(image: RgbaImage): Promise<Buffer> {
     throw new Error(`encodePng: a ${width}x${height} image needs ${width * height * 4} bytes, it has ${data.length}`);
   }
   const photo = (await compressedRatio(data, width, height)) >= PHOTO_RATIO;
-  const filtered = photo ? upFiltered(data, width, height) : rowFiltered(data, width, height);
+  const filtered = scanlines(data, width, height, photo);
   const idat = await deflate(filtered, photo ? { level: 1, strategy: zlib.constants.Z_RLE } : { level: 6 });
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
@@ -56,18 +57,17 @@ async function compressedRatio(data: Buffer, width: number, height: number): Pro
 }
 
 /**
- * A UI screen's scanlines, each with the filter its content wants — None or Up, the two that cost no per-byte
- * arithmetic beyond Up's word subtraction (D19 review, MINOR-2):
+ * The scanlines, each with the filter its content wants — None or Up, the two that cost no per-byte arithmetic beyond
+ * Up's word subtraction. A photo (`photo`) is Up on every row after the first. A UI screen chooses per row (D19
+ * review, MINOR-2):
  * - a row identical to the one above is Up, all zeros (a flat UI is mostly these);
- * - a "noisy" row — more than a quarter of its pixels differ from their left neighbour: a photo, a gradient — is Up,
- *   which turns a smooth image into small numbers deflate folds;
+ * - a "noisy" row — more than a quarter of its pixels differ from their left neighbour: a photo strip, a gradient — is
+ *   Up, which turns a smooth image into small numbers deflate folds;
  * - every other row (text, edges, flat runs) is None: deflate finds its runs and repeats as they are, and Up would
  *   only turn them into scattered differences.
- * Measured 2026-10-31 against zlib level 6 with pngjs's adaptive filters (every filter tried per row) on three lab
- * frames with 0, 150 and 400 rows of the launcher's photo pasted in: 0.57–0.99× its size, about 18–21 ms on a plain
- * UI frame (all None was 0.57–1.30×, 16–19 ms).
+ * The first row is None either way (nothing above it). Figures: `encodePng`'s header.
  */
-function rowFiltered(data: Buffer, width: number, height: number): Buffer {
+function scanlines(data: Buffer, width: number, height: number, photo: boolean): Buffer {
   const rowBytes = width * 4;
   const out = Buffer.allocUnsafe(height * (rowBytes + 1));
   const aligned = data.byteOffset % 4 === 0 ? data : Buffer.from(data);
@@ -78,14 +78,12 @@ function rowFiltered(data: Buffer, width: number, height: number): Buffer {
   for (let y = 0; y < height; y++) {
     const at = y * (rowBytes + 1);
     const from = y * rowBytes;
-    if (y > 0 && aligned.compare(aligned, from - rowBytes, from, from, from + rowBytes) === 0) {
+    if (y > 0 && !photo && aligned.compare(aligned, from - rowBytes, from, from, from + rowBytes) === 0) {
       out[at] = 2;
       out.fill(0, at + 1, at + 1 + rowBytes);
       continue;
     }
-    let changes = 0;
-    for (let x = 1, i = y * width + 1; x < width; x++, i++) if (pixels[i] !== pixels[i - 1]) changes++;
-    if (y > 0 && changes > noisy) {
+    if (y > 0 && (photo || changesInRow(pixels, y, width) > noisy)) {
       out[at] = 2;
       upRow(pixels, row, y, width);
       rowView.copy(out, at + 1);
@@ -97,8 +95,15 @@ function rowFiltered(data: Buffer, width: number, height: number): Buffer {
   return out;
 }
 
-/** Above this share of pixels differing from their left neighbour a UI screen's row is Up-filtered (`rowFiltered`). */
+/** Above this share of pixels differing from their left neighbour a UI screen's row is Up-filtered (`scanlines`). */
 const NOISY_ROW = 0.25;
+
+/** How many of row `y`'s pixels differ from their left neighbour. */
+function changesInRow(pixels: Uint32Array, y: number, width: number): number {
+  let changes = 0;
+  for (let x = 1, i = y * width + 1; x < width; x++, i++) if (pixels[i] !== pixels[i - 1]) changes++;
+  return changes;
+}
 
 /**
  * Row `y` (≥ 1) Up-filtered into `row`: each byte minus the one above it, modulo 256, four bytes a step — a pixel is
@@ -111,25 +116,6 @@ function upRow(pixels: Uint32Array, row: Uint32Array, y: number, width: number):
     const b = pixels[up]!;
     row[x] = ((a | 0x80808080) - (b & 0x7f7f7f7f)) ^ ((a ^ ~b) & 0x80808080);
   }
-}
-
-/** The scanlines with filter type 2 (Up, `upRow`), the first row None — a photo's. */
-function upFiltered(data: Buffer, width: number, height: number): Buffer {
-  const rowBytes = width * 4;
-  const out = Buffer.allocUnsafe(height * (rowBytes + 1));
-  const aligned = data.byteOffset % 4 === 0 ? data : Buffer.from(data);
-  const pixels = new Uint32Array(aligned.buffer, aligned.byteOffset, width * height);
-  const row = new Uint32Array(width);
-  const rowView = Buffer.from(row.buffer);
-  out[0] = 0;
-  aligned.copy(out, 1, 0, rowBytes);
-  for (let y = 1; y < height; y++) {
-    upRow(pixels, row, y, width);
-    const at = y * (rowBytes + 1);
-    out[at] = 2;
-    rowView.copy(out, at + 1);
-  }
-  return out;
 }
 
 /** A PNG chunk: length, type, data, and the CRC of type and data. */

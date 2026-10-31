@@ -57,7 +57,7 @@ describe('Shot', () => {
     expect(first.data.equals(image(5).data)).toBe(true);
   });
 
-  it("a PNG that does not decode throws decodePng's error on every ask, and `decoded()` is undefined", () => {
+  it("a PNG that does not decode throws decodePng's error on every ask, and `tryDecode()` is undefined", () => {
     const shot = Shot.ofPng(Buffer.from('not a png'));
     expect(() => shot.decode()).toThrow();
     let again: unknown;
@@ -67,7 +67,7 @@ describe('Shot', () => {
       again = e;
     }
     expect(again).toBeInstanceOf(Error);
-    expect(shot.decoded()).toBeUndefined();
+    expect(shot.tryDecode()).toBeUndefined();
   });
 });
 
