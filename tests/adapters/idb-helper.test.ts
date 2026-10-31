@@ -348,11 +348,10 @@ describe('runIdb with an IdbHelper', () => {
     expect(logged).toEqual([]);
   });
 
-  it('turns off a helper whose requests time out in a row — the second and later timeouts count, the CLI then serves', async () => {
+  it('turns off a helper after two requests in a row time out with no answer between — the CLI then serves', async () => {
     const h = await readyHelper();
-    await timeOutAndRestart(h);
-    await timeOutAndRestart(h); // the second in a row: one failure, still restarted
-    expect(h.s.children).toHaveLength(3);
+    await timeOutAndRestart(h); // one timeout alone: restarted
+    expect(h.s.children).toHaveLength(2);
     expect(logged).toEqual([]);
     const got = await runIdb(h.cli.exec, UDID, READ, { helper: h.helper, timeoutMs: 10 }).catch((e: unknown) => e);
     expect((got as ExecError).timedOut).toBe(true);
@@ -361,10 +360,8 @@ describe('runIdb with an IdbHelper', () => {
     expect((await runIdb(h.cli.exec, UDID, READ, { helper: h.helper })).stdout.toString()).toBe('cli');
     await settle();
     expect(h.cli.idbCalls).toHaveLength(before + 1);
-    expect(h.s.children).toHaveLength(3);
-    expect(logged).toEqual([
-      'averi: idb helper off for this process (2 failures in a row, the last: 3 requests in a row timed out) — the idb CLI serves every call',
-    ]);
+    expect(h.s.children).toHaveLength(2);
+    expect(logged).toEqual(['averi: idb helper off for this process (2 requests in a row timed out) — the idb CLI serves every call']);
   });
 
   it('answers a read in flight when the adapter is disposed under it — retried on the CLI', async () => {

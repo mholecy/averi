@@ -45,9 +45,9 @@ before.**
   serves. A failure is a start that never says ready (exit, spawn error, 10 s) or a helper that dies before it has
   answered any request (one that says ready and dies under every request would otherwise restart forever); after 2 in
   a row the helper is off for the process, and says so in one line on the server's stderr, with the tail of its own.
-  A request that times out right after another did (no answer between) is a failure too — one hung helper would
-  otherwise make every read pay the caller's whole 15 s — so three timeouts in a row turn it off; one alone is not (a
-  stuck companion times the CLI out as well). The first answered request resets the count. Otherwise a helper that
+  Two requests in a row that time out in the helper, with no answer between, turn it off as well — each costs the
+  caller's whole 15 s, and one hung helper would otherwise make every read pay it; one alone does not (a stuck
+  companion times the CLI out as well). Any answered request resets both counts. Otherwise a helper that
   dies is restarted lazily by the next call; one disposed under a read answers it `died`, and the read runs on the CLI.
 - No orphans: the child and its pipes are unref'd; it exits on stdin EOF (dispose, or node's death closing the pipe);
   `IosAdapter.dispose()` kills it; one `process.once('exit')` hook for every helper in the process kills what dispose

@@ -50,13 +50,18 @@ export function idbHelperDisabled(env: NodeJS.ProcessEnv = process.env): boolean
  * After this many failures in a row the helper is off for the process. A failure is:
  * - a start that never said `ready`;
  * - a helper that died before it answered any request — one that says ready and then dies under every request would
- *   otherwise restart forever (review 2026-10-31, MINOR-4);
- * - a request that timed out right after another did, with no answer between — a helper that hangs would otherwise
- *   make every read pay the caller's whole budget (15 s for describe-all) forever (review round 2, NIT-B). One timeout
- *   alone is not: the CLI would likely have timed out too (a stuck companion), and the next helper may answer.
- * The first answered request resets the count. With 2, three timeouts in a row turn it off.
+ *   otherwise restart forever (review 2026-10-31, MINOR-4).
+ * The first answered request resets the count. Timeouts have a latch of their own: TIMEOUTS_IN_A_ROW.
  */
 export const MAX_FAILURES_IN_A_ROW = 2;
+
+/**
+ * After this many requests in a row timed out in the helper, with no answer between, it is off for the process (review
+ * round 2, NIT-B): each costs the caller's whole budget (15 s for describe-all), and a helper that hangs would make
+ * every read pay it forever. One alone is not: the CLI would likely have timed out too (a stuck companion), and the
+ * next helper may answer. Any answer resets the count.
+ */
+export const TIMEOUTS_IN_A_ROW = 2;
 
 /** How much of the helper's own stderr is kept, to say why it turned itself off. */
 const STDERR_TAIL = 2_000;
@@ -157,8 +162,9 @@ interface Pending {
  * Its whole contract is that it is never worse than the CLI:
  * - `run` answers undefined — "use the CLI" — whenever it is not READY and idle: not started yet (it starts now, in
  *   the background: the first call pays nothing extra), starting, busy with another request (concurrent reads of an
- *   iOS leg), off (the kill switch, MAX_FAILURES_IN_A_ROW failures in a row, no interpreter, disposed). Turning itself
- *   off writes one line to the server's stderr, with the tail of the helper's own.
+ *   iOS leg), off (the kill switch, MAX_FAILURES_IN_A_ROW failures or TIMEOUTS_IN_A_ROW timeouts in a row, no
+ *   interpreter, disposed). Turning itself off writes one line to the server's stderr, with the tail of the helper's
+ *   own.
  * - A helper that dies under a request answers `died`; the caller runs the CLI. The next call starts a new one.
  * - The caller's timeout kills it (SIGKILL) and rejects with IdbHelperTimeout; the caller throws the CLI's timeout.
  * - No orphans: the child and its pipes are unref'd (the server stays free to exit), it exits on stdin's EOF (dispose,
@@ -177,7 +183,7 @@ export class IdbHelper {
   private killed: ChildProcess | undefined;
   private pending: Pending | undefined;
   private failures = 0;
-  /** Requests that timed out since the last answer (MAX_FAILURES_IN_A_ROW: the second and later count). */
+  /** Requests that timed out since the last answer (TIMEOUTS_IN_A_ROW). */
   private timeoutsInARow = 0;
   private nextId = 1;
   private stderrTail = '';
@@ -305,7 +311,7 @@ export class IdbHelper {
 
   /**
    * The child exited (or failed to spawn). A start that never said ready, or a helper that never answered, counts
-   * against it (MAX_FAILURES_IN_A_ROW); one this helper killed on a timeout only when the one before timed out too.
+   * against it (MAX_FAILURES_IN_A_ROW); one this helper killed on a timeout turns it off at TIMEOUTS_IN_A_ROW.
    */
   private gone(child: ChildProcess, wasReady: boolean, answered: boolean): void {
     liveChildren.delete(child);
@@ -320,7 +326,7 @@ export class IdbHelper {
     if (this.state === 'off') return;
     if (this.killed === child) {
       this.killed = undefined;
-      if (this.timeoutsInARow >= 2) this.failed(`${this.timeoutsInARow} requests in a row timed out`);
+      if (this.timeoutsInARow >= TIMEOUTS_IN_A_ROW) this.turnOff(`${this.timeoutsInARow} requests in a row timed out`);
       else this.state = 'idle';
     } else if (!wasReady) this.failed('it exited before it said ready');
     else if (!answered) this.failed('it died before it answered a request');
