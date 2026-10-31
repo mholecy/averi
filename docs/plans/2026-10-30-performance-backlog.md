@@ -51,7 +51,8 @@ measured before and after.
 | D21 | iOS idb: right after a simulator boot with a fresh companion every `idb ui describe-all` fails "The simulator's accessibility service named no frontmost application" for the whole call (D20's device check 2026-10-31: 133 reads in 90 s, 5 of 5 repeats); a hand launch + read before the run cured it once. Find the cause and what averi can do (re-front the app? a named recovery in the reply?) — needs the device | stability | open |
 | D22 | iOS registry probe: the bound simulator proven booted from its `device.plist` (0.05 ms) before `simctl list devices` (~80–110 ms, every verb); anything else falls back to simctl | device | done (3574d5b2; ADR 0031) — device-checked: tree −32 %, tap −12 % |
 | D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) together, not in series | device | done (fa334d35; not one spawn — the iOS 27 runtime has no shell; 445 → 250 ms a launch on the lab simulator) |
-| D24 | iOS RN: a burst from `idb ui text` drops a controlled field's tail — after a repaired drop (ADR 0023's retype landed it), later typings into that app send the first key alone, 150 ms, then the rest | stability | done (ffec743d; ADR 0023 D24 amendment) — the owner's RN A/B pending |
+| D24 | iOS RN: a burst from `idb ui text` drops a controlled field's tail — after a repaired drop (ADR 0023's retype landed it), later typings into that app send the first key alone, 150 ms, then the rest | stability | done (ffec743d; ADR 0023 D24 amendment) — device-checked: rn-fill-20 5 925 → 2 346 ms (−60 %) |
+| D25 | iOS RN: the D24 split also costs short texts that never dropped (rn-fill "Jan" 2 155 → 2 341 ms, +1 idb call + 150 ms) — measure from what length a burst drops, split only above it | device | open |
 
 ## Notes
 
@@ -283,6 +284,14 @@ read back from the app's state file): one burst (averi today) kept all 20 charac
 (784 ms); chunks of 1 15/15 (3.8 s). ADR 0023's chunks-of-3 losing mid-text (14–15/25) did not reproduce here.
 Decision: after a fill on an app has seen its tail dropped, later iOS fills on that app send the first character alone,
 wait 150 ms, then the rest (sticky per app; native fills never pay); ADR 0023's tail retype stays the safety net.
+
+### D24 device check (322bc127, 2026-10-31)
+
+The owner's `ios-run.sh ios-rn-after-d24 --app react-native --repeat 5` (AveriLabRN, tree via WDA, one server across
+the repeats): repeat 1's rn-fill-20 learned the drop (5 383 ms, the poll and the retype); repeats 2–5 split and landed
+whole first time — rn-fill-20 median 2 346 ms [2 326–5 383] against 5 925 in D0 on iOS (−60 %), `idb ui text` ×2 and
+one 400 ms poll, no retype. The cost: rn-fill ("Jan", which never dropped) 2 155 → 2 341 ms — the split applies to
+every typing into a learned app (D25). rn-tree 276 → 166 ms (D22).
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
