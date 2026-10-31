@@ -41,7 +41,7 @@ before.**
 - Kill switch: `AVERI_IDB_HELPER=off` (SETUP.md, troubleshooting). The differential fake device sets it: the golden
   log pins the CLI's argv per call, and the fake answers execFile only.
 - The D0 harness sees helper calls on `node:diagnostics_channel` (`averi:idb-helper:start`/`end`, published by
-  `runIdb`), recorded as `idb ui describe-all` with `via: helper` (`scripts/perf/instrument.ts#recordHelperCalls`).
+  `runIdb`), recorded as `idb ui describe-all` with `via: helper` (`recordHelperCalls` in `scripts/perf/instrument.ts`).
 
 ### Error parity
 
