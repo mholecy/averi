@@ -188,6 +188,7 @@ describe('runIdb with an IdbHelper', () => {
     ['a coordinate that is no plain decimal', ['ui', 'tap', '1e3', '20']],
     ['a button averi never presses', ['ui', 'button', 'SIRI']],
     ['an empty key sequence', ['ui', 'key-sequence']],
+    ['a key sequence with a word that is no number', ['ui', 'key-sequence', '42', 'x']],
     ['a read with a flag more', ['ui', 'describe-all', '--json', '--nested']],
   ])('sends a call it does not allowlist to the CLI — %s', async (_, args) => {
     const { helper, s, cli } = await readyHelper();
@@ -563,6 +564,16 @@ describe('runIdb with an IdbHelper — input (D7b)', () => {
     await settle();
     expect(h.cli.idbCalls.filter((a) => a[1] === 'swipe')).toEqual([]); // not retried
     expect(logged).toEqual(['averi: idb helper off for this process (2 requests in a row timed out) — the idb CLI serves every call']);
+  });
+
+  it('runs an input the helper never took once on the CLI when the adapter is disposed under it — as a CLI call in flight before D7 would', async () => {
+    const { helper, s, cli } = await readyHelper();
+    const tap = runIdb(cli.exec, UDID, ['ui', 'tap', '120', '640'], { helper });
+    await settle();
+    expect(s.children[0].requests).toHaveLength(1); // written, not acknowledged
+    await helper.dispose();
+    expect((await tap).stdout.toString()).toBe('cli');
+    expect(cli.idbCalls).toEqual([CLI_ARGV, ['ui', 'tap', '120', '640', '--udid', UDID]]);
   });
 
   it('reports an input in flight when the adapter is disposed under it — not retried either', async () => {

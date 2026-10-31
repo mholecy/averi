@@ -108,7 +108,9 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
   ```
 
   (`idb.ts#INPUT_LOST`; the first line is exec's, the second does not repeat the command — review round 1, NIT-2.) A
-  disposed adapter under an input it took reads the same. Nothing in averi matches idb's input errors by text
+  disposed adapter under an input it took reads the same; one disposed under an input the helper had NOT taken (written,
+  no ack) runs that input once on the CLI after the dispose — accepted (review of D7b): it runs once, as a CLI call in
+  flight at the dispose did before D7. Nothing in averi matches idb's input errors by text
   (grep of `src`, `tests`, `docs` 2026-10-31: callers read `ExecError.timedOut`, never the message), so no caller
   changes.
 - **A death before the helper took the request runs the CLI**, input or not — `gen_main` never saw it, so it runs
@@ -116,8 +118,11 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
   yet — `run` declines, nothing is written; the write itself failed (EPIPE: a pipe with no reader took none of the
   line) — `IdbHelperReply` `unsent`, and the helper is killed; or it died and its fd 3 ended with no ack — `unsent`.
   node may run `exit` before fd 3's last lines (an ack written just before the death), so an unacknowledged request is
-  judged only once fd 3 has ended; a fd 3 still open `DRAIN_MS` (1 s) after the exit — something else holds it, a
-  companion the helper spawned — leaves it unknown, and unknown is `died`: reported, never repeated. The reviewer's
+  judged only once fd 3 has ended; a fd 3 still open `DRAIN_MS` (1 s) after the exit leaves it unknown, and unknown
+  is `died`: reported, never repeated. `DRAIN_MS` is a backstop for an unknown holder of fd 3, not an expected path:
+  fb-idb starts its children (the companion it may spawn, `idb/common/companion*.py`) with
+  `asyncio.create_subprocess_exec`, whose `close_fds=True` default keeps fd 3 out of them (no `close_fds`/`pass_fds`
+  anywhere in fb-idb, grep 2026-10-31). The reviewer's
   fuzz of round 1 found 21 of 22 "lost" reports were inputs the helper had never read, before the ack.
 - **Timeouts** as for reads: the helper is SIGKILLed, `Command timed out: idb …`, not retried, and counted toward
   `TIMEOUTS_IN_A_ROW` with reads (a read's timeout then an input's turn it off).
@@ -145,7 +150,8 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
   helper on) must confirm the split still lands whole first time.
 - Tests: `tests/adapters/idb-helper.test.ts` (each HID argv to the helper; near-miss shapes and ill-formed texts to the
   CLI; a death after the ack → the error, no CLI call; before it, an exit not yet seen, and a failed write → the CLI;
-  an ack read after the exit still counts; a fd 3 that never ends → the error; a stale ack ignored; an input's
+  an ack read after the exit still counts; a fd 3 that never ends → the error; a stale ack ignored; a dispose under
+  an input never taken → the CLI once; an input's
   timeout counted; clearText's two sequences one after the other), `tests/adapters/idb-helper-contract.test.ts` (every
   HID argv against `--companion localhost:1`, a dash-led text, and `ui tap --help`: equal code, stderr and stdout bytes
   to the CLI; a fake fb-idb writing to `sys.stdout.buffer`, printing a surrogate escape to stderr, and dying inside

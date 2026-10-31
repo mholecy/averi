@@ -5,8 +5,12 @@ import { detectXcodeEnv } from './xcode-env.js';
 
 /** A number as IosAdapter writes one into an argv (`String(x)`, `String(ms / 1000)`). */
 const NUM = /^-?\d+(\.\d+)?$/;
-/** A word of an allowlisted shape: a literal, a number, or any one string (`ui text`'s text). */
-type Word = string | typeof NUM | 'ANY';
+/** Any one string — `ui text`'s text (what the CLI and the helper would both receive alike: sameForBoth). */
+const ANY = /^[\s\S]*$/;
+/** One or more numbers, to the end of the argv — `ui key-sequence`'s codes (clearText sends `count` of them). Last only. */
+const NUMS = Symbol('one or more numbers');
+/** A word of an allowlisted shape: a literal, a pattern (NUM, ANY), or NUMS as the last word. */
+type Word = string | RegExp | typeof NUMS;
 
 /**
  * The idb calls the helper may serve, word by word, the `--udid` excluded (runIdb appends it last, as for the CLI):
@@ -23,16 +27,22 @@ const HID_ARGV: readonly (readonly Word[])[] = [
   ['ui', 'tap', NUM, NUM],
   ['ui', 'tap', NUM, NUM, '--duration', NUM],
   ['ui', 'swipe', NUM, NUM, NUM, NUM, '--duration', NUM],
-  ['ui', 'text', 'ANY'],
+  ['ui', 'text', ANY],
+  ['ui', 'key-sequence', NUMS],
   ['ui', 'key', NUM],
   ['ui', 'button', 'HOME'],
 ];
 
-const fits = (shape: readonly Word[], args: readonly string[]) =>
-  shape.length === args.length && shape.every((w, i) => (w === 'ANY' ? true : typeof w === 'string' ? w === args[i] : w.test(args[i])));
-
-/** `ui key-sequence` takes one or more HID key codes: clearText sends `count` of them. */
-const isKeySequence = (args: readonly string[]) => args.length > 2 && args[0] === 'ui' && args[1] === 'key-sequence' && args.slice(2).every((w) => NUM.test(w));
+/** Whether an argv is of a shape: as many words as it has (or, ending in NUMS, at least one more), each fitting. */
+function fits(shape: readonly Word[], args: readonly string[]): boolean {
+  const variadic = shape.at(-1) === NUMS;
+  const fixed = (variadic ? shape.slice(0, -1) : shape) as readonly (string | RegExp)[];
+  if (variadic ? args.length <= fixed.length : args.length !== fixed.length) return false;
+  return args.every((a, i) => {
+    const w = i < fixed.length ? fixed[i] : NUM;
+    return typeof w === 'string' ? w === a : w.test(a);
+  });
+}
 
 /**
  * A word the CLI and the helper would receive differently (D7b, `ui text` takes any string): a lone surrogate reaches
@@ -47,7 +57,7 @@ const sameForBoth = (args: readonly string[]) => args.every((w) => !w.includes('
 function helperKind(args: readonly string[]): 'read' | 'input' | undefined {
   if (!sameForBoth(args)) return undefined;
   if (READ_ARGV.some((s) => fits(s, args))) return 'read';
-  if (HID_ARGV.some((s) => fits(s, args)) || isKeySequence(args)) return 'input';
+  if (HID_ARGV.some((s) => fits(s, args))) return 'input';
   return undefined;
 }
 

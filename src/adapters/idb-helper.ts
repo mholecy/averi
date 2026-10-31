@@ -158,6 +158,28 @@ async function firstLine(file: string): Promise<string | undefined> {
   }
 }
 
+/** What one helper child has done so far — its start() closure's, read by gone() when it exits. */
+interface ChildRun {
+  /** It said `{"ready"}`. */
+  ready: boolean;
+  /** It answered at least one request. */
+  answered: boolean;
+  /** Its fd 3 ended (readline's 'close'): every line it wrote has been read — an ack included (judge, D7b). */
+  fd3Closed: { closed: boolean; promise: Promise<void> };
+}
+
+/** true when `done` settles within `ms`, false after. */
+function within(done: Promise<void>, ms: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(false), ms);
+    t.unref();
+    void done.then(() => {
+      clearTimeout(t);
+      resolve(true);
+    });
+  });
+}
+
 interface Pending {
   id: number;
   /** The helper said `{"got": id}` (D7b): it took the line off stdin, and gen_main runs it next. */
@@ -171,8 +193,8 @@ interface Pending {
  * One persistent fb-idb client per adapter, started by the first call it could serve — since D7b an input too, so a
  * wda-backed adapter starts one as well (its input is idb's), and a simulator served under both tree sources at once
  * runs two (D7, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md, section "D7b"): a Python process
- * that imported idb's CLI once and runs it in-process per request (idb-helper-script.ts), so a call no longer pays the CLI's Python start-up
- * — measured 114.3 → 24.7 ms a `describe-all` (D7, n = 20, the lab simulator). Created by the registry per iOS adapter
+ * that imported idb's CLI once and runs it in-process per request (idb-helper-script.ts), so a call no longer pays
+ * the CLI's Python start-up — measured 114.3 → 24.7 ms a `describe-all` (D7, n = 20, the lab simulator). Created by the registry per iOS adapter
  * (registry.ts#iosAdapterFor) and shared, like `exec`, by IosAdapter and IdbTreeSource; runIdb (idb.ts) decides which
  * argv may come here.
  *
@@ -296,11 +318,14 @@ export class IdbHelper {
       exitHookInstalled = true;
       process.once('exit', killIdbHelpersOnExit);
     }
-    let ready = false;
-    let answered = false;
-    const endFd3: (() => void)[] = [];
+    let closeFd3!: () => void;
+    const run: ChildRun = {
+      ready: false,
+      answered: false,
+      fd3Closed: { closed: false, promise: new Promise<void>((r) => (closeFd3 = r)) },
+    };
     const readyTimer = setTimeout(() => {
-      if (!ready) this.kill(child);
+      if (!run.ready) this.kill(child);
     }, this.readyTimeoutMs);
     readyTimer.unref();
     child.unref();
@@ -310,19 +335,17 @@ export class IdbHelper {
       if (this.child === child) this.stderrTail = (this.stderrTail + d.toString('utf8')).slice(-STDERR_TAIL);
     });
     // ENOENT and friends arrive as an 'error' event; with no listener it would take the server down.
-    let fd3Ended = false;
-    const fd3End: Promise<void> = new Promise((r) => endFd3.push(r));
     const onGone = () => {
       clearTimeout(readyTimer);
-      this.gone(child, ready, answered, () => (fd3Ended ? Promise.resolve(true) : this.within(fd3End, this.drainMs)));
+      this.gone(child, run);
     };
     child.once('error', onGone);
     child.once('exit', onGone);
     child.stdin?.on('error', () => undefined); // EPIPE on a dead helper: 'exit' tells the story
     const lines = createInterface({ input: child.stdio[3] as Readable });
     lines.once('close', () => {
-      fd3Ended = true;
-      for (const r of endFd3) r();
+      run.fd3Closed.closed = true;
+      closeFd3();
     });
     lines.on('line', (line) => {
       let msg: { ready?: number; got?: number; id?: number; code?: number; stdout?: string; stderr?: string };
@@ -339,8 +362,8 @@ export class IdbHelper {
         return;
       }
       if (this.child !== child) return;
-      if (!ready && msg.ready !== undefined) {
-        ready = true;
+      if (!run.ready && msg.ready !== undefined) {
+        run.ready = true;
         clearTimeout(readyTimer);
         if (this.state === 'starting') this.state = 'ready';
         return;
@@ -349,11 +372,11 @@ export class IdbHelper {
       if (p === undefined || msg.id !== p.id) return;
       clearTimeout(p.timer);
       this.pending = undefined;
-      answered = true;
+      run.answered = true;
       this.failures = 0;
       this.timeoutsInARow = 0;
       if (this.state === 'busy') this.state = 'ready';
-      // The streams come as base64 of their bytes (idb-helper-script.ts): stdout a Buffer, stderr utf-8 — exec's decoding.
+      // The streams come as base64 of their bytes (idb-helper-script.ts): stdout a Buffer, stderr utf-8 — as exec.
       p.resolve({ kind: 'answer', code: msg.code ?? 1, stdout: Buffer.from(msg.stdout ?? '', 'base64'), stderr: Buffer.from(msg.stderr ?? '', 'base64').toString('utf8') });
     });
   }
@@ -362,7 +385,7 @@ export class IdbHelper {
    * The child exited (or failed to spawn). A start that never said ready, or a helper that never answered, counts
    * against it (MAX_FAILURES_IN_A_ROW); one this helper killed on a timeout turns it off at TIMEOUTS_IN_A_ROW.
    */
-  private gone(child: ChildProcess, wasReady: boolean, answered: boolean, drained: () => Promise<boolean>): void {
+  private gone(child: ChildProcess, run: ChildRun): void {
     liveChildren.delete(child);
     if (this.child !== child) return;
     this.child = undefined;
@@ -370,15 +393,15 @@ export class IdbHelper {
     if (p !== undefined) {
       clearTimeout(p.timer);
       this.pending = undefined;
-      this.judge(p, drained);
+      this.judge(p, run.fd3Closed);
     }
     if (this.state === 'off') return;
     if (this.killed === child) {
       this.killed = undefined;
       if (this.timeoutsInARow >= TIMEOUTS_IN_A_ROW) this.turnOff(`${this.timeoutsInARow} requests in a row timed out`);
       else this.state = 'idle';
-    } else if (!wasReady) this.failed('it exited before it said ready');
-    else if (!answered) this.failed('it died before it answered a request');
+    } else if (!run.ready) this.failed('it exited before it said ready');
+    else if (!run.answered) this.failed('it died before it answered a request');
     else this.state = 'idle';
   }
 
@@ -386,29 +409,17 @@ export class IdbHelper {
    * A request the helper died with (D7b): `died` once it was taken (`{"got": id}` read — gen_main may have sent the
    * event), `unsent` when fd 3 ended without the ack (it never left stdin; the CLI may run it, it runs once). node
    * may see the exit before fd 3's last lines, so the ack is looked for until fd 3 ends; a fd 3 still open DRAIN_MS
-   * after the exit (a grandchild holding it) leaves it unknown, and unknown is `died` — reported, never repeated.
+   * after the exit (some unknown holder of it) leaves it unknown, and unknown is `died` — reported, never repeated.
    */
-  private judge(p: Pending, drained: () => Promise<boolean>): void {
+  private judge(p: Pending, fd3Closed: ChildRun['fd3Closed']): void {
     if (p.taken) {
       p.resolve({ kind: 'died' });
       return;
     }
     this.judging = p;
-    void drained().then((ended) => {
+    void (fd3Closed.closed ? Promise.resolve(true) : within(fd3Closed.promise, this.drainMs)).then((ended) => {
       if (this.judging === p) this.judging = undefined;
       p.resolve({ kind: p.taken || !ended ? 'died' : 'unsent' });
-    });
-  }
-
-  /** true when `done` settles within `ms`, false after. */
-  private within(done: Promise<void>, ms: number): Promise<boolean> {
-    return new Promise((resolve) => {
-      const t = setTimeout(() => resolve(false), ms);
-      t.unref();
-      void done.then(() => {
-        clearTimeout(t);
-        resolve(true);
-      });
     });
   }
 

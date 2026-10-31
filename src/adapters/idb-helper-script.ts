@@ -12,8 +12,8 @@
  * pointed at buffers. The reply, `{"id", "code", "stdout", "stderr"}` (the streams base64), goes out on fd 3 — a pipe
  * of its own, so a stray `print` of a plugin or of the import cannot corrupt the protocol. Before it runs a request it
  * says `{"got": id}` there (D7b): node then knows the line left stdin, and a death before the ack runs an input on the
- * CLI — gen_main never saw it — where a death after it is reported (idb.ts#inputLost). The first line on fd 3 is `{"ready": <pid>}`,
- * written only after the import succeeded: an fb-idb without `gen_main`, or an interpreter that cannot import it, exits
+ * CLI — gen_main never saw it — where a death after it is reported (idb.ts#inputLost). The first line on fd 3 is
+ * `{"ready": <pid>}`, written only after the import succeeded: an fb-idb without `gen_main`, or an interpreter that cannot import it, exits
  * before it, and node reads that as a failed start.
  *
  * The import sees what the shebang'd CLI sees (review 2026-10-31, MINOR-5): no `-I`, so `PYTHONPATH` and the user
