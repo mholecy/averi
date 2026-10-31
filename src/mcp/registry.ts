@@ -1,7 +1,8 @@
 import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
 import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
-import { createIosTreeSource } from '../adapters/ios-tree-source.js';
+import { createIosTreeSource, type IosTreeSourceDeps } from '../adapters/ios-tree-source.js';
+import { IdbHelper } from '../adapters/idb-helper.js';
 import { androidUnusable, iosBootedFromDevicePlist, listAndroidDevices, listIosDevices, type ListOpts } from '../adapters/discovery.js';
 import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
@@ -81,11 +82,19 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
   if (platform === 'android') return new AndroidAdapter({ serial: deviceId, drawnOverStrip });
   // The registry hands over the resolved kind (kindFor); the fallback only
   // serves a direct caller of the factory, and names the same default.
-  return new IosAdapter({
-    udid: deviceId,
-    treeSource: createIosTreeSource(opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE, deviceId),
-  });
+  return iosAdapterFor(deviceId, opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE);
 };
+
+/**
+ * The iOS adapter's wiring, in one place (review round 2 of D7a): one idb helper per adapter, shared like `exec` by
+ * the adapter (which owns and disposes it) and its tree source. It starts on the first call it could serve, so a
+ * wda-backed adapter never starts one — at most one live helper per simulator. `deps` reach the tree source: the
+ * server passes none; scripts/perf/baseline.ts passes its lab WebDriverAgent's port and derived data.
+ */
+export function iosAdapterFor(udid: string, kind: IosTreeSourceKind, deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {}): IosAdapter {
+  const idbHelper = new IdbHelper();
+  return new IosAdapter({ udid, treeSource: createIosTreeSource(kind, udid, { ...deps, idbHelper }), idbHelper });
+}
 
 /**
  * The cache key's third part: which tree-source kind an opts set resolves

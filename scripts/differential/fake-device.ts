@@ -453,4 +453,7 @@ export function installFakeDevice(): void {
   syncBuiltinESMExports();
   globalThis.fetch = refuse('fetch') as unknown as typeof fetch;
   process.env.DEVELOPER_DIR = '/differential/fake/Developer';
+  // No idb helper (D7a, src/adapters/idb-helper.ts): it is a spawned Python, not an execFile, so this fake could not
+  // answer it — and the call log pins the CLI's argv per call. Every idb call stays the CLI, as before D7.
+  process.env.AVERI_IDB_HELPER = 'off';
 }

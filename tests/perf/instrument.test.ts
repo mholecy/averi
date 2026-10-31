@@ -1,7 +1,10 @@
 import type { execFile } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import { sleep } from '../../src/util/sleep.js';
-import { classify, Recorder, recordingExecFile, recordingFetch, recordingSetTimeout } from '../../scripts/perf/instrument.js';
+import { classify, Recorder, recordHelperCalls, recordingExecFile, recordingFetch, recordingSetTimeout } from '../../scripts/perf/instrument.js';
+import type { ExecFn } from '../../src/adapters/exec.js';
+import { runIdb } from '../../src/adapters/idb.js';
+import type { IdbHelper } from '../../src/adapters/idb-helper.js';
 
 // instrument.ts: the baseline's wrappers over the process boundary (child_process.execFile, fetch) and averi's sleep
 // (setTimeout called from src/util/sleep.ts). Each wrapper is checked over a fake of what it wraps and a hand-moved
@@ -187,6 +190,34 @@ describe('recordingSetTimeout — averi\'s sleeps, told by the frame that set th
     } finally {
       globalThis.setTimeout = saved;
       vi.useRealTimers();
+    }
+  });
+});
+
+describe('recordHelperCalls — a call the idb helper serves is no process, and is still counted', () => {
+  it('records a helper-served describe-all as `idb ui describe-all` via the helper, and nothing after unsubscribing', async () => {
+    const saved = process.env.DEVELOPER_DIR;
+    process.env.DEVELOPER_DIR = '/fake/Developer'; // the Xcode probe answers without exec
+    const c = clock();
+    const rec = new Recorder(c.now);
+    const stop = recordHelperCalls(rec);
+    try {
+      // A helper that takes the call and answers at 30: runIdb publishes around it.
+      const answer = { kind: 'answer' as const, code: 0, stdout: Buffer.from('[]'), stderr: '' };
+      const helper = { run: () => new Promise((r) => setTimeout(() => (c.set(30), r(answer)), 0)) } as unknown as IdbHelper;
+      const exec: ExecFn = async () => ({ stdout: Buffer.from('cli'), stderr: '' });
+      rec.begin();
+      c.set(10);
+      await runIdb(exec, 'D8DACDE6-6352-437C-AA22-86FB06275C3F', ['ui', 'describe-all', '--json'], { helper });
+      expect(rec.end().calls).toEqual([{ kind: 'idb', label: 'idb ui describe-all', startMs: 10, endMs: 30, ok: true, via: 'helper' }]);
+      stop();
+      rec.begin();
+      await runIdb(exec, 'D8DACDE6-6352-437C-AA22-86FB06275C3F', ['ui', 'describe-all', '--json'], { helper });
+      expect(rec.end().calls).toEqual([]);
+    } finally {
+      stop();
+      if (saved === undefined) delete process.env.DEVELOPER_DIR;
+      else process.env.DEVELOPER_DIR = saved;
     }
   });
 });
