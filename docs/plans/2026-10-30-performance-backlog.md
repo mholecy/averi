@@ -52,7 +52,7 @@ measured before and after.
 | D22 | iOS registry probe: the bound simulator proven booted from its `device.plist` (0.05 ms) before `simctl list devices` (~80–110 ms, every verb); anything else falls back to simctl | device | done (3574d5b2; ADR 0031) — device-checked: tree −32 %, tap −12 % |
 | D23 | iOS launch: the two `simctl spawn defaults write` (Accessibility) together, not in series | device | done (fa334d35; not one spawn — the iOS 27 runtime has no shell; 445 → 250 ms a launch on the lab simulator) |
 | D24 | iOS RN: a burst from `idb ui text` drops a controlled field's tail — after a repaired drop (ADR 0023's retype landed it), later typings into that app send the first key alone, 150 ms (50 ms since D25), then the rest | stability | done (ffec743d; ADR 0023 D24 amendment) — device-checked: rn-fill-20 5 925 → 2 346 ms (−60 %) |
-| D25 | iOS RN: the D24 split also costs short texts that never dropped (rn-fill "Jan" 2 155 → 2 341 ms, +1 idb call + 150 ms) — measure from what length a burst drops, split only above it | device | done (c2d82c2a; no length threshold — a burst drops from 2 characters; FIRST_KEY_ALONE_MS 150 → 50 ms, ADR 0023 D25 amendment; the 50 ms through averi's helper waits for a device check) |
+| D25 | iOS RN: the D24 split also costs short texts that never dropped (rn-fill "Jan" 2 155 → 2 341 ms, +1 idb call + 150 ms) — measure from what length a burst drops, split only above it | device | done (c2d82c2a; no length threshold — a burst drops from 2 characters; FIRST_KEY_ALONE_MS 150 → 50 ms, ADR 0023 D25 amendment; device-checked 2026-10-31: rn-fill 2 000 → 1 925 ms, rn-fill-20 2 031 → 1 930 ms, every split landed first time) |
 | D26 | iOS: `simctl io screenshot` stalls ~+1 000 ms (bimodal ~400 / ~1 400 ms) in ~10 % of calls (D7a A/B: 24/201), with or without the idb helper, never under WDA-only runs' tree reads — every screenshot, colour/OCR assert and ensure_state frame can pay it; find the cause (a frame/IOSurface wait?), try `idb screenshot` through the helper or a timeout-and-retry, and count stalls separately in the D0 report | device | D26a done (aa676f9e: the D0 report and `scripts/perf/stalls.ts` count stalls > 900 ms apart, with a stall-free median); D26b (idb screenshot on the idb tree source) done (a06b7ad8; device A/B: screenshot 1 085 → 487 ms, color −625, ocr −641, ensure-warm −636, ensure-cold −630) |
 
 ## Notes
@@ -397,6 +397,13 @@ companion-side 50 ms HIDDelay between the first key and the rest) 80/80 (148/204
 lands the rest: a HID delay inside one call as well as the second call's own ~90 ms round trip. Decision: FIRST_KEY_ALONE_MS 150 → 50 ms (−100 ms per typing into an app
 seen dropping a tail; 50 ms of margin over split:0: a bare 50 ms pause with no round trip, hid:50, landed
 80/80, so the sleep lands even if the helper's round trip shrank). hid:G (one call) would save ~90 ms more but needs a new helper verb carrying a delay — not now.
+
+### D25 device check (2f431be7, 2026-10-31, `ios-run.sh ios-rn-d25 --app react-native --repeat 5`)
+React Native, WDA tree, input through the helper with FIRST_KEY_ALONE_MS = 50: 15/15 ok. Repeat 1's rn-fill-20 is
+D24's learning run (5 041 ms: the drop repaired, the app then splits); from there every typing split (`idb ui text` ×2)
+and landed on the first read-back — no retype, no extra 400 ms poll in repeats 2–5. Medians against D7b's run (150 ms
+gap, same path): rn-fill ("Jan") 2 000 → 1 925 ms, rn-fill-20 2 031 → 1 930 ms [1 880–1 945 after learning]; the
+ios.ts:549 sleep shows as 40 ms a run (0.8 × 50). So 50 ms through averi's helper lands as the script's split:50 did.
 
 ### D2 and D11 analysed (2026-10-31)
 D2 is still real at HEAD: the second look before a rung (`detects` over `ensureTimeoutMs`, 20 s, engine.ts ~727) ends
