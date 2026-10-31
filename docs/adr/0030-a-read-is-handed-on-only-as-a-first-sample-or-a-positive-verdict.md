@@ -4,7 +4,8 @@ Status: accepted 2026-10-31 (performance backlog row D3, docs/plans/2026-10-30-p
 2026-10-31 …)"; the orchestrator's decision on the owner's standing: fast AND stable — acting on a stale or still-moving
 tree is unacceptable). Implemented on `perf/d3-read-handoff`: `844076de`
 (the hand-off, `pollTree`'s first round, the settle's first sample), `a77c1451` (the asserts), `9461eee8` (the engine,
-the `verify` leg, ARCHITECTURE.md §8); the device measurement follows.
+the `verify` leg, ARCHITECTURE.md §8), `8a76f5c5` (review: one `watching` helper, `detects`' options); measured on
+the lab emulator (below).
 
 ## Context
 
@@ -109,3 +110,35 @@ One dump per eligible read on Android, ≈ 2.3 s: cold `ensure_state` (launch, t
 flow `tap:` after a `wait:`/assert/detect 2 → 1 dump; each element assert after an assert, and a `verify` leg's first
 element assert after its state's detect. The MCP `tap` tool, a warm ensure and the color assert are unchanged (one
 call, no producer before them).
+
+## Device measurement
+
+2026-10-31, averi_lab AVD (Android 13, API 33), native app, `scripts/perf/baseline.ts --platform android --device
+emulator-5554 --scenarios ensure-cold,ensure-warm,tap,color --repeat 5`, the branch's base `70c565e9` against
+`8a76f5c5`.
+Medians, ms [min–max] (host load 4.8–6.2 on the base run, 3.8–4.2 on the branch's):
+
+| scenario | wall before | wall after | Δ wall | uiautomator dumps | dump ms |
+|---|---|---|---|---|---|
+| ensure_state cold | 14623 [13656–15313] | 12265 [11474–13614] | −2358 | 5.2 → 4.2 | 13018 → 10771 |
+| ensure_state warm | 3296 [2815–3537] | 3352 [3228–3378] | +56 | 1 → 1 | 2237 → 2243 |
+| tap | 4835 [4729–4980] | 4996 [4742–5014] | +161 | 2 → 2 | 4524 → 4596 |
+| color assert | 3451 [3346–3549] | 3595 [3292–3621] | +144 | 1 → 1 | 2319 → 2349 |
+
+- The cold ensure (launch, tap the catalog row, `wait:`, re-detect) loses the re-detect's dump: the rung's closing
+  `wait:` read answers it. −2.36 s, the one dump (≈ 2.25 s) and the device calls 14 → 13; one base run and one branch
+  run each read once more (16 and 15 calls: a cold launch's first read missed), the same shape on both sides. The
+  rung's tap still reads twice: the `launch` before it invalidates the entry probe's read, as designed.
+- Warm ensure, the MCP `tap` and the color assert have no producer before them in their call: same device calls, same
+  sleeps; their wall moves by the dumps' own spread (+6…+72 ms a dump here).
+- No new pause: the cold ensure's sleeps are the same 453 ms (the capture's 300, the tap settle's 150) — no handed
+  round missed.
+- Host CPU per call rose by 6–60 ms (color 47 → 107 ms); not investigated further — it is not in the wall-clock
+  difference, which the dumps explain, and stays under D0's 133 ms per call.
+
+Live golden, `scripts/truth/live.ts --serial emulator-5554 --groups forms` (the `forms` group holds the `run_flow`,
+`wait:` and assert cases; the script has no separate flows group), base and branch: 32 cases each, 27 ok, 2 LOUD (b1d,
+b7: `adb input text` refuses `Š` and `’`, known), 3 SKIP (kf1–kf3: the keyboard came up docked), 0 mismatches — every
+verdict, and every reply line, the same case for case.
+
+Raw runs: the session's `scratchpad/d3-live/` (baseline-base/branch .json and .log, live-base/branch .log).
