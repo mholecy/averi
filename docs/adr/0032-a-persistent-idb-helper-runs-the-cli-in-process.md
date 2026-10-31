@@ -191,7 +191,7 @@ it; it is a ~1 s wait inside CoreSimulator, worst beside a `simctl spawn launchc
   not the viewport at one scale (a turned one) or a viewport that cannot be read compared whole as before; a
   difference in the first row under the band still fails (tests/verify/assert.test.ts). The band is the status bar's
   and the island's, never the app's to assert on — the same band a tap counts as off the screen.
-- **D0** counts both captures (`scripts/perf/stats.ts#SCREENSHOT_LABELS`): the totals as before, `stalls.byLabel` in
+- **D0** counts both captures (`SCREENSHOT_LABELS` in `scripts/perf/stats.ts`): the totals as before, `stalls.byLabel` in
   the JSON (added, nothing changed), a stall line per capture in the text.
 - The differential's fake device answers `idb screenshot -` with the same frame as simctl's file.
 - Residuals: the companion's own screenshot path under load is measured only by the diag (120 rounds, one simulator);
