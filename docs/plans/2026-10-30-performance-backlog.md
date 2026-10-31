@@ -47,7 +47,7 @@ measured before and after.
 | D17 | uiautomator cuts a sideways carousel item's bounds at the screen edge, so its true centre is unknown and "CLIPPED 88 %" can name an item whose centre is past the carousel edge (pre-existing; found in D10's live run, `carousel-in-list.C`) | correctness | open |
 | D18 | No lab field reformats as it is typed into (IBAN grouping, amount separators): the typing pace and a fill's read-back are unproven there, and `type_text` without a selector, flow `type:` and `type_pin` type blind (found in D6's review) | stability | open |
 | D19 | Android capture by `shell screencap <file>` + `adb pull` (raw RGBA, PNG encoded on the host only when returned/stored): −80…110 ms per capture on lab screens, −1.3 s on photo-heavy ones; changes the `screenshot()` contract | device | open |
-| D20 | iOS idb: `scroll_until` on form-picker's 45-row sheet stops "the swipe CHANGED THE SCREEN" after its first stroke (524 pt / 300 ms) — every repeat of the D0 probe 2026-10-31; suspected a fling past all 15 listed rows (idb's flat tree keeps no anchor), not a dismissal — to be proven on the device | stability | open |
+| D20 | iOS idb: `scroll_until` on form-picker's 45-row sheet stops "the swipe CHANGED THE SCREEN" after its first stroke (524 pt / 300 ms) — every repeat of the D0 probe 2026-10-31; suspected a fling past all 15 listed rows (idb's flat tree keeps no anchor), not a dismissal — to be proven on the device | stability | done in code (7e32f1d3; idb full strokes paced at 349 pt/s, ADR 0018 Decision 4) — the owner's iOS device check pending |
 
 ## Notes
 
@@ -220,6 +220,13 @@ Albania → Italy at the top, still moving at 0.4 s) — past every row of the r
 anchor and `screenChangedUnder` names a dismissal that did not happen; 524 pt / 1.5 s carried ~11 rows (~570 pt, the
 stroke plus a little) and kept two rows of the read before; 160 pt / 600 ms (the feeler) ~3 rows. So on idb a full
 stroke flings about twice its length on a SwiftUI List and loses the overlap the changed-screen judgement relies on.
+
+Fixed in 7e32f1d3 (perf/d20-idb-paced-strokes): on a tree idb read, every full `scroll_until` stroke takes
+`max(300, ceil(travel / 349 pt/s))` ms (`interact/stroke-plan.ts#PACED`, gated on `CallEvidence.source === 'idb'`; the
+feeler first; no `IosAdapter.dragSpeed`, so WDA and Android are unchanged). Golden: 63 idb scroll checks changed, the
+`--duration` alone (0.3 → 1.502 for 524 pt). Estimated cost ~1.2 s a stroke; the limits (6 swipes, 15 s) unchanged and
+named in ADR 0018 Decision 4 as what the device run decides. Device check (outside the sandbox, the pre-run recipe of D0):
+`node --import tsx scripts/perf/baseline.ts --platform ios --device <udid> --scenarios scroll --repeat 5`.
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
