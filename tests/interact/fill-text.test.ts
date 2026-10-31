@@ -69,6 +69,17 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
     );
   });
 
+  it('an added `.` or `,` is a ⚠ caveat on both media, never the aside', () => {
+    const point = "the field shows them reformatted: 1 separator added — it added '.': check it is a thousands separator, not a decimal point";
+    expect(both('id:amount', fact({ typed: 4, readBack: landed, reformatted: { added: 1, respaced: 0, point: '.' } }), '1234')).toEqual({
+      reply: `Filled id:amount (4 characters)\n⚠ ${point}`,
+      flow: [
+        ['⚠ fill', `id:amount: ${point}`],
+        ['fill', 'id:amount = 1234'],
+      ],
+    });
+  });
+
   it('a clear that sent no delete says nothing of clearing, on either medium', () => {
     expect(both('id:amount', fact({ typed: 4, readBack: landed, cleared: 0 }), '2.50')).toEqual({
       reply: 'Filled id:amount (4 characters)',

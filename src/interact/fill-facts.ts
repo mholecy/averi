@@ -162,11 +162,15 @@ export interface FillResult {
 /**
  * How a field reformatted what was typed (FillResult.reformatted, measured by interact/fill-type.ts#reformatOf):
  * `added` the separators it put between the typed characters, `respaced` the typed spaces it shows as another space
- * (a no-break or narrow no-break space). Counts only, never content.
+ * (a no-break or narrow no-break space) — never both 0: reformatOf returns no Reformat for an exact reading. `point`:
+ * the added separator is `.` or `,`, which the reading cannot tell from a decimal point (FillVerdict's caveat). Counts
+ * only, never content: on a secret, `respaced` can only be measured in a field that shows it unmasked (a masked
+ * reading is never a reformat).
  */
 export interface Reformat {
   added: number;
   respaced: number;
+  point?: '.' | ',';
 }
 
 /**

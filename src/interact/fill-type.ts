@@ -151,10 +151,9 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
   // them the change alone is the proof, as their length is for inputs.
   const tookText = (observed: string) =>
     intent.isInput || (observed !== intent.resolvedValue && (isMaskedValue(observed) || observed.includes(value)));
-  const landed = (observed: string) =>
-    tookText(observed) &&
-    (reformatted(observed) !== undefined ||
-      (isMaskedValue(observed)
+  // What a reading that landed is: exact (`{}`), or reformatted — computed once per reading, by the poll (`landing`).
+  const exactly = (observed: string) =>
+    isMaskedValue(observed)
         ? clear
           ? observed.length === value.length
           : observed.length >= intent.maskedHeld + value.length
@@ -164,18 +163,24 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
             // `Search`, nothing typed must not pass for a typed `ear`.
             // Raw equality first: a value equal to the placeholder is the
             // one reading that cannot be told from it (see `fill-facts.ts#heldText`).
-            observed === value || heldText(observed, intent.placeholder).includes(value)));
+            observed === value || heldText(observed, intent.placeholder).includes(value);
   // D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows the typing with
   // separators of its own (`reformatOf`): what it should hold — its earlier text, unless cleared, then the value —
-  // reformatted. A masked reading never is one (bullets are no typed characters), and a non-input still proves it took
-  // the text only by showing it (`tookText`, which a reformatted reading does not pass).
-  const reformatted = (observed: string): Reformat | undefined => reformatOf(heldText(observed, intent.placeholder), priorText(intent) + value);
+  // reformatted. A masked reading never is one (bullets are no typed characters). `tookText` gates this rule as it
+  // gates the exact one: a non-input must still have changed to show the value itself, which a reformatted reading
+  // (the value split by separators) never contains.
+  const landing = (observed: string): Landing | undefined => {
+    if (!tookText(observed)) return undefined;
+    const reformatted = reformatOf(heldText(observed, intent.placeholder), priorText(intent) + value);
+    if (reformatted !== undefined) return { reformatted };
+    return exactly(observed) ? {} : undefined;
+  };
 
   // What every other input held when typing began: the proof that the typing stayed in the field (`whereTyped`).
   const before = io.screen();
   const others = before === undefined ? undefined : inputsOf(before, inputKey(intent.field));
   await io.type(value);
-  let read = await pollValue(io.read, landed, intent.pollMs);
+  let read = await pollValue(io.read, landing, intent.pollMs);
   const again: SentAgain[] = [];
   const tails = () => again.filter((a) => a.kind === 'tail').length;
   for (;;) {
@@ -185,14 +190,14 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     // A non-input that never took the text is not the field: never wiped (its length is not the field's), never
     // retyped. Asked of the first reading only, as it always was: after a retry the last reading is a mismatch.
     if (again.length === 0 && !tookText(observed)) return { kind: 'not-taken', observed };
-    if (landed(observed)) {
+    if (read.landed !== undefined) {
       // A drop is proven only by its repair: the typing landed whole through a tail typed again. A capped or
       // trimming field (maxLength, an IBAN or phone mask) keeps its strict prefix for good — its retype moves nothing
       // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
       // (D24 review).
       if (tails() > 0) io.reportDroppedTail();
-      const reformat = reformatted(observed);
-      return { kind: 'landed', observed, again, ...(reformat !== undefined && { reformatted: reformat }) };
+      const { reformatted } = read.landed;
+      return { kind: 'landed', observed, again, ...(reformatted !== undefined && { reformatted }) };
     }
     const where = whereTyped(others, io.screen(), missingOf(observed, intent));
     const tail =
@@ -213,7 +218,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       return { kind: 'missed', observed, again, ...(where.kind === 'elsewhere' && { elsewhere: where.input }) };
     }
     const prior = observed;
-    read = { ...(await pollValue(io.read, landed, intent.pollMs)), prior };
+    read = { ...(await pollValue(io.read, landing, intent.pollMs)), prior };
   }
 }
 
@@ -221,45 +226,91 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
 const SPACES = new Set([' ', '\u00A0', '\u202F']);
 /** What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. */
 const SEPARATORS = new Set([...SPACES, '.', ',', '-', '/']);
-/** An added `.` or `,` is a thousands separator only: exactly three digits after it, then no digit. */
-const THOUSANDS_AFTER = /^\d{3}(?!\d)/;
+/** The added separators that could be a decimal point: said as a caveat, never passed silently (FillVerdict). */
+const POINTS = new Set(['.', ',']);
+const ALNUM = /^[\p{L}\p{N}]$/u;
+const DIGITS = /^\d+$/;
 
 /**
- * The reading is `expected` — every character of it, in order — with separators the field added between them (an IBAN
- * grouped in fours, an amount's thousands, a date's slashes) and nothing else: `Reformat`, else undefined (also for an
- * exact reading, which the exact rule passes). D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md.
- * Tight, since a wrong pass is worse than a false mismatch:
+ * The reading is `expected` — every character of it, in order — with ONE separator character the field added between
+ * them (an IBAN grouped in fours, an amount's thousands, a date's slashes) and nothing else: `Reformat`, else undefined
+ * (also for an exact reading, which the exact rule passes — a Reformat always counts at least one change). D18,
+ * docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md. Tight, since a wrong pass is worse than a false
+ * mismatch:
  * - every expected character is shown, in order and unchanged — a typed space may be shown as another space
- *   (`respaced`), nothing else may differ (letter case included);
- * - only SEPARATORS are added, never before the first expected character (a leading `-` is a sign);
- * - an added `.` or `,` is a thousands separator only (three digits after it, then none): a cents mask that shows
- *   `125` as `1.25` changed the amount;
- * - a separator that was typed must be shown: a field that dropped one (`12,50` → `1250`) changed the value.
+ *   (`respaced`), nothing else may differ (letter case included); a separator that was typed must be shown: a field
+ *   that dropped one (`12,50` → `1250`) changed the value;
+ * - the added separators are all one character of SEPARATORS, each between two typed letters or digits: none
+ *   leading (a `-` there is a sign), trailing, next to another, or after typed punctuation (`Hello, world` for
+ *   `Hello,world` is an edit, not a format);
+ * - they cut the typing into groups of two or more characters, but for ONE single-character group at either end
+ *   (`1 234`, an IBAN's last `1`): `1-5` for `15` is no grouping;
+ * - an added `.` or `,` is a thousands separator: never a character the typing itself holds as `.` or `,`, the digits
+ *   before the first one 1–3 and not a lone `0`, exactly three between two of them and after the last (then no
+ *   digit). That rules out a cents mask's `1.25` for `125` and `0.123` for `0123`, but not every decimal point: `1.234`
+ *   for `1234` is de-DE's thousands or a three-decimal mask, which the reading cannot tell — so the verdict passes it
+ *   with a caveat (`point`), not silently.
  * Greedy: a reading character equal to the next expected one is taken as that character. Taken as an added separator
  * instead, the expected one would have to match a later, equal character — so matching first never rejects what
- * skipping would pass, but under the thousands rule, where the miss is a false mismatch (the safe side). Pure,
+ * skipping would pass but under the grouping rules, where the miss is a false mismatch (the safe side). Pure,
  * O(reading).
  */
 export function reformatOf(observed: string, expected: string): Reformat | undefined {
-  if (observed === expected) return undefined;
+  // The reading as tokens: each an expected character shown (its index) or an added separator (-1).
+  const tokens: number[] = [];
   let j = 0;
-  let added = 0;
   let respaced = 0;
-  for (let i = 0; i < observed.length; i++) {
-    const c = observed[i];
+  for (const c of observed) {
     const e = expected[j];
-    if (c === e) {
-      j++;
-    } else if (e !== undefined && SPACES.has(c) && SPACES.has(e)) {
-      j++;
+    if (c === e) tokens.push(j++);
+    else if (e !== undefined && SPACES.has(c) && SPACES.has(e)) {
+      tokens.push(j++);
       respaced++;
-    } else if (SEPARATORS.has(c) && j > 0 && ((c !== '.' && c !== ',') || THOUSANDS_AFTER.test(observed.slice(i + 1)))) {
-      added++;
-    } else {
-      return undefined;
-    }
+    } else if (SEPARATORS.has(c)) tokens.push(-1);
+    else return undefined;
   }
-  return j === expected.length ? { added, respaced } : undefined;
+  if (j !== expected.length) return undefined;
+  const chars = [...observed];
+  const added = new Set(chars.filter((_, k) => tokens[k] === -1));
+  if (added.size > 1) return undefined;
+  const sep = [...added][0];
+  // Each added separator between two typed letters or digits; the groups between them.
+  const groups: number[] = [0];
+  for (let k = 0; k < tokens.length; k++) {
+    if (tokens[k] !== -1) {
+      groups[groups.length - 1]++;
+      continue;
+    }
+    // Both neighbours typed letters or digits: none leading or trailing (no neighbour), none next to another added
+    // one (-1), none after typed punctuation.
+    const typedAlnum = (t: number | undefined) => t !== undefined && t !== -1 && ALNUM.test(expected[t]);
+    if (!typedAlnum(tokens[k - 1]) || !typedAlnum(tokens[k + 1])) return undefined;
+    groups.push(0);
+  }
+  const short = groups.map((n, k) => (n < 2 ? k : -1)).filter((k) => k !== -1);
+  if (short.length > 1 || (short.length === 1 && short[0] !== 0 && short[0] !== groups.length - 1)) return undefined;
+  if (sep !== undefined && POINTS.has(sep) && !thousands(chars, tokens, expected, sep)) return undefined;
+  const count = groups.length - 1;
+  if (count + respaced === 0) return undefined;
+  return { added: count, respaced, ...(sep !== undefined && POINTS.has(sep) && { point: sep as '.' | ',' }) };
+}
+
+/** An added `.` or `,` groups digits by thousands (see `reformatOf`). */
+function thousands(chars: string[], tokens: number[], expected: string, sep: string): boolean {
+  // The typing holds this character itself (its decimal point, or its own grouping): an added one is no thousands mark.
+  if (expected.includes(sep)) return false;
+  const at = tokens.flatMap((t, k) => (t === -1 ? [k] : []));
+  let start = at[0] - 1;
+  while (start >= 0 && /\d/.test(chars[start])) start--;
+  const lead = chars.slice(start + 1, at[0]).join('');
+  if (!DIGITS.test(lead) || lead.length > 3 || lead === '0') return false;
+  for (let n = 0; n < at.length; n++) {
+    const end = n + 1 < at.length ? at[n + 1] : at[n] + 4;
+    const run = chars.slice(at[n] + 1, end).join('');
+    if (run.length !== 3 || !DIGITS.test(run)) return false;
+    if (n + 1 === at.length && chars[end] !== undefined && /\d/.test(chars[end])) return false;
+  }
+  return true;
 }
 
 /** Every input on a screen but the field, by role, identifier and rect, with the value it shows. */
@@ -348,13 +399,20 @@ interface PollEnd {
   observed: string | undefined;
   steady: boolean;
   prior?: string;
+  /** The last reading landed, and how (`Landing`); absent when it did not. */
+  landed?: Landing;
+}
+
+/** A reading that landed: exactly (`{}`), or reformatted by the field (`reformatOf`). */
+interface Landing {
+  reformatted?: Reformat;
 }
 
 /** How many reads `pollValue` takes of the field at most, `pollMs` apart — a round count, not a deadline (ui-tree/read-tree.ts's module doc says why). */
 const READ_BACK_POLLS = 5;
 
 /**
- * Poll the field until its exposed value satisfies `ok`; returns the last observation.
+ * Poll the field until its exposed value lands (`ok`: how it landed, else undefined); returns the last observation.
  *
  * It does NOT stop early on a stable mismatch (considered 2026-10-09: the
  * auto-capitalised fill in docs/bugs/2026-10-09-fill-mismatch-error-says-
@@ -368,13 +426,14 @@ const READ_BACK_POLLS = 5;
  * cost of a transformed value is paid on a fill that fails anyway; the price
  * of stopping early would be paid by ones that pass.
  */
-async function pollValue(read: () => Promise<string | undefined>, ok: (observed: string) => boolean, pollMs: number): Promise<PollEnd> {
+async function pollValue(read: () => Promise<string | undefined>, ok: (observed: string) => Landing | undefined, pollMs: number): Promise<PollEnd> {
   let observed: string | undefined;
   let previous: string | undefined;
   for (let i = 0; i < READ_BACK_POLLS; i++) {
     previous = observed;
     observed = await read();
-    if (observed !== undefined && ok(observed)) return { observed, steady: false };
+    const landed = observed === undefined ? undefined : ok(observed);
+    if (landed !== undefined) return { observed, steady: false, landed };
     // No text (a non-input withholding it) or no field — stop waiting. An
     // empty input reads "" and keeps every round: its text may be late.
     if (observed === undefined && i >= 1) return { observed, steady: false };

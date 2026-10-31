@@ -1309,6 +1309,15 @@ describe('fillField — the mismatch error says what differs, without content (2
     );
   });
 
+  // D18 review round 1 (d): a de-DE thousands mark reads as a 3-decimal mask's point would — passed, with a ⚠ caveat.
+  it('a field that adds a `.` between thousands is filled, the point said as a caveat', async () => {
+    const result = await fillField(transforming(null, (s) => s.replace(/\./g, '').replace(/^(\d)(\d{3})$/, '$1.$2')), { id: 'notes' }, '1234', FAST);
+    expect(result).toMatchObject({ readBack: { kind: 'landed' }, reformatted: { added: 1, point: '.' } });
+    expect(fillReply(result, 'id:notes')).toBe(
+      "Filled id:notes (4 characters)\n⚠ the field shows them reformatted: 1 separator added — it added '.': check it is a thousands separator, not a decimal point",
+    );
+  });
+
   // Until D18 the mask here inserted a space (`1234 5`) — a reformat that passes now (fill-type.ts#reformatOf). A cents
   // mask's decimal point changes the amount, so it still fails.
   it('a length difference says the lengths alone, as before (a cents mask that inserts a decimal point)', async () => {

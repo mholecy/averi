@@ -271,6 +271,8 @@ const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
     );
   },
   'masked-append': ({ held }) => `masked field already held ${charactersText(held)} and clear is not set — typing APPENDS; pass clear: true to replace`,
+  'reformatted-point': ({ reformat }) =>
+    `${reformattedText(reformat)} — it added '${reformat.point}': check it is a thousands separator, not a decimal point`,
 };
 
 /**

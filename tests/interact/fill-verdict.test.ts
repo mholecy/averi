@@ -26,6 +26,15 @@ describe('judgeFill — what the facts mean', () => {
     });
   });
 
+  it('a reformat that added `.` or `,` (a thousands mark or a decimal point?) is filled with a caveat, not the aside', () => {
+    expect(judgeFill(fact({ typed: 4, readBack: landed, reformatted: { added: 1, respaced: 0, point: '.' } }))).toEqual({
+      did: 'filled',
+      typed: 4,
+      reasons: [],
+      caveats: [{ code: 'reformatted-point', reformat: { added: 1, respaced: 0, point: '.' } }],
+    });
+  });
+
   it('a landed read-back is filled, with or without a clear that deleted something', () => {
     expect(judgeFill(fact({ typed: 4, readBack: landed }))).toEqual({ did: 'filled', typed: 4, reasons: [], caveats: [] });
     expect(judgeFill(fact({ typed: 4, readBack: landed, cleared: 7 }))).toMatchObject({ did: 'filled', sent: { what: 'characters', n: 7 }, reasons: [] });

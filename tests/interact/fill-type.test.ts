@@ -46,26 +46,31 @@ describe('droppedTail — a strict prefix with some of the typing in it, else no
  * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
  * character, in order, with separators of its own between them — measured on the lab's Compose, React Native and
  * VisualTransformation fields (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md). Tight: a field
- * that dropped, reordered or changed a character never passes, nor one whose added `.`/`,` is no thousands separator.
+ * that dropped, reordered or changed a character never passes, nor an added separator that is no grouping (review
+ * round 1, MAJOR-1: every pair the reviewer found is pinned below).
  */
-describe('reformatOf — the typed characters in order, only separators added', () => {
+describe('reformatOf — the typed characters in order, one separator added between groups', () => {
   it('an IBAN grouped in fours, an amount grouped by thousands (a no-break space), a date and a phone', () => {
     expect(reformatOf('SK31 1200 0000', 'SK3112000000')).toEqual({ added: 2, respaced: 0 });
-    expect(reformatOf('1 234 567,89', '1234567,89')).toEqual({ added: 2, respaced: 0 });
-    expect(reformatOf('1 234', '1234')).toEqual({ added: 1, respaced: 0 });
-    expect(reformatOf('1,234,567.89', '1234567.89')).toEqual({ added: 2, respaced: 0 });
-    expect(reformatOf('1.234,56', '1234,56')).toEqual({ added: 1, respaced: 0 });
+    expect(reformatOf('SK31 1200 0000 1', 'SK31120000001')).toEqual({ added: 3, respaced: 0 }); // a last group of one
+    expect(reformatOf('1\u00A0234\u00A0567,89', '1234567,89')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('1\u202F234', '1234')).toEqual({ added: 1, respaced: 0 }); // a first group of one
     expect(reformatOf('31/12/2026', '31122026')).toEqual({ added: 2, respaced: 0 });
     expect(reformatOf('0905-123-456', '0905123456')).toEqual({ added: 2, respaced: 0 });
   });
 
-  it('a typed space shown as a no-break space is respaced, not added; a trailing group separator is the field\'s', () => {
-    expect(reformatOf('1 234', '1 234')).toEqual({ added: 0, respaced: 1 });
-    expect(reformatOf('SK31 ', 'SK31')).toEqual({ added: 1, respaced: 0 });
-    expect(reformatOf('31/', '31')).toEqual({ added: 1, respaced: 0 });
+  it('an added `.` or `,` thousands separator passes, marked as a point (the verdict\'s caveat)', () => {
+    expect(reformatOf('1,234,567.89', '1234567.89')).toEqual({ added: 2, respaced: 0, point: ',' });
+    expect(reformatOf('1.234,56', '1234,56')).toEqual({ added: 1, respaced: 0, point: '.' });
+    expect(reformatOf('1.234', '1234')).toEqual({ added: 1, respaced: 0, point: '.' }); // de-DE, or a 3-decimal mask
+    expect(reformatOf('12.345.678', '12345678')).toEqual({ added: 2, respaced: 0, point: '.' });
   });
 
-  it('exactly the typed text is no reformat (the exact rule passes it)', () => {
+  it('a typed space shown as a no-break space is respaced, not added', () => {
+    expect(reformatOf('1\u00A0234', '1 234')).toEqual({ added: 0, respaced: 1 });
+  });
+
+  it('exactly the typed text is no reformat (the exact rule passes it): a Reformat always counts a change', () => {
     expect(reformatOf('SK31 1200', 'SK31 1200')).toBeUndefined();
     expect(reformatOf('', '')).toBeUndefined();
   });
@@ -85,17 +90,40 @@ describe('reformatOf — the typed characters in order, only separators added', 
     expect(reformatOf('12 50', '12,50')).toBeUndefined(); // changed, not added
   });
 
-  it('nothing added before the first typed character: a leading `-` is a sign', () => {
-    expect(reformatOf('-5', '5')).toBeUndefined();
+  it('a separator leading, trailing, next to another, or after typed punctuation is no grouping — free text included', () => {
+    expect(reformatOf('-5', '5')).toBeUndefined(); // a sign
     expect(reformatOf(' 5', '5')).toBeUndefined();
+    expect(reformatOf('1234-', '1234')).toBeUndefined();
+    expect(reformatOf('SK31 ', 'SK31')).toBeUndefined(); // an eager trailing group mark: a false mismatch, the safe side
+    expect(reformatOf('31/', '31')).toBeUndefined();
+    expect(reformatOf('1 - - 2', '12')).toBeUndefined();
+    expect(reformatOf('Hello, world', 'Hello,world')).toBeUndefined();
+    expect(reformatOf('1. 5', '1.5')).toBeUndefined();
+    expect(reformatOf('end. Start', 'end.Start')).toBeUndefined();
   });
 
-  it('an added `.` or `,` must be a thousands separator — three digits after it — never a decimal point a cents mask put in', () => {
+  it('groups of one on both sides, or one inside, are no grouping', () => {
+    expect(reformatOf('1-5', '15')).toBeUndefined();
+    expect(reformatOf('1/2', '12')).toBeUndefined();
+    expect(reformatOf('12 3 45', '12345')).toBeUndefined();
+  });
+
+  it('one separator character per reading', () => {
+    expect(reformatOf('1,234.567', '1234567')).toBeUndefined();
+    expect(reformatOf('31/12-2026', '31122026')).toBeUndefined();
+  });
+
+  it('an added `.` or `,` is a thousands separator only: never a cents mask\'s point, a typed point\'s twin, or an uneven grouping', () => {
     expect(reformatOf('1.25', '125')).toBeUndefined();
     expect(reformatOf('12,50', '1250')).toBeUndefined();
     expect(reformatOf('125.00', '12500')).toBeUndefined();
     expect(reformatOf('1.2345', '12345')).toBeUndefined(); // four digits after it
-    expect(reformatOf('12.', '12')).toBeUndefined(); // none after it
+    expect(reformatOf('1234.567', '1234567')).toBeUndefined(); // four before the first
+    expect(reformatOf('0.123', '0123')).toBeUndefined(); // a lone 0 before it
+    expect(reformatOf('1.23.456', '123456')).toBeUndefined(); // two between two of them
+    expect(reformatOf('1.234.5', '12345')).toBeUndefined(); // one digit after the last
+    expect(reformatOf('1.234.5', '1234.5')).toBeUndefined(); // the typing's own point
+    expect(reformatOf('1,234,5', '1234,5')).toBeUndefined();
   });
 });
 
@@ -294,6 +322,18 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
       again: [{ kind: 'whole', wiped: true }],
     });
     expect(typed).toEqual(['SK3112000000', 'SK3112000000']);
+  });
+
+  // Review round 1: the landing is computed once (`landing`), and `tookText` gates it — after a retry too, where the
+  // loop's own not-taken check is no longer asked.
+  it('a non-input that ends on its own resolved text after the wipe and retype has not landed', async () => {
+    const { io, intent, field } = scripted();
+    field.value = 'X';
+    expect(await typeAndConfirm(io, { ...intent, value: 'SK31', isInput: false, resolvedValue: 'SK31', clear: true })).toMatchObject({
+      kind: 'missed',
+      observed: 'SK31',
+      again: [{ kind: 'whole', wiped: true }],
+    });
   });
 
   it('a non-input proves it took the text only by showing it exactly: no reformat there', async () => {
