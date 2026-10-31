@@ -27,6 +27,8 @@ describe('classify — which device a command talks to, and the words it is grou
   it('names simctl through xcrun, and drops a simulator udid and idb\'s --udid', () => {
     expect(classify('xcrun', ['simctl', 'io', 'D8DACDE6-6352-437C-AA22-86FB06275C3F', 'screenshot', '/tmp/x.png'])).toEqual({ kind: 'simctl', label: 'simctl io screenshot' });
     expect(classify('idb', ['ui', 'describe-all', '--json', '--udid', 'D8DACDE6-6352-437C-AA22-86FB06275C3F'])).toEqual({ kind: 'idb', label: 'idb ui describe-all' });
+    // D26b: the idb tree source's capture — stats.ts#SCREENSHOT_LABELS counts it under this label.
+    expect(classify('idb', ['screenshot', '-', '--udid', 'D8DACDE6-6352-437C-AA22-86FB06275C3F'])).toEqual({ kind: 'idb', label: 'idb screenshot' });
   });
   it('calls anything else a host process, by its file name', () => {
     expect(classify('/var/folders/x/averi-ocr/recognizer-ab12', [])).toEqual({ kind: 'host', label: 'recognizer-ab12' });

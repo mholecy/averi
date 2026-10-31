@@ -3,7 +3,7 @@ import {
   isScreenshotStall,
   overallStalls,
   scenarioStalls,
-  SCREENSHOT_LABEL,
+  SCREENSHOT_LABELS,
   SCREENSHOT_STALL_MS,
   type DeviceCall,
   type Status,
@@ -15,12 +15,19 @@ import {
 // report counts the screenshots and the stalls apart, and gives each scenario's wall clock over its stall-free runs.
 // Numbers worked by hand. The rendering is tests/perf/report.test.ts's.
 
-const shot = (startMs: number, ms: number): DeviceCall => ({ kind: 'simctl', label: SCREENSHOT_LABEL, startMs, endMs: startMs + ms, ok: true });
+const shot = (startMs: number, ms: number): DeviceCall => ({ kind: 'simctl', label: 'simctl io screenshot', startMs, endMs: startMs + ms, ok: true });
+/** D26b: the idb tree source's capture, as instrument.ts#classify labels it (the CLI's and the helper's alike). */
+const idbShot = (startMs: number, ms: number): DeviceCall => ({ kind: 'idb', label: 'idb screenshot', startMs, endMs: startMs + ms, ok: true });
 const other = (ms: number): DeviceCall => ({ kind: 'idb', label: 'idb ui describe-all', startMs: 0, endMs: ms, ok: true });
 const win = (...calls: DeviceCall[]): Window => ({ calls, sleeps: [] });
 const run = (wallMs: number, window: Window, status: Status = 'ok'): TimedRun => ({ status, wallMs, window });
 
-describe('isScreenshotStall — a simctl screenshot over the threshold', () => {
+describe('isScreenshotStall — a screenshot over the threshold', () => {
+  it('knows both captures averi takes: simctl\'s and, since D26b, idb\'s', () => {
+    expect(SCREENSHOT_LABELS).toEqual(['simctl io screenshot', 'idb screenshot']);
+    expect(isScreenshotStall(idbShot(0, 1100))).toBe(true);
+    expect(isScreenshotStall(idbShot(0, 90))).toBe(false);
+  });
   it('sits between the modes: 900 ms', () => {
     expect(SCREENSHOT_STALL_MS).toBe(900);
   });
@@ -36,9 +43,10 @@ describe('isScreenshotStall — a simctl screenshot over the threshold', () => {
     // Recorder.end marks a pending call not ok; the type does not, and pending alone is enough.
     expect(isScreenshotStall({ ...shot(0, 1400), pending: true })).toBe(false);
   });
-  it('is only ever a simctl screenshot: a slow call of any other command is not one', () => {
+  it('is only ever a screenshot: a slow call of any other command is not one', () => {
     expect(isScreenshotStall(other(5000))).toBe(false);
     expect(isScreenshotStall({ ...shot(0, 1400), label: 'simctl io recordVideo' })).toBe(false);
+    expect(isScreenshotStall({ ...idbShot(0, 1400), label: 'idb ui describe-all' })).toBe(false);
   });
 });
 
@@ -56,6 +64,15 @@ describe('scenarioStalls — one scenario\'s screenshots, stalls, and wall clock
       run(30, win(shot(0, 400)), 'failed'),
     ]);
     expect(s).toEqual({ screenshots: 8, stalls: 3, failed: 0, stallFreeRuns: 3, stallFreeWallMs: { median: 1100, min: 1000, max: 1300 } });
+  });
+  it('counts an `idb screenshot` (D26b) as a screenshot, and its stall as a stall', () => {
+    expect(scenarioStalls([run(1000, win(idbShot(0, 80))), run(2000, win(idbShot(0, 1100))), run(1200, win(shot(0, 400)))])).toEqual({
+      screenshots: 3,
+      stalls: 1,
+      failed: 0,
+      stallFreeRuns: 2,
+      stallFreeWallMs: { median: 1100, min: 1000, max: 1200 },
+    });
   });
   it('has no stall-free wall clock when every ok run stalled', () => {
     expect(scenarioStalls([run(2000, win(shot(0, 1400)))])).toEqual({ screenshots: 1, stalls: 1, failed: 0, stallFreeRuns: 0 });
@@ -90,10 +107,13 @@ describe('overallStalls — the whole run\'s screenshots, and each mode\'s lengt
       failed: 0,
       okMs: { median: 375, min: 350, max: 400 },
       stallMs: { median: 1390, min: 1380, max: 1400 },
+      byLabel: {
+        'simctl io screenshot': { screenshots: 4, stalls: 2, failed: 0, okMs: { median: 375, min: 350, max: 400 }, stallMs: { median: 1390, min: 1380, max: 1400 } },
+      },
     });
   });
   it('is zero, with no lengths, when no screenshot was taken', () => {
-    expect(overallStalls([win(other(100))])).toEqual({ thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0 });
+    expect(overallStalls([win(other(100))])).toEqual({ thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0, byLabel: {} });
   });
   it('keeps a failed or pending screenshot out of the stalls and out of both lengths, and counts it apart', () => {
     expect(overallStalls([win(shot(0, 400), { ...shot(500, 1500), ok: false }, { ...shot(2000, 50), ok: false, pending: true }, shot(3000, 1400))])).toEqual({
@@ -103,6 +123,24 @@ describe('overallStalls — the whole run\'s screenshots, and each mode\'s lengt
       failed: 2,
       okMs: { median: 400, min: 400, max: 400 },
       stallMs: { median: 1400, min: 1400, max: 1400 },
+      byLabel: {
+        'simctl io screenshot': { screenshots: 4, stalls: 1, failed: 2, okMs: { median: 400, min: 400, max: 400 }, stallMs: { median: 1400, min: 1400, max: 1400 } },
+      },
+    });
+  });
+  it('counts `idb screenshot` (D26b) beside `simctl io screenshot`: in the totals, and per label apart', () => {
+    const o = overallStalls([win(shot(0, 400), idbShot(500, 80)), win(idbShot(0, 1100), idbShot(2000, 90), shot(3000, 1400))]);
+    expect(o).toEqual({
+      thresholdMs: 900,
+      screenshots: 5,
+      stalls: 2,
+      failed: 0,
+      okMs: { median: 90, min: 80, max: 400 },
+      stallMs: { median: 1250, min: 1100, max: 1400 },
+      byLabel: {
+        'simctl io screenshot': { screenshots: 2, stalls: 1, failed: 0, okMs: { median: 400, min: 400, max: 400 }, stallMs: { median: 1400, min: 1400, max: 1400 } },
+        'idb screenshot': { screenshots: 3, stalls: 1, failed: 0, okMs: { median: 85, min: 80, max: 90 }, stallMs: { median: 1100, min: 1100, max: 1100 } },
+      },
     });
   });
 });

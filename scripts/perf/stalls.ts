@@ -1,13 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fmtMs, stallCells, stallLine } from './report.js';
+import { fmtMs, stallCells, stallLines } from './report.js';
 import { overallStalls, scenarioStalls, type Spread, type TimedRun, type Window } from './stats.js';
 
 /**
  * D26's stall summary recomputed from D0 results JSON (baseline.ts `--out`) — for files written before the report
- * carried it, from each run's recorded window: per scenario its `simctl io screenshot` calls/stalls, its wall median and
- * its stall-free one, then the overall line; with several files, the pooled line last.
+ * carried it, from each run's recorded window: per scenario its screenshot calls/stalls (`simctl io screenshot` and,
+ * since D26b, `idb screenshot` — stats.ts#SCREENSHOT_LABELS), its wall median and
+ * its stall-free one, then the overall line per capture; with several files, the pooled lines last.
  *
  *   node --import tsx scripts/perf/stalls.ts <result.json> [<result.json> …]
  */
@@ -17,7 +18,7 @@ export interface ResultsJson {
   scenarios: { id: string; summary: { wallMs?: Spread }; runs: TimedRun[] }[];
 }
 
-/** Per file its name, a line per scenario and the overall line; with several files, the pooled line last. */
+/** Per file its name, a line per scenario and the overall line per capture; with several files, the pooled lines last. */
 export function stallReport(files: readonly { file: string; result: ResultsJson }[]): string[] {
   const out: string[] = [];
   const pooled: Window[] = [];
@@ -26,7 +27,7 @@ export function stallReport(files: readonly { file: string; result: ResultsJson 
     out.push(file, ...lines);
     pooled.push(...windows);
   }
-  if (files.length > 1) out.push(`pooled, ${files.length} files: ${stallLine(overallStalls(pooled))}`);
+  if (files.length > 1) out.push(...stallLines(overallStalls(pooled)).map((l) => `pooled, ${files.length} files: ${l}`));
   return out;
 }
 
@@ -38,7 +39,7 @@ function oneFile(result: ResultsJson): { lines: string[]; windows: Window[] } {
     return `  ${s.id.padEnd(width)}  ${shots}  wall med ${wall}  stall-free ${free}`;
   });
   const windows = result.scenarios.flatMap((s) => s.runs.map((r) => r.window));
-  return { lines: [...lines, `  ${stallLine(overallStalls(windows))}`], windows };
+  return { lines: [...lines, ...stallLines(overallStalls(windows)).map((l) => `  ${l}`)], windows };
 }
 
 async function main(files: string[]): Promise<void> {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fmtMs, fmtSpread, reportTable, stallCells, stallLine } from '../../scripts/perf/report.js';
-import type { Summary } from '../../scripts/perf/stats.js';
+import { fmtMs, fmtSpread, reportTable, stallCells, stallLine, stallLines } from '../../scripts/perf/report.js';
+import type { OverallStalls, Summary } from '../../scripts/perf/stats.js';
 
 // report.ts: the D0 report's text — the table, and D26's stall columns and line. Strings written out by hand.
 
@@ -15,27 +15,44 @@ describe('fmtMs / fmtSpread — the two number formats', () => {
   });
 });
 
-describe('stallLine — the overall stall line of the text report', () => {
+describe('stallLine — one capture\'s stall line of the text report', () => {
   it('says the count, the share and both modes', () => {
     expect(
-      stallLine({ thresholdMs: 900, screenshots: 201, stalls: 24, failed: 0, okMs: { median: 382.4, min: 336, max: 451 }, stallMs: { median: 1390, min: 1366, max: 1415 } }),
+      stallLine({ screenshots: 201, stalls: 24, failed: 0, okMs: { median: 382.4, min: 336, max: 451 }, stallMs: { median: 1390, min: 1366, max: 1415 } }, 900, 'simctl io screenshot'),
     ).toBe('simctl io screenshot: 24 stalls (> 900 ms) in 201 calls, 11.9 % · ok calls 382 [336–451] ms · stalls 1390 [1366–1415] ms');
   });
   it('says none stalled without a stall length', () => {
-    expect(stallLine({ thresholdMs: 900, screenshots: 50, stalls: 0, failed: 0, okMs: { median: 260, min: 240, max: 300 } })).toBe(
+    expect(stallLine({ screenshots: 50, stalls: 0, failed: 0, okMs: { median: 260, min: 240, max: 300 } }, 900, 'simctl io screenshot')).toBe(
       'simctl io screenshot: 0 stalls (> 900 ms) in 50 calls, 0.0 % · ok calls 260 [240–300] ms',
     );
   });
   it('says how many failed, and gives the share over the calls that completed', () => {
-    expect(stallLine({ thresholdMs: 900, screenshots: 10, stalls: 2, failed: 1, okMs: { median: 400, min: 380, max: 420 }, stallMs: { median: 1400, min: 1390, max: 1410 } })).toBe(
+    expect(stallLine({ screenshots: 10, stalls: 2, failed: 1, okMs: { median: 400, min: 380, max: 420 }, stallMs: { median: 1400, min: 1390, max: 1410 } }, 900, 'simctl io screenshot')).toBe(
       'simctl io screenshot: 2 stalls (> 900 ms) in 10 calls (1 failed, not timed), 22.2 % · ok calls 400 [380–420] ms · stalls 1400 [1390–1410] ms',
     );
   });
   it('gives no share when every screenshot failed', () => {
-    expect(stallLine({ thresholdMs: 900, screenshots: 2, stalls: 0, failed: 2 })).toBe('simctl io screenshot: 0 stalls (> 900 ms) in 2 calls (2 failed, not timed), — %');
+    expect(stallLine({ screenshots: 2, stalls: 0, failed: 2 }, 900, 'simctl io screenshot')).toBe('simctl io screenshot: 0 stalls (> 900 ms) in 2 calls (2 failed, not timed), — %');
   });
-  it('says none were taken', () => {
-    expect(stallLine({ thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0 })).toBe('simctl io screenshot: none taken');
+});
+
+describe('stallLines — the run\'s stall lines: one per capture it took (D26b)', () => {
+  const one = { screenshots: 2, stalls: 1, failed: 0, okMs: { median: 400, min: 400, max: 400 }, stallMs: { median: 1400, min: 1400, max: 1400 } };
+  const idb = { screenshots: 3, stalls: 0, failed: 0, okMs: { median: 85, min: 80, max: 90 } };
+  const total = (byLabel: OverallStalls['byLabel']): OverallStalls => ({ thresholdMs: 900, screenshots: 5, stalls: 1, failed: 0, byLabel });
+  it('is the one line it always was when the run took one kind', () => {
+    expect(stallLines(total({ 'simctl io screenshot': one }))).toEqual([
+      'simctl io screenshot: 1 stalls (> 900 ms) in 2 calls, 50.0 % · ok calls 400 [400–400] ms · stalls 1400 [1400–1400] ms',
+    ]);
+  });
+  it('is a line per capture when it took both, simctl\'s first', () => {
+    expect(stallLines(total({ 'idb screenshot': idb, 'simctl io screenshot': one }))).toEqual([
+      'simctl io screenshot: 1 stalls (> 900 ms) in 2 calls, 50.0 % · ok calls 400 [400–400] ms · stalls 1400 [1400–1400] ms',
+      'idb screenshot: 0 stalls (> 900 ms) in 3 calls, 0.0 % · ok calls 85 [80–90] ms',
+    ]);
+  });
+  it('says none were taken, naming both captures', () => {
+    expect(stallLines({ thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0, byLabel: {} })).toEqual(['simctl io screenshot / idb screenshot: none taken']);
   });
 });
 
@@ -66,14 +83,14 @@ describe('reportTable — the text table under the run\'s header line', () => {
   const ocr: Summary = { runs: 1, statuses: { unavailable: 1 } };
   const none = { screenshots: 0, stalls: 0, failed: 0, stallFreeRuns: 1 };
 
-  it('with no simctl screenshot taken is the columns it always had, and no stall line', () => {
+  it('with no screenshot taken is the columns it always had, and no stall line', () => {
     expect(
       reportTable(
         [
           { id: 'tap', summary: tap, stalls: none },
           { id: 'ocr', summary: ocr, stalls: { ...none, stallFreeRuns: 0 } },
         ],
-        { thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0 },
+        { thresholdMs: 900, screenshots: 0, stalls: 0, failed: 0, byLabel: {} },
       ),
     ).toEqual([
       'scenario            ok/runs  wall ms med [min–max]  dev calls  dev ms  dev busy  slept ms  sleeps  host ms  cpu ms',
@@ -82,7 +99,7 @@ describe('reportTable — the text table under the run\'s header line', () => {
     ]);
   });
   it('adds the stall columns when screenshots were taken, even with no stall', () => {
-    const [head] = reportTable([{ id: 'screenshot', summary: tap, stalls: { ...none, screenshots: 3 } }], { thresholdMs: 900, screenshots: 3, stalls: 0, failed: 0 });
+    const [head] = reportTable([{ id: 'screenshot', summary: tap, stalls: { ...none, screenshots: 3 } }], { thresholdMs: 900, screenshots: 3, stalls: 0, failed: 0, byLabel: { 'idb screenshot': { screenshots: 3, stalls: 0, failed: 0 } } });
     expect(head).toMatch(/shots\/stalls  stall-free wall med \(runs\)$/);
   });
   it('with one adds the two stall columns and the stall line', () => {
@@ -94,6 +111,7 @@ describe('reportTable — the text table under the run\'s header line', () => {
         failed: 0,
         okMs: sp(400, 380, 420),
         stallMs: sp(1400, 1390, 1410),
+        byLabel: { 'simctl io screenshot': { screenshots: 10, stalls: 2, failed: 0, okMs: sp(400, 380, 420), stallMs: sp(1400, 1390, 1410) } },
       }),
     ).toEqual([
       'scenario         ok/runs  wall ms med [min–max]  dev calls  dev ms  dev busy  slept ms  sleeps  host ms  cpu ms  shots/stalls  stall-free wall med (runs)',
