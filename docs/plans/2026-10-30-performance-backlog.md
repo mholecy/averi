@@ -43,7 +43,7 @@ measured before and after.
 | D13 | Small ones: `appHealth` ∥ `finalFrame`; `type_pin` key delay in YAML; config cache by mtime+size; Android `viewport()` and discovery `getprop` in parallel; status bands reuse the keyboard's `dumpsys` | device | done (02f78183): probe without getprop, ensure's health beside its frame; the rest won't do or measure later |
 | D14 | golden never reaches `framesOnly`: a mutation of it leaves golden at 0 changed (found in P1's review) | harness | open |
 | D15 | Two engines compiling the OCR helper at once share the `${binary}.${pid}` staging path (pre-existing; found in P6) | stability | done (65900f1f) |
-| D16 | `tests/truth/calibration.test.ts` spawns a `git merge-base` per fix and times out (5 s) under load | tests | open |
+| D16 | `tests/truth/calibration.test.ts` spawns a `git merge-base` per fix and times out (5 s) under load | tests | done (b5b40276) |
 | D17 | uiautomator cuts a sideways carousel item's bounds at the screen edge, so its true centre is unknown and "CLIPPED 88 %" can name an item whose centre is past the carousel edge (pre-existing; found in D10's live run, `carousel-in-list.C`) | correctness | open |
 | D18 | No lab field reformats as it is typed into (IBAN grouping, amount separators): the typing pace and a fill's read-back are unproven there, and `type_text` without a selector, flow `type:` and `type_pin` type blind (found in D6's review) | stability | open |
 | D19 | Android capture by `shell screencap <file>` + `adb pull` (raw RGBA, PNG encoded on the host only when returned/stored): −80…110 ms per capture on lab screens, −1.3 s on photo-heavy ones; changes the `screenshot()` contract | device | open |
@@ -323,6 +323,18 @@ counts). Part of the read saving again moves into D1's pause (`read-tree.ts:414`
 React Native (`ios-rn-d7b`, WDA tree, input through the helper): rn-fill 2 000 ms and rn-fill-20 2 031 ms medians, 5/5
 ok each; the first rn-fill-20 (5 041 ms) is D24's learning run (the drop repaired, the app then split), the next four
 1 962–2 045 ms (D24 after: 2 346). The D24 split holds through the helper. D7 done.
+
+### D26 diag (owner's run 2026-10-31, `scratchpad/d26/d26-diag.sh`, 120 interleaved rounds)
+Per capture, p50 / p90 / stalls: `simctl io screenshot` png 398 / 417 / 8 of 120 (jpeg 6.7 %, tiff 4.2 %, `--mask=ignored`
+10 %, `--display=internal` 2.5 % — no variant avoids it); `idb screenshot` CLI 168 / 179 / 0; a persistent fb-idb gRPC
+client (what the D7 helper would do) 77 / 88 / 0 of 120. Conditions for simctl: beside a `simctl spawn launchctl`
+38 % stall (appHealth beside ensure_state's frame), after 1.5 s idle 0 %, 300 ms after a capture 7.5 %, after a
+describe-all 2.5 %, two at once 7.5 % and +230 ms; a 1 s wait inside CoreSimulator, not encoding. Kill at 800 ms and
+retry: 8 of 180 killed, no retry stalled — but the kill costs 800 ms, so it saves ~600 ms on 4 % of calls only.
+`recordVideo` alongside: no effect worth having. Pixels: same size (1206×2622), same sRGB; idb draws the Dynamic Island
+(a black pill, 378×112 px at the top centre) where simctl shows the app's background, and 16 corner pixels differ.
+Decision: D26b = screenshots through idb on the idb tree source (helper first, the `idb screenshot` CLI as its fallback,
+so the image never mixes sources within a capture pair); simctl stays for WDA and when idb is unusable.
 
 ### D5 — raw screencap (measured, won't do)
 Measured 2026-10-31 on averi_lab API 33 (30 interleaved runs): `exec-out screencap -p` 368 ms median (device ~350 ms, of
