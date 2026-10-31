@@ -564,7 +564,11 @@ export const anotherScreen = (before: ScreenIdentity, after: ScreenIdentity): bo
  * - RECYCLED ROWS give a loud stop: under idb, which lists no scroll view, a fling that replaces every identified row
  *   it lists — touching down on a row or a gap — reads `changed` (the stop where the scroll could have gone on: the
  *   failure the decision prefers to a claimed stop); a list that also lists a node the read after keeps under the
- *   touch-down (a labelled header, a scroll view) is a scroll;
+ *   touch-down (a labelled header, a scroll view) is a scroll. Met on the first real list (D20, 2026-10-31: a full
+ *   300 ms stroke flung the lab's 45-row SwiftUI picker ~1 040 pt, past all 15 rows the read before listed; every D0
+ *   repeat stopped so): idb's full strokes are now paced (interact/stroke-plan.ts#PACED; ADR 0018, "idb's presented
+ *   layer", Decision 4), 524 pt in 1.5 s carrying it ~570 pt and keeping two rows. Narrowed, not closed: a list whose
+ *   rows are taller than a stroke's overlap, or one that flings further at that pace, still reads `changed`;
  * - a stroke whose touched node PERSISTS while the sheet goes — a row label the host repeats by role and label (a
  *   picker sheet over a list of the same items), a title, a scroll view at the very rect of one the host lists — keeps
  *   it unchanged, the stop claimed as before;

@@ -218,7 +218,16 @@ export type ScrollAdapter = Pick<
  *   its length the container's, and on an adapter
  *   with a `dragSpeed` (Android) at that speed (swipe.ts#dragMs) — the
  *   time it costs against the 15 s default is on adapters/android.ts
- *   #dragSpeed; the default is unchanged.
+ *   #dragSpeed; the default is unchanged. On idb's flat list a full
+ *   stroke is paced by its plan (stroke-plan.ts#PACED, 524 pt in 1.5 s;
+ *   D20) — estimated, not measured: a round ≈ 2.2–2.5 s (the stroke, the
+ *   400 ms settle, an idb read, overhead) against ~1 s before, so six
+ *   rounds ≈ 13–15 s and the 15 s timeout may fire before `maxSwipes`; a
+ *   call may end up to ~2.2 s past the timeout (judged before a stroke:
+ *   the stroke, the settle and the read after it), ~1.2 s more than
+ *   before; and six paced strokes reach ~3 400 pt, not the ~6 200 pt the
+ *   fling did (ADR 0018, "idb's presented layer", Decision 4). The
+ *   limits are unchanged until the owner's device run.
  * - Exhausted (scroll-rounds.ts#UNMOVED_STROKES_EXHAUST): a
  *   target in the tree, off the frame, with a non-zero rect, that two
  *   identical strokes in a row left — with every other match — where it was,
@@ -387,8 +396,9 @@ export async function scrollUntilVisible(
       // adapters/android.ts#dragSpeed has the measured fling and
       // the time it costs), so one stroke moves the content about its own
       // length and a row cannot cross the list between two reads; else at
-      // the adapter's default duration (iOS). A feeler over the time its plan gives it (`step.durationMs`,
-      // interact/stroke-plan.ts#FEELER), whatever the adapter's: slow, so a sheet the tree does not list springs back.
+      // the adapter's default duration (iOS). A feeler or a paced stroke over the time its plan gives it
+      // (`step.durationMs`, interact/stroke-plan.ts#FEELER, #PACED), whatever the adapter's: slow, so a sheet the tree
+      // does not list springs back, and on idb's flat list a full stroke does not fling past every row it listed (D20).
       const { points, durationMs } = step;
       if (points === undefined || screen === undefined) throw noBox;
       drawn = points;

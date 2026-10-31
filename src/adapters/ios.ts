@@ -320,14 +320,22 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * The stroke's duration defaults to 300 ms, and `scroll_until` passes
-   * none but a feeler's (interact/stroke-plan.ts#FEELER, 600 ms): this adapter sets no `dragSpeed` (types.ts#DeviceAdapter
-   * .dragSpeed; decided 2026-10-09 with the Android one). `idb ui swipe
-   * --duration` would take one, but nothing measured says which: a
+   * a feeler's (interact/stroke-plan.ts#FEELER, 600 ms) and, on idb's flat
+   * list, a paced full stroke's (interact/stroke-plan.ts#PACED, 349 pt/s:
+   * 524 pt in 1502 ms; its `minDurationMs` floor is this 300 ms default —
+   * keep the two in step) —
+   * on a WDA tree none: this adapter sets no `dragSpeed` (types.ts#DeviceAdapter
+   * .dragSpeed; decided 2026-10-09 with the Android one), which would pace
+   * WDA's strokes too and switch the motion ledger to drag rules. A
    * UIScrollView decelerates by a rate per ms, its fling roughly linear in
    * the lift speed (measured under WDA: a 344-pt stroke in 300 ms, 1147
    * pt/s, carried the SwiftUI form 729–970 pt), so a speed tuned on
-   * Android's spline would still fling here, and idb's own step timing
-   * over a long duration is unmeasured. The scroll's turn — every turn
+   * Android's spline would still fling here. idb's step timing over a long
+   * duration is measured once (D20, 2026-10-31, the lab's form-picker
+   * sheet, three runs each): 524 pt in 300 ms flung the SwiftUI List
+   * ~1 040 pt, in 1.5 s it carried it ~570 pt — the paced speed. Strokes
+   * between 300 ms and 1.5 s, a UIKit table and a horizontal stroke are
+   * unmeasured. The scroll's turn — every turn
    * halving the reach — was device-checked on that form, and a lazy list's
    * dropped row now turns the stroke too (interact/scroll-rounds.ts) —
    * and, on WDA's trees, no stroke reaches further than the target still

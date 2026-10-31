@@ -1387,4 +1387,17 @@ describe('scroll_until\'s feeler on idb, as the driver sends it', () => {
       { from: { x: 201, y: 175 }, to: { x: 201, y: 335 }, durationMs: 600 },
     ]);
   });
+
+  it('a full stroke on idb is paced (D20): the plan\'s time reaches adapter.swipe — the picker\'s 524 pt in 1502 ms', async () => {
+    const picker = parseIdbDescribeAllOf(await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/form-picker.idb.json', import.meta.url), 'utf8'));
+    const fake = new FakeAdapter({ picker }, 'picker');
+    fake.platform = 'ios';
+    fake.keyboard = undefined; // as IosAdapter: no oracle
+    fake.viewportSize = { width: 402, height: 874, statusBand: 62 };
+    await scrollUntilVisible(fake, 'id:lab.form-picker.country.GB', { maxSwipes: 6, timeoutMs: 5_000, settleMs: 1 }).catch(() => undefined);
+    expect(fake.swipes).toEqual([
+      { from: { x: 201, y: 699 }, to: { x: 201, y: 175 }, durationMs: 1502 },
+      { from: { x: 201, y: 699 }, to: { x: 201, y: 175 }, durationMs: 1502 },
+    ]);
+  });
 });

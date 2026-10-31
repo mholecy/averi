@@ -1286,25 +1286,33 @@ function detentMove({ detents }: State): DetentMove | undefined {
  *   the strokes may land on such a layer — `source`, the tree source the stop's note speaks of. THE FEELER's trigger:
  *   its content-up strokes are feelers (`strokeKind`; interact/stroke-plan.ts#StrokeKind, how a feeler is drawn);
  * - `felt`: anything else — a tree that lists its presented layers or its scroll views (WDA, uiautomator; a layer it
- *   marks is no stroke's, the plan's `presented`), a target the call has seen, a tree a stroke has moved.
+ *   marks is no stroke's, the plan's `presented`), a target the call has seen, a tree a stroke has moved. Its `source`,
+ *   when the last read that read is still of a source that lists only the top layer (the strokes after the first on
+ *   idb, a target seen there): THE PACE's trigger — idb's full strokes are paced (`strokeKind`; D20).
  */
-type CallEvidence = { of: 'unread' } | { of: 'unfelt'; source: TopLayerOnlySource } | { of: 'felt' };
+type CallEvidence = { of: 'unread' } | { of: 'unfelt'; source: TopLayerOnlySource } | { of: 'felt'; source?: TopLayerOnlySource };
 
 function callEvidence(s: State): CallEvidence {
   const last = s.screenBefore?.tree;
   if (last === undefined) return { of: 'unread' };
   const source = topLayerOnlySource(last);
-  return source !== undefined && !s.everFound && !treeMoved(s.motion) ? { of: 'unfelt', source } : { of: 'felt' };
+  if (source === undefined) return { of: 'felt' };
+  return !s.everFound && !treeMoved(s.motion) ? { of: 'unfelt', source } : { of: 'felt', source };
 }
 
 /**
  * The kind of stroke this round sends toward `toward` (interact/stroke-plan.ts#StrokeKind): a FEELER while the call's
  * strokes are `unfelt`, toward content ABOVE (`up`: the finger dragged down — the one stroke that dismisses a
  * swipe-dismissable sheet; measured, ADR 0018 residual 6); else a full stroke — every push-up, and every stroke the
- * call's evidence has `felt`. A list that moves on the feeler gets full strokes after it.
+ * call's evidence has `felt`. A list that moves on the feeler gets full strokes after it. A full stroke is PACED
+ * (stroke-plan.ts#PACED) when the evidence's `source` is idb — `unfelt` or `felt` alike: a stroke after the first is
+ * `felt` and still idb's, and a full stroke on idb flings a SwiftUI List about twice its length, past every row the
+ * read before listed (D20). Only idb: the pace is idb's measured one, not a top-layer-only source's whatever it is.
+ * The feeler keeps precedence.
  */
 function strokeKind(evidence: CallEvidence, toward: Direction): StrokeKind {
-  return toward === 'up' && evidence.of === 'unfelt' ? 'feeler' : 'full';
+  if (toward === 'up' && evidence.of === 'unfelt') return 'feeler';
+  return evidence.of !== 'unread' && evidence.source === 'idb' ? 'paced' : 'full';
 }
 
 /**
