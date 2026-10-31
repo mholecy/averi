@@ -6,6 +6,7 @@ import type { EnvValues } from '../flow/credentials.js';
 import { refuseUnknownEnvironment } from './preflight.js';
 import { formatTrace, FlowEngine, runRequestOf, type EngineContext, type TraceEntry } from '../flow/engine.js';
 import { scanForCrashes, Verifier, type AssertResult, type AssertSpec } from '../verify/assert.js';
+import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { errorMessage } from '../util/error-message.js';
 import { captureFrame, captureRefusal, unsettledNote, type Frame, type MeasuredFrame, type TreeFrame } from '../verify/capture.js';
 import {
@@ -541,11 +542,16 @@ export async function runVerification(
     // Neither named (or both empty, as `if (req.state)` always read them):
     // no run, an empty trace.
     const request = runRequestOf(req.state, req.flow);
+    // One hand-off of the last read for the leg's run and its asserts (ui-tree/read-handoff.ts, docs/adr/0030-a-read-
+    // is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md): the state's detect that answered `yes`, or the
+    // flow's closing `wait:`, is the screen the first element assert judges — taken as a pass only, fresh otherwise.
+    // Per leg, so never across platforms or calls.
+    const handOff = new ReadHandOff();
     const trace: TraceEntry[] =
       request === undefined ?
         []
-      : await FlowEngine.run(cfg, adapter, { env, environment: req.environment, session: req.session }, request);
-    const results = await new Verifier(adapter, { baselineDir: req.baselineDir, ocr }).assertAll(specs);
+      : await FlowEngine.run(cfg, adapter, { env, environment: req.environment, session: req.session, handOff }, request);
+    const results = await new Verifier(adapter, { baselineDir: req.baselineDir, ocr, handOff }).assertAll(specs);
     // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
     // a bare screenshot, so the color and text tables could be fed the one
     // frame the color assert's own doc rules out: a mid-animation one. With a

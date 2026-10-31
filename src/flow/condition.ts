@@ -122,3 +122,17 @@ export function conditionStateRefs(c: Condition): string[] {
     ...[...(c.any ?? []), ...(c.all ?? [])].flatMap(conditionStateRefs),
   ];
 }
+
+/**
+ * Does judging `c` ask whether something is ABSENT — an `absent: true` leaf at any depth, through the states it
+ * names (`detectOf`, the evaluator's own lookup)? The flow engine hands a read on to a detect only when it does not
+ * (docs/adr/0030-a-read-is-handed-on-only-as-a-first-sample-or-a-positive-verdict.md): a `yes` that rests on an
+ * absence in a tree read earlier says the element was gone THEN, and a late prompt is exactly what a fresh read is
+ * for. Static, so a leaf that would not decide this tree still counts: the rule is about what the condition may rest
+ * on. Terminates: config.ts rejects detect cycles before any engine runs.
+ */
+export function asksAbsence(c: Condition, detectOf: (state: string) => Condition): boolean {
+  if (c.element !== undefined) return c.absent === true;
+  if (c.state !== undefined) return asksAbsence(detectOf(c.state), detectOf);
+  return [...(c.any ?? []), ...(c.all ?? [])].some((arm) => asksAbsence(arm, detectOf));
+}
