@@ -763,8 +763,8 @@ export class FlowEngine {
       // — it is a screen saying it still loads — and a held "no" says so in
       // one `state` line before the rung. The accepted risk, with no wipe
       // anywhere ahead: a rendered loading screen WITHOUT a progress
-      // indicator (on iOS through WDA a React Native ActivityIndicator is
-      // one: its type reads `other`, not `progress` — backlog row D27) that
+      // indicator (on iOS through WDA a React Native ActivityIndicator was
+      // one until backlog row D27, 2026-10-31, made its type `progress`) that
       // holds for 2 s costs
       // a cheap rung run on it, or an escalation to the next cheap one. Bare
       // and unknown answers are unchanged — a bare or a failed read restarts

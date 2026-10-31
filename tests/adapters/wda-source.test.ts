@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { resolveNow } from '../../src/interact/resolve.js';
+import { showsProgress } from '../../src/ui-tree/read-tree.js';
 import { findAll } from '../../src/ui-tree/selectors.js';
 import type { UiNode } from '../../src/adapters/types.js';
 
@@ -212,6 +213,16 @@ describe('parseWdaSource — normalization and input shapes', () => {
   it("a bare node's own string `value` field does not trip the envelope unwrap", () => {
     const tree = parseWdaSourceValue(el('TextField', { value: 'alice' }));
     expect(tree).toMatchObject({ role: 'textfield', value: 'alice' });
+  });
+
+  // D27 (2026-10-31): XCUIElementTypeActivityIndicator — a UIActivityIndicatorView, React Native's <ActivityIndicator> —
+  // arrives as `ActivityIndicator` (WDA strips the prefix) and is a spinner: `progress`, so showsProgress sees it.
+  it('maps ActivityIndicator to "progress", which showsProgress reads as loading', () => {
+    const tree = parseWdaSourceValue(
+      el('Window', { children: [el('ActivityIndicator', { rect: { x: 181, y: 417, width: 40, height: 40 } })] }),
+    );
+    expect(tree.children[0]).toMatchObject({ role: 'progress' });
+    expect(showsProgress(tree)).toBe(true);
   });
 
   it('maps unknown types to "other"', () => {

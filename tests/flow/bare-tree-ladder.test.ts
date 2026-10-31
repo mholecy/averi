@@ -467,6 +467,35 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
   });
 
+  it('the same through WDA: a React Native ActivityIndicator is a spinner, so its screen never holds (D27)', async () => {
+    // RN's <ActivityIndicator> is a UIActivityIndicatorView: XCUIElementTypeActivityIndicator, `ActivityIndicator` in WDA's /source.
+    const spinning = parseWdaSourceValue({
+      type: 'Application', label: 'MyPort', rawIdentifier: null, rect: FULL,
+      children: [{
+        type: 'Window', rect: FULL,
+        children: [other([
+          { type: 'StaticText', label: 'Načítava sa…', rawIdentifier: 'loading', rect: { x: 24, y: 360, width: 354, height: 24 }, children: [] },
+          { type: 'ActivityIndicator', label: null, rawIdentifier: null, rect: { x: 181, y: 417, width: 40, height: 40 }, children: [] },
+        ])],
+      }],
+    });
+    expect(isBareTree(spinning)).toBe(false);
+    expect(showsProgress(spinning)).toBe(true);
+    let relaunched = false;
+    const { fake } = timeline((ms) => (relaunched ? WDA_LOGIN : ms < 30 ? WDA_SPLASH : spinning), 'ios');
+    const launch = fake.launch.bind(fake);
+    const started = Date.now();
+    let msBeforeLaunch = -1;
+    fake.launch = async (appId, opts) => {
+      if (msBeforeLaunch < 0) msBeforeLaunch = Date.now() - started;
+      relaunched = true;
+      return launch(appId, opts);
+    };
+    await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_only' });
+    expect(msBeforeLaunch).toBeGreaterThanOrEqual(300);
+    expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
+  });
+
   /**
    * Round-1 review's BLOCKER (2026-10-31): a hold before a cheap rung shortened the wait before the NEXT, destructive
    * rung from the whole window to the hold — the cheap rung ran on a loading screen with no progress node, its

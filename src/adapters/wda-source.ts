@@ -61,6 +61,14 @@ const ROLE_MAP: Record<string, string> = {
   // seen to carry a Toolbar (it does carry the keyboard on iOS 27 — the
   // keys as plain buttons, the band as `other` — but nothing marks them).
   Toolbar: 'toolbar',
+  // `ActivityIndicator` is `progress` (D27, 2026-10-31): XCUIElementTypeActivityIndicator, a UIActivityIndicatorView —
+  // React Native's <ActivityIndicator> — is a spinner, so ui-tree/read-tree.ts#showsProgress must see it: a loading
+  // screen then never holds (flow/hold-tracker.ts, ADR 0033) and a scroll does not call it exhausted
+  // (interact/scroll-read.ts `loading`). Until then the type fell through to `other`, a structural role. The spelling
+  // is XCUI's enum name less the prefix, which WDA strips (above) — no capture holds one yet. Here and not in the
+  // shared IOS_ROLE_MAP: no idb capture shows what describe-all names a UIActivityIndicatorView, so its spelling
+  // there is unknown (`ProgressIndicator`, already shared, is XCUI's other progress type).
+  ActivityIndicator: 'progress',
 };
 
 /**
