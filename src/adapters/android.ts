@@ -3,11 +3,12 @@ import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
-import { screenshotPng } from './screenshot-bytes.js';
+import { encodePng } from './png-encode.js';
+import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScreenCapture, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -20,6 +21,13 @@ interface AdbCallOptions {
 const NULL_ROOT_RE = /null root node/i;
 const NULL_ROOT_RETRY_MS = 1_000;
 const DUMP_TIMEOUT_MS = 15_000;
+/**
+ * The capture (`capture`, D19): the raw frame, gzipped on the device. One exec-out word: the device's sh runs the pipe.
+ * screencap's stdout is gzip's input, so a word it prints would land INSIDE the stream; its stderr ("Capturing
+ * failed.", a multi-display warning) goes to /dev/null. The shell's own `gzip: not found` is sh's, not screencap's,
+ * and still arrives (exec-out merges sh's stderr). Exported for the differential's fake device.
+ */
+export const RAW_SCREENCAP = 'screencap 2>/dev/null | gzip -1';
 /** diagnoseDumpFailure's `adb get-state` — a one-line answer; past this, adb is not answering. */
 const GET_STATE_TIMEOUT_MS = 5_000;
 
@@ -389,15 +397,61 @@ export class AndroidAdapter implements DeviceAdapter {
     }
   }
 
+  /**
+   * D19 (docs/adr/0035-android-captures-raw-pixels.md): `RAW_SCREENCAP`, the raw frame gzipped on the device —
+   * measured 2026-10-31 on the lab AVD (API 33, n=10 each, interleaved, medians) against `screencap -p`: 77–79 ms vs
+   * 101–104 on four lab cells, 76 vs 103 on Settings, 171 vs 446 on the launcher's photo wallpaper (the device's PNG
+   * encode is what `-p` pays, and it grows with the content). `shell screencap <file>` + `adb pull` was 110 ms flat, 155 with the
+   * file's removal — a 9.6 MB file left behind by a killed server, and one per concurrent server; raw over exec-out
+   * 321 ms. No file is written here.
+   *
+   * The command is ONE word, the pipe in it — exec-out's first word reaches the device's sh unescaped (execOut).
+   * screenshot-bytes.ts#screencapRaw judges the answer: a frame, a transport error, or a refusal of the raw path. On a
+   * refusal this call captures with `screencap -p`, whose own check says whether the device is alive. A LASTING
+   * refusal (the shell says there is no gzip; a format other than RGBA_8888) on a live device pins this adapter to
+   * `-p` (`#rawPinned`) — today's path, never a slower one — said once on stderr with its reason; any other refusal
+   * (the shell's `Killed`, a stream cut short) costs that one call a `-p` and the next one tries raw again.
+   */
+  async capture(): Promise<ScreenCapture> {
+    if (!this.#rawPinned) {
+      const { stdout } = await this.execOut([RAW_SCREENCAP]);
+      const raw = screencapRaw(stdout, this.screenshotSource(`'${RAW_SCREENCAP}'`));
+      if ('image' in raw) return { kind: 'rgba', image: raw.image };
+      const bytes = await this.pngScreenshot();
+      // Checked and set with no await between: of two captures refused at once, one pins and says so.
+      if (raw.lasting && !this.#rawPinned) {
+        this.#rawPinned = true;
+        console.error(`averi: device ${this.serial}: ${raw.refused} — captures with \`screencap -p\` from now on (slower: the device encodes a PNG)`);
+      }
+      return { kind: 'png', bytes };
+    }
+    return { kind: 'png', bytes: await this.pngScreenshot() };
+  }
+
+  /** Set once the raw capture was refused for good on a live device (`capture`): from then on every capture is `-p`. */
+  #rawPinned = false;
+
+  /** The capture as a PNG: the device's when it gave one, else encoded here (adapters/png-encode.ts). */
   async screenshot(): Promise<Buffer> {
+    const shot = await this.capture();
+    return shot.kind === 'png' ? shot.bytes : encodePng(shot.image);
+  }
+
+  /** `screencap -p`: the device's PNG — the capture before D19, and its fallback (`capture`). */
+  private async pngScreenshot(): Promise<Buffer> {
     const { stdout } = await this.execOut(['screencap', '-p']);
     // exec-out exits 0 with whatever the guest wrote — nothing, or `Killed`,
     // on a dying emulator — so the bytes are judged here (screenshot-bytes.ts).
-    return screenshotPng(stdout, {
+    return screenshotPng(stdout, this.screenshotSource('screencap -p'));
+  }
+
+  /** Where a capture's bytes came from, for its transport error: this device and the exec-out command as typed. */
+  private screenshotSource(command: string): ScreenshotSource {
+    return {
       device: `device ${this.serial}`,
-      command: `adb -s ${this.serial} exec-out screencap -p`,
+      command: `adb -s ${this.serial} exec-out ${command}`,
       remedy: 'Re-check `adb devices` and retry; if it repeats, the emulator, not the app, needs attention.',
-    });
+    };
   }
 
   async uiTree(opts: { settle?: boolean } = {}): Promise<UiNode> {

@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { PNG } from 'pngjs';
-import { describe, expect, it } from 'vitest';
-import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { describe, expect, it, vi } from 'vitest';
+import { everyNode, type Rect, type ScreenCapture, type UiNode } from '../../src/adapters/types.js';
 import { eyesQuestion, type EyesQuestion } from '../../src/ui-tree/eyes.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { eyesOn, judgeEyes } from '../../src/verify/eyes.js';
+import { decodePng } from '../../src/verify/png.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 
@@ -202,6 +203,19 @@ describe('eyesOn — one screenshot, never a throw', () => {
     const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop') as EyesQuestion;
     expect(await eyesOn(fake).fully(q)).toMatchObject({ sees: 'surface', depth: 28 });
     expect(fake.screenshots).toHaveLength(1);
+  });
+
+  it("D19: an adapter that captures raw pixels is read from them — the same answer, no screenshot()", async () => {
+    const tree = await k7Tree();
+    const fake = new FakeAdapter({ s: tree }, 's');
+    fake.viewportSize = { width: 1080, height: 2220 };
+    const image = decodePng(await k7Png());
+    const capture = vi.fn(async (): Promise<ScreenCapture> => ({ kind: 'rgba', image }));
+    const adapter = Object.assign(fake, { capture });
+    const q = eyesQuestion(sceneOf(tree), tree, byId(tree, 'lab.form-keyboard.phone'), undefined, 'stop') as EyesQuestion;
+    expect(await eyesOn(adapter).fully(q)).toMatchObject({ sees: 'surface', depth: 28 });
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(fake.screenshots).toHaveLength(0);
   });
 
   it('bytes that are no png — unjudged, said so', async () => {

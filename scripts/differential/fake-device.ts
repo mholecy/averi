@@ -3,9 +3,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { PNG } from 'pngjs';
 import type { Platform, Screen } from './corpus.js';
 import { WINDOW_MANAGER_WORD, type ImeCapture } from '../truth/schema.js';
+import { RAW_SCREENCAP } from '../../src/adapters/android.js';
+import { decodePng } from '../../src/verify/png.js';
 
 /**
  * The fake device of the differential harness: the PROCESS boundary, faked
@@ -40,7 +43,7 @@ import { WINDOW_MANAGER_WORD, type ImeCapture } from '../truth/schema.js';
  *    device in tests/fixtures (API 33 Pixel_3a, keyboard hidden or shown; API
  *    36 without an IME source), the `mInputShown` witness and the touchable
  *    region (docked or floating Gboard, tests/helpers/android-dumps.ts's
- *    measurements), `screencap -p` the frame, every `input` accepted — and
+ *    measurements), `screencap 2>/dev/null | gzip -1` (android.ts#RAW_SCREENCAP) the frame raw (D19) and `screencap -p` as a PNG, every `input` accepted — and
  *    `input keyevent 4` (back) hides a shown keyboard, as Gboard does; the app
  *    running (`pidof`), no log. A ground-truth capture with the IME up serves
  *    the device's own keyboard answers instead (DeviceProfile.ime), and a
@@ -224,6 +227,23 @@ function frame(screen: Screen, paint: Paint | undefined, screenshot?: Buffer): B
   return png;
 }
 
+/**
+ * The frame as Android's capture answers it since D19 (android.ts#RAW_SCREENCAP): the API 28+ raw header — width, height,
+ * RGBA_8888, sRGB — and the PNG's pixels, gzipped. Built once per PNG.
+ */
+function rawFrame(png: Buffer): Buffer {
+  let raw = rawFrames.get(png);
+  if (raw === undefined) {
+    const { width, height, data } = decodePng(png);
+    const head = Buffer.alloc(16);
+    [width, height, 1, 1].forEach((v, i) => head.writeUInt32LE(v, i * 4));
+    raw = gzipSync(Buffer.concat([head, data]), { level: 1 });
+    rawFrames.set(png, raw);
+  }
+  return raw;
+}
+const rawFrames = new WeakMap<Buffer, Buffer>();
+
 // --- the Android device profiles ---
 
 const FIXTURES = new URL('../../tests/fixtures/', import.meta.url);
@@ -333,6 +353,10 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
       device.calls.push('adb uiautomator dump');
       if (device.dumpXml === undefined) throw new CommandError('differential: no uiautomator dump recorded', 1);
       return `${device.dumpXml}\nUI hierchary dumped to: /dev/tty\n`;
+    }
+    if (argv[0] === 'exec-out' && argv[1] === RAW_SCREENCAP) {
+      device.calls.push('adb screencap');
+      return rawFrame(frame(profile.frame, device.paint, profile.screenshot));
     }
     if (argv[0] === 'exec-out' && argv[1] === 'screencap') {
       device.calls.push('adb screencap');

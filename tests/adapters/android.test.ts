@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { gzipSync } from 'node:zlib';
+import { PNG as Pngjs } from 'pngjs';
 import { describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
 import { AndroidAdapter, parseImeInsets, parseInputShown, parseNavigationBand, parseStatusBand, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
@@ -10,6 +12,7 @@ import { drawOrder } from '../../src/ui-tree/draw-order.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
 import { resolveSettled } from '../../src/interact/resolve.js';
 import { FakeAdapter } from '../helpers/fake.js';
+import { decodePng } from '../../src/verify/png.js';
 import { coverNodes } from '../helpers/covers.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
@@ -1669,27 +1672,33 @@ describe('AndroidAdapter.keyboard.touchable — the IME window\'s touchable regi
  * adapters/screenshot-bytes.ts): an empty or non-PNG capture is a transport
  * error naming the device and the command, never bytes handed upward — the
  * stability wait would have read two empty captures as a settled frame.
+ * Since D19 that is the fallback's check: the capture is `screencap 2>/dev/null | gzip -1`
+ * first, and `-p` only on a device that refuses the raw path (no gzip).
  */
 describe('AndroidAdapter.screenshot — the bytes are a PNG or the call fails', () => {
   const PNG_HEAD = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
+  const RAW = 'adb -s emulator-5554 exec-out screencap 2>/dev/null | gzip -1';
+  const PNG = 'adb -s emulator-5554 exec-out screencap -p';
+  /** The shell's answer on a device without gzip: the raw path is refused, `-p` captures. */
+  const NO_GZIP = '/system/bin/sh: gzip: inaccessible or not found\n';
 
   it('passes a capture that starts with the PNG signature through unchanged', async () => {
-    const { fn, calls } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': PNG_HEAD });
+    const { fn, calls } = fakeExec({ [RAW]: NO_GZIP, [PNG]: PNG_HEAD });
     const shot = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot();
     expect(shot.equals(PNG_HEAD)).toBe(true);
-    expect(calls).toEqual(['adb -s emulator-5554 exec-out screencap -p']);
+    expect(calls).toEqual([RAW, PNG]);
   });
 
   it('the signature alone — exactly 8 bytes — is enough; 7 of them is not', async () => {
     const signature = PNG_HEAD.subarray(0, 8);
-    const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': signature });
+    const { fn } = fakeExec({ [RAW]: NO_GZIP, [PNG]: signature });
     expect((await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot()).equals(signature)).toBe(true);
-    const short = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': signature.subarray(0, 7) });
+    const short = fakeExec({ [RAW]: NO_GZIP, [PNG]: signature.subarray(0, 7) });
     await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: short.fn }).screenshot()).rejects.toThrow(/returned 7 bytes starting ".PNG/);
   });
 
   it('an empty capture (exit 0, no bytes) is a transport error naming the device and the command', async () => {
-    const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': Buffer.alloc(0) });
+    const { fn } = fakeExec({ [RAW]: NO_GZIP, [PNG]: Buffer.alloc(0) });
     await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot()).rejects.toThrow(
       '`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG, though the ' +
         'command reported success: the device transport failed (a dying or hung emulator / simulator), not the app\'s ' +
@@ -1698,9 +1707,134 @@ describe('AndroidAdapter.screenshot — the bytes are a PNG or the call fails', 
   });
 
   it('text on stdout (`Killed`, the measured dying-guest shape) is refused too, quoting what came back', async () => {
-    const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out screencap -p': 'Killed\n' });
+    const { fn } = fakeExec({ [RAW]: 'Killed\n', [PNG]: 'Killed\n' });
     await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot()).rejects.toThrow(
       /^`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 7 bytes starting "Killed" — not a PNG/,
     );
+  });
+});
+
+/**
+ * D19 (docs/adr/0035-android-captures-raw-pixels.md): Android captures the raw frame, gzipped on the device, and
+ * encodes a PNG on the host only for `screenshot()`. A device that refuses the raw path is captured with `-p` from
+ * then on — but only once `-p` has shown the device alive.
+ */
+describe('AndroidAdapter.capture — the raw frame, `screencap -p` where the device refuses it', () => {
+  const RAW = 'adb -s emulator-5554 exec-out screencap 2>/dev/null | gzip -1';
+  const PNG = 'adb -s emulator-5554 exec-out screencap -p';
+  const NO_GZIP = '/system/bin/sh: gzip: inaccessible or not found\n';
+  const pixels = Buffer.from(Array.from({ length: 3 * 2 * 4 }, (_, i) => (i * 41) & 255));
+  /** A 3x2 RGBA_8888 frame as `screencap 2>/dev/null | gzip -1` answers it: the API 28+ header, the pixels, gzipped. */
+  const rawFrame = (format = 1): Buffer => {
+    const head = Buffer.alloc(16);
+    [3, 2, format, 1].forEach((v, i) => head.writeUInt32LE(v, i * 4));
+    return gzipSync(Buffer.concat([head, pixels]));
+  };
+  /** What `screencap -p` would answer: some PNG of the frame (pngjs's — the bytes are passed on, never re-encoded). */
+  const devicePng = Pngjs.sync.write(Object.assign(new Pngjs({ width: 3, height: 2 }), { data: pixels }));
+
+  it('one exec-out, no file on the device: the pixels as they came', async () => {
+    const { fn, calls } = fakeExec({ [RAW]: rawFrame() });
+    const got = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).capture();
+    expect(got).toEqual({ kind: 'rgba', image: { width: 3, height: 2, data: pixels } });
+    expect(calls).toEqual([RAW]);
+  });
+
+  it('screenshot() is that capture encoded on the host: a PNG of the same pixels', async () => {
+    const { fn, calls } = fakeExec({ [RAW]: rawFrame() });
+    const png = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).screenshot();
+    expect(decodePng(png)).toEqual({ width: 3, height: 2, data: pixels });
+    expect(calls).toEqual([RAW]);
+  });
+
+  it("a device without gzip: `-p`'s PNG, as it is, every later capture straight to `-p`, and the pin said once", async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { fn, calls } = fakeExec({ [RAW]: NO_GZIP, [PNG]: devicePng });
+      const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+      expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+      expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+      expect((await adapter.screenshot()).equals(devicePng)).toBe(true);
+      expect(calls).toEqual([RAW, PNG, PNG, PNG]);
+      expect(said.mock.calls).toEqual([
+        [
+          'averi: device emulator-5554: the device answered 48 bytes starting "/system/bin/sh: gzip: inaccessible or not found", ' +
+            'not a gzip stream — captures with `screencap -p` from now on (slower: the device encodes a PNG)',
+        ],
+      ]);
+    } finally {
+      said.mockRestore();
+    }
+  });
+
+  it('two captures refused at once: one pin, said once', async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { fn, calls } = fakeExec({ [RAW]: NO_GZIP, [PNG]: devicePng });
+      const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+      await Promise.all([adapter.capture(), adapter.capture()]);
+      expect(calls).toEqual([RAW, RAW, PNG, PNG]);
+      expect(said).toHaveBeenCalledTimes(1);
+    } finally {
+      said.mockRestore();
+    }
+  });
+
+  it('a pixel format other than RGBA_8888 is refused the same way', async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { fn, calls } = fakeExec({ [RAW]: rawFrame(2), [PNG]: devicePng });
+      const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+      expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+      await adapter.capture();
+      expect(calls).toEqual([RAW, PNG, PNG]);
+      expect(said).toHaveBeenCalledTimes(1);
+      expect(said.mock.calls[0]![0]).toContain('screencap wrote pixel format 2, not RGBA_8888 (1)');
+    } finally {
+      said.mockRestore();
+    }
+  });
+
+  it('any other answer that is not gzip, on a live device, costs that call a `-p` and pins nothing (MINOR-1)', async () => {
+    const said = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      for (const answer of ["/system/bin/sh: can't fork: Try again\n", 'Killed\n', '\x1f', gzipSync(Buffer.alloc(0))]) {
+        const raw = Buffer.isBuffer(answer) ? answer : Buffer.from(answer, 'latin1');
+        const { fn, calls } = fakeExec({ [RAW]: raw, [PNG]: devicePng });
+        const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+        expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+        expect(await adapter.capture()).toEqual({ kind: 'png', bytes: devicePng });
+        expect(calls, JSON.stringify(answer)).toEqual([RAW, PNG, RAW, PNG]);
+      }
+      expect(said).not.toHaveBeenCalled();
+    } finally {
+      said.mockRestore();
+    }
+  });
+
+  it('a refusal on a dying device is the `-p` transport error, and the raw path is tried again next time', async () => {
+    const { fn, calls } = fakeExec({ [RAW]: 'Killed\n', [PNG]: Buffer.alloc(0) });
+    const adapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn });
+    await expect(adapter.capture()).rejects.toThrow(/exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG/);
+    await expect(adapter.capture()).rejects.toThrow(/returned 0 bytes/);
+    expect(calls).toEqual([RAW, PNG, RAW, PNG]);
+  });
+
+  it("a failing screencap (an empty gzip stream: its words went to /dev/null) is told by `-p`: the device's own message", async () => {
+    const { fn, calls } = fakeExec({ [RAW]: gzipSync(Buffer.alloc(0)), [PNG]: 'Capturing failed.\n' });
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).capture()).rejects.toThrow(
+      /^`adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 18 bytes starting "Capturing failed\." — not a PNG/,
+    );
+    expect(calls).toEqual([RAW, PNG]);
+  });
+
+  it('an empty raw answer is a transport error naming the raw command, with no `-p` after it', async () => {
+    const { fn, calls } = fakeExec({ [RAW]: Buffer.alloc(0), [PNG]: devicePng });
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).capture()).rejects.toThrow(
+      "`adb -s emulator-5554 exec-out 'screencap 2>/dev/null | gzip -1'` on device emulator-5554 returned 0 bytes — not a screenshot, " +
+        'though the command reported success: the device transport failed (a dying or hung emulator / simulator), ' +
+        "not the app's screen. Re-check `adb devices` and retry; if it repeats, the emulator, not the app, needs attention.",
+    );
+    expect(calls).toEqual([RAW]);
   });
 });

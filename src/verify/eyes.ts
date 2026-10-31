@@ -7,7 +7,7 @@ import { errorMessage } from '../util/error-message.js';
 import { measuredFrameFor, pngRegion, witnessScreen, type EdgeBounds, type MeasuredFrame, type RgbaImage } from './capture.js';
 import { ciede2000, rgbToHex, srgbToLab, type Rgb } from './ciede2000.js';
 import { DEFAULT_TOLERANCE_DE, sampleDominant } from './color-parity.js';
-import { decodePng } from './png.js';
+import { captureShot, type Shot } from './shot.js';
 
 /**
  * THE EYES' production adapter (ui-tree/eyes.ts has the concept and the triggers): for either question one screenshot,
@@ -15,18 +15,18 @@ import { decodePng } from './png.js';
  * by `judgeEyes` or `judgeOrder` (which judges a clear question by `judgeClear`). Never throws: a screenshot that fails, a png that does not decode, a scale the tree
  * refuses is `unjudged` (every pair `untold`), said why.
  */
-export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>): Eyes => {
-  /** The screenshot as `tree` scales it, or why there is none. */
+export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'viewport'>): Eyes => {
+  /** The screenshot as `tree` scales it, or why there is none. An Android capture is raw pixels (D19): no decode. */
   const look = async (tree: UiNode): Promise<{ png: RgbaImage; scale: number } | { why: string }> => {
-    let shot: Buffer;
+    let shot: Shot;
     try {
-      shot = await adapter.screenshot();
+      shot = await captureShot(adapter);
     } catch (e) {
       return { why: `the screenshot failed: ${errorMessage(e).split('\n')[0]}` };
     }
     let png: RgbaImage;
     try {
-      png = decodePng(shot);
+      png = shot.decode();
     } catch (e) {
       return { why: `the screenshot did not decode: ${errorMessage(e).split('\n')[0]}` };
     }

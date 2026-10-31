@@ -25,7 +25,7 @@ import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
  * expectation with the text in the diff.
  */
 const DEVICE_COMMANDS = [
-  'am', 'pm', 'monkey', 'input', 'pidof', 'dumpsys', 'grep', 'wm', 'getprop', 'screencap', 'uiautomator',
+  'am', 'pm', 'monkey', 'input', 'pidof', 'dumpsys', 'grep', 'wm', 'getprop', 'screencap', 'gzip', 'uiautomator',
 ];
 const ARG_SEP = '\x1f';
 const RECORD_SEP = '\x1e';

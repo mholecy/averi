@@ -8,7 +8,8 @@ import {
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
-import { decodePng, type DecodedPng, type RgbaImage } from './png.js';
+import type { DecodedPng, RgbaImage } from './png.js';
+import { captureShot, type Shot } from './shot.js';
 import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.js';
 
 /**
@@ -198,7 +199,7 @@ export const STABILITY_DELAY_MS = 300;
 const TREE_READ_ATTEMPTS = 5;
 const TREE_READ_DELAY_MS = 300;
 
-/** Defined beside its decoder (verify/png.ts imports nothing from here); re-exported for the pixel readers that import their frame types from capture. */
+/** Defined in adapters/types.ts (an adapter's capture is one, D19), re-exported by verify/png.ts and here for the pixel readers that import their frame types from capture. */
 export type { RgbaImage } from './png.js';
 
 /**
@@ -250,9 +251,11 @@ export interface Frame {
    * The screenshot bytes. Settled over the whole screen: the first capture
    * that repeated. Settled over the caller's region only: the later capture
    * of the pair whose region matched. Not settled: the LAST one taken, as the
-   * best available. What a tool returns to the caller either way.
+   * best available. What a tool returns to the caller either way — as a PNG
+   * (`shot.png()`), encoded on the host when the capture was raw pixels (D19,
+   * verify/shot.ts).
    */
-  shot: Buffer;
+  shot: Shot;
   /**
    * What the stability wait concluded — decided HERE, once, so no consumer
    * re-derives it from the capture count:
@@ -510,15 +513,15 @@ type CaptureOptions = {
  * failing the frame.
  */
 export function captureFrame(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
   opts: CaptureOptions & ({ readTree: true } | { tree: UiNode }),
 ): Promise<TreeRequestedFrame>;
 export function captureFrame(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
   opts?: CaptureOptions,
 ): Promise<Frame>;
 export async function captureFrame(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
   opts: CaptureOptions = {},
 ): Promise<Frame> {
   const region = opts.tree !== undefined && opts.region !== undefined ? { rect: opts.region, tree: opts.tree } : undefined;
@@ -529,7 +532,7 @@ export async function captureFrame(
   // all read this one size (the parity code review's A4: until then each
   // measured frame walked it twice, and each region pair once more).
   const suppliedSize = opts.tree === undefined ? undefined : treeSizeOf(opts.tree);
-  const { png: waitPng, ...wait } = await stableScreenshot(
+  const wait = await stableScreenshot(
     adapter,
     opts.deadline,
     region && suppliedSize && { ...region, size: suppliedSize },
@@ -559,8 +562,9 @@ export async function captureFrame(
   const { screen } = witness;
   let png: DecodedPng;
   try {
-    // A shot the region check already decoded (settled or moving) is not decoded twice.
-    png = waitPng ?? decodePng(shot);
+    // A shot the region check already decoded (settled or moving) is not decoded twice (Shot memoizes);
+    // a raw capture (D19) is its pixels already.
+    png = shot.decode();
   } catch (e) {
     return {
       ...wait,
@@ -605,7 +609,7 @@ export async function captureFrame(
  * is untouched, and the window stops at the first differing capture.
  */
 export async function captureBaselineFrame(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'uiTree' | 'viewport'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'uiTree' | 'viewport'>,
 ): Promise<BaselineFrame> {
   const frame = await captureFrame(adapter);
   if (frame.stability !== 'settled') return { ...frame, stability: frame.stability };
@@ -613,7 +617,7 @@ export async function captureBaselineFrame(
   let captures = frame.captures;
   for (const delayMs of BASELINE_CONFIRMATION_DELAYS_MS) {
     if (delayMs > 0) await sleep(delayMs);
-    const shot = await screenshotOf(adapter);
+    const shot = await captureShot(adapter);
     captures += 1;
     if (!shot.equals(frame.shot)) return { ...frame, stability, captures, confirmed: false };
   }
@@ -785,32 +789,33 @@ function windowFor(tree: UiNode, screen: DeviceScreen | undefined, size: TreeSiz
  * With a `region` (2026-10-06, the supplied-tree arm only), a pair whose
  * whole buffers differ gets a second question — do they match inside the
  * element's rect? — answered by `regionSettled` below; the header says what
- * it falls back to and why. Identical buffers never reach it, so a still
+ * it falls back to and why. Identical captures never reach it, so a still
  * screen costs no decode and no device read, region or not. Each capture is
- * decoded at most once across the wait AND the frame: the later png of one
- * pair is the earlier of the next, and the returned shot's png — the settled
- * pair's later one, or a moving frame's last — is handed back so
- * `captureFrame` measures it without decoding the same bytes again.
+ * decoded at most once across the wait AND the frame: a Shot memoizes its
+ * decode (verify/shot.ts), the later shot of one pair is the earlier of the
+ * next, and `captureFrame` measures the returned shot. Since D19 an Android
+ * capture is raw pixels: compared as they are, never decoded, and encoded to
+ * a PNG only where one leaves the process (`Shot.png`).
  */
 async function stableScreenshot(
-  adapter: Pick<DeviceAdapter, 'screenshot' | 'viewport'>,
+  adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | 'viewport'>,
   deadline?: number,
   region?: SizedRegion,
-): Promise<Pick<Frame, 'shot' | 'stability' | 'settledOver' | 'captures'> & { png?: DecodedPng }> {
-  const memo = lastDecodeMemo();
-  let previous = await screenshotOf(adapter);
+): Promise<Pick<Frame, 'shot' | 'stability' | 'settledOver' | 'captures'>> {
+  let previous = await captureShot(adapter);
   let captures = 1;
   let recaptureMs = 0; // measured cost of the last re-capture (delay + screencap); 0 until one has run
   for (let i = 0; i < STABILITY_ATTEMPTS; i++) {
     if (deadline !== undefined && Date.now() + recaptureMs >= deadline) break;
     const started = Date.now();
     await sleep(STABILITY_DELAY_MS);
-    const current = await screenshotOf(adapter);
+    const current = await captureShot(adapter);
     captures += 1;
     if (current.equals(previous)) return { shot: current, stability: 'settled', settledOver: 'screen', captures };
     if (region !== undefined) {
-      const png = await regionSettled(adapter, region, memo.decode(previous), memo.decode(current));
-      if (png !== undefined) return { shot: current, stability: 'settled', settledOver: 'region', captures, png };
+      if (await regionSettled(adapter, region, previous.tryDecode(), current.tryDecode())) {
+        return { shot: current, stability: 'settled', settledOver: 'region', captures };
+      }
     }
     // Taken AFTER the region check (review 2026-10-06): its decode is part of
     // what the next re-capture will cost. The fast path above returns first,
@@ -820,33 +825,9 @@ async function stableScreenshot(
   }
   // The ONE place "one capture is no verdict" is decided (2026-10-05): a
   // consumer reads `stability`, never the count.
-  return { shot: previous, stability: captures < 2 ? 'unjudged' : 'moving', captures, png: memo.decoded(previous) };
+  return { shot: previous, stability: captures < 2 ? 'unjudged' : 'moving', captures };
 }
 
-/**
- * One capture, refused when it holds no bytes (2026-10-08). Every capture in
- * this module goes through here. The adapter is the owner of "these bytes are
- * a screenshot" — each platform's `screenshot()` refuses an empty or non-PNG
- * result as a transport error naming its device and command
- * (adapters/screenshot-bytes.ts) — so in production this never fires; it is
- * the wait's own floor under that contract, for an adapter that breaks it:
- * `Buffer.equals` holds for two empty buffers, and before the adapters
- * checked, a dead emulator's two 0-byte captures came back as a SETTLED
- * frame the `screenshot` tool returned with no note. Length only, not the
- * signature: the frames here are opaque bytes (the tests' fakes use short
- * tags), and a non-PNG that reaches a measuring caller already fails its
- * decode, with its own wording, in `captureFrame`.
- */
-async function screenshotOf(adapter: Pick<DeviceAdapter, 'screenshot'>): Promise<Buffer> {
-  const shot = await adapter.screenshot();
-  if (shot.length === 0) {
-    throw new Error(
-      'the device adapter returned an empty screenshot (0 bytes) — no frame can settle on nothing; ' +
-        'DeviceAdapter.screenshot must throw on a failed capture instead (adapters/screenshot-bytes.ts)',
-    );
-  }
-  return shot;
-}
 
 /**
  * Why a capture threw, in one line: the first line of the error — the
@@ -904,33 +885,6 @@ async function regionSettled(
     if (Buffer.compare(earlier.data.subarray(from, to), later.data.subarray(from, to)) !== 0) return undefined;
   }
   return later;
-}
-
-/**
- * A decoder that remembers its last answer: in the stability wait the later
- * capture of one pair is the earlier of the next, so each capture is decoded
- * once. `decode` never throws — a png that does not decode is `undefined`,
- * the region check's fallback; the capture's own decode words that failure.
- * `decoded` only looks: the png of a shot already decoded, else `undefined`
- * (never decoded, or did not decode), and the frame decodes it itself.
- */
-function lastDecodeMemo(): { decode: (shot: Buffer) => DecodedPng | undefined; decoded: (shot: Buffer) => DecodedPng | undefined } {
-  let last: { shot: Buffer; png: DecodedPng | undefined } | undefined;
-  return {
-    decode: (shot) => {
-      if (last?.shot !== shot) {
-        let png: DecodedPng | undefined;
-        try {
-          png = decodePng(shot);
-        } catch {
-          png = undefined;
-        }
-        last = { shot, png };
-      }
-      return last.png;
-    },
-    decoded: (shot) => (last?.shot === shot ? last.png : undefined),
-  };
 }
 
 /**

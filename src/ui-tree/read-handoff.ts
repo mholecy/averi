@@ -148,6 +148,7 @@ export const ADAPTER_SURFACE: Record<keyof DeviceAdapter, 'tree' | 'reads' | 'ac
   terminate: 'acts',
   openDeepLink: 'acts',
   screenshot: 'reads',
+  capture: 'reads',
   uiTree: 'tree',
   viewport: 'reads',
   tap: 'acts',
