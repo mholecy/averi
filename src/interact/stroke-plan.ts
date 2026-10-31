@@ -214,6 +214,9 @@ export interface StrokeAsk {
 /**
  * The kinds of stroke a round may ask for. A `full` stroke: the plan's reach over its box (a probe's travel capped by
  * the probe), at the adapter's own speed.
+ * A `paced` stroke: a full stroke on a tree whose source lists only the top layer (idb's flat list,
+ * ui-tree/miss.ts#topLayerOnlySource), sent over its travel at `PACED`'s speed — the idb counterpart of Android's
+ * `dragSpeed`, set on the stroke and not on the adapter, which WDA's trees share (`PACED`).
  * A `feeler`: the same touch-down, its travel capped and sent slowly (`FEELER`), so a swipe-dismissable sheet the tree
  * does not list springs back where a list still moves — when the round asks for one is scroll-rounds.ts#CallEvidence's
  * `unfelt`. Measured on the lab's large sheet (sheet-background, iPhone 17
@@ -222,10 +225,29 @@ export interface StrokeAsk {
  * in 150 ms and by the full stroke, 524 pt in 300 ms. So a feeler is 160 pt in 600 ms — under half the distance that
  * held and a fifth of the speed that dismissed (ADR 0018, "idb's presented layer", its 2026-10-22 feeler).
  */
-export type StrokeKind = 'full' | 'feeler';
+export type StrokeKind = 'full' | 'paced' | 'feeler';
 
 /** A feeler's cap on its finger travel (pt) and the time it is sent over (ms) — `StrokeKind`'s measurement. */
 export const FEELER = { maxTravel: 160, durationMs: 600 } as const;
+
+/**
+ * A paced stroke's speed (pt/s) and the least time it is sent over (ms) — `StrokeKind`'s `paced`: its time is
+ * `max(minDurationMs, ceil(travel / ptPerS × 1000))`, 524 pt → 1502 ms. Measured on the lab's 45-row form-picker sheet
+ * (a SwiftUI List, rows 52 pt; iPhone 17 simulator, iOS 27.0, 2026-10-31; one stroke from (201,699), finger moving up,
+ * screenshots 0.4 s and 2.4 s after it, three runs each): the full stroke, 524 pt in 300 ms, carried the list ~20 rows
+ * (~1 040 pt, still moving at 0.4 s) — past every row the read before it listed, so idb's flat tree kept no anchor and
+ * read-tree.ts#screenChangedUnder called it a changed screen: D0's `scroll_until` for country GB failed so in all 5
+ * repeats under idb (under WDA it passed in 2 strokes). 524 pt in 1.5 s carried it ~11 rows (~570 pt, the stroke and a
+ * little) and kept two rows of the read before; the feeler, 160 pt in 600 ms, ~3 rows. So 524 pt / 1.5 s ≈ 349 pt/s,
+ * and a shorter stroke is never sent quicker than the 300 ms the adapter's own default gave it (adapters/ios.ts#swipe).
+ * Unmeasured: strokes between 300 ms and 1.5 s (a quicker pace may keep the overlap too); idb on a UIKit table or a
+ * sheet-long list; whether a 1.5 s stroke can register as a tap or a selection on a row. A feeler keeps its own time
+ * (`FEELER`): its 160 pt / 600 ms is slower still, and its question is a sheet's dismissal (ADR 0018), not a fling.
+ */
+export const PACED = { ptPerS: 349, minDurationMs: 300 } as const;
+
+/** The time a paced stroke of `travel` pt is sent over (`PACED`). */
+const pacedMs = (travel: number): number => Math.max(PACED.minDurationMs, Math.ceil((travel / PACED.ptPerS) * 1000));
 
 /**
  * A stroke as planned, the driver's to send as `points` over `durationMs` — the two fields production reads
@@ -245,7 +267,7 @@ export interface PlannedStroke {
   points?: Stroke;
   /** The kind asked for (`StrokeKind`). */
   kind: StrokeKind;
-  /** The time the driver sends `points` over, a feeler's (`FEELER`) — the one field besides `points` production reads; absent, the adapter's own. */
+  /** The time the driver sends `points` over, a feeler's (`FEELER`) or a paced stroke's (`PACED`) — the one field besides `points` production reads; absent, the adapter's own. */
   durationMs?: number;
 }
 
@@ -306,6 +328,7 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
     ...(points !== undefined && { points }),
     kind,
     ...(feeler !== undefined && { maxTravel: feeler.maxTravel, durationMs: feeler.durationMs }),
+    ...(kind === 'paced' && points !== undefined && { durationMs: pacedMs(strokeLength(points)) }),
   };
   const press = read === undefined || points === undefined ? undefined : read.facts.scene.presentedAt(points.from, read.target);
   const presented = press === undefined || points === undefined ? undefined : { ...press, touchDown: points.from };

@@ -52,7 +52,7 @@ export const edges: KnownFile = {
     // row is green (the 7 % of it on the screen reads as the page's #EEEEEE around it: failed closed). WDA answers all
     // three rows as the truth does: its two strokes 307 181 → 95 181 lie inside the carousel, along its axis (round
     // 6's S4, the measurement this cell was built for).
-    ...keys(`${IOS}/carousel-in-list.idb.json`, ['C'], ['scroll_until'], { cls: 'touched down outside its scroll view carousel at (322,437) (322,437) (80,437)', kind: 'refused', calls: ['idb ui swipe 322 437 80 437 --duration 0.3', 'idb ui swipe 322 437 80 437 --duration 0.3', 'idb ui swipe 80 437 201 437 --duration 0.3'], note: 'idb lists no carousel — the screen\'s sideways stroke, below the carousel holding C', as: IDB_NO_SCROLL_VIEW }),
+    ...keys(`${IOS}/carousel-in-list.idb.json`, ['C'], ['scroll_until'], { cls: 'touched down outside its scroll view carousel at (322,437) (322,437) (80,437)', kind: 'refused', calls: ['idb ui swipe 322 437 80 437 --duration 0.694', 'idb ui swipe 322 437 80 437 --duration 0.694', 'idb ui swipe 80 437 201 437 --duration 0.347'], note: 'idb lists no carousel — the screen\'s sideways stroke, below the carousel holding C', as: IDB_NO_SCROLL_VIEW }),
     // LAB FINDING LE4 — fixed on arch/r21-strokes (958bd27, round 5's 0a), merged with arch/round-21: WDA's O and F of
     // scroll-bounded, stroked over the screen beside `lower` until then, are stroked inside it (201 524 → 416) and green;
     // struck off here, calibrated in scripts/truth/calibration.json.

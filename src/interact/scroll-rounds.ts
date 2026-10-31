@@ -1115,7 +1115,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   const next = nextStroke(s.course);
   const { toward, reach, still } = next;
   const learnt = callEvidence(s);
-  const kind = strokeKind(learnt, toward);
+  const kind = strokeKind(learnt, toward, s.screenBefore?.tree);
   const plan = planStroke(s.strokes, {
     toward,
     reach,
@@ -1301,10 +1301,14 @@ function callEvidence(s: State): CallEvidence {
  * The kind of stroke this round sends toward `toward` (interact/stroke-plan.ts#StrokeKind): a FEELER while the call's
  * strokes are `unfelt`, toward content ABOVE (`up`: the finger dragged down — the one stroke that dismisses a
  * swipe-dismissable sheet; measured, ADR 0018 residual 6); else a full stroke — every push-up, and every stroke the
- * call's evidence has `felt`. A list that moves on the feeler gets full strokes after it.
+ * call's evidence has `felt`. A list that moves on the feeler gets full strokes after it. A full stroke is PACED
+ * (stroke-plan.ts#PACED) when the last read that read is of a source that lists only the top layer — judged on that
+ * tree, not on the evidence: a stroke after the first is `felt` and still idb's, and a full stroke on idb flings a
+ * SwiftUI List about twice its length, past every row the read before listed (D20). The feeler keeps precedence.
  */
-function strokeKind(evidence: CallEvidence, toward: Direction): StrokeKind {
-  return toward === 'up' && evidence.of === 'unfelt' ? 'feeler' : 'full';
+function strokeKind(evidence: CallEvidence, toward: Direction, last: UiNode | undefined): StrokeKind {
+  if (toward === 'up' && evidence.of === 'unfelt') return 'feeler';
+  return last !== undefined && topLayerOnlySource(last) !== undefined ? 'paced' : 'full';
 }
 
 /**
