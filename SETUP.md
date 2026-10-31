@@ -358,7 +358,7 @@ one happens by itself.
 
 - **`idb` install fails** — fb-idb requires Python ≤ 3.13: `pipx install fb-idb --python python3.13`.
 - **An iOS tree read behaves differently than `idb ui describe-all --json` run by hand** — averi reads the iOS tree through
-  a persistent idb helper (one Python process per simulator running idb's own CLI; it falls back to the `idb` CLI by
+  a persistent idb helper (one Python process per simulator, running idb's own CLI; it falls back to the `idb` CLI by
   itself when it cannot start or dies). To rule it out, set `AVERI_IDB_HELPER=off` in the environment the MCP host
   starts the server with (an `env` block in its server entry) and reconnect: every idb call is then the `idb` CLI.
 - **Launch opens LeakCanary instead of the app** — set `app.android.activity` (see step 4 skeleton).

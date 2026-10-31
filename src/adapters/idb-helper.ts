@@ -21,11 +21,12 @@ export class IdbHelperTimeout extends Error {
   }
 }
 
-export type SpawnFn = (cmd: string, args: readonly string[], opts: SpawnOptions) => ChildProcess;
+/** node's spawn, or a test's fake child (wda.ts has a SpawnFn of its own, for xcodebuild). */
+export type IdbHelperSpawn = (cmd: string, args: readonly string[], opts: SpawnOptions) => ChildProcess;
 
 export interface IdbHelperOptions {
   /** node's spawn unless a test hands in a fake child speaking the protocol. */
-  spawn?: SpawnFn;
+  spawn?: IdbHelperSpawn;
   /** The Python that runs idb, from the env the helper starts in; idbInterpreter unless a test hands one in. */
   interpreter?: (env: NodeJS.ProcessEnv) => Promise<IdbInterpreter | undefined>;
   /** How long a start may take to say `ready` before it counts as failed (READY_TIMEOUT_MS). */
@@ -46,12 +47,16 @@ export function idbHelperDisabled(env: NodeJS.ProcessEnv = process.env): boolean
 }
 
 /**
- * After this many failures in a row the helper is off for the process. A failure is a start that never said `ready`,
- * or a helper that died before it answered any request — one that says ready and then dies under every request would
- * otherwise restart forever (review 2026-10-31, MINOR-4). The first answered request resets the count; a helper killed
- * on the caller's timeout is not a failure of its own (the CLI would have timed out too).
+ * After this many failures in a row the helper is off for the process. A failure is:
+ * - a start that never said `ready`;
+ * - a helper that died before it answered any request — one that says ready and then dies under every request would
+ *   otherwise restart forever (review 2026-10-31, MINOR-4);
+ * - a request that timed out right after another did, with no answer between — a helper that hangs would otherwise
+ *   make every read pay the caller's whole budget (15 s for describe-all) forever (review round 2, NIT-B). One timeout
+ *   alone is not: the CLI would likely have timed out too (a stuck companion), and the next helper may answer.
+ * The first answered request resets the count. With 2, three timeouts in a row turn it off.
  */
-export const MAX_FAILED_STARTS = 2;
+export const MAX_FAILURES_IN_A_ROW = 2;
 
 /** How much of the helper's own stderr is kept, to say why it turned itself off. */
 const STDERR_TAIL = 2_000;
@@ -63,15 +68,18 @@ const STDERR_TAIL = 2_000;
 const liveChildren = new Set<ChildProcess>();
 let exitHookInstalled = false;
 
+/** SIGKILL, and nothing if it is gone already. */
+function killChild(child: ChildProcess): void {
+  try {
+    child.kill('SIGKILL');
+  } catch {
+    // already gone
+  }
+}
+
 /** The backstop: kill every helper child dispose did not reach. Exported for its test. */
 export function killIdbHelpersOnExit(): void {
-  for (const child of liveChildren) {
-    try {
-      child.kill('SIGKILL');
-    } catch {
-      // already gone
-    }
-  }
+  for (const child of liveChildren) killChild(child);
   liveChildren.clear();
 }
 
@@ -139,17 +147,18 @@ interface Pending {
 }
 
 /**
- * One persistent fb-idb client per simulator (D7, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md):
- * a Python process that imported idb's CLI once and runs it in-process per request (idb-helper-script.ts), so a call
- * no longer pays the CLI's Python start-up — measured 114.3 → 24.7 ms a `describe-all` (D7, n = 20, the lab simulator).
- * Created by the registry per simulator and shared, like `exec`, by IosAdapter and IdbTreeSource; runIdb (idb.ts)
- * decides which argv may come here.
+ * One persistent fb-idb client per adapter — at most one live per simulator: a wda adapter never starts its helper
+ * (D7, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md): a Python process that imported idb's CLI
+ * once and runs it in-process per request (idb-helper-script.ts), so a call no longer pays the CLI's Python start-up
+ * — measured 114.3 → 24.7 ms a `describe-all` (D7, n = 20, the lab simulator). Created by the registry per iOS adapter
+ * (registry.ts#iosAdapterFor) and shared, like `exec`, by IosAdapter and IdbTreeSource; runIdb (idb.ts) decides which
+ * argv may come here.
  *
  * Its whole contract is that it is never worse than the CLI:
  * - `run` answers undefined — "use the CLI" — whenever it is not READY and idle: not started yet (it starts now, in
  *   the background: the first call pays nothing extra), starting, busy with another request (concurrent reads of an
- *   iOS leg), off (the kill switch, MAX_FAILED_STARTS failures in a row, no interpreter, disposed). Turning itself off
- *   writes one line to the server's stderr, with the tail of the helper's own.
+ *   iOS leg), off (the kill switch, MAX_FAILURES_IN_A_ROW failures in a row, no interpreter, disposed). Turning itself
+ *   off writes one line to the server's stderr, with the tail of the helper's own.
  * - A helper that dies under a request answers `died`; the caller runs the CLI. The next call starts a new one.
  * - The caller's timeout kills it (SIGKILL) and rejects with IdbHelperTimeout; the caller throws the CLI's timeout.
  * - No orphans: the child and its pipes are unref'd (the server stays free to exit), it exits on stdin's EOF (dispose,
@@ -158,7 +167,7 @@ interface Pending {
  *   (wda.ts, spawnChild).
  */
 export class IdbHelper {
-  private readonly spawn: SpawnFn;
+  private readonly spawn: IdbHelperSpawn;
   private readonly interpreter: (env: NodeJS.ProcessEnv) => Promise<IdbInterpreter | undefined>;
   private readonly readyTimeoutMs: number;
   private readonly log: (line: string) => void;
@@ -168,6 +177,8 @@ export class IdbHelper {
   private killed: ChildProcess | undefined;
   private pending: Pending | undefined;
   private failures = 0;
+  /** Requests that timed out since the last answer (MAX_FAILURES_IN_A_ROW: the second and later count). */
+  private timeoutsInARow = 0;
   private nextId = 1;
   private stderrTail = '';
 
@@ -195,6 +206,7 @@ export class IdbHelper {
     return new Promise<IdbHelperReply>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending = undefined;
+        this.timeoutsInARow++;
         this.killed = child;
         this.kill(child);
         reject(new IdbHelperTimeout(argv));
@@ -285,6 +297,7 @@ export class IdbHelper {
       this.pending = undefined;
       answered = true;
       this.failures = 0;
+      this.timeoutsInARow = 0;
       if (this.state === 'busy') this.state = 'ready';
       p.resolve({ kind: 'answer', code: msg.code ?? 1, stdout: Buffer.from(msg.stdout ?? '', 'utf8'), stderr: msg.stderr ?? '' });
     });
@@ -292,7 +305,7 @@ export class IdbHelper {
 
   /**
    * The child exited (or failed to spawn). A start that never said ready, or a helper that never answered, counts
-   * against it (MAX_FAILED_STARTS) — unless this helper killed it on a timeout.
+   * against it (MAX_FAILURES_IN_A_ROW); one this helper killed on a timeout only when the one before timed out too.
    */
   private gone(child: ChildProcess, wasReady: boolean, answered: boolean): void {
     liveChildren.delete(child);
@@ -307,7 +320,8 @@ export class IdbHelper {
     if (this.state === 'off') return;
     if (this.killed === child) {
       this.killed = undefined;
-      this.state = 'idle';
+      if (this.timeoutsInARow >= 2) this.failed(`${this.timeoutsInARow} requests in a row timed out`);
+      else this.state = 'idle';
     } else if (!wasReady) this.failed('it exited before it said ready');
     else if (!answered) this.failed('it died before it answered a request');
     else this.state = 'idle';
@@ -315,7 +329,7 @@ export class IdbHelper {
 
   private failed(why: string): void {
     this.failures++;
-    if (this.failures >= MAX_FAILED_STARTS) this.turnOff(`${this.failures} failures in a row, the last: ${why}`);
+    if (this.failures >= MAX_FAILURES_IN_A_ROW) this.turnOff(`${this.failures} failures in a row, the last: ${why}`);
     else this.state = 'idle';
   }
 
@@ -327,10 +341,6 @@ export class IdbHelper {
   }
 
   private kill(child: ChildProcess): void {
-    try {
-      child.kill('SIGKILL');
-    } catch {
-      // already gone
-    }
+    killChild(child);
   }
 }

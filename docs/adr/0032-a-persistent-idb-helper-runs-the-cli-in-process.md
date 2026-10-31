@@ -18,7 +18,7 @@ and D24 measured"; the orchestrator's design from the D7 analysis). Part a (read
 
 ## Decision
 
-**One helper process per simulator runs fb-idb's own CLI entry, `idb.cli.main.gen_main(argv)`, in-process, per request.
+**One helper process per iOS adapter — at most one live per simulator: a wda adapter never starts its helper — runs fb-idb's own CLI entry, `idb.cli.main.gen_main(argv)`, in-process, per request.
 In D7a it serves `ui describe-all --json` alone; every other call, and every call it cannot take, is the CLI as
 before.**
 
@@ -30,13 +30,14 @@ before.**
 - What it imports is what the shebang'd CLI imports (review 2026-10-31, MINOR-5). No `-I`: `PYTHONPATH` and the user
   site-packages count as they do for `idb` (an earlier `-I` could import a different fb-idb, or none). Under `-c`,
   `sys.path[0]` is `''` — the cwd; the script's first statement replaces it with the directory of idb's REAL path, the
-  entry Python itself puts there when it runs the script. `sys` is built in and `os` already imported by `site`, so
-  nothing is looked up on the cwd before it is gone, and `''` is never on the path after: a module planted in averi's
-  cwd cannot be imported (the bootstrap test plants one).
+  entry Python itself puts there when it runs the script — only when it is `''`: under safe-path mode
+  (`PYTHONSAFEPATH`, 3.11+) `-c` prepends nothing and neither does the CLI's run, so the path is left alone. `sys` is
+  built in and `os` already imported by `site`, so nothing is looked up on the cwd before it is gone, and `''` is never
+  on the path after: a module planted in averi's cwd cannot be imported (the bootstrap test plants one).
 - The interpreter is the one the CLI runs under: the shebang of the `idb` on the PATH exec uses — `#!/abs/python…` as
   is, `#!/usr/bin/env python…` through PATH; anything else (a binary, a shell wrapper, arguments) is no helper. An import
   that fails exits before `ready`: a failed start.
-- Node side: `adapters/idb-helper.ts#IdbHelper`, one per simulator, created by `mcp/registry.ts#defaultFactory` and
+- Node side: `adapters/idb-helper.ts#IdbHelper`, one per iOS adapter, created by `mcp/registry.ts#iosAdapterFor` and
   shared by `IosAdapter` (which owns and disposes it) and `IdbTreeSource`, as `exec` is. `runIdb` offers it an
   allowlisted argv (`HELPER_ARGV`); the helper answers or declines.
 - Lifecycle: the first allowlisted call starts it in the background and runs on the CLI — no call waits for it. Until
@@ -44,8 +45,10 @@ before.**
   serves. A failure is a start that never says ready (exit, spawn error, 10 s) or a helper that dies before it has
   answered any request (one that says ready and dies under every request would otherwise restart forever); after 2 in
   a row the helper is off for the process, and says so in one line on the server's stderr, with the tail of its own.
-  The first answered request resets the count; a helper killed on the caller's timeout is not a failure. Otherwise a
-  helper that dies is restarted lazily by the next call.
+  A request that times out right after another did (no answer between) is a failure too — one hung helper would
+  otherwise make every read pay the caller's whole 15 s — so three timeouts in a row turn it off; one alone is not (a
+  stuck companion times the CLI out as well). The first answered request resets the count. Otherwise a helper that
+  dies is restarted lazily by the next call; one disposed under a read answers it `died`, and the read runs on the CLI.
 - No orphans: the child and its pipes are unref'd; it exits on stdin EOF (dispose, or node's death closing the pipe);
   `IosAdapter.dispose()` kills it; one `process.once('exit')` hook for every helper in the process kills what dispose
   did not reach (WdaServer's pattern; one hook, not one per helper, so an 11th simulator raises no listener warning).
@@ -105,4 +108,4 @@ What an agent reads must not change with the helper:
 - Every `describe-all` after the helper is ready saves the CLI's start-up: −90 ms measured in isolation (D7). Only the
   device shows it in a whole tool call — the owner's A/B: `ios-run.sh` native and idb legs with
   `AVERI_IDB_HELPER=off` vs on.
-- One more long-lived child per simulator, Python, ~idb's import in memory.
+- One more long-lived child per idb-backed simulator, Python, ~idb's import in memory.

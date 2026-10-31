@@ -7,7 +7,7 @@ import type { ChildProcess } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
 import { runIdb } from '../../src/adapters/idb.js';
-import { IdbHelper, idbInterpreter, killIdbHelpersOnExit, MAX_FAILED_STARTS, type SpawnFn } from '../../src/adapters/idb-helper.js';
+import { IdbHelper, idbInterpreter, killIdbHelpersOnExit, MAX_FAILURES_IN_A_ROW, type IdbHelperSpawn } from '../../src/adapters/idb-helper.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
 
@@ -64,7 +64,7 @@ class FakeChild extends EventEmitter {
 function fakeSpawn() {
   const children: FakeChild[] = [];
   const calls: { cmd: string; args: readonly string[] }[] = [];
-  const spawn: SpawnFn = (cmd, args) => {
+  const spawn: IdbHelperSpawn = (cmd, args) => {
     calls.push({ cmd, args });
     const c = new FakeChild();
     children.push(c);
@@ -204,7 +204,7 @@ describe('runIdb with an IdbHelper', () => {
     const s = fakeSpawn();
     const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
     const cli = fakeExec();
-    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
+    for (let i = 0; i < MAX_FAILURES_IN_A_ROW; i++) {
       await runIdb(cli.exec, UDID, READ, { helper });
       await settle();
       s.children[i].die();
@@ -212,8 +212,8 @@ describe('runIdb with an IdbHelper', () => {
     }
     for (let i = 0; i < 3; i++) await runIdb(cli.exec, UDID, READ, { helper });
     await settle();
-    expect(s.children).toHaveLength(MAX_FAILED_STARTS);
-    expect(cli.idbCalls).toHaveLength(MAX_FAILED_STARTS + 3);
+    expect(s.children).toHaveLength(MAX_FAILURES_IN_A_ROW);
+    expect(cli.idbCalls).toHaveLength(MAX_FAILURES_IN_A_ROW + 3);
   });
 
   it('never starts with AVERI_IDB_HELPER=off', async () => {
@@ -262,15 +262,15 @@ describe('runIdb with an IdbHelper', () => {
     const s = fakeSpawn();
     const helper = new IdbHelper({ spawn: s.spawn, interpreter, log, readyTimeoutMs: 20 });
     const cli = fakeExec();
-    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
+    for (let i = 0; i < MAX_FAILURES_IN_A_ROW; i++) {
       await runIdb(cli.exec, UDID, READ, { helper });
       await new Promise((r) => setTimeout(r, 40));
       expect(s.children[i].signals).toEqual(['SIGKILL']);
     }
     await runIdb(cli.exec, UDID, READ, { helper });
     await settle();
-    expect(s.children).toHaveLength(MAX_FAILED_STARTS);
-    expect(cli.idbCalls).toEqual(Array(MAX_FAILED_STARTS + 1).fill(CLI_ARGV));
+    expect(s.children).toHaveLength(MAX_FAILURES_IN_A_ROW);
+    expect(cli.idbCalls).toEqual(Array(MAX_FAILURES_IN_A_ROW + 1).fill(CLI_ARGV));
   });
 
   it('drops the ready deadline of a start that already exited — nothing is killed after', async () => {
@@ -287,7 +287,7 @@ describe('runIdb with an IdbHelper', () => {
     const s = fakeSpawn();
     const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
     const cli = fakeExec();
-    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
+    for (let i = 0; i < MAX_FAILURES_IN_A_ROW; i++) {
       await runIdb(cli.exec, UDID, READ, { helper }); // starts child i
       await settle();
       s.children[i].ready();
@@ -299,30 +299,89 @@ describe('runIdb with an IdbHelper', () => {
     }
     for (let i = 0; i < 3; i++) await runIdb(cli.exec, UDID, READ, { helper });
     await settle();
-    expect(s.children).toHaveLength(MAX_FAILED_STARTS);
+    expect(s.children).toHaveLength(MAX_FAILURES_IN_A_ROW);
     expect(logged).toHaveLength(1);
     expect(logged[0]).toMatch(/^averi: idb helper off for this process \(2 failures in a row, the last: it died before it answered a request\)/);
   });
 
-  it('does not count a helper it killed on a timeout — the next call starts a new one, and again after that', async () => {
-    const { helper, s, cli } = await readyHelper();
-    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
-      await runIdb(cli.exec, UDID, READ, { helper, timeoutMs: 10 }).catch(() => undefined);
+  /** One read that times out in the helper, then the call that starts the next helper, which says ready. */
+  async function timeOutAndRestart(h: { helper: IdbHelper; s: ReturnType<typeof fakeSpawn>; cli: ReturnType<typeof fakeExec> }) {
+    const got = await runIdb(h.cli.exec, UDID, READ, { helper: h.helper, timeoutMs: 10 }).catch((e: unknown) => e);
+    expect(got).toBeInstanceOf(ExecError);
+    await settle();
+    await runIdb(h.cli.exec, UDID, READ, { helper: h.helper }); // starts the next, if it is not off
+    await settle();
+    h.s.children.at(-1)!.ready();
+    await settle();
+  }
+
+  it('does not count a timeout with an answer after it — a helper that answers between timeouts restarts every time', async () => {
+    const h = await readyHelper();
+    for (let i = 0; i < 4; i++) {
+      await timeOutAndRestart(h);
+      const read = runIdb(h.cli.exec, UDID, READ, { helper: h.helper });
       await settle();
-      await runIdb(cli.exec, UDID, READ, { helper }); // starts the next
-      await settle();
-      s.children[i + 1].ready();
-      await settle();
+      h.s.children.at(-1)!.answer(0, 'helper');
+      expect((await read).stdout.toString()).toBe('helper');
     }
-    expect(s.children).toHaveLength(MAX_FAILED_STARTS + 1);
+    expect(h.s.children).toHaveLength(5);
     expect(logged).toEqual([]);
+  });
+
+  it('starts the timeout count afresh after an answer — a timeout after one is a first one again', async () => {
+    const h = await readyHelper();
+    await timeOutAndRestart(h);
+    const read = runIdb(h.cli.exec, UDID, READ, { helper: h.helper });
+    await settle();
+    h.s.children.at(-1)!.answer(0, 'helper');
+    await read;
+    // A timeout (first in a row again: no failure), then a start that dies (one failure): not off.
+    await runIdb(h.cli.exec, UDID, READ, { helper: h.helper, timeoutMs: 10 }).catch(() => undefined);
+    await settle();
+    await runIdb(h.cli.exec, UDID, READ, { helper: h.helper });
+    await settle();
+    h.s.children.at(-1)!.die();
+    await settle();
+    await runIdb(h.cli.exec, UDID, READ, { helper: h.helper });
+    await settle();
+    expect(h.s.children).toHaveLength(4);
+    expect(logged).toEqual([]);
+  });
+
+  it('turns off a helper whose requests time out in a row — the second and later timeouts count, the CLI then serves', async () => {
+    const h = await readyHelper();
+    await timeOutAndRestart(h);
+    await timeOutAndRestart(h); // the second in a row: one failure, still restarted
+    expect(h.s.children).toHaveLength(3);
+    expect(logged).toEqual([]);
+    const got = await runIdb(h.cli.exec, UDID, READ, { helper: h.helper, timeoutMs: 10 }).catch((e: unknown) => e);
+    expect((got as ExecError).timedOut).toBe(true);
+    await settle();
+    const before = h.cli.idbCalls.length;
+    expect((await runIdb(h.cli.exec, UDID, READ, { helper: h.helper })).stdout.toString()).toBe('cli');
+    await settle();
+    expect(h.cli.idbCalls).toHaveLength(before + 1);
+    expect(h.s.children).toHaveLength(3);
+    expect(logged).toEqual([
+      'averi: idb helper off for this process (2 failures in a row, the last: 3 requests in a row timed out) — the idb CLI serves every call',
+    ]);
+  });
+
+  it('answers a read in flight when the adapter is disposed under it — retried on the CLI', async () => {
+    const { helper, s, cli } = await readyHelper();
+    const read = runIdb(cli.exec, UDID, READ, { helper });
+    await settle();
+    expect(s.children[0].requests).toHaveLength(1);
+    await helper.dispose();
+    expect((await read).stdout.toString()).toBe('cli');
+    expect(cli.idbCalls).toEqual([CLI_ARGV, CLI_ARGV]);
   });
 
   it('says once, on the server\'s stderr, why it turned itself off — with the tail of the helper\'s own stderr', async () => {
     const s = fakeSpawn();
     const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
     const cli = fakeExec();
-    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
+    for (let i = 0; i < MAX_FAILURES_IN_A_ROW; i++) {
       await runIdb(cli.exec, UDID, READ, { helper });
       await settle();
       s.children[i].stderr.write("ModuleNotFoundError: No module named 'idb'\n");

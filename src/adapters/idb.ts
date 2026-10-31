@@ -29,9 +29,11 @@ export interface IdbHelperCall {
  * methods (tap, swipe, text, keys, viewport) and the idb tree source alike:
  * the Xcode env probe first (xcode-env.ts, memoized per ExecFn), then
  * `idb <args> --udid <udid>` — the flag LAST, as idb's CLI wants it after the
- * subcommand. A leaf beside xcode-env.ts, not part of the tree-source seam,
- * because input uses it and input is not behind that seam (review
- * 2026-10-03). Written once since 2026-10-03; the two copies were identical.
+ * subcommand. Beside xcode-env.ts, not part of the tree-source seam, because
+ * input uses it and input is not behind that seam (review 2026-10-03).
+ * Written once since 2026-10-03; the two copies were identical. Since D7a it
+ * also routes to the idb helper (idb-helper.ts) and publishes the helper's
+ * calls on the diagnostics channels above.
  *
  * With a `helper` (D7a, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md) an argv of HELPER_ARGV is
  * offered to it first; when it takes the call, the answer is the CLI's, to the byte of the error an agent reads: a

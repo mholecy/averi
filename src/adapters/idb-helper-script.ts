@@ -16,9 +16,11 @@
  *
  * The import sees what the shebang'd CLI sees (review 2026-10-31, MINOR-5): no `-I`, so `PYTHONPATH` and the user
  * site-packages count as they do for `idb`; and its first statement replaces `sys.path[0]` — `''`, the cwd, under
- * `-c` — with the directory of idb's real path, the entry Python puts there when it runs the script. `sys` is built in
- * and `os` was imported by `site` before any of this runs, so nothing is looked up on the cwd before it is gone, and
- * nothing from averi's cwd can be imported after.
+ * `-c` — with the directory of idb's real path, the entry Python puts there when it runs the script. Only when it IS
+ * `''`: under safe-path mode (`PYTHONSAFEPATH`, Python 3.11+) `-c` prepends nothing and neither does the script run,
+ * so the path is left as it is — the CLI's exactly (review round 2, NIT-A). `sys` is built in and `os` was imported by
+ * `site` before any of this runs, so nothing is looked up on the cwd before it is gone, and nothing from averi's cwd
+ * can be imported after.
  *
  * Parity with the CLI (the contract test, tests/adapters/idb-helper-contract.test.ts, runs both against the real
  * fb-idb): `sys.argv[0]` is idb's own path, as the shebang'd script sees it, so argparse names itself `idb` in usage
@@ -31,7 +33,8 @@
  */
 export const IDB_HELPER_SCRIPT = String.raw`
 import sys, os
-sys.path[0] = os.path.dirname(os.path.realpath(sys.argv[1]))
+if sys.path and sys.path[0] == '':
+    sys.path[0] = os.path.dirname(os.path.realpath(sys.argv[1]))
 argv0 = sys.argv[1]
 import asyncio, io, json, logging, traceback
 proto = os.fdopen(3, 'w', encoding='utf-8', buffering=1)

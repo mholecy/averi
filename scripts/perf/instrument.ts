@@ -1,8 +1,8 @@
 import type { execFile as ExecFileFn } from 'node:child_process';
-import { IDB_HELPER_CALL_END, IDB_HELPER_CALL_START, type IdbHelperCall } from '../../src/adapters/idb.js';
 import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { basename } from 'node:path';
 import { promisify } from 'node:util';
+import { IDB_HELPER_CALL_END, IDB_HELPER_CALL_START, type IdbHelperCall } from '../../src/adapters/idb.js';
 import { SLEEP_OWNER } from '../differential/clock.js';
 import type { DeviceCall, Sleep, Window } from './stats.js';
 
@@ -19,12 +19,13 @@ import type { DeviceCall, Sleep, Window } from './stats.js';
  *   `recordingFetch` wraps that. The xcodebuild that serves WDA is a long-running `spawn`, a server and not a call, and
  *   is not counted.
  * - The idb helper (D7a): a call it serves is no process — it is published on src/adapters/idb.ts's diagnostics
- *   channels, and `recordHelperCalls` records it as the `idb` call it stands for (`idb ui describe-all`, `via: helper`),
- *   so a breakdown still names it. The helper's own start is a server, as WDA's xcodebuild is, and is not counted.
+ *   channels, and `recordHelperCalls` records it as the `idb` call it stands for (`idb ui describe-all`,
+ *   `via: helper`), so a breakdown still names it. The helper's own start is a server, as WDA's xcodebuild is, and is
+ *   not counted.
  * - Sleeps: averi has one sleep owner, src/util/sleep.ts ("waits, not sleeps"), and it is the only `setTimeout` in src/
  *   outside the process shutdown and the idb helper's deadlines (src/adapters/idb-helper.ts: a request's timeout and a
- *   start's ready deadline — bounds, not sleeps). `recordingSetTimeout` tells its timers from every other one (the MCP SDK's, node's)
- *   by the stack, as scripts/differential/clock.ts does, and records each with the file:line that called `sleep` — the
+ *   start's ready deadline — bounds, not sleeps). `recordingSetTimeout` tells its timers from every other one (the
+ *   MCP SDK's, node's) by the stack, as scripts/differential/clock.ts does, and records each with the file:line that called `sleep` — the
  *   settle or poll a D row names. Nothing is faked: the timer runs for its real length.
  *
  * Only calls that START inside a window (`Recorder.begin` … `end`) are recorded, so the harness's own setup — launching
