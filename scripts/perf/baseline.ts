@@ -10,7 +10,7 @@ import { IosAdapter } from '../../src/adapters/ios.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import type { Platform } from '../../src/adapters/types.js';
-import { AdapterRegistry, defaultDiscovery, defaultFactory } from '../../src/mcp/registry.js';
+import { AdapterRegistry, defaultDiscovery, defaultFactory, defaultIosBooted } from '../../src/mcp/registry.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_WDA_DERIVED_DATA } from '../truth/lab-device.js';
 import { allPassed, callReply, claimsDone, claimsTap, claimsVisible, isError, OCR_FAILED_CLOSED } from '../truth/replies.js';
@@ -227,6 +227,8 @@ const registry = new AdapterRegistry({
       ? defaultFactory(p, deviceId, opts)
       : new IosAdapter({ udid: deviceId, treeSource: createIosTreeSource(opts?.treeSource ?? treeSource, deviceId, { port: wdaPort, derivedDataPath: LAB_WDA_DERIVED_DATA }) }),
   discovery: defaultDiscovery,
+  // The server's own proof (D22): a bound simulator proven booted from its device.plist, as `new AdapterRegistry()` does.
+  iosBooted: defaultIosBooted,
 });
 const server = createAveriServer({ registry, version: 'perf-baseline' });
 const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();

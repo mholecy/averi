@@ -128,7 +128,11 @@ with a fake factory cannot list the host's real devices) and asks it on every
 `get()`, as it asked a probe adapter before — since D13 (2026-10-31) with
 `versions: false`, so the per-call probe on Android is `adb devices -l` alone (the
 getprop per online device — its cost on `adapters/discovery.ts#ListOpts` — is asked only by
-`select()` and `listAll()`, whose replies show a version). Until then `listDevices()` was an adapter
+`select()` and `listAll()`, whose replies show a version). Since D22 (2026-10-31) the BOUND iOS path asks the
+simulator's own `device.plist` first (`adapters/discovery.ts#iosBootedFromDevicePlist`, the
+registry's optional third seam `iosBooted` — absent when the seams are injected, so such a
+registry reads no host file): state 3 is proof and no `simctl list` is spawned; anything
+short of proof lists as before (ADR 0031). Until then `listDevices()` was an adapter
 member, so both adapters carried an unbound mode the registry used for nothing else —
 an `IosAdapter` without a UDID (simctl's `booted` alias, a lazily resolved UDID for
 idb, a `uiTree()` that refused) and an `AndroidAdapter` without a serial (adb without

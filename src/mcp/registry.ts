@@ -2,7 +2,7 @@ import { AndroidAdapter } from '../adapters/android.js';
 import { IosAdapter } from '../adapters/ios.js';
 import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import { createIosTreeSource } from '../adapters/ios-tree-source.js';
-import { androidUnusable, listAndroidDevices, listIosDevices, type ListOpts } from '../adapters/discovery.js';
+import { androidUnusable, iosBootedFromDevicePlist, listAndroidDevices, listIosDevices, type ListOpts } from '../adapters/discovery.js';
 import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
 import { drawnOverStrip } from '../ui-tree/draw-order.js';
@@ -57,6 +57,17 @@ export const discoveryWith = (exec: ExecFn = defaultExec): DeviceDiscovery => (p
   platform === 'android' ? listAndroidDevices(exec, opts) : listIosDevices(exec);
 
 export const defaultDiscovery: DeviceDiscovery = discoveryWith();
+
+/**
+ * Whether the bound simulator is PROVEN booted without a listing — `true`
+ * only when proven; `false` (or a rejection) is "cannot tell", and the
+ * registry asks discovery as before. The registry's optional third seam
+ * (D22, 2026-10-31), asked on get()'s bound iOS path alone.
+ */
+export type IosBootedProof = (udid: string) => Promise<boolean>;
+
+/** The real proof: the simulator's own device.plist (adapters/discovery.ts#iosBootedFromDevicePlist, where why and the trade are). */
+export const defaultIosBooted: IosBootedProof = (udid) => iosBootedFromDevicePlist(udid);
 
 /**
  * Exported for its tests: the registry's own tests inject a factory, so this
@@ -121,15 +132,30 @@ export class AdapterRegistry {
 
   private readonly factory: AdapterFactory;
   private readonly discovery: DeviceDiscovery;
+  private readonly iosBooted: IosBootedProof;
 
   /**
    * Both seams or neither: a caller that injected a fake factory but left
    * discovery at its default would have its tests run `adb devices` and
    * `simctl list` on the host — the type does not let it.
+   *
+   * `iosBooted` (D22) is the one optional seam, and its absence is the safe
+   * side: a caller that injects its seams and names no proof gets one that
+   * never proves anything, so every bound iOS call lists through discovery
+   * as before and no host file is read. Only the default registry (and a
+   * caller passing `defaultIosBooted`, as scripts/perf/baseline.ts does)
+   * reads the device.plist.
    */
-  constructor(deps: { factory: AdapterFactory; discovery: DeviceDiscovery } = { factory: defaultFactory, discovery: defaultDiscovery }) {
+  constructor(
+    deps: { factory: AdapterFactory; discovery: DeviceDiscovery; iosBooted?: IosBootedProof } = {
+      factory: defaultFactory,
+      discovery: defaultDiscovery,
+      iosBooted: defaultIosBooted,
+    },
+  ) {
     this.factory = deps.factory;
     this.discovery = deps.discovery;
+    this.iosBooted = deps.iosBooted ?? (async () => false);
   }
 
   async listAll(): Promise<Device[]> {
@@ -169,10 +195,15 @@ export class AdapterRegistry {
     this.assertOpen();
     const binding = this.bindings.get(platform);
     if (binding) {
+      // iOS first asks the simulator's own device.plist (D22): proven booted,
+      // no listing is spawned (~110 ms of `simctl list devices` a call) — the
+      // only fact this path reads from a listing is "booted". Anything short
+      // of proof lists as before, so every refusal below keeps its wording.
+      const proven = platform === 'ios' && (await this.provenBooted(binding.deviceId));
       // Every entry with the serial: cheap phones can share one, and any
       // booted entry keeps the binding, as before the C5 refusals.
-      const matches = (await this.probe(platform, { versions: false })).filter((d) => d.id === binding.deviceId);
-      const stillBooted = matches.some((d) => d.state === 'booted');
+      const matches = proven ? [] : (await this.probe(platform, { versions: false })).filter((d) => d.id === binding.deviceId);
+      const stillBooted = proven || matches.some((d) => d.state === 'booted');
       const listed = matches[0];
       // A select() may have rebound the platform while we awaited the probe.
       // Acting on the CAPTURED binding would re-cache the evicted (already
@@ -277,11 +308,26 @@ export class AdapterRegistry {
    * listing are where a version is read.
    *
    * Not cached here — a stale "still booted" would hand out an adapter for a
-   * device that is gone. Async, so a discovery that throws synchronously is
+   * device that is gone. (D22's device.plist proof, `provenBooted`, is no
+   * cache either: CoreSimulator's own record, read afresh on each call.) Async, so a discovery that throws synchronously is
    * the same event as one that rejects (the rule disposeQuietly states) —
    * listAll's per-platform catch must see both.
    */
   private async probe(platform: Platform, opts?: ListOpts): Promise<Device[]> {
     return this.discovery(platform, opts);
+  }
+
+  /**
+   * The bound simulator proven booted without a listing (D22). Not a cache
+   * either: the proof is read afresh on every call, as the listing was. A
+   * proof that throws (synchronously or not) proves nothing — the listing
+   * decides, as before.
+   */
+  private async provenBooted(udid: string): Promise<boolean> {
+    try {
+      return (await this.iosBooted(udid)) === true;
+    } catch {
+      return false;
+    }
   }
 }

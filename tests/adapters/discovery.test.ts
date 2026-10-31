@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { androidUnusable, listAndroidDevices, listIosDevices } from '../../src/adapters/discovery.js';
+import { androidUnusable, iosBootedFromDevicePlist, listAndroidDevices, listIosDevices } from '../../src/adapters/discovery.js';
 import type { Device } from '../../src/adapters/types.js';
 import type { ExecFn, ExecOptions, ExecResult } from '../../src/adapters/exec.js';
 
@@ -129,5 +129,71 @@ describe('listIosDevices', () => {
     expect(calls).toContain('xcrun --find simctl');
     // Through xcode-env.ts#simctl (pinned in xcode-env.test.ts): the listing has no timeout of its own.
     expect(options[calls.indexOf('xcrun simctl list devices --json')]).not.toHaveProperty('timeoutMs');
+  });
+});
+
+describe('iosBootedFromDevicePlist — the bound simulator\'s own record, before simctl (D22)', () => {
+  const UDID = 'D8DACDE6-6352-437C-AA22-86FB06275C3F';
+  /** The lab simulator's device.plist as CoreSimulator wrote it (Xcode 27, iOS 27.0; 701 bytes, 2026-10-31), its state a parameter. */
+  const plist = (state: string, udid = UDID, extra = '') => `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+\t<key>UDID</key>
+\t<string>${udid}</string>
+\t<key>deviceType</key>
+\t<string>com.apple.CoreSimulator.SimDeviceType.iPhone-17</string>
+\t<key>isDeleted</key>
+\t<false/>
+\t<key>isEphemeral</key>
+\t<false/>
+\t<key>lastUsedAt</key>
+\t<date>2026-10-31T09:34:48Z</date>
+\t<key>name</key>
+\t<string>averi-lab iPhone 17</string>
+\t<key>runtime</key>
+\t<string>com.apple.CoreSimulator.SimRuntime.iOS-27-0</string>
+\t<key>runtimePolicy</key>
+\t<string>System</string>${extra}
+\t<key>state</key>
+\t<integer>${state}</integer>
+</dict>
+</plist>
+`;
+  /** A reader over one file's text; records each path asked for. A thrown value stands for a missing or unreadable file. */
+  const reader = (text: string | Error) => {
+    const paths: string[] = [];
+    const read = async (path: string) => {
+      paths.push(path);
+      if (text instanceof Error) throw text;
+      return text;
+    };
+    return { read, paths };
+  };
+
+  it('state 3 in the default device set\'s file for that UDID reads booted', async () => {
+    const { read, paths } = reader(plist('3'));
+    expect(await iosBootedFromDevicePlist(UDID, read, '/Users/lab')).toBe(true);
+    expect(paths).toEqual([`/Users/lab/Library/Developer/CoreSimulator/Devices/${UDID}/device.plist`]);
+  });
+
+  // false is "ask simctl", never "shut down": each of these leaves the answer to the listing.
+  it.each([
+    ['state 1 (shut down)', plist('1')],
+    ['state 2 (booting, unmeasured)', plist('2')],
+    ['state 3 recorded for another UDID', plist('3', 'AAAA-1111')],
+    ['state 3 on a deleted device', plist('3').replace('<key>isDeleted</key>\n\t<false/>', '<key>isDeleted</key>\n\t<true/>')],
+    // A 3 in some other dict is not the device's own: not the flat shape read, so not believed.
+    ['a second state key, 3, beside the device\'s own 1', plist('1', UDID, '\n\t<key>state</key>\n\t<integer>3</integer>')],
+    ['no state key', plist('3').replace(/\t<key>state<\/key>\n\t<integer>3<\/integer>\n/, '')],
+    ['a binary plist', 'bplist00\u00d4\u0001\u0002state'],
+    ['garbage', 'not a plist'],
+  ])('%s reads not-proven-booted', async (_why, text) => {
+    expect(await iosBootedFromDevicePlist(UDID, reader(text).read, '/Users/lab')).toBe(false);
+  });
+
+  it('a missing or unreadable file reads not-proven-booted, without throwing', async () => {
+    const missing = Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
+    expect(await iosBootedFromDevicePlist(UDID, reader(missing).read, '/Users/lab')).toBe(false);
   });
 });
