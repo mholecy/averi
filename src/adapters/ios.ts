@@ -331,8 +331,9 @@ export class IosAdapter implements DeviceAdapter {
    * Android's spline would still fling here. idb's step timing over a long
    * duration is measured once (D20, 2026-10-31, the lab's form-picker
    * sheet, three runs each): 524 pt in 300 ms flung the SwiftUI List
-   * ~1 040 pt, in 1.5 s it carried it ~570 pt — the paced speed; 300 ms to
-   * 1.5 s, a UIKit table and a horizontal stroke are unmeasured. The scroll's turn — every turn
+   * ~1 040 pt, in 1.5 s it carried it ~570 pt — the paced speed. Strokes
+   * between 300 ms and 1.5 s, a UIKit table and a horizontal stroke are
+   * unmeasured. The scroll's turn — every turn
    * halving the reach — was device-checked on that form, and a lazy list's
    * dropped row now turns the stroke too (interact/scroll-rounds.ts) —
    * and, on WDA's trees, no stroke reaches further than the target still

@@ -23,8 +23,6 @@ const DOWN = { ...UP, direction: 'down' } as const;
 type StrokeStep = Extract<RoundStep, { do: 'stroke' }>;
 const strokes = (played: Played): StrokeStep[] => played.steps.filter((s): s is StrokeStep => s.do === 'stroke');
 const travel = (s: StrokeStep): number => Math.abs(s.points!.to.y - s.points!.from.y) + Math.abs(s.points!.to.x - s.points!.from.x);
-/** A paced stroke's time (D20): its travel at 349 pt/s, rounded up, never under 300 ms — 524 pt in ~1.5 s. */
-const pacedMs = (s: StrokeStep): number => Math.max(300, Math.ceil((travel(s) / 349) * 1000));
 
 /** An idb list of rows `row_<from>`…, the first at `top`: a list that moves when stroked. */
 const rows = (from: number, top: number): UiNode =>
@@ -51,11 +49,11 @@ describe('scroll_until on idb, a content-up stroke for a target never seen: a fe
     const sent = strokes(played);
     expect(sent[0]).toMatchObject({ kind: 'feeler', durationMs: 600 });
     expect(travel(sent[0])).toBe(160);
-    for (const s of sent.slice(1)) {
-      expect(s.kind).toBe('paced');
-      expect(s.durationMs).toBe(pacedMs(s));
-      expect(travel(s)).toBeGreaterThan(160);
-    }
+    // 524 pt at 349 pt/s: 1501.4 ms, rounded up (D20).
+    expect(sent.slice(1).map((s) => [s.kind, travel(s), s.durationMs])).toEqual([
+      ['paced', 524, 1502],
+      ['paced', 524, 1502],
+    ]);
   });
 
   it('a target the call has seen is no feeler\'s: its strokes are full, paced on idb (D20)', () => {
@@ -69,7 +67,7 @@ describe('scroll_until on idb, a content-up stroke for a target never seen: a fe
     const seenA = { tree, found: tree.children.filter((n) => n.label === 'A') };
     const sent = strokes(play(UP, [seenA, seenA, seenA]));
     expect(sent.length).toBeGreaterThan(0);
-    for (const s of sent) expect([s.kind, s.durationMs]).toEqual(['paced', pacedMs(s)]);
+    for (const s of sent) expect([s.kind, travel(s), s.durationMs]).toEqual(['paced', 524, 1502]);
   });
 
   it('a push-up (content below) is never a feeler: the finger moving up dismisses no sheet — full strokes, paced on idb (D20)', () => {
