@@ -30,7 +30,7 @@ measured before and after.
 | D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | Android done (0119d76d); iOS run by the owner |
 | D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | done (0d551270; with a 150 ms floor, ADR 0029) |
 | D2 | `ensure_state`'s second look ends on a held "no" | device | open |
-| D3 | Per-call tree snapshot cache, invalidated by every action | device | open |
+| D3 | Per-call tree snapshot cache, invalidated by every action | device | done (8bdb8004; a one-shot hand-off, not a cache — ADR 0030) |
 | D4 | OCR: one persistent Swift helper, per-frame result cache, parallel crops | device | open |
 | D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | open |
 | D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | open |
@@ -45,6 +45,7 @@ measured before and after.
 | D15 | Two engines compiling the OCR helper at once share the `${binary}.${pid}` staging path (pre-existing; found in P6) | stability | open |
 | D16 | `tests/truth/calibration.test.ts` spawns a `git merge-base` per fix and times out (5 s) under load | tests | open |
 | D17 | uiautomator cuts a sideways carousel item's bounds at the screen edge, so its true centre is unknown and "CLIPPED 88 %" can name an item whose centre is past the carousel edge (pre-existing; found in D10's live run, `carousel-in-list.C`) | correctness | open |
+| D18 | No lab field reformats as it is typed into (IBAN grouping, amount separators): the typing pace and a fill's read-back are unproven there, and `type_text` without a selector, flow `type:` and `type_pin` type blind (found in D6's review) | stability | open |
 
 ## Notes
 
@@ -152,6 +153,14 @@ unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 
 cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
+
+### D3 — read hand-off
+Done in 8bdb8004 (ADR 0030): not a transparent cache — a one-shot hand-off of the last read (a watched adapter whose
+exhaustive typed record says which methods act; any action empties it; ≤ 1 s since the read ended; never across tool
+calls), taken only as a first sample or a positive verdict: the ladder's re-detect (yes only, never for an absence),
+element asserts (pass only), a flow tap/fill's first sample. Detect probes produce it too. Cold ensure_state
+14.6 → 12.3 s (one dump fewer), every other D0 scenario unchanged; live forms 32/32 identical. Residuals: a handed yes
+can be ~3.3 s older than the fresh read it replaces; concurrent tool calls on one device are not seen.
 
 ### D1 — poll cadence
 Done in 0d551270 (ADR 0029): `pollTree` sleeps `min(pollMs, max(150, pollMs − read))` — reads start ≥ pollMs apart and
