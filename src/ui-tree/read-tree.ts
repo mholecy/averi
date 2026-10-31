@@ -488,8 +488,12 @@ export function sameTreeWithinPixel(a: UiNode, b: UiNode): boolean {
  * ProgressIndicator; through WDA an ActivityIndicator — React Native's
  * <ActivityIndicator> — since D27 (2026-10-31). A spinner keeps
  * a fixed rect and no text, so `treeFingerprint` reads a loading screen as
- * unchanged; `scroll_until` asks this so a list still loading its next
- * page is not called exhausted (code review of fix/r3-scroll, 2026-10-09).
+ * unchanged. Two callers: `scroll_until` (interact/scroll-read.ts's
+ * `loading`) asks this so a list still loading its next page is not called
+ * exhausted (code review of fix/r3-scroll, 2026-10-09); D2's hold
+ * (flow/hold-tracker.ts, ADR 0033) so a screen still loading never holds.
+ * Every progress node with area counts, hidden or off-screen too (D27's
+ * stated residual: the safe direction, both callers' windows bounded).
  * One walk.
  */
 export function showsProgress(tree: UiNode): boolean {

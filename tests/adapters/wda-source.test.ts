@@ -240,6 +240,22 @@ describe('parseWdaSource — normalization and input shapes', () => {
     expect(showsProgress(tree)).toBe(true);
   });
 
+  // The residual's other half: an OFF-SCREEN spinner — a FlatList ListFooterComponent below the viewport, visible to WDA —
+  // still reads as loading: the list is still loading a page, so scroll_until must not call it exhausted.
+  it('a visible ActivityIndicator wholly below the screen (a list footer) on a loaded screen still makes showsProgress true', () => {
+    const tree = parseWdaSourceValue(
+      el('Window', {
+        rect: { x: 0, y: 0, width: 402, height: 874 },
+        children: [
+          el('StaticText', { label: 'Prehľad', rect: { x: 24, y: 120, width: 354, height: 24 } }),
+          el('ActivityIndicator', { isVisible: '1', rect: { x: 181, y: 1200, width: 40, height: 40 } }),
+        ],
+      }),
+    );
+    expect(tree.children.find((n) => n.role === 'progress')).toMatchObject({ rect: { y: 1200 } });
+    expect(showsProgress(tree)).toBe(true);
+  });
+
   it('maps unknown types to "other"', () => {
     expect(parseWdaSourceValue(el('SomeFutureType')).role).toBe('other');
   });

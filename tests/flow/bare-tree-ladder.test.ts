@@ -377,12 +377,12 @@ describe('a cold launch\'s bare trees are not "not in state": the ladder looks a
  */
 describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)', () => {
   /**
-   * The device after `at` until a launch, ANDROID_LOGIN after it; `msBeforeLaunch` is when the (first) launch began,
-   * counted from the run's start.
+   * The device after `at` until a launch, `after` (ANDROID_LOGIN by default) after it, on `platform` (Android by
+   * default); `msBeforeLaunch` is when the (first) launch began, counted from the run's start.
    */
-  function relaunching(at: (ms: number, read: number) => UiNode | Error) {
+  function relaunching(at: (ms: number, read: number) => UiNode | Error, platform: 'android' | 'ios' = 'android', after: UiNode = ANDROID_LOGIN) {
     let relaunched = false;
-    const { fake, state } = timeline((ms, read) => (relaunched ? ANDROID_LOGIN : at(ms, read)));
+    const { fake, state } = timeline((ms, read) => (relaunched ? after : at(ms, read)), platform);
     const launch = fake.launch.bind(fake);
     const seen = { msBeforeLaunch: -1, started: Date.now() };
     fake.launch = async (appId, opts) => {
@@ -481,18 +481,9 @@ describe('the second look before a CHEAP rung ends on a held rendered "no" (D2)'
     });
     expect(isBareTree(spinning)).toBe(false);
     expect(showsProgress(spinning)).toBe(true);
-    let relaunched = false;
-    const { fake } = timeline((ms) => (relaunched ? WDA_LOGIN : ms < 30 ? WDA_SPLASH : spinning), 'ios');
-    const launch = fake.launch.bind(fake);
-    const started = Date.now();
-    let msBeforeLaunch = -1;
-    fake.launch = async (appId, opts) => {
-      if (msBeforeLaunch < 0) msBeforeLaunch = Date.now() - started;
-      relaunched = true;
-      return launch(appId, opts);
-    };
+    const { fake, seen } = relaunching((ms) => (ms < 30 ? WDA_SPLASH : spinning), 'ios', WDA_LOGIN);
     await FlowEngine.run(CFG, fake, { ...FAST, ensureTimeoutMs: 300 }, { state: 'logged_out_cheap_only' });
-    expect(msBeforeLaunch).toBeGreaterThanOrEqual(300);
+    expect(seen.msBeforeLaunch).toBeGreaterThanOrEqual(300);
     expect(fake.launches).toEqual([expect.objectContaining({ clearState: false })]);
   });
 
