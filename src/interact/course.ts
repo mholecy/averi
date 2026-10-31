@@ -3,6 +3,7 @@ import { drawOrderFound } from '../ui-tree/cover.js';
 import { axisOfEdge, rectIntersection, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { Judged, Since } from './scroll-read.js';
+import { UNMEASURED_MIN_DRAG } from './stroke-plan.js';
 import { axisOf, OPPOSITE, type Direction } from './swipe.js';
 
 /**
@@ -340,6 +341,41 @@ function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direc
   const need = toward === 'down' || toward === 'right' ? lo + len - (wLo + wLen) : wLo - lo;
   const slack = Math.max(0, wLen - len);
   return need <= 0 ? undefined : { needs: need + slack / 2, slack };
+}
+
+/**
+ * How near the known far side of a target whose centre is unknown may lie to its frame's far edge and still take
+ * `unknownCentreNeeds`'s stroke: twice UNMEASURED_MIN_DRAG (216 px), the shortest drag the plan cuts a stroke to — which
+ * an Android drag carries about its own length (measured live on `carousel-in-list`: a 569-px drag carried the
+ * carousel 632 px, 1.11 a px) — so even that shortest stroke cannot push the known side past the frame's far edge.
+ */
+export const UNKNOWN_CENTRE_MIN_GAP = 2 * UNMEASURED_MIN_DRAG;
+
+/**
+ * What a target whose CENTRE IS UNKNOWN still needs of one more stroke toward `toward` (D17; the carry model turns it
+ * into a stroke, stroke-plan.ts#carryReach): the source cut its `toward` side at the screen's edge
+ * (ui-tree/standing.ts#StandingFacts.unknownPast: uiautomator's), so how far it runs past is unknown, and so is its
+ * centre — measured, C laid at x 586 948 wide was dumped `[586,380][1080,614]`, its listed centre 833 inside the
+ * carousel ending at 1014, its true one 1060 past it. Its FAR side, the one content leaves through, is known: the
+ * stroke may carry it up to the frame's far edge and no further — `needs` that distance, `slack` none (the carry model
+ * then cuts the stroke to it, at UNMEASURED_CARRY a point before any carry was measured: the safe, short side). After
+ * it as much of the target as can be lies in the frame. `frame` is the frame it was judged in, cut to what its scroll
+ * views draw (StandingFacts.screen). Undefined — no such stroke — when the side toward `toward` is not unknown, or when
+ * the far side lies within UNKNOWN_CENTRE_MIN_GAP of the frame's far edge (the shortest stroke could push it past) or
+ * past it — as it does when it is unknown too (cut at both edges: nothing known to bring up).
+ */
+export function unknownCentreNeeds(rect: Rect, unknownPast: readonly Edge[] | undefined, frame: Rect, toward: Direction): StillNeeds | undefined {
+  const { far, near } = FAR_EDGE[toward];
+  if (unknownPast === undefined || !unknownPast.includes(near)) return undefined;
+  // How far the far side lies inside the frame's far edge: negative where it is unknown too — on the screen's edge,
+  // past the frame's (cut at both: nothing known to bring up).
+  const gap: Record<Edge, number> = {
+    top: rect.y - frame.y,
+    bottom: frame.y + frame.height - (rect.y + rect.height),
+    left: rect.x - frame.x,
+    right: frame.x + frame.width - (rect.x + rect.width),
+  };
+  return gap[far] < UNKNOWN_CENTRE_MIN_GAP ? undefined : { needs: gap[far], slack: 0 };
 }
 
 declare const opaque: unique symbol;
