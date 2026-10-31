@@ -1,4 +1,10 @@
-import { PersistentReadError, type DeviceAdapter, type DeviceScreen, type Rect, type UiNode } from '../adapters/types.js';
+import {
+  PersistentReadError,
+  type DeviceAdapter,
+  type DeviceScreen,
+  type Rect,
+  type UiNode,
+} from '../adapters/types.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';

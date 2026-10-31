@@ -334,8 +334,8 @@ const describeEmptyPayload = (types: readonly (string | undefined)[]): string =>
  * in 13 runs.
  *
  * Hence a PersistentReadError: no poll retries it (types.ts — before this, every waiting caller polled it to its
- * deadline, which is all D20's 90 s were), and averi neither re-fronts the app, nor re-reads, nor reboots: nothing short
- * of a reboot cures it, and averi does not boot simulators. The message says so and names the cure — the reboot
+ * deadline, which is all D20's 90 s were), and averi neither re-fronts the app, nor re-reads, nor reboots: nothing
+ * short of a reboot cures it, and averi does not boot simulators. The message says so and names the cure — the reboot
  * (simulator-reboot.ts, the one owner of the command, with the bound UDID), a companion started a few seconds after
  * the boot completes, or the WDA tree source, which does not read through idb.
  *
@@ -359,12 +359,13 @@ export class IdbNoFrontmostError extends PersistentReadError {
       "idb cannot read the UI tree: the simulator's accessibility service named no frontmost application — " +
         'it stays so until the simulator reboots, and averi does not retry the read\n' +
         'Measured 2026-10-31 on a lab simulator (9 reboots): an accessibility query made too soon after a boot ' +
-        '(idb_companion started as the boot completed) leaves the accessibility service like this for every read after it; ' +
-        're-fronting the app (launch_app on the running app), terminate_app then launch_app, a new idb_companion and ' +
+        '(idb_companion started as the boot completed) leaves the accessibility service like this ' +
+        'for every read after it; re-fronting the app (launch_app on the running app), ' +
+        'terminate_app then launch_app, a new idb_companion and ' +
         `30 s more of waiting each cured it 0 of 5 times. To cure it, ${rebootSimulatorAdvice(udid)}, ` +
-        `wait until the boot completes (\`xcrun simctl bootstatus ${udid} -b\`) and start idb_companion a few seconds ` +
-        'after that (3 s measured: 0 of 3 wedged); or set app.ios.treeSource: wda in averi.yaml to read the tree ' +
-        'through WebDriverAgent instead',
+        `wait until the boot completes (\`xcrun simctl bootstatus ${udid} -b\`) ` +
+        'and start idb_companion a few seconds after that (3 s measured: 0 of 3 wedged); ' +
+        'or set app.ios.treeSource: wda in averi.yaml to read the tree through WebDriverAgent instead',
       opts.cause === undefined ? undefined : { cause: opts.cause },
     );
     this.name = 'IdbNoFrontmostError';
@@ -427,7 +428,9 @@ export class IdbTreeSource implements IosTreeSource {
         helper: this.helper,
       }));
     } catch (e) {
-      if (e instanceof ExecError && !e.timedOut && NO_FRONTMOST.test(e.stderr)) throw new IdbNoFrontmostError(this.udid, { cause: e });
+      if (e instanceof ExecError && !e.timedOut && NO_FRONTMOST.test(e.stderr)) {
+        throw new IdbNoFrontmostError(this.udid, { cause: e });
+      }
       throw e;
     }
     const elements = idbElements(stdout.toString('utf8'));

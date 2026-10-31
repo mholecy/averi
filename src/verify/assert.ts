@@ -4,7 +4,7 @@ import pixelmatch from 'pixelmatch';
 import { z } from 'zod';
 import { PersistentReadError, type DeviceAdapter, type UiNode } from '../adapters/types.js';
 import { describeElementSpec, elementSpecSchema, type ElementSpec } from '../ui-tree/element-spec.js';
-import { pollOnVerdict, pollTree, Undecided, type FirstSample } from '../ui-tree/read-tree.js';
+import { pollOnVerdict, pollTree, Undecided, type FirstSample, type PollOutcome } from '../ui-tree/read-tree.js';
 import { ReadHandOff } from '../ui-tree/read-handoff.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
 import { formatSeconds, parseDuration } from '../util/duration.js';
@@ -237,8 +237,11 @@ export interface VerifierOptions {
    * the MCP `assert` tool (run/commands.ts#runAsserts). D21 review round 2: a failing result everywhere turned a
    * flow's wedged assert into a plain "flow asserts failed" that `optional:` skipped and the ladder escalated past.
    */
-  persistentRead?: 'throw' | 'fail';
+  persistentRead?: PersistentReadMode;
 }
+
+/** VerifierOptions.persistentRead: whether an assert throws a read no wait cures (`throw`) or fails on it (`fail`). */
+export type PersistentReadMode = 'throw' | 'fail';
 
 interface PollSpec {
   description: string;
@@ -284,7 +287,7 @@ export class Verifier {
   /** The device, as `handOff` watches it: what an action through it would invalidate is never handed on. */
   private readonly adapter: DeviceAdapter;
   /** VerifierOptions.persistentRead: whether a read no wait cures fails the assert or is thrown. */
-  private readonly persistentRead: 'throw' | 'fail';
+  private readonly persistentRead: PersistentReadMode;
 
   constructor(adapter: DeviceAdapter, opts: VerifierOptions = {}) {
     this.persistentRead = opts.persistentRead ?? 'throw';
@@ -515,7 +518,9 @@ export class Verifier {
    * under `throw`, and for any other error, it propagates as it came.
    */
   private failedOnPersistentRead(description: string, e: unknown): AssertResult {
-    if (this.persistentRead === 'fail' && e instanceof PersistentReadError) return { description, pass: false, detail: e.message };
+    if (this.persistentRead === 'fail' && e instanceof PersistentReadError) {
+      return { description, pass: false, detail: e.message };
+    }
     throw e;
   }
 
@@ -563,7 +568,7 @@ export class Verifier {
     spec: PollSpec,
   ): Promise<AssertResult> {
     const { description, timeoutMs } = spec;
-    let outcome;
+    let outcome: PollOutcome<{ detail?: string }>;
     try {
       outcome = await pollTree(this.adapter, async (tree) => {
         const verdict = await evaluate(tree);

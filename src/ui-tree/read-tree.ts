@@ -1,4 +1,13 @@
-import { everyNode, PersistentReadError, rectArea, sameRectWithinPixel, STRUCTURAL_ROLES, type DeviceAdapter, type Point, type UiNode } from '../adapters/types.js';
+import {
+  everyNode,
+  PersistentReadError,
+  rectArea,
+  sameRectWithinPixel,
+  STRUCTURAL_ROLES,
+  type DeviceAdapter,
+  type Point,
+  type UiNode,
+} from '../adapters/types.js';
 import { containsPoint, screenOf } from './geometry.js';
 import { fillsScreen } from './placed.js';
 import { isScrollViewOf, scrolls } from './scroll-containers.js';

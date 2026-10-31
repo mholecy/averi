@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
+import { everyNode, PersistentReadError, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { fillField } from '../../src/interact/fill.js';
 import { AfterDismissalTap, AfterKeyboardDismissal, KeyboardWithoutDismissal, dismissKeyboard, resolveClearOfKeyboard, type KeyboardDismissal } from '../../src/interact/keyboard.js';
 import { KEYBOARD_HIDE_DELAY_MS } from '../../src/interact/keyboard-model.js';
@@ -1188,6 +1188,20 @@ describe('dismissKeyboard — the in-tree model (no oracle), stage B', () => {
     expect(fake.keys).toEqual([]);
     expect(reads).toBe(2); // the dismissal's read, then the first confirming read — which ends it: no second confirming read
     expect(sleeps).toEqual([KEYBOARD_HIDE_DELAY_MS]);
+  });
+
+  // D21 code review: a read no wait cures (PersistentReadError — idb's wedged accessibility service) passes through
+  // the guard's wrap unchanged, so the read loops above and the flow engine's isTerminal still see its class.
+  it('a confirming read that throws a PersistentReadError: thrown as it came, not wrapped in AfterDismissalTap', async () => {
+    const fake = withBand();
+    const real = fake.uiTree.bind(fake);
+    const wedged = new PersistentReadError('wedged until a reboot');
+    fake.uiTree = async () => {
+      if (fake.taps.length > 0) throw wedged;
+      return real();
+    };
+    await expect(dismissKeyboard(fake, { ...FIRST, dismissals: [TITLE_TAP] })).rejects.toBe(wedged);
+    expect(fake.taps).toEqual(['login_title']);
   });
 
   it('the band is gone only on the SECOND confirming read (a hide animation caught mid-way): hidden, not a refusal', async () => {

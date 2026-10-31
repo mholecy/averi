@@ -561,7 +561,8 @@ export async function runVerification(
     // one read, its message the detail (VerifierOptions.persistentRead), so the leg still captures its frame below —
     // idb's screenshot works while its tree read is wedged — and asks its health line. Only this leg and the MCP
     // `assert` tool ask for that; everywhere else, a flow's `assert:` step included, the error is thrown and terminal.
-    const results = await new Verifier(adapter, { baselineDir: req.baselineDir, ocr, handOff, persistentRead: 'fail' }).assertAll(specs);
+    const verifier = new Verifier(adapter, { baselineDir: req.baselineDir, ocr, handOff, persistentRead: 'fail' });
+    const results = await verifier.assertAll(specs);
     // The frame the leg ended on, captured SETTLED — until 2026-10-02 this was
     // a bare screenshot, so the color and text tables could be fed the one
     // frame the color assert's own doc rules out: a mid-animation one. With a

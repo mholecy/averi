@@ -1,4 +1,4 @@
-import type { Rect, UiNode } from '../adapters/types.js';
+import { PersistentReadError, type Rect, type UiNode } from '../adapters/types.js';
 import { frameText } from '../ui-tree/geometry.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
 import { cannotHide } from '../ui-tree/soft-keyboard.js';
@@ -419,6 +419,9 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
           try {
             reread = await adapter.uiTree();
           } catch (e) {
+            // A read no wait cures (adapters/types.ts#PersistentReadError, D21) passes through unchanged, not as
+            // AfterDismissalTap: its class is what the read loops and the flow engine's isTerminal stop on.
+            if (e instanceof PersistentReadError) throw e;
             throw failed(e);
           }
           const after = lookOn(adapter, reread);

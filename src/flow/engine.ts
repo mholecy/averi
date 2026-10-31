@@ -258,7 +258,10 @@ const notSkippable = (e: unknown): e is Error & (RefusedOnPresentElement | FillV
  * does not run on it either.
  */
 const isTerminal = (e: unknown): boolean =>
-  e instanceof SetupError || e instanceof UnreadTreeRefusal || e instanceof OptionalNotSkipped || e instanceof PersistentReadError;
+  e instanceof SetupError ||
+  e instanceof UnreadTreeRefusal ||
+  e instanceof OptionalNotSkipped ||
+  e instanceof PersistentReadError;
 
 /**
  * What one detect probe learned. `unknown` is "every read failed — the probe
