@@ -122,7 +122,7 @@ filesystem check again. Memoise the binary promise at module level, keeping whic
 Done in 5731c309: the probe (not the binary) is memoized per exec, as `adapters/xcode-env.ts` does; the per-engine
 `existsSync` stays so a swept temp dir rebuilds. 20 Verifiers 1.7 s → 0.2 ms. A missing or refusing `swiftc` now sticks
 for the process (the error says to restart averi); a probe timeout or EAGAIN is forgotten; a failed compile stays the
-engine's answer and the next Verifier compiles again, as before. Left: D15.
+engine's answer and the next Verifier compiles again, as before. D15 done (see ### D15).
 
 ### P7 — selectors (ui-tree/selectors.ts:101)
 `new RegExp(cond.value)` per node per condition; compile once on the `Condition`. 0.06 ms per query at N=242 —
@@ -394,14 +394,15 @@ had been truncating the old tap, scroll_until, ui_snapshot and assert).
 Done in c0e38019: concurrent builds of one recognizer binary in a process share ONE compile, through a module-level
 in-flight map (`compilesInFlight`, verify/ocr.ts) keyed by the binary path and dropped when the build settles. A failed
 shared compile is the sticky answer of every engine that joined it, as if each had compiled itself (same source, same
-toolchain), and the next engine compiles afresh. The cost: an engine that joins late inherits the compile's
-remaining time, and on a compile timeout it gets that timeout as its own answer; the next Verifier retries. A missing swiftc still sticks process-wide and transient errors are still
-forgotten (P6). Source and staging paths are `${binary}.${pid}.${uuid}`, so they are unique per build, also when a pid
-is reused across sandboxes. A failed compile now removes its staging binary, which it did not before (a red run left
-`recognizer-*.<pid>` files behind). Rename stays the only publishing step. Review round 1: the source write sits
-inside the cleanup's try (a half-written source on ENOSPC is removed; the error stays plain and forgotten), a failing
-cleanup never replaces the compile's answer, the harness's `scripts/differential/ocr-probe.ts` stages the same way, and
-the per-engine `existsSync` (P6) is pinned by a test.
+toolchain), and the next engine compiles afresh. The cost: an engine that joins late inherits the compile's remaining
+time, and on a compile timeout it gets that timeout as its own answer; the next Verifier retries. A missing swiftc still
+sticks process-wide and transient errors are still forgotten (P6). Source and staging paths are
+`${binary}.${pid}.${uuid}`, so they are unique per build, also when a pid is reused across sandboxes. A failed compile
+now removes its staging binary, which it did not before (a red run left `recognizer-*.<pid>` files behind). Rename stays
+the only publishing step. Review round 1: the source write sits inside the cleanup's try (a half-written source on
+ENOSPC is removed; the error stays plain and forgotten), a failing cleanup never replaces the compile's answer, the
+harness's `scripts/differential/ocr-probe.ts` stages the same way, and the per-engine `existsSync` (P6) is pinned by a
+test.
 
 ### D1–D13
 Sources and estimates are in the artifact. Before each: measure on D0's scenario; after: the same run, golden and
