@@ -48,7 +48,8 @@ export class ExecError extends Error {
   }
 }
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+/** A call's timeout when it names none — exported for runIdb, whose idb helper answers under the same budget. */
+export const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_BUFFER = 64 * 1024 * 1024; // screenshots can be several MB
 
 export const exec: ExecFn = (cmd, args, opts = {}) =>

@@ -7,7 +7,7 @@ import type { ChildProcess } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
 import { runIdb } from '../../src/adapters/idb.js';
-import { IdbHelper, idbInterpreter, MAX_FAILED_STARTS, type SpawnFn } from '../../src/adapters/idb-helper.js';
+import { IdbHelper, idbInterpreter, killIdbHelpersOnExit, MAX_FAILED_STARTS, type SpawnFn } from '../../src/adapters/idb-helper.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { createIosTreeSource } from '../../src/adapters/ios-tree-source.js';
 
@@ -23,7 +23,8 @@ const CLI_ARGV = [...READ, '--udid', UDID];
 class FakeChild extends EventEmitter {
   readonly stdin = new PassThrough();
   readonly fd3 = new PassThrough();
-  readonly stdio = [this.stdin, null, null, this.fd3];
+  readonly stderr = new PassThrough();
+  readonly stdio = [this.stdin, null, this.stderr, this.fd3];
   readonly requests: { id: number; argv: string[] }[] = [];
   readonly signals: string[] = [];
   unrefed = false;
@@ -87,8 +88,13 @@ const interpreter = async () => ({ python: '/abs/python3', idb: '/abs/idb' });
 /** Let the helper's start (an awaited interpreter lookup, then spawn) and its stream events run. */
 const settle = () => new Promise((r) => setTimeout(r, 5));
 
+/** What the helpers said on the server's stderr. */
+let logged: string[] = [];
+const log = (line: string) => void logged.push(line);
+
 let savedDeveloperDir: string | undefined;
 beforeEach(() => {
+  logged = [];
   savedDeveloperDir = process.env.DEVELOPER_DIR;
   process.env.DEVELOPER_DIR = '/fake/Developer'; // the Xcode probe answers without exec
   delete process.env.AVERI_IDB_HELPER;
@@ -102,7 +108,7 @@ afterEach(() => {
 /** A helper whose first child has said ready. */
 async function readyHelper() {
   const s = fakeSpawn();
-  const helper = new IdbHelper({ spawn: s.spawn, interpreter });
+  const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
   const cli = fakeExec();
   await runIdb(cli.exec, UDID, READ, { helper }); // starts it
   await settle();
@@ -114,14 +120,14 @@ async function readyHelper() {
 describe('runIdb with an IdbHelper', () => {
   it('runs the CLI until the helper is ready — the first call starts it and pays nothing', async () => {
     const s = fakeSpawn();
-    const helper = new IdbHelper({ spawn: s.spawn, interpreter });
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
     const cli = fakeExec();
     const first = await runIdb(cli.exec, UDID, READ, { helper });
     expect(first.stdout.toString()).toBe('cli');
     await settle();
     expect(s.calls).toHaveLength(1);
     expect(s.calls[0].cmd).toBe('/abs/python3');
-    expect(s.calls[0].args[0]).toBe('-I');
+    expect(s.calls[0].args[0]).toBe('-c');
     expect(s.calls[0].args.at(-1)).toBe('/abs/idb');
     const second = await runIdb(cli.exec, UDID, READ, { helper }); // started, not ready
     expect(second.stdout.toString()).toBe('cli');
@@ -196,7 +202,7 @@ describe('runIdb with an IdbHelper', () => {
 
   it('turns itself off after two starts that never said ready', async () => {
     const s = fakeSpawn();
-    const helper = new IdbHelper({ spawn: s.spawn, interpreter });
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
     const cli = fakeExec();
     for (let i = 0; i < MAX_FAILED_STARTS; i++) {
       await runIdb(cli.exec, UDID, READ, { helper });
@@ -213,7 +219,7 @@ describe('runIdb with an IdbHelper', () => {
   it('never starts with AVERI_IDB_HELPER=off', async () => {
     process.env.AVERI_IDB_HELPER = 'off';
     const s = fakeSpawn();
-    const helper = new IdbHelper({ spawn: s.spawn, interpreter });
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
     const cli = fakeExec();
     await runIdb(cli.exec, UDID, READ, { helper });
     await settle();
@@ -223,7 +229,7 @@ describe('runIdb with an IdbHelper', () => {
 
   it('starts no helper when idb\'s interpreter is unknown', async () => {
     const s = fakeSpawn();
-    const helper = new IdbHelper({ spawn: s.spawn, interpreter: async () => undefined });
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter: async () => undefined, log });
     const cli = fakeExec();
     await runIdb(cli.exec, UDID, READ, { helper });
     await settle();
@@ -243,17 +249,90 @@ describe('runIdb with an IdbHelper', () => {
     expect(cli.idbCalls.at(-1)).toEqual(CLI_ARGV);
   });
 
-  it('kills the child on process exit — the backstop for a dispose that never came', async () => {
-    const once = vi.spyOn(process, 'once');
-    try {
-      const { s } = await readyHelper();
-      const hook = once.mock.calls.find(([event]) => event === 'exit')?.[1] as (() => void) | undefined;
-      expect(hook).toBeDefined();
-      hook!();
-      expect(s.children[0].signals).toEqual(['SIGKILL']);
-    } finally {
-      once.mockRestore();
+  it('kills every child on process exit through ONE hook, however many helpers — the backstop for a dispose that never came', async () => {
+    const hooks = () => process.listeners('exit').filter((l) => l === killIdbHelpersOnExit).length;
+    const helpers = await Promise.all(Array.from({ length: 11 }, () => readyHelper()));
+    expect(hooks()).toBe(1);
+    expect(process.listenerCount('exit')).toBeLessThan(11);
+    killIdbHelpersOnExit();
+    for (const { s } of helpers) expect(s.children[0].signals).toEqual(['SIGKILL']);
+  });
+
+  it('kills a start that never says ready by its deadline, counts it, and the CLI serves meanwhile', async () => {
+    const s = fakeSpawn();
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter, log, readyTimeoutMs: 20 });
+    const cli = fakeExec();
+    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
+      await runIdb(cli.exec, UDID, READ, { helper });
+      await new Promise((r) => setTimeout(r, 40));
+      expect(s.children[i].signals).toEqual(['SIGKILL']);
     }
+    await runIdb(cli.exec, UDID, READ, { helper });
+    await settle();
+    expect(s.children).toHaveLength(MAX_FAILED_STARTS);
+    expect(cli.idbCalls).toEqual(Array(MAX_FAILED_STARTS + 1).fill(CLI_ARGV));
+  });
+
+  it('drops the ready deadline of a start that already exited — nothing is killed after', async () => {
+    const s = fakeSpawn();
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter, log, readyTimeoutMs: 20 });
+    await runIdb(fakeExec().exec, UDID, READ, { helper });
+    await settle();
+    s.children[0].die();
+    await new Promise((r) => setTimeout(r, 40));
+    expect(s.children[0].signals).toEqual([]);
+  });
+
+  it('turns off a helper that says ready and then dies under every request — it does not restart forever', async () => {
+    const s = fakeSpawn();
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
+    const cli = fakeExec();
+    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
+      await runIdb(cli.exec, UDID, READ, { helper }); // starts child i
+      await settle();
+      s.children[i].ready();
+      await settle();
+      const read = runIdb(cli.exec, UDID, READ, { helper });
+      await settle();
+      s.children[i].die();
+      expect((await read).stdout.toString()).toBe('cli'); // retried on the CLI
+    }
+    for (let i = 0; i < 3; i++) await runIdb(cli.exec, UDID, READ, { helper });
+    await settle();
+    expect(s.children).toHaveLength(MAX_FAILED_STARTS);
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toMatch(/^averi: idb helper off for this process \(2 failures in a row, the last: it died before it answered a request\)/);
+  });
+
+  it('does not count a helper it killed on a timeout — the next call starts a new one, and again after that', async () => {
+    const { helper, s, cli } = await readyHelper();
+    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
+      await runIdb(cli.exec, UDID, READ, { helper, timeoutMs: 10 }).catch(() => undefined);
+      await settle();
+      await runIdb(cli.exec, UDID, READ, { helper }); // starts the next
+      await settle();
+      s.children[i + 1].ready();
+      await settle();
+    }
+    expect(s.children).toHaveLength(MAX_FAILED_STARTS + 1);
+    expect(logged).toEqual([]);
+  });
+
+  it('says once, on the server\'s stderr, why it turned itself off — with the tail of the helper\'s own stderr', async () => {
+    const s = fakeSpawn();
+    const helper = new IdbHelper({ spawn: s.spawn, interpreter, log });
+    const cli = fakeExec();
+    for (let i = 0; i < MAX_FAILED_STARTS; i++) {
+      await runIdb(cli.exec, UDID, READ, { helper });
+      await settle();
+      s.children[i].stderr.write("ModuleNotFoundError: No module named 'idb'\n");
+      await settle();
+      s.children[i].die();
+      await settle();
+    }
+    expect(logged).toEqual([
+      "averi: idb helper off for this process (2 failures in a row, the last: it exited before it said ready) — the idb CLI serves every call; its stderr: ModuleNotFoundError: No module named 'idb'",
+    ]);
   });
 });
 

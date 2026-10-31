@@ -22,10 +22,17 @@ and D24 measured"; the orchestrator's design from the D7 analysis). Part a (read
 In D7a it serves `ui describe-all --json` alone; every other call, and every call it cannot take, is the CLI as
 before.**
 
-- The helper (`adapters/idb-helper-script.ts`, a string run as `<python> -I -c <script> <idb path>`) imports the CLI
+- The helper (`adapters/idb-helper-script.ts`, a string run as `<python> -c <script> <idb path>`) imports the CLI
   once, says `{"ready"}` on fd 3, then answers one JSON request a line on stdin, `{id, argv}`, with `{id, code, stdout,
-  stderr}` on fd 3. `sys.stdout`/`sys.stderr` and the root logging handlers' stream point at buffers for the call; fd 3
-  is the protocol's alone, so a stray print cannot corrupt it. It exits on stdin's EOF.
+  stderr}` on fd 3. Per request it creates an event loop and closes it after, as the CLI's one per process is;
+  `sys.stdout`/`sys.stderr` and the root logging handlers' stream (`logger.exception`'s tracebacks) point at buffers for
+  the call; fd 3 is the protocol's alone, so a stray print cannot corrupt it. It exits on stdin's EOF.
+- What it imports is what the shebang'd CLI imports (review 2026-10-31, MINOR-5). No `-I`: `PYTHONPATH` and the user
+  site-packages count as they do for `idb` (an earlier `-I` could import a different fb-idb, or none). Under `-c`,
+  `sys.path[0]` is `''` — the cwd; the script's first statement replaces it with the directory of idb's REAL path, the
+  entry Python itself puts there when it runs the script. `sys` is built in and `os` already imported by `site`, so
+  nothing is looked up on the cwd before it is gone, and `''` is never on the path after: a module planted in averi's
+  cwd cannot be imported (the bootstrap test plants one).
 - The interpreter is the one the CLI runs under: the shebang of the `idb` on the PATH exec uses — `#!/abs/python…` as
   is, `#!/usr/bin/env python…` through PATH; anything else (a binary, a shell wrapper, arguments) is no helper. An import
   that fails exits before `ready`: a failed start.
@@ -34,10 +41,14 @@ before.**
   allowlisted argv (`HELPER_ARGV`); the helper answers or declines.
 - Lifecycle: the first allowlisted call starts it in the background and runs on the CLI — no call waits for it. Until
   `ready`, while busy (one request at a time: concurrent reads of an iOS leg go to the CLI), and when off, the CLI
-  serves. A start that never says ready (exit, spawn error, 10 s) counts as failed; after 2 the helper is off for the
-  process. A helper that dies after ready is restarted lazily by the next call.
+  serves. A failure is a start that never says ready (exit, spawn error, 10 s) or a helper that dies before it has
+  answered any request (one that says ready and dies under every request would otherwise restart forever); after 2 in
+  a row the helper is off for the process, and says so in one line on the server's stderr, with the tail of its own.
+  The first answered request resets the count; a helper killed on the caller's timeout is not a failure. Otherwise a
+  helper that dies is restarted lazily by the next call.
 - No orphans: the child and its pipes are unref'd; it exits on stdin EOF (dispose, or node's death closing the pipe);
-  `IosAdapter.dispose()` kills it; a `process.once('exit')` hook kills it as the backstop (WdaServer's pattern).
+  `IosAdapter.dispose()` kills it; one `process.once('exit')` hook for every helper in the process kills what dispose
+  did not reach (WdaServer's pattern; one hook, not one per helper, so an 11th simulator raises no listener warning).
 - Kill switch: `AVERI_IDB_HELPER=off` (SETUP.md, troubleshooting). The differential fake device sets it: the golden
   log pins the CLI's argv per call, and the fake answers execFile only.
 - The D0 harness sees helper calls on `node:diagnostics_channel` (`averi:idb-helper:start`/`end`, published by
@@ -50,12 +61,18 @@ What an agent reads must not change with the helper:
   CLI failing alike (`Command failed (exit N): idb ui describe-all --json --udid U` and the stderr); an empty stderr
   is replaced by node's own `Command failed: <command>\n`, as exec's `stderrText || err.message` does.
 - The caller's timeout SIGKILLs the helper and throws `ExecError(…, timedOut = true)`: `Command timed out: idb …`,
-  not retried.
+  not retried. The message is exec's; the error's `stderr` field is `''` where exec's carries what the killed CLI had
+  printed (or node's message) — no caller reads it off a timeout today.
+- The exit code is the CLI's process status: `gen_main`'s int or a `SystemExit`'s code, masked `& 0xff`; a non-int code
+  is printed to stderr and is 1, as `sys.exit` does.
 - A helper that dies under a call (a read, idempotent) is retried once on the CLI; the CLI's result or error is the
   one returned.
 - The contract test (`tests/adapters/idb-helper-contract.test.ts`, the real fb-idb, no simulator) runs both on
   `--companion localhost:1 ui describe-all --json` (equal code and stderr) and on `ui describe-all --help` (equal
-  stdout bytes, `usage: idb …`: the helper sets `sys.argv[0]` to idb's path for argparse).
+  stdout bytes, `usage: idb …`: the helper sets `sys.argv[0]` to idb's path for argparse), on `--companion
+  localhost:abc` (`logger.exception`'s traceback through the logging handler: equal but the timestamp), and 50 requests
+  in a row (equal each time). A fake fb-idb under the same interpreter pins the bootstrap: the package beside idb's
+  real path is imported, not one planted in the cwd; the code is masked; a logging handler's output is captured.
 
 ## Why Python and `gen_main`, not a node gRPC client
 
@@ -73,8 +90,15 @@ What an agent reads must not change with the helper:
   as the CLI does, so a new companion should be found — not measured), grpc state across many calls.
 - One request at a time: concurrent iOS reads still pay the CLI. Input (D7b) is out of scope here because a helper
   dying under a HID event may have delivered it — a retry is not safe the way a read's is.
-- `-I` ignores `PYTHONPATH` and user site-packages that the CLI would see; an install that depends on them fails the
-  import and stays on the CLI.
+- stdout is TEXT (a `StringIO`): a command that writes bytes to `sys.stdout.buffer` (`idb screenshot -`, any binary
+  output) breaks in the helper. D7b must solve that before the allowlist grows past `describe-all`.
+- Process-scoped state outlives a request where the CLI's died with its process: the `warnings` registry (a warning
+  printed once by the CLI each run is printed by the helper once per process), handlers a plugin adds to a logger,
+  and anything native code writes to fd 2 directly (it goes to the helper's own stderr, kept only as a tail, not to
+  the reply).
+- A companion the client spawns (fb-idb's `--companion-path` path, for a udid with no companion running) would be a
+  child of the helper and may hold pipes the helper holds, for the helper's life rather than one call's — not
+  measured here (no companion in the sandbox). The device soak must look at that path.
 
 ## Consequences
 

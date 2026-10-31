@@ -30,6 +30,8 @@ export interface IdbHelperOptions {
   interpreter?: (env: NodeJS.ProcessEnv) => Promise<IdbInterpreter | undefined>;
   /** How long a start may take to say `ready` before it counts as failed (READY_TIMEOUT_MS). */
   readyTimeoutMs?: number;
+  /** Where the one line goes when the helper turns itself off: the server's stderr unless a test hands one in. */
+  log?: (line: string) => void;
 }
 
 /** The interpreter idb's script runs under, and the script's own path (argparse's `prog`). */
@@ -43,8 +45,35 @@ export function idbHelperDisabled(env: NodeJS.ProcessEnv = process.env): boolean
   return env.AVERI_IDB_HELPER === 'off';
 }
 
-/** After this many starts that never said `ready`, the helper is off for the process. */
+/**
+ * After this many failures in a row the helper is off for the process. A failure is a start that never said `ready`,
+ * or a helper that died before it answered any request — one that says ready and then dies under every request would
+ * otherwise restart forever (review 2026-10-31, MINOR-4). The first answered request resets the count; a helper killed
+ * on the caller's timeout is not a failure of its own (the CLI would have timed out too).
+ */
 export const MAX_FAILED_STARTS = 2;
+
+/** How much of the helper's own stderr is kept, to say why it turned itself off. */
+const STDERR_TAIL = 2_000;
+
+/**
+ * Every live helper child in the process, for the ONE `process.once('exit')` backstop all helpers share (review
+ * 2026-10-31, MINOR-3: a hook per helper would pass node's 10-listener warning with the 11th simulator).
+ */
+const liveChildren = new Set<ChildProcess>();
+let exitHookInstalled = false;
+
+/** The backstop: kill every helper child dispose did not reach. Exported for its test. */
+export function killIdbHelpersOnExit(): void {
+  for (const child of liveChildren) {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
+  liveChildren.clear();
+}
 
 /**
  * How long a start may take to say `ready`. The import measured ~90 ms (D7); a start ten seconds in is not a slow
@@ -119,28 +148,34 @@ interface Pending {
  * Its whole contract is that it is never worse than the CLI:
  * - `run` answers undefined — "use the CLI" — whenever it is not READY and idle: not started yet (it starts now, in
  *   the background: the first call pays nothing extra), starting, busy with another request (concurrent reads of an
- *   iOS leg), off (the kill switch, MAX_FAILED_STARTS failed starts, disposed).
+ *   iOS leg), off (the kill switch, MAX_FAILED_STARTS failures in a row, no interpreter, disposed). Turning itself off
+ *   writes one line to the server's stderr, with the tail of the helper's own.
  * - A helper that dies under a request answers `died`; the caller runs the CLI. The next call starts a new one.
  * - The caller's timeout kills it (SIGKILL) and rejects with IdbHelperTimeout; the caller throws the CLI's timeout.
- * - No orphans: the child is unref'd (the server stays free to exit), it exits on stdin's EOF (dispose, or node's
- *   death closing the pipe), dispose() kills it, and a `process.once('exit')` hook kills it as the backstop for
- *   anything dispose did not reach — the pattern of WdaServer (wda.ts, spawnChild).
+ * - No orphans: the child and its pipes are unref'd (the server stays free to exit), it exits on stdin's EOF (dispose,
+ *   or node's death closing the pipe), dispose() kills it, and one `process.once('exit')` hook for all helpers
+ *   (killIdbHelpersOnExit) kills it as the backstop for anything dispose did not reach — the pattern of WdaServer
+ *   (wda.ts, spawnChild).
  */
 export class IdbHelper {
   private readonly spawn: SpawnFn;
   private readonly interpreter: (env: NodeJS.ProcessEnv) => Promise<IdbInterpreter | undefined>;
   private readonly readyTimeoutMs: number;
+  private readonly log: (line: string) => void;
   private state: 'idle' | 'starting' | 'ready' | 'busy' | 'off' = 'idle';
   private child: ChildProcess | undefined;
+  /** The child this helper killed on purpose (a timeout): its death is not counted as a failure. */
+  private killed: ChildProcess | undefined;
   private pending: Pending | undefined;
-  private failedStarts = 0;
+  private failures = 0;
   private nextId = 1;
-  private exitHook: (() => void) | undefined;
+  private stderrTail = '';
 
   constructor(opts: IdbHelperOptions = {}) {
     this.spawn = opts.spawn ?? nodeSpawn;
     this.interpreter = opts.interpreter ?? idbInterpreter;
     this.readyTimeoutMs = opts.readyTimeoutMs ?? READY_TIMEOUT_MS;
+    this.log = opts.log ?? ((line) => void process.stderr.write(line + '\n'));
   }
 
   /**
@@ -160,6 +195,7 @@ export class IdbHelper {
     return new Promise<IdbHelperReply>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending = undefined;
+        this.killed = child;
         this.kill(child);
         reject(new IdbHelperTimeout(argv));
       }, opts.timeoutMs);
@@ -173,10 +209,6 @@ export class IdbHelper {
     const child = this.child;
     this.state = 'off';
     if (child !== undefined) this.kill(child);
-    if (this.exitHook !== undefined) {
-      process.removeListener('exit', this.exitHook);
-      this.exitHook = undefined;
-    }
     return Promise.resolve();
   }
 
@@ -192,36 +224,45 @@ export class IdbHelper {
     if (this.state !== 'starting') return; // disposed meanwhile
     if (interpreter === undefined) {
       // No interpreter now is no interpreter later: the PATH does not change under a running server.
-      this.state = 'off';
+      this.turnOff('the `idb` on PATH names no Python interpreter in its shebang');
       return;
     }
     let child: ChildProcess;
     try {
-      child = this.spawn(interpreter.python, ['-I', '-c', IDB_HELPER_SCRIPT, interpreter.idb], {
+      // No -I: the import must see what the shebang'd CLI sees (idb-helper-script.ts, the bootstrap).
+      child = this.spawn(interpreter.python, ['-c', IDB_HELPER_SCRIPT, interpreter.idb], {
         env: childEnv,
-        stdio: ['pipe', 'ignore', 'ignore', 'pipe'],
+        stdio: ['pipe', 'ignore', 'pipe', 'pipe'],
       });
-    } catch {
-      this.startFailed();
+    } catch (e) {
+      this.failed(`spawn failed: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
     this.child = child;
+    liveChildren.add(child);
+    if (!exitHookInstalled) {
+      exitHookInstalled = true;
+      process.once('exit', killIdbHelpersOnExit);
+    }
     let ready = false;
+    let answered = false;
     const readyTimer = setTimeout(() => {
       if (!ready) this.kill(child);
     }, this.readyTimeoutMs);
     readyTimer.unref();
     child.unref();
-    for (const s of [child.stdin, child.stdio[3]]) (s as unknown as { unref?: () => void } | null)?.unref?.();
-    if (this.exitHook === undefined) {
-      this.exitHook = () => {
-        if (this.child !== undefined) this.kill(this.child);
-      };
-      process.once('exit', this.exitHook);
-    }
+    for (const s of [child.stdin, child.stderr, child.stdio[3]]) (s as unknown as { unref?: () => void } | null)?.unref?.();
+    this.stderrTail = '';
+    child.stderr?.on('data', (d: Buffer) => {
+      if (this.child === child) this.stderrTail = (this.stderrTail + d.toString('utf8')).slice(-STDERR_TAIL);
+    });
     // ENOENT and friends arrive as an 'error' event; with no listener it would take the server down.
-    child.once('error', () => this.gone(child, ready));
-    child.once('exit', () => this.gone(child, ready));
+    const onGone = () => {
+      clearTimeout(readyTimer);
+      this.gone(child, ready, answered);
+    };
+    child.once('error', onGone);
+    child.once('exit', onGone);
     child.stdin?.on('error', () => undefined); // EPIPE on a dead helper: 'exit' tells the story
     const lines = createInterface({ input: child.stdio[3] as Readable });
     lines.on('line', (line) => {
@@ -235,7 +276,6 @@ export class IdbHelper {
       if (!ready && msg.ready !== undefined) {
         ready = true;
         clearTimeout(readyTimer);
-        this.failedStarts = 0;
         if (this.state === 'starting') this.state = 'ready';
         return;
       }
@@ -243,13 +283,19 @@ export class IdbHelper {
       if (p === undefined || msg.id !== p.id) return;
       clearTimeout(p.timer);
       this.pending = undefined;
+      answered = true;
+      this.failures = 0;
       if (this.state === 'busy') this.state = 'ready';
       p.resolve({ kind: 'answer', code: msg.code ?? 1, stdout: Buffer.from(msg.stdout ?? '', 'utf8'), stderr: msg.stderr ?? '' });
     });
   }
 
-  /** The child exited (or failed to spawn): a start that never said ready counts against the helper. */
-  private gone(child: ChildProcess, wasReady: boolean): void {
+  /**
+   * The child exited (or failed to spawn). A start that never said ready, or a helper that never answered, counts
+   * against it (MAX_FAILED_STARTS) — unless this helper killed it on a timeout.
+   */
+  private gone(child: ChildProcess, wasReady: boolean, answered: boolean): void {
+    liveChildren.delete(child);
     if (this.child !== child) return;
     this.child = undefined;
     const p = this.pending;
@@ -259,13 +305,25 @@ export class IdbHelper {
       p.resolve({ kind: 'died' });
     }
     if (this.state === 'off') return;
-    if (!wasReady) this.startFailed();
+    if (this.killed === child) {
+      this.killed = undefined;
+      this.state = 'idle';
+    } else if (!wasReady) this.failed('it exited before it said ready');
+    else if (!answered) this.failed('it died before it answered a request');
     else this.state = 'idle';
   }
 
-  private startFailed(): void {
-    this.failedStarts++;
-    this.state = this.failedStarts >= MAX_FAILED_STARTS ? 'off' : 'idle';
+  private failed(why: string): void {
+    this.failures++;
+    if (this.failures >= MAX_FAILED_STARTS) this.turnOff(`${this.failures} failures in a row, the last: ${why}`);
+    else this.state = 'idle';
+  }
+
+  /** Off for the process, said once on the server's stderr: why, and the tail of the helper's own stderr. */
+  private turnOff(why: string): void {
+    this.state = 'off';
+    const tail = this.stderrTail.trim().split('\n').slice(-3).join(' | ');
+    this.log(`averi: idb helper off for this process (${why}) — the idb CLI serves every call${tail ? `; its stderr: ${tail}` : ''}`);
   }
 
   private kill(child: ChildProcess): void {

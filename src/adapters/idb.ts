@@ -1,5 +1,5 @@
 import { channel } from 'node:diagnostics_channel';
-import { ExecError, type ExecFn, type ExecResult } from './exec.js';
+import { DEFAULT_TIMEOUT_MS, ExecError, type ExecFn, type ExecResult } from './exec.js';
 import { IdbHelperTimeout, type IdbHelper } from './idb-helper.js';
 import { detectXcodeEnv } from './xcode-env.js';
 
@@ -11,9 +11,6 @@ import { detectXcodeEnv } from './xcode-env.js';
 const HELPER_ARGV: readonly (readonly string[])[] = [['ui', 'describe-all', '--json']];
 
 const helperServes = (args: readonly string[]) => HELPER_ARGV.some((a) => a.length === args.length && a.every((w, i) => w === args[i]));
-
-/** What exec's timeout stands in for when a call carries none (exec.ts, DEFAULT_TIMEOUT_MS). */
-const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
  * A helper call, as the D0 harness sees it (scripts/perf/instrument.ts): it is no process, so the execFile wrapper
