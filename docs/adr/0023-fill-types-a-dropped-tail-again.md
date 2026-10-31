@@ -117,8 +117,7 @@ each key 15/15 (705 ms); chunks of 5 15/15 (784 ms); chunks of 1 15/15 (3.8 s). 
 **Decision.** "Not done: chunked or paced typing on iOS" (Consequences) stands for every app but one that has shown a
 drop: after a fill has typed a dropped tail again (decision 1 — the field kept a strict prefix) and the typing then
 LANDED whole, later typings into that SAME app send the first character alone, wait 150 ms (50 ms since the D25
-amendment below), then the rest. Sticky per
-app for the adapter's life; an app never seen dropping a tail never pays.
+amendment below), then the rest. Sticky per app for the adapter's life; an app never seen dropping a tail never pays.
 
 - **Who learns, who acts.** The fill reports what it saw, nothing more: `fill-type.ts` calls `FieldIo.reportDroppedTail`
   once a fill, when the typing has landed through a tail typed again, which `fill.ts` hands to
@@ -133,8 +132,9 @@ app for the adapter's life; an app never seen dropping a tail never pays.
 - **A capped field is no drop** (D24 review). A field that keeps a strict prefix for good — its maxLength, an IBAN or
   phone mask trimming the typing — gets its one retype that moves nothing and the mismatch error (Consequences above);
   reported at the retype, one such fill would have marked a native app and made every later typing into it pay the split
-  (~370 ms with the extra idb call; ~270 ms since D25). Only the repair proves the drop, so only a typing that landed
-  through a tail retype is reported; one whose retypes moved the field and still missed is not either.
+  (~370 ms with the extra idb call; ~270 ms since D25, estimated: 100 ms less wait). Only the repair proves the drop, so
+  only a typing that landed through a tail retype is reported; one whose retypes moved the field and still missed is not
+  either.
 - **The first character is a grapheme** (`Intl.Segmenter`): a surrogate pair or a combining mark is never cut between
   two idb calls. A text of one character is one call, with no wait.
 - **The retype stays the safety net, unchanged.** Decision 1–3 are as they were. The first fill's own tail retypes are

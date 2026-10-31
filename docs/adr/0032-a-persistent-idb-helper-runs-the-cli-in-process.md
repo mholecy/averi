@@ -144,13 +144,12 @@ D7 measured `ui tap` 219.0 → 96.5 ms through a persistent client (−122); D7b
   tree). A simulator served under both tree sources at once (two projects, two cached adapters) runs two helpers —
   each still one request at a time; sharing one per simulator would need a refcount across adapters, not done.
 - **D24's split through the helper.** `typeText` into an app that drops a tail sends `ui text <first>`, waits
-  `FIRST_KEY_ALONE_MS` (150 ms, explicit, unchanged here; 50 ms since ADR 0023's D25 amendment), then
-  `ui text <rest>`. Through the CLI the second call paid the Python start-up (~90 ms of D7's −122 on a tap; `ui text`
-  unmeasured) between the wait and its first event; through
-  the helper it does not, so the gap between the first key and the rest shrinks by roughly that — the wait itself
-  (FIRST_KEY_ALONE_MS) stays. D24's 15/15 was
-  measured through the CLI (raw `idb ui text`); the owner's RN re-check (`ios-run.sh --app react-native`, rn-fill-20,
-  helper on) must confirm the split still lands whole first time.
+  `FIRST_KEY_ALONE_MS` (150 ms, explicit, unchanged here; 50 ms since ADR 0023's D25 amendment), then `ui text <rest>`.
+  Through the CLI the second call paid the Python start-up (~90 ms of D7's −122 on a tap; `ui text` unmeasured) between
+  the wait and its first event; through the helper it does not, so the gap between the first key and the rest shrinks by
+  roughly that — the wait itself (FIRST_KEY_ALONE_MS) stays. D24's 15/15 was measured through the CLI (raw
+  `idb ui text`); the owner's RN re-check (`ios-run.sh --app react-native`, rn-fill-20, helper on) must confirm the
+  split still lands whole first time.
 - Tests: `tests/adapters/idb-helper.test.ts` (each HID argv to the helper; near-miss shapes and ill-formed texts to the
   CLI; a death after the ack → the error, no CLI call; before it, an exit not yet seen, and a failed write → the CLI;
   an ack read after the exit still counts; a fd 3 that never ends → the error; a stale ack ignored; a dispose under

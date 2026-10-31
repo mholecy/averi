@@ -84,10 +84,10 @@ export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): bo
  * A burst lands in ~93 ms, the 150 ms split in ~335 ms (+240 ms at lengths 2–8; +215–220 at 12 and 20, where the
  * burst's drops skew its median). A burst already drops at 2 characters (4 of 40 lost the second key), so splitting
  * only above some length — D25's first idea, to spare short texts the split — would leave drops in: there is no safe
- * threshold. The gap is the lever instead: at 8 and 20 characters (40 rounds each, 80 typings a mode) the split with 0
- * ms kept 80/80 (185 / 238 ms), with 50 ms 80/80 (235 / 292 ms), with 100 ms 80/80, with 150 ms 80/80; one call with a
- * companion-side 50 ms HID delay between the first key and the rest 80/80 (148 / 204 ms). So any pause after the first
- * key of at least ~50 ms appears to let the controlled input catch up after its first keystroke (whose JS value
+ * threshold. The gap is the lever instead: at 8 and 20 characters (40 rounds each, 80 typings a mode) the split
+ * with 0 ms kept 80/80 (185 / 238 ms), with 50 ms 80/80 (235 / 292 ms), with 100 ms 80/80, with 150 ms 80/80; one call
+ * with a companion-side 50 ms HID delay between the first key and the rest 80/80 (148 / 204 ms). So any pause after the
+ * first key of at least ~50 ms appears to let the controlled input catch up after its first keystroke (whose JS value
  * round-trip is what the keys arriving behind it are dropped against — ADR 0023's measurement: the END of a burst) and
  * the rest land: 0, 50, 100 and 150 ms between two calls all landed, and so did one call with a bare 50 ms HID pause
  * and no second round trip. The second call's own round trip (~90 ms) already gives such a pause, and 150 ms bought
