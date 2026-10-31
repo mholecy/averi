@@ -35,7 +35,7 @@ measured before and after.
 | D5 | Android raw `screencap` (PNG encoded only when stored or returned) | device | open |
 | D6 | Android `typeText` / `clearText` as one `adb shell` script, pacing kept | device | open |
 | D7 | iOS: persistent idb gRPC client; WDA `excluded_attributes`; no `/status` before `/source`; parallel `defaults write`; one key-sequence in `clearText` | device | open |
-| D8 | Fill re-reads after focus only for secure or unknown fields | device | open |
+| D8 | Fill re-reads after focus only for secure or unknown fields | device | done (1083523e; Android only, ADR 0028) |
 | D9 | The keyboard's pre-action second look takes the earlier sighting as its first sample | device | won't do — the second look guards a re-flow after the keyboard hides; iOS only, 0 in D0 |
 | D10 | Scroll: no confirming read after an Android drag stroke (ADR 0021 amendment); keyboard state read beside the tree | device | done (4cd4825a); keyboard beside the tree: won't do (stale IME band → false "fully visible") |
 | D11 | One deadline per tool call that every window is clamped to | device | open |
@@ -152,6 +152,13 @@ unavailable in the sandbox). One `uiautomator dump` costs 2.2–2.5 s and is 87 
 cold ensure and 65 % of the scroll: every read a D row removes is worth ~2.3 s on Android. The scroll over ~3 screens
 takes 21 s, past the 15 s default budget. CPU is ≤ 133 ms per call. Order from these numbers: D10, D8, D9, D3, D1, D6,
 D5; D2 did not trigger (the lab app renders fast); D13's discovery probe is ~55 ms.
+
+### D8 — fill re-read
+Done in 1083523e (ADR 0028): parsers report `UiNode.secure`; the post-focus re-read is skipped only for an empty plain
+field named by a sole `id` on Android (iOS keeps it: a tail retype needs the after-focus inputs); a bullets read-back of
+another length on that path fails loudly. fill 11.7 → 9.3 s, fill-20 17.4 → 15.2 s; live forms 32/32 identical. Golden:
+verdicts unchanged, 45 ui_snapshot replies gain `"secure": true` (new golden base taken at 1083523e). Residual R1: a
+field wrongly said plain + autofill on focus + exactly as many dropped keys passes silently.
 
 ### D10 — Android settled read
 Done in 4cd4825a (ADR 0021 decision 7): `DeviceAdapter.treeReadSettles` on Android — a `uiautomator dump` snapshots only after

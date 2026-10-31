@@ -2,7 +2,7 @@
 
 Status: accepted 2026-10-31 (performance backlog item D8, docs/plans/2026-10-30-performance-backlog.md; the
 orchestrator's decision on the owner's standing: fast AND stable — a fill that reports success on the wrong field or
-misses a transformed value is unacceptable). Implemented on `perf/d8-fill-reread`.
+misses a transformed value is unacceptable). Implemented in 5ea9bfd2…546c8804, merged 1083523e.
 
 ## Context
 
