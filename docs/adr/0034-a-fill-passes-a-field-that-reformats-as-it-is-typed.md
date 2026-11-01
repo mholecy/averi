@@ -228,7 +228,9 @@ app held `SK31 1200 00`).
   typed `10001000` and `100,010` retyped a `5` for `1000105`. `reformatOf`'s and `prefixOf`'s rules are unchanged,
   judged over the value alone; a reading that starts with the earlier text's letters and digits is judged after it,
   never without it. The earlier text is tried first: a reading that is a prefix of it too (`SK` of `SK00 …`) shows
-  nothing of the typing landed, and nothing is typed again.
+  nothing of the typing landed, and nothing is typed again. An earlier text with no letters or digits (a `—`, a
+  `__/__/____` mask) keeps the pre-D29 judgment — a false mismatch, never a wrong pass — deliberately not loosened
+  (review round 2, MINOR-A, the owner's decision).
   **Where it reaches** (review round 1, MINOR-2): every source that names no placeholder — idb, and the API 33
   uiautomator dump (a classic EditText's hint dumped as its `text`, android.ts; the Android lab's fields are Compose,
   which dump no placeholder, so the lab is not affected) — and, on both platforms, a field that replaces its earlier
@@ -246,8 +248,9 @@ app held `SK31 1200 00`).
   dropped the last two (`SK31 1200 00`). A flow's `type:` (engine → interact/type-text.ts `typeIntoFocused`) never
   reads back, by design (above): it cannot see the drop, so it cannot type the tail again. **Accepted**: into a field
   that reformats as it is typed, use a flow's `fill:` (or `type_text` with a selector), which reads back and types a
-  dropped tail again — rf1 and rf2 pass that way on the same field. scripts/truth/live.ts marks rf4 a known LOUD on iOS in a comment (live-known.ts files visibility cases only);
-  skill/references/averi-yaml.md's `type` row says to use `fill`.
+  dropped tail again — rf1 and rf2 pass that way on the same field. scripts/truth/live.ts marks rf4 a known LOUD on
+  iOS in a comment (live-known.ts files visibility cases only); skill/references/averi-yaml.md's `type` row says to use
+  `fill`.
 
 **Not checked on the device.** The owner re-runs, on iOS: `live.ts --udid … --cases f1,f7` (both should read `Filled …
 the field shows them reformatted`: f1 `2 separators added`, f7's fills `1` and `2`).

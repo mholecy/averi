@@ -226,6 +226,12 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(tailOf('100,010', e('1000105', '1,000'))).toBeUndefined();
   });
 
+  // D29 review round 2, MINOR-A (the owner's decision): an earlier text with no letters or digits (a dash, a
+  // `__/__/____` mask) keeps the pre-D29 judgment — a false mismatch, never a wrong pass; deliberately not loosened.
+  it('an earlier text with no letters or digits: judged after it alone, as before D29', () => {
+    expect(reformatAfter('SK31 1200 0000', e('SK3112000000', '\u2014'))).toBeUndefined();
+  });
+
   // MINOR-3: the earlier text inside the reading, not at its start, did not survive as the earlier text.
   it('the earlier text inside the reading but not at its start: judged as the value alone', () => {
     expect(reformatAfter('34 12', e('3412', '12'))).toEqual({ added: 1, respaced: 0 });

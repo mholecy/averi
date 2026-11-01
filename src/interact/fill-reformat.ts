@@ -164,7 +164,9 @@ const skeleton = (text: string): string => [...text].filter((c) => ALNUM.test(c)
  *
  * What it adds: a reading whose letters and digits do not start with the earlier text's may pass, or be retyped, as
  * the value alone, under `reformatOf`'s and `prefixOf`'s rules unchanged. A reading that starts with them is judged
- * after the earlier text, never without it.
+ * after the earlier text, never without it. An earlier text with no letters or digits (a `—`, a `__/__/____` mask)
+ * keeps the pre-D29 judgment — every reading starts with its empty skeleton — failing safe, as a false mismatch and
+ * never a wrong pass: deliberately not loosened (D29 review round 2, MINOR-A).
  *
  * The earlier text is tried FIRST: a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is then
  * that earlier text's prefix, nothing of the typing landed, and nothing is typed again; tried second, the same reading
