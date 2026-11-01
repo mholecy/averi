@@ -502,7 +502,11 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [fill(RF, 'G.field', 'SK31'), { tool: 'type_text', args: { text: '12000000' } }],
     judge: holds('G', 'SK31 1200 0000'),
   },
-  { id: 'rf4', cell: RF, says: "a flow's tap + `type:` into the RN grouping field", flows: typeFlow(RF, 'G.field', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('G', 'SK31 1200 0000') },
+  // rf4: a known LOUD — a residual of blind typing (ADR 0034's D29 amendment). The owner's iOS run held `SK31 1200 00`
+  // with D24's first-key-alone split running: `type:` never reads back, so a tail the RN field drops is not typed again;
+  // `fill:` is the remedy (rf1, rf2). live-known.ts files visibility cases only (a rule and a reply kind per entry), and
+  // a LOUD fails no run, so the case says it.
+  { id: 'rf4', cell: RF, says: "a flow's tap + `type:` into the RN grouping field (known LOUD on iOS: blind typing, ADR 0034's D29 residual)", flows: typeFlow(RF, 'G.field', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('G', 'SK31 1200 0000') },
   { id: 'rf5', cell: RF, says: "a flow's tap + `type_pin:` into the RN amount field", flows: pinFlow(RF, 'A.field', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('A', `1${NBSP}234${NBSP}567`) },
 ];
 const CASES: Case[] = FORMS.map((c) => ({ ...c, group: 'forms' }));

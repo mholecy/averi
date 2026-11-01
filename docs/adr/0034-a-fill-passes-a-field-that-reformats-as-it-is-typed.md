@@ -4,7 +4,8 @@ Status: accepted 2026-10-31 (performance backlog row D18, docs/plans/2026-10-30-
 orchestrator's proposal, tightened; tightened again in review round 1 — MAJOR-1 — with the orchestrator's decision on
 an added `.` or `,`). Implemented on `perf/d18-reformatting-field`. Amended 2026-10-31 (D28: a reformatted strict
 prefix is a dropped tail — the owner's iOS run of D18, the remedy, the diagnosis and the SwiftUI lab fix; implemented
-on `fix/d28-reformat-dropped-tail`).
+on `fix/d28-reformat-dropped-tail`). Amended 2026-11-01 (D29: an earlier text that vanished — idb's unnamed
+placeholder — and rf4's tail, a residual of blind typing; implemented on `fix/d29-placeholder-prior`).
 
 ## Context
 
@@ -146,7 +147,8 @@ Three findings:
   has the focus and cannot tell which field that is, so it cannot know what it should hold. What it does get is the
   adapter's typing: once a fill in the same averi session has reported the app's drop (rf2, after this change), every
   later typing into that app — `type:` too — sends its first key alone (ADR 0023's D24/D25 amendments), which is what
-  D25 measured to land a burst whole. Accepted, as blind typing is.
+  D25 measured to land a burst whole. Accepted, as blind typing is. (D29, below: the split ran in rf4 and the tail
+  still dropped — a residual.)
 - **f1–f3 are the SwiftUI pitfall predicted above** — a lab-app fidelity bug, not averi's: averi reported what the
   screen showed (`Filled … (12 characters)`, exact), and the screen was not the model.
 
@@ -201,3 +203,39 @@ dropped them, the field shows them reformatted: 2 separators added)`, or Filled 
 same session and should land through the first-key-alone split), and after rebuilding the lab app `live.ts --udid …
 --cases f1,f2,f3,f5,f6,f7,f8,f9,f10` (f1–f3: the tree now shows the model's grouped text). Android is unchanged but for
 the diagnosis wording (no retype there); its forms groups need no re-run beyond the usual golden.
+
+## Amendment: an earlier text that vanished, and rf4's tail (2026-11-01, D29)
+
+**Measured** (the owner, iPhone 17 simulator, iOS 27.0, idb; `live.ts` at b768f376, both lab apps rebuilt): f2, f3,
+f5, f6, f8, f9, f10 ok — f2 and f3 `Filled … reformatted: 2 separators added`, the tree showing the model's text (the
+UIKit lab field works); rf1 and rf2 ok, each `the last character typed again after the field dropped it`
+(D28's retype, live); rf3 and rf5 ok. Not ok: **f1 and f7** (MISMATCH: the app held `SK31 1200 0000` /
+`CZ65 0800 0000`, averi failed `typed 12 characters but the field shows 14`; f7's first fill `SK3112` failed `typed 6
+… shows 7`, its clear said `the field still shows 16 characters … its hint or placeholder`), and **rf4** (LOUD: the
+app held `SK31 1200 00`).
+
+- **f1 and f7: the earlier text was an unnamed placeholder.** idb names no placeholder (adapters/types.ts,
+  `UiNode.placeholder`), so the UIKit iban field's `SK00 0000 0000 …` (16 characters, fixtures/apps/cells/forms.json)
+  is read as the empty field's value — the fill's `before` — and vanishes at the first key. Without clear the reading
+  was judged after it (`priorText(intent) + value`): no reformat of that, no prefix of it (so a dropped tail there was
+  never typed again, and D24's split never started — the same bug as D28's, one step earlier), and the exact rule
+  passed only a value typed with its own spaces (f5, `held.includes(value)`); with clear the earlier text is none, so
+  f2 passed. **Decision:** without clear, a reading that does not START with the earlier text is judged after none as
+  well, second (`fill-reformat.ts#priorsOf`, asked by `reformatAfter` — the typing's landing rule — and by `tailOf` —
+  the retype, `whereTyped`'s missing text and the verdict's `dropped-tail`). `reformatOf`'s and `prefixOf`'s rules are
+  unchanged, judged over the value alone; a reading that still starts with the earlier text is judged after it, never
+  without it. The reading cannot tell an unnamed placeholder from earlier text the field replaced (a select-all on
+  focus); the exact rule already passes that, and the reformat and the tail now read it alike. Mutation-checked: seven
+  mutants (no fallback; the fallback without the starts-with guard; the value alone instead of both; the fallback in
+  `tailOf` or in `reformatAfter` only; the fallback under clear; fill-type's old landing expression), each killed.
+- **rf4 is a residual of blind typing — `fill:` is its remedy.** The companion log shows D24's split ran: the first
+  key alone (`S`, one idb `hid` call at 07:19:08.880), the other eleven in one burst at 07:19:09.127 (24 HID frames),
+  after rf1/rf2 had reported the app's drop — and the React Native field, reformatting on every keystroke, still
+  dropped the last two (`SK31 1200 00`). A flow's `type:` (engine → interact/type-text.ts `typeIntoFocused`) never
+  reads back, by design (above): it cannot see the drop, so it cannot type the tail again. **Accepted**: into a field
+  that reformats as it is typed, use a flow's `fill:` (or `type_text` with a selector), which reads back and types a
+  dropped tail again — rf1 and rf2 pass that way on the same field. scripts/truth/live.ts marks rf4 a known LOUD;
+  skill/references/averi-yaml.md's `type` row says to use `fill`.
+
+**Not checked on the device.** The owner re-runs, on iOS: `live.ts --udid … --cases f1,f7` (both should read `Filled …
+the field shows them reformatted`: f1 `2 separators added`, f7's fills `1` and `2`).
