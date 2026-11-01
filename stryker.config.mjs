@@ -16,6 +16,9 @@ export default {
     '/*',
     '!/src/',
     '!/tests/',
+    // Only scripts/mutation/ (scope.json): un-ignoring it alone brings all of scripts/ back in Stryker's walk.
+    '!/scripts/',
+    '/scripts/*',
     '!/scripts/mutation/',
     '!/package.json',
     '!/tsconfig.json',
