@@ -413,9 +413,8 @@ describe('a read error no wait cures (idb\'s wedged accessibility service) stops
     return { stdout: Buffer.alloc(0), stderr: '' };
   };
   /**
-   * The PIN screen while `wedged(readNo)` says no, the wedged idb after. The flow must stop on the FIRST wedged read: a
-   * second is a poisoned tree (D38, tests/helpers/terminal-read.ts), so a regressed seam fails the pin at once rather
-   * than polling to SLOW's 60 s.
+   * The PIN screen while `wedged(readNo)` says no, the wedged idb after. The flow must stop on the FIRST wedged read
+   * (bounded: D38, tests/helpers/terminal-read.ts).
    */
   function wedgedIdb(wedged: (read: number) => boolean) {
     const fake = new FakeAdapter(screens(), 'pin');

@@ -889,8 +889,7 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
 
   // D21 (2026-10-31): idb's wedged accessibility service ("named no frontmost application") lasts until a reboot. A
   // tap on it fails on its first read — not after its budget — and the reply carries the cure, the bound UDID in it.
-  // In both pins a second read is a poisoned tree (D38, tests/helpers/terminal-read.ts), so a regressed seam fails the
-  // pin at once rather than polling to the tool's default budget.
+  // Both pins are bounded to the one read (D38, tests/helpers/terminal-read.ts).
   it('tap: idb\'s wedged accessibility service (IdbNoFrontmostError) fails on the first read, the reply naming the reboot', async () => {
     const wedged = new FakeAdapter({}, 'none');
     let reads = 0;

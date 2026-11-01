@@ -272,13 +272,13 @@ flows: {}
 describe('a leg whose tree read no wait cures', () => {
   it('keeps the assert results, the screenshot and the health line', async () => {
     const ios = fake('ios');
-    // One read per assert; a third is a poisoned tree (D38, tests/helpers/terminal-read.ts), so a regressed seam fails
-    // here at once rather than polling each assert to the Verifier's default budget.
-    ios.uiTree = boundReads(2, async () => {
+    const specs = [{ element: { id: 'card' } }, { element: { id: 'card' }, absent: true }];
+    // One read per assert (bounded: D38, tests/helpers/terminal-read.ts).
+    ios.uiTree = boundReads(specs.length, async () => {
       throw new PersistentReadError('idb cannot read the UI tree: wedged until a reboot');
     });
     const out = await runVerification(
-      request({ platforms: ['ios'], specs: [{ element: { id: 'card' } }, { element: { id: 'card' }, absent: true }] }),
+      request({ platforms: ['ios'], specs }),
       async () => ios,
     );
     expect(out.sections[0]).toContain('## ios');

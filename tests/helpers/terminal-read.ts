@@ -12,15 +12,18 @@ import type { UiNode } from '../../src/adapters/types.js';
  * scroll loop, the resolver, the flow engine's detect) is outside the seam, and an error it throws ends the poll at
  * once (read-tree.ts#pollTree). So the regression fails that test alone, at once, under any sleep and any deadline,
  * naming the cause. `then` stays undefined so the tree can be awaited as a read's result.
+ *
+ * It protects only a pin whose caller READS the tree it is handed: a predicate or loop that never looks at the tree
+ * (a bare `() => undefined`) polls past the poisoned one to the deadline, as before. Such a pin must look at it.
  */
-export function boundReads<A extends unknown[]>(limit: number, read: (...args: A) => Promise<UiNode>): (...args: A) => Promise<UiNode> {
+export function boundReads(limit: number, read: () => Promise<UiNode>): () => Promise<UiNode> {
   let reads = 0;
-  return async (...args: A) => (++reads > limit ? polledPast(reads, limit) : read(...args));
+  return async () => (++reads > limit ? polledPast(reads, limit) : read());
 }
 
-function polledPast(read: number, limit: number): UiNode {
+function polledPast(readNo: number, limit: number): UiNode {
   const stop = (): never => {
-    throw new Error(`polled past a terminal read (read ${read}; the test expects at most ${limit})`);
+    throw new Error(`polled past a terminal read (read ${readNo}; the test expects at most ${limit})`);
   };
   return new Proxy({} as UiNode, {
     get: (_target, key) => (key === 'then' || typeof key === 'symbol' ? undefined : stop()),

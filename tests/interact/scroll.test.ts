@@ -111,7 +111,7 @@ describe('scrollUntilVisible — a read error no wait cures ends the scroll at o
     const fake = scrollingFake(3100);
     const wedged = new PersistentReadError('wedged until a reboot');
     let reads = 0;
-    // A second read is a poisoned tree (D38, tests/helpers/terminal-read.ts): a regressed seam fails here at once.
+    // Bounded to the one read (D38, tests/helpers/terminal-read.ts).
     fake.uiTree = boundReads(1, async () => {
       reads++;
       throw wedged;

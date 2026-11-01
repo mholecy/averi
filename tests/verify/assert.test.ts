@@ -67,8 +67,8 @@ function drawnAt(rect: Rect, hex: string, { width, height } = { width: 402, heig
 // Under persistentRead: 'fail' it fails THE assert, after its one read, with the error's message as the detail — what
 // a verify leg (whose frame, screenshot and health line a throw would lose) and the MCP assert tool ask for. By
 // default it is thrown as it came, after the one read: a flow's `assert:` step must reach the engine's isTerminal
-// with the named error (review round 2), not as a plain "flow asserts failed". Past the reads a test expects, the
-// fake answers a poisoned tree (D38, tests/helpers/terminal-read.ts): a regressed seam fails here at once, not at 60 s.
+// with the named error (review round 2), not as a plain "flow asserts failed". Reads are bounded to the ones each test
+// expects (D38, tests/helpers/terminal-read.ts).
 describe('asserts on a tree read no wait cures', () => {
   const wedgedFake = (expectedReads: number) => {
     const fake = dashboardFake();
