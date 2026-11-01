@@ -1,7 +1,8 @@
 # 38. A mutation run guards the pure leaves' tests, each module held to its own floor
 
 Status: accepted 2026-11-01 (backlog row D36, docs/plans/2026-10-30-performance-backlog.md). Tooling only: no
-behaviour changes.
+behaviour changes. Amended 2026-11-02 (D45): geometry.ts joined the run with direct tests of its own, and draw-order's
+floor rose with its.
 
 ## Context
 
@@ -15,12 +16,14 @@ behaviour changes.
 
 ## Decision
 
-**`npm run mutate` runs Stryker over five pure leaves, each against its direct tests only, and fails when any module's
+**`npm run mutate` runs Stryker over six pure leaves, each against its direct tests only, and fails when any module's
 score drops below its own floor. A merge runs it cold.**
 
 - Scope: one data file, `scripts/mutation/scope.json`. For each mutated module it gives the module's direct tests
   (globs), its floor and the baseline the floor came from. The modules are flow/wipes-ahead.ts,
-  interact/fill-reformat.ts, fill-verdict.ts and fill-landing.ts, and ui-tree/draw-order.ts. `stryker.config.mjs`
+  interact/fill-reformat.ts, fill-verdict.ts and fill-landing.ts, and ui-tree/draw-order.ts and geometry.ts (since
+  D45). One run holds every module's tests, and Stryker's per-test coverage runs a mutant against every test that
+  reaches it: draw-order*.test.ts reach geometry.ts too, so its score counts their kills. `stryker.config.mjs`
   (`mutate`), `vitest.mutation.config.ts` (`include`, with `related: false` and a cache of its own) and
   `scripts/mutation/mutate.ts` all read it. The normal `npx vitest run` never reads the mutation vitest config.
 - Per-module floors, not Stryker's `thresholds.break`: `break` is one global score, and the baselines lie 23 points
@@ -30,7 +33,7 @@ score drops below its own floor. A merge runs it cold.**
   and on a floor for a module Stryker did not mutate. It also fails when Stryker writes no report.
 - The floor rule: raise a floor when its module's baseline rises. Lower it only with a reason written in that module's
   `baseline` field.
-- Cold at merge: `npm run mutate -- --force` (about 45 s) reruns every mutant. Stryker's incremental mode
+- Cold at merge: `npm run mutate -- --force` (about 60 s with geometry.ts, 45 s before it) reruns every mutant. Stryker's incremental mode
   (`reports/mutation/stryker-incremental.json`) stays a local convenience of one checkout and is never committed. Its
   blind spot is why: it compares only the mutated files and their test files with the last run, never the modules they
   import. A change to `fill-facts.ts` can turn a killed mutant of `fill-landing.ts` into a survivor, and an incremental
@@ -43,14 +46,15 @@ score drops below its own floor. A merge runs it cold.**
 
 ## Consequences
 
-- A branch that touches one of the five modules, their tests or a module they import runs `npm run mutate -- --force`
+- A branch that touches one of the six modules, their tests or a module they import runs `npm run mutate -- --force`
   before merging.
 - A module joins the run only with direct tests of its own. Adding it is one edit: an entry in scope.json with its
   tests, its floor and its baseline.
-- geometry.ts stays out until its direct tests exist. That is a backlog row of its own.
+- geometry.ts stayed out until its direct tests existed. They came with D45 (tests/ui-tree/geometry-viewport.test.ts,
+  geometry-clips.test.ts), and lifted it from 49.5 % to 95.5 %.
 - The tests added with the run pin behaviour, not object shape. So a mutant that only adds an `undefined` key, such as
   `...(x !== undefined && { x })` turned into `...{ x }`, survives. It is counted against the floor, not hidden.
-- draw-order's floor is low on purpose. Its 61 uncovered mutants (`paintsOver`'s own-content and clickable-layer
-  exemptions, `drawnOver`, `drawnOverStrip`) and its idb keyboard band survivors are exercised by other suites
-  (tests/verify/pixel-chrome.test.ts, tests/ui-tree/keyboard-position.test.ts, the adapters'), not by
-  draw-order*.test.ts.
+- draw-order's floor was low on purpose until D45 gave its 61 uncovered mutants (`paintsOver`'s own-content and
+  clickable-layer exemptions, `drawnOver`, `drawnOverStrip`) direct tests (draw-order-paints-over.test.ts): 77 % to
+  87 %. Its idb keyboard band survivors are still exercised by other suites (tests/ui-tree/keyboard-position.test.ts,
+  the adapters'), not by draw-order*.test.ts.
