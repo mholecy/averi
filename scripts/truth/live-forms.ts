@@ -2,6 +2,8 @@ import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
 import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
+import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
+import type { SourceKind } from '../differential/corpus.js';
 import type { LabState, Rect } from './schema.js';
 import { probePoint, within } from './truth.js';
 
@@ -13,6 +15,9 @@ import { probePoint, within } from './truth.js';
  * form-picker's sheet, `judgeMissUnderSheet` the asserts and the flow's `wait:` there.
  */
 
+/** The tree sources the live cases run under: iOS's (idb, wda), Android's one. */
+export type Source = IosTreeSourceKind | Extract<SourceKind, 'uiautomator'>;
+
 export const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
 export const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
 
@@ -21,11 +26,11 @@ export const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
  * verdict names its rule (`cls`, live-visibility.ts#VerdictClass): `failed-holds` where the app holds `want` but averi
  * failed; `fill-claim` where averi claims done and the app holds another value; else LOUD, `loud-untouched` with the
  * field as the launch left it, `loud-changed` with it changed (a part typed, a part cleared). Every verdict carries the
- * kind of the last reply (replies.ts#replyKind) — the two that live-known.ts pins.
+ * kind of the last reply (replies.ts#replyKind): live-known.ts pins a case's `cls` and `kind`.
  */
 export const holds =
   (tag: string, want: string) =>
-  (s: LabState, replies: string[], _source: string, launched: LabState): LiveVerdict => {
+  (s: LabState, replies: string[], _source: Source, launched: LabState): LiveVerdict => {
     const got = valueOf(s, tag);
     // The launch is the baseline: a field it did not lay out (undefined) is untouched only while it stays so.
     const before = valueOf(launched, tag);
@@ -49,7 +54,7 @@ export const holds =
  */
 export const holdsShown =
   (tag: string, want: string) =>
-  (s: LabState, replies: string[], source: string, launched: LabState): LiveVerdict => {
+  (s: LabState, replies: string[], source: Source, launched: LabState): LiveVerdict => {
     const v = holds(tag, want)(s, replies.slice(0, 1), source, launched);
     if (v.outcome !== 'ok') return v;
     const shown = replies[1];
@@ -71,7 +76,7 @@ export const underBar = (field: Rect | undefined | null, bar: Rect | undefined |
  * the bar, or dismiss the keyboard first), note really a strip — what of it the bar leaves showing under the tap
  * minimum, by the app's frames at the refusal — every field as the launch left it, nothing submitted.
  */
-export function judgeNoteFill(s: LabState, replies: string[], source: string, launched: LabState): LiveVerdict {
+export function judgeNoteFill(s: LabState, replies: string[], source: Source, launched: LabState): LiveVerdict {
   const v = holds('note', 'Thanks - ok')(s, replies, source, launched);
   if (source === 'idb' && v.outcome === 'LOUD' && valueOf(s, 'note') === '') return { outcome: 'ok', why: `refused (idb): ${short(replies[0])}` };
   if (source !== 'uiautomator' || v.outcome !== 'LOUD') return v;

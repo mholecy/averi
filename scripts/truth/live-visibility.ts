@@ -55,10 +55,10 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
  * (LOUD) one whose stroke changed the screen — the layer dismissed — and that said so, claiming nothing; `presented-pass` a colour
  * assert beneath a presented layer that passed (it measured the layer); `dismissal` the dismissal's judge; `end-unread`
  * a scroll_until for a row not there, at its list's end, that spent more strokes than UNMOVED_STROKES_EXHAUST before
- * failing (the end read as more to come, ABSENT_AT_END). A fill's (live-forms.ts#holds): `loud-untouched` (LOUD) the
- * value not held and the field as the launch left it; `loud-changed` (LOUD) not held and the field changed — a part
- * typed, or cleared; `fill-claim` a fill that claims done while the app holds another value; `failed-holds` again where
- * the app holds the value but averi failed.
+ * failing (the end read as more to come, ABSENT_AT_END). A fill's rules (live-forms.ts#holds): `loud-untouched` (LOUD)
+ * the value not held and the field as the launch left it; `loud-changed` (LOUD) not held and the field changed — a part
+ * typed, or cleared; `fill-claim` a fill that claims done while the app holds another value; `failed-holds`, the same
+ * rule as the visibility group's, where the app holds the value but averi failed.
  */
 export type VerdictClass =
   | 'stop-claim'

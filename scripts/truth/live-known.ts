@@ -42,7 +42,7 @@ const NO_ID_RESIDUAL = 'residual:ADR 0018 residual 20 — idb lists no identifie
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
 const CENTRE_A_POINT_OUT = 'bug:2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md';
-// The forms group's (live-forms.ts#holds: a fill's class, the kind of the case's last reply).
+// The notes of the forms group's entries (filed by live-forms.ts#holds' class and the kind of the case's last reply).
 const IOS_NON_ASCII = 'bug:2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md';
 const ANDROID_NON_ASCII = 'bug:2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md';
 const SECURE_CLEARED = 'residual:ADR 0028 residual 2 — iOS clears a secure field when typing resumes: a no-clear fill into a prefilled one leaves what was typed, and averi says so';

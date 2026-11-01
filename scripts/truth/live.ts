@@ -13,7 +13,7 @@ import { loadSide } from '../differential/side.js';
 import { familyOf } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
+import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, type Source, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, callReply, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
@@ -107,7 +107,6 @@ const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
 const device = (values.udid ?? values.serial ?? 'rejudged')!;
 const port = Number(values['wda-port'] ?? 8120);
 /** The tree sources the cases run under: iOS's (idb, wda), Android's one. */
-type Source = IosTreeSourceKind | Extract<SourceKind, 'uiautomator'>;
 const sources: Source[] = rejudging !== undefined ? [...new Set(rejudging.results.map((r) => r.source))] : platform === 'android' ? ['uiautomator'] : ((values.sources ?? 'idb,wda').split(',') as IosTreeSourceKind[]);
 const only = values.cases?.split(',');
 // `forms` by default: the reproduce lines of the earlier summaries (docs/truth/live-android-2026-10-16.md) stay true.

@@ -47,3 +47,10 @@ type_text description should say which it is.
 
 - Android: `input text` takes no non-ASCII either (unmeasured here; phase 2 of the lab app).
 - `run_flow`'s `fill:` step goes through the same adapter call (adapters/ios.ts#typeText) — same failure.
+
+## Notes
+
+- Live only (a replayed tree cannot judge typing): `scripts/truth/live.ts` cases `b1d` and `b7` on iOS, LOUD under idb
+  and WDA (averi said it failed; the field as the launch left it). Filed in the live KNOWN since D31 as
+  `ios idb|wda b1d, b7` (scripts/truth/live-known.ts: `loud-untouched` on `refused`;
+  docs/truth/live-records/ios-forms-d40-1.json).

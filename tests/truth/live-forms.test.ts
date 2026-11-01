@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet } from '../../scripts/truth/live-forms.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
+import { readLiveRecord, recordedCase, withFieldValue } from '../helpers/live-records.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
 // Lab note F2A1's live form cases (scripts/truth/live-forms.ts), over the committed record of round 6's Android device
@@ -9,8 +9,7 @@ import type { LabState } from '../../scripts/truth/schema.js';
 // by design (the owner's decision of 2026-10-18, ADR 0013) — and k7, scroll_until phone under the bar riding on the IME
 // (with round 7's A6 record of it, android-k7-eyes-1.json).
 
-type Rec = { results: { id: string; source: string; replies: string[]; launched: LabState; state: LabState }[] };
-const record = JSON.parse(readFileSync(new URL('../../docs/truth/live-records/android-vis.json', import.meta.url), 'utf8')) as Rec;
+const record = readLiveRecord('android-vis.json');
 const k = (id: string) => record.results.find((r) => r.id === id)!;
 
 describe('k3: a fill into note, a strip under the bar — refused by design', () => {
@@ -43,7 +42,7 @@ describe('k7: scroll_until phone — a stop with phone partly under the bar\'s p
   // Round 7's A6 (the eyes on a "fully" claim): averi names the band the bar's node-less padding draws over phone's
   // bottom (docs/truth/live-records/android-k7-eyes-1.json, its src's); before it, "fully visible" overstated by the
   // 18 px the app's frames put under the bar — an accepted residual (ADR 0013) until the eyes, a MISMATCH since.
-  const eyes = (JSON.parse(readFileSync(new URL('../../docs/truth/live-records/android-k7-eyes-1.json', import.meta.url), 'utf8')) as Rec).results.find((r) => r.id === 'k7')!;
+  const eyes = readLiveRecord('android-k7-eyes-1.json').results.find((r) => r.id === 'k7')!;
   const { replies, launched, state } = k('k7');
   it('the eyes\' record: the band named, phone\'s centre clear — ok', () => {
     expect(judgePhoneScroll(eyes.state, eyes.replies, 'uiautomator', eyes.launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/18 px of it under the bar.*: Element id:"lab\.form-keyboard\.phone" visible after 1 swipe — PARTLY UNDER a surface the tree does not list: /) });
@@ -139,7 +138,7 @@ describe('c5–c7: an assert and a flow\'s wait: on name beneath form-picker\'s 
 describe('kf1–kf2: the submit between a floating panel and its strip — the panel evidenced by the case\'s own first reply', () => {
   // docs/truth/live-records/android-forms-r1023b-fu1-cr-1.json: Gboard floated by hand; each case begins with a colour
   // assert on ks whose refusal quotes the panel over it.
-  const fu1 = JSON.parse(readFileSync(new URL('../../docs/truth/live-records/android-forms-r1023b-fu1-cr-1.json', import.meta.url), 'utf8')) as Rec;
+  const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
   const kf = (id: string) => fu1.results.find((r) => r.id === id)!;
   const noPanel = 'FAIL  element id:"lab.form-keyboard-floating.ks" fill within dE00 8 of #FFFFFF — measured #FFFFFF';
 
@@ -174,11 +173,10 @@ describe('kf1–kf2: the submit between a floating panel and its strip — the p
  * (docs/truth/live-records/ios-forms-d40-1.json, ios-rn-forms-d40-1.json, android-forms-d40-1.json).
  */
 describe('holds and holdsShown: the class and the kind of a fill verdict', () => {
-  const read = (file: string) => JSON.parse(readFileSync(new URL(`../../docs/truth/live-records/${file}`, import.meta.url), 'utf8')) as Rec;
-  const ios = read('ios-forms-d40-1.json');
-  const rn = read('ios-rn-forms-d40-1.json');
-  const android = read('android-forms-d40-1.json');
-  const at = (rec: Rec, source: string, id: string) => rec.results.find((r) => r.source === source && r.id === id)!;
+  const ios = readLiveRecord('ios-forms-d40-1.json');
+  const rn = readLiveRecord('ios-rn-forms-d40-1.json');
+  const android = readLiveRecord('android-forms-d40-1.json');
+  const at = recordedCase;
 
   it.each([
     ['iOS idb b1d: idb ui text refuses the non-ASCII name, the field as the launch left it — loud-untouched on refused', ios, 'idb', 'b1d', 'name', 'Jan Šťastný', 'loud-untouched', 'refused'],
@@ -197,9 +195,8 @@ describe('holds and holdsShown: the class and the kind of a fill verdict', () =>
   });
 
   it('the app holds the value but averi failed: MISMATCH failed-holds, on the refusal', () => {
-    const { replies, launched, state } = at(ios, 'wda', 'p5');
-    const held = { ...state, fields: { ...state.fields!, pin: { ...state.fields!.pin, value: '25801' } } };
-    expect(holds('pin', '25801')(held, replies, 'wda', launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds', kind: 'refused' });
+    const { replies, launched, state } = withFieldValue(at(ios, 'wda', 'p5'), 'pin', '25801');
+    expect(holds('pin', '25801')(state, replies, 'wda', launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds', kind: 'refused' });
   });
 
   it('ok: no class, the kind of the reply', () => {
@@ -217,8 +214,7 @@ describe('holds and holdsShown: the class and the kind of a fill verdict', () =>
   });
 
   it('holdsShown: the fill not held — holds\' verdict over the fill alone: fill-claim on the fill\'s kind (other), not the assert\'s (PASS)', () => {
-    const { replies, launched, state } = at(ios, 'wda', 'f1');
-    const lost = { ...state, fields: { ...state.fields!, iban: { ...state.fields!.iban, value: 'SK31 12' } } };
-    expect(holdsShown('iban', 'SK31 1200 0000')(lost, replies, 'wda', launched)).toEqual(expect.objectContaining({ outcome: 'MISMATCH', cls: 'fill-claim', kind: 'other' }));
+    const { replies, launched, state } = withFieldValue(at(ios, 'wda', 'f1'), 'iban', 'SK31 12');
+    expect(holdsShown('iban', 'SK31 1200 0000')(state, replies, 'wda', launched)).toEqual(expect.objectContaining({ outcome: 'MISMATCH', cls: 'fill-claim', kind: 'other' }));
   });
 });
