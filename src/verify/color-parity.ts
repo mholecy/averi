@@ -382,21 +382,21 @@ export interface ColorParityOptions {
  * per-anchor problem.
  */
 function statsFor(platform: Platform, capture: MeasuredFrame): ColorPlatformStats {
-  const { png, scale: scaled } = capture;
+  const { image, scale: scaled } = capture;
   if (scaled.error !== undefined) {
     throw new Error(`color parity: ${platform}: ${scaled.error}; failing closed.`);
   }
   let translucent = false;
-  for (let o = 3; o < png.data.length; o += 4) {
-    if (png.data[o] < 255) {
+  for (let o = 3; o < image.data.length; o += 4) {
+    if (image.data[o] < 255) {
       translucent = true;
       break;
     }
   }
   return {
     platform,
-    pngWidth: png.width,
-    pngHeight: png.height,
+    pngWidth: image.width,
+    pngHeight: image.height,
     rootWidth: scaled.width,
     scale: scaled.scale,
     translucent,
@@ -447,7 +447,7 @@ function sampleAnchor(
   mode: ColorSampleMode,
 ): { sample?: ColorSample; absent?: string; notes: string[] } {
   if (rect === undefined) return { absent: 'no id in tree', notes: [] };
-  const got = sampleFill(capture.png, rect, scale, mode);
+  const got = sampleFill(capture.image, rect, scale, mode);
   if (got.absent !== undefined) {
     return { absent: got.absent === 'off-png' ? 'rect outside png (off-screen)' : 'empty sample region', notes: [] };
   }
@@ -739,13 +739,13 @@ export function evaluateColorAssert(
   frame: MeasuredFrame,
 ): { pass: boolean; detail: string } {
   const tol = expectation.deltaE ?? DEFAULT_TOLERANCE_DE;
-  const { png, scale: scaled } = frame;
+  const { image, scale: scaled } = frame;
   if (scaled.error !== undefined) {
     return { pass: false, detail: failClosed(scaled.error, 'color') };
   }
   const scale = scaled.scale;
   const mode: ColorSampleMode = expectation.sample ?? 'dominant';
-  const got = sampleFill(png, rect, scale, mode);
+  const got = sampleFill(image, rect, scale, mode);
   if (got.absent !== undefined) {
     // The fact found, no remedy: where the element lies and what to do is the pixel standing's to decide
     // (ui-tree/standing.ts, `offScreen`, presented first), asked before any capture. The standing leaves a rect of NO

@@ -65,8 +65,9 @@ export class Shot {
   }
 
   /**
-   * The same screen: see the class doc for how each pair of forms is compared. Byte for byte, so it relies on the
-   * adapter's one-source rule (adapters/types.ts#DeviceAdapter.screenshot): a still screen captures to equal bytes.
+   * The same screen: see the class doc for how each pair of forms is compared. Exactly — bytes, or decoded pixels for a
+   * mixed raw/PNG pair — so it relies on the adapter's one-source rule (adapters/types.ts#DeviceAdapter.screenshot): a
+   * still screen captures to equal frames.
    */
   equals(other: Shot): boolean {
     const [a, b] = [this.capture, other.capture];

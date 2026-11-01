@@ -53,7 +53,7 @@ export const eyesOn = (adapter: Pick<DeviceAdapter, 'screenshot' | 'capture' | '
  * pair `untold`, said why.
  */
 export const orderOfFrame = (frame: MeasuredFrame, question: PairQuestion): readonly OrderSeen[] =>
-  frame.scale.error !== undefined ? untoldAll(question, `the screenshot could not be scaled to the tree: ${frame.scale.error}`) : judgeOrder(frame.png, frame.scale.scale, question);
+  frame.scale.error !== undefined ? untoldAll(question, `the screenshot could not be scaled to the tree: ${frame.scale.error}`) : judgeOrder(frame.image, frame.scale.scale, question);
 
 /**
  * THE EYES' THIRD QUESTION — does the colour assert's region read as THE SCREEN BESIDE IT? Asked of an element whose
@@ -109,18 +109,18 @@ const BESIDE_DEPTH = 8;
 /** The colour assert's region against the screen beside it, on a frame already captured (`ApartSeen`). */
 export function apartOfFrame(frame: MeasuredFrame, region: Rect): ApartSeen {
   if (frame.scale.error !== undefined) return { seen: 'untold', why: `the screenshot could not be scaled to the tree: ${frame.scale.error}` };
-  const { png } = frame;
+  const { image } = frame;
   const { scale } = frame.scale;
   /** `r` on the png, when FLANK_MIN_PX wide and tall at least there — else too little of it to tell a colour by. */
   const readable = (r: Rect): EdgeBounds | undefined => {
-    const on = pngRegion(r, scale, png);
+    const on = pngRegion(r, scale, image);
     return on === undefined || on.x1 - on.x0 < FLANK_MIN_PX || on.y1 - on.y0 < FLANK_MIN_PX ? undefined : on;
   };
   const at = readable(region);
   if (at === undefined) return { seen: 'untold', why: 'the region lies off the screenshot, or too thin on it to read' };
-  const own = sampleDominant(png, [at])?.rgb;
+  const own = sampleDominant(image, [at])?.rgb;
   if (own === undefined) return { seen: 'apart' };
-  const { near, total } = nearCount(png, at, own, EYES_SAME_DE);
+  const { near, total } = nearCount(image, at, own, EYES_SAME_DE);
   if (total - near > OWN_PIXELS_MAX * scale * scale) return { seen: 'apart' };
   const d = BESIDE_DEPTH;
   const { x, y, width, height } = region;
@@ -131,8 +131,8 @@ export function apartOfFrame(frame: MeasuredFrame, region: Rect): ApartSeen {
     { x: x + width, y, width: d, height },
   ].flatMap((r) => readable(r) ?? []);
   const plain = strips.flatMap((strip) => {
-    const colour = sampleDominant(png, [strip])?.rgb;
-    return colour === undefined || !oneColour(png, strip, colour) ? [] : [colour];
+    const colour = sampleDominant(image, [strip])?.rgb;
+    return colour === undefined || !oneColour(image, strip, colour) ? [] : [colour];
   });
   if (plain.length === 0) return { seen: 'untold', why: 'no plain screen beside it' };
   return plain.some((c) => distance(c, own) <= EYES_SAME_DE) ? { seen: 'blends', colour: rgbToHex(own) } : { seen: 'apart' };

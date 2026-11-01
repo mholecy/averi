@@ -23,8 +23,8 @@ import type { RawImage } from '../adapters/types.js';
  * were weighed and rejected: a per-platform binary breaks the `npx` install.
  */
 
-/** The decoded screenshot every pixel reader reads (adapters/types.ts#RgbaImage, D19: an adapter's capture is one). */
-export type { RgbaImage } from '../adapters/types.js';
+/** The decoded screenshot every pixel reader reads (adapters/types.ts#RgbaImage, D19: an adapter's capture is one), and its Buffer-backed form, this decoder's answer (adapters/types.ts#RawImage). */
+export type { RawImage, RgbaImage } from '../adapters/types.js';
 
 /**
  * Decodes `bytes` as pngjs would: the fast path when it takes the input, pngjs

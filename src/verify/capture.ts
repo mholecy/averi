@@ -1,7 +1,6 @@
 import {
   type DeviceAdapter,
   type DeviceScreen,
-  type RawImage,
   type Rect,
   type UiNode,
 } from '../adapters/types.js';
@@ -9,7 +8,7 @@ import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { readTreeOrMiss, type TreeRead } from '../ui-tree/read-tree.js';
 import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
-import type { RgbaImage } from './png.js';
+import type { RawImage, RgbaImage } from './png.js';
 import { captureShot, type Shot } from './shot.js';
 import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.js';
 
@@ -211,7 +210,7 @@ export type { RgbaImage } from './png.js';
  */
 export interface MeasuredFrame {
   tree: UiNode;
-  png: RgbaImage;
+  image: RgbaImage;
   scale: PngScale;
   window: WindowWidth;
   error?: undefined;
@@ -225,7 +224,7 @@ export interface MeasuredFrame {
  */
 export interface Undecoded {
   tree: UiNode;
-  png?: undefined;
+  image?: undefined;
   scale?: undefined;
   window: WindowWidth;
   error: string;
@@ -234,7 +233,7 @@ export interface Undecoded {
 /** No tree at all: the read failed after retry. `error` is the one sentence a consumer quotes. */
 interface Treeless {
   tree?: undefined;
-  png?: undefined;
+  image?: undefined;
   scale?: undefined;
   error: string;
 }
@@ -582,7 +581,7 @@ export async function captureFrame(
       },
     };
   }
-  return { ...wait, measured: { tree, png: image, scale: scaleFor(tree, image, screen, size), window } };
+  return { ...wait, measured: { tree, image, scale: scaleFor(tree, image, screen, size), window } };
 }
 
 /**
@@ -714,9 +713,9 @@ export class ScreenWitness {
  * shares only its window derivation (`windowFor`), the one fact it carries
  * that does not need pixels.
  */
-export function measuredFrameFor(tree: UiNode, png: RgbaImage, screen?: DeviceScreen): MeasuredFrame {
+export function measuredFrameFor(tree: UiNode, image: RgbaImage, screen?: DeviceScreen): MeasuredFrame {
   const size = treeSizeOf(tree);
-  return { tree, png, scale: scaleFor(tree, png, screen, size), window: windowFor(tree, screen, size) };
+  return { tree, image, scale: scaleFor(tree, image, screen, size), window: windowFor(tree, screen, size) };
 }
 
 /**
@@ -735,14 +734,14 @@ function treeSizeOf(tree: UiNode): TreeSize {
 }
 
 /** The frame's png scale from an already-walked tree size, with the walk's containment. */
-function scaleFor(tree: UiNode, png: RgbaImage, screen: DeviceScreen | undefined, size: TreeSize): PngScale {
+function scaleFor(tree: UiNode, image: RgbaImage, screen: DeviceScreen | undefined, size: TreeSize): PngScale {
   // The geometry walk assumes a well-formed tree. A node without children
   // or a pathological depth must fail THIS frame's scale, not the leg: the
   // walk used to run inside the parity tables' containment, and moving it
   // here must not widen what a bad tree can take down.
   if (size.thrown !== undefined) return { error: malformedTree('the png scale', size.thrown) };
   try {
-    return pngScale(tree, png.width, png.height, screen, size.size);
+    return pngScale(tree, image.width, image.height, screen, size.size);
   } catch (e) {
     return { error: malformedTree('the png scale', e) };
   }

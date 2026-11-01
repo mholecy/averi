@@ -378,7 +378,7 @@ export function ocrRegionsFor(
   contract: LayoutContract,
   frame: MeasuredFrame,
 ): { regions: OcrRegion[]; note?: string } {
-  const { tree, png, scale: scaled } = frame;
+  const { tree, image, scale: scaled } = frame;
   if (scaled.error !== undefined) throw new Error(`text parity: ${scaled.error}; failing closed`);
   const rects = collectRects(tree);
   const regions: OcrRegion[] = [];
@@ -386,7 +386,7 @@ export function ocrRegionsFor(
     if (!wantsTextCheck(anchor)) continue;
     const rect = rects.get(anchor.id);
     if (rect === undefined) continue;
-    const region = regionForRect(anchor.id, rect, scaled.scale, png);
+    const region = regionForRect(anchor.id, rect, scaled.scale, image);
     if (region !== undefined) regions.push(region);
   }
   return { regions, note: scaled.note };
@@ -404,9 +404,9 @@ export function ocrRegionForRect(
   rect: Rect,
   frame: MeasuredFrame,
 ): { region: OcrRegion; note?: string; error?: undefined } | { region?: undefined; note?: undefined; error: string } {
-  const { png, scale: scaled } = frame;
+  const { image, scale: scaled } = frame;
   if (scaled.error !== undefined) return { error: scaled.error };
-  const region = regionForRect(id, rect, scaled.scale, png);
+  const region = regionForRect(id, rect, scaled.scale, image);
   return region === undefined
     ? { error: `element rect ${rectText(rect)} scaled by ${scaled.scale.toFixed(3)} leaves nothing on-screen` }
     : { region, note: scaled.note };
@@ -512,7 +512,7 @@ async function measureTextLeg(
     if (regions.length === 0) return treeOnly;
     const results = await engine.recognize(await shot.png(), regions);
     return {
-      value: { tree: frame.tree, ocr: { byId: new Map(results.map((r) => [r.id, r])), pngWidth: frame.png.width } },
+      value: { tree: frame.tree, ocr: { byId: new Map(results.map((r) => [r.id, r])), pngWidth: frame.image.width } },
       notes: note === undefined ? [] : [`(${platform}: ${note})`],
     };
   } catch (e) {
@@ -1063,7 +1063,7 @@ export async function measureOcrAssert(
   if (read?.error !== undefined) {
     return { pass: false, detail: failClosed([`OCR could not read the element: ${read.error}`, ...notes].join('; '), 'rendered text') };
   }
-  return evaluateOcrAssert(expectation, read?.lines ?? [], measured.png.width, notes);
+  return evaluateOcrAssert(expectation, read?.lines ?? [], measured.image.width, notes);
 }
 
 /**
