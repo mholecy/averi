@@ -2,6 +2,7 @@
 
 Status: accepted 2026-11-01 (backlog row A1, docs/plans/2026-10-30-performance-backlog.md, from the architecture review
 of the perf programme). Implemented in merge 5cd0d8e4. Behaviour-preserving.
+Amended 2026-11-01 (D39: fill's not-input hint read goes through the seam — see the amendment below).
 
 ## Context
 
@@ -38,3 +39,14 @@ of the perf programme). Implemented in merge 5cd0d8e4. Behaviour-preserving.
   included: it is a hint, read only when no re-read happened. Whether it should stop on a terminal failure is left open.
 - The raw `uiTree()` calls outside src/adapters and the seam are pinned, with the reason each may read raw, by
   tests/ui-tree/raw-tree-reads.test.ts: a new one fails that test until it goes through the seam or is listed.
+
+## Amendment: fill's not-input hint read stops on a terminal failure (2026-11-01, backlog D39)
+
+`notInput` reads its own tree only when the fill made no re-read: `value: ''` on a node that is not an input, with or
+without `clear`. Its bare `catch {}` turned a wedged simulator (`PersistentReadError`) into "success, nothing typed, the
+screen could not be read again". The agent got no reboot message; the wedge surfaced one call later.
+
+`notInput` now reads through `readTreeOrMiss`. A miss stays a hint (`input: 'unread'`); a terminal failure stops the
+fill and passes through as it came. Its entry in tests/ui-tree/raw-tree-reads.test.ts's allowlist is gone, so the guard
+covers it. Pinned by tests/interact/fill.test.ts ("notInput's read that throws a PersistentReadError", its `clear: true`
+variant, and its companion for a miss).
