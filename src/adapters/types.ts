@@ -989,10 +989,10 @@ export type FocusedWindow =
 /**
  * A UI tree read failure that no wait cures (D21, 2026-10-31) — what `uiTree()` throws when the device's own state
  * makes every later read fail the same way until something outside averi's reach is done to it (the error says what).
- * Every other read error is a poll miss (ui-tree/read-tree.ts#readTreeOrError: a device still launching, a tree
+ * Every other read error is a poll miss (ui-tree/read-tree.ts#readTreeOrMiss: a device still launching, a tree
  * momentarily unproducible), and the loops that wait on a tree read past it until their deadline. This one they do
- * not: each throws it at once — pollTree, the scroll loop, the frame capture's bounded retry — and the flow engine's
- * ladder neither escalates past it nor re-runs rungs on it (engine.ts#isTerminal), because a re-read, a relaunch or a
+ * not — the read seam throws it (docs/adr/0036-a-read-failure-no-wait-cures-is-thrown-by-the-read-seam.md) — and the
+ * flow engine's ladder neither escalates past it nor re-runs rungs on it (engine.ts#isTerminal), because a re-read, a relaunch or a
  * re-run reach flow cannot end it, and polling it to a deadline only spends the budget (D20's device run: a
  * `scroll_until` made 133 failing reads over 90 s and then said so). The one subclass today is the idb tree source's
  * IdbNoFrontmostError (ios-tree-source.ts). A base class here, beside the adapter contract, so the read loops ask
@@ -1044,9 +1044,9 @@ export interface DeviceAdapter {
    * Pollers leave it off — their interval already is the retry.
    *
    * A failed read throws; the read loops above treat that as a miss and read
-   * again (ui-tree/read-tree.ts#readTreeOrError) — except a PersistentReadError
+   * again (ui-tree/read-tree.ts#readTreeOrMiss) — except a PersistentReadError
    * (above, D21: a failure no wait cures, idb's wedged accessibility service),
-   * on which every read loop stops at once, throwing it on, and which the flow
+   * on which every read loop stops at once, and which the flow
    * engine treats as terminal — a flow's `assert:` step included. The one
    * place it becomes a value is an assert whose caller asked for that
    * (VerifierOptions.persistentRead: 'fail' — a `verify` leg and the MCP

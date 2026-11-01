@@ -1,6 +1,6 @@
-import { PersistentReadError, type DeviceAdapter, type Stroke } from '../adapters/types.js';
+import type { DeviceAdapter, Stroke } from '../adapters/types.js';
 import { pairsSeenBy, unseen, type Eyes } from '../ui-tree/eyes.js';
-import { readTreeOrError } from '../ui-tree/read-tree.js';
+import { readTreeOrMiss } from '../ui-tree/read-tree.js';
 import { CallWindow } from '../ui-tree/window-mark.js';
 import { readKeyboard, type KeyboardReading } from '../ui-tree/keyboard-cover.js';
 import { sleep } from '../util/sleep.js';
@@ -46,7 +46,7 @@ export interface ScrollOptions {
  * (`readKeyboard`) — nothing it does not use, so a caller with a narrower
  * adapter can scroll, and a reader sees what a scroll can touch. Every
  * reader the driver hands it to takes a `Pick` of its own
- * (`readTreeOrError`, `screenBox`, `readKeyboard`).
+ * (`readTreeOrMiss`, `screenBox`, `readKeyboard`).
  */
 export type ScrollAdapter = Pick<
   DeviceAdapter,
@@ -82,7 +82,7 @@ export type ScrollAdapter = Pick<
  * Every match is judged, not only the actionable one: an id can sit on a
  * container and its child, and the MOST revealed of the two is the honest
  * report, so this loop does not go through resolveNow. It keeps its own loop
- * on readTreeOrError rather than pollTree because it ACTS between reads (a
+ * on readTreeOrMiss rather than pollTree because it ACTS between reads (a
  * swipe, then a settle pause — none where the tree read waits for the screen
  * at rest, `DeviceAdapter.treeReadSettles`) and has a second stop bound (maxSwipes); the
  * read-failure rule is the same — a failed read is a miss, the last error is
@@ -300,17 +300,15 @@ export async function scrollUntilVisible(
   const window = new CallWindow(adapter);
   let matched = false; // some read of the call matched the target: no miss's word is asked any more
   for (;;) {
-    // A failed read is a miss, not a failure — see readTreeOrError. Timed
+    // A failed read is a miss, not a failure — see readTreeOrMiss. Timed
     // alone (`readMs`), failed or not: a timeout says how long the reads took,
     // so one spent by a tree source restarting under the scroll does not read
     // as the content's fault.
     const readStarted = Date.now();
-    const read = await readTreeOrError(adapter);
+    const read = await readTreeOrMiss(adapter);
     const readMs = Date.now() - readStarted;
-    // Except the read error no wait cures (adapters/types.ts#PersistentReadError, D21): thrown at once, as pollTree
-    // throws it — D20's device run read idb's wedged accessibility service 133 times in a 90 s scroll before this.
-    if (read.error instanceof PersistentReadError) throw read.error;
-    const tree = read.tree === undefined ? undefined : await window.mark(read.tree, () => matched || matchesToJudge(read.tree!, target).length > 0);
+    // This round's read with the window manager's mark on its tree; a miss as it came.
+    const markedRead = read.tree === undefined ? read : { tree: await window.mark(read.tree, () => matched || matchesToJudge(read.tree, target).length > 0) };
     // The round's screen box (swipe.ts#screenBox), read once and handed to
     // the round whole (`RoundSeen.screen`): the frame it judges in and the
     // gesture box it decides the stroke's box over.
@@ -335,13 +333,10 @@ export async function scrollUntilVisible(
     // and the region while it reads shown).
     let reading: KeyboardReading | undefined;
     let seen: RoundSeen;
-    if (tree === undefined) {
-      // `?? new Error(…)` is unreachable: readTreeOrError sets `error` whenever
-      // `tree` is not, but TreeRead's type cannot say so. Its wording is a
-      // plain Error's, not the absence one's (ElementNotFoundError): a read
-      // that returned nothing is a miss, as every failed read is.
-      seen = { read: { error: read.error ?? new Error('the UI tree read returned nothing') }, elapsedMs: 0, readMs };
+    if (markedRead.tree === undefined) {
+      seen = { read: { error: markedRead.error }, elapsedMs: 0, readMs };
     } else {
+      const { tree } = markedRead;
       // The matches the round judges: the one the next tap would act on, when the preference picks one (resolve.ts#matchesToJudge).
       const found = matchesToJudge(tree, target);
       matched ||= found.length > 0;

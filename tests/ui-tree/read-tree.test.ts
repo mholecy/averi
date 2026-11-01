@@ -12,7 +12,8 @@ import {
   pollTree,
   SETTLE_FLOOR_MS,
   readErrorLine,
-  readTreeOrError,
+  readTreeOrThrow,
+  readTreeOrMiss,
   screenChangedUnder,
   screenIdentity,
   sheetDetent,
@@ -31,9 +32,9 @@ const tree: UiNode = {
   children: [],
 };
 
-describe('readTreeOrError', () => {
+describe('readTreeOrMiss', () => {
   it('returns the tree and no error on a successful read', async () => {
-    const read = await readTreeOrError({ uiTree: async () => tree });
+    const read = await readTreeOrMiss({ uiTree: async () => tree });
     expect(read.tree).toBe(tree);
     expect(read.error).toBeUndefined();
   });
@@ -42,7 +43,7 @@ describe('readTreeOrError', () => {
   // VALUE (so the loop treats it as a miss and keeps waiting) while still
   // carrying the reason (so a genuinely dead device stays diagnosable).
   it('reports a failed read as a value, preserving the message', async () => {
-    const read = await readTreeOrError({
+    const read = await readTreeOrMiss({
       uiTree: async () => {
         throw new Error('null root node returned by UiTestAutomationBridge');
       },
@@ -53,7 +54,7 @@ describe('readTreeOrError', () => {
 
   // Adapters shell out, and a rejected child process can surface as a string.
   it('wraps a non-Error rejection so callers can always read .message', async () => {
-    const read = await readTreeOrError({
+    const read = await readTreeOrMiss({
       uiTree: async () => {
         throw 'adb: device offline';
       },
@@ -72,11 +73,55 @@ describe('readTreeOrError', () => {
         return tree;
       },
     };
-    const first = await readTreeOrError(adapter);
+    const first = await readTreeOrMiss(adapter);
     fail = false;
-    const second = await readTreeOrError(adapter);
+    const second = await readTreeOrMiss(adapter);
     expect(first.error).toBeDefined();
     expect('error' in second && second.error !== undefined).toBe(false);
+  });
+});
+
+/** A failure no wait cures, as a platform declares one (the idb tree source's IdbNoFrontmostError is the real one). */
+class WedgedForTest extends PersistentReadError {}
+
+// The read seam decides both questions once (A1): is this failure a miss, and does any wait cure it? A failure that
+// heals comes back as a value (readTreeOrMiss) or wrapped by the caller (readTreeOrThrow); one no wait cures is THROWN, as
+// it came, so no reader has to recognise it and rethrow it.
+describe('the read seam throws a failure no wait cures', () => {
+  const wedged = new WedgedForTest('the accessibility service is wedged until a reboot');
+  const wedgedDevice = {
+    uiTree: async (): Promise<UiNode> => {
+      throw wedged;
+    },
+  };
+
+  it('readTreeOrMiss: a healing failure is a miss; a PersistentReadError is thrown as the same instance', async () => {
+    const miss = await readTreeOrMiss({
+      uiTree: async () => {
+        throw new Error('null root node');
+      },
+    });
+    expect(miss.error?.message).toBe('null root node');
+    await expect(readTreeOrMiss(wedgedDevice)).rejects.toBe(wedged);
+  });
+
+  it('readTreeOrThrow: a healing failure is thrown as wrap(e); a PersistentReadError passes through unwrapped, wrap never called', async () => {
+    const wrap = vi.fn((e: Error) => new Error(`wrapped: ${e.message}`));
+    await expect(
+      readTreeOrThrow(
+        {
+          uiTree: async () => {
+            throw new Error('null root node');
+          },
+        },
+        wrap,
+      ),
+    ).rejects.toThrow('wrapped: null root node');
+    expect(wrap).toHaveBeenCalledTimes(1);
+    wrap.mockClear();
+    await expect(readTreeOrThrow(wedgedDevice, wrap)).rejects.toBe(wedged);
+    expect(wrap).not.toHaveBeenCalled();
+    await expect(readTreeOrThrow({ uiTree: async () => tree }, wrap)).resolves.toBe(tree);
   });
 });
 

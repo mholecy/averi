@@ -1,5 +1,4 @@
 import {
-  PersistentReadError,
   type DeviceAdapter,
   type DeviceScreen,
   type Rect,
@@ -7,6 +6,7 @@ import {
 } from '../adapters/types.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
+import { readTreeOrMiss, type TreeRead } from '../ui-tree/read-tree.js';
 import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
 import type { DecodedPng, RgbaImage } from './png.js';
 import { captureShot, type Shot } from './shot.js';
@@ -891,11 +891,10 @@ async function regionSettled(
  * Bounded-retry tree read for the tree half of a captured frame: right after
  * a flow settles, a device can transiently fail to produce a tree
  * (uiautomator "null root node") — the same transient the polling asserts
- * absorb via readTreeOrError. Throws after the last attempt with the
+ * absorb via readTreeOrMiss. Throws after the last attempt with the
  * underlying error in the message; `captureFrame` carries that on the frame.
- * A PersistentReadError (adapters/types.ts, D21 — a read no wait cures)
- * throws after its own attempt, its message whole: the next four would say
- * it again.
+ * A failure no wait cures ends it after its own attempt, its message whole
+ * (see ui-tree/read-tree.ts#readTreeOrMiss).
  */
 async function readTreeWithRetry(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
@@ -904,14 +903,15 @@ async function readTreeWithRetry(
   let last: string | undefined;
   for (let i = 0; i < budget.attempts; i++) {
     if (i > 0) await sleep(budget.delayMs);
+    let read: TreeRead;
     try {
-      return await adapter.uiTree();
+      read = await readTreeOrMiss(adapter);
     } catch (e) {
-      // A read error no wait cures (adapters/types.ts#PersistentReadError, D21) is not retried: the next four reads
-      // would say it again. Its message says why, so the frame's reason is that message, not an attempt count.
-      if (e instanceof PersistentReadError) throw new Error(`UI tree read failed: ${e.message}`, { cause: e });
-      last = errorMessage(e);
+      // Only a failure no wait cures can reach here (the seam's contract): not retried, its message the frame's reason.
+      throw new Error(`UI tree read failed: ${errorMessage(e)}`, { cause: e });
     }
+    if (read.tree !== undefined) return read.tree;
+    last = read.error.message;
   }
   throw new Error(`UI tree read failed after ${budget.attempts} attempts: ${last ?? 'unknown error'}`);
 }
