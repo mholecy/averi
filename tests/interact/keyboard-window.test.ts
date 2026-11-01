@@ -7,6 +7,7 @@ import { KEYBOARD_DISAGREEMENT_BUDGET_MS, KEYBOARD_DISAGREEMENT_POLL_MS, dismiss
 import { tapElement } from '../../src/interact/tap.js';
 import { readKeyboard, type Covering } from '../../src/ui-tree/keyboard-cover.js';
 import { FAST, FakeAdapter, node, recorded, screen } from '../helpers/fake.js';
+import { boundReads } from '../helpers/terminal-read.js';
 
 // The WINDOW model (interact/keyboard-window.ts: Android, the adapter has the
 // keyboard oracle), through the module's interface — tapElement, fillField,
@@ -304,9 +305,9 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     const fake = loginFake();
     const wedged = new PersistentReadError('wedged until a reboot');
     fake.onKey = (_key, self) => {
-      self.uiTree = async () => {
+      self.uiTree = boundReads(1, async () => {
         throw wedged;
-      };
+      });
     };
     await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toBe(wedged);
     expect(fake.keys).toEqual(['back']);

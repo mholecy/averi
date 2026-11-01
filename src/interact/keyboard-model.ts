@@ -252,7 +252,8 @@ export interface LookedAgain {
  * fails — the target not coming back, or coming back ambiguous — is the
  * caller's error over `failedLookMessage`: the trace must still show what
  * the guard found or did before, or a timeout here reads as a plain slow
- * screen. No pause of its own: the caller sleeps KEYBOARD_HIDE_DELAY_MS
+ * screen — except a PersistentReadError, which passes through as it came
+ * (ADR 0036). No pause of its own: the caller sleeps KEYBOARD_HIDE_DELAY_MS
  * first (`confirmHidden` does for its looks).
  */
 export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: GuardOptions, failed: (e: unknown) => KeyboardGuardError): Promise<LookedAgain> {

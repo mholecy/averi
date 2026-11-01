@@ -8,6 +8,7 @@ import { tapElement } from '../../src/interact/tap.js';
 import { AmbiguityRefusal } from '../../src/interact/resolve.js';
 import { bandNode, dropBand, FAST, FakeAdapter, hidesKeyboardOn, IOS_LOGIN_BAND, iosLoginFake, node, recorded } from '../helpers/fake.js';
 import { readFile } from 'node:fs/promises';
+import { boundReads } from '../helpers/terminal-read.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 
@@ -323,9 +324,9 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       const wedged = new PersistentReadError('wedged until a reboot');
       fake.onTap = (id, self) => {
         if (id === 'login_title') {
-          self.uiTree = async () => {
+          self.uiTree = boundReads(1, async () => {
             throw wedged;
-          };
+          });
         }
       };
       await expect(tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP] })).rejects.toBe(wedged);
@@ -907,9 +908,9 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
     const fake = iosFake();
     const wedged = new PersistentReadError('wedged until a reboot');
     onRead(fake, 3, () => {
-      fake.uiTree = async () => {
+      fake.uiTree = boundReads(1, async () => {
         throw wedged;
-      };
+      });
     });
     await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toBe(wedged);
     expect(fake.taps).toEqual([]);
