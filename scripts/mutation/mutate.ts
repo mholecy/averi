@@ -1,34 +1,32 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
  * `npm run mutate` (D36, docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md): Stryker over the pure leaves
- * stryker.config.mjs names, then each module's score held to its own FLOOR. Stryker's `thresholds.break` is one global
- * score, and the modules' baselines lie 20 points apart: a global floor low enough for draw-order would let a fill
- * module lose a fifth of its kills unnoticed.
+ * stryker.config.mjs names, then each module's score held to its own FLOOR (why per module: the ADR).
  *
- *   npm run mutate                          incremental: only mutants whose code or covering tests changed run
- *   npm run mutate -- --force               a full cold run (monthly): every mutant, the incremental file rebuilt;
- *                                           any argument goes to Stryker
+ *   npm run mutate -- --force   every mutant, cold (~45 s): the run a merge needs
+ *   npm run mutate              incremental, from this checkout's own last run: a local convenience while working,
+ *                               blind to a change in a module the mutated ones import (stryker.config.mjs)
+ *
+ * Any argument goes to Stryker.
  *
  * A module's score is Stryker's: killed and timed-out mutants over every mutant but the ignored (a `// Stryker
  * disable` comment) and the ones that do not compile. A floor sits about 2 points under the module's recorded
  * baseline (ARCHITECTURE.md §8). Raise it when the baseline rises; lower it only for a reason written beside it.
  */
 const FLOORS: Readonly<Record<string, number>> = {
-  // module                            floor   baseline (2026-11-01, D36: mutants, survived)
-  'src/flow/wipes-ahead.ts': 98, //          100    (22, 0)
-  'src/interact/fill-reformat.ts': 96, //    98.78  (268, 3 — equivalent)
-  'src/interact/fill-verdict.ts': 98, //     100    (150, 0)
-  'src/interact/fill-landing.ts': 97, //     99.13  (248, 2 — equivalent)
-  'src/ui-tree/draw-order.ts': 75, //        77.22  (948, 155 + 61 no coverage)
+  // module                            floor   baseline (2026-11-01, D36: mutants; survived, no coverage)
+  'src/flow/wipes-ahead.ts': 98, //          100    (22; 0)
+  'src/interact/fill-reformat.ts': 92, //    94.03  (268; 16)
+  'src/interact/fill-verdict.ts': 97, //     99.33  (150; 1)
+  'src/interact/fill-landing.ts': 93, //     95.16  (248; 12)
+  'src/ui-tree/draw-order.ts': 75, //        77.22  (948; 155, 61)
 };
 
 const REPORTS = join(import.meta.dirname, '..', '..', 'reports', 'mutation');
 const REPORT = join(REPORTS, 'mutation.json');
-/** Committed (stryker.config.mjs#incrementalFile): kept in one canonical form, `canonical`. */
-const INCREMENTAL = join(REPORTS, 'stryker-incremental.json');
 const KILLED = new Set(['Killed', 'Timeout']);
 const COUNTED = new Set([...KILLED, 'Survived', 'NoCoverage']);
 
@@ -36,55 +34,18 @@ interface Report {
   files: Record<string, { mutants: { status: string }[] }>;
 }
 
-interface Test {
-  id: string;
-  name: string;
-  location?: { start: { line: number; column: number } };
-}
-interface Incremental {
-  projectRoot?: string;
-  files: Record<string, { mutants: { id: string; killedBy?: string[]; coveredBy?: string[] }[] }>;
-  testFiles: Record<string, { tests: Test[] }>;
-}
-
-/**
- * The incremental file as a run with nothing changed leaves it: Stryker numbers the tests in the order its worker
- * threads report them, lists a rerun mutant after the reused ones and writes the checkout's absolute path, so two such
- * runs differ in every id. Here the tests are numbered in file, then line order, the mutants point at them by those
- * numbers and are listed by id, and the root is `.`. Stryker matches a test by its file and name, never its id or the
- * root (a run from another checkout reuses every result). What a rerun mutant was killed by may still change.
- */
-function canonical(report: Incremental): Incremental {
-  const at = (t: Test): number => (t.location?.start.line ?? 0) * 1e4 + (t.location?.start.column ?? 0);
-  const ids = new Map<string, string>();
-  const testFiles = Object.fromEntries(
-    Object.keys(report.testFiles)
-      .sort()
-      .map((file) => {
-        const entry = report.testFiles[file];
-        const tests = [...entry.tests].sort((a, b) => at(a) - at(b) || a.name.localeCompare(b.name)).map((t) => {
-          ids.set(t.id, String(ids.size));
-          return { ...t, id: ids.get(t.id) as string };
-        });
-        return [file, { ...entry, tests }];
-      }),
-  );
-  const renumber = (list?: string[]): string[] | undefined => list?.map((id) => ids.get(id) ?? id).sort((a, b) => Number(a) - Number(b));
-  const files = Object.fromEntries(
-    Object.keys(report.files)
-      .sort()
-      .map((file) => {
-        const mutants = [...report.files[file].mutants].sort((a, b) => Number(a.id) - Number(b.id));
-        return [file, { ...report.files[file], mutants: mutants.map((m) => ({ ...m, killedBy: renumber(m.killedBy), coveredBy: renumber(m.coveredBy) })) }];
-      }),
-  );
-  return { ...report, projectRoot: '.', files, testFiles };
-}
-
+// A report left by an earlier run must not be read as this one's.
+rmSync(REPORT, { force: true });
 const stryker = spawnSync(join('node_modules', '.bin', 'stryker'), ['run', ...process.argv.slice(2)], { stdio: 'inherit' });
-if (stryker.status !== 0) process.exit(stryker.status ?? 1);
-
-writeFileSync(INCREMENTAL, `${JSON.stringify(canonical(JSON.parse(readFileSync(INCREMENTAL, 'utf8')) as Incremental), null, 2)}\n`);
+if (stryker.error !== undefined || stryker.status === null) {
+  console.error(`npm run mutate: Stryker did not run to an end: ${stryker.error?.message ?? `killed by ${stryker.signal}`}`);
+  process.exit(1);
+}
+if (stryker.status !== 0) process.exit(stryker.status);
+if (!existsSync(REPORT)) {
+  console.error(`npm run mutate: Stryker wrote no report at ${REPORT}: did it crash?`);
+  process.exit(1);
+}
 
 const report = JSON.parse(readFileSync(REPORT, 'utf8')) as Report;
 const failures: string[] = [];

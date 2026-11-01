@@ -119,7 +119,6 @@ const heldCount = (e: Pick<Expectation, 'held'>): number => (e.held === 'unread'
 const bulletsSaidPlain = (observed: string, e: Pick<Expectation, 'held'>): boolean => e.held === 'unread' && isMaskedValue(observed);
 
 /** The text the typing lands after: the field's text before the typing (its placeholder aside), or none once cleared. */
-// Stryker disable next-line StringLiteral: a cleared field's prior replaced by a text no reading starts with is tried, missed, and priorsOf falls back to none ('')
 const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): string => (e.clear ? '' : heldText(e.before, e.placeholder));
 
 /**
@@ -152,7 +151,6 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
  */
 function priorsOf(held: string, e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): readonly string[] {
   const prior = priorText(e);
-  // Stryker disable next-line ConditionalExpression,StringLiteral: an empty prior's skeleton starts every reading, so the guard changes nothing
   return prior !== '' && !skeleton(held).startsWith(skeleton(prior)) ? [prior, ''] : [prior];
 }
 
@@ -260,13 +258,11 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
       differ++;
       caseAlone = a.toLowerCase() === b.toLowerCase() || a.toUpperCase() === b.toUpperCase();
     }
-    // Stryker disable next-line EqualityOperator: `<=` keeps the same count; differ 0 is a run equal to the value, which landed and is never judged here
     if (caseAlone && differ > 0 && (caseOnly === undefined || differ < caseOnly)) caseOnly = differ;
   }
   if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
   if (typed.length !== value.length) return { kind: 'length' };
   let differ = 0;
-  // Stryker disable next-line EqualityOperator: typed and value are as long here, so the index past both reads undefined on both sides
   for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;
   return { kind: 'same-length', positions: differ };
 }
@@ -283,7 +279,6 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
  * changes pass or fail — it words the failure.
  */
 function typedPartOf(shown: string, prior: string): string {
-  // Stryker disable next-line ConditionalExpression,StringLiteral: every text starts with an empty prior, and slicing off none is the text itself
   return prior !== '' && shown.startsWith(prior) ? shown.slice(prior.length) : shown;
 }
 

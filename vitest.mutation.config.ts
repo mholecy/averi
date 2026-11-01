@@ -7,6 +7,8 @@ import { defineConfig } from 'vitest/config';
  * `npx vitest run` does not read this file (vitest picks up only `vitest.config.*`).
  */
 export default defineConfig({
+  // Its own cache: a mutation run must not overwrite the normal suite's results cache (node_modules/.vite/vitest).
+  cacheDir: 'node_modules/.vite-mutation',
   test: {
     include: [
       'tests/flow/wipes-ahead.test.ts',

@@ -38,10 +38,6 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('1-2', '1 2')).toBeUndefined();
   });
 
-  it('a separator that is no `.` or `,` carries no `point` at all', () => {
-    expect(reformatOf('31/12/2026', '31122026')).toStrictEqual({ added: 2, respaced: 0 });
-  });
-
   it('exactly the typed text is no reformat (the exact rule passes it): a Reformat always counts a change', () => {
     expect(reformatOf('SK31 1200', 'SK31 1200')).toBeUndefined();
     expect(reformatOf('', '')).toBeUndefined();

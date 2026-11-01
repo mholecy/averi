@@ -5,12 +5,11 @@
  * that no test notices. ARCHITECTURE.md §8 says when it runs, how to add a module and how to
  * accept an equivalent mutant; docs/adr/0038-a-mutation-run-guards-the-pure-leaves-tests.md says why.
  *
- * The run is incremental: reports/mutation/stryker-incremental.json (committed) remembers each
- * mutant's result, and only mutants whose code or covering tests changed run again. A full cold
- * run that also rebuilds the file: `npm run mutate -- --force`.
+ * A merge runs it cold, `npm run mutate -- --force`. A plain `npm run mutate` is incremental, from this
+ * checkout's last run (reports/mutation/stryker-incremental.json, never committed): it reruns only the mutants
+ * whose module or covering test files changed, and does not see a change in a module they import.
  *
- * Stryker's own `thresholds.break` is one global score, so it is left unset: the per-module floors
- * live in scripts/mutation/mutate.ts, which runs Stryker and then checks them (`npm run mutate`).
+ * The per-module floors live in scripts/mutation/mutate.ts, which runs Stryker and then checks them.
  *
  * @type {import('@stryker-mutator/api/core').PartialStrykerOptions}
  */
@@ -29,8 +28,10 @@ export default {
   incrementalFile: 'reports/mutation/stryker-incremental.json',
   timeoutMS: 5000,
   reporters: ['clear-text', 'progress', 'json', 'html'],
+  clearTextReporter: { reportMutants: false },
   jsonReporter: { fileName: 'reports/mutation/mutation.json' },
   htmlReporter: { fileName: 'reports/mutation/mutation.html' },
-  tempDirName: '.stryker-tmp',
+  // Under node_modules: vitest's default exclude keeps a leftover sandbox's copied tests out of `npx vitest run`.
+  tempDirName: 'node_modules/.stryker-tmp',
   cleanTempDir: 'always',
 };
