@@ -3,6 +3,7 @@
 Status: accepted 2026-11-01 (backlog row A1, docs/plans/2026-10-30-performance-backlog.md, from the architecture review
 of the perf programme). Implemented in merge 5cd0d8e4. Behaviour-preserving.
 Amended 2026-11-01 (D39: fill's not-input hint read goes through the seam — see the amendment below).
+Amended 2026-11-01 (D42: the keyboard guard's looks pass a terminal failure through — see the amendment below).
 
 ## Context
 
@@ -50,3 +51,19 @@ screen could not be read again". The agent got no reboot message; the wedge surf
 fill and passes through as it came. Its entry in tests/ui-tree/raw-tree-reads.test.ts's allowlist is gone, so the guard
 covers it. Pinned by tests/interact/fill.test.ts ("notInput's read that throws a PersistentReadError", its `clear: true`
 variant, and its companion for a miss).
+
+## Amendment: the keyboard guard's looks pass a terminal failure through (2026-11-01, backlog D42)
+
+The guard's looks after a first covered one go through `lookAgain` (interact/keyboard-model.ts): the in-tree model's
+second look, and the confirming looks after `back` or a dismissal tap. Their tree reads go through the seam
+(`resolveSettled` polls with `pollTree`), so a `PersistentReadError` reached `lookAgain`. But its catch wrapped every
+failure in the model's `KeyboardGuardError` (`KeyboardWithoutDismissal`, `AfterKeyboardDismissal`, `AfterDismissalTap`).
+The reboot text and the `cause` survived, the class did not: the flow engine's `isTerminal` missed it, so the ladder
+escalated past a wedged simulator.
+
+`lookAgain` now rethrows a `PersistentReadError` as it came, before the wrap; every other failure is wrapped as before.
+It is the one place the guard wraps a look's failure, so no model can forget it, and the claim "readers stop on it
+without knowing it exists" holds for the guard too. The cost: the step's trace has no `⚠ tap` / `⚠ fill` line saying
+what the guard did before the wedge, as with the post-fill dismissal's confirming read. Pinned by
+tests/interact/keyboard-window.test.ts and tests/interact/keyboard-in-tree.test.ts (each model's look: the same
+instance, `toBe`), and by tests/flow/engine.test.ts ("a wedged read on the look after back stops the ladder").
