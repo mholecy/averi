@@ -1,10 +1,10 @@
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { capture } from './capture-run.js';
 import { loadCatalog, selectCells } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, type LabDevice } from './lab-device.js';
 import { parseLabApp } from './schema.js';
+import { isMain } from '../is-main.js';
 
 /**
  * The truth capture's command lines (capture-run.ts does the work; README.md beside scripts/differential, "Golden
@@ -68,4 +68,4 @@ export async function main(platform: 'ios' | 'android', argv: string[] = process
   }
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main('ios');
+if (isMain(import.meta.url)) await main('ios');

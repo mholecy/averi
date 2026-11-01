@@ -10,6 +10,7 @@ import { calibrationReport, verdictCell } from './calibration-report.js';
 import { FAMILIES } from './schema.js';
 import { decidedAsHost, harnessDigest, sideCache, sideKeys, thisHost } from './side-cache.js';
 import { WORKING_TREE, type SideRun } from './side-run.js';
+import { isMain } from '../is-main.js';
 
 /**
  * Phase 3's calibration (docs/plans/2026-10-15-ground-truth-lab-app.md): golden must fail on the commit before a
@@ -426,7 +427,7 @@ export function notesOf(table: Pick<Calibration, 'notes'>, only: readonly string
 
 // --- the command line ---
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const { values } = parseArgs({
     options: {
       worktrees: { type: 'string' },
