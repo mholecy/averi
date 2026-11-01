@@ -159,11 +159,13 @@ export async function fillField(
   value: string,
   opts: FillOptions,
 ): Promise<FillResult> {
-  // Before the field is resolved: a refused value must cost no keyboard
-  // dismissal, no focus tap and no clear (type-text.ts). Marked 'refused'
-  // (FillValueFailure) — the message is type-text.ts's, unchanged.
+  // Before the field is resolved: a refused value — a control character, or
+  // one the adapter cannot type (ADR 0037) — must cost no keyboard dismissal,
+  // no focus tap and no clear (type-text.ts). A dropped tail typed again
+  // (fill-type.ts, ADR 0023) is a suffix of this value: checked here too.
+  // Marked 'refused' (FillValueFailure) — the message is type-text.ts's.
   try {
-    assertTypeable(value);
+    assertTypeable(value, adapter.typeable);
   } catch (e) {
     throw new FillValueFailure(errorMessage(e), 'refused', { cause: e });
   }
@@ -448,11 +450,12 @@ export async function fillField(
  *   that left text twice, a re-read that failed mid-fill). The field was
  *   tapped and may hold partial text, so the step after it would run on a
  *   half-typed form.
- * - `refused`: a value holding a control character (type-text.ts), refused
- *   before anything is sent. A broken value, not an absent field.
+ * - `refused`: a value holding a control character, or a character the
+ *   adapter cannot type (type-text.ts, ADR 0037), refused before anything is
+ *   sent. A broken value, not an absent field.
  * Neither is skipped by `optional:` — it fails the flow, as a tap refused on
  * a present element does (resolve.ts#RefusedOnPresentElement). The `type:`
- * step's own control-character refusal (typeIntoFocused) is not marked.
+ * step's own refusal (typeIntoFocused) is not marked.
  * Errors from the resolution and the keyboard guard before the focus tap
  * (absent field, refusals on a present one) keep their own classes. NOT
  * marked either, so an `optional:` still skips them — the owner approved

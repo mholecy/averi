@@ -54,3 +54,4 @@ IME broadcast) — the round's to choose. At the least, never a half-typed field
 - Live only (a replayed tree cannot judge typing): `scripts/truth/live.ts` cases `b1d` and `b7` on Android, LOUD (averi
   said it failed; the app holds a prefix). Not a golden row; filed in the live KNOWN since D31 (scripts/truth/live-known.ts,
   `android uiautomator b1d`, `b7`: `loud-changed` on `refused`; docs/truth/live-records/android-forms-d40-1.json).
+- Refused before typing since D43a (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md); a typing path is open.

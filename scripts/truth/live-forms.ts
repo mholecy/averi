@@ -47,6 +47,27 @@ export const holds =
   };
 
 /**
+ * p7 (D43a, docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md): a no-clear fill of a
+ * character neither platform's typing can type (`Š`) into a field the launch prefilled. averi must refuse it before
+ * anything is sent — its words, "Refused before anything was sent" — and the prefill must stay as the launch left it:
+ * ok only so. The field changed is LOUD `loud-changed` (a tap, a clear or a part typed reached it); kept, but the
+ * refusal not said so — another error, or none — is LOUD `loud-untouched`; a claim of done is a MISMATCH `fill-claim`.
+ * When a platform gains a typing path for `Š` (ADR 0037's later work), this case's judge becomes `holds` again.
+ */
+export const refusedKept =
+  (tag: string) =>
+  (s: LabState, replies: string[], _source: Source, launched: LabState): LiveVerdict => {
+    const got = valueOf(s, tag);
+    const before = valueOf(launched, tag);
+    const last = replies[replies.length - 1];
+    const kind = replyKind(last);
+    if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — it cannot type the value; the app holds ${JSON.stringify(got)}` };
+    if (got !== before) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)} — field CHANGED (was ${JSON.stringify(before)}); averi: ${short(last)}` };
+    if (!isError(last) || !last.includes('Refused before anything was sent')) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the prefill kept, but not refused before anything was sent: ${short(last)}` };
+    return { outcome: 'ok', kind, why: `refused before anything was sent, the prefill kept: ${short(last)}` };
+  };
+
+/**
  * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds, over the fill's reply), AND the tree shows
  * the same text (the `shows` assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's
  * binding setter may leave the TextField showing what was typed), is a MISMATCH here even when the fill passed:

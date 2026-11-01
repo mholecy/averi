@@ -2,6 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
+import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
@@ -772,6 +773,17 @@ export class AndroidAdapter implements DeviceAdapter {
   readonly treeReadSettles = true as const;
   /** `input text` hands keys to the IME's queue, which may still deliver them after the call (types.ts#TypingDelivery). */
   readonly typingDelivery = 'may-arrive-late' as const;
+  /**
+   * What `input text` types (types.ts#DeviceAdapter.typeable, ADR 0037): printable ASCII. A character outside the
+   * virtual key map makes `KeyCharacterMap.getEvents` return null and `input` exit 255 on an NPE — after every
+   * character before it has landed, the field half-typed (docs/bugs/2026-10-16-lab-android-type-text-types-a-prefix-
+   * then-fails-on-non-ascii.md). Conservative: an extended letter the virtual key map may hold (`é`) is unmeasured, so
+   * refused too.
+   */
+  readonly typeable: Typeable = {
+    refuses: NOT_PRINTABLE_ASCII,
+    says: 'on Android averi types only printable ASCII (U+0020–U+007E): `input text` crashes on another character after typing the ones before it',
+  };
 
   /** `durationMs` defaults to 300 ms, kept equal to interact/swipe.ts#MIN_DRAG_MS — change both. */
   async swipe(from: Point, to: Point, durationMs = 300): Promise<void> {
@@ -805,6 +817,10 @@ export class AndroidAdapter implements DeviceAdapter {
         `typeText cannot type ${JSON.stringify(ch)} on Android: \`input text\` ${inputTextControlFate(ch)}. ${controlCharRemedy(ch)}`,
       );
     }
+    // The same defence for a character `input text` cannot type (ADR 0037): refused before the first `input text`, so
+    // a direct caller cannot leave the field half-typed. An ASCII value pays one regex test, no device call.
+    const refusal = refusalOf(text, this.typeable);
+    if (refusal !== undefined) throw new Error(`typeText ${refusal}`);
     for (const ch of text) {
       await this.shell(['input', 'text', ch === ' ' ? '%s' : ch]);
       await sleep(TYPING_PACE_MS);

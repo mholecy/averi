@@ -223,10 +223,14 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
   ]),
   // The forms group (D31; D40's device run at main 40ba3dd1: ios-forms-d40-1.json, ios-rn-forms-d40-1.json,
   // android-forms-d40-1.json). A fill's LOUD names what it left — the field as the launch left it, or changed.
-  // Android: `input text` types `Jan ` / `O`, then exits 255 on `Š` / `’` — the field changed, refused.
-  ...each('android uiautomator', ['b1d', 'b7'], ANDROID_NON_ASCII, 'loud-changed', 'refused'),
+  // Android: since D43a (ADR 0037) averi refuses `Š` / `’` before the focus tap — `input text` cannot type them — so
+  // the field is as the launch left it, refused (as iOS below). Before it, `input text` typed `Jan ` / `O` and then
+  // exited 255: the field changed, refused — what D40's record still reads (android-forms-d40-1.json, NOT known since;
+  // tests/truth/live-rejudge.test.ts). The bug stays open: a real typing path for them is later work.
+  ...each('android uiautomator', ['b1d', 'b7'], ANDROID_NON_ASCII, 'loud-untouched', 'refused'),
   ...['idb', 'wda'].flatMap((src) => [
-    // `idb ui text` (WDA's fill types through it too) fails on the first non-ASCII character: nothing typed, refused.
+    // `idb ui text` (WDA's fill types through it too) cannot type a non-ASCII character: nothing typed, refused — by
+    // idb's whole-call failure until D43a, by averi before the focus tap since (ADR 0037). The bug stays open.
     ...each(`ios ${src}`, ['b1d', 'b7'], IOS_NON_ASCII, 'loud-untouched', 'refused'),
     // p5: the PIN held `2580`, the fill typed `1`, iOS cleared the field as typing resumed — `1`, averi refused
     // ("typed 1 character but the field shows 1 (masked field …)").

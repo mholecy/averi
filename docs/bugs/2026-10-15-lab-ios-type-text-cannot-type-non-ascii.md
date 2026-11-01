@@ -54,3 +54,4 @@ type_text description should say which it is.
   and WDA (averi said it failed; the field as the launch left it). Filed in the live KNOWN since D31 as
   `ios idb|wda b1d, b7` (scripts/truth/live-known.ts: `loud-untouched` on `refused`;
   docs/truth/live-records/ios-forms-d40-1.json).
+- Refused before typing since D43a (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md); a typing path is open.
