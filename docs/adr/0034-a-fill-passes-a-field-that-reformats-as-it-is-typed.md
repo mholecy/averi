@@ -261,8 +261,9 @@ the field shows them reformatted`: f1 `2 separators added`, f7's fills `1` and `
 
 `landedReformat`, `tailOf`, `landedSome`, `priorText` and `priorsOf` moved from fill-reformat.ts to
 `interact/fill-landing.ts`, beside the exact rule (`landingOf`) and the mismatch's classification (`differenceOf`);
-`priorText` and `priorsOf` are private there. fill-reformat.ts keeps the character rules alone (`reformatOf`,
-`prefixOf`, `skeleton`). No rule changed.
+`landedReformat`, `landedSome`, `priorText` and `priorsOf` are private there, asked through `landingOf`, `tailOf`
+and `droppedTail`. fill-reformat.ts keeps the character rules alone (`reformatOf`, `prefixOf`, `skeleton`). No rule
+changed.
 
 - **The literal-start slice is deliberate.** `differenceOf` compares what follows the earlier text when the reading
   starts with it LITERALLY (`typedPartOf`), not `priorsOf`'s letters-and-digits rule: a skeleton match cannot be sliced

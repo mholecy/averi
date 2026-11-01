@@ -1,10 +1,11 @@
 /**
  * What a fill MEASURED — the facts interact/fill.ts#fillField returns, and
  * nothing else: no I/O, no judgement, no sentence. A leaf, so that the
- * three modules that read them each import it and none imports another for
+ * modules that read them each import it and none imports another for
  * its types — fill.ts measures (and imports fill-text.ts for the words of
  * the errors it throws, `fillFailureText` over a `FillFailure` here),
- * fill-verdict.ts judges, fill-text.ts says. Until
+ * fill-landing.ts judges a reading, fill-verdict.ts judges the result,
+ * fill-text.ts says. Until
  * 2026-10-09 these types lived in fill.ts, which imported fill-verdict.ts
  * by value while fill-verdict.ts imported them back as types: no runtime
  * cycle, but a cycle in the module graph all the same (code review of the

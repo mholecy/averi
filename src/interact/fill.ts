@@ -125,7 +125,7 @@ function sameField(tree: UiNode, chosen: UiNode): UiNode | undefined {
  * and a floating-label `text` node on iOS idb was reported filled with
  * nothing typed. An INPUT with no value is an empty field (UiNode.value):
  * a fill whose text it dropped entirely is a mismatch, `shows 0`
- * (2026-10-09). Fields that expose BULLETS verify by length (see `landed`). A
+ * (2026-10-09). Fields that expose BULLETS verify by length (fill-landing.ts#landingOf). A
  * matched node that is not an input (INPUT_ROLE) is warned about, with the
  * nearest input named — not refused (see `notInput` below).
  * An EMPTY value is the focus tap and the optional clear alone: nothing is
@@ -253,7 +253,7 @@ export async function fillField(
   const placeholder = node.placeholder;
 
   let current: UiNode | undefined = node;
-  let preText = heldText(node.value, placeholder); // what the field holds when typing starts (see `landed`)
+  let preText = heldText(node.value, placeholder); // what the field holds when typing starts (the masked rule's count: fill-landing.ts#landingOf)
   let maskedAppend: FillResult['maskedAppend'];
   if (value !== '' && !clear && (preText === '' || isMaskedValue(preText)) && skipped === undefined) {
     // The pre-tap read is stale for exactly the fields the length rule cares
@@ -276,7 +276,7 @@ export async function fillField(
       maskedAppend = { held: preText.length };
     }
   }
-  // What a MASKED read-back must add the typed length to (see `landed`): the
+  // What a MASKED read-back must add the typed length to (fill-landing.ts#landingOf): the
   // bullets the field held before typing — and only bullets. A masked
   // field's content reads as bullets on both platforms (2026-09-17), so a
   // plain reading before typing was not its content: an Android password

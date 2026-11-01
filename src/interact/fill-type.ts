@@ -150,7 +150,9 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
       // (D24 review).
       const landed = read.landed;
-      // Final, but no landing: the field said plain shows bullets of another length (fill-landing.ts#Landing).
+      // Final, but no landing: the field said plain shows bullets of another length (fill-landing.ts#Landing). Before
+      // reportDroppedTail: a held count 'unread' means no tail was retyped (fill.ts skips the re-read only where
+      // !retypesTail).
       if (landed.kind === 'said-plain') return { kind: 'missed', observed, again, differs: differenceOf(observed, intent) };
       if (tails() > 0) io.reportDroppedTail();
       if (landed.kind === 'placeholder') return { kind: 'landed', observed, again, placeholder: true };
