@@ -283,7 +283,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // together, the RN forms group again — the same.
     ['ios-rn-vis-lr3-3.json', 'visibility', { cases: 12, ok: 9, loud: 0, mismatches: 3 }],
     ['ios-rn-forms-lr3-2.json', 'forms', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
-    // D40's device run at HEAD (main 9f37857f's src, this checkout): the forms groups, every case not ok known (D31) —
+    // D40's device run at HEAD (main 40ba3dd1's src, this checkout): the forms groups, every case not ok known (D31) —
     // iOS b1d and b7 under both sources (idb ui text refuses non-ASCII, the field untouched), p5 (the secure field
     // cleared when typing resumed, averi says so); the RN app's rf4 under both (a blind `type:` dropped the tail);
     // Android b1d and b7 (input text typed a prefix, then exit 255) and kf1–kf3 skipped (Gboard docked).

@@ -25,9 +25,10 @@ export const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
  */
 export const holds =
   (tag: string, want: string) =>
-  (s: LabState, replies: string[], _source?: string, launched?: LabState): LiveVerdict => {
+  (s: LabState, replies: string[], _source: string, launched: LabState): LiveVerdict => {
     const got = valueOf(s, tag);
-    const before = launched === undefined ? undefined : valueOf(launched, tag);
+    // The launch is the baseline: a field it did not lay out (undefined) is untouched only while it stays so.
+    const before = valueOf(launched, tag);
     const untouched = got === before;
     const left = before === undefined ? '' : untouched ? ' — field untouched' : ` — field CHANGED (was ${JSON.stringify(before)})`;
     const last = replies[replies.length - 1];

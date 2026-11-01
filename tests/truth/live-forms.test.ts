@@ -216,9 +216,9 @@ describe('holds and holdsShown: the class and the kind of a fill verdict', () =>
     expect(holdsShown('iban', 'SK31 1200 0000')(state, [replies[0], failed], 'wda', launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds', kind: 'FAIL' });
   });
 
-  it('holdsShown: the fill not held — holds\' verdict, its class and the fill\'s kind', () => {
+  it('holdsShown: the fill not held — holds\' verdict over the fill alone: fill-claim on the fill\'s kind (other), not the assert\'s (PASS)', () => {
     const { replies, launched, state } = at(ios, 'wda', 'f1');
     const lost = { ...state, fields: { ...state.fields!, iban: { ...state.fields!.iban, value: 'SK31 12' } } };
-    expect(holdsShown('iban', 'SK31 1200 0000')(lost, replies, 'wda', launched)).toMatchObject({ outcome: expect.stringMatching(/LOUD|MISMATCH/), cls: expect.stringMatching(/^(loud-changed|fill-claim)$/) });
+    expect(holdsShown('iban', 'SK31 1200 0000')(lost, replies, 'wda', launched)).toEqual(expect.objectContaining({ outcome: 'MISMATCH', cls: 'fill-claim', kind: 'other' }));
   });
 });

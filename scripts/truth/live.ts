@@ -607,7 +607,8 @@ const selected = CASES.filter((x) => groups.includes(x.group) && appOf(familyOf(
 /**
  * Judge one case's reads: the state after the calls; a forms case not ok is read again 3 s later (`late`: a model that
  * catches up was the app's lag, not a lost value) — never a visibility case, whose stop is judged on the state read
- * when scroll_until returned, and which a later read would let a fling finish behind the reply's back.
+ * when scroll_until returned, and which a later read would let a fling finish behind the reply's back. When the re-read
+ * comes out the same, the first read's verdict is kept whole — its cls and kind included.
  */
 function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined): LiveVerdict {
   const verdict = c.judge(state, replies, source, launched, after);

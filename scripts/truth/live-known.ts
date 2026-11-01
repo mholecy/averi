@@ -221,7 +221,7 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // dismissal), struck off at its final src (94fc318b): under a cover whose order is not told scroll_until stops
     // before any swipe, nothing stroked, in two runs of two (ios-vis-r8-l4-3.json, -4.json).
   ]),
-  // The forms group (D31; D40's device run at main 9f37857f: ios-forms-d40-1.json, ios-rn-forms-d40-1.json,
+  // The forms group (D31; D40's device run at main 40ba3dd1: ios-forms-d40-1.json, ios-rn-forms-d40-1.json,
   // android-forms-d40-1.json). A fill's LOUD names what it left — the field as the launch left it, or changed.
   // Android: `input text` types `Jan ` / `O`, then exits 255 on `Š` / `’` — the field changed, refused.
   ...each('android uiautomator', ['b1d', 'b7'], ANDROID_NON_ASCII, 'loud-changed', 'refused'),
