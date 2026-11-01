@@ -5,10 +5,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * The production wiring of D22's proof, which discovery.test.ts's injected
  * reader cannot see: the real reader's path under the real home directory,
  * and which discovery reads it. node:fs/promises is mocked, so no host file
- * is read.
+ * is read; and the real exec is one that throws, so a proof that fails to
+ * short-circuit cannot spawn simctl on the host.
  */
 const readFile = vi.hoisted(() => vi.fn());
 vi.mock('node:fs/promises', () => ({ readFile }));
+vi.mock('../../src/adapters/exec.js', () => ({
+  exec: async (cmd: string, args: string[]) => {
+    throw new Error(`test harness: no command may run here — ${[cmd, ...args].join(' ')}`);
+  },
+}));
 
 const { defaultDiscovery, defaultDiscoveryDeps, discoveryWith } = await import('../../src/adapters/discovery.js');
 

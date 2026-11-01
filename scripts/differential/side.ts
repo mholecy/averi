@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
 import type { AdapterFactory, AdapterRegistry } from '../../src/mcp/registry.js';
-import type { DeviceDiscovery, discoveryOver } from '../../src/adapters/discovery.js';
+import type { DeviceDiscovery } from '../../src/adapters/discovery.js';
 import type { createAveriServer } from '../../src/mcp/tools.js';
 import type { IosAdapter } from '../../src/adapters/ios.js';
 import type { Recording } from './corpus.js';
@@ -50,13 +50,16 @@ export interface Side {
 /** Which devices a platform has — what the harness fakes (adapters/discovery.ts#DeviceDiscovery's `list`). */
 export type Listing = DeviceDiscovery['list'];
 
+/** A side's adapters/discovery.ts#discoveryOver, as this checkout types it. */
+type DiscoveryOver = typeof import('../../src/adapters/discovery.js').discoveryOver;
+
 /**
  * A side's discovery over the harness's listing, read by every constructor since 8413120: callable as the listing
  * (until A3, 2026-11-01, discovery was a function), and an object with `list` and `check` (since). `check` is the
  * side's own `discoveryOver`'s, built without a proof — no host file is read, and the bound check lists, as before A3
  * when the harness passed no proof. A side without `discoveryOver` never asks `check`.
  */
-function discoveryFor(listing: Listing, over: typeof discoveryOver | undefined): Listing & DeviceDiscovery {
+function discoveryFor(listing: Listing, over: DiscoveryOver | undefined): Listing & DeviceDiscovery {
   const shaped: DeviceDiscovery = over?.(listing) ?? {
     list: listing,
     check: () => Promise.reject(new Error('side.ts: this side has no discoveryOver, so nothing asks check')),
@@ -81,7 +84,7 @@ export async function loadSide(root: string): Promise<Side> {
   const treeSource = (await import(pathToFileURL(resolve(root, 'src/adapters/ios-tree-source.ts')).href).catch(() => ({}))) as Record<string, unknown>;
   // Optional too: a side before A3 lists through a discovery that is a plain function.
   const discovery = (await import(pathToFileURL(resolve(root, 'src/adapters/discovery.ts')).href).catch(() => ({}))) as Record<string, unknown>;
-  const over = typeof discovery.discoveryOver === 'function' ? (discovery.discoveryOver as typeof discoveryOver) : undefined;
+  const over = typeof discovery.discoveryOver === 'function' ? (discovery.discoveryOver as DiscoveryOver) : undefined;
   const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
   const discoverySeam = await takesDeps(Registry);
   return {

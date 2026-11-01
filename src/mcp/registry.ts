@@ -27,9 +27,9 @@ export interface AdapterOpts {
 
 /**
  * Builds the adapter that drives ONE device — the id is required: listing
- * devices is DeviceDiscovery's (adapters/discovery.ts), so there is no unbound adapter
- * (2026-10-08; until then a factory call without an id built a probe
- * adapter whose only use was `listDevices()`). The registry resolves `opts`
+ * devices is DeviceDiscovery's (adapters/discovery.ts), so there is no
+ * unbound adapter (2026-10-08; until then a factory call without an id
+ * built a probe adapter whose only use was `listDevices()`). The registry resolves `opts`
  * to a kind before calling (kindFor): an ios call always carries one, an
  * android call never does.
  */
