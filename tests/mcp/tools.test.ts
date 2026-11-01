@@ -1059,6 +1059,7 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
   });
 
   it('ios without a project config: one idb adapter, shared by the tree tools and the rest', async () => {
+    // `missing()` stands in for the default ./averi.yaml: the server's working directory is the repo, not a test's own.
     const harness = await connect();
     for (const name of Object.keys(DEVICE_CALLS)) {
       expect((await harness.call(toolOf(name), { platform: 'ios', configPath: missing(), ...DEVICE_CALLS[name] })).isError, name).toBe(false);

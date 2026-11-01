@@ -23,7 +23,7 @@ Arguments:
 ## `install_app`
 
 - Install an app build (.apk / .app bundle) on the booted device.
-- Omit path to use the build path from averi.yaml (app.android.apk / app.ios.app), which is resolved relative to averi.yaml itself — no need to pre-absolutize it when the config sits in a subdirectory.
+- Omit path to use the build path from averi.yaml (app.android.apk / app.ios.app), which is resolved relative to averi.yaml itself — no need to pre-absolutize it when the config sits in a subdirectory; on iOS a call with a path still reads averi.yaml, for the tree source.
 
 Arguments:
 
@@ -98,7 +98,7 @@ Arguments:
 ## `swipe`
 
 - Swipe across the screen, by direction OR by coordinates — exactly one of the two. direction (up/down/left/right) names the FINGER's movement, as a flow's swipe: step does (up = the finger travels up, revealing content below): a stroke through the screen centre, 30% of the screen either side, over the device's screen size (adb wm size / idb describe) turned the way the UI tree's window is; when that size cannot be read the UI tree's window stands in, and when the tree cannot be read the screen is taken as built — the reply says either; with neither size the swipe is refused and nothing is sent.
-- A direction on iOS reads the tree source from averi.yaml (optional, like scroll_until); coordinates read no config.
+- On iOS a direction and coordinates alike read the tree source from averi.yaml (optional, like scroll_until): a missing file is the default, an invalid one fails the call.
 - Coordinates (fromX, fromY, toX, toY — all four) are sent as given, in the platform's tree units (Android pixels, iOS points).
 - To bring an element into view use scroll_until instead.
 
