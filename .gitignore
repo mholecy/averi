@@ -11,3 +11,8 @@ coverage/
 # calibrate.ts: a partial (--note) or failed run writes beside the report, never over it
 docs/truth/*.md.partial
 docs/truth/*.md.failed
+
+# npm run mutate (stryker.config.mjs): the reports are per run; the incremental file is committed
+reports/mutation/*
+!reports/mutation/stryker-incremental.json
+.stryker-tmp/

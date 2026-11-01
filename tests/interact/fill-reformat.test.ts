@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prefixOf, reformatOf } from '../../src/interact/fill-reformat.js';
+import { prefixOf, reformatOf, skeleton } from '../../src/interact/fill-reformat.js';
 
 /**
  * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
@@ -27,6 +27,19 @@ describe('reformatOf — the typed characters in order, one separator added betw
 
   it('a typed space shown as a no-break space is respaced, not added', () => {
     expect(reformatOf('1\u00A0234', '1 234')).toEqual({ added: 0, respaced: 1 });
+  });
+
+  it('respaced and added together count both: one of each is a change, not none', () => {
+    expect(reformatOf('1\u00A0234 567', '1 234567')).toEqual({ added: 1, respaced: 1 });
+  });
+
+  it('a typed space shown as another character is a change, not a respacing', () => {
+    expect(reformatOf('1x2', '1 2')).toBeUndefined();
+    expect(reformatOf('1-2', '1 2')).toBeUndefined();
+  });
+
+  it('a separator that is no `.` or `,` carries no `point` at all', () => {
+    expect(reformatOf('31/12/2026', '31122026')).toStrictEqual({ added: 2, respaced: 0 });
   });
 
   it('exactly the typed text is no reformat (the exact rule passes it): a Reformat always counts a change', () => {
@@ -69,6 +82,7 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('jo-hn@x.com', 'john@x.com')).toBeUndefined();
     expect(reformatOf('in fact 2', 'infact 2')).toBeUndefined(); // digits, but a typed space: prose
     expect(reformatOf('Flat A 12', 'Flat A12')).toEqual({ added: 1, respaced: 0 }); // a letter and a digit: no word split
+    expect(reformatOf('Flat 12 A', 'Flat 12A')).toEqual({ added: 1, respaced: 0 }); // a digit and a letter: no word split either
     expect(reformatOf('MT84 MALT 0110 0001 2345 MTLC AST0 01S', 'MT84MALT011000012345MTLCAST001S')).toEqual({ added: 7, respaced: 0 });
     expect(reformatOf('GB29 NWBK 6016 1331 9268 19', 'GB29NWBK60161331926819')).toEqual({ added: 5, respaced: 0 });
     expect(reformatOf('FR14 2004 1010 0505 0001 3M02 606', 'FR1420041010050500013M02606')).toEqual({ added: 6, respaced: 0 });
@@ -112,6 +126,15 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('1.234.5', '1234.5')).toBeUndefined(); // the typing's own point
     expect(reformatOf('1,234,5', '1234,5')).toBeUndefined();
     expect(reformatOf('0,12.345', '0,12345')).toBeUndefined(); // round 2, MINOR-B: a fraction is no whole part
+    expect(reformatOf('.1,234', '.1234')).toBeUndefined(); // a fraction from the reading's first character
+    expect(reformatOf('1,2345,678', '12345678')).toBeUndefined(); // four between two of them
+    expect(reformatOf('1,23a', '123a')).toBeUndefined(); // a group of three holds digits only
+    expect(reformatOf('1,a23', '1a23')).toBeUndefined();
+  });
+
+  it('an added `.` or `,` after up to three digits, a word before them included', () => {
+    expect(reformatOf('123,456', '123456')).toEqual({ added: 1, respaced: 0, point: ',' });
+    expect(reformatOf('EUR 1,234', 'EUR 1234')).toEqual({ added: 1, respaced: 0, point: ',' });
   });
 });
 
@@ -148,5 +171,13 @@ describe('prefixOf — a strict prefix of the typing, exactly or reformatted', (
     expect(prefixOf('12', '12')).toBeUndefined();
     expect(prefixOf('SK31 1300', 'SK3112000000')).toBeUndefined();
     expect(prefixOf('SK31 ', 'SK3112000000')).toBeUndefined(); // a trailing mark (ADR 0034: a false mismatch, the safe side)
+  });
+});
+
+describe('skeleton — a text\'s letters and digits alone', () => {
+  it('drops everything else, keeps the order', () => {
+    expect(skeleton('SK31 1200-0000')).toBe('SK3112000000');
+    expect(skeleton('1\u00A0234,56 €')).toBe('123456');
+    expect(skeleton('—')).toBe('');
   });
 });

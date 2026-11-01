@@ -14,8 +14,10 @@ import { isPoint, type Reformat } from './fill-facts.js';
 const SPACES = new Set([' ', '\u00A0', '\u202F']);
 /** What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. */
 const SEPARATORS = new Set([...SPACES, '.', ',', '-', '/']);
+// Stryker disable next-line Regex: only ever tested on one code point, where the anchors change nothing
 const ALNUM = /^[\p{L}\p{N}]$/u;
 const DIGIT = /\d/;
+// Stryker disable next-line Regex: only ever tested on one code point, where the anchors change nothing
 const LETTER = /^\p{L}$/u;
 const DIGITS = /^\d+$/;
 
@@ -70,6 +72,7 @@ export function reformatOf(observed: string, expected: string, typing: string = 
     }
     // Both neighbours typed letters or digits: none leading or trailing (no neighbour), none next to another added
     // one (-1), none after typed punctuation.
+    // Stryker disable next-line ConditionalExpression,LogicalOperator: expectedChars[undefined] and expectedChars[-1] are undefined, which ALNUM never matches
     const typedAlnum = (t: number | undefined) => t !== undefined && t !== -1 && ALNUM.test(expectedChars[t]);
     if (!typedAlnum(tokens[k - 1]) || !typedAlnum(tokens[k + 1])) return undefined;
     // Between two LETTERS only in a code (round 2, MAJOR-A): in prose a space or `-` added there is autocorrect
@@ -125,6 +128,7 @@ function thousands(chars: string[], tokens: number[], typing: string, point: str
     const end = n + 1 < marks.length ? marks[n + 1] : marks[n] + 4;
     const run = chars.slice(marks[n] + 1, end).join('');
     if (run.length !== 3 || !DIGITS.test(run)) return false;
+    // Stryker disable next-line ConditionalExpression,LogicalOperator: before the last mark chars[end] is the next mark, and past the reading undefined, neither a digit
     if (n + 1 === marks.length && chars[end] !== undefined && DIGIT.test(chars[end])) return false;
   }
   return true;

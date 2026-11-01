@@ -35,6 +35,20 @@ describe('judgeFill — what the facts mean', () => {
     });
   });
 
+  it('a dropped tail typed again (ADR 0023) is carried as `retyped`; none typed again carries no `retyped` key', () => {
+    expect(judgeFill(fact({ typed: 12, readBack: landed, retyped: [3] }))).toStrictEqual({
+      did: 'filled',
+      typed: 12,
+      sent: undefined,
+      reasons: [],
+      caveats: [],
+      retyped: [3],
+      note: undefined,
+    });
+    expect('retyped' in judgeFill(fact({ typed: 12, readBack: landed, retyped: [] }))).toBe(false);
+    expect('retyped' in judgeFill(fact({ typed: 12, readBack: landed }))).toBe(false);
+  });
+
   it('a landed read-back is filled, with or without a clear that deleted something', () => {
     expect(judgeFill(fact({ typed: 4, readBack: landed }))).toEqual({ did: 'filled', typed: 4, reasons: [], caveats: [] });
     expect(judgeFill(fact({ typed: 4, readBack: landed, cleared: 7 }))).toMatchObject({ did: 'filled', sent: { what: 'characters', n: 7 }, reasons: [] });

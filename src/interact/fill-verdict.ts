@@ -174,6 +174,7 @@ export function judgeFill(r: FillResult): FillVerdict {
   // Characters: what the clear was SEEN to delete (`cleared`). Deletes:
   // what went out, all rounds — said only of a clear alone nobody saw land,
   // where the deletes are all there is to report.
+  // Stryker disable next-line ConditionalExpression: 'unmeasured' or undefined in place of 0 is no number > 0 either, so `sent` is the same
   const characters = typeof cleared === 'number' ? cleared : 0;
   const deletes = r.clearUnchanged?.deletes ?? characters;
   const sent: Sent | undefined =
