@@ -10,6 +10,7 @@ import { parseConfig } from '../../src/flow/config.js';
 import { FlowEngine, FlowError, type TraceEntry } from '../../src/flow/engine.js';
 import { EngineSession } from '../../src/flow/launch.js';
 import { el, FakeAdapter, resetLayout, screen } from '../helpers/fake.js';
+import { boundReads } from '../helpers/terminal-read.js';
 
 /**
  * The ladder against the measured stuck idb tree (docs/bugs/2026-10-06-ios-
@@ -411,14 +412,18 @@ describe('a read error no wait cures (idb\'s wedged accessibility service) stops
     if (cmd === 'idb') throw new ExecError(['idb', ...args].join(' '), 1, "The simulator's accessibility service named no frontmost application");
     return { stdout: Buffer.alloc(0), stderr: '' };
   };
-  /** The PIN screen while `wedged(readNo)` says no, the wedged idb after. */
+  /**
+   * The PIN screen while `wedged(readNo)` says no, the wedged idb after. The flow must stop on the FIRST wedged read
+   * (bounded: D38, tests/helpers/terminal-read.ts).
+   */
   function wedgedIdb(wedged: (read: number) => boolean) {
     const fake = new FakeAdapter(screens(), 'pin');
     fake.platform = 'ios';
     const source = new IdbTreeSource({ udid: 'D34212DB', exec: noFrontmostExec });
     const readable = fake.uiTree.bind(fake);
+    const wedgedRead = boundReads(1, () => source.read());
     let reads = 0;
-    fake.uiTree = async () => (wedged(reads++) ? source.read() : readable());
+    fake.uiTree = async () => (wedged(reads++) ? wedgedRead() : readable());
     return { fake, reads: () => reads };
   }
   const D21 = parseConfig(`

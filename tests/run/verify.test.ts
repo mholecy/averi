@@ -20,6 +20,7 @@ import type { LayoutContract } from '../../src/verify/layout-contract.js';
 import { ocrEngineFor, ocrUnavailableReason, type OcrEngine } from '../../src/verify/ocr.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { boundReads } from '../helpers/terminal-read.js';
 import { Shot } from '../../src/verify/shot.js';
 
 /**
@@ -271,11 +272,13 @@ flows: {}
 describe('a leg whose tree read no wait cures', () => {
   it('keeps the assert results, the screenshot and the health line', async () => {
     const ios = fake('ios');
-    ios.uiTree = async () => {
+    const specs = [{ element: { id: 'card' } }, { element: { id: 'card' }, absent: true }];
+    // One read per assert (bounded: D38, tests/helpers/terminal-read.ts).
+    ios.uiTree = boundReads(specs.length, async () => {
       throw new PersistentReadError('idb cannot read the UI tree: wedged until a reboot');
-    };
+    });
     const out = await runVerification(
-      request({ platforms: ['ios'], specs: [{ element: { id: 'card' } }, { element: { id: 'card' }, absent: true }] }),
+      request({ platforms: ['ios'], specs }),
       async () => ios,
     );
     expect(out.sections[0]).toContain('## ios');

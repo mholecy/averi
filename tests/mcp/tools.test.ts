@@ -12,6 +12,7 @@ import { createAveriServer } from '../../src/mcp/tools.js';
 import { TOOL_CONFIG } from '../../src/mcp/config-policy.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { boundReads } from '../helpers/terminal-read.js';
 import { TOOL_NAMES } from '../helpers/tool-names.js';
 
 /**
@@ -888,13 +889,14 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
 
   // D21 (2026-10-31): idb's wedged accessibility service ("named no frontmost application") lasts until a reboot. A
   // tap on it fails on its first read — not after its budget — and the reply carries the cure, the bound UDID in it.
+  // Both pins are bounded to the one read (D38, tests/helpers/terminal-read.ts).
   it('tap: idb\'s wedged accessibility service (IdbNoFrontmostError) fails on the first read, the reply naming the reboot', async () => {
     const wedged = new FakeAdapter({}, 'none');
     let reads = 0;
-    wedged.uiTree = async () => {
+    wedged.uiTree = boundReads(1, async () => {
       reads++;
       throw new IdbNoFrontmostError('AAAA-1111');
-    };
+    });
     const { call } = await connect({ ios: wedged, android: home() });
     const result = await call('tap', { platform: 'ios', selector: 'id:login_submit', configPath: missing() });
     expect(result.isError).toBe(true);
@@ -909,10 +911,10 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
   it('assert: idb\'s wedged accessibility service fails the assert after one read — a result, not an error', async () => {
     const wedged = new FakeAdapter({}, 'none');
     let reads = 0;
-    wedged.uiTree = async () => {
+    wedged.uiTree = boundReads(1, async () => {
       reads++;
       throw new IdbNoFrontmostError('AAAA-1111');
-    };
+    });
     const { call } = await connect({ ios: wedged, android: home() });
     const result = await call('assert', { platform: 'ios', asserts: [{ element: { id: 'login_submit' } }], configPath: missing() });
     expect(result.isError).toBe(false);
