@@ -258,10 +258,12 @@ Which adapter a tool call is served by, only; what the helper is and how it runs
 adapter per simulator and tree-source kind, and each iOS adapter owns its helper. Every MCP tool now asks the registry
 for the project's kind: each handler goes through one resolver, `mcp/tools.ts#deviceFor`, with the
 `app.ios.treeSource` of the config the call loaded, and the registry's `get` takes that kind as a required argument
-(`undefined` is the default, idb), so a call without it no longer typechecks. Eight tools (`install_app`,
-`launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, a coordinate `swipe`, `press_key`, `get_logs`) used to
-ask without the kind, and several of them could not know it, because their policy read no averi.yaml on iOS. Each now
-takes `configPath`, and on iOS each reads the file under the `optional` policy.
+(`undefined` is the default, idb): the kind-less overload is gone, and the one resolver plus
+`tests/mcp/registry-gets.test.ts`, which pins it as the only `registry.get` in `src/`, keep every call on the
+project's kind. Eight tools (`install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, a
+coordinate `swipe`, `press_key`, `get_logs`) used to ask without the kind, and several of them could not know it,
+because their policy read no averi.yaml on iOS. Each now takes `configPath`, and on iOS each reads the file under the
+`optional` policy.
 
 So one project drives one adapter per simulator, with one helper. The D7b note "a simulator served under both tree
 sources at once runs two helpers" mostly came from those kind-less calls inside one `treeSource: wda` project, not

@@ -193,11 +193,10 @@ interface Pending {
  * One persistent fb-idb client per adapter, started by the first call it could serve — since D7b an input too, so a
  * wda-backed adapter starts one as well (its input is idb's), and a simulator served under both tree sources at once
  * runs two — since D41 only across two projects (D7, docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md,
- * section "D7b" and amendment D41): a Python process
- * that imported idb's CLI once and runs it in-process per request (idb-helper-script.ts), so a call no longer pays
- * the CLI's Python start-up — measured 114.3 → 24.7 ms a `describe-all` (D7, n = 20, the lab simulator). Created by the registry per iOS adapter
- * (registry.ts#iosAdapterFor) and shared, like `exec`, by IosAdapter and IdbTreeSource; runIdb (idb.ts) decides which
- * argv may come here.
+ * section "D7b" and amendment D41): a Python process that imported idb's CLI once and runs it in-process per request
+ * (idb-helper-script.ts), so a call no longer pays the CLI's Python start-up — measured 114.3 → 24.7 ms a
+ * `describe-all` (D7, n = 20, the lab simulator). Created by the registry per iOS adapter (registry.ts#iosAdapterFor)
+ * and shared, like `exec`, by IosAdapter and IdbTreeSource; runIdb (idb.ts) decides which argv may come here.
  *
  * Its whole contract is that it is never worse than the CLI:
  * - `run` answers undefined — "use the CLI" — whenever it is not READY and idle: not started yet (it starts now, in

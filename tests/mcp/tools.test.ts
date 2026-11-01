@@ -1027,23 +1027,28 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
  */
 describe('every tool gets the project\'s adapter — one per simulator and configured tree source (D41)', () => {
   const WDA_PROJECT = 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n';
-  /** The eight tools that once asked kind-less, each with what an iOS call of it needs. */
-  const DEVICE_CALLS: Record<string, Record<string, unknown>> = {
-    install_app: { path: '/builds/Bank.app' },
-    launch_app: { appId: 'md.bank.app' },
-    terminate_app: { appId: 'md.bank.app' },
-    open_deep_link: { url: 'bank://home' },
-    screenshot: {},
-    'swipe (coordinates)': { fromX: 1, fromY: 2, toX: 3, toY: 4 },
-    press_key: { key: 'home' },
-    get_logs: {},
-  };
-  const toolOf = (name: string) => name.split(' ')[0];
+  /** The eight tools that once asked kind-less: what an iOS call of each needs, and an Android one where it differs. */
+  interface DeviceCall {
+    tool: string;
+    label: string;
+    args: Record<string, unknown>;
+    androidArgs?: Record<string, unknown>;
+  }
+  const DEVICE_CALLS: DeviceCall[] = [
+    { tool: 'install_app', label: 'install_app', args: { path: '/builds/Bank.app' }, androidArgs: { path: '/builds/app.apk' } },
+    { tool: 'launch_app', label: 'launch_app', args: { appId: 'md.bank.app' } },
+    { tool: 'terminate_app', label: 'terminate_app', args: { appId: 'md.bank.app' } },
+    { tool: 'open_deep_link', label: 'open_deep_link', args: { url: 'bank://home' } },
+    { tool: 'screenshot', label: 'screenshot', args: {} },
+    { tool: 'swipe', label: 'swipe (coordinates)', args: { fromX: 1, fromY: 2, toX: 3, toY: 4 } },
+    { tool: 'press_key', label: 'press_key', args: { key: 'home' } },
+    { tool: 'get_logs', label: 'get_logs', args: {} },
+  ];
 
-  it.each(Object.keys(DEVICE_CALLS))('ios %s in a treeSource: wda project is served by the wda adapter', async (name) => {
+  it.each(DEVICE_CALLS)('ios $label in a treeSource: wda project is served by the wda adapter', async ({ tool, args }) => {
     const harness = await connect();
     const configPath = await file('averi.yaml', WDA_PROJECT);
-    const result = await harness.call(toolOf(name), { platform: 'ios', configPath, ...DEVICE_CALLS[name] });
+    const result = await harness.call(tool, { platform: 'ios', configPath, ...args });
     expect(result.isError).toBe(false);
     expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
   });
@@ -1051,8 +1056,8 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
   it('ios: all eight and a tree tool in one wda project share ONE adapter, built once', async () => {
     const harness = await connect();
     const configPath = await file('averi.yaml', WDA_PROJECT);
-    for (const name of Object.keys(DEVICE_CALLS)) {
-      expect((await harness.call(toolOf(name), { platform: 'ios', configPath, ...DEVICE_CALLS[name] })).isError, name).toBe(false);
+    for (const { tool, label, args } of DEVICE_CALLS) {
+      expect((await harness.call(tool, { platform: 'ios', configPath, ...args })).isError, label).toBe(false);
     }
     expect((await harness.call('ui_snapshot', { platform: 'ios', configPath })).isError).toBe(false);
     expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
@@ -1061,29 +1066,29 @@ describe('every tool gets the project\'s adapter — one per simulator and confi
   it('ios without a project config: one idb adapter, shared by the tree tools and the rest', async () => {
     // `missing()` stands in for the default ./averi.yaml: the server's working directory is the repo, not a test's own.
     const harness = await connect();
-    for (const name of Object.keys(DEVICE_CALLS)) {
-      expect((await harness.call(toolOf(name), { platform: 'ios', configPath: missing(), ...DEVICE_CALLS[name] })).isError, name).toBe(false);
+    for (const { tool, label, args } of DEVICE_CALLS) {
+      expect((await harness.call(tool, { platform: 'ios', configPath: missing(), ...args })).isError, label).toBe(false);
     }
     expect((await harness.call('ui_snapshot', { platform: 'ios', configPath: missing() })).isError).toBe(false);
     expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'idb' }]);
   });
 
-  it.each(Object.keys(DEVICE_CALLS))('ios %s: an INVALID averi.yaml fails the call naming the file, before a device is bound', async (name) => {
+  it.each(DEVICE_CALLS)('ios $label: an INVALID averi.yaml fails the call naming the file, before a device is bound', async ({ tool, args }) => {
     const harness = await connect();
     const configPath = await invalidConfig();
-    const result = await harness.call(toolOf(name), { platform: 'ios', configPath, ...DEVICE_CALLS[name] });
+    const result = await harness.call(tool, { platform: 'ios', configPath, ...args });
     expect(result.isError).toBe(true);
     expect(result.text).toContain(configPath);
     expect(harness.bound()).toEqual([]);
   });
 
   // Android has no tree source: these tools read nothing there, so a broken file beside them is not their business.
-  it.each(Object.keys(DEVICE_CALLS).filter((n) => n !== 'launch_app'))('android %s: an INVALID averi.yaml is not read at all', async (name) => {
+  // launch_app is left out: with nothing named it reads the activity fallback (its own describe).
+  it.each(DEVICE_CALLS.filter((c) => c.tool !== 'launch_app'))('android $label: an INVALID averi.yaml is not read at all', async ({ tool, args, androidArgs }) => {
     const harness = await connect();
     const configPath = await invalidConfig();
     reads.paths.length = 0;
-    const args = name === 'install_app' ? { path: '/builds/app.apk' } : DEVICE_CALLS[name];
-    const result = await harness.call(toolOf(name), { platform: 'android', configPath, ...args });
+    const result = await harness.call(tool, { platform: 'android', configPath, ...(androidArgs ?? args) });
     expect(result.isError).toBe(false);
     expect(configReads(configPath)).toBe(0);
   });
