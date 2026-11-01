@@ -18,19 +18,24 @@ behaviour changes.
 **`npm run mutate` runs Stryker over five pure leaves, each against its direct tests only, and fails when any module's
 score drops below its own floor. A merge runs it cold.**
 
-- Scope: `stryker.config.mjs`. The modules are flow/wipes-ahead.ts, interact/fill-reformat.ts, fill-verdict.ts and
-  fill-landing.ts, and ui-tree/draw-order.ts. The test files are listed in `vitest.mutation.config.ts`, with
-  `related: false` and a cache of its own. The normal `npx vitest run` never reads that file.
+- Scope: one data file, `scripts/mutation/scope.json`. For each mutated module it gives the module's direct tests
+  (globs), its floor and the baseline the floor came from. The modules are flow/wipes-ahead.ts,
+  interact/fill-reformat.ts, fill-verdict.ts and fill-landing.ts, and ui-tree/draw-order.ts. `stryker.config.mjs`
+  (`mutate`), `vitest.mutation.config.ts` (`include`, with `related: false` and a cache of its own) and
+  `scripts/mutation/mutate.ts` all read it. The normal `npx vitest run` never reads the mutation vitest config.
 - Per-module floors, not Stryker's `thresholds.break`: `break` is one global score, and the baselines lie 23 points
   apart (draw-order 77 %, the other four 94 to 100 %). A global break low enough for draw-order would let a fill module
-  lose a fifth of its kills unnoticed. So one table in `scripts/mutation/mutate.ts` holds a floor per module, about 2
-  points below its baseline. The script fails on a module below its floor, on a mutated module without a floor, on a
-  floor for a module Stryker did not mutate, and when Stryker writes no report.
+  lose a fifth of its kills unnoticed. So scope.json holds a floor per module, about 2 points below its baseline.
+  `scripts/mutation/mutate.ts` (`checkFloors`) fails on a module below its floor, on a mutated module without a floor
+  and on a floor for a module Stryker did not mutate. It also fails when Stryker writes no report.
+- The floor rule: raise a floor when its module's baseline rises. Lower it only with a reason written in that module's
+  `baseline` field.
 - Cold at merge: `npm run mutate -- --force` (about 45 s) reruns every mutant. Stryker's incremental mode
   (`reports/mutation/stryker-incremental.json`) stays a local convenience of one checkout and is never committed. Its
   blind spot is why: it compares only the mutated files and their test files with the last run, never the modules they
   import. A change to `fill-facts.ts` can turn a killed mutant of `fill-landing.ts` into a survivor, and an incremental
-  run would still report the old result.
+  run would still report the old result. The cold run at every merge also replaces the monthly cold run that D36's
+  spec proposed.
 - Surviving mutants stay counted, equivalent ones included. The floors absorb them. A mutant is excluded only with
   `// Stryker disable next-line <mutator>: <reason>`, and only when that mutator kills nothing else on the line: the
   comment ignores every mutant of that mutator there, the killed ones too. On 2026-11-01 no line qualified with an
@@ -40,7 +45,8 @@ score drops below its own floor. A merge runs it cold.**
 
 - A branch that touches one of the five modules, their tests or a module they import runs `npm run mutate -- --force`
   before merging.
-- A module joins the run only with direct tests of its own. Its floor is added to the table the same day.
+- A module joins the run only with direct tests of its own. Adding it is one edit: an entry in scope.json with its
+  tests, its floor and its baseline.
 - geometry.ts stays out until its direct tests exist. That is a backlog row of its own.
 - The tests added with the run pin behaviour, not object shape. So a mutant that only adds an `undefined` key, such as
   `...(x !== undefined && { x })` turned into `...{ x }`, survives. It is counted against the floor, not hidden.
