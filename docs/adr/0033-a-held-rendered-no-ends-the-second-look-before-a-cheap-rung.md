@@ -4,7 +4,8 @@ Status: accepted 2026-10-31 (performance backlog row D2, docs/plans/2026-10-30-p
 D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-held-no`
 (938a8426, 3ab677f3, 52cb2e41, 04ec6000, d0efd6f0, a883e09a), merged 11cb9064. Amended 2026-10-31 (D27: WDA
 `ActivityIndicator` → `progress`, so a React Native spinner stops a hold — the D27 sub-bullet below; commits 4b5e254f,
-8a4efe1b, 021fade0 and 8999f3ff, merged e26fa898).
+8a4efe1b, 021fade0 and 8999f3ff, merged e26fa898). Amended 2026-11-01 (A7): both checks now live in one module — the
+last section.
 
 ## Context
 
@@ -127,3 +128,9 @@ wipe lies ahead (above).
   ~70–180 ms) it spans many reads.
 - The second look's held "no" writes one trace line (above); a rendered "no" at the deadline still writes none.
 - Changing `reachRecheckMs` now changes two windows: the re-check after a rung and the hold before a cheap one.
+
+## Amendment: one owner for "is a wipe ahead?" (2026-11-01, backlog A7)
+
+The two checks of "No wipe ahead" above — `wipeAhead === 0`, the engine counter, and `state.reach.slice(i)` under
+`flowIsDestructive` — now live in `flow/wipes-ahead.ts#WipesAhead`: `noneAheadOf(rungs, i)` asks both,
+`running(rungs, i, fn)` raises and lowers the count around a rung. The decision is unchanged.
