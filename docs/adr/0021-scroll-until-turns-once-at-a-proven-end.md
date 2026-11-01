@@ -21,6 +21,9 @@ Round 9 (2026-10-25, the owner): decision 6 (a rebound read settled, the tree un
 fling) and residual 2 (the WDA plain stop on a centre a fraction of a point out) accepted.
 2026-10-30 (the owner, performance backlog D10): decision 7 (where the tree read waits for the screen at rest, the
 read after a stroke is the settled read) accepted (1a51687b, cf5c0ac0; merged 4cd4825a).
+2026-11-01 (performance backlog D17): the amendment "a side uiautomator cut at the screen's edge" (below) accepted
+(orchestrator, owner's mandate; f11ed5f0 … 4d07fc5c and the code review's fixes on `fix/d17-screen-edge-bounds`;
+merged on main).
 
 ## Context
 
@@ -374,3 +377,82 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
    (on this cell it flings O out of the clip's top and ends in a turn or a LOUD failure, for a stop that worked); a
    tolerance in the truth harness (it would bend ADR 0020's contract for one wording). The live KNOWN entry stays,
    intermittent (`ios wda scroll:scroll-bounded-footer.O`, stop-claim on `visible`).
+
+## Amendment: a side uiautomator cut at the screen's edge (2026-10-31, performance backlog D17)
+
+**Context.** uiautomator cuts a node's bounds at the SCREEN's edge, not at the scroll view it runs past. Measured live
+on the lab app's `carousel-in-list` (API 33, emulator-5554): after a 440-px drag the carousel `[66,380][1014,614]` was
+at offset 428 and the app laid C at x 586, 948 wide; the dump listed C as `[586,380][1080,614]`. Its true centre, 1060,
+lies past the carousel's edge at 1014; its listed centre, 833, lies inside. In D10's live runs the plain stop said
+"CLIPPED at right, 91 % of it is in the viewport" while only 66–67 % of C lay inside the carousel by the app's model
+(C at x 376–385). A tap on C still fires: it aims at the drawn part. The carry model (decision 4) does not run on
+Android's trees (`listedWhereItLies` is WDA's), so it had nothing to say here. The same holds along the vertical axis:
+the lab's form-picker lists its country list ending at 2154, above the navigation bar, and "Faroe Islands" as
+`[0,2080][1080,2220]`, ending at the screen's bottom.
+
+**Decision.**
+1. *The mark.* The uiautomator parser marks its root `boundsCutAtScreen` (adapters/types.ts#UiNode.boundsCutAtScreen),
+   as WDA's parser marks `unclippedFrames`. The drawn frame (ui-tree/geometry.ts#Clips.drawnIn) then names the
+   UNKNOWN sides (`DrawnFrame.unknownPast`, `cutAtScreenEdges`): a side within a pixel of the screen's edge (the root's
+   rect), where the drawn frame's side lies more than a pixel inside the screen. A full-width row of a full-width list
+   lies on the screen's edges with its scroll view, so it has none.
+2. *The share is an upper bound.* The standing carries the sides (ui-tree/standing.ts#StandingFacts.unknownPast), and
+   every clip sentence of `scroll_until` (the stop, the stuck and bound failures) says "at most N %", then
+   "— uiautomator does not say how far it runs past the screen's right edge".
+3. *One more stroke.* A plain stop on such a match whose unknown side is the one the course strokes toward takes one
+   more stroke first (interact/scroll-rounds.ts#centreStroke). Its known far side may go up to the frame's far edge
+   and no further. That distance is the stroke's `needs`, with no slack (interact/course.ts#unknownCentreNeeds), and
+   the carry model cuts the stroke to it (stroke-plan.ts#carryReach) at an ANDROID drag's figures, not WDA's
+   (`StillNeeds.unmeasured`): CUT_EDGE_CARRY, 1.11 a px — the most measured. Live, full 569-px drags over the carousel
+   carried it 451–632 px (0.79–1.11 a px), and 145–178-px drags carried 102–140 px (0.69–0.85). So the stroke lands
+   short of its needs at every measured carry, and an overshoot under half the card's width keeps its centre inside.
+   The shortest stroke is CUT_EDGE_MIN_DRAG, 48 px, swipe.ts#shortenStroke's floor. On the carousel (C at 382, its
+   left side 316 px inside) the stroke is 285 px. Along either axis: on form-picker, "Faroe Islands"
+   dumped as above, a plain stop down takes one more stroke — its top 1859 px inside the list's, so the full stroke
+   (1160 px) — and stops on it fully visible.
+4. *Bounded, and decided in place.* The stroke is decided and SENT where the stop would be made, never left to the rest
+   of the round: a stuck turn, a presented hold or a bound later in the round could otherwise turn it, hold it or fail
+   the call. It is sent only as the course's next stroke unchanged and no turn (`NextStroke.turn`), touching down on no
+   presented screen (`StrokePlan.presented`), with points to draw (a round with no gesture box draws none); else the
+   stop is made. Only ONCE per scroll (`centreStroked`): the carousel is exactly one card wide and shows C whole at one
+   offset only, so a rule that stroked until the centre was known could swing it to and fro. Never past the bound (a
+   swipe and time must be left), and never when the known side lies under UNKNOWN_CENTRE_MIN_GAP (54 px: the shortest
+   drag at the most carry) inside the frame's far edge, or past it. A node cut at both edges is such a node — its far
+   side lies on the screen's edge, outside its frame's — so it takes no stroke, and its centre stays unknown (a
+   residual, below). The next read's stop is made as it stands. `fully: true` needs nothing new: a match past its frame
+   is `clipped`, never a stop.
+
+**Device check (2026-11-01, emulator-5554, API 33).** The live visibility group: 153 cases, 147 ok, 6 loud, 0
+mismatches, before and after (and after review round 1). The same six LOUD cases appear every time.
+`scroll:carousel-in-list.C` before: "visible after 1 swipe — CLIPPED at right, 89 %", with C at x 470 (63 % of it
+inside by the app's model). At the first version, which planned the stroke at UNMEASURED_CARRY: five runs said "visible
+after 2 swipes — … at most 90–91 %", the extra stroke carrying 102–140 px and C ending at x 369–424. At CUT_EDGE_CARRY
+(review round 1), five runs said "visible after 2 swipes — CLIPPED at right, at most 93 % … uiautomator does not say
+how far it runs past the screen's right edge", then Tapped. The extra stroke carried 251–355 px (0.81–0.93 a px of its
+travel, short of its needs every time), and C ended at x 131–159, its centre inside and every stroke closer. The D17
+shape, by averi's own reply after a 440-px drag: on main, with C at 599 (true centre 1073, past 1014), "visible after 0
+swipes — CLIPPED at right, 86 %". On this branch, with C at 624 (true centre 1098), one stroke brought it to 159 (true
+centre 633), then "visible after 1 swipe — CLIPPED at right, at most 93 % …".
+
+**Residuals.**
+- After its one stroke, or with no room for one, a card wider than about twice what its frame shows past its known
+  side can still be stopped on with its true centre past the scroll view's edge. The reply then says "at most" and why.
+- A node cut at both edges (wider than the screen along the axis) takes no stroke: nothing known can be brought up to
+  its frame's edge, and its centre stays unknown. The reply says "at most" for both sides.
+- Only the clip sentences say "at most". The covered share ("PARTLY UNDER …, N % of it shows") and the sliver's
+  sentence (interact/scroll-text.ts#sliverText) are not marked as bounds; the fraction marked is the clip's.
+- A stroke toward the unknown side against the course is a turn, and no centre stroke is taken as a turn: content
+  asked LEFT with the card cut on the RIGHT, the stop is made as it stands, "at most", and its centre can still lie past
+  the frame.
+- The presented-screen guard of the stroke (decision 4) is reached only where the stroke room's touch-down lands on a
+  screen presented over the target's beside it. A MARKED presented layer reaches the whole screen, so a match beneath
+  one is never a plain stop. On Android trees the shape fallback (ADR 0018) also infers surfaces that are not
+  whole-screen (a sheet's scroll view, a half-sheet's dim, a dismiss popup): one over the target covers it, and the
+  stroke room keeps the touch-down off what is drawn over the list's lower half. So the guard fires on a sheet inferred
+  by shape ABOVE a bar the room keeps the touch-down over — tested (tests/interact/scroll-carousel-android.test.ts, the
+  by-shape sheet with a bar over the list's lower half): the plain stop is made, and `fully: true` fails as a presented
+  stop whose shortfall says "at most".
+- The cut is read at the root's rect. A dialog window's edge is taken to be the screen's, which is unmeasured.
+- `cutAtScreen` is set on every uiautomator tree. A source that cuts at the screen only in Compose (a classic View tree
+  may cut at the scroll container, LE1's note) does not change the rule: there no side lies on the screen's edge past
+  its frame.

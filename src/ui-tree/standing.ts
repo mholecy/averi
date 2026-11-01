@@ -2,6 +2,7 @@ import { isTyped, rectArea, rectIntersection, rectsOverlap, SCREEN_SIZED_FRACTIO
 import {
   drawOrder,
   listsAncestry,
+  listsBoundsCutAtScreen,
   listsUnclippedFrames,
   type DrawOrder,
   type Exposure,
@@ -422,8 +423,15 @@ export interface StandingFacts {
    * status band — each cut to the drawn frame (`drawn`; no area when nothing of it is drawn).
    */
   readonly screen: Rect;
-  /** The fraction of the node inside the frame, covers or not: of what is drawn there. */
+  /** The fraction of the node inside the frame, covers or not: of what is drawn there — an upper bound where `unknownPast` says how far it runs is unknown. */
   readonly visible: number;
+  /**
+   * The sides along which the node runs on an unknown distance past its listed rect (geometry.ts#DrawnFrame.unknownPast:
+   * the source cut it at the screen's edge, uiautomator's): `visible` is then an upper bound — the node's true area is
+   * larger — and its centre along that axis unknown (`scroll_until`'s plain stop, interact/scroll-rounds.ts#round,
+   * strokes once more toward it). Absent when none.
+   */
+  readonly unknownPast?: readonly Edge[];
   /** The frame's edges the node extends past (geometry.ts#clippedEdges). */
   readonly clipped: readonly Edge[];
   /**
@@ -759,7 +767,7 @@ export function sceneOf(tree: UiNode, seen?: SeenOrder): Scene {
     },
     ...(seen !== undefined && { orderSeen: seen }),
     get clips() {
-      return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree), unclipped: listsUnclippedFrames(tree) }));
+      return (clips ??= clipsOf(tree, { ancestry: listsAncestry(tree), unclipped: listsUnclippedFrames(tree), cutAtScreen: listsBoundsCutAtScreen(tree) }));
     },
     standing,
     pixelRegion: (node, screen) => pixelDrawn(node, pixelScreen(screen)).rect,
@@ -1269,6 +1277,7 @@ function factsIn(judged: Judged, frame: Rect, exposed: Rect = frame, { sliver: j
     screen: frame,
     visible: visibleFractionInViewport(node.rect, frame),
     clipped: clippedEdges(node.rect, frame),
+    ...(within?.unknownPast !== undefined && { unknownPast: within.unknownPast }),
     covers: seen.covers,
     ...(seen.centreCover !== undefined && { centreCover: seen.centreCover }),
     centreExcused: seen.centreExcused,

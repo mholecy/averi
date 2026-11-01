@@ -487,8 +487,9 @@ export function strokedContent(memory: StrokeMemory, facts: Pick<TreeFacts, 'sce
  * drag keeps its 300 ms whatever its length: a shorter drag is a slower one, and its fling shrinks with it (the linear
  * model; unmeasured under 108 pt — a residual). On the measured case: three full strokes leave F ~150 pt short of the
  * window's middle, and the fourth travels ~63 pt, landing it mid-window whatever the spread of the runs. Before any
- * stroke over that scroll view was measured the carry is taken as UNMEASURED_CARRY, so a FIRST stroke that would skip
- * the window is cut too (the carousel's card,
+ * stroke over that scroll view was measured the carry is taken as what the needs bring (`StillNeeds.unmeasured`: an
+ * Android drag's, course.ts#CUT_EDGE_CARRY, for a target whose centre is unknown), else as UNMEASURED_CARRY, the
+ * fallback — so a FIRST stroke that would skip the window is cut too (the carousel's card,
  * docs/bugs/2026-10-18-lab-ios-wda-carousel-stop-claimed-while-the-fling-carries-the-card-past-its-centre.md).
  * docs/bugs/2026-10-17-lab-ios-wda-scroll-until-overshoots-a-row-of-a-short-scroll-view-and-spends-its-budget.md
  */
@@ -543,14 +544,14 @@ export const UNMEASURED_CARRY = 2.8;
  */
 export const UNMEASURED_MIN_DRAG = 108;
 
-/** The reach of the full stroke (`full` points of travel) that carries the target what it still needs (the carry model, `carried`; UNMEASURED_CARRY until a stroke was measured), never above `reach`; `reach` itself while nothing is needed or one stroke cannot skip the window. */
+/** The reach of the full stroke (`full` points of travel) that carries the target what it still needs (the carry model, `carried`; until a stroke was measured, the needs' own `unmeasured` carry and floor, else UNMEASURED_CARRY and UNMEASURED_MIN_DRAG), never above `reach`; `reach` itself while nothing is needed or one stroke cannot skip the window. */
 function carryReach(measured: number | undefined, still: StillNeeds | undefined, full: number, reach: number): number {
   if (still === undefined || full <= 0) return reach;
-  const carry = measured ?? UNMEASURED_CARRY;
+  const carry = measured ?? still.unmeasured?.carry ?? UNMEASURED_CARRY;
   if (carry * full * reach <= still.slack) return reach;
   const cut = still.needs / carry / full;
-  // Unmeasured, never under the shortest drag the carry was measured at (UNMEASURED_CARRY's floor).
-  return Math.min(reach, measured === undefined ? Math.max(cut, UNMEASURED_MIN_DRAG / full) : cut);
+  // Unmeasured, never under the shortest drag that carry was measured at (UNMEASURED_CARRY's floor, or the needs' own).
+  return Math.min(reach, measured === undefined ? Math.max(cut, (still.unmeasured?.minDrag ?? UNMEASURED_MIN_DRAG) / full) : cut);
 }
 
 /** The rects drawn over `rect` in this read, when it holds that scroll view (`TreeFacts.scene`'s draw order). */

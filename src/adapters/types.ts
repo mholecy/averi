@@ -548,6 +548,21 @@ export interface UiNode {
    */
   unclippedFrames?: true;
   /**
+   * Set on the ROOT of a tree whose source CUTS a node's bounds AT THE SCREEN'S EDGE (the root's rect) even where the
+   * node lies past a scroll view that ends inside the screen: uiautomator's (adapters/android.ts#parseUiautomatorXml).
+   * Measured on the lab app's `carousel-in-list` (API 33): the carousel `[66,380][1014,614]` drawn at 1014, its card C
+   * laid at x 586 948 wide (the app's model) is dumped `[586,380][1080,614]` — cut at the screen's 1080, not at its
+   * 948 px — so its listed centre 833 lies inside the carousel while its true centre, 1060, lies past it. So where a
+   * node's side lies on the screen's edge and its drawn frame's matching side lies inside the screen, how far the
+   * node runs past that side is unknown (geometry.ts#DrawnFrame.unknownPast): its visible fraction is an upper bound,
+   * and its centre unknown along that axis. A full-width row in a full-width list is not such a node: its scroll
+   * view ends at the screen's edge too. Read by ui-tree/draw-order.ts#listsBoundsCutAtScreen. A mark of the source,
+   * like `flatList`: ui-tree knows no platform. Absent on WDA's trees (frames unclipped, `unclippedFrames`) and idb's
+   * flat list (no scroll view listed).
+   * docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md (its amendment "a side cut at the screen's edge")
+   */
+  boundsCutAtScreen?: true;
+  /**
    * Set on a node whose CHILDREN its source lists in READING ORDER — by their frames' tops — and so not as their draw
    * order: iOS's accessibility lists a SwiftUI container's elements so (the bug note below: the lab's in-screen menu
    * row W `51,448`, drawn on top by `zIndex`, is listed BEFORE the row C `51,470` it is drawn over, in idb's flat list

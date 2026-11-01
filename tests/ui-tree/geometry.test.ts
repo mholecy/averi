@@ -788,6 +788,46 @@ describe('clipsOf(tree).drawnIn — the frame a node is drawn in, cut by every a
     expect(toldFrame(clips.drawnIn(rightward))?.frame).toEqual(r(0, 241, 1081, 1737));
   });
 
+  describe("`unknownPast` — a side the source cut at the screen's edge (`cutAtScreen`: uiautomator's, UiNode.boundsCutAtScreen)", () => {
+    const CUT = { ancestry: true, cutAtScreen: true } as const;
+    /** The lab's `carousel-in-list` on API 33: the carousel `[66,380][1014,614]` in a full-screen page; C laid 948 wide, dumped cut at 1080. */
+    const lab = (card: ReturnType<typeof r>) => {
+      const c = fakeNode({ role: 'button', identifier: 'lab.carousel-in-list.C', rect: card });
+      const carousel = fakeNode({ role: 'scrollable', rect: r(66, 380, 948, 234), children: [c] });
+      const row = fakeNode({ role: 'button', rect: r(0, 700, 1080, 176) });
+      const page = fakeNode({ role: 'scrollable', rect: r(0, 0, 1080, 2220), children: [carousel, row] });
+      const tree = fakeNode({ role: 'container', rect: r(0, 0, 1080, 2220), children: [page] });
+      return { tree, c, carousel, page, row };
+    };
+
+    it("C dumped `[586,380][1080,614]` with its carousel ending at 1014: its right side lies on the screen's edge, its carousel's inside the screen — how far it runs past is unknown", () => {
+      const { tree, c, carousel, page } = lab(r(586, 380, 494, 234));
+      expect(clipsOf(tree, CUT).drawnIn(c)).toEqual({ told: true, frame: r(66, 380, 948, 234), scrollers: [carousel, page], listedWhereItLies: false, unknownPast: ['right'] });
+    });
+
+    it('cut at both sides of the screen: both unknown; a side a pixel off the edge counts as on it', () => {
+      const { tree, c } = lab(r(0, 380, 1080, 234));
+      expect(toldFrame(clipsOf(tree, CUT).drawnIn(c))?.unknownPast).toEqual(['left', 'right']);
+      const { tree: t2, c: c2 } = lab(r(1, 380, 1078, 234));
+      expect(toldFrame(clipsOf(t2, CUT).drawnIn(c2))?.unknownPast).toEqual(['left', 'right']);
+    });
+
+    it("none where the side lies off the screen's edge (C at rest `[1014,380][1080,614]`: its left side is known), nor for a full-width row of a full-width list — its scroll view ends at the screen's edge too", () => {
+      const { tree, c, row } = lab(r(382, 380, 600, 234));
+      const clips = clipsOf(tree, CUT);
+      expect(toldFrame(clips.drawnIn(c))?.unknownPast).toBeUndefined();
+      expect(toldFrame(clips.drawnIn(row))?.unknownPast).toBeUndefined();
+      const { tree: rest, c: atRest } = lab(r(1014, 380, 66, 234));
+      expect(toldFrame(clipsOf(rest, CUT).drawnIn(atRest))?.unknownPast).toEqual(['right']);
+    });
+
+    it('none on a tree whose source does not cut at the screen (WDA\'s unclipped frames, a nested tree not marked)', () => {
+      const { tree, c } = lab(r(586, 380, 494, 234));
+      expect(toldFrame(clipsOf(tree, UNCLIPPED).drawnIn(c))?.unknownPast).toBeUndefined();
+      expect(toldFrame(clipsOf(tree, NESTED).drawnIn(c))?.unknownPast).toBeUndefined();
+    });
+  });
+
   it('an ancestor of no area cuts nothing — it fails open, as a root of no area does: a ScrollView WDA reports 0,0 0x0', () => {
     const { tree, scroll, row } = form();
     const zero = fakeNode({ role: 'scrollable', rect: r(0, 0, 0, 0), children: [row] });

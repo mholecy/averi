@@ -42,6 +42,12 @@ export interface ScrollUntilResult {
   /** Viewport edges the element still extends past, [] when fully revealed — `bottom` is the keyboard's top edge when `keyboard` is shown. */
   clipped: Edge[];
   /**
+   * The sides along which the element runs on an unknown distance past its rect: the tree source cut it at the screen's
+   * edge there (ui-tree/standing.ts#StandingFacts.unknownPast: uiautomator's, D17) — so `visible` is an upper bound.
+   * The reply says "at most". Absent when none.
+   */
+  unknownPast?: Edge[];
+  /**
    * The soft keyboard at the stop, when it changed what the result means
    * — absent when none was read, so a run without a keyboard
    * reports what it always did:
@@ -154,6 +160,7 @@ export function scrollResult(o: Extract<ScrollOutcome, { kind: 'visible' }>): Sc
     swipes: o.swipes,
     visible: facts.visible,
     clipped: [...facts.clipped],
+    ...(facts.unknownPast !== undefined && { unknownPast: [...facts.unknownPast] }),
     ...(keyboard !== undefined && { keyboard }),
     ...(!o.settled && { settled: false as const }),
     ...(o.flush !== undefined && { flush: o.flush }),
@@ -224,13 +231,25 @@ function sliverText({ judged, cut, minPiece }: Extract<Shortfall, { of: 'sliver'
  * without judging it again — including `describeScrollResult`, which holds a
  * result and no rect at all.
  */
-function describeClip(edges: readonly string[], visible: number, topCover?: Rect): string {
+function describeClip({ clipped, visible, unknownPast }: ClipFacts, topCover?: Rect): string {
   // Never round a clipped element up to a reassuring 100%: the whole point of
   // the line is that something is missing.
-  const pct = percent(visible);
   const where = topCover === undefined ? 'the viewport' : `the viewport above the soft keyboard over ${frameText(topCover)}`;
-  return `CLIPPED at ${edges.join('/')}, ${pct}% of it is in ${where}`;
+  return `CLIPPED at ${clipped.join('/')}, ${shareText(visible, unknownPast)} of it is in ${where}${unknownPastText(unknownPast)}`;
 }
+
+/** What a clip sentence quotes of a judged element: the edges clipping it, its share in the frame, and the sides it runs past an unknown distance — a standing's facts or a result alike. */
+type ClipFacts = { readonly clipped: readonly Edge[]; readonly visible: number; readonly unknownPast?: readonly Edge[] };
+
+/** The share is only an upper bound: the element runs past some side an unknown distance (`ScrollUntilResult.unknownPast`). */
+const boundedBy = (unknownPast: readonly Edge[] | undefined): unknownPast is readonly Edge[] => unknownPast !== undefined && unknownPast.length > 0;
+
+/** An element's share in the frame as the clip sentences quote it: `N%`, or `at most N%` where the tree does not say how far it runs past the screen's edge (`boundedBy`). */
+const shareText = (visible: number, unknownPast: readonly Edge[] | undefined): string => `${boundedBy(unknownPast) ? 'at most ' : ''}${percent(visible)}%`;
+
+/** Why a share is only an upper bound (`shareText`), or nothing: the source cut the element at the screen's edge there (D17, adapters/types.ts#UiNode.boundsCutAtScreen — uiautomator's only). */
+const unknownPastText = (unknownPast: readonly Edge[] | undefined): string =>
+  boundedBy(unknownPast) ? ` — uiautomator does not say how far it runs past the screen's ${unknownPast.join('/')} edge` : '';
 
 /** `1 swipe`, `3 swipes` — the one spelling of the count every scroll sentence quotes. */
 const swipesText = (n: number): string => countOf(n, 'swipe');
@@ -260,7 +279,7 @@ export function describeScrollResult(r: ScrollUntilResult): string {
     r.covered === undefined ? undefined : `PARTLY UNDER ${nodeText(r.covered.by)}, drawn over it — ${percent(r.covered.shows)}% of it shows, its centre clear`;
   // Partly under a surface the tree does not list, the eyes saw (ui-tree/eyes.ts): said as a cover is.
   const unlisted = surface === undefined ? undefined : `${unlistedText(surface)}, its centre clear`;
-  const clip = r.clipped.length === 0 ? undefined : describeClip(r.clipped, r.visible, topCover);
+  const clip = r.clipped.length === 0 ? undefined : describeClip(r, topCover);
   const measures = clip !== undefined ? 'the CLIPPED box' : 'what is drawn over it too';
   return `visible after ${n} — ${[clip, covered, unlisted].filter((t) => t !== undefined).join('; ')}. A rect assert or screenshot on this element will measure ${measures}${moving}${endTurnText(r.endTurn)}${detentText(r.detent)}`;
 }
@@ -609,7 +628,8 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
         };
       }
       // Clipped at the end of the content, worded by what cuts it (scroll-read.ts#ClipCause).
-      const { clipped, visible } = judged.standing.facts;
+      const { facts } = judged.standing;
+      const { clipped, visible, unknownPast } = facts;
       switch (short.cause.of) {
         // The keyboard's edge: the keyboard, not the layout, is what hides the rest — a container that does not resize
         // for it keeps its last rows under it. Said as such, with how to hide it; the layout-defect wording only when
@@ -619,7 +639,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
           return {
             message:
               `scroll_until ${describe} failed after ${n} — element is in the viewport but ` +
-                `${describeClip(clipped, visible, keyboard.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
+                `${describeClip(facts, keyboard.topCover)}, and the content is exhausted: swiping ${o.lastStroke} ` +
                 `no longer moves it${neither}. The soft keyboard covers the rest — ${hideToJudgeWholeScreen(keyboard.remedy)}; only if it ` +
                 `stays clipped with the keyboard down is it a layout defect. ${last}`,
           };
@@ -637,7 +657,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
               : `The rest lies past ${past}: either the swipes do not scroll that scroll view (swipe inside it), or ${CONTENT_STOPS_SHORT[stopsShort]}.`;
           return {
             message:
-              `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${percent(visible)}% of it is drawn, and the content is exhausted: ` +
+              `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${shareText(visible, unknownPast)} of it is drawn${unknownPastText(unknownPast)}, and the content is exhausted: ` +
                 `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
           };
         }
@@ -647,7 +667,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
           return {
             message:
               `scroll_until ${describe} failed after ${n} — ` +
-                `element is in the viewport but ${describeClip(clipped, visible, judged.under?.topCover)}, ` +
+                `element is in the viewport but ${describeClip(facts, judged.under?.topCover)}, ` +
                 `and the content is exhausted: swiping ${o.lastStroke} no longer moves it${neither}. ` +
                 `The element cannot be fully revealed — that is a layout defect ` +
                 `(no clearance for an overlay?), not a scroll that needs more swipes. ${last}`,
@@ -789,7 +809,7 @@ function shortClause(judged: Judged): string {
   const short = shortOf(judged);
   switch (short.of) {
     case 'clipped':
-      return describeClip(judged.standing.facts.clipped, judged.standing.facts.visible, judged.under?.topCover);
+      return describeClip(judged.standing.facts, judged.under?.topCover);
     case 'sliver':
       return sliverText(short);
     case 'systemBar':
@@ -876,8 +896,8 @@ function shortText(short: Shortfall): string {
       return `no UI tree read succeeded, and no swipe is drawn blind (it could land on a sheet, alert or cover over the screen) — last UI tree read failed: ${short.error.message}`;
     case 'clipped': {
       const { judged } = short;
-      const { clipped, visible } = judged.standing.facts;
-      return `element reached the viewport but stayed ${describeClip(clipped, visible, judged.under?.topCover)} (last rect ${JSON.stringify(judged.node.rect)})`;
+      const { facts } = judged.standing;
+      return `element reached the viewport but stayed ${describeClip(facts, judged.under?.topCover)} (last rect ${JSON.stringify(judged.node.rect)})`;
     }
     case 'covered': {
       const { judged } = short;

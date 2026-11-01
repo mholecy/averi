@@ -1,9 +1,9 @@
 import type { ClippedSide, Rect } from '../adapters/types.js';
 import { drawOrderFound } from '../ui-tree/cover.js';
-import { axisOfEdge, rectIntersection, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, distanceInside, rectIntersection, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { Judged, Since } from './scroll-read.js';
-import { axisOf, OPPOSITE, type Direction } from './swipe.js';
+import { axisOf, OPPOSITE, TOUCH_SLOP, type Direction } from './swipe.js';
 
 /**
  * THE COURSE: which way and how far the next stroke of one `scroll_until` run goes. The round
@@ -172,14 +172,9 @@ const FAR_EDGE: Readonly<Record<Direction, { readonly far: Edge; readonly near: 
  * frame) is not beyond either: turning back could not help it.
  */
 function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
-  const past: Record<Edge, boolean> = {
-    top: rect.y < frame.y,
-    bottom: rect.y + rect.height > frame.y + frame.height,
-    left: rect.x < frame.x,
-    right: rect.x + rect.width > frame.x + frame.width,
-  };
+  const past = (edge: Edge): boolean => distanceInside(rect, frame, edge) < 0;
   const { far, near } = FAR_EDGE[direction];
-  return past[far] && !past[near];
+  return past(far) && !past(near);
 }
 
 /**
@@ -317,6 +312,12 @@ function showsOnlyPast(rect: Rect, far: Edge, cover: Rect, frame: Rect): boolean
 export interface StillNeeds {
   readonly needs: number;
   readonly slack: number;
+  /**
+   * The carry per point to plan with while none was measured over the scroll view, and the shortest drag it may cut a
+   * stroke to — absent: WDA's fling (stroke-plan.ts#UNMEASURED_CARRY, #UNMEASURED_MIN_DRAG); an Android drag's for a
+   * target whose centre is unknown (`unknownCentreNeeds`: CUT_EDGE_CARRY, CUT_EDGE_MIN_DRAG).
+   */
+  readonly unmeasured?: { readonly carry: number; readonly minDrag: number };
 }
 
 /**
@@ -340,6 +341,52 @@ function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direc
   const need = toward === 'down' || toward === 'right' ? lo + len - (wLo + wLen) : wLo - lo;
   const slack = Math.max(0, wLen - len);
   return need <= 0 ? undefined : { needs: need + slack / 2, slack };
+}
+
+/**
+ * What an Android DRAG carries the content per px of finger travel, as `unknownCentreNeeds` plans its stroke with (its
+ * `StillNeeds.unmeasured`): 1.11, the most measured — uiautomator's trees are never measured during a scroll
+ * (stroke-plan.ts#carried runs only where a tree lists a row where it lies, WDA's), and WDA's flings are another physics
+ * (UNMEASURED_CARRY, 2.8). Measured live on the lab's `carousel-in-list` (emulator-5554, API 33): full 569-px drags over
+ * the carousel carried it 451–632 px (0.79–1.11 a px) by run; shorter drags carried less — 145–178 px drags carried
+ * 102–140 px (0.69–0.85 a px). The most, as UNMEASURED_CARRY is WDA's most: a stroke planned on it lands short of what
+ * it needs at every measured carry; an overshoot under half the card's width keeps its centre inside.
+ */
+export const CUT_EDGE_CARRY = 1.11;
+
+/** The shortest drag `unknownCentreNeeds`'s stroke is cut to: swipe.ts#shortenStroke's floor, twice TOUCH_SLOP — still a drag, never a tap. */
+export const CUT_EDGE_MIN_DRAG = 2 * TOUCH_SLOP;
+
+/**
+ * How far inside its frame's far edge the known far side of a target whose centre is unknown must lie for
+ * `unknownCentreNeeds`'s stroke: what the shortest such stroke (CUT_EDGE_MIN_DRAG) carries at the most (CUT_EDGE_CARRY),
+ * 54 px — so even that stroke cannot push the known side past the frame's far edge at the most carry measured; short
+ * drags were measured at 0.69–0.85 a px, which leaves headroom (a 48-px drag carrying some 33–41 px).
+ */
+export const UNKNOWN_CENTRE_MIN_GAP = Math.ceil(CUT_EDGE_MIN_DRAG * CUT_EDGE_CARRY);
+
+/**
+ * What a target whose CENTRE IS UNKNOWN still needs of one more stroke toward `toward` (D17; the carry model turns it
+ * into a stroke, stroke-plan.ts#carryReach): the source cut its `toward` side at the screen's edge
+ * (ui-tree/standing.ts#StandingFacts.unknownPast: uiautomator's), so how far it runs past is unknown, and so is its
+ * centre — measured, C laid at x 586 948 wide was dumped `[586,380][1080,614]`, its listed centre 833 inside the
+ * carousel ending at 1014, its true one 1060 past it. Its FAR side, the one content leaves through, is known: the
+ * stroke may carry it up to the frame's far edge and no further — `needs` that distance, `slack` none, planned at an
+ * Android drag's carry (`unmeasured`: CUT_EDGE_CARRY, CUT_EDGE_MIN_DRAG; the carry model then cuts the stroke to it,
+ * never above the full stroke's reach). After it as much of the target as can lies in the frame. Along either axis: a
+ * row of a vertical list dumped ending at the screen's bottom below its list's (the lab's form-picker, its list ending
+ * at 2154 above the navigation bar, "Faroe Islands" dumped `[0,2080][1080,2220]`) takes it as a card does. Of the
+ * judged match: its rect, its unknown sides (StandingFacts.unknownPast) and the frame it was judged in, cut to what its
+ * scroll views draw (StandingFacts.screen). Undefined — no such stroke — when
+ * the side toward `toward` is not unknown, or when the far side lies within UNKNOWN_CENTRE_MIN_GAP inside the frame's
+ * far edge or past it. A node cut at both edges is such a node: its far side lies on the screen's edge, outside its
+ * frame's, and takes no stroke (its centre stays unknown: ADR 0021's amendment, its residuals).
+ */
+export function unknownCentreNeeds({ node, standing: { facts } }: Pick<Judged, 'node' | 'standing'>, toward: Direction): StillNeeds | undefined {
+  const { far, near } = FAR_EDGE[toward];
+  if (facts.unknownPast === undefined || !facts.unknownPast.includes(near)) return undefined;
+  const gap = distanceInside(node.rect, facts.screen, far);
+  return gap < UNKNOWN_CENTRE_MIN_GAP ? undefined : { needs: gap, slack: 0, unmeasured: { carry: CUT_EDGE_CARRY, minDrag: CUT_EDGE_MIN_DRAG } };
 }
 
 declare const opaque: unique symbol;

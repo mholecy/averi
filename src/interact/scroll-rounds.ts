@@ -14,8 +14,8 @@ import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts } from './scroll-read.js';
 import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
-import { carried, planStroke, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type TouchedOn } from './stroke-plan.js';
-import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, type Course, type EndProof, type EndTurn, type PastSide } from './course.js';
+import { carried, planStroke, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
+import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, unknownCentreNeeds, type Course, type EndProof, type EndTurn, type NextStroke, type PastSide } from './course.js';
 import { probing, seeFlush, startFlush, type Flush, type FlushCheck, type FlushCut, type FlushVerdict, type ProbeMeans } from './flush-check.js';
 import type { Direction } from './swipe.js';
 
@@ -651,6 +651,8 @@ interface State {
   readonly screenBefore: IdentifiedRead | undefined;
   /** Where each stroke drawn since that read touched down (`RoundSeen.drawn`'s `from`), in order. */
   readonly touchDowns: readonly Point[];
+  /** The one stroke a scroll takes for a plain stop's match whose centre is unknown (`centreStroke`) was sent. */
+  readonly centreStroked: boolean;
 }
 
 /** The state before round 0: nothing read, the frame the device as built (`asBuilt`, read before the loop so a device whose screen cannot be read fails there). */
@@ -683,6 +685,7 @@ export function startRounds(rules: RoundRules, asBuilt: DeviceScreen): Rounds {
     detents: undefined,
     screenBefore: undefined,
     touchDowns: [],
+    centreStroked: false,
   };
   return state as unknown as Rounds;
 }
@@ -994,10 +997,15 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
         if (question !== undefined && eyes === undefined) return ask(question);
         const finding: EyesFinding | undefined = eyes === undefined || eyes.sees === 'own' ? undefined : eyes;
         if (finding?.sees !== 'surface' || !(fully || reachesPoint(finding, question?.region ?? best.node.rect, tapPoint(best.node)))) {
-          return stop(s, { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(verdict.of === 'flush' && { flush: verdict.flush }), ...(finding !== undefined && { eyes: finding }) });
+          const visible: VisibleStop = { kind: 'visible', swipes: s.swipes, judged: best, settled, unlocated, ...(verdict.of === 'flush' && { flush: verdict.flush }), ...(finding !== undefined && { eyes: finding }) };
+          // ITS CENTRE UNKNOWN (D17): the plain stop's match cut at the screen's edge on the side the content lies
+          // toward — one more stroke first, cut to bring its known side up to the frame's (`centreStroke`), else this stop.
+          // Never under `fully: true`, which does not stop on a match past its frame (`clipped`) — as one cut at the screen's edge is.
+          return centreStroke(s, visible, { gesture, facts: now.facts, elapsedMs: seen.elapsedMs });
+        } else {
+          unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: { lineY: offered.line.y, remedy: offered.remedy } }) };
+          if (question !== undefined) s.eyesRefused = { asked: askedOf(question), short: unlisted };
         }
-        unlisted = { of: 'unlisted', judged: best, finding, ...(offered !== undefined && { offered: { lineY: offered.line.y, remedy: offered.remedy } }) };
-        if (question !== undefined) s.eyesRefused = { asked: askedOf(question), short: unlisted };
       }
     }
     // Under a screen presented over it (ADR 0018) no swipe moves it out, and a swipe on that screen may
@@ -1190,7 +1198,12 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
   if (plan.presented !== undefined) {
     return holdPresented(s, { kind: 'presented', swipes: s.swipes, judged: best, viewport, next: plan.presented }, current === 'settle' && presentedBefore, seen.elapsedMs);
   }
-  s.strokes = strokeSent(s.strokes);
+  return send(s, next, plan);
+}
+
+/** The stroke `plan` planned for the course's `next` stroke, SENT: the plan's memory and the course told, the swipe counted, a read owed. */
+function send(s: Mutable<State>, next: NextStroke, plan: StrokePlan): Next {
+  s.strokes = strokeSent(plan.memory);
   s.course = sent(s.course, next);
   s.confirmReads = 0;
   s.since = 'stroke';
@@ -1201,6 +1214,45 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
 
 /** One round's step, as `round` returns it. */
 type Next = { state: Rounds; step: RoundStep };
+
+/** A `visible` stop, as `round` makes it. */
+type VisibleStop = Extract<ScrollOutcome, { kind: 'visible' }>;
+
+/**
+ * THE UNKNOWN CENTRE (D17): the plain stop `visible` made — or, first, ONE more stroke. uiautomator cuts a node's bounds
+ * at the screen's edge whatever scroll view it lies past (adapters/types.ts#UiNode.boundsCutAtScreen), so a carousel's
+ * card running past its carousel's edge is listed ending at the screen's: its centre, which the stop judges, is
+ * unknown — measured, C laid at x 586 948 wide was dumped `[586,380][1080,614]`, its listed centre 833 inside the
+ * carousel ending at 1014, its true one 1060 past it, and the stop said "visible". A vertical list's row dumped ending at
+ * the screen's bottom below its list's is the same (the lab's form-picker). So the stop strokes once more toward that
+ * side, cut to what its known side still needs to reach its frame's far edge (course.ts#unknownCentreNeeds), and the
+ * next read's stop is made as it stands, its share "at most" (interact/scroll-text.ts).
+ * Decided and sent HERE, never left to the rest of the round (which could turn it, hold it, or bound it): the course's
+ * next stroke as it stands — sent only when it is no turn (a stroke against the course is none of this rule's), its
+ * plan touches down on no presented screen (`StrokePlan.presented`), and it has a box to be drawn in (a round with no
+ * gesture box draws none); else the stop. Once a scroll (`centreStroked`): a carousel exactly one card wide shows such a
+ * card whole at one offset only, and a rule that stroked until the centre were known could swing it to and fro. Not at
+ * the bound (no swipe or time left).
+ */
+function centreStroke(s: Mutable<State>, visible: VisibleStop, { gesture, facts, elapsedMs }: { gesture: Rect | undefined; facts: TreeFacts; elapsedMs: number }): Next {
+  if (s.centreStroked || s.swipes >= s.rules.maxSwipes || elapsedMs >= s.rules.timeoutMs) return stop(s, visible);
+  const { judged } = visible;
+  const next = nextStroke(s.course);
+  const still = unknownCentreNeeds(judged, next.toward);
+  if (still === undefined || next.turn) return stop(s, visible);
+  const plan = planStroke(s.strokes, {
+    toward: next.toward,
+    reach: next.reach,
+    gesture,
+    read: { facts, target: judged.node },
+    still,
+    ...(!overRegion(s.motion, next.toward) && { screenBox: true }),
+    kind: strokeKind(callEvidence(s), next.toward),
+  });
+  if (plan.presented !== undefined || plan.stroke.points === undefined) return stop(s, visible);
+  s.centreStroked = true;
+  return send(s, next, plan);
+}
 
 /**
  * A `presented` stop (`outcome`) on this read: made at once when this read confirms the last one's hold
