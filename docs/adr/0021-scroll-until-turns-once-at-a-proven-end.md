@@ -421,14 +421,16 @@ the lab's form-picker lists its country list ending at 2154, above the navigatio
    frame is `clipped`, never a stop.
 
 **Device check (2026-11-01, emulator-5554, API 33).** The live visibility group: 153 cases, 147 ok, 6 loud, 0
-mismatches, before and after. The same six LOUD cases appear both times. `scroll:carousel-in-list.C` before: "visible
-after 1 swipe — CLIPPED at right, 89 %", with C at x 470 (63 % of it inside by the app's model). After, in five runs:
-"visible after 2 swipes — CLIPPED at right, at most 90–91 % … uiautomator does not say how far it runs past the
-screen's right edge", then Tapped. The extra stroke carried the carousel 102–140 px, and C ended at x 369–424, its
-centre inside every time and every stroke closer. The D17 shape, by averi's own reply after a 440-px drag: on main,
-with C at 599 (true centre 1073, past 1014), "visible after 0 swipes — CLIPPED at right, 86 %". On this branch, with C
-at 596, one stroke brought it to 464 (true centre 938, inside), then "visible after 1 swipe — CLIPPED at right, at most
-89 % …".
+mismatches, before and after (and after review round 1). The same six LOUD cases appear every time.
+`scroll:carousel-in-list.C` before: "visible after 1 swipe — CLIPPED at right, 89 %", with C at x 470 (63 % of it
+inside by the app's model). At the first version, which planned the stroke at UNMEASURED_CARRY: five runs said "visible
+after 2 swipes — … at most 90–91 %", the extra stroke carrying 102–140 px and C ending at x 369–424. At CUT_EDGE_CARRY
+(review round 1), five runs said "visible after 2 swipes — CLIPPED at right, at most 93 % … uiautomator does not say
+how far it runs past the screen's right edge", then Tapped. The extra stroke carried 251–355 px (0.81–0.93 a px of its
+travel, short of its needs every time), and C ended at x 131–159, its centre inside and every stroke closer. The D17
+shape, by averi's own reply after a 440-px drag: on main, with C at 599 (true centre 1073, past 1014), "visible after 0
+swipes — CLIPPED at right, 86 %". On this branch, with C at 624 (true centre 1098), one stroke brought it to 159 (true
+centre 633), then "visible after 1 swipe — CLIPPED at right, at most 93 % …".
 
 **Residuals.**
 - After its one stroke, or with no room for one, a card wider than about twice what its frame shows past its known
