@@ -151,7 +151,7 @@ describe('compareColorParity — the live-validated semantics', () => {
   it('dominant (mode) sampling is immune to glyph noise — a mean would be dragged dark', () => {
     const captures = capturePair(WHITE, WHITE);
     // Scatter dark "glyph" rows over ~25% of the android card.
-    const png = captures.android.png as PNG;
+    const png = captures.android.image as PNG;
     for (let y = 30; y < 70; y += 8) paint(png, 30, y, 80, 2, '#1A1A1A');
     const r = compareColorParity(cardContract(), captures);
     expect(r.rows[0].android?.hex).toBe(WHITE);
@@ -161,7 +161,7 @@ describe('compareColorParity — the live-validated semantics', () => {
   it('sample: "patches" samples 4 corners + center and survives a busy center', () => {
     const captures = capturePair(WHITE, WHITE);
     // A center blob large enough to win a whole-region mode on android...
-    paint(captures.android.png as PNG, 45, 35, 55, 32, '#3F3F50');
+    paint(captures.android.image as PNG, 45, 35, 55, 32, '#3F3F50');
     const dominant = compareColorParity(cardContract(), captures);
     expect(dominant.rows[0].verdict).toBe('FAIL'); // proves the blob dominates
     // ...but the corner patches still see the card fill.
@@ -272,7 +272,7 @@ describe('compareColorParity — missing anchors and off-png rects', () => {
     // Push half the android card below the png bottom edge: 100x60 rect with
     // only 100x24 remaining on-png → 60% clipped.
     (captures.android.tree.children[0] as UiNode).rect = { x: 20, y: 376, width: 100, height: 60 };
-    paint(captures.android.png as PNG, 20, 376, 100, 24, WHITE);
+    paint(captures.android.image as PNG, 20, 376, 100, 24, WHITE);
     const r = compareColorParity(cardContract(), captures);
     expect(r.rows[0].android?.hex).toBe(WHITE);
     expect(r.notes.some((note) => note.includes("dominant may be a neighbor's fill"))).toBe(true);
@@ -343,7 +343,7 @@ describe('compareColorParity — failing closed', () => {
   // with the tree it is to be measured against — not patched after the fact.
   it('throws on a tree with no usable width (never a vacuous pass)', () => {
     const captures = capturePair(WHITE, WHITE);
-    captures.android = measured(n({ children: [n({ identifier: 'card' })] }), captures.android.png); // all rects 0-sized
+    captures.android = measured(n({ children: [n({ identifier: 'card' })] }), captures.android.image); // all rects 0-sized
     expect(() => compareColorParity(cardContract(), captures)).toThrow(/width could not be inferred/);
   });
 
@@ -359,7 +359,7 @@ describe('compareColorParity — failing closed', () => {
   it('flags an insane scale in the stats line — the scale\'s own note, worded by verify/scale.ts', () => {
     const captures = capturePair(WHITE, WHITE);
     // png 200 wide but root claims 25 → scale 8, outside [0.5, 4].
-    captures.android = measured(root(25, 400, [leaf('card', 2, 2, 12, 8)]), captures.android.png);
+    captures.android = measured(root(25, 400, [leaf('card', 2, 2, 12, 8)]), captures.android.image);
     const r = compareColorParity(cardContract(), captures);
     expect(formatColorParity(r)).toContain('scale 8.000 outside [0.5, 4] — wrong png/tree pairing?');
   });
@@ -368,13 +368,13 @@ describe('compareColorParity — failing closed', () => {
     // Root inset at x=5 → not a window, and the widest rect is inset too, so
     // the width is the CONTENT width. It used to be a note on a passing table.
     const captures = capturePair(WHITE, WHITE);
-    captures.android = measured(root(25, 400, [leaf('card', 2, 2, 12, 8)], 5), captures.android.png);
+    captures.android = measured(root(25, 400, [leaf('card', 2, 2, 12, 8)], 5), captures.android.image);
     expect(() => compareColorParity(cardContract(), captures)).toThrow(/CONTENT width/);
   });
 
   it('notes alpha<255 pixels (alpha ignored, RGB used as stored)', () => {
     const captures = capturePair(WHITE, WHITE);
-    paint(captures.android.png as PNG, 0, 0, 4, 4, BG, 128);
+    paint(captures.android.image as PNG, 0, 0, 4, 4, BG, 128);
     const r = compareColorParity(cardContract(), captures);
     expect(r.stats.find((s) => s.platform === 'android')?.translucent).toBe(true);
     expect(formatColorParity(r)).toContain('! alpha<255 pixels present');
@@ -382,7 +382,7 @@ describe('compareColorParity — failing closed', () => {
 
   it('warns when the dominant bucket covers under 40% of the region (busy content)', () => {
     const captures = capturePair(WHITE, WHITE);
-    const png = captures.android.png as PNG;
+    const png = captures.android.image as PNG;
     // Four equal vertical stripes → winning bucket share 25%.
     paint(png, 20, 20, 25, 60, '#FF0000');
     paint(png, 45, 20, 25, 60, '#00FF00');

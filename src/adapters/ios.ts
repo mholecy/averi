@@ -149,7 +149,7 @@ export class IosAdapter implements DeviceAdapter {
   /**
    * Where screenshot() captures (D26b): `idb` on the idb tree source — the helper first, the `idb` CLI as its fallback —
    * and `simctl` on the WDA one or under AVERI_IOS_SCREENSHOT=simctl. Fixed for the adapter's life: one source for every
-   * frame, so a capture pair never compares two (screenshot()).
+   * frame (types.ts#DeviceAdapter.screenshot).
    */
   private readonly screenshotVia: 'idb' | 'simctl';
   /** The app the typing goes into, as far as this adapter knows (FrontApp). */
@@ -421,10 +421,9 @@ export class IosAdapter implements DeviceAdapter {
    *   it is ready and idle, the `idb` CLI otherwise, and the CLI again when the helper dies under it (a read). Measured
    *   on the lab simulator, 120 interleaved rounds each (backlog "### D26 diag"): through a persistent fb-idb client 77
    *   ms p50 / 88 p90 and no stall, the CLI 168 / 179 and no stall, where `simctl io screenshot` took 398 / 417 and
-   *   stalled ~+1 000 ms in 8 of 120 (no simctl variant avoided it). No simctl fallback when idb fails: idb draws the
-   *   Dynamic Island where simctl shows the app's background, so a stability pair of one frame from each compares two
-   *   different images and reads as moving (verify/capture.ts) — the idb error is the answer, and the kill switch is
-   *   the way back (AVERI_IOS_SCREENSHOT=simctl).
+   *   stalled ~+1 000 ms in 8 of 120 (no simctl variant avoided it). No simctl fallback when idb fails (one source,
+   *   types.ts#DeviceAdapter.screenshot): idb draws the Dynamic Island where simctl shows the app's background — the
+   *   idb error is the answer, and the kill switch is the way back (AVERI_IOS_SCREENSHOT=simctl).
    * - simctl (the WDA tree source, or the kill switch): `xcrun simctl io <udid> screenshot <file>`, as before D26b.
    * Either way the bytes are judged here (screenshot-bytes.ts): a command that succeeds with an empty or foreign answer
    * is a transport error naming that command.

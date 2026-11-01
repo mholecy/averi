@@ -1027,6 +1027,20 @@ export interface DeviceAdapter {
    * device and command — screenshot-bytes.ts. verify/shot.ts#captureShot keeps
    * a floor under it (an empty buffer equals an empty buffer, which the
    * stability wait would read as settled).
+   *
+   * ONE SOURCE (this and `capture()`; the decision:
+   * docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md): every
+   * frame of one adapter comes from one capture source with one deterministic
+   * encoding, so the same still screen gives the same frame on every call —
+   * byte-identical PNG bytes, identical raw pixels — because
+   * verify/shot.ts#Shot.equals compares frames exactly to decide "settled".
+   * An adapter therefore must not fall back to a second capture tool
+   * mid-session: two tools can draw one screen differently, and a pair of
+   * frames from each reads a still screen as moving (iOS:
+   * ios.ts#IosAdapter.screenshot). Android's raw-or-`-p` per call
+   * (`capture()`) is still one source: `screencap` reading one framebuffer,
+   * raw or encoded on the device — `Shot.equals` compares that mixed pair by
+   * its decoded pixels.
    */
   screenshot(): Promise<Buffer>;
   /**
@@ -1035,7 +1049,8 @@ export interface DeviceAdapter {
    * and decoded (verify/shot.ts). Android's: `screencap 2>/dev/null | gzip -1`, the raw frame
    * (adapters/screenshot-bytes.ts#screencapRaw), or — on a device the raw path refuses — `screencap -p`'s PNG, as it
    * is. `screenshot()` is then this capture, encoded on the host when it is pixels. Throws as `screenshot()` does: a
-   * capture is a frame or a transport error.
+   * capture is a frame or a transport error. It keeps the one-source rule written on `screenshot()`
+   * (types.ts#DeviceAdapter.screenshot).
    */
   capture?(): Promise<ScreenCapture>;
   /**
@@ -1228,7 +1243,10 @@ export interface RgbaImage {
   data: Buffer | Uint8Array;
 }
 
-/** An `RgbaImage` whose bytes are a Buffer (pixelmatch, `Buffer.compare`) — a decoded PNG's, a raw capture's. */
+/**
+ * Raw pixels: an `RgbaImage` whose bytes are a Buffer (pixelmatch, `Buffer.compare`), whatever the source — a PNG
+ * decoded (verify/png.ts#decodePng) or a raw capture as it came (Android's, `capture()`).
+ */
 export interface RawImage extends RgbaImage {
   data: Buffer;
 }

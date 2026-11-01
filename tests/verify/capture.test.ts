@@ -171,7 +171,7 @@ describe('captureFrame — stability over the caller\'s region', () => {
     expect(sleeps).toEqual([STABILITY_DELAY_MS]);
     // The capture that confirmed stability — the later of the pair — is the frame, and it is what gets measured.
     expect(got.shot.equals(Shot.ofPng(clock(2)))).toBe(true);
-    expect(got.measured.png?.data[0]).toBe(2);
+    expect(got.measured.image?.data[0]).toBe(2);
     expect(got.measured.scale).toMatchObject({ scale: 0.1 });
   });
 
@@ -425,7 +425,7 @@ describe('captureFrame — the tree beside the png', () => {
     expect(got.shot.equals(Shot.ofPng(png(1000, 2000)))).toBe(true);
     expect(got.measured.tree).toBeUndefined();
     expect(got.measured.error).toMatch(/^UI tree read failed after 5 attempts: null root node$/);
-    expect(got.measured.png).toBeUndefined();
+    expect(got.measured.image).toBeUndefined();
     // One stability wait, then five attempts with four waits between them, each the tree-read budget's 300 ms.
     expect(sleeps).toEqual([300, 300, 300, 300, 300]);
   });
@@ -437,7 +437,7 @@ describe('captureFrame — the tree beside the png', () => {
     };
     const got = await captureFrame(fake, { tree: SCREEN });
     expect(got.measured.tree).toBe(SCREEN);
-    expect(got.measured.png).toMatchObject({ width: 1000, height: 2000 });
+    expect(got.measured.image).toMatchObject({ width: 1000, height: 2000 });
     expect(got.measured.scale).toMatchObject({ scale: 1, width: 1000 });
   });
 
@@ -445,7 +445,7 @@ describe('captureFrame — the tree beside the png', () => {
     const fake = device([Buffer.from('not a png')]);
     const got = await captureFrame(fake, { readTree: true });
     expect(got.measured.tree).toBeDefined();
-    expect(got.measured.png).toBeUndefined();
+    expect(got.measured.image).toBeUndefined();
     // The frame's one sentence: pngjs's own words, then how to recover.
     expect(got.measured.error).toMatch(/^screenshot PNG decode failed: unrecognised content at end of stream — re-run; if it repeats/);
     // No adb or simctl here since 2026-10-08: a non-PNG is the adapter's refusal to word.
@@ -513,9 +513,9 @@ describe('measuredFrameFor — the pure tail captureFrame and the comparator fix
     expect(got.measured.tree).toBe(SCREEN);
     expect(got.measured.scale).toEqual(direct.scale);
     expect(got.measured.scale).toMatchObject({ scale: 2, width: 500 });
-    expect(got.measured.png?.width).toBe(direct.png.width);
-    expect(got.measured.png?.height).toBe(direct.png.height);
-    expect(Buffer.from(got.measured.png!.data).equals(Buffer.from(direct.png.data))).toBe(true);
+    expect(got.measured.image?.width).toBe(direct.image.width);
+    expect(got.measured.image?.height).toBe(direct.image.height);
+    expect(Buffer.from(got.measured.image!.data).equals(Buffer.from(direct.image.data))).toBe(true);
   });
 
   it('without a device screen it scales from the tree — the comparator fixtures\' default', () => {
@@ -571,7 +571,7 @@ describe('measuredFrameFor — the pure tail captureFrame and the comparator fix
     const malformed = { ...node({ rect: { x: 0, y: 0, width: 0, height: 0 } }), children: undefined as unknown as UiNode[] };
     const measured = measuredFrameFor(malformed, decode(png(1000, 2000)));
     expect(measured.tree).toBe(malformed);
-    expect(measured.png.width).toBe(1000);
+    expect(measured.image.width).toBe(1000);
     expect(measured.scale.error).toMatch(/^the png scale could not be derived from this tree: .* — the tree is not well-formed/);
   });
 });

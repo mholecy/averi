@@ -1,6 +1,6 @@
 import { encodePng } from '../adapters/png-encode.js';
-import type { DeviceAdapter, ScreenCapture } from '../adapters/types.js';
-import { decodePng, type DecodedPng } from './png.js';
+import type { DeviceAdapter, RawImage, ScreenCapture } from '../adapters/types.js';
+import { decodePng } from './png.js';
 
 /**
  * ONE CAPTURE of the screen, as the pixel readers hold it (D19, docs/adr/0035-android-captures-raw-pixels.md): the
@@ -20,7 +20,7 @@ export class Shot {
   /** A raw capture's PNG, once encoded. */
   #encoded: Promise<Buffer> | undefined;
   /** A PNG capture's pixels, once decoded — or its decode error. */
-  #decoded: { image: DecodedPng } | { error: unknown } | undefined;
+  #decoded: { image: RawImage } | { error: unknown } | undefined;
 
   private constructor(private readonly capture: ScreenCapture) {}
 
@@ -42,7 +42,7 @@ export class Shot {
   }
 
   /** The pixels; throws decodePng's error for a PNG that does not decode, every time it is asked. */
-  decode(): DecodedPng {
+  decode(): RawImage {
     if (this.capture.kind === 'rgba') return this.capture.image;
     if (this.#decoded === undefined) {
       try {
@@ -56,7 +56,7 @@ export class Shot {
   }
 
   /** The pixels, or undefined when the PNG does not decode (`decode()` without the throw). */
-  tryDecode(): DecodedPng | undefined {
+  tryDecode(): RawImage | undefined {
     try {
       return this.decode();
     } catch {
@@ -64,7 +64,11 @@ export class Shot {
     }
   }
 
-  /** The same screen: see the class doc for how each pair of forms is compared. */
+  /**
+   * The same screen: see the class doc for how each pair of forms is compared. Exactly — bytes, or decoded pixels for a
+   * mixed raw/PNG pair — so it relies on the adapter's one-source rule (adapters/types.ts#DeviceAdapter.screenshot): a
+   * still screen captures to equal frames.
+   */
   equals(other: Shot): boolean {
     const [a, b] = [this.capture, other.capture];
     if (a.kind === 'png' && b.kind === 'png') return a.bytes.equals(b.bytes);

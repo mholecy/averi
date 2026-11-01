@@ -181,7 +181,8 @@ it; it is a ~1 s wait inside CoreSimulator, worst beside a `simctl spawn launchc
   stdout from a fake fb-idb, byte-equal.
 - **The WDA tree source keeps `simctl io screenshot` exactly as before**, and `AVERI_IOS_SCREENSHOT=simctl` forces it
   on the idb source too (SETUP.md, troubleshooting). Both are fixed when the adapter is made — the kill switch is read
-  once per adapter — so an adapter captures every frame from one source.
+  once per adapter — so an adapter captures every frame from one source (the rule, for every adapter, is on
+  `adapters/types.ts#DeviceAdapter.screenshot`).
 - **No simctl fallback at run time.** idb draws the Dynamic Island (a black pill, 378×112 px at the top centre of the
   1206×2622 frame) where simctl shows the app's background, and 16 corner pixels differ; the rest is equal (same size,
   same sRGB). The stability wait (`verify/capture.ts`) compares a pair of captures byte for byte: one from each source

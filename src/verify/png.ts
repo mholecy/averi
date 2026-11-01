@@ -23,11 +23,8 @@ import type { RawImage } from '../adapters/types.js';
  * were weighed and rejected: a per-platform binary breaks the `npx` install.
  */
 
-/** The decoded screenshot every pixel reader reads (adapters/types.ts#RgbaImage, D19: an adapter's capture is one). */
-export type { RgbaImage } from '../adapters/types.js';
-
-/** `decodePng`'s answer: an `RgbaImage` whose bytes are a Buffer (pixelmatch, `Buffer.compare`). */
-export type DecodedPng = RawImage;
+/** The decoded screenshot every pixel reader reads (adapters/types.ts#RgbaImage, D19: an adapter's capture is one), and its Buffer-backed form, this decoder's answer (adapters/types.ts#RawImage). */
+export type { RawImage, RgbaImage } from '../adapters/types.js';
 
 /**
  * Decodes `bytes` as pngjs would: the fast path when it takes the input, pngjs
@@ -35,7 +32,7 @@ export type DecodedPng = RawImage;
  * is `PNG.sync.read` on an input the fast path declined: pngjs's error, worded
  * by pngjs.
  */
-export function decodePng(bytes: Uint8Array): DecodedPng {
+export function decodePng(bytes: Uint8Array): RawImage {
   const buffer = asBuffer(bytes);
   const fast = fastDecode(buffer);
   if (fast !== undefined) return fast;
@@ -113,7 +110,7 @@ function asBuffer(bytes: Uint8Array): Buffer {
  * Exported for the tests (tests/verify/png.test.ts), which pin which inputs the
  * fast path takes; no production importer — callers decode with `decodePng`.
  */
-export function fastDecode(input: Uint8Array, crc32: Crc32 | null = nativeCrc): DecodedPng | undefined {
+export function fastDecode(input: Uint8Array, crc32: Crc32 | null = nativeCrc): RawImage | undefined {
   if (crc32 === null) return undefined;
   const bytes = asBuffer(input);
   if (bytes.length < SIGNATURE.length || !bytes.subarray(0, SIGNATURE.length).equals(SIGNATURE)) return undefined;
