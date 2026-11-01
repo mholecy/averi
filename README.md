@@ -133,6 +133,7 @@ On a Linux/Windows box you get the full Android toolset — pass `platforms: ["a
 npm install
 npm test           # vitest
 npm run lint       # typecheck src + tests
+npm run mutate     # mutation run over the pure leaves' tests (ARCHITECTURE.md §8)
 npm run build      # tsc → dist/
 npm run dev        # run the MCP server over stdio from source
 ```

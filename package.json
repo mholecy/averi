@@ -40,7 +40,8 @@
     "dev": "tsx src/mcp/server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit && tsc -p tsconfig.test.json"
+    "lint": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "mutate": "node --import tsx scripts/mutation/mutate.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -51,6 +52,8 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
     "@types/node": "^20.0.0",
     "@types/pixelmatch": "^5.2.6",
     "@types/pngjs": "^6.0.5",

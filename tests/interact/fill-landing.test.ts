@@ -32,6 +32,7 @@ describe('landingOf — did this reading land, and how', () => {
     // the placeholder kind (probe B)
     ['a reading exactly the named placeholder, which is the value too: placeholder, not verified', 'Search', { value: 'Search', placeholder: 'Search' }, { kind: 'placeholder' }],
     ['the same with clear', 'Search', { value: 'Search', clear: true, placeholder: 'Search' }, { kind: 'placeholder' }],
+    ['a reading other than the named placeholder lands', 'hello', { value: 'hello', clear: true, placeholder: 'Search' }, { kind: 'landed' }],
     // masked, by length
     ['masked without clear: held bullets plus the typed length', '•••••••', { value: 'abcd', held: 3 }, { kind: 'landed' }],
     ['masked without clear: more than held + typed lands too (the short direction only)', '••••••••', { value: 'abcd', held: 3 }, { kind: 'landed' }],
@@ -265,6 +266,7 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['auto-capitalised, with clear', { observed: 'Hello world', value: 'hello world', clear: true }, { kind: 'case', positions: 1 }],
     ['no clear onto held text: only the run after it is compared', { observed: 'NOTE: HI THERE', before: 'Note: ', value: 'hi there' }, { kind: 'case', positions: 7 }],
     ['no clear: of several runs that match but for case, the closest counts — not the first', { observed: 'HELLO Hello', value: 'hello' }, { kind: 'case', positions: 1 }],
+    ['no clear: of several runs that match but for case, the closest counts — not the last', { observed: 'Hello HELLO', value: 'hello' }, { kind: 'case', positions: 1 }],
     ['no clear, the held text changed too: compared whole, closest run', { observed: 'NOTE: HI THERE', before: 'xyz', value: 'hi there' }, { kind: 'case', positions: 7 }],
     ['with clear the earlier text is gone: the whole reading is the typing (`priorText`)', { observed: 'abXY', before: 'ab', value: 'abxy', clear: true }, { kind: 'case', positions: 2 }],
     ['with clear the field must EQUAL the value: longer but for case is a length', { observed: 'Re: Hello', value: 'hello', clear: true }, { kind: 'length' }],
@@ -274,6 +276,7 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['typing onto a field showing only its placeholder: the placeholder is no held text, so nothing is sliced off', { observed: 'Searchx', before: 'Search', value: 'searchx', placeholder: 'Search' }, { kind: 'case', positions: 1 }],
     ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length' }],
     ['a pair equal only upper-cased (dotless `ı`, `i`) is case too', { observed: 'ıd', value: 'id', clear: true }, { kind: 'case', positions: 1 }],
+    ['a pair equal only lower-cased (the Kelvin sign `\u212A`, `k`) is case too', { observed: '\u212Ad', value: 'kd', clear: true }, { kind: 'case', positions: 1 }],
     ['`ß`/`SS` differ in length: a plain difference, never case', { observed: 'SS', value: 'ß', clear: true }, { kind: 'length' }],
     // D28: a reformatted strict prefix is a dropped tail — iOS React Native's rf2 read "transformed the input"
     ['a grouping field that dropped the tail (rf2): a dropped tail, not a transformed input', { observed: '1 234 567,', value: '1234567,89', clear: true }, { kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true }],
