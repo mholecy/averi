@@ -317,6 +317,21 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
       expect(fake.taps).toEqual(['login_title']);
     });
 
+    // D42 (ADR 0036): a read no wait cures on the look after the move is not wrapped — isTerminal sees its class.
+    it('a PersistentReadError on the look after the dismissal tap: thrown as it came, not wrapped in AfterDismissalTap', async () => {
+      const fake = iosFake();
+      const wedged = new PersistentReadError('wedged until a reboot');
+      fake.onTap = (id, self) => {
+        if (id === 'login_title') {
+          self.uiTree = async () => {
+            throw wedged;
+          };
+        }
+      };
+      await expect(tapElement(fake, 'id:login_submit', { ...FAST, dismissals: [TITLE_TAP] })).rejects.toBe(wedged);
+      expect(fake.taps).toEqual(['login_title']);
+    });
+
     it('an ambiguous refusal on the look after the dismissal tap keeps its headline and says below it what was tapped', async () => {
       const fake = iosFake();
       fake.onTap = (id, self) => {
@@ -885,6 +900,19 @@ describe('tapElement — an in-tree keyboard (no oracle) covering the target: a 
         'Nothing was pressed; the screen is as the step found it',
       '  (last UI tree read failed: device offline)',
     ]);
+  });
+
+  // D42 (ADR 0036): the same for the second look, before anything was pressed — not wrapped in KeyboardWithoutDismissal.
+  it('a PersistentReadError on the second look: thrown as it came, not wrapped in KeyboardWithoutDismissal', async () => {
+    const fake = iosFake();
+    const wedged = new PersistentReadError('wedged until a reboot');
+    onRead(fake, 3, () => {
+      fake.uiTree = async () => {
+        throw wedged;
+      };
+    });
+    await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toBe(wedged);
+    expect(fake.taps).toEqual([]);
   });
 
   it('a refusal on the second look (refuse mode, a second interactive match revealed) keeps its FIRST line as the headline and says below it that nothing was pressed', async () => {

@@ -1,4 +1,4 @@
-import type { DeviceAdapter, Point, Rect, UiNode } from '../adapters/types.js';
+import { PersistentReadError, type DeviceAdapter, type Point, type Rect, type UiNode } from '../adapters/types.js';
 import type { OrderEyes } from '../ui-tree/eyes.js';
 import type { Covering, FrameVerdict, Uncovered } from '../ui-tree/keyboard-cover.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
@@ -260,6 +260,7 @@ export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: 
   try {
     resolved = seenLook(adapter, await resolveSettled(adapter, target, opts));
   } catch (e) {
+    if (e instanceof PersistentReadError) throw e; // a read no wait cures passes through as it came (ADR 0036, D42)
     throw failed(e);
   }
   const point = tapPoint(resolved.node);

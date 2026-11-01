@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { KeyboardWitness, Rect, UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type KeyboardWitness, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { fillField } from '../../src/interact/fill.js';
 import { AfterKeyboardDismissal, KeyboardStateDisagreement, dismissKeyboard, resolveClearOfKeyboard, type KeyboardDismissal } from '../../src/interact/keyboard.js';
 import { KEYBOARD_HIDE_DELAY_MS } from '../../src/interact/keyboard-model.js';
@@ -297,6 +297,20 @@ describe('tapElement — a target under the Android soft keyboard is not tapped 
     };
     const error = (await tapElement(fake, 'id:login_submit', FAST).catch((e: unknown) => e)) as Error;
     expect(error.message.split('\n')).toEqual([TIMEOUT_AFTER_BACK, '  (last UI tree read failed: device offline)']);
+  });
+
+  // D42 (ADR 0036): a read no wait cures on the look after back is not wrapped — the flow engine's isTerminal sees its class.
+  it('a PersistentReadError on the look after back: thrown as it came, not wrapped in AfterKeyboardDismissal', async () => {
+    const fake = loginFake();
+    const wedged = new PersistentReadError('wedged until a reboot');
+    fake.onKey = (_key, self) => {
+      self.uiTree = async () => {
+        throw wedged;
+      };
+    };
+    await expect(tapElement(fake, 'id:login_submit', FAST)).rejects.toBe(wedged);
+    expect(fake.keys).toEqual(['back']);
+    expect(fake.taps).toEqual([]);
   });
 
   it('an ElementSpec target is named in the flow vocabulary', async () => {

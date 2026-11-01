@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 // Date.now-based and still fire; measured: the suite is ~1 s faster, not
 // slower, with every test green either way.
 vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
-import type { UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
 import { FlowEngine, FlowError, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
 import { EngineSession } from '../../src/flow/launch.js';
@@ -19,6 +19,7 @@ import { readFile } from 'node:fs/promises';
 import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { ACTIVE_WINDOW_HINT, missNote } from '../../src/ui-tree/miss.js';
+import { boundReads } from '../helpers/terminal-read.js';
 
 const CONFIG = parseConfig(`
 app:
@@ -3302,6 +3303,41 @@ flows:
           'that moment, back may have navigated away — check the screen (ui_snapshot / screenshot)',
       },
     ]);
+  });
+
+  // D42 (ADR 0036): the guard's look after back passes a read no wait cures through as it came, so the step's error is
+  // terminal (engine.ts#isTerminal) — the ladder neither escalates to the next rung nor salvages the one that failed.
+  it('a wedged read on the look after back stops the ladder: no escalation, no salvage, the wedged error is the answer', async () => {
+    const fake = loginFake();
+    fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
+    const wedged = new PersistentReadError('wedged until a reboot');
+    fake.onKey = (_key, self) => {
+      self.uiTree = boundReads(1, async () => {
+        throw wedged;
+      });
+    };
+    const ladder = parseConfig(`
+app: { android: { package: md.bank.app } }
+states:
+  home:
+    detect: { element: { id: home_marker } }
+    reach: [tap_submit, relaunch]
+flows:
+  tap_submit:
+    steps:
+      - tap: { id: login_submit }
+  relaunch:
+    steps:
+      - launch: { clearState: false }
+`);
+    const error = (await FlowEngine.run(ladder, fake, FAST, { state: 'home' }).catch((e: unknown) => e)) as FlowError;
+    expect(error).toBeInstanceOf(FlowError);
+    expect(error.message).toContain('wedged until a reboot');
+    expect(fake.keys).toEqual(['back']);
+    expect(fake.taps).toEqual([]);
+    expect(fake.launches).toEqual([]);
+    expect(error.trace.some((t) => t.detail?.includes('escalating to') === true)).toBe(false);
+    expect(error.trace.some((t) => t.action.startsWith('⚠ salvage') || t.action.startsWith('↻ recovery'))).toBe(false);
   });
 
   it('the window state was STALE and cleared while averi waited: ONE ⚠ tap line that explains the wait, no back, the tap', async () => {
