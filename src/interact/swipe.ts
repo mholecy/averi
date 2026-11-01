@@ -179,8 +179,9 @@ export const strokeLength = ({ from, to }: Stroke): number => Math.hypot(to.x - 
 
 /**
  * The floor on a `dragMs` duration: Android's own `input swipe` default
- * (adapters/android.ts#swipe), so a short stroke — a probe, a halved one —
- * is never sent faster than an undragged stroke.
+ * (adapters/android.ts#swipe — kept equal to it, change both), so a short
+ * stroke — a probe, a halved one — is never sent faster than an undragged
+ * stroke.
  */
 export const MIN_DRAG_MS = 300;
 
