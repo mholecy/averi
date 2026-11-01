@@ -154,7 +154,7 @@ Three findings:
 
 **Decision.**
 - **A reading that is `reformatOf` a strict prefix of what the field should hold, some of the typing in it, is a
-  dropped tail** (`fill-reformat.ts#tailOf`, shared by `droppedTail` and `whereTyped`): the tail alone is typed again at
+  dropped tail** (`fill-landing.ts#tailOf` since A2, shared by `droppedTail` and `whereTyped`): the tail alone is typed again at
   the end — no wipe — under every condition ADR 0023 sets (`on-return` delivery, a steady reading, the typing provably
   in the field, at most `MAX_TAIL_RETYPES`, again only when a retype moved the field), the drop is reported once it
   landed whole (`reportDroppedTail` → D24's split), and the read-back then passes as `reformatted`. Tight: the prefix
@@ -168,8 +168,8 @@ Three findings:
   sends nothing to move it. A field that moved the caret elsewhere would put the tail in the middle: the read-back
   then fails (no reformat of the value), the safe side. Android never retypes a tail (`may-arrive-late`), so there
   the change is the diagnosis and the `elsewhere` proof below.
-- **The diagnosis.** A mismatch whose reading is such a prefix is `Difference` `dropped-tail` (`fill-verdict.ts#
-  differenceOf`, before the case and same-length comparisons): `… but the field shows 10 — the first 8 typed
+- **The diagnosis.** A mismatch whose reading is such a prefix is `Difference` `dropped-tail` (`fill-landing.ts#
+  differenceOf` since A2, before the case and same-length comparisons): `… but the field shows 10 — the first 8 typed
   characters are there, grouped by the field (separators of its own added), the last 2 did not land: dropped, or
   refused by the field (a length cap, a character it does not take) — not a transformed input; content withheld from
   this error`. A prefix the field only RESPACED (a typed space shown as a no-break space, nothing added — `Jan\u00A0`
@@ -221,7 +221,7 @@ app held `SK31 1200 00`).
   never typed again, and D24's split never started — the same bug as D28's, one step earlier), and the exact rule
   passed only a value typed with its own spaces (f5, `held.includes(value)`); with clear the earlier text is none, so
   f2 passed. **Decision:** without clear, a reading whose letters and digits do not START with the earlier text's is
-  judged after no earlier text as well, second (`fill-reformat.ts#priorsOf`, asked by `landedReformat` — the typing's
+  judged after no earlier text as well, second (`fill-landing.ts#priorsOf` since A2, asked by `landedReformat` — the typing's
   landing rule — and by `tailOf` — the retype, `whereTyped`'s missing text and the verdict's `dropped-tail`). Letters
   and digits, not the text as typed (review round 1, MAJOR-1): a field that regroups as it is typed shows an earlier
   `1,000` as `10,00…` once typed into, and that text is still there — compared as typed, `10,001,000` passed for a
@@ -256,3 +256,21 @@ app held `SK31 1200 00`).
 
 **Not checked on the device.** The owner re-runs, on iOS: `live.ts --udid … --cases f1,f7` (both should read `Filled …
 the field shows them reformatted`: f1 `2 separators added`, f7's fills `1` and `2`).
+
+## Amendment: the landing rule in one module (2026-11-01, A2)
+
+`landedReformat`, `tailOf`, `landedSome`, `priorText` and `priorsOf` moved from fill-reformat.ts to
+`interact/fill-landing.ts`, beside the exact rule (`landingOf`) and the mismatch's classification (`differenceOf`);
+`landedReformat`, `landedSome`, `priorText` and `priorsOf` are private there, asked through `landingOf`, `tailOf`
+and `droppedTail`. fill-reformat.ts keeps the character rules alone (`reformatOf`, `prefixOf`, `skeleton`). No rule
+changed.
+
+- **The literal-start slice is deliberate.** `differenceOf` compares what follows the earlier text when the reading
+  starts with it LITERALLY (`typedPartOf`), not `priorsOf`'s letters-and-digits rule: a skeleton match cannot be sliced
+  back to reading positions. An earlier `1,000` that a regrouping field shows, with `5678` typed, as `10,005,678`
+  starts with `1000` by its letters and digits, but no slice of the reading is the typing — so it is compared whole,
+  as a vanished earlier text is. No input was found where the two rules give another `Difference`, and a `Difference`
+  never changes pass or fail (mutation-checked: `differenceOf` switched to `priorsOf` kills no test).
+- **Residual — the placeholder asymmetry.** A value equal to the named placeholder that the field shows exactly is
+  read back `placeholder` (not verified); the same placeholder shown GROUPED for an ungrouped value (`SK00 0000` for
+  `SK000000`) is held as empty (`heldText` is exact equality), lands as nothing, and fails `unchanged`. Kept as is.

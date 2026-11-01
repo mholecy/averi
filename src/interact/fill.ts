@@ -19,8 +19,8 @@ import { assertTypeable } from './type-text.js';
 import { fillFailureText, focusTapNote } from './fill-text.js';
 import { heldText, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
 import { clearStep, startClear, type ClearFacts } from './fill-clear.js';
-import { differenceOf } from './fill-verdict.js';
-import { typeAndConfirm } from './fill-type.js';
+import { needsHeldCount } from './fill-landing.js';
+import { retypesTail, typeAndConfirm } from './fill-type.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
 export const DEFAULT_FOCUS_DELAY_MS = 350;
@@ -125,7 +125,7 @@ function sameField(tree: UiNode, chosen: UiNode): UiNode | undefined {
  * and a floating-label `text` node on iOS idb was reported filled with
  * nothing typed. An INPUT with no value is an empty field (UiNode.value):
  * a fill whose text it dropped entirely is a mismatch, `shows 0`
- * (2026-10-09). Fields that expose BULLETS verify by length (see `landed`). A
+ * (2026-10-09). Fields that expose BULLETS verify by length (fill-landing.ts#landingOf). A
  * matched node that is not an input (INPUT_ROLE) is warned about, with the
  * nearest input named — not refused (see `notInput` below).
  * An EMPTY value is the focus tap and the optional clear alone: nothing is
@@ -186,13 +186,11 @@ export async function fillField(
   const isInput = node.role === INPUT_ROLE;
   // The post-focus re-read (below, after the focus tap) is SKIPPED where nothing it feeds can change the verdict
   // (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md): a value typed without
-  // `clear` into an EMPTY input its source says is plain (types.ts#UiNode.secure `false`), named by a sole `id`
-  // selector, on an adapter that never types a dropped tail again. What the re-read feeds, and why none of it
-  // matters there:
-  // - the count the masked length rule starts from (`maskedHeld`): a plain field shows its text, not bullets, so the
-  //   read-back compares content (`includes`), which needs no count. A field said plain that shows bullets after all
-  //   is failed loudly instead (`masked-said-plain` below): its count was never read, so no length of it proves
-  //   anything.
+  // `clear` into a field whose held count the masked rule does not need (fill-landing.ts#needsHeldCount), named by a
+  // sole `id` selector, on an adapter that never types a dropped tail again (fill-type.ts#retypesTail). What the
+  // re-read feeds, and why none of it matters there:
+  // - the count the masked length rule starts from: the typing is told it is `'unread'` (fill-landing.ts#Expectation),
+  //   and a field that shows bullets after all fails `masked-said-plain` there.
   // - `lastTree`, which becomes `screenBeforeTyping` when typing starts — the screen sameField's twin fallback must
   //   stay on. The fallback is asked only when the selector stops matching; an `id` keeps matching through typing,
   //   while a label, hint or value selector may stop (the field's text changed), and without a pre-typing read the
@@ -202,21 +200,15 @@ export async function fillField(
   //   (`skipped.from`, in refetch).
   // - the other inputs `whereTyped` compares (fill-type.ts), keyed by rect: read off the resolution's tree instead,
   //   so a layout that moves on focus (keyboard avoidance) reads `unproven` there. That proof gates only the dropped
-  //   tail's retype (docs/adr/0023-fill-types-a-dropped-tail-again.md), which only an `on-return` adapter (iOS) does —
-  //   hence the delivery gate: iOS keeps the re-read, Android (`may-arrive-late`, never retyping a tail) skips it.
+  //   tail's retype — hence the delivery gate: iOS keeps the re-read, Android (never retyping a tail) skips it.
   // - what the field showed before typing (`shownBeforeTyping`): empty before the tap, and taken as empty. The cost:
   //   a plain field that inserts text on focus (a `+421 ` prefix) and takes none of the typing is worded as a length
   //   mismatch, not as "did not change".
   // undefined: the re-read is made. Else `from`, the screen the field was resolved on — the wording of a `lost`
   // alone (refetch).
+  const delivery = adapter.typingDelivery ?? 'may-arrive-late';
   const skipped: { from: ScreenIdentity } | undefined =
-    value !== '' &&
-    !clear &&
-    isInput &&
-    node.secure === false &&
-    heldText(node.value, node.placeholder) === '' &&
-    soleIdOf(target) !== undefined &&
-    adapter.typingDelivery !== 'on-return'
+    value !== '' && !clear && !needsHeldCount(node) && soleIdOf(target) !== undefined && !retypesTail(delivery)
       ? { from: screenIdentity(resolvedIn) }
       : undefined;
   const refetch = async (): Promise<{ node: UiNode; lost?: undefined } | { node?: undefined; lost: LostWhy }> => {
@@ -261,7 +253,7 @@ export async function fillField(
   const placeholder = node.placeholder;
 
   let current: UiNode | undefined = node;
-  let preText = heldText(node.value, placeholder); // what the field holds when typing starts (see `landed`)
+  let preText = heldText(node.value, placeholder); // what the field holds when typing starts (the masked rule's count: fill-landing.ts#landingOf)
   let maskedAppend: FillResult['maskedAppend'];
   if (value !== '' && !clear && (preText === '' || isMaskedValue(preText)) && skipped === undefined) {
     // The pre-tap read is stale for exactly the fields the length rule cares
@@ -284,7 +276,7 @@ export async function fillField(
       maskedAppend = { held: preText.length };
     }
   }
-  // What a MASKED read-back must add the typed length to (see `landed`): the
+  // What a MASKED read-back must add the typed length to (fill-landing.ts#landingOf): the
   // bullets the field held before typing — and only bullets. A masked
   // field's content reads as bullets on both platforms (2026-09-17), so a
   // plain reading before typing was not its content: an Android password
@@ -399,26 +391,19 @@ export async function fillField(
         resolvedValue: node.value,
         before: shownBeforeTyping,
         placeholder,
-        maskedHeld,
+        held: skipped === undefined ? maskedHeld : 'unread',
         pollMs,
         field: current ?? node,
-        delivery: adapter.typingDelivery ?? 'may-arrive-late',
+        delivery,
       },
     );
-    // A field said plain that shows bullets after all, where the re-read was skipped: what it held after focus was
-    // never read (an autofill on focus would be unseen), so its length proves nothing unless it is exactly the
-    // typed length. Any other length fails, saying so — never the length rule's pass on `held + typed` with a
-    // `held` of 0 (two dropped keys under five autofilled bullets read as a pass).
-    if (skipped !== undefined && (typed.kind === 'landed' || typed.kind === 'missed') && isMaskedValue(typed.observed) && typed.observed.length !== value.length) {
-      throw failure({ code: 'mismatch', typed: value.length, shows: typed.observed.length, differs: { kind: 'masked-said-plain' } });
-    }
     if (typed.kind === 'missed') {
       const wrong = await notInput();
       throw failure({
         code: 'mismatch',
         typed: value.length,
         shows: typed.observed.length,
-        differs: differenceOf({ observed: typed.observed, before: shownBeforeTyping, value, clear: clear === true, maskedHeld, placeholder }),
+        differs: typed.differs,
         notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
         ...(typed.again.length > 0 && { again: typed.again }),
         ...(typed.elsewhere !== undefined && { elsewhere: typed.elsewhere }),
@@ -432,10 +417,7 @@ export async function fillField(
       typed.kind === 'not-taken'
         ? { kind: 'not-taken' }
         : typed.kind === 'landed'
-          ? // The value IS the named placeholder's text, and the field shows
-            // it: typed, or empty with the typing dropped — the tree cannot
-            // tell (review of this branch, probe B). Not verified.
-            placeholder !== undefined && typed.observed === placeholder
+          ? typed.placeholder === true // fill-landing.ts#Landing: not verified
             ? { kind: 'placeholder' }
             : { kind: 'landed' }
           : // No reading: when the last read did not find the field at all,

@@ -546,6 +546,52 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     await expect(fillField(fake, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(`fill: typed 8 characters but the field shows 6 ${SAID_PLAIN}`);
   });
 
+  // A2: the said-plain failure is a landing of its own (fill-landing.ts#Landing `said-plain`), with today's timing: a
+  // reading LONGER than typed stops the poll at once, a shorter one polls the whole budget (it may still be arriving).
+  it('skipped: a field said plain failing on bullets reads no more of the tree than before — at once when longer, the whole poll when shorter', async () => {
+    const counted = (fake: FakeAdapter) => {
+      const reads = { n: 0 };
+      const read = fake.uiTree.bind(fake);
+      fake.uiTree = async (...a: Parameters<FakeAdapter['uiTree']>) => (reads.n++, read(...a));
+      return reads;
+    };
+    const longer = field({ secure: false });
+    onFocus(longer, (f) => (f.value = '•'.repeat(5)));
+    appendBullets(longer, 2);
+    const longerReads = counted(longer);
+    await expect(fillField(longer, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(SAID_PLAIN);
+    expect(longerReads.n).toBe(3); // the settle wait (2), the first value poll — it stops there
+    const shorter = field({ secure: false });
+    appendBullets(shorter, 2);
+    const shorterReads = counted(shorter);
+    await expect(fillField(shorter, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(SAID_PLAIN);
+    expect(shorterReads.n).toBe(7); // the settle wait (2), the whole value poll (5)
+  });
+
+  // A2 code review: until A2 fill.ts threw this failure itself for a skipped re-read, before its generic mismatch path —
+  // no `elsewhere`, no `again`, no not-input finding. It now leaves through the typing's `missed`; the reply must stay
+  // the same even when another input changed while typing (a masked reading proves no missing tail, so nothing reads
+  // as typed elsewhere).
+  it('skipped: a field said plain that shows FEWER bullets, another input changed meanwhile — the same reply, nothing named elsewhere', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { form: screen(el({ role: 'textfield', identifier: 'amount_input', secure: false }), el({ role: 'textfield', identifier: 'note', secure: false })) },
+      'form',
+    );
+    fake.typingDelivery = 'may-arrive-late';
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + '•'.repeat(text.length - 2);
+      const note = fake.live().children.find((n) => n.identifier === 'note');
+      if (note) note.value = text.slice(-2); // the dropped `rd` appended to another input
+    };
+    const failed = await fillField(fake, { id: 'amount_input' }, 'password', FAST).then(
+      () => undefined,
+      (e: Error) => e.message,
+    );
+    expect(failed).toBe(`fill: typed 8 characters but the field shows 6 ${SAID_PLAIN}`);
+  });
+
   it('accepted residual (R1, ADR 0028): a field WRONGLY said plain, autofilled with N bullets on focus, dropping exactly N keys, passes silently', async () => {
     // Review of this branch, scenario K. With the re-read the count would start at 3 and `3 + 5` fail; skipped, the
     // field shows 3 + (5 − 3) = 5 bullets, the typed length — the one reading no read-back can tell from a landed fill.
@@ -1430,7 +1476,7 @@ describe('fillField — a textfield whose null value is empty: a dropped fill is
  * letters are kept in the test names). Since the fill-clear deepening
  * (2026-10-09) the clear's RULES behind A, E, I, J, K and the third round
  * are rows of tests/interact/fill-clear.test.ts (clearStep, one reading at a
- * time) and the mismatch's kinds rows of fill-verdict.test.ts
+ * time) and the mismatch's kinds rows of fill-landing.test.ts
  * (differenceOf); what stays here for those is the driver's part — the
  * device calls in their order and count, and the facts it hands on.
  */

@@ -1,10 +1,11 @@
 /**
  * What a fill MEASURED — the facts interact/fill.ts#fillField returns, and
  * nothing else: no I/O, no judgement, no sentence. A leaf, so that the
- * three modules that read them each import it and none imports another for
+ * modules that read them each import it and none imports another for
  * its types — fill.ts measures (and imports fill-text.ts for the words of
  * the errors it throws, `fillFailureText` over a `FillFailure` here),
- * fill-verdict.ts judges, fill-text.ts says. Until
+ * fill-landing.ts judges a reading, fill-verdict.ts judges the result,
+ * fill-text.ts says. Until
  * 2026-10-09 these types lived in fill.ts, which imported fill-verdict.ts
  * by value while fill-verdict.ts imported them back as types: no runtime
  * cycle, but a cycle in the module graph all the same (code review of the
@@ -14,7 +15,7 @@
  * the DEFINITION every measurement of a field is taken in — what it holds as
  * opposed to what it shows — so the driver (fill.ts), the clear's rules
  * (fill-clear.ts) and the mismatch's classifier
- * (fill-verdict.ts#differenceOf) count the same characters (2026-10-09,
+ * (fill-landing.ts#differenceOf) count the same characters (2026-10-09,
  * the fill-clear deepening; it was a closure inside fillField until then,
  * and only fillField could ask it).
  */
@@ -314,7 +315,7 @@ export interface OtherInput {
 /**
  * What differs between the typed value and a read-back that did not match
  * it, without carrying either string — classified by ONE function,
- * interact/fill-verdict.ts#differenceOf, all six kinds (until 2026-10-09
+ * interact/fill-landing.ts#differenceOf, all seven kinds (until 2026-10-09
  * fill.ts chose `unchanged`, `masked` and a partly masked `length` in a
  * ternary at the throw, and a helper of its own the rest):
  * - `masked`: the field shows bullets, compared by length only; `held` the
@@ -322,8 +323,8 @@ export interface OtherInput {
  * - `masked-said-plain`: the field shows bullets, though its source said it
  *   is plain, so what it held after focus was never read and only the typed
  *   length passes (interact/fill.ts, the skipped re-read: docs/adr/
- *   0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md).
- *   Made by fill.ts itself, not by differenceOf: it is a fact of the skip.
+ *   0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md;
+ *   the held count `'unread'`, fill-landing.ts#Landing `said-plain`).
  * - `case`: the typed text IS there but for letter case — at `positions`
  *   characters (with clear the whole field; without, the best-matching run
  *   of it). UIKit's sentence auto-capitalisation turning `hello` into
@@ -340,7 +341,7 @@ export interface OtherInput {
  *   Review of this branch: probes D and D2 were told "the app transformed
  *   the input".
  * - `dropped-tail` (D28): the field holds the first `landed` characters of
- *   the typing, reformatted (interact/fill-reformat.ts#tailOf): `grouped`
+ *   the typing, reformatted (interact/fill-landing.ts#tailOf): `grouped`
  *   when the field added separators of its own, else it only showed its typed
  *   spaces as another kind of space (`Jan\u00A0` for `Jan Novak`) — and not the last
  *   `dropped` — a tail the
