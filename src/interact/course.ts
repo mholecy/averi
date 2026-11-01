@@ -1,6 +1,6 @@
 import type { ClippedSide, Rect } from '../adapters/types.js';
 import { drawOrderFound } from '../ui-tree/cover.js';
-import { axisOfEdge, insideBy, rectIntersection, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, distanceInside, rectIntersection, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { Judged, Since } from './scroll-read.js';
 import { axisOf, OPPOSITE, TOUCH_SLOP, type Direction } from './swipe.js';
@@ -172,14 +172,9 @@ const FAR_EDGE: Readonly<Record<Direction, { readonly far: Edge; readonly near: 
  * frame) is not beyond either: turning back could not help it.
  */
 function beyondFarEdge(rect: Rect, direction: Direction, frame: Rect): boolean {
-  const past: Record<Edge, boolean> = {
-    top: rect.y < frame.y,
-    bottom: rect.y + rect.height > frame.y + frame.height,
-    left: rect.x < frame.x,
-    right: rect.x + rect.width > frame.x + frame.width,
-  };
+  const past = (edge: Edge): boolean => distanceInside(rect, frame, edge) < 0;
   const { far, near } = FAR_EDGE[direction];
-  return past[far] && !past[near];
+  return past(far) && !past(near);
 }
 
 /**
@@ -380,16 +375,17 @@ export const UNKNOWN_CENTRE_MIN_GAP = Math.ceil(CUT_EDGE_MIN_DRAG * CUT_EDGE_CAR
  * Android drag's carry (`unmeasured`: CUT_EDGE_CARRY, CUT_EDGE_MIN_DRAG; the carry model then cuts the stroke to it,
  * never above the full stroke's reach). After it as much of the target as can lies in the frame. Along either axis: a
  * row of a vertical list dumped ending at the screen's bottom below its list's (the lab's form-picker, its list ending
- * at 2154 above the navigation bar, "Faroe Islands" dumped `[0,2080][1080,2220]`) takes it as a card does. `frame` is
- * the frame it was judged in, cut to what its scroll views draw (StandingFacts.screen). Undefined — no such stroke — when
+ * at 2154 above the navigation bar, "Faroe Islands" dumped `[0,2080][1080,2220]`) takes it as a card does. Of the
+ * judged match: its rect, its unknown sides (StandingFacts.unknownPast) and the frame it was judged in, cut to what its
+ * scroll views draw (StandingFacts.screen). Undefined — no such stroke — when
  * the side toward `toward` is not unknown, or when the far side lies within UNKNOWN_CENTRE_MIN_GAP inside the frame's
  * far edge or past it. A node cut at both edges is such a node: its far side lies on the screen's edge, outside its
  * frame's, and takes no stroke (its centre stays unknown: ADR 0021's amendment, its residuals).
  */
-export function unknownCentreNeeds(rect: Rect, unknownPast: readonly Edge[] | undefined, frame: Rect, toward: Direction): StillNeeds | undefined {
+export function unknownCentreNeeds({ node, standing: { facts } }: Pick<Judged, 'node' | 'standing'>, toward: Direction): StillNeeds | undefined {
   const { far, near } = FAR_EDGE[toward];
-  if (unknownPast === undefined || !unknownPast.includes(near)) return undefined;
-  const gap = insideBy(rect, frame, far);
+  if (facts.unknownPast === undefined || !facts.unknownPast.includes(near)) return undefined;
+  const gap = distanceInside(node.rect, facts.screen, far);
   return gap < UNKNOWN_CENTRE_MIN_GAP ? undefined : { needs: gap, slack: 0, unmeasured: { carry: CUT_EDGE_CARRY, minDrag: CUT_EDGE_MIN_DRAG } };
 }
 

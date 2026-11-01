@@ -919,14 +919,14 @@ const SCREEN_EDGE_SLACK = 1;
  * full-width row of a full-width list lies on the screen's edges with its frame: none. In the order of `EDGES`.
  */
 export function cutAtScreenEdges(rect: Rect, frame: Rect, screen: Rect): Edge[] {
-  return EDGES.filter((edge) => Math.abs(insideBy(rect, screen, edge)) <= SCREEN_EDGE_SLACK && insideBy(frame, screen, edge) > SCREEN_EDGE_SLACK);
+  return EDGES.filter((edge) => Math.abs(distanceInside(rect, screen, edge)) <= SCREEN_EDGE_SLACK && distanceInside(frame, screen, edge) > SCREEN_EDGE_SLACK);
 }
 
 /**
  * How far `rect`'s `edge` side lies INSIDE `outer`'s same side, toward `outer`'s middle: positive inside, 0 on it,
  * negative past it. For `cutAtScreenEdges` and interact/course.ts#unknownCentreNeeds.
  */
-export function insideBy(rect: Rect, outer: Rect, edge: Edge): number {
+export function distanceInside(rect: Rect, outer: Rect, edge: Edge): number {
   switch (edge) {
     case 'top':
       return rect.y - outer.y;
@@ -987,9 +987,9 @@ function stackedAcross(nodes: readonly UiNode[], axis: ScrollAxis): boolean {
  * tree's nesting is its nodes' ancestry (draw-order.ts#listsAncestry), which
  * `inScroller` and `drawnIn` ask; `unclipped`: whether its source reports
  * frames unclipped (draw-order.ts#listsUnclippedFrames), which `axesOf` and
- * `contentToward` ask — the two readers of the tree's dialect, both in draw order;
- * `cutAtScreen`: whether its source cuts a node's bounds at the screen's edge
- * (draw-order.ts#listsBoundsCutAtScreen), which `drawnIn`'s `unknownPast` asks.
+ * `contentToward` ask; `cutAtScreen`: whether its source cuts a node's bounds at
+ * the screen's edge (draw-order.ts#listsBoundsCutAtScreen), which `drawnIn`'s
+ * `unknownPast` asks — the three readers of the tree's dialect, all in draw order.
  */
 export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen = false }: { readonly ancestry: boolean; readonly unclipped?: boolean; readonly cutAtScreen?: boolean }): Clips {
   const chains = new Map<UiNode, readonly Rect[]>();

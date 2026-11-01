@@ -1238,7 +1238,7 @@ function centreStroke(s: Mutable<State>, visible: VisibleStop, { gesture, facts,
   if (s.centreStroked || s.swipes >= s.rules.maxSwipes || elapsedMs >= s.rules.timeoutMs) return stop(s, visible);
   const { judged } = visible;
   const next = nextStroke(s.course);
-  const still = unknownCentreNeeds(judged.node.rect, judged.standing.facts.unknownPast, judged.standing.facts.screen, next.toward);
+  const still = unknownCentreNeeds(judged, next.toward);
   if (still === undefined || next.turn) return stop(s, visible);
   const plan = planStroke(s.strokes, {
     toward: next.toward,

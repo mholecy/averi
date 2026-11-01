@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { CUT_EDGE_CARRY, CUT_EDGE_MIN_DRAG, UNKNOWN_CENTRE_MIN_GAP, unknownCentreNeeds } from '../../src/interact/course.js';
+import type { Judged } from '../../src/interact/scroll-read.js';
+import type { Direction } from '../../src/interact/swipe.js';
+import type { Edge } from '../../src/ui-tree/geometry.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { containsPoint } from '../../src/ui-tree/geometry.js';
@@ -205,22 +208,26 @@ describe("a sheet presented BY SHAPE (ADR 0018's fallback, on every Android tree
   });
 });
 
+/** `unknownCentreNeeds` of a judged match with `rect`, its unknown sides `unknownPast` and its frame `frame` — the three facts it reads. */
+const needsOf = (rect: Rect, unknownPast: readonly Edge[] | undefined, frame: Rect, toward: Direction) =>
+  unknownCentreNeeds({ node: { rect }, standing: { facts: { unknownPast, screen: frame } } } as unknown as Pick<Judged, 'node' | 'standing'>, toward);
+
 describe('course.ts#unknownCentreNeeds — what one more stroke needs for a target whose centre is unknown', () => {
   const frame = CAROUSEL;
   const DRAG = { unmeasured: { carry: CUT_EDGE_CARRY, minDrag: CUT_EDGE_MIN_DRAG } };
   it("its near side unknown, its far side known and UNKNOWN_CENTRE_MIN_GAP or more inside the frame's far edge: that distance, no slack, an Android drag's carry — along either axis", () => {
-    expect(unknownCentreNeeds({ x: 382, y: 380, width: 698, height: 234 }, ['right'], frame, 'right')).toEqual({ needs: 316, slack: 0, ...DRAG });
-    expect(unknownCentreNeeds({ x: 0, y: 380, width: 700, height: 234 }, ['left'], frame, 'left')).toEqual({ needs: 314, slack: 0, ...DRAG });
-    expect(unknownCentreNeeds({ x: 0, y: 1200, width: 1080, height: 1020 }, ['bottom'], { x: 0, y: 300, width: 1080, height: 1700 }, 'down')).toEqual({ needs: 900, slack: 0, ...DRAG });
+    expect(needsOf({ x: 382, y: 380, width: 698, height: 234 }, ['right'], frame, 'right')).toEqual({ needs: 316, slack: 0, ...DRAG });
+    expect(needsOf({ x: 0, y: 380, width: 700, height: 234 }, ['left'], frame, 'left')).toEqual({ needs: 314, slack: 0, ...DRAG });
+    expect(needsOf({ x: 0, y: 1200, width: 1080, height: 1020 }, ['bottom'], { x: 0, y: 300, width: 1080, height: 1700 }, 'down')).toEqual({ needs: 900, slack: 0, ...DRAG });
   });
   it(`none with the gap under ${UNKNOWN_CENTRE_MIN_GAP}, with both sides unknown, with the side toward it known (the far one, or one across the axis, unknown), or with none`, () => {
     const rect = { x: 382, y: 380, width: 698, height: 234 };
-    expect(unknownCentreNeeds({ ...rect, x: 66 + UNKNOWN_CENTRE_MIN_GAP - 1 }, ['right'], frame, 'right')).toBeUndefined();
-    expect(unknownCentreNeeds({ ...rect, x: 66 + UNKNOWN_CENTRE_MIN_GAP }, ['right'], frame, 'right')).toEqual({ needs: UNKNOWN_CENTRE_MIN_GAP, slack: 0, ...DRAG });
-    expect(unknownCentreNeeds({ x: 0, y: 380, width: 1080, height: 234 }, ['left', 'right'], frame, 'right')).toBeUndefined();
-    expect(unknownCentreNeeds(rect, ['right'], frame, 'left')).toBeUndefined();
-    expect(unknownCentreNeeds(rect, ['top'], frame, 'right')).toBeUndefined();
-    expect(unknownCentreNeeds(rect, undefined, frame, 'right')).toBeUndefined();
+    expect(needsOf({ ...rect, x: 66 + UNKNOWN_CENTRE_MIN_GAP - 1 }, ['right'], frame, 'right')).toBeUndefined();
+    expect(needsOf({ ...rect, x: 66 + UNKNOWN_CENTRE_MIN_GAP }, ['right'], frame, 'right')).toEqual({ needs: UNKNOWN_CENTRE_MIN_GAP, slack: 0, ...DRAG });
+    expect(needsOf({ x: 0, y: 380, width: 1080, height: 234 }, ['left', 'right'], frame, 'right')).toBeUndefined();
+    expect(needsOf(rect, ['right'], frame, 'left')).toBeUndefined();
+    expect(needsOf(rect, ['top'], frame, 'right')).toBeUndefined();
+    expect(needsOf(rect, undefined, frame, 'right')).toBeUndefined();
   });
   it(`the Android figures: CUT_EDGE_CARRY ${CUT_EDGE_CARRY} a px, the shortest drag ${CUT_EDGE_MIN_DRAG} px, so the least gap ${UNKNOWN_CENTRE_MIN_GAP} px`, () => {
     expect([CUT_EDGE_CARRY, CUT_EDGE_MIN_DRAG, UNKNOWN_CENTRE_MIN_GAP]).toEqual([1.11, 48, 54]);
