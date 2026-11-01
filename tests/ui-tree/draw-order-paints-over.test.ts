@@ -8,6 +8,8 @@ import { drawOrder, drawnOverStrip } from '../../src/ui-tree/draw-order.js';
  * draw-order.ts asked directly (backlog D45) where only other suites reached it before: `paintsOver`'s own-content and
  * clickable-layer exemptions (ADR 0003; tests/verify/pixel-chrome.test.ts judges the same shapes through the pixel
  * assert), `drawnOverAt`, the parser's port `drawnOverStrip`, and `ofKeyboardBand`.
+ * The paintsOver shapes mirror pixel-chrome.test.ts's (its "own content and clickable layers" and round-2 probes):
+ * a change to one set must be made in step with the other.
  */
 
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });

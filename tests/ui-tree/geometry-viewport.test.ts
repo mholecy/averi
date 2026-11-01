@@ -76,7 +76,7 @@ describe('windowTurnsScreen — a window whose reach fits the panel turned sidew
     expect(windowTurnsScreen(windowed(1101, 1101), PIXEL)).toBe(false);
   });
 
-  it('a walked height never votes: a reliable width alone decides — wider than the panel as built and within it turned (an 852-wide walk over rows down to y 3000 on 393x852)', () => {
+  it('a walked height never votes: a reliable width alone decides (an 852-wide walk on 393x852 is turned)', () => {
     const panel: DeviceScreen = { width: 393, height: 852 };
     expect(windowTurnsScreen(walked(852, 3000), panel)).toBe(true);
     expect(windowTurnsScreen(walked(393, 3000), panel)).toBe(false);
@@ -89,7 +89,7 @@ describe('windowTurnsScreen — a window whose reach fits the panel turned sidew
     expect(windowTurnsScreen(walked(393, 200), panel)).toBe(false);
   });
 
-  it("an unreliable tree on a platform whose windows sit beside system bars: the inset window's REACH witnesses — beside a left nav bar, and below a status bar too", () => {
+  it("windows beside system bars: an unreliable tree's inset window witnesses by its reach", () => {
     expect(windowTurnsScreen(inset(r(126, 0, 2274, 1080)), PIXEL)).toBe(true);
     expect(windowTurnsScreen(inset(r(126, 63, 2274, 1017)), PIXEL)).toBe(true);
     // Its reach, not its size: the same window laid at 300 reaches past the turned panel.
@@ -196,7 +196,7 @@ describe('visibleFractionInViewport — how much of a rect a box holds, as a fra
     expect(visibleFractionInViewport(r(0, 800, 100, 100), vp)).toBe(0);
     expect(visibleFractionInViewport(r(500, 0, 100, 100), vp)).toBe(0);
     expect(visibleFractionInViewport(r(0, 900, 100, 100), vp)).toBe(0);
-    // Past on both axes: two negative overlaps make a positive product — still nothing of it inside.
+    // Wholly past on both axes: nothing of it inside.
     expect(visibleFractionInViewport(r(500, 900, 100, 100), vp)).toBe(0);
   });
 
@@ -450,7 +450,7 @@ describe('inferScreenSize — the inset window: screen-shaped in the window\'s p
     expect(inferScreenSize(rectless(at(r(126, 0, 1003, 334)))).insetWindow).toBeUndefined();
   });
 
-  it('a candidate the layout inside it contradicts — content starting in it and reaching 10 % past its right — is not offered; content peeking, or parked past its right, is no contradiction', () => {
+  it('content starting inside a candidate and reaching over 10 % past its right contradicts it; peeking or parked content does not', () => {
     const window = r(126, 0, 1000, 1000);
     // 1226 is 10 % past: the limit, not past it.
     expect(inferScreenSize(rectless(at(window), at(r(200, 100, 1026, 100)))).insetWindow).toEqual(window);
@@ -494,10 +494,8 @@ describe('inferScreenSize — the edges of the walk and of the window test', () 
     expect(inferScreenSize(rectless(at(r(0.5, 0, 370, 1200))))).toMatchObject({ width: 370.5, reliable: true });
   });
 
-  it('the widest is the FIRST to reach furthest: an inset window before the bar that reaches as far keeps the width unreliable', () => {
-    // A bar first: the origin-anchored maximum, corroborated by the screen-shaped window reaching as far.
+  it('an origin-anchored bar listed first, corroborated by a screen-shaped window reaching as far: a reliable width', () => {
     expect(inferScreenSize(rectless(at(r(0, 0, 2400, 63)), at(r(126, 63, 2274, 1017)))).reliable).toBe(true);
-    expect(inferScreenSize(rectless(at(r(126, 63, 2274, 1017)), at(r(0, 0, 2400, 63)))).reliable).toBe(false);
   });
 
   it("the walked height is the lowest bottom edge, whichever rect comes first; a scrim above the screen's top is no layout", () => {

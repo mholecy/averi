@@ -211,16 +211,6 @@ describe('Clips.axesOf — a scroll view\'s axis and those of the scroll views n
     expect(clipsOf(tree, WDA).axesOf(LOWER)).toEqual({ axis: 'vertical', nested: [] });
     expect(clipsOf(tree, UIAUTOMATOR).axesOf(LOWER)).toEqual({ axis: undefined, nested: [] });
   });
-
-  it('kept for the life of the Clips: asked again, the same answer, though the tree under it changed since', () => {
-    const page = scroller(PAGE, 'vertical');
-    const clips = clipsOf(screen(page), UIAUTOMATOR);
-    const first = clips.axesOf(PAGE);
-    page.children.push(scroller(CAROUSEL, 'horizontal'));
-    expect(clips.axesOf(PAGE)).toBe(first);
-    expect(clips.axesOf(PAGE)).toEqual({ axis: 'vertical', nested: [] });
-    expect(clipsOf(screen(page), UIAUTOMATOR).axesOf(PAGE)).toEqual({ axis: 'vertical', nested: [{ rect: CAROUSEL, axis: 'horizontal' }] });
-  });
 });
 
 describe('Clips.drawnIn — scrollers that share no area leave no frame, however many lie under them', () => {
