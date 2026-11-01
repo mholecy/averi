@@ -23,7 +23,7 @@ fling) and residual 2 (the WDA plain stop on a centre a fraction of a point out)
 read after a stroke is the settled read) accepted (1a51687b, cf5c0ac0; merged 4cd4825a).
 2026-11-01 (performance backlog D17): the amendment "a side uiautomator cut at the screen's edge" (below) accepted
 (orchestrator, owner's mandate; f11ed5f0 … 4d07fc5c and the code review's fixes on `fix/d17-screen-edge-bounds`;
-merged on main).
+merged ee517997).
 
 ## Context
 
