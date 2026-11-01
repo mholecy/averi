@@ -1,4 +1,5 @@
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from '../adapters/input-text.js';
+import { firstUntypeable, untypeableRefusal, type Typeable } from '../adapters/typeable.js';
 import type { DeviceAdapter } from '../adapters/types.js';
 
 /**
@@ -33,6 +34,17 @@ import type { DeviceAdapter } from '../adapters/types.js';
  * adapter keeps a defensive assert of its own for a caller that bypasses
  * interact/.
  *
+ * Then what the adapter can type (D43a, docs/adr/0037-a-value-the-adapter-
+ * cannot-type-is-refused-before-any-device-call.md): a character outside its
+ * `typeable` set (DeviceAdapter.typeable — printable ASCII on both platforms
+ * today) is refused here too, by the same callers, before the same nothing.
+ * Before it, iOS's `idb ui text` failed the whole call with a Python trace
+ * AFTER the fill's tap and clear, and Android's `input text` typed every
+ * character before it and then crashed, the field half-typed. The control
+ * check comes first: a control character is a key on every platform, and its
+ * remedy (`pressKey`) is its own. An ASCII value pays one regex test more —
+ * no device call, no wait.
+ *
  * The error names the character by code point, never the value around it:
  * values may be credentials.
  */
@@ -48,10 +60,14 @@ function visibleEscape(ch: string): string {
   return `"${SHORT_ESCAPES[ch] ?? `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`}"`;
 }
 
-/** Throws when `value` holds a character typing cannot deliver as text (see the module doc). */
-export function assertTypeable(value: string): void {
+/** Throws when `value` holds a character typing cannot deliver as text, or one `typeable` refuses (see the module doc). */
+export function assertTypeable(value: string, typeable: Typeable): void {
   const match = value.match(CONTROL_CHAR_RE);
-  if (match === null) return;
+  if (match === null) {
+    const untypeable = firstUntypeable(value, typeable);
+    if (untypeable !== undefined) throw new Error(untypeableRefusal(untypeable, typeable));
+    return;
+  }
   const ch = match[0];
   const code = `U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
   throw new Error(
@@ -63,6 +79,6 @@ export function assertTypeable(value: string): void {
 
 /** Type into whatever is focused, after `assertTypeable` — the one path for a caller that has no field to fill. */
 export async function typeIntoFocused(adapter: DeviceAdapter, value: string): Promise<void> {
-  assertTypeable(value);
+  assertTypeable(value, adapter.typeable);
   await adapter.typeText(value);
 }

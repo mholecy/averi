@@ -15,6 +15,7 @@ import { appInfoNames } from './simctl-appinfo.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { sleep } from '../util/sleep.js';
+import type { Typeable } from './typeable.js';
 
 /**
  * How long uiTree({ settle: true }) waits before its one re-read of an idb
@@ -129,6 +130,18 @@ function appKey(front: FrontApp): AppKey | undefined {
 }
 
 /**
+ * What `idb ui text` can type (types.ts#DeviceAdapter.typeable, ADR 0037): printable ASCII and `\n`. idb maps the whole
+ * string through its KEY_MAP before it sends anything (fb-idb idb/common/hid.py), and KEY_MAP holds exactly U+0020–U+007E
+ * and `\n` (the Return key): any other character fails the whole call — exit 1, a Python trace, nothing typed
+ * (docs/bugs/2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md). The `\n` is idb's fact, kept here; interact/
+ * refuses it before this set is asked, as a control character (type-text.ts — the Return key is `pressKey('enter')`).
+ */
+const IDB_TYPEABLE: Typeable = {
+  refuses: /[^\x20-\x7e\n]/u,
+  says: "on iOS averi types only printable ASCII (U+0020–U+007E): `idb ui text` has no key for any other character and fails the whole call",
+};
+
+/**
  * iOS adapter: `xcrun simctl` for lifecycle (and screenshots on WDA), `idb` for input (and screenshots on idb, D26b), and
  * an injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
  * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
@@ -141,6 +154,8 @@ export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
   /** `idb ui text` delivers its HID events before it returns (types.ts#TypingDelivery, measured 2026-10-19). */
   readonly typingDelivery = 'on-return' as const;
+  /** What `idb ui text` types, under either tree source (WDA's types through idb too): IDB_TYPEABLE. */
+  readonly typeable = IDB_TYPEABLE;
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;

@@ -1,5 +1,6 @@
 import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
+import { NOT_PRINTABLE_ASCII, type Typeable } from '../../src/adapters/typeable.js';
 
 export const node = (partial: Partial<UiNode>): UiNode => ({
   role: 'other',
@@ -97,6 +98,15 @@ export function iosLoginFake({
 }
 
 /**
+ * What the fake types by default (types.ts#DeviceAdapter.typeable, ADR 0037): printable ASCII, as both real adapters —
+ * so a test typing through the fake is refused where the device would refuse it.
+ */
+export const FAKE_TYPEABLE: Typeable = { refuses: NOT_PRINTABLE_ASCII, says: 'the fake types only printable ASCII (U+0020–U+007E)' };
+
+/** A fake that types anything: for a test of what is typed, not of what an adapter refuses. */
+export const PERMISSIVE: Typeable = { refuses: /(?!)/u, says: 'the fake types anything' };
+
+/**
  * Programmable fake device: named screens, tap-driven transitions.
  * `onTap(identifier)` mutates `current` to simulate the app reacting.
  */
@@ -105,6 +115,8 @@ export class FakeAdapter implements DeviceAdapter {
   platform: 'android' | 'ios' = 'android';
   /** Assignable: the fake's typing lands when typeText returns (types.ts#TypingDelivery); a test of Android's queue sets `may-arrive-late`. */
   typingDelivery: TypingDelivery = 'on-return';
+  /** Assignable: what typeText types — FAKE_TYPEABLE, printable ASCII; a test of typing a wider set sets PERMISSIVE. */
+  typeable: Typeable = FAKE_TYPEABLE;
   /** Each DeviceAdapter.noteDroppedTail a fill sent, in order with the typing: the index into `typed` it came after. */
   droppedTails: number[] = [];
   current: string;

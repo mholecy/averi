@@ -64,7 +64,12 @@ flows:
   vanished (a placeholder the source does not name, read as the empty field's value) no longer
   fails the fill: the reading is judged as the value alone too (ADR 0034's D29 amendment).
   Android types one character per `input text` call: bulk injection races Compose's async state
-  and drops most characters (measured 3 of 11 landing).
+  and drops most characters (measured 3 of 11 landing). Non-ASCII is refused before typing on
+  both platforms: a value holding a character outside printable ASCII (U+0020–U+007E) — `Š`, `’`,
+  `–`, an NBSP, an emoji — is refused as a control character is, before the field is tapped,
+  cleared or typed into, the error naming the first such character by code point, never the
+  value (idb's `ui text` and Android's `input text` cannot type it: ADR 0037). The same holds for
+  `type:` and the `type_text` tool.
 - **Field errors**: on iOS `ui_snapshot` attaches `error` to an input by one of two rules, on idb
   and WDA alike. First, a same-identifier text below the field (the SwiftUI convention when
   titles/errors share the field's `accessibilityIdentifier`) that is not a title of a

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet } from '../../scripts/truth/live-forms.js';
+import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedKept } from '../../scripts/truth/live-forms.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import { readLiveRecord, recordedCase, withFieldValue } from '../helpers/live-records.js';
 import type { LabState } from '../../scripts/truth/schema.js';
@@ -216,5 +216,37 @@ describe('holds and holdsShown: the class and the kind of a fill verdict', () =>
   it('holdsShown: the fill not held — holds\' verdict over the fill alone: fill-claim on the fill\'s kind (other), not the assert\'s (PASS)', () => {
     const { replies, launched, state } = withFieldValue(at(ios, 'wda', 'f1'), 'iban', 'SK31 12');
     expect(holdsShown('iban', 'SK31 1200 0000')(state, replies, 'wda', launched)).toEqual(expect.objectContaining({ outcome: 'MISMATCH', cls: 'fill-claim', kind: 'other' }));
+  });
+});
+
+/**
+ * p7 (D43a, ADR 0037): a no-clear fill of `Š` into form-prefilled's name — refused before anything was sent, the
+ * prefill kept. No device has run it yet: pinned over D40's p1 (the same cell and field, its launch the prefill), its
+ * final state set to what each reply would leave.
+ */
+describe('refusedKept: p7, a character averi cannot type into a prefilled field', () => {
+  const REFUSAL = "ERROR cannot type U+0160 'Š': on Android averi types only printable ASCII (U+0020–U+007E): `input text` crashes on another character after typing the ones before it. Refused before anything was sent — nothing tapped, cleared or typed.";
+  const p1 = recordedCase(readLiveRecord('android-forms-d40-1.json'), 'uiautomator', 'p1');
+  const prefill = p1.launched.fields!.name.value;
+  const left = (value: string) => withFieldValue(p1, 'name', value).state;
+
+  it('the prefill is the launch\'s, not empty (the case asks a prefilled field)', () => {
+    expect(prefill).toBe('Jan Šťastný');
+  });
+
+  it('refused before anything was sent, the prefill kept: ok', () => {
+    expect(refusedKept('name')(left(prefill), [REFUSAL], 'uiautomator', p1.launched)).toMatchObject({ outcome: 'ok', kind: 'refused' });
+  });
+
+  it('refused, but the field changed (a prefix typed, a clear): LOUD loud-changed', () => {
+    expect(refusedKept('name')(left('Jan ŠťastnýJ'), [REFUSAL], 'uiautomator', p1.launched)).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed', kind: 'refused' });
+  });
+
+  it('kept, but refused by the device, not before sending (idb\'s trace, exit 255): LOUD loud-untouched', () => {
+    expect(refusedKept('name')(left(prefill), ['ERROR Command failed (exit 1): idb ui text Š'], 'idb', p1.launched)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched', kind: 'refused' });
+  });
+
+  it('a claim of done: MISMATCH fill-claim', () => {
+    expect(refusedKept('name')(left(prefill), ['Filled id:"lab.form-prefilled.name" (1 character)'], 'uiautomator', p1.launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
   });
 });

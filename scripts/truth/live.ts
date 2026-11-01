@@ -13,7 +13,7 @@ import { loadSide } from '../differential/side.js';
 import { familyOf } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, type Source, valueOf } from './live-forms.js';
+import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedKept, short, type Source, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, callReply, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
@@ -341,6 +341,8 @@ const FORMS: Omit<Case, 'group'>[] = [
     judge: holds('pin', '25801'),
   },
   { id: 'p6', cell: P, says: 'a clear fill on the prefilled secure PIN', calls: [fill(P, 'pin', '4821', true)], judge: holds('pin', '4821') },
+  // D43a (ADR 0037): a character averi cannot type, into the prefill — refused before the tap, the prefill kept.
+  { id: 'p7', cell: P, says: 'a no-clear fill of a character averi cannot type (Š) is refused, the prefill kept', calls: [fill(P, 'name', 'Š')], judge: refusedKept('name') },
   {
     id: 'e1',
     cell: 'form-errors',

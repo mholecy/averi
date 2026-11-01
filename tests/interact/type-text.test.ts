@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { AndroidAdapter } from '../../src/adapters/android.js';
+import { IosAdapter } from '../../src/adapters/ios.js';
+import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { assertTypeable } from '../../src/interact/type-text.js';
+import { drawnOverStrip } from '../helpers/android-dumps.js';
+import { FakeAdapter } from '../helpers/fake.js';
+
+const noExec = () => Promise.reject(new Error('this test sends nothing'));
+const IOS = new IosAdapter({
+  udid: 'AAAA-1111',
+  exec: noExec,
+  treeSource: { kind: 'idb', read: noExec, applicationLabel: noExec, dispose: () => Promise.resolve() },
+});
+const ANDROID = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: noExec });
 
 /** The refusal's text, or a failure when nothing was refused. */
-function refusal(value: string): string {
+function refusal(value: string, adapter: Pick<DeviceAdapter, 'typeable'> = new FakeAdapter({}, 'none')): string {
   try {
-    assertTypeable(value);
+    assertTypeable(value, adapter.typeable);
   } catch (e) {
     return (e as Error).message;
   }
@@ -87,5 +100,64 @@ describe('assertTypeable names pressKey(\'enter\') as the remedy only for a newl
     const msg = refusal(`a${ch}b`);
     expect(msg).toMatch(/before anything was sent\. Type the text without it; there is no key for it, so it cannot be typed\.$/);
     expect(msg).not.toMatch(/pressKey|tab key/);
+  });
+});
+
+/**
+ * D43a (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md): a character the adapter
+ * cannot type is refused here too, after the control-character check, before anything is sent — iOS's `idb ui text`
+ * failed the whole call on it with a Python trace, Android's `input text` typed the characters before it and then
+ * crashed. The message names the character by code point (and shows it where it is visible), says nothing was sent
+ * and what the adapter types — and never the value around it.
+ */
+describe('assertTypeable refuses a character the adapter cannot type', () => {
+  it.each([
+    ['iOS', IOS, /idb ui text/],
+    ['Android', ANDROID, /input text/],
+  ] as const)('%s: names the character by code point and shows it, says nothing was sent and that it types only printable ASCII', (_name, adapter, tool) => {
+    const msg = refusal('Jan Šťastný', adapter);
+    expect(msg).toMatch(/^cannot type U\+0160 'Š': /);
+    expect(msg).toContain('only printable ASCII (U+0020–U+007E)');
+    expect(msg).toMatch(tool);
+    expect(msg).toContain('Refused before anything was sent — nothing tapped, cleared or typed.');
+  });
+
+  it.each([
+    ['’', "U+2019 '’'"],
+    ['“', "U+201C '“'"],
+    ['–', "U+2013 '–'"],
+    ['…', "U+2026 '…'"],
+    ['é', "U+00E9 'é'"],
+    ['😀', "U+1F600 '😀'"],
+  ])('%j reads %s', (ch, shown) => {
+    expect(refusal(`a${ch}b`, IOS)).toMatch(new RegExp(`^cannot type ${shown.replace(/[+.]/g, '\\$&')}: `));
+  });
+
+  it('a space other than U+0020 is named, not shown (a quoted NBSP reads as a plain space)', () => {
+    const msg = refusal('99\u00a090', ANDROID);
+    expect(msg).toMatch(/^cannot type U\+00A0 \(a space other than U\+0020\): /);
+    expect(msg).not.toContain('\u00a0');
+  });
+
+  it('an invisible character (a combining mark, a zero-width space) is named by code point alone', () => {
+    expect(refusal('e\u0301', IOS)).toMatch(/^cannot type U\+0301: /);
+    expect(refusal('a\u200bb', IOS)).toMatch(/^cannot type U\+200B: /);
+  });
+
+  it('never echoes the value — it may be a credential', () => {
+    for (const adapter of [IOS, ANDROID]) {
+      const msg = refusal('heslo-Š-123', adapter);
+      expect(msg).not.toContain('heslo');
+      expect(msg).not.toContain('123');
+    }
+  });
+
+  it('the control-character refusal comes first: a value holding both is refused as the control character, on either platform', () => {
+    expect(refusal('Š\n', IOS)).toMatch(/^cannot type U\+000A \("\\n", a control character\)/);
+    expect(refusal('Š\n', ANDROID)).toMatch(/^cannot type U\+000A \("\\n", a control character\)/);
+  });
+
+  it('printable ASCII passes, on both', () => {
+    for (const adapter of [IOS, ANDROID]) expect(() => assertTypeable('Jan Novak & Co. <jan@example.com> ~!', adapter.typeable)).not.toThrow();
   });
 });

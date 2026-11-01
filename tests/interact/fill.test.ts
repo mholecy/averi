@@ -4,7 +4,7 @@ import { DEFAULT_FOCUS_DELAY_MS, DEFAULT_VALUE_POLL_MS, fillField } from '../../
 import type { ReadBack } from '../../src/interact/fill-facts.js';
 import { judgeFill } from '../../src/interact/fill-verdict.js';
 import { fillReply, wordingOf } from '../../src/interact/fill-text.js';
-import { el, FakeAdapter, idbFloatingLabelFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, idbFloatingLabelFake, node, PERMISSIVE, resetLayout, screen } from '../helpers/fake.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
 // is a sequence of delays, and asserting the sequence is exact where a wall
@@ -824,10 +824,65 @@ describe('fillField refuses a control character before anything is sent', () => 
     expect((cause as Error).message).toBe(message);
   });
 
-  it('printable text — a space, non-ASCII, a C1-range letter — is typed as before', async () => {
+  it('printable text — a space, non-ASCII, a C1-range letter — passes the control check: an adapter that types it gets it whole', async () => {
     const fake = formFake();
+    fake.typeable = PERMISSIVE; // the control check is the platform-free rule; what the adapter types is its own (below)
     await fillField(fake, { id: 'amount_input' }, 'a b é\u0085', FAST);
     expect(fake.typed).toEqual(['a b é\u0085']);
+  });
+});
+
+/**
+ * D43a (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md): a value holding a
+ * character the adapter cannot type is refused where a control character is — before the field is resolved, so no
+ * tree read, no keyboard dismissal, no focus tap, no clear and nothing typed. Before it, iOS refused with idb's
+ * Python trace after the tap (and the clear), and Android typed the prefix and then crashed: a half-typed field.
+ */
+describe('fillField refuses a character the adapter cannot type before anything is sent', () => {
+  const recorded = (fake: FakeAdapter) => {
+    const calls: string[] = [];
+    const proxy = new Proxy(fake, {
+      get(target, prop, receiver) {
+        const v = Reflect.get(target, prop, receiver);
+        if (typeof v !== 'function') return v;
+        return (...args: unknown[]) => {
+          calls.push(String(prop));
+          return (v as (...a: unknown[]) => unknown).apply(target, args);
+        };
+      },
+    });
+    return { proxy, calls };
+  };
+  for (const platform of ['android', 'ios'] as const) {
+    for (const clear of [false, true]) {
+      it(`${platform}, clear: ${clear} — Š into a prefilled field: refused, no device call at all, the prefill kept`, async () => {
+        const fake = formFake('Jan');
+        fake.platform = platform;
+        const { proxy, calls } = recorded(fake);
+        const error = await fillField(proxy, { id: 'amount_input' }, ' Šťastný', { ...FAST, clear }).catch((e: unknown) => e);
+        expect(error).toMatchObject({ name: 'FillValueFailure', fillValue: 'refused' });
+        expect((error as Error).message).toMatch(/^cannot type U\+0160 'Š': .*only printable ASCII.*Refused before anything was sent — nothing tapped, cleared or typed\./);
+        expect(calls).toEqual([]);
+        expect(fake.taps).toEqual([]);
+        expect(fake.deletes).toEqual([]);
+        expect(fake.typed).toEqual([]);
+        expect(fake.live().children.find((n) => n.identifier === 'amount_input')?.value).toBe('Jan');
+      });
+    }
+  }
+
+  it('the message never contains the value (a credential): heslo-Š-123', async () => {
+    const error = (await fillField(formFake(), { id: 'amount_input' }, 'heslo-Š-123', FAST).catch((e: unknown) => e)) as Error;
+    expect(error.message).toContain('U+0160');
+    expect(error.message).not.toContain('heslo');
+    expect(error.message).not.toContain('123');
+  });
+
+  it('the adapter\'s own declaration decides: a fake that types Š gets it typed', async () => {
+    const fake = formFake();
+    fake.typeable = PERMISSIVE;
+    await fillField(fake, { id: 'amount_input' }, 'Šťastný', FAST);
+    expect(fake.typed).toEqual(['Šťastný']);
   });
 });
 

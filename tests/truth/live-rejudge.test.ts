@@ -39,6 +39,13 @@ async function rejudge(record: string, groups: string): Promise<{ code: number; 
   }
 }
 
+/**
+ * A pre-D43a Android b1d or b7 line: the LOUD `input text` left (a prefix typed, then exit 255), NOT known against the
+ * entry D43a pins — averi refuses the value before the focus tap since (docs/adr/0037-a-value-the-adapter-cannot-type-
+ * is-refused-before-any-device-call.md), the field untouched. Every Android forms record committed before D43a reads it.
+ */
+const PRE_D43A_LOUD = /^- LOUD \(loud-changed\) (b1d|b7) .*\[NOT known: loud-changed on refused, where KNOWN pins loud-untouched on refused \(bug:2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii\.md\)\]$/gm;
+
 describe('live.ts --rejudge over the committed visibility records', () => {
   it.each([
     // round 6's closing review: the active-window hint run live (src and lab app ea070d2) — form-picker's c2–c4 ok with
@@ -120,7 +127,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-k7-eyes-2.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
     ['android-k7-eyes-3.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
     ['android-k7-eyes-r1.json', 'forms', { cases: 1, ok: 1, loud: 0, mismatches: 0 }],
-    ['android-forms-eyes.json', 'forms', { cases: 25, ok: 23, loud: 2, mismatches: 0 }],
+    ['android-forms-eyes.json', 'forms', { cases: 25, ok: 23, loud: 2, mismatches: 0, preD43a: true }],
     // round 7's final device check (truth/round-7 836e04b1, every app rebuilt from it; the summaries' "Round 7 final
     // device check, 2026-10-19" sections): iOS — WDA's and idb's visibility groups as A2's and A5's records but LV4's
     // turn ok and the carry case at rest inside L's window (its entry struck off: three more runs of sheet-long-list),
@@ -139,7 +146,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-wda-long-list-r7final-1.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-wda-long-list-r7final-2.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-wda-long-list-r7final-3.json', 'visibility', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
-    ['android-forms-r7final.json', 'forms', { cases: 25, ok: 23, loud: 2, mismatches: 0 }],
+    ['android-forms-r7final.json', 'forms', { cases: 25, ok: 23, loud: 2, mismatches: 0, preD43a: true }],
     ['android-rn-r7final-1.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
     ['android-rn-r7final-2.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
     ['android-rn-r7final-3.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
@@ -233,7 +240,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // Round 1023's phone-after-back fix (bugs/r1023-phone, ADR 0026): k7f — after back, phone fully visible after 0 swipes,
     // the next title over its touch margin seen clear on one screenshot — and k7 unchanged; then the whole forms group.
     ['android-forms-r1023-phone-1.json', 'forms', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
-    ['android-forms-r1023-phone-2.json', 'forms', { cases: 29, ok: 27, loud: 2, mismatches: 0 }],
+    ['android-forms-r1023-phone-2.json', 'forms', { cases: 29, ok: 27, loud: 2, mismatches: 0, preD43a: true }],
     // The same two at the branch's tip (the strict beside rows, one kept answer per text, the code review's renames).
     ['android-forms-r1023-phone-3.json', 'forms', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     // Round 1023's LV2 fix (bugs/r1023-lv2, ADR 0013 refined 2026-10-23): scroll-bounded-flush five times — S.fully
@@ -255,15 +262,15 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-vis-r1023b-r19-1.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
     ['android-vis-r1023b-r19-2.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
     ['android-vis-r1023b-r19-3.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
-    ['android-forms-r1023b-r19-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
-    ['android-forms-r1023b-r19-2.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
-    ['android-forms-r1023b-r19-3.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
+    ['android-forms-r1023b-r19-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3, preD43a: true }],
+    ['android-forms-r1023b-r19-2.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3, preD43a: true }],
+    ['android-forms-r1023b-r19-3.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3, preD43a: true }],
     // …and once more where form-picker's taps and its not-founds say the sheet's own list first.
     ['android-vis-r1023b-r19-cr-1.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
-    ['android-forms-r1023b-r19-cr-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
+    ['android-forms-r1023b-r19-cr-1.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3, preD43a: true }],
     // …and where the sheet's own list is said in the shorter words ("scroll_until it in that window's own list first").
     ['android-vis-r1023b-r19-cr-2.json', 'visibility', { cases: 39, ok: 39, loud: 0, mismatches: 0 }],
-    ['android-forms-r1023b-r19-cr-2.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3 }],
+    ['android-forms-r1023b-r19-cr-2.json', 'forms', { cases: 32, ok: 27, loud: 2, mismatches: 0, skipped: 3, preD43a: true }],
     // Row 19's fix (bugs/r1023b-row19, ADR 0026 rule 8): k7 and k7f, the clear path, as before.
     ['android-forms-r1023b-row19-1.json', 'forms', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     // Round 9 (2026-10-25)'s rebound and tree-within-a-point fix (ADR 0021 decision 6): absent:scroll-top-edge-end under
@@ -287,17 +294,24 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // D40's device run at 40ba3dd1: the forms groups, every case not ok known (D31) —
     // iOS b1d and b7 under both sources (idb ui text refuses non-ASCII, the field untouched), p5 (the secure field
     // cleared when typing resumed, averi says so); the RN app's rf4 under both (a blind `type:` dropped the tail);
-    // Android b1d and b7 (input text typed a prefix, then exit 255) and kf1–kf3 skipped (Gboard docked).
+    // Android b1d and b7 (input text typed a prefix, then exit 255: LOUD, NOT known since D43a — pinned below) and
+    // kf1–kf3 skipped (Gboard docked).
     ['ios-forms-d40-1.json', 'forms', { cases: 68, ok: 62, loud: 6, mismatches: 0 }],
     ['ios-rn-forms-d40-1.json', 'forms', { cases: 10, ok: 8, loud: 2, mismatches: 0 }],
-    ['android-forms-d40-1.json', 'forms', { cases: 42, ok: 37, loud: 2, mismatches: 0, skipped: 3 }],
+    ['android-forms-d40-1.json', 'forms', { cases: 42, ok: 37, loud: 2, mismatches: 0, skipped: 3, preD43a: true }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
     expect(header, out.slice(0, 2000)).not.toBeNull();
     const [, cases, ok, loud, mismatches, notKnown, skipped] = header!.map(Number);
-    expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ notKnown: 0, skipped: 0, ...want });
-    expect(out).not.toMatch(/NOT known|FIXED, not intermittent/);
+    const { preD43a, ...counts } = want as typeof want & { preD43a?: true };
+    expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ notKnown: 0, skipped: 0, ...counts });
+    // An Android forms record from before D43a: b1d and b7 read as `input text` left them (a prefix typed, then exit
+    // 255 — loud-changed), NOT known against the entry D43a pins (loud-untouched: refused before the tap). Those two
+    // lines, exactly, and nothing else not known; a LOUD fails no run, so the exit stays 0.
+    const stale = [...out.matchAll(PRE_D43A_LOUD)].map((m) => m[1]);
+    expect(stale.sort()).toEqual(preD43a ? ['b1d', 'b7'] : []);
+    expect(out.replace(PRE_D43A_LOUD, '')).not.toMatch(/NOT known|FIXED, not intermittent/);
     expect(code, out.slice(-2000)).toBe(0);
   });
 });
@@ -911,7 +925,6 @@ describe('live.ts --rejudge over D40\'s forms records: every LOUD known by its r
   it.each([
     ['ios-forms-d40-1.json', ['b1d', 'b7', 'p5', 'b1d', 'b7', 'p5']],
     ['ios-rn-forms-d40-1.json', ['rf4', 'rf4']],
-    ['android-forms-d40-1.json', ['b1d', 'b7']],
   ] as const)('%s: each LOUD [known:', { timeout: 60_000 }, async (record, louds) => {
     const { code, out } = await rejudge(record, 'forms');
     const marked = [...out.matchAll(/^- LOUD \((loud-untouched|loud-changed)\) (\S+) .*\[known: (?:bug|residual):[^\]]+\]$/gm)].map((m) => m[2]);
@@ -951,10 +964,19 @@ describe('live.ts --rejudge over D40\'s forms records: every LOUD known by its r
     expect(code).toBe(0);
   });
 
-  it('Android b1d with the field as the launch left it: LOUD by another rule, NOT known', { timeout: 60_000 }, async () => {
+  /**
+   * D43a (ADR 0037): Android refuses `Š` and `’` before the focus tap, so b1d and b7 leave the field as the launch left
+   * it — KNOWN pins `loud-untouched` now. D40's Android record predates it and reads them NOT known (PRE_D43A_LOUD, in
+   * the counts' table above) until the next device run's record replaces it. That record's shape, the field
+   * untouched, rejudges known with no NOT known:
+   */
+  it('Android b1d and b7 with the field as the launch left it (D43a\'s refusal before the tap): each LOUD known, no NOT known', { timeout: 60_000 }, async () => {
     const android = readLiveRecord('android-forms-d40-1.json');
-    const b1d = android.results.filter((r) => r.id === 'b1d').map((r) => withFieldValue(r, 'name', r.launched.fields!.name.value));
-    const { out } = await rejudgeOf(android, b1d);
-    expect(out).toMatch(/^- LOUD \(loud-untouched\) b1d .*\[NOT known: loud-untouched on refused, where KNOWN pins loud-changed on refused /m);
+    const refused = android.results.filter((r) => r.id === 'b1d' || r.id === 'b7').map((r) => withFieldValue(r, 'name', r.launched.fields!.name.value));
+    const { code, out } = await rejudgeOf(android, refused);
+    const marked = [...out.matchAll(/^- LOUD \(loud-untouched\) (\S+) .*\[known: bug:2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii\.md\]$/gm)].map((m) => m[1]);
+    expect(marked.sort()).toEqual(['b1d', 'b7']);
+    expect(out).not.toMatch(/NOT known|FIXED, not intermittent/);
+    expect(code).toBe(0);
   });
 });
