@@ -15,7 +15,7 @@ type Word = string | RegExp | typeof NUMS;
 /**
  * The idb calls the helper may serve, word by word, the `--udid` excluded (runIdb appends it last, as for the CLI):
  * - D7a: the tree read, `ui describe-all --json`. A read: a helper that dies under one is retried on the CLI.
- * - D26b: the screenshot (on either tree source since D44), `screenshot -` (the PNG on stdout, carried as base64 of its bytes —
+ * - D26b: the screenshot (ios.ts#screenshotVia), `screenshot -` (the PNG on stdout, carried as base64 of its bytes —
  *   idb-helper-script.ts). A read too: it changes nothing on the simulator, so a death under it is retried on the CLI;
  *   its timeout is the caller's (ios.ts, 15 s as describe-all's) and counts toward TIMEOUTS_IN_A_ROW like any other.
  *   `screenshot <file>` (or none) is the CLI's: averi never sends it.

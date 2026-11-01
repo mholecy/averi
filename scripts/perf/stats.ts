@@ -181,9 +181,10 @@ export function breakdown(windows: readonly Window[]): Breakdown {
 /**
  * How instrument.ts#classify labels the screenshots averi takes, the CLI's and the idb helper's alike (D26b):
  * `xcrun simctl io <udid> screenshot …` (Android's `adb exec-out screencap` is not one: D26 is iOS's), and since D26b
- * `idb screenshot - --udid U` — the capture on the idb tree source, simctl's on WDA or under AVERI_IOS_SCREENSHOT=simctl.
- * Both are counted, in the totals and apart (OverallStalls.byLabel): a run on the idb source that read 0/0 here would
- * hide its screenshots. A new capture command must be added here, or its stalls go uncounted.
+ * `idb screenshot - --udid U` — iOS's capture on either tree source since D44 (ios.ts#screenshotVia), simctl's only
+ * under AVERI_IOS_SCREENSHOT=simctl. Both are counted, in the totals and apart (OverallStalls.byLabel): a run that
+ * counted only simctl's would read 0/0 and hide its screenshots. A new capture command must be added here, or its
+ * stalls go uncounted.
  */
 export const SCREENSHOT_LABELS = ['simctl io screenshot', 'idb screenshot'] as const;
 export type ScreenshotLabel = (typeof SCREENSHOT_LABELS)[number];

@@ -735,13 +735,13 @@ export class Verifier {
 /**
  * The png rows of the iOS status band a baseline diff leaves out of both images (D26b), or 0: compare every row.
  *
- * Why: since D26b (D44: on the WDA tree source too) an iOS adapter captures through `idb screenshot`, which draws the
- * Dynamic Island (a black pill, 378×112 px at the top centre of the lab simulator's 1206×2622 frame) where
- * `simctl io screenshot` — every baseline stored before (on a wda project, before D44), and every capture under
- * AVERI_IOS_SCREENSHOT=simctl — shows the app's background; nothing else differs but 16 corner pixels (backlog "### D26 diag"). Measured, that is 1.219 %
- * of the frame, over the 1 % default threshold: a stored baseline would fail on the island alone. The band is the top of
- * the screen down to the safe area (adapters/ios-status-band.ts, 62 pt there: 186 px rows at scale 3), the status bar's
- * and the island's, never the app's to assert on — the same band a tap counts as off the screen.
+ * Why: an iOS adapter captures through `idb screenshot` (adapters/ios.ts#screenshotVia), which draws the Dynamic Island
+ * (a black pill, 378×112 px at the top centre of the lab simulator's 1206×2622 frame) where `simctl io screenshot` —
+ * every baseline stored before D26b (on a wda project, before D44), and every capture under AVERI_IOS_SCREENSHOT=simctl
+ * — shows the app's background; nothing else differs but 16 corner pixels (backlog "### D26 diag"). Measured, that is
+ * 1.219 % of the frame, over the 1 % default threshold: a stored baseline would fail on the island alone. The band is
+ * the top of the screen down to the safe area (adapters/ios-status-band.ts, 62 pt there: 186 px rows at scale 3), the
+ * status bar's and the island's, never the app's to assert on — the same band a tap counts as off the screen.
  *
  * This LOOSENS the check, so it is held to exactly that: iOS only (Android's captures have one source), the band's
  * rows only — `ceil(statusBand × scale)`, the scale the png's width over the viewport's. A png that is not the viewport

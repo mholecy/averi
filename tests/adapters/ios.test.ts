@@ -44,7 +44,7 @@ const NO_TREE: IosTreeSource = {
   dispose: () => Promise.resolve(),
 };
 
-/** NO_TREE of the WDA kind: since D44 its screenshots are `idb screenshot`, as on the idb kind. */
+/** NO_TREE of the WDA kind — its screenshots too are idb's (ios.ts#screenshotVia). */
 const WDA_NO_TREE: IosTreeSource = { ...NO_TREE, kind: 'wda' };
 
 const IDB_DESCRIBE_ALL = JSON.stringify([
@@ -497,15 +497,8 @@ describe('IosAdapter re-enables accessibility automation before every launch and
  * transport error naming the simulator and the command, as on Android.
  */
 describe('IosAdapter.screenshot — the file is a PNG or the call fails (simctl: the kill switch)', () => {
-  let saved: string | undefined;
-  beforeEach(() => {
-    saved = process.env.AVERI_IOS_SCREENSHOT;
-    process.env.AVERI_IOS_SCREENSHOT = 'simctl';
-  });
-  afterEach(() => {
-    if (saved === undefined) delete process.env.AVERI_IOS_SCREENSHOT;
-    else process.env.AVERI_IOS_SCREENSHOT = saved;
-  });
+  beforeEach(() => vi.stubEnv('AVERI_IOS_SCREENSHOT', 'simctl'));
+  afterEach(() => vi.unstubAllEnvs());
 
   /** simctl's stand-in: writes `bytes` to the path it is given, as `simctl io <udid> screenshot <file>` does. */
   function writesScreenshot(bytes: Buffer): ExecFn {
@@ -537,22 +530,16 @@ describe('IosAdapter.screenshot — the file is a PNG or the call fails (simctl:
 });
 
 /**
- * D26b (docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md, "D26b" and amendment D44): on either tree
- * source the screenshot is `idb screenshot -` — through runIdb, so the helper first and the idb CLI as its fallback — never
- * `simctl io screenshot`, which stalls ~+1 000 ms in ~7 % of calls (backlog "### D26 diag"). No simctl fallback at run
- * time: a capture pair from two sources compares two different images (the Dynamic Island) and reads as moving.
+ * ios.ts#screenshotVia (docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md, "D26b" and amendment D44): on
+ * either tree source the screenshot is `idb screenshot -` — through runIdb, so the helper first and the idb CLI as its
+ * fallback — never `simctl io screenshot`, which stalls ~+1 000 ms in ~7 % of calls (backlog "### D26 diag"). No simctl
+ * fallback at run time: a capture pair from two sources compares two different images (the Dynamic Island) and reads as
+ * moving.
  */
 describe('IosAdapter.screenshot — through idb on either tree source (D26b, D44)', () => {
   const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x0a, 0xff]);
-  let saved: string | undefined;
-  beforeEach(() => {
-    saved = process.env.AVERI_IOS_SCREENSHOT;
-    delete process.env.AVERI_IOS_SCREENSHOT;
-  });
-  afterEach(() => {
-    if (saved === undefined) delete process.env.AVERI_IOS_SCREENSHOT;
-    else process.env.AVERI_IOS_SCREENSHOT = saved;
-  });
+  beforeEach(() => vi.stubEnv('AVERI_IOS_SCREENSHOT', undefined));
+  afterEach(() => vi.unstubAllEnvs());
 
   /** Answers `idb screenshot -` with `idb`, writes `simctl` to simctl's file; logs every call but the Xcode probe. */
   function both(idb: Buffer | Error, simctlBytes: Buffer = PNG_BYTES) {
@@ -600,7 +587,7 @@ describe('IosAdapter.screenshot — through idb on either tree source (D26b, D44
   });
 
   it('keeps `simctl io screenshot` on the WDA tree source under AVERI_IOS_SCREENSHOT=simctl', async () => {
-    process.env.AVERI_IOS_SCREENSHOT = 'simctl';
+    vi.stubEnv('AVERI_IOS_SCREENSHOT', 'simctl');
     const { exec, calls } = both(PNG_BYTES);
     await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: WDA_NO_TREE }).screenshot();
     expect(calls).toHaveLength(1);
@@ -608,17 +595,17 @@ describe('IosAdapter.screenshot — through idb on either tree source (D26b, D44
   });
 
   it('keeps `simctl io screenshot` with AVERI_IOS_SCREENSHOT=simctl — read once, when the adapter is made', async () => {
-    process.env.AVERI_IOS_SCREENSHOT = 'simctl';
+    vi.stubEnv('AVERI_IOS_SCREENSHOT', 'simctl');
     const { exec, calls } = both(PNG_BYTES);
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE });
-    delete process.env.AVERI_IOS_SCREENSHOT;
+    vi.stubEnv('AVERI_IOS_SCREENSHOT', undefined);
     await adapter.screenshot();
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatch(/^xcrun simctl io AAAA-1111 screenshot /);
     // …and set after an adapter is made, it changes nothing for that adapter: one source for its whole life.
     const later = both(PNG_BYTES);
     const made = new IosAdapter({ udid: 'AAAA-1111', exec: later.exec, treeSource: NO_TREE });
-    process.env.AVERI_IOS_SCREENSHOT = 'simctl';
+    vi.stubEnv('AVERI_IOS_SCREENSHOT', 'simctl');
     await made.screenshot();
     expect(later.calls).toEqual(['idb screenshot - --udid AAAA-1111']);
   });
