@@ -1,5 +1,5 @@
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from '../adapters/input-text.js';
-import { firstUntypeable, untypeableRefusal, type Typeable } from '../adapters/typeable.js';
+import { codePoint, refusalOf, type Typeable } from '../adapters/typeable.js';
 import type { DeviceAdapter } from '../adapters/types.js';
 
 /**
@@ -64,12 +64,12 @@ function visibleEscape(ch: string): string {
 export function assertTypeable(value: string, typeable: Typeable): void {
   const match = value.match(CONTROL_CHAR_RE);
   if (match === null) {
-    const untypeable = firstUntypeable(value, typeable);
-    if (untypeable !== undefined) throw new Error(untypeableRefusal(untypeable, typeable));
+    const refusal = refusalOf(value, typeable);
+    if (refusal !== undefined) throw new Error(refusal);
     return;
   }
   const ch = match[0];
-  const code = `U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
+  const code = codePoint(ch);
   throw new Error(
     `cannot type ${code} (${visibleEscape(ch)}, a control character): it is a key, not text — on Android ` +
       `\`input text\` ${inputTextControlFate(ch)}, on iOS ` +

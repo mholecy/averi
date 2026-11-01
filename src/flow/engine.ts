@@ -1304,6 +1304,8 @@ export class FlowEngine {
       } else {
         // One keystroke at a time: auto-advancing multi-box inputs (OTP
         // fields) move focus per digit and silently drop bulk-typed text.
+        // No assertTypeable (interact/type-text.ts, ADR 0037): `\D` without
+        // the `u` flag kept only ASCII 0–9 above — typeable everywhere.
         for (const digit of pin) {
           await this.adapter.typeText(digit);
           await sleep(this.pinKeyDelayMs);

@@ -15,7 +15,7 @@ import { appInfoNames } from './simctl-appinfo.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { sleep } from '../util/sleep.js';
-import type { Typeable } from './typeable.js';
+import { PRINTABLE_ASCII, type Typeable } from './typeable.js';
 
 /**
  * How long uiTree({ settle: true }) waits before its one re-read of an idb
@@ -137,7 +137,7 @@ function appKey(front: FrontApp): AppKey | undefined {
  * refuses it before this set is asked, as a control character (type-text.ts — the Return key is `pressKey('enter')`).
  */
 const IDB_TYPEABLE: Typeable = {
-  refuses: /[^\x20-\x7e\n]/u,
+  refuses: new RegExp(`[^${PRINTABLE_ASCII}\\n]`, 'u'),
   says: "on iOS averi types only printable ASCII (U+0020–U+007E): `idb ui text` has no key for any other character and fails the whole call",
 };
 

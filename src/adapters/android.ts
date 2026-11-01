@@ -2,7 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
-import { firstUntypeable, NOT_PRINTABLE_ASCII, untypeableRefusal, type Typeable } from './typeable.js';
+import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
@@ -819,8 +819,8 @@ export class AndroidAdapter implements DeviceAdapter {
     }
     // The same defence for a character `input text` cannot type (ADR 0037): refused before the first `input text`, so
     // a direct caller cannot leave the field half-typed. An ASCII value pays one regex test, no device call.
-    const untypeable = firstUntypeable(text, this.typeable);
-    if (untypeable !== undefined) throw new Error(`typeText ${untypeableRefusal(untypeable, this.typeable)}`);
+    const refusal = refusalOf(text, this.typeable);
+    if (refusal !== undefined) throw new Error(`typeText ${refusal}`);
     for (const ch of text) {
       await this.shell(['input', 'text', ch === ' ' ? '%s' : ch]);
       await sleep(TYPING_PACE_MS);

@@ -28,13 +28,15 @@ behaviour: a non-ASCII value is refused before the tap. It used to fail on the d
 control-character check and before any device call.**
 
 - **The declaration** is data: `refuses`, a `u`-flagged RegExp that matches one character the adapter cannot type, and
-  `says`, the clause the refusal quotes. One checker reads it (`firstUntypeable`), and one function words the refusal
-  (`untypeableRefusal`). It is REQUIRED on the interface, so an adapter that does not say what it types does not
+  `says`, the clause the refusal quotes. One function reads it (`refusalOf(text, typeable)`): the refusal of the
+  first character it cannot type, or undefined. The printable-ASCII class is defined once (`PRINTABLE_ASCII`), and
+  iOS's set is derived from it with `\n` added. It is REQUIRED on the interface, so an adapter that does not say what it types does not
   compile, and the test fake declares it too (tests/helpers/fake.ts `FAKE_TYPEABLE`, printable ASCII, as both real
   adapters). It is data and not a method because the flow's read hand-off wraps the adapter in a Proxy that turns every
   method it does not class `reads` into an async action (ui-tree/read-handoff.ts#watch). A synchronous
-  `untypeable(value)` method would return a Promise there, and every value would read as refused. `ADAPTER_SURFACE`
-  classes `typeable` as a `fact`.
+  `untypeable(value)` method would return a Promise there, and every value would read as refused. Classing it `reads`
+  would keep it synchronous, but would mislabel a pure check as a device read. `ADAPTER_SURFACE` classes `typeable` as
+  a `fact`.
 - **What each platform types:**
   - iOS, both tree sources: printable ASCII (U+0020–U+007E) and `\n`, which is idb's `KEY_MAP`. The `\n` is idb's fact,
     kept in the declaration. interact/ still refuses it first as a control character, so the Return key stays
@@ -50,15 +52,20 @@ control-character check and before any device call.**
     `FillValueFailure` marked `refused`, which `optional:` does not skip, like the control character's. A `type:`
     step's refusal is a plain error, as before.
 - **Android's `typeText`** checks the same declaration again, defensively, before its first `input text`. A caller
-  that bypasses interact/ cannot half-type. It already did this for a control character.
+  that bypasses interact/ cannot half-type. It already did this for a control character. iOS's `typeText` has no check
+  of its own: idb fails all or nothing per call (it maps the whole string before it sends a key), so nothing is half-typed. (Only
+  the split typing of an app seen dropping a tail, ADR 0023's D24 amendment, sends its first character in a call of
+  its own; a direct caller there could leave that one, and interact/ refuses before it.)
 - **The message** names the first refused character by code point, and shows it where it is visible: `U+0160 'Š'`. A
   space other than U+0020 is named as one, and a combining or invisible character gets its code point alone. The
   message never includes the value around the character, since a value may be a credential. It says what the adapter
   types and why, that nothing was sent, and that there is no other typing path yet:
 
-  `cannot type U+0160 'Š': on iOS averi types only printable ASCII (U+0020–U+007E): `idb ui text` has no key for any
+  ```text
+  cannot type U+0160 'Š': on iOS averi types only printable ASCII (U+0020–U+007E): `idb ui text` has no key for any
   other character and fails the whole call. Refused before anything was sent — nothing tapped, cleared or typed. averi
-  has no other typing path yet (ADR 0037): use a value without it, or enter it by hand.`
+  has no other typing path yet (ADR 0037): use a value without it, or enter it by hand.
+  ```
 
 - **Cost:** an ASCII value pays one regex test per call. It makes no device call and takes no extra wait.
 

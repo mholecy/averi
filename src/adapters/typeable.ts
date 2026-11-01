@@ -1,6 +1,6 @@
 /**
  * Which characters an adapter's `typeText` can type — a per-adapter fact (`DeviceAdapter.typeable`), read by one
- * checker (`firstUntypeable`) and worded by one refusal (`untypeableRefusal`)
+ * function (`refusalOf`), which finds the first character it refuses and words the refusal
  * (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md, D43a).
  *
  * A leaf, as input-text.ts is: interact/type-text.ts refuses with it before any device call, and the Android adapter's
@@ -20,13 +20,18 @@ export interface Typeable {
   readonly says: string;
 }
 
-/** Every character outside printable ASCII (U+0020–U+007E) — the set both adapters type today, iOS with `\n` too. */
-export const NOT_PRINTABLE_ASCII = /[^\x20-\x7e]/u;
+/** Printable ASCII (U+0020–U+007E) as the body of a RegExp character class — the set both adapters type today. */
+export const PRINTABLE_ASCII = '\\x20-\\x7e';
 
-/** The first character of `text` the adapter cannot type, whole (a surrogate pair is one character), or undefined. */
-export const firstUntypeable = (text: string, typeable: Typeable): string | undefined => text.match(typeable.refuses)?.[0];
+/** Every character outside printable ASCII — Android's `refuses`, and the test fake's; iOS adds `\n` (adapters/ios.ts). */
+export const NOT_PRINTABLE_ASCII = new RegExp(`[^${PRINTABLE_ASCII}]`, 'u');
 
-const codePoint = (ch: string): string => `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
+/**
+ * A character's code point as a refusal names it: `U+0160`, at least four hex digits, a character outside the BMP whole
+ * (`U+1F600`, not half a surrogate pair). Both refusals of interact/type-text.ts — a control character's and this
+ * module's — word it so.
+ */
+export const codePoint = (ch: string): string => `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
 
 /**
  * The character as the refusal names it: its code point, and the character itself where it is visible (`U+0160 'Š'`)
@@ -40,11 +45,14 @@ function named(ch: string): string {
 }
 
 /**
- * The refusal of `ch`, which `typeable` refuses. Names the character, never the value around it (a value may be a
- * credential), says nothing was sent — true at both places that throw it: before the fill's field is resolved
- * (interact/fill.ts) and before Android's first `input text` — and what the adapter types.
+ * The refusal of `text` by `typeable`, or undefined when it can type all of it. The refusal names the FIRST character it
+ * cannot type (whole: a surrogate pair is one), never the value around it (a value may be a credential); says nothing
+ * was sent — true at both places that throw it: before the fill's field is resolved (interact/type-text.ts) and before
+ * Android's first `input text` — and what the adapter types.
  */
-export function untypeableRefusal(ch: string, typeable: Typeable): string {
+export function refusalOf(text: string, typeable: Typeable): string | undefined {
+  const ch = text.match(typeable.refuses)?.[0];
+  if (ch === undefined) return undefined;
   return (
     `cannot type ${named(ch)}: ${typeable.says}. Refused before anything was sent — nothing tapped, cleared or typed. ` +
     'averi has no other typing path yet (ADR 0037): use a value without it, or enter it by hand.'

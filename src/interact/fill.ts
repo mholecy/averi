@@ -163,8 +163,7 @@ export async function fillField(
   // one the adapter cannot type (ADR 0037) — must cost no keyboard dismissal,
   // no focus tap and no clear (type-text.ts). A dropped tail typed again
   // (fill-type.ts, ADR 0023) is a suffix of this value: checked here too.
-  // Marked 'refused'
-  // (FillValueFailure) — the message is type-text.ts's, unchanged.
+  // Marked 'refused' (FillValueFailure) — the message is type-text.ts's.
   try {
     assertTypeable(value, adapter.typeable);
   } catch (e) {

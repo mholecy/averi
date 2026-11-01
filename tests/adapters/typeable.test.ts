@@ -3,7 +3,7 @@ import { AndroidAdapter } from '../../src/adapters/android.js';
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import type { IosTreeSource } from '../../src/adapters/ios-tree-source.js';
-import { firstUntypeable } from '../../src/adapters/typeable.js';
+import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';
 
@@ -12,12 +12,15 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
 /**
  * Typeability is a per-adapter fact (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md,
  * D43a): the characters each adapter's `typeText` can deliver, declared on the adapter (`DeviceAdapter.typeable`) and
- * read by one checker (adapters/typeable.ts#firstUntypeable).
+ * read by one function (adapters/typeable.ts#refusalOf).
  * - iOS, under both tree sources (the typing is `idb ui text` on either): printable ASCII and `\n` — idb's KEY_MAP
  *   (fb-idb idb/common/hid.py), anything else fails the whole call with a Python trace, the field untouched.
  * - Android: printable ASCII — `input text` NPEs (exit 255) on a character outside the virtual key map, after every
  *   earlier one landed. Conservative: an extended letter the key map may hold (é) is unmeasured, refused too.
  */
+/** The code point `refusalOf` names first in its refusal of `text` — the first character it cannot type — or undefined. */
+const refused = (text: string, typeable: Typeable): string | undefined => refusalOf(text, typeable)?.match(/^cannot type (U\+[0-9A-F]{4,})/)?.[1];
+
 const recordingExec = () => {
   const calls: string[] = [];
   const fn: ExecFn = async (cmd, args) => {
@@ -56,37 +59,37 @@ const adapters: [string, () => DeviceAdapter][] = [
 ];
 
 describe.each(adapters)('%s declares what its typeText types: printable ASCII', (_name, make) => {
-  it.each(UNTYPEABLE)('%j (%s) is untypeable — and named whole, as the first untypeable character after ASCII', (ch) => {
+  it.each(UNTYPEABLE)('%j (%s) is untypeable — and named whole, as the first untypeable character after ASCII', (ch, code) => {
     const adapter = make();
-    expect(firstUntypeable(ch, adapter.typeable)).toBe(ch);
-    expect(firstUntypeable(`heslo-${ch}-123`, adapter.typeable)).toBe(ch);
+    expect(refused(ch, adapter.typeable)).toBe(code);
+    expect(refused(`heslo-${ch}-123`, adapter.typeable)).toBe(code);
   });
 
   it('the first untypeable character, not a later one', () => {
-    expect(firstUntypeable('a–Šb', make().typeable)).toBe('–');
+    expect(refused('a–Šb', make().typeable)).toBe('U+2013');
   });
 
   it('the boundaries: U+0020 and U+007E typeable, U+007F not (also the control-character refusal\'s), U+0080 not', () => {
     const { typeable } = make();
-    expect(firstUntypeable(' ', typeable)).toBeUndefined();
-    expect(firstUntypeable('~', typeable)).toBeUndefined();
-    expect(firstUntypeable('\x7f', typeable)).toBe('\x7f');
-    expect(firstUntypeable('\x80', typeable)).toBe('\x80');
+    expect(refused(' ', typeable)).toBeUndefined();
+    expect(refused('~', typeable)).toBeUndefined();
+    expect(refused('\x7f', typeable)).toBe('U+007F');
+    expect(refused('\x80', typeable)).toBe('U+0080');
   });
 
   it('every printable ASCII character is typeable', () => {
     const all = Array.from({ length: 0x7f - 0x20 }, (_, i) => String.fromCharCode(0x20 + i)).join('');
-    expect(firstUntypeable(all, make().typeable)).toBeUndefined();
+    expect(refused(all, make().typeable)).toBeUndefined();
   });
 });
 
 describe('the newline: in idb\'s key map, not Android\'s — and refused on both before typing as a control character (type-text.ts)', () => {
   it.each([['idb'], ['wda']] as const)('iOS (%s tree source): an ASCII value with \\n is typeable by the adapter', (kind) => {
-    expect(firstUntypeable('line one\nline two', ios(kind).typeable)).toBeUndefined();
+    expect(refused('line one\nline two', ios(kind).typeable)).toBeUndefined();
   });
 
   it('Android: \\n is not typeable text (`input text` may send it as ENTER)', () => {
-    expect(firstUntypeable('line one\nline two', android().typeable)).toBe('\n');
+    expect(refused('line one\nline two', android().typeable)).toBe('U+000A');
   });
 });
 
