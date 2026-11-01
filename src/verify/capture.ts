@@ -1,6 +1,7 @@
 import {
   type DeviceAdapter,
   type DeviceScreen,
+  type RawImage,
   type Rect,
   type UiNode,
 } from '../adapters/types.js';
@@ -8,7 +9,7 @@ import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
 import { readTreeOrMiss, type TreeRead } from '../ui-tree/read-tree.js';
 import { inferScreenSize, type ScreenSize } from '../ui-tree/geometry.js';
-import type { DecodedPng, RgbaImage } from './png.js';
+import type { RgbaImage } from './png.js';
 import { captureShot, type Shot } from './shot.js';
 import { pngScale, windowWidth, type PngScale, type WindowWidth } from './scale.js';
 
@@ -560,11 +561,11 @@ export async function captureFrame(
   const witness = await ScreenWitness.read(adapter);
   const window = await witness.judge(tree, size);
   const { screen } = witness;
-  let png: DecodedPng;
+  let image: RawImage;
   try {
     // A shot the region check already decoded (settled or moving) is not decoded twice (Shot memoizes);
     // a raw capture (D19) is its pixels already.
-    png = shot.decode();
+    image = shot.decode();
   } catch (e) {
     return {
       ...wait,
@@ -581,7 +582,7 @@ export async function captureFrame(
       },
     };
   }
-  return { ...wait, measured: { tree, png, scale: scaleFor(tree, png, screen, size), window } };
+  return { ...wait, measured: { tree, png: image, scale: scaleFor(tree, image, screen, size), window } };
 }
 
 /**
@@ -865,9 +866,9 @@ interface SizedRegion extends StabilityRegion {
 async function regionSettled(
   adapter: Pick<DeviceAdapter, 'viewport'>,
   region: SizedRegion,
-  earlier: DecodedPng | undefined,
-  later: DecodedPng | undefined,
-): Promise<DecodedPng | undefined> {
+  earlier: RawImage | undefined,
+  later: RawImage | undefined,
+): Promise<RawImage | undefined> {
   if (earlier === undefined || later === undefined) return undefined;
   if (earlier.width !== later.width || earlier.height !== later.height) return undefined;
   const screen = await witnessScreen(adapter);

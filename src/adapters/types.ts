@@ -1027,6 +1027,14 @@ export interface DeviceAdapter {
    * device and command — screenshot-bytes.ts. verify/shot.ts#captureShot keeps
    * a floor under it (an empty buffer equals an empty buffer, which the
    * stability wait would read as settled).
+   *
+   * ONE SOURCE (this and `capture()`): every frame of one adapter comes from one capture source with one deterministic
+   * encoding, so the same still screen gives the same frame on every call — byte-identical PNG bytes, identical raw
+   * pixels — because verify/shot.ts#Shot.equals compares frames byte for byte to decide "settled". An adapter therefore
+   * must not fall back to a second capture tool mid-session: two tools can draw one screen differently, and a pair of
+   * frames from each reads a still screen as moving (iOS: ios.ts#IosAdapter.screenshot). Android's raw-or-`-p` per call
+   * (`capture()`) keeps the rule: one tool, `screencap`, one framebuffer — `Shot.equals` compares that mixed pair by its
+   * decoded pixels.
    */
   screenshot(): Promise<Buffer>;
   /**
@@ -1228,7 +1236,10 @@ export interface RgbaImage {
   data: Buffer | Uint8Array;
 }
 
-/** An `RgbaImage` whose bytes are a Buffer (pixelmatch, `Buffer.compare`) — a decoded PNG's, a raw capture's. */
+/**
+ * Raw pixels: an `RgbaImage` whose bytes are a Buffer (pixelmatch, `Buffer.compare`), whatever the source — a PNG
+ * decoded (verify/png.ts#decodePng) or a raw capture as it came (Android's, `capture()`).
+ */
 export interface RawImage extends RgbaImage {
   data: Buffer;
 }
