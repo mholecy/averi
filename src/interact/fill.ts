@@ -1,7 +1,6 @@
 import {
   everyNode,
   INPUT_ROLE,
-  PersistentReadError,
   rectArea,
   rectIntersection,
   sameRect,
@@ -10,7 +9,7 @@ import {
   type UiNode,
 } from '../adapters/types.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
-import { sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
+import { readTreeOr, sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
 import { soleIdOf } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -224,15 +223,7 @@ export async function fillField(
     // Only the READ is wrapped: a refusal from resolveNow (a second match
     // appearing mid-fill — a suggestion row, a duplicated field) is a
     // selector finding with its own wording, not a device that went away.
-    let tree: UiNode;
-    try {
-      tree = await adapter.uiTree();
-    } catch (e) {
-      // A read no wait cures (adapters/types.ts#PersistentReadError, D21) passes through unchanged: it is no value that
-      // failed to land, and its class is what the loops above and the flow engine's isTerminal stop on.
-      if (e instanceof PersistentReadError) throw e;
-      throw failure({ code: 'reread-failed', target: describeTarget(target), cause: errorMessage(e) });
-    }
+    const tree = await readTreeOr(adapter, (e) => failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }));
     lastTree = tree;
     lostOnLastRead = undefined;
     const bySelector = resolveNow(tree, target, opts)?.node;
@@ -376,7 +367,9 @@ export async function fillField(
       try {
         tree = await adapter.uiTree();
       } catch {
-        return { input: 'unread' }; // a hint, not a verdict: the fill does not fail for it
+        // Deliberately swallows ANY read failure, one no wait cures included: a hint, not a verdict, read only when no
+        // refetch was made — the fill does not fail for it.
+        return { input: 'unread' };
       }
     }
     return { input: nearestInput(tree, node) };

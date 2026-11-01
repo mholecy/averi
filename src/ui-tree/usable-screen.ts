@@ -83,7 +83,7 @@ export interface UsableScreen {
  * The usable screen for `read` (the tree the caller already read) on
  * `adapter`'s device — `usableScreenOf` over the device's size and the
  * tree's — a verb hands in its read's look (ui-tree/look.ts#Look, a
- * TreeRead). A device whose size cannot be read is no device; undefined when
+ * TreeRead; only its tree is asked). A device whose size cannot be read is no device; undefined when
  * there is no usable screen at all. FAILS OPEN: a tree that cannot be sized
  * (a throw out of `inferScreenSize`) is no usable screen either, so a
  * judgement behaves as with no box rather than failing the verb.
@@ -96,7 +96,7 @@ export interface UsableScreen {
  * (adapters/viewport-memo.ts), so the plain read after it asks the device
  * once more — one extra read on a refusal path, accepted.
  */
-export async function usableScreen(adapter: Pick<DeviceAdapter, 'viewport'>, read: TreeRead, opts?: { fresh?: boolean }): Promise<UsableScreen | undefined> {
+export async function usableScreen(adapter: Pick<DeviceAdapter, 'viewport'>, read: Partial<TreeRead>, opts?: { fresh?: boolean }): Promise<UsableScreen | undefined> {
   if (opts?.fresh === true) {
     try {
       await adapter.viewport({ fresh: true });

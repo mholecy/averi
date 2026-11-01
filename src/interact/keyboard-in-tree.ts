@@ -1,6 +1,7 @@
-import { PersistentReadError, type Rect, type UiNode } from '../adapters/types.js';
+import type { Rect } from '../adapters/types.js';
 import { frameText } from '../ui-tree/geometry.js';
 import { lookOn, type Look } from '../ui-tree/look.js';
+import { readTreeOr } from '../ui-tree/read-tree.js';
 import { cannotHide } from '../ui-tree/soft-keyboard.js';
 import { usableScreen } from '../ui-tree/usable-screen.js';
 import { sleep } from '../util/sleep.js';
@@ -178,8 +179,9 @@ const passedOver = (skipped: readonly string[]): string => (skipped.length === 0
  * THE wrap for a look that failed after a dismissal move — the one owner of "a read after the dismissal failed", for
  * both protocols that move: the guard's confirming looks (`Hiding.failed`, the target not coming back or coming back
  * ambiguous) and the post-fill dismissal's confirming reads (a tree read that throws — WDA or idb gone between the move
- * and the read). Both are wrapped — except a PersistentReadError (adapters/types.ts, D21), which the dismissal's read
- * passes through as it came, so the read loops and the flow engine's isTerminal see its class: a read's own error
+ * and the read). Both are wrapped — except a failure no wait cures (adapters/types.ts#PersistentReadError, D21), which
+ * the read seam (read-tree.ts#readTreeOr) passes through as it came, so the read loops and the flow engine's isTerminal
+ * see its class: a read's own error
  * left raw is not a KeyboardGuardError, so the flow engine's
  * `tracingGuardFailure` would log no `⚠ fill` line and the `✗` line would never say a move had been sent. `did` is the
  * moves as both sentences name them (`tapping <strategy> at (x,y) to hide the soft keyboard …`); `traceLine` is the
@@ -417,16 +419,7 @@ export function inTreeModel(adapter: KeyboardAdapter): KeyboardModel {
         await perform(adapter, move);
         // The same confirmation as the guard's, each look one tree read.
         const seen = await confirmHidden<DismissResult, { frame: Rect; look: Look }>(KEYBOARD_HIDE_CONFIRM_LOOKS, async () => {
-          let reread: UiNode;
-          try {
-            reread = await adapter.uiTree();
-          } catch (e) {
-            // A read no wait cures (adapters/types.ts#PersistentReadError, D21) passes through unchanged, not as
-            // AfterDismissalTap: its class is what the read loops and the flow engine's isTerminal stop on.
-            if (e instanceof PersistentReadError) throw e;
-            throw failed(e);
-          }
-          const after = lookOn(adapter, reread);
+          const after = lookOn(adapter, await readTreeOr(adapter, failed));
           const cover = await after.reading.cover();
           return cover === undefined
             ? { gone: { hiddenBy: moves.length === 1 ? wordsOf(move).moving : `${wordsOf(move).moving}, after ${moves.slice(0, -1).map((m) => wordsOf(m).moving).join(', ')} left it up` } }

@@ -1,6 +1,6 @@
 import { usableSize, type DeviceAdapter, type DeviceScreen, type Rect, type ScrollAxis, type Stroke } from '../adapters/types.js';
 import { axisOfEdge, inferScreenSize, type Edge } from '../ui-tree/geometry.js';
-import { readTreeOrError, type TreeRead } from '../ui-tree/read-tree.js';
+import { readTreeOrMiss, type TreeRead } from '../ui-tree/read-tree.js';
 import type { Direction } from '../ui-tree/sides.js';
 import { usableScreenOf, type UsableScreen } from '../ui-tree/usable-screen.js';
 
@@ -324,7 +324,11 @@ export async function swipeScreen(
   adapter: Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe'>,
   opts: SwipeOptions,
 ): Promise<ScreenSwipe> {
-  const { usable, note } = await screenBox(adapter, await readTreeOrError(adapter));
+  // The one reader that opts out of the seam's throw (ARCHITECTURE.md, the swipe's orientation read): a failure no wait
+  // cures loses only the orientation witness, as any failed read does — the swipe is sent over the device box and the
+  // note quotes it. Nothing reads the tree again here to need stopping.
+  const read = await readTreeOrMiss(adapter).catch((e: Error) => ({ error: e }));
+  const { usable, note } = await screenBox(adapter, read);
   const { from, to } = swipeVector(usable.oriented, opts.direction, opts.meaning);
   const times = opts.times ?? 1;
   for (let i = 0; i < times; i++) await adapter.swipe(from, to, opts.durationMs);

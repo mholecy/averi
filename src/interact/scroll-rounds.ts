@@ -146,7 +146,7 @@ export type { Flush, FlushCut } from './flush-check.js';
 
 /** What one round saw — the driver's gathering, or a test's table row. */
 export interface RoundSeen {
-  /** This round's tree read: what it held, or the error that stood in for it (a miss, not a failure — read-tree.ts#readTreeOrError). */
+  /** This round's tree read: what it held, or the error that stood in for it (a miss, not a failure — read-tree.ts#readTreeOrMiss). */
   read: RoundRead | { error: Error };
   /**
    * This round's usable screen (swipe.ts#screenBox's `usable`) — ONE read gives both boxes the round

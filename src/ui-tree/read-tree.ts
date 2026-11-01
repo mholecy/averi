@@ -17,16 +17,21 @@ import type { Verdict } from './verdict.js';
 /**
  * Reading the UI tree, and waiting on it.
  *
- * Two primitives live here: `readTreeOrError`, the one-shot read that reports
- * a failure as a value, and `pollTree`, the deadline loop over it that the
- * flow engine's waits and detect probe, the verifier's asserts and the
- * interaction module's settle wait are built on. Two loops are deliberately
- * NOT built on it: the fill's value poll (interact/fill-type.ts#pollValue) is
+ * Two primitives live here: the read seam — `readTreeOrMiss`, the one-shot
+ * read that reports a failure that heals as a value, and `readTreeOr`, the
+ * same read for a caller that wraps such a failure in its own error — and
+ * `pollTree`, the deadline loop over it that the flow engine's waits and
+ * detect probe, the verifier's asserts and the interaction module's settle
+ * wait are built on. The seam is the one place a read failure is classified
+ * (A1, docs/adr/0036-a-read-failure-no-wait-cures-is-thrown-by-the-read-seam.md):
+ * a miss is returned or wrapped, a failure no wait cures (PersistentReadError)
+ * is THROWN, so no reader recognises it again. Two loops are deliberately
+ * NOT built on pollTree: the fill's value poll (interact/fill-type.ts#pollValue) is
  * bounded by a round count rather than a deadline and lets a read failure
  * throw, because by then the field has been tapped and an unreadable tree is
  * a dead device, not a screen settling; and the scroll loop
  * (interact/scroll.ts) acts between reads and has a second stop bound. Both
- * use readTreeOrError's rule where it applies. They are one module because
+ * use the seam's rule where it applies. They are one module because
  * the second exists to apply the first's rule, and a caller that needs one
  * usually needs the other.
  *
@@ -68,18 +73,17 @@ import type { Verdict } from './verdict.js';
  */
 
 /**
- * What one tree read gave the caller: the tree, or the error that stood in
- * for it — `readTreeOrError`'s result. Named so a caller that hands a read
- * on (interact/swipe.ts#screenBox, whose note quotes the cause) does not
- * respell it.
+ * What one tree read gave the caller: the tree, or the failure that heals (a
+ * miss) that stood in for it — `readTreeOrMiss`'s result. A failure no wait
+ * cures (PersistentReadError) is THROWN by the seam, never returned. Named so
+ * a caller that hands a read on (interact/swipe.ts#screenBox, whose note
+ * quotes the cause) does not respell it.
  */
-export interface TreeRead {
-  tree?: UiNode;
-  error?: Error;
-}
+export type TreeRead = { tree: UiNode; error?: undefined } | { tree?: undefined; error: Error };
 
 /**
- * Read the UI tree, reporting a failure as a value instead of throwing.
+ * Read the UI tree, reporting a failure that heals as a value instead of
+ * throwing — and throwing, as it came, the one that does not.
  *
  * A failed tree read is a POLL MISS, not a failure — the rule every waiting
  * loop in this codebase depends on. Right after launch (`clearState`
@@ -91,11 +95,15 @@ export interface TreeRead {
  * The error is returned rather than swallowed because the other half of the
  * rule matters just as much: a genuinely broken device (adb gone, emulator
  * offline) must stay diagnosable, so every caller quotes the LAST read error
- * in its timeout message. The one read error that is NOT a miss — a
- * PersistentReadError (adapters/types.ts, D21), which no wait cures — comes
- * back as a value here too: this read stays one-shot, and the loops over it
- * (pollTree, the scroll loop) throw it. `error` is set only when `tree` is not, so callers
+ * in its timeout message. `error` is set only when `tree` is not, so callers
  * can assign both each round and get the "clear on success" behaviour free.
+ *
+ * Throws only a failure no wait cures (adapters/types.ts#PersistentReadError,
+ * D21 — idb's wedged accessibility service): polled like a miss it only spends
+ * the budget, and its message, not a timeout's, is what the reader needs. So
+ * every reader through this seam — pollTree, the scroll loop, the frame
+ * capture's retry — stops on it without knowing it exists. The one reader
+ * that opts out catches it itself (interact/swipe.ts#swipeScreen).
  *
  * A free function rather than a method on each poller: the rule was written
  * out three times (pollUntil, scrollUntilVisible, Verifier.tryReadTree), which
@@ -103,12 +111,26 @@ export interface TreeRead {
  * `Pick<…, 'uiTree'>` keeps it callable from anything that can read a tree,
  * fakes included, without dragging in the rest of the adapter surface.
  */
-export async function readTreeOrError(adapter: Pick<DeviceAdapter, 'uiTree'>): Promise<TreeRead> {
+export async function readTreeOrMiss(adapter: Pick<DeviceAdapter, 'uiTree'>): Promise<TreeRead> {
   try {
     return { tree: await adapter.uiTree() };
   } catch (e) {
+    if (e instanceof PersistentReadError) throw e;
     return { error: e instanceof Error ? e : new Error(String(e)) };
   }
+}
+
+/**
+ * Read the UI tree for a caller that has no use for a miss: a tree, or
+ * `wrap(e)` of a failure that heals thrown in its place — the caller's own
+ * wording (fill's `reread-failed`, the keyboard dismissal's AfterDismissalTap).
+ * A failure no wait cures passes through unwrapped (`wrap` is never called):
+ * its class is what the read loops and the flow engine's isTerminal stop on.
+ */
+export async function readTreeOr(adapter: Pick<DeviceAdapter, 'uiTree'>, wrap: (e: Error) => Error): Promise<UiNode> {
+  const read = await readTreeOrMiss(adapter);
+  if (read.tree === undefined) throw wrap(read.error);
+  return read.tree;
 }
 
 /**
@@ -325,7 +347,7 @@ export interface PollRound {
  * "not in state" with no trace of why.
  *
  * The loop's shape is load-bearing and pinned by tests:
- * - Every round reads the tree ONCE, through readTreeOrError: a failed read
+ * - Every round reads the tree ONCE, through readTreeOrMiss: a failed read
  *   is a miss that keeps polling, and its error is remembered so a timeout
  *   can quote it. Any later successful read clears it. A timeout also counts
  *   the rounds that read a tree (`treesRead`), so a caller can tell "never
@@ -341,12 +363,11 @@ export interface PollRound {
  *   that cannot be read) propagate at once: they are the caller's bug or the
  *   device's, never a miss.
  * - Except a read error no wait cures (adapters/types.ts#PersistentReadError,
- *   since 2026-10-31 — D21, idb's wedged accessibility service): it is thrown
- *   as it came, from the round that read it, whatever was read before. Polled
- *   like a miss it only spent the budget — D20's device run made 133 failing
- *   reads in a 90 s `scroll_until` — and its message, not a timeout's, is what
- *   the reader needs. The callers let it propagate (the flow engine treats it
- *   as terminal: engine.ts#isTerminal).
+ *   since 2026-10-31 — D21, idb's wedged accessibility service): the read
+ *   seam throws it, so it leaves the poll as it came, from the round that read
+ *   it, whatever was read before — D20's device run had made 133 failing reads
+ *   in a 90 s `scroll_until`. The callers let it propagate (the flow engine
+ *   treats it as terminal: engine.ts#isTerminal).
  * - The predicate is handed the poll's `deadline` (since 2026-10-05), for a
  *   predicate that itself waits — the color and ocr asserts capture a
  *   settled frame per round, up to 1.5 s — so it bounds ITS OWN wait: the
@@ -418,11 +439,8 @@ export async function pollTree<T>(
   }
   for (;;) {
     const readStart = Date.now();
-    const read = await readTreeOrError(adapter);
+    const read = await readTreeOrMiss(adapter);
     const readMs = Date.now() - readStart;
-    // A read error no wait cures (adapters/types.ts#PersistentReadError — idb's wedged accessibility service, D21) is
-    // not a miss: thrown as it came, the next read would only say it again until the deadline.
-    if (read.error instanceof PersistentReadError) throw read.error;
     readError = read.error;
     if (read.tree !== undefined) {
       treesRead++;
