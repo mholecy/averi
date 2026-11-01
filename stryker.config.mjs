@@ -10,6 +10,19 @@ import { readFileSync } from 'node:fs';
  */
 export default {
   testRunner: 'vitest',
+  // The sandbox is an allowlist: what the covered tests load, never the whole tree — an untracked build (the RN lab's
+  // ios/Pods) holds files Stryker cannot copy, and failed the run in 1 s (D36b).
+  ignorePatterns: [
+    '/*',
+    '!/src/',
+    '!/tests/',
+    '!/scripts/mutation/',
+    '!/package.json',
+    '!/tsconfig.json',
+    '!/tsconfig.test.json',
+    '!/stryker.config.mjs',
+    '!/vitest.mutation.config.ts',
+  ],
   vitest: { configFile: 'vitest.mutation.config.ts', related: false },
   coverageAnalysis: 'perTest',
   mutate: Object.keys(JSON.parse(readFileSync(new URL('./scripts/mutation/scope.json', import.meta.url), 'utf8'))),
