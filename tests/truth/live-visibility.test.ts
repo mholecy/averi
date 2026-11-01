@@ -424,8 +424,9 @@ describe('the live KNOWN pins the rule a case fails by and the kind of reply it 
     expect(bad).toEqual([]);
   });
   // Its notes (a bug note of docs/bugs, a residual of a decision) are checked in tests/truth/lab-notes.test.ts.
+  // A visibility case's id names its kind (`tap:<cell>.<target>`, …); a forms case's is live.ts's own (b1d, p5, rf4: D31).
   it('every entry is keyed `<platform> <source> <case id>` and names a rule', () => {
-    for (const [k, e] of Object.entries(LIVE_KNOWN)) expect(`${k} ${e.cls}`).toMatch(/^(android|ios) \w+ (tap|scroll|turn|carry):\S+ \S+$/);
+    for (const [k, e] of Object.entries(LIVE_KNOWN)) expect(`${k} ${e.cls}`).toMatch(/^(android|ios) \w+ ((tap|scroll|turn|carry):\S+|[a-z]+\d+[a-z]*) \S+$/);
   });
 });
 

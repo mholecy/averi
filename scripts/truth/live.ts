@@ -13,7 +13,7 @@ import { loadSide } from '../differential/side.js';
 import { familyOf } from './catalog.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
-import { FLOATING_PANEL_EVIDENCE, holds, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, valueOf } from './live-forms.js';
+import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, short, type Source, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, callReply, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
@@ -107,7 +107,6 @@ const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
 const device = (values.udid ?? values.serial ?? 'rejudged')!;
 const port = Number(values['wda-port'] ?? 8120);
 /** The tree sources the cases run under: iOS's (idb, wda), Android's one. */
-type Source = IosTreeSourceKind | Extract<SourceKind, 'uiautomator'>;
 const sources: Source[] = rejudging !== undefined ? [...new Set(rejudging.results.map((r) => r.source))] : platform === 'android' ? ['uiautomator'] : ((values.sources ?? 'idb,wda').split(',') as IosTreeSourceKind[]);
 const only = values.cases?.split(',');
 // `forms` by default: the reproduce lines of the earlier summaries (docs/truth/live-android-2026-10-16.md) stay true.
@@ -172,20 +171,6 @@ const fillFlow = (cell: string, tag: string, value: string) => ({ fill_it: { ste
 const pinFlow = (cell: string, tag: string, value: string) => ({ pin_it: { steps: [{ tap: { id: labId(cell, tag) } }, { type_pin: { value } }] } });
 /** An assert that the field's text in the tree reads `text` — what the screen shows, beside the model the judge reads. */
 const shows = (cell: string, tag: string, text: string): Call => ({ tool: 'assert', args: { asserts: [{ element: { id: labId(cell, tag) }, text, timeout: 2_000 }] } });
-/**
- * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds), AND the tree shows the same text (the
- * `shows` assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's binding setter
- * may leave the TextField showing what was typed), is a MISMATCH here even when the fill passed.
- */
-const holdsShown =
-  (tag: string, want: string) =>
-  (s: LabState, replies: string[], source: Source, launched: LabState): LiveVerdict => {
-    const v = holds(tag, want)(s, replies.slice(0, 1), source, launched);
-    if (v.outcome !== 'ok') return v;
-    return allPassed(replies[1])
-      ? { outcome: 'ok', why: `${v.why}; the tree shows the model's text` }
-      : { outcome: 'MISMATCH', why: `the model holds ${JSON.stringify(want)}, the tree does not show it: ${short(replies[1])}` };
-  };
 
 const FORMS: Omit<Case, 'group'>[] = [
   // The keyboard's cases first: once the simulator has seen HID typing (idb ui text) it shows no soft keyboard
@@ -502,10 +487,6 @@ const FORMS: Omit<Case, 'group'>[] = [
     calls: [fill(RF, 'G.field', 'SK31'), { tool: 'type_text', args: { text: '12000000' } }],
     judge: holds('G', 'SK31 1200 0000'),
   },
-  // rf4: a known LOUD — a residual of blind typing (ADR 0034's D29 amendment). The owner's iOS run held `SK31 1200 00`
-  // with D24's first-key-alone split running: `type:` never reads back, so a tail the RN field drops is not typed again;
-  // `fill:` is the remedy (rf1, rf2). live-known.ts files visibility cases only (a rule and a reply kind per entry), and
-  // a LOUD fails no run: so this comment says it — known LOUD on iOS.
   { id: 'rf4', cell: RF, says: "a flow's tap + `type:` into the RN grouping field", flows: typeFlow(RF, 'G.field', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('G', 'SK31 1200 0000') },
   { id: 'rf5', cell: RF, says: "a flow's tap + `type_pin:` into the RN amount field", flows: pinFlow(RF, 'A.field', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('A', `1${NBSP}234${NBSP}567`) },
 ];
@@ -625,7 +606,8 @@ const selected = CASES.filter((x) => groups.includes(x.group) && appOf(familyOf(
 /**
  * Judge one case's reads: the state after the calls; a forms case not ok is read again 3 s later (`late`: a model that
  * catches up was the app's lag, not a lost value) — never a visibility case, whose stop is judged on the state read
- * when scroll_until returned, and which a later read would let a fling finish behind the reply's back.
+ * when scroll_until returned, and which a later read would let a fling finish behind the reply's back. When the re-read
+ * comes out the same, the first read's verdict is kept whole — its cls and kind included.
  */
 function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined): LiveVerdict {
   const verdict = c.judge(state, replies, source, launched, after);

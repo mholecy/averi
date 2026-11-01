@@ -13,7 +13,9 @@
 > model, read again 3 s later: `b1` (WDA) "Jan Nova", `b4` (idb) and `p2` (idb) the IBAN's last digit, `b2` (WDA)
 > "Jan & Co" (LOUD: averi said "Typed 6 characters"). The screenshot after `b1` shows the field holding "Jan Novak",
 > the cursor after the k — the note's shape: the field has every character, the model not. Not filed in the live
-> KNOWN (a forms case has no rule to pin); docs/truth/live-ios-2026-10-18-visibility.md lists them.
+> KNOWN: a forms case has a rule to pin since D31 (live-forms.ts#holds' class), but none of this note's cases reads not
+> ok in D40's run at 40ba3dd1 (docs/truth/live-records/ios-forms-d40-1.json: b1, b2, b4, p2 ok under both sources), so
+> there is nothing to file; docs/truth/live-ios-2026-10-18-visibility.md lists them.
 
 **Found 2026-10-15** by the live golden (scripts/truth/live.ts) on the lab simulator `averi-lab iPhone 17` (3AB1E82E,
 iOS 27.0), averi = mobile-verify `truth/forms-ios` on `dda435b`'s `src/`. Status: OPEN, triage — not a confirmed averi

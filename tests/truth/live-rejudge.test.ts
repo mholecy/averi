@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
+import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } from '../helpers/live-records.js';
 
 /**
  * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, round 6's device check;
@@ -16,7 +17,7 @@ import { describe, expect, it } from 'vitest';
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before; ios-rn-*-lr3*.json, round 9's LR3 fix) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before; ios-rn-*-lr3*.json, round 9's LR3 fix; ios-forms-d40-1.json, ios-rn-forms-d40-1.json and android-forms-d40-1.json, D40's device run at 40ba3dd1, whose forms LOUDs D31 filed) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -283,6 +284,13 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // together, the RN forms group again — the same.
     ['ios-rn-vis-lr3-3.json', 'visibility', { cases: 12, ok: 9, loud: 0, mismatches: 3 }],
     ['ios-rn-forms-lr3-2.json', 'forms', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
+    // D40's device run at 40ba3dd1: the forms groups, every case not ok known (D31) —
+    // iOS b1d and b7 under both sources (idb ui text refuses non-ASCII, the field untouched), p5 (the secure field
+    // cleared when typing resumed, averi says so); the RN app's rf4 under both (a blind `type:` dropped the tail);
+    // Android b1d and b7 (input text typed a prefix, then exit 255) and kf1–kf3 skipped (Gboard docked).
+    ['ios-forms-d40-1.json', 'forms', { cases: 68, ok: 62, loud: 6, mismatches: 0 }],
+    ['ios-rn-forms-d40-1.json', 'forms', { cases: 10, ok: 8, loud: 2, mismatches: 0 }],
+    ['android-forms-d40-1.json', 'forms', { cases: 42, ok: 37, loud: 2, mismatches: 0, skipped: 3 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudge(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -713,7 +721,7 @@ describe('live.ts --rejudge over the committed Android records of round 9\'s src
 describe('live.ts --rejudge over the committed Android records of the src before the eyes on a "fully" claim', () => {
   // k7: scroll_until phone under the bar riding on the IME. Its stop said "fully visible" with 18 px of phone under the
   // bar's node-less padding — ok by an allowance (ADR 0013's residual) until round 7's A6 made averi name the band
-  // ("PARTLY UNDER a surface …") and live-forms.ts#judgePhoneScroll ask it. A forms case has no KNOWN: in these records,
+  // ("PARTLY UNDER a surface …") and live-forms.ts#judgePhoneScroll ask it. k7 has no KNOWN entry: in these records,
   // each an older src's, k7 reads a MISMATCH not known — a calibration of that src now: exit 1, as recorded.
   it.each([
     // round 6's device check (src e98b87e) with the forms cases: k3 (a fill into note's 14-px strip under the bar) ok
@@ -765,7 +773,7 @@ describe('live.ts --rejudge over a committed calibration record of the src befor
 describe('live.ts --rejudge over the committed record of a --side run of b71cbbb, before the fixes of the scroll stop beneath a presented window and of k7', () => {
   // Round 6's device check, the same cases and lab build as android-vis.json. Its cases not known are exactly the two
   // fixes' before: L1's eight scroll_until beneath the AlertDialog and the half sheet (a stop "after 1 swipe" that
-  // dismissed the layer, or three strokes that expanded the sheet) and F2A1's k7 (a forms case: no KNOWN) — a
+  // dismissed the layer, or three strokes that expanded the sheet) and F2A1's k7 (no KNOWN entry) — a
   // calibration, not HEAD's KNOWN: exit 1, as recorded.
   it('android-vis-b71cbbb.json: the scroll cases beneath the dialog and the half sheet, and k7, not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudge('android-vis-b71cbbb.json', 'forms,visibility');
@@ -783,7 +791,7 @@ describe('live.ts --rejudge over the committed iOS record of a --side run of b71
   // build as ios-vis.json (src 11683c3), the forms group with them. HEAD's KNOWN explains every visibility case not ok
   // — WDA's carousel C, its stop claimed on a read still moving, by the triage note's intermittent entry. Its cases not
   // known are two forms fills whose model lost the IBAN's last digit (lab note
-  // 2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md): a forms case has no KNOWN, so exit 1 — and,
+  // 2026-10-15-lab-ios-swiftui-model-drops-trailing-typed-characters.md): neither has a KNOWN entry, so exit 1 — and,
   // since round 7's A1 struck their entries off, WDA's turn of F (LV4) and carousel C's stop claimed on a read still
   // moving, as recorded at that src; since A5's, idb's presented-layer cases (A5_IDB, above); since L4's, C's cases
   // beneath the blur menus (L4_IDB, L4_WDA); since LE2's and LE3's (round 14), LE2_IDB and scroll-sticky's R fully
@@ -863,8 +871,7 @@ describe('live.ts: a known case not intermittent that comes out ok fails the run
   // (Until round 8's L4 fix struck it off, the example was idb's tap:blur-menu-grouped.C read as WDA read it; until
   // round 14's LV3 fix struck it off, idb's scroll:tabbar-floating.R.)
   it('idb scroll:scroll-bounded.F read as WDA read it (known under idb, which lists no scroll view; WDA strokes inside `lower`, stops on F, the tap firing it): FIXED, exit 1', { timeout: 60_000 }, async () => {
-    type Rec = { platform: string; side: string; results: { source: string; id: string }[] };
-    const ios = JSON.parse(readFileSync(`${ROOT}docs/truth/live-records/ios-vis.json`, 'utf8')) as Rec;
+    const ios = readLiveRecord('ios-vis.json');
     const wda = ios.results.find((r) => r.source === 'wda' && r.id === 'scroll:scroll-bounded.F')!;
     const dir = await mkdtemp(join(tmpdir(), 'live-rejudge-'));
     try {
@@ -892,5 +899,62 @@ describe('live.ts --rejudge over the committed record of absent:scroll-top-edge-
     expect(out).toMatch(/^# Live golden: 2 cases, 0 ok, 0 loud, 2 mismatches \(2 not known\), 0 skipped$/m);
     expect(notKnown(out)).toEqual(['absent:scroll-top-edge-end', 'absent:scroll-top-edge-end']);
     expect(code).toBe(1);
+  });
+});
+
+/**
+ * D31: the forms group's standing LOUDs are machine-checked — live-known.ts files b1d, b7, p5 and rf4 by the rule a
+ * fill verdict fails by (live-forms.ts#holds) and the kind of its last reply, as a visibility case is filed. Over D40's
+ * device run at 40ba3dd1: every LOUD line marked known; a record read otherwise is not known, or FIXED.
+ */
+describe('live.ts --rejudge over D40\'s forms records: every LOUD known by its rule and its kind', () => {
+  it.each([
+    ['ios-forms-d40-1.json', ['b1d', 'b7', 'p5', 'b1d', 'b7', 'p5']],
+    ['ios-rn-forms-d40-1.json', ['rf4', 'rf4']],
+    ['android-forms-d40-1.json', ['b1d', 'b7']],
+  ] as const)('%s: each LOUD [known:', { timeout: 60_000 }, async (record, louds) => {
+    const { code, out } = await rejudge(record, 'forms');
+    const marked = [...out.matchAll(/^- LOUD \((loud-untouched|loud-changed)\) (\S+) .*\[known: (?:bug|residual):[^\]]+\]$/gm)].map((m) => m[2]);
+    expect(marked.sort()).toEqual([...louds].sort());
+    expect(out.match(/^- LOUD /gm)).toHaveLength(louds.length);
+    expect(out).not.toMatch(/NOT known|FIXED, not intermittent/);
+    expect(code).toBe(0);
+  });
+
+  const rejudgeOf = async (rec: LiveRecord, results: RecordedCase[]) => {
+    const dir = await mkdtemp(join(tmpdir(), 'live-rejudge-'));
+    try {
+      const file = join(dir, 'mutated.json');
+      await writeFile(file, JSON.stringify({ ...rec, results }));
+      return await rejudge(file, 'forms');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  };
+
+  it('iOS p5 with the app holding the value asked and the fill claiming it: FIXED, exit 1', { timeout: 60_000 }, async () => {
+    const ios = readLiveRecord('ios-forms-d40-1.json');
+    const p5 = ios.results.filter((r) => r.id === 'p5').map((r) => ({ ...withFieldValue(r, 'pin', '25801'), replies: ['Filled id:"lab.form-prefilled.pin" (1 character)'] }));
+    const { code, out } = await rejudgeOf(ios, p5);
+    expect(out).toMatch(/^# Live golden: 2 cases, 2 ok, 0 loud, 0 mismatches \(0 not known\)/m);
+    expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb p5, wda p5');
+    expect(code).toBe(1);
+  });
+
+  it('RN rf4 with the whole value typed (no committed record reads it ok): intermittent — printed so, no FIXED, exit 0', { timeout: 60_000 }, async () => {
+    const rn = readLiveRecord('ios-rn-forms-d40-1.json');
+    const rf4 = rn.results.filter((r) => r.id === 'rf4').map((r) => withFieldValue(r, 'G', 'SK31 1200 0000'));
+    const { code, out } = await rejudgeOf(rn, rf4);
+    expect(out).toMatch(/^# Live golden: 2 cases, 2 ok, 0 loud, 0 mismatches \(0 not known\)/m);
+    expect(out.match(/^- ok rf4 .*\[known \(intermittent\), ok this run: residual:ADR 0034 residual 2 /gm)).toHaveLength(2);
+    expect(out).not.toMatch(/FIXED, not intermittent/);
+    expect(code).toBe(0);
+  });
+
+  it('Android b1d with the field as the launch left it: LOUD by another rule, NOT known', { timeout: 60_000 }, async () => {
+    const android = readLiveRecord('android-forms-d40-1.json');
+    const b1d = android.results.filter((r) => r.id === 'b1d').map((r) => withFieldValue(r, 'name', r.launched.fields!.name.value));
+    const { out } = await rejudgeOf(android, b1d);
+    expect(out).toMatch(/^- LOUD \(loud-untouched\) b1d .*\[NOT known: loud-untouched on refused, where KNOWN pins loud-changed on refused /m);
   });
 });

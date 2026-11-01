@@ -1,7 +1,9 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
+import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
+import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
+import type { SourceKind } from '../differential/corpus.js';
 import type { LabState, Rect } from './schema.js';
 import { probePoint, within } from './truth.js';
 
@@ -13,24 +15,52 @@ import { probePoint, within } from './truth.js';
  * form-picker's sheet, `judgeMissUnderSheet` the asserts and the flow's `wait:` there.
  */
 
+/** The tree sources the live cases run under: iOS's (idb, wda), Android's one. */
+export type Source = IosTreeSourceKind | Extract<SourceKind, 'uiautomator'>;
+
 export const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
 export const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
 
-/** The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). */
+/**
+ * The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). Not ok, the
+ * verdict names its rule (`cls`, live-visibility.ts#VerdictClass): `failed-holds` where the app holds `want` but averi
+ * failed; `fill-claim` where averi claims done and the app holds another value; else LOUD, `loud-untouched` with the
+ * field as the launch left it, `loud-changed` with it changed (a part typed, a part cleared). Every verdict carries the
+ * kind of the last reply (replies.ts#replyKind): live-known.ts pins a case's `cls` and `kind`.
+ */
 export const holds =
   (tag: string, want: string) =>
-  (s: LabState, replies: string[], _source?: string, launched?: LabState): LiveVerdict => {
+  (s: LabState, replies: string[], _source: Source, launched: LabState): LiveVerdict => {
     const got = valueOf(s, tag);
-    // LOUD splits by what averi left behind: the field as the launch left it, or changed (a part typed, a part cleared).
-    const before = launched === undefined ? undefined : valueOf(launched, tag);
-    const left = before === undefined ? '' : got === before ? ' — field untouched' : ` — field CHANGED (was ${JSON.stringify(before)})`;
+    // The launch is the baseline: a field it did not lay out (undefined) is untouched only while it stays so.
+    const before = valueOf(launched, tag);
+    const untouched = got === before;
+    const left = before === undefined ? '' : untouched ? ' — field untouched' : ` — field CHANGED (was ${JSON.stringify(before)})`;
     const last = replies[replies.length - 1];
+    const kind = replyKind(last);
     if (got === want) {
-      return isError(last) ? { outcome: 'MISMATCH', why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', why: short(last) };
+      return isError(last) ? { outcome: 'MISMATCH', cls: 'failed-holds', kind, why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', kind, why: short(last) };
     }
     return claimsDone(last)
-      ? { outcome: 'MISMATCH', why: `averi says ${short(last)} — the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}` }
-      : { outcome: 'LOUD', why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}${left}; averi: ${short(last)}` };
+      ? { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}` }
+      : { outcome: 'LOUD', cls: untouched ? 'loud-untouched' : 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}${left}; averi: ${short(last)}` };
+  };
+
+/**
+ * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds, over the fill's reply), AND the tree shows
+ * the same text (the `shows` assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's
+ * binding setter may leave the TextField showing what was typed), is a MISMATCH here even when the fill passed:
+ * `failed-holds` on the assert's kind (the model holds it, averi's read of the screen failed).
+ */
+export const holdsShown =
+  (tag: string, want: string) =>
+  (s: LabState, replies: string[], source: Source, launched: LabState): LiveVerdict => {
+    const v = holds(tag, want)(s, replies.slice(0, 1), source, launched);
+    if (v.outcome !== 'ok') return v;
+    const shown = replies[1];
+    return allPassed(shown)
+      ? { outcome: 'ok', kind: replyKind(shown), why: `${v.why}; the tree shows the model's text` }
+      : { outcome: 'MISMATCH', cls: 'failed-holds', kind: replyKind(shown), why: `the model holds ${JSON.stringify(want)}, the tree does not show it: ${short(shown)}` };
   };
 
 /** How many px of `field`'s height the bar (`submit.bar`, the surface with no node) lies over. */
@@ -46,7 +76,7 @@ export const underBar = (field: Rect | undefined | null, bar: Rect | undefined |
  * the bar, or dismiss the keyboard first), note really a strip — what of it the bar leaves showing under the tap
  * minimum, by the app's frames at the refusal — every field as the launch left it, nothing submitted.
  */
-export function judgeNoteFill(s: LabState, replies: string[], source: string, launched: LabState): LiveVerdict {
+export function judgeNoteFill(s: LabState, replies: string[], source: Source, launched: LabState): LiveVerdict {
   const v = holds('note', 'Thanks - ok')(s, replies, source, launched);
   if (source === 'idb' && v.outcome === 'LOUD' && valueOf(s, 'note') === '') return { outcome: 'ok', why: `refused (idb): ${short(replies[0])}` };
   if (source !== 'uiautomator' || v.outcome !== 'LOUD') return v;

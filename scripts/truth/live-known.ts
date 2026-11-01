@@ -8,7 +8,10 @@ import type { ReplyKind } from './replies.js';
  * replayed row's class and kind (ADR 0020 §4): a known case failing by another rule, or by the same rule on another
  * kind of reply (a stop claimed turned into a timeout, a refusal into a tap), is not known. The notes are docs/bugs
  * file names (`bug:`) or a residual of a decision (`residual:`), the static KNOWN's own wording; tests/truth/
- * lab-notes.test.ts ties them to docs/bugs and calibration.json.
+ * lab-notes.test.ts ties them to docs/bugs and calibration.json. A forms case is filed alike since D31: a fill verdict
+ * names its rule (live-forms.ts#holds — `loud-untouched`, `loud-changed`, `fill-claim`, `failed-holds`) and rests on
+ * the case's last reply. A LOUD fails no run, so a known LOUD that reads another rule or kind is marked NOT known and
+ * no more; tests/truth/live-rejudge.test.ts holds the committed records to their marks.
  *
  * Its contract is weaker than ADR 0020 §4's in two ways, on purpose. The strokes are not pinned: a device's timing
  * moves how many a scroll_until sends, run to run. And a case on the device can pass by chance of timing: so live.ts
@@ -39,6 +42,11 @@ const NO_ID_RESIDUAL = 'residual:ADR 0018 residual 20 — idb lists no identifie
 /** calibration.json #24's status, verbatim: the decision is that note's. */
 const FAB = 'residual:accepted (round 13: the FAB host layer is a cover)';
 const CENTRE_A_POINT_OUT = 'bug:2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md';
+// The notes of the forms group's entries (filed by live-forms.ts#holds' class and the kind of the case's last reply).
+const IOS_NON_ASCII = 'bug:2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md';
+const ANDROID_NON_ASCII = 'bug:2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md';
+const SECURE_CLEARED = 'residual:ADR 0028 residual 2 — iOS clears a secure field when typing resumes: a no-clear fill into a prefilled one leaves what was typed, and averi says so';
+const BLIND_TAIL = 'residual:ADR 0034 residual 2 — a flow\'s blind `type:` cannot type again a tail a reformatting field dropped: `fill:` is the remedy';
 
 /**
  * A known case: its note, the rule it fails by (live-visibility.ts#VerdictClass), the kind of reply that verdict rests
@@ -212,6 +220,20 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // blur-menu's C: refused after three strokes on the blur at L4's 37bf5a15 (ios-vis-r8-l4-1.json, -2.json; no
     // dismissal), struck off at its final src (94fc318b): under a cover whose order is not told scroll_until stops
     // before any swipe, nothing stroked, in two runs of two (ios-vis-r8-l4-3.json, -4.json).
+  ]),
+  // The forms group (D31; D40's device run at main 40ba3dd1: ios-forms-d40-1.json, ios-rn-forms-d40-1.json,
+  // android-forms-d40-1.json). A fill's LOUD names what it left — the field as the launch left it, or changed.
+  // Android: `input text` types `Jan ` / `O`, then exits 255 on `Š` / `’` — the field changed, refused.
+  ...each('android uiautomator', ['b1d', 'b7'], ANDROID_NON_ASCII, 'loud-changed', 'refused'),
+  ...['idb', 'wda'].flatMap((src) => [
+    // `idb ui text` (WDA's fill types through it too) fails on the first non-ASCII character: nothing typed, refused.
+    ...each(`ios ${src}`, ['b1d', 'b7'], IOS_NON_ASCII, 'loud-untouched', 'refused'),
+    // p5: the PIN held `2580`, the fill typed `1`, iOS cleared the field as typing resumed — `1`, averi refused
+    // ("typed 1 character but the field shows 1 (masked field …)").
+    ...each(`ios ${src}`, ['p5'], SECURE_CLEARED, 'loud-changed', 'refused'),
+    // rf4 (the RN app): the flow's blind `type:` left `SK31 1200 0` and said `flow type_it: done` — no claim
+    // (`other`); runs of the same commit differ (`SK31 1200 00` at D29's), and a run may type it whole.
+    ...each(`ios ${src}`, ['rf4'], BLIND_TAIL, 'loud-changed', 'other', { intermittent: true }),
   ]),
 ]);
 

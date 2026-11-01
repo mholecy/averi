@@ -26,7 +26,7 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
 
 /**
  * Notes a KNOWN row is filed as that are no open note of calibration.json — each a live-only finding (scroll dynamics,
- * a stroke's reach on the device): no captured tree reproduces it, so the replay has no row to calibrate it on, and
+ * a stroke's reach on the device, typing — what a fill leaves in the app's field): no captured tree reproduces it, so the replay has no row to calibrate it on, and
  * calibration.json lists it under `excluded` (checked below, with the reason it gives).
  * (2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md filed idb's sheet-long-list F until round 7's recapture
  * recorded F unlisted under idb — no live entry files it since, so it is no exemption. LV4's and the carousel triage
@@ -37,6 +37,9 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  */
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md': "a fling's rest a fraction of a point centre-out under WDA, live only (and intermittent)",
+  // D31: the forms group's fills of non-ASCII text (live.ts b1d, b7): a replayed tree cannot judge typing.
+  '2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md': '`idb ui text` refuses non-ASCII text, the field untouched: typing, live only',
+  '2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md': '`input text` types a prefix, then fails on non-ASCII text: typing, live only',
 };
 
 /**
