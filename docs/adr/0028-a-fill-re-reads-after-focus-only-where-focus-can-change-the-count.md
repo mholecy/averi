@@ -2,7 +2,8 @@
 
 Status: accepted 2026-10-31 (performance backlog item D8, docs/plans/2026-10-30-performance-backlog.md; the
 orchestrator's decision on the owner's standing: fast AND stable — a fill that reports success on the wrong field or
-misses a transformed value is unacceptable). Implemented in 5ea9bfd2…546c8804, merged 1083523e.
+misses a transformed value is unacceptable). Implemented in 5ea9bfd2…546c8804, merged 1083523e. Amended 2026-11-01
+(D31: the residuals numbered under "Residuals accepted", p5's secure field that iOS clears accepted as residual 2).
 
 ## Context
 
@@ -117,3 +118,25 @@ overriding the typing's outcome. The landing rule then says `said-plain` for a m
 final, the poll stops on it as it stopped on the landed reading fill.ts overrode — and `differenceOf` builds
 `masked-said-plain` for it and for a shorter one, which still polls the whole budget (its keys may be late). Timing
 and every reply are unchanged (pinned: tests/interact/fill.test.ts counts the tree reads of both).
+
+## Amendment: the residuals numbered, and the secure field iOS clears (2026-11-01, D31)
+
+The live golden's KNOWN (scripts/truth/live-known.ts) files a forms case by a decision's numbered residual, as it files
+a visibility case; this ADR's are numbered below. "Residual" above stands as written: (R1) is residual 1; the React
+Native secure field is no residual — unmeasured, it concerns the parsers' word only.
+
+Residual 2 is the lab's p5 (`live.ts`, form-prefilled): a fill without `clear` of `1` into the secure PIN that holds
+`2580`. iOS clears a secure field when typing resumes in it, so the field holds `1`, not `25801`. iOS keeps the
+post-focus re-read (Decision): it read 4 bullets after focus, the length rule expects 5, the field shows 1, and the
+fill fails saying so — `typed 1 character but the field shows 1 (masked field — compared by length; it held 4 after
+focus)`. LOUD under idb and WDA in every iOS forms run (docs/truth/live-ios-2026-10-18-visibility.md; D40's
+docs/truth/live-records/ios-forms-d40-1.json). What iOS clears no typing can keep; the remedy is the whole value with
+`clear: true` (p6, ok).
+
+## Residuals accepted
+
+1. **A source that wrongly says plain of a masking field**, an autofill of N bullets on focus and exactly N dropped
+   keys: the fill passes silently ((R1) above).
+2. **iOS clears a secure field when typing resumes.** A no-clear fill into a prefilled secure field leaves only what
+   was typed; the read-back's length rule fails it and averi says so (LOUD, the amendment above). Filed in
+   live-known.ts as `ios idb|wda p5` (`loud-changed` on `refused`).

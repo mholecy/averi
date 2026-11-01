@@ -5,7 +5,8 @@ orchestrator's proposal, tightened; tightened again in review round 1 — MAJOR-
 an added `.` or `,`). Implemented on `perf/d18-reformatting-field`. Amended 2026-10-31 (D28: a reformatted strict
 prefix is a dropped tail — the owner's iOS run of D18, the remedy, the diagnosis and the SwiftUI lab fix; implemented
 on `fix/d28-reformat-dropped-tail`). Amended 2026-11-01 (D29: an earlier text that vanished — idb's unnamed
-placeholder — and rf4's tail, a residual of blind typing; implemented on `fix/d29-placeholder-prior`).
+placeholder — and rf4's tail, a residual of blind typing; implemented on `fix/d29-placeholder-prior`). Amended
+2026-11-01 (D31: the accepted residuals numbered under "Residuals accepted"; rf4's is residual 2, filed in live-known.ts).
 
 ## Context
 
@@ -274,3 +275,23 @@ changed.
 - **Residual — the placeholder asymmetry.** A value equal to the named placeholder that the field shows exactly is
   read back `placeholder` (not verified); the same placeholder shown GROUPED for an ungrouped value (`SK00 0000` for
   `SK000000`) is held as empty (`heldText` is exact equality), lands as nothing, and fails `unchanged`. Kept as is.
+
+## Amendment: the residuals numbered, rf4 filed (2026-11-01, D31)
+
+The live golden's KNOWN (scripts/truth/live-known.ts) now files the forms group's cases as it files the visibility
+group's: by a fill verdict's class (`holds` in scripts/truth/live-forms.ts: `loud-untouched`, `loud-changed`, `fill-claim`,
+`failed-holds`) and the kind of the case's last reply. rf4 is filed there as `ios idb|wda rf4`, `loud-changed` on
+`other` (the flow's `flow type_it: done`, no claim), intermittent — the tail it drops differs run to run
+(`SK31 1200 00` at D29's, `SK31 1200 0` in D40's docs/truth/live-records/ios-rn-forms-d40-1.json). The D29
+amendment's "marks rf4 a known LOUD on iOS in a comment (live-known.ts files visibility cases only)" no longer holds:
+the comment is gone, the entry replaces it. The accepted residuals above are numbered below; the dropped tail of
+review round 1's MINOR-3, fixed by D28, is none.
+
+## Residuals accepted
+
+1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
+   Consequences), said in the reply's aside.
+2. **A flow's blind `type:` cannot type again a tail a reformatting field dropped** (D29): no read-back, by design;
+   `fill:` is the remedy. Filed in live-known.ts as `ios idb|wda rf4`.
+3. **The placeholder asymmetry** (A2's amendment): a named placeholder shown grouped for an ungrouped value is held as
+   empty and fails `unchanged`.

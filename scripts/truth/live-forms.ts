@@ -1,7 +1,7 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
+import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
 import type { LabState, Rect } from './schema.js';
 import { probePoint, within } from './truth.js';
 
@@ -16,21 +16,45 @@ import { probePoint, within } from './truth.js';
 export const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
 export const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
 
-/** The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). */
+/**
+ * The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). Not ok, the
+ * verdict names its rule (`cls`, live-visibility.ts#VerdictClass): `failed-holds` where the app holds `want` but averi
+ * failed; `fill-claim` where averi claims done and the app holds another value; else LOUD, `loud-untouched` with the
+ * field as the launch left it, `loud-changed` with it changed (a part typed, a part cleared). Every verdict carries the
+ * kind of the last reply (replies.ts#replyKind) — the two that live-known.ts pins.
+ */
 export const holds =
   (tag: string, want: string) =>
   (s: LabState, replies: string[], _source?: string, launched?: LabState): LiveVerdict => {
     const got = valueOf(s, tag);
-    // LOUD splits by what averi left behind: the field as the launch left it, or changed (a part typed, a part cleared).
     const before = launched === undefined ? undefined : valueOf(launched, tag);
-    const left = before === undefined ? '' : got === before ? ' — field untouched' : ` — field CHANGED (was ${JSON.stringify(before)})`;
+    const untouched = got === before;
+    const left = before === undefined ? '' : untouched ? ' — field untouched' : ` — field CHANGED (was ${JSON.stringify(before)})`;
     const last = replies[replies.length - 1];
+    const kind = replyKind(last);
     if (got === want) {
-      return isError(last) ? { outcome: 'MISMATCH', why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', why: short(last) };
+      return isError(last) ? { outcome: 'MISMATCH', cls: 'failed-holds', kind, why: `the app holds ${JSON.stringify(got)}, but averi failed: ${short(last)}` } : { outcome: 'ok', kind, why: short(last) };
     }
     return claimsDone(last)
-      ? { outcome: 'MISMATCH', why: `averi says ${short(last)} — the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}` }
-      : { outcome: 'LOUD', why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}${left}; averi: ${short(last)}` };
+      ? { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}` }
+      : { outcome: 'LOUD', cls: untouched ? 'loud-untouched' : 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(want)}${left}; averi: ${short(last)}` };
+  };
+
+/**
+ * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds, over the fill's reply), AND the tree shows
+ * the same text (the `shows` assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's
+ * binding setter may leave the TextField showing what was typed), is a MISMATCH here even when the fill passed:
+ * `failed-holds` on the assert's kind (the model holds it, averi's read of the screen failed).
+ */
+export const holdsShown =
+  (tag: string, want: string) =>
+  (s: LabState, replies: string[], source: string, launched: LabState): LiveVerdict => {
+    const v = holds(tag, want)(s, replies.slice(0, 1), source, launched);
+    if (v.outcome !== 'ok') return v;
+    const shown = replies[1];
+    return allPassed(shown)
+      ? { outcome: 'ok', kind: replyKind(shown), why: `${v.why}; the tree shows the model's text` }
+      : { outcome: 'MISMATCH', cls: 'failed-holds', kind: replyKind(shown), why: `the model holds ${JSON.stringify(want)}, the tree does not show it: ${short(shown)}` };
   };
 
 /** How many px of `field`'s height the bar (`submit.bar`, the surface with no node) lies over. */

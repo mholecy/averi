@@ -37,6 +37,9 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  */
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md': "a fling's rest a fraction of a point centre-out under WDA, live only (and intermittent)",
+  // D31: the forms group's fills of non-ASCII text (live.ts b1d, b7): a replayed tree cannot judge typing.
+  '2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md': '`idb ui text` refuses non-ASCII text, the field untouched: typing, live only',
+  '2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md': '`input text` types a prefix, then fails on non-ASCII text: typing, live only',
 };
 
 /**
