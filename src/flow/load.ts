@@ -137,9 +137,12 @@ const announced = new Map<string, Record<string, string>>();
  * platform asked about (already resolved against the config's directory by
  * loadConfig). The error is the `install_app` tool's wording, kept
  * byte-identical when the lookup moved here from its handler (2026-10-03).
+ * `cfg` may be undefined since D41 (2026-11-01): install_app reads averi.yaml
+ * under a call-dependent entry (`required` only without a path), so the type
+ * it holds is optional; no config names no build, the same error.
  */
-export function appBuildPath(cfg: AveriConfig, platform: Platform): string {
-  const path = platform === 'android' ? cfg.app.android?.apk : cfg.app.ios?.app;
+export function appBuildPath(cfg: AveriConfig | undefined, platform: Platform): string {
+  const path = platform === 'android' ? cfg?.app.android?.apk : cfg?.app.ios?.app;
   if (path === undefined) throw new Error(`No path given and averi.yaml has no app.${platform} build path`);
   return path;
 }

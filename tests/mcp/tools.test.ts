@@ -595,11 +595,11 @@ describe('launch_app — the entry activity', () => {
     expect(bound()).toEqual([]);
   });
 
-  // The same broken file beside a call that would use nothing from it: not read.
+  // The same broken file beside a call that would use nothing from it: not read. (iOS reads it since D41, for the
+  // tree source — its own describe below.)
   it.each([
     ['android, an activity named', 'android', { activity: '.ShareActivity' }],
     ['android, an intent given', 'android', { intent: { action: 'android.intent.action.SEND' } }],
-    ['ios', 'ios', {}],
   ] as const)('%s → the invalid averi.yaml is not read, and the launch goes ahead', async (_name, platform, entry) => {
     const configPath = await invalidConfig();
     reads.paths.length = 0;
@@ -1007,16 +1007,84 @@ describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_un
     expect(bound).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
   });
 
-  it('ios swipe: a direction reads the tree through the configured source; coordinates read no config at all', async () => {
+  // Until D41 coordinates read no config, and stroked on another adapter than a direction in a wda project.
+  it('ios swipe: a direction and coordinates alike go through the configured source', async () => {
     const harness = await connect();
     const configPath = await file('averi.yaml', 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n');
     expect((await harness.call('swipe', { platform: 'ios', direction: 'up', configPath })).isError).toBe(false);
+    expect((await harness.call('swipe', { platform: 'ios', fromX: 1, fromY: 2, toX: 3, toY: 4, configPath })).isError).toBe(false);
     expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
-    const invalid = await invalidConfig();
+    expect(harness.fakes.ios!.swipes).toHaveLength(2);
+  });
+});
+
+/**
+ * D41 (2026-11-01): one adapter per simulator and configured tree source, for EVERY tool. Until then the eight tools
+ * below asked the registry without a kind, so in a `treeSource: wda` project they were served by a second, idb-kind
+ * adapter — a second idb helper, launch_app's foreground wait and terminate_app's front-app memory on the wrong
+ * adapter, a screenshot from another source than assert's frames, a coordinate swipe stroked on another adapter than
+ * a direction swipe. Each now reads the project's tree source like the tree tools (ADR 0032, amendment D41).
+ */
+describe('every tool gets the project\'s adapter — one per simulator and configured tree source (D41)', () => {
+  const WDA_PROJECT = 'app:\n  ios: { bundleId: md.bank.app, treeSource: wda }\n';
+  /** The eight tools that once asked kind-less, each with what an iOS call of it needs. */
+  const DEVICE_CALLS: Record<string, Record<string, unknown>> = {
+    install_app: { path: '/builds/Bank.app' },
+    launch_app: { appId: 'md.bank.app' },
+    terminate_app: { appId: 'md.bank.app' },
+    open_deep_link: { url: 'bank://home' },
+    screenshot: {},
+    'swipe (coordinates)': { fromX: 1, fromY: 2, toX: 3, toY: 4 },
+    press_key: { key: 'home' },
+    get_logs: {},
+  };
+  const toolOf = (name: string) => name.split(' ')[0];
+
+  it.each(Object.keys(DEVICE_CALLS))('ios %s in a treeSource: wda project is served by the wda adapter', async (name) => {
+    const harness = await connect();
+    const configPath = await file('averi.yaml', WDA_PROJECT);
+    const result = await harness.call(toolOf(name), { platform: 'ios', configPath, ...DEVICE_CALLS[name] });
+    expect(result.isError).toBe(false);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
+  });
+
+  it('ios: all eight and a tree tool in one wda project share ONE adapter, built once', async () => {
+    const harness = await connect();
+    const configPath = await file('averi.yaml', WDA_PROJECT);
+    for (const name of Object.keys(DEVICE_CALLS)) {
+      expect((await harness.call(toolOf(name), { platform: 'ios', configPath, ...DEVICE_CALLS[name] })).isError, name).toBe(false);
+    }
+    expect((await harness.call('ui_snapshot', { platform: 'ios', configPath })).isError).toBe(false);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'wda' }]);
+  });
+
+  it('ios without a project config: one idb adapter, shared by the tree tools and the rest', async () => {
+    const harness = await connect();
+    for (const name of Object.keys(DEVICE_CALLS)) {
+      expect((await harness.call(toolOf(name), { platform: 'ios', configPath: missing(), ...DEVICE_CALLS[name] })).isError, name).toBe(false);
+    }
+    expect((await harness.call('ui_snapshot', { platform: 'ios', configPath: missing() })).isError).toBe(false);
+    expect(harness.bound()).toEqual([{ platform: 'ios', deviceId: 'ios-1', treeSource: 'idb' }]);
+  });
+
+  it.each(Object.keys(DEVICE_CALLS))('ios %s: an INVALID averi.yaml fails the call naming the file, before a device is bound', async (name) => {
+    const harness = await connect();
+    const configPath = await invalidConfig();
+    const result = await harness.call(toolOf(name), { platform: 'ios', configPath, ...DEVICE_CALLS[name] });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain(configPath);
+    expect(harness.bound()).toEqual([]);
+  });
+
+  // Android has no tree source: these tools read nothing there, so a broken file beside them is not their business.
+  it.each(Object.keys(DEVICE_CALLS).filter((n) => n !== 'launch_app'))('android %s: an INVALID averi.yaml is not read at all', async (name) => {
+    const harness = await connect();
+    const configPath = await invalidConfig();
     reads.paths.length = 0;
-    const coords = await harness.call('swipe', { platform: 'ios', fromX: 1, fromY: 2, toX: 3, toY: 4, configPath: invalid });
-    expect(coords.isError).toBe(false);
-    expect(configReads(invalid)).toBe(0);
+    const args = name === 'install_app' ? { path: '/builds/app.apk' } : DEVICE_CALLS[name];
+    const result = await harness.call(toolOf(name), { platform: 'android', configPath, ...args });
+    expect(result.isError).toBe(false);
+    expect(configReads(configPath)).toBe(0);
   });
 });
 

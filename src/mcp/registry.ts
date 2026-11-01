@@ -20,7 +20,12 @@ function unusableNamed(device: Device | undefined): string | undefined {
   return why === undefined || device === undefined ? undefined : `"${device.id}" ${why}`;
 }
 
-/** Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). */
+/**
+ * Per-call adapter options — today only the iOS tree-source kind (averi.yaml `app.ios.treeSource`). Required by
+ * `get` (D41, 2026-11-01): a caller states the project's kind, or that it has none (`treeSource` undefined — the
+ * default), and cannot forget it — the eight tools that once asked without it were served, in a `treeSource: wda`
+ * project, by a second adapter of the default kind.
+ */
 export interface AdapterOpts {
   treeSource?: IosTreeSourceKind;
 }
@@ -57,8 +62,9 @@ export const defaultFactory: AdapterFactory = (platform, deviceId, opts) => {
 /**
  * The iOS adapter's wiring, in one place (review round 2 of D7a): one idb helper per adapter, shared like `exec` by
  * the adapter (which owns and disposes it) and its tree source. It starts on the first call it could serve — since D7b
- * an input too, so a wda-backed adapter starts one as well (its input is idb's): a simulator served under both tree
- * sources at once runs two (ADR 0032, section "D7b"). `deps` reach the tree source: the
+ * an input too, so a wda-backed adapter starts one as well (its input is idb's). Since D41 every tool of a project asks
+ * for the project's kind, so a simulator runs one helper; two only when two projects with different tree sources
+ * drive it from one server (ADR 0032, amendment D41). `deps` reach the tree source: the
  * server passes none; scripts/perf/baseline.ts passes its lab WebDriverAgent's port and derived data.
  */
 export function iosAdapterFor(udid: string, kind: IosTreeSourceKind, deps: Omit<IosTreeSourceDeps, 'idbHelper'> = {}): IosAdapter {
@@ -70,13 +76,12 @@ export function iosAdapterFor(udid: string, kind: IosTreeSourceKind, deps: Omit<
  * The cache key's third part: which tree-source kind an opts set resolves
  * to. Normalized so equivalent calls share one cached instance: android has
  * no tree source (a stray value must not fork its cache), and on ios an
- * omitted kind IS the default — a treeSource-less get for the same device
- * gets the default-kind instance and never races the wda one, which owns a
- * WdaServer. Resolving the default HERE is what makes the cache key and the
- * factory call agree: the factory is handed the resolved kind.
+ * undefined kind IS the default — a project without a configured source gets
+ * the default-kind instance. Resolving the default HERE is what makes the
+ * cache key and the factory call agree: the factory is handed the resolved kind.
  */
-function kindFor(platform: Platform, opts?: AdapterOpts): IosTreeSourceKind | undefined {
-  return platform === 'ios' ? opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE : undefined;
+function kindFor(platform: Platform, opts: AdapterOpts): IosTreeSourceKind | undefined {
+  return platform === 'ios' ? opts.treeSource ?? DEFAULT_IOS_TREE_SOURCE : undefined;
 }
 
 /** The registry's two seams: the factory of bound adapters and discovery (adapters/discovery.ts#DeviceDiscovery) — both or neither. */
@@ -168,7 +173,7 @@ export class AdapterRegistry {
     return device;
   }
 
-  async get(platform: Platform, opts?: AdapterOpts): Promise<DeviceAdapter> {
+  async get(platform: Platform, opts: AdapterOpts): Promise<DeviceAdapter> {
     this.assertOpen();
     const binding = this.bindings.get(platform);
     if (binding) {
@@ -218,7 +223,7 @@ export class AdapterRegistry {
     return this.adapterFor(platform, booted[0].id, opts);
   }
 
-  private adapterFor(platform: Platform, deviceId: string, opts?: AdapterOpts): DeviceAdapter {
+  private adapterFor(platform: Platform, deviceId: string, opts: AdapterOpts): DeviceAdapter {
     // Defence in depth, currently unreachable: both callers re-check
     // assertOpen() after their awaits (get()'s binding-identity recursion and
     // the check before its unbound write). It stays because THIS is the line

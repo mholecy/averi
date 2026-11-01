@@ -7,7 +7,7 @@ message, [troubleshooting.md](troubleshooting.md) is organised by symptom.
 
 ## Shared arguments
 
-- `configPath`: Path to averi.yaml (default: ./averi.yaml in the server working directory). Paths INSIDE it — the build paths, .env.averi, .averi/baselines/ — resolve against the file, so a config in a subdirectory needs nothing else. Read only when this call uses a value from it; a call that reads it fails on an invalid file (naming it) rather than ignoring it, and a missing file fails only the tools that cannot work without one (ensure_state, run_flow, verify, install_app without a path).
+- `configPath`: Path to averi.yaml (default: ./averi.yaml in the server working directory). Paths INSIDE it — the build paths, .env.averi, .averi/baselines/ — resolve against the file, so a config in a subdirectory needs nothing else. Read only when this call uses a value from it; a call that reads it fails on an invalid file (naming it) rather than ignoring it, and a missing file fails only the tools that cannot work without one (ensure_state, run_flow, verify, install_app without a path). On iOS every tool that touches the device reads it for app.ios.treeSource, so all the tools of one project drive the same adapter: under `treeSource: wda`, screenshot captures through simctl (the source of assert's frames) and launch_app returns without waiting for the app's tree.
 - `environment`: Credential environment from averi.yaml `environments:` (e.g. "starterkit") — pass when the build under test points at a different backend than usual. Defaults to $AVERI_ENV (settable in .env.averi), then `defaultEnvironment:`.
 
 ## `select_device`
@@ -32,8 +32,8 @@ Arguments:
 ## `launch_app`
 
 - Launch an app by package name / bundle id. clearState wipes app data first (forces fresh login); the reply then carries a ⚠ clearState line counting the wipes this server session has made, flow launches included.
-- Android: activity pins the entry point — without it (and without app.android.activity in averi.yaml) the launcher activity is picked arbitrarily, which opens LeakCanary instead of the app on debug builds that bundle it. intent exercises non-launcher entry points (share/SEND); an intent without an activity is delivered within the app's package (never to another app, and not to app.android.activity), and fails if no activity there handles it. averi.yaml is read only for that fallback (android, neither activity nor intent named), and an invalid one then fails the call instead of launching without its activity.
-- iOS (idb tree source): returns once the UI tree is the launched app's — for a second or two after an app switch idb still lists the previous app's tree, on which an absent assert would pass — waiting at most 3 s; when it never saw the app, the reply carries a ⚠ line naming what the tree showed: compare with screenshot before trusting a read.
+- Android: activity pins the entry point — without it (and without app.android.activity in averi.yaml) the launcher activity is picked arbitrarily, which opens LeakCanary instead of the app on debug builds that bundle it. intent exercises non-launcher entry points (share/SEND); an intent without an activity is delivered within the app's package (never to another app, and not to app.android.activity), and fails if no activity there handles it. On Android averi.yaml is read only for that fallback (neither activity nor intent named), and an invalid one then fails the call instead of launching without its activity; on iOS it is read for the tree source.
+- iOS (idb tree source): returns once the UI tree is the launched app's — for a second or two after an app switch idb still lists the previous app's tree, on which an absent assert would pass — waiting at most 3 s; when it never saw the app, the reply carries a ⚠ line naming what the tree showed: compare with screenshot before trusting a read. Under `treeSource: wda` it returns without that wait.
 
 Arguments:
 

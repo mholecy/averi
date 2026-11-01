@@ -305,7 +305,7 @@ Small, high-level surface — agents perform better with fewer, smarter tools:
 | `verify(platforms?, state?, flow?, asserts?, contract?, environment?)` | Runs the same sequence on the requested platforms (default: iOS **and** Android; the legs run concurrently, and their sections and images always come back android-then-ios), returns per-platform screenshots + assert results; `contract` (layout-contract JSON) appends a per-anchor `## rect parity` geometry table, anchors carrying `bg`/`bg_dark`/`sample` add a `## color parity` table sampled from the legs' own screenshots (CIEDE2000: android-vs-ios primary at `tolerance_de` 8, vs-contract at 1.5×), and anchors carrying `text`/`text_dynamic` add a `## text parity` table reading the RENDERED copy and ink height back off those same screenshots with OCR (`tolerance_size_pct` 10) — numbers over impressions; since 2026-10-03 a contract field one of those tables could not read (bad `bg`, `sample`, `text`, `text_dynamic` or `tolerance_*`) refuses the call before any leg starts, listing every such field, where it used to run both legs and print `FAILED:` in that table |
 | `get_logs(platform, sinceSeconds?, grep?, maxLines?)` | Crash/exception scan (logcat, os_log), `sinceSeconds` back (default 60). Returns the last `maxLines` matching lines (default 400), headed by how many the grep matched and how many are shown — a `grep` alone is not a token budget |
 
-Every tool that reads averi.yaml also takes `configPath` (default `./averi.yaml` in the server's working directory). `record_flow` is not a tool — it is a v2 idea (§9).
+Every tool that reads averi.yaml also takes `configPath` (default `./averi.yaml` in the server's working directory) — since D41 (2026-11-01) every tool that resolves a device, so on iOS each gets the project's adapter (below). `record_flow` is not a tool — it is a v2 idea (§9).
 
 ### Which tools read averi.yaml
 
@@ -313,15 +313,15 @@ Declared once per tool, in `mcp/config-policy.ts#TOOL_CONFIG`, and carried out b
 
 | Tool | Android | iOS | `.env.averi` |
 |---|---|---|---|
-| `install_app` | required — only without `path` (\*) | required — only without `path` (\*) | no |
-| `launch_app` | optional — only with neither `activity` nor `intent` (the `app.android.activity` fallback) | none | no |
-| `ui_snapshot`, `tap`, `type_text`, `scroll_until` | none | optional (tree source; dismissals for `tap`/`type_text`) | no |
-| `swipe` | none | optional — only with `direction` (tree source); coordinates read nothing | no |
+| `install_app` | required without `path`; none with one | required without `path`; optional (tree source) with one | no |
+| `launch_app` | optional — only with neither `activity` nor `intent` (the `app.android.activity` fallback) | optional (tree source) | no |
+| `ui_snapshot`, `tap`, `type_text`, `scroll_until`, `swipe` | none | optional (tree source; dismissals for `tap`/`type_text`) | no |
+| `terminate_app`, `open_deep_link`, `screenshot`, `press_key`, `get_logs` | none | optional (tree source) | no |
 | `assert` | optional (health line) | optional (tree source, health line) | no |
 | `ensure_state`, `run_flow`, `verify` | required | required | yes |
-| every other tool | none | none | no |
+| `list_devices`, `select_device` | none | none | no |
 
-(\*) The table entry is plain `required` and does not look at `path`, by design: the handler's `path ?? appBuildPath(…)` short-circuits before the read, so a call with a path reads nothing, and the entry keeps `cfg` typed non-optional where `appBuildPath` needs it. `launch_app` and `swipe` are the entries that take the call's arguments.
+`install_app` and `launch_app` are the entries that take the call's arguments. Every handler reaches its device through one resolver, `mcp/tools.ts#deviceFor` — the registry's adapter for the bound device and the loaded config's `app.ios.treeSource` — and the registry's `get` requires that kind (`undefined` is the default, idb), so a kind-less get does not typecheck (D41, 2026-11-01; tests/mcp/registry-gets.test.ts pins the one call). Until then eight tools (`install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, a coordinate `swipe`, `press_key`, `get_logs`) asked without the kind and, in a `treeSource: wda` project, were served by a second, idb-kind adapter: a second idb helper, `launch_app`'s foreground wait and `terminate_app`'s front-app memory on the wrong adapter, a screenshot from another source than `assert`'s and `ensure_state`'s frames. In a wda project those tools now behave as the wda adapter does: `screenshot` captures through simctl, the source of the frames the asserts read (~300 ms more than idb's); `launch_app` has no foreground wait (the wda source answers no application label — as a flow's `launch:` step already had); `press_key` and a coordinate `swipe` still send idb input, through the wda adapter's own helper. Without a project config nothing changes (the default kind, as the tree tools had); since they read `./averi.yaml` by default, these tools now honour the one in the server's working directory, as the tree tools did (ADR 0032, amendment D41).
 
 - **none** — the file is not read; a broken one beside the call is not its business, because the call uses no value from it.
 - **optional** — a MISSING file is no config and the call proceeds on the defaults (no health line, the idb tree source, no dismissals, the launcher's activity).
