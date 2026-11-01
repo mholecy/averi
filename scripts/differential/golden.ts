@@ -13,6 +13,7 @@ import { pct, type CellTruth, type ImeCapture } from '../truth/schema.js';
 import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/truth.js';
 import { hostExec, useRecognizer } from './fake-device.js';
 import { ocrDecision, ocrSkip, probeHarness } from './ocr-probe.js';
+import { isMain } from '../is-main.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -254,7 +255,7 @@ export const exitCode = (results: readonly GoldenResult[]): 0 | 1 =>
 
 // --- the command line ---
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const { values } = parseArgs({
     options: { corpus: { type: 'string' }, side: { type: 'string' }, worktrees: { type: 'string' }, only: { type: 'string' }, json: { type: 'boolean' }, against: { type: 'string' } },
   });
