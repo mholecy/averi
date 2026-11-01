@@ -70,6 +70,34 @@ describe('fillField — focus, clear, type, verify', () => {
     }
   });
 
+  // D29: idb names no placeholder, so the SwiftUI lab's UIKit iban field reads its placeholder `SK00 0000 0000 …` as
+  // its value while empty, and drops it at the first key. f7 on the owner's iOS run: a fill, a clear alone, a fill —
+  // the app held `CZ65 0800 0000`, the fills failed "typed 6 characters but the field shows 7" and "typed 12
+  // characters but the field shows 14".
+  it('f7: a grouping field whose unnamed placeholder shows while empty — fill, clear alone, fill: both fills land reformatted', async () => {
+    const PH = 'SK00 0000 0000 \u2026';
+    const fake = formFake(PH);
+    const held = () => (fake.focused === undefined || fake.focused.value === PH ? '' : (fake.focused.value ?? ''));
+    const group4 = (t: string) => (t.replace(/ /g, '').match(/.{1,4}/g) ?? []).join(' ');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = group4(held() + text) || PH;
+    };
+    fake.clearText = async (count: number) => {
+      fake.deletes.push(count);
+      if (fake.focused) fake.focused.value = held().slice(0, Math.max(0, held().length - count)) || PH;
+    };
+    const first = await fillField(fake, { id: 'amount_input' }, 'SK3112', FAST);
+    expect(fillReply(first, 'id:amount_input')).toContain('the field shows them reformatted: 1 separator added');
+    expect(fake.focused?.value).toBe('SK31 12');
+    await fillField(fake, { id: 'amount_input' }, '', { ...FAST, clear: true });
+    expect(fake.focused?.value).toBe(PH);
+    const last = await fillField(fake, { id: 'amount_input' }, 'CZ6508000000', FAST);
+    expect(fillReply(last, 'id:amount_input')).toContain('the field shows them reformatted: 2 separators added');
+    expect(fake.focused?.value).toBe('CZ65 0800 0000');
+    expect(fake.typed).toEqual(['SK3112', '', 'CZ6508000000']); // nothing typed again
+  });
+
   it('taps the field then types; no clearing by default (pre-filled login fields must survive)', async () => {
     const fake = formFake('9.99');
     const result = await fillField(fake, { id: 'amount_input' }, '2.50', FAST);

@@ -251,6 +251,8 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['the same on Android (no-break spaces), no clear onto held text', { observed: 'SK31\u00A01200\u00A00', before: 'SK31', value: '12000000' }, { kind: 'dropped-tail', landed: 5, dropped: 3, grouped: true }],
     // D28 code review: a prefix only RESPACED (a typed space shown as a no-break space), nothing added, is not grouped
     ['a respaced-only prefix (`Jan\u00A0` for `Jan Novak`): a dropped tail, not grouped', { observed: 'Jan\u00A0', value: 'Jan Novak', clear: true }, { kind: 'dropped-tail', landed: 4, dropped: 5, grouped: false }],
+    // D29: idb names no placeholder — `before` was the UIKit field's own `SK00 0000 0000 …`, gone at the first key
+    ['a grouping field that dropped the tail after its unnamed placeholder vanished: a dropped tail, not a length', { observed: 'SK31 1200 0', before: 'SK00 0000 0000 \u2026', value: 'SK3112000000' }, { kind: 'dropped-tail', landed: 9, dropped: 3, grouped: true }],
     ['an exact prefix stays a length (the field grouped nothing)', { observed: '12345', value: '1234567', clear: true }, { kind: 'length' }],
     ['a grouped reading with a changed character is no prefix', { observed: '1 235 5', value: '1234567', clear: true }, { kind: 'same-length', positions: 5 }],
     ['a grouped reading that holds nothing of the typing is no dropped tail', { observed: '1 234', before: '1234', value: '5' }, { kind: 'length' }],

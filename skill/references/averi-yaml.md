@@ -63,7 +63,7 @@ The recovery pass never re-runs a destructive flow, one whose `requires:` chain 
 |---|---|---|
 | `launch` | `{ clearState: bool }`; Android: `activity`, `intent: { action, mimeType, extras }` | `clearState: true` wipes the app's data. An `intent` without an `activity` goes to the activity whose intent filter matches, and `app.android.activity` is not applied. iOS has no intents; use deep links. |
 | `tap` | element spec, optional `timeout:` | Waits for the element to appear and hold still. |
-| `type` | `{ value }` | Types into the focused field. |
+| `type` | `{ value }` | Types into the focused field; nothing is read back. Into a field that reformats as it is typed (an IBAN, an amount), use `fill`, which reads back and types a dropped tail again. |
 | `fill` | element spec + `value`, optional `clear`, `dismissKeyboard` | Typing APPENDS: pass `clear: true` whenever the field may already hold text. |
 | `type_pin` | `{ value, keypad: { id_pattern: "pin_key_{digit}" } }` or `text_pattern: "{digit}"`; optional `twice: true` | Only the digits are used; a value with no digits is refused. `twice` covers set + confirm. |
 | `swipe` | `{ direction, times }` | |

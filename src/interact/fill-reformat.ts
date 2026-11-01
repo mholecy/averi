@@ -1,8 +1,9 @@
 /**
  * What a field's reading IS of the text it should hold, character by character — a pure leaf (D28 review, MINOR-2):
  * the rules that read a reformatting field (D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md)
- * and a strict prefix of the typing, exact or reformatted (D28, that ADR's amendment). Two modules ask it:
- * interact/fill-type.ts, the typing — whether a reading landed (`reformatOf`) and what tail to type again (`tailOf`) —
+ * and a strict prefix of the typing, exact or reformatted (D28, that ADR's amendment) — after the field's earlier text,
+ * or after none once that text vanished (D29: an unnamed placeholder, `priorsOf`). Two modules ask it:
+ * interact/fill-type.ts, the typing — whether a reading landed (`landedReformat`) and what tail to type again (`tailOf`) —
  * and interact/fill-verdict.ts, the judge — whether a mismatch is a dropped tail (`tailOf`), so the retype and the
  * error judge a prefix alike. It imports only the facts (fill-facts.ts) and the mask characters; nothing here types,
  * reads a device or words a sentence.
@@ -142,6 +143,55 @@ function thousands(chars: string[], tokens: number[], typing: string, point: str
 /** The text the typing lands after: the field's text before the typing (its placeholder aside), or none once cleared. */
 export const priorText = (intent: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): string => (intent.clear ? '' : heldText(intent.before, intent.placeholder));
 
+/** A text's letters and digits alone (`ALNUM`), in order: what a field that regroups it keeps of it. */
+const skeleton = (text: string): string => [...text].filter((c) => ALNUM.test(c)).join('');
+
+/**
+ * The texts a reading (`held`, its named placeholder aside) is judged after: the earlier text (`priorText`) — and,
+ * without clear, when the reading's letters and digits do not START with the earlier text's (`skeleton`), no earlier
+ * text as well, tried second: the earlier text VANISHED. Letters and digits, not the text as typed: a field that
+ * regroups as it is typed shows an earlier `1,000` as `10,00…` once typed into, and that text is still there (D29
+ * review round 1, MAJOR-1) — judged as the value alone, `10,001,000` would pass for a typed `10001000`.
+ *
+ * D29, measured on the owner's iOS run (SwiftUI lab, form-format's iban, f1 and f7): idb names no placeholder
+ * (adapters/types.ts, UiNode.placeholder), so the UIKit field's placeholder `SK00 0000 0000 …` was read as the empty
+ * field's value — `before` — and was gone at the first key; judged after it, the field holding `SK31 1200 0000` failed
+ * "typed 12 characters but the field shows 14", and a dropped tail there was never typed again (D28). The fallback
+ * reaches every source that names no placeholder — idb, and the API 33 uiautomator dump (a classic EditText's hint
+ * dumped as its `text`; the Android lab's Compose fields dump no placeholder at all, so the lab is not affected) — and,
+ * on both platforms, a field that REPLACES its earlier text on focus (a select-all): the reading cannot tell that from
+ * an unnamed placeholder, and both are judged as the value alone.
+ *
+ * What it adds: a reading whose letters and digits do not start with the earlier text's may pass, or be retyped, as
+ * the value alone, under `reformatOf`'s and `prefixOf`'s rules unchanged. A reading that starts with them is judged
+ * after the earlier text, never without it. An earlier text with no letters or digits (a `—`, a `__/__/____` mask)
+ * keeps the pre-D29 judgment — every reading starts with its empty skeleton — failing safe, as a false mismatch and
+ * never a wrong pass: deliberately not loosened (D29 review round 2, MINOR-A). So does an unnamed placeholder whose
+ * letters and digits are a prefix of the typed value's (a `+421` placeholder, `421903…` typed): the reading starts
+ * with them, the fallback never runs, and the result is the old false mismatch.
+ *
+ * The earlier text is tried FIRST: a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is then
+ * that earlier text's prefix, nothing of the typing landed, and nothing is typed again; tried second, the same reading
+ * would read as two typed characters and retype the rest. Pure.
+ */
+function priorsOf(held: string, intent: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): readonly string[] {
+  const prior = priorText(intent);
+  return prior !== '' && !skeleton(held).startsWith(skeleton(prior)) ? [prior, ''] : [prior];
+}
+
+/**
+ * The reading `reformatOf` what the field should hold — its earlier text, unless cleared (or vanished: `priorsOf`,
+ * D29), then the value — else undefined. The typing's landing rule (fill-type.ts). Pure.
+ */
+export function landedReformat(observed: string, intent: Expectation): Reformat | undefined {
+  const held = heldText(observed, intent.placeholder);
+  for (const prior of priorsOf(held, intent)) {
+    const reformatted = reformatOf(held, prior + intent.value);
+    if (reformatted !== undefined) return reformatted;
+  }
+  return undefined;
+}
+
 /**
  * The strict prefix of `whole` a reading shows: exactly, or — D28 — REFORMATTED (`reformatOf` of the prefix, its
  * rules judged over the whole typing: one separator kind, letters split only in a code, an added `.`/`,` only as a
@@ -174,17 +224,20 @@ export interface Tail {
 export const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined && tail.landed > 0;
 
 /**
- * What the field is missing of what it should hold (its text before the typing, unless cleared, then the value),
- * when its reading is a strict prefix of that — exactly or reformatted (`prefixOf`, D28) — and shows no bullet:
- * a `Tail`, else undefined. Pure.
+ * What the field is missing of what it should hold (its text before the typing, unless cleared — or vanished, then
+ * none: `priorsOf`, D29 — then the value), when its reading is a strict prefix of that — exactly or reformatted
+ * (`prefixOf`, D28) — and shows no bullet: a `Tail`, else undefined. Pure.
  */
 export function tailOf(observed: string, intent: Expectation): Tail | undefined {
   const held = heldText(observed, intent.placeholder);
-  const prior = priorText(intent);
-  if (hasBullet(held) || hasBullet(prior)) return undefined;
-  const whole = prior + intent.value;
-  const shown = prefixOf(held, whole);
-  if (shown === undefined) return undefined;
-  const { prefix, reformatted } = shown;
-  return { missing: whole.slice(prefix.length), landed: prefix.length - prior.length, ...(reformatted !== undefined && { reformatted }) };
+  const priors = priorsOf(held, intent); // the earlier text first (`priorText`)
+  if (hasBullet(held) || hasBullet(priors[0])) return undefined;
+  for (const prior of priors) {
+    const whole = prior + intent.value;
+    const shown = prefixOf(held, whole);
+    if (shown === undefined) continue;
+    const { prefix, reformatted } = shown;
+    return { missing: whole.slice(prefix.length), landed: prefix.length - prior.length, ...(reformatted !== undefined && { reformatted }) };
+  }
+  return undefined;
 }

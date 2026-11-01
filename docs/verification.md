@@ -60,9 +60,11 @@ flows:
   or changed character still fails — the one accepted change is a typed space shown as a no-break
   or narrow no-break space (`respaced`), which is formatting (ADR 0034). A field that grouped
   what landed and dropped the end (`1 234 567,` for `1234567,89`) gets the tail alone typed again
-  on iOS, as an exact prefix does (ADR 0034's D28 amendment). Android types one character per
-  `input text` call: bulk injection races Compose's async state and drops most characters
-  (measured 3 of 11 landing).
+  on iOS, as an exact prefix does (ADR 0034's D28 amendment). Without clear, an earlier text that
+  vanished (a placeholder the source does not name, read as the empty field's value) no longer
+  fails the fill: the reading is judged as the value alone too (ADR 0034's D29 amendment).
+  Android types one character per `input text` call: bulk injection races Compose's async state
+  and drops most characters (measured 3 of 11 landing).
 - **Field errors**: on iOS `ui_snapshot` attaches `error` to an input by one of two rules, on idb
   and WDA alike. First, a same-identifier text below the field (the SwiftUI convention when
   titles/errors share the field's `accessibilityIdentifier`) that is not a title of a
