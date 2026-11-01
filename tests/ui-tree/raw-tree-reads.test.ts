@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // A1: whether a failed tree read is a miss, and whether any wait cures it, is decided in ONE place — the read seam
-// (ui-tree/read-tree.ts#readTreeOrMiss, #readTreeOr), which throws a failure no wait cures (PersistentReadError). A
+// (ui-tree/read-tree.ts#readTreeOrMiss, #readTreeOrThrow), which throws a failure no wait cures (PersistentReadError). A
 // raw `adapter.uiTree()` decides it again wherever it stands, and inside a catch-all it would swallow that failure as
 // a miss. So the raw calls outside the adapters and the seam are pinned here: a new one fails this test, and is either
 // routed through the seam or added below with the reason it may read raw.

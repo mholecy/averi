@@ -12,7 +12,7 @@ import {
   pollTree,
   SETTLE_FLOOR_MS,
   readErrorLine,
-  readTreeOr,
+  readTreeOrThrow,
   readTreeOrMiss,
   screenChangedUnder,
   screenIdentity,
@@ -85,7 +85,7 @@ describe('readTreeOrMiss', () => {
 class WedgedForTest extends PersistentReadError {}
 
 // The read seam decides both questions once (A1): is this failure a miss, and does any wait cure it? A failure that
-// heals comes back as a value (readTreeOrMiss) or wrapped by the caller (readTreeOr); one no wait cures is THROWN, as
+// heals comes back as a value (readTreeOrMiss) or wrapped by the caller (readTreeOrThrow); one no wait cures is THROWN, as
 // it came, so no reader has to recognise it and rethrow it.
 describe('the read seam throws a failure no wait cures', () => {
   const wedged = new WedgedForTest('the accessibility service is wedged until a reboot');
@@ -105,10 +105,10 @@ describe('the read seam throws a failure no wait cures', () => {
     await expect(readTreeOrMiss(wedgedDevice)).rejects.toBe(wedged);
   });
 
-  it('readTreeOr: a healing failure is thrown as wrap(e); a PersistentReadError passes through unwrapped, wrap never called', async () => {
+  it('readTreeOrThrow: a healing failure is thrown as wrap(e); a PersistentReadError passes through unwrapped, wrap never called', async () => {
     const wrap = vi.fn((e: Error) => new Error(`wrapped: ${e.message}`));
     await expect(
-      readTreeOr(
+      readTreeOrThrow(
         {
           uiTree: async () => {
             throw new Error('null root node');
@@ -119,9 +119,9 @@ describe('the read seam throws a failure no wait cures', () => {
     ).rejects.toThrow('wrapped: null root node');
     expect(wrap).toHaveBeenCalledTimes(1);
     wrap.mockClear();
-    await expect(readTreeOr(wedgedDevice, wrap)).rejects.toBe(wedged);
+    await expect(readTreeOrThrow(wedgedDevice, wrap)).rejects.toBe(wedged);
     expect(wrap).not.toHaveBeenCalled();
-    await expect(readTreeOr({ uiTree: async () => tree }, wrap)).resolves.toBe(tree);
+    await expect(readTreeOrThrow({ uiTree: async () => tree }, wrap)).resolves.toBe(tree);
   });
 });
 

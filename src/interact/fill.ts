@@ -9,7 +9,7 @@ import {
   type UiNode,
 } from '../adapters/types.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
-import { readTreeOr, sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
+import { readTreeOrThrow, sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
 import { soleIdOf } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -223,7 +223,7 @@ export async function fillField(
     // Only the READ is wrapped: a refusal from resolveNow (a second match
     // appearing mid-fill — a suggestion row, a duplicated field) is a
     // selector finding with its own wording, not a device that went away.
-    const tree = await readTreeOr(adapter, (e) => failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }));
+    const tree = await readTreeOrThrow(adapter, (e) => failure({ code: 'reread-failed', target: describeTarget(target), cause: e.message }));
     lastTree = tree;
     lostOnLastRead = undefined;
     const bySelector = resolveNow(tree, target, opts)?.node;

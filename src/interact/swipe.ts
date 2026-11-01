@@ -324,10 +324,8 @@ export async function swipeScreen(
   adapter: Pick<DeviceAdapter, 'uiTree' | 'viewport' | 'swipe'>,
   opts: SwipeOptions,
 ): Promise<ScreenSwipe> {
-  // The one reader that opts out of the seam's throw (ARCHITECTURE.md, the swipe's orientation read): a failure no wait
-  // cures loses only the orientation witness, as any failed read does — the swipe is sent over the device box and the
-  // note quotes it. Nothing reads the tree again here to need stopping.
-  const read = await readTreeOrMiss(adapter).catch((e: Error) => ({ error: e }));
+  // Opts out of the seam's throw: a failure no wait cures loses only the orientation witness (ADR 0036).
+  const read = await readTreeOrMiss(adapter).catch((e: unknown) => ({ error: e instanceof Error ? e : new Error(String(e)) }));
   const { usable, note } = await screenBox(adapter, read);
   const { from, to } = swipeVector(usable.oriented, opts.direction, opts.meaning);
   const times = opts.times ?? 1;

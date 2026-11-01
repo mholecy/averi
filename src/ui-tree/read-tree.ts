@@ -18,7 +18,7 @@ import type { Verdict } from './verdict.js';
  * Reading the UI tree, and waiting on it.
  *
  * Two primitives live here: the read seam — `readTreeOrMiss`, the one-shot
- * read that reports a failure that heals as a value, and `readTreeOr`, the
+ * read that reports a failure that heals as a value, and `readTreeOrThrow`, the
  * same read for a caller that wraps such a failure in its own error — and
  * `pollTree`, the deadline loop over it that the flow engine's waits and
  * detect probe, the verifier's asserts and the interaction module's settle
@@ -74,8 +74,7 @@ import type { Verdict } from './verdict.js';
 
 /**
  * What one tree read gave the caller: the tree, or the failure that heals (a
- * miss) that stood in for it — `readTreeOrMiss`'s result. A failure no wait
- * cures (PersistentReadError) is THROWN by the seam, never returned. Named so
+ * miss) that stood in for it — `readTreeOrMiss`'s result. Named so
  * a caller that hands a read on (interact/swipe.ts#screenBox, whose note
  * quotes the cause) does not respell it.
  */
@@ -129,7 +128,7 @@ export async function readTreeOrMiss(adapter: Pick<DeviceAdapter, 'uiTree'>): Pr
  * A failure no wait cures passes through unwrapped (`wrap` is never called):
  * its class is what the read loops and the flow engine's isTerminal stop on.
  */
-export async function readTreeOr(adapter: Pick<DeviceAdapter, 'uiTree'>, wrap: (e: Error) => Error): Promise<UiNode> {
+export async function readTreeOrThrow(adapter: Pick<DeviceAdapter, 'uiTree'>, wrap: (e: Error) => Error): Promise<UiNode> {
   const read = await readTreeOrMiss(adapter);
   if (read.tree === undefined) throw wrap(read.error);
   return read.tree;
@@ -364,12 +363,10 @@ export interface PollRound {
  * - Errors thrown by the predicate itself (an unknown state name, a viewport
  *   that cannot be read) propagate at once: they are the caller's bug or the
  *   device's, never a miss.
- * - Except a read error no wait cures (adapters/types.ts#PersistentReadError,
- *   since 2026-10-31 — D21, idb's wedged accessibility service): the read
- *   seam throws it, so it leaves the poll as it came, from the round that read
- *   it, whatever was read before — D20's device run had made 133 failing reads
- *   in a 90 s `scroll_until`. The callers let it propagate (the flow engine
- *   treats it as terminal: engine.ts#isTerminal).
+ * - Except a read error no wait cures (PersistentReadError, D21): the read
+ *   seam throws it (readTreeOrMiss), so it leaves the poll from the round that
+ *   read it, whatever was read before. The callers let it propagate (the flow
+ *   engine treats it as terminal: engine.ts#isTerminal).
  * - The predicate is handed the poll's `deadline` (since 2026-10-05), for a
  *   predicate that itself waits — the color and ocr asserts capture a
  *   settled frame per round, up to 1.5 s — so it bounds ITS OWN wait: the

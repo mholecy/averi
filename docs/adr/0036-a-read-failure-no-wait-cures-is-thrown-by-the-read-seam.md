@@ -16,7 +16,7 @@ of the perf programme). Implemented on `arch/a1-read-seam`. Behaviour-preserving
 ## Decision
 
 **The read seam (ui-tree/read-tree.ts) classifies a read failure once: a failure that heals is returned
-(`readTreeOrMiss` → `TreeRead`, a tree or an error) or wrapped in the caller's error (`readTreeOr(adapter, wrap)`); a
+(`readTreeOrMiss` → `TreeRead`, a tree or an error) or wrapped in the caller's error (`readTreeOrThrow(adapter, wrap)`); a
 `PersistentReadError` is THROWN as it came, never returned, and never handed to `wrap`.**
 
 - `TreeRead` is a discriminated union (`{ tree }` or `{ error }`), so a reader needs no fallback for "neither".

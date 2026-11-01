@@ -893,9 +893,8 @@ async function regionSettled(
  * (uiautomator "null root node") — the same transient the polling asserts
  * absorb via readTreeOrMiss. Throws after the last attempt with the
  * underlying error in the message; `captureFrame` carries that on the frame.
- * A failure no wait cures (adapters/types.ts#PersistentReadError, D21),
- * which the seam throws, ends it after its own attempt, its message whole:
- * the next four would say it again.
+ * A failure no wait cures ends it after its own attempt, its message whole
+ * (see ui-tree/read-tree.ts#readTreeOrMiss).
  */
 async function readTreeWithRetry(
   adapter: Pick<DeviceAdapter, 'uiTree'>,
@@ -908,7 +907,7 @@ async function readTreeWithRetry(
     try {
       read = await readTreeOrMiss(adapter);
     } catch (e) {
-      // Only a failure no wait cures reaches here (the seam throws it): not retried, and its message is the frame's reason.
+      // Only a failure no wait cures can reach here (the seam's contract): not retried, its message the frame's reason.
       throw new Error(`UI tree read failed: ${errorMessage(e)}`, { cause: e });
     }
     if (read.tree !== undefined) return read.tree;

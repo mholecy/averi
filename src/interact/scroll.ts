@@ -300,15 +300,15 @@ export async function scrollUntilVisible(
   const window = new CallWindow(adapter);
   let matched = false; // some read of the call matched the target: no miss's word is asked any more
   for (;;) {
-    // A failed read is a miss, not a failure — see readTreeOrMiss, which
-    // throws the one no wait cures. Timed alone (`readMs`), failed or not: a
-    // timeout says how long the reads took, so one spent by a tree source
-    // restarting under the scroll does not read as the content's fault.
+    // A failed read is a miss, not a failure — see readTreeOrMiss. Timed
+    // alone (`readMs`), failed or not: a timeout says how long the reads took,
+    // so one spent by a tree source restarting under the scroll does not read
+    // as the content's fault.
     const readStarted = Date.now();
     const read = await readTreeOrMiss(adapter);
     const readMs = Date.now() - readStarted;
     // This round's read with the window manager's mark on its tree; a miss as it came.
-    const marked = read.tree === undefined ? read : { tree: await window.mark(read.tree, () => matched || matchesToJudge(read.tree, target).length > 0) };
+    const markedRead = read.tree === undefined ? read : { tree: await window.mark(read.tree, () => matched || matchesToJudge(read.tree, target).length > 0) };
     // The round's screen box (swipe.ts#screenBox), read once and handed to
     // the round whole (`RoundSeen.screen`): the frame it judges in and the
     // gesture box it decides the stroke's box over.
@@ -333,10 +333,10 @@ export async function scrollUntilVisible(
     // and the region while it reads shown).
     let reading: KeyboardReading | undefined;
     let seen: RoundSeen;
-    if (marked.tree === undefined) {
-      seen = { read: { error: marked.error }, elapsedMs: 0, readMs };
+    if (markedRead.tree === undefined) {
+      seen = { read: { error: markedRead.error }, elapsedMs: 0, readMs };
     } else {
-      const { tree } = marked;
+      const { tree } = markedRead;
       // The matches the round judges: the one the next tap would act on, when the preference picks one (resolve.ts#matchesToJudge).
       const found = matchesToJudge(tree, target);
       matched ||= found.length > 0;
