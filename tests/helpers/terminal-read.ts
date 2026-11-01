@@ -5,7 +5,7 @@ import type { UiNode } from '../../src/adapters/types.js';
  * expects, the fake's read answers a tree that throws `polled past a terminal read` the moment anything looks at it
  * (D38, 2026-11-01). Such a pin runs its poll under a long deadline on purpose — that is what "not polled to the
  * deadline" means — so if the read seam regresses (ui-tree/read-tree.ts#readTreeOrMiss takes the error for a miss)
- * the poll would spin to that deadline, starve its worker, and fail ~50 unrelated tests with it.
+ * the poll would spin to that deadline, starve its worker, and so time out and fail its neighbours too.
  *
  * Why a poisoned TREE and not a read that throws: under exactly that regression the seam catches whatever the read
  * throws and polls on, so a thrown bound would be swallowed like the error it guards. The poll's predicate (or the

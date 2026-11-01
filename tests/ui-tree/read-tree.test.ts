@@ -170,6 +170,7 @@ describe('pollTree — the one deadline loop', () => {
           throw wedged;
         }),
       },
+      // Never satisfied, but it reads the tree: the bound's poisoned tree must be read to end the poll.
       (t) => void t.role,
       { timeoutMs: 60_000, pollMs: 2 },
     );
