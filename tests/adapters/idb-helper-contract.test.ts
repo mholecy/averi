@@ -112,7 +112,7 @@ describe.skipIf(found === undefined)('the idb helper against the idb CLI (real f
     expect(byHelper.stdout.toString()).toMatch(/^usage: idb ui tap/);
   }, 60_000);
 
-  // D26b: the idb tree source's screenshot, `screenshot -` — a read the helper serves.
+  // D26b: iOS's screenshot, `screenshot -` — a read the helper serves.
   it('fails `screenshot -` with the same code and stderr as the CLI (D26b)', async () => {
     const argv = ['--companion', 'localhost:1', 'screenshot', '-', '--udid', UDID];
     const [byHelper, byCli] = [await viaHelper(argv), await cli(argv)];

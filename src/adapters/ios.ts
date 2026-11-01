@@ -49,8 +49,8 @@ const idbCaptureRemedy = (reboot?: string): string =>
 const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
- * `AVERI_IOS_SCREENSHOT=simctl`: every iOS screenshot through `simctl io screenshot`, as before D26b, whatever the tree
- * source (SETUP.md, troubleshooting). Read once per adapter, when it is made.
+ * `AVERI_IOS_SCREENSHOT=simctl`: every iOS screenshot through `simctl io screenshot`, as before D26b (SETUP.md,
+ * troubleshooting). Read once per adapter, when it is made.
  */
 export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.AVERI_IOS_SCREENSHOT === 'simctl';
@@ -142,8 +142,8 @@ const IDB_TYPEABLE: Typeable = {
 };
 
 /**
- * iOS adapter: `xcrun simctl` for lifecycle (and screenshots on WDA), `idb` for input (and screenshots on idb, D26b), and
- * an injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
+ * iOS adapter: `xcrun simctl` for lifecycle, `idb` for input and screenshots (screenshotVia), and an
+ * injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
  * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
  * averi.yaml). Everything idb-specific for INPUT stays in the `idb*` methods;
  * the tree read belongs to the source, so swapping the tree backend touches
@@ -162,9 +162,9 @@ export class IosAdapter implements DeviceAdapter {
   /** The simulator's idb helper (D7a, idb-helper.ts) — owned here: dispose() kills it. */
   private readonly idbHelper: IdbHelper | undefined;
   /**
-   * Where screenshot() captures (D26b): `idb` on the idb tree source — the helper first, the `idb` CLI as its fallback —
-   * and `simctl` on the WDA one or under AVERI_IOS_SCREENSHOT=simctl. Fixed for the adapter's life: one source for every
-   * frame (types.ts#DeviceAdapter.screenshot).
+   * Where screenshot() captures: `idb` (D26b; on the WDA tree source too since D44, ADR 0032 amendment) — the helper
+   * first, the `idb` CLI as its fallback — and `simctl` under AVERI_IOS_SCREENSHOT=simctl. Fixed for the adapter's
+   * life: one source for every frame (types.ts#DeviceAdapter.screenshot).
    */
   private readonly screenshotVia: 'idb' | 'simctl';
   /** The app the typing goes into, as far as this adapter knows (FrontApp). */
@@ -202,7 +202,7 @@ export class IosAdapter implements DeviceAdapter {
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
     this.idbHelper = opts.idbHelper;
-    this.screenshotVia = this.treeSource.kind === 'idb' && !iosScreenshotViaSimctl() ? 'idb' : 'simctl';
+    this.screenshotVia = iosScreenshotViaSimctl() ? 'simctl' : 'idb';
   }
 
   /** `xcrun simctl` under the DEVELOPER_DIR probe shared with WdaServer — see xcode-env.ts. */
@@ -432,14 +432,14 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * One frame, as a PNG — from the one source this adapter captures with (screenshotVia):
-   * - idb (D26b, the idb tree source): `idb screenshot - --udid U`, the PNG on stdout, through runIdb — the helper when
-   *   it is ready and idle, the `idb` CLI otherwise, and the CLI again when the helper dies under it (a read). Measured
-   *   on the lab simulator, 120 interleaved rounds each (backlog "### D26 diag"): through a persistent fb-idb client 77
-   *   ms p50 / 88 p90 and no stall, the CLI 168 / 179 and no stall, where `simctl io screenshot` took 398 / 417 and
-   *   stalled ~+1 000 ms in 8 of 120 (no simctl variant avoided it). No simctl fallback when idb fails (one source,
+   * - idb: `idb screenshot - --udid U`, the PNG on stdout, through runIdb — the helper when it is ready and idle, the
+   *   `idb` CLI otherwise, and the CLI again when the helper dies under it (a read). Measured on the lab simulator, 120
+   *   interleaved rounds each (backlog "### D26 diag"): through a persistent fb-idb client 77 ms p50 / 88 p90 and no
+   *   stall, the CLI 168 / 179 and no stall, where `simctl io screenshot` took 398 / 417 and stalled ~+1 000 ms in 8 of
+   *   120 (no simctl variant avoided it). No simctl fallback when idb fails (one source,
    *   types.ts#DeviceAdapter.screenshot): idb draws the Dynamic Island where simctl shows the app's background — the
    *   idb error is the answer, and the kill switch is the way back (AVERI_IOS_SCREENSHOT=simctl).
-   * - simctl (the WDA tree source, or the kill switch): `xcrun simctl io <udid> screenshot <file>`, as before D26b.
+   * - simctl (the kill switch): `xcrun simctl io <udid> screenshot <file>`, as before D26b.
    * Either way the bytes are judged here (screenshot-bytes.ts): a command that succeeds with an empty or foreign answer
    * is a transport error naming that command.
    */
