@@ -219,6 +219,24 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(reformatAfter('SK31 1200 00', e('0000', 'SK3112'))).toEqual({ added: 2, respaced: 0 });
   });
 
+  // D29 review round 1, MAJOR-1: the guard compares letters and digits, not the text as typed — an earlier text the
+  // field regrouped (`1,000` shown `10,00…`) is still there, and the reading is judged after it alone.
+  it('an earlier text the field regrouped is still there: judged after it, never as the value alone', () => {
+    expect(reformatAfter('10,001,000', e('10001000', '1,000'))).toBeUndefined();
+    expect(tailOf('100,010', e('1000105', '1,000'))).toBeUndefined();
+  });
+
+  // MINOR-3: the earlier text inside the reading, not at its start, did not survive as the earlier text.
+  it('the earlier text inside the reading but not at its start: judged as the value alone', () => {
+    expect(reformatAfter('34 12', e('3412', '12'))).toEqual({ added: 1, respaced: 0 });
+  });
+
+  // MINOR-3: the earlier text first — a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is no
+  // proof that the typing landed: nothing of it counted, nothing typed again.
+  it('a reading that is a prefix of the earlier text too: judged after the earlier text first — none of the typing landed', () => {
+    expect(landedSome(tailOf('SK', e('SK3112000000', PH)))).toBe(false);
+  });
+
   it('tailOf: the earlier text vanished but other text took its place — none', () => {
     expect(tailOf('XY12', e('1234', PH))).toBeUndefined();
     expect(tailOf('SK31 1300', e('SK3112000000', PH))).toBeUndefined();

@@ -143,21 +143,36 @@ function thousands(chars: string[], tokens: number[], typing: string, point: str
 /** The text the typing lands after: the field's text before the typing (its placeholder aside), or none once cleared. */
 export const priorText = (intent: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): string => (intent.clear ? '' : heldText(intent.before, intent.placeholder));
 
+/** A text's letters and digits alone (`ALNUM`), in order: what a field that regroups it keeps of it. */
+const skeleton = (text: string): string => [...text].filter((c) => ALNUM.test(c)).join('');
+
 /**
  * The texts a reading (`held`, its named placeholder aside) is judged after: the earlier text (`priorText`) — and,
- * without clear, when the reading does not START with it, no earlier text as well, tried second: the earlier text
- * VANISHED. D29, measured on the owner's iOS run (SwiftUI lab, form-format's iban, f1 and f7): idb names no placeholder
+ * without clear, when the reading's letters and digits do not START with the earlier text's (`skeleton`), no earlier
+ * text as well, tried second: the earlier text VANISHED. Letters and digits, not the text as typed: a field that
+ * regroups as it is typed shows an earlier `1,000` as `10,00…` once typed into, and that text is still there (D29
+ * review round 1, MAJOR-1) — judged as the value alone, `10,001,000` would pass for a typed `10001000`.
+ *
+ * D29, measured on the owner's iOS run (SwiftUI lab, form-format's iban, f1 and f7): idb names no placeholder
  * (adapters/types.ts, UiNode.placeholder), so the UIKit field's placeholder `SK00 0000 0000 …` was read as the empty
  * field's value — `before` — and was gone at the first key; judged after it, the field holding `SK31 1200 0000` failed
- * "typed 12 characters but the field shows 14", and a dropped tail there was never typed again (D28). Most likely an
- * unnamed placeholder, then; the reading cannot tell one from earlier text the field replaced (a select-all on focus),
- * and the exact rule passes that too (fill-type.ts: the value inside the reading). Nothing here is looser than
- * `reformatOf` and `prefixOf` judged over the value alone; a reading that still starts with the earlier text is judged
- * after it, never without it. Pure.
+ * "typed 12 characters but the field shows 14", and a dropped tail there was never typed again (D28). The fallback
+ * reaches every source that names no placeholder — idb, and the API 33 uiautomator dump (a classic EditText's hint
+ * dumped as its `text`; the Android lab's Compose fields dump no placeholder at all, so the lab is not affected) — and,
+ * on both platforms, a field that REPLACES its earlier text on focus (a select-all): the reading cannot tell that from
+ * an unnamed placeholder, and both are judged as the value alone.
+ *
+ * What it adds: a reading whose letters and digits do not start with the earlier text's may pass, or be retyped, as
+ * the value alone, under `reformatOf`'s and `prefixOf`'s rules unchanged. A reading that starts with them is judged
+ * after the earlier text, never without it.
+ *
+ * The earlier text is tried FIRST: a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is then
+ * that earlier text's prefix, nothing of the typing landed, and nothing is typed again; tried second, the same reading
+ * would read as two typed characters and retype the rest. Pure.
  */
 function priorsOf(held: string, intent: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): readonly string[] {
   const prior = priorText(intent);
-  return prior !== '' && !held.startsWith(prior) ? [prior, ''] : [prior];
+  return prior !== '' && !skeleton(held).startsWith(skeleton(prior)) ? [prior, ''] : [prior];
 }
 
 /**

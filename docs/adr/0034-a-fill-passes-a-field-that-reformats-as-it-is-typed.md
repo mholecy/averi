@@ -220,21 +220,33 @@ app held `SK31 1200 00`).
   was judged after it (`priorText(intent) + value`): no reformat of that, no prefix of it (so a dropped tail there was
   never typed again, and D24's split never started — the same bug as D28's, one step earlier), and the exact rule
   passed only a value typed with its own spaces (f5, `held.includes(value)`); with clear the earlier text is none, so
-  f2 passed. **Decision:** without clear, a reading that does not START with the earlier text is judged after none as
-  well, second (`fill-reformat.ts#priorsOf`, asked by `reformatAfter` — the typing's landing rule — and by `tailOf` —
-  the retype, `whereTyped`'s missing text and the verdict's `dropped-tail`). `reformatOf`'s and `prefixOf`'s rules are
-  unchanged, judged over the value alone; a reading that still starts with the earlier text is judged after it, never
-  without it. The reading cannot tell an unnamed placeholder from earlier text the field replaced (a select-all on
-  focus); the exact rule already passes that, and the reformat and the tail now read it alike. Mutation-checked: seven
-  mutants (no fallback; the fallback without the starts-with guard; the value alone instead of both; the fallback in
-  `tailOf` or in `reformatAfter` only; the fallback under clear; fill-type's old landing expression), each killed.
+  f2 passed. **Decision:** without clear, a reading whose letters and digits do not START with the earlier text's is
+  judged after no earlier text as well, second (`fill-reformat.ts#priorsOf`, asked by `reformatAfter` — the typing's
+  landing rule — and by `tailOf` — the retype, `whereTyped`'s missing text and the verdict's `dropped-tail`). Letters
+  and digits, not the text as typed (review round 1, MAJOR-1): a field that regroups as it is typed shows an earlier
+  `1,000` as `10,00…` once typed into, and that text is still there — compared as typed, `10,001,000` passed for a
+  typed `10001000` and `100,010` retyped a `5` for `1000105`. `reformatOf`'s and `prefixOf`'s rules are unchanged,
+  judged over the value alone; a reading that starts with the earlier text's letters and digits is judged after it,
+  never without it. The earlier text is tried first: a reading that is a prefix of it too (`SK` of `SK00 …`) shows
+  nothing of the typing landed, and nothing is typed again.
+  **Where it reaches** (review round 1, MINOR-2): every source that names no placeholder — idb, and the API 33
+  uiautomator dump (a classic EditText's hint dumped as its `text`, android.ts; the Android lab's fields are Compose,
+  which dump no placeholder, so the lab is not affected) — and, on both platforms, a field that replaces its earlier
+  text on focus (a select-all), which the reading cannot tell from an unnamed placeholder: both are judged as the value
+  alone, reformatted or with a dropped tail retyped (on iOS).
+  **Mutation-checked**: ten mutants, each killed — no fallback (6 tests fail); no guard (3); the value alone instead of
+  both (1); the fallback in `tailOf` only removed (3); in `reformatAfter` only (4); the fallback under clear too (1);
+  the guard on the text as typed (1); the guard `includes` instead of a start (1); the order reversed, the value alone
+  first (1); fill-type's old landing expression (2).
+  **The golden says nothing of this change**: it replays tree reads and never runs a fill, so its `Changed 0` is no
+  evidence either way; the unit tests and the owner's device re-run are.
 - **rf4 is a residual of blind typing — `fill:` is its remedy.** The companion log shows D24's split ran: the first
   key alone (`S`, one idb `hid` call at 07:19:08.880), the other eleven in one burst at 07:19:09.127 (24 HID frames),
   after rf1/rf2 had reported the app's drop — and the React Native field, reformatting on every keystroke, still
   dropped the last two (`SK31 1200 00`). A flow's `type:` (engine → interact/type-text.ts `typeIntoFocused`) never
   reads back, by design (above): it cannot see the drop, so it cannot type the tail again. **Accepted**: into a field
   that reformats as it is typed, use a flow's `fill:` (or `type_text` with a selector), which reads back and types a
-  dropped tail again — rf1 and rf2 pass that way on the same field. scripts/truth/live.ts marks rf4 a known LOUD;
+  dropped tail again — rf1 and rf2 pass that way on the same field. scripts/truth/live.ts marks rf4 a known LOUD on iOS in a comment (live-known.ts files visibility cases only);
   skill/references/averi-yaml.md's `type` row says to use `fill`.
 
 **Not checked on the device.** The owner re-runs, on iOS: `live.ts --udid … --cases f1,f7` (both should read `Filled …
