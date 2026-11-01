@@ -1,8 +1,7 @@
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { fmtMs, stallCells, stallLines } from './report.js';
 import { overallStalls, scenarioStalls, type Spread, type TimedRun, type Window } from './stats.js';
+import { isMain } from '../is-main.js';
 
 /**
  * D26's stall summary recomputed from D0 results JSON (baseline.ts `--out`) — for files written before the report
@@ -48,4 +47,4 @@ async function main(files: string[]): Promise<void> {
   for (const l of stallReport(read)) console.log(l);
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main(process.argv.slice(2));
+if (isMain(import.meta.url)) await main(process.argv.slice(2));

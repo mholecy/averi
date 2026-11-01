@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isMain } from '../is-main.js';
 
 /**
  * `npm run mutate`: Stryker over the modules scope.json names, then each module's score held to its own floor there.
@@ -84,7 +85,6 @@ export function main(args: readonly string[]): number {
   return 1;
 }
 
-// Real paths on both sides: through a symlink (/tmp → /private/tmp) the merge gate must run, never pass idle.
-if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+if (isMain(import.meta.url)) {
   process.exit(main(process.argv.slice(2)));
 }

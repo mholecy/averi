@@ -4,6 +4,7 @@ import { basename, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { CaptureEntry, RunManifest, Screen } from './corpus.js';
 import { syntheticIdb, syntheticUiautomator, withHeaderId, zeroRootWda } from './synthetic.js';
+import { isMain } from '../is-main.js';
 
 /**
  * Builds a corpus (corpus.ts) from these sources:
@@ -343,4 +344,4 @@ async function main(): Promise<void> {
   console.log(`total: ${[...counts.values()].reduce((a, b) => a + b, 0)}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main();
+if (isMain(import.meta.url)) await main();

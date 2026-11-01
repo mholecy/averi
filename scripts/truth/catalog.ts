@@ -1,9 +1,10 @@
 import { readdir, readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import type { Platform } from '../differential/corpus.js';
 import { FAMILIES, type Catalog, type CatalogCell, type Family, type NavigationMode } from './schema.js';
+import { isMain } from '../is-main.js';
 
 /**
  * The cell catalog, one file per family (fixtures/apps/cells/<family>.json, schema.ts#FAMILIES), and the one catalog
@@ -134,7 +135,7 @@ export function captureRefusal(cell: Pick<CatalogCell, 'platforms' | 'navigation
 /** The family of each cell of the catalog — how a capture's KNOWN rows are grouped (tests/differential/golden/). */
 export const familyOf = (catalog: Catalog, cell: string): Family | undefined => catalog.cells.find((c) => c.id === cell)?.family;
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const { values } = parseArgs({ options: { check: { type: 'boolean' } } });
   const text = await generatedCatalog();
   if (values.check === true) {
