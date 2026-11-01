@@ -118,8 +118,8 @@ interface DeviceAdapter {           // bound to ONE device: the constructor requ
 
 Device discovery is NOT on this interface either (2026-10-08, the iOS adapter
 stack review's candidate 1): which devices a platform has is a question about the
-platform, answered by `adapters/discovery.ts#DeviceDiscovery` — `list` and `check` (`listAndroidDevices`: `adb devices -l`
-plus one `adb -s <id> shell getprop` per online device, its argv `adb-shell.ts#adbShellArgv`'s;
+platform, answered by `adapters/discovery.ts#DeviceDiscovery` — `list` and `check`
+(`listAndroidDevices`: `adb devices -l` plus one `adb -s <id> shell getprop` per online device, its argv `adb-shell.ts#adbShellArgv`'s;
 `listIosDevices`: `simctl list devices --json` through `xcode-env.ts#simctl`, the one
 spelling of a simctl call — `xcrun simctl` under the DEVELOPER_DIR probe — which
 `IosAdapter`'s simctl calls go through too). The registry takes it as its second dependency beside the adapter

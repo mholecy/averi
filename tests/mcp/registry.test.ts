@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { AdapterRegistry, defaultFactory, defaultRegistryDeps, type AdapterOpts } from '../../src/mcp/registry.js';
-import { defaultDiscovery, discoveryOver, type DeviceDiscovery } from '../../src/adapters/discovery.js';
+import { defaultDiscovery, discoveryOver } from '../../src/adapters/discovery.js';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { resetWdaPortAllocatorForTests, wdaPortFor } from '../../src/adapters/wda.js';
 import type { Device, DeviceAdapter, Platform } from '../../src/adapters/types.js';
 import { FakeAdapter } from '../helpers/fake.js';
+import { device, recordingListing } from '../helpers/listing.js';
 
 /**
  * A registry over a device list that is mutable mid-test (devices boot and
- * vanish) — discovery is the real `discoveryOver` over the list itself, so
- * the bound check keeps its real steps; no adapter is built to ask it.
+ * vanish) — discovery is the real `discoveryOver` over a `recordingListing`,
+ * so the bound check keeps its real steps; no adapter is built to ask it.
  * `onProbe` gates the listing — lets a test freeze a probe mid-flight.
- * `probes` counts listings per platform; `versions` records, per listing,
- * whether it asked for OS versions (a listing's default: yes). `iosBooted`
+ * `probes` records each listing's platform; `versions`, whether it asked for
+ * OS versions. `iosBooted`
  * is the check's D22 proof (the bound simulator's device.plist): left out,
  * discovery is built without one; `plistReads` records each udid it was
  * asked about.
@@ -21,8 +22,6 @@ import { FakeAdapter } from '../helpers/fake.js';
 function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void, iosBooted?: (udid: string) => Promise<boolean>) {
   const bound: string[] = [];
   const created: FakeAdapter[] = [];
-  const probes: Platform[] = [];
-  const versions: boolean[] = [];
   // Records what the registry asked for: `id+kind` on ios (the registry
   // resolves the kind before calling, so the default is spelled out), a bare
   // id on android (no tree source there).
@@ -32,25 +31,12 @@ function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void, i
     created.push(adapter);
     return adapter;
   };
-  const listing: DeviceDiscovery['list'] = async (platform, opts) => {
-    probes.push(platform);
-    versions.push(opts?.versions ?? true);
-    await onProbe?.();
-    return devices.filter((d) => d.platform === platform);
-  };
+  const { listing, platforms: probes, versions } = recordingListing(devices, onProbe);
   const plistReads: string[] = [];
   const discovery = discoveryOver(listing, iosBooted === undefined ? undefined : (udid) => (plistReads.push(udid), iosBooted(udid)));
   const registry = new AdapterRegistry({ factory, discovery });
   return { registry, bound, created, devices, probes, versions, plistReads };
 }
-
-const device = (id: string, state: Device['state'] = 'booted', platform: Platform = 'android'): Device => ({
-  id,
-  platform,
-  name: id,
-  osVersion: '14',
-  state,
-});
 
 describe('AdapterRegistry', () => {
   it('lists through discovery alone — no adapter is built to ask which devices exist', async () => {
@@ -243,9 +229,11 @@ describe('AdapterRegistry', () => {
   // check owns the proof and its steps (pinned in adapters/discovery.test.ts); here, what the registry does with it.
   describe('the bound simulator proven booted from its device.plist (D22)', () => {
     it('proven booted: no listing, the same cached adapter, bound to the same simulator', async () => {
-      const { registry, probes, bound } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => true);
-      const adapter = await registry.get('ios'); // unbound: the auto-pick lists
+      const { registry, probes, bound, plistReads } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => true);
+      const adapter = await registry.get('ios'); // unbound: the auto-pick lists, and asks no proof
+      expect(plistReads).toEqual([]);
       expect(await registry.get('ios')).toBe(adapter);
+      expect(plistReads).toEqual(['sim']);
       expect(probes).toEqual(['ios']); // the bound call listed nothing
       expect(bound).toEqual(['sim+idb']);
     });
@@ -257,6 +245,16 @@ describe('AdapterRegistry', () => {
       await registry.get('ios', { treeSource: 'wda' });
       expect(probes).toEqual(['ios']);
       expect(plistReads).toEqual(['b', 'b']);
+    });
+
+    it('a proof that rejects: the bound call lists, and a shut-down pin keeps its wording', async () => {
+      const { registry, devices, probes } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => Promise.reject(new Error('EACCES')));
+      await registry.select('ios', 'sim');
+      devices[0] = device('sim', 'offline', 'ios');
+      await expect(registry.get('ios')).rejects.toThrow(
+        'Selected ios device "sim" is no longer booted — reboot it or select_device another one',
+      );
+      expect(probes).toEqual(['ios', 'ios']); // select's listing, then the check's
     });
 
     it('the server\'s registry is built on the real factory and discovery', () => {

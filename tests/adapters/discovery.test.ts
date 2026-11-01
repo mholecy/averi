@@ -8,9 +8,9 @@ import {
   listAndroidDevices,
   listIosDevices,
   type BootedProof,
-  type DeviceDiscovery,
 } from '../../src/adapters/discovery.js';
-import type { Device, Platform } from '../../src/adapters/types.js';
+import type { Device } from '../../src/adapters/types.js';
+import { device, recordingListing } from '../helpers/listing.js';
 import { exec as defaultExec, type ExecFn, type ExecOptions, type ExecResult } from '../../src/adapters/exec.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
@@ -218,27 +218,19 @@ describe('iosBootedFromDevicePlist — the bound simulator\'s own record, before
 });
 
 describe('DeviceDiscovery.check — is the bound device still usable? (discoveryOver)', () => {
-  const device = (id: string, state: Device['state'] = 'booted', platform: Platform = 'android'): Device => ({ id, platform, name: id, osVersion: '14', state });
-
-  /**
-   * A discovery over a fixed device list. `listings` records each listing's platform and whether it asked for
-   * versions (a listing's default: yes); `proofs` each udid the proof was asked about. No proof given: none is wired.
-   */
+  /** A discovery over a fixed device list (`recordingListing`); `proofs` records each udid the proof was asked about. No proof given: none is wired. */
   function over(devices: Device[], proof?: BootedProof) {
-    const listings: { platform: Platform; versions: boolean }[] = [];
+    const { listing, platforms, versions } = recordingListing(devices);
     const proofs: string[] = [];
-    const listing: DeviceDiscovery['list'] = async (platform, opts) => {
-      listings.push({ platform, versions: opts?.versions ?? true });
-      return devices.filter((d) => d.platform === platform);
-    };
     const discovery = discoveryOver(listing, proof === undefined ? undefined : (udid) => (proofs.push(udid), proof(udid)));
-    return { discovery, listings, proofs };
+    return { discovery, platforms, versions, proofs };
   }
 
   it('listed and booted: usable, from a listing without versions (D13)', async () => {
-    const { discovery, listings } = over([device('phone')]);
+    const { discovery, platforms, versions } = over([device('phone')]);
     expect(await discovery.check('android', 'phone')).toEqual({ usable: true });
-    expect(listings).toEqual([{ platform: 'android', versions: false }]);
+    expect(platforms).toEqual(['android']);
+    expect(versions).toEqual([false]);
   });
 
   it('listed but not booted: unusable, the entry kept for the refusal\'s wording', async () => {
@@ -258,10 +250,11 @@ describe('DeviceDiscovery.check — is the bound device still usable? (discovery
   });
 
   it('iOS proven booted (D22): usable without a listing', async () => {
-    const { discovery, listings, proofs } = over([], async () => true);
+    const { discovery, platforms, versions, proofs } = over([], async () => true);
     expect(await discovery.check('ios', 'sim')).toEqual({ usable: true });
     expect(proofs).toEqual(['sim']);
-    expect(listings).toEqual([]);
+    expect(platforms).toEqual([]);
+    expect(versions).toEqual([]);
   });
 
   // Not proven is "ask simctl", never "shut down": the listing decides, with the same options.
@@ -270,31 +263,35 @@ describe('DeviceDiscovery.check — is the bound device still usable? (discovery
     ['a proof that rejects', async () => Promise.reject(new Error('EACCES'))],
     ['a proof that throws synchronously', (() => { throw new Error('boom'); }) as unknown as BootedProof],
   ])('%s: the listing decides, without versions', async (_why, proof) => {
-    const { discovery, listings, proofs } = over([device('sim', 'booted', 'ios'), device('off', 'offline', 'ios')], proof);
+    const { discovery, platforms, versions, proofs } = over([device('sim', 'booted', 'ios'), device('off', 'offline', 'ios')], proof);
     expect(await discovery.check('ios', 'sim')).toEqual({ usable: true });
     expect(await discovery.check('ios', 'off')).toEqual({ usable: false, listed: device('off', 'offline', 'ios') });
     expect(proofs).toEqual(['sim', 'off']);
-    expect(listings).toEqual([{ platform: 'ios', versions: false }, { platform: 'ios', versions: false }]);
+    expect(platforms).toEqual(['ios', 'ios']);
+    expect(versions).toEqual([false, false]);
   });
 
   it('Android never asks the proof: it lists with adb', async () => {
-    const { discovery, listings, proofs } = over([device('phone')], async () => true);
+    const { discovery, platforms, versions, proofs } = over([device('phone')], async () => true);
     expect(await discovery.check('android', 'phone')).toEqual({ usable: true });
     expect(proofs).toEqual([]);
-    expect(listings).toEqual([{ platform: 'android', versions: false }]);
+    expect(platforms).toEqual(['android']);
+    expect(versions).toEqual([false]);
   });
 
   it('a discovery built without a proof never proves: the iOS check lists', async () => {
-    const { discovery, listings } = over([device('sim', 'booted', 'ios')]);
+    const { discovery, platforms, versions } = over([device('sim', 'booted', 'ios')]);
     expect(await discovery.check('ios', 'sim')).toEqual({ usable: true });
-    expect(listings).toEqual([{ platform: 'ios', versions: false }]);
+    expect(platforms).toEqual(['ios']);
+    expect(versions).toEqual([false]);
   });
 
   it('list is the listing itself, its options passed through', async () => {
-    const { discovery, listings } = over([device('phone'), device('sim', 'booted', 'ios')]);
+    const { discovery, platforms, versions } = over([device('phone'), device('sim', 'booted', 'ios')]);
     expect((await discovery.list('ios')).map((d) => d.id)).toEqual(['sim']);
     await discovery.list('android', { versions: false });
-    expect(listings).toEqual([{ platform: 'ios', versions: true }, { platform: 'android', versions: false }]);
+    expect(platforms).toEqual(['ios', 'android']);
+    expect(versions).toEqual([true, false]);
   });
 });
 

@@ -15,12 +15,12 @@ import { RecordedTreeSource } from './recorded-source.js';
  * and the adapter SEAM — what tests/mcp/tools.test.ts builds a server from,
  * plus the iOS adapter and its WDA parser to put a recorded source behind:
  *
- *   src/mcp/tools.ts          createAveriServer (the tool handlers)
- *   src/mcp/registry.ts       AdapterRegistry, defaultFactory (the live wiring) — the registry built through
- *                             `registry` below, which also takes the constructor an older side had
- *   src/adapters/discovery.ts discoveryOver, when the side has it (since A3) — its discovery over the harness's listing
- *   src/adapters/ios.ts       IosAdapter (takes any IosTreeSource)
- *   src/adapters/wda-source.ts parseWdaSourceValue (WdaTreeSource's parser)
+ *   src/mcp/tools.ts            createAveriServer (the tool handlers)
+ *   src/mcp/registry.ts         AdapterRegistry, defaultFactory (the live wiring) — the registry built through
+ *                               `registry` below, which also takes the constructor an older side had
+ *   src/adapters/discovery.ts   discoveryOver, when the side has it (since A3) — its discovery over the harness's listing
+ *   src/adapters/ios.ts         IosAdapter (takes any IosTreeSource)
+ *   src/adapters/wda-source.ts  parseWdaSourceValue (WdaTreeSource's parser)
  *
  * No module behind the tools (standing, scroll rounds, tap judgement …) is
  * imported, so a refactor inside averi needs no change here. The types are
@@ -58,6 +58,7 @@ type DiscoveryOver = typeof import('../../src/adapters/discovery.js').discoveryO
  * (until A3, 2026-11-01, discovery was a function), and an object with `list` and `check` (since). `check` is the
  * side's own `discoveryOver`'s, built without a proof — no host file is read, and the bound check lists, as before A3
  * when the harness passed no proof. A side without `discoveryOver` never asks `check`.
+ * Delete this shim (and pass `over(listing)` straight) once no replayed side predates A3.
  */
 function discoveryFor(listing: Listing, over: DiscoveryOver | undefined): Listing & DeviceDiscovery {
   const shaped: DeviceDiscovery = over?.(listing) ?? {

@@ -29,9 +29,9 @@ export interface AdapterOpts {
  * Builds the adapter that drives ONE device — the id is required: listing
  * devices is DeviceDiscovery's (adapters/discovery.ts), so there is no
  * unbound adapter (2026-10-08; until then a factory call without an id
- * built a probe adapter whose only use was `listDevices()`). The registry resolves `opts`
- * to a kind before calling (kindFor): an ios call always carries one, an
- * android call never does.
+ * built a probe adapter whose only use was `listDevices()`). The registry
+ * resolves `opts` to a kind before calling (kindFor): an ios call always
+ * carries one, an android call never does.
  */
 export type AdapterFactory = (
   platform: Platform,
@@ -174,16 +174,16 @@ export class AdapterRegistry {
     if (binding) {
       // Still usable? Discovery's check, asked on every call: how it proves it
       // cheaply, and why: adapters/discovery.ts#discoveryOver.
-      const found = await this.discovery.check(platform, binding.deviceId);
+      const bound = await this.discovery.check(platform, binding.deviceId);
       // A select() may have rebound the platform while we awaited the check.
       // Acting on the CAPTURED binding would re-cache the evicted (already
       // disposed) device's adapter — start over against the current binding.
       // (select() always stores a fresh object, so identity detects it.)
       if (this.bindings.get(platform) !== binding) return this.get(platform, opts);
-      if (found.usable) return this.adapterFor(platform, binding.deviceId, opts);
+      if (bound.usable) return this.adapterFor(platform, binding.deviceId, opts);
       if (binding.pinned) {
         // Still listed, but unauthorized (a revoked key) or offline: say which.
-        const unusable = unusableNamed(found.listed);
+        const unusable = unusableNamed(bound.listed);
         throw new Error(
           unusable === undefined
             ? `Selected ${platform} device "${binding.deviceId}" is no longer booted — ` +
