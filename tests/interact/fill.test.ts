@@ -341,7 +341,7 @@ describe('fillField — focus, clear, type, verify', () => {
   // D39: notInput's own read (value '' on a non-input, no read-back tree to reuse) goes through the read seam. A miss
   // stays a hint ('unread'); a read no wait cures stops the fill as it came, instead of a "filled" the wedge then
   // contradicts one call later. Settle (2 reads) + the finding's one read; a fourth read fails the test fast.
-  const notInputReadFails = (err: Error): FakeAdapter => {
+  const notInputReadFails = (err: Error): FakeAdapter & { reads: () => number } => {
     const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
     let reads = 0;
     const real = fake.uiTree.bind(fake);
@@ -351,17 +351,28 @@ describe('fillField — focus, clear, type, verify', () => {
       if (reads === 3) throw err;
       return real();
     };
-    return fake;
+    return Object.assign(fake, { reads: () => reads });
   };
 
   it("notInput's read that throws a PersistentReadError: the fill rejects with it as it came", async () => {
     const wedged = new PersistentReadError('wedged until a reboot');
-    await expect(fillField(notInputReadFails(wedged), 'text:"IBAN*"', '', FAST)).rejects.toBe(wedged);
+    const fake = notInputReadFails(wedged);
+    await expect(fillField(fake, 'text:"IBAN*"', '', FAST)).rejects.toBe(wedged);
+    expect(fake.reads()).toBe(3); // the failure came from the finding's read, not a settle read
+  });
+
+  it("notInput's read that throws a PersistentReadError with clear: true: the same read, rejected as it came", async () => {
+    const wedged = new PersistentReadError('wedged until a reboot');
+    const fake = notInputReadFails(wedged);
+    await expect(fillField(fake, 'text:"IBAN*"', '', { ...FAST, clear: true })).rejects.toBe(wedged);
+    expect(fake.reads()).toBe(3);
   });
 
   it("notInput's read that misses: still a hint, the fill resolves with input 'unread'", async () => {
-    const result = await fillField(notInputReadFails(new Error('transient')), 'text:"IBAN*"', '', FAST);
+    const fake = notInputReadFails(new Error('transient'));
+    const result = await fillField(fake, 'text:"IBAN*"', '', FAST);
     expect(result.notInput).toEqual({ input: 'unread' });
+    expect(fake.reads()).toBe(3);
   });
 });
 
