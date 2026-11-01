@@ -160,10 +160,11 @@ interface Extent {
   width: number;
   height: number;
   /**
-   * False when the width cannot be believed: no ON-LAYOUT rect reaching the
-   * furthest starts at the origin (a CONTENT width; listing order never decides
-   * a tie), or a screen-shaped rect in the same tree reaches
-   * materially less far than a bar-shaped one does (see walkExtent).
+   * False when the width cannot be believed: the widest ON-LAYOUT rect starts
+   * inset (a CONTENT width; under a root of no area, a tie in reach goes to an
+   * origin-anchored rect, so listing order never decides it), or a
+   * screen-shaped rect in the same tree reaches materially less far than a
+   * bar-shaped one does (see walkExtent).
    */
   reliable: boolean;
 }
@@ -188,12 +189,18 @@ function walkExtent(tree: UiNode): Extent {
   /** The widest extent reached by anything SHAPED like a screen, if anything is. */
   let screenShaped = 0;
   let sawScreenShaped = false;
+  // A tie in reach is broken toward the origin only under a root of NO area: a
+  // multi-window dump lists its windows in no meaningful order, so first-wins
+  // would let listing order decide `reliable` (D47). A root WITH area is the
+  // window by design (uiautomator's inset app window, A1 in verify/scale.ts),
+  // is visited first and keeps the tie: an origin child reaching only as far
+  // must not turn its inset into a reliable screen width.
+  const tieGoesToOrigin = !(tree.rect.width > 0 && tree.rect.height > 0);
   const walk = (n: UiNode): void => {
     if (onLayout(n.rect)) {
       const reach = n.rect.x + n.rect.width;
       const widestReach = widest.x + widest.width;
-      // On equal reach the origin-anchored rect wins, so `reliable` never hangs on listing order (D47).
-      if (reach > widestReach || (reach === widestReach && Math.abs(n.rect.x) < ORIGIN_SLACK)) widest = n.rect;
+      if (reach > widestReach || (tieGoesToOrigin && reach === widestReach && Math.abs(n.rect.x) < ORIGIN_SLACK)) widest = n.rect;
       if (n.rect.y + n.rect.height > tallest.y + tallest.height) tallest = n.rect;
       if (isScreenShaped(n.rect) && n.rect.width > 0) {
         sawScreenShaped = true;

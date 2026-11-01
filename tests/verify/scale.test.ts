@@ -484,6 +484,12 @@ describe('windowWidth — an Android window beside its system bars (A1, A2)', ()
     expect(windowWidth(dump, ANDROID)).toEqual({ width: 2274, left: 126 });
   });
 
+  it('the single inset root with an origin child or bar reaching as far (D47): the root keeps the tie, still measured', () => {
+    const root = (child: UiNode): UiNode => node({ x: 126, y: 0, width: 2274, height: 1080 }, [child]);
+    expect(windowWidth(root(node({ x: 0, y: 0, width: 2400, height: 63 })), ANDROID)).toEqual({ width: 2274, left: 126 });
+    expect(windowWidth(root(node({ x: 0, y: 0, width: 2400, height: 1080 })), ANDROID)).toEqual({ width: 2274, left: 126 });
+  });
+
   it('needs the device witness: with no screen, or an iOS one, the inset window is a CONTENT width as before', () => {
     expect(windowWidth(appWindow(110, 2290)).error).toMatch(/^screen width 2400 is a CONTENT width/);
     expect(windowWidth(appWindow(110, 2290), { width: 1080, height: 2400 }).error).toMatch(/CONTENT width/);

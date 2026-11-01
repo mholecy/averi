@@ -135,6 +135,30 @@ describe('inferScreenSize — the edges of the walk and of the window test', () 
     expect(inferScreenSize(rectless(bar, app))).toEqual(size);
   });
 
+  it('half a root rect is no area: its tie in reach goes to the origin too, in either order (D47)', () => {
+    const app = nodeAt(rect(126, 63, 2274, 1017));
+    const bar = nodeAt(rect(0, 0, 2400, 63));
+    const size = { width: 2400, height: 1080, reliable: true, trustworthyHeight: false, insetWindow: rect(126, 63, 2274, 1017) };
+    for (const root of [rect(0, 0, 0, 1080), rect(126, 0, 2274, 0)]) {
+      expect(inferScreenSize(nodeAt(root, app, bar))).toEqual(size);
+      expect(inferScreenSize(nodeAt(root, bar, app))).toEqual(size);
+    }
+  });
+
+  it('only a TIE goes to the origin: an origin bar reaching less, listed after the widest, takes nothing from it', () => {
+    expect(inferScreenSize(rectless(nodeAt(rect(126, 0, 1000, 1000)), nodeAt(rect(0, 0, 400, 100))))).toEqual({ width: 1126, height: 1000, reliable: false, trustworthyHeight: false, insetWindow: rect(126, 0, 1000, 1000) });
+  });
+
+  // An inset root WITH area is the window by design (uiautomator's, A1): visited first, it keeps a tie in reach, so an
+  // origin child reaching only as far does not make its inset a screen width; reaching further, the child is widest.
+  it.each([
+    ['an origin child reaching further: the child is widest, reliable', rect(0, 0, 2500, 1080), { width: 2500, height: 1080, reliable: true }],
+    ['an origin child reaching as far: the root keeps the tie, unreliable', rect(0, 0, 2400, 1080), { width: 2400, height: 1080, reliable: false }],
+    ['an origin bar reaching as far: the root keeps the tie, unreliable', rect(0, 0, 2400, 63), { width: 2400, height: 1080, reliable: false }],
+  ])('an inset root with area (126,0 2274x1080) is offered as the inset window — %s', (_, child, walked) => {
+    expect(inferScreenSize(nodeAt(rect(126, 0, 2274, 1080), nodeAt(child)))).toEqual({ ...walked, trustworthyHeight: false, insetWindow: rect(126, 0, 2274, 1080) });
+  });
+
   it("the walked height is the lowest bottom edge, not the tallest rect's; a scrim above the screen's top is no layout", () => {
     const walkedHeight = { width: 386, height: 900, reliable: false, trustworthyHeight: false, insetWindow: rect(16, 0, 370, 850) };
     expect(inferScreenSize(rectless(nodeAt(rect(16, 100, 370, 800)), nodeAt(rect(16, 0, 370, 850))))).toEqual(walkedHeight);
