@@ -733,27 +733,23 @@ export class FlowEngine {
       // `yes`, so a cold launch whose decor turned into a settled screen
       // outside the state (a login screen for `logged_in`) polled the full
       // 20 s before its cheap rung. Now the look also ends, answering `no`,
-      // once one rendered tree outside the state has held the same
-      // fingerprint across reads spanning reachRecheckMs (2 s, the grace a
-      // rung's own re-check already gives a screen to land; flow/hold-
-      // tracker.ts) — but only when NO wipe lies ahead (flow/wipes-ahead.ts
-      // #WipesAhead states the rule). A ladder that ends in a wipe gives up
-      // the gain. A tree that shows a spinner (read-tree.ts#showsProgress)
-      // never holds — it is a screen saying it still loads — and a held "no"
-      // says so in one `state` line before the rung. The accepted risk, with no wipe
-      // anywhere ahead: a rendered loading screen WITHOUT a progress
-      // indicator (on iOS through WDA a React Native ActivityIndicator was
-      // one until backlog row D27, 2026-10-31, made its type `progress`) that
-      // holds for 2 s costs
-      // a cheap rung run on it, or an escalation to the next cheap one. Bare
-      // and unknown answers are unchanged — a bare or a failed read restarts
-      // the hold.
+      // once one rendered tree outside the state has held the same fingerprint
+      // across reads spanning reachRecheckMs (2 s, the grace a rung's own
+      // re-check already gives a screen to land; flow/hold-tracker.ts) — but
+      // only when no wipe lies ahead (flow/wipes-ahead.ts#WipesAhead). A tree
+      // that shows a spinner (read-tree.ts#showsProgress) never holds — it is
+      // a screen saying it still loads — and a held "no" says so in one
+      // `state` line before the rung. The accepted risk: a rendered loading
+      // screen WITHOUT a progress indicator (on iOS through WDA a React
+      // Native ActivityIndicator was one until backlog row D27, 2026-10-31,
+      // made its type `progress`) that holds for 2 s costs a cheap rung run
+      // on it, or an escalation to the next cheap one. Bare and unknown
+      // answers are unchanged — a bare or a failed read restarts the hold.
       //
       // The rung's re-detect below (the grace window after a rung) gets no
       // hold: it is not a second look. Its window IS reachRecheckMs, so a
       // hold could never end it sooner; and when it answers bare, the next
-      // turn of this loop gives the next rung this very second look — with
-      // the hold if no wipe lies ahead of it.
+      // turn of this loop gives the next rung this very second look.
       if (probe.answer === 'bare' || (destructive && learnedNothing(probe))) {
         // The refusal's cause is what BOTH probes read (UnreadCause): a
         // bare entry read is still worth naming when every read of the
@@ -762,7 +758,7 @@ export class FlowEngine {
         // Transitive (WipesAhead), unlike `destructive` above (flowItselfIsDestructive). Do not unify the two.
         probe = await this.detects(state.detect, this.ensureTimeoutMs, {
           look: 'second look',
-          holdMs: this.wipes.noneFrom(state.reach, i) ? this.reachRecheckMs : undefined,
+          holdMs: this.wipes.noneAheadOf(state.reach, i) ? this.reachRecheckMs : undefined,
         });
         if (probe.answer === 'yes') {
           this.log(`state ${name}`, i === 0 ? 'already active' : `reached after ${state.reach[i - 1]}`);

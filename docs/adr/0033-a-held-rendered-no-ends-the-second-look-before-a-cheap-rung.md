@@ -132,5 +132,5 @@ wipe lies ahead (above).
 ## Amendment: one owner for "is a wipe ahead?" (2026-11-01, backlog A7)
 
 The two checks of "No wipe ahead" above — `wipeAhead === 0`, the engine counter, and `state.reach.slice(i)` under
-`flowIsDestructive` — now live in `flow/wipes-ahead.ts#WipesAhead`: `noneFrom(rungs, i)` asks both, `running(rungs, i,
-fn)` raises and lowers the count around a rung. The decision is unchanged.
+`flowIsDestructive` — now live in `flow/wipes-ahead.ts#WipesAhead`: `noneAheadOf(rungs, i)` asks both,
+`running(rungs, i, fn)` raises and lowers the count around a rung. The decision is unchanged.

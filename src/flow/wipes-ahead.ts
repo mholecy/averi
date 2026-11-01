@@ -25,7 +25,7 @@ export class WipesAhead {
   constructor(private readonly cfg: AveriConfig) {}
 
   /** No wipe in rungs[i..] (transitive) and none ahead in any enclosing ladder. */
-  noneFrom(rungs: readonly string[], i: number): boolean {
+  noneAheadOf(rungs: readonly string[], i: number): boolean {
     return this.enclosing === 0 && !this.wipeAmong(rungs.slice(i));
   }
 
