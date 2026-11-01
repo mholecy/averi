@@ -6,6 +6,12 @@ deliver the whole text reliably, the agent's hands needing no retries). Implemen
 Widened 2026-10-31 by D28 (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md, its amendment): the
 strict prefix this ADR retypes may be REFORMATTED — exact by typed characters, only the field's grouping added.
 
+Widened 2026-11-01 by D29 (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md, its D29 amendment),
+in one case only: decision 2's "never when the field's earlier text changed" no longer holds when that text VANISHED —
+its letters and digits no longer start the reading (an unnamed placeholder read as the empty field's value, or text the
+field replaced on focus). Then the reading is also judged as a prefix of the value alone; earlier text that changed in
+any other way still stops the retype.
+
 ## Context
 
 - docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md: on the

@@ -221,7 +221,7 @@ app held `SK31 1200 00`).
   never typed again, and D24's split never started — the same bug as D28's, one step earlier), and the exact rule
   passed only a value typed with its own spaces (f5, `held.includes(value)`); with clear the earlier text is none, so
   f2 passed. **Decision:** without clear, a reading whose letters and digits do not START with the earlier text's is
-  judged after no earlier text as well, second (`fill-reformat.ts#priorsOf`, asked by `reformatAfter` — the typing's
+  judged after no earlier text as well, second (`fill-reformat.ts#priorsOf`, asked by `landedReformat` — the typing's
   landing rule — and by `tailOf` — the retype, `whereTyped`'s missing text and the verdict's `dropped-tail`). Letters
   and digits, not the text as typed (review round 1, MAJOR-1): a field that regroups as it is typed shows an earlier
   `1,000` as `10,00…` once typed into, and that text is still there — compared as typed, `10,001,000` passed for a
@@ -230,14 +230,16 @@ app held `SK31 1200 00`).
   never without it. The earlier text is tried first: a reading that is a prefix of it too (`SK` of `SK00 …`) shows
   nothing of the typing landed, and nothing is typed again. An earlier text with no letters or digits (a `—`, a
   `__/__/____` mask) keeps the pre-D29 judgment — a false mismatch, never a wrong pass — deliberately not loosened
-  (review round 2, MINOR-A, the owner's decision).
+  (review round 2, MINOR-A, the owner's decision). So does an unnamed placeholder whose letters and digits are a
+  prefix of the typed value's (a `+421` placeholder, `421903…` typed): the fallback never runs, the old false mismatch.
+  This widens ADR 0023's decision 2 in that one case (its header says so).
   **Where it reaches** (review round 1, MINOR-2): every source that names no placeholder — idb, and the API 33
   uiautomator dump (a classic EditText's hint dumped as its `text`, android.ts; the Android lab's fields are Compose,
   which dump no placeholder, so the lab is not affected) — and, on both platforms, a field that replaces its earlier
   text on focus (a select-all), which the reading cannot tell from an unnamed placeholder: both are judged as the value
   alone, reformatted or with a dropped tail retyped (on iOS).
   **Mutation-checked**: ten mutants, each killed — no fallback (6 tests fail); no guard (3); the value alone instead of
-  both (1); the fallback in `tailOf` only removed (3); in `reformatAfter` only (4); the fallback under clear too (1);
+  both (1); the fallback in `tailOf` only removed (3); in `landedReformat` only (4); the fallback under clear too (1);
   the guard on the text as typed (1); the guard `includes` instead of a start (1); the order reversed, the value alone
   first (1); fill-type's old landing expression (2).
   **The golden says nothing of this change**: it replays tree reads and never runs a fill, so its `Changed 0` is no

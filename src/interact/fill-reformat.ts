@@ -3,7 +3,7 @@
  * the rules that read a reformatting field (D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md)
  * and a strict prefix of the typing, exact or reformatted (D28, that ADR's amendment) — after the field's earlier text,
  * or after none once that text vanished (D29: an unnamed placeholder, `priorsOf`). Two modules ask it:
- * interact/fill-type.ts, the typing — whether a reading landed (`reformatAfter`) and what tail to type again (`tailOf`) —
+ * interact/fill-type.ts, the typing — whether a reading landed (`landedReformat`) and what tail to type again (`tailOf`) —
  * and interact/fill-verdict.ts, the judge — whether a mismatch is a dropped tail (`tailOf`), so the retype and the
  * error judge a prefix alike. It imports only the facts (fill-facts.ts) and the mask characters; nothing here types,
  * reads a device or words a sentence.
@@ -166,7 +166,9 @@ const skeleton = (text: string): string => [...text].filter((c) => ALNUM.test(c)
  * the value alone, under `reformatOf`'s and `prefixOf`'s rules unchanged. A reading that starts with them is judged
  * after the earlier text, never without it. An earlier text with no letters or digits (a `—`, a `__/__/____` mask)
  * keeps the pre-D29 judgment — every reading starts with its empty skeleton — failing safe, as a false mismatch and
- * never a wrong pass: deliberately not loosened (D29 review round 2, MINOR-A).
+ * never a wrong pass: deliberately not loosened (D29 review round 2, MINOR-A). So does an unnamed placeholder whose
+ * letters and digits are a prefix of the typed value's (a `+421` placeholder, `421903…` typed): the reading starts
+ * with them, the fallback never runs, and the result is the old false mismatch.
  *
  * The earlier text is tried FIRST: a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is then
  * that earlier text's prefix, nothing of the typing landed, and nothing is typed again; tried second, the same reading
@@ -181,7 +183,7 @@ function priorsOf(held: string, intent: Pick<Expectation, 'clear' | 'before' | '
  * The reading `reformatOf` what the field should hold — its earlier text, unless cleared (or vanished: `priorsOf`,
  * D29), then the value — else undefined. The typing's landing rule (fill-type.ts). Pure.
  */
-export function reformatAfter(observed: string, intent: Expectation): Reformat | undefined {
+export function landedReformat(observed: string, intent: Expectation): Reformat | undefined {
   const held = heldText(observed, intent.placeholder);
   for (const prior of priorsOf(held, intent)) {
     const reformatted = reformatOf(held, prior + intent.value);
@@ -228,8 +230,9 @@ export const landedSome = (tail: Tail | undefined): tail is Tail => tail !== und
  */
 export function tailOf(observed: string, intent: Expectation): Tail | undefined {
   const held = heldText(observed, intent.placeholder);
-  if (hasBullet(held) || hasBullet(priorText(intent))) return undefined;
-  for (const prior of priorsOf(held, intent)) {
+  const priors = priorsOf(held, intent); // the earlier text first (`priorText`)
+  if (hasBullet(held) || hasBullet(priors[0])) return undefined;
+  for (const prior of priors) {
     const whole = prior + intent.value;
     const shown = prefixOf(held, whole);
     if (shown === undefined) continue;

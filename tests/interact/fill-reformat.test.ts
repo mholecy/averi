@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { landedSome, prefixOf, reformatAfter, reformatOf, tailOf } from '../../src/interact/fill-reformat.js';
+import { landedSome, prefixOf, landedReformat, reformatOf, tailOf } from '../../src/interact/fill-reformat.js';
 
 /**
  * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
@@ -187,21 +187,21 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
   const PH = 'SK00 0000 0000 \u2026';
   const e = (value: string, before: string | null, clear = false) => ({ value, clear, before, placeholder: undefined });
 
-  it('reformatAfter: the reading reformatted from the value alone once the earlier text is gone', () => {
-    expect(reformatAfter('SK31 1200 0000', e('SK3112000000', PH))).toEqual({ added: 2, respaced: 0 });
-    expect(reformatAfter('CZ65 0800 0000', e('CZ6508000000', PH))).toEqual({ added: 2, respaced: 0 });
+  it('landedReformat: the reading reformatted from the value alone once the earlier text is gone', () => {
+    expect(landedReformat('SK31 1200 0000', e('SK3112000000', PH))).toEqual({ added: 2, respaced: 0 });
+    expect(landedReformat('CZ65 0800 0000', e('CZ6508000000', PH))).toEqual({ added: 2, respaced: 0 });
   });
 
-  it('reformatAfter: an earlier text still shown is judged after it, never without it', () => {
-    expect(reformatAfter('SK31 1200 0000', e('000000', 'SK31 12'))).toEqual({ added: 1, respaced: 0 });
+  it('landedReformat: an earlier text still shown is judged after it, never without it', () => {
+    expect(landedReformat('SK31 1200 0000', e('000000', 'SK31 12'))).toEqual({ added: 1, respaced: 0 });
     // `1` is still there: `1234 5678` is no reformat of `1` + `12345678`, and not judged as the value alone.
-    expect(reformatAfter('1234 5678', e('12345678', '1'))).toBeUndefined();
+    expect(landedReformat('1234 5678', e('12345678', '1'))).toBeUndefined();
   });
 
-  it('reformatAfter: with clear the earlier text never counts', () => {
-    expect(reformatAfter('SK31 1200 0000', e('SK3112000000', PH, true))).toEqual({ added: 2, respaced: 0 });
+  it('landedReformat: with clear the earlier text never counts', () => {
+    expect(landedReformat('SK31 1200 0000', e('SK3112000000', PH, true))).toEqual({ added: 2, respaced: 0 });
     // cleared, the field must hold the value alone: `SK31` shown before it is no earlier text to judge after
-    expect(reformatAfter('SK31 1200 0000', e('12000000', 'SK31', true))).toBeUndefined();
+    expect(landedReformat('SK31 1200 0000', e('12000000', 'SK31', true))).toBeUndefined();
     expect(tailOf('SK31 12', e('12000000', 'SK31', true))).toBeUndefined();
   });
 
@@ -216,25 +216,25 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(tailOf('1234 5', e('12345678', '1'))).toBeUndefined();
     // an earlier text the field regrouped (`SK3112` shown `SK31 12…`) no longer starts the reading as typed: judged after it first
     expect(tailOf('SK31 1200', e('0000', 'SK3112'))).toEqual({ missing: '00', landed: 2, reformatted: { added: 1, respaced: 0 } });
-    expect(reformatAfter('SK31 1200 00', e('0000', 'SK3112'))).toEqual({ added: 2, respaced: 0 });
+    expect(landedReformat('SK31 1200 00', e('0000', 'SK3112'))).toEqual({ added: 2, respaced: 0 });
   });
 
   // D29 review round 1, MAJOR-1: the guard compares letters and digits, not the text as typed — an earlier text the
   // field regrouped (`1,000` shown `10,00…`) is still there, and the reading is judged after it alone.
   it('an earlier text the field regrouped is still there: judged after it, never as the value alone', () => {
-    expect(reformatAfter('10,001,000', e('10001000', '1,000'))).toBeUndefined();
+    expect(landedReformat('10,001,000', e('10001000', '1,000'))).toBeUndefined();
     expect(tailOf('100,010', e('1000105', '1,000'))).toBeUndefined();
   });
 
   // D29 review round 2, MINOR-A (the owner's decision): an earlier text with no letters or digits (a dash, a
   // `__/__/____` mask) keeps the pre-D29 judgment — a false mismatch, never a wrong pass; deliberately not loosened.
   it('an earlier text with no letters or digits: judged after it alone, as before D29', () => {
-    expect(reformatAfter('SK31 1200 0000', e('SK3112000000', '\u2014'))).toBeUndefined();
+    expect(landedReformat('SK31 1200 0000', e('SK3112000000', '\u2014'))).toBeUndefined();
   });
 
   // MINOR-3: the earlier text inside the reading, not at its start, did not survive as the earlier text.
   it('the earlier text inside the reading but not at its start: judged as the value alone', () => {
-    expect(reformatAfter('34 12', e('3412', '12'))).toEqual({ added: 1, respaced: 0 });
+    expect(landedReformat('34 12', e('3412', '12'))).toEqual({ added: 1, respaced: 0 });
   });
 
   // MINOR-3: the earlier text first — a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is no

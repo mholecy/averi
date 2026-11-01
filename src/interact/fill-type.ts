@@ -25,7 +25,7 @@
  *   asks too — has every rule; docs/adr/0034-a-fill-passes-a-field-
  *   that-reformats-as-it-is-typed.md). Since D29, without clear, a reading
  *   whose letters and digits no longer start with the field's earlier
- *   text's is judged after none as well (`reformatAfter`, and `tailOf` for
+ *   text's is judged after none as well (`landedReformat`, and `tailOf` for
  *   a dropped tail): that text vanished — an unnamed placeholder read as
  *   the empty field's value (idb, the API 33 uiautomator dump), or text the
  *   field replaced on focus.
@@ -80,7 +80,7 @@ import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adap
 import { isMaskedValue } from '../ui-tree/masked-value.js';
 import { sleep } from '../util/sleep.js';
 import { heldText, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
-import { landedSome, reformatAfter, tailOf, type Expectation } from './fill-reformat.js';
+import { landedSome, landedReformat, tailOf, type Expectation } from './fill-reformat.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
 export interface FieldIo {
@@ -182,14 +182,14 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
           observed === value || heldText(observed, intent.placeholder).includes(value);
   // D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows the typing with
   // separators of its own (`reformatOf`): what it should hold — its earlier text, unless cleared, then the value —
-  // reformatted (`reformatAfter`; an earlier text that vanished — D29, `priorsOf` — judged as none too). A
+  // reformatted (`landedReformat`; an earlier text that vanished — D29, `priorsOf` — judged as none too). A
   // masked reading never is one (bullets are no typed characters). `tookText` gates this rule as it
   // gates the exact one: a non-input must still have changed to show the value itself, which a reformatted reading
   // (the value split by separators) never contains.
   // What a reading that landed is: exact (`{}`), or reformatted — computed once per reading, by the poll.
   const landing = (observed: string): Landing | undefined => {
     if (!tookText(observed)) return undefined;
-    const reformatted = reformatAfter(observed, intent);
+    const reformatted = landedReformat(observed, intent);
     if (reformatted !== undefined) return { reformatted };
     return exactly(observed) ? {} : undefined;
   };

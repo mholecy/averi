@@ -283,6 +283,8 @@ export function differenceOf(m: Mismatch): Difference {
     return { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 };
   }
   const shown = heldText(observed, m.placeholder);
+  // `priorText`, not fill-reformat.ts's vanished-text fallback (D29): an earlier text the reading no longer starts
+  // with is compared whole below — which is what a vanished one (an unnamed placeholder) asks for.
   const prior = priorText(m);
   // Without clear the field may hold text from before the typing; only what
   // came AFTER it is compared, when the field still starts with it (typing
