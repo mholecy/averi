@@ -9,7 +9,7 @@ import {
   type UiNode,
 } from '../adapters/types.js';
 import { isMaskedValue } from '../ui-tree/masked-value.js';
-import { readTreeOrThrow, sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
+import { readTreeOrMiss, readTreeOrThrow, sameScreen, screenIdentity, type ScreenIdentity } from '../ui-tree/read-tree.js';
 import { soleIdOf } from '../ui-tree/selectors.js';
 import { errorMessage } from '../util/error-message.js';
 import { sleep } from '../util/sleep.js';
@@ -356,13 +356,10 @@ export async function fillField(
     if (isInput) return undefined;
     let tree = lastTree;
     if (tree === undefined) {
-      try {
-        tree = await adapter.uiTree();
-      } catch {
-        // Deliberately swallows ANY read failure, one no wait cures included: a hint, not a verdict, read only when no
-        // refetch was made — the fill does not fail for it.
-        return { input: 'unread' };
-      }
+      // Through the seam (D39, ADR 0036): a miss stays a hint, a read no wait cures stops the fill as it came.
+      const read = await readTreeOrMiss(adapter);
+      if (read.tree === undefined) return { input: 'unread' };
+      tree = read.tree;
     }
     return { input: nearestInput(tree, node) };
   };

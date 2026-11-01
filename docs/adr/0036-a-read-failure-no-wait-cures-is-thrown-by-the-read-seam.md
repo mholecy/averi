@@ -1,7 +1,8 @@
 # 36. A read failure no wait cures is thrown by the read seam, never returned as a miss
 
 Status: accepted 2026-11-01 (backlog row A1, docs/plans/2026-10-30-performance-backlog.md, from the architecture review
-of the perf programme). Implemented in merge 5cd0d8e4. Behaviour-preserving.
+of the perf programme). Implemented in merge 5cd0d8e4. Behaviour-preserving. Amended 2026-11-01 (D39): fill's
+not-input hint read goes through the seam (see the amendment below).
 
 ## Context
 
@@ -34,7 +35,18 @@ of the perf programme). Implemented in merge 5cd0d8e4. Behaviour-preserving.
   their caller, which is not a read's question.
 - One reader opts out on purpose: the swipe's orientation read (interact/swipe.ts#swipeScreen) catches it, and loses
   only its witness — the swipe is sent over the device box and its note quotes the failure (ARCHITECTURE.md).
-- fill's not-input hint read (interact/fill.ts, `notInput`) still reads raw and swallows any failure, the terminal one
-  included: it is a hint, read only when no re-read happened. Whether it should stop on a terminal failure is left open.
+- fill's not-input hint read (interact/fill.ts, `notInput`) read raw and swallowed any failure, the terminal one
+  included. Left open here; closed by the D39 amendment below.
 - The raw `uiTree()` calls outside src/adapters and the seam are pinned, with the reason each may read raw, by
   tests/ui-tree/raw-tree-reads.test.ts: a new one fails that test until it goes through the seam or is listed.
+
+## Amendment: fill's not-input hint read stops on a terminal failure (2026-11-01, performance backlog D39)
+
+**Context.** `notInput` reads its own tree only when the fill made no re-read: `value: ''` on a node that is not an
+input. Its bare `catch {}` turned a wedged simulator (`PersistentReadError`) into "success, nothing typed, the screen
+could not be read again". The agent got no reboot message; the wedge surfaced one call later.
+
+**Decision.** `notInput` reads through `readTreeOrMiss`. A miss stays a hint (`input: 'unread'`); a terminal failure
+stops the fill and passes through as it came. Its entry in tests/ui-tree/raw-tree-reads.test.ts's allowlist is gone, so
+the guard covers it. Pinned by tests/interact/fill.test.ts ("notInput's read that throws a PersistentReadError", and
+its companion for a miss).

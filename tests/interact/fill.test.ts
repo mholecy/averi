@@ -337,6 +337,32 @@ describe('fillField — focus, clear, type, verify', () => {
     };
     await expect(fillField(fake, { id: 'amount_input' }, '1', FAST)).rejects.toBe(wedged);
   });
+
+  // D39: notInput's own read (value '' on a non-input, no read-back tree to reuse) goes through the read seam. A miss
+  // stays a hint ('unread'); a read no wait cures stops the fill as it came, instead of a "filled" the wedge then
+  // contradicts one call later. Settle (2 reads) + the finding's one read; a fourth read fails the test fast.
+  const notInputReadFails = (err: Error): FakeAdapter => {
+    const fake = idbFloatingLabelFake('IBAN*', 'XX12345');
+    let reads = 0;
+    const real = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      reads++;
+      if (reads > 3) throw new Error(`unexpected read #${reads}`);
+      if (reads === 3) throw err;
+      return real();
+    };
+    return fake;
+  };
+
+  it("notInput's read that throws a PersistentReadError: the fill rejects with it as it came", async () => {
+    const wedged = new PersistentReadError('wedged until a reboot');
+    await expect(fillField(notInputReadFails(wedged), 'text:"IBAN*"', '', FAST)).rejects.toBe(wedged);
+  });
+
+  it("notInput's read that misses: still a hint, the fill resolves with input 'unread'", async () => {
+    const result = await fillField(notInputReadFails(new Error('transient')), 'text:"IBAN*"', '', FAST);
+    expect(result.notInput).toEqual({ input: 'unread' });
+  });
 });
 
 describe('fillField — masked fields verify by length', () => {
