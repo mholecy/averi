@@ -6,6 +6,8 @@ and D24 measured"; the orchestrator's design from the D7 analysis). Part a (read
 (input, D7b) implemented on `perf/d7b-idb-helper-hid` (c1afc5e0, acc106c2, 90995f24, a8609ac2), merged a4746de9 —
 section "D7b" below. D26b (screenshots through idb on the idb tree source, `perf/d26b-idb-screenshot`) — section
 "D26b" below.
+Amended 2026-11-01 (D41: every tool gets the project's adapter, so one simulator runs one helper — see the amendment
+below).
 
 ## Context
 
@@ -249,3 +251,30 @@ it; it is a ~1 s wait inside CoreSimulator, worst beside a `simctl spawn launchc
   device shows it in a whole tool call — the owner's A/B: `ios-run.sh` native and idb legs with
   `AVERI_IDB_HELPER=off` vs on.
 - One more long-lived child per idb-backed simulator, Python, ~idb's import in memory.
+
+## Amendment: every tool gets the project's adapter (2026-11-01, backlog D41)
+
+Which adapter a tool call is served by, only; what the helper is and how it runs are unchanged. The registry keeps one
+adapter per simulator and tree-source kind, and each iOS adapter owns its helper. Every MCP tool now asks the registry
+for the project's kind: each handler goes through one resolver, `mcp/tools.ts#deviceFor`, with the
+`app.ios.treeSource` of the config the call loaded, and the registry's `get` takes that kind as a required argument
+(`undefined` is the default, idb): the kind-less overload is gone, and the one resolver plus
+`tests/mcp/registry-gets.test.ts`, which pins it as the only `registry.get` in `src/`, keep every call on the
+project's kind. Eight tools (`install_app`, `launch_app`, `terminate_app`, `open_deep_link`, `screenshot`, a
+coordinate `swipe`, `press_key`, `get_logs`) used to ask without the kind, and several of them could not know it,
+because their policy read no averi.yaml on iOS. Each now takes `configPath`, and on iOS each reads the file under the
+`optional` policy.
+
+So one project drives one adapter per simulator, with one helper. The D7b note "a simulator served under both tree
+sources at once runs two helpers" mostly came from those kind-less calls inside one `treeSource: wda` project, not
+from two projects. Two projects with different tree sources on one simulator and one server still run two helpers.
+The same calls had put `launch_app`'s foreground wait, D24's tail-drop memory and `terminate_app`'s front-app memory
+on an adapter the project's tree tools never used.
+
+The screenshot source follows the tree source (D26b) for the `screenshot` tool too. In a wda project the tool captures
+through simctl, the source of the frames that `assert` and `ensure_state` read, at about 300 ms more than idb's
+helper. `launch_app` has no foreground wait there, because the wda source answers no application label; a flow's
+`launch:` step already behaved this way. `press_key` and a coordinate `swipe` still send idb input, through the wda
+adapter's own helper. Without a project config nothing changes: the kind is the default, as it already was for the
+tree tools. Because these tools read `./averi.yaml` by default, they now honour the file in the server's working
+directory, as the tree tools did.

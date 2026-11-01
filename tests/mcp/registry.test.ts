@@ -64,18 +64,18 @@ describe('AdapterRegistry', () => {
 
   it('no booted device in the listing: each platform says where it looked, and nothing is built', async () => {
     const { registry, created } = makeRegistry([device('sim', 'offline', 'ios')]);
-    await expect(registry.get('android')).rejects.toThrow('No booted Android emulator/device found (adb devices)');
-    await expect(registry.get('ios')).rejects.toThrow('No booted iOS simulator found (xcrun simctl list)');
+    await expect(registry.get('android', {})).rejects.toThrow('No booted Android emulator/device found (adb devices)');
+    await expect(registry.get('ios', {})).rejects.toThrow('No booted iOS simulator found (xcrun simctl list)');
     expect(created).toEqual([]);
   });
 
   it('get() resolves the device through discovery and builds ONE adapter, bound to it — every call asks discovery again', async () => {
     const { registry, bound, created, probes } = makeRegistry([device('offline-one', 'offline'), device('phone')]);
-    const adapter = await registry.get('android');
+    const adapter = await registry.get('android', {});
     expect(created).toEqual([adapter]);
     expect(bound).toEqual(['phone']);
     expect(probes).toEqual(['android']);
-    expect(await registry.get('android')).toBe(adapter); // cached, but the binding is re-checked
+    expect(await registry.get('android', {})).toBe(adapter); // cached, but the binding is re-checked
     expect(probes).toEqual(['android', 'android']);
   });
 
@@ -83,8 +83,8 @@ describe('AdapterRegistry', () => {
   // ids and states — on Android a version is a getprop per attached device.
   it('get() lists without OS versions, on both its paths; select() and listAll() still ask for them', async () => {
     const { registry, versions } = makeRegistry([device('phone'), device('sim', 'booted', 'ios')]);
-    await registry.get('android'); // unbound: the auto-pick's listing
-    await registry.get('android'); // bound: the still-booted check
+    await registry.get('android', {}); // unbound: the auto-pick's listing
+    await registry.get('android', {}); // bound: the still-booted check
     expect(versions).toEqual([false, false]);
     versions.length = 0;
     await registry.select('android', 'phone');
@@ -96,7 +96,7 @@ describe('AdapterRegistry', () => {
 
   it('binds to the first booted device when nothing is selected', async () => {
     const { registry, bound } = makeRegistry([device('watch-emulator'), device('phone')]);
-    await registry.get('android');
+    await registry.get('android', {});
     expect(bound).toEqual(['watch-emulator']);
     expect(registry.boundId('android')).toBe('watch-emulator');
   });
@@ -105,7 +105,7 @@ describe('AdapterRegistry', () => {
     const { registry, bound } = makeRegistry([device('watch-emulator'), device('phone')]);
     const selected = await registry.select('android', 'phone');
     expect(selected.id).toBe('phone');
-    await registry.get('android');
+    await registry.get('android', {});
     expect(bound).toEqual(['phone']);
   });
 
@@ -130,7 +130,7 @@ describe('AdapterRegistry', () => {
 
     it('auto-pick with only an unauthorized device: named, not "no booted device", nothing built or bound', async () => {
       const { registry, created } = makeRegistry([device('R58M123', 'unauthorized')]);
-      const err = await registry.get('android').then(() => undefined, (e: Error) => e);
+      const err = await registry.get('android', {}).then(() => undefined, (e: Error) => e);
       expect(err?.message).toMatch(/^No usable Android emulator\/device found \(adb devices\): "R58M123" is unauthorized: /);
       expect(err?.message).toMatch(UNAUTHORIZED);
       expect(created).toEqual([]);
@@ -139,14 +139,14 @@ describe('AdapterRegistry', () => {
 
     it('auto-pick with an unauthorized and an offline device names both', async () => {
       const { registry } = makeRegistry([device('R58M123', 'unauthorized'), device('emulator-5556', 'offline')]);
-      const err = await registry.get('android').then(() => undefined, (e: Error) => e);
+      const err = await registry.get('android', {}).then(() => undefined, (e: Error) => e);
       expect(err?.message).toMatch(UNAUTHORIZED);
       expect(err?.message).toMatch(OFFLINE);
     });
 
     it('auto-pick passes over an unauthorized device listed first and binds the booted one', async () => {
       const { registry, bound } = makeRegistry([device('R58M123', 'unauthorized'), device('phone')]);
-      await registry.get('android');
+      await registry.get('android', {});
       expect(bound).toEqual(['phone']);
     });
 
@@ -169,14 +169,14 @@ describe('AdapterRegistry', () => {
       const { registry, devices } = makeRegistry([device('R58M123'), device('emulator-5556')]);
       await registry.select('android', 'R58M123');
       devices[0] = device('R58M123', 'unauthorized');
-      const err = await registry.get('android').then(() => undefined, (e: Error) => e);
+      const err = await registry.get('android', {}).then(() => undefined, (e: Error) => e);
       expect(err?.message).toMatch(/^Selected android device "R58M123" is unauthorized: /);
       expect(err?.message).toMatch(/ Or select_device another one\.$/);
       expect(err?.message).not.toContain('no longer booted');
 
       await registry.select('android', 'emulator-5556');
       devices[1] = device('emulator-5556', 'offline');
-      await expect(registry.get('android')).rejects.toThrow(/^Selected android device "emulator-5556" is offline: /);
+      await expect(registry.get('android', {})).rejects.toThrow(/^Selected android device "emulator-5556" is offline: /);
     });
 
     it('a select() landing during an unbound probe that saw only an unauthorized phone wins over the refusal', async () => {
@@ -196,7 +196,7 @@ describe('AdapterRegistry', () => {
           return stale;
         }),
       });
-      const racing = registry.get('android');
+      const racing = registry.get('android', {});
       await registry.select('android', 'R58M123');
       release();
       await expect(racing).resolves.toBeInstanceOf(FakeAdapter);
@@ -207,14 +207,14 @@ describe('AdapterRegistry', () => {
       const { registry, devices } = makeRegistry([device('0123456789ABCDEF')]);
       await registry.select('android', '0123456789ABCDEF');
       devices.unshift(device('0123456789ABCDEF', 'unauthorized'));
-      await expect(registry.get('android')).resolves.toBeInstanceOf(FakeAdapter);
+      await expect(registry.get('android', {})).resolves.toBeInstanceOf(FakeAdapter);
     });
 
     it('iOS keeps its wording on the pinned path: a shut-down simulator is "no longer booted"', async () => {
       const { registry, devices } = makeRegistry([device('sim', 'booted', 'ios')]);
       await registry.select('ios', 'sim');
       devices[0] = device('sim', 'offline', 'ios');
-      await expect(registry.get('ios')).rejects.toThrow(
+      await expect(registry.get('ios', {})).rejects.toThrow(
         'Selected ios device "sim" is no longer booted — reboot it or select_device another one',
       );
     });
@@ -230,9 +230,9 @@ describe('AdapterRegistry', () => {
   describe('the bound simulator proven booted from its device.plist (D22)', () => {
     it('proven booted: no listing, the same cached adapter, bound to the same simulator', async () => {
       const { registry, probes, bound, plistReads } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => true);
-      const adapter = await registry.get('ios'); // unbound: the auto-pick lists, and asks no proof
+      const adapter = await registry.get('ios', {}); // unbound: the auto-pick lists, and asks no proof
       expect(plistReads).toEqual([]);
-      expect(await registry.get('ios')).toBe(adapter);
+      expect(await registry.get('ios', {})).toBe(adapter);
       expect(plistReads).toEqual(['sim']);
       expect(probes).toEqual(['ios']); // the bound call listed nothing
       expect(bound).toEqual(['sim+idb']);
@@ -241,7 +241,7 @@ describe('AdapterRegistry', () => {
     it('a PINNED simulator proven booted lists only for select_device, not for each call', async () => {
       const { registry, probes, plistReads } = makeRegistry([device('a', 'booted', 'ios'), device('b', 'booted', 'ios')], undefined, async () => true);
       await registry.select('ios', 'b');
-      await registry.get('ios');
+      await registry.get('ios', {});
       await registry.get('ios', { treeSource: 'wda' });
       expect(probes).toEqual(['ios']);
       expect(plistReads).toEqual(['b', 'b']);
@@ -251,7 +251,7 @@ describe('AdapterRegistry', () => {
       const { registry, devices, probes } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => Promise.reject(new Error('EACCES')));
       await registry.select('ios', 'sim');
       devices[0] = device('sim', 'offline', 'ios');
-      await expect(registry.get('ios')).rejects.toThrow(
+      await expect(registry.get('ios', {})).rejects.toThrow(
         'Selected ios device "sim" is no longer booted — reboot it or select_device another one',
       );
       expect(probes).toEqual(['ios', 'ios']); // select's listing, then the check's
@@ -268,10 +268,10 @@ describe('AdapterRegistry', () => {
         undefined,
         async () => (await gate, true),
       );
-      const first = (await registry.get('ios')) as FakeAdapter; // auto-binds a
+      const first = (await registry.get('ios', {})) as FakeAdapter; // auto-binds a
       let release!: () => void;
       gate = new Promise((r) => { release = r; });
-      const racing = registry.get('ios'); // bound to a, frozen on a's proof
+      const racing = registry.get('ios', {}); // bound to a, frozen on a's proof
       await Promise.resolve();
       gate = undefined;
       await registry.select('ios', 'b'); // evicts a, binds b
@@ -288,20 +288,21 @@ describe('AdapterRegistry', () => {
     const { registry, devices } = makeRegistry([device('phone'), device('emulator')]);
     await registry.select('android', 'phone');
     devices.splice(0, 1); // phone disconnects
-    await expect(registry.get('android')).rejects.toThrow(/no longer booted/);
+    await expect(registry.get('android', {})).rejects.toThrow(/no longer booted/);
   });
 
   it('a vanished auto-picked device falls back to the next booted one', async () => {
     const { registry, bound, devices } = makeRegistry([device('first'), device('second')]);
-    await registry.get('android');
+    await registry.get('android', {});
     devices.splice(0, 1); // first disconnects
-    await registry.get('android');
+    await registry.get('android', {});
     expect(bound).toEqual(['first', 'second']);
   });
 
   it('caches per tree-source kind: same kind shares an instance, wda gets its own', async () => {
     const { registry, bound } = makeRegistry([device('sim', 'booted', 'ios')]);
-    const dflt = await registry.get('ios');
+    // `{}` is a project that configures no kind: the default's instance.
+    const dflt = await registry.get('ios', {});
     const wda = await registry.get('ios', { treeSource: 'wda' });
     expect(await registry.get('ios', { treeSource: 'wda' })).toBe(wda);
     expect(wda).not.toBe(dflt);
@@ -312,7 +313,7 @@ describe('AdapterRegistry', () => {
 
   it('android has no tree source — a stray kind neither forks the cache nor reaches the factory', async () => {
     const { registry, bound } = makeRegistry([device('phone')]);
-    const plain = await registry.get('android');
+    const plain = await registry.get('android', {});
     expect(await registry.get('android', { treeSource: 'wda' })).toBe(plain);
     expect(bound).toEqual(['phone']);
   });
@@ -323,7 +324,7 @@ describe('AdapterRegistry', () => {
       device('b', 'booted', 'ios'),
     ]);
     await registry.select('ios', 'b');
-    await registry.get('ios');
+    await registry.get('ios', {});
     await registry.get('ios', { treeSource: 'wda' });
     expect(bound).toEqual(['b+idb', 'b+wda']);
   });
@@ -333,7 +334,7 @@ describe('AdapterRegistry', () => {
       device('a', 'booted', 'ios'),
       device('b', 'booted', 'ios'),
     ]);
-    const oldDefault = (await registry.get('ios')) as FakeAdapter;
+    const oldDefault = (await registry.get('ios', {})) as FakeAdapter;
     const oldWda = (await registry.get('ios', { treeSource: 'wda' })) as FakeAdapter;
     await registry.select('ios', 'b');
     expect(oldDefault.disposed).toBe(1);
@@ -362,12 +363,12 @@ describe('AdapterRegistry', () => {
       [device('a', 'booted', 'ios'), device('b', 'booted', 'ios')],
       () => gate,
     );
-    const first = (await registry.get('ios')) as FakeAdapter; // auto-binds a
+    const first = (await registry.get('ios', {})) as FakeAdapter; // auto-binds a
     expect(bound).toEqual(['a+idb']);
 
     let release!: () => void;
     gate = new Promise((r) => { release = r; });
-    const racing = registry.get('ios'); // captures binding a, freezes on the probe
+    const racing = registry.get('ios', {}); // captures binding a, freezes on the probe
     gate = undefined; // select()'s own probe must run through
     await registry.select('ios', 'b'); // evicts + disposes a's adapter, binds b
     expect(first.disposed).toBe(1);
@@ -376,7 +377,7 @@ describe('AdapterRegistry', () => {
     const resumed = (await racing) as FakeAdapter;
     expect(resumed).not.toBe(first);
     expect(bound).toEqual(['a+idb', 'b+idb']); // no second adapter for the deselected a
-    expect(resumed).toBe(await registry.get('ios')); // and it IS b's cached adapter
+    expect(resumed).toBe(await registry.get('ios', {})); // and it IS b's cached adapter
     expect(created.filter((a) => a.disposed > 0)).toEqual([first]);
   });
 
@@ -396,7 +397,7 @@ describe('AdapterRegistry', () => {
 describe('AdapterRegistry.shutdown — the process-shutdown path', () => {
   it('disposes every cached adapter, drops bindings, and WAITS for async disposals', async () => {
     const { registry, created } = makeRegistry([device('phone'), device('sim', 'booted', 'ios')]);
-    await registry.get('android');
+    await registry.get('android', {});
     await registry.get('ios', { treeSource: 'wda' });
     expect(created).toHaveLength(2);
     // An async dispose (the iOS wda variant shuts its WdaServer down) must be
@@ -414,8 +415,8 @@ describe('AdapterRegistry.shutdown — the process-shutdown path', () => {
 
   it('tolerates a dispose that throws or rejects — the other adapters are still disposed', async () => {
     const { registry, created } = makeRegistry([device('a'), device('b', 'booted', 'ios')]);
-    await registry.get('android');
-    await registry.get('ios');
+    await registry.get('android', {});
+    await registry.get('ios', {});
     created[0].dispose = () => { throw new Error('boom'); };
     created[1].onDispose = () => Promise.reject(new Error('later boom'));
     await expect(registry.shutdown()).resolves.toBeUndefined();
@@ -437,7 +438,7 @@ describe('AdapterRegistry.shutdown — the process-shutdown path', () => {
     release();
     await expect(inflight).rejects.toThrow(/shutting down/);
     expect(created.filter((a) => a.disposed === 0)).toHaveLength(0);
-    await expect(registry.get('ios')).rejects.toThrow(/shutting down/);
+    await expect(registry.get('ios', {})).rejects.toThrow(/shutting down/);
     await expect(registry.select('ios', 'sim')).rejects.toThrow(/shutting down/);
   });
 });

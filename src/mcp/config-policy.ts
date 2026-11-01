@@ -1,5 +1,4 @@
 import type { Platform } from '../adapters/types.js';
-import type { Direction } from '../interact/swipe.js';
 import { launchConsultsConfigActivity, type LaunchEntry } from '../flow/config.js';
 import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } from '../flow/tool-config.js';
 
@@ -18,31 +17,43 @@ import { NO_CONFIG, OPTIONAL_CONFIG, REQUIRED_CONFIG, REQUIRED_CONFIG_AND_ENV } 
  * tests/mcp/tools.test.ts the behaviour through the protocol and that the
  * table's tools are exactly the ones whose schema takes a `configPath`.
  *
- * Each entry takes only what its decision reads. Two depend on the call:
- * `launch_app` reads averi.yaml only when the `app.android.activity`
- * fallback can apply (flow/config.ts's own `launchConsultsConfigActivity`),
- * `swipe` only for a `direction` (2026-10-08).
- * `install_app` does NOT take the call, by design: its entry is plain
- * `required`, and a call that names a path never asks it — the handler's
- * `path ?? appBuildPath(…)` short-circuits before the read. Folding the path
- * into the entry would make it `required | none`, and `cfg` would lose its
- * non-optional type exactly where `appBuildPath` needs it.
+ * Each entry takes only what its decision reads. Since D41 (2026-11-01) every
+ * tool that resolves a device is here: on iOS each reads averi.yaml for the
+ * tree source, because the registry keeps one adapter per (simulator, tree
+ * source) and a tool that asked without the project's kind was served by a
+ * second, idb-kind adapter (ADR 0032, amendment D41). Two entries depend on
+ * the call: `launch_app` reads averi.yaml on Android only when the
+ * `app.android.activity` fallback can apply (flow/config.ts's own
+ * `launchConsultsConfigActivity`), and `install_app`
+ * requires it only when the call names no path — the config is then the
+ * only source of the build; a call with a path reads it as any device tool
+ * does. (Until D41 the path case read nothing, by the handler's
+ * `path ?? appBuildPath(…)` short-circuit.)
  */
 
-/** The tree tools' entry: the iOS tree source and keyboard dismissals are iOS-only values, so android reads nothing. */
+/**
+ * The device tools' entry: the iOS tree source (and, for tap and type_text, the keyboard dismissals) are iOS-only
+ * values, so android reads nothing. `optional`: without a file the kind is undefined — the registry's default, idb.
+ */
 const onIos = (p: Platform) => (p === 'ios' ? OPTIONAL_CONFIG : NO_CONFIG);
 
 export const TOOL_CONFIG = {
-  // `required` for a call without a path; one with a path never asks (above).
-  install_app: () => REQUIRED_CONFIG,
-  launch_app: (call: Omit<LaunchEntry, 'appId'>) => (launchConsultsConfigActivity(call) ? OPTIONAL_CONFIG : NO_CONFIG),
+  // Without a path the build comes from averi.yaml, so the file is required; with one, only the tree source is read.
+  install_app: (call: { platform: Platform; path: string | undefined }) => (call.path === undefined ? REQUIRED_CONFIG : onIos(call.platform)),
+  launch_app: (call: Omit<LaunchEntry, 'appId'>) => (launchConsultsConfigActivity(call) ? OPTIONAL_CONFIG : onIos(call.platform)),
+  terminate_app: onIos,
+  open_deep_link: onIos,
+  screenshot: onIos,
   ui_snapshot: onIos,
   tap: onIos,
   type_text: onIos,
   scroll_until: onIos,
-  // Only a DIRECTION reads a tree (the orientation witness, the fallback
-  // box): coordinates are sent as given and read nothing.
-  swipe: (call: { platform: Platform; direction: Direction | undefined }) => (call.direction !== undefined ? onIos(call.platform) : NO_CONFIG),
+  // A direction or coordinates alike (until D41 coordinates read nothing):
+  // on iOS the stroke goes through the project's adapter, and a direction
+  // also reads its tree (the orientation witness, the fallback box).
+  swipe: onIos,
+  press_key: onIos,
+  get_logs: onIos,
   // Both platforms: the health line asks about the app averi.yaml names for
   // the platform, and iOS also reads its tree source from it.
   assert: () => OPTIONAL_CONFIG,

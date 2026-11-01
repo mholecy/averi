@@ -33,9 +33,9 @@ import { loadConfig, loadConfigIfPresent, loadProjectConfig, projectConfigPath, 
  *   app the health line asks about, the build to install, the states and
  *   flows. A call that would use nothing reads nothing, so a broken file
  *   beside it is not its business (`tap` on Android, `launch_app` with an
- *   activity named, `install_app` with a path — the last by the handler's
- *   `path ?? …` short-circuit, not by its table entry: see
- *   mcp/config-policy.ts).
+ *   activity named on Android, `install_app` with a path on Android). On iOS
+ *   every tool that touches the device uses the tree source (D41, 2026-11-01;
+ *   see mcp/config-policy.ts).
  * - Whatever a call reads, a present-but-invalid file FAILS it, naming the
  *   file — under `optional` as under `required`. Silently ignoring a broken
  *   config would lose the very setting the call came for.
