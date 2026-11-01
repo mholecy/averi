@@ -237,10 +237,13 @@ describe('Clips.drawnIn — scrollers that share no area leave no frame, however
 });
 
 describe('Clips.cutSliver — an inherited cut is the edge the node lies flush with, not another', () => {
-  /** A short list 0,0 1080x40 (uiautomator): a row filling it, cut at its TOP (a child dumped running on above it). */
+  /**
+   * A short list 0,500 1080x40 (uiautomator): a row filling it, cut at its TOP (a child dumped running on above it). The
+   * leaf at its bottom is 7 px thin — no inside evidence of a bottom cut, so the row's only evidenced edge is the top.
+   */
   it('a leaf flush with the list\'s bottom inside a row cut to a sliver at the TOP inherits nothing; flush with the top, it inherits the top', () => {
     const LIST = rect(0, 500, 1080, 40);
-    const atBottom = box(rect(0, 520, 1080, 20));
+    const atBottom = box(rect(0, 533, 1080, 7));
     const atTop = box(rect(0, 500, 1080, 20));
     const row = box(LIST, box(rect(0, 480, 100, 30)), atBottom, atTop);
     const clips = clipsOf(android(node({ rect: LIST, children: [row], clipsDescendants: true })), UIAUTOMATOR);

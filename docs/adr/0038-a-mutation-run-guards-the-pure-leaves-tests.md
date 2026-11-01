@@ -60,9 +60,9 @@ score drops below its own floor. A merge runs it cold.**
 
 geometry.ts is the run's sixth module. It joined once it had direct tests of its own: tests/ui-tree/geometry.test.ts,
 which reached 49.5 % alone, and four new files: geometry-viewport.test.ts, geometry-clips.test.ts,
-geometry-screen-size.test.ts and geometry-text.test.ts. Its scope.json entry names them as `tests/ui-tree/geometry*.test.ts`, with a floor of 93 under a baseline of 95.3 %.
-tests/truth/geometry.test.ts stays out: it tests scripts/truth/truth.ts, not this module, and the sandbox's allowlist
-does not copy the scripts it imports.
+geometry-screen-size.test.ts and geometry-text.test.ts. Its scope.json entry names them as
+`tests/ui-tree/geometry*.test.ts`, with a floor of 93 under a baseline of 95.1 %. tests/truth/geometry.test.ts stays
+out: it tests scripts/truth/truth.ts, not this module, and the sandbox's allowlist does not copy the scripts it imports.
 
 One run holds every module's tests, and Stryker's per-test coverage runs a mutant against every test that reaches
 it, not only its module's. draw-order*.test.ts call geometry.ts heavily, so their kills count toward geometry's score

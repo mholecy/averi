@@ -34,10 +34,11 @@ describe('inferScreenSize — the inset window: screen-shaped in the window\'s p
     expect(inferScreenSize(nodeAt(rect(0, 0, 0, 1080), nodeAt(rect(126, 63, 2274, 1017)))).insetWindow).toEqual(rect(126, 63, 2274, 1017));
   });
 
-  it('a rect-less multi-window dump: the app window below the status bar and beside the nav bar (126,63 2274x1017) is offered; the bar, origin-anchored and bar-shaped, is no window', () => {
+  it('a rect-less multi-window dump: the app window below the status bar and beside the nav bar is offered, in either order; the bar is no window', () => {
     const app = nodeAt(rect(126, 63, 2274, 1017));
     const bar = nodeAt(rect(0, 0, 2400, 63));
-    expect(inferScreenSize(rectless(app, bar))).toEqual({ width: 2400, height: 1080, reliable: false, trustworthyHeight: false, insetWindow: rect(126, 63, 2274, 1017) });
+    expect(inferScreenSize(rectless(app, bar)).insetWindow).toEqual(rect(126, 63, 2274, 1017));
+    expect(inferScreenSize(rectless(bar, app)).insetWindow).toEqual(rect(126, 63, 2274, 1017));
   });
 
   // Each pair is asked in both listing orders: the pick is by size, never by order.
@@ -117,7 +118,9 @@ describe('inferScreenSize — the edges of the walk and of the window test', () 
   });
 
   it("the walked height is the lowest bottom edge, not the tallest rect's; a scrim above the screen's top is no layout", () => {
-    expect(inferScreenSize(rectless(nodeAt(rect(16, 100, 370, 800)), nodeAt(rect(16, 0, 370, 850))))).toEqual({ width: 386, height: 900, reliable: false, trustworthyHeight: false, insetWindow: rect(16, 0, 370, 850) });
+    const walkedHeight = { width: 386, height: 900, reliable: false, trustworthyHeight: false, insetWindow: rect(16, 0, 370, 850) };
+    expect(inferScreenSize(rectless(nodeAt(rect(16, 100, 370, 800)), nodeAt(rect(16, 0, 370, 850))))).toEqual(walkedHeight);
+    expect(inferScreenSize(rectless(nodeAt(rect(16, 0, 370, 850)), nodeAt(rect(16, 100, 370, 800))))).toEqual(walkedHeight);
     expect(inferScreenSize(rectless(nodeAt(rect(16, 0, 370, 800)), nodeAt(rect(0, -5, 804, 900))))).toEqual({ width: 386, height: 800, reliable: false, trustworthyHeight: false, insetWindow: rect(16, 0, 370, 800) });
   });
 
@@ -127,7 +130,9 @@ describe('screenOf — the root\'s rect, or the tree\'s largest when the root ha
   it("the root's rect when it has area; else the largest by area (idb's synthetic 0x0 root); the empty root when nothing has area", () => {
     expect(screenOf(nodeAt(rect(0, 0, 402, 874), nodeAt(rect(0, 0, 804, 874))))).toEqual(rect(0, 0, 402, 874));
     expect(screenOf(rectless(nodeAt(rect(0, 0, 402, 100)), nodeAt(rect(0, 0, 402, 874), nodeAt(rect(0, 0, 400, 2000))), nodeAt(rect(0, 0, 100, 100))))).toEqual(rect(0, 0, 400, 2000));
-    expect(screenOf(rectless(nodeAt(rect(0, 0, 402, 874)), nodeAt(rect(10, 10, 402, 874))))).toEqual(rect(0, 0, 402, 874));
+    // The larger by area, in either order.
+    expect(screenOf(rectless(nodeAt(rect(0, 0, 402, 874)), nodeAt(rect(10, 10, 402, 800))))).toEqual(rect(0, 0, 402, 874));
+    expect(screenOf(rectless(nodeAt(rect(10, 10, 402, 800)), nodeAt(rect(0, 0, 402, 874))))).toEqual(rect(0, 0, 402, 874));
     expect(screenOf(nodeAt(rect(0, 0, 402, 0), nodeAt(rect(0, 0, 402, 874))))).toEqual(rect(0, 0, 402, 874));
     expect(screenOf(rectless())).toEqual(rect(0, 0, 0, 0));
   });
