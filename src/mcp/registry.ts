@@ -3,8 +3,7 @@ import { IosAdapter } from '../adapters/ios.js';
 import { DEFAULT_IOS_TREE_SOURCE, type IosTreeSourceKind } from '../adapters/ios-node.js';
 import { createIosTreeSource, type IosTreeSourceDeps } from '../adapters/ios-tree-source.js';
 import { IdbHelper } from '../adapters/idb-helper.js';
-import { androidUnusable, iosBootedFromDevicePlist, listAndroidDevices, listIosDevices, type ListOpts } from '../adapters/discovery.js';
-import { exec as defaultExec, type ExecFn } from '../adapters/exec.js';
+import { androidUnusable, defaultDiscovery, type DeviceDiscovery, type ListOpts } from '../adapters/discovery.js';
 import type { Device, DeviceAdapter, Platform } from '../adapters/types.js';
 import { drawnOverStrip } from '../ui-tree/draw-order.js';
 
@@ -28,7 +27,7 @@ export interface AdapterOpts {
 
 /**
  * Builds the adapter that drives ONE device — the id is required: listing
- * devices is DeviceDiscovery's (below), so there is no unbound adapter
+ * devices is DeviceDiscovery's (adapters/discovery.ts), so there is no unbound adapter
  * (2026-10-08; until then a factory call without an id built a probe
  * adapter whose only use was `listDevices()`). The registry resolves `opts`
  * to a kind before calling (kindFor): an ios call always carries one, an
@@ -39,36 +38,6 @@ export type AdapterFactory = (
   deviceId: string,
   opts?: AdapterOpts,
 ) => DeviceAdapter;
-
-/**
- * Which devices a platform has, booted or not — the registry's second
- * dependency beside the factory (2026-10-08, the iOS adapter stack review's
- * candidate 1). A platform question, so it is not a member of the bound
- * adapter; adapters/discovery.ts holds the adb and simctl listings, and the
- * registry's tests hand in a list.
- *
- * `opts.versions: false` (D13) says the caller reads no OS version — the
- * listing may leave them `unknown` (adapters/discovery.ts#ListOpts); omitted,
- * the versions are read.
- */
-export type DeviceDiscovery = (platform: Platform, opts?: ListOpts) => Promise<Device[]>;
-
-/** The platform → listing wiring over one exec — exported so its tests can hand in a fake exec. */
-export const discoveryWith = (exec: ExecFn = defaultExec): DeviceDiscovery => (platform, opts) =>
-  platform === 'android' ? listAndroidDevices(exec, opts) : listIosDevices(exec);
-
-export const defaultDiscovery: DeviceDiscovery = discoveryWith();
-
-/**
- * Whether the bound simulator is PROVEN booted without a listing — `true`
- * only when proven; `false` (or a rejection) is "cannot tell", and the
- * registry asks discovery as before. The registry's optional third seam
- * (D22, 2026-10-31), asked on get()'s bound iOS path alone.
- */
-export type IosBootedProof = (udid: string) => Promise<boolean>;
-
-/** The real proof: the simulator's own device.plist (adapters/discovery.ts#iosBootedFromDevicePlist, where why and the trade are). */
-export const defaultIosBooted: IosBootedProof = (udid) => iosBootedFromDevicePlist(udid);
 
 /**
  * Exported for its tests: the registry's own tests inject a factory, so this
@@ -110,18 +79,16 @@ function kindFor(platform: Platform, opts?: AdapterOpts): IosTreeSourceKind | un
   return platform === 'ios' ? opts?.treeSource ?? DEFAULT_IOS_TREE_SOURCE : undefined;
 }
 
-/** The registry's seams: the factory and discovery (both or neither), and D22's optional proof. */
+/** The registry's two seams: the factory of bound adapters and discovery (adapters/discovery.ts#DeviceDiscovery) — both or neither. */
 export interface RegistryDeps {
   factory: AdapterFactory;
   discovery: DeviceDiscovery;
-  iosBooted?: IosBootedProof;
 }
 
 /** What `new AdapterRegistry()` is built on — the server's wiring; exported so its tests can pin it. */
 export const defaultRegistryDeps: Readonly<RegistryDeps> = {
   factory: defaultFactory,
   discovery: defaultDiscovery,
-  iosBooted: defaultIosBooted,
 };
 
 /**
@@ -156,24 +123,16 @@ export class AdapterRegistry {
 
   private readonly factory: AdapterFactory;
   private readonly discovery: DeviceDiscovery;
-  private readonly iosBooted: IosBootedProof;
 
   /**
    * Both seams or neither: a caller that injected a fake factory but left
    * discovery at its default would have its tests run `adb devices` and
-   * `simctl list` on the host — the type does not let it.
-   *
-   * `iosBooted` (D22) is the one optional seam, and its absence is the safe
-   * side: a caller that injects its seams and names no proof gets one that
-   * never proves anything, so every bound iOS call lists through discovery
-   * as before and no host file is read. Only the default registry (and a
-   * caller passing `defaultIosBooted`, as scripts/perf/baseline.ts does)
-   * reads the device.plist.
+   * `simctl list` — or read a simulator's device.plist — on the host; the
+   * type does not let it.
    */
   constructor(deps: RegistryDeps = defaultRegistryDeps) {
     this.factory = deps.factory;
     this.discovery = deps.discovery;
-    this.iosBooted = deps.iosBooted ?? (async () => false);
   }
 
   async listAll(): Promise<Device[]> {
@@ -213,29 +172,18 @@ export class AdapterRegistry {
     this.assertOpen();
     const binding = this.bindings.get(platform);
     if (binding) {
-      // iOS first asks the simulator's own device.plist (D22): proven booted,
-      // the adapter is handed out without `simctl list devices` (~110 ms a
-      // call); anything short of proof lists below, as before. What the file
-      // cannot prove, and the trade: docs/adr/0031-the-bound-simulator-is-proven-booted-from-its-own-record.md.
-      if (platform === 'ios' && (await this.provenBooted(binding.deviceId))) {
-        // The select() race, as after the probe below.
-        if (this.bindings.get(platform) !== binding) return this.get(platform, opts);
-        return this.adapterFor(platform, binding.deviceId, opts);
-      }
-      // Every entry with the serial: cheap phones can share one, and any
-      // booted entry keeps the binding, as before the C5 refusals.
-      const matches = (await this.probe(platform, { versions: false })).filter((d) => d.id === binding.deviceId);
-      const stillBooted = matches.some((d) => d.state === 'booted');
-      const listed = matches[0];
-      // A select() may have rebound the platform while we awaited the probe.
+      // Still usable? Discovery's check, asked on every call: how it proves it
+      // cheaply, and why: adapters/discovery.ts#discoveryOver.
+      const found = await this.discovery.check(platform, binding.deviceId);
+      // A select() may have rebound the platform while we awaited the check.
       // Acting on the CAPTURED binding would re-cache the evicted (already
       // disposed) device's adapter — start over against the current binding.
       // (select() always stores a fresh object, so identity detects it.)
       if (this.bindings.get(platform) !== binding) return this.get(platform, opts);
-      if (stillBooted) return this.adapterFor(platform, binding.deviceId, opts);
+      if (found.usable) return this.adapterFor(platform, binding.deviceId, opts);
       if (binding.pinned) {
         // Still listed, but unauthorized (a revoked key) or offline: say which.
-        const unusable = unusableNamed(listed);
+        const unusable = unusableNamed(found.listed);
         throw new Error(
           unusable === undefined
             ? `Selected ${platform} device "${binding.deviceId}" is no longer booted — ` +
@@ -321,35 +269,19 @@ export class AdapterRegistry {
   }
 
   /**
-   * One listing per call, as before discovery left the adapter: get() asks on
-   * EVERY tool call (that is how a vanished device is noticed). get() reads
-   * only ids and states, so it asks with `versions: false` (D13, 2026-10-31):
-   * on Android that is `adb devices -l` alone, without the getprop per
-   * attached device (its cost: adapters/discovery.ts#ListOpts). select() and
-   * listAll() keep the versions: select_device's reply and the device
-   * listing are where a version is read.
+   * One listing per call: get()'s unbound path asks with `versions: false`
+   * (D13, 2026-10-31) — it reads only ids and states, and on Android a
+   * version is a getprop per attached device (adapters/discovery.ts#ListOpts).
+   * select() and listAll() keep the versions: select_device's reply and the
+   * device listing are where a version is read. (get()'s bound path asks
+   * discovery's `check` instead.)
    *
    * Not cached here — a stale "still booted" would hand out an adapter for a
-   * device that is gone. (D22's device.plist proof, `provenBooted`, is no
-   * cache either: CoreSimulator's own record, read afresh on each call.) Async, so a discovery that throws synchronously is
+   * device that is gone. Async, so a discovery that throws synchronously is
    * the same event as one that rejects (the rule disposeQuietly states) —
    * listAll's per-platform catch must see both.
    */
   private async probe(platform: Platform, opts?: ListOpts): Promise<Device[]> {
-    return this.discovery(platform, opts);
-  }
-
-  /**
-   * The bound simulator proven booted without a listing (D22). Not a cache
-   * either: the proof is read afresh on every call, as the listing was. A
-   * proof that throws (synchronously or not) proves nothing — the listing
-   * decides, as before.
-   */
-  private async provenBooted(udid: string): Promise<boolean> {
-    try {
-      return await this.iosBooted(udid); // awaited HERE, so the catch sees a rejection too
-    } catch {
-      return false;
-    }
+    return this.discovery.list(platform, opts);
   }
 }

@@ -1,7 +1,8 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
-import type { AdapterFactory, AdapterRegistry, DeviceDiscovery } from '../../src/mcp/registry.js';
+import type { AdapterFactory, AdapterRegistry } from '../../src/mcp/registry.js';
+import type { DeviceDiscovery, discoveryOver } from '../../src/adapters/discovery.js';
 import type { createAveriServer } from '../../src/mcp/tools.js';
 import type { IosAdapter } from '../../src/adapters/ios.js';
 import type { Recording } from './corpus.js';
@@ -17,6 +18,7 @@ import { RecordedTreeSource } from './recorded-source.js';
  *   src/mcp/tools.ts          createAveriServer (the tool handlers)
  *   src/mcp/registry.ts       AdapterRegistry, defaultFactory (the live wiring) — the registry built through
  *                             `registry` below, which also takes the constructor an older side had
+ *   src/adapters/discovery.ts discoveryOver, when the side has it (since A3) — its discovery over the harness's listing
  *   src/adapters/ios.ts       IosAdapter (takes any IosTreeSource)
  *   src/adapters/wda-source.ts parseWdaSourceValue (WdaTreeSource's parser)
  *
@@ -33,15 +35,33 @@ export interface Side {
   /**
    * The side's registry over `deps`, whichever constructor the side has: since 8413120 (2026-10-08) it takes
    * `{ factory, discovery }`; before, the factory alone, and devices were listed by an UNBOUND adapter's
-   * `listDevices()` — so an older side gets a factory that answers an unbound call with the discovery. Which one is
-   * told by the constructor's own behaviour (`takesDeps`), not by what else the module exports.
+   * `listDevices()` — so an older side gets a factory that answers an unbound call with the listing. Which one is
+   * told by the constructor's own behaviour (`takesDeps`), not by what else the module exports. The harness hands a
+   * listing; each side gets it as the discovery it reads (`discoveryFor`).
    */
-  registry(deps: { factory: AdapterFactory; discovery: DeviceDiscovery }): AdapterRegistry;
+  registry(deps: { factory: AdapterFactory; discovery: Listing }): AdapterRegistry;
   /**
    * The side's iOS tree-source seam (src/adapters/ios-tree-source.ts#createIosTreeSource), when it has one — what the
    * live golden (scripts/truth/live.ts `--side`) builds a real WDA or idb source with; the replay does not use it.
    */
   createIosTreeSource?: (kind: 'idb' | 'wda', udid: string, deps: { port?: number; derivedDataPath?: string }) => unknown;
+}
+
+/** Which devices a platform has — what the harness fakes (adapters/discovery.ts#DeviceDiscovery's `list`). */
+export type Listing = DeviceDiscovery['list'];
+
+/**
+ * A side's discovery over the harness's listing, read by every constructor since 8413120: callable as the listing
+ * (until A3, 2026-11-01, discovery was a function), and an object with `list` and `check` (since). `check` is the
+ * side's own `discoveryOver`'s, built without a proof — no host file is read, and the bound check lists, as before A3
+ * when the harness passed no proof. A side without `discoveryOver` never asks `check`.
+ */
+function discoveryFor(listing: Listing, over: typeof discoveryOver | undefined): Listing & DeviceDiscovery {
+  const shaped: DeviceDiscovery = over?.(listing) ?? {
+    list: listing,
+    check: () => Promise.reject(new Error('side.ts: this side has no discoveryOver, so nothing asks check')),
+  };
+  return Object.assign((platform: Parameters<Listing>[0], opts?: Parameters<Listing>[1]) => listing(platform, opts), shaped);
 }
 
 export async function loadSide(root: string): Promise<Side> {
@@ -59,6 +79,9 @@ export async function loadSide(root: string): Promise<Side> {
   ]);
   // Optional: a side without the seam loads all the same (the replay never needs it).
   const treeSource = (await import(pathToFileURL(resolve(root, 'src/adapters/ios-tree-source.ts')).href).catch(() => ({}))) as Record<string, unknown>;
+  // Optional too: a side before A3 lists through a discovery that is a plain function.
+  const discovery = (await import(pathToFileURL(resolve(root, 'src/adapters/discovery.ts')).href).catch(() => ({}))) as Record<string, unknown>;
+  const over = typeof discovery.discoveryOver === 'function' ? (discovery.discoveryOver as typeof discoveryOver) : undefined;
   const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
   const discoverySeam = await takesDeps(Registry);
   return {
@@ -69,7 +92,7 @@ export async function loadSide(root: string): Promise<Side> {
     parseWdaSourceValue: wda.parseWdaSourceValue as Side['parseWdaSourceValue'],
     ...(typeof treeSource.createIosTreeSource === 'function' && { createIosTreeSource: treeSource.createIosTreeSource as NonNullable<Side['createIosTreeSource']> }),
     registry: (deps) => {
-      if (discoverySeam) return new Registry(deps);
+      if (discoverySeam) return new Registry({ factory: deps.factory, discovery: discoveryFor(deps.discovery, over) });
       const legacy = Registry as unknown as new (factory: AdapterFactory) => AdapterRegistry;
       return new legacy((platform, deviceId, opts) =>
         deviceId === undefined ? ({ listDevices: () => deps.discovery(platform) } as unknown as DeviceAdapter) : deps.factory(platform, deviceId, opts),
@@ -80,8 +103,9 @@ export async function loadSide(root: string): Promise<Side> {
 
 /**
  * Whether a registry constructor takes `{ factory, discovery }`: one built so lists its devices through that
- * discovery. The old constructor keeps the object as its factory, and its listing calls it — a TypeError, caught (or
- * caught by `listAll` itself) — so the discovery is never asked. Nothing is bound and no adapter is built.
+ * discovery (called, or asked `list` — `discoveryFor`). The old constructor keeps the object as its factory, and its
+ * listing calls it — a TypeError, caught (or caught by `listAll` itself) — so the discovery is never asked. Nothing is
+ * bound and no adapter is built.
  */
 export async function takesDeps(Registry: new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry): Promise<boolean> {
   let asked = false;
@@ -89,10 +113,10 @@ export async function takesDeps(Registry: new (deps: { factory: AdapterFactory; 
     factory: () => {
       throw new Error('side.ts: the registry probe builds no adapter');
     },
-    discovery: async () => {
+    discovery: discoveryFor(async () => {
       asked = true;
       return [];
-    },
+    }, undefined),
   });
   try {
     await probe.listAll();

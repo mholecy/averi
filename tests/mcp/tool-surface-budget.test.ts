@@ -26,7 +26,7 @@ beforeAll(async () => {
   const untouched = (): never => {
     throw new Error('test harness: listing tools touches no device');
   };
-  const server = createAveriServer({ registry: new AdapterRegistry({ factory: untouched, discovery: untouched }), version: '0.0.0-test' });
+  const server = createAveriServer({ registry: new AdapterRegistry({ factory: untouched, discovery: { list: untouched, check: untouched } }), version: '0.0.0-test' });
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   const client = new Client({ name: 'tool-surface-budget-test', version: '0' });

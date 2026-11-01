@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { exec as defaultExec, type ExecFn } from './exec.js';
 import { adbShellArgv } from './adb-shell.js';
 import { simctl } from './xcode-env.js';
-import type { Device } from './types.js';
+import type { Device, Platform } from './types.js';
 
 /**
  * Which devices a platform has — a question about the PLATFORM, not about a
@@ -17,12 +17,13 @@ import type { Device } from './types.js';
  * without a serial (adb with no `-s`, a "the default adb device" wording, a
  * "more than one device" diagnosis `adb -s <serial> get-state` never
  * returns). The registry built one such probe adapter per probe. Now the
- * registry has two dependencies — this listing (mcp/registry.ts,
- * `DeviceDiscovery`) and the factory of bound adapters, whose device id is a
- * constructor invariant — and the unbound mode is gone.
+ * registry has two dependencies — this module's `DeviceDiscovery` (at the
+ * end: the listings below, and the bound device's check) and the factory of
+ * bound adapters, whose device id is a constructor invariant — and the
+ * unbound mode is gone.
  *
  * Plain functions over an `ExecFn`, like the adapters: the tests hand them a
- * fake exec, and the registry's tests fake the listing itself.
+ * fake exec, and the registry's tests hand `discoveryOver` a fake listing.
  */
 
 /** An adb state averi lists: what the Device's state becomes, and — for one that cannot be driven — why, and what to do (`androidUnusable`). */
@@ -66,8 +67,9 @@ const ADB_LINE = new RegExp(`^(\\S+)\\s+(${Object.keys(ADB_STATES).join('|')})\\
  * listing (the runtime key), so the flag changes nothing there. Default: the
  * versions are read.
  *
- * Why the flag (D13, 2026-10-31): the registry's per-call probe
- * (mcp/registry.ts#get) asks only "is the bound device still booted?", and
+ * Why the flag (D13, 2026-10-31): the bound device's per-call check
+ * (`discoveryOver`, asked by mcp/registry.ts#get) asks only "is it still
+ * booted?", and
  * a getprop is a full `adb shell` round trip — ≈30–35 ms, up to ~70 ms, per
  * attached device, on every tool call
  * (docs/plans/2026-10-30-performance-backlog.md, D13 note (2026-10-31,
@@ -186,8 +188,8 @@ const DEVICE_PLIST_BOOTED_STATE = '3';
  * simctl (`listIosDevices`), which words every refusal as before (D22).
  *
  * Why (D22, docs/plans/2026-10-30-performance-backlog.md, "iOS per-call
- * costs"): the registry proves the bound device is still booted on EVERY
- * tool call (mcp/registry.ts#get), and on iOS that was `xcrun simctl list
+ * costs"): the bound device is checked on EVERY tool call (`discoveryOver`,
+ * asked by mcp/registry.ts#get), and on iOS that was `xcrun simctl list
  * devices --json` — ~110 ms in the D0 windows on the lab iPhone 17
  * (iOS 27.0), 80 ms timed alone on an idle host (2026-10-31) — for one bit.
  * This read and parse: 0.045 ms median, 0.09 ms p95, ~0.4 ms cold, over
@@ -249,3 +251,73 @@ export async function iosBootedFromDevicePlist(udid: string, read: ReadText = re
     !/<key>isDeleted<\/key>\s*<true\s*\/>/.test(text)
   );
 }
+
+/**
+ * What a bound device's check found. Unusable carries `listed`, the first
+ * listing entry with the device's id (undefined: not listed at all), for the
+ * refusal's wording (mcp/registry.ts words it).
+ */
+export type BoundCheck = { usable: true } | { usable: false; listed: Device | undefined };
+
+/**
+ * Which devices a platform has, and whether the bound one is still usable —
+ * the registry's second dependency beside the factory of bound adapters
+ * (2026-10-08, the iOS adapter stack review's candidate 1; `check` since A3,
+ * 2026-11-01).
+ */
+export interface DeviceDiscovery {
+  /** Every device on the platform, booted or not. `versions: false` leaves versions `unknown` (D13, `ListOpts`); on iOS it changes nothing. */
+  list(platform: Platform, opts?: ListOpts): Promise<Device[]>;
+  /** Is the bound device still usable? The cheapest proof first (iOS: its device.plist, D22); short of proof, a listing. */
+  check(platform: Platform, deviceId: string): Promise<BoundCheck>;
+}
+
+/** Proof that a simulator is booted, without a listing: true = proven; false, a throw or a rejection = cannot tell. */
+export type BootedProof = (udid: string) => Promise<boolean>;
+
+/**
+ * THE implementation of `check`, over any listing — so the registry's fakes
+ * keep the real order of steps. The registry asks it on EVERY tool call
+ * (mcp/registry.ts#get), so it is no cache, and it asks the least it can:
+ *
+ * 1. iOS with a proof: `iosBooted(udid)`, read afresh each call. Proven, the
+ *    device is usable and nothing is listed — `simctl list devices` costs
+ *    ~110 ms a call (D22; what the file cannot prove, and the trade:
+ *    docs/adr/0031-the-bound-simulator-is-proven-booted-from-its-own-record.md).
+ *    Not proven — false, or a proof that throws or rejects — is "cannot
+ *    tell", never "shut down": step 2 decides, as before. Android has no such
+ *    proof and never asks it; a discovery built without one never proves, so
+ *    no host file is read by omission.
+ * 2. The listing, without versions (D13: the check reads ids and states, and
+ *    on Android a version is a getprop per attached device). Every entry with
+ *    the id counts — cheap phones can share a serial, and any booted entry
+ *    keeps the device usable, as before the C5 refusals.
+ */
+export function discoveryOver(listing: DeviceDiscovery['list'], iosBooted?: BootedProof): DeviceDiscovery {
+  const proven = async (udid: string): Promise<boolean> => {
+    if (iosBooted === undefined) return false;
+    try {
+      return await iosBooted(udid); // awaited HERE, so the catch sees a rejection too
+    } catch {
+      return false;
+    }
+  };
+  return {
+    list: listing,
+    async check(platform, deviceId) {
+      if (platform === 'ios' && (await proven(deviceId))) return { usable: true };
+      const matches = (await listing(platform, { versions: false })).filter((d) => d.id === deviceId);
+      return matches.some((d) => d.state === 'booted') ? { usable: true } : { usable: false, listed: matches[0] };
+    },
+  };
+}
+
+/** The adb and simctl listings over one exec, with `iosBooted` as the check's proof when given — none by default. */
+export function discoveryWith(exec: ExecFn, iosBooted?: BootedProof): DeviceDiscovery {
+  return discoveryOver((platform, opts) => (platform === 'android' ? listAndroidDevices(exec, opts) : listIosDevices(exec)), iosBooted);
+}
+
+/** What the server's discovery is built on — the real exec, and the device.plist proof (D22); exported so its tests can pin it. */
+export const defaultDiscoveryDeps = { exec: defaultExec, iosBooted: iosBootedFromDevicePlist } as const;
+
+export const defaultDiscovery: DeviceDiscovery = discoveryWith(defaultDiscoveryDeps.exec, defaultDiscoveryDeps.iosBooted);

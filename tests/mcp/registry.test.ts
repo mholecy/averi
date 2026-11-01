@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AdapterRegistry, defaultDiscovery, defaultFactory, defaultIosBooted, defaultRegistryDeps, discoveryWith, type AdapterOpts, type DeviceDiscovery } from '../../src/mcp/registry.js';
-import type { ExecFn } from '../../src/adapters/exec.js';
+import { AdapterRegistry, defaultFactory, defaultRegistryDeps, type AdapterOpts } from '../../src/mcp/registry.js';
+import { defaultDiscovery, discoveryOver, type DeviceDiscovery } from '../../src/adapters/discovery.js';
 import { AndroidAdapter } from '../../src/adapters/android.js';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { resetWdaPortAllocatorForTests, wdaPortFor } from '../../src/adapters/wda.js';
@@ -9,13 +9,14 @@ import { FakeAdapter } from '../helpers/fake.js';
 
 /**
  * A registry over a device list that is mutable mid-test (devices boot and
- * vanish) — the discovery seam is the list itself, no adapter is built to
- * ask it. `onProbe` gates the listing — lets a test freeze a probe
- * mid-flight. `probes` counts listings per platform; `versions` records, per
- * listing, whether it asked for OS versions (a discovery's default: yes).
- * `iosBooted` is the D22 seam (the bound simulator's device.plist): left
- * out, the registry is built without it, as every caller that injects its
- * seams is; `plistReads` records each udid it was asked about.
+ * vanish) — discovery is the real `discoveryOver` over the list itself, so
+ * the bound check keeps its real steps; no adapter is built to ask it.
+ * `onProbe` gates the listing — lets a test freeze a probe mid-flight.
+ * `probes` counts listings per platform; `versions` records, per listing,
+ * whether it asked for OS versions (a listing's default: yes). `iosBooted`
+ * is the check's D22 proof (the bound simulator's device.plist): left out,
+ * discovery is built without one; `plistReads` records each udid it was
+ * asked about.
  */
 function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void, iosBooted?: (udid: string) => Promise<boolean>) {
   const bound: string[] = [];
@@ -31,18 +32,15 @@ function makeRegistry(devices: Device[], onProbe?: () => Promise<void> | void, i
     created.push(adapter);
     return adapter;
   };
-  const discovery: DeviceDiscovery = async (platform, opts) => {
+  const listing: DeviceDiscovery['list'] = async (platform, opts) => {
     probes.push(platform);
     versions.push(opts?.versions ?? true);
     await onProbe?.();
     return devices.filter((d) => d.platform === platform);
   };
   const plistReads: string[] = [];
-  const registry = new AdapterRegistry(
-    iosBooted === undefined
-      ? { factory, discovery }
-      : { factory, discovery, iosBooted: (udid) => (plistReads.push(udid), iosBooted(udid)) },
-  );
+  const discovery = discoveryOver(listing, iosBooted === undefined ? undefined : (udid) => (plistReads.push(udid), iosBooted(udid)));
+  const registry = new AdapterRegistry({ factory, discovery });
   return { registry, bound, created, devices, probes, versions, plistReads };
 }
 
@@ -63,17 +61,17 @@ describe('AdapterRegistry', () => {
   });
 
   it('a platform whose discovery throws (adb or xcrun missing) lists nothing; the other still lists', async () => {
-    const discovery: DeviceDiscovery = async (platform) => {
+    const discovery = discoveryOver(async (platform) => {
       if (platform === 'android') throw new Error('spawn adb ENOENT');
       return [device('sim', 'booted', 'ios')];
-    };
+    });
     const registry = new AdapterRegistry({ factory: () => new FakeAdapter({}, 'none'), discovery });
     expect((await registry.listAll()).map((d) => d.id)).toEqual(['sim']);
     // A discovery that throws SYNCHRONOUSLY is the same event, not an escape from listAll.
-    const throwsSync: DeviceDiscovery = (platform) => {
+    const throwsSync = discoveryOver((platform) => {
       if (platform === 'ios') throw new Error('xcrun not found');
       return Promise.resolve([device('phone')]);
-    };
+    });
     const sync = new AdapterRegistry({ factory: () => new FakeAdapter({}, 'none'), discovery: throwsSync });
     expect((await sync.listAll()).map((d) => d.id)).toEqual(['phone']);
   });
@@ -204,13 +202,13 @@ describe('AdapterRegistry', () => {
       const bound: string[] = [];
       const registry = new AdapterRegistry({
         factory: (_p, id) => { bound.push(id); return new FakeAdapter({}, 'none'); },
-        discovery: async () => {
+        discovery: discoveryOver(async () => {
           if (!first) return [device('R58M123')];
           first = false;
           const stale = [device('R58M123', 'unauthorized')];
           await gate;
           return stale;
-        },
+        }),
       });
       const racing = registry.get('android');
       await registry.select('android', 'R58M123');
@@ -241,16 +239,14 @@ describe('AdapterRegistry', () => {
     });
   });
 
-  // D22 (2026-10-31): on iOS the still-booted check was `simctl list devices` (~110 ms) on every tool call.
+  // D22 (2026-10-31): on iOS the still-booted check was `simctl list devices` (~110 ms) on every tool call. Discovery's
+  // check owns the proof and its steps (pinned in adapters/discovery.test.ts); here, what the registry does with it.
   describe('the bound simulator proven booted from its device.plist (D22)', () => {
     it('proven booted: no listing, the same cached adapter, bound to the same simulator', async () => {
-      const { registry, probes, bound, plistReads } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => true);
-      const adapter = await registry.get('ios'); // unbound: the auto-pick lists, and asks no file
-      expect(probes).toEqual(['ios']);
-      expect(plistReads).toEqual([]);
+      const { registry, probes, bound } = makeRegistry([device('sim', 'booted', 'ios')], undefined, async () => true);
+      const adapter = await registry.get('ios'); // unbound: the auto-pick lists
       expect(await registry.get('ios')).toBe(adapter);
       expect(probes).toEqual(['ios']); // the bound call listed nothing
-      expect(plistReads).toEqual(['sim']);
       expect(bound).toEqual(['sim+idb']);
     });
 
@@ -263,43 +259,8 @@ describe('AdapterRegistry', () => {
       expect(plistReads).toEqual(['b', 'b']);
     });
 
-    // Not proven is "ask simctl", never "shut down": the listing decides, with the same options and the same wording.
-    it.each([
-      ['not proven', async () => false],
-      ['a proof that rejects', async () => Promise.reject(new Error('EACCES'))],
-      ['a proof that throws synchronously', (() => { throw new Error('boom'); }) as unknown as (udid: string) => Promise<boolean>],
-    ])('%s: the bound call lists exactly as before, and a shut-down pin keeps its wording', async (_why, proof) => {
-      const { registry, devices, probes, versions, plistReads } = makeRegistry([device('sim', 'booted', 'ios')], undefined, proof);
-      await registry.select('ios', 'sim');
-      const adapter = await registry.get('ios');
-      expect(probes).toEqual(['ios', 'ios']);
-      expect(versions).toEqual([true, false]); // select's listing, then the still-booted check's
-      expect(plistReads).toEqual(['sim']);
-      expect(await registry.get('ios')).toBe(adapter);
-      devices[0] = device('sim', 'offline', 'ios');
-      await expect(registry.get('ios')).rejects.toThrow(
-        'Selected ios device "sim" is no longer booted — reboot it or select_device another one',
-      );
-      expect(probes).toEqual(['ios', 'ios', 'ios', 'ios']);
-    });
-
-    it('Android never asks the proof: its bound call lists with adb, as before', async () => {
-      const { registry, probes, plistReads } = makeRegistry([device('phone')], undefined, async () => true);
-      await registry.get('android');
-      await registry.get('android');
-      expect(probes).toEqual(['android', 'android']);
-      expect(plistReads).toEqual([]);
-    });
-
-    it('the server\'s registry is built on the real factory, discovery AND proof', () => {
-      expect(defaultRegistryDeps).toEqual({ factory: defaultFactory, discovery: defaultDiscovery, iosBooted: defaultIosBooted });
-    });
-
-    it('a registry built with injected seams and no proof never proves: the bound iOS call lists', async () => {
-      const { registry, probes } = makeRegistry([device('sim', 'booted', 'ios')]);
-      await registry.get('ios');
-      await registry.get('ios');
-      expect(probes).toEqual(['ios', 'ios']);
+    it('the server\'s registry is built on the real factory and discovery', () => {
+      expect(defaultRegistryDeps).toEqual({ factory: defaultFactory, discovery: defaultDiscovery });
     });
 
     it('a select() landing while the proof is read wins: get() starts over against the new binding', async () => {
@@ -529,33 +490,6 @@ describe('defaultFactory — the wiring the injected factories above never see',
     expect(kindOf(defaultFactory('ios', 'AAAA-1111'))).toBe('idb');
     expect(kindOf(defaultFactory('ios', 'AAAA-1111', { treeSource: 'idb' }))).toBe('idb');
     expect(kindOf(defaultFactory('ios', 'AAAA-1111', { treeSource: 'wda' }))).toBe('wda');
-  });
-
-  it('the default discovery lists android with adb and ios with simctl — the platform reaches the right listing', async () => {
-    const calls: string[] = [];
-    const exec: ExecFn = async (cmd, args) => {
-      calls.push([cmd, ...args].join(' '));
-      return { stdout: Buffer.from(cmd === 'xcrun' && args[0] === 'simctl' ? '{"devices":{}}' : ''), stderr: '' };
-    };
-    const discover = discoveryWith(exec);
-    expect(await discover('android')).toEqual([]);
-    expect(calls).toEqual(['adb devices -l']);
-    calls.length = 0;
-    expect(await discover('ios')).toEqual([]);
-    expect(calls).toContain('xcrun simctl list devices --json');
-    expect(calls.some((c) => c.startsWith('adb'))).toBe(false);
-  });
-
-  it('the default discovery hands the listing its options — `versions: false` reaches adb as no getprop', async () => {
-    const calls: string[] = [];
-    const exec: ExecFn = async (cmd, args) => {
-      calls.push([cmd, ...args].join(' '));
-      return { stdout: Buffer.from(args[0] === 'devices' ? 'List of devices attached\nemulator-5554 device\n' : '14\n'), stderr: '' };
-    };
-    const discover = discoveryWith(exec);
-    expect((await discover('android', { versions: false })).map((d) => d.osVersion)).toEqual(['unknown']);
-    expect(calls).toEqual(['adb devices -l']);
-    expect((await discover('android')).map((d) => d.osVersion)).toEqual(['14']);
   });
 
   it('android gets an AndroidAdapter, whatever the kind says; ios an IosAdapter', () => {
