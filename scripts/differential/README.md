@@ -29,7 +29,7 @@ Where the recording meets each side:
 The **fake device** (`fake-device.ts`) is the process boundary: `child_process.execFile` is replaced before either side
 loads, and answers `idb`, `xcrun simctl`, `adb` and the OCR recognizer's `swiftc` from the recording and a small device
 profile: the screen size; the screenshot frame (grey, one rect painted on request — on iOS the same frame to
-`simctl io screenshot` and to `idb screenshot -`, the idb tree source's capture since D26b — so a replay serves the
+`simctl io screenshot` and to `idb screenshot -`, iOS's capture since D26b (on the WDA tree source since D44) — so a replay serves the
 truth capture's simctl frames for both commands and never shows the Dynamic Island idb draws); on iOS the launch commands and
 `appinfo` (the recording's app); on Android the `dumpsys window displays` captures in `tests/fixtures` (API 33 Pixel_3a
 with the keyboard hidden, docked or floating; API 36 with no IME entry), the `mInputShown` witness and the touchable

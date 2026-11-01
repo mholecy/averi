@@ -7,6 +7,7 @@ import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter } from '../../src/ad
 import { IdbEmptyTreeError, IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { captureRefusal } from '../../src/verify/capture.js';
+import type { IdbHelper } from '../../src/adapters/idb-helper.js';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { fillField } from '../../src/interact/fill.js';
@@ -43,7 +44,7 @@ const NO_TREE: IosTreeSource = {
   dispose: () => Promise.resolve(),
 };
 
-/** NO_TREE of the WDA kind: screenshots there stay `simctl io screenshot` (D26b). */
+/** NO_TREE of the WDA kind: since D44 its screenshots are `idb screenshot`, as on the idb kind. */
 const WDA_NO_TREE: IosTreeSource = { ...NO_TREE, kind: 'wda' };
 
 const IDB_DESCRIBE_ALL = JSON.stringify([
@@ -495,7 +496,17 @@ describe('IosAdapter re-enables accessibility automation before every launch and
  * (2026-10-08, adapters/screenshot-bytes.ts): an empty or non-PNG file is a
  * transport error naming the simulator and the command, as on Android.
  */
-describe('IosAdapter.screenshot — the file is a PNG or the call fails (simctl: the WDA tree source)', () => {
+describe('IosAdapter.screenshot — the file is a PNG or the call fails (simctl: the kill switch)', () => {
+  let saved: string | undefined;
+  beforeEach(() => {
+    saved = process.env.AVERI_IOS_SCREENSHOT;
+    process.env.AVERI_IOS_SCREENSHOT = 'simctl';
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.AVERI_IOS_SCREENSHOT;
+    else process.env.AVERI_IOS_SCREENSHOT = saved;
+  });
+
   /** simctl's stand-in: writes `bytes` to the path it is given, as `simctl io <udid> screenshot <file>` does. */
   function writesScreenshot(bytes: Buffer): ExecFn {
     return async (cmd, args): Promise<ExecResult> => {
@@ -526,12 +537,12 @@ describe('IosAdapter.screenshot — the file is a PNG or the call fails (simctl:
 });
 
 /**
- * D26b (docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md, "D26b"): on the idb tree source the
- * screenshot is `idb screenshot -` — through runIdb, so the helper first and the idb CLI as its fallback — never
+ * D26b (docs/adr/0032-a-persistent-idb-helper-runs-the-cli-in-process.md, "D26b" and amendment D44): on either tree
+ * source the screenshot is `idb screenshot -` — through runIdb, so the helper first and the idb CLI as its fallback — never
  * `simctl io screenshot`, which stalls ~+1 000 ms in ~7 % of calls (backlog "### D26 diag"). No simctl fallback at run
  * time: a capture pair from two sources compares two different images (the Dynamic Island) and reads as moving.
  */
-describe('IosAdapter.screenshot — through idb on the idb tree source (D26b)', () => {
+describe('IosAdapter.screenshot — through idb on either tree source (D26b, D44)', () => {
   const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x0a, 0xff]);
   let saved: string | undefined;
   beforeEach(() => {
@@ -566,7 +577,30 @@ describe('IosAdapter.screenshot — through idb on the idb tree source (D26b)', 
     expect(calls).toEqual(['idb screenshot - --udid AAAA-1111']);
   });
 
-  it('keeps `simctl io screenshot` on the WDA tree source', async () => {
+  it('sends `idb screenshot -` on the WDA tree source too, and no simctl call (D44)', async () => {
+    const { exec, calls } = both(PNG_BYTES);
+    const shot = await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: WDA_NO_TREE }).screenshot();
+    expect(shot.equals(PNG_BYTES)).toBe(true);
+    expect(calls).toEqual(['idb screenshot - --udid AAAA-1111']);
+  });
+
+  it('on the WDA tree source hands the helper the `screenshot` argv: no CLI, no simctl call (D44)', async () => {
+    const helperArgv: string[][] = [];
+    const idbHelper = {
+      run: async (argv: string[]) => {
+        helperArgv.push(argv);
+        return { kind: 'answer' as const, code: 0, stdout: PNG_BYTES, stderr: '' };
+      },
+    } as unknown as IdbHelper;
+    const { exec, calls } = both(PNG_BYTES);
+    const shot = await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: WDA_NO_TREE, idbHelper }).screenshot();
+    expect(shot.equals(PNG_BYTES)).toBe(true);
+    expect(helperArgv).toEqual([['screenshot', '-', '--udid', 'AAAA-1111']]);
+    expect(calls).toEqual([]);
+  });
+
+  it('keeps `simctl io screenshot` on the WDA tree source under AVERI_IOS_SCREENSHOT=simctl', async () => {
+    process.env.AVERI_IOS_SCREENSHOT = 'simctl';
     const { exec, calls } = both(PNG_BYTES);
     await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: WDA_NO_TREE }).screenshot();
     expect(calls).toHaveLength(1);

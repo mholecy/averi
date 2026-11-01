@@ -330,7 +330,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
       if (profile.screen === undefined) throw new CommandError('differential: idb describe answered nothing', 1);
       return JSON.stringify({ screen_dimensions: { width_points: profile.screen.width, height_points: profile.screen.height } });
     }
-    // D26b: the idb tree source's capture — the same frame simctl's file holds, on stdout.
+    // D26b: iOS's capture (on either tree source since D44) — the same frame simctl's file holds, on stdout.
     if (line === 'screenshot -') {
       device.calls.push('idb screenshot');
       return frame(profile.frame, device.paint, profile.screenshot);

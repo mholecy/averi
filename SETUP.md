@@ -365,9 +365,8 @@ one happens by itself.
   `AVERI_IDB_HELPER=off` in the environment the MCP host starts the server with (an `env` block in its server entry)
   and reconnect: every idb call is then the `idb` CLI.
 - **iOS screenshots, color/OCR asserts or `ensure_state` fail with `idb screenshot - --udid …`, or an iOS screenshot
-  baseline fails where it passed before** — on `treeSource: idb` averi captures the screen with `idb screenshot`
-  (through the same helper, or the `idb` CLI); on `treeSource: wda` with `xcrun simctl io <udid> screenshot`, as
-  before. It does not switch to simctl by itself when idb fails. Check that `idb list-targets` lists the simulator as
+  baseline fails where it passed before** — averi captures the iOS screen with `idb screenshot` (through the same
+  helper, or the `idb` CLI), on either tree source. It does not switch to simctl by itself when idb fails. Check that `idb list-targets` lists the simulator as
   Booted with its companion; to capture through simctl instead, set `AVERI_IOS_SCREENSHOT=simctl` in the environment
   the MCP host starts the server with (an `env` block in its server entry) and reconnect. idb's capture draws the
   Dynamic Island where simctl's shows the app: an iOS baseline diff leaves the status band out of both images for that

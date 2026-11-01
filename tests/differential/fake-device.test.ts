@@ -40,7 +40,7 @@ describe('the fake device serving a captured screenshot', () => {
     expect((await readFile(file)).equals(shot)).toBe(true);
   });
 
-  it('iOS: `idb screenshot -` answers the same captured PNG on stdout, byte for byte — the idb tree source\'s capture (D26b)', async () => {
+  it('iOS: `idb screenshot -` answers the same captured PNG on stdout, byte for byte — iOS\'s capture (D26b, D44)', async () => {
     const shot = png(30, 60);
     useDevice({ platform: 'ios', screen: { width: 10, height: 20 }, frame: { width: 30, height: 60 }, screenshot: shot });
     expect((await execFile('idb', ['screenshot', '-', '--udid', 'AAAA-1111'])).equals(shot)).toBe(true);
