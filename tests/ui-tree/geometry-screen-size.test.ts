@@ -37,8 +37,10 @@ describe('inferScreenSize — the inset window: screen-shaped in the window\'s p
   it('a rect-less multi-window dump: the app window below the status bar and beside the nav bar is offered, in either order; the bar is no window', () => {
     const app = nodeAt(rect(126, 63, 2274, 1017));
     const bar = nodeAt(rect(0, 0, 2400, 63));
-    expect(inferScreenSize(rectless(app, bar)).insetWindow).toEqual(rect(126, 63, 2274, 1017));
-    expect(inferScreenSize(rectless(bar, app)).insetWindow).toEqual(rect(126, 63, 2274, 1017));
+    // The bar reaches exactly as far as the window and starts at the origin: the width is reliable whichever is listed first (D47).
+    const size = { width: 2400, height: 1080, reliable: true, trustworthyHeight: false, insetWindow: rect(126, 63, 2274, 1017) };
+    expect(inferScreenSize(rectless(app, bar))).toEqual(size);
+    expect(inferScreenSize(rectless(bar, app))).toEqual(size);
   });
 
   // Each pair is asked in both listing orders: the pick is by size, never by order.
@@ -115,6 +117,19 @@ describe('inferScreenSize — the edges of the walk and of the window test', () 
     const size = { width: 2400, height: 1080, reliable: true, trustworthyHeight: false, insetWindow: rect(126, 63, 2273, 1017) };
     expect(inferScreenSize(rectless(bar, app))).toEqual(size);
     expect(inferScreenSize(rectless(app, bar))).toEqual(size);
+  });
+
+  it('rects tying at the furthest reach: the width is reliable when any of them starts at the origin, whatever the listing order (D47)', () => {
+    expect(inferScreenSize(rectless(nodeAt(rect(126, 63, 2274, 1017)), nodeAt(rect(0, 0, 2400, 63)))).reliable).toBe(true);
+    expect(inferScreenSize(rectless(nodeAt(rect(0, 0, 2400, 63)), nodeAt(rect(126, 63, 2274, 1017)))).reliable).toBe(true);
+  });
+
+  it('rects tying at the furthest reach with none at the origin: a content width, unreliable in either order', () => {
+    const app = nodeAt(rect(126, 63, 2274, 1017));
+    const bar = nodeAt(rect(50, 0, 2350, 63));
+    const size = { width: 2400, height: 1080, reliable: false, trustworthyHeight: false, insetWindow: rect(126, 63, 2274, 1017) };
+    expect(inferScreenSize(rectless(app, bar))).toEqual(size);
+    expect(inferScreenSize(rectless(bar, app))).toEqual(size);
   });
 
   it("the walked height is the lowest bottom edge, not the tallest rect's; a scrim above the screen's top is no layout", () => {

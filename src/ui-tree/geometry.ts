@@ -160,8 +160,9 @@ interface Extent {
   width: number;
   height: number;
   /**
-   * False when the width cannot be believed: the widest ON-LAYOUT rect starts
-   * inset (a CONTENT width), or a screen-shaped rect in the same tree reaches
+   * False when the width cannot be believed: no ON-LAYOUT rect reaching the
+   * furthest starts at the origin (a CONTENT width; listing order never decides
+   * a tie), or a screen-shaped rect in the same tree reaches
    * materially less far than a bar-shaped one does (see walkExtent).
    */
   reliable: boolean;
@@ -189,7 +190,10 @@ function walkExtent(tree: UiNode): Extent {
   let sawScreenShaped = false;
   const walk = (n: UiNode): void => {
     if (onLayout(n.rect)) {
-      if (n.rect.x + n.rect.width > widest.x + widest.width) widest = n.rect;
+      const reach = n.rect.x + n.rect.width;
+      const widestReach = widest.x + widest.width;
+      // On equal reach the origin-anchored rect wins, so `reliable` never hangs on listing order (D47).
+      if (reach > widestReach || (reach === widestReach && Math.abs(n.rect.x) < ORIGIN_SLACK)) widest = n.rect;
       if (n.rect.y + n.rect.height > tallest.y + tallest.height) tallest = n.rect;
       if (isScreenShaped(n.rect) && n.rect.width > 0) {
         sawScreenShaped = true;
