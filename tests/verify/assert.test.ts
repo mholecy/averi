@@ -8,6 +8,7 @@ import { el, FakeAdapter, node, resetLayout, screen } from '../helpers/fake.js';
 import { KEYBOARD_ROLE, PersistentReadError, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { findBySpec } from '../../src/ui-tree/selectors.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+import { boundReads } from '../helpers/terminal-read.js';
 import { captureFrame, STABILITY_DELAY_MS } from '../../src/verify/capture.js';
 import { OcrUnavailableError } from '../../src/verify/ocr.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
@@ -66,15 +67,16 @@ function drawnAt(rect: Rect, hex: string, { width, height } = { width: 402, heig
 // Under persistentRead: 'fail' it fails THE assert, after its one read, with the error's message as the detail — what
 // a verify leg (whose frame, screenshot and health line a throw would lose) and the MCP assert tool ask for. By
 // default it is thrown as it came, after the one read: a flow's `assert:` step must reach the engine's isTerminal
-// with the named error (review round 2), not as a plain "flow asserts failed".
+// with the named error (review round 2), not as a plain "flow asserts failed". Past the reads a test expects, the
+// fake answers a poisoned tree (D38, tests/helpers/terminal-read.ts): a regressed seam fails here at once, not at 60 s.
 describe('asserts on a tree read no wait cures', () => {
-  const wedgedFake = () => {
+  const wedgedFake = (expectedReads: number) => {
     const fake = dashboardFake();
     let reads = 0;
-    fake.uiTree = async () => {
+    fake.uiTree = boundReads(expectedReads, async () => {
       reads++;
       throw new PersistentReadError('wedged until a reboot\nthe cure');
-    };
+    });
     return { fake, reads: () => reads };
   };
 
@@ -83,7 +85,7 @@ describe('asserts on a tree read no wait cures', () => {
     ['absent', { element: { id: 'balance' }, absent: true }],
     ['color', { element: { id: 'balance' }, color: { expected: '#FDFDFD' } }],
   ] as const)('%s, under persistentRead: \'fail\': fails after one read, the detail the error\'s message, and the next assert still runs', async (_kind, spec) => {
-    const { fake, reads } = wedgedFake();
+    const { fake, reads } = wedgedFake(2);
     const results = await new Verifier(fake, { pollMs: 5, timeoutMs: 60_000, persistentRead: 'fail' }).assertAll([spec, spec]);
     expect(results.map((r) => ({ pass: r.pass, detail: r.detail }))).toEqual([
       { pass: false, detail: 'wedged until a reboot\nthe cure' },
@@ -98,7 +100,7 @@ describe('asserts on a tree read no wait cures', () => {
     ['absent', { element: { id: 'balance' }, absent: true }],
     ['color', { element: { id: 'balance' }, color: { expected: '#FDFDFD' } }],
   ] as const)('%s, by default: thrown as it came after one read', async (_kind, spec) => {
-    const { fake, reads } = wedgedFake();
+    const { fake, reads } = wedgedFake(1);
     await expect(new Verifier(fake, { pollMs: 5, timeoutMs: 60_000 }).assertAll([spec, spec])).rejects.toBeInstanceOf(PersistentReadError);
     expect(reads()).toBe(1);
   });

@@ -9,6 +9,7 @@ import { flingCarry, LazyList } from '../helpers/lazy-list.js';
 import { SETTINGS_ROW_SLIVER } from '../helpers/synthetic-android-trees.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { remedyThenEscape } from '../helpers/escape-order.js';
+import { boundReads } from '../helpers/terminal-read.js';
 import { parseIdbDescribeAll as parseIdbDescribeAllOf } from '../../src/adapters/ios-tree-source.js';
 
 /** The driver's settle pause, observed (passed through to the real sleep): a test sets `onSleep` to see each pause in order with the device's calls. */
@@ -110,10 +111,11 @@ describe('scrollUntilVisible — a read error no wait cures ends the scroll at o
     const fake = scrollingFake(3100);
     const wedged = new PersistentReadError('wedged until a reboot');
     let reads = 0;
-    fake.uiTree = async () => {
+    // A second read is a poisoned tree (D38, tests/helpers/terminal-read.ts): a regressed seam fails here at once.
+    fake.uiTree = boundReads(1, async () => {
       reads++;
       throw wedged;
-    };
+    });
     await expect(scrollUntilVisible(fake, 'id:submit_button', { maxSwipes: 4, timeoutMs: 60_000, settleMs: 1 })).rejects.toBe(wedged);
     expect(reads).toBe(1);
     expect(fake.swipes).toHaveLength(0);
