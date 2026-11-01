@@ -16,7 +16,7 @@ import {
 // Numbers worked by hand. The rendering is tests/perf/report.test.ts's.
 
 const shot = (startMs: number, ms: number): DeviceCall => ({ kind: 'simctl', label: 'simctl io screenshot', startMs, endMs: startMs + ms, ok: true });
-/** D26b: the idb tree source's capture, as instrument.ts#classify labels it (the CLI's and the helper's alike). */
+/** D26b: iOS's capture (ios.ts#screenshotVia), as instrument.ts#classify labels it (the CLI's and the helper's). */
 const idbShot = (startMs: number, ms: number): DeviceCall => ({ kind: 'idb', label: 'idb screenshot', startMs, endMs: startMs + ms, ok: true });
 const other = (ms: number): DeviceCall => ({ kind: 'idb', label: 'idb ui describe-all', startMs: 0, endMs: ms, ok: true });
 const win = (...calls: DeviceCall[]): Window => ({ calls, sleeps: [] });

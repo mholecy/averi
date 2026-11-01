@@ -208,6 +208,28 @@ flows:
     expect(trace).toContainEqual({ action: 'type_pin', detail: '9 digits' });
   });
 
+  // D43a (ADR 0037): type_pin needs no assertTypeable — `\D` is ASCII-only in JS, so it strips every character but ASCII 0–9,
+  // so a non-ASCII digit (Arabic-Indic ٣, U+0663) is dropped as formatting, never sent to typeText; a value of only
+  // such digits has no digits at all and is refused before the first key.
+  it('type_pin types only ASCII digits: a non-ASCII digit is stripped, a value of only those is refused', async () => {
+    const cfg = (value: string) => parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - type_pin: { value: "${value}" }
+`);
+    resetLayout();
+    const fake = new FakeAdapter({ otp: screen(el({ identifier: 'otp_screen' })) }, 'otp');
+    const trace = await FlowEngine.run(cfg('12٣4'), fake, FAST, { flow: 'f' });
+    expect(fake.typed).toEqual(['1', '2', '4']);
+    expect(trace).toContainEqual({ action: 'type_pin', detail: '3 digits' });
+
+    const none = new FakeAdapter({ otp: screen(el({ identifier: 'otp_screen' })) }, 'otp');
+    await expect(FlowEngine.run(cfg('٣٣'), none, FAST, { flow: 'f' })).rejects.toThrow('has no digits');
+    expect(none.typed).toEqual([]);
+  });
+
   // 2026-10-08 (after-ios-idb review #4): the digits were stripped and
   // whatever was left typed — so a value with none typed nothing, traced
   // "0 digits" and passed, and the PIN was rejected a screen later. Refused
@@ -2439,6 +2461,38 @@ flows:
     const fake = formFake();
     await expect(FlowEngine.run(c, fake, FAST, { flow: 'f' })).rejects.toThrow('cannot type U+000A');
     expect(fake.typed).toEqual([]);
+  });
+
+  // D43a (ADR 0037): a character the adapter cannot type is refused the same way, before anything is typed — and,
+  // as the control character's refusal, it fails the flow (a type: is not marked; its plain error ends the run).
+  it('a type: step holding a character the adapter cannot type is refused before anything is typed', async () => {
+    const c = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - type: { value: "heslo-Š-123" }
+`);
+    const fake = formFake();
+    const run = FlowEngine.run(c, fake, FAST, { flow: 'f' });
+    await expect(run).rejects.toThrow("cannot type U+0160 'Š'");
+    await expect(run).rejects.toThrow(expect.objectContaining({ message: expect.not.stringContaining('heslo') }));
+    expect(fake.typed).toEqual([]);
+    expect(fake.taps).toEqual([]);
+  });
+
+  it('a fill: step holding a character the adapter cannot type is refused before the field is tapped', async () => {
+    const c = parseConfig(`
+app: { android: { package: md.bank.app } }
+flows:
+  f:
+    steps:
+      - fill: { id: amount_input, value: "Šťastný" }
+`);
+    const fake = formFake();
+    await expect(FlowEngine.run(c, fake, FAST, { flow: 'f' })).rejects.toThrow("cannot type U+0160 'Š'");
+    expect(fake.typed).toEqual([]);
+    expect(fake.taps).toEqual([]);
   });
 
   it('redacts credential values in the fill trace', async () => {

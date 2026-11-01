@@ -1,3 +1,5 @@
+import type { Typeable } from './typeable.js';
+
 /**
  * Device Adapter — the only layer that knows platform commands.
  * One interface, two implementations (Android/adb, iOS/simctl+idb).
@@ -1199,6 +1201,14 @@ export interface DeviceAdapter {
    * tail-again.md). Absent: `may-arrive-late`, the retype never sent.
    */
   readonly typingDelivery?: TypingDelivery;
+  /**
+   * The characters `typeText` can type (adapters/typeable.ts#Typeable, docs/adr/0037-a-value-the-adapter-cannot-type-
+   * is-refused-before-any-device-call.md) — the platform's fact, so the adapter's, and REQUIRED: an adapter that does
+   * not say what it types cannot be written. interact/type-text.ts#assertTypeable refuses a value holding any other
+   * character before any device call (no tap, no clear, nothing typed): the fill, the type_text tool and the flow's
+   * `type:` and `fill:` steps. Data, not a method (typeable.ts says why).
+   */
+  readonly typeable: Typeable;
   /**
    * What a fill tells the adapter after a REPAIRED drop (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-
    * tail-again.md, its D24 amendment): the field kept a strict prefix of a typing whose delivery is `on-return`, the

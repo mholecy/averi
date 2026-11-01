@@ -162,6 +162,7 @@ export const ADAPTER_SURFACE: Record<keyof DeviceAdapter, 'tree' | 'reads' | 'ac
   dragSpeed: 'fact',
   treeReadSettles: 'fact',
   typingDelivery: 'fact',
+  typeable: 'fact',
   noteDroppedTail: 'reads',
   focusedWindow: 'reads',
   logs: 'reads',
