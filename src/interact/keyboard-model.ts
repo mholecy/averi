@@ -261,7 +261,7 @@ export async function lookAgain(adapter: KeyboardAdapter, target: Target, opts: 
   try {
     resolved = seenLook(adapter, await resolveSettled(adapter, target, opts));
   } catch (e) {
-    if (e instanceof PersistentReadError) throw e; // a read no wait cures passes through as it came (ADR 0036, D42)
+    if (e instanceof PersistentReadError) throw e;
     throw failed(e);
   }
   const point = tapPoint(resolved.node);
