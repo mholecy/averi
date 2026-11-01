@@ -107,10 +107,10 @@ One tree read saved per Android fill into an empty plain field named by id, ≈ 
 
 ## Amendment: the gate's clauses from their owners, the failure from the landing (2026-11-01, A2)
 
-The gate reads `value !== '' && !clear && !needsHeldCount(node) && soleIdOf(target) !== undefined &&
-!retypesTail(delivery)`: the empty-plain-input clauses are `interact/fill-landing.ts#needsHeldCount`, the delivery
-clause `interact/fill-type.ts#retypesTail` (ADR 0023's retype condition). Its premise is unchanged: the post-focus
-re-read is never made for a non-empty plain field.
+The gate (`interact/fill.ts`, `skipped`) asks its clauses of their owners: whether the field can hold bullets to count
+from is `interact/fill-landing.ts#needsHeldCount`, whether the adapter retypes a tail `interact/fill-type.ts#retypesTail`
+(ADR 0023's retype condition); the empty value, `clear` and the sole id stay fill.ts's own. Its premise is unchanged:
+the post-focus re-read is never made for a non-empty plain field.
 
 A skipped fill tells the typing its held count is `'unread'` (fill-landing.ts#Expectation) instead of fill.ts
 overriding the typing's outcome. The landing rule then says `said-plain` for a masked reading longer than typed —

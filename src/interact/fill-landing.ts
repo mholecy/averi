@@ -42,7 +42,7 @@ export interface Expectation {
 }
 
 /** What the text rules ask of an Expectation: the value, and the earlier text it is typed after. */
-export type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeholder'>;
+type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeholder'>;
 
 /**
  * A reading that landed:
@@ -62,16 +62,16 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
  * - a non-input proves it took the text only by CHANGING to show it (`tookText`);
  * - a field that reformats as it is typed (D18) lands when it shows what it should hold — its earlier text, unless
  *   cleared, then the value — every typed character in order, separators of its own added (`landedReformat`);
- * - else the reading must show the value exactly (`exactly`): with clear the whole reading, without it inside what
+ * - else the reading must show the value exactly (`showsExactly`): with clear the whole reading, without it inside what
  *   the field holds; a masked reading by length.
- * A landed reading is `said-plain` when the held count is unread and it is masked but not the typed length, else
- * `placeholder` when it is exactly the named placeholder. Pure.
+ * A landed reading is `said-plain` when it shows bullets said plain (`bulletsSaidPlain`) and is longer than typed (a
+ * shorter one has not landed), else `placeholder` when it is exactly the named placeholder. Pure.
  */
 export function landingOf(observed: string, e: Expectation): Landing | undefined {
   if (!tookText(observed, e)) return undefined;
   const reformatted = landedReformat(observed, e);
-  if (reformatted === undefined && !exactly(observed, e)) return undefined;
-  if (e.held === 'unread' && isMaskedValue(observed) && observed.length !== e.value.length) return { kind: 'said-plain' };
+  if (reformatted === undefined && !showsExactly(observed, e)) return undefined;
+  if (bulletsSaidPlain(observed, e) && observed.length !== e.value.length) return { kind: 'said-plain' };
   if (e.placeholder !== undefined && observed === e.placeholder) return { kind: 'placeholder' };
   return { kind: 'landed', ...(reformatted !== undefined && { reformatted }) };
 }
@@ -97,17 +97,26 @@ export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInp
  * compared by count, never by content. The rule detects the SHORT direction only — dropped keystrokes; without `clear`
  * the field must show at least what it held after focus plus what was typed. It cannot tell a correct append from
  * typing onto an autofilled password (both read `held + typed`); that case is fill.ts's `maskedAppend`, not a failure.
- * A held count `'unread'` counts as none here; `landingOf` fails any length but the typed one (`said-plain`).
+ * A held count `'unread'` counts as none (`heldCount`); `landingOf` fails any length but the typed one there.
  *
  * A placeholder is not content: on an empty field showing `Search`, nothing typed must not pass for a typed `ear`. Raw
  * equality first: a value equal to the placeholder is the one reading that cannot be told from it (`landingOf`'s
  * `placeholder`; fill-facts.ts#heldText).
  */
-function exactly(observed: string, e: Expectation): boolean {
+function showsExactly(observed: string, e: Expectation): boolean {
   const { value, clear } = e;
-  if (isMaskedValue(observed)) return clear ? observed.length === value.length : observed.length >= (e.held === 'unread' ? 0 : e.held) + value.length;
+  if (isMaskedValue(observed)) return clear ? observed.length === value.length : observed.length >= heldCount(e) + value.length;
   return clear ? observed === value : observed === value || heldText(observed, e.placeholder).includes(value);
 }
+
+/** The bullets the field held after focus, an unread count as none. */
+const heldCount = (e: Pick<Expectation, 'held'>): number => (e.held === 'unread' ? 0 : e.held);
+
+/**
+ * A masked reading of a field whose held count was never read (`'unread'`: said plain, the re-read skipped) — no length
+ * of it but the typed one proves anything. `landingOf`'s `said-plain` and `differenceOf`'s `masked-said-plain`.
+ */
+const bulletsSaidPlain = (observed: string, e: Pick<Expectation, 'held'>): boolean => e.held === 'unread' && isMaskedValue(observed);
 
 /** The text the typing lands after: the field's text before the typing (its placeholder aside), or none once cleared. */
 const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): string => (e.clear ? '' : heldText(e.before, e.placeholder));
@@ -150,7 +159,7 @@ function priorsOf(held: string, e: Pick<Expectation, 'clear' | 'before' | 'place
  * D29), then the value — else undefined. D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md.
  * A masked reading never is one (bullets are no typed characters). Pure.
  */
-export function landedReformat(observed: string, e: TextExpectation): Reformat | undefined {
+function landedReformat(observed: string, e: TextExpectation): Reformat | undefined {
   const held = heldText(observed, e.placeholder);
   for (const prior of priorsOf(held, e)) {
     const reformatted = reformatOf(held, prior + e.value);
@@ -171,7 +180,7 @@ export interface Tail {
 }
 
 /** Some of the typing is in the prefix: a tail the field dropped, not a typing that never reached it. */
-export const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined && tail.landed > 0;
+const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined && tail.landed > 0;
 
 /**
  * What the field is missing of what it should hold (its text before the typing, unless cleared — or vanished, then
@@ -227,9 +236,9 @@ export function droppedTail(observed: string, e: TextExpectation): string | unde
  */
 export function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>): Difference {
   const { value, clear } = e;
-  if (e.held === 'unread' && isMaskedValue(observed)) return { kind: 'masked-said-plain' };
+  if (bulletsSaidPlain(observed, e)) return { kind: 'masked-said-plain' };
   if (observed === e.before) return { kind: 'unchanged' };
-  if (isMaskedValue(observed)) return { kind: 'masked', held: clear || e.held === 'unread' ? undefined : e.held };
+  if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : heldCount(e) };
   if (hasBullet(observed)) return { kind: 'length' };
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   const tail = tailOf(observed, e);

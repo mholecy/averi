@@ -568,6 +568,30 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     expect(shorterReads.n).toBe(7); // the settle wait (2), the whole value poll (5)
   });
 
+  // A2 code review: until A2 fill.ts threw this failure itself for a skipped re-read, before its generic mismatch path —
+  // no `elsewhere`, no `again`, no not-input finding. It now leaves through the typing's `missed`; the reply must stay
+  // the same even when another input changed while typing (a masked reading proves no missing tail, so nothing reads
+  // as typed elsewhere).
+  it('skipped: a field said plain that shows FEWER bullets, another input changed meanwhile — the same reply, nothing named elsewhere', async () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { form: screen(el({ role: 'textfield', identifier: 'amount_input', secure: false }), el({ role: 'textfield', identifier: 'note', secure: false })) },
+      'form',
+    );
+    fake.typingDelivery = 'may-arrive-late';
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + '•'.repeat(text.length - 2);
+      const note = fake.live().children.find((n) => n.identifier === 'note');
+      if (note) note.value = text.slice(-2); // the dropped `rd` appended to another input
+    };
+    const failed = await fillField(fake, { id: 'amount_input' }, 'password', FAST).then(
+      () => undefined,
+      (e: Error) => e.message,
+    );
+    expect(failed).toBe(`fill: typed 8 characters but the field shows 6 ${SAID_PLAIN}`);
+  });
+
   it('accepted residual (R1, ADR 0028): a field WRONGLY said plain, autofilled with N bullets on focus, dropping exactly N keys, passes silently', async () => {
     // Review of this branch, scenario K. With the re-read the count would start at 3 and `3 + 5` fail; skipped, the
     // field shows 3 + (5 − 3) = 5 bullets, the typed length — the one reading no read-back can tell from a landed fill.
