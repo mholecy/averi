@@ -90,9 +90,10 @@ describe('droppedTail — a reformatted strict prefix (D28)', () => {
 
 /**
  * A scripted field: `typeText` lands what `keep` lets through of each typing (in order), a read returns the field's
- * text, and the screen is the field and one other input whose value the script may change while typing.
+ * text, and the screen is the field and one other input whose value the script may change while typing. `unnamed`: the
+ * placeholder an empty field reads as its value, not named as one (idb, D29).
  */
-function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string | null; grows?: boolean; moves?: boolean; otherHeld?: string; format?: (text: string) => string } = {}) {
+function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string | null; grows?: boolean; moves?: boolean; otherHeld?: string; format?: (text: string) => string; unnamed?: string } = {}) {
   const keeps = [...(opts.keep ?? [])];
   const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: null });
   const other = node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: opts.otherHeld ?? null });
@@ -122,7 +123,7 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
         pending = pending.slice(1);
       }
       last = snapshot();
-      return field.value ?? '';
+      return field.value || (opts.unnamed ?? '');
     },
     screen: () => last,
     reportDroppedTail: () => dropped.push(typed.length),
@@ -289,6 +290,30 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
       expect(typed).toEqual(['SK3112000000', '0']);
       expect(dropped).toEqual([2]);
     }
+  });
+
+  // D29: idb names no placeholder, so the UIKit iban field's `SK00 0000 0000 …` was read as the empty field's value —
+  // `before` — and vanished at the first key (the owner's iOS run, f1 and f7: "typed 12 characters but the field shows
+  // 14" for a field holding `SK31 1200 0000`).
+  it('a grouping field whose unnamed placeholder vanished lands reformatted without clear — and its dropped tail is typed again', async () => {
+    const PH = 'SK00 0000 0000 \u2026';
+    const landed = scripted({ format: group4, unnamed: PH });
+    expect(await typeAndConfirm(landed.io, { ...landed.intent, value: 'SK3112000000', before: PH })).toEqual({
+      kind: 'landed',
+      observed: 'SK31 1200 0000',
+      again: [],
+      reformatted: { added: 2, respaced: 0 },
+    });
+    expect(landed.typed).toEqual(['SK3112000000']);
+    const dropping = scripted({ format: group4, unnamed: PH, keep: [9] });
+    expect(await typeAndConfirm(dropping.io, { ...dropping.intent, value: 'SK3112000000', before: PH })).toEqual({
+      kind: 'landed',
+      observed: 'SK31 1200 0000',
+      again: [{ kind: 'tail', length: 3 }],
+      reformatted: { added: 2, respaced: 0 },
+    });
+    expect(dropping.typed).toEqual(['SK3112000000', '000']);
+    expect(dropping.dropped).toEqual([2]);
   });
 
   it('a reformatted prefix whose missing part another input gained: the typing left the field — nothing sent again', async () => {
