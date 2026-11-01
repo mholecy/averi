@@ -16,8 +16,8 @@ behaviour: a non-ASCII value is refused before the tap. It used to fail on the d
 - **Android.** `AndroidAdapter.typeText` sends one `input text <ch>` per character. For a character outside the
   virtual key map, `KeyCharacterMap.getEvents` returns null and `input` exits 255 on an NPE. Every character before it
   has already landed, so the field is left half-typed: `Jan ` from `Jan Šťastný`, `O` from `O’Brien`.
-- The only check before the device was the control-character refusal (interact/type-text.ts#assertTypeable, code review of
-  2026-10-07). It refuses C0 and DEL on both platforms before the field is resolved. Nothing checked the rest.
+- The only check before the device was the control-character refusal (interact/type-text.ts#assertTypeable, code review
+  of 2026-10-07). It refuses C0 and DEL on both platforms before the field is resolved. Nothing checked the rest.
 - The live golden filed this as KNOWN since D31: b1d and b7 read `loud-untouched` on iOS and `loud-changed` on Android.
   A banking app's names and addresses (Š, ť, ’, NBSP in a pasted amount) reach these paths every day.
 
@@ -28,22 +28,23 @@ behaviour: a non-ASCII value is refused before the tap. It used to fail on the d
 control-character check and before any device call.**
 
 - **The declaration** is data: `refuses`, a `u`-flagged RegExp that matches one character the adapter cannot type, and
-  `says`, the clause the refusal quotes. One function reads it (`refusalOf(text, typeable)`): the refusal of the
-  first character it cannot type, or undefined. The printable-ASCII class is defined once (`PRINTABLE_ASCII`), and
-  iOS's set is derived from it with `\n` added. It is REQUIRED on the interface, so an adapter that does not say what it types does not
-  compile, and the test fake declares it too (tests/helpers/fake.ts `FAKE_TYPEABLE`, printable ASCII, as both real
-  adapters). It is data and not a method because the flow's read hand-off wraps the adapter in a Proxy that turns every
-  method it does not class `reads` into an async action (ui-tree/read-handoff.ts#watch). A synchronous
+  `says`, the clause the refusal quotes. One function reads it (`refusalOf(text, typeable)`): the refusal of the first
+  character it cannot type, or undefined. The printable-ASCII class is defined once (`PRINTABLE_ASCII`), and iOS's set
+  is derived from it with `\n` added. It is REQUIRED on the interface, so an adapter that does not say what it types
+  does not compile, and the test fake declares it too (tests/helpers/fake.ts `FAKE_TYPEABLE`, printable ASCII, as both
+  real adapters). It is data and not a method because the flow's read hand-off wraps the adapter in a Proxy that turns
+  every method it does not class `reads` into an async action (ui-tree/read-handoff.ts#watch). A synchronous
   `untypeable(value)` method would return a Promise there, and every value would read as refused. Classing it `reads`
-  would keep it synchronous, but would mislabel a pure check as a device read. `ADAPTER_SURFACE` classes `typeable` as
-  a `fact`.
+  would keep it synchronous, but would mislabel a pure check as a device read. `ADAPTER_SURFACE` classes `typeable` as a
+  `fact`.
 - **What each platform types:**
   - iOS, both tree sources: printable ASCII (U+0020–U+007E) and `\n`, which is idb's `KEY_MAP`. The `\n` is idb's fact,
     kept in the declaration. interact/ still refuses it first as a control character, so the Return key stays
     `pressKey('enter')`, as before.
   - Android: printable ASCII (U+0020–U+007E). This is conservative. An extended letter in the virtual key map (`é`) is
     unmeasured, so it is refused too.
-- **Where:** `assertTypeable(value, adapter.typeable)`. Its two callers cover every path that ends in `adapter.typeText`:
+- **Where:** `assertTypeable(value, adapter.typeable)`. Its two callers cover every path that ends in
+  `adapter.typeText`:
   - `fillField` calls it before the field is resolved. That covers the type_text tool with a selector and the flow's
     `fill:` step. The fill's retype of a dropped tail (ADR 0023) is a suffix of the same value.
   - `typeIntoFocused` covers the type_text tool without a selector and the flow's `type:` step.
@@ -51,11 +52,11 @@ control-character check and before any device call.**
   - There is no tree read, keyboard dismissal, tap, clear or keystroke before the refusal. A fill's refusal stays a
     `FillValueFailure` marked `refused`, which `optional:` does not skip, like the control character's. A `type:`
     step's refusal is a plain error, as before.
-- **Android's `typeText`** checks the same declaration again, defensively, before its first `input text`. A caller
-  that bypasses interact/ cannot half-type. It already did this for a control character. iOS's `typeText` has no check
-  of its own: idb fails all or nothing per call (it maps the whole string before it sends a key), so nothing is half-typed. (Only
-  the split typing of an app seen dropping a tail, ADR 0023's D24 amendment, sends its first character in a call of
-  its own; a direct caller there could leave that one, and interact/ refuses before it.)
+- **Android's `typeText`** checks the same declaration again, defensively, before its first `input text`. A caller that
+  bypasses interact/ cannot half-type. It already did this for a control character. iOS's `typeText` has no check of its
+  own: idb fails all or nothing per call (it maps the whole string before it sends a key), so nothing is half-typed.
+  (Only the split typing of an app seen dropping a tail, ADR 0023's D24 amendment, sends its first character in a call
+  of its own; a direct caller there could leave that one, and interact/ refuses before it.)
 - **The message** names the first refused character by code point, and shows it where it is visible: `U+0160 'Š'`. A
   space other than U+0020 is named as one, and a combining or invisible character gets its code point alone. The
   message never includes the value around the character, since a value may be a credential. It says what the adapter

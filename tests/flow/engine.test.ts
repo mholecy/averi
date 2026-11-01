@@ -208,7 +208,7 @@ flows:
     expect(trace).toContainEqual({ action: 'type_pin', detail: '9 digits' });
   });
 
-  // D43a (ADR 0037): type_pin needs no assertTypeable — `\D` without the `u` flag strips every character but ASCII 0–9,
+  // D43a (ADR 0037): type_pin needs no assertTypeable — `\D` is ASCII-only in JS, so it strips every character but ASCII 0–9,
   // so a non-ASCII digit (Arabic-Indic ٣, U+0663) is dropped as formatting, never sent to typeText; a value of only
   // such digits has no digits at all and is refused before the first key.
   it('type_pin types only ASCII digits: a non-ASCII digit is stripped, a value of only those is refused', async () => {
