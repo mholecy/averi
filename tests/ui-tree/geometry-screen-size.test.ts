@@ -119,9 +119,12 @@ describe('inferScreenSize — the edges of the walk and of the window test', () 
     expect(inferScreenSize(rectless(app, bar))).toEqual(size);
   });
 
-  it('rects tying at the furthest reach: the width is reliable when any of them starts at the origin, whatever the listing order (D47)', () => {
-    expect(inferScreenSize(rectless(nodeAt(rect(126, 63, 2274, 1017)), nodeAt(rect(0, 0, 2400, 63)))).reliable).toBe(true);
-    expect(inferScreenSize(rectless(nodeAt(rect(0, 0, 2400, 63)), nodeAt(rect(126, 63, 2274, 1017)))).reliable).toBe(true);
+  it('rects tying at the furthest reach: the origin-anchored one decides, even against a rect a unit inset (ORIGIN_SLACK is exclusive), in either order (D47)', () => {
+    const bar = nodeAt(rect(0, 0, 2400, 63));
+    const app = nodeAt(rect(1, 63, 2399, 1017));
+    const size = { width: 2400, height: 1080, reliable: true, trustworthyHeight: false, insetWindow: rect(1, 63, 2399, 1017) };
+    expect(inferScreenSize(rectless(bar, app))).toEqual(size);
+    expect(inferScreenSize(rectless(app, bar))).toEqual(size);
   });
 
   it('rects tying at the furthest reach with none at the origin: a content width, unreliable in either order', () => {

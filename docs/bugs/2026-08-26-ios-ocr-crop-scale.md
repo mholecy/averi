@@ -82,7 +82,8 @@ Corrections to the analysis above:
   and the cause is elsewhere. **Run that assert first — it is the cheapest discriminator.**
 - **"Honor `reliable`" was not sufficient on its own.** Case 3 above breaks identically with
   `reliable === true`; the flag only sees a widest rect that starts *inset*.
-  (D47, 2026-11-02: on a tie in reach, the width is reliable if any rect reaching that far starts at the origin; listing order no longer decides.)
+  (D47, 2026-11-02: on a tie in reach, the width is reliable if any rect reaching that far starts at the
+  origin; listing order no longer decides.)
 - **`reliable` was nowhere a failure.** It was a display note in color-parity (`:547`, `:691`)
   and rect-parity (`:401`, `:554`) — no comparator failed on it.
 - **Blast radius was wider than filed.** `assertColor` and the whole-screen color/text tables
