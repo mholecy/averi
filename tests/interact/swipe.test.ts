@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type DeviceScreen, type UiNode } from '../../src/adapters/types.js';
 import { axisOfEdge } from '../../src/ui-tree/geometry.js';
 import { SIDES } from '../../src/ui-tree/sides.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
@@ -26,6 +26,20 @@ function device(root: UiNode, viewport: DeviceScreen | Error): FakeAdapter {
   }
   return fake;
 }
+
+// The one reader of the read seam that opts out of its throw (ARCHITECTURE.md: a swipe's orientation read loses only its
+// witness; ADR 0036): a failure no wait cures still lets the swipe go over the device box, and the note quotes it.
+describe('swipeScreen — a read failure no wait cures', () => {
+  it('still swipes, and its note quotes the message', async () => {
+    const fake = fresh();
+    fake.uiTree = async () => {
+      throw new PersistentReadError('the accessibility service is wedged until a reboot');
+    };
+    const drawn = await swipeScreen(fake, { direction: 'up', meaning: 'finger' });
+    expect(fake.swipes).toHaveLength(1);
+    expect(drawn.note).toContain('the accessibility service is wedged until a reboot');
+  });
+});
 
 describe('swipeScreen — one table, two meanings', () => {
   it("'finger' names the finger's movement: up travels from below centre to above it, 30% either side", async () => {

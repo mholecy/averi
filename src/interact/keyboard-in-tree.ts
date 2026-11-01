@@ -181,9 +181,8 @@ const passedOver = (skipped: readonly string[]): string => (skipped.length === 0
  * ambiguous) and the post-fill dismissal's confirming reads (a tree read that throws — WDA or idb gone between the move
  * and the read). Both are wrapped — except a failure no wait cures (adapters/types.ts#PersistentReadError, D21), which
  * the read seam (read-tree.ts#readTreeOr) passes through as it came, so the read loops and the flow engine's isTerminal
- * see its class: a read's own error
- * left raw is not a KeyboardGuardError, so the flow engine's
- * `tracingGuardFailure` would log no `⚠ fill` line and the `✗` line would never say a move had been sent. `did` is the
+ * see its class: a read's own error left raw is not a KeyboardGuardError, so the flow engine's `tracingGuardFailure`
+ * would log no `⚠ fill` line and the `✗` line would never say a move had been sent. `did` is the
  * moves as both sentences name them (`tapping <strategy> at (x,y) to hide the soft keyboard …`); `traceLine` is the
  * caller's, since each protocol's trace sentence starts from its own fact. The message is `failedLookMessage`'s shape
  * with `mayHaveChanged` after it, as on the still-up refusals. The refused sentence ("This was the look after …") is

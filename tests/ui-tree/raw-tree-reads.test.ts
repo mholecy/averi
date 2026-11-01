@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 // raw `adapter.uiTree()` decides it again wherever it stands, and inside a catch-all it would swallow that failure as
 // a miss. So the raw calls outside the adapters and the seam are pinned here: a new one fails this test, and is either
 // routed through the seam or added below with the reason it may read raw.
+// A textual tripwire (it counts `.uiTree(` in the source text), not a proof: an aliased or destructured read slips by.
 const ALLOWED_RAW_READS: Record<string, { calls: number; why: string }> = {
   'src/flow/engine.ts': { calls: 1, why: 'a hold-observing wrapper handed to pollTree: it rethrows every failure' },
   'src/interact/fill.ts': { calls: 1, why: "notInput's hint read: swallows any failure on purpose (a hint, not a verdict)" },

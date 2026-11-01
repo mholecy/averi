@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { TreeRead } from '../../src/ui-tree/read-tree.js';
 import type { DeviceScreen, UiNode } from '../../src/adapters/types.js';
 import type { ScreenSize } from '../../src/ui-tree/geometry.js';
 import { treeScreen, usableScreen, usableScreenOf } from '../../src/ui-tree/usable-screen.js';
 import { el, FakeAdapter, node, screen } from '../helpers/fake.js';
+
+/** A read that failed, as the read seam returns it (a TreeRead): usableScreen asks only its tree. */
+const failedRead = (message: string): TreeRead => ({ error: new Error(message) });
 
 /** A fake whose tree is `root` and whose device reports `viewport` (or throws it, as a failed `wm size` would). */
 function device(root: UiNode, viewport: DeviceScreen | Error): FakeAdapter {
@@ -59,7 +63,7 @@ describe('usableScreen — the oriented box: the device screen, turned only when
   });
 
   it('a tree that cannot be read: the device as built, from the device', async () => {
-    const got = await usableScreen(device(screen(), { width: 1000, height: 2000 }), { error: new Error('uiautomator dump returned no XML') });
+    const got = await usableScreen(device(screen(), { width: 1000, height: 2000 }), failedRead('uiautomator dump returned no XML'));
     expect(got).toMatchObject({ oriented: box(1000, 2000), boxes: [box(1000, 2000)], from: 'device' });
   });
 
@@ -184,7 +188,7 @@ describe('usableScreen — the fallback window, and nothing', () => {
   });
 
   it('no usable screen: neither the device nor the tree read', async () => {
-    expect(await usableScreen(device(screen(), new Error('device offline')), { error: new Error('null root node') })).toBeUndefined();
+    expect(await usableScreen(device(screen(), new Error('device offline')), failedRead('null root node'))).toBeUndefined();
   });
 });
 

@@ -124,6 +124,8 @@ export async function readTreeOrMiss(adapter: Pick<DeviceAdapter, 'uiTree'>): Pr
  * Read the UI tree for a caller that has no use for a miss: a tree, or
  * `wrap(e)` of a failure that heals thrown in its place — the caller's own
  * wording (fill's `reread-failed`, the keyboard dismissal's AfterDismissalTap).
+ * `wrap` receives a normalised Error: a non-Error rejection arrives as
+ * `new Error(String(e))`.
  * A failure no wait cures passes through unwrapped (`wrap` is never called):
  * its class is what the read loops and the flow engine's isTerminal stop on.
  */

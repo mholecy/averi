@@ -22,8 +22,6 @@ import {
   type IdentifiedRead,
 } from '../../src/ui-tree/read-tree.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { swipeScreen } from '../../src/interact/swipe.js';
-import { el, FakeAdapter, screen } from '../helpers/fake.js';
 
 const tree: UiNode = {
   role: 'container',
@@ -124,16 +122,6 @@ describe('the read seam throws a failure no wait cures', () => {
     await expect(readTreeOr(wedgedDevice, wrap)).rejects.toBe(wedged);
     expect(wrap).not.toHaveBeenCalled();
     await expect(readTreeOr({ uiTree: async () => tree }, wrap)).resolves.toBe(tree);
-  });
-
-  // The one reader that opts out (ARCHITECTURE.md: a swipe's orientation read loses only its witness): the swipe is
-  // sent over the device box, and its note quotes the failure.
-  it('swipeScreen on a terminal read still swipes, and its note quotes the message', async () => {
-    const fake = new FakeAdapter({ s: screen(el({ identifier: 'anything' })) }, 's');
-    fake.uiTree = wedgedDevice.uiTree;
-    const drawn = await swipeScreen(fake, { direction: 'up', meaning: 'finger' });
-    expect(fake.swipes).toHaveLength(1);
-    expect(drawn.note).toContain('the accessibility service is wedged until a reboot');
   });
 });
 

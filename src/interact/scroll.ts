@@ -301,10 +301,9 @@ export async function scrollUntilVisible(
   let matched = false; // some read of the call matched the target: no miss's word is asked any more
   for (;;) {
     // A failed read is a miss, not a failure — see readTreeOrMiss, which
-    // throws the one no wait cures. Timed
-    // alone (`readMs`), failed or not: a timeout says how long the reads took,
-    // so one spent by a tree source restarting under the scroll does not read
-    // as the content's fault.
+    // throws the one no wait cures. Timed alone (`readMs`), failed or not: a
+    // timeout says how long the reads took, so one spent by a tree source
+    // restarting under the scroll does not read as the content's fault.
     const readStarted = Date.now();
     const read = await readTreeOrMiss(adapter);
     const readMs = Date.now() - readStarted;
