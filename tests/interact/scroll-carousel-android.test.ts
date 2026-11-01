@@ -5,6 +5,8 @@ import { type RoundRules } from '../../src/interact/scroll-rounds.js';
 import { CUT_EDGE_CARRY, CUT_EDGE_MIN_DRAG, UNKNOWN_CENTRE_MIN_GAP, unknownCentreNeeds } from '../../src/interact/course.js';
 import { describeScrollResult } from '../../src/interact/scroll-text.js';
 import { parseDump } from '../helpers/android-dumps.js';
+import { containsPoint } from '../../src/ui-tree/geometry.js';
+import { node } from '../helpers/fake.js';
 import { coverOver, failureOf, play, resultOf, strokesToward, type Row } from '../helpers/rounds.js';
 
 /**
@@ -162,6 +164,44 @@ describe("a vertical list's row cut at the screen's bottom (D17): the lab's form
     const band = { x: 0, y: 2120, width: 1080, height: 100 };
     const played = play({ ...RULES, direction: 'down', fully: true }, Array.from({ length: 4 }, () => ({ ...at(2080), cover: coverOver(band) })));
     expect(failureOf(played, 'FO').message).toMatch(/at most \d+% of it is in the viewport above the soft keyboard over \[0,2120\]\[1080,2220\] — uiautomator does not say how far it runs past the screen's bottom edge/);
+  });
+});
+
+describe("a sheet presented BY SHAPE (ADR 0018's fallback, on every Android tree) over the list beside the row", () => {
+  const r = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
+  /**
+   * form-picker's shape — its list ending at 2154, the row dumped ending at the screen's 2220 — and a later screen-sized
+   * layer stacked over it, in one window, holding a sheet's scroll view; with `bar`, a bar of the screen beneath drawn
+   * over the list's lower half, which the stroke room keeps the touch-down above.
+   */
+  const shaped = (sheet: Rect, bar?: Rect): Row => {
+    const fo = node({ role: 'button', identifier: 'FO', label: 'Faroe Islands', rect: r(0, 2080, 1080, 140) });
+    const list = node({ role: 'scrollable', rect: r(0, 221, 1080, 1933), children: [node({ role: 'button', label: 'Row A', rect: r(0, 300, 1080, 140) }), fo] });
+    const sheetView = node({ role: 'scrollable', rect: sheet, children: [node({ role: 'text', label: 'Sheet row', rect: r(40, sheet.y + 20, 600, 80) })] });
+    const beneath = [list, ...(bar === undefined ? [] : [node({ role: 'button', label: 'Bar', rect: bar })])];
+    const holder = node({ role: 'container', rect: r(0, 0, 1080, 2220), children: [node({ role: 'container', rect: r(0, 0, 1080, 2220), children: beneath }), node({ role: 'container', rect: r(0, 0, 1080, 2220), children: [sheetView] })] });
+    const tree: UiNode = { ...node({ role: 'container', rect: r(0, 0, 1080, 2220), children: [holder] }), boundsCutAtScreen: true, activeWindowOnly: true, paddedTouchTargets: true };
+    return { tree, found: [fo] };
+  };
+
+  it.each([r(0, 1200, 1080, 600), r(0, 1600, 1080, 300), r(0, 500, 1080, 700)])('a sheet at %o, clear of the row: the row a plain stop with its bottom unknown — the centre stroke is sent, touching down off the sheet (the stroke room keeps it off what is drawn over the list)', (sheet) => {
+    const played = play({ ...RULES, direction: 'down' }, [shaped(sheet)]);
+    const [step] = played.steps;
+    expect(step.do).toBe('stroke');
+    if (step.do !== 'stroke' || step.points === undefined) throw new Error('no stroke');
+    expect(containsPoint(sheet, step.points.from)).toBe(false);
+  });
+
+  it("with a bar over the list's lower half the touch-down lands on the sheet above it: the centre stroke is not sent — the plain stop is made at once, its share \"at most\"", () => {
+    const played = play({ ...RULES, direction: 'down' }, [shaped(r(0, 600, 1080, 700), r(0, 1400, 1080, 300))]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stop']);
+    expect(describeScrollResult(resultOf(played))).toMatch(/^visible after 0 swipes — CLIPPED at bottom, at most \d+% of it is in the viewport — uiautomator does not say how far it runs past the screen's bottom edge/);
+  });
+
+  it('…and `fully: true` there fails as a presented stop whose shortfall says "at most"', () => {
+    const row = (): Row => shaped(r(0, 600, 1080, 700), r(0, 1400, 1080, 300));
+    const played = play({ ...RULES, direction: 'down', fully: true }, [row(), row()]);
+    expect(failureOf(played, 'FO').message).toMatch(/element is in the viewport but CLIPPED at bottom, at most \d+% of it is in the viewport — uiautomator does not say how far it runs past the screen's bottom edge, and the next swipe would touch down at \(540,1165\) on scrollable \(0,600 1080x700\)/);
   });
 });
 

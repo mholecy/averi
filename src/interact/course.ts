@@ -355,7 +355,7 @@ function stillNeeds(found: FarFacts & { frames: readonly Rect[] }, toward: Direc
  * (UNMEASURED_CARRY, 2.8). Measured live on the lab's `carousel-in-list` (emulator-5554, API 33): full 569-px drags over
  * the carousel carried it 451–632 px (0.79–1.11 a px) by run; shorter drags carried less — 145–178 px drags carried
  * 102–140 px (0.69–0.85 a px). The most, as UNMEASURED_CARRY is WDA's most: a stroke planned on it lands short of what
- * it needs, never past.
+ * it needs at every measured carry; an overshoot under half the card's width keeps its centre inside.
  */
 export const CUT_EDGE_CARRY = 1.11;
 
@@ -365,7 +365,8 @@ export const CUT_EDGE_MIN_DRAG = 2 * TOUCH_SLOP;
 /**
  * How far inside its frame's far edge the known far side of a target whose centre is unknown must lie for
  * `unknownCentreNeeds`'s stroke: what the shortest such stroke (CUT_EDGE_MIN_DRAG) carries at the most (CUT_EDGE_CARRY),
- * 54 px — so even that stroke cannot push the known side past the frame's far edge.
+ * 54 px — so even that stroke cannot push the known side past the frame's far edge at the most carry measured; short
+ * drags were measured at 0.69–0.85 a px, which leaves headroom (a 48-px drag carrying some 33–41 px).
  */
 export const UNKNOWN_CENTRE_MIN_GAP = Math.ceil(CUT_EDGE_MIN_DRAG * CUT_EDGE_CARRY);
 
