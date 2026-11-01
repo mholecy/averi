@@ -42,7 +42,8 @@ export interface IosTreeSource {
   /**
    * The configured kind this source serves (mcp/registry.ts wires it). No reader above the adapter dispatches on it: a
    * tree says its own source by its marks (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts). The
-   * adapter reads it once, for where its screenshots come from (ios.ts#screenshot, D26b: idb on idb, simctl on WDA).
+   * adapter reads it for its keyboard advice only (ios.ts#keyboardAdvice); its screenshots do not follow it
+   * (ios.ts#screenshotVia).
    */
   readonly kind: IosTreeSourceKind;
   read(): Promise<UiNode>;
