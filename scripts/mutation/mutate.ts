@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -36,8 +36,10 @@ export function scoreOf(mutants: readonly { status: string }[]): number {
   return valid.length === 0 ? 100 : (100 * valid.filter((m) => DETECTED.has(m.status)).length) / valid.length;
 }
 
+const floorText = (floor: number | undefined): string => (floor === undefined ? 'no floor' : `floor ${floor} %`);
+
 const scoreLine = (file: string, report: MutationReport, scope: Scope): string =>
-  `${file}: ${scoreOf(report.files[file].mutants).toFixed(2)} % (floor ${scope[file]?.floor ?? 'none'} %)`;
+  `${file}: ${scoreOf(report.files[file].mutants).toFixed(2)} % (${floorText(scope[file]?.floor)})`;
 
 /**
  * The failure lines of a run: a mutated module below its floor, a mutated module without a floor, a floor whose
@@ -82,6 +84,7 @@ export function main(args: readonly string[]): number {
   return 1;
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Real paths on both sides: through a symlink (/tmp → /private/tmp) the merge gate must run, never pass idle.
+if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   process.exit(main(process.argv.slice(2)));
 }

@@ -1,3 +1,8 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { checkFloors, readScope, scoreOf, type MutationReport, type Scope } from '../../scripts/mutation/mutate.js';
 
@@ -43,6 +48,23 @@ describe('checkFloors — the failure lines of a run', () => {
       expect(m.tests.length).toBeGreaterThan(0);
       expect(m.floor).toBeGreaterThan(0);
       expect(m.floor).toBeLessThanOrEqual(100);
+    }
+  });
+});
+
+describe('main — the merge gate runs whatever path starts it', () => {
+  it('through a symlink (/tmp is one to /private/tmp on macOS) it runs, never exits 0 idle', () => {
+    // `stryker run --help` prints its help and writes no report, so main fails fast and says so. It deletes the
+    // checkout's last reports/mutation/mutation.json first, as every run does — a generated file.
+    const dir = mkdtempSync(join(tmpdir(), 'averi-mutate-'));
+    try {
+      const link = join(dir, 'mutate.ts');
+      symlinkSync(fileURLToPath(new URL('../../scripts/mutation/mutate.ts', import.meta.url)), link);
+      const run = spawnSync(process.execPath, ['--import', 'tsx', link, '--help'], { encoding: 'utf8' });
+      expect(run.status).toBe(1);
+      expect(run.stderr).toContain('Stryker wrote no report');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });
