@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { androidUnusable, iosBootedFromDevicePlist, listAndroidDevices, listIosDevices } from '../../src/adapters/discovery.js';
+import {
+  androidUnusable,
+  defaultDiscoveryDeps,
+  discoveryOver,
+  discoveryWith,
+  iosBootedFromDevicePlist,
+  listAndroidDevices,
+  listIosDevices,
+  type BootedProof,
+} from '../../src/adapters/discovery.js';
 import type { Device } from '../../src/adapters/types.js';
-import type { ExecFn, ExecOptions, ExecResult } from '../../src/adapters/exec.js';
+import { device, recordingListing } from '../helpers/listing.js';
+import { exec as defaultExec, type ExecFn, type ExecOptions, type ExecResult } from '../../src/adapters/exec.js';
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
 function fakeExec(responses: Record<string, string>) {
@@ -204,5 +214,114 @@ describe('iosBootedFromDevicePlist — the bound simulator\'s own record, before
   it('a missing or unreadable file reads not-proven-booted, without throwing', async () => {
     const missing = Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' });
     expect(await iosBootedFromDevicePlist(UDID, reader(missing).read, '/Users/lab')).toBe(false);
+  });
+});
+
+describe('DeviceDiscovery.check — is the bound device still usable? (discoveryOver)', () => {
+  /** A discovery over a fixed device list (`recordingListing`); `proofs` records each udid the proof was asked about. No proof given: none is wired. */
+  function over(devices: Device[], proof?: BootedProof) {
+    const { listing, platforms, versions } = recordingListing(devices);
+    const proofs: string[] = [];
+    const discovery = discoveryOver(listing, proof === undefined ? undefined : (udid) => (proofs.push(udid), proof(udid)));
+    return { discovery, platforms, versions, proofs };
+  }
+
+  it('listed and booted: usable, from a listing without versions (D13)', async () => {
+    const { discovery, platforms, versions } = over([device('phone')]);
+    expect(await discovery.check('android', 'phone')).toEqual({ usable: true });
+    expect(platforms).toEqual(['android']);
+    expect(versions).toEqual([false]);
+  });
+
+  it('listed but not booted: unusable, the entry kept for the refusal\'s wording', async () => {
+    const { discovery } = over([device('other'), device('R58M123', 'unauthorized')]);
+    expect(await discovery.check('android', 'R58M123')).toEqual({ usable: false, listed: device('R58M123', 'unauthorized') });
+  });
+
+  it('not listed: unusable, nothing listed', async () => {
+    const { discovery } = over([device('other')]);
+    expect(await discovery.check('android', 'phone')).toEqual({ usable: false, listed: undefined });
+  });
+
+  it('listed twice (a shared serial): usable while one entry is booted; unusable names the FIRST entry', async () => {
+    expect(await over([device('0123', 'unauthorized'), device('0123')]).discovery.check('android', '0123')).toEqual({ usable: true });
+    const { discovery } = over([device('0123', 'unauthorized'), device('0123', 'offline')]);
+    expect(await discovery.check('android', '0123')).toEqual({ usable: false, listed: device('0123', 'unauthorized') });
+  });
+
+  it('iOS proven booted (D22): usable without a listing', async () => {
+    const { discovery, platforms, versions, proofs } = over([], async () => true);
+    expect(await discovery.check('ios', 'sim')).toEqual({ usable: true });
+    expect(proofs).toEqual(['sim']);
+    expect(platforms).toEqual([]);
+    expect(versions).toEqual([]);
+  });
+
+  // Not proven is "ask simctl", never "shut down": the listing decides, with the same options.
+  it.each([
+    ['not proven', async () => false],
+    ['a proof that rejects', async () => Promise.reject(new Error('EACCES'))],
+    ['a proof that throws synchronously', (() => { throw new Error('boom'); }) as unknown as BootedProof],
+  ])('%s: the listing decides, without versions', async (_why, proof) => {
+    const { discovery, platforms, versions, proofs } = over([device('sim', 'booted', 'ios'), device('off', 'offline', 'ios')], proof);
+    expect(await discovery.check('ios', 'sim')).toEqual({ usable: true });
+    expect(await discovery.check('ios', 'off')).toEqual({ usable: false, listed: device('off', 'offline', 'ios') });
+    expect(proofs).toEqual(['sim', 'off']);
+    expect(platforms).toEqual(['ios', 'ios']);
+    expect(versions).toEqual([false, false]);
+  });
+
+  it('Android never asks the proof: it lists with adb', async () => {
+    const { discovery, platforms, versions, proofs } = over([device('phone')], async () => true);
+    expect(await discovery.check('android', 'phone')).toEqual({ usable: true });
+    expect(proofs).toEqual([]);
+    expect(platforms).toEqual(['android']);
+    expect(versions).toEqual([false]);
+  });
+
+  it('a discovery built without a proof never proves: the iOS check lists', async () => {
+    const { discovery, platforms, versions } = over([device('sim', 'booted', 'ios')]);
+    expect(await discovery.check('ios', 'sim')).toEqual({ usable: true });
+    expect(platforms).toEqual(['ios']);
+    expect(versions).toEqual([false]);
+  });
+
+  it('list is the listing itself, its options passed through', async () => {
+    const { discovery, platforms, versions } = over([device('phone'), device('sim', 'booted', 'ios')]);
+    expect((await discovery.list('ios')).map((d) => d.id)).toEqual(['sim']);
+    await discovery.list('android', { versions: false });
+    expect(platforms).toEqual(['ios', 'android']);
+    expect(versions).toEqual([true, false]);
+  });
+});
+
+describe('discoveryWith — the adb and simctl listings over one exec', () => {
+  it('lists android with adb and ios with simctl — the platform reaches the right listing', async () => {
+    const { fn, calls } = fakeExec({ 'xcrun simctl': '{"devices":{}}' });
+    const discovery = discoveryWith(fn);
+    expect(await discovery.list('android')).toEqual([]);
+    expect(calls).toEqual(['adb devices -l']);
+    calls.length = 0;
+    expect(await discovery.list('ios')).toEqual([]);
+    expect(calls).toContain('xcrun simctl list devices --json');
+    expect(calls.some((c) => c.startsWith('adb'))).toBe(false);
+  });
+
+  it('hands the listing its options — `versions: false` reaches adb as no getprop', async () => {
+    const { fn, calls } = fakeExec({ 'adb devices': 'List of devices attached\nemulator-5554 device\n', 'adb -s': '14\n' });
+    const discovery = discoveryWith(fn);
+    expect((await discovery.list('android', { versions: false })).map((d) => d.osVersion)).toEqual(['unknown']);
+    expect(calls).toEqual(['adb devices -l']);
+    expect((await discovery.list('android')).map((d) => d.osVersion)).toEqual(['14']);
+  });
+
+  it('check lists without versions: on Android `adb devices -l` alone', async () => {
+    const { fn, calls } = fakeExec({ 'adb devices': 'List of devices attached\nemulator-5554 device\n' });
+    expect(await discoveryWith(fn).check('android', 'emulator-5554')).toEqual({ usable: true });
+    expect(calls).toEqual(['adb devices -l']);
+  });
+
+  it('the server\'s discovery is built on the real exec and the device.plist proof', () => {
+    expect(defaultDiscoveryDeps).toEqual({ exec: defaultExec, iosBooted: iosBootedFromDevicePlist });
   });
 });

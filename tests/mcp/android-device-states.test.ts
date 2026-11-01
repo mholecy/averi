@@ -2,7 +2,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ExecFn } from '../../src/adapters/exec.js';
-import { AdapterRegistry, discoveryWith } from '../../src/mcp/registry.js';
+import { AdapterRegistry } from '../../src/mcp/registry.js';
+import { discoveryWith } from '../../src/adapters/discovery.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 
 /**

@@ -118,6 +118,35 @@ describe("an older side's registry (side.ts#registry)", () => {
     }
   });
 
+  it('since A3: discovery is asked `list` and `check` — the check the side\'s own discoveryOver, over the listing', async () => {
+    const root = await fakeSide(`
+      export const defaultFactory = () => undefined;
+      export class AdapterRegistry {
+        constructor(deps) { this.deps = deps; }
+        async listAll() { return this.deps.discovery.list('ios'); }
+        async get(platform, id) { return (await this.deps.discovery.check(platform, id)).usable ? this.deps.factory(platform, id) : undefined; }
+      }`);
+    await writeFile(
+      join(root, 'src/adapters/discovery.ts'),
+      `export const discoveryOver = (listing) => ({
+        list: listing,
+        check: async (platform, id) => ({ usable: (await listing(platform, { versions: false })).some((d) => d.id === id) }),
+      });`,
+    );
+    try {
+      const side = await loadSide(root);
+      const r = side.registry({ factory: () => adapter, discovery: async (p) => (p === 'ios' ? [device] : []) }) as unknown as {
+        listAll(): Promise<unknown>;
+        get(p: string, id: string): Promise<unknown>;
+      };
+      expect(await r.listAll()).toEqual([device]);
+      expect(await r.get('ios', device.id)).toBe(adapter);
+      expect(await r.get('ios', 'gone')).toBeUndefined();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("this checkout's registry reads as the new constructor", async () => {
     expect(await takesDeps(AdapterRegistry)).toBe(true);
   });

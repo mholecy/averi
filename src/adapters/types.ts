@@ -7,7 +7,7 @@
 
 export type Platform = 'android' | 'ios';
 
-/** One entry of a platform's device list (discovery.ts, behind the registry's DeviceDiscovery). */
+/** One entry of a platform's device list (discovery.ts#DeviceDiscovery, the registry's discovery seam). */
 export interface Device {
   id: string; // adb serial / simctl UDID
   platform: Platform;

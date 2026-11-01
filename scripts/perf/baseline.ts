@@ -8,7 +8,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import type { Platform } from '../../src/adapters/types.js';
-import { AdapterRegistry, defaultDiscovery, defaultFactory, defaultIosBooted, iosAdapterFor } from '../../src/mcp/registry.js';
+import { AdapterRegistry, defaultFactory, iosAdapterFor } from '../../src/mcp/registry.js';
+import { defaultDiscovery } from '../../src/adapters/discovery.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_WDA_DERIVED_DATA } from '../truth/lab-device.js';
 import { allPassed, callReply, claimsDone, claimsTap, claimsVisible, isError, OCR_FAILED_CLOSED } from '../truth/replies.js';
@@ -246,9 +247,8 @@ const registry = new AdapterRegistry({
     p === 'android'
       ? defaultFactory(p, deviceId, opts)
       : iosAdapterFor(deviceId, opts?.treeSource ?? treeSource, { port: wdaPort, derivedDataPath: LAB_WDA_DERIVED_DATA }),
+  // The server's own discovery, its check's device.plist proof (D22) included, as `new AdapterRegistry()` has.
   discovery: defaultDiscovery,
-  // The server's own proof (D22): a bound simulator proven booted from its device.plist, as `new AdapterRegistry()` does.
-  iosBooted: defaultIosBooted,
 });
 const server = createAveriServer({ registry, version: 'perf-baseline' });
 const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();

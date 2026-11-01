@@ -6,7 +6,8 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IdbEmptyTreeError, IdbNoFrontmostError } from '../../src/adapters/ios-tree-source.js';
 import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
-import { AdapterRegistry, type AdapterFactory, type DeviceDiscovery } from '../../src/mcp/registry.js';
+import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
+import { discoveryOver } from '../../src/adapters/discovery.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { TOOL_CONFIG } from '../../src/mcp/config-policy.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
@@ -87,10 +88,10 @@ async function connect(
   version = '0.0.0-test',
 ) {
   const factoryCalls: { platform: Platform; deviceId?: string; treeSource?: string }[] = [];
-  const discovery: DeviceDiscovery = async (platform) => {
+  const discovery = discoveryOver(async (platform) => {
     factoryCalls.push({ platform });
     return [booted(platform)];
-  };
+  });
   const factory: AdapterFactory = (platform, deviceId, opts) => {
     factoryCalls.push({ platform, deviceId, treeSource: opts?.treeSource });
     const fake = fakes[platform];

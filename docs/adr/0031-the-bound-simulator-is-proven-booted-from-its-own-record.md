@@ -2,6 +2,7 @@
 
 Status: accepted 2026-10-31 (performance backlog row D22, docs/plans/2026-10-30-performance-backlog.md, section "iOS
 per-call costs"; the orchestrator's decision from the D0 iOS windows). Implemented on `perf/d22-ios-probe-plist` (51bf3d9b, 85f7de99, 70d3b61c), merged 3574d5b2.
+Amended 2026-11-01 (A3: the proof moved from the registry into discovery's check — see the amendment below).
 
 ## Context
 
@@ -30,7 +31,7 @@ registry hands out the adapter without a listing. Anything short of proof lists 
   a missing or unreadable file, a binary plist, garbage, another UDID, a reader that throws.
 - The unbound path (the auto-pick), `select()` and `listAll()` keep simctl: they need the listing itself. Android is
   untouched.
-- The proof is the registry's optional third seam (`iosBooted`, `mcp/registry.ts#IosBootedProof`). The default registry
+- The proof is the registry's optional third seam (`iosBooted`, `IosBootedProof` in mcp/registry.ts until A3). The default registry
   wires the real reader (`defaultIosBooted`; scripts/perf/baseline.ts passes it too, so D0 measures the server's path);
   a caller that injects its seams and names no proof gets one that proves nothing — its bound iOS calls list as before
   and no host file is read. That keeps the "both seams or neither" rule's point: a test cannot touch the host by
@@ -63,3 +64,16 @@ registry hands out the adapter without a listing. Anything short of proof lists 
   iOS) shows the saving in a whole call, and whether a simulator's record ever reads 3 while simctl says otherwise
   outside the two residuals above — not seen, not looked for beyond the lab simulator.
 - A shut-down or deleted simulator still gets the listing's wording ("Selected ios device … is no longer booted").
+
+## Amendment: the proof is discovery's check (2026-11-01, A3)
+
+Where the proof sits, only; what is proof, and why it is safe enough, are unchanged. The proof is discovery's own first
+step of the bound device's check, `DeviceDiscovery.check` (`adapters/discovery.ts#discoveryOver`, the one
+implementation of the check), no longer the registry's optional third seam. The default discovery wires the real
+reader (`iosBootedFromDevicePlist`, `adapters/discovery.ts#defaultDiscoveryDeps`); a discovery built without a proof
+never proves — its bound iOS checks list as before and no host file is read. The registry has two seams, factory and
+discovery, both or neither without exception: a test still cannot touch the host by omission.
+
+Consequences: the registry's bound path awaits one `check` and makes one select() race check after it, whichever step
+answered; scripts/perf/baseline.ts measures the server's path by building its registry on `defaultDiscovery`, the
+proof included. No behaviour changed.
