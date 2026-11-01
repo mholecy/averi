@@ -358,13 +358,17 @@ describe('fillField — focus, clear, type, verify', () => {
     const wedged = new PersistentReadError('wedged until a reboot');
     const fake = notInputReadFails(wedged);
     await expect(fillField(fake, 'text:"IBAN*"', '', FAST)).rejects.toBe(wedged);
-    expect(fake.reads()).toBe(3); // the failure came from the finding's read, not a settle read
+    // The focus tap lies between the settle reads and the finding's read: one tap and three reads put the failure on
+    // the finding's read, not on a third settle read.
+    expect(fake.taps).toHaveLength(1);
+    expect(fake.reads()).toBe(3);
   });
 
   it("notInput's read that throws a PersistentReadError with clear: true: the same read, rejected as it came", async () => {
     const wedged = new PersistentReadError('wedged until a reboot');
     const fake = notInputReadFails(wedged);
     await expect(fillField(fake, 'text:"IBAN*"', '', { ...FAST, clear: true })).rejects.toBe(wedged);
+    expect(fake.taps).toHaveLength(1); // as above: the tap lies between the settle reads and the finding's read
     expect(fake.reads()).toBe(3);
   });
 
