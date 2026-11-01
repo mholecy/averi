@@ -22,9 +22,8 @@
  *      tail-of-its-text-in-a-react-native-single-line-field.md, docs/adr/0023-fill-types-a-dropped-tail-again.md):
  *      the field holds a strict prefix of what it should hold — some of the
  *      typed characters landed, the end did not — the reading held still
- *      over the poll's last two reads, the adapter's typing has arrived when
- *      its call returns (DeviceAdapter.typingDelivery `on-return`: iOS; on
- *      Android a late key could be doubled), and the typing provably stayed
+ *      over the poll's last two reads, the adapter retypes a tail
+ *      (`retypesTail`), and the typing provably stayed
  *      in the field (`whereTyped`: every other input the screen showed before
  *      the typing is there with its value — an auto-advancing code box that
  *      moved the focus would get the tail too; a sibling the app recomputed
@@ -93,7 +92,7 @@ export interface TypingIntent extends Expectation {
   pollMs: number;
   /** The field as the newest read before typing found it — left out of the other inputs the typing must not change. */
   field: UiNode;
-  /** When the adapter's typing has reached the field (DeviceAdapter.typingDelivery): a tail is typed again only `on-return`. */
+  /** When the adapter's typing has reached the field (DeviceAdapter.typingDelivery): whether a tail is typed again (`retypesTail`). */
   delivery: TypingDelivery;
 }
 
@@ -114,6 +113,13 @@ export type Typed =
   | { kind: 'not-taken'; observed: string }
   | { kind: 'unread' }
   | { kind: 'missed'; observed: string; again: SentAgain[]; differs: Difference; elsewhere?: OtherInput };
+
+/**
+ * Whether a dropped tail is typed again on this adapter (docs/adr/0023-fill-types-a-dropped-tail-again.md): only when
+ * its typing has arrived when its call returns (`on-return`: iOS) — on Android a key still arriving would be doubled.
+ * Asked here and by fill.ts's post-focus re-read gate, whose proof (`whereTyped`) only a retype needs.
+ */
+export const retypesTail = (delivery: TypingDelivery): boolean => delivery === 'on-return';
 
 /** How many times a dropped tail is typed again (docs/adr/0023-fill-types-a-dropped-tail-again.md): the second covers a tail the first retype lost a part of. */
 export const MAX_TAIL_RETYPES = 2;
@@ -143,14 +149,16 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       // trimming field (maxLength, an IBAN or phone mask) keeps its strict prefix for good — its retype moves nothing
       // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
       // (D24 review).
-      if (tails() > 0) io.reportDroppedTail();
       const landed = read.landed;
+      // Final, but no landing: the field said plain shows bullets of another length (fill-landing.ts#Landing).
+      if (landed.kind === 'said-plain') return { kind: 'missed', observed, again, differs: differenceOf(observed, intent) };
+      if (tails() > 0) io.reportDroppedTail();
       if (landed.kind === 'placeholder') return { kind: 'landed', observed, again, placeholder: true };
       return { kind: 'landed', observed, again, ...(landed.reformatted !== undefined && { reformatted: landed.reformatted }) };
     }
     const where = whereTyped(others, io.screen(), tailOf(observed, intent)?.missing);
     const tail =
-      intent.delivery === 'on-return' && where.kind === 'field' && read.steady && tails() < MAX_TAIL_RETYPES
+      retypesTail(intent.delivery) && where.kind === 'field' && read.steady && tails() < MAX_TAIL_RETYPES
         ? droppedTail(observed, intent)
         : undefined;
     if (tail !== undefined && (tails() === 0 || observed !== read.prior)) {

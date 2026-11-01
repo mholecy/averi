@@ -256,3 +256,20 @@ app held `SK31 1200 00`).
 
 **Not checked on the device.** The owner re-runs, on iOS: `live.ts --udid … --cases f1,f7` (both should read `Filled …
 the field shows them reformatted`: f1 `2 separators added`, f7's fills `1` and `2`).
+
+## Amendment: the landing rule in one module (2026-11-01, A2)
+
+`landedReformat`, `tailOf`, `landedSome`, `priorText` and `priorsOf` moved from fill-reformat.ts to
+`interact/fill-landing.ts`, beside the exact rule (`landingOf`) and the mismatch's classification (`differenceOf`);
+`priorText` and `priorsOf` are private there. fill-reformat.ts keeps the character rules alone (`reformatOf`,
+`prefixOf`, `skeleton`). No rule changed.
+
+- **The literal-start slice is deliberate.** `differenceOf` compares what follows the earlier text when the reading
+  starts with it LITERALLY (`typedPartOf`), not `priorsOf`'s letters-and-digits rule: a skeleton match cannot be sliced
+  back to reading positions. An earlier `1,000` that a regrouping field shows, with `5678` typed, as `10,005,678`
+  starts with `1000` by its letters and digits, but no slice of the reading is the typing — so it is compared whole,
+  as a vanished earlier text is. No input was found where the two rules give another `Difference`, and a `Difference`
+  never changes pass or fail (mutation-checked: `differenceOf` switched to `priorsOf` kills no test).
+- **Residual — the placeholder asymmetry.** A value equal to the named placeholder that the field shows exactly is
+  read back `placeholder` (not verified); the same placeholder shown GROUPED for an ungrouped value (`SK00 0000` for
+  `SK000000`) is held as empty (`heldText` is exact equality), lands as nothing, and fails `unchanged`. Kept as is.

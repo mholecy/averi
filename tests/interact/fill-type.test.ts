@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { MAX_TAIL_RETYPES, typeAndConfirm, type FieldIo, type TypingIntent } from '../../src/interact/fill-type.js';
+import { MAX_TAIL_RETYPES, retypesTail, typeAndConfirm, type FieldIo, type TypingIntent } from '../../src/interact/fill-type.js';
 import { node } from '../helpers/fake.js';
 
 vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => undefined }));
@@ -314,3 +314,9 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
   });
 });
 
+describe('retypesTail — ADR 0023\'s retype condition, asked by the typing and by fill.ts\'s re-read gate', () => {
+  it('only an adapter whose typing has arrived when its call returns types a dropped tail again', () => {
+    expect(retypesTail('on-return')).toBe(true);
+    expect(retypesTail('may-arrive-late')).toBe(false);
+  });
+});

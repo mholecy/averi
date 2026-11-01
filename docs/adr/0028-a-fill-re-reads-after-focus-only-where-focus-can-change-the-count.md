@@ -104,3 +104,16 @@ change); kf1–kf3 skipped on both (the keyboard docked).
 ## Gain
 
 One tree read saved per Android fill into an empty plain field named by id, ≈ 2.3 s per such fill. None on iOS.
+
+## Amendment: the gate's clauses from their owners, the failure from the landing (2026-11-01, A2)
+
+The gate reads `value !== '' && !clear && !needsHeldCount(node) && soleIdOf(target) !== undefined &&
+!retypesTail(delivery)`: the empty-plain-input clauses are `interact/fill-landing.ts#needsHeldCount`, the delivery
+clause `interact/fill-type.ts#retypesTail` (ADR 0023's retype condition). Its premise is unchanged: the post-focus
+re-read is never made for a non-empty plain field.
+
+A skipped fill tells the typing its held count is `'unread'` (fill-landing.ts#Expectation) instead of fill.ts
+overriding the typing's outcome. The landing rule then says `said-plain` for a masked reading longer than typed —
+final, the poll stops on it as it stopped on the landed reading fill.ts overrode — and `differenceOf` builds
+`masked-said-plain` for it and for a shorter one, which still polls the whole budget (its keys may be late). Timing
+and every reply are unchanged (pinned: tests/interact/fill.test.ts counts the tree reads of both).

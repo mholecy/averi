@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Difference } from '../../src/interact/fill-facts.js';
-import { differenceOf, droppedTail, landedReformat, landedSome, landingOf, tailOf, type Expectation } from '../../src/interact/fill-landing.js';
+import { differenceOf, droppedTail, landedReformat, landedSome, landingOf, needsHeldCount, tailOf, type Expectation } from '../../src/interact/fill-landing.js';
 
 /**
  * Did the fill land? — interact/fill-landing.ts, the one judge of a field's reading. `landingOf`'s table first, then
@@ -38,6 +38,11 @@ describe('landingOf — did this reading land, and how', () => {
     ['masked without clear: fewer than held + typed does not land', '••••••', { value: 'abcd', held: 3 }, undefined],
     ['masked with clear: exactly the typed length', '••••', { value: 'abcd', clear: true, held: 3 }, { kind: 'landed' }],
     ['masked with clear: another length does not land', '•••••', { value: 'abcd', clear: true }, undefined],
+    // masked, the held count unread (the post-focus re-read skipped, ADR 0028): only the typed length passes
+    ['masked, held unread: exactly the typed length lands', '••••', { value: 'abcd', held: 'unread' }, { kind: 'landed' }],
+    ['masked, held unread: LONGER is said-plain — final, the poll stops', '•••••••', { value: 'abcd', held: 'unread' }, { kind: 'said-plain' }],
+    ['masked, held unread: shorter has not landed yet — the poll goes on (keys may be late)', '••', { value: 'abcd', held: 'unread' }, undefined],
+    ['held unread, a PLAIN reading: the content rule, as ever', 'xabcd', { value: 'abcd', held: 'unread' }, { kind: 'landed' }],
     // a non-input
     ['a non-input that changed to show the value lands', 'Name: Jan', { value: 'Jan', isInput: false, resolvedValue: 'Name' }, { kind: 'landed' }],
     ['a non-input showing its own resolved text has taken nothing', 'Meno', { value: 'e', isInput: false, resolvedValue: 'Meno' }, undefined],
@@ -246,6 +251,11 @@ describe('differenceOf — what a missed read-back differs by, without content',
     // 2. masked
     ['bullets, no clear: the held count rides along', { observed: '•••••', value: '123456', held: 0 }, { kind: 'masked', held: 0 }],
     ['bullets onto held bullets, no clear', { observed: '•'.repeat(32), before: '•'.repeat(20), value: 'x'.repeat(16), held: 20 }, { kind: 'masked', held: 20 }],
+    // 0. masked-said-plain — before unchanged: the held count was never read, so no reading proves what the field held
+    ['bullets, held unread (said plain), longer than typed', { observed: '•••••••', value: 'abcd', held: 'unread' }, { kind: 'masked-said-plain' }],
+    ['bullets, held unread, shorter than typed', { observed: '••', value: 'abcd', held: 'unread' }, { kind: 'masked-said-plain' }],
+    ['bullets, held unread, the reading what it showed before typing: said-plain, not unchanged', { observed: '••', before: '••', value: 'abcd', held: 'unread' }, { kind: 'masked-said-plain' }],
+    ['a plain reading, held unread: compared as text', { observed: 'abcx', value: 'abcd', held: 'unread' }, { kind: 'same-length', positions: 1 }],
     ['bullets with clear: no held count (the clear emptied it)', { observed: '•••••', value: 'secret', clear: true, held: 4 }, { kind: 'masked', held: undefined }],
     // 3. partly masked
     ['show-the-last-character (`•••••t`): lengths only', { observed: '•••••t', value: 'secret' }, { kind: 'length' }],
@@ -317,4 +327,21 @@ describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
     }
     expect(swept).toBeGreaterThan(50); // the sweep is not vacuous
   });
+});
+
+/**
+ * Where the post-focus re-read can change the count the masked rule starts from (ADR 0028): everywhere but an EMPTY
+ * input its source says is plain. The gate's other clauses (no clear, a sole id, no tail retype) are fill.ts's.
+ */
+describe('needsHeldCount — whether a field can hold bullets the typing must count from', () => {
+  const rows: [string, Parameters<typeof needsHeldCount>[0], boolean][] = [
+    ['an empty input said plain: no', { role: 'textfield', secure: false, value: null, placeholder: undefined }, false],
+    ['an input said plain showing its named placeholder (empty): no', { role: 'textfield', secure: false, value: '0,00', placeholder: '0,00' }, false],
+    ['an input said plain that holds text: yes', { role: 'textfield', secure: false, value: '9.99', placeholder: undefined }, true],
+    ['an input said plain showing bullets: yes', { role: 'textfield', secure: false, value: '••••', placeholder: undefined }, true],
+    ['a secure input: yes', { role: 'textfield', secure: true, value: null, placeholder: undefined }, true],
+    ['an input its source said nothing of: yes', { role: 'textfield', secure: undefined, value: null, placeholder: undefined }, true],
+    ['a node of another role said plain (`secure` is an input\'s word): yes', { role: 'other', secure: false, value: null, placeholder: undefined }, true],
+  ];
+  for (const [shape, f, needs] of rows) it(shape, () => expect(needsHeldCount(f)).toBe(needs));
 });

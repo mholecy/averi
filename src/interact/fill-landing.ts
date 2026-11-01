@@ -2,14 +2,18 @@
  * Did the fill land? — the one module that judges a field's reading against what it should hold (A2, 2026-11-01).
  * Until then that was judged in four modules by three rules of the earlier text, and D28 and D29 were both bugs of
  * the typing and the verdict judging the same reading differently. Three questions, one answer each:
- * - `landingOf`: did this reading land — exactly, reformatted, or only as the field's placeholder?
+ * - `landingOf`: did this reading land — exactly, reformatted, or only as the field's placeholder — or is it a masked
+ *   reading that proves the field was wrongly said plain?
  * - `tailOf` (and `droppedTail`): is it a strict prefix of what the field should hold — the tail a field dropped?
  * - `differenceOf`: what can be said of a reading that missed, without content?
  * interact/fill-type.ts asks the first two as it types, polls and retypes; it asks the third once, for a typing that
- * missed, and fill.ts throws what comes back. Pure: no device, no wait, no sentence. Its imports are the facts
- * (fill-facts.ts), the character rules of a reformatting field (fill-reformat.ts) and the mask characters.
+ * missed, and fill.ts throws what comes back. fill.ts asks one more (`needsHeldCount`): whether the field can hold
+ * bullets the masked rule must count from — its post-focus re-read's gate. Pure: no device, no wait, no sentence. Its
+ * imports are the facts (fill-facts.ts), the character rules of a reformatting field (fill-reformat.ts), the mask
+ * characters and the input role.
  */
 
+import { INPUT_ROLE, type UiNode } from '../adapters/types.js';
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
 import { heldText, type Difference, type Reformat } from './fill-facts.js';
 import { prefixOf, reformatOf, skeleton } from './fill-reformat.js';
@@ -28,8 +32,13 @@ export interface Expectation {
   isInput: boolean;
   /** The matched node's value when it was resolved, before the focus tap — what a non-input shows of itself. */
   resolvedValue: string | null;
-  /** The bullets a masked field held after focus — a masked reading must show these plus the typed length. */
-  held: number;
+  /**
+   * The bullets a masked field held after focus — a masked reading must show these plus the typed length. `'unread'`:
+   * fill.ts skipped the post-focus re-read (`needsHeldCount`; docs/adr/0028-a-fill-re-reads-after-focus-only-where-
+   * focus-can-change-the-count.md), the field being said plain, so what it held is unknown and only the typed length
+   * passes a masked reading (`landingOf`'s `said-plain`).
+   */
+  held: number | 'unread';
 }
 
 /** What the text rules ask of an Expectation: the value, and the earlier text it is typed after. */
@@ -39,9 +48,14 @@ export type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | '
  * A reading that landed:
  * - `landed`: it shows the value — exactly, or `reformatted` (the field added separators of its own: `reformatOf`);
  * - `placeholder`: it is exactly the field's named placeholder, which is the value too — typed, or an empty field
- *   with the typing dropped; the tree cannot tell (review of the read-back, probe B). Not verified.
+ *   with the typing dropped; the tree cannot tell (review of the read-back, probe B). Not verified;
+ * - `said-plain`: the held count is `'unread'` and the reading is masked, longer than typed — the field its source said
+ *   is plain shows bullets after all, and no length of it proves anything but the typed one (two dropped keys under
+ *   five autofilled bullets would pass `held + typed` with a `held` of 0). Final: the poll stops on it, as on a landed
+ *   reading, and the fill fails `masked-said-plain` (`differenceOf`). A SHORTER masked reading has not landed and the
+ *   poll goes on — its keys may still arrive; the timing of both is as it was when fill.ts overrode a landed reading.
  */
-export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'placeholder' };
+export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'placeholder' } | { kind: 'said-plain' };
 
 /**
  * Whether a reading landed, and how; undefined when it did not. The rules:
@@ -50,12 +64,14 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
  *   cleared, then the value — every typed character in order, separators of its own added (`landedReformat`);
  * - else the reading must show the value exactly (`exactly`): with clear the whole reading, without it inside what
  *   the field holds; a masked reading by length.
- * A landed reading that is exactly the named placeholder is `placeholder`. Pure.
+ * A landed reading is `said-plain` when the held count is unread and it is masked but not the typed length, else
+ * `placeholder` when it is exactly the named placeholder. Pure.
  */
 export function landingOf(observed: string, e: Expectation): Landing | undefined {
   if (!tookText(observed, e)) return undefined;
   const reformatted = landedReformat(observed, e);
   if (reformatted === undefined && !exactly(observed, e)) return undefined;
+  if (e.held === 'unread' && isMaskedValue(observed) && observed.length !== e.value.length) return { kind: 'said-plain' };
   if (e.placeholder !== undefined && observed === e.placeholder) return { kind: 'placeholder' };
   return { kind: 'landed', ...(reformatted !== undefined && { reformatted }) };
 }
@@ -81,6 +97,7 @@ export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInp
  * compared by count, never by content. The rule detects the SHORT direction only — dropped keystrokes; without `clear`
  * the field must show at least what it held after focus plus what was typed. It cannot tell a correct append from
  * typing onto an autofilled password (both read `held + typed`); that case is fill.ts's `maskedAppend`, not a failure.
+ * A held count `'unread'` counts as none here; `landingOf` fails any length but the typed one (`said-plain`).
  *
  * A placeholder is not content: on an empty field showing `Search`, nothing typed must not pass for a typed `ear`. Raw
  * equality first: a value equal to the placeholder is the one reading that cannot be told from it (`landingOf`'s
@@ -88,7 +105,7 @@ export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInp
  */
 function exactly(observed: string, e: Expectation): boolean {
   const { value, clear } = e;
-  if (isMaskedValue(observed)) return clear ? observed.length === value.length : observed.length >= e.held + value.length;
+  if (isMaskedValue(observed)) return clear ? observed.length === value.length : observed.length >= (e.held === 'unread' ? 0 : e.held) + value.length;
   return clear ? observed === value : observed === value || heldText(observed, e.placeholder).includes(value);
 }
 
@@ -189,6 +206,9 @@ export function droppedTail(observed: string, e: TextExpectation): string | unde
  * What can be said of a reading that missed the value — ONE classification of the kinds (fill-facts.ts#Difference),
  * first match wins (2026-10-09, the fill-clear deepening; until then fill.ts chose `unchanged`, `masked` and the partly
  * masked `length` in a ternary at the throw, and a helper of its own the rest):
+ * 0. `masked-said-plain`: a masked reading where the held count is `'unread'` (`landingOf`'s `said-plain`; one of the
+ *    typed length lands, so it never gets here). Before `unchanged`: no reading of a field whose count was never
+ *    read says more than that (A2, 2026-11-01; until then fill.ts built this Difference itself).
  * 1. `unchanged`: the reading is exactly what the field showed when typing began — whatever it is, bullets included
  *    (probes D and D2 were told "the app transformed the input").
  * 2. `masked`: bullets only, compared by length; `held` without clear.
@@ -207,8 +227,9 @@ export function droppedTail(observed: string, e: TextExpectation): string | unde
  */
 export function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>): Difference {
   const { value, clear } = e;
+  if (e.held === 'unread' && isMaskedValue(observed)) return { kind: 'masked-said-plain' };
   if (observed === e.before) return { kind: 'unchanged' };
-  if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : e.held };
+  if (isMaskedValue(observed)) return { kind: 'masked', held: clear || e.held === 'unread' ? undefined : e.held };
   if (hasBullet(observed)) return { kind: 'length' };
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   const tail = tailOf(observed, e);
@@ -251,3 +272,13 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
 function typedPartOf(shown: string, prior: string): string {
   return prior !== '' && shown.startsWith(prior) ? shown.slice(prior.length) : shown;
 }
+
+/**
+ * Whether the masked rule needs to know what the field held after focus — the post-focus re-read's question
+ * (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md). Not for an EMPTY input its
+ * source says is plain (UiNode.secure `false`; a named placeholder is empty, fill-facts.ts#heldText): it shows its
+ * text, not bullets, so the reading compares content, which needs no count — and one that shows bullets after all
+ * fails `said-plain` (`landingOf`). Everything else may hold bullets, or gain them on focus (an autofill). Pure.
+ */
+export const needsHeldCount = (f: Pick<UiNode, 'role' | 'secure' | 'value' | 'placeholder'>): boolean =>
+  !(f.role === INPUT_ROLE && f.secure === false && heldText(f.value, f.placeholder) === '');

@@ -546,6 +546,28 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     await expect(fillField(fake, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(`fill: typed 8 characters but the field shows 6 ${SAID_PLAIN}`);
   });
 
+  // A2: the said-plain failure is a landing of its own (fill-landing.ts#Landing `said-plain`), with today's timing: a
+  // reading LONGER than typed stops the poll at once, a shorter one polls the whole budget (it may still be arriving).
+  it('skipped: a field said plain failing on bullets reads no more of the tree than before — at once when longer, the whole poll when shorter', async () => {
+    const counted = (fake: FakeAdapter) => {
+      const reads = { n: 0 };
+      const read = fake.uiTree.bind(fake);
+      fake.uiTree = async (...a: Parameters<FakeAdapter['uiTree']>) => (reads.n++, read(...a));
+      return reads;
+    };
+    const longer = field({ secure: false });
+    onFocus(longer, (f) => (f.value = '•'.repeat(5)));
+    appendBullets(longer, 2);
+    const longerReads = counted(longer);
+    await expect(fillField(longer, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(SAID_PLAIN);
+    expect(longerReads.n).toBe(3); // the settle wait (2), the first value poll — it stops there
+    const shorter = field({ secure: false });
+    appendBullets(shorter, 2);
+    const shorterReads = counted(shorter);
+    await expect(fillField(shorter, { id: 'amount_input' }, 'password', FAST)).rejects.toThrow(SAID_PLAIN);
+    expect(shorterReads.n).toBe(7); // the settle wait (2), the whole value poll (5)
+  });
+
   it('accepted residual (R1, ADR 0028): a field WRONGLY said plain, autofilled with N bullets on focus, dropping exactly N keys, passes silently', async () => {
     // Review of this branch, scenario K. With the re-read the count would start at 3 and `3 + 5` fail; skipped, the
     // field shows 3 + (5 − 3) = 5 bullets, the typed length — the one reading no read-back can tell from a landed fill.
