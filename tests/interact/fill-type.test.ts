@@ -1,92 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
-import { droppedTail, MAX_TAIL_RETYPES, typeAndConfirm, type FieldIo, type TypingIntent } from '../../src/interact/fill-type.js';
+import { MAX_TAIL_RETYPES, typeAndConfirm, type FieldIo, type TypingIntent } from '../../src/interact/fill-type.js';
 import { node } from '../helpers/fake.js';
 
 vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => undefined }));
 
 /**
- * What of a typing a field's reading proves dropped — the only text fillField ever types again
- * (docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md). The retype
- * itself is pinned through fillField (fill.test.ts), the module's one caller, and here through `typeAndConfirm`'s
- * own interface with a scripted field.
+ * The typing, its poll and what it sends again, through `typeAndConfirm`'s own interface with a scripted field; its
+ * one caller, fillField, pins it end to end (fill.test.ts). Whether a reading landed, and what tail it proves dropped,
+ * is fill-landing.test.ts's.
  */
-const intent = (value: string, before: string | null = null, clear = false, placeholder?: string) => ({ value, before, clear, placeholder });
-
-describe('droppedTail — a strict prefix with some of the typing in it, else nothing', () => {
-  it('a prefix of the value: the rest of it', () => {
-    expect(droppedTail('Jan', intent('Jan Novak'))).toBe(' Novak');
-    expect(droppedTail('SK31 1', intent('SK31 1200'))).toBe('200');
-  });
-
-  it('without clear the field should hold its earlier text and the value; with clear the value alone', () => {
-    expect(droppedTail('9.9912', intent('12.34', '9.99'))).toBe('.34');
-    expect(droppedTail('12', intent('12.34', '9.99', true))).toBe('.34');
-  });
-
-  it('nothing of the typing landed, the whole of it, more than it, or other text: nothing', () => {
-    expect(droppedTail('9.99', intent('12.34', '9.99'))).toBeUndefined();
-    expect(droppedTail('', intent('12.34'))).toBeUndefined();
-    expect(droppedTail('12.34', intent('12.34'))).toBeUndefined();
-    expect(droppedTail('12.345', intent('12.34'))).toBeUndefined();
-    expect(droppedTail('Jan', intent('jan novak'))).toBeUndefined();
-    expect(droppedTail('9.812', intent('12.34', '9.99'))).toBeUndefined(); // the earlier text changed
-  });
-
-  it('a reading with a bullet (masked) proves no prefix; a placeholder is no content', () => {
-    expect(droppedTail('••', intent('12345'))).toBeUndefined();
-    expect(droppedTail('•••3', intent('12345'))).toBeUndefined();
-    expect(droppedTail('••', intent('••••'))).toBeUndefined(); // even a value of bullets: the reading cannot be told from a mask
-    expect(droppedTail('Search', intent('Sea', null, false, 'Search'))).toBeUndefined();
-    expect(droppedTail('Se', intent('Sea', 'Search', false, 'Search'))).toBe('a');
-  });
-});
-
-/**
- * D28 (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md, its amendment): a field that groups as it
- * is typed and dropped the end of the typing shows a REFORMATTED strict prefix — iOS React Native's rf2 held
- * `1 234 567,` for `1234567,89`. The prefix must be exact by typed characters, with only grouping added, under
- * `reformatOf`'s rules judged over the WHOLE typing (one separator kind, letters split only in a code, thousands).
- */
-describe('droppedTail — a reformatted strict prefix (D28)', () => {
-  it('an amount grouped by thousands, an IBAN grouped in fours: the rest of the typing', () => {
-    expect(droppedTail('1 234 567,', intent('1234567,89', null, true))).toBe('89');
-    expect(droppedTail('SK31 1200 0', intent('SK3112000000'))).toBe('000');
-    expect(droppedTail('SK31 1200', intent('SK3112000000'))).toBe('0000');
-  });
-
-  it('Android-shaped readings: a no-break or narrow no-break space as the grouping', () => {
-    expect(droppedTail('1\u00A0234\u00A0567', intent('1234567,89', null, true))).toBe(',89');
-    expect(droppedTail('12\u202F345', intent('1234567'))).toBe('67');
-  });
-
-  it('without clear: the earlier text first, and some of the typing in the prefix', () => {
-    expect(droppedTail('SK31 1200', intent('12000000', 'SK31'))).toBe('0000');
-    expect(droppedTail('SK31', intent('12000000', 'SK31'))).toBeUndefined(); // nothing of the typing landed
-  });
-
-  it('only grouping added: a trailing mark, a changed character, two separator kinds, a lone grouping — nothing', () => {
-    expect(droppedTail('SK31 1200 ', intent('SK3112000000'))).toBeUndefined(); // an eager trailing mark
-    expect(droppedTail('SK31 1300', intent('SK3112000000'))).toBeUndefined();
-    expect(droppedTail('1 234.567', intent('12345678'))).toBeUndefined();
-    expect(droppedTail('1-2', intent('1234'))).toBeUndefined(); // groups of one
-    expect(droppedTail('1 2', intent('1234'))).toBeUndefined();
-    expect(droppedTail('••• •', intent('12345'))).toBeUndefined(); // bullets
-    expect(droppedTail('SK31 1200 0000', intent('SK3112000000'))).toBeUndefined(); // the whole typing: no tail
-  });
-
-  it('a typed space the field shows as a no-break space is part of the prefix (respaced)', () => {
-    expect(droppedTail('1\u00A0234', intent('1 23456'))).toBe('56');
-  });
-
-  it('the rules are the whole typing\'s: a letter split is a code\'s only when the WHOLE typing is one, and a `.`/`,` it holds is never a thousands mark', () => {
-    expect(droppedTail('a1bc de', intent('a1bcde f'))).toBeUndefined(); // the prefix is a code, the typing (a typed space) is not
-    expect(droppedTail('a1bc de', intent('a1bcdefg'))).toBe('fg');
-    expect(droppedTail('1,234', intent('1234,5'))).toBeUndefined(); // the typing's own `,` is its decimal point
-    expect(droppedTail('1.234', intent('1234,5'))).toBe(',5');
-    expect(droppedTail('a lot', intent('alotmore'))).toBeUndefined(); // prose: autocorrect, not a format
-  });
-});
 
 /**
  * A scripted field: `typeText` lands what `keep` lets through of each typing (in order), a read returns the field's
@@ -135,7 +58,7 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
     resolvedValue: null,
     before: null,
     placeholder: undefined,
-    maskedHeld: 0,
+    held: 0,
     pollMs: 1,
     field,
     delivery: 'on-return',
@@ -188,6 +111,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(out).toEqual({
       kind: 'missed',
       observed: 'Ja',
+      differs: { kind: 'length' },
       again: [
         { kind: 'tail', length: 6 },
         { kind: 'tail', length: 5 },
@@ -210,6 +134,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
       kind: 'missed',
       observed: 'Jan',
       again: [],
+      differs: { kind: 'length' },
       elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } },
     });
     expect(typed).toEqual(['Jan Novak']);
@@ -217,7 +142,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
 
   it('a sibling the app replaced or recomputed proves nothing: no tail, and the clear\'s wipe and retype still runs', async () => {
     const recomputed = scripted({ keep: [3], elsewhere: () => 'EUR 18' });
-    expect(await typeAndConfirm(recomputed.io, recomputed.intent)).toEqual({ kind: 'missed', observed: 'Jan', again: [] });
+    expect(await typeAndConfirm(recomputed.io, recomputed.intent)).toEqual({ kind: 'missed', observed: 'Jan', again: [], differs: { kind: 'length' } });
     expect(recomputed.typed).toEqual(['Jan Novak']);
     const cleared = scripted({ keep: [3], elsewhere: () => 'EUR 18' });
     expect(await typeAndConfirm(cleared.io, { ...cleared.intent, clear: true })).toEqual({
@@ -236,7 +161,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
 
   it('an input of then that the read-back cannot find again (moved, gone) proves nothing: no tail typed again', async () => {
     const { io, intent, typed } = scripted({ keep: [3], moves: true });
-    expect(await typeAndConfirm(io, intent)).toEqual({ kind: 'missed', observed: 'Jan', again: [] });
+    expect(await typeAndConfirm(io, intent)).toEqual({ kind: 'missed', observed: 'Jan', again: [], differs: { kind: 'length' } });
     expect(typed).toEqual(['Jan Novak']);
   });
 
@@ -349,6 +274,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000', clear: true })).toEqual({
       kind: 'missed',
       observed: 'SK31 1200 000',
+      differs: { kind: 'dropped-tail', landed: 11, dropped: 1, grouped: true },
       again: [
         { kind: 'tail', length: 1 },
         { kind: 'whole', wiped: true },
@@ -365,6 +291,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
       kind: 'missed',
       observed: 'SK13 1200 0000',
       again: [{ kind: 'whole', wiped: true }],
+      differs: { kind: 'length' },
     });
     expect(typed).toEqual(['SK3112000000', 'SK3112000000']);
   });

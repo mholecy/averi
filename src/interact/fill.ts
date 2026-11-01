@@ -19,7 +19,6 @@ import { assertTypeable } from './type-text.js';
 import { fillFailureText, focusTapNote } from './fill-text.js';
 import { heldText, type FillFailure, type FillResult, type LostWhy, type NearbyInput, type ReadBack } from './fill-facts.js';
 import { clearStep, startClear, type ClearFacts } from './fill-clear.js';
-import { differenceOf } from './fill-verdict.js';
 import { typeAndConfirm } from './fill-type.js';
 
 /** Measured 2026-08-05: the keyboard needs about this long to come up after the focus tap. */
@@ -399,7 +398,7 @@ export async function fillField(
         resolvedValue: node.value,
         before: shownBeforeTyping,
         placeholder,
-        maskedHeld,
+        held: maskedHeld,
         pollMs,
         field: current ?? node,
         delivery: adapter.typingDelivery ?? 'may-arrive-late',
@@ -418,7 +417,7 @@ export async function fillField(
         code: 'mismatch',
         typed: value.length,
         shows: typed.observed.length,
-        differs: differenceOf({ observed: typed.observed, before: shownBeforeTyping, value, clear: clear === true, maskedHeld, placeholder }),
+        differs: typed.differs,
         notInput: wrong === undefined ? undefined : { role: node.role, input: wrong.input },
         ...(typed.again.length > 0 && { again: typed.again }),
         ...(typed.elsewhere !== undefined && { elsewhere: typed.elsewhere }),
@@ -432,10 +431,7 @@ export async function fillField(
       typed.kind === 'not-taken'
         ? { kind: 'not-taken' }
         : typed.kind === 'landed'
-          ? // The value IS the named placeholder's text, and the field shows
-            // it: typed, or empty with the typing dropped — the tree cannot
-            // tell (review of this branch, probe B). Not verified.
-            placeholder !== undefined && typed.observed === placeholder
+          ? typed.placeholder === true // fill-landing.ts#Landing: not verified
             ? { kind: 'placeholder' }
             : { kind: 'landed' }
           : // No reading: when the last read did not find the field at all,

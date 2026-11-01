@@ -14,7 +14,7 @@
  * the DEFINITION every measurement of a field is taken in — what it holds as
  * opposed to what it shows — so the driver (fill.ts), the clear's rules
  * (fill-clear.ts) and the mismatch's classifier
- * (fill-verdict.ts#differenceOf) count the same characters (2026-10-09,
+ * (fill-landing.ts#differenceOf) count the same characters (2026-10-09,
  * the fill-clear deepening; it was a closure inside fillField until then,
  * and only fillField could ask it).
  */
@@ -314,7 +314,7 @@ export interface OtherInput {
 /**
  * What differs between the typed value and a read-back that did not match
  * it, without carrying either string — classified by ONE function,
- * interact/fill-verdict.ts#differenceOf, all six kinds (until 2026-10-09
+ * interact/fill-landing.ts#differenceOf, all six kinds (until 2026-10-09
  * fill.ts chose `unchanged`, `masked` and a partly masked `length` in a
  * ternary at the throw, and a helper of its own the rest):
  * - `masked`: the field shows bullets, compared by length only; `held` the
@@ -340,7 +340,7 @@ export interface OtherInput {
  *   Review of this branch: probes D and D2 were told "the app transformed
  *   the input".
  * - `dropped-tail` (D28): the field holds the first `landed` characters of
- *   the typing, reformatted (interact/fill-reformat.ts#tailOf): `grouped`
+ *   the typing, reformatted (interact/fill-landing.ts#tailOf): `grouped`
  *   when the field added separators of its own, else it only showed its typed
  *   spaces as another kind of space (`Jan\u00A0` for `Jan Novak`) — and not the last
  *   `dropped` — a tail the

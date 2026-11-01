@@ -57,26 +57,18 @@
  *   reading took the text, a reformatted point a plain reading (a masked one
  *   is never a reformat).
  *
- * The same module classifies a mismatch (`differenceOf`, below): what a
- * read-back that missed the value can be said to differ by, as a
- * `Difference` code — judged here, worded by fill-text.ts, measured by
- * fill.ts, which hands it the strings and throws what comes back.
+ * It judges facts, never a reading: what a read-back that missed the value
+ * differs by (`Difference`) is interact/fill-landing.ts#differenceOf's,
+ * carried in the mismatch FillFailure (A2, 2026-11-01; until then
+ * `differenceOf` lived here).
  *
- * Its imports are the facts (interact/fill-facts.ts, a leaf: the types and
- * `heldText`), the mask characters (ui-tree/masked-value.ts) and, since D28,
- * the pure leaf interact/fill-reformat.ts's `tailOf` — the one definition of
- * a (reformatted) prefix, which the typing (fill-type.ts) asks too, so the
- * retype and the error judge a dropped tail alike. It imports neither
- * fill.ts, which measures, nor fill-type.ts, which types, nor fill-text.ts,
- * which reads the verdict — the graph is fill.ts → fill-facts.ts ←
- * fill-verdict.ts ← fill-text.ts, fill-type.ts and fill-verdict.ts →
- * fill-reformat.ts → fill-facts.ts, fill.ts → fill-verdict.ts for
- * `differenceOf`, and fill.ts → fill-text.ts for its errors' words.
+ * Its one import is the facts (interact/fill-facts.ts, a leaf). It imports
+ * neither fill.ts, which measures, nor fill-text.ts, which reads the
+ * verdict — the graph is fill.ts → fill-facts.ts ← fill-verdict.ts ←
+ * fill-text.ts, and fill.ts → fill-text.ts for its errors' words.
  */
 
-import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
-import { hasPoint, heldText, type Difference, type FillResult, type LostWhy, type NearbyInput, type PointedReformat, type Reformat } from './fill-facts.js';
-import { landedSome, priorText, tailOf } from './fill-reformat.js';
+import { hasPoint, type FillResult, type LostWhy, type NearbyInput, type PointedReformat, type Reformat } from './fill-facts.js';
 
 /**
  * Why a fill is NOT verified — one code per reason, in render order:
@@ -221,94 +213,3 @@ export function judgeFill(r: FillResult): FillVerdict {
  * decides.
  */
 const clearSawNoEmpty = (end: FillResult['clearPlaceholder']): boolean => end === 'shown' || end === 'prefix';
-
-/**
- * A read-back that missed the value, as fillField saw it — the strings
- * stay here and in fill.ts; only the `Difference` they make leaves (into
- * the FillFailure, lengths and counts only: a value may be a credential).
- */
-export interface Mismatch {
-  /** The last reading of the field. */
-  observed: string;
-  /** What it showed when typing began (null: no value, or not found). */
-  before: string | null;
-  /** The value typed. */
-  value: string;
-  /** The fill cleared first: the field must EQUAL the value, not contain it. */
-  clear: boolean;
-  /** The bullets a masked field held after focus (fill.ts, `maskedHeld`); said only without clear. */
-  maskedHeld: number;
-  /** The field's named placeholder (UiNode.placeholder): no text, so never compared (fill-facts.ts#heldText). */
-  placeholder: string | undefined;
-}
-
-/**
- * What can be said of the difference — ONE classification of all six
- * kinds (fill-facts.ts#Difference), first match wins (2026-10-09, the
- * fill-clear deepening; until then fill.ts chose `unchanged`, `masked` and
- * the partly masked `length` in a ternary at the throw, and a helper of its
- * own the rest):
- * 1. `unchanged`: the reading is exactly what the field showed when typing
- *    began — whatever it is, bullets included (probes D and D2 were told
- *    "the app transformed the input").
- * 2. `masked`: bullets only, compared by length; `held` without clear.
- * 3. `length` of a PARTLY masked reading (Android's show-the-last-character
- *    password field, `•••••t`): its content is not comparable either
- *    (hasBullet: • and ● only — `*` and `·` are ordinary text too).
- * 4. `dropped-tail` (D28): the held text is a strict prefix of what the
- *    field should hold, grouped by the field (interact/fill-reformat.ts#tailOf),
- *    with some of the typing in it — the tail dropped.
- * 5. Otherwise the HELD text is compared (a named placeholder is no text):
- *    with clear the field must EQUAL the value, so the two are compared
- *    whole; without, it must CONTAIN it, so every run of the new text (what
- *    came after `before`'s held text, when the field still starts with it)
- *    as long as the value is compared and the closest one counts — `case`
- *    when one differs only in letter case, else `same-length` when the
- *    lengths match, else `length`. Only position-for-position: an inserted
- *    or dropped character is a length difference. Letter case by
- *    toLowerCase/toUpperCase of each UTF-16 unit — enough for the measured
- *    auto-capitalisation; a case pair whose forms differ in length
- *    (`ß`/`SS`) reads as a plain difference, never as a pass.
- * Pure, O(observed × value) — run once, at the throw.
- */
-export function differenceOf(m: Mismatch): Difference {
-  const { observed, value, clear } = m;
-  if (observed === m.before) return { kind: 'unchanged' };
-  if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : m.maskedHeld };
-  if (hasBullet(observed)) return { kind: 'length' };
-  // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
-  // A Mismatch is an Expectation (value, clear, before, placeholder): tailOf reads it as the typing does.
-  const tail = tailOf(observed, m);
-  if (landedSome(tail) && tail.reformatted !== undefined) {
-    return { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 };
-  }
-  const shown = heldText(observed, m.placeholder);
-  // `priorText`, not fill-reformat.ts's vanished-text fallback (D29): an earlier text the reading no longer starts
-  // with is compared whole below — which is what a vanished one (an unnamed placeholder) asks for.
-  const prior = priorText(m);
-  // Without clear the field may hold text from before the typing; only what
-  // came AFTER it is compared, when the field still starts with it (typing
-  // appends at the cursor, which the focus tap leaves at the end). A field
-  // whose earlier text changed too is compared whole — the limit: a run of
-  // the old text can then be named as the "transformed" typing.
-  const typed = prior !== '' && shown.startsWith(prior) ? shown.slice(prior.length) : shown;
-  let caseOnly: number | undefined; // fewest case-only differing characters over the runs compared
-  const starts = clear ? (typed.length === value.length ? [0] : []) : Array.from({ length: Math.max(0, typed.length - value.length + 1) }, (_, i) => i);
-  for (const at of starts) {
-    let differ = 0;
-    let caseAlone = true;
-    for (let i = 0; i < value.length && caseAlone; i++) {
-      const a = typed[at + i];
-      const b = value[i];
-      if (a === b) continue;
-      differ++;
-      caseAlone = a.toLowerCase() === b.toLowerCase() || a.toUpperCase() === b.toUpperCase();
-    }
-    if (caseAlone && differ > 0 && (caseOnly === undefined || differ < caseOnly)) caseOnly = differ;
-  }
-  if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
-  if (typed.length !== value.length) return { kind: 'length' };
-  let differ = 0;
-  for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;
-  return { kind: 'same-length', positions: differ };
-}

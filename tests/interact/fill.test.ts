@@ -1430,7 +1430,7 @@ describe('fillField — a textfield whose null value is empty: a dropped fill is
  * letters are kept in the test names). Since the fill-clear deepening
  * (2026-10-09) the clear's RULES behind A, E, I, J, K and the third round
  * are rows of tests/interact/fill-clear.test.ts (clearStep, one reading at a
- * time) and the mismatch's kinds rows of fill-verdict.test.ts
+ * time) and the mismatch's kinds rows of fill-landing.test.ts
  * (differenceOf); what stays here for those is the driver's part — the
  * device calls in their order and count, and the facts it hands on.
  */
