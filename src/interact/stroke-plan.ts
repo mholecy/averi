@@ -241,7 +241,7 @@ export const FEELER = { maxTravel: 160, durationMs: 600 } as const;
  * repeats under idb (under WDA it passed in 2 strokes). 524 pt in 1.5 s carried it ~11 rows (~570 pt, the stroke and a
  * little) and kept two rows of the read before; the feeler, 160 pt in 600 ms, ~3 rows. So 524 pt / 1.5 s ≈ 349 pt/s,
  * and a shorter stroke is never sent quicker than the 300 ms the adapter's own default gave it (adapters/ios.ts#swipe's
- * `durationMs` default — keep `minDurationMs` in step with it; interact/ does not import the adapter).
+ * `durationMs` default — kept equal to it, change both; interact/ does not import the adapter).
  * Unmeasured: strokes between 300 ms and 1.5 s (a quicker pace may keep the overlap too); idb on a UIKit table or a
  * sheet-long list; whether a 1.5 s stroke can register as a tap or a selection on a row. A feeler keeps its own time
  * (`FEELER`): its 160 pt / 600 ms is slower still, and its question is a sheet's dismissal (ADR 0018), not a fling.

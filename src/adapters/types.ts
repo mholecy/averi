@@ -1156,19 +1156,21 @@ export interface DeviceAdapter {
   /**
    * How fast a finger may move — in screens per second, the screen's LONG
    * side — for a stroke to DRAG this platform's scroll views about its own
-   * length rather than fling them on. `scroll_until` sizes
-   * each stroke's duration from it (interact/swipe.ts#dragMs) and reads its
-   * motion by drag rules (`rules.strokes`, 'drag'); absent, the adapter's own
-   * default duration is used — except for a stroke whose plan carries its
-   * own: a feeler (interact/stroke-plan.ts#FEELER) or a paced stroke
-   * (#PACED), keyed on the TREE's mark (ui-tree/miss.ts#topLayerOnlySource,
-   * idb's flat list), not on the adapter. Not the adapter's because one
-   * `IosAdapter` serves WDA's trees and idb's alike with the same `idb ui
-   * swipe`, so a field of it cannot tell them apart, and a `dragSpeed` there
-   * would also switch WDA's strokes to drag rules. Android's is a platform
-   * fact, so the adapter's: the fling is the platform's scroll physics, and
-   * the scroll is platform-agnostic. Set by Android only — the reasons for
-   * iOS are on `IosAdapter`'s absence of it (adapters/ios.ts#swipe).
+   * length rather than fling them on. It does TWO jobs: `scroll_until` sizes
+   * each stroke's duration from it (interact/swipe.ts#dragMs), and its mere
+   * presence switches the scroll's motion reading to drag rules
+   * (interact/scroll.ts `rules.strokes`; interact/motion-ledger.ts#StrokePhysics).
+   * Absent, the adapter's own default duration is used — except for a stroke
+   * whose plan carries its own: a feeler (interact/stroke-plan.ts#FEELER) or
+   * a paced stroke (#PACED), keyed on the TREE's mark
+   * (ui-tree/miss.ts#topLayerOnlySource, idb's flat list), not on the adapter.
+   * Android's is a platform fact, so the adapter's: the fling is the
+   * platform's scroll physics, and the scroll is platform-agnostic. Set by
+   * Android only. iOS leaves it unset for the second job — its strokes are
+   * read as flings under WDA and idb alike, and a `dragSpeed` would switch
+   * both to drag rules; not for want of telling the sources apart
+   * (`IosAdapter` holds its `treeSource` and branches on its kind). The rest
+   * of iOS's reasons: adapters/ios.ts#swipe.
    * docs/bugs/2026-10-09-scroll-until-fling-skips-target-in-lazy-list.md
    */
   readonly dragSpeed?: number;

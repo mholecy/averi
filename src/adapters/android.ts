@@ -773,6 +773,7 @@ export class AndroidAdapter implements DeviceAdapter {
   /** `input text` hands keys to the IME's queue, which may still deliver them after the call (types.ts#TypingDelivery). */
   readonly typingDelivery = 'may-arrive-late' as const;
 
+  /** `durationMs` defaults to 300 ms, kept equal to interact/swipe.ts#MIN_DRAG_MS — change both. */
   async swipe(from: Point, to: Point, durationMs = 300): Promise<void> {
     await this.shell(['input', 'swipe',
       String(from.x), String(from.y), String(to.x), String(to.y), String(durationMs)]);
