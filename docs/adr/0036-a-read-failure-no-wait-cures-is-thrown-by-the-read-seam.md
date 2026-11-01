@@ -1,7 +1,7 @@
 # 36. A read failure no wait cures is thrown by the read seam, never returned as a miss
 
 Status: accepted 2026-11-01 (backlog row A1, docs/plans/2026-10-30-performance-backlog.md, from the architecture review
-of the perf programme). Implemented on `arch/a1-read-seam`. Behaviour-preserving.
+of the perf programme). Implemented in merge 5cd0d8e4. Behaviour-preserving.
 
 ## Context
 
