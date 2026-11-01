@@ -2,6 +2,7 @@
 
 Status: accepted 2026-11-01 (backlog row D36, docs/plans/2026-10-30-performance-backlog.md). Tooling only: no
 behaviour changes.
+Amended 2026-11-02 (D45: geometry.ts joined the run — see the amendment below).
 
 ## Context
 
@@ -54,3 +55,27 @@ score drops below its own floor. A merge runs it cold.**
   exemptions, `drawnOver`, `drawnOverStrip`) and its idb keyboard band survivors are exercised by other suites
   (tests/verify/pixel-chrome.test.ts, tests/ui-tree/keyboard-position.test.ts, the adapters'), not by
   draw-order*.test.ts.
+
+## Amendment: geometry.ts joins the run (2026-11-02, backlog D45)
+
+geometry.ts is the run's sixth module. It joined once it had direct tests of its own: tests/ui-tree/geometry.test.ts,
+which reached 49.5 % alone, and four new files: geometry-viewport.test.ts, geometry-clips.test.ts,
+geometry-screen-size.test.ts and geometry-text.test.ts. Its scope.json entry names them as
+`tests/ui-tree/geometry*.test.ts`, with a floor of 93 under a baseline of 95.1 %. tests/truth/geometry.test.ts stays
+out: it tests scripts/truth/truth.ts, not this module, and the sandbox's allowlist does not copy the scripts it imports.
+
+One run holds every module's tests, and Stryker's per-test coverage runs a mutant against every test that reaches
+it, not only its module's. draw-order*.test.ts call geometry.ts heavily, so their kills count toward geometry's score
+too: about 0.2 points over its own tests' score. Each module is still held to a floor its own tests earn, within that
+margin. This cross-module coverage is also most of the added cost: the cold run takes about 60 s, against 45 s for
+the five modules before.
+
+Running Stryker once per module, each with only its own tests, was considered and not taken. It would score each
+module strictly by its direct tests, but it gives up the kills a module's mutants get from its neighbours' tests, and
+it adds a Stryker start-up per module. Revisit it if an idle cold run passes about 90 s.
+
+draw-order's floor rises from 75 to 84. The same backlog row gave its 61 uncovered mutants direct tests
+(tests/ui-tree/draw-order-paints-over.test.ts): `paintsOver`'s own-content and clickable-layer exemptions,
+`drawnOverAt`, `drawnOverStrip` and `ofKeyboardBand`. Its baseline went from 77.2 % to 86.6 %, and the floor rule
+moves the floor with it. Its idb keyboard band survivors are still covered only elsewhere
+(tests/ui-tree/keyboard-position.test.ts, the adapters' suites), not by draw-order*.test.ts.

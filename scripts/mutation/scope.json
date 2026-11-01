@@ -21,7 +21,12 @@
   },
   "src/ui-tree/draw-order.ts": {
     "tests": ["tests/ui-tree/draw-order*.test.ts"],
-    "floor": 75,
-    "baseline": "77.22 % on 2026-11-01 (D36): 948 mutants, 155 survived, 61 without coverage"
+    "floor": 84,
+    "baseline": "86.60 % on 2026-11-02 (D45, direct tests of paintsOver, drawnOverAt, drawnOverStrip, ofKeyboardBand): 948 mutants, 124 survived, 3 without coverage; 77.22 % on 2026-11-01 (D36)"
+  },
+  "src/ui-tree/geometry.ts": {
+    "tests": ["tests/ui-tree/geometry*.test.ts"],
+    "floor": 93,
+    "baseline": "95.10 % on 2026-11-02 (D45): 1143 mutants, 56 survived, 0 without coverage; 49.52 % from tests/ui-tree/geometry.test.ts alone before D45. draw-order*.test.ts, in the same run, reach it too"
   }
 }
