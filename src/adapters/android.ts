@@ -376,7 +376,7 @@ export class AndroidAdapter implements DeviceAdapter {
     await this.shell(['am', 'force-stop', packageName]);
   }
 
-  async openDeepLink(url: string): Promise<void> {
+  async openDeepLink(url: string): Promise<LaunchOutcome> {
     // The url as ONE word: the device's sh would cut it at the first `&`
     // (and run the rest), at a space, and expand `$` — adb-shell.ts.
     const outcome = await runStart(
@@ -396,6 +396,9 @@ export class AndroidAdapter implements DeviceAdapter {
         causeOf(outcome),
       );
     }
+    // No wait and no note (D49a is iOS's): a link with two handlers starts Android's chooser, which am reports as
+    // `started` (android-start.ts) — unmeasured on a device, its own backlog row.
+    return {};
   }
 
   /**

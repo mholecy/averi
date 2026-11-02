@@ -126,9 +126,21 @@ import { sleep } from '../util/sleep.js';
  * ms; D48's device check) — an ask in flight at the bound is under WdaServer's
  * ACTIVE_APP_TIMEOUT_MS.
  *
- * Not for `openDeepLink`: a link may legitimately bring ANOTHER app forward
- * (a universal link handed to Safari, a link the app routes elsewhere), and
- * the adapter knows no bundle to wait for. Not on Android: the previous app's
+ * After `openDeepLink` only for the project's own scheme (D49a, 2026-11-02;
+ * ADR 0032's D49a amendment). A link may legitimately bring ANOTHER app
+ * forward (a universal link handed to Safari, `tel:`, another app's scheme),
+ * so a link in general has no bundle to wait for. But one whose scheme the
+ * project's app declares (its Info.plist's CFBundleURLTypes, ios-url-schemes.ts)
+ * is expected to bring that app forward, and when it is not in front iOS
+ * first asks "Open in “AveriLab”?" over SpringBoard — batch-1 D's probe: the
+ * reply said "Opened", and every launch after it stayed behind the alert.
+ * Such a link waits here as a launch does (`link` set: the notes say
+ * "opening <url> in <bundle>"), and a note it ends with LEADS with what the
+ * agent must do: averi did not see the app come forward — iOS may be asking
+ * to confirm the link, or another app is in front — take a screenshot and
+ * answer an alert it shows. The alert itself is not looked for (no text
+ * match, no button, no tap): its shape in either source's tree is unmeasured
+ * (D49b, after the device check). Not on Android: the previous app's
  * tree after a switch has not been measured there (uiautomator dumps the
  * focused window), so android.ts waits for nothing.
  */
@@ -188,6 +200,11 @@ export interface ForegroundCheck {
    * when several do. No device call: asked only for the note.
    */
   ownerOf(label: string): string | undefined;
+  /**
+   * The deep link that should bring `bundleId` forward, when the wait follows `simctl openurl` rather than a launch
+   * (D49a): the notes then say "opening <link> in <bundle>", and lead with the link's own advice (LINK_LEAD).
+   */
+  link?: string;
 }
 
 /**
@@ -197,6 +214,26 @@ export interface ForegroundCheck {
  * not ask.
  */
 export async function awaitForeground(check: ForegroundCheck): Promise<string | undefined> {
+  const note = await poll(check);
+  return note === undefined || check.link === undefined ? note : `${linkLead(check.bundleId)}${note}`;
+}
+
+/**
+ * What a link's note says first (D49a): the app was not seen coming forward, and the likely why — iOS's "Open in …?"
+ * confirmation, which a link to a custom scheme raises when its app is not in front (batch-1 D), or another app — and
+ * what to do. Not "the alert is up": nothing here looked for it (the module comment).
+ */
+const linkLead = (bundleId: string): string =>
+  `averi did not see ${bundleId} come forward after the link: iOS may be asking to confirm it ("Open in “…”?") or ` +
+  'another app may be in front — take a screenshot, and if it shows a system alert, answer it (every launch stays ' +
+  'behind it until then). ';
+
+/** What the notes say came before the wait: the launch, or the link (`ForegroundCheck.link`). */
+const after = (check: ForegroundCheck): string =>
+  check.link === undefined ? `launching ${check.bundleId}` : `opening ${check.link} in ${check.bundleId}`;
+
+/** The wait itself (awaitForeground's, without the link's lead). */
+async function poll(check: ForegroundCheck): Promise<string | undefined> {
   let deadline = Date.now() + FOREGROUND_WAIT_MS;
   let names: readonly string[] | undefined;
   /** The last label that was not a match — what the note names. */
@@ -250,12 +287,12 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
     // Pause only if the read after it would START before the deadline.
     if (Date.now() + FOREGROUND_POLL_MS >= deadline) {
       // The most telling thing read wins: a real label (or bundle), then an unlabelled tree, then nothing at all.
-      if (staleBundle !== undefined) return stillReads(check.bundleId, staleBundle);
-      if (stale !== undefined) return notInFront(check.bundleId, stale, names ?? [], check.ownerOf(stale));
+      if (staleBundle !== undefined) return stillReads(after(check), staleBundle);
+      if (stale !== undefined) return notInFront(check.bundleId, after(check), stale, names ?? [], check.ownerOf(stale));
       if (unlabelled) {
         return unchecked(check.bundleId, `${WORDS[check.source].unlabelled} for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`, check.source);
       }
-      return emptyThroughout(check.bundleId);
+      return emptyThroughout(after(check));
     }
     await sleep(FOREGROUND_POLL_MS);
   }
@@ -276,9 +313,9 @@ const whose = (label: string) =>
  * (`owner`) — that app's tree, read again; else both readings, told apart
  * by a read LOCALIZED_REREAD_MS after the launch. The head is the same for all three.
  */
-function notInFront(bundleId: string, label: string, names: readonly string[], owner: string | undefined): string {
+function notInFront(bundleId: string, did: string, label: string, names: readonly string[], owner: string | undefined): string {
   const head =
-    `${formatSeconds(FOREGROUND_WAIT_MS)} after launching ${bundleId}${names.length > 0 ? ` (${quoted(names)})` : ''}, ` +
+    `${formatSeconds(FOREGROUND_WAIT_MS)} after ${did}${names.length > 0 ? ` (${quoted(names)})` : ''}, ` +
     `the UI tree was still ${whose(label)} — iOS can hand idb the previous app's tree for a second or more after an app ` +
     'switch, so a read now may judge the wrong app (an absent check passes on it). ';
   if (label.trim() === '') {
@@ -319,9 +356,9 @@ const WORDS: Record<IosTreeSourceKind, { lag: string; unlabelled: string }> = {
   wda: { lag: 'WebDriverAgent can still read the previous app', unlabelled: "WebDriverAgent's active app carried no bundle id" },
 };
 
-function emptyThroughout(bundleId: string): string {
+function emptyThroughout(did: string): string {
   return (
-    `idb's tree stayed empty for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited after launching ${bundleId}, ` +
+    `idb's tree stayed empty for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited after ${did}, ` +
     `so which app is in front was not checked — ${READ_AGAIN}`
   );
 }
@@ -339,11 +376,11 @@ const SPRINGBOARD_BUNDLE = 'com.apple.springboard';
  * app — the tree `/source` reads now is that app's, whatever the screenshot
  * shows. No `ownerOf`: the bundle id already names it.
  */
-function stillReads(bundleId: string, other: string): string {
+function stillReads(did: string, other: string): string {
   const app =
     other === SPRINGBOARD_BUNDLE ? 'SpringBoard (the home screen, the launch animation or a system alert)' : other;
   return (
-    `${formatSeconds(FOREGROUND_WAIT_MS)} after launching ${bundleId}, WebDriverAgent still read ${app} as the active app — ` +
+    `${formatSeconds(FOREGROUND_WAIT_MS)} after ${did}, WebDriverAgent still read ${app} as the active app — ` +
     "a ui_snapshot now reads that app's tree, on which an absent check passes. Read again; if it repeats, take a screenshot"
   );
 }

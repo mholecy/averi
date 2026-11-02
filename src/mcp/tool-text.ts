@@ -19,7 +19,7 @@
  * agree with — the flow engine may not import this layer.
  */
 
-import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
+import { everyNode, type LaunchOutcome, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
@@ -73,6 +73,14 @@ export const launchText = (platform: Platform, launched: Launched): string =>
   `Launched ${launchedLine(launched, platform)}` +
   (launched.note !== undefined ? `\n⚠ ${launched.note}` : '') +
   (launched.wiped !== undefined ? `\n${WIPE_LABEL}: ${launched.wiped}` : '');
+
+/**
+ * `Opened <url> on <platform>`, and the link's note on its own line as `⚠ <note>` (D49a: iOS's foreground wait after a
+ * link to the project's own scheme, adapters/ios-foreground.ts — the note leads with what to do), as launchText lays
+ * out a launch's.
+ */
+export const deepLinkText = (platform: Platform, url: string, outcome: LaunchOutcome): string =>
+  `Opened ${url} on ${platform}` + (outcome.note !== undefined ? `\n⚠ ${outcome.note}` : '');
 
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array

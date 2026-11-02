@@ -374,7 +374,8 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     expect(sleeps).toEqual([]);
   });
 
-  it('a deep link does not wait — it may legitimately bring another app forward', async () => {
+  // D49a: only a link to the project's own scheme waits (tests/adapters/ios-deep-link.test.ts); one opened with no project app reads nothing.
+  it('a deep link with no project app does not wait — it may legitimately bring another app forward', async () => {
     const d = device([BANK]);
     await d.adapter.openDeepLink('contacts://new');
     expect(d.describeAlls()).toBe(0);

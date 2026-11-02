@@ -1,4 +1,4 @@
-import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOptions, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 import { NOT_PRINTABLE_ASCII, type Typeable } from '../../src/adapters/typeable.js';
 
@@ -278,6 +278,15 @@ export class FakeAdapter implements DeviceAdapter {
     return this.launchNote === undefined ? {} : { note: this.launchNote };
   }
 
+  /** The links opened, with what they were opened with; `deepLinkNote` is what the next ones report as their note. */
+  readonly deepLinks: { url: string; opts?: DeepLinkOptions }[] = [];
+  deepLinkNote: string | undefined;
+
+  async openDeepLink(url: string, opts?: DeepLinkOptions): Promise<LaunchOutcome> {
+    this.deepLinks.push(opts === undefined ? { url } : { url, opts });
+    return this.deepLinkNote === undefined ? {} : { note: this.deepLinkNote };
+  }
+
   async isAppRunning(): Promise<boolean> {
     return this.appRunning;
   }
@@ -303,7 +312,6 @@ export class FakeAdapter implements DeviceAdapter {
   // Unused by tests:
   async install(_path: string): Promise<void> {}
   async terminate(): Promise<void> {}
-  async openDeepLink(): Promise<void> {}
   async longPress(): Promise<void> {}
   async swipe(from: Point, to: Point, durationMs?: number): Promise<void> {
     this.swipes.push({ from, to, ...(durationMs !== undefined && { durationMs }) });

@@ -963,6 +963,17 @@ export interface LaunchOutcome {
 }
 
 /**
+ * What a deep link is opened with (D49a, 2026-11-02). `appId`: the project's app (averi.yaml's `app.ios.bundleId` —
+ * open_deep_link passes it on iOS). On iOS, when the link's scheme is one that app declares (its Info.plist's
+ * CFBundleURLTypes), the link is expected to bring it forward, and openDeepLink waits for that as a launch does
+ * (adapters/ios-foreground.ts); without it, or for any other link, nothing is expected and nothing is read. Android
+ * ignores it.
+ */
+export interface DeepLinkOptions {
+  appId?: string;
+}
+
+/**
  * When typed text has reached the focused field:
  * - `on-return`: all of it has when `typeText` returns, so what a field still
  *   lacks after the read-back's poll was DROPPED, not delayed. iOS (`idb ui
@@ -1017,9 +1028,13 @@ export interface DeviceAdapter {
   /**
    * Throws when the platform says nothing was opened — on Android an
    * `am start` refusal (no app's intent filter matches the url, or the
-   * activity refused it; android-start.ts).
+   * activity refused it; android-start.ts). Returns a LaunchOutcome: on iOS,
+   * a link to a scheme of `opts.appId`'s app returns once the tree source
+   * names that app, or with a note when a bounded wait did not see it (iOS
+   * may be asking "Open in …?" — D49a, adapters/ios-foreground.ts); every
+   * other link, and Android's, returns with none.
    */
-  openDeepLink(url: string): Promise<void>;
+  openDeepLink(url: string, opts?: DeepLinkOptions): Promise<LaunchOutcome>;
 
   /**
    * PNG bytes — the device's own, or on Android (D19) a PNG encoded on the host

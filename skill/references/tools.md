@@ -41,6 +41,13 @@ Arguments:
 - `activity`: Android only: activity to start (".MainActivity" or fully-qualified). Defaults to app.android.activity from averi.yaml when no intent is given either.
 - `intent`: Android only: am start parameters for custom entry points. Without activity, resolved within the package (am start -p).
 
+## `open_deep_link`
+
+- Open a deep link / universal link URL on the device. The reply is `Opened <url> on <platform>`, plus a ⚠ line when averi has reason to doubt it.
+- iOS: when the link's scheme is one the project's app declares (averi.yaml `app.ios.bundleId`, its Info.plist's `CFBundleURLTypes`), averi waits as `launch_app` does — at most 3 s — until the tree source names that app. When that app is not in front, iOS first asks "Open in “<app>”?" over the current screen; the link is not opened, and every later `launch_app` stays behind the alert, until it is answered. averi does not look for the alert or tap it. A ⚠ line starting `averi did not see <app> come forward after the link` means the wait never saw the app: take a `screenshot`; if it shows a system alert, answer it with a `tap` (Open opens the link, Cancel drops it); otherwise read again before trusting a read. To test a link without the prompt, `launch_app` the app first (a warm link — not the same code path as a cold one).
+- iOS, any other link (`https`, `tel:`, another app's scheme, no averi.yaml, an Info.plist averi could not read): opened and returned at once, unchecked — a reply of `Opened` says only that `simctl openurl` succeeded.
+- Android: a link no installed app handles fails the call. A link two apps handle opens Android's "Open with" chooser, which the reply does not mention (unmeasured): take a `screenshot` when the handler matters.
+
 ## `ui_snapshot`
 
 - Normalized accessibility tree as JSON — cheap text-based verification.

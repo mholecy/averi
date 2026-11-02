@@ -12,6 +12,7 @@ Amended 2026-11-01 (D44: the capture source no longer follows the tree source, s
 too — see the amendment below).
 Amended 2026-11-02 (D48: a wda project's launch waits too — it asks WebDriverAgent which app it reads, once WDA is
 running — see the amendment below).
+Amended 2026-11-02 (D49a: a deep link to the project's own scheme waits as a launch does — see the amendment below).
 
 ## Context
 
@@ -366,7 +367,8 @@ Decision:
   Every launch note's advice is one (review 2026-11-02): read again before trusting a read — the screenshot switches
   before the tree, on either source.
 - `launch_app`, a flow's `launch:` and `ensure_state`'s launch rungs all pass `IosAdapter.launch`, so all gain it.
-  `openDeepLink` still waits for nothing (a link may bring another app forward).
+  `openDeepLink` still waits for nothing (a link may bring another app forward) — until D49a, the next amendment, for
+  a link to the project's own scheme.
 
 Considered, not chosen:
 
@@ -388,3 +390,45 @@ To check on the device (the next batch): Q2 ×10 A/B main vs this change, judged
 (`/wda/activeAppInfo` every 50 ms after `simctl launch`); the happy-path cost (accept ≤ +150 ms median); a cold launch;
 a launch before WDA is up; an idb project unchanged. Android has the same shape of code (no wait after `am start`) but a
 different read (`uiautomator dump` waits for 1 s of accessibility idle) — not changed until measured.
+
+## Amendment: a deep link to the project's own scheme waits as a launch does (2026-11-02, backlog D49a)
+
+`open_deep_link` replied `Opened <url> on ios` once `simctl openurl` returned, and read nothing after it. Batch-1 D's
+probe (main 0262c69d, wda): with SpringBoard in front, `open_deep_link averilab://d41` replied "Opened" in 383 ms while
+iOS asked "Open in “AveriLab”?"; the five `launch_app`s after it all stayed behind the alert (every `ui_snapshot` read
+SpringBoard's root). With the lab in front there was no alert (batch-2 rerun). The D48 wait already flags the launches
+that follow; nothing said so at the call that caused it.
+
+Decision (the D49 analysis, split by the orchestrator: D49a now, D49b after a device capture):
+
+- `open_deep_link` hands `IosAdapter.openDeepLink` the project's app (`app.ios.bundleId`, `DeepLinkOptions.appId`).
+  After the accessibility writes and `simctl openurl` — sent exactly as before — the adapter asks whether the URL's
+  scheme is one that app declares: not `http`/`https`, and in its Info.plist's `CFBundleURLTypes`. `simctl appinfo` and
+  `listapps` carry no URL types (measured); `plutil -extract CFBundleURLTypes json -o - <Path>/Info.plist` does, a host
+  read of milliseconds at the `Path` appinfo already gives (`adapters/ios-url-schemes.ts` reads the answer; plutil's
+  "No value at that key path" is "declares none"). Cached per bundle until `install`, as appinfo is.
+- When it is, the D48 wait runs as for a launch (`ForegroundCheck.link`): idb's Application label or WDA's active
+  bundle, at most 3 s, failing open, declining while WDA is not up. Its notes say "opening <url> in <bundle>" and lead
+  with: averi did not see the app come forward after the link — iOS may be asking to confirm it ("Open in “…”?") or
+  another app may be in front: take a screenshot, and if it shows a system alert, answer it (every launch stays behind
+  it until then). The reply keeps `Opened <url>` with that `⚠` line under it. A match (not a decline) moves D24's
+  `front` to the app: a link that brought it forward is a launch of it.
+- Every other link — none given, a web link, another app's scheme — reads nothing after `openurl`. Schemes that could
+  not be read (appinfo failed or listed no `Path`, plutil failed otherwise, another JSON shape) are the same, plus one
+  stderr line naming why: not knowing is the old behaviour, but not silently.
+
+Considered, not chosen:
+
+- Naming the alert and its buttons from the tree at the give-up, or tapping Open (the D49 analysis's (a) in full, and
+  its (b)): the alert's shape in idb's and WDA's trees was never captured (the only fixture is hand-written), idb's
+  match would be English text, and a wrong tap on a SpringBoard dialog has side effects the agent did not ask for. D49b,
+  after the device check (E1–E7).
+- `simctl launch` of the app before `openurl`, to avoid the alert: it changes what is tested (a warm link and a cold one
+  run different app code).
+- Scanning every installed app's Info.plist for the scheme: N reads per link for a case the agent rarely has.
+
+Cost: no project app or a web link — nothing. Another scheme — one `simctl appinfo` (shared with the launch's cache)
+and one `plutil` per bundle per adapter, no read of the device's UI. The project's scheme — that, plus the D48 wait:
+one ask when the app is already in front, the stale window when the link brings it forward, the 3 s bound and a note
+when it never comes. Android unchanged: a link with two handlers starts the chooser, which `am start` reports as
+started — a separate row, after a device check.
