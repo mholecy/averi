@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
+import { rejudge as rejudgeRecord, type RunRecord } from '../../scripts/truth/live-cases.js';
 import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } from '../helpers/live-records.js';
 
 /**
@@ -27,17 +28,43 @@ import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } fr
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const run = promisify(execFile);
+const pathOf = (record: string) => (record.startsWith('/') ? record : `docs/truth/live-records/${record}`);
 
+/**
+ * `live.ts --rejudge <record> --groups <groups>`, in process (scripts/truth/live-cases.ts#rejudge — the CLI's own
+ * path, a thin wrapper over it): the exit code and what it prints. A node+tsx process a record cost the suite ~45 s of
+ * one worker (T1); the CLI itself is pinned once below, against this.
+ */
 async function rejudge(record: string, groups: string): Promise<{ code: number; out: string }> {
+  const file = pathOf(record);
+  const recorded = JSON.parse(readFileSync(file.startsWith('/') ? file : join(ROOT, file), 'utf8')) as RunRecord;
+  const { lines, exitCode } = await rejudgeRecord(recorded, file, { groups: groups.split(',') });
+  return { code: exitCode, out: `${lines.join('\n')}\n` };
+}
+
+/** The CLI itself, spawned: `node --import tsx scripts/truth/live.ts --rejudge <record> --groups <groups>`. */
+async function rejudgeCli(record: string, groups: string): Promise<{ code: number; out: string }> {
   try {
-    const file = record.startsWith('/') ? record : `docs/truth/live-records/${record}`;
-    const { stdout } = await run(process.execPath, ['--import', 'tsx', 'scripts/truth/live.ts', '--rejudge', file, '--groups', groups], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 });
+    const { stdout } = await run(process.execPath, ['--import', 'tsx', 'scripts/truth/live.ts', '--rejudge', pathOf(record), '--groups', groups], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 });
     return { code: 0, out: stdout };
   } catch (e) {
     const err = e as { code?: number; stdout?: string; stderr?: string };
     return { code: err.code ?? -1, out: `${err.stdout ?? ''}${err.stderr ?? ''}` };
   }
 }
+
+describe('live.ts --rejudge, the CLI: argv in, the summary on stdout, the exit code', () => {
+  it.each([
+    ['ios-wda-long-list-parked-2.json', 'visibility', 0],
+    ['ios-forms-r8-l2-before.json', 'forms', 1],
+  ] as const)('%s (--groups %s): exit %i, printing exactly what rejudge() returns', { timeout: 60_000 }, async (record, groups, code) => {
+    const cli = await rejudgeCli(record, groups);
+    expect(cli).toEqual(await rejudge(record, groups));
+    expect(cli.code).toBe(code);
+    expect(cli.out.split('\n')[0]).toMatch(/^<!-- averi: .+ \(rejudged from docs\/truth\/live-records\/.+\.json\) -->$/);
+    expect(cli.out).toContain(`(rejudged from docs/truth/live-records/${record})`);
+  });
+});
 
 /**
  * A pre-D43a Android b1d or b7 line: the LOUD `input text` left (a prefix typed, then exit 255), NOT known against the
