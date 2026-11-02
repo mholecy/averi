@@ -2,10 +2,11 @@
  * The character rules of a field that reformats as it is typed — a pure leaf (D28 review, MINOR-2): whether a reading
  * is a typing with separators of the field's own added (`reformatOf`; D18,
  * docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md), whether it is a strict prefix of a typing,
- * exact or reformatted (`prefixOf`; D28, that ADR's amendment), whether it is a typing with separators added that
- * those rules refuse (`separatedOf`; D53), and a text's letters and digits (`skeleton`). It knows texts, not fields:
- * which text a reading is judged against — the earlier text, the placeholder, clear — is interact/fill-landing.ts's,
- * its one caller. It imports only the facts (fill-facts.ts); nothing here types, reads a device or words a sentence.
+ * exact or reformatted (`prefixOf`; D28 and D60, that ADR's amendments), whether it is a typing with separators added
+ * that those rules refuse (`separatedOf`; D53), and a text's letters and digits (`skeleton`). It knows texts, not
+ * fields: which text a reading is judged against — the earlier text, the placeholder, clear — is
+ * interact/fill-landing.ts's, its one caller. It imports only the facts (fill-facts.ts); nothing here types, reads a
+ * device or words a sentence.
  */
 
 import { isPoint, type Point, type Reformat } from './fill-facts.js';
@@ -113,8 +114,8 @@ function markKind(
  * The reading walked against `expectedChars`, greedily (see `reformatOf`): each reading character the next expected one
  * (or a space shown for a typed space — `respaced`), else an added separator (-1 in `tokens`, an expected character's
  * index otherwise); undefined at the first character that is neither. `matched`: how many expected characters it
- * showed — all of them for `reformatOf` and `separatedOf` (`walkWhole`), fewer for a prefix (`prefixOf`). The one
- * walk all three ask.
+ * showed — all of them for `reformatOf` and `separatedOf` (`walkWhole`), fewer for a prefix (`prefixOf`, which also
+ * reads whether the last token is an added separator: an eager trailing mark, D60). The one walk all three ask.
  */
 function walk(observed: string, expectedChars: readonly string[]): { tokens: number[]; matched: number; respaced: number } | undefined {
   const tokens: number[] = [];
@@ -197,6 +198,14 @@ export const skeleton = (text: string): string => [...text].filter((c) => ALNUM.
  * rules judged over the whole typing: one separator kind, letters split only in a code, an added `.`/`,` only as a
  * thousands mark the typing does not hold itself). The prefix is the typed characters the reading shows, in order —
  * `walk`, the greedy walk `reformatOf` takes, every other reading character an added separator; nothing else may differ.
+ * D60 (ADR 0034's amendment): an EAGER field adds its mark once a group is complete, so a dropped end shows a trailing
+ * mark (`SK31 1200 ` for `SK3112000000`, `31.12.`). A walk that ends in an added separator is judged with the next
+ * typed character after it — the strict prefix leaves one — so every rule of `reformatOf` holds for the trailing mark
+ * too (it is counted in `added`): one kind, never next to another or after typed punctuation (`1 234 ` for `1234,56`),
+ * a typed letter or digit before it (no empty prefix), groups of two or more, a `.`/`,` only as thousands or a D51
+ * grouping (`31.` and `12.` stay none). Unless the whole typing holds that mark itself, any space for a space (as
+ * `thousands`' rule): then it may be the typing's own, and the walk took it for an added one (`12/` of `1234/56` stays
+ * none). The pass rule is not moved: a FULL reading with a trailing mark (`SK31 1200 0000 `) never passes.
  * Undefined when the reading is no strict prefix (the whole of it, more, or other text). Pure, O(reading).
  */
 export function prefixOf(held: string, whole: string): { prefix: string; reformatted?: Reformat } | undefined {
@@ -205,6 +214,17 @@ export function prefixOf(held: string, whole: string): { prefix: string; reforma
   const walked = walk(held, wholeChars);
   if (walked === undefined || walked.matched >= wholeChars.length) return undefined;
   const prefix = wholeChars.slice(0, walked.matched).join('');
-  const reformatted = reformatOf(held, prefix, whole);
+  // D60: an eager trailing mark, judged with the next typed character after it (one the strict prefix leaves).
+  const mark = walked.tokens.at(-1) === -1 ? [...held].at(-1) : undefined;
+  const next = mark !== undefined && !holdsMark(wholeChars, mark) ? wholeChars[walked.matched] : '';
+  // With `next === ''` the call is exactly the pre-D60 judgment: why the change is additive.
+  const reformatted = reformatOf(held + next, prefix + next, whole);
   return reformatted === undefined ? undefined : { prefix, reformatted };
 }
+
+/**
+ * The typing holds `mark` itself (D60's typed-mark guard): `thousands`' "a character the typing holds itself", but with
+ * all spaces as one kind — a typed space may be shown as another (`respaced`), which `thousands`' `.`/`,` never are.
+ */
+const holdsMark = (typing: readonly string[], mark: string): boolean =>
+  typing.some((c) => c === mark || (SPACES.has(c) && SPACES.has(mark)));

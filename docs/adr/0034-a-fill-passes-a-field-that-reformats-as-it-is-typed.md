@@ -11,6 +11,8 @@ Amended 2026-11-02 (D51: an added `.`/`,` that groups digits — a dotted date, 
 no earlier text, narrowing D29's MINOR-A; residual 4 accepted; implemented on `fix/d51-dotted-date-lands`).
 Amended 2026-11-02 (D53: a reading that shows every typed character in order with only separators the rules refuse
 fails `separated`, naming the check and the remedy; implemented on `fix/d53-separated`).
+Amended 2026-11-02 (D60: a dropped tail that ends in an eager trailing mark is typed again; implemented on
+`fix/d60-eager-trailing-tail`).
 
 ## Context
 
@@ -97,7 +99,9 @@ beside `retyped`, or the `reformatted-point` caveat), counts only — a value ma
   - a `.`/`,` grouping that is not by thousands (Indian lakh grouping), and a dotted date (`31.12.2026` for
     `31122026`: its `.` groups are no thousands) (see the D51 amendment below);
   - mixed separators (`+421 900-123-456`: one separator character per reading);
-  - an eager trailing mark (`SK31 ` after four characters, `31/`);
+  - an eager trailing mark (`SK31 ` after four characters, `31/`) — on a FULL reading, `separated` since D53; a strict
+    prefix that ends in one (`SK31 1200 ` for `SK3112000000`) is a dropped tail, its tail typed again (see the D60
+    amendment below);
   - spaced single characters (`1 2 3 4`: groups of one);
   - a separator outside the set (`12:30` for `1230`), a prefix or a suffix (`€`);
   - a letter split by a separator in prose (`a lot` for `alot` — autocorrect; review round 2, MAJOR-A): between two
@@ -167,7 +171,8 @@ Three findings:
   are judged over the WHOLE typing (its new `typing` parameter): one separator kind, letters split only when the whole
   typing is a code (`a1bc de` for `a1bcde f` is no prefix — the typing holds a space), an added `.`/`,` only as a
   thousands mark the whole typing does not hold itself (`1,234` for `1234,5` is none), no trailing mark
-  (`SK31 1200 ` for `SK3112000000`), groups of two or more but one at an end.
+  (`SK31 1200 ` for `SK3112000000` — since D60 this holds for a full reading only: a prefix's trailing mark is judged
+  with the next typed character after it, see the D60 amendment below), groups of two or more but one at an end.
 - **The caret.** The tail is typed where the caret is. React Native's controlled `TextInput` keeps the caret at the
   end as it regroups (Context above; on iOS rf3's typing on after a reformatting fill landed in order), and averi
   sends nothing to move it. A field that moved the caret elsewhere would put the tail in the middle: the read-back
@@ -405,9 +410,10 @@ field shows 5 (content withheld from this error)`, which names no remedy (the D5
 
 **Consequences.** Beyond the four shapes it names a leading `-` (a sign), a leading or trailing `.`, `1.2.3.4`, two
 adjacent separators and smart punctuation's `Hello, world` for `Hello,world` — all true statements, all still
-failures. Out of scope, backlog row D60: a dropped tail that ends in an eager trailing mark (`SK31 1200 ` of
-a full IBAN) is neither typed again (`prefixOf` refuses the trailing mark) nor named — it stays `length`; fixing it
-changes the retype, not the wording. No new residual: nothing passes that did not.
+failures. Out of scope here, backlog row D60: a dropped tail that ends in an eager trailing mark (`SK31 1200 ` of
+a full IBAN) was neither typed again (`prefixOf` refused the trailing mark) nor named — it stayed `length`; fixing it
+changes the retype, not the wording — done, see the D60 amendment below. No new residual: nothing passes that did
+not.
 
 **The golden says nothing of this change** (it never types): 0 changed. Live: no lab format produces a refused
 separated reading, and tests/truth/live-rejudge.test.ts re-judges the recorded replies by class and kind, so nothing
@@ -421,6 +427,80 @@ counting without `countOf`, a mark dropped from its list, a mark or a space adde
 `dropped-tail` it is equivalent (the two are disjoint). `npm run mutate` (cold): fill-reformat 94.35 → 94.69 % (floor
 92), fill-landing 95.20 → 95.33 % (floor 93), no survivor in the new code; floors unchanged.
 
+## Amendment: a dropped tail that ends in an eager trailing mark is typed again (2026-11-02, D60)
+
+**Context.** D53's amendment left it out of scope: an EAGER field adds its mark once a group is complete, so when it
+drops the end of a burst the reading is a strict prefix AND that mark — `SK31 1200 ` for `SK3112000000`, `903 123 `
+for `903123456`, `4111 1111 ` for a card, `31.12.` for `31122026`. `prefixOf` refused it: D28 judged a prefix under
+`reformatOf`'s rules, and those want every added mark between two typed letters or digits, which a trailing one is
+not. So nothing was typed again and the fill failed `length`, naming no remedy; with clear the fill wiped and typed
+the whole value again, which rf2 (D28's amendment) showed drops the tail again on iOS. The rule against a trailing
+mark guards the PASS path — a trailing addition may be a suffix, a sign or a decimal point waiting for its fraction
+(`12.` in a cents mask) — and D28 inherited it for a prefix, where the risk it must guard is another: the retype may
+type only characters that are provably missing (ADR 0023).
+
+**Decision.**
+- `fill-reformat.ts#prefixOf` alone changes. When the walk's last token is an added separator, the reading is judged
+  with the next typed character after it — `next = whole[matched]`, which the strict prefix leaves —
+  `reformatOf(held + next, prefix + next, whole)`. Every rule of `reformatOf` then applies to the trailing mark
+  unchanged: one kind (`SK31 1200-` is none), never next to another (`SK31 1200  `) or after typed punctuation, never
+  before it either (`1 234 ` for `1234,56`: the next typed character is `,`), a typed letter or digit before it (a
+  leading mark, an empty prefix, is none), letters split only in a code (`Jan ` for `JanNovak` is none), groups of two
+  or more but one at an end (`1 234 ` for `1234567`, `1 2 ` are none), and a `.`/`,` only as a thousands mark or a
+  D51 grouping (`31.12.` passes, groups 2, 2, 1; `31.`, `12.` and `1.234.` are none). `reformatted.added` counts it.
+- **The typed-mark guard:** the trailing mark is not a character the whole typing holds itself, all spaces one kind —
+  as `thousands`' rule. Greedy, the walk takes a typed separator later in the value for an added one: `12/` of
+  `1234/56` would retype `34/56`, wrong if the field had dropped `34` from the middle and kept the typed `/`. A typing
+  that holds its own separators where the field shows them is an exact prefix anyway (the trailing mark is typed).
+  The guard's cost is a field that adds the same kind of mark the typing holds elsewhere: `+421 903 ` for a typed
+  `+421 903123456` is refused — a `length`, no tail typed again (with clear, the wipe and the whole retype, as before
+  D60) — residual 5 below. Another kind still passes: `+421 903-` for `+421 903123456` (a typed space beside an added
+  `-`).
+- **Additive in what it accepts.** The branch is reached only where `prefixOf` returned undefined (a trailing added
+  mark always failed `reformatOf`), so nothing `prefixOf` accepted, and no pass, changes. Two behaviours change, by
+  intent, for the readings it now accepts: on iOS the tail alone is typed again where, with clear, the wipe and the
+  whole retype ran; and on Android with clear a sibling that gained part of the tail now reads `elsewhere`, so the
+  wipe and retype are skipped (Consequences). The pass rule (`landingOf`, `reformatOf` of the final reading) does not
+  move: a FULL reading with a trailing mark (`SK31 1200 0000 `) still fails `separated`, and `SK31 ` for `SK31` still
+  does not land.
+- No code change in fill-landing.ts: `tailOf`, `droppedTail`, `differenceOf` and `whereTyped` get it through
+  `prefixOf` — one definition of a dropped tail, so D28's invariant holds (what is retyped and what is named judge a
+  prefix alike; the `tailOf` sweep's prefixes that end in an added mark — an eager field's readings — now agree too,
+  over 200 of them).
+
+**Consequences.**
+- iOS: the tail alone is typed again under ADR 0023's every condition, then the read-back judges the whole: a field
+  that adds no mark at its full length lands `reformatted` and the drop is reported (D24); with clear the tail
+  replaces the wipe and the whole retype. An eager field that adds its mark at the end too (`SK31 1200 0000 `) gets
+  one retype, then fails `separated` — a full reading, no loop. A capped eager field gets one retype that moves
+  nothing, then fails `dropped-tail` (`… refused by the field (a length cap …)`), not reported — ADR 0023's cost.
+- Android: nothing is typed again (`may-arrive-late`); the wording changes from `length` to `dropped-tail`, and
+  `whereTyped` now has `missing`, so a sibling that gained part of the tail reads `elsewhere` and the clear's wipe is
+  skipped — D28's safe direction.
+- Without clear `priorsOf`'s order holds: after an earlier `SK31`, `SK31 1200 ` lands 4 of the typing and retypes
+  `0000`; after a vanished placeholder (D29) or a mask template (D51, `__.__.____`) the value alone is judged;
+  `SK31 ` after `SK31` holds nothing of the typing, so no tail (the D29 rule).
+- A caret left before the mark, or a mask that inserts it again, puts the tail where the final rule refuses it
+  (`SK31 1200000 `, `SK31 1200  000`): a false mismatch, the safe side (D28's caret argument).
+- Nothing passes that did not. The guard keeps `12/` of `1234/56` a `length` (the value's own `/` may be the one
+  shown), the safe side, and `+421 903 ` for a typed `+421 903123456` too: residual 5 below. Not in this change:
+  `1 2 ` for `1234` reads `same-length`, and `31.` stays a refused prefix (D51's one-mark residual).
+
+**Mutation-checked**: hand mutants, each killed by the new tests — the branch removed, the `-1` check negated or asked
+of the token before, the mark taken one character early, the guard removed, asked of the reading instead of the
+typing, without the spaces as one kind, `||` → `&&`, or a space typed anywhere refusing every mark; `next` as
+`whole[matched ± 1]` (killed by `12 345 ` for `12345,67`) or a fixed character; `prefix + next` → `prefix`,
+`held + next` → `held`, the whole typing → `prefix + next` (killed by `ab ` for `abcd12`, a code). The `-1` check
+replaced by `true` is equivalent (the guard refuses every typed last character: the typing holds it) — Stryker's one
+survivor in the new code. `npm run mutate` (cold): fill-reformat 94.69 → 94.80 % (floor 92), fill-landing 95.33 %
+(floor 93, no code change); floors unchanged.
+
+**Golden and live.** The golden never types: 0 changed. Live: no lab format adds an eager mark (`formatted` in
+Forms.kt, Forms.swift and rn/src/format.ts joins its groups, no trailing mark), and tests/truth/live-rejudge.test.ts
+re-judges the recorded replies by class and kind, unchanged; the forms groups (f1–f14, rf1–rf5) take only the
+earlier branches. No device check before merge; a lab format that marks a complete group eagerly, for a live proof on
+iOS React Native, is a later batch's.
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
@@ -433,3 +513,9 @@ counting without `countOf`, a mark dropped from its list, a mark or a space adde
    `1.23.456`, `1.23.456.789` — said in the reply's aside, no ⚠ caveat. Every typed digit is there, in order, and two
    marks cannot be a decimal point. So does `12.34.56` for `123456` (a grouping in twos), though one `12.34` for `1234`
    still fails.
+5. **An eager trailing mark of a kind the typing holds itself is no dropped tail** (D60's amendment, the typed-mark
+   guard): `+421 903 ` for a typed `+421 903123456`, any space for a space, fails `length` — no tail typed again; with
+   clear the wipe and the whole retype run, as before D60. The walk cannot tell the field's mark from the typing's own
+   shown after a drop from the middle (`12/` of `1234/56`), so a false mismatch, the safe side. Remedy, for a field
+   that regroups the value the way it shows it: type the value without its own separators (`+421903123456`) — the
+   field's marks are then all added, and a dropped tail is typed again.

@@ -230,7 +230,51 @@ describe('prefixOf — a strict prefix of the typing, exactly or reformatted', (
     expect(prefixOf('SK31 1200 0000', 'SK3112000000')).toBeUndefined();
     expect(prefixOf('12', '12')).toBeUndefined();
     expect(prefixOf('SK31 1300', 'SK3112000000')).toBeUndefined();
-    expect(prefixOf('SK31 ', 'SK3112000000')).toBeUndefined(); // a trailing mark (ADR 0034: a false mismatch, the safe side)
+    expect(prefixOf('SK31 1200 0000 ', 'SK3112000000')).toBeUndefined(); // the whole typing with an eager mark: no prefix
+  });
+
+  // D60: an eager field adds its mark once a group is complete, so a dropped end leaves a strict prefix AND that mark.
+  // The mark is judged as if the next typed character had landed after it — every rule of `reformatOf` unchanged.
+  it('a prefix that ends in an eager trailing mark (D60): reformatted, the trailing mark counted', () => {
+    expect(prefixOf('SK31 ', 'SK3112000000')).toEqual({ prefix: 'SK31', reformatted: { added: 1, respaced: 0 } });
+    expect(prefixOf('SK31 1200 ', 'SK3112000000')).toEqual({ prefix: 'SK311200', reformatted: { added: 2, respaced: 0 } });
+    expect(prefixOf('SK31\u00A01200\u00A0', 'SK3112000000')).toEqual({ prefix: 'SK311200', reformatted: { added: 2, respaced: 0 } });
+    expect(prefixOf('4111 1111 ', '4111111111111111')).toEqual({ prefix: '41111111', reformatted: { added: 2, respaced: 0 } });
+    expect(prefixOf('903 123 ', '903123456')).toEqual({ prefix: '903123', reformatted: { added: 2, respaced: 0 } });
+    expect(prefixOf('0903 12 ', '0903123456')).toEqual({ prefix: '090312', reformatted: { added: 2, respaced: 0 } });
+    expect(prefixOf('+421 903 ', '+421903123456')).toEqual({ prefix: '+421903', reformatted: { added: 2, respaced: 0 } });
+    expect(prefixOf('31.12.', '31122026')).toEqual({ prefix: '3112', reformatted: { added: 2, respaced: 0 } }); // a D51 grouping
+    expect(prefixOf('31/12/', '31122026')).toEqual({ prefix: '3112', reformatted: { added: 2, respaced: 0 } });
+    // the whole typing's rules: a letter split is a code's when the WHOLE typing is one (digits later in it)
+    expect(prefixOf('ab ', 'abcd12')).toEqual({ prefix: 'ab', reformatted: { added: 1, respaced: 0 } });
+    // a typing that holds a space of its own: another mark may still be the field's
+    expect(prefixOf('+421 903-', '+421 903123456')).toEqual({ prefix: '+421 903', reformatted: { added: 1, respaced: 0 } });
+  });
+
+  it('a trailing mark `reformatOf` would refuse before the next typed character (D60): none', () => {
+    expect(prefixOf('SK31 1200  ', 'SK3112000000')).toBeUndefined(); // two marks, next to each other
+    expect(prefixOf('SK31 1200-', 'SK3112000000')).toBeUndefined(); // two kinds
+    expect(prefixOf('31.', '31122026')).toBeUndefined(); // one `.`: neither thousands nor a grouping (D51's residual)
+    expect(prefixOf('12.', '1234')).toBeUndefined(); // a cents mask's point waiting for its fraction
+    expect(prefixOf('1.234.', '1234567')).toBeUndefined(); // no thousands: `1.234.5`
+    expect(prefixOf('1 234 ', '1234567')).toBeUndefined(); // two single-character groups
+    expect(prefixOf('1 2 ', '1234')).toBeUndefined(); // groups of one
+    expect(prefixOf('1 234 ', '1234,56')).toBeUndefined(); // before typed punctuation
+    expect(prefixOf('12 345 ', '12345,67')).toBeUndefined(); // the same, judged by THE next typed character: `,`
+    expect(prefixOf('Jan ', 'JanNovak')).toBeUndefined(); // prose: autocorrect splitting a word
+    expect(prefixOf(' ', 'SK3112000000')).toBeUndefined(); // a leading mark: an empty prefix
+    expect(prefixOf('-', '12')).toBeUndefined();
+  });
+
+  // D60's typed-mark guard (as `thousands`' rule): a mark the typing holds itself may be the typing's own, shown after a
+  // drop from the middle — the retype of what follows it would misplace characters. All spaces are one kind.
+  it('a trailing mark the whole typing holds itself (D60): none', () => {
+    expect(prefixOf('12/', '1234/56')).toBeUndefined();
+    expect(prefixOf('12 ', '1234 5678')).toBeUndefined();
+    expect(prefixOf('12\u00A0', '1234 5678')).toBeUndefined(); // another space for the typing's own
+    expect(prefixOf('12 ', '1234\u00A05678')).toBeUndefined();
+    // ADR 0034 residual 5: an eager mark of the kind the typing holds elsewhere — a false mismatch, the safe side
+    expect(prefixOf('+421 903 ', '+421 903123456')).toBeUndefined();
   });
 });
 

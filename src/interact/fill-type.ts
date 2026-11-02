@@ -32,7 +32,10 @@
  *      typed shows `1 234 567,` for a typed `1234567,89` that lost `89` —
  *      exact by typed characters, only grouping added, `reformatOf`'s rules
  *      judged over the whole typing (iOS React Native, rf2, 2026-10-31: the
- *      wipe and retype it got instead dropped the tail again). The tail is
+ *      wipe and retype it got instead dropped the tail again). Since D60 the
+ *      prefix may end in a mark an EAGER field added once a group was
+ *      complete (`SK31 1200 ` for `SK3112000000`), judged as if the next
+ *      typed character followed it (fill-reformat.ts#prefixOf). The tail is
  *      typed at the caret, which the field keeps at the end as it regroups
  *      (React Native's controlled TextInput, ADR 0034; rf3's typing on after
  *      a reformatting fill landed in order on iOS). Only the missing tail is typed, up to

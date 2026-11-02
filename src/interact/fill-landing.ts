@@ -197,8 +197,9 @@ const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined 
 /**
  * What the field is missing of what it should hold (its text before the typing, unless cleared — or vanished, then
  * none: `priorsOf`, D29 — then the value), when its reading is a strict prefix of that — exactly or reformatted
- * (`prefixOf`, D28) — and shows no bullet: a `Tail`, else undefined. The one definition of a dropped tail: the typing
- * retypes it (`droppedTail`) and the verdict names it (`differenceOf`), so the two judge a prefix alike. Pure.
+ * (`prefixOf`, D28; ending in an eager trailing mark too, D60) — and shows no bullet: a `Tail`, else undefined. The one
+ * definition of a dropped tail: the typing retypes it (`droppedTail`) and the verdict names it (`differenceOf`), so the
+ * two judge a prefix alike. Pure.
  */
 export function tailOf(observed: string, e: TextExpectation): Tail | undefined {
   const held = heldText(observed, e.placeholder);
