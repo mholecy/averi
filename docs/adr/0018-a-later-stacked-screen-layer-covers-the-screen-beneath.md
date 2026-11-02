@@ -1301,6 +1301,26 @@ opens mid-call is read as the word said. Measured on API 33 only:
 another API's `windows` format, unread, is `unknown` — today's hint. A Compose `Popup` (a panel) is typed `stacked` by
 the rule but unmeasured (no lab cell).
 
+## Amendment: the soft keyboard on idb's tap and fill miss (2026-11-02, D32)
+
+Residual 20's reply says idb's reasons, not which one holds, and "nothing beneath the keyboard" is one of them. For the
+tap's and fill's wait (interact/resolve.ts#notFound) the read can tell more where idb's keyboard band is read up by its
+shape (draw-order.ts#keyboardBandTop, the line ADR 0006 already judges taps against): the wait's last read is idb's flat
+list (`UiNode.flatList`) and holds the band, so the timeout says, on a line of its own beneath the headline and above
+idb's reasons, "the soft keyboard is up (its top edge at y 590) and idb lists nothing beneath it, so the element may lie
+there — hide it first (tap a neutral element such as the screen title — a tap: step in a flow; the return key submits)
+and try again". One short, actionable line: the adapter's remedy facts (ui-tree/keyboard-cover.ts#readKeyboard — how to
+hide it, `hideKeyboardHow`, and the key not to press, `DeviceAdapter.keyboardCaution`), composed by
+interact/target-text.ts#hideFirstBriefly, never the adapter's long advice; the input-accessory toolbar's Done, measured
+under WDA, is not offered (no idb capture lists one). "May": the band is a position, never a reading of the keyboard
+shown (K5d), so the target's place there is a possibility. A read with no band, a `zeroArea` or `presented` miss, a
+failed last read, and every tree of WDA and uiautomator (which list what lies beneath the keyboard) keep their reply
+unchanged; the 5 s wait is kept. Not changed: every assert's "not found within …", a flow's `wait:` and an optional
+step's one-line skip, which word the `Miss` alone — the keyboard is not a fact of the `Miss` (decision 5's precedence
+is unchanged). The golden's 16 under-keyboard tap rows of form-keyboard and the three toolbar-dismiss cells under idb,
+now judged as their stop has been since D32 slice 1 (a "not found" naming idb's reasons and the soft keyboard), are
+green and struck off.
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -1550,6 +1570,10 @@ the rule but unmeasured (no lab cell).
    paragraph on the band, which says how hard hiding it is under idb — accepted: the paragraph is the measured one, and
    a note without the keyboard for that one reply would be a variant for a wording's sake. Remedy: close what lies over
    it, a `text:`/`label:` selector, or `treeSource: wda`.
+   **Narrowed on idb's tap and fill wait** (2026-11-02, D32; "Amendment: the soft keyboard on idb's tap and fill
+   miss"): where the read holds idb's keyboard band, read by its shape, the timeout names the soft keyboard and how to
+   hide it on a line above idb's reasons — the keyboard reason said as the likely one; the asserts' not-found, a flow's
+   `wait:` and an optional step's skip still give the reasons alone.
 21. **On idb, a tap beneath a layer the list shows no sign of times out with idb's reasons, not the presented remedy**
    (2026-11-02, D32; what the amendments "idb's presented layer" (its Residuals) and "an idb read that lists no
    identifier" accepted, numbered). A presentation UIKit lays with no dismiss region in idb's list (a large-detent
@@ -1575,20 +1599,3 @@ docs/bugs/2026-10-14-ios-color-assert-on-a-sliver-beneath-a-presented-sheet-meas
 docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md
 docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it.md
 docs/bugs/2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md
-
-## Amendment: the soft keyboard on idb's tap and fill miss (2026-11-02, D32)
-
-Residual 20's reply says idb's reasons, not which one holds, and "nothing beneath the keyboard" is one of them. For the
-tap's and fill's wait (interact/resolve.ts#notFound) the read can tell more where idb's keyboard band is read up by its
-shape (draw-order.ts#keyboardBandTop, the line ADR 0006 already judges taps against): the wait's last read is idb's flat
-list (`UiNode.flatList`) and holds the band, so the timeout says, on a line of its own beneath the headline and above
-idb's reasons, "the soft keyboard is up (its top edge at y 590) and may cover it — hide it first (tap a neutral element
-such as the screen title — a tap: step in a flow) and look again; this adapter cannot hide it on its own (…)" — the
-adapter's own remedy (ui-tree/keyboard-cover.ts#readKeyboard), worded as `scroll_until`'s whole-screen advice. "May":
-the band is a position, never a reading of the keyboard shown (K5d), and idb lists nothing beneath it, so the target's
-place there is a possibility. A read with no band, a `zeroArea` or `presented` miss, a failed last read, and every tree
-of WDA and uiautomator (which list what lies beneath the keyboard) keep their reply unchanged; the 5 s wait is kept.
-Not changed: every assert's "not found within …", a flow's `wait:` and an optional step's one-line skip, which word the
-`Miss` alone — the keyboard is not a fact of the `Miss` (decision 5's precedence is unchanged). The golden's 16
-under-keyboard tap rows of form-keyboard and the three toolbar-dismiss cells under idb, now judged as their stop has been
-since D32 slice 1 (a "not found" naming idb's reasons and the soft keyboard), are green and struck off.

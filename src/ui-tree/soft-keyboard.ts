@@ -218,6 +218,8 @@ export interface KeyboardRemedy {
   dismissal: DismissalMeans;
   /** With `none`: the adapter's own sentence on why, and what works instead (`DeviceAdapter.keyboardAdvice`), when it has one. */
   advice?: string;
+  /** With `none`: the key not to press, one clause for a short remedy (`DeviceAdapter.keyboardCaution`), when it has one. */
+  caution?: string;
 }
 
 /**

@@ -1156,6 +1156,13 @@ export interface DeviceAdapter {
    */
   readonly keyboardAdvice?: string;
   /**
+   * The key NOT to press to hide a covering soft keyboard, as one clause a SHORT remedy says after how to hide it
+   * (`ui-tree/soft-keyboard.ts#KeyboardRemedy.caution`, interact/target-text.ts#hideFirstBriefly): IosAdapter's
+   * `the return key submits` (measured, K5: the login's return key submitted the form). Set only by an adapter WITHOUT
+   * the oracle, as `keyboardAdvice`, whose long sentence it does not repeat; absent on Android, whose `back` hides it.
+   */
+  readonly keyboardCaution?: string;
+  /**
    * How fast a finger may move — in screens per second, the screen's LONG
    * side — for a stroke to DRAG this platform's scroll views about its own
    * length rather than fling them on. Set by Android only: the fling is the

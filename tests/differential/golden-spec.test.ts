@@ -302,7 +302,7 @@ describe('a field under the keyboard its replayed tree does not list (form-keybo
     const t = row(idbRows, 'tap');
     expect(t.absent).toBeDefined();
     const wait = (...notes: string[]) => [`ERROR Timed out after 5000ms waiting for element id:"${ID}" to appear`, ...notes.map((n) => `  (${n})`)].join('\n');
-    const KEYS = 'the soft keyboard is up (its top edge at y 590) and may cover it — hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and look again';
+    const KEYS = 'the soft keyboard is up (its top edge at y 590) and idb lists nothing beneath it, so the element may lie there — hide it first (tap a neutral element such as the screen title — a tap: step in a flow; the return key submits) and try again';
     expect(t.judge(out(wait(KEYS, REASONS)))).toBeUndefined();
     expect(t.judge(out(wait(REASONS)))).toMatch(/^refused without naming the keyboard: /);
     expect(t.judge(out(wait(KEYS)))).toMatch(/^not found, without naming idb's reasons and the soft keyboard: /);

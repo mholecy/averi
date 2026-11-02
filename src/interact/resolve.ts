@@ -1,7 +1,7 @@
 import type { DeviceAdapter, UiNode } from '../adapters/types.js';
 import { describeElementSpec } from '../ui-tree/element-spec.js';
 import { lookOn } from '../ui-tree/look.js';
-import { MissedError, missNote, missOf, presentedAloneHeadline, topLayerOnlySource, type Miss } from '../ui-tree/miss.js';
+import { KEYBOARD_UNLISTED, MissedError, missNote, missOf, presentedAloneHeadline, topLayerOnlySource, type Miss } from '../ui-tree/miss.js';
 import { pollTimeoutMessage, pollTree, readTreeOrMiss, type FirstSample } from '../ui-tree/read-tree.js';
 import { findTarget, hasArea, preferInteractive, type Target } from '../ui-tree/selectors.js';
 import { markedForMiss } from '../ui-tree/window-mark.js';
@@ -278,7 +278,7 @@ export interface ResolvedSettled extends Resolved {
  * docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md
  */
 export async function resolveSettled(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<ResolvedSettled> {
@@ -382,7 +382,7 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * on a line of their own above the miss's note (D32 K1).
  */
 async function notFound(
-  adapter: Pick<DeviceAdapter, 'focusedWindow' | 'keyboard' | 'keyboardAdvice'>,
+  adapter: Pick<DeviceAdapter, 'focusedWindow' | 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>,
   target: Target,
   timeoutMs: number,
   outcome: { readError?: Error; treesRead: number; lastTree?: UiNode },
@@ -391,25 +391,28 @@ async function notFound(
   const tree = await markedForMiss(adapter, outcome, target);
   const miss = missOf({ tree, readError: outcome.readError, target });
   if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss)}`);
-  const hints = [tree === undefined || miss.of === 'zeroArea' || miss.of === 'unread' ? undefined : keyboardUnlisting(adapter, tree), missNote(miss)].filter((h) => h !== undefined);
+  const keyboard = tree === undefined || miss.of === 'zeroArea' || miss.of === 'unread' ? undefined : keyboardUnlisting(adapter, tree);
+  const hints = [keyboard, missNote(miss)].filter((h) => h !== undefined);
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, hints), { sighted: false, ...outcome, miss });
 }
 
 /**
- * The soft keyboard, when it may be why a wait found nothing (D32 K1): the tree is idb's flat list, which lists nothing
- * beneath the keyboard (`topLayerOnlySource`; ADR 0018), and its keys are read up by their shape — the band's line
- * (ui-tree/keyboard-position.ts#KeyboardPosition.line, over draw-order.ts#keyboardBandTop: a position, never a reading
- * of the keyboard shown, K5d). Then `keyboardMayCoverText`, with the adapter's own remedy (ui-tree/keyboard-cover.ts
- * #readKeyboard: on iOS no key hides it — tap a neutral element; the adapter's advice). Undefined on any other tree —
- * WDA and uiautomator list what lies beneath the keyboard, so a miss there is not the keyboard's — and on an idb read
- * with no band: today's reply, unchanged. Not said where the target matched only at 0×0 (`zeroArea`: it IS in the
- * tree), after a failed last read (`unread`: the hints are dropped) nor beneath a presented layer's own headline. Asked of the last read only, on a miss only: one draw-order walk.
+ * The soft keyboard, when it may be why a wait found nothing (D32 K1): the tree's source lists nothing beneath the
+ * keyboard (`topLayerOnlySource`: idb's flat list; ADR 0018), and its keys are read up by their shape — the band's
+ * line (ui-tree/keyboard-position.ts#KeyboardPosition.line, over draw-order.ts#keyboardBandTop: a position, never a
+ * reading of the keyboard shown, K5d). Then `keyboardMayCoverText`, with the adapter's own remedy, short
+ * (ui-tree/keyboard-cover.ts#readKeyboard: how to hide it, and its caution). Undefined on any other tree — WDA and
+ * uiautomator list what lies beneath the keyboard, so a miss there is not the keyboard's — and on an idb read with no
+ * band: today's reply, unchanged. Not said where the target matched only at 0×0 (`zeroArea`: it IS in the tree),
+ * after a failed last read (`unread`: the hints are dropped) nor beneath a presented layer's own headline. Asked of
+ * the last read only, on a miss only: one draw-order walk.
  */
-function keyboardUnlisting(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>, tree: UiNode): string | undefined {
-  if (topLayerOnlySource(tree) === undefined) return undefined;
+function keyboardUnlisting(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>, tree: UiNode): string | undefined {
+  const source = topLayerOnlySource(tree);
+  if (source === undefined) return undefined;
   const look = lookOn(adapter, tree);
   const line = look.keyboard.line();
-  return line === undefined ? undefined : keyboardMayCoverText({ lineY: line.y, remedy: look.reading.remedy });
+  return line === undefined ? undefined : keyboardMayCoverText({ lineY: line.y, remedy: look.reading.remedy }, KEYBOARD_UNLISTED[source]);
 }
 
 /**
@@ -427,7 +430,7 @@ function keyboardUnlisting(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAd
  * budget shorter than one read still gets one honest look.
  */
 export async function resolvePresent(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<Resolved> {

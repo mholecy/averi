@@ -159,6 +159,7 @@ export const ADAPTER_SURFACE: Record<keyof DeviceAdapter, 'tree' | 'reads' | 'ac
   pressKey: 'acts',
   keyboard: 'reads',
   keyboardAdvice: 'fact',
+  keyboardCaution: 'fact',
   dragSpeed: 'fact',
   treeReadSettles: 'fact',
   typingDelivery: 'fact',

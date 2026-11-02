@@ -107,6 +107,12 @@ export const TOP_LAYER_ONLY_HINT: Record<TopLayerOnlySource, string> = {
   idb: 'idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element lies beneath one, close it first',
 };
 
+/**
+ * What a tree whose source lists only the top layer (`TopLayerOnlySource`) leaves out under the soft keyboard, as the
+ * tap's and fill's wait says it beside the keyboard's line (interact/target-text.ts#keyboardMayCoverText, D32 K1).
+ */
+export const KEYBOARD_UNLISTED: Record<TopLayerOnlySource, string> = { idb: 'idb lists nothing beneath it' };
+
 /** THE hint of a miss on a tree whose source lists the active window only and marks no window presented (`Miss`'s `activeWindow`). */
 export const ACTIVE_WINDOW_HINT = 'the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first';
 
