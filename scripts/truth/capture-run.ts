@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import type { RunManifest } from '../differential/corpus.js';
-import { LAB_APP, type LabDevice } from './lab-device.js';
+import { LAB_APP, type LabDevice, pause } from './lab-device.js';
 import { captureRefusal } from './catalog.js';
 import { measure } from './pixels.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
@@ -209,7 +209,7 @@ async function probe(lab: LabDevice, cell: string, where: Rect | { x: number; y:
   const before = first === undefined ? launched.events.length : (await lab.state())!.events.length;
   const at = 'width' in where ? probePoint(where) : where;
   await lab.tap(at.x, at.y);
-  await new Promise((r) => setTimeout(r, 1_000));
+  await pause(1_000);
   const after = await lab.state();
   return { events: probeEvents(after, before), after };
 }

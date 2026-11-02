@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PersistentReadError, type DeviceAdapter, type Platform, type UiNode } from '../../src/adapters/types.js';
 import { parseConfig } from '../../src/flow/config.js';
 import { EngineSession } from '../../src/flow/launch.js';
@@ -46,6 +46,9 @@ vi.mock('../../src/verify/ocr.js', async (importOriginal) => {
 beforeEach(() => {
   resetSleeps();
   vi.mocked(ocrEngineFor).mockClear();
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const CFG = parseConfig(
@@ -255,6 +258,7 @@ flows: {}
   });
 
   it('surfaces a failing assert without throwing', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); // the assert's whole default budget, in recorded sleeps only
     const adapters = { android: fake('android'), ios: fake('ios') };
     const out = await runVerification(
       request({ platforms: ['android'], specs: [{ element: { id: 'nope' } }] }),

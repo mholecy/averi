@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { PNG } from 'pngjs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { everyNode, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
@@ -11,6 +11,12 @@ import { sceneOf } from '../../src/ui-tree/standing.js';
 import { eyesOn, judgeOrder } from '../../src/verify/eyes.js';
 import { FakeAdapter, node } from '../helpers/fake.js';
 import { Verifier } from '../../src/verify/assert.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts), and the colour
+// assert's polls below fake the Date: only the recorded sleeps move the clock, so a budget holds the same rounds however
+// long a 1206x2622 png takes to decode — on the real clock a loaded machine left C fewer rounds than the test counts.
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 /**
  * THE EYES TELL THE ORDER (ui-tree/eyes.ts#pairQuestion, verify/eyes.ts#judgeOrder) over the lab's real blur-menu
@@ -306,6 +312,14 @@ describe('the judge — each rule answers untold where its evidence is missing',
 // The colour assert answers the order question from the frame it captures anyway (verify/pixel-poll.ts#pollPixels):
 // W, covered by C in the listing and seen on top, costs one round's settled pair — what any measured element costs.
 describe('the colour assert — the order seen on the frame it measures, no capture added', () => {
+  beforeEach(() => {
+    resetSleeps();
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   /** The png with one pixel changed at (x, y), to `k`: two captures that differ there. */
   const touched = (base: PNG, x: number, y: number, k: number): Buffer => {
     const img = new PNG({ width: base.width, height: base.height });
@@ -337,6 +351,7 @@ describe('the colour assert — the order seen on the frame it measures, no capt
     const w = await assertOn('lab.blur-menu.W');
     expect(w.result).toMatchObject({ pass: true, detail: expect.stringContaining('sampled #00897B') });
     expect(w.captures).toBe(2);
+    expect(sleeps).toEqual([300]); // one round: the settled pair's one gap, no poll after it
   });
 
   it('C, seen under W, asks once per distinct tree: every later round of the same tree reuses the answer, no capture', async () => {

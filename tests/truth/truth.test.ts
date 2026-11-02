@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
@@ -27,6 +27,14 @@ import {
   touchTargetOf,
   touchesAt,
 } from '../../scripts/truth/truth.js';
+
+// The probe's 1 s for the app to log (capture-run.ts#probe) goes through the harness's one wait, lab-device.ts#pause:
+// recorded here, not waited on — the fake lab logs a tap's events as it taps.
+const pauses = vi.hoisted((): number[] => []);
+vi.mock('../../scripts/truth/lab-device.js', async (original) => ({
+  ...(await original<typeof import('../../scripts/truth/lab-device.js')>()),
+  pause: async (ms: number) => void pauses.push(ms),
+}));
 
 // The truth's arithmetic (scripts/truth/truth.ts) and the one capture (capture-run.ts) behind a fake LabDevice: where a
 // form control lies from the app's frames, what a probe's events say, when a cell is broken — no device.
@@ -360,6 +368,7 @@ class FakeLab implements LabDevice {
 
 let out: string;
 beforeEach(async () => {
+  pauses.length = 0;
   out = await mkdtemp(join(tmpdir(), 'averi-truth-'));
 });
 afterEach(async () => {
@@ -375,6 +384,7 @@ describe('capture', () => {
     expect(broken).toEqual([]);
     expect(skipped).toEqual(['form-x: a form cell']);
     expect(lab.taps).toEqual([[20, 20]]);
+    expect(pauses).toEqual([1_000]); // the probe gives the app 1 s to log before it reads the events
     const truth = JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')) as CellTruth;
     expect(truth.targets).toEqual([
       { tag: 'A', id: 'lab.open.A', color: GREEN, declared: 'open', frame: rect(10, 10, 20, 20), reached: true, probe: [ev('touch', '20,20')], drawn: 1, seen: GREEN },

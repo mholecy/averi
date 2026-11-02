@@ -17,10 +17,13 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 // (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay
 // is capture.ts's constant and no option of the Verifier's, so this file
 // cannot buy speed with a small `pollMs` any more — it pins the DELAY
-// SEQUENCE instead. The deadline tests fake the Date; the recorder moves it.
+// SEQUENCE instead. Every test fakes the Date and the recorder moves it: a
+// deadline plays out in recorded sleeps, so a miss costs no wall clock and
+// holds the same rounds on any machine (T1).
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 beforeEach(() => {
   resetSleeps();
+  vi.useFakeTimers({ toFake: ['Date'] });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -816,7 +819,8 @@ describe('ocr asserts (what the element RENDERS)', () => {
         throw new Error('recognizer exited 2');
       },
     };
-    const result = await new Verifier(cardFake(), { ...FAST, ocr: { engine: flaky } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    // A budget that holds more than one round: each captures its settled pair (300 ms) before the read.
+    const result = await new Verifier(cardFake(), { ...FAST, timeoutMs: 1_000, ocr: { engine: flaky } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result).toMatchObject({ pass: false, detail: 'OCR failed: recognizer exited 2; failing closed, rendered text unchecked' });
     expect(reads).toBeGreaterThan(1);
   });

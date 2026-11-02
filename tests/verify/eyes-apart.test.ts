@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { PNG } from 'pngjs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
@@ -8,6 +8,12 @@ import { measuredFrameFor } from '../../src/verify/capture.js';
 import { apartOfFrame } from '../../src/verify/eyes.js';
 import { Verifier } from '../../src/verify/assert.js';
 import { FakeAdapter } from '../helpers/fake.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts), and the colour
+// assert's polls below fake the Date: only the recorded sleeps move the clock, so a budget holds the same rounds however
+// long the 1206x2622 pngs take to encode and decode (T1, as eyes-order.test.ts).
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
 /**
  * THE EYES' THIRD QUESTION (verify/eyes.ts#apartOfFrame): does the colour assert's region read as the screen beside it?
@@ -101,6 +107,14 @@ describe('apartOfFrame — a small mark of its own on a large element is its own
 
 // The colour assert asks it of the frame it measures (verify/pixel-poll.ts#pollPixels): no capture added.
 describe('the colour assert under idb — a region that reads as the screen beside it fails closed', () => {
+  beforeEach(() => {
+    resetSleeps();
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const assertOn = async (cell: string, target: string, expected: string, timeoutMs = 600) => {
     const tree = await idbTree(cell);
     const fake = new FakeAdapter({ screen: tree }, 'screen');
@@ -151,10 +165,12 @@ describe('the colour assert under idb — a region that reads as the screen besi
       still.data[0] = shots++ % 2 === 0 ? 0 : 255;
       return PNG.sync.write(still);
     };
-    // Two rounds at least (a region-settled frame measures only at a rect two reads agree on), each encoding pngs.
-    const result = await new Verifier(fake, { pollMs: 5, timeoutMs: 3000 }).assert({ element: { id: 'lab.scroll-bounded.O' }, color: { expected: '#FFFFFF' } });
+    // Two rounds at least (a region-settled frame measures only at a rect two reads agree on): on the faked clock 600 ms
+    // holds exactly two, each its settled pair.
+    const result = await new Verifier(fake, { pollMs: 5, timeoutMs: 600 }).assert({ element: { id: 'lab.scroll-bounded.O' }, color: { expected: '#FFFFFF' } });
     expect(result).toMatchObject({ pass: false, detail: expect.stringContaining('its region reads as the screen beside it (#FFFFFF)') });
-  }, 20_000);
+    expect(sleeps).toEqual([300, 5, 300]);
+  });
 
   it('scroll-bounded W asked its own red: passes in one round, the settled pair', async () => {
     const w = await assertOn('scroll-bounded', 'W', '#E53935');

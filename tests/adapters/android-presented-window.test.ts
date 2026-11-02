@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DeviceScreen, FocusedWindow, UiNode } from '../../src/adapters/types.js';
 import { parseFocusedWindow } from '../../src/adapters/android.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
@@ -13,6 +13,13 @@ import { parseDump } from '../helpers/android-dumps.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { formatSeconds } from '../../src/util/duration.js';
 import { Verifier } from '../../src/verify/assert.js';
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts); a test that runs a
+// whole budget out fakes the Date too, so the recorded sleeps alone move its clock (T1).
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 // ANDROID'S PRESENTED WINDOW (docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md):
 // `uiautomator dump` lists the ACTIVE window only, so beneath an AlertDialog or a ModalBottomSheet the screen's targets
@@ -509,13 +516,15 @@ describe('a miss on an unmarked uiautomator tree asks the window manager', () =>
   });
 
   it('a pixel assert whose finding stands when its element is gone from the last read never asks: the finding is the reply', async () => {
+    // On the faked clock 400 ms is the first round's settled pair (300 ms) and dozens of reads without the element after.
+    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, asked } = device(lab('dialog-fullscreen'), word('dialog-fullscreen'));
     fake.nextScreenshot = readFileSync(new URL('dialog-fullscreen.png', TRUTH));
     const dialog = lab('dialog-fullscreen');
     const without = { ...dialog, children: [] };
     let reads = 0;
     fake.uiTree = async () => (reads++ === 0 ? dialog : without);
-    const { pass, detail } = await new Verifier(fake, { pollMs: 2, timeoutMs: 2_000 }).assert({ element: { id: 'lab.dialog-fullscreen.S' }, color: { expected: '#00FF00' } });
+    const { pass, detail } = await new Verifier(fake, { pollMs: 2, timeoutMs: 400 }).assert({ element: { id: 'lab.dialog-fullscreen.S' }, color: { expected: '#00FF00' } });
     expect(pass).toBe(false);
     expect(detail).toMatch(/vs expected #00FF00/);
     expect(reads).toBeGreaterThan(1);
