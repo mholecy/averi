@@ -489,6 +489,7 @@ export class IdbTreeSource implements IosTreeSource {
     const { elements } = await this.readOnce();
     const label = elements.find((el) => el.type === 'Application')?.AXLabel;
     if (label === undefined || label === null || label === '') return { kind: 'unlabelled' };
+    // alertShapeInIdb returns undefined at once for any Application label other than SpringBoard's ' '.
     const candidate = alertShapeInIdb(elements);
     return candidate === undefined ? { kind: 'label', label } : { kind: 'label', label, candidate };
   }

@@ -40,7 +40,7 @@ const ACTIVE_APP_TIMEOUT_MS = 2_000;
 /** /source on deep trees is the known WDA weakness — Phase 4 measures it. */
 const SOURCE_TIMEOUT_MS = 30_000;
 /**
- * sourceNow's budget (D54): the one /source a deep link's foreground wait reads at its 3 s bound to name iOS's system
+ * quickSourceIfUp's budget (D54): the one /source a deep link's foreground wait reads at its 3 s bound to name iOS's system
  * alert. 2 s, as ACTIVE_APP_TIMEOUT_MS: a whole app tree read in 0.9–1.25 s (batch-2 D, the lab's), and the alert's
  * SpringBoard tree is small (about 24 KB of XML, batch-5 D49A) — so 2 s clears a healthy WDA on a loaded host, and
  * it caps what the aid adds to a link's reply (the bound, one ask in flight, then this) where SOURCE_TIMEOUT_MS's
@@ -270,12 +270,14 @@ export class WdaServer {
   }
 
   /**
-   * GET /source?format=json ONCE, under SYSTEM_ALERT_SOURCE_TIMEOUT_MS (D54): the short read of a deep link's wait at
-   * its bound. Unlike source(), it NEVER starts WDA (no ensureRunning), never probes /status and never restarts it:
-   * the read is an aid to a reply, and a WDA that cannot answer it in time is left as it is — a refusal, a timeout or
-   * an HTTP error fails naming the port and the log, as activeAppInfo's do. Callers ask upGeneration() first.
+   * GET /source?format=json ONCE, under the short SYSTEM_ALERT_SOURCE_TIMEOUT_MS, and only from a WDA of ours that is
+   * up (upGeneration) — undefined, with no call, when none is (D54: the read of a deep link's wait at its bound).
+   * Unlike source(), it NEVER starts WDA (no ensureRunning), never probes /status and never restarts it: the read is
+   * an aid to a reply, and a WDA that cannot answer it in time is left as it is — a refusal, a timeout or an HTTP
+   * error fails naming the port and the log, as activeAppInfo's do.
    */
-  async sourceNow(): Promise<unknown> {
+  async quickSourceIfUp(): Promise<unknown> {
+    if (this.upGeneration() === undefined) return undefined;
     return this.askOnce('/source?format=json', SYSTEM_ALERT_SOURCE_TIMEOUT_MS, '/source');
   }
 

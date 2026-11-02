@@ -324,18 +324,16 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
           try {
             names = await check.names();
           } catch (e) {
-            return unchecked(check, headline(e));
+            // D54: an alert whose title needs no names (the English "Open in “…”?") is named all the same.
+            const alert = idbAlert(check, read, []);
+            return alert === undefined ? unchecked(check, headline(e)) : { kind: 'alert', alert };
           }
           // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
           deadline += Date.now() - asked;
         }
         if (names.includes(read.label)) return { kind: 'matched' };
-        // D54: SpringBoard's read carries its alert shape — no other call; its title is gated with the names held. A
-        // launch looks for no alert.
-        const candidate = check.link === undefined ? undefined : read.candidate;
-        if (candidate !== undefined && titleAsksToOpen(candidate.title, names)) {
-          return { kind: 'alert', alert: { ...candidate, asksForApp: namesApp(candidate.title, names) } };
-        }
+        const alert = idbAlert(check, read, names);
+        if (alert !== undefined) return { kind: 'alert', alert };
         stale = read.label;
       }
     }
@@ -365,9 +363,21 @@ async function alertAtBound(check: ForegroundCheck): Promise<LinkAlert | undefin
   if (check.link === undefined || check.alert === undefined) return undefined;
   const alert = await check.alert().catch(() => undefined);
   if (alert === undefined) return undefined;
-  const names = await check.names().catch((): readonly string[] => []);
-  return { ...alert, asksForApp: namesApp(alert.title, names) };
+  return linkAlertOf(alert, await check.names().catch((): readonly string[] => []));
 }
+
+/**
+ * idb's system alert in a SpringBoard label read (D54): the read's alert shape (`candidate`, no other call), for a link
+ * only, when its title asks to open the link judged with `names` (titleAsksToOpen; none when they could not be read,
+ * so only the English form passes).
+ */
+function idbAlert(check: ForegroundCheck, read: Extract<ApplicationLabel, { kind: 'label' }>, names: readonly string[]): LinkAlert | undefined {
+  const candidate = check.link === undefined ? undefined : read.candidate;
+  return candidate !== undefined && titleAsksToOpen(candidate.title, names) ? linkAlertOf(candidate, names) : undefined;
+}
+
+/** A found alert as the link's outcome carries it: whether its title names the app (`asksForApp`, namesApp). */
+const linkAlertOf = (alert: SystemAlert, names: readonly string[]): LinkAlert => ({ ...alert, asksForApp: namesApp(alert.title, names) });
 
 /** What a "could not check" note quotes of an error: its first line — the cause, not a stack or a paragraph of advice. */
 const headline = (e: unknown): string => errorMessage(e).split('\n')[0];

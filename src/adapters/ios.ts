@@ -478,9 +478,8 @@ export class IosAdapter implements DeviceAdapter {
     const handler = await this.linkHandler(url, opts.appId);
     if (handler === undefined) return {};
     // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground). The alert
-    // read is the source's own (WDA's short /source); idb has none — its label reads carry the alert's shape, and the
-    // wait asks this only after a bundle answer, which idb never gives.
-    const alert = async () => this.treeSource.systemAlert?.();
+    // read is the source's own (WDA's short /source); idb has none — its label reads carry the alert's shape.
+    const alert = this.treeSource.systemAlert?.bind(this.treeSource);
     const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url, alert }));
     if (outcome.note === undefined && outcome.alert === undefined) this.front = { kind: 'launched', bundleId: handler };
     return outcome;

@@ -141,6 +141,16 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     expect(exec.calls).toEqual([]);
   });
 
+  // Review of D54: the ask's own 2 s budget (ACTIVE_APP_TIMEOUT_MS), not /source's 30 s.
+  it('the ask runs under its own 2 s budget', async () => {
+    const { source } = await setup();
+    await source.read();
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    await source.applicationLabel();
+    expect(timeout.mock.calls).toEqual([[2_000]]);
+    timeout.mockRestore();
+  });
+
   it('after a read: one GET /wda/activeAppInfo, no /source, no /status — the bundle it names', async () => {
     const { source, spawner, fetcher } = await setup();
     await source.read();

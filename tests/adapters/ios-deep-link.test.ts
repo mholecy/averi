@@ -453,6 +453,36 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     const d = lab([SPRINGBOARD], { tree: WDA_ALERT, info: appinfo(undefined, undefined, { path: LAB_PATH }) });
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ alert: { ...ALERT.alert!, asksForApp: false } });
   });
+
+  // Review of D54: on idb the names are asked at the first label. When they cannot be read, an alert whose title reads
+  // the English "Open in “…”?" needs none, so it is named all the same; only one that needs the names is "could not check".
+  const NO_NAMES = appinfo(undefined, undefined, { path: LAB_PATH });
+
+  it("idb, the app's names unreadable: the English-form alert is named (not as asking for the app) — one describe-all, no pause", async () => {
+    const d = idbLab([IDB_ALERT], NO_NAMES);
+    expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ alert: { ...ALERT.alert!, asksForApp: false } });
+    expect(d.describeAlls()).toBe(1);
+    expect(d.calls.filter((c) => c.includes('appinfo'))).toHaveLength(1);
+    expect(sleeps).toEqual([]);
+  });
+
+  it("idb, the app's names unreadable and a localised title that needs them: \"could not check\" at once, as before", async () => {
+    const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'In „AveriLab“ öffnen?')], NO_NAMES);
+    const outcome = await d.adapter.openDeepLink('averilab://d54', { appId: LAB });
+    expect(outcome.alert).toBeUndefined();
+    expect(outcome.note).toMatch(/^averi could not check that dev\.averi\.lab came forward after the link: .*\(simctl appinfo listed neither CFBundleDisplayName nor CFBundleName\)/);
+    expect(d.describeAlls()).toBe(1);
+  });
+
+  it("idb, the app's names unreadable and no alert shape (the lab's tree): \"could not check\", as before", async () => {
+    const d = idbLab([IDB_LAB], NO_NAMES);
+    expect((await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).note).toMatch(/^averi could not check that dev\.averi\.lab came forward/);
+  });
+
+  it('a launch with the names unreadable over the same alert: unchanged — its "could not check" note, no alert', async () => {
+    const d = idbLab([IDB_ALERT], NO_NAMES);
+    expect(await d.adapter.launch(LAB)).toEqual({ note: expect.stringMatching(/^could not check that dev\.averi\.lab is in front/) });
+  });
 });
 
 // D24's memory of which app is in front (ios.ts#FrontApp): a link that brought the project's app forward is a launch
