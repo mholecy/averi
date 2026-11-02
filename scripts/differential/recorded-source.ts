@@ -2,6 +2,7 @@ import { markIdbDialect, type ApplicationLabel, type IosTreeSource } from '../..
 import type { UiNode } from '../../src/adapters/types.js';
 import { markWdaDialect } from '../../src/adapters/wda-source.js';
 import type { Recording } from './corpus.js';
+import { REPLAYED_APP } from './fake-device.js';
 
 /**
  * The recorded adapter at the iOS tree-source seam (src/adapters/
@@ -47,7 +48,7 @@ export class RecordedTreeSource implements IosTreeSource {
      * Whether the side's own WdaTreeSource answers a bundle id (Side.asksWdaBundle, D48) — false for a side from
      * before it, whose launch wait cannot match one: it is handed `declined`, as its WdaTreeSource answered.
      */
-    private readonly answersBundle: boolean = false,
+    private readonly asksWdaBundle: boolean = false,
   ) {
     if (recording.platform !== 'ios' || recording.source === 'uiautomator') {
       throw new Error(`RecordedTreeSource replays iOS trees; ${recording.id} is ${recording.platform} ${recording.source}`);
@@ -67,15 +68,15 @@ export class RecordedTreeSource implements IosTreeSource {
 
   /**
    * WDA: as the side's WdaTreeSource answers once its WebDriverAgent is up —
-   * since D48 the app the replay launched (differential.ts's
-   * `differential.app`), so the launch's foreground wait takes its match path
+   * since D48 the app the replay launched (fake-device.ts's
+   * REPLAYED_APP), so the launch's foreground wait takes its match path
    * with no device call and no read (`onRead` is not told); before D48
-   * (`answersBundle` false) `declined`. Either way the reply carries no
+   * (`asksWdaBundle` false) `declined`. Either way the reply carries no
    * note. idb: a normalized tree keeps no element types to answer from.
    */
   async applicationLabel(): Promise<ApplicationLabel> {
     if (this.kind === 'idb') return { kind: 'unlabelled' };
-    return this.answersBundle ? { kind: 'bundle', bundleId: 'differential.app' } : { kind: 'declined' };
+    return this.asksWdaBundle ? { kind: 'bundle', bundleId: REPLAYED_APP } : { kind: 'declined' };
   }
 
   async dispose(): Promise<void> {}

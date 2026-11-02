@@ -41,6 +41,8 @@ export class WdaTreeSource implements IosTreeSource {
   private readonly udid: string;
   private readonly server: WdaServer;
   private disposed = false;
+  /** The WDA start (WdaServer.upGeneration) whose activeAppInfo ask failed — not asked again (applicationLabel). */
+  private askFailedIn: number | undefined;
 
   constructor(opts: WdaServerOptions) {
     this.udid = opts.udid;
@@ -83,25 +85,34 @@ export class WdaTreeSource implements IosTreeSource {
    * poll, 0.9–1.25 s in that run, and display names to match), and not
    * idb's Application label (another reader, whose lag is not `/source`'s).
    *
-   * - WDA not up (WdaServer.isUp: no start of ours reached /status, or it
+   * - WDA not up (WdaServer.upGeneration: no start of ours reached /status, or it
    *   exited or was stopped since) → `declined`, no device call. The
    *   2026-10-09 objection stands for this case: asking would move WDA's
    *   start (a build on first use, then up to 60 s for /status) into every
    *   first `launch_app`, and the first read's own start (7.7 s measured in
    *   that run) outlasts the switch anyway.
    * - up → `bundle` with the payload's `value.bundleId`, `unlabelled` when it
-   *   is not a non-empty string; WDA's error (port, log) when the ask fails.
+   *   is not a non-empty string; WDA's error (port, log) when the ask fails —
+   *   once per WDA child: after a failed ask the same child is not asked
+   *   again (`declined`), so a wedged runner costs one launch its ask's
+   *   budget and one "could not check" note, not every launch (review
+   *   2026-11-02); a restarted WDA (a new upGeneration) is asked again.
+   *   The bundle id is matched exactly by the wait (ios-foreground.ts): WDA
+   *   reports the app's canonical CFBundleIdentifier, the id `simctl launch`
+   *   was given — no case folding, by design.
    * - released → the released error, as read() (checked first: a shut-down
    *   server is not up, and `declined` would hide the release).
    */
   async applicationLabel(): Promise<ApplicationLabel> {
     if (this.disposed) throw this.released();
-    if (!this.server.isUp()) return { kind: 'declined' };
+    const generation = this.server.upGeneration();
+    if (generation === undefined || generation === this.askFailedIn) return { kind: 'declined' };
     let payload: unknown;
     try {
       payload = await this.server.activeAppInfo();
     } catch (err) {
       if (this.disposed) throw this.released(err);
+      this.askFailedIn = generation;
       throw err;
     }
     const bundleId = (payload as { value?: { bundleId?: unknown } } | null | undefined)?.value?.bundleId;

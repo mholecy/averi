@@ -511,7 +511,7 @@ describe('WdaServer.source', () => {
   });
 });
 
-describe('WdaServer.isUp and activeAppInfo — asked of a running WDA only, never starting one (D48)', () => {
+describe('WdaServer.upGeneration and activeAppInfo — asked of a running WDA only, never starting one (D48)', () => {
   async function upSetup(active: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: { value: { bundleId: 'dev.averi.lab' } } })) {
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();
@@ -528,15 +528,15 @@ describe('WdaServer.isUp and activeAppInfo — asked of a running WDA only, neve
     return { server, spawner, fetcher };
   }
 
-  it('isUp: false before any start, true once ensureRunning resolved on our child', async () => {
+  it('upGeneration: none before any start, a number once ensureRunning resolved on our child', async () => {
     const { server } = await upSetup();
-    expect(server.isUp()).toBe(false);
+    expect(server.upGeneration()).toBeUndefined();
     await server.ensureRunning();
-    expect(server.isUp()).toBe(true);
+    expect(server.upGeneration()).toBeDefined();
     server.stop();
   });
 
-  it('isUp: false while a start is still in flight (spawned, /status not yet answered)', async () => {
+  it('upGeneration: none while a start is still in flight (spawned, /status not yet answered)', async () => {
     const { dd } = await tempDerivedData(true);
     const spawner = fakeSpawn();
     let ready = false;
@@ -544,37 +544,41 @@ describe('WdaServer.isUp and activeAppInfo — asked of a running WDA only, neve
     const server = new WdaServer({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
     const starting = server.ensureRunning();
     while (spawner.spawns.length === 0) await new Promise((r) => setTimeout(r, 2));
-    expect(server.isUp()).toBe(false);
+    expect(server.upGeneration()).toBeUndefined();
     ready = true;
     await starting;
-    expect(server.isUp()).toBe(true);
+    expect(server.upGeneration()).toBeDefined();
     server.stop();
   });
 
-  it('isUp: false after stop(), after our child exited, and after shutdown()', async () => {
+  it('upGeneration: none after stop(), after our child exited, and after shutdown()', async () => {
     const a = await upSetup();
     await a.server.ensureRunning();
     a.server.stop();
-    expect(a.server.isUp()).toBe(false);
+    expect(a.server.upGeneration()).toBeUndefined();
 
     const b = await upSetup();
     await b.server.ensureRunning();
     b.spawner.children[0].exit.forEach((l) => l());
-    expect(b.server.isUp()).toBe(false);
+    expect(b.server.upGeneration()).toBeUndefined();
 
     const c = await upSetup();
     await c.server.ensureRunning();
     await c.server.shutdown();
-    expect(c.server.isUp()).toBe(false);
+    expect(c.server.upGeneration()).toBeUndefined();
   });
 
-  it('isUp after a stop() and a fresh start: true again, for the new child', async () => {
+  it('upGeneration after a stop() and a fresh start: up again, under a new generation — and the same one across reuse', async () => {
     const { server, spawner } = await upSetup();
     await server.ensureRunning();
+    const first = server.upGeneration();
+    await server.ensureRunning(); // the fast path on our live child: the same start
+    expect(server.upGeneration()).toBe(first);
     server.stop();
     await server.ensureRunning();
     expect(spawner.spawns).toHaveLength(2);
-    expect(server.isUp()).toBe(true);
+    expect(server.upGeneration()).toBeDefined();
+    expect(server.upGeneration()).not.toBe(first);
     server.stop();
   });
 

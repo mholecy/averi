@@ -219,7 +219,8 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
       // The source does not ask (WDA not up yet): nothing to wait for and nothing to say.
       if (read.kind === 'declined') return undefined;
       if (read.kind === 'bundle') {
-        // WDA's exact answer (D48): the bundle id, never localized — no names, no appinfo.
+        // WDA's exact answer (D48): the bundle id, never localized — no names, no appinfo. Exact by design, case
+        // included: WDA reports the app's canonical CFBundleIdentifier, the id `simctl launch` was given.
         if (read.bundleId === check.bundleId) return undefined;
         staleBundle = read.bundleId;
       } else if (read.kind === 'unlabelled') {
@@ -252,11 +253,7 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
       if (staleBundle !== undefined) return stillReads(check.bundleId, staleBundle);
       if (stale !== undefined) return notInFront(check.bundleId, stale, names ?? [], check.ownerOf(stale));
       if (unlabelled) {
-        const why =
-          check.source === 'wda'
-            ? `WebDriverAgent's active app carried no bundle id for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`
-            : `the tree's Application element had no label, or there was none, for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`;
-        return unchecked(check.bundleId, why, check.source);
+        return unchecked(check.bundleId, `${WORDS[check.source].unlabelled} for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`, check.source);
       }
       return emptyThroughout(check.bundleId);
     }
@@ -303,20 +300,27 @@ function notInFront(bundleId: string, label: string, names: readonly string[], o
   );
 }
 
+/**
+ * The one advice of the notes that could not confirm the app (review 2026-11-02): read again — never "compare with
+ * screenshot", which shows the launched app before either source's tree does (the 2026-10-09 correction above).
+ */
+const READ_AGAIN = 'read again before trusting a read (the screenshot switches before the tree)';
+
+/** What the notes say per source: the lag it has after a switch, and what an `unlabelled` answer was. */
+const WORDS: Record<IosTreeSourceKind, { lag: string; unlabelled: string }> = {
+  idb: { lag: "iOS can hand idb the previous app's tree", unlabelled: "the tree's Application element had no label, or there was none," },
+  wda: { lag: 'WebDriverAgent can still read the previous app', unlabelled: "WebDriverAgent's active app carried no bundle id" },
+};
+
 function emptyThroughout(bundleId: string): string {
   return (
     `idb's tree stayed empty for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited after launching ${bundleId}, ` +
-    'so which app is in front was not checked — compare with screenshot before trusting a read'
+    `so which app is in front was not checked — ${READ_AGAIN}`
   );
 }
 
 function unchecked(bundleId: string, why: string, source: IosTreeSourceKind): string {
-  const lag =
-    source === 'wda' ? 'WebDriverAgent can still read the previous app' : "iOS can hand idb the previous app's tree";
-  return (
-    `could not check that ${bundleId} is in front (${why}) — for a moment after a ` +
-    `launch ${lag}; compare with screenshot before trusting a read`
-  );
+  return `could not check that ${bundleId} is in front (${why}) — for a moment after a launch ${WORDS[source].lag}; ${READ_AGAIN}`;
 }
 
 /** WDA's bundle id for SpringBoard (D48's note names it as what it is, as `whose` does idb's `' '`). */

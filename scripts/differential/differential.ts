@@ -6,7 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { Platform, Recording, Screen } from './corpus.js';
 import { resetClock, wallNow } from './clock.js';
-import { deviceCalls, paintFrame, resetDevice, type DeviceProfile, type Paint } from './fake-device.js';
+import { deviceCalls, paintFrame, REPLAYED_APP, resetDevice, type DeviceProfile, type Paint } from './fake-device.js';
 import { ANDROID_SERIAL, IOS_UDID, recordedAdapter, type Side } from './side.js';
 import type { CellConfig } from '../truth/schema.js';
 
@@ -332,7 +332,7 @@ function treeCalls(recording: Recording, tools: ReadonlySet<ToolName>, shared: r
   const calls: Call[] = [];
   if (tools.has('swipe')) for (const direction of ['up', 'down']) calls.push({ tool: 'swipe', args: { platform, direction } });
   if (tools.has('tap') && tools.has('ui_snapshot')) for (const text of shared) calls.push({ tool: 'tap', args: { platform, selector: `text:"${text}"` } });
-  if (tools.has('launch_app') && platform === 'ios' && recording.form === 'raw') calls.push({ tool: 'launch_app', args: { platform, appId: 'differential.app' } });
+  if (tools.has('launch_app') && platform === 'ios' && recording.form === 'raw') calls.push({ tool: 'launch_app', args: { platform, appId: REPLAYED_APP } });
   return calls;
 }
 
@@ -402,8 +402,8 @@ export async function configFor(recording: Recording, dismiss: unknown[] | undef
   configDir ??= join(tmpdir(), `averi-differential-${process.pid}`);
   await mkdir(configDir, { recursive: true });
   const kind = recording.source === 'uiautomator' ? undefined : recording.source;
-  const ios = { bundleId: 'differential.app', ...(kind !== undefined && { treeSource: kind }), ...(dismiss !== undefined && { keyboardDismiss: dismiss }), ...cell?.ios };
-  const android = { package: 'differential.app', ...cell?.android };
+  const ios = { bundleId: REPLAYED_APP, ...(kind !== undefined && { treeSource: kind }), ...(dismiss !== undefined && { keyboardDismiss: dismiss }), ...cell?.ios };
+  const android = { package: REPLAYED_APP, ...cell?.android };
   const path = join(configDir, `averi-${configs++}.yaml`);
   // JSON is YAML: the config needs no YAML writer.
   await writeFile(path, JSON.stringify({ app: { android, ios } }));

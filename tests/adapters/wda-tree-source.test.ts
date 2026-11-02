@@ -38,7 +38,7 @@ const ACTIVE_LAB = { value: { pid: 4242, bundleId: 'dev.averi.lab', name: '', pr
 
 /**
  * A REAL WdaServer behind the fakes that drive its own tests: /status is
- * refused until our fake spawn ran and again once our child was signalled
+ * refused until our fake spawn ran and again once that child was signalled (a later spawn answers)
  * (the port goes quiet the moment xcodebuild's teardown runs, as on the
  * happy path), /source answers the envelope.
  */
@@ -47,7 +47,8 @@ async function setup(activeApp: () => 'refused' | { status: number; body?: unkno
   const spawner = fakeSpawn();
   const fetcher = fakeFetch((url) => {
     if (url.endsWith('/status')) {
-      return spawner.spawns.length === 0 || spawner.kills.length > 0 ? 'refused' : { status: 200, body: WDA_STATUS };
+      // Alive while a spawned child is not yet signalled: a kill quiets the port, a fresh spawn answers again.
+      return spawner.kills.length < spawner.spawns.length ? { status: 200, body: WDA_STATUS } : 'refused';
     }
     if (url.endsWith('/wda/activeAppInfo')) return activeApp();
     return { status: 200, body: WDA_ENVELOPE };
@@ -169,6 +170,22 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     expect(fetcher.urls.slice(before).filter((u) => !u.endsWith('/wda/activeAppInfo'))).toEqual([]);
     expect(spawner.spawns).toHaveLength(1);
     expect(spawner.kills).toEqual([]);
+  });
+
+  it('after a failed ask, declined for the rest of that WDA child\'s life — no second 2 s ask per launch on a wedged runner; a restart asks again', async () => {
+    let answer: 'refused' | { status: number; body?: unknown } = 'refused';
+    const { source, fetcher } = await setup(() => answer);
+    await source.read();
+    await expect(source.applicationLabel()).rejects.toThrow(/activeAppInfo request failed/);
+    answer = { status: 200, body: ACTIVE_LAB }; // even an answering server: this child is not asked again
+    expect(await source.applicationLabel()).toEqual({ kind: 'declined' });
+    expect(await source.applicationLabel()).toEqual({ kind: 'declined' });
+    expect(asked(fetcher.urls)).toHaveLength(1);
+    // A restart (a dead server's one restart inside a read) is a new child: asked again.
+    (source as unknown as { server: { stop(): void } }).server.stop();
+    await source.read();
+    expect(await source.applicationLabel()).toEqual({ kind: 'bundle', bundleId: 'dev.averi.lab' });
+    expect(asked(fetcher.urls)).toHaveLength(2);
   });
 
   it('after dispose: the released error, nothing asked', async () => {

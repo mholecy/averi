@@ -87,12 +87,17 @@ export async function loadSide(root: string): Promise<Side> {
     at('src/adapters/ios.ts', ['IosAdapter']),
     at('src/adapters/wda-source.ts', ['parseWdaSourceValue']),
   ]);
-  // Optional: a side without the seam loads all the same (the replay never needs it).
-  const treeSource = (await import(pathToFileURL(resolve(root, 'src/adapters/ios-tree-source.ts')).href).catch(() => ({}))) as Record<string, unknown>;
-  // Optional too: a side before D48 has no WdaServer.activeAppInfo (RecordedTreeSource then declines, as it did).
-  const wdaServer = (await import(pathToFileURL(resolve(root, 'src/adapters/wda.ts')).href).catch(() => ({}))) as { WdaServer?: { prototype?: Record<string, unknown> } };
-  // Optional too: a side before A3 lists through a discovery that is a plain function.
-  const discovery = (await import(pathToFileURL(resolve(root, 'src/adapters/discovery.ts')).href).catch(() => ({}))) as Record<string, unknown>;
+  /** A module a side may lack: its exports, or none. */
+  const optional = async (path: string): Promise<Record<string, unknown>> =>
+    (await import(pathToFileURL(resolve(root, path)).href).catch(() => ({}))) as Record<string, unknown>;
+  // Optional: a side without the seam loads all the same (the replay never needs it); a side before D48 has no
+  // WdaServer.activeAppInfo (RecordedTreeSource then declines, as its WdaTreeSource did); a side before A3 lists
+  // through a discovery that is a plain function.
+  const [treeSource, wdaServer, discovery] = await Promise.all([
+    optional('src/adapters/ios-tree-source.ts'),
+    optional('src/adapters/wda.ts'),
+    optional('src/adapters/discovery.ts'),
+  ]);
   const over = typeof discovery.discoveryOver === 'function' ? (discovery.discoveryOver as DiscoveryOver) : undefined;
   const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
   const discoverySeam = await takesDeps(Registry);
@@ -102,7 +107,7 @@ export async function loadSide(root: string): Promise<Side> {
     defaultFactory: registry.defaultFactory as Side['defaultFactory'],
     IosAdapter: ios.IosAdapter as Side['IosAdapter'],
     parseWdaSourceValue: wda.parseWdaSourceValue as Side['parseWdaSourceValue'],
-    asksWdaBundle: typeof wdaServer.WdaServer?.prototype?.activeAppInfo === 'function',
+    asksWdaBundle: typeof (wdaServer.WdaServer as { prototype?: Record<string, unknown> } | undefined)?.prototype?.activeAppInfo === 'function',
     ...(typeof treeSource.createIosTreeSource === 'function' && { createIosTreeSource: treeSource.createIosTreeSource as NonNullable<Side['createIosTreeSource']> }),
     registry: (deps) => {
       if (discoverySeam) return new Registry({ factory: deps.factory, discovery: discoveryFor(deps.discovery, over) });

@@ -170,8 +170,10 @@ export class WdaServer {
   /** Set by shutdown(): terminal — unlike stop(), no restart may follow. */
   private shutDown = false;
   private child: WdaChild | undefined;
-  /** The child whose WDA answered /status in awaitReady — isUp() while it is still `child` and alive. */
+  /** The child whose WDA answered /status in awaitReady — up (upGeneration) while it is still `child` and alive. */
   private readyChild: WdaChild | undefined;
+  /** Counts the starts that reached /status; `readyChild`'s is upGeneration()'s answer. */
+  private readyStarts = 0;
   private childExited = false;
   private childError: Error | undefined;
   private exitHook: (() => void) | undefined;
@@ -229,17 +231,19 @@ export class WdaServer {
   }
 
   /**
-   * Whether OUR WebDriverAgent is up now, without asking it: a start of ours
-   * reached /status and its xcodebuild has neither exited nor been stopped
-   * since (stop() and shutdown() clear `child`; a restart is up again only
-   * once its own start reached /status). No device call — what the launch's
-   * foreground wait asks before activeAppInfo (wda-tree-source.ts), so a
-   * launch never starts WDA. A runner that died inside the simulator while
+   * Which start of OUR WebDriverAgent is up now, without asking it — or
+   * undefined when none is: a start of ours reached /status and its
+   * xcodebuild has neither exited nor been stopped since (stop() and
+   * shutdown() clear `child`; a restart is up again only once its own start
+   * reached /status, under a new number). No device call — what the
+   * launch's foreground wait asks before activeAppInfo (wda-tree-source.ts),
+   * so a launch never starts WDA; the number lets it remember a failed ask
+   * for one child's life. A runner that died inside the simulator while
    * xcodebuild lives on still reads as up; activeAppInfo then fails in WDA's
    * words.
    */
-  isUp(): boolean {
-    return this.child !== undefined && this.child === this.readyChild && !this.childExited;
+  upGeneration(): number | undefined {
+    return this.child !== undefined && this.child === this.readyChild && !this.childExited ? this.readyStarts : undefined;
   }
 
   /**
@@ -250,25 +254,34 @@ export class WdaServer {
    * Returns the raw envelope `{ value: { pid, bundleId, name, … } }`.
    * NEVER starts WDA (no ensureRunning) and never restarts it: one request
    * under ACTIVE_APP_TIMEOUT_MS; a refusal, a timeout or an HTTP error
-   * fails naming the port and the log, like source(). Callers ask isUp()
-   * first.
+   * fails naming the port and the log, like source(). Callers ask
+   * upGeneration() first.
    */
   async activeAppInfo(): Promise<unknown> {
+    const route = '/wda/activeAppInfo';
     let res: Awaited<ReturnType<FetchFn>>;
     try {
-      res = await this.fetchFn(`${this.baseUrl()}/wda/activeAppInfo`, {
-        signal: AbortSignal.timeout(ACTIVE_APP_TIMEOUT_MS),
-      });
+      res = await this.request(route, ACTIVE_APP_TIMEOUT_MS);
     } catch (err) {
       throw new Error(
-        `WDA /wda/activeAppInfo request failed on port ${this.port} (udid ${this.udid}): ${errorMessage(err)} — ` +
+        `WDA ${route} request failed on port ${this.port} (udid ${this.udid}): ${errorMessage(err)} — ` +
           `xcodebuild log: ${this.logPath}`,
         { cause: err },
       );
     }
+    return this.body(route, res);
+  }
+
+  /** GET `route` under `timeoutMs`. A request that did not complete throws as fetch threw it: each caller words it (source() decides on a restart). */
+  private request(route: string, timeoutMs: number): ReturnType<FetchFn> {
+    return this.fetchFn(`${this.baseUrl()}${route}`, { signal: AbortSignal.timeout(timeoutMs) });
+  }
+
+  /** A completed request's JSON body; a non-2xx fails naming the route, the port, the udid and the log. */
+  private body(route: string, res: Awaited<ReturnType<FetchFn>>): Promise<unknown> {
     if (!res.ok) {
       throw new Error(
-        `WDA /wda/activeAppInfo failed: HTTP ${res.status} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`,
+        `WDA ${route} failed: HTTP ${res.status} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`,
       );
     }
     return res.json();
@@ -278,9 +291,7 @@ export class WdaServer {
     await this.ensureRunning();
     let res: Awaited<ReturnType<FetchFn>>;
     try {
-      res = await this.fetchFn(`${this.baseUrl()}/source?format=json`, {
-        signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS),
-      });
+      res = await this.request('/source?format=json', SOURCE_TIMEOUT_MS);
     } catch (err) {
       // A bare "fetch failed"/"TimeoutError" names neither device nor server —
       // keep the log-path contract even for connection-level failures.
@@ -320,12 +331,7 @@ export class WdaServer {
         { cause: err },
       );
     }
-    if (!res.ok) {
-      throw new Error(
-        `WDA /source failed: HTTP ${res.status} on port ${this.port} — xcodebuild log: ${this.logPath}`,
-      );
-    }
-    return res.json();
+    return this.body('/source', res);
   }
 
   /**
@@ -672,6 +678,7 @@ export class WdaServer {
         }
         if (await this.probeStatus()) {
           this.readyChild = myChild;
+          this.readyStarts++;
           return;
         }
         await sleep(this.pollIntervalMs);

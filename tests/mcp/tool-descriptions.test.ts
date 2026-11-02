@@ -202,6 +202,9 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('launch_app')).toContain(
       "iOS: returns once the tree source names the launched app (idb: the tree's Application label; WebDriverAgent: its active app, once WDA is running)",
     );
+    // One piece of advice wherever a launch's wait is quoted (ios-foreground.ts#unchecked): the screenshot switches first.
+    expect(description('launch_app')).toContain('a ⚠ line means it never saw the app — read again before trusting a read (the screenshot switches before the tree).');
+    expect(description('launch_app')).not.toContain('compare with screenshot');
   });
 
   it('scroll_until: the swipe and time bounds (interact/scroll.ts DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS)', () => {
@@ -238,6 +241,7 @@ describe('tool descriptions quote each operation default from its owner', () => 
     // The 2026-10-09 correction (ios-foreground.ts#notInFront): the screenshot switches before the tree does.
     expect(troubleshooting).not.toContain('If it shows the launched app, its on-screen name differs from its Info.plist name (a localized display name) and you can go on.');
     expect(troubleshooting).toContain('The screenshot does not settle it: it shows the launched app before idb\'s tree does.');
+    expect(troubleshooting).toContain('averi could not tell which app the tree shows, and the parentheses say why. The tree may still be the previous app\'s. Read again before you trust a read (the screenshot switches before the tree).');
   });
 
   it('swipe: how far a direction stroke reaches from the centre (interact/swipe.ts SWIPE_REACH_FRACTION)', () => {

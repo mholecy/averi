@@ -345,20 +345,25 @@ measured with (docs/bugs/2026-10-09-ios-launch-app-reads-previous-apps-tree.md),
 
 Decision:
 
-- `WdaServer.isUp()` — no device call: a start of ours reached `/status`, and its xcodebuild has neither exited nor been
-  stopped since. `WdaServer.activeAppInfo()` — `GET /wda/activeAppInfo`, sessionless; FBCustomCommands.m resolves its
+- `WdaServer.upGeneration()` — no device call: which start of ours is up (it reached `/status`, and its xcodebuild has
+  neither exited nor been stopped since), or none. `WdaServer.activeAppInfo()` — `GET /wda/activeAppInfo`, sessionless; FBCustomCommands.m resolves its
   app with the same `request.session.activeApplication ?: fb_activeApplication` as `/source`, so it names the app the
   next `/source` reads, without walking the tree. It never starts or restarts WDA; one request under 2 s; a refusal, a
   timeout or an HTTP error fails naming the port and the log.
 - `WdaTreeSource.applicationLabel()`: WDA not up → `declined`, as before (the first read's own start, 7.7 s in that
   run, outlasts the switch, and a launch must not start WDA); up → the new `{ kind: 'bundle', bundleId }` from
-  `value.bundleId`, `unlabelled` when that is not a non-empty string; released → the released error.
+  `value.bundleId`, `unlabelled` when that is not a non-empty string; released → the released error. A failed ask
+  is the "could not check" note once, and that WDA child is not asked again (`declined` until a restart), so a wedged
+  runner does not cost every later launch the ask's 2 s (review 2026-11-02). The bundle id is matched exactly: WDA
+  reports the app's canonical identifier, the id `simctl launch` was given.
 - `ios-foreground.ts#awaitForeground`: a `bundle` answer matches when it is the launched bundle — exact, so no
   `simctl appinfo`, no names, no localized-name reading. Another bundle is polled like a stale label within the same
   3 s bound, and then the note: `3 s after launching <id>, WebDriverAgent still read <other> as the active app — a
   ui_snapshot now reads that app's tree, on which an absent check passes. Read again; if it repeats, take a
   screenshot`, SpringBoard (`com.apple.springboard`) named as "SpringBoard (the home screen, the launch animation or a
   system alert)". A failed ask, or no bundle id to the bound, is the "could not check" note, worded for WebDriverAgent.
+  Every launch note's advice is one (review 2026-11-02): read again before trusting a read — the screenshot switches
+  before the tree, on either source.
 - `launch_app`, a flow's `launch:` and `ensure_state`'s launch rungs all pass `IosAdapter.launch`, so all gain it.
   `openDeepLink` still waits for nothing (a link may bring another app forward).
 
