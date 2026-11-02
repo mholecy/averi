@@ -3,7 +3,8 @@
 Status: accepted 2026-11-02 (backlog row D33, docs/plans/2026-10-30-performance-backlog.md). The `DeviceAdapter`
 contract, `run/verify.ts#appHealth` and every reply line are unchanged. One verdict changes on purpose: launchctl's
 match is now exact (below). Amended 2026-11-02 (batch-4's device check: the A/B shown, the agreement before a
-reinstall — the last section).
+reinstall — the batch-4 amendment). Amended 2026-11-02 (batch-5: the agreement after a reinstall measured, PASS —
+the last section).
 
 ## Context
 
@@ -93,3 +94,18 @@ front, home, terminated, `kill -9`, Contacts in front) and S8-pre, S1 median 20.
 measured: the agreement after a hand reinstall (S8). The reinstall moved the container (`…/Application/37588271…/` →
 `…/B913B894…/`), the case the exact-path pattern is most exposed to, and the probe's next cell open did not report
 ready within 10 s, so no check ran after it. Pending (batch-5).
+
+## Amendment: the agreement after a reinstall (2026-11-02, batch-5)
+
+Batch-4's pending S8 (`d33-probe-v3.ts`, lab simulator, main 28c1d37d): main's `IosAdapter.isAppRunning` (f)
+agrees 40/40 with exact raw launchctl — S1 5 checks, and 7 reinstall cycles × 5 states, each counted: `simctl install` moved the bundle container every cycle, and the relaunched pid's `ps -o command=` started
+with appinfo's new `Path/executable`. One adapter ran the whole probe, so each install left its cached Path stale, and
+f's calls (pgrep / launchctl / appinfo) prove the path the decision above describes: not running on the stale path
+1/1/0 (pgrep misses, launchctl's no, the cache kept), running on the stale path 1/1/0 (launchctl's yes, the cache
+dropped), the next check 1/0/1 (appinfo re-read, the new path matches). f's medians: S1 19.7 ms, before the install
+19.3, stale-off 248.3, stale-on 244.9, re-learnt 108, off 241.9 — the stale window costs one launchctl, once per
+install, as above.
+
+Batch-4's relaunch miss did not recur: the cell opened after the install was ready at the first attempt 7/7, in about
+2.5 s (2.3–2.8), with no settle pause (4 cycles, relaunched about 2 s after the install returned, batch-4's condition)
+or a 3 s one (3 cycles). It was a one-off, not a property of the reinstall. D33 / L4 is done.

@@ -13,6 +13,7 @@ too — see the amendment below).
 Amended 2026-11-02 (D48: a wda project's launch waits too — it asks WebDriverAgent which app it reads, once WDA is
 running — see the amendment below).
 Amended 2026-11-02 (D49a: a deep link to the project's own scheme waits as a launch does — see the amendment below).
+Amended 2026-11-02 (batch-5: D49a's ⚠ path device-checked — the D49a amendment's last paragraph).
 
 ## Context
 
@@ -458,3 +459,14 @@ NOT verified: in E2–E4 (SpringBoard, Contacts, a cold start) iOS raised no "Op
 no averi) saw no alert in 27 polls over 3 s — so the link went straight through and the reply's bare "Opened" was
 right. Likely iOS remembered an earlier "Open" tap. The ⚠ line has not yet been seen on a device; raising the alert
 reproducibly is part of D54.
+
+Checked again (batch-5, 2026-11-02, lab simulator, main 28c1d37d, `d49-probe-v2.ts`): the alert path holds. The alert
+was raised on purpose by deleting the decision iOS remembers, `com.apple.CoreSimulator.CoreSimulatorBridge-->averilab`
+(= `dev.averi.lab`) in the simulator's `com.apple.launchservices.schemeapproval` defaults domain (`simctl spawn <udid>
+defaults delete`, live); with no change (t0) the link was proven to go straight through, so that key is the cause. In
+all 6 cases — E2 (SpringBoard in front), E3 (Contacts), E4 (a cold start), each under idb and WDA — the alert was up
+(idb listed "Open in “AveriLab”?" with Cancel and Open; WDA's `/source` held an Alert and `/wda/activeAppInfo` named
+`com.apple.springboard`) and the reply carried the ⚠ line, "averi did not see dev.averi.lab come forward after the
+link …", at the 3 s bound (about 3.4 s). Answered by the probe, Open brought the lab forward and Cancel left Contacts in
+front. The decision was restored afterwards and verified (read back after a reboot, the link through with no alert).
+The alert's shape in both trees is D54's input.
