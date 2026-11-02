@@ -525,10 +525,8 @@ vertical list it is clipped across (cut at the list's left side) still gets the 
 sentence, since no swipe of that list moves it there. A scroll view whose axis the tree does not tell (on Android a
 Compose LazyRow, a RecyclerView or a ViewPager2, which carry no `scrollAxis`; under WDA one whose content is not laid
 out past its frame) gives no `unfit` either, and its match runs as before: it may still run to the bound (residual 3;
-inferring the axis is backlog D59). The golden says nothing of this change: `node --import tsx
-scripts/differential/golden.ts --corpus tests/fixtures/truth --against
-/private/tmp/claude-502/-Volumes-Workspaces-Projects-averi/1ea289f1-7bae-463b-9304-adfeaaf20c0c/scratchpad/golden-base-main-v3.json`
-reports Changed: 0 (1611 checks, 120 mismatches as before). Its `fully` rows judge only "claims visible", and
+inferring the axis is backlog D59). The golden says nothing of this change: golden against the base of main 870896f4
+(v3), 0 of 1611 checks changed, 120 mismatches as before. Its `fully` rows judge only "claims visible", and
 carousel-in-list's C at rest is cut at the screen's edge, its right side unknown.
 
 **Residual.** Number 3 under "Residuals accepted": a target with a little more room than FIT_ROOM_PX, under about the
