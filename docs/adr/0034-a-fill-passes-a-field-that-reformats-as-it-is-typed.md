@@ -405,7 +405,7 @@ field shows 5 (content withheld from this error)`, which names no remedy (the D5
 
 **Consequences.** Beyond the four shapes it names a leading `-` (a sign), a leading or trailing `.`, `1.2.3.4`, two
 adjacent separators and smart punctuation's `Hello, world` for `Hello,world` — all true statements, all still
-failures. Out of scope, a backlog row of its own: a dropped tail that ends in an eager trailing mark (`SK31 1200 ` of
+failures. Out of scope, backlog row D60: a dropped tail that ends in an eager trailing mark (`SK31 1200 ` of
 a full IBAN) is neither typed again (`prefixOf` refuses the trailing mark) nor named — it stays `length`; fixing it
 changes the retype, not the wording. No new residual: nothing passes that did not.
 
