@@ -170,7 +170,7 @@ describe('`fully: true` on a card as wide as its carousel (D52): fails at the fi
     expect(failureOf(played, 'id:"lab.carousel-in-list.C"').message).toBe(
       'scroll_until id:"lab.carousel-in-list.C" failed after 3 swipes — element is in the viewport but CLIPPED at left: 98% of it is drawn, ' +
         'and it is 948 wide (tree units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one exact scroll offset only, ' +
-        'which no swipe can be aimed at — drop fully: true (the plain stop needs only its centre in view), or accept what it shows (98%). ' +
+        'which no swipe can be aimed at — drop fully: true, or accept what it shows. ' +
         'Last rect {"x":45,"y":380,"width":948,"height":234} in a 1080x2220 viewport',
     );
   });
@@ -182,9 +182,21 @@ describe('`fully: true` on a card as wide as its carousel (D52): fails at the fi
     expect(failureOf(played, 'C').message).toBe(
       'scroll_until C failed after 0 swipes — element is in the viewport but CLIPPED at left/right: 95% of it is drawn, ' +
         'and it is 1000 wide (tree units), wider than its scroll view scrollable (66,380 948x234): no scroll offset shows all of it ' +
-        '— drop fully: true (the plain stop needs only its centre in view), or accept what it shows (95%). ' +
+        '— drop fully: true, or accept what it shows. ' +
         'Last rect {"x":40,"y":380,"width":1000,"height":234} in a 1080x2220 viewport',
     );
+  });
+
+  it('the agent-facing references quote the two replies as the code words them (skill/references/tools.md, troubleshooting.md)', () => {
+    const tools = readFileSync(new URL('../../skill/references/tools.md', import.meta.url), 'utf8');
+    const troubleshooting = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+    const asWide = failureOf(replay(FULLY_LEFT, E2_RUN_0), 'C').message;
+    const wider = failureOf(play(FULLY_LEFT, [cAt(40, 1000)]), 'C').message;
+    const quoted = (message: string, from: string): string => message.slice(message.indexOf(from), message.indexOf('. Last rect'));
+    expect(tools).toContain(`'${quoted(asWide, 'element is in the viewport')}'`);
+    expect(tools).toContain(`'… ${quoted(wider, 'wider than')}'`);
+    expect(troubleshooting).toContain(`…: ${quoted(asWide, 'fully: true holds')}\``);
+    expect(troubleshooting).toContain(`…: ${quoted(wider, 'no scroll offset')}\``);
   });
 
   it('a still carousel (C at 76, 10 px short, the strokes leaving it there): unfit at once — never "stuck … a layout defect"', () => {

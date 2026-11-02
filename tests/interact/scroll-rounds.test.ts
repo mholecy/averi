@@ -2221,7 +2221,7 @@ describe('round — `fully: true` on a row as tall as its list (D52, WDA)', () =
     expect(failureOf(played, 'id:row').message).toBe(
       'scroll_until id:row failed after 0 swipes — element is in the viewport but CLIPPED at top: 98% of it is drawn, ' +
         'and it is 400 tall (tree units), as tall as its scroll view scrollable id:list (0,200 402x400): fully: true holds at one exact scroll offset only, ' +
-        'which no swipe can be aimed at — drop fully: true (the plain stop needs only its centre in view), or accept what it shows (98%). ' +
+        'which no swipe can be aimed at — drop fully: true, or accept what it shows. ' +
         'Last rect {"x":24,"y":190,"width":354,"height":400} in a 402x874 viewport',
     );
   });
@@ -2253,7 +2253,7 @@ describe('round — `fully: true` on a row as tall as its list (D52, WDA)', () =
     const tree: UiNode = { ...node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [list] }), boundsCutAtScreen: true };
     const played = play({ ...ANDROID, fully: true }, [{ tree, found: [row] }]);
     expect(played.outcome).toMatchObject({ kind: 'unfit', unfit: { along: 'vertical', size: 400 } });
-    expect(failureOf(played, 'id:row').message).toMatch(/CLIPPED at top\/right: at most \d+% of it is drawn — uiautomator does not say how far it runs past the screen's right edge, .*or accept what it shows \(at most \d+%\)/);
+    expect(failureOf(played, 'id:row').message).toMatch(/CLIPPED at top\/right: at most \d+% of it is drawn — uiautomator does not say how far it runs past the screen's right edge, .*or accept what it shows\. Last rect/);
   });
 
   it('B1, nested: a page list (0,100 402x700) scrolled so its carousel (20,700 362x200) runs past its foot, a card filling the carousel — the frame the page leaves is no room of the card\'s: no unfit, the strokes go on', () => {
@@ -2321,7 +2321,7 @@ describe('round — `fully: true` on a row as tall as its list (D52, WDA)', () =
     expect(failureOf(played, 'id:row_7').message).toBe(
       'scroll_until id:row_7 failed after 0 swipes — element is in the viewport but CLIPPED at top/bottom: 89% of it is drawn, ' +
         'and it is 400 tall (tree units), taller than its scroll view scrollable id:country_list (31,456 340x355): no scroll offset shows all of it ' +
-        '— drop fully: true (the plain stop needs only its centre in view), or accept what it shows (89%). ' +
+        '— drop fully: true, or accept what it shows. ' +
         'Last rect {"x":31,"y":440,"width":340,"height":400} in a 402x874 viewport',
     );
   });

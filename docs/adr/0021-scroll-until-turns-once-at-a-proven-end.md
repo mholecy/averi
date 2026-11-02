@@ -385,9 +385,10 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
    fires only within FIT_ROOM_PX (1 unit) of the scroll view's size. A target with more room than that, but under about
    the shortest stroke's carry (~53 px on Android: CUT_EDGE_MIN_DRAG, 48 px, at CUT_EDGE_CARRY, 1.11 a px), fits at a
    window of offsets narrower than any stroke can aim at, and the course may still turn and halve its reach until
-   maxSwipes. So may one as large as a scroll view whose axis the tree does not tell (a Compose lazy row, a
-   RecyclerView), which gets no `unfit`. Nothing has measured such a target yet. The bound's failure still says "CLIPPED at …" and by how much, so
-   the reply never claims a stop on it.
+   maxSwipes. So may one as large as a scroll view whose axis the tree does not tell (a Compose LazyRow, a RecyclerView,
+   a ViewPager2), which gets no `unfit`: inferring that axis is performance backlog D59, after a device check. Nothing
+   has measured such a target yet. The bound's failure still says "CLIPPED at …" and by how much, so the reply never
+   claims a stop on it.
 
 ## Amendment: a side uiautomator cut at the screen's edge (2026-10-31, performance backlog D17)
 
@@ -476,8 +477,8 @@ lab's carousel-in-list draws C 948 px wide in a 948-px carousel (66–1014), so 
 no other offset. `left-fully` after a 440-px pre-drag ran 6 strokes and 3 turns (offset 440 → 783 → 1116 → 969 → 825 →
 883 → 938 in run 0) and failed on maxSwipes: "stayed CLIPPED at right, 99 % … turned round 3 times", 3 runs of 3. No
 drag is shorter than CUT_EDGE_MIN_DRAG (48 px), and the reach halves at each turn (decision 4, `course.ts#nextStroke`),
-so the course converges to about ±50 px of the one offset and never to 1 px. On a carousel that does not move, the
-reply was "stuck … a layout defect" instead. Neither reply said why.
+so the course converges to about ±50 px of the one offset and never to 1 px. On a carousel that does not move, the reply
+was "stuck … a layout defect" instead. Neither reply said why.
 
 **Decision.**
 1. *The predicate* (`interact/scroll-read.ts#unfitAlong`, pure). On one read, a match cannot be shown whole along an
@@ -486,12 +487,11 @@ reply was "stuck … a layout defect" instead. Neither reply said why.
    - both its sides are known there (no `unknownPast` side, the D17 amendment's mark);
    - its scroll views' drawn frame (`StandingFacts.drawn`) IS the frame it was judged in on that axis
      (`StandingFacts.screen`), so neither the soft keyboard's line nor a system band cuts it;
-   - the room-giving scroll view — the smallest of its scroll views along that axis (`Clips.drawnIn`'s `scrollers`,
-     the nearest of equals, `scroll-read.ts#scrollViewsOf`) — scrolls ON that axis as the tree tells it
-     (`Clips.axesOf`): the one exact offset is that scroll view's, and across it no swipe of it moves the match at all;
+   - the room-giving scroll view — the smallest of its scroll views along that axis (`Clips.drawnIn`'s `scrollers`, the
+     nearest of equals, `scroll-read.ts#scrollViewsOf`) — scrolls ON that axis as the tree tells it (`Clips.axesOf`):
+     the one exact offset is that scroll view's, and across it no swipe of it moves the match at all;
    - the drawn frame is that scroll view's along the axis within FIT_ROOM_PX: an outer scroll view's position that cuts
-     it shorter (a page list scrolled so its carousel runs past its foot) gives the match more room once the page
-     moves;
+     it shorter (a page list scrolled so its carousel runs past its foot) gives the match more room once the page moves;
    - its size there is at least that scroll view's less FIT_ROOM_PX (1 unit, a rounding of the source's bounds, as
      MOTION_EDGE_SLACK reads an edge flush with a frame's).
    It is judged per axis, vertical first. It lives beside `stops`, not in ui-tree/geometry.ts.
@@ -503,12 +503,13 @@ reply was "stuck … a layout defect" instead. Neither reply said why.
    its 4th read (C at 45), after 3 strokes, where it ran 6 strokes and 3 turns before
    (tests/interact/scroll-carousel-android.test.ts).
 3. *The reply* (`interact/scroll-text.ts#unfitText`, a plain Error, as `stuck`). It is a failure, never a "visible"
-   claim. It gives where the match is clipped and how much of it is drawn, its size against the room-giving scroll
-   view's — that scroll view quoted, the one whose size it was judged by — the reason, and the way out: "scroll_until …
-   failed after 3 swipes — element is in the viewport but CLIPPED at left: 98% of it is drawn, and it is 948 wide (tree
-   units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one exact scroll offset only,
-   which no swipe can be aimed at — drop fully: true (the plain stop needs only its centre in view), or accept what
-   it shows (98%). Last rect …". When it is larger, the reason reads "wider than …: no scroll offset shows all of it".
+   claim, and short: where the match is clipped and how much of it is drawn (said once), its size against the
+   room-giving scroll view's — that scroll view quoted, the one whose size it was judged by — the reason, and the way
+   out. Its head is the stuck sentence's at a scroll view's edge (`scroll-text.ts#clippedDrawnHead`, one spelling for
+   both): "scroll_until … failed after 3 swipes — element is in the viewport but CLIPPED at left: 98% of it is drawn,
+   and it is 948 wide (tree units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one
+   exact scroll offset only, which no swipe can be aimed at — drop fully: true, or accept what it shows. Last rect …".
+   When it is larger, the reason reads "wider than …: no scroll offset shows all of it".
 
 Rejected:
 - a tolerance on "fully" (accept a few px clipped): it breaks the contract, and a 10-px shortfall is not rounding;
@@ -518,17 +519,21 @@ Rejected:
 
 **Consequences.** A match taller than a list the tree tells scrolls vertically, which "stuck" reported as "taller than
 what of its scroll view the screen shows: no scroll shows it whole" after the stuck strokes, now fails `unfit` on its
-first read. The stuck sentence keeps that wording where the screen shows less of the scroll view than the scroll view
-is long, and wherever the tree does not tell the scroll view's axis. There is no cross-axis `unfit`: a row as wide as a
+first read. The stuck sentence keeps that wording where the screen shows less of the scroll view than the scroll view is
+long, and wherever the tree does not tell the scroll view's axis. There is no cross-axis `unfit`: a row as wide as a
 vertical list it is clipped across (cut at the list's left side) still gets the stuck strokes and the layout-defect
 sentence, since no swipe of that list moves it there. A scroll view whose axis the tree does not tell (on Android a
-Compose lazy list or a RecyclerView, which carry no `scrollAxis`; under WDA one whose content is not laid out past its
-frame) gives no `unfit` either, and its match runs as before: it may still run to the bound. The golden says nothing
-of this change (Changed: 0 against main 870896f4): its `fully` rows judge only "claims visible", and
+Compose LazyRow, a RecyclerView or a ViewPager2, which carry no `scrollAxis`; under WDA one whose content is not laid
+out past its frame) gives no `unfit` either, and its match runs as before: it may still run to the bound (residual 3;
+inferring the axis is backlog D59). The golden says nothing of this change: `node --import tsx
+scripts/differential/golden.ts --corpus tests/fixtures/truth --against
+/private/tmp/claude-502/-Volumes-Workspaces-Projects-averi/1ea289f1-7bae-463b-9304-adfeaaf20c0c/scratchpad/golden-base-main-v3.json`
+reports Changed: 0 (1611 checks, 120 mismatches as before). Its `fully` rows judge only "claims visible", and
 carousel-in-list's C at rest is cut at the screen's edge, its right side unknown.
 
 **Residual.** Number 3 under "Residuals accepted": a target with a little more room than FIT_ROOM_PX, under about the
-shortest stroke's carry, can still run to the bound.
+shortest stroke's carry, or as large as a scroll view whose axis the tree does not tell (backlog D59), can still run to
+the bound.
 
 **Device check.** Optional, for the next owner batch: Android E2 `left-fully` ×3, expecting `unfit` 3 of 3 within 3
 swipes, with the wall time against batch-3's.

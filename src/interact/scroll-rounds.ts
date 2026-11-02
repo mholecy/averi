@@ -1032,8 +1032,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // one exact offset at most, which no stroke lands on — the strokes and turns would only swing it to and fro to the
     // bound (D52: batch-3 E2, 6 strokes and 3 turns), and a still one would read "stuck … a layout defect". Stop on the
     // first read that knows its size, before the stuck turn, saying why. Its scroll views are asked only of a clipped match.
-    const clipped = fully && best.standing.facts.clipped.length > 0;
-    const unfit = clipped ? unfitAlong(best.standing.facts, best.node.rect, scrollViewsOf(now.facts.scene.clips, best.node)) : undefined;
+    const clippedUnderFully = fully && best.standing.facts.clipped.length > 0;
+    const unfit = clippedUnderFully ? unfitAlong(best.standing.facts, best.node.rect, scrollViewsOf(now.facts.scene.clips, best.node)) : undefined;
     if (unfit !== undefined) return stop(s, { kind: 'unfit', swipes: s.swipes, judged: best, viewport, unfit });
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.

@@ -251,6 +251,15 @@ const shareText = (visible: number, unknownPast: readonly Edge[] | undefined): s
 const unknownPastText = (unknownPast: readonly Edge[] | undefined): string =>
   boundedBy(unknownPast) ? ` — uiautomator does not say how far it runs past the screen's ${unknownPast.join('/')} edge` : '';
 
+/**
+ * The head of a failure on an element its frame cuts, judged by what of it is drawn: `scroll_until <describe> failed
+ * after N swipes — element is <where> but CLIPPED at <at>: N% of it is drawn` and, where uiautomator cut it at the
+ * screen's edge, why the share is only an upper bound. One spelling for the stuck sentence at a scroll view's edge and
+ * the `unfit` one (`unfitText`), so the two cannot drift apart.
+ */
+const clippedDrawnHead = (describe: string, swipes: number, where: string, at: string, { visible, unknownPast }: Omit<ClipFacts, 'clipped'>): string =>
+  `scroll_until ${describe} failed after ${swipesText(swipes)} — element is ${where} but CLIPPED at ${at}: ${shareText(visible, unknownPast)} of it is drawn${unknownPastText(unknownPast)}`;
+
 /** `1 swipe`, `3 swipes` — the one spelling of the count every scroll sentence quotes. */
 const swipesText = (n: number): string => countOf(n, 'swipe');
 
@@ -629,7 +638,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       }
       // Clipped at the end of the content, worded by what cuts it (scroll-read.ts#ClipCause).
       const { facts } = judged.standing;
-      const { clipped, visible, unknownPast } = facts;
+      const { clipped } = facts;
       switch (short.cause.of) {
         // The keyboard's edge: the keyboard, not the layout, is what hides the rest — a container that does not resize
         // for it keeps its last rows under it. Said as such, with how to hide it; the layout-defect wording only when
@@ -657,7 +666,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
               : `The rest lies past ${past}: either the swipes do not scroll that scroll view (swipe inside it), or ${CONTENT_STOPS_SHORT[stopsShort]}.`;
           return {
             message:
-              `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${shareText(visible, unknownPast)} of it is drawn${unknownPastText(unknownPast)}, and the content is exhausted: ` +
+              `${clippedDrawnHead(describe, o.swipes, 'in the viewport', at, facts)}, and the content is exhausted: ` +
                 `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
           };
         }
@@ -769,8 +778,7 @@ const SIZE_WORDS: Readonly<Record<Unfit['along'], { readonly as: string; readonl
  */
 function unfitText(o: Extract<ScrollOutcome, { kind: 'unfit' }>, describe: string): string {
   const { judged, viewport, unfit } = o;
-  const { clipped, visible, unknownPast } = judged.standing.facts;
-  const share = shareText(visible, unknownPast);
+  const { facts } = judged.standing;
   const where = judged.under === undefined ? 'in the viewport' : `in the viewport above the soft keyboard over ${frameText(judged.under.topCover)}`;
   const view = `its scroll view ${nodeText(unfit.scrollView)}`;
   const words = SIZE_WORDS[unfit.along];
@@ -779,9 +787,9 @@ function unfitText(o: Extract<ScrollOutcome, { kind: 'unfit' }>, describe: strin
       ? `${words.more} than ${view}: no scroll offset shows all of it`
       : `as ${words.as} as ${view}: fully: true holds at one exact scroll offset only, which no swipe can be aimed at`;
   return (
-    `scroll_until ${describe} failed after ${swipesText(o.swipes)} — element is ${where} but CLIPPED at ${clipped.join('/')}: ${share} of it is drawn${unknownPastText(unknownPast)}, ` +
-    `and it is ${unfit.size} ${words.as} (tree units), ${why} — drop fully: true (the plain stop needs only its centre in view), ` +
-    `or accept what it shows (${share}). Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
+    `${clippedDrawnHead(describe, o.swipes, where, facts.clipped.join('/'), facts)}, ` +
+    `and it is ${unfit.size} ${words.as} (tree units), ${why} — drop fully: true, or accept what it shows. ` +
+    `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
   );
 }
 

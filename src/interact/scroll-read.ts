@@ -519,10 +519,10 @@ export function unfitAlong(facts: Pick<StandingFacts, 'clipped' | 'unknownPast' 
     const { at, extent } = SPAN[along];
     const judgedInDrawn = screen[at] === drawn[at] && screen[extent] === drawn[extent];
     if (!clipped.some(on) || unknownPast.some(on) || !judgedInDrawn) continue;
-    const roomy = views.reduce<ScrollViewOf | undefined>((least, v) => (least === undefined || v.node.rect[extent] < least.node.rect[extent] ? v : least), undefined);
-    if (roomy === undefined || roomy.axis !== along) continue;
-    const room = roomy.node.rect[extent];
-    if (drawn[extent] >= room - FIT_ROOM_PX && rect[extent] >= room - FIT_ROOM_PX) return { along, size: rect[extent], scrollView: roomy.node };
+    const roomGiver = views.reduce<ScrollViewOf | undefined>((least, v) => (least === undefined || v.node.rect[extent] < least.node.rect[extent] ? v : least), undefined);
+    if (roomGiver === undefined || roomGiver.axis !== along) continue;
+    const room = roomGiver.node.rect[extent];
+    if (drawn[extent] >= room - FIT_ROOM_PX && rect[extent] >= room - FIT_ROOM_PX) return { along, size: rect[extent], scrollView: roomGiver.node };
   }
   return undefined;
 }
