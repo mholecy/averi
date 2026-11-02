@@ -94,7 +94,7 @@ One interface, e.g.:
 interface DeviceAdapter {           // bound to ONE device: the constructor requires the serial / UDID
     install(appPath): void          // reinstall triggers login requirement
     readonly platform: 'android' | 'ios'
-    launch(bundleId, opts?: {clearState?, activity?, intent?}): {note?}   // activity/intent: Android only; iOS refuses them. iOS returns once the tree source names the launched app (idb since 2026-10-09; WDA once running since D48, 2026-11-02), or with a `note` when a 3 s wait never saw it
+    launch(bundleId, opts?: {clearState?, activity?, intent?}): {note?}   // activity/intent: Android only; iOS refuses them. iOS returns once the tree source names the launched app (idb since 2026-10-09; WDA once running since D48, 2026-11-02), or with a `note` when a 3 s wait never saw it — naming iOS's system alert and its buttons' centres when that holds the launch (D56)
     terminate(bundleId): void
     screenshot(): Png
     uiTree(opts?: {settle?}): UiNode // normalized accessibility tree; `settle` = one-shot caller may wait out a "no window yet" transient: one re-read after 1 s of Android's "null root node" and of iOS idb's empty tree (`IdbEmptyTreeError`; since 2026-10-08 — any other iOS error is not retried)

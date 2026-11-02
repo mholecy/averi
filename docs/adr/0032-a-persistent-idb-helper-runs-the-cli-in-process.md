@@ -16,6 +16,8 @@ Amended 2026-11-02 (D49a: a deep link to the project's own scheme waits as a lau
 Amended 2026-11-02 (batch-5: D49a's ⚠ path device-checked — the D49a amendment's last paragraph).
 Amended 2026-11-02 (D54: when iOS's "Open in …?" alert holds such a link, the reply names the alert and its buttons'
 centres instead of the ⚠ line — see the amendment below).
+Amended 2026-11-02 (D56: a launch that waits behind iOS's system alert names it and its buttons' centres in its ⚠ note
+— see the amendment below).
 
 ## Context
 
@@ -513,8 +515,8 @@ Decision (spec-D54, adopting the D54 analysis; review round 1 reshaped the seams
   has not opened the link yet — true whenever the alert holds it, which is when the wait found it in place of the app
   — and the title and the labels are quoted verbatim, never paraphrased or judged by their words. Only coordinates are advised: batch-5 answered the alert by coordinates, and a selector tap on
   SpringBoard's tree is unverified (D57). `front` does not move: the app is not in front.
-- Unchanged: a link that matches (no `/source`, no extra call on either source), a launch (it looks for no alert), every
-  link that expects no app (web links, iOS's own schemes, another app's scheme).
+- Unchanged: a link that matches (no `/source`, no extra call on either source), a launch (it looks for no alert; since
+  D56 it does — see that amendment), every link that expects no app (web links, iOS's own schemes, another app's scheme).
 
 A correction to the backlog row: WDA's payload has no `presentation` key, in either `/source` form; `presentation:
 'alert'` is averi's own mark on the layer holding an `Alert` element.
@@ -522,7 +524,8 @@ A correction to the backlog row: WDA's payload has no `presentation` key, in eit
 Considered, not chosen: tapping Open, or an opt-in `confirm: true` (a tap on a SpringBoard dialog acts for the agent,
 and which label opens is localised; D58); reading `/source` on every WDA poll (a whole tree per poll for the rare
 case); reading it through `source()` (its start, its 30 s and its restart are a recovery, not an aid); the same naming
-in `launch_app`'s D48 note (the detectors fit it, but its wording is D48's — D56).
+in `launch_app`'s D48 note (the detectors fit it, but its wording is D48's — D56; since then done — see that
+amendment).
 
 Cost: the happy path none (pinned by call counts in `tests/adapters/ios-deep-link.test.ts`). The alert up: idb ends at
 its first read (about 0.4 s, from about 3.4 s); WDA pays one `/source` of a small tree at the bound (unmeasured, at
@@ -534,3 +537,57 @@ the English `Open in “…”?` is named (as not asking for the app) — a loca
 ends at once with D49a's "could not check" note, even while the alert is up; a WDA `/source` slower than
 2 s at the bound falls back to the note. To check on the device (the next owner batch): D49A E2–E4 judged on the new
 reply, the WDA `/source` time at the bound.
+
+## Amendment: the alert named in launch_app's note (2026-11-02, backlog D56)
+
+With an alert up — an unanswered "Open in “AveriLab”?" — `launch_app` on iOS waited behind it to the 3 s bound and gave
+D48's ⚠ note: on idb "the UI tree was still SpringBoard's (the home screen or the launch animation) … Read again", on
+WDA "still read SpringBoard … Read again; if it repeats, take a screenshot". Neither said what held the launch back, and
+"read again" cannot answer it: only a tap does. The alert keeps every later launch behind it (batch-2's first run lost
+two cases to it; backlog D41: it covered every launch in batch-1). The detectors were D54's already; only the caller
+was gated out: on idb the wait threw away the read's `candidate` for a launch, and on WDA the alert read was wired for
+links alone.
+
+Decision (spec-D56, adopting the D56 analysis):
+
+- Wiring: `IosAdapter.foregroundCheck` wires `ForegroundCheck.alert` (`IosTreeSource.systemAlert`, WDA's) for every
+  wait, a launch's as a link's; the two `link` gates in `ios-foreground.ts` (`idbAlert`, `alertAtBound`) are gone. The
+  title gate `titleAsksToOpen` is unchanged, judged against the launched app's names, which the idb wait asks after
+  its first label anyway — or none when they cannot be read, so the English `Open in “…”?` alone passes, as for a link.
+- The wait's end: a launch that finds the alert ends on it (`WaitEnd` `alert`) — on idb at the read that lists it, on
+  WDA at the bound — and `awaitForeground` returns `{ note: alertNote(...) }` in place of D48's note. `LaunchOutcome`,
+  `Launched`, the flow engine and `launchText` are unchanged: they carry the note already, so `launch_app`'s ⚠ line and
+  a flow's `⚠ launch` line both show it. The launch never fails: D48's rule holds, the wait only delays, and `simctl
+  launch` succeeded (batch-1: a bare "Launched" behind the alert).
+- One wording of the buttons and the advice, in `adapters/ios-system-alert.ts`: `alertButtons(alert)` (`buttons
+  "Cancel" at (127, 474), "Open" at (275, 474)`, "button" for one) and `ANSWER_ALERT` ("Answer it with a tap at the
+  chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered").
+  `mcp/tool-text.ts#alertText` (open_deep_link's reply) uses both and stays byte-identical.
+- The note: `iOS has not brought <bundle> forward yet: a system alert is up, "<title>" — buttons "<label>" at (x, y),
+  …. <ANSWER_ALERT> — then read again before trusting a read`. Always "a system alert is up", never "it asks": the alert
+  belongs to something earlier (a link) and may name another app (launching Contacts behind "Open in “AveriLab”?"). The
+  title is quoted verbatim. No "3 s after": idb ends at once, WDA at the bound. The tail keeps D48's "read again"
+  without its parenthesis: what comes forward once the alert is answered is unmeasured.
+- Device calls: the happy path is call-identical on both sources (pinned by call lists in
+  `tests/adapters/ios-deep-link.test.ts`). idb makes no extra call: `candidate` rides on the label read. WDA makes at
+  most one `quickSourceIfUp` read, only at the bound, only when SpringBoard was the last bundle named; a launch asks no
+  names for it (`asksForApp` is a link's alone), so a WDA launch pays no `simctl appinfo`. A read that throws, times out
+  or holds no alert gives D48's note byte-identical (fail open).
+
+Considered, not chosen: a structured `LaunchOutcome.alert` (new fields in three types and both renderers, and wording
+in `flow/launch.ts`, which may not import `mcp/`, for one line the note already carries); "it asks" for a launch (a
+link's fact, and on WDA it would need an appinfo the launch does not otherwise pay); failing the launch, or a flow's
+`launch:` step, on the alert (the launch did happen; a flow's next read meets SpringBoard and says so in its own
+words).
+
+Cost: the happy path none. The alert up: an idb launch ends at the read that lists it instead of at 3 s; a WDA launch
+pays one `/source` of a small tree at the bound (386–539 ms in batch-6 for a link, at most
+`SYSTEM_ALERT_SOURCE_TIMEOUT_MS`). Paid in a new place: a WDA cold launch still on SpringBoard at the bound gains that
+one read before the same D48 note (batch-4's cold launches matched at 2.0–2.1 s, so the bound is rarely reached).
+Residuals, stated: D54's apply (a localised title without the app's name falls back to D48's note on idb; an alert
+shape another iOS lists differently falls back too); a localised alert that names another app than the launched one
+is not found on idb (the title gate judges the launched app's names), and the note is D48's; on idb, when the launched
+app's names cannot be read, a localised alert gives D48's "could not check" note at once. To check on the device (the
+next owner batch): a launch behind the alert on idb and on WDA (the note, the describe-all count, the `/source` time at
+the bound); what comes forward after a tap on each button — which decides whether the note's tail should say "launch
+again"; a launch of another app behind the alert; the happy path's call lists and launch time against main.
