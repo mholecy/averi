@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isWebScheme, linkScheme, NO_SUCH_KEY, urlSchemes } from '../../src/adapters/ios-url-schemes.js';
+import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, urlSchemes } from '../../src/adapters/ios-url-schemes.js';
 
 describe('linkScheme', () => {
   it('the scheme before the first colon, lower-cased', () => {
@@ -24,6 +24,15 @@ describe('isWebScheme', () => {
     expect(isWebScheme('https')).toBe(true);
     expect(isWebScheme('averilab')).toBe(false);
     expect(isWebScheme('httpx')).toBe(false);
+  });
+});
+
+describe('isSystemScheme', () => {
+  it("iOS's own schemes and the x-apple- family; not a custom one, nor a near miss", () => {
+    for (const scheme of ['tel', 'telprompt', 'mailto', 'sms', 'facetime', 'facetime-audio', 'maps', 'itms-apps', 'itms-services', 'app-settings', 'shortcuts', 'x-apple-health']) {
+      expect(isSystemScheme(scheme)).toBe(true);
+    }
+    for (const scheme of ['averilab', 'http', 'x-apple', 'x-apples', 'tels', 'xx-apple-health']) expect(isSystemScheme(scheme)).toBe(false);
   });
 });
 
@@ -52,9 +61,9 @@ describe('urlSchemes — plutil -extract CFBundleURLTypes json', () => {
   });
 });
 
-describe('NO_SUCH_KEY', () => {
+describe('PLUTIL_NO_SUCH_KEY', () => {
   it("matches plutil's missing-key message (measured), not another failure", () => {
-    expect(NO_SUCH_KEY.test('Info.plist: Could not extract value, error: No value at that key path or invalid key path: CFBundleURLTypes')).toBe(true);
-    expect(NO_SUCH_KEY.test('/x/Info.plist: (The file “Info.plist” couldn’t be opened because there is no such file.)')).toBe(false);
+    expect(PLUTIL_NO_SUCH_KEY.test('Info.plist: Could not extract value, error: No value at that key path or invalid key path: CFBundleURLTypes')).toBe(true);
+    expect(PLUTIL_NO_SUCH_KEY.test('/x/Info.plist: (The file “Info.plist” couldn’t be opened because there is no such file.)')).toBe(false);
   });
 });

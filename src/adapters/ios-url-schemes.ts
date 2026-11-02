@@ -25,11 +25,34 @@ export function linkScheme(url: string): string | undefined {
 export const isWebScheme = (scheme: string): boolean => scheme === 'http' || scheme === 'https';
 
 /**
+ * iOS's own schemes — handled by a system app (Phone, Mail, Messages, FaceTime, Maps, the App Store, Settings,
+ * Shortcuts), never by the project's app — so a link to one costs no lookup at all (review of D49a). Small on purpose:
+ * a scheme missing here costs one cached lookup per bundle, never a wrong wait (the lookup then finds it undeclared).
+ * `x-apple-*` is Apple's private family (`x-apple-health`, `x-apple-reminderkit`, …).
+ */
+const SYSTEM_SCHEMES: ReadonlySet<string> = new Set([
+  'tel',
+  'telprompt',
+  'mailto',
+  'sms',
+  'facetime',
+  'facetime-audio',
+  'maps',
+  'itms-apps',
+  'itms-services',
+  'app-settings',
+  'shortcuts',
+]);
+
+/** Whether a (lower-cased) scheme is one of iOS's own (SYSTEM_SCHEMES, or `x-apple-…`). */
+export const isSystemScheme = (scheme: string): boolean => SYSTEM_SCHEMES.has(scheme) || scheme.startsWith('x-apple-');
+
+/**
  * What `plutil -extract` writes to stderr (exit 1) when the plist has no such key — measured on macOS 26 with a
  * plist holding none: `Info.plist: Could not extract value, error: No value at that key path or invalid key path:
  * CFBundleURLTypes`. An app that declares no URL types: no scheme of its own, not a read failure.
  */
-export const NO_SUCH_KEY = /No value at that key path/;
+export const PLUTIL_NO_SUCH_KEY = /No value at that key path/;
 
 /**
  * The schemes in `plutil -extract CFBundleURLTypes json`'s output, lower-cased: every string in every entry's

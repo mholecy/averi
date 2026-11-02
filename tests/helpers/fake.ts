@@ -1,4 +1,4 @@
-import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOptions, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOptions, type DeepLinkOutcome, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 import { NOT_PRINTABLE_ASCII, type Typeable } from '../../src/adapters/typeable.js';
 
@@ -282,7 +282,7 @@ export class FakeAdapter implements DeviceAdapter {
   readonly deepLinks: { url: string; opts?: DeepLinkOptions }[] = [];
   deepLinkNote: string | undefined;
 
-  async openDeepLink(url: string, opts?: DeepLinkOptions): Promise<LaunchOutcome> {
+  async openDeepLink(url: string, opts?: DeepLinkOptions): Promise<DeepLinkOutcome> {
     this.deepLinks.push(opts === undefined ? { url } : { url, opts });
     return this.deepLinkNote === undefined ? {} : { note: this.deepLinkNote };
   }

@@ -367,8 +367,7 @@ Decision:
   Every launch note's advice is one (review 2026-11-02): read again before trusting a read — the screenshot switches
   before the tree, on either source.
 - `launch_app`, a flow's `launch:` and `ensure_state`'s launch rungs all pass `IosAdapter.launch`, so all gain it.
-  `openDeepLink` still waits for nothing (a link may bring another app forward) — until D49a, the next amendment, for
-  a link to the project's own scheme.
+  `openDeepLink` still waits for nothing (a link may bring another app forward) (see the D49a amendment).
 
 Considered, not chosen:
 
@@ -409,13 +408,20 @@ Decision (the D49 analysis, split by the orchestrator: D49a now, D49b after a de
   "No value at that key path" is "declares none"). Cached per bundle until `install`, as appinfo is.
 - When it is, the D48 wait runs as for a launch (`ForegroundCheck.link`): idb's Application label or WDA's active
   bundle, at most 3 s, failing open, declining while WDA is not up. Its notes say "opening <url> in <bundle>" and lead
-  with: averi did not see the app come forward after the link — iOS may be asking to confirm it ("Open in “…”?") or
-  another app may be in front: take a screenshot, and if it shows a system alert, answer it (every launch stays behind
-  it until then). The reply keeps `Opened <url>` with that `⚠` line under it. A match (not a decline) moves D24's
-  `front` to the app: a link that brought it forward is a launch of it.
-- Every other link — none given, a web link, another app's scheme — reads nothing after `openurl`. Schemes that could
-  not be read (appinfo failed or listed no `Path`, plutil failed otherwise, another JSON shape) are the same, plus one
-  stderr line naming why: not knowing is the old behaviour, but not silently.
+  with what the wait knows: when it read another app or SpringBoard to the bound, "averi did not see <app> come
+  forward after the link: iOS may be asking to confirm it ("Open in “…”?") or another app may be in front — take a
+  screenshot, and if it shows a system alert, answer it (every launch stays behind it until then)"; when it could not
+  tell (a read error, an unlabelled or empty tree), "averi could not check that <app> came forward …" with the same
+  advice (review of D49a: no over-claim). A WDA not up yet (`declined`), which a launch leaves silent, gives a short
+  note too — not checked, answer an "Open in …?" if iOS asks — so no own-scheme link replies a bare "Opened". The reply
+  keeps `Opened <url>` with that `⚠` line under it. A match moves D24's `front` to the app: a link that brought it
+  forward is a launch of it.
+- Every other link reads nothing of the UI after `openurl`, and has no note: none given, a web link, one of iOS's own
+  schemes (`tel`, `telprompt`, `mailto`, `sms`, `facetime`, `facetime-audio`, `maps`, `itms-apps`, `itms-services`,
+  `app-settings`, `shortcuts`, `x-apple-*` — `ios-url-schemes.ts#isSystemScheme`, no lookup at all), another app's
+  scheme. Schemes that could not be read (appinfo failed or listed no `Path`, plutil failed otherwise, another JSON
+  shape) are the same, plus one stderr line naming why — not knowing is the old behaviour, but not silently — and the
+  failure is cached per bundle until `install` like an answer.
 
 Considered, not chosen:
 
@@ -427,8 +433,9 @@ Considered, not chosen:
   run different app code).
 - Scanning every installed app's Info.plist for the scheme: N reads per link for a case the agent rarely has.
 
-Cost: no project app or a web link — nothing. Another scheme — one `simctl appinfo` (shared with the launch's cache)
-and one `plutil` per bundle per adapter, no read of the device's UI. The project's scheme — that, plus the D48 wait:
+Cost: no project app, a web link or one of iOS's own schemes — nothing. Another scheme — one `simctl appinfo` (shared
+with the launch's cache) and one `plutil` per bundle per adapter life (a failed lookup included, cleared by `install`),
+no read of the device's UI, no wait, no note — the review accepted this as "as before" for another app's link. The project's scheme — that, plus the D48 wait:
 one ask when the app is already in front, the stale window when the link brings it forward, the 3 s bound and a note
 when it never comes. Android unchanged: a link with two handlers starts the chooser, which `am start` reports as
 started — a separate row, after a device check.

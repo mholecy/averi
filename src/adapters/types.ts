@@ -969,6 +969,12 @@ export interface LaunchOutcome {
  * (adapters/ios-foreground.ts); without it, or for any other link, nothing is expected and nothing is read. Android
  * ignores it.
  */
+/**
+ * What a deep link has to say beyond "opened" — a launch's shape (LaunchOutcome): `note` is iOS's foreground-wait
+ * caveat for a link to the project's own scheme (D49a), shown as the open_deep_link reply's `⚠` line.
+ */
+export type DeepLinkOutcome = LaunchOutcome;
+
 export interface DeepLinkOptions {
   appId?: string;
 }
@@ -1034,7 +1040,7 @@ export interface DeviceAdapter {
    * may be asking "Open in …?" — D49a, adapters/ios-foreground.ts); every
    * other link, and Android's, returns with none.
    */
-  openDeepLink(url: string, opts?: DeepLinkOptions): Promise<LaunchOutcome>;
+  openDeepLink(url: string, opts?: DeepLinkOptions): Promise<DeepLinkOutcome>;
 
   /**
    * PNG bytes — the device's own, or on Android (D19) a PNG encoded on the host

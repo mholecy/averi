@@ -341,7 +341,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     {
       description:
         'Open a deep link / universal link URL on the device. ' +
-        `iOS, a link to averi.yaml's app's scheme: waits up to ${FOREGROUND_BUDGET} for that app; ⚠ = it never came forward (iOS may ask "Open in …?"): screenshot, answer it.`,
+        `iOS, a link to the scheme of averi.yaml's iOS app: waits up to ${FOREGROUND_BUDGET} for it; ⚠ = not seen in front (iOS may ask "Open in …?"): screenshot, answer it.`,
       inputSchema: { platform, url: z.string(), configPath },
     },
     async ({ platform: p, url, configPath: cp }) => {

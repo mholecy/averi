@@ -9,10 +9,10 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
-import type { DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
-import { awaitForeground } from './ios-foreground.js';
+import type { DeepLinkOptions, DeepLinkOutcome, DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
+import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
-import { isWebScheme, linkScheme, NO_SUCH_KEY, urlSchemes } from './ios-url-schemes.js';
+import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, urlSchemes } from './ios-url-schemes.js';
 import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
@@ -329,13 +329,7 @@ export class IosAdapter implements DeviceAdapter {
     // until the source names this app (idb: the tree's Application; WDA, once
     // up: its active app's bundle id), bounded and failing open; the facts,
     // the bound and the cost are ios-foreground.ts's.
-    const note = await awaitForeground({
-      bundleId,
-      label: () => this.treeSource.applicationLabel(),
-      names: () => this.appNames(bundleId),
-      ownerOf: (label) => this.ownerOf(label),
-      source: this.treeSource.kind,
-    });
+    const note = await awaitForeground(this.foregroundCheck(bundleId));
     return note === undefined ? {} : { note };
   }
 
@@ -469,79 +463,88 @@ export class IosAdapter implements DeviceAdapter {
   /**
    * `simctl openurl`, after launch's accessibility writes (a link can cold-start the app: that is a launch). Then, only
    * for a link to a scheme the project's app (`opts.appId`) declares, launch's foreground wait (D49a,
-   * ios-foreground.ts: iOS may ask "Open in …?" first, and `openurl` returns either way); every other link — none
-   * given, `http(s)`, another app's scheme, schemes that could not be read — expects no app and reads nothing after
-   * `openurl`, as before D49a. The scheme lookup runs after `openurl` (the writes and the open go out as they did):
-   * one `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install().
-   * `front` moves to the app only when the wait saw it in front.
+   * ios-foreground.ts: iOS may ask "Open in …?" first, and `openurl` returns either way) — with a note whenever it did
+   * not confirm the app, a WDA not up yet included; every other link — none given, `http(s)`, iOS's own schemes,
+   * another app's scheme, schemes that could not be read — expects no app and reads nothing of the UI after `openurl`,
+   * as before D49a. The scheme lookup runs after `openurl` (the writes and the open go out as they did): one
+   * `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a failed
+   * one too. `front` moves to the app only when the wait saw it in front.
    */
-  async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<LaunchOutcome> {
+  async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<DeepLinkOutcome> {
     await this.enableAccessibilityAutomation(`opening ${url}`);
     await this.simctl(['openurl', this.udid, url]);
     const handler = await this.linkHandler(url, opts.appId);
     if (handler === undefined) return {};
-    /** Whether the source declined to ask (WDA not up): the wait then returns no note having confirmed nothing. */
-    let declined = false;
-    const note = await awaitForeground({
-      bundleId: handler,
-      link: url,
-      label: async () => {
-        const read = await this.treeSource.applicationLabel();
-        if (read.kind === 'declined') declined = true;
-        return read;
-      },
-      names: () => this.appNames(handler),
-      ownerOf: (label) => this.ownerOf(label),
-      source: this.treeSource.kind,
-    });
+    // A link's wait has a note in every case but a match (ios-foreground.ts#awaitForeground).
+    const note = await awaitForeground(this.foregroundCheck(handler, { link: url }));
     if (note !== undefined) return { note };
-    if (!declined) this.front = { kind: 'launched', bundleId: handler };
+    this.front = { kind: 'launched', bundleId: handler };
     return {};
   }
 
-  /** `appId` when the link's scheme is one it declares (not http/https); undefined otherwise, or when not known. */
+  /** The foreground wait's check of `bundleId` through this adapter's source and caches — launch's and a link's. */
+  private foregroundCheck(bundleId: string, extra: Pick<ForegroundCheck, 'link'> = {}): ForegroundCheck {
+    return {
+      bundleId,
+      label: () => this.treeSource.applicationLabel(),
+      names: () => this.appNames(bundleId),
+      ownerOf: (label) => this.ownerOf(label),
+      source: this.treeSource.kind,
+      ...extra,
+    };
+  }
+
+  /**
+   * `appId` when the link's scheme is one it declares; undefined otherwise — no app, no scheme, a web or system scheme
+   * (no lookup at all), another app's, or schemes that could not be read.
+   */
   private async linkHandler(url: string, appId: string | undefined): Promise<string | undefined> {
     const scheme = linkScheme(url);
-    if (appId === undefined || scheme === undefined || isWebScheme(scheme)) return undefined;
-    try {
-      return (await this.urlSchemes(appId)).includes(scheme) ? appId : undefined;
-    } catch (e) {
-      // Not knowing is today's behaviour — no wait — said on stderr (this layer's channel for a non-fatal note), so
-      // a drift in the lookup does not switch the wait off unseen (ios-foreground.ts's "never silent").
-      console.error(
-        `averi: could not read ${appId}'s URL schemes (${errorMessage(e).split('\n')[0]}) — ` +
-          `opened ${url} without waiting for ${appId} to come forward`,
-      );
-      return undefined;
-    }
+    if (appId === undefined || scheme === undefined || isWebScheme(scheme) || isSystemScheme(scheme)) return undefined;
+    return (await this.urlSchemes(appId, url))?.includes(scheme) === true ? appId : undefined;
   }
 
   /**
    * The schemes a bundle declares (its Info.plist's CFBundleURLTypes, lower-cased; ios-url-schemes.ts), per bundle
-   * until install() — an answer is cached, "declares none" included; a failure is not.
+   * until install() — "declares none" included, and `undefined` for a lookup that failed (review of D49a: one
+   * lookup and one stderr line per bundle per adapter, not one per link).
    */
-  private readonly urlSchemesCache = new Map<string, readonly string[]>();
+  private readonly urlSchemesCache = new Map<string, readonly string[] | undefined>();
 
   /**
-   * One bundle's schemes: `plutil` on the host, on the Info.plist at appinfo's Path (appInfo, cached). Throws when
+   * One bundle's schemes: `plutil` on the host, on the Info.plist at appinfo's Path (appInfo, cached); undefined when
    * they could not be read — appinfo failed or listed no Path, plutil failed other than on a missing key, or its
-   * answer has another shape. 10 s, as appinfo: a host read of milliseconds (measured on the lab app).
+   * answer has another shape — said once on stderr (this layer's channel for a non-fatal note), so a drift in the
+   * lookup does not switch the wait off unseen (ios-foreground.ts's "never silent"). 10 s, as appinfo: a host read of
+   * milliseconds (measured on the lab app).
    */
-  private async urlSchemes(bundleId: string): Promise<readonly string[]> {
-    const cached = this.urlSchemesCache.get(bundleId);
-    if (cached !== undefined) return cached;
-    const { path } = await this.appInfo(bundleId);
-    if (path === undefined) throw new Error('simctl appinfo listed no Path');
-    let schemes: readonly string[];
+  private async urlSchemes(bundleId: string, url: string): Promise<readonly string[] | undefined> {
+    if (this.urlSchemesCache.has(bundleId)) return this.urlSchemesCache.get(bundleId);
+    let schemes: readonly string[] | undefined;
     try {
-      const { stdout } = await this.exec('plutil', ['-extract', 'CFBundleURLTypes', 'json', '-o', '-', join(path, 'Info.plist')], { timeoutMs: 10_000 });
-      schemes = urlSchemes(stdout.toString('utf8'));
+      schemes = await this.readUrlSchemes(bundleId);
     } catch (e) {
-      if (!(e instanceof ExecError && NO_SUCH_KEY.test(e.stderr))) throw e;
-      schemes = [];
+      console.error(
+        `averi: could not read ${bundleId}'s URL schemes (${errorMessage(e).split('\n')[0]}) — ` +
+          `opened ${url} without waiting for ${bundleId} to come forward, and will not wait for it on later links ` +
+          'until the app is installed again',
+      );
     }
     this.urlSchemesCache.set(bundleId, schemes);
     return schemes;
+  }
+
+  /** urlSchemes' read, uncached; throws when it could not read them. */
+  private async readUrlSchemes(bundleId: string): Promise<readonly string[]> {
+    const { path } = await this.appInfo(bundleId);
+    if (path === undefined) throw new Error('simctl appinfo listed no Path');
+    try {
+      const { stdout } = await this.exec('plutil', ['-extract', 'CFBundleURLTypes', 'json', '-o', '-', join(path, 'Info.plist')], { timeoutMs: 10_000 });
+      return urlSchemes(stdout.toString('utf8'));
+    } catch (e) {
+      if (e instanceof ExecError && PLUTIL_NO_SUCH_KEY.test(e.stderr)) return [];
+      throw e;
+    }
   }
 
   /**

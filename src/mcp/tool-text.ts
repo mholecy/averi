@@ -1,5 +1,5 @@
 /**
- * The one-line responses of the tap, type_text, swipe and launch_app tools, as pure functions.
+ * The one-line responses of the tap, type_text, swipe, launch_app and open_deep_link tools, as pure functions.
  *
  * They are here rather than inline in server.ts because server.ts connects a
  * transport at module load and cannot be imported by a test — and these lines
@@ -19,7 +19,7 @@
  * agree with — the flow engine may not import this layer.
  */
 
-import { everyNode, type LaunchOutcome, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
+import { everyNode, type DeepLinkOutcome, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
@@ -79,7 +79,7 @@ export const launchText = (platform: Platform, launched: Launched): string =>
  * link to the project's own scheme, adapters/ios-foreground.ts — the note leads with what to do), as launchText lays
  * out a launch's.
  */
-export const deepLinkText = (platform: Platform, url: string, outcome: LaunchOutcome): string =>
+export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkOutcome): string =>
   `Opened ${url} on ${platform}` + (outcome.note !== undefined ? `\n⚠ ${outcome.note}` : '');
 
 /**

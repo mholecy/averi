@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IosAdapter } from '../../src/adapters/ios.js';
-import type { ApplicationLabel, IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { IdbEmptyTreeError, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-foreground.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
@@ -39,13 +39,17 @@ const SPRINGBOARD = bundle('com.apple.springboard');
  * `kind` given — and an exec answering `simctl appinfo` with `info` and plutil with `types` (an Error rejects each).
  * Every exec command line but xcode-env's one-time `xcrun --find simctl` is recorded.
  */
-function lab(answers: ApplicationLabel[], opts: { kind?: IosTreeSourceKind; info?: string | Error; types?: string | Error } = {}) {
+function lab(answers: Array<ApplicationLabel | Error>, opts: { kind?: IosTreeSourceKind; info?: string | Error; types?: string | Error } = {}) {
   const calls: string[] = [];
   let asked = 0;
   const source: IosTreeSource = {
     kind: opts.kind ?? 'wda',
     read: () => Promise.reject(new Error('unused')),
-    applicationLabel: async () => answers[Math.min(asked++, answers.length - 1)],
+    applicationLabel: async () => {
+      const a = answers[Math.min(asked++, answers.length - 1)];
+      if (a instanceof Error) throw a;
+      return a;
+    },
     dispose: () => Promise.resolve(),
   };
   const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
@@ -98,17 +102,28 @@ describe("IosAdapter.openDeepLink — a link nothing expects is opened exactly a
     expect(d.calls).toEqual([...WRITES, openurl('averilab')]);
   });
 
+  // Review of D49a: iOS's own schemes are never the project's app — no lookup at all.
+  it.each(['tel:+421900', 'TELPROMPT:1', 'mailto:a@b.c', 'sms:1', 'facetime:a', 'facetime-audio:a', 'maps://?q=x', 'itms-apps://x', 'itms-services://x', 'app-settings:', 'shortcuts://run', 'x-apple-health://'])(
+    'one of iOS\'s own schemes (%s): the writes and openurl, nothing else',
+    async (url) => {
+      const d = lab([bundle(LAB)]);
+      expect(await d.adapter.openDeepLink(url, { appId: LAB })).toEqual({});
+      expect(d.calls).toEqual([...WRITES, openurl(url)]);
+      expect(d.asks()).toBe(0);
+    },
+  );
+
   it("a scheme the project's app does not declare: no ask, no wait, no note — its schemes read once and cached", async () => {
     const d = lab([bundle(LAB)]);
-    expect(await d.adapter.openDeepLink('tel:+421900', { appId: LAB })).toEqual({});
     expect(await d.adapter.openDeepLink('contacts://new', { appId: LAB })).toEqual({});
+    expect(await d.adapter.openDeepLink('x-apples://new', { appId: LAB })).toEqual({});
     expect(d.calls).toEqual([
       ...WRITES,
-      openurl('tel:+421900'),
+      openurl('contacts://new'),
       'xcrun simctl appinfo AAAA-1111 dev.averi.lab',
       PLUTIL,
       ...WRITES,
-      openurl('contacts://new'),
+      openurl('x-apples://new'),
     ]);
     expect(d.asks()).toBe(0);
     expect(sleeps).toEqual([]);
@@ -126,26 +141,29 @@ describe("IosAdapter.openDeepLink — a link nothing expects is opened exactly a
   });
 });
 
-describe('IosAdapter.openDeepLink — the schemes could not be read: opened as before, one stderr line, asked again next link', () => {
-  it('an unreadable Info.plist (any other plutil failure)', async () => {
+const couldNotRead = (why: string) =>
+  `averi: could not read dev.averi.lab's URL schemes (${why}) — opened averilab://d49 without waiting for dev.averi.lab ` +
+  'to come forward, and will not wait for it on later links until the app is installed again';
+
+describe('IosAdapter.openDeepLink — the schemes could not be read: opened as before, one stderr line, the failure cached until install()', () => {
+  it('an unreadable Info.plist (any other plutil failure): one lookup and one line for two links; install() asks again', async () => {
     const d = lab([bundle(LAB)], { types: execErrorLikeExec(PLUTIL, 1, `${LAB_PATH}/Info.plist: (The file couldn’t be opened.)\n`) });
     expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
     expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
     expect(d.asks()).toBe(0);
+    expect(d.calls.filter((c) => c.startsWith('plutil') || c.includes('appinfo'))).toHaveLength(2);
+    expect(stderrLines()).toEqual([couldNotRead(`Command failed (exit 1): ${PLUTIL}`)]);
+    await d.adapter.install('/builds/AveriLab.app');
+    await d.adapter.openDeepLink('averilab://d49', { appId: LAB });
     expect(d.calls.filter((c) => c.startsWith('plutil'))).toHaveLength(2);
-    expect(stderrLines()).toEqual([
-      `averi: could not read dev.averi.lab's URL schemes (Command failed (exit 1): ${PLUTIL}) — opened averilab://d49 without waiting for dev.averi.lab to come forward`,
-      `averi: could not read dev.averi.lab's URL schemes (Command failed (exit 1): ${PLUTIL}) — opened averilab://d49 without waiting for dev.averi.lab to come forward`,
-    ]);
+    expect(stderrLines()).toHaveLength(2);
   });
 
   it('a plutil answer of another shape', async () => {
     const d = lab([bundle(LAB)], { types: '{"CFBundleURLSchemes":["averilab"]}' });
     expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
     expect(d.asks()).toBe(0);
-    expect(stderrLines()).toEqual([
-      "averi: could not read dev.averi.lab's URL schemes (CFBundleURLTypes is not an array) — opened averilab://d49 without waiting for dev.averi.lab to come forward",
-    ]);
+    expect(stderrLines()).toEqual([couldNotRead('CFBundleURLTypes is not an array')]);
   });
 
   it('appinfo fails (the app not installed): no plutil', async () => {
@@ -153,9 +171,7 @@ describe('IosAdapter.openDeepLink — the schemes could not be read: opened as b
     expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
     expect(d.calls.filter((c) => c.startsWith('plutil'))).toEqual([]);
     expect(d.asks()).toBe(0);
-    expect(stderrLines()).toEqual([
-      "averi: could not read dev.averi.lab's URL schemes (simctl appinfo: no such bundle) — opened averilab://d49 without waiting for dev.averi.lab to come forward",
-    ]);
+    expect(stderrLines()).toEqual([couldNotRead('simctl appinfo: no such bundle')]);
   });
 
   it('appinfo lists no Path: no plutil', async () => {
@@ -163,9 +179,7 @@ describe('IosAdapter.openDeepLink — the schemes could not be read: opened as b
     expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
     expect(d.calls.filter((c) => c.startsWith('plutil'))).toEqual([]);
     expect(d.asks()).toBe(0);
-    expect(stderrLines()).toEqual([
-      "averi: could not read dev.averi.lab's URL schemes (simctl appinfo listed no Path) — opened averilab://d49 without waiting for dev.averi.lab to come forward",
-    ]);
+    expect(stderrLines()).toEqual([couldNotRead('simctl appinfo listed no Path')]);
   });
 });
 
@@ -216,11 +230,43 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
     expect(outcome.note).toMatch(/\(every launch stays behind it until then\)\. 3 s after opening averilab:\/\/d49 in dev\.averi\.lab \("AveriLab"\), the UI tree was still the app labelled "Contacts" — /);
   });
 
-  it('WebDriverAgent not up yet (declined): no wait, no note', async () => {
+  // Review of D49a (MINOR 1): a launch before WDA is up stays silent, but an own-scheme link may wait behind "Open in
+  // …?" — so it says it did not check rather than a bare "Opened".
+  it('WebDriverAgent not up yet (declined): no wait — and a short note that it was not checked', async () => {
     const d = lab([{ kind: 'declined' }]);
-    expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
+    expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({
+      note:
+        'whether dev.averi.lab came forward after the link was not checked (WebDriverAgent is not running yet) — ' +
+        'if iOS asks "Open in “…”?", answer it (a screenshot shows it)',
+    });
     expect(d.asks()).toBe(1);
     expect(sleeps).toEqual([]);
+  });
+
+  // Review of D49a: "did not see it come forward" only when the wait read another app; when it could not tell, the
+  // lead says so.
+  it('the ask fails: no "did not see" — a lead that it could not check, then launch\'s "could not check" note worded for the link', async () => {
+    const outcome = await lab([new Error('WDA /wda/activeAppInfo request failed: ECONNREFUSED\nstack')]).adapter.openDeepLink('averilab://d49', { appId: LAB });
+    expect(outcome.note).toBe(
+      'averi could not check that dev.averi.lab came forward after the link: if iOS asks to confirm it ("Open in “…”?"), ' +
+        'the link waits behind the alert — take a screenshot, and if it shows a system alert, answer it (every launch ' +
+        'stays behind it until then). could not check that dev.averi.lab is in front (WDA /wda/activeAppInfo request ' +
+        'failed: ECONNREFUSED) — for a moment after a launch WebDriverAgent can still read the previous app; read again ' +
+        'before trusting a read (the screenshot switches before the tree)',
+    );
+  });
+
+  it('no bundle id to the bound (unlabelled): the could-not-check lead too', async () => {
+    const outcome = await lab([{ kind: 'unlabelled' }]).adapter.openDeepLink('averilab://d49', { appId: LAB });
+    expect(outcome.note).toMatch(/^averi could not check that dev\.averi\.lab came forward after the link: /);
+    expect(outcome.note).not.toMatch(/did not see/);
+  });
+
+  it("idb's tree empty to the bound: the could-not-check lead, then the empty-tree note worded for the link", async () => {
+    const outcome = await lab([new IdbEmptyTreeError('AAAA-1111', [])], { kind: 'idb' }).adapter.openDeepLink('averilab://d49', { appId: LAB });
+    expect(outcome.note).toMatch(
+      /^averi could not check that dev\.averi\.lab came forward after the link: .*\. idb's tree stayed empty for the 3 s averi waited after opening averilab:\/\/d49 in dev\.averi\.lab, /,
+    );
   });
 });
 
