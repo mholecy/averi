@@ -1734,7 +1734,8 @@ export class FlowEngine {
     // not where the bare-tree note is the message, which words no miss.
     const lastTree = await markedForMiss(this.adapter, outcome, bareNote === undefined ? hint?.missing : undefined);
     const { hint: said, miss } = hint?.say(lastTree) ?? {};
-    const message = pollTimeoutMessage(what, timeoutMs, outcome.readError, bareNote ?? said);
+    const note = bareNote ?? said;
+    const message = pollTimeoutMessage(what, timeoutMs, outcome.readError, note === undefined ? [] : [note]);
     // The miss rides on the error only where its note is what the message says beneath the headline.
     const saidMiss = miss !== undefined && bareNote === undefined && outcome.readError === undefined && missNote(miss) !== undefined;
     throw saidMiss ? new WaitMissedError(message, miss) : new Error(message);

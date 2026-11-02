@@ -1,5 +1,5 @@
 import type { Call, Outcome } from '../differential.js';
-import { allPassed, claimsTap, firstLine, idbReasonsSaid, isError, namesKeyboard, noIdListedSaid, notInTree, presentedRemedySaid, windowHintSaid } from '../../truth/replies.js';
+import { allPassed, claimsTap, firstLine, idbReasonsSaid, isError, keyboardUnlistedSaid, namesKeyboard, noIdListedSaid, notInTree, presentedRemedySaid, windowHintSaid } from '../../truth/replies.js';
 import type { CellTruth, Rect } from '../../truth/schema.js';
 import { bandsOf, pointText, within } from '../../truth/truth.js';
 import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
@@ -127,6 +127,14 @@ export const PRESENTED_REMEDY: WayOut = { said: presentedRemedySaid, words: 'the
 export const IDB_REASONS: WayOut = { said: idbReasonsSaid, words: "idb's reasons" };
 /** idb's reasons and the soft keyboard named (replies.ts#namesKeyboard): the stop of a field under idb's keyboard. */
 export const REASONS_AND_KEYBOARD: WayOut = { said: (r) => idbReasonsSaid(r) && namesKeyboard(r), words: "idb's reasons and the soft keyboard" };
+/**
+ * idb's reasons and the soft keyboard as what idb lists nothing beneath (replies.ts#keyboardUnlistedSaid): the tap of a
+ * field under idb's keyboard (D32 K1).
+ */
+export const REASONS_AND_KEYBOARD_UNLISTED: WayOut = {
+  said: (r) => idbReasonsSaid(r) && keyboardUnlistedSaid(r),
+  words: "idb's reasons and the soft keyboard idb lists nothing beneath",
+};
 /** The presented remedy or idb's reasons: a presented colour row under idb, whose list shows no sign of some layers. */
 export const IDB_PRESENTED: WayOut = { said: (r) => presentedRemedySaid(r) || idbReasonsSaid(r), words: "the presented remedy or idb's reasons" };
 

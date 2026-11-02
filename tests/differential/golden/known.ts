@@ -44,8 +44,6 @@ export interface KnownFile {
 export const keys = (file: string, tags: readonly string[], verbs: readonly string[], k: Known) =>
   tags.flatMap((t) => verbs.map((v) => [`${file} ${t} ${v}`, { cls: k.cls, kind: k.kind, calls: k.calls, note: k.note, ...(k.as !== undefined && { as: k.as }) }] as const));
 
-/** The note of an idb row under the keyboard (form-keyboard, the toolbar cells): idb lists nothing there. */
-export const IDB_UNDER_KEYBOARD = 'idb lists nothing under the keyboard';
 export const NO_CLOSE_IT_FIRST = 'refused without "close it first"';
 /** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
 export const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';

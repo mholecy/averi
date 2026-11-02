@@ -5,7 +5,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 import { readFile } from 'node:fs/promises';
-import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
+import { PersistentReadError, type Rect, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { tapText } from '../../src/mcp/tool-text.js';
@@ -1126,6 +1126,96 @@ describe('a tap or fill by an id idb\'s read does not list: the timeout says idb
   it('resolvePresent (the optional tap\'s presence check): the same', async () => {
     const error = await resolvePresent(await idbFake('sheet-long-list'), { id: 'lab.sheet-long-list.R' }, OPTS).catch((e: unknown) => e);
     expect((error as ElementNotFoundError).miss).toEqual({ of: 'noIdListed', id: 'lab.sheet-long-list.R' });
+  });
+});
+
+/**
+ * D32 K1: idb lists nothing beneath the soft keyboard, so a tap or fill on a field under it waits and ends "not found".
+ * Where the keys are read up by shape (draw-order.ts#keyboardBandTop, idb's band: the lab's form-keyboard capture, its
+ * band's top at y 590), the timeout names the soft keyboard and the way out first, in one short line — how to hide it,
+ * never the adapter's long advice — then idb's reasons as before. A tree with no band keeps today's reply byte for
+ * byte.
+ */
+describe('a tap or fill that misses under idb with the soft keyboard read up: the timeout names the keyboard', () => {
+  const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
+  const OPTS = { ...REFUSE, timeoutMs: 20, pollMs: 2 };
+  /** The keyboard band's background in the capture (`other 0,590 402x284`), which makes the keys a band. */
+  const isBand = (e: { frame: Rect; role: string }) => e.frame.x === 0 && e.frame.y === 590 && e.frame.width === 402 && e.frame.height === 284;
+  const fakeOf = async (cell: string, { band = true, extra = [] as object[] } = {}) => {
+    const raw = JSON.parse(await readFile(new URL(`${cell}.idb.json`, IOS), 'utf8')) as { frame: Rect; role: string }[];
+    const listed = band ? raw : raw.filter((e) => !isBand(e));
+    const fake = new FakeAdapter({ s: parseIdbDescribeAll(JSON.stringify([listed[0], ...extra, ...listed.slice(1)])) }, 's');
+    fake.keyboard = undefined;
+    fake.keyboardAdvice = 'ADVICE';
+    fake.viewportSize = { width: 402, height: 874 };
+    return fake;
+  };
+  const KEYBOARD =
+    '  (the soft keyboard is up (its top edge at y 590) and idb lists nothing beneath it, so the element may lie there — ' +
+    'tap a neutral element such as the screen title to hide it, then try again)';
+  const VS = 'id:"lab.form-keyboard.vs"';
+  const VS_MISS = { of: 'idUnlisted', id: 'lab.form-keyboard.vs' } as const;
+
+  it('tap by an id under the keys (form-keyboard vs): the keyboard and its remedy first, then idb\'s reasons; nothing tapped', async () => {
+    const fake = await fakeOf('form-keyboard');
+    const error = await tapElement(fake, VS, OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as ElementNotFoundError).miss).toEqual(VS_MISS);
+    expect((error as Error).message).toBe(`Timed out after 20ms waiting for element ${VS} to appear\n${KEYBOARD}\n  (${missNote(VS_MISS)})`);
+    expect(fake.tapPoints).toEqual([]);
+  });
+
+  it('tap by a text no read lists (no idb reasons to say): the keyboard alone beneath the headline', async () => {
+    const error = await tapElement(await fakeOf('form-keyboard'), 'text:"Nowhere"', OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe(`Timed out after 20ms waiting for element text:"Nowhere" to appear\n${KEYBOARD}`);
+  });
+
+  it('fill, by the same wait: the same reply', async () => {
+    const error = await fillField(await fakeOf('form-keyboard'), VS, 'x', OPTS).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe(`Timed out after 20ms waiting for element ${VS} to appear\n${KEYBOARD}\n  (${missNote(VS_MISS)})`);
+  });
+
+  it('the same tree with the band\'s background dropped (no keyboard read up): today\'s reply, byte-equal — tap and fill', async () => {
+    const today = `Timed out after 20ms waiting for element ${VS} to appear\n  (${missNote(VS_MISS)})`;
+    const tapped = await tapElement(await fakeOf('form-keyboard', { band: false }), VS, OPTS).catch((e: unknown) => e);
+    expect((tapped as Error).message).toBe(today);
+    const filled = await fillField(await fakeOf('form-keyboard', { band: false }), VS, 'x', OPTS).catch((e: unknown) => e);
+    expect((filled as Error).message).toBe(today);
+    const text = await tapElement(await fakeOf('form-keyboard', { band: false }), 'text:"Nowhere"', OPTS).catch((e: unknown) => e);
+    expect((text as Error).message).toBe('Timed out after 20ms waiting for element text:"Nowhere" to appear');
+  });
+
+  it('the band up, then the last read FAILED: the read error alone beneath the headline, no keyboard line (the fresher fact)', async () => {
+    const fake = await fakeOf('form-keyboard');
+    const real = fake.uiTree.bind(fake);
+    let reads = 0;
+    fake.uiTree = async () => {
+      if (reads++ === 0) return real();
+      throw new Error('device offline');
+    };
+    const error = await tapElement(fake, VS, OPTS).catch((e: unknown) => e);
+    expect(reads).toBeGreaterThan(1);
+    expect(error).not.toBeInstanceOf(ElementNotFoundError);
+    expect((error as Error).message).toBe(`Timed out after 20ms waiting for element ${VS} to appear\n  (last UI tree read failed: device offline)`);
+  });
+
+  it('a target matched only at 0×0 with the keys up (`zeroArea`: it IS in the tree): the 0×0 note alone, no keyboard line', async () => {
+    const zero = { AXLabel: 'Zero', AXUniqueId: 'lab.form-keyboard.zero', type: 'StaticText', role: 'AXStaticText', frame: { x: 20, y: 136, width: 0, height: 0 }, AXFrame: '{{20, 136}, {0, 0}}', enabled: true, traits: ['StaticText'], custom_actions: [] };
+    const error = await tapElement(await fakeOf('form-keyboard', { extra: [zero] }), 'id:"lab.form-keyboard.zero"', OPTS).catch((e: unknown) => e);
+    const miss = (error as ElementNotFoundError).miss;
+    expect(miss.of).toBe('zeroArea');
+    expect((error as Error).message).toBe(`Timed out after 20ms waiting for element id:"lab.form-keyboard.zero" to appear\n  (${missNote(miss)})`);
+  });
+
+  it('a tree source that lists beneath the keyboard (WDA, the same screen): no keyboard line — unchanged', async () => {
+    const fake = new FakeAdapter({ s: parseWdaSource(await readFile(new URL('../fixtures/wda-capture-lab-form-keyboard.json', import.meta.url), 'utf8')) }, 's');
+    fake.keyboard = undefined;
+    fake.keyboardAdvice = 'ADVICE';
+    fake.viewportSize = { width: 402, height: 874 };
+    const error = await tapElement(fake, 'id:"lab.form-keyboard.nowhere"', OPTS).catch((e: unknown) => e);
+    expect((error as Error).message).toBe('Timed out after 20ms waiting for element id:"lab.form-keyboard.nowhere" to appear');
   });
 });
 

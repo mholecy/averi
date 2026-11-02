@@ -275,7 +275,7 @@ describe('tool descriptions on idb\'s keyboard band', () => {
   it('the tap: a centre under the band is refused, and a covered node was measured absent from idb\'s tree', () => {
     expect(description('tap')).toContain('iOS idb marks no keyboard and refuses a centre below the keyboard\'s top line likewise');
     expect(full('tap')).toContain('a target whose centre lies below that line is REFUSED, nothing tapped');
-    expect(full('tap')).toContain('Measured twice on iOS 27, a covered node was absent from idb\'s tree and the tap timed out waiting for it to appear.');
+    expect(full('tap')).toContain('Measured twice on iOS 27, a covered node was absent from idb\'s tree and the tap timed out waiting for it to appear; where idb\'s keys are read up by that shape, the timeout');
   });
 });
 

@@ -1,4 +1,4 @@
-import { ANDROID, IDB_STROKE, IDB_UNDER_KEYBOARD, idbUnmarkedTap, IOS, keys, NOT_YET_IN_TREE, twice, type KnownFile } from './known.js';
+import { ANDROID, IDB_STROKE, idbUnmarkedTap, IOS, keys, NOT_YET_IN_TREE, twice, type KnownFile } from './known.js';
 
 // The forms family's ratchet (fixtures/apps/cells/forms.json, phase 1b).
 
@@ -20,13 +20,12 @@ export const forms: KnownFile = {
     // The form beneath the country picker sheet: the same, a form's fields and its submit.
     ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], idbUnmarkedTap('idb lists only the presented sheet: the tap times out')),
     ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented sheet: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
-    // idb lists nothing under the keyboard (src/mcp/tools.ts, tap: "a covered node was absent from idb's tree and the
-    // tap timed out waiting for it to appear"): the tap times out — no false Tapped, but no keyboard advice. Its
-    // scroll_until (two strokes ABOVE the keyboard, then "never appeared in the tree"), colour and ocr rows were
-    // vacuous here until D32 slice 1: the replayed tree lists no node of the field (golden-spec.ts#unlistedIn), so
-    // their "not found" is judged — green while it names idb's reasons (and, scroll_until, the soft keyboard) — struck
-    // off.
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], { cls: 'refused without naming the keyboard', kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the tap times out` }),
+    // idb lists nothing under the keyboard: the form-keyboard fields' scroll_until (two strokes ABOVE the keyboard,
+    // then "never appeared in the tree"), colour and ocr rows were vacuous here until D32 slice 1: the replayed tree
+    // lists no node of the field (golden-spec.ts#unlistedIn), so their "not found" is judged — green while it names
+    // idb's reasons (and, scroll_until, the soft keyboard) — struck off. Their tap timed out with idb's reasons and no
+    // keyboard advice until D32 slice 4 (K1): it now names the soft keyboard, read up by shape, and the way out
+    // (src/interact/resolve.ts#notFound) — green, struck off.
     // LAB FINDING L2, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md —
     // under idb the submit lifted onto the keyboard over the phone field's centre read as no cover (a key overhanging
     // the screen's bottom by a rounded point cut the keyboard's run short): fixed by round 8, the phone tap and

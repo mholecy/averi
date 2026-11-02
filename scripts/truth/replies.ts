@@ -1,5 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
@@ -155,6 +155,12 @@ export const scrollAdvice = (reply: string) => /scroll_until/.test(ownWords(repl
 
 /** The reply names the soft keyboard in its own words — a tap refused under it (golden-spec/forms.ts's under-keyboard row). */
 export const namesKeyboard = (reply: string) => /\bsoft keyboard\b/i.test(ownWords(reply));
+
+/**
+ * The tap's and fill's wait names the soft keyboard as what idb lists nothing beneath (src/interact/target-text.ts
+ * #keyboardMayCoverText, D32 K1): the soft keyboard named and src/ui-tree/miss.ts#KEYBOARD_UNLISTED's words, imported.
+ */
+export const keyboardUnlistedSaid = (reply: string) => namesKeyboard(reply) && ownWords(reply).includes(KEYBOARD_UNLISTED.idb);
 
 /**
  * averi's reply for a tap it moved off a node's centre to an uncovered piece (src/interact/tap-judgement.ts:325,

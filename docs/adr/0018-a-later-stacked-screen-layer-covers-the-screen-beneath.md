@@ -59,7 +59,9 @@ PACED at 349 pt/s, so a SwiftUI List no longer flings past every row the read be
 changed-screen stop no longer fires on a list that only scrolled; the scroll's two limits now reach less under idb
 (estimated; see "Amendment: idb's presented layer", Decision 4). Amended again 2026-11-02 (D32: residual 21 numbers the
 tap's wait beneath a layer idb shows no sign of, which the amendments "idb's presented layer" and "an idb read that
-lists no identifier" left unnumbered; no behaviour changes).
+lists no identifier" left unnumbered; no behaviour changes). Amended again 2026-11-02 (D32: on idb the tap's and fill's
+not-found names the soft keyboard where its keys are read up by shape — see the amendment "the soft keyboard on idb's
+tap and fill miss" below; residual 20 narrowed for those waits).
 
 ## Context
 
@@ -1299,6 +1301,26 @@ opens mid-call is read as the word said. Measured on API 33 only:
 another API's `windows` format, unread, is `unknown` — today's hint. A Compose `Popup` (a panel) is typed `stacked` by
 the rule but unmeasured (no lab cell).
 
+## Amendment: the soft keyboard on idb's tap and fill miss (2026-11-02, D32)
+
+Residual 20's reply says idb's reasons, not which one holds, and "nothing beneath the keyboard" is one of them. For the
+tap's and fill's wait (interact/resolve.ts#notFound) the read can tell more where idb's keyboard band is read up by its
+shape (draw-order.ts#keyboardBandTop, the line ADR 0006 already judges taps against): the wait's last read is idb's flat
+list (`UiNode.flatList`) and holds the band, so the timeout says, on a line of its own beneath the headline and above
+idb's reasons, "the soft keyboard is up (its top edge at y 590) and idb lists nothing beneath it, so the element may lie
+there — tap a neutral element such as the screen title to hide it, then try again". One short, actionable line: how to
+hide it is the adapter's remedy (ui-tree/keyboard-cover.ts#readKeyboard, dismissal `none`), said briefly by
+interact/target-text.ts#hideKeyboardBriefly — `hideKeyboardHow`'s action without its flow clause — never the adapter's
+long advice; the input-accessory toolbar's Done, measured under WDA, is not offered (no idb capture lists one). "May":
+the band is a position, never a reading of the keyboard shown (K5d), so the target's place there is a possibility. A
+read with no band, a `zeroArea` or `presented` miss, a failed last read, and every tree of WDA and uiautomator (which
+list what lies beneath the keyboard) keep their reply unchanged; the 5 s wait is kept. Not changed: every assert's "not
+found within …", a flow's `wait:` and an optional step's one-line skip, which word the `Miss` alone — the keyboard is
+not a fact of the `Miss` (decision 5's precedence is unchanged). The golden's 16 under-keyboard tap rows of
+form-keyboard and the three toolbar-dismiss cells under idb, judged unlisted as their stop has been since D32 slice 1 —
+a "not found" naming idb's reasons and the soft keyboard idb lists nothing beneath (the golden reader
+`keyboardUnlistedSaid`, in scripts/truth/replies.ts) — are green and struck off.
+
 ## Residuals accepted
 
 (Numbered as before; 8 replaced by the sheet's bare dim after the full-screen leaf condition removed the Android background case.)
@@ -1548,6 +1570,10 @@ the rule but unmeasured (no lab cell).
    paragraph on the band, which says how hard hiding it is under idb — accepted: the paragraph is the measured one, and
    a note without the keyboard for that one reply would be a variant for a wording's sake. Remedy: close what lies over
    it, a `text:`/`label:` selector, or `treeSource: wda`.
+   **Narrowed on idb's tap and fill wait** (2026-11-02, D32; "Amendment: the soft keyboard on idb's tap and fill
+   miss"): where the read holds idb's keyboard band, read by its shape, the timeout names the soft keyboard and how to
+   hide it on a line above idb's reasons — the keyboard reason said first, as a possibility; the asserts' not-found, a
+   flow's `wait:` and an optional step's skip still give the reasons alone.
 21. **On idb, a tap beneath a layer the list shows no sign of times out with idb's reasons, not the presented remedy**
    (2026-11-02, D32; what the amendments "idb's presented layer" (its Residuals) and "an idb read that lists no
    identifier" accepted, numbered). A presentation UIKit lays with no dismiss region in idb's list (a large-detent
