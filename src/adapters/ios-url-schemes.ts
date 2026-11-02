@@ -75,3 +75,24 @@ export function urlSchemes(json: string): string[] {
   }
   return schemes;
 }
+
+/**
+ * Where iOS keeps an answer to "Open in “<App>”?" (D58; ADR 0032's D58 amendment): the domain
+ * `com.apple.launchservices.schemeapproval`, one key per opener and scheme, `<opener>--><scheme>`, whose value is the
+ * bundle id the answer opens. Batch-5 captured the lab simulator's (iOS 27.0) after Open was tapped:
+ * `com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab` (and one such key for another project's
+ * scheme); deleting that key raised the alert again on the next `simctl openurl`, with no reboot. The opener is
+ * CoreSimulatorBridge, the caller behind `simctl openurl` — Safari and other openers have keys of their own. Whether a
+ * key written before the link stops the alert is batch-8's device check.
+ */
+export const SCHEME_APPROVAL_DOMAIN = 'com.apple.launchservices.schemeapproval';
+/** The opener behind `simctl openurl`, as the key names it. */
+export const SIMCTL_OPENER = 'com.apple.CoreSimulator.CoreSimulatorBridge';
+
+/**
+ * The `defaults write` argv (run in the simulator with `simctl spawn <udid>`) that records the answer an Open tap
+ * records: `scheme` (lower-cased, as the captured key holds it) approved for `bundleId` when `simctl openurl` opens it.
+ */
+export function schemeApprovalWrite(scheme: string, bundleId: string): string[] {
+  return ['defaults', 'write', SCHEME_APPROVAL_DOMAIN, `${SIMCTL_OPENER}-->${scheme.toLowerCase()}`, '-string', bundleId];
+}
