@@ -17,10 +17,13 @@ import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 // (tests/helpers/sleep-recorder.ts): since 2026-10-05 the stability delay
 // is capture.ts's constant and no option of the Verifier's, so this file
 // cannot buy speed with a small `pollMs` any more — it pins the DELAY
-// SEQUENCE instead. The deadline tests fake the Date; the recorder moves it.
+// SEQUENCE instead. Every test fakes the Date and the recorder moves it: a
+// deadline plays out in recorded sleeps, so a miss costs no wall clock and
+// holds the same rounds on any machine (T1).
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 beforeEach(() => {
   resetSleeps();
+  vi.useFakeTimers({ toFake: ['Date'] });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -816,7 +819,8 @@ describe('ocr asserts (what the element RENDERS)', () => {
         throw new Error('recognizer exited 2');
       },
     };
-    const result = await new Verifier(cardFake(), { ...FAST, ocr: { engine: flaky } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
+    // A budget that holds more than one round: each captures its settled pair (300 ms) before the read.
+    const result = await new Verifier(cardFake(), { ...FAST, timeoutMs: 1_000, ocr: { engine: flaky } }).assert({ element: { id: 'card' }, ocr: { text: 'CONTINUE' } });
     expect(result).toMatchObject({ pass: false, detail: 'OCR failed: recognizer exited 2; failing closed, rendered text unchecked' });
     expect(reads).toBeGreaterThan(1);
   });
@@ -1265,7 +1269,6 @@ describe('screenshot baseline asserts — a frame that did not settle is never a
   };
 
   it('refuses to CREATE a baseline from a caret screen the settled pair alone would have stored (2026-10-06)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     // 100 ms into the caret's on-phase.
     vi.setSystemTime(1_000_000_100);
     // The old rule on this very screen: two captures, in phase, settled.
@@ -1291,7 +1294,6 @@ describe('screenshot baseline asserts — a frame that did not settle is never a
     still.nextScreenshot = png(50, 50);
     await new Verifier(still, { ...FAST, baselineDir: dir }).assert({ screenshot: { baseline: 'dash' } });
 
-    vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(1_000_000_100);
     resetSleeps();
     const caret = caretDevice();
@@ -1375,7 +1377,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   };
 
   it('a screen that never settles: the deadline, not a moving frame, decides — the capture stops short of it and the failure says the frame never settled', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, treeReads } = slowNeverSettling();
     const start = Date.now();
     const verifier = new Verifier(fake, { pollMs: 300, timeoutMs: 3000 });
@@ -1395,7 +1396,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('a screen that SETTLES in the second round passes — the previous round\'s cost never forbids the next one', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = cardFake(); // not slowNeverSettling(): its 1.5 s dump leaves no room for a second round
     const start = Date.now();
     let i = 0;
@@ -1428,7 +1428,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('when every round is cut before a settled frame could be captured, the failure says the element was FOUND, not "not found"', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake } = slowNeverSettling();
     // A dump longer than the whole budget: the element is found, but the
     // round that found it is already past the deadline.
@@ -1445,7 +1444,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('a round whose first screencap crosses the deadline captures nothing more and says the element was found, no time left', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake } = slowNeverSettling();
     // The dump ends 100 ms inside the deadline; the one screencap (300 ms)
     // crosses it, so the stability wait cannot take a second capture — one
@@ -1463,7 +1461,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('a settled screen whose assert keeps failing is measured and the measurement is the verdict, within the timeout', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, treeReads } = slowNeverSettling();
     // Still screen: every capture is the same wrong colour.
     fake.screenshot = async () => {
@@ -1485,7 +1482,7 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('the ocr assert treats an unsettled frame the same way: a miss, worded as rendered text unchecked', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] }); // only the mocked sleeps move the clock: the full 6-capture budget fits one round
+    // The Date faked (beforeEach); only the mocked sleeps move the clock: the full 6-capture budget fits one round
     const fake = cardFake();
     let i = 0;
     fake.screenshot = async () => {
@@ -1534,7 +1531,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   };
 
   it('live content OFF the element does not keep a color assert from settling: the card holds still, and the assert passes once a second read confirms where it is (2026-10-06)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, probe } = clockScreen(() => CARD);
     // Until 2026-10-06 this screen never settled and the assert failed "the
     // screen did not settle: 6 captures …" about pixels it never reads.
@@ -1553,7 +1549,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('an element that moved between tree reads is not measured on a region-only frame — even though both crops are still — until two reads agree (2026-10-06)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     // A slide-in: read 1 puts the card at y 100, every later read at y 150.
     // The screen is #FDFDFD wherever either rect lands, so a crop at the
     // stale rect would sample the right colour — the false pass this guards.
@@ -1568,7 +1563,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('an element that moves every round times out on the position-changed sentence, quoting the last two rects (2026-10-06)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, probe } = clockScreen((read) => ({ ...CARD, y: 100 + 10 * read }));
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
@@ -1586,7 +1580,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('a resize is a move: the same origin with a growing card is never confirmed, and the timeout quotes both sizes (review 2026-10-06)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, probe } = clockScreen((read) => ({ ...CARD, width: 700 + 10 * read }));
     const result = await new Verifier(fake, { pollMs: 300, timeoutMs: 3000 }).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
     expect(result.pass).toBe(false);
@@ -1600,7 +1593,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('a poll that ends after ONE region-only round — nothing to confirm it against — says the region held still and there was no time to confirm the position (review 2026-10-06)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, probe } = clockScreen(() => CARD);
     // Round 1 takes its two captures (one 300 ms wait) and ends exactly at
     // the 300 ms deadline, so there is no second round to confirm the rect.
@@ -1616,7 +1608,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('a round CUT after the unconfirmed one decides the wording: the poll ran out before capturing, and the cut sentence says so (review 2026-10-06)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const { fake, probe } = clockScreen(() => CARD);
     // Round 1 is unconfirmed and ends at 300 ms, inside a 500 ms deadline;
     // after the 300 ms poll pause, round 2 reads at 600 ms, finds the card,
@@ -1630,7 +1621,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('a read that does not find the element breaks the confirmation: found at A, gone, back at A is not two agreeing reads (review 2026-10-06)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     // A bottom CTA with the same id at the same rect on consecutive wizard
     // screens, with a read between them that saw neither.
     const { fake, probe } = clockScreen((read) => (read === 2 ? undefined : CARD));
@@ -1661,7 +1651,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   };
 
   it('a moving frame is never measured: no text is recognized and no colour sampled while every capture differs', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const moving = () => {
       const fake = cardFake();
       let i = 0;
@@ -1694,7 +1683,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('an unjudged frame (one capture, the deadline crossed) is never measured, even when it would pass', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = cardFake();
     // A still, correct screen: measured, it would pass. The dump ends 100 ms
     // inside the deadline and the one screencap (300 ms) crosses it.
@@ -1769,7 +1757,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   };
 
   it('with no timeout configured, a color assert passes on a still screen at device speed (2.7 s read, 0.65 s screencap)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = deviceTimed(false);
     const t0 = Date.now();
     const result = await new Verifier(fake).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
@@ -1780,7 +1767,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('with no timeout configured, a color assert passes at device speed when live content off the element needs the confirming round', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = deviceTimed(true);
     const t0 = Date.now();
     const result = await new Verifier(fake).assert({ element: { id: 'card' }, color: { expected: '#FDFDFD' } });
@@ -1792,7 +1778,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('an explicit budget smaller than one round still times out, and the sentence names what one round cost', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = deviceTimed(false);
     const result = await new Verifier(fake, { timeoutMs: 3000 }).assert({
       element: { id: 'card' },
@@ -1805,7 +1790,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('with no timeout configured, an ocr assert passes on a still screen at device speed too', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = deviceTimed(false);
     const { probe, engine } = countingEngine();
     const t0 = Date.now();
@@ -1816,7 +1800,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('the tree asserts keep the 3 s default — only the pixel asserts pay for a round of captures', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     // element exists: never found
     expect((await new Verifier(cardFake()).assert({ element: { id: 'ghost' } })).detail).toBe('not found within 3 s');
     // text content: never found
@@ -1834,7 +1817,6 @@ describe('the polling asserts and the stability budget (2026-10-05)', () => {
   });
 
   it('the timeout sentence quotes the SLOWEST round, not the last one', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = deviceTimed(true);
     // Round 1: a 3 s read, then the settled pair (0.65 + 0.3 + 0.65) — 4.6 s,
     // settled over the region only, so unconfirmed. Round 2 (after the 150 ms
@@ -2144,7 +2126,6 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
   const SLOW = { pollMs: 300, timeoutMs: 1000 };
 
   it('a keyboard over the element fails closed with both rects, every round, and nothing is captured or measured', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     // The colour the keyboard's keys would give: had it been sampled, it would have passed.
     const color = cardFake();
     color.nextScreenshot = png(1000, 320, (p) => fill(p, '#FFFFFF'));
@@ -2224,7 +2205,6 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
   });
 
   it('a keyboard that goes away between rounds costs one round, not the verdict', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = cardFake();
     fake.attachKeyboard({ state: 'shown', frame: COVERING }).windowAnswers.queue = [
       { state: 'shown', frame: COVERING },
@@ -2251,7 +2231,6 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
    * "dismiss the keyboard" would be false; the cut sentence is the truth.
    */
   it('a covered miss that a later query contradicted is not the timeout wording — the cut round after it is', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = cardFake();
     fake.attachKeyboard({ state: 'shown', frame: COVERING }).windowAnswers.queue = [
       { state: 'shown', frame: COVERING },
@@ -2281,7 +2260,6 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
   });
 
   it('a keyboard that comes back after a clear round is the timeout wording again', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = cardFake();
     const SHOWN = { state: 'shown' as const, frame: COVERING };
     // Covered at 0 ms; clear at 300 ms, measured and wrong (#3F3F50 is not #FFFFFF); covered again from 900 ms on.
@@ -2294,7 +2272,6 @@ describe('pixel asserts under the Android soft keyboard (2026-10-06)', () => {
   });
 
   it('a real finding made AFTER a contradicted cover is the timeout wording — only the stale cover itself is dropped', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = cardFake();
     const SHOWN = { state: 'shown' as const, frame: COVERING };
     // Covered at 0 ms; clear from 300 ms on, measured and wrong (#3F3F50 is
@@ -2347,7 +2324,6 @@ describe('pixel asserts under the iOS in-tree keyboard (2026-10-07)', () => {
   const SLOW = { pollMs: 300, timeoutMs: 1000 };
 
   it('a band over the element fails closed every round, naming both rects and the in-tree remedy, and captures nothing', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     const fake = iosFake(COVERING);
     let reads = 0;
     const real = fake.uiTree.bind(fake);

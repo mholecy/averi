@@ -13,11 +13,14 @@ import { vi } from 'vitest';
  * deterministically. One copy (2026-10-05) for the verify, run, mcp and
  * ui-tree/interact tests that touch the deadline loop; before, the capture,
  * assert and run/verify tests each carried their own and had drifted on the
- * clock rule. fill.test.ts and the two keyboard-*.test.ts keep a no-yield recorder of
- * their own on purpose (their fakes never react on a timer), but share this
- * clock rule (since 2026-10-31): they fake Date for every test and their
- * recorders advance it, so a fake read takes exactly 0 ms and pollTree's
- * pause after it (ui-tree/read-tree.ts#pauseAfterRead, ADR 0029) is exact.
+ * clock rule. Since T1 (2026-11-02) the flow engine and ladder tests, the
+ * Android adapter's and the eyes' polls take it too, the Date faked where a
+ * budget runs out. fill.test.ts and the two keyboard-*.test.ts keep a
+ * no-yield recorder of their own on purpose (their fakes never react on a
+ * timer), but share this clock rule (since 2026-10-31): they fake Date for
+ * every test and their recorders advance it, so a fake read takes exactly
+ * 0 ms and pollTree's pause after it (ui-tree/read-tree.ts#pauseAfterRead,
+ * ADR 0029) is exact.
  */
 export const sleeps: number[] = [];
 

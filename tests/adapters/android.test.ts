@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { PNG as Pngjs } from 'pngjs';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
 import { AndroidAdapter, parseImeInsets, parseInputShown, parseNavigationBand, parseStatusBand, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
@@ -14,6 +14,14 @@ import { resolveSettled } from '../../src/interact/resolve.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { decodePng } from '../../src/verify/png.js';
 import { coverNodes } from '../helpers/covers.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts): the adapter's
+// pacing, its settles and the null-root retry are pinned as the delay sequence, and cost no wall clock (T1).
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
+beforeEach(() => {
+  resetSleeps();
+});
 
 /** Fake exec that records calls and replays canned responses by command prefix. */
 function fakeExec(responses: Record<string, string | Buffer>) {
@@ -574,7 +582,8 @@ describe('AndroidAdapter interactions', () => {
       expect(tree.children).toHaveLength(3);
       expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(2);
       expect(calls.some((c) => c.endsWith('get-state'))).toBe(false);
-    }, 10_000);
+      expect(sleeps).toEqual([1_000]); // the one retry, after 1 s
+    });
 
     it('null root node twice on a reachable device with settle: classified as settling', async () => {
       const { fn, calls } = scripted(['ERROR: null root node returned by UiTestAutomationBridge.'], 'device');
@@ -582,7 +591,8 @@ describe('AndroidAdapter interactions', () => {
         /device emulator-5554 is still settling.*retried once after 1 s\)/s,
       );
       expect(calls.filter((c) => c.includes('uiautomator dump'))).toHaveLength(2);
-    }, 10_000);
+      expect(sleeps).toEqual([1_000]);
+    });
 
     it('null root node WITHOUT settle (a poller): one dump, no hidden retry, still classified', async () => {
       const { fn, calls } = scripted(['ERROR: null root node returned by UiTestAutomationBridge.'], 'device');
@@ -1048,52 +1058,26 @@ describe('typeText pacing (measured anti-flake behaviour)', () => {
    * and a flaky login.
    */
   it('waits 100ms after each of 20 characters and 150ms after the commit nudge', async () => {
-    vi.useFakeTimers();
-    try {
-      const { fn, calls } = fakeExec({});
-      const waits: number[] = [];
-      const spy = vi.spyOn(global, 'setTimeout').mockImplementation(((cb: () => void, ms?: number) => {
-        waits.push(ms ?? 0);
-        cb();
-        return 0 as unknown as NodeJS.Timeout;
-      }) as typeof setTimeout);
+    const { fn, calls } = fakeExec({});
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('Jan Novak Bratislava');
 
-      await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('Jan Novak Bratislava');
-      spy.mockRestore();
-
-      // Twenty characters paced at 100ms, then the DPAD nudge settle at 150ms.
-      expect(waits).toEqual([...Array<number>(20).fill(100), 150]);
-      // The nudge itself must still bracket that final wait.
-      expect(calls.slice(-2)).toEqual([
-        'adb -s emulator-5554 shell input keyevent 21',
-        'adb -s emulator-5554 shell input keyevent 22',
-      ]);
-    } finally {
-      vi.useRealTimers();
-    }
+    // Twenty characters paced at 100ms, then the DPAD nudge settle at 150ms.
+    expect(sleeps).toEqual([...Array<number>(20).fill(100), 150]);
+    // The nudge itself must still bracket that final wait.
+    expect(calls.slice(-2)).toEqual([
+      'adb -s emulator-5554 shell input keyevent 21',
+      'adb -s emulator-5554 shell input keyevent 22',
+    ]);
   });
 
   // The "" pin above sees adb calls only; this one sees the 150ms settle, so
   // an early return that drops the key events but keeps the sleep still fails.
   it('waits for nothing on an empty string: no pacing, no settle after a nudge that is not sent', async () => {
-    vi.useFakeTimers();
-    try {
-      const { fn, calls } = fakeExec({});
-      const waits: number[] = [];
-      const spy = vi.spyOn(global, 'setTimeout').mockImplementation(((cb: () => void, ms?: number) => {
-        waits.push(ms ?? 0);
-        cb();
-        return 0 as unknown as NodeJS.Timeout;
-      }) as typeof setTimeout);
+    const { fn, calls } = fakeExec({});
+    await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('');
 
-      await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).typeText('');
-      spy.mockRestore();
-
-      expect(waits).toEqual([]);
-      expect(calls).toEqual([]);
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(sleeps).toEqual([]);
+    expect(calls).toEqual([]);
   });
 });
 

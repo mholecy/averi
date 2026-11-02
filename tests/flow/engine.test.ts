@@ -1,14 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-
-// The one sleep owner (util/sleep.ts) is a zero-delay macrotask yield here,
-// not a wait: every poll cadence and the fill's 350 ms focus delay collapse to
-// one event-loop turn, so EngineOptions needs no test-only timing knob for
-// the fill (review 2026-10-03). A macrotask rather than a no-op on purpose —
-// some fakes below make an element appear on a real setTimeout, and a poll
-// that never leaves the microtask queue would starve them. Deadlines are
-// Date.now-based and still fire; measured: the suite is ~1 s faster, not
-// slower, with every test green either way.
-vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
 import { FlowEngine, FlowError, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
@@ -20,6 +10,21 @@ import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree
 import { parseDump } from '../helpers/android-dumps.js';
 import { ACTIVE_WINDOW_HINT, missNote } from '../../src/ui-tree/miss.js';
 import { boundReads } from '../helpers/terminal-read.js';
+
+// The one sleep owner (util/sleep.ts) is recorded, not waited on
+// (tests/helpers/sleep-recorder.ts): every poll cadence and the fill's 350 ms
+// focus delay collapse to one macrotask yield, so EngineOptions needs no
+// test-only timing knob (review 2026-10-03). Every test fakes the Date, and the
+// recorder moves it by each sleep: a deadline plays out in virtual time, the
+// same rounds on any machine, and a timeout costs no wall clock (T1). A fake
+// that must outlast a budget moves the clock itself (vi.setSystemTime).
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const CONFIG = parseConfig(`
 app:
@@ -315,7 +320,7 @@ flows:
     });
     const slowRead = fake.uiTree.bind(fake);
     fake.uiTree = async () => {
-      await new Promise((r) => setTimeout(r, FAST.optionalTimeoutMs + 20));
+      vi.setSystemTime(Date.now() + FAST.optionalTimeoutMs + 20); // a read that outlasts the optional budget
       return slowRead();
     };
     const cfg = parseConfig(`
@@ -337,7 +342,7 @@ flows:
     const slowRead = fake.uiTree.bind(fake);
     fake.uiTree = async () => {
       reads++;
-      await new Promise((r) => setTimeout(r, FAST.optionalTimeoutMs + 20));
+      vi.setSystemTime(Date.now() + FAST.optionalTimeoutMs + 20); // a read that outlasts the optional budget
       return slowRead();
     };
     const cfg = parseConfig(`

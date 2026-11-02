@@ -2,10 +2,12 @@ import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
+import { type Case, judged, rejudge as rejudgeRecord, ROOT, type RunRecord } from '../../scripts/truth/live-cases.js';
+import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
+import type { LabState } from '../../scripts/truth/schema.js';
 import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } from '../helpers/live-records.js';
 
 /**
@@ -25,19 +27,75 @@ import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } fr
  * five keyboard scroll probes — no live.ts case asks them) and A9's raw typing diagnosis (a9-fill-tail-diag/).
  */
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const run = promisify(execFile);
+const pathOf = (record: string) => (record.startsWith('/') ? record : `docs/truth/live-records/${record}`);
 
-async function rejudge(record: string, groups: string): Promise<{ code: number; out: string }> {
+/**
+ * `live.ts --rejudge <record> --groups <groups>`, in process (scripts/truth/live-cases.ts#rejudge — the CLI's own
+ * path, a thin wrapper over it): the exit code and what it prints. A node+tsx process a record cost the suite ~45 s of
+ * one worker (T1); the CLI itself is pinned once below, against this.
+ */
+async function rejudgeInProcess(record: string, groups: string): Promise<{ code: number; out: string }> {
+  const file = pathOf(record);
+  const recorded = JSON.parse(readFileSync(resolve(ROOT, file), 'utf8')) as RunRecord;
+  const { lines, exitCode } = await rejudgeRecord(recorded, file, { groups: groups.split(',') });
+  return { code: exitCode, out: `${lines.join('\n')}\n` };
+}
+
+/** The CLI itself, spawned: `node --import tsx scripts/truth/live.ts --rejudge <record> --groups <groups>`. */
+async function rejudgeCli(record: string, groups: string): Promise<{ code: number; out: string }> {
   try {
-    const file = record.startsWith('/') ? record : `docs/truth/live-records/${record}`;
-    const { stdout } = await run(process.execPath, ['--import', 'tsx', 'scripts/truth/live.ts', '--rejudge', file, '--groups', groups], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 });
+    const { stdout } = await run(process.execPath, ['--import', 'tsx', 'scripts/truth/live.ts', '--rejudge', pathOf(record), '--groups', groups], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 });
     return { code: 0, out: stdout };
   } catch (e) {
     const err = e as { code?: number; stdout?: string; stderr?: string };
     return { code: err.code ?? -1, out: `${err.stdout ?? ''}${err.stderr ?? ''}` };
   }
 }
+
+describe('live.ts --rejudge, the CLI: argv in, the summary on stdout, the exit code', () => {
+  it.each([
+    ['ios-wda-long-list-parked-2.json', 'visibility', 0],
+    ['ios-forms-r8-l2-before.json', 'forms', 1],
+  ] as const)('%s (--groups %s): exit %i, printing exactly what rejudge() returns', { timeout: 60_000 }, async (record, groups, code) => {
+    const cli = await rejudgeCli(record, groups);
+    expect(cli).toEqual(await rejudgeInProcess(record, groups));
+    expect(cli.code).toBe(code);
+    expect(cli.out.split('\n')[0]).toMatch(/^<!-- averi: .+ \(rejudged from docs\/truth\/live-records\/.+\.json\) -->$/);
+    expect(cli.out).toContain(`(rejudged from docs/truth/live-records/${record})`);
+  });
+});
+
+// live-cases.ts#judged: a forms case not ok is read again 3 s later (`late`) — a model that catches up was the app's lag.
+describe('judged — the first read, and the late one 3 s after it', () => {
+  const read = (focus: string): LabState => ({ cell: 'form-basic', ready: true, screen: { x: 0, y: 0, width: 402, height: 874 }, scale: 3, frames: {}, events: [], focus });
+  /** A case whose verdict is read off the focus each read holds — each its own outcome, rule and kind of reply. */
+  const VERDICTS: Record<string, LiveVerdict> = {
+    name: { outcome: 'ok', why: 'the focus on name' },
+    phone: { outcome: 'LOUD', why: 'the focus on phone', cls: 'loud-untouched', kind: 'refused' },
+    note: { outcome: 'LOUD', why: 'the focus on note', cls: 'loud-changed', kind: 'other' },
+    email: { outcome: 'MISMATCH', why: 'the focus on email', cls: 'tap-claim', kind: 'Tapped' },
+  };
+  const c: Case = { id: 'x1', group: 'forms', cell: 'form-basic', says: 'a synthesized case', calls: [], judge: (s) => VERDICTS[s.focus!] };
+  const judge = (state: string, late?: string) => judged(c, 'idb', [], read('name'), [], read(state), late === undefined ? undefined : read(late));
+
+  it('no late read: the first verdict', () => {
+    expect(judge('phone')).toEqual(VERDICTS.phone);
+  });
+
+  it('an ok first read is never read again, whatever the late one says', () => {
+    expect(judge('name', 'email')).toEqual(VERDICTS.name);
+  });
+
+  it('a late read with the same outcome: the first verdict kept whole — its why, rule and kind, not the late one\'s', () => {
+    expect(judge('phone', 'note')).toEqual(VERDICTS.phone);
+  });
+
+  it('a late read with another outcome: the late verdict, its why saying so and quoting the first', () => {
+    expect(judge('email', 'name')).toEqual({ outcome: 'ok', why: 'the focus on name (only 3 s later; first read: the focus on email)' });
+    expect(judge('email', 'phone')).toEqual({ ...VERDICTS.phone, why: 'the focus on phone (only 3 s later; first read: the focus on email)' });
+  });
+});
 
 /**
  * A pre-D43a Android b1d or b7 line: the LOUD `input text` left (a prefix typed, then exit 255), NOT known against the
@@ -300,7 +358,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-rn-forms-d40-1.json', 'forms', { cases: 10, ok: 8, loud: 2, mismatches: 0 }],
     ['android-forms-d40-1.json', 'forms', { cases: 42, ok: 37, loud: 2, mismatches: 0, skipped: 3, preD43a: true }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
-    const { code, out } = await rejudge(record, groups);
+    const { code, out } = await rejudgeInProcess(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
     expect(header, out.slice(0, 2000)).not.toBeNull();
     const [, cases, ok, loud, mismatches, notKnown, skipped] = header!.map(Number);
@@ -358,7 +416,7 @@ describe('live.ts --rejudge over the committed iOS records of the src before the
     ['ios-vis-r9-final-sanity.json', 'visibility', { cases: 78, ok: 66, loud: 2, mismatches: 10 }],
     ['ios-vis-r14-lv3.json', 'visibility', { cases: 149, ok: 113, loud: 5, mismatches: 31 }],
   ] as const)('%s (--groups %s): sheet-background\'s A and B LOUD, marked not known; everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want) => {
-    const { code, out } = await rejudge(record, groups);
+    const { code, out } = await rejudgeInProcess(record, groups);
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(0 not known\\), 0 skipped$`, 'm'));
     const marked = [...out.matchAll(/^- (?:MISMATCH|LOUD) (?:\([A-Za-z-]+\) )?(\S+) .*\[NOT known: presented-changed on refused, where KNOWN pins presented-stroke on not found .*$/gm)].map((m) => m[1]);
     expect(marked.sort()).toEqual([...R6_IDB].sort());
@@ -398,7 +456,7 @@ describe('live.ts --rejudge over the committed iOS records of the src before the
       // android-vis-r9-final.json, is pinned below VA1's fix.)
       ['ios-vis-r9-final-2.json', 'visibility', { cases: 40, ok: 15, loud: 0, mismatches: 25 }],
   ] as const)('%s (--groups %s): blur-menu-grouped\'s WDA cases not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want) => {
-    const { code, out } = await rejudge(record, groups);
+    const { code, out } = await rejudgeInProcess(record, groups);
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${BLUR_WDA.length} not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual([...BLUR_WDA].sort());
@@ -417,7 +475,7 @@ describe('live.ts --rejudge over the committed iOS records of LE2\'s chooser bef
     ['ios-vis-r16-le2-2.json', { cases: 12, ok: 7, loud: 1, mismatches: 4 }],
     ['ios-vis-r16-le2-3.json', { cases: 12, ok: 8, loud: 1, mismatches: 3 }],
   ] as const)('%s: chooser-over-list R\'s WDA strokes not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, want) => {
-    const { code, out } = await rejudge(record, 'visibility,dismissal');
+    const { code, out } = await rejudgeInProcess(record, 'visibility,dismissal');
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(1 not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown).toEqual(['scroll:chooser-over-list.R']);
@@ -431,7 +489,7 @@ describe('live.ts --rejudge over the committed iOS record of the src before L2\'
   // under idb the tap on phone answered Tapped and SUBMITTED the form, scroll_until called it fully visible after 0
   // swipes, its centre under the bar — no live-known.ts entry explains either: exit 1, as recorded.
   it('ios-forms-r8-l2-before.json: k6 and k7 not known, the form submitted', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('ios-forms-r8-l2-before.json', 'forms');
+    const { code, out } = await rejudgeInProcess('ios-forms-r8-l2-before.json', 'forms');
     expect(out).toMatch(/^# Live golden: 2 cases, 0 ok, 0 loud, 2 mismatches \(2 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown).toEqual(['k6', 'k7']);
@@ -451,7 +509,7 @@ describe('live.ts --rejudge over the committed iOS records of L4\'s fix before i
     ['ios-vis-r8-l4-1.json'],
     ['ios-vis-r8-l4-2.json'],
   ] as const)('%s: C\'s three strokes not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record) => {
-    const { code, out } = await rejudge(record, 'visibility');
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
     expect(out).toMatch(/^# Live golden: 40 cases, 10 ok, 2 loud, 28 mismatches \(10 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual(['scroll:blur-menu.C', 'scroll:blur-menu.C', 'scroll:blur-menu-grouped.C', ...BLUR_WDA].sort());
@@ -461,7 +519,7 @@ describe('live.ts --rejudge over the committed iOS records of L4\'s fix before i
   // freshly booted simulator — averi's wait for A timed out with no tree, nothing tapped: ok, vacuously, so its entry
   // reads FIXED here; it read Tapped (the menu dismissed) in -4.json, so the entry stays: exit 1, as recorded.
   it('ios-vis-r8-l4-3.json: idb\'s tap of A ok by a timeout, so FIXED; nothing else not ok unknown', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('ios-vis-r8-l4-3.json', 'visibility');
+    const { code, out } = await rejudgeInProcess('ios-vis-r8-l4-3.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 40 cases, 14 ok, 2 loud, 24 mismatches \(7 not known\), 0 skipped$/m);
     expect(out).toMatch(/^- ok tap:blur-menu\.A blur-menu: .*ERROR Timed out after 5000ms waiting for element id:"lab\.blur-menu\.A" to appear/m);
     expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb tap:blur-menu.A\n');
@@ -475,7 +533,7 @@ describe('live.ts --rejudge over the first committed iOS record of L4\'s remaini
   // first case on a freshly booted simulator — the wait for A timed out with no tree, nothing tapped: ok, vacuously, so
   // its entry reads FIXED here; it read Tapped (the menu dismissed) in -2.json, so the entry stays: exit 1, as recorded.
   it('ios-vis-r9-l4w-1.json: idb\'s tap of A ok by a timeout, so FIXED; W tapped under both sources', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('ios-vis-r9-l4w-1.json', 'visibility');
+    const { code, out } = await rejudgeInProcess('ios-vis-r9-l4w-1.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 40 cases, 16 ok, 0 loud, 24 mismatches \(7 not known\), 0 skipped$/m);
     expect(out).toMatch(/^- ok tap:blur-menu\.A blur-menu: .*ERROR Timed out after 5000ms waiting for element id:"lab\.blur-menu\.A" to appear/m);
     expect(out.match(/^- ok tap:blur-menu\.W blur-menu: tap W \(open\): fires it alone — Tapped id:"lab\.blur-menu\.W"$/gm)).toHaveLength(2);
@@ -490,7 +548,7 @@ describe('live.ts --rejudge over the first committed iOS record of round 9\'s fi
   // first case on a freshly booted simulator — the wait for A timed out with no tree, nothing tapped: ok, vacuously, so
   // its entry reads FIXED here; it read Tapped (the menu dismissed) in -2.json, so the entry stays: exit 1, as recorded.
   it('ios-vis-r9-final-1.json: idb\'s tap of A ok by a timeout, so FIXED; W tapped under both sources', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('ios-vis-r9-final-1.json', 'visibility');
+    const { code, out } = await rejudgeInProcess('ios-vis-r9-final-1.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 40 cases, 16 ok, 0 loud, 24 mismatches \(7 not known\), 0 skipped$/m);
     expect(out).toMatch(/^- ok tap:blur-menu\.A blur-menu: .*ERROR Timed out after 5000ms waiting for element id:"lab\.blur-menu\.A" to appear/m);
     expect(out.match(/^- ok tap:blur-menu\.W blur-menu: tap W \(open\): fires it alone — Tapped id:"lab\.blur-menu\.W"$/gm)).toHaveLength(2);
@@ -506,7 +564,7 @@ describe('live.ts --rejudge over the committed Android record of B4-L1\'s first 
   // entry does not explain it (R-direction): exit 1, as recorded. Why e6ed7d43 dropped the clause (ADR 0013, refined
   // 2026-10-20).
   it('android-vis-r9-b4l1-sticky.json: scroll-sticky-cut R fully not known, ended under the header', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('android-vis-r9-b4l1-sticky.json', 'visibility');
+    const { code, out } = await rejudgeInProcess('android-vis-r9-b4l1-sticky.json', 'visibility');
     // (1 not known until LV1's fix, round 14: tabbar-floating F's unchanged claim since.)
     expect(out).toMatch(/^# Live golden: 18 cases, 16 ok, 0 loud, 2 mismatches \(2 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
@@ -522,7 +580,7 @@ describe('live.ts --rejudge over the committed iOS record of the src before the 
   // above). A2's run 1 (src a1b0b82, before A1's src reached it) rested L 14 pt past its window: it reads
   // as recorded, not known — a calibration of that src now: exit 1, as recorded.
   it('ios-wda-long-list-parked-1.json: the carry case not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('ios-wda-long-list-parked-1.json', 'visibility');
+    const { code, out } = await rejudgeInProcess('ios-wda-long-list-parked-1.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 6 cases, 5 ok, 0 loud, 1 mismatches \(1 not known\), 0 skipped$/m);
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown).toEqual(['carry:sheet-long-list.L']);
@@ -550,7 +608,7 @@ describe('live.ts --rejudge over the committed iOS records of the src before the
     ['ios-scroll-bounded-wda-2725e76-1.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
     ['ios-scroll-bounded-wda-2725e76-2.json', 'visibility', { cases: 12, ok: 11, loud: 0, mismatches: 1 }],
   ] as const)('%s (--groups %s): the turn of F not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want) => {
-    const { code, out } = await rejudge(record, groups);
+    const { code, out } = await rejudgeInProcess(record, groups);
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(1 not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown).toEqual(['turn:scroll-bounded.F']);
@@ -618,7 +676,7 @@ describe('live.ts --rejudge over the committed iOS records of the src before L4\
     // round 8's own --side run of fix/round-8 e0c2587e, the src before the fix: C's tap fired W under both sources
     ['ios-vis-r8-l4-before.json', { cases: 40, ok: 7, loud: 2, mismatches: 31 }, [...L4_IDB, ...L4_WDA, ...BLUR_WDA]],
   ] as const)('%s: C\'s cases beneath the blur menus not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, want, unknownIds) => {
-    const { code, out } = await rejudge(record, 'visibility');
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${unknownIds.length} not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual([...unknownIds].sort());
@@ -650,7 +708,7 @@ describe('live.ts --rejudge over the committed iOS records of the src before idb
     // of the blur menus then, so of L4's only C's taps (idb's two, WDA's one: hence tap:blur-menu.C twice)
     ['ios-vis-2725e76.json', 'visibility,dismissal', { cases: 248, ok: 214, loud: 5, mismatches: 29 }, ['scroll:sheet-medium-edges.H', 'scroll:sheet-medium-edges.G', 'turn:scroll-bounded.F', 'tap:blur-menu.C', 'tap:blur-menu-grouped.C', 'tap:blur-menu.C', 'tap:blur-menu-grouped.A', 'tap:blur-menu-grouped.B', 'tap:blur-menu-grouped.D', ...LE2_IDB, ...LE3_IDB, ...LE3_WDA, ...LV3_IDB]],
   ] as const)('%s (--groups %s): idb\'s presented-layer cases (and L4\'s C) not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want, unknownIds) => {
-    const { code, out } = await rejudge(record, groups);
+    const { code, out } = await rejudgeInProcess(record, groups);
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${unknownIds.length} not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual([...unknownIds].sort());
@@ -685,7 +743,7 @@ describe('live.ts --rejudge over the committed Android record of the active-wind
   // change the screen" while their strokes moved `upper` — LV1's, known until round 14 struck them off: not known now,
   // a calibration of that src: exit 1, as recorded. Every other case as HEAD knows it.
   it('android-vis-hint-ea070d2.json: LV1\'s two scroll-bounded cases not known', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('android-vis-hint-ea070d2.json', 'forms,visibility');
+    const { code, out } = await rejudgeInProcess('android-vis-hint-ea070d2.json', 'forms,visibility');
     expect(out).toMatch(/^# Live golden: 24 cases, 21 ok, 1 loud, 2 mismatches \(2 not known\), 0 skipped$/m);
     expect(notKnown(out).sort()).toEqual(['scroll:scroll-bounded.F', 'scroll:scroll-bounded.O']);
     expect(code).toBe(1);
@@ -706,7 +764,7 @@ describe('live.ts --rejudge over the committed Android visibility records of the
     // (and residual 19's four beneath the full-screen dialog, since the window manager's word types it)
     ['android-vis-r7final.json', { cases: 137, ok: 120, loud: 3, mismatches: 14, dialog: FULL_SCREEN_DIALOG_CASES }],
   ] as const)('%s: LE1\'s six cases not known, and VA1\'s and LV1\'s', { timeout: 60_000 }, async (record, want) => {
-    const { code, out } = await rejudge(record, 'visibility');
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
     // (6 not known until VA1's fix, round 14: its case since; 7 until LV1's, its three since.)
     const unknown = [...LE1_CASES, VA1_CASE, ...LV1_CASES, ...want.dialog];
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${unknown.length} not known\\), 0 skipped$`, 'm'));
@@ -724,7 +782,7 @@ describe('live.ts --rejudge over the committed Android records of round 9\'s src
   // until round 14 struck it off — not known now, a calibration of that src: exit 1, as recorded.
   // Since LV1's fix (round 14), tabbar-floating F's unchanged claim not known too.
   it.each([['android-vis-r9-b4l1.json'], ['android-vis-r9-final.json']] as const)('%s: VA1\'s case not known, and LV1\'s', { timeout: 60_000 }, async (record) => {
-    const { code, out } = await rejudge(record, 'visibility');
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
     expect(out).toMatch(/^# Live golden: 18 cases, 16 ok, 0 loud, 2 mismatches \(2 not known\), 0 skipped$/m);
     expect(notKnown(out).sort()).toEqual([VA1_CASE, 'scroll:tabbar-floating.F'].sort());
     expect(code).toBe(1);
@@ -746,7 +804,7 @@ describe('live.ts --rejudge over the committed Android records of the src before
     // A6's own run of k7 at its base, arch/round-23 bd43fc66, before the eyes
     ['android-k7-eyes-before-bd43fc66.json', 'forms', { cases: 1, ok: 0, loud: 0, mismatches: 1, unknown: ['k7'] }],
   ] as const)('%s (--groups %s): k7 not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, groups, want) => {
-    const { code, out } = await rejudge(record, groups);
+    const { code, out } = await rejudgeInProcess(record, groups);
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.unknown.length} not known\\), 0 skipped$`, 'm'));
     expect(notKnown(out).sort()).toEqual([...want.unknown].sort());
     expect(out).toMatch(/^- MISMATCH k7 .*fully visible after 1 swipe — 18 px of phone under the bar, unsaid/m);
@@ -759,7 +817,7 @@ describe('live.ts --rejudge over the first committed records of FU1\'s fix, befo
   // colour assert on ks that quotes the panel over it. With no such reply a floating panel is not evidenced (an IME
   // collapsed to its strip reads the same to the app), so kf1 and kf2 are SKIP; kf3's refusal names the panel: ok.
   it.each(['android-forms-r1023b-fu1-1.json', 'android-forms-r1023b-fu1-2.json', 'android-forms-r1023b-fu1-3.json'])('%s: kf1 and kf2 SKIP, no panel quoted; kf3 ok', { timeout: 60_000 }, async (record) => {
-    const { code, out } = await rejudge(record, 'forms');
+    const { code, out } = await rejudgeInProcess(record, 'forms');
     expect(out).toMatch(/^# Live golden: 3 cases, 1 ok, 0 loud, 0 mismatches \(0 not known\), 2 skipped$/m);
     expect(out).toMatch(/^- SKIP kf1 .*no measured panel quoted over ks/m);
     expect(out).toMatch(/^- SKIP kf2 .*no measured panel quoted over ks/m);
@@ -775,7 +833,7 @@ describe('live.ts --rejudge over a committed calibration record of the src befor
   // and struck them off; they never were LV2's at that src (no probe was sent), so all three read not known now — a
   // calibration, not HEAD's KNOWN: exit 1, as recorded.
   it('cal12-d043e65-1.json: S, P.fully and S.fully not known', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('cal12-d043e65-1.json', 'visibility');
+    const { code, out } = await rejudgeInProcess('cal12-d043e65-1.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 7 cases, 4 ok, 0 loud, 3 mismatches \(3 not known\), 0 skipped$/m);
     expect(notKnown(out).sort()).toEqual(['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S', 'scroll:scroll-bounded-flush.S.fully']);
     expect(out).toMatch(/^- MISMATCH \(stop-claim\) scroll:scroll-bounded-flush\.S\.fully .*fully visible after 0 swipes/m);
@@ -790,7 +848,7 @@ describe('live.ts --rejudge over the committed record of a --side run of b71cbbb
   // dismissed the layer, or three strokes that expanded the sheet) and F2A1's k7 (no KNOWN entry) — a
   // calibration, not HEAD's KNOWN: exit 1, as recorded.
   it('android-vis-b71cbbb.json: the scroll cases beneath the dialog and the half sheet, and k7, not known, everything else as HEAD knows it', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('android-vis-b71cbbb.json', 'forms,visibility');
+    const { code, out } = await rejudgeInProcess('android-vis-b71cbbb.json', 'forms,visibility');
     // (108 ok, 20 mismatches until 2026-10-18: the turn of scroll-collapsing's A ok by the Android turn judge since.)
     // (9 not known until round 14: LE1's six cases since, and VA1's and LV1's three.)
     expect(out).toMatch(/^# Live golden: 133 cases, 109 ok, 5 loud, 19 mismatches \(19 not known\), 0 skipped$/m);
@@ -812,7 +870,7 @@ describe('live.ts --rejudge over the committed iOS record of a --side run of b71
   // (LE3_IDB, LE3_WDA); since LV3's (round 14), idb's tabbar-floating R (LV3_IDB).
   // The visibility cases A1 and A5 fixed since.
   it('ios-vis-b71cbbb.json: forms b4 and p2 not known, and the visibility cases the one-stroke stop and idb\'s presented layer fixed since', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('ios-vis-b71cbbb.json', 'forms,visibility,dismissal');
+    const { code, out } = await rejudgeInProcess('ios-vis-b71cbbb.json', 'forms,visibility,dismissal');
     // (351 cases, 14 loud, 67 mismatches until round 7: its carry case, Row 30 of the 40-row table, no case since; idb's
     // scroll case of F LOUD, F recorded unlisted under idb. 270 ok, 15 loud until NI1's fix: idb's two R taps, refused
     // with nothing fired, are ok since — a target its source does not list is not asked to fire.)
@@ -839,7 +897,7 @@ describe('live.ts --rejudge over the committed records of the src before the par
     // LV6's as above, every other case ok — the turn of F in one stroke, carousel C settled
     ['ios-wda-scroll-cells-659fdf00.json', { cases: 32, ok: 30, loud: 0, mismatches: 2, notKnown: 2 }, ['carry:sheet-long-list.L', 'scroll:sheet-long-list.L']],
   ] as const)('%s: L\'s WDA cases not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, want, unknownIds) => {
-    const { code, out } = await rejudge(record, 'visibility');
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.notKnown} not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown.sort()).toEqual([...unknownIds].sort());
@@ -859,7 +917,7 @@ describe('live.ts --rejudge over the committed records of the src before the Vie
     ['android-vis-dialogs-scroll-run2.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 8 }],
     ['android-vis-dialogs-scroll-run3.json', { cases: 8, ok: 0, loud: 0, mismatches: 8, notKnown: 8 }],
   ] as const)('%s: the bottom sheet dialog\'s four scroll cases not known, and the full-screen dialog\'s', { timeout: 60_000 }, async (record, want) => {
-    const { code, out } = await rejudge(record, 'visibility');
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(${want.notKnown} not known\\), 0 skipped$`, 'm'));
     expect(notKnown(out).sort()).toEqual([...['A', 'B', 'C', 'D'].map((t) => `scroll:bottom-sheet-dialog.${t}`), ...FULL_SCREEN_DIALOG_CASES].sort());
     expect(code).toBe(1);
@@ -874,7 +932,7 @@ describe('live.ts --rejudge over the committed records of the src before the ful
     ['android-vis-r14-lv1.json', { cases: 140, ok: 131, loud: 5, mismatches: 4 }],
     ['android-vis-r1023-lv2-group.json', { cases: 140, ok: 130, loud: 6, mismatches: 4 }],
   ] as const)('%s: the full-screen dialog\'s four scroll cases not known, everything else as HEAD knows it', { timeout: 60_000 }, async (record, want) => {
-    const { code, out } = await rejudge(record, 'visibility');
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(4 not known\\), 0 skipped$`, 'm'));
     expect(notKnown(out).sort()).toEqual([...FULL_SCREEN_DIALOG_CASES].sort());
     expect(code).toBe(1);
@@ -891,13 +949,13 @@ describe('live.ts: a known case not intermittent that comes out ok fails the run
     try {
       const file = join(dir, 'fixed.json');
       await writeFile(file, JSON.stringify({ ...ios, results: [{ ...wda, source: 'idb' }] }));
-      const { code, out } = await rejudge(file, 'visibility');
+      const { code, out } = await rejudgeInProcess(file, 'visibility');
       expect(out).toMatch(/^# Live golden: 1 cases, 1 ok, 0 loud, 0 mismatches \(0 not known\)/m);
       expect(out).toContain('FIXED, not intermittent — strike off live-known.ts: idb scroll:scroll-bounded.F');
       expect(code).toBe(1);
       // the same read as a --side run's record: a calibration, not held to HEAD's KNOWN
       await writeFile(file, JSON.stringify({ ...ios, side: '/some/differential-cal-checkout', results: [{ ...wda, source: 'idb' }] }));
-      expect((await rejudge(file, 'visibility')).code).toBe(0);
+      expect((await rejudgeInProcess(file, 'visibility')).code).toBe(0);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -909,7 +967,7 @@ describe('live.ts --rejudge over the committed record of absent:scroll-top-edge-
   // main 265a2bb4 through --side: under idb "failed after 3 swipes" (the first stroke's read a point off, read as motion),
   // under WDA "failed after 6 swipes (maxSwipes)" — both end-unread, not known: a calibration of that src, exit 1.
   it('ios-vis-r9-absent-before.json: both sources end-unread, not known', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudge('ios-vis-r9-absent-before.json', 'visibility');
+    const { code, out } = await rejudgeInProcess('ios-vis-r9-absent-before.json', 'visibility');
     expect(out).toMatch(/^# Live golden: 2 cases, 0 ok, 0 loud, 2 mismatches \(2 not known\), 0 skipped$/m);
     expect(notKnown(out)).toEqual(['absent:scroll-top-edge-end', 'absent:scroll-top-edge-end']);
     expect(code).toBe(1);
@@ -926,7 +984,7 @@ describe('live.ts --rejudge over D40\'s forms records: every LOUD known by its r
     ['ios-forms-d40-1.json', ['b1d', 'b7', 'p5', 'b1d', 'b7', 'p5']],
     ['ios-rn-forms-d40-1.json', ['rf4', 'rf4']],
   ] as const)('%s: each LOUD [known:', { timeout: 60_000 }, async (record, louds) => {
-    const { code, out } = await rejudge(record, 'forms');
+    const { code, out } = await rejudgeInProcess(record, 'forms');
     const marked = [...out.matchAll(/^- LOUD \((loud-untouched|loud-changed)\) (\S+) .*\[known: (?:bug|residual):[^\]]+\]$/gm)].map((m) => m[2]);
     expect(marked.sort()).toEqual([...louds].sort());
     expect(out.match(/^- LOUD /gm)).toHaveLength(louds.length);
@@ -939,7 +997,7 @@ describe('live.ts --rejudge over D40\'s forms records: every LOUD known by its r
     try {
       const file = join(dir, 'mutated.json');
       await writeFile(file, JSON.stringify({ ...rec, results }));
-      return await rejudge(file, 'forms');
+      return await rejudgeInProcess(file, 'forms');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

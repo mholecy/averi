@@ -194,7 +194,7 @@ export interface LiveCalibration {
   before: string;
   after: string;
   /**
-   * live.ts case ids: a forms case's bare (`k6`), a visibility or dismissal case's prefixed by its kind
+   * live-cases.ts case ids (the cases live.ts runs): a forms case's bare (`k6`), a visibility or dismissal case's prefixed by its kind
    * (`scroll:scroll-bounded-flush.P.fully`, `turn:…`, `dismiss:…`).
    */
   cases: string[];

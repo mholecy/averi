@@ -1,10 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
-
-// The one sleep owner as a zero-delay macrotask yield, as in engine.test.ts:
-// every poll cadence collapses to one event-loop turn; deadlines are
-// Date.now-based and still fire.
-vi.mock('../../src/util/sleep.js', () => ({ sleep: () => new Promise((r) => setTimeout(r, 0)) }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
@@ -18,6 +13,19 @@ import { Verifier } from '../../src/verify/assert.js';
 import { FakeAdapter } from '../helpers/fake.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
+// The one sleep owner recorded, not waited on, as in engine.test.ts
+// (tests/helpers/sleep-recorder.ts): every poll cadence collapses to one
+// event-loop turn, and with the Date faked in every test the recorder moves
+// the clock by each sleep — the timelines below play out in virtual time, the
+// same rounds on any machine, and a whole window costs no wall clock (T1).
+vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 /**
  * The ladder against a cold launch's BARE trees (docs/bugs/2026-10-06-second-
  * look-reads-android-decor-as-not-in-state.md). Measured 2026-10-06 on
@@ -30,9 +38,10 @@ import { parseDump } from '../helpers/android-dumps.js';
  * no second look at all. Every tree below goes through the REAL parser of
  * its source, so what the engine sees is what the adapter returns.
  *
- * The timelines are scaled down (ms, not s) and run against the clock: the
- * second look is one Date.now-deadline poll, so "rendered after tapTimeoutMs
- * but before ensureTimeoutMs" can only be said in time.
+ * The timelines are scaled down (ms, not s) and run against the clock — a
+ * faked one, moved by the recorded sleeps: the second look is one
+ * Date.now-deadline poll, so "rendered after tapTimeoutMs but before
+ * ensureTimeoutMs" can only be said in time.
  */
 
 const PKG = 'sk.example.app';

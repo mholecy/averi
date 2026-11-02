@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
 import type { CatalogCell, CellTruth, Geometry, Insets, LabState, NavigationMode, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
@@ -24,6 +24,11 @@ import {
   visibleOf,
   type GeometryContext,
 } from '../../scripts/truth/truth.js';
+import { pauses, resetPauses } from '../helpers/pause-recorder.js';
+
+// The probe's 1 s for the app to log (capture-run.ts#probe) is recorded, not waited on (tests/helpers/pause-recorder.ts):
+// the fake lab logs a tap's events as it taps.
+vi.mock('../../scripts/truth/lab-device.js', async (original) => ({ ...(await original<object>()), ...(await import('../helpers/pause-recorder.js')) }));
 
 // Phase 3's measured geometry (scripts/truth/truth.ts#geometryOf): where a target's frame lies against the screen, its
 // scroll view's clip, the system bands and the app's chrome — and the capture that measures it only when the app's
@@ -335,6 +340,7 @@ class GeometryLab implements LabDevice {
 describe('capture with a measured geometry', () => {
   let out: string;
   beforeEach(async () => {
+    resetPauses();
     out = await mkdtemp(join(tmpdir(), 'averi-geometry-'));
   });
   afterEach(async () => {
@@ -358,6 +364,7 @@ describe('capture with a measured geometry', () => {
       [20, 20],
       [20, 32],
     ]);
+    expect(pauses).toEqual([1_000, 1_000]); // each probe its own second for the app to log
     const t = await truthOf();
     expect(t.safeArea).toEqual({ top: 4, left: 0, bottom: 0, right: 0 });
     expect(t.chrome).toEqual({ bar: rect(0, 34, 40, 6) });
