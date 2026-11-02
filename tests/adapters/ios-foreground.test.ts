@@ -239,7 +239,9 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
     const outcome = await device([SPRINGBOARD]).adapter.launch('com.apple.MobileAddressBook');
     expect(outcome.note).toMatch(/the UI tree was still SpringBoard's \(the home screen or the launch animation\) — /);
     // never "a localized display name": SpringBoard is not the app under another name
-    expect(outcome.note).toMatch(/Compare with screenshot\. Read again before trusting what the tree says$/);
+    expect(outcome.note).toMatch(
+      /\(an absent check passes on it\)\. Read again before trusting a read \(the screenshot switches before the tree\)\. A screenshot does tell one thing here: whether a system alert is in front \(answer it\) or the home screen still is$/,
+    );
   });
 
   it('a check whose names() lists none (the ForegroundCheck contract allows it): the note quotes no empty name — "labelled with one of its names", never "labelled :" (code review of fix/r4, S11)', async () => {

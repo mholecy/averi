@@ -41,8 +41,11 @@ export class WdaTreeSource implements IosTreeSource {
   private readonly udid: string;
   private readonly server: WdaServer;
   private disposed = false;
-  /** The WDA start (WdaServer.upGeneration) whose activeAppInfo ask failed — not asked again (applicationLabel). */
-  private askFailedIn: number | undefined;
+  /**
+   * The failed activeAppInfo ask, and the WDA start (WdaServer.upGeneration) it failed on: that child is not asked
+   * again — its error is thrown again at once — until a /source read succeeds on it (applicationLabel).
+   */
+  private failedAsk: { generation: number; error: unknown } | undefined;
 
   constructor(opts: WdaServerOptions) {
     this.udid = opts.udid;
@@ -65,6 +68,7 @@ export class WdaTreeSource implements IosTreeSource {
       if (this.disposed) throw this.released(err);
       throw err;
     }
+    this.failedAsk = undefined; // WDA answered a read: the launch's wait may ask it again
     return parseWdaSourceValue(payload);
   }
 
@@ -93,10 +97,13 @@ export class WdaTreeSource implements IosTreeSource {
    *   that run) outlasts the switch anyway.
    * - up → `bundle` with the payload's `value.bundleId`, `unlabelled` when it
    *   is not a non-empty string; WDA's error (port, log) when the ask fails —
-   *   once per WDA child: after a failed ask the same child is not asked
-   *   again (`declined`), so a wedged runner costs one launch its ask's
-   *   budget and one "could not check" note, not every launch (review
-   *   2026-11-02); a restarted WDA (a new upGeneration) is asked again.
+   *   asked once per WDA child until it proves it answers: after a failed
+   *   ask the same child is not asked again — the remembered error is thrown
+   *   at once, so every later launch still carries its "could not check"
+   *   note (never a silent decline, which is D48's bug) without paying the
+   *   ask's budget again on a wedged runner (review 2026-11-02). A /source
+   *   read that succeeds clears it, and so does a restart (a new
+   *   upGeneration).
    *   The bundle id is matched exactly by the wait (ios-foreground.ts): WDA
    *   reports the app's canonical CFBundleIdentifier, the id `simctl launch`
    *   was given — no case folding, by design.
@@ -106,13 +113,14 @@ export class WdaTreeSource implements IosTreeSource {
   async applicationLabel(): Promise<ApplicationLabel> {
     if (this.disposed) throw this.released();
     const generation = this.server.upGeneration();
-    if (generation === undefined || generation === this.askFailedIn) return { kind: 'declined' };
+    if (generation === undefined) return { kind: 'declined' };
+    if (this.failedAsk?.generation === generation) throw this.failedAsk.error;
     let payload: unknown;
     try {
       payload = await this.server.activeAppInfo();
     } catch (err) {
       if (this.disposed) throw this.released(err);
-      this.askFailedIn = generation;
+      this.failedAsk = { generation, error: err };
       throw err;
     }
     const bundleId = (payload as { value?: { bundleId?: unknown } } | null | undefined)?.value?.bundleId;

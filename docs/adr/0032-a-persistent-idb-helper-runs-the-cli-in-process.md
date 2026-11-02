@@ -353,8 +353,9 @@ Decision:
 - `WdaTreeSource.applicationLabel()`: WDA not up → `declined`, as before (the first read's own start, 7.7 s in that
   run, outlasts the switch, and a launch must not start WDA); up → the new `{ kind: 'bundle', bundleId }` from
   `value.bundleId`, `unlabelled` when that is not a non-empty string; released → the released error. A failed ask
-  is the "could not check" note once, and that WDA child is not asked again (`declined` until a restart), so a wedged
-  runner does not cost every later launch the ask's 2 s (review 2026-11-02). The bundle id is matched exactly: WDA
+  is the "could not check" note, and that WDA child is not asked again: every later launch gets the remembered error at
+  once, so its note still says it could not check (never a silent decline) without paying the ask's 2 s again on a
+  wedged runner — until a `/source` read succeeds on that child, or WDA restarts (review 2026-11-02, two rounds). The bundle id is matched exactly: WDA
   reports the app's canonical identifier, the id `simctl launch` was given.
 - `ios-foreground.ts#awaitForeground`: a `bundle` answer matches when it is the launched bundle — exact, so no
   `simctl appinfo`, no names, no localized-name reading. Another bundle is polled like a stale label within the same

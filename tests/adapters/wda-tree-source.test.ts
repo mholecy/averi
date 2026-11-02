@@ -42,7 +42,10 @@ const ACTIVE_LAB = { value: { pid: 4242, bundleId: 'dev.averi.lab', name: '', pr
  * (the port goes quiet the moment xcodebuild's teardown runs, as on the
  * happy path), /source answers the envelope.
  */
-async function setup(activeApp: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: ACTIVE_LAB })) {
+async function setup(
+  activeApp: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: ACTIVE_LAB }),
+  sourceAnswer: () => { status: number; body?: unknown } = () => ({ status: 200, body: WDA_ENVELOPE }),
+) {
   const { dd } = await tempDerivedData(true);
   const spawner = fakeSpawn();
   const fetcher = fakeFetch((url) => {
@@ -51,7 +54,7 @@ async function setup(activeApp: () => 'refused' | { status: number; body?: unkno
       return spawner.kills.length < spawner.spawns.length ? { status: 200, body: WDA_STATUS } : 'refused';
     }
     if (url.endsWith('/wda/activeAppInfo')) return activeApp();
-    return { status: 200, body: WDA_ENVELOPE };
+    return sourceAnswer();
   });
   const exec = fakeExec();
   const source = new WdaTreeSource({
@@ -172,18 +175,49 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     expect(spawner.kills).toEqual([]);
   });
 
-  it('after a failed ask, declined for the rest of that WDA child\'s life — no second 2 s ask per launch on a wedged runner; a restart asks again', async () => {
+  it('after a failed ask, the same WDA child is not asked again: each later launch gets the remembered error at once (never a silent decline); a restart asks again', async () => {
     let answer: 'refused' | { status: number; body?: unknown } = 'refused';
     const { source, fetcher } = await setup(() => answer);
     await source.read();
-    await expect(source.applicationLabel()).rejects.toThrow(/activeAppInfo request failed/);
-    answer = { status: 200, body: ACTIVE_LAB }; // even an answering server: this child is not asked again
-    expect(await source.applicationLabel()).toEqual({ kind: 'declined' });
-    expect(await source.applicationLabel()).toEqual({ kind: 'declined' });
+    const first = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    expect(first?.message).toMatch(/activeAppInfo request failed/);
+    answer = { status: 200, body: ACTIVE_LAB }; // even an answering server: this child is not asked again until a read proves it
+    for (let i = 0; i < 2; i++) {
+      const again = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+      expect(again).toBe(first); // the remembered error, so the launch's note still says it could not check
+    }
     expect(asked(fetcher.urls)).toHaveLength(1);
-    // A restart (a dead server's one restart inside a read) is a new child: asked again.
+    // A restart is a new child: asked again.
     (source as unknown as { server: { stop(): void } }).server.stop();
+    expect(await source.applicationLabel()).toEqual({ kind: 'declined' }); // not up until a read starts it
     await source.read();
+    expect(await source.applicationLabel()).toEqual({ kind: 'bundle', bundleId: 'dev.averi.lab' });
+    expect(asked(fetcher.urls)).toHaveLength(2);
+  });
+
+  it('a restart is a new child, asked again even when no /source read has succeeded on it', async () => {
+    let answer: 'refused' | { status: number; body?: unknown } = 'refused';
+    let source500 = false;
+    const { source, spawner, fetcher } = await setup(() => answer, () => (source500 ? { status: 500 } : { status: 200, body: WDA_ENVELOPE }));
+    await source.read();
+    await expect(source.applicationLabel()).rejects.toThrow(/activeAppInfo request failed/);
+    (source as unknown as { server: { stop(): void } }).server.stop();
+    source500 = true;
+    await expect(source.read()).rejects.toThrow(/HTTP 500/); // the restart reached /status, its /source failed
+    expect(spawner.spawns).toHaveLength(2);
+    answer = { status: 200, body: ACTIVE_LAB };
+    expect(await source.applicationLabel()).toEqual({ kind: 'bundle', bundleId: 'dev.averi.lab' });
+    expect(asked(fetcher.urls)).toHaveLength(2);
+  });
+
+  it('a successful /source read clears a failed ask: the same child is asked again once it has answered a read', async () => {
+    let answer: 'refused' | { status: number; body?: unknown } = 'refused';
+    const { source, spawner, fetcher } = await setup(() => answer);
+    await source.read();
+    await expect(source.applicationLabel()).rejects.toThrow(/activeAppInfo request failed/);
+    answer = { status: 200, body: ACTIVE_LAB };
+    await source.read(); // the same child (no restart) answered /source
+    expect(spawner.spawns).toHaveLength(1);
     expect(await source.applicationLabel()).toEqual({ kind: 'bundle', bundleId: 'dev.averi.lab' });
     expect(asked(fetcher.urls)).toHaveLength(2);
   });

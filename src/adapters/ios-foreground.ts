@@ -281,7 +281,14 @@ function notInFront(bundleId: string, label: string, names: readonly string[], o
     `${formatSeconds(FOREGROUND_WAIT_MS)} after launching ${bundleId}${names.length > 0 ? ` (${quoted(names)})` : ''}, ` +
     `the UI tree was still ${whose(label)} — iOS can hand idb the previous app's tree for a second or more after an app ` +
     'switch, so a read now may judge the wrong app (an absent check passes on it). ';
-  if (label.trim() === '') return head + 'Compare with screenshot. Read again before trusting what the tree says';
+  if (label.trim() === '') {
+    // SpringBoard is never the app under another name; what a screenshot can still tell is which part of it is in front.
+    return (
+      head +
+      `${READ_AGAIN[0].toUpperCase()}${READ_AGAIN.slice(1)}. A screenshot does tell one thing here: whether a system alert ` +
+      'is in front (answer it) or the home screen still is'
+    );
+  }
   if (owner !== undefined) {
     return (
       head +
