@@ -11,7 +11,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
+import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
@@ -728,6 +728,8 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }
+    case 'unfit':
+      return { message: unfitText(o, describe) };
     case 'bound': {
       const turned =
         o.turns > 0 ? `. It was turned round ${countOf(o.turns, 'time')}: a swipe carried it past the viewport (a fling), or it lay at the edge the swipes push it out through, so the next was drawn the other way` : '';
@@ -751,6 +753,35 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
     case 'changed':
       return { message: changedText(o, describe) };
   }
+}
+
+/** The words of an axis for `unfitText`: how a target's size along it is said. */
+const SIZE_WORDS: Readonly<Record<Unfit['along'], { readonly as: string; readonly more: string }>> = {
+  vertical: { as: 'tall', more: 'taller' },
+  horizontal: { as: 'wide', more: 'wider' },
+};
+
+/**
+ * The `unfit` failure (scroll-read.ts#Unfit, D52): a `fully: true` match as wide or as tall as its scroll view, or more —
+ * where it stands and how much of it is in, its size against the scroll view's (the scroll view the standing names when
+ * it cuts it, else the frame it draws), why no swipe shows it whole, and the way out. A plain Error, as `stuck`: the
+ * element was there and seen. Never a claim it is visible.
+ */
+function unfitText(o: Extract<ScrollOutcome, { kind: 'unfit' }>, describe: string): string {
+  const { judged, viewport, unfit } = o;
+  const { facts } = judged.standing;
+  const scroller = judged.standing.kind === 'clipped' ? judged.standing.byScrollView?.scroller : undefined;
+  const view = scroller === undefined ? `the frame its scroll view draws (${rectText(unfit.frame)})` : `its scroll view ${nodeText(scroller)}`;
+  const words = SIZE_WORDS[unfit.along];
+  const why =
+    unfit.size > unfit.room
+      ? `${words.more} than ${view}: no scroll offset shows all of it`
+      : `as ${words.as} as ${view}: fully: true holds at one exact scroll offset only, which no swipe can be aimed at`;
+  return (
+    `scroll_until ${describe} failed after ${swipesText(o.swipes)} — element is in the viewport but ${describeClip(facts, judged.under?.topCover)}, ` +
+    `and it is ${unfit.size} ${words.as} (tree units), ${why} — drop fully: true (the plain stop needs only its centre in view), ` +
+    `or accept the ${shareText(facts.visible, facts.unknownPast)} shown. Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
+  );
 }
 
 /**

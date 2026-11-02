@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
-import { judgeRead, shortOf, strokeLine, type ReadJudgement, type RoundRead } from '../../src/interact/scroll-read.js';
+import { FIT_ROOM_PX, judgeRead, shortOf, strokeLine, unfitAlong, type ReadJudgement, type RoundRead } from '../../src/interact/scroll-read.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
 import { node } from '../helpers/fake.js';
@@ -272,5 +272,63 @@ describe('shortOf — a clipped match carries what cuts it (`ClipCause`), decide
     it('at the screen\'s edge, its scroll view reaching it too: the viewport, not the scroll view', () => {
       expect(at(418, { x: 31, y: 850, width: 340, height: 43 })).toEqual({ of: 'viewport' });
     });
+  });
+});
+
+/**
+ * D52: a `fully: true` target as wide (or tall) as its scroll view, or more (`unfitAlong`): fully shown at one exact
+ * offset at most, which no swipe can be aimed at. Its facts as the standing gives them: the frame judged in (`screen`,
+ * cut to the drawn frame), the edges it is clipped at, the drawn frame and the sides uiautomator cut at the screen.
+ * The lab carousel: `[66,380][1014,614]`, 948 wide.
+ */
+describe('unfitAlong — a target too large for its scroll view to show whole', () => {
+  const CAROUSEL: Rect = { x: 66, y: 380, width: 948, height: 234 };
+  /** C laid at x 45, `width` wide: clipped at the carousel's left, its right side inside it. */
+  const card = (width: number): Rect => ({ x: 45, y: 380, width, height: 234 });
+  const facts = { screen: CAROUSEL, drawn: CAROUSEL, clipped: ['left'] as const };
+
+  it.each([
+    [CAROUSEL.width - 2, false],
+    [CAROUSEL.width - 1, true],
+    [CAROUSEL.width, true],
+    [CAROUSEL.width + 1, true],
+  ])(`the boundary, FIT_ROOM_PX (${FIT_ROOM_PX}) under the room: %d wide in 948 — unfit %s`, (width, unfit) => {
+    expect(unfitAlong(facts, card(width))).toEqual(unfit ? { along: 'horizontal', size: width, room: CAROUSEL.width, frame: CAROUSEL } : undefined);
+  });
+
+  it('a 900-wide card in the 948 carousel (48 of room) fits', () => {
+    expect(unfitAlong(facts, card(900))).toBeUndefined();
+  });
+
+  it('along the vertical too: a row as tall as its list, clipped at the top', () => {
+    const list: Rect = { x: 0, y: 200, width: 402, height: 400 };
+    expect(unfitAlong({ screen: list, drawn: list, clipped: ['top'] }, { x: 24, y: 190, width: 354, height: 400 })).toEqual({ along: 'vertical', size: 400, room: 400, frame: list });
+  });
+
+  it('not clipped along that axis — a target that already fits, or one clipped across it only: none', () => {
+    expect(unfitAlong({ ...facts, clipped: [] }, card(948))).toBeUndefined();
+    // As wide as the carousel, but clipped only at its top (the cross axis), where it is short of the carousel's height.
+    expect(unfitAlong({ ...facts, clipped: ['top'] }, { x: 66, y: 370, width: 948, height: 200 })).toBeUndefined();
+  });
+
+  it('a side uiautomator cut at the screen on that axis: its size unknown — none; one on the other axis only does not count', () => {
+    expect(unfitAlong({ ...facts, unknownPast: ['right'] }, card(948))).toBeUndefined();
+    expect(unfitAlong({ ...facts, unknownPast: ['left'] }, card(948))).toBeUndefined();
+    expect(unfitAlong({ ...facts, unknownPast: ['bottom'] }, card(948))).toEqual({ along: 'horizontal', size: 948, room: 948, frame: CAROUSEL });
+  });
+
+  it('no drawn frame (no scroll view told, idb\'s): none', () => {
+    expect(unfitAlong({ screen: CAROUSEL, clipped: ['left'] }, card(948))).toBeUndefined();
+  });
+
+  it('a frame judged in that is cut short of the drawn frame on that axis (a keyboard line, a band): none — on the other axis only, it counts', () => {
+    const list: Rect = { x: 0, y: 200, width: 402, height: 400 };
+    const aboveKeyboard: Rect = { ...list, height: 372 };
+    const row: Rect = { x: 24, y: 190, width: 354, height: 400 };
+    expect(unfitAlong({ screen: aboveKeyboard, drawn: list, clipped: ['top', 'bottom'] }, row)).toBeUndefined();
+    expect(unfitAlong({ screen: { ...list, y: 210, height: 390 }, drawn: list, clipped: ['top'] }, row)).toBeUndefined();
+    expect(unfitAlong({ screen: { ...CAROUSEL, height: 200 }, drawn: CAROUSEL, clipped: ['left'] }, card(948))).toEqual({ along: 'horizontal', size: 948, room: 948, frame: CAROUSEL });
+    expect(unfitAlong({ screen: { ...CAROUSEL, x: 70, width: 944 }, drawn: CAROUSEL, clipped: ['left'] }, card(948))).toBeUndefined();
+    expect(unfitAlong({ screen: { ...CAROUSEL, x: 70 }, drawn: CAROUSEL, clipped: ['left'] }, card(948))).toBeUndefined();
   });
 });

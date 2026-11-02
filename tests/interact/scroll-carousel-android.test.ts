@@ -143,6 +143,73 @@ describe('the layout-defect failure says "at most" too', () => {
   });
 });
 
+/**
+ * D52: `fully: true` on C, as wide as the carousel (948 in 948) — fully shown at x 66 exactly, an offset no swipe can be
+ * aimed at (the shortest drag CUT_EDGE_MIN_DRAG, the reach halved at each turn). The batch-3 E2 run 0 (C after a 440-px
+ * pre-drag, asked LEFT) ran 6 strokes and 3 turns to maxSwipes; it fails on the first read that knows both its sides.
+ */
+describe('`fully: true` on a card as wide as its carousel (D52): fails at the first read that knows its width, saying why', () => {
+  const FULLY_LEFT = { ...RULES, direction: 'left' as const, fully: true };
+  /** C's x at each read of E2 run 0 (the carousel's offset 440 → 783 → 1116 → 969 → 825 → 883 → 938: x = 1014 − offset). */
+  const E2_RUN_0 = [574, 231, -102, 45, 189, 131, 76];
+  /** The rounds over E2's reads in order, until the stop. */
+  const replay = (rules: RoundRules & { screen: { width: number; height: number } }, xs: readonly number[], width = 948): ReturnType<typeof play> => {
+    const rows: Row[] = [];
+    for (const x of xs) {
+      rows.push(cAt(x, width));
+      const played = play(rules, rows);
+      if (played.outcome !== undefined) return played;
+    }
+    throw new Error('replay: no stop');
+  };
+
+  it('E2 run 0: unfit on the 4th read (C at 45, both sides known) after 3 strokes — not 6 strokes and 3 turns to maxSwipes', () => {
+    const played = replay(FULLY_LEFT, E2_RUN_0);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 3, unfit: { along: 'horizontal', size: 948, room: 948, frame: CAROUSEL } });
+    expect(failureOf(played, 'id:"lab.carousel-in-list.C"').message).toBe(
+      'scroll_until id:"lab.carousel-in-list.C" failed after 3 swipes — element is in the viewport but CLIPPED at left, 98% of it is in the viewport, ' +
+        'and it is 948 wide (tree units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one exact scroll offset only, ' +
+        'which no swipe can be aimed at — drop fully: true (the plain stop needs only its centre in view), or accept the 98% shown. ' +
+        'Last rect {"x":45,"y":380,"width":948,"height":234} in a 1080x2220 viewport',
+    );
+  });
+
+  it('wider than the carousel (1000 in 948), both sides known: unfit before any swipe, "no scroll shows all of it"', () => {
+    const played = play(FULLY_LEFT, [cAt(40, 1000)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stop']);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0, unfit: { size: 1000, room: 948 } });
+    expect(failureOf(played, 'C').message).toBe(
+      'scroll_until C failed after 0 swipes — element is in the viewport but CLIPPED at left/right, 95% of it is in the viewport, ' +
+        'and it is 1000 wide (tree units), wider than its scroll view scrollable (66,380 948x234): no scroll offset shows all of it ' +
+        '— drop fully: true (the plain stop needs only its centre in view), or accept the 95% shown. ' +
+        'Last rect {"x":40,"y":380,"width":1000,"height":234} in a 1080x2220 viewport',
+    );
+  });
+
+  it('a still carousel (C at 76, 10 px short, the strokes leaving it there): unfit at once — never "stuck … a layout defect"', () => {
+    const played = play(FULLY_LEFT, [cAt(76)]);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0 });
+    expect(failureOf(played, 'C').message).not.toMatch(/layout defect/);
+  });
+
+  it('a 900-wide card (48 px of room) is not unfit: it is stroked for, as before', () => {
+    expect(play(FULLY_LEFT, [cAt(45, 900)]).steps.map((s) => s.do)).toEqual(['stroke']);
+  });
+
+  it('a card that already fits (900 wide, at 90): the stop, fully visible', () => {
+    expect(play(FULLY_LEFT, [cAt(90, 900)]).outcome).toMatchObject({ kind: 'visible', swipes: 0 });
+  });
+
+  it('`fully: false`: the plain stop on C at 45, as before (D17)', () => {
+    expect(play({ ...FULLY_LEFT, fully: false }, [cAt(45)]).outcome).toMatchObject({ kind: 'visible', swipes: 0 });
+  });
+
+  it("a side cut at the screen's edge (C at 231, its right side unknown): never unfit — stroked for", () => {
+    expect(play(FULLY_LEFT, [cAt(231)]).steps.map((s) => s.do)).toEqual(['stroke']);
+  });
+});
+
 describe("a vertical list's row cut at the screen's bottom (D17): the lab's form-picker, \"Faroe Islands\" dumped ending at 2220 below its list's 2154", () => {
   const PICKER = readFileSync(new URL('../fixtures/uiautomator-lab-form-picker.xml', import.meta.url), 'utf8');
   const FO = 'lab.form-picker.country.FO';
