@@ -4,6 +4,7 @@ Status: accepted 2026-11-01 (backlog row D43, its first half D43a, docs/plans/20
 notes docs/bugs/2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md and
 docs/bugs/2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md, which stay open). Changes
 behaviour: a non-ASCII value is refused before the tap. It used to fail on the device.
+Amended 2026-11-02 (D43a device run: the refusal holds on iOS idb, iOS wda and Android — see the amendment below).
 
 ## Context
 
@@ -109,3 +110,12 @@ Pinned by tests/adapters/typeable.test.ts (each adapter's declaration, both iOS 
 `typeText`), tests/interact/type-text.test.ts (the message), tests/interact/fill.test.ts (no device call at all,
 through a recording proxy), tests/mcp/tools.test.ts (type_text with and without a selector), tests/flow/engine.test.ts
 (`type:` and `fill:`), and tests/truth/live-forms.test.ts (p7's judge).
+
+## Amendment: device run (2026-11-02, backlog D43)
+
+The forms cases b1d, b2, b3, b7, p1, p2 and p7 ran on the lab devices at main 0262c69d under iOS idb, iOS wda and
+Android (docs/truth/live-records/ios-idb-forms-d43a-1.json, ios-wda-forms-d43a-1.json, android-forms-d43a-1.json). Each
+record rejudges to 7 cases, 5 ok, 2 loud, 0 mismatches. b1d and b7 were refused before anything was sent, the field
+untouched (`loud-untouched`, known); on Android that replaces D40's half-typed `loud-changed`. p7 was refused with the
+prefill kept. The ASCII cases b2, b3, p1 and p2 are ok. tests/truth/live-rejudge.test.ts pins the three records. The
+real typing path ("Later") stays open.

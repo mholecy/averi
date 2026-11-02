@@ -302,4 +302,21 @@ band is unchanged: `verify/assert.ts#iosBandRows` gates on the platform, not the
 out on the WDA tree source. That matters now, because a wda project's stored baselines were taken with simctl and now
 meet idb frames. They have the same size and the same sRGB, and differ in the Dynamic Island and 16 corner pixels; the
 band covers the island, as it has for an idb project's older baselines since D26b. The residual on an island device
-missing from `IOS_SAFE_AREA_TOPS` applies to wda projects too. The device A/B for this change is still to come.
+missing from `IOS_SAFE_AREA_TOPS` applies to wda projects too.
+
+Device A/B (2026-11-02, batch-1 at main 0262c69d): `scripts/perf/baseline.ts` on a wda project, 10 repeats per
+scenario, three runs in the order simctl / idb / simctl, every scenario 10/10 ok. Medians in ms:
+
+| scenario | simctl (run 1) | idb (run 2) | simctl (run 3) |
+|---|---|---|---|
+| screenshot | 1 112 | 505 | 1 087 |
+| colour assert | 1 471 | 839 | 1 454 |
+| OCR assert | 1 674 | 1 020 | 1 625 |
+| ensure_state, cold | 6 677 | 6 019 | 6 724 |
+| ensure_state, warm | 1 179 | 506 | 1 144 |
+| tap (control) | 692 | 692 | 679 |
+
+So on the wda tree source, capture through idb saves about 590 ms on a screenshot, 620 on a colour assert, 630 on an
+OCR assert, 650 on a warm ensure_state and 680 on a cold one; the tap, which captures nothing, is unchanged. D26
+stalls: simctl 9 of 100 captures in run 1 and 0 of 100 in run 3; idb 0 of 102, its ok calls at a median of 94 ms
+against simctl's ~400 ms.
