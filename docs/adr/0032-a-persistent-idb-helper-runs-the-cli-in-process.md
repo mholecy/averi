@@ -21,6 +21,8 @@ Amended 2026-11-02 (D56: a launch that waits behind iOS's system alert names it 
 Amended 2026-11-02 (batch-7: D56 device-checked — the D56 amendment's last paragraph).
 Amended 2026-11-02 (D57: the alert's advice leads with a tap by the button's label, its x and y the fallback — see the
 amendment below).
+Amended 2026-11-02 (D58: before a link to the project's own scheme, averi records the answer an Open tap records, so iOS
+should not ask "Open in …?" — see the amendment below).
 
 ## Context
 
@@ -421,7 +423,8 @@ Decision (the D49 analysis, split by the orchestrator: D49a now, D49b after a de
   scheme is one that app declares: not `http`/`https`, and in its Info.plist's `CFBundleURLTypes`. `simctl appinfo` and
   `listapps` carry no URL types (measured); `plutil -extract CFBundleURLTypes json -o - <Path>/Info.plist` does, a host
   read of milliseconds at the `Path` appinfo already gives (`adapters/ios-url-schemes.ts` reads the answer; plutil's
-  "No value at that key path" is "declares none"). Cached per bundle until `install`, as appinfo is.
+  "No value at that key path" is "declares none"). Cached per bundle until `install`, as appinfo is. (Since D58 the
+  ask comes first, before the writes and `openurl` — see that amendment.)
 - When it is, the D48 wait runs as for a launch (`ForegroundCheck.link`): idb's Application label or WDA's active
   bundle, at most 3 s, failing open, declining while WDA is not up. Its notes say "opening <url> in <bundle>" and lead
   with what the wait knows: when it read another app or SpringBoard to the bound, "averi did not see <app> come
@@ -528,8 +531,8 @@ A correction to the backlog row: WDA's payload has no `presentation` key, in eit
 'alert'` is averi's own mark on the layer holding an `Alert` element.
 
 Considered, not chosen: tapping Open, or an opt-in `confirm: true` (a tap on a SpringBoard dialog acts for the agent,
-and which label opens is localised; D58); reading `/source` on every WDA poll (a whole tree per poll for the rare
-case); reading it through `source()` (its start, its 30 s and its restart are a recovery, not an aid); the same naming
+and which label opens is localised; D58 — since then not built: D58 prevents the alert instead, see that amendment);
+reading `/source` on every WDA poll (a whole tree per poll for the rare case); reading it through `source()` (its start, its 30 s and its restart are a recovery, not an aid); the same naming
 in `launch_app`'s D48 note (the detectors fit it, but its wording is D48's — D56; since then done — see that
 amendment).
 
@@ -658,7 +661,8 @@ Decision (spec-D57, adopting the D57 analysis's option A with a test that pins t
   `tests/interact/tap-system-alert.test.ts`: the real `tapElement`, with its `ambiguous` option `'refuse'` (as the MCP
   tap passes it), over the three committed alert captures.
 - No "alert layer first" guard in the resolution: its only effect would be to turn today's honest ambiguity refusal
-  into a guess. "averi taps nothing itself" stands (an opt-in confirm is D58's).
+  into a guess. "averi taps nothing itself" stands (an opt-in confirm is D58's; since then not built — D58 prevents the
+  alert instead, see that amendment).
 - Unchanged, byte for byte: the detection, the headline (`iOS has not opened <url> yet: …`, `iOS has not brought
   <bundle> forward yet: …`), the button list with its centres, launch_app's tail ("then read again before trusting a
   read"), the happy-path replies, D48's and D49a's ⚠ notes, every call list, the cost.
@@ -671,3 +675,43 @@ instead; on idb a tap at an app element while the alert is up times out "to appe
 refuses it "close it first"; outside D57); on WDA a tap by text costs two `/source` reads for its settle, about
 1.2–1.6 s, against about 0.6 s on idb. To check on the device (the next owner batch): D49A E2 under idb and WDA, the
 new reply read once and its first remedy followed.
+
+## Amendment: the project's own scheme is pre-approved for simctl's opener (2026-11-02, backlog D58)
+
+iOS asks "Open in “AveriLab”?" when `simctl openurl` opens a scheme its opener has no remembered answer for. The answer
+lives in the simulator's `com.apple.launchservices.schemeapproval` domain, one key per opener and scheme: batch-5's
+capture of the lab simulator (iOS 27.0) held `com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab`
+after Open was tapped, and deleting the key raised the alert again on the next `simctl openurl`, with no reboot
+(batch-7).
+The opener is CoreSimulatorBridge, the caller behind `simctl openurl`; Safari and other openers have keys of their own.
+So the alert comes once per simulator per scheme, on a fresh or erased simulator or after the key is deleted. Since D54
+and D57 the reply names it and a tap by its label; that still costs the agent one turn, and on WDA the 3 s bound first.
+
+Decision (spec-D58, adopting the D58 analysis's option D; its confirm tap, options B and C, is not built):
+
+- `adapters/ios-url-schemes.ts#schemeApprovalWrite(scheme, bundleId)` gives the `defaults write` argv:
+  `defaults write com.apple.launchservices.schemeapproval com.apple.CoreSimulator.CoreSimulatorBridge--><scheme> -string
+  <bundleId>`, the scheme lower-cased as the captured key holds it. The domain and opener are constants there, with the
+  capture's provenance.
+- `IosAdapter.openDeepLink` asks whether the link's scheme is the project app's (`linkHandler`, D49a's lookup and cache)
+  BEFORE `openurl`, no longer after it. When it is, `prepareForOpen` (the accessibility writer, extended) runs the
+  approval write beside the two `com.apple.Accessibility` writes, in one `Promise.allSettled`, so it adds no wall time
+  of its own; then `openurl` and the same wait. It writes on every such link (idempotent; a key deleted under the
+  session is restored by the next link), and says so on stderr once per bundle and scheme.
+- A failed write never fails the link: one stderr line, then `openurl` and the wait as before — if iOS then asks, D54's
+  reply and D56's note name the alert. Not tried again until `install`, as the scheme cache.
+- Unchanged: web links, iOS's own schemes, another app's scheme and no project app make no write (and, but for the
+  first lookup of another app's scheme now coming before `openurl`, the same calls); `launch()` writes no approval;
+  every reply text, byte for byte; the detection and naming of the alert; the MCP schema (no new option).
+
+Why prevention, not a tap: the alert is a test-harness artefact (simctl's opener has no answer yet), not the app's UX,
+and writing the answer an Open tap writes removes the alert, the extra turn and WDA's bound on both sources and in any
+language. A tap made for the agent would guess a localised label, break "averi taps nothing itself", and need a schema
+field that means nothing on Android (D55's "Open with" is a chooser, not a confirm).
+
+Residuals, stated: the key and its effect are measured on one iOS (27.0) and one Xcode; whether a live write before the
+link stops the alert is the merge gate's device check (batch-8), and the end-to-end check through averi is a later
+batch's. The write is persistent and simulator-wide: the same answer an Open tap writes, scoped to CoreSimulatorBridge
+and the scheme the project's own app declares, and averi never removes it. An alert for another app's scheme is not
+prevented, and is still named (D54). A change in the key's format on another iOS or Xcode fails open: the alert comes,
+and D54's reply and D56's note name it as before.
