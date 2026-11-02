@@ -367,7 +367,7 @@ Decision:
   Every launch note's advice is one (review 2026-11-02): read again before trusting a read — the screenshot switches
   before the tree, on either source.
 - `launch_app`, a flow's `launch:` and `ensure_state`'s launch rungs all pass `IosAdapter.launch`, so all gain it.
-  `openDeepLink` still waits for nothing (a link may bring another app forward) (see the D49a amendment).
+  `openDeepLink` still waits for nothing (a link may bring another app forward — see the D49a amendment).
 
 Considered, not chosen:
 
@@ -420,8 +420,10 @@ Decision (the D49 analysis, split by the orchestrator: D49a now, D49b after a de
   schemes (`tel`, `telprompt`, `mailto`, `sms`, `facetime`, `facetime-audio`, `maps`, `itms-apps`, `itms-services`,
   `app-settings`, `shortcuts`, `x-apple-*` — `ios-url-schemes.ts#isSystemScheme`, no lookup at all), another app's
   scheme. Schemes that could not be read (appinfo failed or listed no `Path`, plutil failed otherwise, another JSON
-  shape) are the same, plus one stderr line naming why — not knowing is the old behaviour, but not silently — and the
-  failure is cached per bundle until `install` like an answer.
+  shape) are the same, plus one stderr line naming why — not knowing is the old behaviour, but not silently. A plutil
+  or shape failure on a bundle whose appinfo named its Path is cached until `install` like an answer (one line); an
+  appinfo failure or a missing Path is not (review round 2, as appinfo's own cache): the app may be installed later
+  outside averi, and every own-scheme link after that would otherwise reply a bare "Opened".
 
 Considered, not chosen:
 
@@ -434,7 +436,7 @@ Considered, not chosen:
 - Scanning every installed app's Info.plist for the scheme: N reads per link for a case the agent rarely has.
 
 Cost: no project app, a web link or one of iOS's own schemes — nothing. Another scheme — one `simctl appinfo` (shared
-with the launch's cache) and one `plutil` per bundle per adapter life (a failed lookup included, cleared by `install`),
+with the launch's cache) and one `plutil` per bundle per adapter life (a failed plutil read included, cleared by `install`; an appinfo failure is asked again),
 no read of the device's UI, no wait, no note — the review accepted this as "as before" for another app's link. The project's scheme — that, plus the D48 wait:
 one ask when the app is already in front, the stale window when the link brings it forward, the 3 s bound and a note
 when it never comes. Android unchanged: a link with two handlers starts the chooser, which `am start` reports as

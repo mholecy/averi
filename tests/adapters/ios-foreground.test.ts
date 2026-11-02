@@ -281,7 +281,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     };
     const outcome = await new IosAdapter({ udid: 'AAAA-1111', exec: async () => ({ stdout: Buffer.alloc(0), stderr: '' }), treeSource: source }).launch('com.app');
     expect(outcome.note).toBe(
-      'could not check that com.app is in front (idb: connection refused) — for a moment after a launch iOS can hand ' +
+      'could not check that com.app is in front (idb: connection refused) — for a moment after an app switch iOS can hand ' +
         "idb the previous app's tree; read again before trusting a read (the screenshot switches before the tree)",
     );
     expect(sleeps).toEqual([]);
@@ -301,7 +301,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     const d = device([BANK], '');
     expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toBe(
       'could not check that com.apple.MobileAddressBook is in front (simctl appinfo listed neither CFBundleDisplayName nor ' +
-        "CFBundleName) — for a moment after a launch iOS can hand idb the previous app's tree; " +
+        "CFBundleName) — for a moment after an app switch iOS can hand idb the previous app's tree; " +
         'read again before trusting a read (the screenshot switches before the tree)',
     );
     expect(d.describeAlls()).toBe(1);
@@ -348,7 +348,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
       const d = device([payload]);
       expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toBe(
         "could not check that com.apple.MobileAddressBook is in front (the tree's Application element had no label, or there " +
-          "was none, for the 3 s averi waited) — for a moment after a launch iOS can hand idb the previous app's tree; " +
+          "was none, for the 3 s averi waited) — for a moment after an app switch iOS can hand idb the previous app's tree; " +
           'read again before trusting a read (the screenshot switches before the tree)',
       );
       expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
@@ -430,7 +430,7 @@ describe('IosAdapter.launch on the WDA source waits until WebDriverAgent names t
     const outcome = await d.adapter.launch('dev.averi.lab');
     expect(outcome.note).toBe(
       'could not check that dev.averi.lab is in front (WDA /wda/activeAppInfo request failed on port 8100 (udid AAAA-1111): ' +
-        'ECONNREFUSED — xcodebuild log: /tmp/x.log) — for a moment after a launch WebDriverAgent can still read the ' +
+        'ECONNREFUSED — xcodebuild log: /tmp/x.log) — for a moment after an app switch WebDriverAgent can still read the ' +
         'previous app; read again before trusting a read (the screenshot switches before the tree)',
     );
     expect(d.asks()).toBe(1);
@@ -441,7 +441,7 @@ describe('IosAdapter.launch on the WDA source waits until WebDriverAgent names t
     const outcome = await wdaDevice([{ kind: 'unlabelled' }]).adapter.launch('dev.averi.lab');
     expect(outcome.note).toBe(
       "could not check that dev.averi.lab is in front (WebDriverAgent's active app carried no bundle id for the 3 s averi " +
-        'waited) — for a moment after a launch WebDriverAgent can still read the previous app; ' +
+        'waited) — for a moment after an app switch WebDriverAgent can still read the previous app; ' +
         'read again before trusting a read (the screenshot switches before the tree)',
     );
   });

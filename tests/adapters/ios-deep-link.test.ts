@@ -39,7 +39,7 @@ const SPRINGBOARD = bundle('com.apple.springboard');
  * `kind` given — and an exec answering `simctl appinfo` with `info` and plutil with `types` (an Error rejects each).
  * Every exec command line but xcode-env's one-time `xcrun --find simctl` is recorded.
  */
-function lab(answers: Array<ApplicationLabel | Error>, opts: { kind?: IosTreeSourceKind; info?: string | Error; types?: string | Error } = {}) {
+function lab(answers: Array<ApplicationLabel | Error>, opts: { kind?: IosTreeSourceKind; info?: string | Error | (() => string | Error); types?: string | Error } = {}) {
   const calls: string[] = [];
   let asked = 0;
   const source: IosTreeSource = {
@@ -59,7 +59,7 @@ function lab(answers: Array<ApplicationLabel | Error>, opts: { kind?: IosTreeSou
       if (out instanceof Error) throw out;
       return { stdout: Buffer.from(out), stderr: '' };
     };
-    if (full.startsWith('xcrun simctl appinfo')) return answer(opts.info ?? LAB_INFO);
+    if (full.startsWith('xcrun simctl appinfo')) return answer(typeof opts.info === 'function' ? opts.info() : (opts.info ?? LAB_INFO));
     if (full.startsWith('plutil ')) return answer(opts.types ?? LAB_TYPES);
     return { stdout: Buffer.alloc(0), stderr: '' };
   };
@@ -144,6 +144,10 @@ describe("IosAdapter.openDeepLink — a link nothing expects is opened exactly a
 const couldNotRead = (why: string) =>
   `averi: could not read dev.averi.lab's URL schemes (${why}) — opened averilab://d49 without waiting for dev.averi.lab ` +
   'to come forward, and will not wait for it on later links until the app is installed again';
+/** The line of a failure that is not cached (appinfo's: the app may be installed later outside averi) — asked again next link. */
+const notYetRead = (why: string) =>
+  `averi: could not read dev.averi.lab's URL schemes (${why}) — opened averilab://d49 without waiting for dev.averi.lab ` +
+  'to come forward; asked again on the next link';
 
 describe('IosAdapter.openDeepLink — the schemes could not be read: opened as before, one stderr line, the failure cached until install()', () => {
   it('an unreadable Info.plist (any other plutil failure): one lookup and one line for two links; install() asks again', async () => {
@@ -171,15 +175,30 @@ describe('IosAdapter.openDeepLink — the schemes could not be read: opened as b
     expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
     expect(d.calls.filter((c) => c.startsWith('plutil'))).toEqual([]);
     expect(d.asks()).toBe(0);
-    expect(stderrLines()).toEqual([couldNotRead('simctl appinfo: no such bundle')]);
+    expect(stderrLines()).toEqual([notYetRead('simctl appinfo: no such bundle')]);
   });
 
-  it('appinfo lists no Path: no plutil', async () => {
+  // Review round 2: an appinfo failure is not cached — the app may be installed outside averi (Xcode, `simctl install`
+  // by hand), and every later own-scheme link would otherwise reply a bare "Opened".
+  it('a link before the app is installed, then the app appears outside averi: the next link looks up again and waits', async () => {
+    let installed = false;
+    const d = lab([bundle(LAB)], { info: () => (installed ? LAB_INFO : new Error('simctl appinfo: no such bundle')) });
+    expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
+    expect(d.asks()).toBe(0);
+    installed = true;
+    expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
+    expect(d.asks()).toBe(1);
+    expect(d.calls.filter((c) => c.includes('appinfo'))).toHaveLength(2);
+    expect(d.calls.filter((c) => c.startsWith('plutil'))).toEqual([PLUTIL]);
+  });
+
+  it('appinfo lists no Path: no plutil — and not cached: the next link asks again (and says so again)', async () => {
     const d = lab([bundle(LAB)], { info: appinfo('AveriLab', 'AveriLab') });
+    expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
     expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({});
     expect(d.calls.filter((c) => c.startsWith('plutil'))).toEqual([]);
     expect(d.asks()).toBe(0);
-    expect(stderrLines()).toEqual([couldNotRead('simctl appinfo listed no Path')]);
+    expect(stderrLines()).toEqual([notYetRead('simctl appinfo listed no Path'), notYetRead('simctl appinfo listed no Path')]);
   });
 });
 
@@ -251,7 +270,7 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
       'averi could not check that dev.averi.lab came forward after the link: if iOS asks to confirm it ("Open in “…”?"), ' +
         'the link waits behind the alert — take a screenshot, and if it shows a system alert, answer it (every launch ' +
         'stays behind it until then). could not check that dev.averi.lab is in front (WDA /wda/activeAppInfo request ' +
-        'failed: ECONNREFUSED) — for a moment after a launch WebDriverAgent can still read the previous app; read again ' +
+        'failed: ECONNREFUSED) — for a moment after an app switch WebDriverAgent can still read the previous app; read again ' +
         'before trusting a read (the screenshot switches before the tree)',
     );
   });

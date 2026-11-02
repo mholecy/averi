@@ -506,38 +506,48 @@ export class IosAdapter implements DeviceAdapter {
 
   /**
    * The schemes a bundle declares (its Info.plist's CFBundleURLTypes, lower-cased; ios-url-schemes.ts), per bundle
-   * until install() — "declares none" included, and `undefined` for a lookup that failed (review of D49a: one
-   * lookup and one stderr line per bundle per adapter, not one per link).
+   * until install() — "declares none" included, and `undefined` for a plutil read that failed on a bundle whose
+   * appinfo named its Path (review of D49a: one lookup and one stderr line per bundle, not one per link). An appinfo
+   * failure, or no Path, is NOT cached, as appInfo's own rule (review round 2): the app may be installed later outside
+   * averi (Xcode, `simctl install` by hand), and every later own-scheme link would then reply a bare "Opened".
    */
   private readonly urlSchemesCache = new Map<string, readonly string[] | undefined>();
 
   /**
    * One bundle's schemes: `plutil` on the host, on the Info.plist at appinfo's Path (appInfo, cached); undefined when
-   * they could not be read — appinfo failed or listed no Path, plutil failed other than on a missing key, or its
-   * answer has another shape — said once on stderr (this layer's channel for a non-fatal note), so a drift in the
-   * lookup does not switch the wait off unseen (ios-foreground.ts's "never silent"). 10 s, as appinfo: a host read of
-   * milliseconds (measured on the lab app).
+   * they could not be read — appinfo failed or listed no Path (asked again next link), plutil failed other than on a
+   * missing key, or its answer has another shape (cached) — said on stderr (this layer's channel for a non-fatal
+   * note), so a drift in the lookup does not switch the wait off unseen (ios-foreground.ts's "never silent"). 10 s,
+   * as appinfo: a host read of milliseconds (measured on the lab app).
    */
   private async urlSchemes(bundleId: string, url: string): Promise<readonly string[] | undefined> {
     if (this.urlSchemesCache.has(bundleId)) return this.urlSchemesCache.get(bundleId);
-    let schemes: readonly string[] | undefined;
-    try {
-      schemes = await this.readUrlSchemes(bundleId);
-    } catch (e) {
+    const unread = (e: unknown, then: string): undefined => {
       console.error(
         `averi: could not read ${bundleId}'s URL schemes (${errorMessage(e).split('\n')[0]}) — ` +
-          `opened ${url} without waiting for ${bundleId} to come forward, and will not wait for it on later links ` +
-          'until the app is installed again',
+          `opened ${url} without waiting for ${bundleId} to come forward${then}`,
       );
+      return undefined;
+    };
+    let path: string | undefined;
+    try {
+      ({ path } = await this.appInfo(bundleId));
+    } catch (e) {
+      return unread(e, '; asked again on the next link');
+    }
+    if (path === undefined) return unread(new Error('simctl appinfo listed no Path'), '; asked again on the next link');
+    let schemes: readonly string[] | undefined;
+    try {
+      schemes = await this.readUrlSchemes(path);
+    } catch (e) {
+      schemes = unread(e, ', and will not wait for it on later links until the app is installed again');
     }
     this.urlSchemesCache.set(bundleId, schemes);
     return schemes;
   }
 
-  /** urlSchemes' read, uncached; throws when it could not read them. */
-  private async readUrlSchemes(bundleId: string): Promise<readonly string[]> {
-    const { path } = await this.appInfo(bundleId);
-    if (path === undefined) throw new Error('simctl appinfo listed no Path');
+  /** The schemes in the Info.plist of the `.app` at `path`, uncached; a missing key is none; throws otherwise. */
+  private async readUrlSchemes(path: string): Promise<readonly string[]> {
     try {
       const { stdout } = await this.exec('plutil', ['-extract', 'CFBundleURLTypes', 'json', '-o', '-', join(path, 'Info.plist')], { timeoutMs: 10_000 });
       return urlSchemes(stdout.toString('utf8'));

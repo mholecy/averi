@@ -393,7 +393,7 @@ function emptyThroughout(check: ForegroundCheck): string {
 }
 
 function unchecked(check: ForegroundCheck, why: string): WaitEnd {
-  const note = `could not check that ${check.bundleId} is in front (${why}) — for a moment after a launch ${WORDS[check.source].lag}; ${READ_AGAIN}`;
+  const note = `could not check that ${check.bundleId} is in front (${why}) — for a moment after an app switch ${WORDS[check.source].lag}; ${READ_AGAIN}`;
   return { kind: 'unchecked', note };
 }
 
