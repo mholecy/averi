@@ -99,4 +99,3 @@ export const schemeApprovalKey = (scheme: string): string => `${SIMCTL_OPENER}--
 export function schemeApprovalWrite(scheme: string, bundleId: string): string[] {
   return ['defaults', 'write', SCHEME_APPROVAL_DOMAIN, schemeApprovalKey(scheme), '-string', bundleId];
 }
-
