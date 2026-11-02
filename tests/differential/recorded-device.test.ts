@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
 import type { Recording } from '../../scripts/differential/corpus.js';
 import { PNG } from 'pngjs';
 import { deviceCalls, installFakeDevice, paintFrame } from '../../scripts/differential/fake-device.js';
 import { loadSide, recordedAdapter, type Side } from '../../scripts/differential/side.js';
+import { RecordedTreeSource } from '../../scripts/differential/recorded-source.js';
 import { COMPOSE, parseDump } from '../helpers/android-dumps.js';
 
 // The recorded device: a side's own adapter over a recorded payload — the iOS tree-source seam (RecordedTreeSource
@@ -58,6 +59,30 @@ describe('a raw WDA capture is read through the side\'s own WDA parser', () => {
     const first = await adapter.uiTree();
     first.children.length = 0;
     expect((await adapter.uiTree()).children.length).toBeGreaterThan(0);
+  });
+});
+
+describe("a recorded WDA source answers the launch's foreground question as the side's own WDA source would (D48)", () => {
+  const wdaRaw = async () => recording({ platform: 'ios', source: 'wda', form: 'raw', payload: await fixture('wda-source-skeleton-login.json') });
+
+  it('a side whose WdaServer asks activeAppInfo: the replayed app\'s bundle — the launch matches, no note, no read', async () => {
+    expect(side.asksWdaBundle).toBe(true);
+    const label = vi.spyOn(RecordedTreeSource.prototype, 'applicationLabel');
+    const adapter = recordedAdapter(side, await wdaRaw(), { platform: 'ios', screen: IPHONE, frame: IPHONE });
+    expect(await adapter.launch('differential.app')).toEqual({});
+    await expect(label.mock.results[0].value).resolves.toEqual({ kind: 'bundle', bundleId: 'differential.app' });
+    label.mockRestore();
+    expect(deviceCalls().filter((c) => c.includes('tree read') || c.includes('appinfo'))).toEqual([]);
+  });
+
+  it('the source per side: this side gets the bundle; an older side (no activeAppInfo) declined, as its WdaTreeSource answered — never a bundle its wait cannot match', async () => {
+    expect(await new RecordedTreeSource(await wdaRaw(), side.parseWdaSourceValue, () => {}, true).applicationLabel()).toEqual({ kind: 'bundle', bundleId: 'differential.app' });
+    expect(await new RecordedTreeSource(await wdaRaw(), side.parseWdaSourceValue, () => {}, false).applicationLabel()).toEqual({ kind: 'declined' });
+    const older: Side = { ...side, asksWdaBundle: false };
+    const label = vi.spyOn(RecordedTreeSource.prototype, 'applicationLabel');
+    await recordedAdapter(older, await wdaRaw(), { platform: 'ios', screen: IPHONE, frame: IPHONE }).launch('differential.app');
+    await expect(label.mock.results[0].value).resolves.toEqual({ kind: 'declined' });
+    label.mockRestore();
   });
 });
 

@@ -1,4 +1,5 @@
 import { IdbEmptyTreeError, type ApplicationLabel } from './ios-tree-source.js';
+import type { IosTreeSourceKind } from './ios-node.js';
 import { errorMessage } from '../util/error-message.js';
 import { formatSeconds } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
@@ -42,8 +43,8 @@ import { sleep } from '../util/sleep.js';
  * an unlabelled one (`unlabelled` — unmeasured shapes, and possibly idb's
  * full-frame launch transient) is a poll miss instead, remembered: if no
  * labelled read follows by the deadline, the note says it could not check.
- * Only a source that does not ask
- * (`declined` — WDA, wda-tree-source.ts, by decision) stays silent. idb's
+ * Only a source that does not ask (`declined` — WDA before its WebDriverAgent
+ * is up, wda-tree-source.ts) stays silent. idb's
  * empty tree (IdbEmptyTreeError — no tree yet, measured 0.4 s after a
  * launch) is a poll miss: the window this exists for is right behind it.
  *
@@ -110,6 +111,21 @@ import { sleep } from '../util/sleep.js';
  * note on EVERY launch — N windows for an ensure_state ladder with N launch
  * rungs.
  *
+ * On the WDA source (D48, 2026-11-02; ADR 0032's D48 amendment). WDA has the
+ * same lag: batch-2 D (main 39c1fcda) read Contacts' whole tree in 2 of 5
+ * `ui_snapshot`s right after a `launch_app` that, declining by decision
+ * (2026-10-09, unmeasured then), had waited for nothing. Its sessionless
+ * `/source` reads the app AX lists as active, so the source answers that
+ * app's bundle id (`bundle`, WDA's `/wda/activeAppInfo`) — exact, never
+ * localized: a match is `bundleId ===` the launched one, with no names and no
+ * appinfo; another bundle is polled like a stale label, and at the bound the
+ * note names it (`stillReads`; SpringBoard as what it is) with no
+ * localized-name branch. A WDA not yet up declines (the first read's start
+ * outlasts the switch), so a project's first launch still waits for nothing.
+ * Cost there: one `/wda/activeAppInfo` per ask (unmeasured, estimated tens of
+ * ms; D48's device check) — an ask in flight at the bound is under WdaServer's
+ * ACTIVE_APP_TIMEOUT_MS.
+ *
  * Not for `openDeepLink`: a link may legitimately bring ANOTHER app forward
  * (a universal link handed to Safari, a link the app routes elsewhere), and
  * the adapter knows no bundle to wait for. Not on Android: the previous app's
@@ -155,8 +171,10 @@ const LOCALIZED_REREAD_MS = 20_000;
 /** What the wait needs: the launched bundle, one read of the tree's Application label, and the bundle's names (cached by the caller). */
 export interface ForegroundCheck {
   bundleId: string;
-  /** IosTreeSource.applicationLabel — one device read per call. */
+  /** IosTreeSource.applicationLabel — one device call per call (none when `declined`). */
   label(): Promise<ApplicationLabel>;
+  /** The source `label` asks — for the notes' wording only (idb's tree, WebDriverAgent's active app). */
+  source: IosTreeSourceKind;
   /**
    * The bundle's names (simctl-appinfo.ts's appInfoNames), never empty;
    * THROWS when they could not be read — the error's first line is what the
@@ -183,6 +201,8 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
   let names: readonly string[] | undefined;
   /** The last label that was not a match — what the note names. */
   let stale: string | undefined;
+  /** The last bundle WDA named that was not the launched one — what its note names. */
+  let staleBundle: string | undefined;
   /** Whether a read came back with no Application label (see below). */
   let unlabelled = false;
   for (;;) {
@@ -193,12 +213,16 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
       // A device that was not read: idb's empty tree is the launch's own
       // transient (read on, `read` left undefined); anything else is not this
       // check's to diagnose.
-      if (!(e instanceof IdbEmptyTreeError)) return unchecked(check.bundleId, headline(e));
+      if (!(e instanceof IdbEmptyTreeError)) return unchecked(check.bundleId, headline(e), check.source);
     }
     if (read !== undefined) {
-      // The source does not ask (WDA): by decision, nothing to wait for and nothing to say.
+      // The source does not ask (WDA not up yet): nothing to wait for and nothing to say.
       if (read.kind === 'declined') return undefined;
-      if (read.kind === 'unlabelled') {
+      if (read.kind === 'bundle') {
+        // WDA's exact answer (D48): the bundle id, never localized — no names, no appinfo.
+        if (read.bundleId === check.bundleId) return undefined;
+        staleBundle = read.bundleId;
+      } else if (read.kind === 'unlabelled') {
         // A poll miss, like the empty tree — not a stop (review round 2):
         // idb's other launch transient, a lone full-frame Application that
         // IdbEmptyTreeError deliberately leaves a tree, may come unlabelled
@@ -213,7 +237,7 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
           try {
             names = await check.names();
           } catch (e) {
-            return unchecked(check.bundleId, headline(e));
+            return unchecked(check.bundleId, headline(e), check.source);
           }
           // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
           deadline += Date.now() - asked;
@@ -224,9 +248,16 @@ export async function awaitForeground(check: ForegroundCheck): Promise<string | 
     }
     // Pause only if the read after it would START before the deadline.
     if (Date.now() + FOREGROUND_POLL_MS >= deadline) {
-      // The most telling thing read wins: a real label, then an unlabelled tree, then nothing at all.
+      // The most telling thing read wins: a real label (or bundle), then an unlabelled tree, then nothing at all.
+      if (staleBundle !== undefined) return stillReads(check.bundleId, staleBundle);
       if (stale !== undefined) return notInFront(check.bundleId, stale, names ?? [], check.ownerOf(stale));
-      if (unlabelled) return unchecked(check.bundleId, `the tree's Application element had no label, or there was none, for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`);
+      if (unlabelled) {
+        const why =
+          check.source === 'wda'
+            ? `WebDriverAgent's active app carried no bundle id for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`
+            : `the tree's Application element had no label, or there was none, for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`;
+        return unchecked(check.bundleId, why, check.source);
+      }
       return emptyThroughout(check.bundleId);
     }
     await sleep(FOREGROUND_POLL_MS);
@@ -279,9 +310,29 @@ function emptyThroughout(bundleId: string): string {
   );
 }
 
-function unchecked(bundleId: string, why: string): string {
+function unchecked(bundleId: string, why: string, source: IosTreeSourceKind): string {
+  const lag =
+    source === 'wda' ? 'WebDriverAgent can still read the previous app' : "iOS can hand idb the previous app's tree";
   return (
     `could not check that ${bundleId} is in front (${why}) — for a moment after a ` +
-    "launch iOS can hand idb the previous app's tree; compare with screenshot before trusting a read"
+    `launch ${lag}; compare with screenshot before trusting a read`
+  );
+}
+
+/** WDA's bundle id for SpringBoard (D48's note names it as what it is, as `whose` does idb's `' '`). */
+const SPRINGBOARD_BUNDLE = 'com.apple.springboard';
+
+/**
+ * The note for a WDA source that named another bundle to the bound (D48).
+ * No localized-name branch: a bundle id is exact, so another one IS another
+ * app — the tree `/source` reads now is that app's, whatever the screenshot
+ * shows. No `ownerOf`: the bundle id already names it.
+ */
+function stillReads(bundleId: string, other: string): string {
+  const app =
+    other === SPRINGBOARD_BUNDLE ? 'SpringBoard (the home screen, the launch animation or a system alert)' : other;
+  return (
+    `${formatSeconds(FOREGROUND_WAIT_MS)} after launching ${bundleId}, WebDriverAgent still read ${app} as the active app — ` +
+    "a ui_snapshot now reads that app's tree, on which an absent check passes. Read again; if it repeats, take a screenshot"
   );
 }

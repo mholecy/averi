@@ -197,6 +197,13 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(description('launch_app')).not.toMatch(/(?<![\d.])3 s\b/);
   });
 
+  it('launch_app: the iOS wait is both sources\' (D48) — idb by the tree\'s Application label, WebDriverAgent by its active app once running', () => {
+    expect(description('launch_app')).not.toContain('iOS (idb)');
+    expect(description('launch_app')).toContain(
+      "iOS: returns once the tree source names the launched app (idb: the tree's Application label; WebDriverAgent: its active app, once WDA is running)",
+    );
+  });
+
   it('scroll_until: the swipe and time bounds (interact/scroll.ts DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS)', () => {
     expect(property('scroll_until', 'maxSwipes').description).toBe('Default 17');
     expect(property('scroll_until', 'timeoutMs').description).toBe('Default 15250');
@@ -218,6 +225,19 @@ describe('tool descriptions quote each operation default from its owner', () => 
     expect(words).toBe('after 1 swipe (the text drawn over it moved with it, both by 0,-300 since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out from under it)');
     expect(troubleshooting).toContain(`failed ${words.replace('1 swipe', 'N swipes').replace('0,-300', 'dx,dy')} — …`);
     expect(troubleshooting).not.toContain('runs to its timeout (a known limit)');
+  });
+
+  it("launch_app's foreground wait under treeSource: wda (D48): the docs say it waits once WDA runs, quote its note, and no longer license a stale tree by screenshot", () => {
+    const troubleshooting = readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8');
+    const yaml = readFileSync(new URL('../../skill/references/averi-yaml.md', import.meta.url), 'utf8');
+    for (const doc of [TOOLS_MD, troubleshooting, yaml]) {
+      expect(doc).not.toMatch(/returns without (waiting|that wait)|the launch does not (wait|check)|unmeasured there/);
+    }
+    expect(full('launch_app')).toContain('`treeSource: wda`: until WebDriverAgent names the launched bundle as its active app');
+    expect(troubleshooting).toContain('**iOS `⚠ … after launching <app>, WebDriverAgent still read <other> as the active app …`**');
+    // The 2026-10-09 correction (ios-foreground.ts#notInFront): the screenshot switches before the tree does.
+    expect(troubleshooting).not.toContain('If it shows the launched app, its on-screen name differs from its Info.plist name (a localized display name) and you can go on.');
+    expect(troubleshooting).toContain('The screenshot does not settle it: it shows the launched app before idb\'s tree does.');
   });
 
   it('swipe: how far a direction stroke reaches from the centre (interact/swipe.ts SWIPE_REACH_FRACTION)', () => {

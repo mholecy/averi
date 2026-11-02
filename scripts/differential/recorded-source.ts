@@ -43,6 +43,11 @@ export class RecordedTreeSource implements IosTreeSource {
     private readonly parseWdaSourceValue: (value: unknown) => UiNode,
     /** Told of every read — the fake device's call log, so a recorded read counts like a device's. */
     private readonly onRead: (what: string) => void = () => {},
+    /**
+     * Whether the side's own WdaTreeSource answers a bundle id (Side.asksWdaBundle, D48) — false for a side from
+     * before it, whose launch wait cannot match one: it is handed `declined`, as its WdaTreeSource answered.
+     */
+    private readonly answersBundle: boolean = false,
   ) {
     if (recording.platform !== 'ios' || recording.source === 'uiautomator') {
       throw new Error(`RecordedTreeSource replays iOS trees; ${recording.id} is ${recording.platform} ${recording.source}`);
@@ -60,9 +65,17 @@ export class RecordedTreeSource implements IosTreeSource {
     return this.kind === 'wda' ? markWdaDialect(value as UiNode) : markIdbDialect(value as UiNode);
   }
 
-  /** As WdaTreeSource answers (declined, no read); a normalized tree keeps no element types to answer from. */
+  /**
+   * WDA: as the side's WdaTreeSource answers once its WebDriverAgent is up —
+   * since D48 the app the replay launched (differential.ts's
+   * `differential.app`), so the launch's foreground wait takes its match path
+   * with no device call and no read (`onRead` is not told); before D48
+   * (`answersBundle` false) `declined`. Either way the reply carries no
+   * note. idb: a normalized tree keeps no element types to answer from.
+   */
   async applicationLabel(): Promise<ApplicationLabel> {
-    return this.kind === 'wda' ? { kind: 'declined' } : { kind: 'unlabelled' };
+    if (this.kind === 'idb') return { kind: 'unlabelled' };
+    return this.answersBundle ? { kind: 'bundle', bundleId: 'differential.app' } : { kind: 'declined' };
   }
 
   async dispose(): Promise<void> {}

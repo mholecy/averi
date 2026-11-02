@@ -33,19 +33,23 @@ const WDA_ENVELOPE = {
   sessionId: 'abc-123',
 };
 
+/** `GET /wda/activeAppInfo`'s envelope, as FBCustomCommands.m#handleActiveAppInfo answers it (WDA 16.1.7). */
+const ACTIVE_LAB = { value: { pid: 4242, bundleId: 'dev.averi.lab', name: '', processArguments: {} }, sessionId: null };
+
 /**
  * A REAL WdaServer behind the fakes that drive its own tests: /status is
  * refused until our fake spawn ran and again once our child was signalled
  * (the port goes quiet the moment xcodebuild's teardown runs, as on the
  * happy path), /source answers the envelope.
  */
-async function setup() {
+async function setup(activeApp: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: ACTIVE_LAB })) {
   const { dd } = await tempDerivedData(true);
   const spawner = fakeSpawn();
   const fetcher = fakeFetch((url) => {
     if (url.endsWith('/status')) {
       return spawner.spawns.length === 0 || spawner.kills.length > 0 ? 'refused' : { status: 200, body: WDA_STATUS };
     }
+    if (url.endsWith('/wda/activeAppInfo')) return activeApp();
     return { status: 200, body: WDA_ENVELOPE };
   });
   const exec = fakeExec();
@@ -116,6 +120,72 @@ describe('WdaTreeSource — the WebDriverAgent adapter at the seam', () => {
     await source.dispose();
     await source.dispose();
     expect(spawner.kills).toEqual(['SIGTERM']);
+  });
+});
+
+describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, asked only of a WDA that is up (D48)', () => {
+  const asked = (urls: string[]) => urls.filter((u) => u.endsWith('/wda/activeAppInfo'));
+
+  it('before any read WDA is not up: declined — nothing spawned, nothing fetched, no idb', async () => {
+    const { source, spawner, fetcher, exec } = await setup();
+    expect(await source.applicationLabel()).toEqual({ kind: 'declined' });
+    expect(spawner.spawns).toEqual([]);
+    expect(fetcher.urls).toEqual([]);
+    expect(exec.calls).toEqual([]);
+  });
+
+  it('after a read: one GET /wda/activeAppInfo, no /source, no /status — the bundle it names', async () => {
+    const { source, spawner, fetcher } = await setup();
+    await source.read();
+    const before = fetcher.urls.length;
+    expect(await source.applicationLabel()).toEqual({ kind: 'bundle', bundleId: 'dev.averi.lab' });
+    expect(fetcher.urls.slice(before)).toEqual([expect.stringMatching(/^http:\/\/127\.0\.0\.1:\d+\/wda\/activeAppInfo$/)]);
+    expect(spawner.spawns).toHaveLength(1);
+  });
+
+  it.each([
+    ['no bundleId', { value: { pid: 1 } }],
+    ['an empty bundleId', { value: { bundleId: '' } }],
+    ['a bundleId that is not a string', { value: { bundleId: 7 } }],
+    ['no value', {}],
+    ['a null body', null],
+  ])('a payload with %s: unlabelled', async (_what, body) => {
+    const { source } = await setup(() => ({ status: 200, body }));
+    await source.read();
+    expect(await source.applicationLabel()).toEqual({ kind: 'unlabelled' });
+  });
+
+  it.each([
+    ['refused', () => 'refused' as const, /activeAppInfo request failed on port \d+ \(udid AAAA-1111\): ECONNREFUSED/],
+    ['HTTP 500', () => ({ status: 500 }), /activeAppInfo failed: HTTP 500 on port \d+ \(udid AAAA-1111\)/],
+  ])('%s: throws in WDA\'s words, naming the port and the log — and starts or restarts nothing', async (_what, answer, words) => {
+    const { source, spawner, fetcher } = await setup(answer);
+    await source.read();
+    const before = fetcher.urls.length;
+    const err = await source.applicationLabel().then(() => undefined, (e: unknown) => e as Error);
+    expect(err?.message).toMatch(words);
+    expect(err?.message).toMatch(/xcodebuild log: .*averi-wda-AAAA-1111\.log/);
+    expect(asked(fetcher.urls)).toHaveLength(1); // one ask, no retry
+    expect(fetcher.urls.slice(before).filter((u) => !u.endsWith('/wda/activeAppInfo'))).toEqual([]);
+    expect(spawner.spawns).toHaveLength(1);
+    expect(spawner.kills).toEqual([]);
+  });
+
+  it('after dispose: the released error, nothing asked', async () => {
+    const { source, fetcher } = await setup();
+    await source.read();
+    await source.dispose();
+    await expect(source.applicationLabel()).rejects.toThrow(/deselected or averi is shutting down; select the device again/);
+    expect(asked(fetcher.urls)).toEqual([]);
+  });
+
+  it('after our xcodebuild child exited, WDA is not up: declined — no ask, no spawn', async () => {
+    const { source, spawner, fetcher } = await setup();
+    await source.read();
+    spawner.children[0].exit.forEach((l) => l());
+    expect(await source.applicationLabel()).toEqual({ kind: 'declined' });
+    expect(asked(fetcher.urls)).toEqual([]);
+    expect(spawner.spawns).toHaveLength(1);
   });
 });
 

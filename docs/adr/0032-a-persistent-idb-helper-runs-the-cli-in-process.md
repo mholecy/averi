@@ -10,6 +10,8 @@ Amended 2026-11-01 (D41: every tool gets the project's adapter, so one simulator
 below).
 Amended 2026-11-01 (D44: the capture source no longer follows the tree source, so a wda project captures through idb
 too — see the amendment below).
+Amended 2026-11-02 (D48: a wda project's launch waits too — it asks WebDriverAgent which app it reads, once WDA is
+running — see the amendment below).
 
 ## Context
 
@@ -325,3 +327,58 @@ So on the wda tree source, capture through idb saves about 590 ms on a screensho
 OCR assert, 650 on a warm ensure_state and 680 on a cold one; the tap, which captures nothing, is unchanged. D26
 stalls: simctl 9 of 100 captures in run 1 and 0 of 100 in run 3; idb 0 of 102, its ok calls at a median of 94 ms
 against simctl's ~400 ms.
+
+## Amendment: the launch asks WebDriverAgent which app it reads (2026-11-02, backlog D48)
+
+The D41 amendment above says `launch_app` has no foreground wait in a wda project, because the wda source answered no
+application label. That was a decision of 2026-10-09 (`adapters/wda-tree-source.ts`): the idb lag after an app switch
+had not been measured on WDA's sessionless `/source`, and asking would move WebDriverAgent's start (a build on first
+use, then up to 60 s for `/status`) into `launch_app`. It is measured now. Batch-2 block D (2026-11-02, main 39c1fcda,
+a wda project on the lab simulator): Contacts in front, `launch_app dev.averi.lab`, a `ui_snapshot` at once. In 2 of 5
+runs the snapshot was Contacts' whole tree — neither empty nor bare, so nothing downstream doubted it — while the reply
+was the bare `Launched dev.averi.lab on ios` (launchMs 340–364: no wait ran).
+
+The mechanism, from WDA 16.1.7's source: averi holds no WDA session, so `/source` reads
+`XCUIApplication.fb_activeApplication` (FBDebugCommands.m), the app AX lists as active — and the lab's WDA log shows AX
+listing one app, which for a moment after `simctl launch` returns is still the previous one. The same lag idb was
+measured with (docs/bugs/2026-10-09-ios-launch-app-reads-previous-apps-tree.md), through another reader.
+
+Decision:
+
+- `WdaServer.isUp()` — no device call: a start of ours reached `/status`, and its xcodebuild has neither exited nor been
+  stopped since. `WdaServer.activeAppInfo()` — `GET /wda/activeAppInfo`, sessionless; FBCustomCommands.m resolves its
+  app with the same `request.session.activeApplication ?: fb_activeApplication` as `/source`, so it names the app the
+  next `/source` reads, without walking the tree. It never starts or restarts WDA; one request under 2 s; a refusal, a
+  timeout or an HTTP error fails naming the port and the log.
+- `WdaTreeSource.applicationLabel()`: WDA not up → `declined`, as before (the first read's own start, 7.7 s in that
+  run, outlasts the switch, and a launch must not start WDA); up → the new `{ kind: 'bundle', bundleId }` from
+  `value.bundleId`, `unlabelled` when that is not a non-empty string; released → the released error.
+- `ios-foreground.ts#awaitForeground`: a `bundle` answer matches when it is the launched bundle — exact, so no
+  `simctl appinfo`, no names, no localized-name reading. Another bundle is polled like a stale label within the same
+  3 s bound, and then the note: `3 s after launching <id>, WebDriverAgent still read <other> as the active app — a
+  ui_snapshot now reads that app's tree, on which an absent check passes. Read again; if it repeats, take a
+  screenshot`, SpringBoard (`com.apple.springboard`) named as "SpringBoard (the home screen, the launch animation or a
+  system alert)". A failed ask, or no bundle id to the bound, is the "could not check" note, worded for WebDriverAgent.
+- `launch_app`, a flow's `launch:` and `ensure_state`'s launch rungs all pass `IosAdapter.launch`, so all gain it.
+  `openDeepLink` still waits for nothing (a link may bring another app forward).
+
+Considered, not chosen:
+
+- Reading `/source` until its root is the launched app: a whole tree read per poll (0.9–1.25 s in that run), and the
+  display names (`appinfo`) to match it against again.
+- idb's Application label in a wda project: another reader, whose lag is not `/source`'s.
+- Starting WDA inside `launch_app`: the 2026-10-09 objection stands — a build and up to 60 s of start in a project's
+  first launch, where declining costs nothing.
+- `ui_snapshot` naming the app it read and warning when it is not the last launched: an extra ask per read, and a false
+  ⚠ after a deep link or a tap that legitimately opens another app.
+
+Cost: WDA not up — nothing (`declined`, no call). Up, the app already in front — one `/wda/activeAppInfo` (estimated
+tens of ms: an AX query, no tree walk; unmeasured). Up, AX still lagging — the lag (estimated 0.3–1 s), time the next
+read would otherwise spend on a stale tree; at worst the 3 s bound plus one ask in flight (≤ 2 s) and a ⚠ line. The idb
+source is unchanged. The differential replay's recorded WDA source answers the replayed app's bundle to a side that
+asks (`Side.asksWdaBundle` in `scripts/differential/side.ts`) and `declined` to an older one, so neither side's reply moves.
+
+To check on the device (the next batch): Q2 ×10 A/B main vs this change, judged by lab ids; the raw lag window
+(`/wda/activeAppInfo` every 50 ms after `simctl launch`); the happy-path cost (accept ≤ +150 ms median); a cold launch;
+a launch before WDA is up; an idb project unchanged. Android has the same shape of code (no wait after `am start`) but a
+different read (`uiautomator dump` waits for 1 s of accessibility idle) — not changed until measured.

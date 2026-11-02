@@ -29,6 +29,14 @@ import { errorMessage } from '../util/error-message.js';
 const WDA_BUNDLE_ID = 'com.facebook.WebDriverAgentRunner';
 const STATUS_PROBE_TIMEOUT_MS = 1_000;
 const BUILD_TIMEOUT_MS = 600_000;
+/**
+ * `/wda/activeAppInfo` (activeAppInfo) asks AX which app is active — no tree walk —
+ * so a running WDA answers it in the tens of ms (unmeasured: D48's device check).
+ * 2 s, not STATUS_PROBE_TIMEOUT_MS's 1 s: the launch's foreground wait (ios-foreground.ts)
+ * adds one in-flight ask to its bound at worst, and a loaded host must not turn a slow
+ * answer into a "could not check" note.
+ */
+const ACTIVE_APP_TIMEOUT_MS = 2_000;
 /** /source on deep trees is the known WDA weakness — Phase 4 measures it. */
 const SOURCE_TIMEOUT_MS = 30_000;
 /** Post-build: the first app-install on the simulator dominates this. */
@@ -162,6 +170,8 @@ export class WdaServer {
   /** Set by shutdown(): terminal — unlike stop(), no restart may follow. */
   private shutDown = false;
   private child: WdaChild | undefined;
+  /** The child whose WDA answered /status in awaitReady — isUp() while it is still `child` and alive. */
+  private readyChild: WdaChild | undefined;
   private childExited = false;
   private childError: Error | undefined;
   private exitHook: (() => void) | undefined;
@@ -216,6 +226,52 @@ export class WdaServer {
    */
   async source(): Promise<unknown> {
     return this.sourceAttempt(false);
+  }
+
+  /**
+   * Whether OUR WebDriverAgent is up now, without asking it: a start of ours
+   * reached /status and its xcodebuild has neither exited nor been stopped
+   * since (stop() and shutdown() clear `child`; a restart is up again only
+   * once its own start reached /status). No device call — what the launch's
+   * foreground wait asks before activeAppInfo (wda-tree-source.ts), so a
+   * launch never starts WDA. A runner that died inside the simulator while
+   * xcodebuild lives on still reads as up; activeAppInfo then fails in WDA's
+   * words.
+   */
+  isUp(): boolean {
+    return this.child !== undefined && this.child === this.readyChild && !this.childExited;
+  }
+
+  /**
+   * GET /wda/activeAppInfo (sessionless): the app WDA's sessionless reads
+   * read — FBCustomCommands.m answers it with the same
+   * `request.session.activeApplication ?: fb_activeApplication` as /source,
+   * so it names the app the next /source walks, without walking it.
+   * Returns the raw envelope `{ value: { pid, bundleId, name, … } }`.
+   * NEVER starts WDA (no ensureRunning) and never restarts it: one request
+   * under ACTIVE_APP_TIMEOUT_MS; a refusal, a timeout or an HTTP error
+   * fails naming the port and the log, like source(). Callers ask isUp()
+   * first.
+   */
+  async activeAppInfo(): Promise<unknown> {
+    let res: Awaited<ReturnType<FetchFn>>;
+    try {
+      res = await this.fetchFn(`${this.baseUrl()}/wda/activeAppInfo`, {
+        signal: AbortSignal.timeout(ACTIVE_APP_TIMEOUT_MS),
+      });
+    } catch (err) {
+      throw new Error(
+        `WDA /wda/activeAppInfo request failed on port ${this.port} (udid ${this.udid}): ${errorMessage(err)} — ` +
+          `xcodebuild log: ${this.logPath}`,
+        { cause: err },
+      );
+    }
+    if (!res.ok) {
+      throw new Error(
+        `WDA /wda/activeAppInfo failed: HTTP ${res.status} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`,
+      );
+    }
+    return res.json();
   }
 
   private async sourceAttempt(restarted: boolean): Promise<unknown> {
@@ -614,7 +670,10 @@ export class WdaServer {
                 `xcodebuild log: ${this.logPath}. ${FIRST_BUILD_NOTE}`,
           );
         }
-        if (await this.probeStatus()) return;
+        if (await this.probeStatus()) {
+          this.readyChild = myChild;
+          return;
+        }
         await sleep(this.pollIntervalMs);
       }
       throw new Error(

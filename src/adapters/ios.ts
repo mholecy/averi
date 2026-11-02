@@ -319,17 +319,19 @@ export class IosAdapter implements DeviceAdapter {
     await this.enableAccessibilityAutomation(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
     this.front = { kind: 'launched', bundleId };
-    // `simctl launch` returns before the app is in front: for ~1–2 s idb can
-    // still hand out the previous app's (or SpringBoard's) tree, complete and
-    // labelled, which no reader doubts. Wait here — the one place both
-    // launch_app and a flow's `launch:` pass, once — until the tree's
-    // Application is this app's, bounded and failing open; the facts, the
-    // bound and the cost are ios-foreground.ts's.
+    // `simctl launch` returns before the app is in front: for ~1–2 s idb (and
+    // WDA's /source, D48) can still hand out the previous app's (or
+    // SpringBoard's) tree, complete and labelled, which no reader doubts. Wait
+    // here — the one place both launch_app and a flow's `launch:` pass, once —
+    // until the source names this app (idb: the tree's Application; WDA, once
+    // up: its active app's bundle id), bounded and failing open; the facts,
+    // the bound and the cost are ios-foreground.ts's.
     const note = await awaitForeground({
       bundleId,
       label: () => this.treeSource.applicationLabel(),
       names: () => this.appNames(bundleId),
       ownerOf: (label) => this.ownerOf(label),
+      source: this.treeSource.kind,
     });
     return note === undefined ? {} : { note };
   }
@@ -341,7 +343,7 @@ export class IosAdapter implements DeviceAdapter {
    * bundle's entry. An answer is cached when it carries a name or a Path — a name-less one with a Path too (appNames
    * throws on it from the cache: the launch's note says so without asking again); a failed call, or an answer with
    * neither (a format drift, maybe a bundle not installed), is asked again.
-   * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter looked up (an idb-source launch — WDA declines the check before asking; a liveness check; this process), so an app never launched or checked through this server is not in it.
+   * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter looked up (an idb-source launch — WDA answers a bundle id and is never matched by name; a liveness check; this process), so an app never launched or checked through this server is not in it.
    */
   private readonly appInfoCache = new Map<string, AppInfo>();
 
