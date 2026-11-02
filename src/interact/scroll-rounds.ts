@@ -11,7 +11,7 @@ import { outsideItsScrollView, type Remedy } from '../ui-tree/standing.js';
 import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
-import { fullyClaimed, judgeRead, shortOf, stops, strokeLine, unfitAlong, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
+import { fullyClaimed, judgeRead, scrollViewsOf, shortOf, stops, strokeLine, unfitAlong, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
 import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
 import { carried, planStroke, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
@@ -247,9 +247,9 @@ export type RoundStep =
  * - `bound`: the bound ended it (`by`), and what the target was short of
  *   (`short`), with the turns, the keyboard the rounds applied, and the
  *   `unlocated` row of the last round's reading.
- * - `unfit`: a `fully: true` match in the frame, clipped, as wide or as tall as its scroll view, or more
- *   (scroll-read.ts#unfitAlong, `unfit`): no swipe shows it whole, so none further is sent — on the first read that
- *   knows its size, before any swipe where the tree lists it where it lies.
+ * - `unfit`: a `fully: true` match in the frame, clipped, as wide or as tall as the scroll view that scrolls it
+ *   along that axis, or more (scroll-read.ts#unfitAlong, `unfit`): no swipe shows it whole, so none further is sent —
+ *   on the first read that knows its size, before any swipe where the tree lists it where it lies.
  * - `changed`: the screen changed under the strokes (ui-tree/read-tree.ts#ScreenChange) — the
  *   first read after them is another screen than the read before them; no
  *   stop is judged on it and no further stroke sent, whether the target is
@@ -1031,8 +1031,9 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // `fully: true` on a match as wide or as tall as its scroll view, or more (scroll-read.ts#unfitAlong): fully shown at
     // one exact offset at most, which no stroke lands on — the strokes and turns would only swing it to and fro to the
     // bound (D52: batch-3 E2, 6 strokes and 3 turns), and a still one would read "stuck … a layout defect". Stop on the
-    // first read that knows its size, before the stuck turn, saying why.
-    const unfit = fully ? unfitAlong(best.standing.facts, best.node.rect) : undefined;
+    // first read that knows its size, before the stuck turn, saying why. Its scroll views are asked only of a clipped match.
+    const clipped = fully && best.standing.facts.clipped.length > 0;
+    const unfit = clipped ? unfitAlong(best.standing.facts, best.node.rect, scrollViewsOf(now.facts.scene.clips, best.node)) : undefined;
     if (unfit !== undefined) return stop(s, { kind: 'unfit', swipes: s.swipes, judged: best, viewport, unfit });
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.

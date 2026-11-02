@@ -11,7 +11,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
+import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
@@ -762,25 +762,26 @@ const SIZE_WORDS: Readonly<Record<Unfit['along'], { readonly as: string; readonl
 };
 
 /**
- * The `unfit` failure (scroll-read.ts#Unfit, D52): a `fully: true` match as wide or as tall as its scroll view, or more —
- * where it stands and how much of it is in, its size against the scroll view's (the scroll view the standing names when
- * it cuts it, else the frame it draws), why no swipe shows it whole, and the way out. A plain Error, as `stuck`: the
- * element was there and seen. Never a claim it is visible.
+ * The `unfit` failure (scroll-read.ts#Unfit, D52): a `fully: true` match as wide or as tall as the scroll view that
+ * scrolls it along that axis, or more — where it is clipped and how much of it is drawn, its size against that scroll
+ * view's (the one whose size it was judged by, quoted), why no swipe shows it whole, and the way out. A plain Error, as
+ * `stuck`: the element was there and seen. Never a claim it is visible.
  */
 function unfitText(o: Extract<ScrollOutcome, { kind: 'unfit' }>, describe: string): string {
   const { judged, viewport, unfit } = o;
-  const { facts } = judged.standing;
-  const scroller = judged.standing.kind === 'clipped' ? judged.standing.byScrollView?.scroller : undefined;
-  const view = scroller === undefined ? `the frame its scroll view draws (${rectText(unfit.frame)})` : `its scroll view ${nodeText(scroller)}`;
+  const { clipped, visible, unknownPast } = judged.standing.facts;
+  const share = shareText(visible, unknownPast);
+  const where = judged.under === undefined ? 'in the viewport' : `in the viewport above the soft keyboard over ${frameText(judged.under.topCover)}`;
+  const view = `its scroll view ${nodeText(unfit.scrollView)}`;
   const words = SIZE_WORDS[unfit.along];
   const why =
-    unfit.size > unfit.room
+    unfit.size > unfitRoom(unfit)
       ? `${words.more} than ${view}: no scroll offset shows all of it`
       : `as ${words.as} as ${view}: fully: true holds at one exact scroll offset only, which no swipe can be aimed at`;
   return (
-    `scroll_until ${describe} failed after ${swipesText(o.swipes)} — element is in the viewport but ${describeClip(facts, judged.under?.topCover)}, ` +
+    `scroll_until ${describe} failed after ${swipesText(o.swipes)} — element is ${where} but CLIPPED at ${clipped.join('/')}: ${share} of it is drawn${unknownPastText(unknownPast)}, ` +
     `and it is ${unfit.size} ${words.as} (tree units), ${why} — drop fully: true (the plain stop needs only its centre in view), ` +
-    `or accept the ${shareText(facts.visible, facts.unknownPast)} shown. Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
+    `or accept what it shows (${share}). Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
   );
 }
 

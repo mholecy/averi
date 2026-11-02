@@ -166,11 +166,11 @@ describe('`fully: true` on a card as wide as its carousel (D52): fails at the fi
   it('E2 run 0: unfit on the 4th read (C at 45, both sides known) after 3 strokes — not 6 strokes and 3 turns to maxSwipes', () => {
     const played = replay(FULLY_LEFT, E2_RUN_0);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
-    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 3, unfit: { along: 'horizontal', size: 948, room: 948, frame: CAROUSEL } });
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 3, unfit: { along: 'horizontal', size: 948, scrollView: { rect: CAROUSEL } } });
     expect(failureOf(played, 'id:"lab.carousel-in-list.C"').message).toBe(
-      'scroll_until id:"lab.carousel-in-list.C" failed after 3 swipes — element is in the viewport but CLIPPED at left, 98% of it is in the viewport, ' +
+      'scroll_until id:"lab.carousel-in-list.C" failed after 3 swipes — element is in the viewport but CLIPPED at left: 98% of it is drawn, ' +
         'and it is 948 wide (tree units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one exact scroll offset only, ' +
-        'which no swipe can be aimed at — drop fully: true (the plain stop needs only its centre in view), or accept the 98% shown. ' +
+        'which no swipe can be aimed at — drop fully: true (the plain stop needs only its centre in view), or accept what it shows (98%). ' +
         'Last rect {"x":45,"y":380,"width":948,"height":234} in a 1080x2220 viewport',
     );
   });
@@ -178,11 +178,11 @@ describe('`fully: true` on a card as wide as its carousel (D52): fails at the fi
   it('wider than the carousel (1000 in 948), both sides known: unfit before any swipe, "no scroll shows all of it"', () => {
     const played = play(FULLY_LEFT, [cAt(40, 1000)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stop']);
-    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0, unfit: { size: 1000, room: 948 } });
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0, unfit: { size: 1000, scrollView: { rect: CAROUSEL } } });
     expect(failureOf(played, 'C').message).toBe(
-      'scroll_until C failed after 0 swipes — element is in the viewport but CLIPPED at left/right, 95% of it is in the viewport, ' +
+      'scroll_until C failed after 0 swipes — element is in the viewport but CLIPPED at left/right: 95% of it is drawn, ' +
         'and it is 1000 wide (tree units), wider than its scroll view scrollable (66,380 948x234): no scroll offset shows all of it ' +
-        '— drop fully: true (the plain stop needs only its centre in view), or accept the 95% shown. ' +
+        '— drop fully: true (the plain stop needs only its centre in view), or accept what it shows (95%). ' +
         'Last rect {"x":40,"y":380,"width":1000,"height":234} in a 1080x2220 viewport',
     );
   });
