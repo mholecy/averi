@@ -14,7 +14,7 @@ import { DEFAULT_MAX_SWIPES, DEFAULT_SCROLL_TIMEOUT_MS, describeScrollResult, sc
 import { eyesOn } from '../verify/eyes.js';
 import { SWIPE_REACH_FRACTION, swipeScreen } from '../interact/swipe.js';
 import { tapElement } from '../interact/tap.js';
-import { launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
+import { deepLinkText, launchText, snapshotNote, swipeText, tapText, typedText } from './tool-text.js';
 import { EngineSession, launchApp } from '../flow/launch.js';
 import { appBuildPath } from '../flow/load.js';
 import { iosToolSettings, loadForCall, type IosToolSettings } from '../flow/tool-config.js';
@@ -339,13 +339,17 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
   registerTool(
     'open_deep_link',
     {
-      description: 'Open a deep link / universal link URL on the device.',
+      description:
+        'Open a deep link / universal link URL on the device. ' +
+        `iOS, a link to the scheme of averi.yaml's iOS app: waits up to ${FOREGROUND_BUDGET} for it; ⚠ = not seen in front (iOS may ask "Open in …?"): screenshot, answer it.`,
       inputSchema: { platform, url: z.string(), configPath },
     },
     async ({ platform: p, url, configPath: cp }) => {
       const { cfg } = await loadForCall(TOOL_CONFIG.open_deep_link(p), cp);
-      await (await deviceFor(p, iosToolSettings(cfg, p))).openDeepLink(url);
-      return text(`Opened ${url} on ${p}`);
+      // The project's iOS app (D49a): a link to its own scheme waits until it is in front (adapters/ios.ts). On
+      // android the policy reads no config, so none is handed over (and android.ts ignores it).
+      const outcome = await (await deviceFor(p, iosToolSettings(cfg, p))).openDeepLink(url, { appId: cfg?.app.ios?.bundleId });
+      return text(deepLinkText(p, url, outcome));
     },
   );
 

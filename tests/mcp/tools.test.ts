@@ -581,6 +581,30 @@ describe('launch_app — the entry activity', () => {
     expect(result.text).toBe(`Launched md.bank.app on ios\n⚠ ${ios.launchNote}`);
   });
 
+  // D49a (2026-11-02): open_deep_link hands the iOS adapter the project's app — a link to its own scheme waits until it
+  // is in front (adapters/ios.ts#openDeepLink) — and the adapter's note reaches the reply as launch_app's does.
+  it("open_deep_link on ios hands the adapter averi.yaml's bundle id, and the link's note reaches the reply as its ⚠ line", async () => {
+    const ios = home();
+    ios.deepLinkNote = 'averi did not see md.bank.app come forward after the link: iOS may be asking to confirm it';
+    const { call } = await connect({ ios });
+    const result = await call('open_deep_link', { platform: 'ios', url: 'bank://home', configPath: await validConfig() });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe(`Opened bank://home on ios\n⚠ ${ios.deepLinkNote}`);
+    expect(ios.deepLinks).toEqual([{ url: 'bank://home', opts: { appId: 'md.bank.app' } }]);
+  });
+
+  it('open_deep_link with no note replies with the one line; without averi.yaml, and on android, no app is handed over', async () => {
+    const ios = home();
+    const android = home();
+    const { call } = await connect({ ios, android });
+    expect((await call('open_deep_link', { platform: 'ios', url: 'bank://home', configPath: missing() })).text).toBe('Opened bank://home on ios');
+    expect((await call('open_deep_link', { platform: 'android', url: 'bank://home', configPath: await validConfig() })).text).toBe(
+      'Opened bank://home on android',
+    );
+    expect(ios.deepLinks).toEqual([{ url: 'bank://home', opts: {} }]);
+    expect(android.deepLinks).toEqual([{ url: 'bank://home', opts: {} }]);
+  });
+
   it('ios never gets an activity from the config', async () => {
     const { launches } = await launch({ appId: 'md.bank.app' }, { platform: 'ios' });
     expect(launches[0].activity).toBeUndefined();

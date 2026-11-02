@@ -1,5 +1,5 @@
 /**
- * The one-line responses of the tap, type_text, swipe and launch_app tools, as pure functions.
+ * The one-line responses of the tap, type_text, swipe, launch_app and open_deep_link tools, as pure functions.
  *
  * They are here rather than inline in server.ts because server.ts connects a
  * transport at module load and cannot be imported by a test — and these lines
@@ -19,7 +19,7 @@
  * agree with — the flow engine may not import this layer.
  */
 
-import { everyNode, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
+import { everyNode, type DeepLinkOutcome, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
@@ -73,6 +73,14 @@ export const launchText = (platform: Platform, launched: Launched): string =>
   `Launched ${launchedLine(launched, platform)}` +
   (launched.note !== undefined ? `\n⚠ ${launched.note}` : '') +
   (launched.wiped !== undefined ? `\n${WIPE_LABEL}: ${launched.wiped}` : '');
+
+/**
+ * `Opened <url> on <platform>`, and the link's note on its own line as `⚠ <note>` (D49a: iOS's foreground wait after a
+ * link to the project's own scheme, adapters/ios-foreground.ts — the note leads with what to do), as launchText lays
+ * out a launch's.
+ */
+export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkOutcome): string =>
+  `Opened ${url} on ${platform}` + (outcome.note !== undefined ? `\n⚠ ${outcome.note}` : '');
 
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array

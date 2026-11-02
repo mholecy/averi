@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { launchText, snapshotNote, swipeText, tapText, typedText } from '../../src/mcp/tool-text.js';
+import { deepLinkText, launchText, snapshotNote, swipeText, tapText, typedText } from '../../src/mcp/tool-text.js';
 import { el, node, screen } from '../helpers/fake.js';
 
 describe('tap and type_text response lines', () => {
@@ -99,5 +99,19 @@ describe('ui_snapshot note (2026-10-06: `[]` right after launch_app was indistin
       `⚠ The tree is bare: 2 nodes, nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon). ${BARE_TAIL}`,
     );
     expect(snapshotNote(node({ role: 'container', rect: ZERO }))).toMatch(/^⚠ The tree is bare: 1 node, nothing of the app's/);
+  });
+});
+
+// D49a: open_deep_link's reply — iOS's note for a link to the project's own scheme on its own ⚠ line.
+describe('deepLinkText', () => {
+  it('without a note: the one line', () => {
+    expect(deepLinkText('ios', 'averilab://d49', {})).toBe('Opened averilab://d49 on ios');
+    expect(deepLinkText('android', 'bank://home', {})).toBe('Opened bank://home on android');
+  });
+
+  it('with a note: the note on a ⚠ line under it, verbatim', () => {
+    expect(deepLinkText('ios', 'averilab://d49', { note: 'averi did not see dev.averi.lab come forward' })).toBe(
+      'Opened averilab://d49 on ios\n⚠ averi did not see dev.averi.lab come forward',
+    );
   });
 });

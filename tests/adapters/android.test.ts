@@ -965,9 +965,9 @@ describe('AndroidAdapter interactions', () => {
       expect(Object.hasOwn(error as Error, 'cause')).toBe(false);
     });
 
-    it('a deep link that started an activity resolves; an adb failure passes through as it is', async () => {
+    it('a deep link that started an activity resolves, with no note; an adb failure passes through as it is', async () => {
       await expect(answering({ stdout: 'Starting: Intent { act=android.intent.action.VIEW dat=bank://home }\n' }).openDeepLink('bank://home'))
-        .resolves.toBeUndefined();
+        .resolves.toEqual({}); // no note (D49a's wait is iOS's)
       const offline = execErrorLikeExec('adb -s e shell am start', 255, "adb: device 'e' not found\n");
       await expect(answering(offline).openDeepLink('bank://home')).rejects.toBe(offline);
     });
