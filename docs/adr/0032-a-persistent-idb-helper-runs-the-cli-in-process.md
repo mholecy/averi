@@ -517,9 +517,9 @@ Decision (spec-D54, adopting the D54 analysis; review round 1 reshaped the seams
   unreadable names are none); any other alert is "a system alert is up, "<title>"". Either way the headline says iOS
   has not opened the link yet — true whenever the alert holds it, which is when the wait found it in place of the app
   — and the title and the labels are quoted verbatim, never paraphrased or judged by their words. Only coordinates are
-  advised, since batch-5 answered the alert by coordinates and a selector tap on SpringBoard's tree was then unverified;
-  D57 proved it, and the advice now leads with a tap by the label (see that amendment). `front` does not move: the app
-  is not in front.
+  advised: batch-5 answered the alert by coordinates, and a selector tap on
+  SpringBoard's tree is unverified (D57; since then proven, and a tap by the label leads — see that amendment).
+  `front` does not move: the app is not in front.
 - Unchanged: a link that matches (no `/source`, no extra call on either source), a launch (it looks for no alert; since
   D56 it does — see that amendment), every link that expects no app (web links, iOS's own schemes, another app's
   scheme).
@@ -567,9 +567,9 @@ Decision (spec-D56, adopting the D56 analysis):
   launch` succeeded (batch-1: a bare "Launched" behind the alert).
 - One wording of the buttons and the advice, in `adapters/ios-system-alert.ts`: `alertButtonsText(alert)` (`buttons
   "Cancel" at (127, 474), "Open" at (275, 474)`, "button" for one) and `ALERT_ADVICE` ("Answer it with a tap at the
-  chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered";
-  reworded by D57 — see that amendment).
-  `mcp/tool-text.ts#alertText` (open_deep_link's reply) uses both and stays byte-identical.
+  chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered").
+  `mcp/tool-text.ts#alertText` (open_deep_link's reply) uses both and stays byte-identical (since D57 the advice
+  leads with a tap by the label — see that amendment).
 - The note: `iOS has not brought <bundle> forward yet: a system alert is up, "<title>" — buttons "<label>" at (x, y),
   …. <ALERT_ADVICE> — then read again before trusting a read`. Always "a system alert is up", never "it asks": the alert
   belongs to something earlier (a link) and may name another app (launching Contacts behind "Open in “AveriLab”?"). The
@@ -631,7 +631,7 @@ stale-tree residual above was not seen in 3 tries, and it stays stated (unmeasur
 no SpringBoard alert other than "Open in …?" can be raised on the lab simulator without a lab change (the lab requests
 no permission; `tel:` has no handler there, batch-4), so "every launch stays behind" is still measured for "Open in …?"
 alone. The remembered answer was restored and verified. The same batch tapped the alert's buttons by text (backlog D57,
-an observation; the advice above is unchanged here — D57 rewords it, see that amendment).
+an observation; the advice above is unchanged). Since then D57 rewords the advice — see that amendment.
 
 ## Amendment: the alert's advice names a tap by the button's label (2026-11-02, backlog D57)
 
@@ -655,8 +655,8 @@ Decision (spec-D57, adopting the D57 analysis's option A with a test that pins t
   Buttons, nothing of the app or the status bar beneath), and on WDA the alert's layer is the marked top layer
   (`presentation: 'alert'`), so a target behind it — Contacts' hidden "Return to AveriLab" breadcrumb — is refused
   "an alert is presented over it (…) — close it first; nothing was tapped". Pinned by
-  `tests/interact/tap-system-alert.test.ts`: the real `tapElement`, with its `ambiguous` option `'refuse'` (as the MCP tap passes it), over the
-  three committed alert captures.
+  `tests/interact/tap-system-alert.test.ts`: the real `tapElement`, with its `ambiguous` option `'refuse'` (as the MCP
+  tap passes it), over the three committed alert captures.
 - No "alert layer first" guard in the resolution: its only effect would be to turn today's honest ambiguity refusal
   into a guess. "averi taps nothing itself" stands (an opt-in confirm is D58's).
 - Unchanged, byte for byte: the detection, the headline (`iOS has not opened <url> yet: …`, `iOS has not brought

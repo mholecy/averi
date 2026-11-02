@@ -7,6 +7,7 @@ import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { AmbiguityRefusal } from '../../src/interact/resolve.js';
 import { tapElement, type TapAdapter } from '../../src/interact/tap.js';
 import { OffScreenRefusal } from '../../src/interact/tap-judgement.js';
+import { IDB_ALERT } from '../helpers/ios-lab.js';
 
 // D57 (ADR 0032's D57 amendment): the alert replies advise `tap text:"<label>"` first, so the real tapElement — the
 // MCP `tap` tool's selector path, with its `ambiguous` option `'refuse'` — is pinned over the captured "Open in
@@ -17,15 +18,14 @@ import { OffScreenRefusal } from '../../src/interact/tap-judgement.js';
 
 const json = async (name: string): Promise<unknown> =>
   JSON.parse(await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
-const IDB_SB = JSON.stringify(
-  ((await json('idb-springboard-open-in-alert.json')) as { elements: unknown[] }).elements,
-);
+// WDA's captures kept raw, not ios-lab.ts's parsed WDA_ALERT: each read parses its own tree, so the injection below
+// never reaches another read's nodes.
 const WDA_SB = await json('wda-capture-springboard-open-in-alert.json');
 const WDA_CT = ((await json('wda-capture-contacts-open-in-alert.json')) as { value: unknown }).value;
 
-/** Each source's tree of the alert, parsed afresh on every read (the guard may mark what it reads). */
+/** Each source's tree of the alert, parsed afresh on every read (idb's elements are ios-lab.ts's IDB_ALERT). */
 const TREES: Record<string, () => UiNode> = {
-  'idb over SpringBoard': () => parseIdbDescribeAll(IDB_SB),
+  'idb over SpringBoard': () => parseIdbDescribeAll(IDB_ALERT),
   'WDA over SpringBoard': () => parseWdaSourceValue(WDA_SB),
   'WDA over Contacts': () => parseWdaSourceValue(WDA_CT),
 };
