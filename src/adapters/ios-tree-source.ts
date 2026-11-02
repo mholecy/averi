@@ -7,7 +7,8 @@ import { IOS_ROLE_MAP, normalizeIosElement, type IosTreeSourceKind } from './ios
 import { WdaTreeSource } from './wda-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
 import type { IdbHelper } from './idb-helper.js';
-import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type UiNode } from './types.js';
+import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type SystemAlert, type UiNode } from './types.js';
+import { alertInIdb } from './ios-system-alert.js';
 import { countOf } from '../util/count.js';
 
 /**
@@ -78,7 +79,11 @@ export interface IosTreeSource {
  * different things and only a comment told them apart).
  *
  * - `label`: the Application element's label as read — SpringBoard's `' '`
- *   included, never trimmed (the caller names it).
+ *   included, never trimmed (the caller names it). On SpringBoard's, from
+ *   idb, also `alertIn` (D54): whether that same read lists iOS's system
+ *   alert, judged against the app names the caller holds
+ *   (ios-system-alert.ts#alertInIdb) — a function, not an answer, since the
+ *   launch's wait asks the names only after its first label; no device call.
  * - `unlabelled`: the read cannot say — it lists no Application element, or
  *   one whose label is missing or empty (both unmeasured; the launch's wait
  *   reads on, and says it could not check if nothing better follows).
@@ -90,7 +95,7 @@ export interface IosTreeSource {
  *   wait then waits for nothing and says nothing.
  */
 export type ApplicationLabel =
-  | { kind: 'label'; label: string }
+  | { kind: 'label'; label: string; alertIn?: (appNames: readonly string[]) => SystemAlert | undefined }
   | { kind: 'bundle'; bundleId: string }
   | { kind: 'unlabelled' }
   | { kind: 'declined' };
@@ -470,11 +475,15 @@ export class IdbTreeSource implements IosTreeSource {
    * The same read as `read()` — an empty payload throws IdbEmptyTreeError
    * here too, so the caller can tell idb's launch transient (no tree yet)
    * from a tree of the wrong app. An empty AXLabel is `unlabelled`, as a
-   * missing one is: no app is named by nothing.
+   * missing one is: no app is named by nothing. SpringBoard's answer carries
+   * `alertIn` over the same elements (D54): idb lists iOS's "Open in …?"
+   * alone under SpringBoard's Application.
    */
   async applicationLabel(): Promise<ApplicationLabel> {
-    const label = (await this.readOnce()).elements.find((el) => el.type === 'Application')?.AXLabel;
-    return label === undefined || label === null || label === '' ? { kind: 'unlabelled' } : { kind: 'label', label };
+    const { elements } = await this.readOnce();
+    const label = elements.find((el) => el.type === 'Application')?.AXLabel;
+    if (label === undefined || label === null || label === '') return { kind: 'unlabelled' };
+    return label === ' ' ? { kind: 'label', label, alertIn: (appNames) => alertInIdb(elements, appNames) } : { kind: 'label', label };
   }
 
   private async readOnce(): Promise<{ elements: IdbElement[]; tree: UiNode }> {

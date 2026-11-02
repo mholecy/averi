@@ -11,6 +11,7 @@ import { errorMessage } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { DeepLinkOptions, DeepLinkOutcome, DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
+import { alertInWda } from './ios-system-alert.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
 import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, urlSchemes } from './ios-url-schemes.js';
 import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
@@ -329,7 +330,7 @@ export class IosAdapter implements DeviceAdapter {
     // until the source names this app (idb: the tree's Application; WDA, once
     // up: its active app's bundle id), bounded and failing open; the facts,
     // the bound and the cost are ios-foreground.ts's.
-    const note = await awaitForeground(this.foregroundCheck(bundleId));
+    const { note } = await awaitForeground(this.foregroundCheck(bundleId));
     return note === undefined ? {} : { note };
   }
 
@@ -468,22 +469,25 @@ export class IosAdapter implements DeviceAdapter {
    * another app's scheme, schemes that could not be read — expects no app and reads nothing of the UI after `openurl`,
    * as before D49a. The scheme lookup runs after `openurl` (the writes and the open go out as they did): one
    * `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a failed
-   * one too. `front` moves to the app only when the wait saw it in front.
+   * one too. `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link
+   * (D54), the outcome names it instead of a note: on idb from the wait's own reads, on WDA from one `/source` read at
+   * the bound (`alert`: the tree source's read and ios-system-alert.ts#alertInWda) — never a tap.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<DeepLinkOutcome> {
     await this.enableAccessibilityAutomation(`opening ${url}`);
     await this.simctl(['openurl', this.udid, url]);
     const handler = await this.linkHandler(url, opts.appId);
     if (handler === undefined) return {};
-    // A link's wait has a note in every case but a match (ios-foreground.ts#awaitForeground).
-    const note = await awaitForeground(this.foregroundCheck(handler, { link: url }));
-    if (note !== undefined) return { note };
-    this.front = { kind: 'launched', bundleId: handler };
-    return {};
+    // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground). WDA's alert
+    // is read from its tree; idb's comes with the wait's own label reads (IdbTreeSource.applicationLabel).
+    const alert = this.treeSource.kind === 'wda' ? async () => alertInWda(await this.treeSource.read()) : undefined;
+    const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url, ...(alert !== undefined && { alert }) }));
+    if (outcome.note === undefined && outcome.alert === undefined) this.front = { kind: 'launched', bundleId: handler };
+    return outcome;
   }
 
   /** The foreground wait's check of `bundleId` through this adapter's source and caches — launch's and a link's. */
-  private foregroundCheck(bundleId: string, extra: Pick<ForegroundCheck, 'link'> = {}): ForegroundCheck {
+  private foregroundCheck(bundleId: string, extra: Pick<ForegroundCheck, 'link' | 'alert'> = {}): ForegroundCheck {
     return {
       bundleId,
       label: () => this.treeSource.applicationLabel(),

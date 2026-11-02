@@ -970,10 +970,31 @@ export interface LaunchOutcome {
  * ignores it.
  */
 /**
- * What a deep link has to say beyond "opened" — a launch's shape (LaunchOutcome): `note` is iOS's foreground-wait
- * caveat for a link to the project's own scheme (D49a), shown as the open_deep_link reply's `⚠` line.
+ * What a deep link has to say beyond "opened" — a launch's shape (LaunchOutcome) and one more: `note` is iOS's
+ * foreground-wait caveat for a link to the project's own scheme (D49a), shown as the open_deep_link reply's `⚠` line;
+ * `alert` (D54) is the system alert iOS shows instead of opening it ("Open in “AveriLab”?"), which replaces the reply's
+ * "Opened" headline (mcp/tool-text.ts#deepLinkText). At most one of the two is set.
  */
-export type DeepLinkOutcome = LaunchOutcome;
+export interface DeepLinkOutcome extends LaunchOutcome {
+  alert?: LinkAlert;
+}
+
+/**
+ * A system alert as a tree source lists it (D54, adapters/ios-system-alert.ts): its title and its buttons, each label
+ * verbatim (localised, never judged by its words) with its centre — where a tap answers it.
+ */
+export interface SystemAlert {
+  title: string;
+  buttons: readonly { label: string; centre: Point }[];
+}
+
+/**
+ * The alert a link waits behind (D54): `namesApp` — its title contains one of the link's app's names, so the reply may
+ * say iOS asks to open the link there; otherwise it calls it a system alert, and no more.
+ */
+export interface LinkAlert extends SystemAlert {
+  namesApp: boolean;
+}
 
 export interface DeepLinkOptions {
   appId?: string;

@@ -114,4 +114,36 @@ describe('deepLinkText', () => {
       'Opened averilab://d49 on ios\n⚠ averi did not see dev.averi.lab come forward',
     );
   });
+  // D54: iOS's alert named — the headline says the link is not open yet, quotes the title and every button with its
+  // centre, and advises a tap at those coordinates (the only answer measured on a device); averi taps nothing.
+  const alert = {
+    title: 'Open in “AveriLab”?',
+    buttons: [
+      { label: 'Cancel', centre: { x: 127, y: 474 } },
+      { label: 'Open', centre: { x: 275, y: 474 } },
+    ],
+  };
+
+  it('an alert that names the app: "iOS has not opened <url> yet: it asks …", every button with its centre, the tap advice', () => {
+    expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, namesApp: true } })).toBe(
+      'iOS has not opened averilab://d54 yet: it asks "Open in “AveriLab”?" — buttons "Cancel" at (127, 474), "Open" at ' +
+        '(275, 474). Answer it with a tap at the chosen button\'s x and y (averi taps nothing itself); every launch stays ' +
+        'behind the alert until it is answered',
+    );
+  });
+
+  it('an alert whose title does not name the app: "a system alert", never "Open in" in averi\'s own words', () => {
+    const text = deepLinkText('ios', 'averilab://d54', { alert: { title: 'Allow “Lab” to use your location?', buttons: [{ label: 'Allow Once', centre: { x: 201, y: 500 } }], namesApp: false } });
+    expect(text).toBe(
+      'iOS has not opened averilab://d54 yet: a system alert is up, "Allow “Lab” to use your location?" — button ' +
+        '"Allow Once" at (201, 500). Answer it with a tap at the chosen button\'s x and y (averi taps nothing itself); ' +
+        'every launch stays behind the alert until it is answered',
+    );
+    expect(text.replace('"Allow “Lab” to use your location?"', '')).not.toMatch(/Open in|asks/);
+  });
+
+  it('no "Opened" headline and no ⚠ line with an alert; a note alone keeps both', () => {
+    expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, namesApp: true } })).not.toMatch(/Opened|⚠|\n/);
+    expect(deepLinkText('ios', 'averilab://d54', { note: 'x' })).toBe('Opened averilab://d54 on ios\n⚠ x');
+  });
 });

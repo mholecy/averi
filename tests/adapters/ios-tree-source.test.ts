@@ -300,7 +300,20 @@ describe('IdbTreeSource.applicationLabel — which app a read is of', () => {
   });
 
   it("SpringBoard's label is a single space, returned as read — not trimmed to nothing", async () => {
-    expect(await label([{ type: 'Application', AXLabel: ' ', frame: F }, BUTTON]).answer).toEqual({ kind: 'label', label: ' ' });
+    expect(await label([{ type: 'Application', AXLabel: ' ', frame: F }, BUTTON]).answer).toMatchObject({ kind: 'label', label: ' ' });
+  });
+
+  // D54: SpringBoard's answer can judge, from the same read, whether it lists iOS's "Open in …?" alert — no second
+  // read; the app's names are the caller's (ios-foreground.ts asks them after the first label anyway).
+  it("SpringBoard's answer carries the alert check over the same read (ios-system-alert.ts#alertInIdb); no other label does", async () => {
+    const title = { type: 'StaticText', AXLabel: 'Open in “AveriLab”?', frame: { x: 71, y: 409, width: 260, height: 20 } };
+    const { answer, calls } = label([{ type: 'Application', AXLabel: ' ', frame: F }, title, BUTTON]);
+    const read = await answer;
+    expect(read.kind === 'label' && read.alertIn?.(['AveriLab'])).toEqual({ title: 'Open in “AveriLab”?', buttons: [{ label: 'Cancel', centre: { x: 46, y: 105 } }] });
+    expect(calls.filter((c) => c.full.startsWith('idb'))).toHaveLength(1);
+    const home = await label([{ type: 'Application', AXLabel: ' ', frame: F }, { ...title, AXLabel: '18:29' }, BUTTON]).answer;
+    expect(home.kind === 'label' && home.alertIn?.(['AveriLab'])).toBeUndefined();
+    expect(await label([{ type: 'Application', AXLabel: 'Contacts', frame: F }, title, BUTTON]).answer).toStrictEqual({ kind: 'label', label: 'Contacts' });
   });
 
   it('found by type, not by place', async () => {
