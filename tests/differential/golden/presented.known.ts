@@ -13,9 +13,10 @@ import { ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, twice, type KnownFil
 // D32 slice 1: the colour asserts beneath a presented layer that the replayed tree does not list (uiautomator's active
 // window, idb's presented layer) failed "not found" — vacuous, no evidence either way — on alert-dim, sheet-medium,
 // bottom-sheet-dialog, dialog-fullscreen and dialog-views-fullscreen (Android), and alert-dim, sheet-medium,
-// sheet-medium-edges, sheet-background and dim-cover (idb): 41 rows. That "not found" is now judged where the tree lists
-// no node of the target (golden-spec.ts#unlistedIn, presented.ts): green while it names the way out — the presented
-// remedy, the active-window hint, or idb's limit or reasons — and every one of them does; struck off.
+// sheet-medium-edges, sheet-background and dim-cover (idb): 41 rows. That "not found" is now judged where the tree
+// lists no node of the target (golden-spec.ts#unlistedIn, presented.ts), each row by its tree source's way out: under
+// uiautomator the presented remedy alone — the active-window hint is never accepted, as the tap row's — under idb the
+// presented remedy or idb's reasons. Every one of them names it; struck off.
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
 /** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
 const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
@@ -49,8 +50,8 @@ export const presented: KnownFile = {
     // Tapped, passed the colour on the dim, and scroll_until called them fully visible) went green with round 19's
     // alert fix, merged into this branch with arch/round-20 at 8600176: all 12 rows now answer "close it first". Struck
     // off. idb lists only the presented layer: a target beneath it is not in the tree. The tap times out "to appear" —
-    // no false Tapped, but no "close it first"; the colour assert fails "not found" naming idb's limit (judged since D32
-    // slice 1, green); and scroll_until swipes twice beneath the presented layer looking for it.
+    // no false Tapped, but no "close it first"; the colour assert fails "not found" naming idb's reasons (judged since
+    // D32 slice 1, green); and scroll_until swipes twice beneath the presented layer looking for it.
     // sheet-medium.idb's tap and scroll_until rows went green with round 7's A5 (merged with arch/round-23 at
     // a1261499): idb's list holds UIKit's dismiss region over the Application frame, now the presented mark
     // (src/adapters/ios-tree-source.ts#listsPresentedLayer), so the tap's wait says "close it first" and scroll_until
@@ -63,8 +64,8 @@ export const presented: KnownFile = {
     // uiautomator dumps the active window only, so beneath an AlertDialog or a ModalBottomSheet the targets are not in
     // the tree, as on idb. Fixed by round 6 (d43df5d, merged with arch/round-22): the window is marked presented, so
     // the tap's wait says "close it first" and scroll_until stops before any swipe — the 16 tap and scroll_until rows
-    // green, struck off here, calibrated in scripts/truth/calibration.json. The colour assert fails "not found" with the
-    // presented remedy: judged since D32 slice 1, green.
+    // green, struck off here, calibrated in scripts/truth/calibration.json. The colour assert fails "not found" with
+    // the presented remedy: judged since D32 slice 1, green.
     // --- round 7 (T2), Android: the presented windows the parser does not mark (ADR 0018 residual 19) ---
     // LAB FINDING LW1, docs/bugs/2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-
     // strokes-its-scrim-and-dismisses-it.md: a Views BottomSheetDialog's touch_outside scrim is unlabelled (NAF) and laid
@@ -85,8 +86,8 @@ export const presented: KnownFile = {
     // sheet's bare background and the transparent cover, the targets are not in the tree. sheet-medium-edges.idb's
     // list holds the dismiss region too: its 10 tap and scroll_until rows went green with A5, as sheet-medium's above —
     // struck off; its colour rows (the presented remedy) green since D32 slice 1. sheet-background's and dim-cover's
-    // lists show no sign of the layer (residual 6 stands there): their colour rows fail "not found" with idb's reasons —
-    // judged since D32 slice 1, green.
+    // lists show no sign of the layer (residual 6 stands there): their colour rows fail "not found" with idb's
+    // reasons — judged since D32 slice 1, green.
     ...['sheet-background', 'dim-cover'].flatMap((cell) => {
       const tags = ['A', 'B', 'C', 'D'];
       return [

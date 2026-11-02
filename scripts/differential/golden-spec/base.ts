@@ -4,7 +4,7 @@ import type { Outcome } from '../differential.js';
 import { claimsTap, isError, movedTap } from '../../truth/replies.js';
 import { pointText, probePoint, selectorOf, touchesAt } from '../../truth/truth.js';
 import type { TargetContract } from '../../truth/target-contract.js';
-import { BUDGET_MS, classed, first, limitUnsaid, notTapped, passed, passes, pointsText, reachedWithNoSwipe, tapPoints, type Expectation, type Point } from './judges.js';
+import { BUDGET_MS, classed, first, notTapped, passed, passes, pointsText, reachedWithNoSwipe, tapPoints, wayOutUnsaid, type Expectation, type Point } from './judges.js';
 
 /**
  * The base family's rows (fixtures/apps/cells/base.json): a coloured target open — reached by its probe and drawn as
@@ -46,14 +46,14 @@ export function openRows(
         (centres.length === 0 ? `Tapped at its probe point ${pointText(probeDelivered(t))}` : `Tapped at its node's centre ${centres.map(pointText).join(' or ')} in the tree`) +
         (absent === undefined ? '' : `, or (${absent}) not tapped, nothing sent, naming the source's limit`),
       call: { tool: 'tap', args: { platform, selector } },
-      judge: (o) => (claimsTap(o.reply) ? atProbe(o, t, nodes) : absent === undefined ? `not tapped: ${first(o)}` : (notTapped(o) ?? limitUnsaid(o, 'not tapped'))),
+      judge: (o) => (claimsTap(o.reply) ? atProbe(o, t, nodes) : absent === undefined ? `not tapped: ${first(o)}` : (notTapped(o) ?? wayOutUnsaid(o, 'not tapped'))),
       ...(absent !== undefined && { absent }),
     },
     {
       verb: 'colour',
       says: nodeAbsent === undefined ? `passes on its own colour ${t.color}` : `fails not found (${nodeAbsent}), naming the source's limit`,
       call: { tool: 'assert', args: { platform, asserts: [{ element, color: { expected: t.color }, timeout: BUDGET_MS }] } },
-      judge: nodeAbsent === undefined ? passes : (o) => (passed(o) ? `passed on ${t.color}: ${first(o)}` : limitUnsaid(o, 'failed')),
+      judge: nodeAbsent === undefined ? passes : (o) => (passed(o) ? `passed on ${t.color}: ${first(o)}` : wayOutUnsaid(o, 'failed')),
       ...(nodeAbsent !== undefined && { absent: nodeAbsent }),
     },
     {
@@ -61,7 +61,7 @@ export function openRows(
       verb: 'scroll_until',
       says: absent === undefined ? 'reached with no swipe' : `reached with no swipe, or (${absent}) not reached, naming the source's limit`,
       call: { tool: 'scroll_until', args: { platform, selector, direction: 'down' } },
-      judge: (o) => (absent === undefined || !isError(o.reply) ? reachedWithNoSwipe(o) : limitUnsaid(o, 'not reached')),
+      judge: (o) => (absent === undefined || !isError(o.reply) ? reachedWithNoSwipe(o) : wayOutUnsaid(o, 'not reached')),
       ...(absent !== undefined && { absent }),
     },
   ] satisfies Expectation[]).map(classed);

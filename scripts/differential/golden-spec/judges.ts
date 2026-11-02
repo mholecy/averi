@@ -1,5 +1,5 @@
 import type { Call, Outcome } from '../differential.js';
-import { allPassed, claimsTap, firstLine, isError, noIdListedSaid, notInTree, presentedRemedySaid, windowHintSaid } from '../../truth/replies.js';
+import { allPassed, claimsTap, firstLine, idbReasonsSaid, isError, namesKeyboard, noIdListedSaid, notInTree, presentedRemedySaid, windowHintSaid } from '../../truth/replies.js';
 import type { CellTruth, Rect } from '../../truth/schema.js';
 import { bandsOf, pointText, within } from '../../truth/truth.js';
 import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
@@ -101,29 +101,57 @@ export const closesItsOwnLayer = (o: Outcome): string | undefined =>
   presentedRemedySaid(o.reply) && !o.reply.includes('scroll_until') ? said(o, 'told to close the layer it lies in, no scroll_until offered') : undefined;
 
 /**
- * A not-found that says nothing of why is a mismatch where the truth says the source cannot list the target: undefined
- * when the reply names `what` (`named`: by default idb's limit on a read that lists no identifier, replies.ts
- * #noIdListedSaid — golden-spec/base.ts's open target unlisted), else why not, `why` first.
+ * The way out a "not found" must name where the replayed tree does not list the target: `said`, a reader of
+ * scripts/truth/replies.ts; `words`, what the mismatch and the row's `says` call it. Each row asks its own
+ * (judgedUnlisted).
  */
-export const limitUnsaid = (o: Outcome, why: string, named: (reply: string) => boolean = noIdListedSaid, what = "the source's limit"): string | undefined =>
-  named(o.reply) ? undefined : said(o, `${why}, without naming ${what}`);
+export interface WayOut {
+  said: (reply: string) => boolean;
+  words: string;
+}
+
+/**
+ * idb's limit on a read that lists no identifier (replies.ts#noIdListedSaid): base.ts's open target its source does
+ * not list.
+ */
+export const SOURCE_LIMIT: WayOut = { said: noIdListedSaid, words: "the source's limit" };
+/**
+ * The presented remedy (replies.ts#presentedRemedySaid): a presented colour row under a source that marks its window
+ * (uiautomator).
+ */
+export const PRESENTED_REMEDY: WayOut = { said: presentedRemedySaid, words: 'the presented remedy' };
+/**
+ * idb's reasons (replies.ts#idbReasonsSaid: idb lists nothing beneath the keyboard or a presented layer; close what
+ * covers it): a field under idb's keyboard, its colour and ocr rows.
+ */
+export const IDB_REASONS: WayOut = { said: idbReasonsSaid, words: "idb's reasons" };
+/** idb's reasons and the soft keyboard named (replies.ts#namesKeyboard): the stop of a field under idb's keyboard. */
+export const REASONS_AND_KEYBOARD: WayOut = { said: (r) => idbReasonsSaid(r) && namesKeyboard(r), words: "idb's reasons and the soft keyboard" };
+/** The presented remedy or idb's reasons: a presented colour row under idb, whose list shows no sign of some layers. */
+export const IDB_PRESENTED: WayOut = { said: (r) => presentedRemedySaid(r) || idbReasonsSaid(r), words: "the presented remedy or idb's reasons" };
+
+/**
+ * A not-found that does not name `wayOut` is a mismatch, `why` first; undefined when it names it. By default the
+ * source's limit (SOURCE_LIMIT, golden-spec/base.ts's open rows).
+ */
+export const wayOutUnsaid = (o: Outcome, why: string, wayOut: WayOut = SOURCE_LIMIT): string | undefined =>
+  wayOut.said(o.reply) ? undefined : said(o, `${why}, without naming ${wayOut.words}`);
 
 /**
  * A row whose target the replayed tree does not list (`absent`, golden-spec.ts#unlistedIn: the harness's own reading of
  * the payload, truth.ts#listedIn): a "not found" is then the honest answer, not vacuous (classed) — but only one that
- * names the way out THAT ROW requires (`named`, a reader of scripts/truth/replies.ts; `what`, its words in the mismatch
- * and in `says`): the presented colour row the presented remedy (and, under idb, idb's reasons), a field under idb's
- * keyboard idb's reasons (and, its stop, the soft keyboard). Each row passes its own: a remedy another row would accept
- * is a mismatch here. The row's own judge goes first, as classed's. `absent` undefined: the row as it was.
+ * names the way out THAT ROW requires (`wayOut`): the presented colour row PRESENTED_REMEDY (IDB_PRESENTED under idb),
+ * a field under idb's keyboard IDB_REASONS (its stop REASONS_AND_KEYBOARD). A remedy another row would accept is a
+ * mismatch here. The row's own judge goes first, as classed's. `absent` undefined: the row as it was.
  */
-export function judgedUnlisted<E extends Expectation>(e: E, absent: string | undefined, named: (reply: string) => boolean, what: string): E {
+export function judgedUnlisted<E extends Expectation>(e: E, absent: string | undefined, wayOut: WayOut): E {
   if (absent === undefined) return e;
   const judge = e.judge;
   return {
     ...e,
-    says: `${e.says}; or (${absent}) not found, naming ${what}`,
+    says: `${e.says}; or (${absent}) not found, naming ${wayOut.words}`,
     absent,
-    judge: (o: Outcome) => judge(o) ?? (notInTree(o.reply) ? limitUnsaid(o, 'not found', named, what) : undefined),
+    judge: (o: Outcome) => judge(o) ?? (notInTree(o.reply) ? wayOutUnsaid(o, 'not found', wayOut) : undefined),
   };
 }
 

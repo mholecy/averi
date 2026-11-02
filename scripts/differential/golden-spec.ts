@@ -32,8 +32,8 @@ import type { Expectation } from './golden-spec/judges.js';
  * Only where the judge would accept it (a refusal, a FAIL) is the reply vacuous — no evidence of what the truth implies
  * — and the judge overruled: a mismatch of one class, said first — `not in the tree:`. A row whose truth says the
  * target may be missing from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply; a
- * row whose replayed tree lists no node of it (unlistedIn: a presented colour row, a form's under-keyboard rows) accepts
- * only one that names the way out that row requires (golden-spec/judges.ts#judgedUnlisted).
+ * row whose replayed tree lists no node of it (unlistedIn: a presented colour row, a form's under-keyboard rows)
+ * accepts only one that names the way out that row requires (golden-spec/judges.ts#judgedUnlisted).
  *
  * The form cells (phase 1b) add rows a replayed tree CAN judge — see golden-spec/forms.ts#formRows. What it
  * cannot judge (a fill, a clear: typing changes nothing in a recorded tree) is the live golden's
@@ -87,7 +87,7 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   // A measured geometry is judged on its capture's screen: without it (a unit test of one row) no geometry row is asked.
   if (cell === undefined && t.declared === 'open' && t.geometry !== undefined && t.geometry !== 'whole') return [];
   const c = contractOf(platform, t, cell);
-  if (t.declared === 'presented-over') return c.tap === undefined ? [] : presentedOverRows(platform, t, c.tap, unlistedIn(tree, source)(t.id));
+  if (t.declared === 'presented-over') return c.tap === undefined ? [] : presentedOverRows(platform, t, c.tap, source, unlistedIn(tree, source)(t.id));
   if (t.declared === 'covered') return c.tap === undefined ? [] : coveredRows(platform, t, c.tap);
   const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, elementOf(t));
   // A text target's own rows (golden-spec/text.ts, phase 4: its string from the tree and, by the host's recognizer, from

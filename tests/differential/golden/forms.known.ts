@@ -21,10 +21,11 @@ export const forms: KnownFile = {
     ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented sheet: the tap times out' }),
     ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented sheet: scroll_until swipes twice beneath it' }),
     // idb lists nothing under the keyboard (src/mcp/tools.ts, tap: "a covered node was absent from idb's tree and the
-    // tap timed out waiting for it to appear"): the tap times out — no false Tapped, but no keyboard advice.
-    // Its scroll_until (two strokes ABOVE the keyboard, then "never appeared in the tree"), colour and ocr rows were
-    // vacuous here until D32 slice 1: the replayed tree lists no node of the field (golden-spec.ts#unlistedIn), so their
-    // "not found" is judged — green while it names idb's reasons (and, scroll_until, the soft keyboard) — struck off.
+    // tap timed out waiting for it to appear"): the tap times out — no false Tapped, but no keyboard advice. Its
+    // scroll_until (two strokes ABOVE the keyboard, then "never appeared in the tree"), colour and ocr rows were
+    // vacuous here until D32 slice 1: the replayed tree lists no node of the field (golden-spec.ts#unlistedIn), so
+    // their "not found" is judged — green while it names idb's reasons (and, scroll_until, the soft keyboard) — struck
+    // off.
     ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], { cls: 'refused without naming the keyboard', kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the tap times out` }),
     // LAB FINDING L2, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md —
     // under idb the submit lifted onto the keyboard over the phone field's centre read as no cover (a key overhanging

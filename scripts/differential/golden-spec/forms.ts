@@ -1,10 +1,10 @@
 import type { Platform } from '../corpus.js';
 import type { Call, Outcome } from '../differential.js';
-import { claimsTap, idbReasonsSaid, isError, namesKeyboard, snapshotNodes, type SnapshotNode } from '../../truth/replies.js';
+import { claimsTap, isError, namesKeyboard, snapshotNodes, type SnapshotNode } from '../../truth/replies.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
 import { ocrFailsClosed } from './text.js';
-import { BUDGET_MS, classed, closesItsOwnLayer, failed, first, judgedUnlisted, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, closesItsOwnLayer, failed, first, IDB_REASONS, judgedUnlisted, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, REASONS_AND_KEYBOARD, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
@@ -276,15 +276,12 @@ export function formRows(platform: Platform, truth: CellTruth, unlisted: (id: st
   return out.map(classed);
 }
 
-/** The scroll_until's way out under idb's keyboard: idb's reasons (idbReasonsSaid) AND the soft keyboard named (namesKeyboard). */
-const reasonsAndKeyboardSaid = (reply: string) => idbReasonsSaid(reply) && namesKeyboard(reply);
-
 /**
- * A control's rows by its situation. `unlisted`: why the replayed tree does not list it (formRows) — an under-keyboard
- * control's colour, ocr and scroll_until rows then judge its "not found" (judges.ts#judgedUnlisted): colour and ocr
- * must name idb's reasons (replies.ts#idbReasonsSaid: idb lists nothing beneath the keyboard; close what covers it),
- * scroll_until idb's reasons AND the soft keyboard (#namesKeyboard) — a bare one, or one naming another remedy (the
- * presented one), is a mismatch. Its tap is not: it asks the keyboard named, which the tap's timeout does not (K1).
+ * A control's rows by its situation. `unlisted`: why the replayed tree does not list it (formRows) — an
+ * under-keyboard control's colour, ocr and scroll_until rows then judge its "not found" (judges.ts#judgedUnlisted):
+ * colour and ocr must name idb's reasons (judges.ts#IDB_REASONS), scroll_until idb's reasons and the soft keyboard
+ * (#REASONS_AND_KEYBOARD). A bare one, or one naming another remedy (the presented one), is a mismatch. Its tap is
+ * not: it asks the keyboard named, which the tap's timeout does not (K1).
  */
 function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unlisted?: string): FormExpectation[] {
   const selector = `id:"${c.id}"`;
@@ -364,13 +361,12 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unli
               judge: (o) => (passed(o) ? `passed on ${expected}, the keyboard's: ${first(o)}` : undefined),
             },
             unlisted,
-            idbReasonsSaid,
-            "idb's reasons",
+            IDB_REASONS,
           ),
         );
         // Its OCR half (phase 4): the recognizer on the real pixels reads the keyboard there.
         const field = truth.form?.fields.find((f) => f.tag === c.tag);
-        rows.push(judgedUnlisted({ target, ...ocrFailsClosed(platform, { id: c.id }, field === undefined ? c.tag : field.value !== '' ? field.value : field.title, 'the soft keyboard over it') }, unlisted, idbReasonsSaid, "idb's reasons"));
+        rows.push(judgedUnlisted({ target, ...ocrFailsClosed(platform, { id: c.id }, field === undefined ? c.tag : field.value !== '' ? field.value : field.title, 'the soft keyboard over it') }, unlisted, IDB_REASONS));
       }
       return [
         ...rows,
@@ -387,8 +383,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unli
             },
           },
           unlisted,
-          reasonsAndKeyboardSaid,
-          "idb's reasons and the soft keyboard",
+          REASONS_AND_KEYBOARD,
         ),
       ];
     }

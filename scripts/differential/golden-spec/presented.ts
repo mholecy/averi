@@ -1,8 +1,8 @@
-import type { Platform } from '../corpus.js';
+import type { Platform, SourceKind } from '../corpus.js';
 import type { TargetTruth } from '../../truth/schema.js';
-import { idbReasonsSaid, notInTree, presentedRemedySaid } from '../../truth/replies.js';
+import { notInTree, presentedRemedySaid } from '../../truth/replies.js';
 import type { TapAsk } from '../../truth/target-contract.js';
-import { BUDGET_MS, classed, judgedUnlisted, notTapped, passed, presentedRemedyMissing, said, swipes, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, IDB_PRESENTED, judgedUnlisted, notTapped, passed, presentedRemedyMissing, PRESENTED_REMEDY, said, swipes, type Expectation, type WayOut } from './judges.js';
 
 /**
  * The presented family's rows (fixtures/apps/cells/presented.json): a coloured target beneath a presented layer — its
@@ -18,15 +18,13 @@ import { BUDGET_MS, classed, judgedUnlisted, notTapped, passed, presentedRemedyM
  * for an open target (golden-spec.ts#expectations): the remedy is to close the layer, and scroll advice cannot be
  * followed (scroll_until refuses beneath it).
  *
- * `absent` (golden-spec.ts#unlistedIn): the replayed tree lists no node of the target — uiautomator's dump of the
- * active window, idb's list of the presented layer alone. The colour assert's "not found" is then the honest answer,
- * judged (judges.ts#judgedUnlisted), and it must name the presented remedy (replies.ts#presentedRemedySaid) — as its
- * tap row asks, the active-window hint is not it — or, on iOS (idb, which lists no sign of some layers), that or idb's
- * reasons (#idbReasonsSaid: "idb lists nothing beneath … a presented sheet, alert or cover … If something covers it,
- * close that first"). A bare one, or one naming another remedy, is a mismatch. Unset (the tree lists it, or no payload
- * was given), such a "not found" is no evidence either way: vacuous (judges.ts#classed).
+ * `absent` (golden-spec.ts#unlistedIn): the replayed tree of `source` lists no node of the target — uiautomator's
+ * dump of the active window, idb's list of the presented layer alone. The colour assert's "not found" is then the
+ * honest answer, judged (judges.ts#judgedUnlisted) by the way out of its tree source (presentedWayOut). A bare one, or
+ * one naming another remedy, is a mismatch. Unset (the tree lists it, or no payload was given), such a "not found" is
+ * no evidence either way: vacuous (judges.ts#classed).
  */
-export function presentedOverRows(platform: Platform, t: TargetTruth, ask: TapAsk, absent?: string): Expectation[] {
+export function presentedOverRows(platform: Platform, t: TargetTruth, ask: TapAsk, source: SourceKind, absent?: string): Expectation[] {
   const selector = `id:"${t.id}"`;
   const element = { id: t.id };
   // A target measured wholly off the screen shows nothing there to ask for (its `seen` is no pixel's): it is asked for
@@ -47,11 +45,13 @@ export function presentedOverRows(platform: Platform, t: TargetTruth, ask: TapAs
         ? `fails (nothing of it is on the screen), asked for its own colour (${asked}), with the element in the tree: close it first`
         : `fails, even asked for the colour the screen shows there (${asked}), with the element in the tree: close it first`,
       call: { tool: 'assert', args: { platform, asserts: [{ element, color: { expected: asked }, timeout: BUDGET_MS }] } },
+      // Lenient on purpose: it accepts any "not found" (no evidence either way, classed calls it vacuous); where the
+      // tree does not list the target, judgedUnlisted adds the way out the reply must name.
       judge: (o) =>
         passed(o) ? `passed on ${asked}: it measured ${offScreen ? 'what is not on the screen' : 'the layer over the target as the target'}`
         : notInTree(o.reply) || presentedRemedySaid(o.reply) ? undefined
         : said(o, 'failed without "close it first"'),
-    } satisfies Expectation, absent, ...presentedWayOut(platform)),
+    } satisfies Expectation, absent, presentedWayOut(source)),
     {
       verb: 'scroll_until',
       says: 'stops before any swipe: close it first',
@@ -63,8 +63,8 @@ export function presentedOverRows(platform: Platform, t: TargetTruth, ask: TapAs
 
 /**
  * The way out a presented colour row's "not found" must name where its tree does not list the target
- * (judges.ts#judgedUnlisted): the presented remedy; on iOS — idb, whose list shows no sign of some layers — or idb's
- * reasons. A uiautomator tree marks its presented window: the remedy alone.
+ * (judges.ts#judgedUnlisted), by its tree source: under idb — whose list shows no sign of some layers — the presented
+ * remedy or idb's reasons (IDB_PRESENTED); under a source that marks its presented window (uiautomator), the presented
+ * remedy alone (PRESENTED_REMEDY) — as the tap row, never the active-window hint.
  */
-const presentedWayOut = (platform: Platform): [(reply: string) => boolean, string] =>
-  platform === 'android' ? [presentedRemedySaid, 'the presented remedy'] : [(r) => presentedRemedySaid(r) || idbReasonsSaid(r), "the presented remedy or idb's reasons"];
+const presentedWayOut = (source: SourceKind): WayOut => (source === 'idb' ? IDB_PRESENTED : PRESENTED_REMEDY);

@@ -166,6 +166,10 @@ describe('a target beneath a presented layer', () => {
   });
 });
 
+/** The presented remedy as a miss note says it (src/ui-tree/miss.ts#missNote): a dialog's window, a sheet's layer. */
+const PRESENTED_WINDOW = missNote({ of: 'presented', layer: { kind: 'dialog' }, listed: 'window' })!;
+const PRESENTED_LAYER = missNote({ of: 'presented', layer: { kind: 'screen' }, listed: 'layer' })!;
+
 /**
  * A target beneath a presented layer that the replayed tree does not list (D32 slice 1): uiautomator dumps the active
  * window only, idb lists only the presented layer. The colour assert's "not found" is then the honest answer — judged
@@ -186,7 +190,7 @@ describe('a target beneath a presented layer its replayed tree does not list', (
   it('uiautomator: the presented remedy is green; the active-window hint, idb\'s reasons or a bare not-found is red', () => {
     const { A, colour } = capture('android-averi_lab-api33', 'alert-dim', 'uiautomator');
     expect(colour.absent).toBeDefined();
-    expect(colour.judge(out(notFound(A.id, 'a dialog is presented over it, and the tree lists only that window — close it first')))).toBeUndefined();
+    expect(colour.judge(out(notFound(A.id, PRESENTED_WINDOW)))).toBeUndefined();
     expect(colour.judge(out(notFound(A.id, missNote({ of: 'activeWindow' })!)))).toMatch(/^not found, without naming the presented remedy: FAIL/);
     expect(colour.judge(out(notFound(A.id, missNote({ of: 'idUnlisted', id: A.id })!)))).toMatch(/^not found, without naming the presented remedy: FAIL/);
     expect(colour.judge(out(notFound(A.id)))).toMatch(/^not found, without naming the presented remedy: FAIL/);
@@ -198,7 +202,7 @@ describe('a target beneath a presented layer its replayed tree does not list', (
     expect(colour.absent).toBeDefined();
     expect(colour.judge(out(notFound(A.id, missNote({ of: 'idUnlisted', id: A.id })!)))).toBeUndefined();
     expect(colour.judge(out(notFound(A.id, missNote({ of: 'noIdListed', id: A.id })!)))).toBeUndefined();
-    expect(colour.judge(out(notFound(A.id, 'a sheet or modal is presented over it, and the tree lists only that layer — close it first')))).toBeUndefined();
+    expect(colour.judge(out(notFound(A.id, PRESENTED_LAYER)))).toBeUndefined();
     expect(colour.judge(out(notFound(A.id, missNote({ of: 'activeWindow' })!)))).toMatch(/^not found, without naming the presented remedy or idb's reasons: /);
     expect(colour.judge(out(notFound(A.id)))).toMatch(/^not found, without naming the presented remedy or idb's reasons: /);
   });
@@ -206,7 +210,7 @@ describe('a target beneath a presented layer its replayed tree does not list', (
   it('a tree that lists the target (WDA marks the layer and lists what is beneath it): the bare not-found stays vacuous', () => {
     const { A, colour } = capture('ios-iphone17-ios27', 'alert-dim', 'wda');
     expect(colour.absent).toBeUndefined();
-    expect(colour.judge(out(notFound(A.id, 'a dialog is presented over it, and the tree lists only that window — close it first')))).toMatch(/^not in the tree: /);
+    expect(colour.judge(out(notFound(A.id, PRESENTED_WINDOW)))).toMatch(/^not in the tree: /);
   });
 });
 
@@ -260,7 +264,7 @@ describe('a field under the keyboard its replayed tree does not list (form-keybo
   const ID = 'lab.form-keyboard.vs';
   const REASONS = missNote({ of: 'idUnlisted', id: ID })!;
   const ABOVE = twice(IDB_STROKE_ABOVE_KEYBOARD);
-  const PRESENTED = 'a sheet or modal is presented over it, and the tree lists only that layer — close it first';
+  const PRESENTED = PRESENTED_LAYER;
   const KEYBOARD = 'The soft keyboard was up over [0,590][402,874] in 3 of the 3 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it first';
   const assertNotFound = (note?: string) => `1/1 asserts FAILED\nFAIL  element id:"${ID}" fill within dE00 8 of #FFFFFF — not found within 1 s${note === undefined ? '' : ` (${note})`}\nappAlive: true`;
   const stop = (note?: string, keyboard?: string) =>
