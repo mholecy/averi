@@ -9,7 +9,7 @@ import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedKept, short, type Source, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
-import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type LabApp, type LabState } from './schema.js';
+import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type HeldSpec, type LabApp, type LabState } from './schema.js';
 
 /**
  * The live golden's cases and their judging, no device (scripts/truth/live.ts is the CLI that runs them): the forms
@@ -432,10 +432,12 @@ const ensureConfig = (cell: string, { wipeAhead = false }: { wipeAhead?: boolean
 });
 /** What every ensure case shares: its one call, its tree source bound before the launch, a SKIP failing the run. */
 const ENSURE_CASE = { calls: [{ tool: 'ensure_state', args: { state: 'home' } }] as Call[], warmUp: true, skipFails: true } as const;
-const ENSURE: Omit<Case, 'group'>[] = [
-  { id: 'h1', cell: 'held-no', says: 'ensure_state from a bare launch onto Welcome, no wipe ahead: the hold ends the look heldS after Welcome, said in one line', ...ensureConfig('held-no'), ...ENSURE_CASE, judge: judgeHeldNo },
-  { id: 'h2', cell: 'held-no-spinner', says: 'the same through 4 s of an unlabelled spinner: the hold carries across a spinner phase — Continue tapped only once Welcome itself has held (the spinner\'s idb spelling is block G\'s raw describe-all check)', ...ensureConfig('held-no-spinner'), ...ENSURE_CASE, judge: judgeHeldNo },
-  { id: 'h3', cell: 'held-no', says: 'the same with a destructive rung after Continue: no hold — the look keeps its full window', ...ensureConfig('held-no', { wipeAhead: true }), ...ENSURE_CASE, judge: judgeFullWindow },
+/** An ensure case: its judge made from its cell's catalog `held` (selectCases). */
+type EnsureCase = Omit<Case, 'group' | 'judge'> & { judgeOf: (spec: HeldSpec) => Case['judge'] };
+const ENSURE: EnsureCase[] = [
+  { id: 'h1', cell: 'held-no', says: 'ensure_state from a bare launch onto Welcome, no wipe ahead: the hold ends the look heldS after Welcome, said in one line', ...ensureConfig('held-no'), ...ENSURE_CASE, judgeOf: judgeHeldNo },
+  { id: 'h2', cell: 'held-no-spinner', says: 'the same through 4 s of an unlabelled spinner: the hold carries across a spinner phase — Continue tapped only once Welcome itself has held (the spinner\'s idb spelling is block G\'s raw describe-all check)', ...ensureConfig('held-no-spinner'), ...ENSURE_CASE, judgeOf: judgeHeldNo },
+  { id: 'h3', cell: 'held-no', says: 'the same with a destructive rung after Continue: no hold — the look keeps its full window', ...ensureConfig('held-no', { wipeAhead: true }), ...ENSURE_CASE, judgeOf: judgeFullWindow },
 ];
 
 /**
@@ -479,7 +481,15 @@ export interface Selection {
 /** The cases of a run, in the order it runs them: the forms, the ensure group's, then the visibility cells', then the dismissal's. */
 export async function selectCases({ platform, app, groups, only, onlyCells }: Selection): Promise<Case[]> {
   const catalog = await catalogOf();
-  const cases: Case[] = [...FORMS.map((c) => ({ ...c, group: 'forms' as const })), ...ENSURE.map((c) => ({ ...c, group: 'ensure' as const }))];
+  const heldOf = (cell: string): HeldSpec => {
+    const spec = catalog.cells.find((x) => x.id === cell)?.held;
+    if (spec === undefined) throw new Error(`catalog: held cell ${cell} has no \`held\` (fixtures/apps/cells/held.json)`);
+    return spec;
+  };
+  const cases: Case[] = [
+    ...FORMS.map((c) => ({ ...c, group: 'forms' as const })),
+    ...ENSURE.map(({ judgeOf, ...c }) => ({ ...c, group: 'ensure' as const, judge: judgeOf(heldOf(c.cell)) })),
+  ];
   if (groups.includes('visibility')) {
     for (const truth of await truthsOf(platform, app)) {
       if (truth.targets.length === 0 || (onlyCells !== undefined && !onlyCells.includes(truth.cell))) continue;

@@ -303,6 +303,12 @@ export interface LabState {
   offsets?: Record<string, number>;
   /** Each stroke a scroll view took, in order: from where it left rest to where it came to rest. */
   strokes?: Stroke[];
+  /**
+   * Not the app's: when the live golden read this state (live.ts, seconds since the epoch, the host's clock — the
+   * simulator's own; the emulator's set from it). The ensure judges ask whether a held cell was read after its Welcome
+   * was due (live-ensure.ts). Absent from captures and from records before it.
+   */
+  readAt?: number;
 }
 
 /**

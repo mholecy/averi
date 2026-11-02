@@ -3,7 +3,7 @@ import type { LiveVerdict } from './live-visibility.js';
 import type { Source } from './live-forms.js';
 import { short } from './live-forms.js';
 import { bareEntry, heldStill, isError, replyKind } from './replies.js';
-import type { LabState } from './schema.js';
+import type { HeldSpec, LabState } from './schema.js';
 
 /**
  * The live golden's `ensure` judges (backlog D30; docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-
@@ -65,28 +65,32 @@ interface Reached {
 }
 
 /**
- * What both judges ask first: Welcome shown (else SKIP: the app never left the bare phase), Home and the reply held to
- * each other, Continue tapped, the bare phase logged (else SKIP), the entry probe bare by the reply (else
- * `entry-not-bare`) — a verdict when any is not so.
+ * What both judges ask first, `spec` the cell's catalog `held`: the app not provably stale (else SKIP), Home and the
+ * reply held to each other, Welcome shown and Continue tapped, the bare phase logged (else SKIP), the entry probe bare
+ * by the reply (else `entry-not-bare`) — a verdict when any is not so.
  */
-function reached(s: LabState, reply: string): LiveVerdict | Reached {
+function reached(s: LabState, reply: string, spec: HeldSpec): LiveVerdict | Reached {
   const kind = replyKind(reply);
   const home = phaseAt(s, 'home') !== undefined;
   const welcome = phaseAt(s, 'welcome');
   const tap = continueAt(s);
-  // Outside averi: the app never drew Welcome — a stale catalog or an old build (its cell without `held`, logged as the
-  // phase `unconfigured`), or a screen stuck bare. A SKIP, which fails the run (Case.skipFails).
+  const bare = phaseAt(s, 'bare');
+  // Outside averi, provably: the app ran without its phases (`unconfigured`: a stale catalog or an old build), or it
+  // was read after its Welcome was due (`readAt`, the harness's stamp — bareMs + spinnerMs past the bare phase) and had
+  // drawn none. A SKIP, which fails the run (Case.skipFails). A read sooner than that — averi failing fast — is averi's.
   const unconfigured = phaseAt(s, 'unconfigured') !== undefined;
-  if (unconfigured || welcome === undefined) {
-    return { outcome: 'SKIP', kind, why: `the lab app never left the bare phase — rebuild/reinstall the lab app with the current catalog (${unconfigured ? 'it logged `unconfigured`: its cell has no held phases' : 'no welcome phase logged'})` };
+  const dueS = (spec.bareMs + (spec.spinnerMs ?? 0)) / 1000;
+  const overdue = welcome === undefined && bare !== undefined && s.readAt !== undefined && s.readAt - bare >= dueS;
+  if (unconfigured || overdue) {
+    const cause = unconfigured ? 'it logged `unconfigured`: its cell has no held phases' : `no welcome phase ${secs(s.readAt! - bare!)} after the bare phase, ${dueS} s due`;
+    return { outcome: 'SKIP', kind, why: `the lab app never left the bare phase — rebuild/reinstall the lab app with the current catalog (${cause})` };
   }
   if (!home) {
-    const shown = tap === undefined ? 'Continue never tapped' : 'Continue tapped, no home phase';
+    const shown = welcome === undefined ? 'no welcome phase logged' : tap === undefined ? 'Continue never tapped' : 'Continue tapped, no home phase';
     return isError(reply) ? { outcome: 'LOUD', cls: 'not-reached', kind, why: `Home not reached (${shown}), and averi said so: ${short(reply)}` } : { outcome: 'MISMATCH', cls: 'ensure-claim', kind, why: `averi did not fail — Home not reached (${shown}): ${short(reply)}` };
   }
   if (isError(reply)) return { outcome: 'MISMATCH', cls: 'failed-holds', kind, why: `the app shows Home, but averi failed: ${short(reply)}` };
-  if (tap === undefined) return { outcome: 'MISMATCH', cls: 'ensure-claim', kind, why: `Home without a Continue tap logged: ${short(reply)}` };
-  const bare = phaseAt(s, 'bare');
+  if (welcome === undefined || tap === undefined) return { outcome: 'MISMATCH', cls: 'ensure-claim', kind, why: `Home without ${welcome === undefined ? 'a welcome phase' : 'a Continue tap'} logged: ${short(reply)}` };
   if (bare === undefined) return { outcome: 'SKIP', kind, why: 'the app logged no bare phase: the case never set up (an old lab app?) — nothing to judge' };
   if (!bareEntry(reply)) return { outcome: 'MISMATCH', cls: 'entry-not-bare', kind, why: `the reply has no bare entry probe line — no second look was earned on a screen bare for ${secs(welcome - bare)}: ${short(reply)}` };
   return { kind, afterWelcome: tap - welcome, afterBare: tap - bare, held: heldStill(reply) };
@@ -97,33 +101,37 @@ function reached(s: LabState, reply: string): LiveVerdict | Reached {
  * heldSlackS(source)], Home reached. Earlier: `held-early` (the hold began before Welcome — on the spinner); later:
  * `held-late`. No held line: `held-late` when the tap came after the whole window, else `held-unsaid`.
  */
-export function judgeHeldNo(s: LabState, [reply]: string[], source: Source, _launched: LabState): LiveVerdict {
-  const r = reached(s, reply);
-  if ('outcome' in r) return r;
-  const { kind, afterWelcome, afterBare, held } = r;
-  if (held === undefined) {
-    return afterBare >= ENSURE_WINDOW_S - EPS_S ?
-        { outcome: 'MISMATCH', cls: 'held-late', kind, why: `no held line, Continue tapped ${secs(afterBare)} after the bare phase: the look ran its whole ${ENSURE_WINDOW_S} s window` }
-      : { outcome: 'MISMATCH', cls: 'held-unsaid', kind, why: `Continue tapped ${secs(afterWelcome)} after Welcome, but the reply has no held line: ${short(reply)}` };
-  }
-  if (afterWelcome < held.heldS - EPS_S) {
-    return { outcome: 'MISMATCH', cls: 'held-early', kind, why: `Continue tapped ${secs(afterWelcome)} after Welcome, though the screen held ${held.heldS} s: the hold began before Welcome — on what came before it` };
-  }
-  const limit = held.heldS + heldSlackS(source);
-  if (afterWelcome > limit) return { outcome: 'MISMATCH', cls: 'held-late', kind, why: `Continue tapped ${secs(afterWelcome)} after Welcome, past the ${secs(limit)} a ${held.heldS} s hold allows under ${source}` };
-  return { outcome: 'ok', kind, why: `Continue tapped ${secs(afterWelcome)} after Welcome; held ${held.heldS} s, then ${held.flow}` };
-}
+export const judgeHeldNo =
+  (spec: HeldSpec) =>
+  (s: LabState, [reply]: string[], source: Source, _launched: LabState): LiveVerdict => {
+    const r = reached(s, reply, spec);
+    if ('outcome' in r) return r;
+    const { kind, afterWelcome, afterBare, held } = r;
+    if (held === undefined) {
+      return afterBare >= ENSURE_WINDOW_S - EPS_S ?
+          { outcome: 'MISMATCH', cls: 'held-late', kind, why: `no held line, Continue tapped ${secs(afterBare)} after the bare phase: the look ran its whole ${ENSURE_WINDOW_S} s window` }
+        : { outcome: 'MISMATCH', cls: 'held-unsaid', kind, why: `Continue tapped ${secs(afterWelcome)} after Welcome, but the reply has no held line: ${short(reply)}` };
+    }
+    if (afterWelcome < held.heldS - EPS_S) {
+      return { outcome: 'MISMATCH', cls: 'held-early', kind, why: `Continue tapped ${secs(afterWelcome)} after Welcome, though the screen held ${held.heldS} s: the hold began before Welcome — on what came before it` };
+    }
+    const limit = held.heldS + heldSlackS(source);
+    if (afterWelcome > limit) return { outcome: 'MISMATCH', cls: 'held-late', kind, why: `Continue tapped ${secs(afterWelcome)} after Welcome, past the ${secs(limit)} a ${held.heldS} s hold allows under ${source}` };
+    return { outcome: 'ok', kind, why: `Continue tapped ${secs(afterWelcome)} after Welcome; held ${held.heldS} s, then ${held.flow}` };
+  };
 
 /**
  * h3 — a wipe ahead (the ladder's last rung marked destructive): the look keeps its full window — no held line,
  * Continue tapped no sooner than the bare phase + ENSURE_WINDOW_S, Home reached. A held line: `held-said`; a tap
  * sooner: `window-cut`.
  */
-export function judgeFullWindow(s: LabState, [reply]: string[], _source: Source, _launched: LabState): LiveVerdict {
-  const r = reached(s, reply);
-  if ('outcome' in r) return r;
-  const { kind, afterWelcome, afterBare, held } = r;
-  if (held !== undefined) return { outcome: 'MISMATCH', cls: 'held-said', kind, why: `a wipe lies ahead, yet the hold ended the look (held ${held.heldS} s, then ${held.flow}); Continue tapped ${secs(afterWelcome)} after Welcome` };
-  if (afterBare < ENSURE_WINDOW_S - EPS_S) return { outcome: 'MISMATCH', cls: 'window-cut', kind, why: `a wipe lies ahead, yet Continue was tapped ${secs(afterBare)} after the bare phase — under the ${ENSURE_WINDOW_S} s window` };
-  return { outcome: 'ok', kind, why: `the full window: Continue tapped ${secs(afterBare)} after the bare phase (${secs(afterWelcome)} after Welcome), no held line` };
-}
+export const judgeFullWindow =
+  (spec: HeldSpec) =>
+  (s: LabState, [reply]: string[], _source: Source, _launched: LabState): LiveVerdict => {
+    const r = reached(s, reply, spec);
+    if ('outcome' in r) return r;
+    const { kind, afterWelcome, afterBare, held } = r;
+    if (held !== undefined) return { outcome: 'MISMATCH', cls: 'held-said', kind, why: `a wipe lies ahead, yet the hold ended the look (held ${held.heldS} s, then ${held.flow}); Continue tapped ${secs(afterWelcome)} after Welcome` };
+    if (afterBare < ENSURE_WINDOW_S - EPS_S) return { outcome: 'MISMATCH', cls: 'window-cut', kind, why: `a wipe lies ahead, yet Continue was tapped ${secs(afterBare)} after the bare phase — under the ${ENSURE_WINDOW_S} s window` };
+    return { outcome: 'ok', kind, why: `the full window: Continue tapped ${secs(afterBare)} after the bare phase (${secs(afterWelcome)} after Welcome), no held line` };
+  };

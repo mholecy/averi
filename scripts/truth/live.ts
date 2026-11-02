@@ -214,11 +214,13 @@ if (rejudging !== undefined) {
           if (c.group === 'visibility' && i < c.calls.length - 1) after.push(await lab.state());
         }
         await pause(800);
-        const state = (await lab.state())!;
+        // Stamped with when it was read (LabState.readAt): the ensure judges ask it.
+        const stamped = (s: LabState | undefined) => (s === undefined ? s : { ...s, readAt: Date.now() / 1000 });
+        const state = stamped(await lab.state())!;
         let late: LabState | undefined;
         if (c.group !== 'visibility' && c.judge(state, replies, source, launched, after).outcome !== 'ok') {
           await pause(3_000);
-          late = await lab.state();
+          late = stamped(await lab.state());
         }
         const verdict = judged(c, source, replies, launched, after, state, late);
         if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));

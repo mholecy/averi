@@ -21,6 +21,9 @@ function read(phases: Record<string, number>, tap?: number, cell = 'held-no'): L
   return { cell, ready: true, screen: { x: 0, y: 0, width: 402, height: 874 }, scale: 3, frames: {}, events };
 }
 const LAUNCHED = read({ bare: 0 });
+/** The judges as held-no's catalog entry makes them (`held.bareMs` 6 s). */
+const heldNo = judgeHeldNo({ bareMs: 6000 });
+const fullWindow = judgeFullWindow({ bareMs: 6000 });
 /** The run of h1: Welcome at 6 s, Continue tapped at `tap`, Home right after it. */
 const h1 = (tap: number) => read({ bare: 0, welcome: 6, home: tap + 0.2 }, tap);
 /** The run of h2: the spinner at 6 s, Welcome at 10 s. */
@@ -61,77 +64,93 @@ describe('judgeHeldNo (h1, h2): no wipe ahead — the hold ends the look heldS a
   });
 
   it('Continue tapped within [Welcome + heldS − ε, Welcome + heldS + slack], the bare entry and the held line said: ok', () => {
-    expect(judgeHeldNo(h1(6 + 2.3), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'ok', kind: 'other' });
-    expect(judgeHeldNo(h1(6 + 2.3 - 0.04), [held(2.3)], 'idb', LAUNCHED).outcome).toBe('ok');
-    expect(judgeHeldNo(h1(6 + 2.3 + 2.45), [held(2.3)], 'wda', LAUNCHED).outcome).toBe('ok');
-    expect(judgeHeldNo(h2(10 + 3), [held(2.1)], 'uiautomator', LAUNCHED).outcome).toBe('ok');
+    expect(heldNo(h1(6 + 2.3), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'ok', kind: 'other' });
+    expect(heldNo(h1(6 + 2.3 - 0.04), [held(2.3)], 'idb', LAUNCHED).outcome).toBe('ok');
+    expect(heldNo(h1(6 + 2.3 + 2.45), [held(2.3)], 'wda', LAUNCHED).outcome).toBe('ok');
+    expect(heldNo(h2(10 + 3), [held(2.1)], 'uiautomator', LAUNCHED).outcome).toBe('ok');
   });
 
   it('past the slack: MISMATCH held-late', () => {
-    expect(judgeHeldNo(h1(6 + 2.3 + 2.6), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-late' });
-    expect(judgeHeldNo(h1(6 + 2.3 + 10.4), [held(2.3)], 'uiautomator', LAUNCHED).outcome).toBe('ok');
-    expect(judgeHeldNo(h1(6 + 2.3 + 10.6), [held(2.3)], 'uiautomator', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-late' });
+    expect(heldNo(h1(6 + 2.3 + 2.6), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-late' });
+    expect(heldNo(h1(6 + 2.3 + 10.4), [held(2.3)], 'uiautomator', LAUNCHED).outcome).toBe('ok');
+    expect(heldNo(h1(6 + 2.3 + 10.6), [held(2.3)], 'uiautomator', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-late' });
   });
 
   it('tapped sooner after Welcome than the screen held: the hold began before Welcome — on the spinner — MISMATCH held-early', () => {
     // The hold ran 2.1 s on a spinner read as content; the rung's tap waited for Continue and tapped it at once.
-    expect(judgeHeldNo(h2(10.4), [held(2.1)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-early', why: expect.stringMatching(/held 2\.1 s/) });
-    expect(judgeHeldNo(h1(6 + 2.3 - 0.06), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-early' });
+    expect(heldNo(h2(10.4), [held(2.1)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-early', why: expect.stringMatching(/held 2\.1 s/) });
+    expect(heldNo(h1(6 + 2.3 - 0.06), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-early' });
   });
 
   it('no bare entry line — the entry probe read content or failed, so no second look was earned: MISMATCH entry-not-bare, never SKIP', () => {
-    expect(judgeHeldNo(h1(6.5), [DONE.join('\n')], 'wda', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'entry-not-bare' });
-    expect(judgeHeldNo(h1(6 + 2.3), [held(2.3, ENTRY_FAILED)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'entry-not-bare' });
+    expect(heldNo(h1(6.5), [DONE.join('\n')], 'wda', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'entry-not-bare' });
+    expect(heldNo(h1(6 + 2.3), [held(2.3, ENTRY_FAILED)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'entry-not-bare' });
   });
 
   it('a bare entry, no held line: the look ran its full window (held-late) or ended unsaid (held-unsaid)', () => {
-    expect(judgeHeldNo(h1(ENSURE_WINDOW_S + 0.5), [full()], 'wda', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-late' });
-    expect(judgeHeldNo(h1(8.5), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-unsaid' });
+    expect(heldNo(h1(ENSURE_WINDOW_S + 0.5), [full()], 'wda', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-late' });
+    expect(heldNo(h1(8.5), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-unsaid' });
   });
 
   it('the app logged no bare phase: SKIP — the case never set up, outside averi', () => {
-    expect(judgeHeldNo(read({ welcome: 0, home: 2.5 }, 2.3), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/no bare phase/) });
+    expect(heldNo(read({ welcome: 0, home: 2.5 }, 2.3), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/no bare phase/) });
   });
 
   it('Home reached but averi failed: MISMATCH failed-holds; Home not reached and averi failed: LOUD; not reached, averi silent: MISMATCH', () => {
-    expect(judgeHeldNo(h1(8.3), [`ERROR ${held(2.3)}`], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
+    expect(heldNo(h1(8.3), [`ERROR ${held(2.3)}`], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
     const stuck = read({ bare: 0, welcome: 6 });
-    expect(judgeHeldNo(stuck, ['ERROR Timed out after 5000ms waiting for element id:"lab.held-no.home"'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });
-    expect(judgeHeldNo(stuck, [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'ensure-claim' });
+    expect(heldNo(stuck, ['ERROR Timed out after 5000ms waiting for element id:"lab.held-no.home"'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });
+    expect(heldNo(stuck, [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'ensure-claim' });
   });
 
-  it('the app never left the bare phase — no welcome phase, or `unconfigured` (a stale catalog): SKIP naming the cause, whatever averi said', () => {
+  it('`unconfigured` (a stale catalog): SKIP naming the cause, whatever averi said or the read holds', () => {
     const stale = /the lab app never left the bare phase — rebuild\/reinstall the lab app with the current catalog/;
     for (const reply of ['ERROR x', held(2.3)]) {
-      expect(judgeHeldNo(read({ bare: 0 }), [reply], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(stale) });
-      expect(judgeHeldNo(read({ bare: 0, unconfigured: 0 }), [reply], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/unconfigured/) });
-      expect(judgeFullWindow(read({ bare: 0, unconfigured: 0 }), [reply], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(stale) });
+      expect(heldNo(read({ bare: 0, unconfigured: 0 }), [reply], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/unconfigured/) });
+      expect(fullWindow(read({ bare: 0, unconfigured: 0 }), [reply], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(stale) });
     }
-    // `unconfigured` is the app's own word that it ran without its phases: SKIP whatever else the read holds.
-    expect(judgeHeldNo(read({ bare: 0, unconfigured: 0, welcome: 6, home: 8.5 }, 8.3), [held(2.3)], 'idb', LAUNCHED).outcome).toBe('SKIP');
+    expect(heldNo(read({ bare: 0, unconfigured: 0, welcome: 6, home: 8.5 }, 8.3), [held(2.3)], 'idb', LAUNCHED).outcome).toBe('SKIP');
+  });
+
+  it('no welcome phase: a stale app only when the read came after Welcome was due (bareMs + spinnerMs past the bare phase)', () => {
+    const stale = /the lab app never left the bare phase — rebuild\/reinstall the lab app with the current catalog/;
+    const at = (readAt: number) => ({ ...read({ bare: 0 }), readAt: T0 + readAt });
+    // held-no: Welcome due at 6 s.
+    expect(heldNo(at(6.5), ['ERROR x'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(stale) });
+    expect(fullWindow(at(6.5), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(stale) });
+    // A fast averi failure, read before Welcome was due: averi's verdict, not the app's.
+    expect(heldNo(at(5.5), ['ERROR boom'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached', why: expect.stringMatching(/no welcome phase logged.*ERROR boom/) });
+    expect(heldNo(at(5.5), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'ensure-claim' });
+    // held-no-spinner: Welcome due at 6 + 4 s.
+    expect(judgeHeldNo({ bareMs: 6000, spinnerMs: 4000 })(at(9.5), ['ERROR x'], 'idb', LAUNCHED).outcome).toBe('LOUD');
+    expect(judgeHeldNo({ bareMs: 6000, spinnerMs: 4000 })(at(10.5), ['ERROR x'], 'idb', LAUNCHED).outcome).toBe('SKIP');
+    // No read time (a record before it was stamped): nothing proves the app stale — averi's verdict.
+    expect(heldNo(read({ bare: 0 }), ['ERROR x'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });
+    // Home without Welcome: averi's claim held to the app.
+    expect(heldNo({ ...read({ bare: 0, home: 7 }, 6.8), readAt: T0 + 5 }, [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'ensure-claim' });
   });
 });
 
 describe('judgeFullWindow (h3): a wipe ahead — the look keeps its full window', () => {
   it('Continue tapped ≥ the bare phase + the 20 s window, a bare entry, no held line: ok', () => {
     expect(ENSURE_WINDOW_S).toBe(20);
-    expect(judgeFullWindow(h1(21), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'ok', kind: 'other' });
-    expect(judgeFullWindow(h1(20 - 0.04), [full()], 'idb', LAUNCHED).outcome).toBe('ok');
+    expect(fullWindow(h1(21), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'ok', kind: 'other' });
+    expect(fullWindow(h1(20 - 0.04), [full()], 'idb', LAUNCHED).outcome).toBe('ok');
   });
   it('a held line with a wipe ahead: MISMATCH held-said', () => {
-    expect(judgeFullWindow(h1(21), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-said' });
+    expect(fullWindow(h1(21), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'held-said' });
   });
   it('tapped before the window could end: MISMATCH window-cut', () => {
-    expect(judgeFullWindow(h1(20 - 0.06), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'window-cut' });
-    expect(judgeFullWindow(h1(9), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'window-cut' });
+    expect(fullWindow(h1(20 - 0.06), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'window-cut' });
+    expect(fullWindow(h1(9), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'window-cut' });
   });
   it('no bare entry line: MISMATCH entry-not-bare; no bare phase: SKIP', () => {
-    expect(judgeFullWindow(h1(6.5), [DONE.join('\n')], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'entry-not-bare' });
-    expect(judgeFullWindow(read({ welcome: 0, home: 21 }, 20.8), [full()], 'idb', LAUNCHED).outcome).toBe('SKIP');
+    expect(fullWindow(h1(6.5), [DONE.join('\n')], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'entry-not-bare' });
+    expect(fullWindow(read({ welcome: 0, home: 21 }, 20.8), [full()], 'idb', LAUNCHED).outcome).toBe('SKIP');
   });
   it('Home and the reply held to each other as in h1', () => {
-    expect(judgeFullWindow(h1(21), [`ERROR ${full()}`], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
-    expect(judgeFullWindow(read({ bare: 0, welcome: 6 }), ['ERROR x'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });
+    expect(fullWindow(h1(21), [`ERROR ${full()}`], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
+    expect(fullWindow(read({ bare: 0, welcome: 6 }), ['ERROR x'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });
   });
 });
 
@@ -147,6 +166,13 @@ describe('the ensure group: h1–h3, only when asked', () => {
       ]);
       // Per case: its tree source bound first (live.ts), and a SKIP of it fails the run (summarize).
       expect(cases.every((c) => c.warmUp === true && c.skipFails === true)).toBe(true);
+      // Each judge reads its cell's catalog `held`: Welcome due at 6 s on held-no, at 10 s on held-no-spinner.
+      const stuck = (readAt: number, cell: string) => ({ ...read({ bare: 0 }, undefined, cell), readAt: T0 + readAt });
+      const [h1c, h2c, h3c] = cases;
+      expect(h1c.judge(stuck(7, 'held-no'), ['ERROR x'], 'idb', LAUNCHED, []).outcome).toBe('SKIP');
+      expect(h2c.judge(stuck(7, 'held-no-spinner'), ['ERROR x'], 'idb', LAUNCHED, []).outcome).toBe('LOUD');
+      expect(h2c.judge(stuck(10.5, 'held-no-spinner'), ['ERROR x'], 'idb', LAUNCHED, []).outcome).toBe('SKIP');
+      expect(h3c.judge(stuck(7, 'held-no'), [full()], 'idb', LAUNCHED, []).outcome).toBe('SKIP');
     }
     expect(await selectCases({ platform: 'ios', app: 'react-native', groups: ['ensure'] })).toEqual([]);
   });
