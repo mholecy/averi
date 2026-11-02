@@ -60,8 +60,8 @@ export function reformatOf(observed: string, expected: string, typing: string = 
   const typingChars = [...typing];
   // A code: digits in it and no typed space (an IBAN, a card number) — the one typing whose letters a field may split.
   const code = typingChars.some((c) => DIGIT.test(c)) && !typingChars.some((c) => SPACES.has(c));
-  const walked = walk(observed, expectedChars);
-  if (walked === undefined || walked.matched !== expectedChars.length) return undefined;
+  const walked = walkWhole(observed, expectedChars);
+  if (walked === undefined) return undefined;
   const { tokens, respaced } = walked;
   const chars = [...observed];
   const added = new Set(chars.filter((_, k) => tokens[k] === -1));
@@ -113,7 +113,8 @@ function markKind(
  * The reading walked against `expectedChars`, greedily (see `reformatOf`): each reading character the next expected one
  * (or a space shown for a typed space — `respaced`), else an added separator (-1 in `tokens`, an expected character's
  * index otherwise); undefined at the first character that is neither. `matched`: how many expected characters it
- * showed — all of them for `reformatOf` and `separatedOf`, fewer for a prefix (`prefixOf`). The one walk all three ask.
+ * showed — all of them for `reformatOf` and `separatedOf` (`walkWhole`), fewer for a prefix (`prefixOf`). The one
+ * walk all three ask.
  */
 function walk(observed: string, expectedChars: readonly string[]): { tokens: number[]; matched: number; respaced: number } | undefined {
   const tokens: number[] = [];
@@ -140,11 +141,16 @@ function walk(observed: string, expectedChars: readonly string[]): { tokens: num
  * one caller). Pure, O(reading).
  */
 export function separatedOf(observed: string, expected: string): number | undefined {
-  const expectedChars = [...expected];
-  const walked = walk(observed, expectedChars);
-  if (walked === undefined || walked.matched !== expectedChars.length) return undefined;
+  const walked = walkWhole(observed, [...expected]);
+  if (walked === undefined) return undefined;
   const added = walked.tokens.filter((t) => t === -1).length;
   return added > 0 ? added : undefined;
+}
+
+/** `walk`, when it showed every expected character (`reformatOf`, `separatedOf`); else undefined. */
+function walkWhole(observed: string, expectedChars: readonly string[]): ReturnType<typeof walk> {
+  const walked = walk(observed, expectedChars);
+  return walked !== undefined && walked.matched === expectedChars.length ? walked : undefined;
 }
 
 /** An added `.` or `,` groups digits by thousands (see `reformatOf`); `typing` the whole typing. */

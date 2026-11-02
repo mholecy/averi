@@ -253,6 +253,7 @@ describe('separatedOf — every typed character in order, separators alone added
     expect(separatedOf('-1234', '1234')).toBe(1);
     expect(separatedOf('a lot', 'alot')).toBe(1);
     expect(separatedOf('12\u00A034', '1234')).toBe(1);
+    expect(separatedOf('12\u202F34', '1234')).toBe(1); // a narrow no-break space
     expect(separatedOf('12  34', '1234')).toBe(2); // every added separator counts, not the groups
     expect(separatedOf('\u{1D400}.\u{1D401}', '\u{1D400}\u{1D401}')).toBe(1); // code points, not UTF-16 units
   });

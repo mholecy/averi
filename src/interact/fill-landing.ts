@@ -158,17 +158,26 @@ function priorsOf(held: string, e: Pick<Expectation, 'clear' | 'before' | 'place
 }
 
 /**
+ * The first defined `judge(whole, prior)` over `priorsOf(held, e)` — the earlier text first, then none where it
+ * vanished (D29) or is a mask template (D51) — `whole` what the field should hold after that earlier text (`prior +
+ * value`): how `landedReformat`, `tailOf` and `differenceOf`'s `separated` rule judge a reading alike. Pure.
+ */
+function overPriors<T>(held: string, e: TextExpectation, judge: (whole: string, prior: string) => T | undefined): T | undefined {
+  for (const prior of priorsOf(held, e)) {
+    const judged = judge(prior + e.value, prior);
+    if (judged !== undefined) return judged;
+  }
+  return undefined;
+}
+
+/**
  * The reading `reformatOf` what the field should hold — its earlier text, unless cleared (or vanished: `priorsOf`,
  * D29), then the value — else undefined. D18, docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md.
  * A masked reading never is one (bullets are no typed characters). Pure.
  */
 function landedReformat(observed: string, e: TextExpectation): Reformat | undefined {
   const held = heldText(observed, e.placeholder);
-  for (const prior of priorsOf(held, e)) {
-    const reformatted = reformatOf(held, prior + e.value);
-    if (reformatted !== undefined) return reformatted;
-  }
-  return undefined;
+  return overPriors(held, e, (whole) => reformatOf(held, whole));
 }
 
 /**
@@ -193,16 +202,13 @@ const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined 
  */
 export function tailOf(observed: string, e: TextExpectation): Tail | undefined {
   const held = heldText(observed, e.placeholder);
-  const priors = priorsOf(held, e); // the earlier text first (`priorText`)
-  if (hasBullet(held) || hasBullet(priors[0])) return undefined;
-  for (const prior of priors) {
-    const whole = prior + e.value;
+  if (hasBullet(held) || hasBullet(priorText(e))) return undefined; // the earlier text, `priorsOf`'s first
+  return overPriors(held, e, (whole, prior): Tail | undefined => {
     const shown = prefixOf(held, whole);
-    if (shown === undefined) continue;
+    if (shown === undefined) return undefined;
     const { prefix, reformatted } = shown;
     return { missing: whole.slice(prefix.length), landed: prefix.length - prior.length, ...(reformatted !== undefined && { reformatted }) };
-  }
-  return undefined;
+  });
 }
 
 /**
@@ -228,10 +234,10 @@ export function droppedTail(observed: string, e: TextExpectation): string | unde
  *    not comparable either (hasBullet: • and ● only — `*` and `·` are ordinary text too).
  * 4. `dropped-tail` (D28): the held text is a strict prefix of what the field should hold, grouped by the field
  *    (`tailOf`), with some of the typing in it — the tail dropped.
- * 5. `separated` (D53): the held text is what the field should hold (over `priorsOf`, as `landedReformat` and
- *    `tailOf` judge it) with separators alone added (`separatedOf`) — ones the grouping rules refused, since the
- *    reading did not land. Disjoint from `dropped-tail` (all of the typing shown, not a strict prefix) and never `same-length`
- *    (it is longer): it re-words what read `length` — and the contrived `case` whose one case-matching run is of the
+ * 5. `separated` (D53): the held text is what the field should hold (`overPriors`, as `landedReformat` and `tailOf`
+ *    judge it) with separators alone added (`separatedOf`) — ones the grouping rules refused, since the reading did
+ *    not land. Disjoint from `dropped-tail` (all of the typing shown, not a strict prefix) and never `same-length` (it
+ *    is longer): it re-words what read `length` — and the contrived `case` whose one case-matching run is of the
  *    earlier text (`x,ABa-b` after `xAB`, `ab` typed), where the typing is all there.
  * 6. Otherwise the HELD text is compared (a named placeholder is no text): with clear the field must EQUAL the value,
  *    so the two are compared whole; without, it must CONTAIN it, so every run of the new text (`typedPartOf`) as long
@@ -256,10 +262,8 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
   }
   const held = heldText(observed, e.placeholder);
   // D53: every typed character there, in order, with separators the rules refused as grouping — never "a length".
-  for (const prior of priorsOf(held, e)) {
-    const added = separatedOf(held, prior + value);
-    if (added !== undefined) return { kind: 'separated', added };
-  }
+  const added = overPriors(held, e, (whole) => separatedOf(held, whole));
+  if (added !== undefined) return { kind: 'separated', added };
   const typed = typedPartOf(held, priorText(e));
   let caseOnly: number | undefined; // fewest case-only differing characters over the runs compared
   const starts = clear ? (typed.length === value.length ? [0] : []) : Array.from({ length: Math.max(0, typed.length - value.length + 1) }, (_, i) => i);

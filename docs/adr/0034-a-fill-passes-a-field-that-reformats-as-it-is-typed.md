@@ -385,7 +385,8 @@ field shows 5 (content withheld from this error)`, which names no remedy (the D5
   `fill-landing.ts#differenceOf` right after `dropped-tail`, over `priorsOf` on the held text as `landedReformat` and
   `tailOf` judge it: the earlier text first, then none when it vanished (D29) or is a mask template (D51). A reading
   equal to a named placeholder is held as empty and stays `length`; bullets stay `masked` or a partly masked
-  `length`, which come first.
+  `length`, which come first. Without clear the count also covers a mark added inside the earlier text the typing
+  extends (`a-b1234` after `ab`, `1234` typed: 1 added).
 - It only re-words a failure: landing (`landingOf`, `reformatOf`, `prefixOf`) is unchanged, so no reading passes or
   fails differently and nothing new is typed again; with clear the wipe and retype runs first, as before. It is
   disjoint from `dropped-tail` (all of the typing shown, not a strict prefix) and never `same-length` (it is longer).
