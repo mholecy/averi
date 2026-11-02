@@ -4,6 +4,8 @@ Status: accepted 2026-10-31 (performance backlog row D1, docs/plans/2026-10-30-p
 orchestrator's decision on the owner's standing: fast AND stable). Implemented on `perf/d1-poll-cadence`: `220b4eca`
 (the read counted), `3e551237` (the 150 ms floor, R2 pinned), `57017e11` (the rule named `pauseAfterRead`); this
 record `bbfb0244`, `fa1cdedf` and the measurement below.
+Amended 2026-11-02 (D35, loop L5): the settle's `pollMs` defaults to the adapter's `settleCadenceMs` (ADR 0040);
+`pauseAfterRead` is unchanged.
 
 ## Context
 

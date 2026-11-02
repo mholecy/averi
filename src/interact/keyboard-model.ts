@@ -67,8 +67,8 @@ import { AmbiguityRefusal, resolveSettled, type Resolved, type ResolvedSettled, 
  */
 export const KEYBOARD_HIDE_DELAY_MS = 300;
 
-/** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice and the drag (the in-tree model's refusal, and its fallback drag — interact/keyboard-dismissal.ts), the screen size (the on-screen rule of the tap's standing, ui-tree/standing.ts#Scene — the tap's and a dismissal's). */
-export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'pressKey' | 'viewport'>;
+/** The adapter surface the guard and the dismissal need: the tree and the tap (every model), the oracle and the key (the window model), the advice and the drag (the in-tree model's refusal, and its fallback drag — interact/keyboard-dismissal.ts), the screen size (the on-screen rule of the tap's standing, ui-tree/standing.ts#Scene — the tap's and a dismissal's), the settle cadence (every look's resolveSettled, interact/resolve.ts#settleCadence, ADR 0040). */
+export type KeyboardAdapter = Pick<DeviceAdapter, 'uiTree' | 'tap' | 'swipe' | 'keyboard' | 'keyboardAdvice' | 'pressKey' | 'viewport' | 'settleCadenceMs'>;
 
 /**
  * A resolved node whose tap point no soft keyboard covers, and the point a

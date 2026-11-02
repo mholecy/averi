@@ -10,6 +10,7 @@ import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree
 import { parseDump } from '../helpers/android-dumps.js';
 import { ACTIVE_WINDOW_HINT, missNote } from '../../src/ui-tree/miss.js';
 import { boundReads } from '../helpers/terminal-read.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
 // (tests/helpers/sleep-recorder.ts): every poll cadence and the fill's 350 ms
@@ -4328,5 +4329,124 @@ flows:
     await FlowEngine.run(cfg, fake, FAST, { flow: 'menu' });
     expect(fake.taps).toEqual(['lab.blur-menu.D']);
     expect(fake.screenshots).toHaveLength(0);
+  });
+});
+
+// D35 → L5 (ADR 0040): an engine built WITHOUT pollMs (production) leaves the settle cadence to the adapter's fact —
+// a flow tap's and fill's settle — while its own 500 still paces everything else: the fill's value poll (passed
+// explicitly), `wait:`, the `optional:` probe and detect. An engine given pollMs pins it everywhere, as before.
+describe('the settle cadence is the adapter\'s when the engine pins none (ADR 0040)', () => {
+  const cfg = parseConfig(`
+app:
+  android: { package: md.bank.app }
+states:
+  home:
+    detect:
+      any:
+        - element: { id: home_root }
+    reach: [go_home]
+flows:
+  tap_it:
+    steps:
+      - tap: { id: go }
+  fill_it:
+    steps:
+      - fill: { id: amount, value: abc }
+  wait_it:
+    steps:
+      - wait: { element: { id: later }, timeout: 2s }
+  optional_it:
+    steps:
+      - optional:
+          - tap: { id: absent }
+  go_home:
+    steps:
+      - tap: { id: go }
+      - wait: { element: { id: home_root }, timeout: 2s }
+`);
+  const PRODUCTION = (): EngineOptions => ({ env: TEST_ENV, session: new EngineSession() });
+
+  /** A fake over a start screen (a button, a field) whose `go` leads home; `fact` is its settle cadence. */
+  const device = (fact: number | undefined) => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      {
+        start: screen(el({ role: 'button', identifier: 'go' }), el({ role: 'textfield', identifier: 'amount' })),
+        home: screen(el({ identifier: 'home_root' })),
+      },
+      'start',
+      (id, self) => {
+        if (id === 'go') self.current = 'home';
+      },
+    );
+    if (fact !== undefined) fake.settleCadenceMs = fact;
+    return fake;
+  };
+
+  beforeEach(() => resetSleeps());
+
+  it('a `tap:` step settles at the fact', async () => {
+    const fake = device(300);
+    await FlowEngine.run(cfg, fake, PRODUCTION(), { flow: 'tap_it' });
+    expect(fake.taps).toEqual(['go']);
+    expect(sleeps).toEqual([300]);
+  });
+
+  it('a `fill:` step settles at the fact, and its value poll stays the engine\'s 500', async () => {
+    const fake = device(300);
+    // The typing lands one read late: the first read-back sees the field empty, the next sees the value.
+    let pending: string | undefined;
+    fake.typeText = async (text) => {
+      fake.typed.push(text);
+      pending = text;
+    };
+    const origTree = fake.uiTree.bind(fake);
+    let typedReads = 0;
+    fake.uiTree = async () => {
+      if (pending !== undefined && typedReads++ === 1 && fake.focused) {
+        fake.focused.value = pending;
+        pending = undefined;
+      }
+      return origTree();
+    };
+    await FlowEngine.run(cfg, fake, PRODUCTION(), { flow: 'fill_it' });
+    expect(fake.typed).toEqual(['abc']);
+    expect(sleeps).toEqual([300, 350, 500]); // the settle, the focus delay (fill.ts#DEFAULT_FOCUS_DELAY_MS), one value-poll round
+  });
+
+  it('a `wait:` step is not a settle: it polls at 500 whatever the fact', async () => {
+    const fake = device(300);
+    let reads = 0;
+    const origTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => (reads++ === 0 ? origTree() : screen(el({ identifier: 'later' })));
+    await FlowEngine.run(cfg, fake, PRODUCTION(), { flow: 'wait_it' });
+    expect(sleeps).toEqual([500]);
+  });
+
+  it('an `optional:` probe is not a settle: it polls at 500 whatever the fact', async () => {
+    const fake = device(300);
+    await FlowEngine.run(cfg, fake, PRODUCTION(), { flow: 'optional_it' });
+    expect(sleeps.length).toBeGreaterThan(0);
+    expect(new Set(sleeps)).toEqual(new Set([500]));
+  });
+
+  it('an ensure_state-shaped run (detect → reach: a tap, a wait): only the tap\'s pause moves', async () => {
+    const withFact = device(300);
+    await FlowEngine.run(cfg, withFact, PRODUCTION(), { state: 'home' });
+    const atFact = [...sleeps];
+    resetSleeps();
+    const without = device(undefined);
+    await FlowEngine.run(cfg, without, PRODUCTION(), { state: 'home' });
+    expect(withFact.taps).toEqual(['go']);
+    expect(without.taps).toEqual(['go']);
+    expect(atFact.length).toBe(sleeps.length);
+    const moved = atFact.flatMap((ms, i) => (ms === sleeps[i] ? [] : [[sleeps[i], ms]]));
+    expect(moved).toEqual([[500, 300]]);
+  });
+
+  it('an engine given pollMs pins it over the fact', async () => {
+    const fake = device(300);
+    await FlowEngine.run(cfg, fake, { ...PRODUCTION(), pollMs: 2 }, { flow: 'tap_it' });
+    expect(sleeps).toEqual([2]);
   });
 });

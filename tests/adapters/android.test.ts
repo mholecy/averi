@@ -527,6 +527,11 @@ describe('AndroidAdapter interactions', () => {
     expect(adapter.treeReadSettles).toBe(true);
   });
 
+  it('sets no settle cadence (types.ts#settleCadenceMs, ADR 0040): a 2.2–2.5 s dump makes the pause the 150 ms floor at any cadence, so it settles at the default', () => {
+    const adapter: DeviceAdapter = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fakeExec({}).fn });
+    expect(adapter.settleCadenceMs).toBeUndefined();
+  });
+
   it('uiTree strips the trailing uiautomator status line', async () => {
     const { fn } = fakeExec({ 'adb -s emulator-5554 exec-out uiautomator': UIAUTOMATOR_XML });
     const tree = await new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: fn }).uiTree();

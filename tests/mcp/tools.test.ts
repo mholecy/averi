@@ -4,11 +4,12 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { IdbEmptyTreeError, IdbNoFrontmostError } from '../../src/adapters/ios-tree-source.js';
+import { IDB_SETTLE_CADENCE_MS, IdbEmptyTreeError, IdbNoFrontmostError } from '../../src/adapters/ios-tree-source.js';
 import type { Device, Platform, UiNode } from '../../src/adapters/types.js';
 import { AdapterRegistry, type AdapterFactory } from '../../src/mcp/registry.js';
 import { discoveryOver } from '../../src/adapters/discovery.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
+import { DEFAULT_FOCUS_DELAY_MS } from '../../src/interact/fill.js';
 import { TOOL_CONFIG } from '../../src/mcp/config-policy.js';
 import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
@@ -1659,5 +1660,60 @@ describe('assert: a refused capture is one failed assert, not a failed call', ()
     expect(result.text).toContain('1/2');
     expect(result.text).toContain('screenshot failed: `adb -s emulator-5554 exec-out screencap -p` on device emulator-5554 returned 0 bytes — not a PNG; failing closed, color unchecked');
     expect(result.text).toContain('PASS  element id:"home_root" exists');
+  });
+});
+
+// D35 → L5 (ADR 0040): the tools pin no settle cadence, so an idb-wired adapter's fact (300) is the settle's, while
+// type_text's value poll keeps its own 400 (fill.ts#DEFAULT_VALUE_POLL_MS). Date faked: a fake read costs 0 ms.
+describe('tap and type_text settle at the adapter\'s cadence (ADR 0040)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  /** An iOS fake as the registry wires IosAdapter over IdbTreeSource: no oracle, the source's 300 as its fact. */
+  const idbWired = () => {
+    resetLayout();
+    const fake = new FakeAdapter(
+      { s: screen(el({ role: 'button', identifier: 'go' }), el({ role: 'textfield', identifier: 'amount' })) },
+      's',
+    );
+    fake.platform = 'ios';
+    fake.keyboardAdvice = 'ADVICE';
+    fake.settleCadenceMs = IDB_SETTLE_CADENCE_MS;
+    return fake;
+  };
+
+  it('tap: the settle pauses 300 between its two reads', async () => {
+    const { call } = await connect({ ios: idbWired(), android: home() });
+    resetSleeps();
+    const result = await call('tap', { platform: 'ios', selector: 'id:go', configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(sleeps).toEqual([300]);
+  });
+
+  it('type_text with a selector: the settle pauses 300, and the value poll after a late typing stays 400', async () => {
+    const fake = idbWired();
+    // The typing lands one read late: the first read-back sees the field empty, the next sees the value.
+    let pending: string | undefined;
+    fake.typeText = async (text) => {
+      fake.typed.push(text);
+      pending = text;
+    };
+    const origTree = fake.uiTree.bind(fake);
+    let typedReads = 0;
+    fake.uiTree = async () => {
+      if (pending !== undefined && typedReads++ === 1 && fake.focused) {
+        fake.focused.value = pending;
+        pending = undefined;
+      }
+      return origTree();
+    };
+    const { call } = await connect({ ios: fake, android: home() });
+    resetSleeps();
+    const result = await call('type_text', { platform: 'ios', selector: 'id:amount', text: 'abc', configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(fake.typed).toEqual(['abc']);
+    expect(sleeps).toEqual([300, DEFAULT_FOCUS_DELAY_MS, 400]); // the settle, the focus delay, one value-poll round
   });
 });

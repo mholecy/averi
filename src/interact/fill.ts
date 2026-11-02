@@ -28,9 +28,10 @@ export const DEFAULT_FOCUS_DELAY_MS = 350;
 /**
  * Cadence of the value poll (five rounds) when the caller has none. 400 ms is
  * what the MCP type_text tool has always used; it is NOT the settle poll's
- * DEFAULT_POLL_MS — the two were separate before 2026-10-03 and a review the
- * same day caught them quietly merged. The engine passes its own pollMs for
- * both, as it always did.
+ * cadence — the two were separate before 2026-10-03 and a review the
+ * same day caught them quietly merged. The engine passes its own 500 as
+ * `valuePollMs` (since 2026-11-02, ADR 0040: its `pollMs` reaches the settle
+ * only when pinned, and the settle's cadence is otherwise the adapter's).
  */
 export const DEFAULT_VALUE_POLL_MS = 400;
 
@@ -38,6 +39,11 @@ export const DEFAULT_VALUE_POLL_MS = 400;
 export interface FillOptions extends GuardOptions {
   /** Delete the field's current content before typing — typing otherwise APPENDS. */
   clear?: boolean;
+  /**
+   * Cadence of the value poll and of a clear's re-read. Default: `pollMs` when given (a test pinning both), else
+   * DEFAULT_VALUE_POLL_MS. Separate from the settle's cadence (ADR 0040): the flow engine passes its own here.
+   */
+  valuePollMs?: number;
 }
 
 /**
@@ -170,7 +176,7 @@ export async function fillField(
     throw new FillValueFailure(errorMessage(e), 'refused', { cause: e });
   }
   const { clear } = opts;
-  const pollMs = opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
+  const pollMs = opts.valuePollMs ?? opts.pollMs ?? DEFAULT_VALUE_POLL_MS;
   const { node, note: resolutionNote, keyboardHidden, point, moved, tree: resolvedIn } = await resolveClearOfKeyboard(adapter, target, opts);
   // A focus tap moved off a covered centre (tap-judgement.ts#TapJudge.aim) is said in the note, after what the
   // resolution said.

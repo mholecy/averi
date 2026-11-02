@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
 import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter, PGREP_TIMEOUT_MS } from '../../src/adapters/ios.js';
-import { IdbEmptyTreeError, IdbTreeSource, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { IDB_SETTLE_CADENCE_MS, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
+import { ReadHandOff } from '../../src/ui-tree/read-handoff.js';
+import { fakeFetch, fakeSpawn } from '../helpers/fake-wda.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
 import { captureRefusal } from '../../src/verify/capture.js';
 import type { IdbHelper } from '../../src/adapters/idb-helper.js';
@@ -67,6 +70,49 @@ describe('IosAdapter interactions', () => {
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
     await tapElement(adapter, 'id:login_button', { ambiguous: 'refuse' });
     expect(calls.at(-1)?.full).toBe('idb ui tap 196 724 --udid AAAA-1111');
+  });
+
+  // D35 → L5 (ADR 0040): the settle cadence is the tree SOURCE's fact, forwarded by the adapter.
+  it("its settle cadence is its tree source's: idb's describe-all 300 (measured), WDA none (unmeasured)", () => {
+    expect(IDB_SETTLE_CADENCE_MS).toBe(300);
+    const { fn } = fakeExec({});
+    const idb = new IdbTreeSource({ udid: 'AAAA-1111', exec: fn });
+    expect(idb.settleCadenceMs).toBe(IDB_SETTLE_CADENCE_MS);
+    expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: idb }).settleCadenceMs).toBe(IDB_SETTLE_CADENCE_MS);
+    const wda: IosTreeSource = new WdaTreeSource({ udid: 'AAAA-1111', exec: fn, fetchFn: fakeFetch(() => 'refused').fn, spawnFn: fakeSpawn().fn });
+    expect(wda.settleCadenceMs).toBeUndefined();
+    expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda }).settleCadenceMs).toBeUndefined();
+    expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: WDA_NO_TREE }).settleCadenceMs).toBeUndefined();
+  });
+
+  it('the settle cadence survives the hand-off proxy (ReadHandOff.watch)', () => {
+    const { fn } = fakeExec({});
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
+    expect(new ReadHandOff().watch<DeviceAdapter>(adapter).settleCadenceMs).toBe(IDB_SETTLE_CADENCE_MS);
+  });
+
+  describe('a tap settles at the source\'s cadence (ADR 0040), Date faked so a read costs 0 ms', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      resetSleeps();
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('idb: one 300 ms pause between the two describe-all reads', async () => {
+      const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
+      const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
+      await tapElement(adapter, 'id:login_button', { ambiguous: 'refuse' });
+      expect(calls.filter((c) => c.full.startsWith('idb ui describe-all'))).toHaveLength(2);
+      expect(sleeps).toEqual([300]);
+    });
+
+    it('a source with no fact (WDA): the unchanged 500', async () => {
+      const { fn } = fakeExec({});
+      const wda: IosTreeSource = { ...WDA_NO_TREE, read: async () => parseIdbDescribeAll(IDB_DESCRIBE_ALL) };
+      const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda });
+      await tapElement(adapter, 'id:login_button', { ambiguous: 'refuse' });
+      expect(sleeps).toEqual([500]);
+    });
   });
 
   it('has no drag speed (decided 2026-10-09, adapters/ios.ts#swipe): scroll_until strokes it at its 300-ms default, as before', () => {

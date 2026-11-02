@@ -1,0 +1,90 @@
+# 40. The settle cadence is the tree source's
+
+Status: accepted 2026-11-02 (performance backlog row D35, docs/plans/2026-10-30-performance-backlog.md; loop L5).
+Merged only after the batch-4 device A/B and the product-path settle run (`d35-motion --settle`, 60 trials, 0 wrong
+settles). One wrong settle there sets `IDB_SETTLE_CADENCE_MS` to 400 (0 wrong in both batches) and the run is
+repeated. ADR 0029's rule (`pauseAfterRead`) is unchanged. This record adds a fact: which `pollMs` the settle is given.
+
+## Context
+
+- `interact/resolve.ts#resolveSettled` proves an element holds still by the same rect on two consecutive fresh reads.
+  It is a `ui-tree/read-tree.ts#pollTree` predicate, so its reads START about `pollMs` apart (ADR 0029). Until now that
+  `pollMs` was the CALLER's, never the device's: the MCP `tap` and `type_text` tools passed none (500,
+  `DEFAULT_POLL_MS`), and the flow engine passed its own 500 (`EngineOptions.pollMs`), the cadence of its waits.
+- What the proof compares is two SNAPSHOTS. Where a snapshot falls inside a read is the tree source's property. idb's
+  `describe-all` snapshots AX at once, in a 20–31 ms read (batch-3 B2 medians). A WDA `/source` snapshot falls
+  anywhere inside a 0.3–1.7 s read. An Android dump snapshots after its own idle wait, inside a 2.2–2.5 s read.
+- On idb, D1 made the pause after a ~30 ms read about 470 ms of a 500 ms cadence. That is one such pause in every tap
+  and fill, and in every keyboard re-look.
+
+## Decision
+
+**`DeviceAdapter.settleCadenceMs?: number` is a fact: the cadence at which two reads of this adapter's tree may prove
+an element holds still. `settleCadence(adapter, opts) = opts.pollMs ?? adapter.settleCadenceMs ?? DEFAULT_POLL_MS`
+(`interact/resolve.ts`) is the one owner of the choice, and `resolveSettled` is its only caller.**
+
+- A caller's explicit `pollMs` wins. Tests and any caller that pins a cadence stay deterministic.
+- The fact belongs to the source. `IosTreeSource.settleCadenceMs` is optional. `IdbTreeSource` declares
+  `IDB_SETTLE_CADENCE_MS` = 300. `WdaTreeSource` declares none, and neither does the differential harness's
+  `RecordedTreeSource`. `IosAdapter` forwards its source's value through a getter and does not dispatch on `kind`.
+  `AndroidAdapter` declares none.
+- `ui-tree/read-handoff.ts#ADAPTER_SURFACE.settleCadenceMs = 'fact'`. The proxy returns a non-function as it is, so
+  the value reaches the settle through `ReadHandOff.watch`. Classing it `'reads'` would be equivalent for the same
+  reason.
+- `resolvePresent` (the flow `optional:` probe) does not use it. It makes no stability claim and stays at 500. The
+  engine's `wait:`, `branch:` and detect probes, the Verifier and the pixel poll are unchanged.
+- The flow engine separates the two meanings its `pollMs` carried. `acting.pollMs` is set only when
+  `EngineOptions.pollMs` was given, so in production a flow's tap and fill settle at the adapter's fact. The fill's
+  value poll is passed on its own (`FillOptions.valuePollMs: this.pollMs`), so it stays 500. Its five rounds are the
+  window a late value has to land in (RN on WDA). `fillField` takes `valuePollMs ?? pollMs ?? DEFAULT_VALUE_POLL_MS`,
+  so MCP's 400 and every test that pins both through `pollMs` are unchanged.
+- **A value is set only from a measurement of that source.** The measurement is a d35-motion-style run: back-to-back
+  reads through real motions, with the settle replayed offline at each cadence using the product's own
+  `pauseAfterRead`. A judgement does not set a value.
+
+What changes in effect: only `resolveSettled`'s pause on iOS idb, from 500 − r to 300 − r (r ≈ 20–40 ms). The 150 ms
+floor binds only for r > 150. That pause comes once per settle that needs a second read: once per tap, once per fill
+plus each keyboard re-look, and once per flow tap or fill. Everything else sleeps as before.
+
+## The measurement (D35, idb, lab simulator)
+
+d35-motion read back to back for 3 s after each trigger. The settle was replayed at each cadence p. A settle is wrong
+when a later read in the window moves the rect.
+
+| | batch-2 B (45 moving trials) | batch-3 B2 (60 moving, 0 unsettled at end) | combined 105 |
+|---|---|---|---|
+| wrong settles p200 | 0 | 1 (M2 carousel C, 840 ms) | 1 |
+| p250 | 1 (M2 carousel, 957 ms) | 0 | 1 |
+| **p300** | **0** | **0** | **0** |
+| p400 / p500 | 0 / 0 | 0 / 0 | 0 / 0 |
+| false-settle pairs g=300 | 3/55 180 | 0/56 514 | 3/111 694 (2.7·10⁻⁵) |
+| g=400 | 10/51 213 | 1/51 892 | 11/103 105 (1.1·10⁻⁴) |
+| g=500 | 3/51 488 | 4/53 125 | 7/104 613 (6.7·10⁻⁵) |
+
+- 300 is the smallest cadence with 0 wrong settles in both batches. The two wrong settles seen, at p200 and p250,
+  come from one mechanism: M2's paging carousel in its last ~100 ms of deceleration.
+- The false-equal pairs are not monotone in the gap between 300 and 500. They look like AX repeating a frame, not slow
+  motion, and 500 does not remove them.
+- The replay is the worst case. It starts the settle at the first read after the trigger. In the product, a settle
+  follows an agent round trip or a flow step, which is later in the motion.
+- M3 (sheet) and M4 (keyboard) are moot on idb. AX reports the end frame at once (batch-2, 15/15 each).
+- Median saving: 205 ms a settle against 500 (batch-3 B2).
+
+## Per source
+
+- **idb**: 300, measured (above).
+- **WDA**: none, so 500. It is unmeasured. At most 200 ms is left to gain, because the floor binds for r ≥ 350
+  (follow-up D35b).
+- **Android**: none, and moot. A 2.2–2.5 s dump makes `pauseAfterRead(p, r)` the 150 ms floor for any p ≤ r + 150.
+
+## Risks accepted
+
+- (R1) The margin is thin. 300 is one 50 ms step above a cadence that failed once. 0/105 bounds the per-settle rate
+  of wrong settles below ≈ 2.9 % (95 %, rule of three), and 500 has the same bound. The data show no difference
+  between 300 and 500. They do not show that 300 is as safe as 500.
+- (R2) Some motion kinds are unmeasured: navigation pushes, which should be moot by the M3/M4 mechanism but that is
+  not proven; JS-driven RN animations; Lottie.
+- (R3) A wrong settle is not caught later. A tap lands where the element WAS, and no later step re-checks a tap's
+  landing. The product-path run (`d35-motion --settle`) is the check before merge.
+- The floor and the run-of-one late read (~150–167 ms back to back, ADR 0029) are unchanged. 300 is still twice the
+  gap the proof already accepts there.

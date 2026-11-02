@@ -741,6 +741,15 @@ export class IosAdapter implements DeviceAdapter {
   // two stub methods without running anything.
 
   /**
+   * The settle cadence (types.ts#DeviceAdapter.settleCadenceMs, ADR 0040): the tree source's own fact
+   * (ios-tree-source.ts#IosTreeSource.settleCadenceMs) — idb's 300, none under WDA. Forwarded, not chosen here: no
+   * dispatch on the source's kind.
+   */
+  get settleCadenceMs(): number | undefined {
+    return this.treeSource.settleCadenceMs;
+  }
+
+  /**
    * Why a covering keyboard cannot be hidden from here, and what was
    * measured to work (DeviceAdapter.keyboardAdvice) — measured 2026-10-07 on
    * the finportal login, iPhone 17 simulator, docs/bugs/2026-10-05-ios-tap-
