@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { appInfoNames } from '../../src/adapters/simctl-appinfo.js';
-import { appinfo } from '../helpers/simctl-appinfo.js';
+import { appInfoBundle, appInfoNames } from '../../src/adapters/simctl-appinfo.js';
+import { appinfo, BANK_APPINFO } from '../helpers/simctl-appinfo.js';
 
 describe('appInfoNames — the names an app\'s Application may carry, from `simctl appinfo`', () => {
   it('CFBundleDisplayName then CFBundleName, quoted or bare; a repeat is listed once', () => {
@@ -33,5 +33,32 @@ describe('appInfoNames — the names an app\'s Application may carry, from `simc
 
   it('a key is matched whole: CFBundleNameSuffix-like keys are not CFBundleName', () => {
     expect(appInfoNames('{\n    CFBundleNameSomething = Wrong;\n    CFBundleName = Right;\n}\n')).toEqual(['Right']);
+  });
+});
+
+describe('appInfoBundle — where the app\'s executable lives, from `simctl appinfo`', () => {
+  it('the top-level Path (quoted, with spaces) and CFBundleExecutable of the recorded output', () => {
+    expect(appInfoBundle(BANK_APPINFO)).toEqual({
+      path: '/Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app',
+      executable: 'Internal',
+    });
+    expect(appInfoBundle('{\n    CFBundleExecutable = "My App";\n    Path = "/a b/My App.app";\n}\n')).toEqual({ path: '/a b/My App.app', executable: 'My App' });
+  });
+
+  it("only TOP-LEVEL keys: an extension's nested CFBundleExecutable / Path listed first is not the app's", () => {
+    const nested =
+      '{\n' +
+      '    Extensions =     {\n        "com.app.widget" =         {\n            CFBundleExecutable = WidgetExt;\n            Path = "/w/WidgetExt.appex";\n        };\n    };\n' +
+      '    CFBundleExecutable = Internal;\n' +
+      '    Path = "/x/Internal.app";\n' +
+      '}\n';
+    expect(appInfoBundle(nested)).toEqual({ path: '/x/Internal.app', executable: 'Internal' });
+  });
+
+  it('a missing key is undefined, not empty; a dictionary or array value is no value', () => {
+    expect(appInfoBundle('')).toEqual({});
+    expect(appInfoBundle('{\n    CFBundleExecutable = Internal;\n}\n')).toEqual({ executable: 'Internal' });
+    expect(appInfoBundle('{\n    Path = "/x/A.app";\n}\n')).toEqual({ path: '/x/A.app' });
+    expect(appInfoBundle('{\n    Path =     {\n    };\n    CFBundleExecutable =     (\n    );\n}\n')).toEqual({});
   });
 });

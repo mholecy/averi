@@ -264,7 +264,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     expect(d.appinfos()).toHaveLength(2);
   });
 
-  it('appinfo lists neither name (a format drift reads the same): a note saying so, not a silent pass — and not cached either', async () => {
+  it('appinfo lists neither name nor Path (a format drift, or not installed): a note saying so, not a silent pass — and asked again next launch', async () => {
     const d = device([BANK], '');
     expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toBe(
       'could not check that com.apple.MobileAddressBook is in front (simctl appinfo listed neither CFBundleDisplayName nor ' +
@@ -272,8 +272,15 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
         'before trusting a read',
     );
     expect(d.describeAlls()).toBe(1);
-    await d.adapter.launch('com.apple.MobileAddressBook');
+    expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(/listed neither CFBundleDisplayName nor CFBundleName/);
     expect(d.appinfos()).toHaveLength(2);
+  });
+
+  it('appinfo lists a Path but no name: the note on every launch, from the cache (D33: the liveness check uses that Path)', async () => {
+    const d = device([BANK], appinfo(undefined, undefined, { path: '/x/AAAA-1111/data/Containers/Bundle/Application/G/C.app' }));
+    expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(/listed neither CFBundleDisplayName nor CFBundleName/);
+    expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(/listed neither CFBundleDisplayName nor CFBundleName/);
+    expect(d.appinfos()).toHaveLength(1);
   });
 
   it('names found are cached per bundle: a second launch of the same bundle asks appinfo nothing', async () => {
@@ -373,5 +380,19 @@ describe('regression: an assert right after launch_app judges the launched app, 
     const verifier = new Verifier(d.adapter, { pollMs: 5, timeoutMs: 500 });
     const r = await verifier.assert({ element: { id: 'accounts.detail.search_field' }, timeout: 500 });
     expect(r.pass).toBe(false);
+  });
+});
+
+describe('the launch and the liveness check share one appinfo per bundle (D33)', () => {
+  it('an idb launch, then isAppRunning: one appinfo in all, and the check asks pgrep with its Path', async () => {
+    const info = appinfo(undefined, 'Contacts', {
+      path: '/Users/me/Library/Developer/CoreSimulator/Devices/AAAA-1111/data/Containers/Bundle/Application/G/Contacts.app',
+    });
+    const d = device([CONTACTS], info);
+    await d.adapter.launch('com.apple.MobileAddressBook');
+    expect(await d.adapter.isAppRunning('com.apple.MobileAddressBook')).toBe(true);
+    expect(d.appinfos()).toHaveLength(1);
+    expect(d.calls.filter((c) => c.startsWith('/usr/bin/pgrep'))).toHaveLength(1);
+    expect(d.calls.filter((c) => c.includes('launchctl'))).toEqual([]);
   });
 });
