@@ -108,5 +108,6 @@ export function idbLab(reads: string[], info = LAB_INFO) {
 /** The launch's ⚠ note over IDB_ALERT or WDA_ALERT (D56), byte for byte. */
 export const LAUNCH_ALERT_NOTE =
   'iOS has not brought dev.averi.lab forward yet: a system alert is up, "Open in “AveriLab”?" — buttons "Cancel" at ' +
-  "(127, 474), \"Open\" at (275, 474). Answer it with a tap at the chosen button's x and y (averi taps nothing itself); " +
-  'every launch stays behind the alert until it is answered — then read again before trusting a read';
+  '(127, 474), "Open" at (275, 474). Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y ' +
+  '(averi taps nothing itself); every launch stays behind the alert until it is answered — then read again before ' +
+  'trusting a read';

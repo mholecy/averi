@@ -536,8 +536,8 @@ describe('awaitForeground — the one alert read, at the bound with SpringBoard 
     expect(await awaitForeground(c.check)).toEqual({
       note:
         'iOS has not brought dev.averi.lab forward yet: a system alert is up, "Open in “AveriLab”?" — button "Open" at ' +
-        "(275, 474). Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays " +
-        'behind the alert until it is answered — then read again before trusting a read',
+        '(275, 474). Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps ' +
+        'nothing itself); every launch stays behind the alert until it is answered — then read again before trusting a read',
     });
     expect(c.reads()).toBe(1);
     expect(c.names()).toBe(0);

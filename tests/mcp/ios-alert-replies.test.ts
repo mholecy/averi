@@ -20,20 +20,21 @@ afterEach(() => {
 
 // The replies with iOS's system alert up, end to end — a real IosAdapter (tests/helpers/ios-lab.ts) through the
 // reply text (tool-text.ts): launch_app's ⚠ line names the alert (D56; ADR 0032's D56 amendment), and open_deep_link's
-// reply stays D54's, byte for byte (the shared wording, extracted to ios-system-alert.ts).
+// reply is D54's headline and buttons with D57's advice (the shared wording, in ios-system-alert.ts).
 describe("launch_app's and open_deep_link's replies over iOS's system alert (D56)", () => {
   it("launch_app's reply: the Launched headline, then the alert note as its one ⚠ line", async () => {
     const launched = await launchApp(idbLab([IDB_ALERT]).adapter, undefined, new EngineSession(), { appId: LAB });
     expect(launchText('ios', launched)).toBe(`Launched dev.averi.lab on ios\n⚠ ${ALERT_NOTE}`);
   });
 
-  // open_deep_link's replies with the alert up, end to end: byte-identical to D54's (the shared wording, extracted).
-  it("open_deep_link's reply over the same alert is D54's, byte for byte — idb and WDA", async () => {
-    const d54 =
+  // open_deep_link's replies with the alert up, end to end: D54's headline and buttons, then D57's advice — a tap by
+  // the button's label, or at its x and y — the same on idb and WDA.
+  it("open_deep_link's reply over the same alert: D54's headline and buttons, D57's advice — idb and WDA", async () => {
+    const alertReply =
       'iOS has not opened averilab://d54 yet: it asks "Open in “AveriLab”?" — buttons "Cancel" at (127, 474), "Open" at ' +
-      "(275, 474). Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays " +
-      'behind the alert until it is answered';
-    expect(deepLinkText('ios', 'averilab://d54', await idbLab([IDB_ALERT]).adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(d54);
-    expect(deepLinkText('ios', 'averilab://d54', await lab([SPRINGBOARD], { tree: WDA_ALERT }).adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(d54);
+      '(275, 474). Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps ' +
+      'nothing itself); every launch stays behind the alert until it is answered';
+    expect(deepLinkText('ios', 'averilab://d54', await idbLab([IDB_ALERT]).adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(alertReply);
+    expect(deepLinkText('ios', 'averilab://d54', await lab([SPRINGBOARD], { tree: WDA_ALERT }).adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(alertReply);
   });
 });

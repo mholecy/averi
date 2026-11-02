@@ -264,9 +264,10 @@ describe('alertButtonsText and ALERT_ADVICE — the words both replies quote an 
     expect(alertButtonsText(alert)).toBe('buttons "Cancel" at (127, 474), "Open" at (275, 474)');
   });
 
-  it('the advice: a tap at the coordinates, none by averi, and what the alert holds back', () => {
+  it('the advice: a tap by the button\'s label first, its x and y the fallback, none by averi, and what the alert holds back', () => {
     expect(ALERT_ADVICE).toBe(
-      "Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered",
+      'Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps nothing itself); ' +
+        'every launch stays behind the alert until it is answered',
     );
   });
 });

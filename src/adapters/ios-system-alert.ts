@@ -120,12 +120,16 @@ export const alertButtonsText = (alert: SystemAlert): string =>
   `${alert.buttons.length === 1 ? 'button' : 'buttons'} ${alert.buttons.map((b) => `"${b.label}" at (${b.centre.x}, ${b.centre.y})`).join(', ')}`;
 
 /**
- * The advice after an alert's buttons: a tap at the chosen button's coordinates — the one answer proven on a device
- * (batch-5 D49A tapped by coordinates; a selector tap on SpringBoard's tree is unverified) — that averi taps nothing,
- * and what the alert holds back (batch-2: every launch after it stayed behind it).
+ * The advice after an alert's buttons (D57; ADR 0032's D57 amendment): a tap by the chosen button's label first —
+ * proven on a device (batch-7 B: `tap text:"Cancel"` and `text:"Open"` in 8 cases — Cancel and Open × idb and WDA ×
+ * over SpringBoard and over Contacts, one run each — one Button matched each time) and settled and judged as every
+ * selector tap is — or a tap at its x and y, the fallback for a label the selector grammar cannot write or two buttons
+ * sharing one (batch-5 D49A tapped by coordinates); that averi taps nothing; and what the alert holds back (batch-2:
+ * every launch after it stayed behind it). `<label>` is literal: the button list before it quotes every label.
  */
 export const ALERT_ADVICE =
-  "Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered";
+  'Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps nothing itself); ' +
+  'every launch stays behind the alert until it is answered';
 
 /** A rect's centre in whole points — where a tap lands. */
 const centreOf = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
