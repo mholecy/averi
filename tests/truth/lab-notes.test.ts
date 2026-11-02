@@ -33,15 +33,15 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  * note's left with their live entries, struck off by round 7's A1: fixed, still excluded with that reason; LV1's with
  * its three, struck off by round 14's bugs/r14-lv1 — fixed live, still excluded, its `why` saying so; LV3's with its idb
  * one, struck off by round 14's bugs/r14-lv3 — fixed live, still excluded; LV2's with its two, struck off by round
- * 1023's bugs/r1023-lv2 — fixed live, still excluded.)
+ * 1023's bugs/r1023-lv2 — fixed live, still excluded; batch-3's dotted-date note with its three f11 entries, struck off
+ * by D51's fix — fixed, still excluded, its `why` saying so, the device check pending.)
  */
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md': "a fling's rest a fraction of a point centre-out under WDA, live only (and intermittent)",
   // D31: the forms group's fills of non-ASCII text (live.ts b1d, b7): a replayed tree cannot judge typing.
   '2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md': '`idb ui text` refuses non-ASCII text, the field untouched: typing, live only',
   '2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md': '`input text` types a prefix, then fails on non-ASCII text: typing, live only',
-  // batch-3 (live.ts f11; ensure h2 under idb): typing, and a hold timed over live reads — the golden replays neither.
-  '2026-11-02-lab-fill-fails-a-date-the-field-dots-as-typed-though-the-app-holds-it.md': 'a fill into a field that dots a date fails while the app holds it: typing, live only',
+  // batch-3 (ensure h2 under idb): a hold timed over live reads — the golden replays none.
   '2026-11-02-lab-ios-idb-reads-an-unlabelled-swiftui-spinner-as-content-so-a-held-no-ends-on-it.md': "ensure_state's held \"no\" began on idb's spinner: a hold over live reads, live only",
 };
 

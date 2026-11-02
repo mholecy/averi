@@ -19,7 +19,7 @@ import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } fr
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before; ios-rn-*-lr3*.json, round 9's LR3 fix; ios-forms-d40-1.json, ios-rn-forms-d40-1.json and android-forms-d40-1.json, D40's device run at 40ba3dd1, whose forms LOUDs D31 filed; ios-idb-forms-d43a-1.json, ios-wda-forms-d43a-1.json and android-forms-d43a-1.json, D43a's device run at 0262c69d; *-ensure-d30-1.json and *-forms-d37-1.json, batch-3's device run at 6b4a44df) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before; ios-rn-*-lr3*.json, round 9's LR3 fix; ios-forms-d40-1.json, ios-rn-forms-d40-1.json and android-forms-d40-1.json, D40's device run at 40ba3dd1, whose forms LOUDs D31 filed; ios-idb-forms-d43a-1.json, ios-wda-forms-d43a-1.json and android-forms-d43a-1.json, D43a's device run at 0262c69d; *-ensure-d30-1.json and *-forms-d37-1.json, batch-3's device run at 6b4a44df — the latter the src before D51's fix) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -370,12 +370,6 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-idb-ensure-d30-1.json', 'ensure', { cases: 3, ok: 2, loud: 0, mismatches: 1 }],
     ['ios-wda-ensure-d30-1.json', 'ensure', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['android-ensure-d30-1.json', 'ensure', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
-    // Block H, f11–f14 (D37): f11 failed-holds under every source — `31122026` typed into the field that dots it, the app
-    // holding `31.12.2026`, averi replying ERROR (ADR 0034 fails a `.` group that is no thousands: known, backlog D51);
-    // f12–f14 ok everywhere.
-    ['ios-idb-forms-d37-1.json', 'forms', { cases: 4, ok: 3, loud: 0, mismatches: 1 }],
-    ['ios-wda-forms-d37-1.json', 'forms', { cases: 4, ok: 3, loud: 0, mismatches: 1 }],
-    ['android-forms-d37-1.json', 'forms', { cases: 4, ok: 3, loud: 0, mismatches: 1 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudgeInProcess(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
@@ -500,6 +494,25 @@ describe('live.ts --rejudge over the committed iOS records of LE2\'s chooser bef
     expect(unknown).toEqual(['scroll:chooser-over-list.R']);
     expect(code).toBe(1);
   });
+});
+
+// D51's fix: the src before it, live (batch-3's block H at 6b4a44df, D37).
+describe('live.ts --rejudge over the committed records of the src before D51\'s fix', () => {
+  // f11: `31122026` typed without clear into the field that dots it — the app held `31.12.2026`, averi replied "ERROR
+  // fill: typed 8 characters but the field shows 10" under idb, WDA and uiautomator (ADR 0034 failed a `.` group that is
+  // no thousands). D51 (ADR 0034's amendment) passes that reading and struck the three live-known.ts entries off: the
+  // recorded replies read as they were, f11 not known — exit 1, as recorded. f12–f14 ok.
+  it.each([['ios-idb-forms-d37-1.json'], ['ios-wda-forms-d37-1.json'], ['android-forms-d37-1.json']] as const)(
+    '%s: f11 not known, f12–f14 ok',
+    { timeout: 60_000 },
+    async (record) => {
+      const { code, out } = await rejudgeInProcess(record, 'forms');
+      expect(out).toMatch(/^# Live golden: 4 cases, 3 ok, 0 loud, 1 mismatches \(1 not known\), 0 skipped$/m);
+      const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+      expect(unknown).toEqual(['f11']);
+      expect(code).toBe(1);
+    },
+  );
 });
 
 // L2's fix (round 8): the src before it, live.

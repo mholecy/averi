@@ -256,7 +256,7 @@ describe('refusedKept: p7, a character averi cannot type into a prefilled field'
 
 /**
  * f11–f14 (D37): form-format's `date` (schema.ts#FieldFormat, placeholder `__.__.____`) and `phone` (no format,
- * placeholder `+421`) — ADR 0034's dotted date and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
+ * placeholder `+421`) — at D37, ADR 0034's dotted date (a false mismatch until D51) and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
  * final state set to what each fill would leave; batch-3's device records are rejudged in live-rejudge.test.ts.
  */
 describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () => {
@@ -295,10 +295,13 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
     expect(f11.judge(left('date', '31.12.2026'), [DATE_FILLED, notShown], 'wda', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
   });
 
-  it('f11 under idb, the likeliest outcome: its dotted reading after the unnamed mask does not land, the fill fails, the app holds the date — MISMATCH failed-holds, not LOUD', async () => {
-    // ADR 0034: a `.` group that is no thousands, after a mask with no letter or digit — no rule lands it.
-    expect(landingOf('31.12.2026', idbReading('31122026', '__.__.____'))).toBeUndefined();
+  it('f11 under idb (D51): its dotted reading after the unnamed mask lands reformatted, the judge ok; the src before the fix failed — MISMATCH failed-holds, not LOUD', async () => {
+    // ADR 0034's D51 amendment: two `.` over a digits-only typing are a digit grouping, and the `__.__.____` template
+    // idb reads as the text before is no earlier text.
+    expect(landingOf('31.12.2026', idbReading('31122026', '__.__.____'))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
     const [f11] = await casesOn('ios');
+    expect(f11.judge(left('date', '31.12.2026'), [DATE_FILLED, DATE_SHOWN], 'idb', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    // batch-3's records (*-forms-d37-1.json, the src before D51) replied so:
     const failed = 'ERROR typed 8 characters but the field shows "31.12.2026"';
     expect(f11.judge(left('date', '31.12.2026'), [failed], 'idb', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds', kind: 'refused' });
   });
@@ -328,9 +331,10 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
 
   // Batch-3's device run (block H, main 6b4a44df; ios-idb-forms-d37-1.json, ios-wda-forms-d37-1.json,
   // android-forms-d37-1.json): f11 failed-holds under every source — the app held `31.12.2026`, averi replied "ERROR
-  // fill: typed 8 characters but the field shows 10" (ADR 0034 fails a `.` group that is no thousands; backlog D51);
-  // f12–f14 ok everywhere, f13 under idb included. Exactly f11 is known, under each source, by the rule and kind it read.
-  it('what the device read is known: f11 failed-holds on refused under every source, f12–f14 under none', () => {
+  // fill: typed 8 characters but the field shows 10" (ADR 0034 then failed a `.` group that is no thousands); f12–f14 ok
+  // everywhere, f13 under idb included. f11 was known under each source until D51 fixed it and struck the three entries
+  // off; none is known now.
+  it('none of f11–f14 is known under any source: f11 fixed by D51 (its three entries struck off), f12–f14 ok', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
     const known = Object.entries(sources).flatMap(([platform, ss]) =>
       ss.flatMap((source) => IDS.flatMap((id) => {
@@ -338,6 +342,6 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
         return e === undefined ? [] : [`${platform} ${source} ${id} ${e.cls} ${e.kind}${e.intermittent ? ' intermittent' : ''}`];
       })),
     );
-    expect(known).toEqual(['ios idb f11 failed-holds refused', 'ios wda f11 failed-holds refused', 'android uiautomator f11 failed-holds refused']);
+    expect(known).toEqual([]);
   });
 });

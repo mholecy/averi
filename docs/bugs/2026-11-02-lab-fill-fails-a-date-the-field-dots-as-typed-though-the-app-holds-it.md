@@ -1,9 +1,17 @@
-# BUG (open, false failure): a fill without clear of `31122026` into a field that dots it fails, though the app holds `31.12.2026`
+# BUG (fixed, false failure): a fill without clear of `31122026` into a field that dots it fails, though the app holds `31.12.2026`
 
 **Found 2026-11-02** by batch-3 block H (backlog D37) on the lab simulator (`averi-lab iPhone 17`, iOS 27.0) and the
 `averi_lab` AVD (API 33), main `6b4a44df`. Records `docs/truth/live-records/ios-idb-forms-d37-1.json`,
 `ios-wda-forms-d37-1.json`, `android-forms-d37-1.json`, case `f11`.
 
+> **Status (2026-11-02, D51):** FIXED on `fix/d51-dotted-date-lands` (ADR 0034's D51 amendment), device check pending
+> (the next batch's `live.ts --groups forms` on idb, WDA and uiautomator). Two causes, both fixed: an added `.`/`,`
+> passes as a digit grouping (two or more marks over a digits-only typing, a group between two of them not three
+> long: no decimal point, no thousands), and — idb only — the unnamed `__.__.____` read as the field's text before is a
+> mask template, tried as no earlier text as well (narrowing D29's MINOR-A). "Why" below is the code before the fix;
+> its "not the cause" holds for WDA and uiautomator only — under idb the unnamed mask was a second cause. The three
+> live-known.ts entries are struck off; the *-forms-d37-1.json records rejudge f11 not known (the src before the fix).
+>
 > **Status (2026-11-02): open, filed KNOWN** (`scripts/truth/live-known.ts`, `ios idb f11`, `ios wda f11`,
 > `android uiautomator f11`, failed-holds on `refused`). Backlog row D51. ADR 0034 (Consequences) lists a dotted date
 > among the rule's deliberate false mismatches. Whether it stays one is that row's analysis.

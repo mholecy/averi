@@ -8,7 +8,7 @@
  * device or words a sentence.
  */
 
-import { isPoint, type Reformat } from './fill-facts.js';
+import { isPoint, type Point, type Reformat } from './fill-facts.js';
 
 /** The spaces a field may show for one another: a space, a no-break (U+00A0) and a narrow no-break (U+202F) space. */
 const SPACES = new Set([' ', '\u00A0', '\u202F']);
@@ -38,7 +38,10 @@ const DIGITS = /^\d+$/;
  *   before the first one 1–3, not a lone `0` and not after a typed `.` or `,` (a fraction), exactly three between two
  *   of them and after the last (then no digit). That rules out a cents mask's `1.25` for `125` and `0.123` for `0123`, but not every decimal point: `1.234`
  *   for `1234` is de-DE's thousands or a three-decimal mask, which the reading cannot tell — so the verdict passes it
- *   with a caveat (`point`), not silently.
+ *   with a caveat (`point`), not silently. Or (D51) two or more of them over a digits-only typing, a group between two
+ *   of them not three long: a digit grouping (a dotted date `31.12.2026`, a lakh `12,34,567`), passed without `point`
+ *   — one number holds at most one decimal point, so two marks are none, and they are no thousands either
+ *   (`digitGrouping`).
  * Greedy: a reading character equal to the next expected one is taken as that character. Taken as an added separator
  * instead, the expected one would have to match a later, equal character — so matching first never rejects what
  * skipping would pass but under the grouping rules, where the miss is a false mismatch (the safe side). Pure,
@@ -81,11 +84,26 @@ export function reformatOf(observed: string, expected: string, typing: string = 
   const singles = groups.map((n, k) => (n < 2 ? k : -1)).filter((k) => k !== -1);
   const atAnEnd = (k: number) => k === 0 || k === groups.length - 1;
   if (singles.length > 1 || (singles.length === 1 && !atAnEnd(singles[0]))) return undefined;
-  const point = isPoint(sep) ? sep : undefined;
-  if (point !== undefined && !thousands(chars, tokens, typing, point)) return undefined;
+  const kind = markKind(sep, { chars, tokens, groups, typing });
+  if (kind === undefined) return undefined;
   const count = groups.length - 1;
   if (count + respaced === 0) return undefined;
-  return { added: count, respaced, ...(point !== undefined && { point }) };
+  return { added: count, respaced, ...(kind === 'thousands' && { point: sep as Point }) };
+}
+
+/**
+ * What the added separator `sep` is, for the `.`/`,` rule: `'none'` — no `.` or `,` (or nothing) added, the rule says
+ * nothing; `'thousands'` — a thousands mark (`thousands`), which the reading cannot tell from a decimal point
+ * (`Reformat.point`, the caveat); `'grouping'` — a digit grouping (D51, `digitGrouping`), no caveat; undefined — a
+ * `.`/`,` that is neither, and the reading fails. The two kinds are disjoint (every inner group three long, or one not).
+ */
+function markKind(
+  sep: string | undefined,
+  r: { chars: string[]; tokens: number[]; groups: readonly number[]; typing: string },
+): 'none' | 'thousands' | 'grouping' | undefined {
+  if (!isPoint(sep)) return 'none';
+  if (thousands(r.chars, r.tokens, r.typing, sep)) return 'thousands';
+  return digitGrouping(r.groups, r.typing) ? 'grouping' : undefined;
 }
 
 /**
@@ -129,6 +147,22 @@ function thousands(chars: string[], tokens: number[], typing: string, point: str
   }
   return true;
 }
+
+/**
+ * D51: the added `.`/`,` group digits, not thousands — a group between two of them (so two or more marks: one number
+ * holds at most one decimal point, so two marks of one kind are none) that is not three long (all three is a thousands
+ * shape — `1.234.56` for `123456` — and only `thousands` judges it), over a digits-only `typing` (no point of its own a
+ * mark could stand for, no edit of typed punctuation). A dotted date, a lakh's commas.
+ */
+function digitGrouping(groups: readonly number[], typing: string): boolean {
+  return DIGITS.test(typing) && groups.slice(1, -1).some((n) => n !== 3);
+}
+
+/**
+ * D51: a text of `_` and separators alone, at least one `_` (`__.__.____`, `__/__/____`) — a mask's blanks.
+ * fill-landing.ts#priorsOf tries such an earlier text as none as well (why: ADR 0034's D51 amendment).
+ */
+export const maskTemplate = (text: string): boolean => text.includes('_') && [...text].every((c) => c === '_' || SEPARATORS.has(c));
 
 /** A text's letters and digits alone (`ALNUM`), in order: what a field that regroups it keeps of it. */
 export const skeleton = (text: string): string => [...text].filter((c) => ALNUM.test(c)).join('');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prefixOf, reformatOf, skeleton } from '../../src/interact/fill-reformat.js';
+import { maskTemplate, prefixOf, reformatOf, skeleton } from '../../src/interact/fill-reformat.js';
 
 /**
  * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
@@ -87,7 +87,6 @@ describe('reformatOf — the typed characters in order, one separator added betw
 
   // Round 2, MINOR-C: the false mismatches ADR 0034 lists — each fails loudly; the remedy is to type it as shown.
   it('the false mismatches ADR 0034 names stay mismatches', () => {
-    expect(reformatOf('31.12.2026', '31122026')).toBeUndefined();
     expect(reformatOf('+421 900-123-456', '+421900123456')).toBeUndefined();
     expect(reformatOf('1 2 3 4', '1234')).toBeUndefined();
     expect(reformatOf('12:30', '1230')).toBeUndefined();
@@ -117,13 +116,11 @@ describe('reformatOf — the typed characters in order, one separator added betw
     expect(reformatOf('1.2345', '12345')).toBeUndefined(); // four digits after it
     expect(reformatOf('1234.567', '1234567')).toBeUndefined(); // four before the first
     expect(reformatOf('0.123', '0123')).toBeUndefined(); // a lone 0 before it
-    expect(reformatOf('1.23.456', '123456')).toBeUndefined(); // two between two of them
     expect(reformatOf('1.234.5', '12345')).toBeUndefined(); // one digit after the last
     expect(reformatOf('1.234.5', '1234.5')).toBeUndefined(); // the typing's own point
     expect(reformatOf('1,234,5', '1234,5')).toBeUndefined();
     expect(reformatOf('0,12.345', '0,12345')).toBeUndefined(); // round 2, MINOR-B: a fraction is no whole part
     expect(reformatOf('.1,234', '.1234')).toBeUndefined(); // a fraction from the reading's first character
-    expect(reformatOf('1,2345,678', '12345678')).toBeUndefined(); // four between two of them
     expect(reformatOf('1,23a', '123a')).toBeUndefined(); // a group of three holds digits only
     expect(reformatOf('1,a23', '1a23')).toBeUndefined();
   });
@@ -131,6 +128,68 @@ describe('reformatOf — the typed characters in order, one separator added betw
   it('an added `.` or `,` after up to three digits, a word before them included', () => {
     expect(reformatOf('123,456', '123456')).toEqual({ added: 1, respaced: 0, point: ',' });
     expect(reformatOf('EUR 1,234', 'EUR 1234')).toEqual({ added: 1, respaced: 0, point: ',' });
+  });
+});
+
+/**
+ * D51 (ADR 0034's amendment): two or more added `.` or `,` over a digits-only typing, a group between two of them not
+ * three long, are a digit grouping — a dotted date, a lakh — not a thousands grouping and never a decimal point (one
+ * number holds one). Measured: f11 typed `31122026` into a field that showed `31.12.2026` and averi replied ERROR under
+ * idb, WDA and uiautomator. Passed WITHOUT `point`: the verdict's caveat asks whether the mark is a thousands separator
+ * rather than a decimal point, and here it is neither.
+ */
+describe('reformatOf — a digit grouping by `.` or `,` (D51)', () => {
+  it('a dotted date, a comma date and a lakh grouping pass, with no point', () => {
+    expect(reformatOf('31.12.2026', '31122026')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('31.12.26', '311226')).toEqual({ added: 2, respaced: 0 }); // DD.MM.YY
+    expect(reformatOf('2026.12.31', '20261231')).toEqual({ added: 2, respaced: 0 }); // YYYY.MM.DD
+    expect(reformatOf('1.12.2026', '1122026')).toEqual({ added: 2, respaced: 0 }); // a first group of one
+    expect(reformatOf('31,12,2026', '31122026')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('12,34,567', '1234567')).toEqual({ added: 2, respaced: 0 }); // Indian lakh
+  });
+
+  it('an uneven grouping no known format uses passes too (residual 4): every digit there, no decimal reading', () => {
+    expect(reformatOf('1.23.456', '123456')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('1,2345,678', '12345678')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('1.23.456.789', '123456789')).toEqual({ added: 3, respaced: 0 }); // one inner group not three is enough
+    expect(reformatOf('12.34.56', '123456')).toEqual({ added: 2, respaced: 0 }); // a grouping in twos; one mark (`12.34`) still fails
+  });
+
+  it('one added mark is never a digit grouping: it may be a decimal point', () => {
+    expect(reformatOf('12.34', '1234')).toBeUndefined(); // a cents mask
+    expect(reformatOf('123.45', '12345')).toBeUndefined();
+  });
+
+  it('inner groups all three digits are a thousands shape, the thousands rule\'s alone to judge', () => {
+    expect(reformatOf('1.234.56', '123456')).toBeUndefined(); // a cents-like tail
+    expect(reformatOf('12.345.67', '1234567')).toBeUndefined();
+    expect(reformatOf('1234.567.890', '1234567890')).toBeUndefined(); // four before the first: no thousands either
+  });
+
+  it('a typing that is not digits alone keeps the thousands rule: a mark may be its decimal point or an edit', () => {
+    expect(reformatOf('A1.12.2026', 'A1122026')).toBeUndefined();
+    expect(reformatOf('12.34.56,7', '123456,7')).toBeUndefined();
+    expect(reformatOf('31.12.2026', '31.122026')).toBeUndefined(); // a typed `.`: one added mark
+  });
+
+  it('the whole typing decides, for a prefix of it', () => {
+    expect(reformatOf('31.12.20', '311220')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('31.12.20', '311220', '311220,5')).toBeUndefined();
+  });
+
+  it('a thousands grouping is judged first: its caveat kept', () => {
+    expect(reformatOf('1.234.567', '1234567')).toEqual({ added: 2, respaced: 0, point: '.' });
+  });
+
+  it('every other rule still holds: a changed, added or reordered digit, a stray mark, groups of one', () => {
+    expect(reformatOf('31.12.2026', '3112202')).toBeUndefined(); // an added digit
+    expect(reformatOf('31.12.2062', '31122026')).toBeUndefined(); // reordered
+    expect(reformatOf('31..12.2026', '31122026')).toBeUndefined();
+    expect(reformatOf('.31.12.2026', '31122026')).toBeUndefined();
+    expect(reformatOf('31.12.2026.', '31122026')).toBeUndefined();
+    expect(reformatOf('31.12/2026', '31122026')).toBeUndefined();
+    expect(reformatOf('3.1.12.2026', '31122026')).toBeUndefined();
+    expect(reformatOf('1.2.3', '123')).toBeUndefined();
   });
 });
 
@@ -162,6 +221,11 @@ describe('prefixOf — a strict prefix of the typing, exactly or reformatted', (
     expect(prefixOf('Jan\u00A0', 'Jan Novak')).toEqual({ prefix: 'Jan ', reformatted: { added: 0, respaced: 1 } });
   });
 
+  it('a dotted date\'s prefix (D51): reformatted; one mark shown is none', () => {
+    expect(prefixOf('31.12.20', '31122026')).toEqual({ prefix: '311220', reformatted: { added: 2, respaced: 0 } });
+    expect(prefixOf('31.1', '31122026')).toBeUndefined();
+  });
+
   it('the whole typing, more, other text, or a grouping that breaks the rules: none', () => {
     expect(prefixOf('SK31 1200 0000', 'SK3112000000')).toBeUndefined();
     expect(prefixOf('12', '12')).toBeUndefined();
@@ -175,5 +239,16 @@ describe('skeleton — a text\'s letters and digits alone', () => {
     expect(skeleton('SK31 1200-0000')).toBe('SK3112000000');
     expect(skeleton('1\u00A0234,56 €')).toBe('123456');
     expect(skeleton('—')).toBe('');
+  });
+});
+
+/** D51: a field's blanks — `_` and separators alone, at least one `_` — a mask template, never content. */
+describe('maskTemplate — a mask\'s blanks, never content', () => {
+  it('`_` and separators, at least one `_`', () => {
+    for (const t of ['__.__.____', '__/__/____', '____ ____', '_', '__-__', '__,__', '__\u00A0__']) expect(maskTemplate(t), t).toBe(true);
+  });
+
+  it('no `_`, another character, or a character outside the separators: no template', () => {
+    for (const t of ['', '\u2014', '-', '..', '__a_', 'SK00 0000', '+421', '__:__', '31.12.____']) expect(maskTemplate(t), t).toBe(false);
   });
 });

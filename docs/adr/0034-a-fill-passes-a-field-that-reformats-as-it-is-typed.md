@@ -7,6 +7,8 @@ prefix is a dropped tail — the owner's iOS run of D18, the remedy, the diagnos
 on `fix/d28-reformat-dropped-tail`). Amended 2026-11-01 (D29: an earlier text that vanished — idb's unnamed
 placeholder — and rf4's tail, a residual of blind typing; implemented on `fix/d29-placeholder-prior`). Amended
 2026-11-01 (D31: the accepted residuals numbered under "Residuals accepted"; rf4's is residual 2, filed in live-known.ts).
+Amended 2026-11-02 (D51: an added `.`/`,` that groups digits — a dotted date, a lakh — and a `_` mask template that is
+no earlier text, narrowing D29's MINOR-A; residual 4 accepted; implemented on `fix/d51-dotted-date-lands`).
 
 ## Context
 
@@ -91,7 +93,7 @@ beside `retyped`, or the `reformatted-point` caveat), counts only — a value ma
   - a no-clear fill whose earlier text the field regroups (`1 234` + `5` → `12 345`), or one typed into the middle of
     the text;
   - a `.`/`,` grouping that is not by thousands (Indian lakh grouping), and a dotted date (`31.12.2026` for
-    `31122026`: its `.` groups are no thousands);
+    `31122026`: its `.` groups are no thousands) (see the D51 amendment below);
   - mixed separators (`+421 900-123-456`: one separator character per reading);
   - an eager trailing mark (`SK31 ` after four characters, `31/`);
   - spaced single characters (`1 2 3 4`: groups of one);
@@ -231,8 +233,9 @@ app held `SK31 1200 00`).
   never without it. The earlier text is tried first: a reading that is a prefix of it too (`SK` of `SK00 …`) shows
   nothing of the typing landed, and nothing is typed again. An earlier text with no letters or digits (a `—`, a
   `__/__/____` mask) keeps the pre-D29 judgment — a false mismatch, never a wrong pass — deliberately not loosened
-  (review round 2, MINOR-A, the owner's decision). So does an unnamed placeholder whose letters and digits are a
-  prefix of the typed value's (a `+421` placeholder, `421903…` typed): the fallback never runs, the old false mismatch.
+  (review round 2, MINOR-A, the owner's decision; see the D51 amendment below). So does an unnamed placeholder whose
+  letters and digits are a prefix of the typed value's (a `+421` placeholder, `421903…` typed): the fallback never
+  runs, the old false mismatch.
   This widens ADR 0023's decision 2 in that one case (its header says so).
   **Where it reaches** (review round 1, MINOR-2): every source that names no placeholder — idb, and the API 33
   uiautomator dump (a classic EditText's hint dumped as its `text`, android.ts; the Android lab's fields are Compose,
@@ -287,6 +290,79 @@ amendment's "marks rf4 a known LOUD on iOS in a comment (live-known.ts files vis
 the comment is gone, the entry replaces it. The accepted residuals above are numbered below; the dropped tail of
 review round 1's MINOR-3, fixed by D28, is none.
 
+## Amendment: a digit grouping by `.` or `,`, and a mask template (2026-11-02, D51)
+
+**Measured** (batch-3 block H, main 6b4a44df; docs/truth/live-records/ios-idb-forms-d37-1.json, ios-wda-forms-d37-1.json,
+android-forms-d37-1.json, f11): `31122026` typed without clear into form-format's `date` (dots after the 2nd and 4th
+digit; placeholder `__.__.____`). The app held `31.12.2026` and the assert after it passed, but averi replied `ERROR
+fill: typed 8 characters but the field shows 10` under idb, WDA and uiautomator. f12 (typed with its dots) was ok.
+docs/bugs/2026-11-02-lab-fill-fails-a-date-the-field-dots-as-typed-though-the-app-holds-it.md.
+
+Two causes. Every added `.`/`,` had to be a thousands mark (`thousands`), which `31.12.2026`'s groups are not: that
+failed f11 under every source. Under idb a second one: idb names no placeholder, so the field's `__.__.____` is read
+as its text before (D29), and without clear the reading was judged against `__.__.____31122026` — `priorsOf` never
+fell back to no earlier text, as the template's letters and digits are none (MINOR-A).
+
+**Decision.**
+- An added `.` or `,` also passes when it is a **digit grouping** (`fill-reformat.ts#digitGrouping`): a group between
+  two of the marks — so two or more marks — that is not three long, over a digits-only typing (`reformatOf`'s
+  `typing`, the whole typing for a prefix). One number holds at most one decimal point, so two marks of one kind are
+  none; a digits-only typing has no point of its own a mark could stand for. A grouping whose inner groups are all
+  three is thousands-shaped and stays `thousands`'s to judge, which keeps `1.234.56` for `123456` and `12.345.67` for
+  `1234567` failing. Such a reformat carries no `point` (the reply's aside, no ⚠ caveat: the caveat asks whether the
+  mark is a thousands separator rather than a decimal point, and here it is neither). A single added `.`/`,` is
+  unchanged: thousands with the caveat, else a failure (`12.34` for `1234`, a cents mask, still fails). Every other
+  rule of `reformatOf` is judged first, unchanged. The two paths are disjoint (thousands needs every inner group three
+  long, a digit grouping one that is not), so a thousands grouping keeps its caveat whichever is asked first.
+- **A mask template is no earlier text** (`fill-reformat.ts#maskTemplate`, asked by `fill-landing.ts#priorsOf`).
+  Without clear, an earlier text of `_` and separators alone, at least one `_` (`__.__.____`, `__/__/____`), is tried
+  as none as well, second, whatever the reading. **This narrows D29 review round 2's MINOR-A** (the owner's decision
+  that an earlier text with no letters or digits keeps the pre-D29 judgment): the `__/__/____` mask it named now falls
+  back. Decided by the orchestrator under the owner's standing goals: a fill that worked must not reply ERROR, and a
+  text of `_` blanks and separators is a mask, never content a fill appends to. The exact rule already passed a value
+  whose earlier text vanished (`showsExactly`'s `includes`, f13 under idb); this gives the reformat and prefix rules
+  the same reach for a `_` template, and no other text. A `—`, a `-` or an earlier text of separators alone (no `_`)
+  keeps MINOR-A's judgment; the template is still tried first, so a reading that is the template itself shows nothing
+  of the typing landed and nothing is typed again.
+- Through `prefixOf`, both reach the dropped-tail rule (D28): `31.12.20` of `31122026` is a reformatted prefix, so the
+  tail is typed again on iOS. A typing longer than the date field takes (`311220261`) now fails as `dropped-tail …
+  refused by the field (a length cap…)`, where it read `length` before — a user-visible wording change, and on iOS one
+  retype of the dropped `1` first.
+- No reply echoes the shown form (`31.12.2026`): replies stay counts only (a dotted field may hold a birth date or a
+  card expiry). The reply is `Filled … (8 characters, the field shows them reformatted: 2 separators added)`.
+
+**Consequences.** The false mismatches above lose the dotted date and the lakh grouping. A `.`/`,` grouping still is
+one when it is a single mark that is no thousands, or a thousands shape with a short tail. A mask that shows its
+blanks while typed (`31.12.____`) is a false mismatch, as `_` is no separator. A reading that shows every typed
+character with only separators the rules refuse still fails with `length`/`same-length` and no remedy named — a
+separate backlog row (D53). **Residual 4 (accepted):** a digit grouping by `.`/`,` that no known format uses
+(`1,2345,678`, `1.23.456`, `1.23.456.789`) passes as a reformat, said in the aside: the typed digits are all there, in
+order, and no reading of two marks makes a decimal of them. So does `12.34.56` for `123456`, a grouping in twos,
+while a single `12.34` for `1234` still fails. Whitelisting date shapes (2-2-4, 2-2-2, 4-2-2) was
+considered and rejected: arbitrary, leaves the lakh failing, and a partial date would have to match a shape's prefix.
+
+**Live.** The three f11 entries of live-known.ts (`android uiautomator f11`, `ios idb f11`, `ios wda f11`) are struck
+off, and the note's live-only exemption with them (tests/truth/lab-notes.test.ts; calibration.json keeps it excluded,
+its `why` saying so). The three `*-forms-d37-1.json` records are the src before the fix: tests/truth/live-rejudge.test.ts
+reads f11 there not known, exit 1. **The golden says nothing of this change** (it never types).
+
+**Mutation-checked**: twenty-five hand mutants, each killed by the new tests — `digitGrouping` always false; its
+`DIGITS.test(typing)` removed, negated, or asked of the shown prefix instead of the whole typing; `.some` → `.every`;
+`!== 3` → `=== 3`; the inner-group conjunct removed; `slice(1, -1)` → `slice(1)`, `slice(0, -1)` or the whole
+`groups`; `markKind`'s `isPoint` negated, its thousands path removed, a neither passing as `'none'` or as
+`'thousands'`, its refusal ignored; `point` set for a grouping, or never; `maskTemplate`'s `includes('_')` removed,
+`every` → `some`, `SEPARATORS` → `SPACES`, `_` dropped from its characters, `:` added; `priorsOf` without
+`maskTemplate`, with its order reversed, or asking it of the reading. A `groups.length >= 3` conjunct the spec
+proposed was dropped as redundant (an inner group exists only with three groups or more; its mutants were
+equivalent). `npm run mutate` (cold; a Stryker timeout counts as killed, as Stryker scores it): fill-reformat
+94.03 → 94.35 % (floor 92; its two new survivors equivalent — `markKind`'s `'none'` and `'grouping'` emptied:
+`reformatOf` tells only `'thousands'` and undefined apart), fill-landing 95.16 → 95.20 % (floor 93); floors unchanged.
+
+**Not checked on the device.** The next batch runs `live.ts --groups forms` on idb, WDA and uiautomator: f11 should read
+`Filled … (8 characters, the field shows them reformatted: 2 separators added)`, f1–f14 otherwise as at D37/D40.
+Under idb it should also confirm part two's premise — a `ui_snapshot` of the empty date field shows `__.__.____` as
+its value, no placeholder — inferred from D29's iban field (the same `FormattingTextField`), never captured.
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
@@ -295,3 +371,7 @@ review round 1's MINOR-3, fixed by D28, is none.
    `fill:` is the remedy. Filed in live-known.ts as `ios idb|wda rf4`.
 3. **The placeholder asymmetry** (A2's amendment): a named placeholder shown grouped for an ungrouped value is held as
    empty and fails `unchanged`.
+4. **A digit grouping by `.`/`,` that no known format uses passes as a reformat** (D51's amendment): `1,2345,678`,
+   `1.23.456`, `1.23.456.789` — said in the reply's aside, no ⚠ caveat. Every typed digit is there, in order, and two
+   marks cannot be a decimal point. So does `12.34.56` for `123456` (a grouping in twos), though one `12.34` for `1234`
+   still fails.

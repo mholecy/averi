@@ -55,8 +55,9 @@ flows:
   fill never destroys existing content (it fails loudly instead). A field that reformats as it is
   typed (an IBAN grouped in fours, an amount's thousands) passes when it shows every typed character
   in order with one kind of separator added between groups — a space, `-`, `/`, or `.`/`,` where a
-  thousands separator sits — and the reply says `the field shows them reformatted: N separators
-  added` (for an added `.` or `,` as a ⚠ line: it reads like a decimal point); a dropped, reordered
+  thousands separator sits or as two or more marks grouping digits alone (a dotted date `31.12.2026`
+  for `31122026`) — and the reply says `the field shows them reformatted: N separators
+  added` (for an added thousands `.` or `,` as a ⚠ line: it reads like a decimal point); a dropped, reordered
   or changed character still fails — the one accepted change is a typed space shown as a no-break
   or narrow no-break space (`respaced`), which is formatting (ADR 0034). A field that grouped
   what landed and dropped the end (`1 234 567,` for `1234567,89`) gets the tail alone typed again
