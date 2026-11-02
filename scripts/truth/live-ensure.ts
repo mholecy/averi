@@ -65,20 +65,27 @@ interface Reached {
 }
 
 /**
- * What both judges ask first: Home and the reply held to each other, Welcome shown, Continue tapped, the bare phase
- * logged (else SKIP), the entry probe bare by the reply (else `entry-not-bare`) — a verdict when any is not so.
+ * What both judges ask first: Welcome shown (else SKIP: the app never left the bare phase), Home and the reply held to
+ * each other, Continue tapped, the bare phase logged (else SKIP), the entry probe bare by the reply (else
+ * `entry-not-bare`) — a verdict when any is not so.
  */
 function reached(s: LabState, reply: string): LiveVerdict | Reached {
   const kind = replyKind(reply);
   const home = phaseAt(s, 'home') !== undefined;
   const welcome = phaseAt(s, 'welcome');
   const tap = continueAt(s);
+  // Outside averi: the app never drew Welcome — a stale catalog or an old build (its cell without `held`, logged as the
+  // phase `unconfigured`), or a screen stuck bare. A SKIP, which fails the run (Case.skipFails).
+  const unconfigured = phaseAt(s, 'unconfigured') !== undefined;
+  if (unconfigured || welcome === undefined) {
+    return { outcome: 'SKIP', kind, why: `the lab app never left the bare phase — rebuild/reinstall the lab app with the current catalog (${unconfigured ? 'it logged `unconfigured`: its cell has no held phases' : 'no welcome phase logged'})` };
+  }
   if (!home) {
-    const shown = welcome === undefined ? 'no welcome phase logged' : tap === undefined ? 'Continue never tapped' : 'Continue tapped, no home phase';
+    const shown = tap === undefined ? 'Continue never tapped' : 'Continue tapped, no home phase';
     return isError(reply) ? { outcome: 'LOUD', cls: 'not-reached', kind, why: `Home not reached (${shown}), and averi said so: ${short(reply)}` } : { outcome: 'MISMATCH', cls: 'ensure-claim', kind, why: `averi did not fail — Home not reached (${shown}): ${short(reply)}` };
   }
   if (isError(reply)) return { outcome: 'MISMATCH', cls: 'failed-holds', kind, why: `the app shows Home, but averi failed: ${short(reply)}` };
-  if (welcome === undefined || tap === undefined) return { outcome: 'MISMATCH', cls: 'ensure-claim', kind, why: `Home without ${welcome === undefined ? 'a welcome phase' : 'a Continue tap'} logged: ${short(reply)}` };
+  if (tap === undefined) return { outcome: 'MISMATCH', cls: 'ensure-claim', kind, why: `Home without a Continue tap logged: ${short(reply)}` };
   const bare = phaseAt(s, 'bare');
   if (bare === undefined) return { outcome: 'SKIP', kind, why: 'the app logged no bare phase: the case never set up (an old lab app?) — nothing to judge' };
   if (!bareEntry(reply)) return { outcome: 'MISMATCH', cls: 'entry-not-bare', kind, why: `the reply has no bare entry probe line — no second look was earned on a screen bare for ${secs(welcome - bare)}: ${short(reply)}` };

@@ -337,7 +337,8 @@ export interface KeyboardState {
 /**
  * `tab` a tab bar's item was chosen (`tag` its name) — app chrome firing, phase 3's bars. A chrome's own button (a
  * toolbar's, a FAB) logs `button`, `tag` `<chrome>.<name>` (the chrome's name in LabState.chrome). `phase` a held cell
- * changed what it draws (`tag` `bare`, `spinner`, `welcome`, `home`; Held.swift, Held.kt) — the live ensure group's
+ * changed what it draws (`tag` `bare`, `spinner`, `welcome`, `home`; `unconfigured` when its catalog entry has no
+ * `held`; Held.swift, Held.kt) — the live ensure group's
  * clock (live-ensure.ts).
  */
 export type EventKind = 'tap' | 'dismissed' | 'button' | 'focus' | 'submit' | 'select' | 'touch' | 'tab' | 'phase';

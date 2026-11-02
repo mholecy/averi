@@ -5,9 +5,9 @@ package dev.averi.lab
 // The held family (fixtures/apps/cells/held.json, backlog D30): a screen that renders late, for the live golden's
 // `ensure` group (scripts/truth/live-ensure.ts) — ensure_state's second look on a device, ADR 0033's held "no".
 //
-// - `held-no`: ready at once while it draws nothing — plain white, no semantics node: a bare dump (the decor chain
-//   alone, src/ui-tree/bare-tree.ts; tests/truth/held-bare.test.ts) — for the catalog's `held.bareMs` (6 s: long, so
-//   the launch rarely outruns the call); then Text "Welcome" and Button "Continue"; Continue shows Text "Home".
+// - `held-no`: ready at once while it draws nothing — plain white, no labelled or identified node: a bare dump (the
+//   decor chain alone, src/ui-tree/bare-tree.ts; tests/truth/held-bare.test.ts) — for the catalog's `held.bareMs` (6 s:
+//   long, so the launch rarely outruns the call); then Text "Welcome" and Button "Continue"; Continue shows Text "Home".
 // - `held-no-spinner`: the same, with `held.spinnerMs` (4 s) of an unlabelled CircularProgressIndicator between the
 //   bare phase and Welcome.
 //
@@ -39,8 +39,11 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-/** What a held cell draws, its `tag` the one its `phase` event logs. */
-internal enum class HeldPhase(val tag: String) { Bare("bare"), Spinner("spinner"), Welcome("welcome"), Home("home") }
+/**
+ * What a held cell draws, its `tag` the one its `phase` event logs. `Unconfigured`: the catalog gave the cell no `held`
+ * (a stale catalog, an old build) — it stays bare, and says so (live-ensure.ts SKIPs on it).
+ */
+internal enum class HeldPhase(val tag: String) { Bare("bare"), Unconfigured("unconfigured"), Spinner("spinner"), Welcome("welcome"), Home("home") }
 
 @Composable
 internal fun HeldScreen(cell: Cell, lab: Lab) {
@@ -52,7 +55,7 @@ internal fun HeldScreen(cell: Cell, lab: Lab) {
     }
     Box(Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }, contentAlignment = Alignment.Center) {
         when (phase) {
-            HeldPhase.Bare -> Unit
+            HeldPhase.Bare, HeldPhase.Unconfigured -> Unit
             HeldPhase.Spinner -> CircularProgressIndicator()
             HeldPhase.Welcome -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 Text("Welcome", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.testTag("lab.${cell.id}.welcome"))
@@ -68,7 +71,7 @@ internal fun HeldScreen(cell: Cell, lab: Lab) {
         lab.event("phase", HeldPhase.Bare.tag)
         // Ready while nothing is drawn: the launch returns into the bare phase.
         lab.settled()
-        val held = cell.held ?: return@LaunchedEffect
+        val held = cell.held ?: return@LaunchedEffect show(HeldPhase.Unconfigured)
         delay(held.optLong("bareMs"))
         if (held.has("spinnerMs")) {
             show(HeldPhase.Spinner)

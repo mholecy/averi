@@ -98,7 +98,17 @@ describe('judgeHeldNo (h1, h2): no wipe ahead — the hold ends the look heldS a
     const stuck = read({ bare: 0, welcome: 6 });
     expect(judgeHeldNo(stuck, ['ERROR Timed out after 5000ms waiting for element id:"lab.held-no.home"'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached' });
     expect(judgeHeldNo(stuck, [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'ensure-claim' });
-    expect(judgeHeldNo(read({ bare: 0 }), ['ERROR x'], 'idb', LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'not-reached', why: expect.stringMatching(/no welcome phase/) });
+  });
+
+  it('the app never left the bare phase — no welcome phase, or `unconfigured` (a stale catalog): SKIP naming the cause, whatever averi said', () => {
+    const stale = /the lab app never left the bare phase — rebuild\/reinstall the lab app with the current catalog/;
+    for (const reply of ['ERROR x', held(2.3)]) {
+      expect(judgeHeldNo(read({ bare: 0 }), [reply], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(stale) });
+      expect(judgeHeldNo(read({ bare: 0, unconfigured: 0 }), [reply], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/unconfigured/) });
+      expect(judgeFullWindow(read({ bare: 0, unconfigured: 0 }), [reply], 'idb', LAUNCHED)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(stale) });
+    }
+    // `unconfigured` is the app's own word that it ran without its phases: SKIP whatever else the read holds.
+    expect(judgeHeldNo(read({ bare: 0, unconfigured: 0, welcome: 6, home: 8.5 }, 8.3), [held(2.3)], 'idb', LAUNCHED).outcome).toBe('SKIP');
   });
 });
 

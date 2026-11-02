@@ -12,9 +12,10 @@ import SwiftUI
 // Each element is identified lab.<cell>.<tag> (welcome, continue, home). Every phase change is logged (`phase`, `bare`
 // / `spinner` / `welcome` / `home`) before it is drawn, Continue's press as the `tap` `continue` — the judges' clock.
 
-/// What a held cell draws, its raw value the tag its `phase` event logs.
+/// What a held cell draws, its raw value the tag its `phase` event logs. `unconfigured`: the catalog gave the cell no
+/// `held` (a stale catalog, an old build) — it stays bare, and says so (live-ensure.ts SKIPs on it).
 enum HeldPhase: String {
-    case bare, spinner, welcome, home
+    case bare, unconfigured, spinner, welcome, home
 }
 
 struct HeldScreen: View {
@@ -26,7 +27,7 @@ struct HeldScreen: View {
         ZStack {
             Color.white
             switch phase {
-            case .bare:
+            case .bare, .unconfigured:
                 EmptyView()
             case .spinner:
                 ProgressView()
@@ -53,7 +54,7 @@ struct HeldScreen: View {
             lab.event("phase", HeldPhase.bare.rawValue)
             // Ready while nothing is drawn: the launch returns into the bare phase.
             lab.settled()
-            guard let held = cell.held else { return }
+            guard let held = cell.held else { return show(.unconfigured) }
             try? await Task.sleep(for: .milliseconds(held.bareMs))
             if let spinner = held.spinnerMs {
                 show(.spinner)
