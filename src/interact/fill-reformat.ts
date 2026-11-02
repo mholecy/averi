@@ -205,6 +205,13 @@ export function prefixOf(held: string, whole: string): { prefix: string; reforma
   const walked = walk(held, wholeChars);
   if (walked === undefined || walked.matched >= wholeChars.length) return undefined;
   const prefix = wholeChars.slice(0, walked.matched).join('');
-  const reformatted = reformatOf(held, prefix, whole);
+  // D60: an eager trailing mark, judged with the next typed character after it (one the strict prefix leaves).
+  const mark = walked.tokens.at(-1) === -1 ? [...held].at(-1) : undefined;
+  const next = mark !== undefined && !holdsMark(wholeChars, mark) ? wholeChars[walked.matched] : '';
+  const reformatted = reformatOf(held + next, prefix + next, whole);
   return reformatted === undefined ? undefined : { prefix, reformatted };
 }
+
+/** The typing holds `mark` itself — any space for a space (D60's typed-mark guard, as `thousands`' rule). */
+const holdsMark = (typing: readonly string[], mark: string): boolean =>
+  typing.some((c) => c === mark || (SPACES.has(c) && SPACES.has(mark)));
