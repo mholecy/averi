@@ -130,7 +130,7 @@ export class WdaTreeSource implements IosTreeSource {
 
   /**
    * iOS's system alert in one SHORT `/source` (D54, ADR 0032's D54 amendment): asked by a deep link's foreground wait
-   * at its bound, when activeAppInfo last named SpringBoard. WdaServer.quickSourceIfUp — its own 2 s budget, no start,
+   * — and a launch's, D56 — at its bound, when activeAppInfo last named SpringBoard. WdaServer.quickSourceIfUp — its own 2 s budget, no start,
    * no /status probe, no restart, unlike read(): an aid to the reply, never a recovery. WDA not up → undefined, no call;
    * a failed read throws as WDA said it (the wait then gives its note); released → the released error. Leaves
    * `failedAsk` alone: this read proves nothing about the ask.

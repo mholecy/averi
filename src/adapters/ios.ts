@@ -328,7 +328,8 @@ export class IosAdapter implements DeviceAdapter {
     // here — the one place both launch_app and a flow's `launch:` pass, once —
     // until the source names this app (idb: the tree's Application; WDA, once
     // up: its active app's bundle id), bounded and failing open; the facts,
-    // the bound and the cost are ios-foreground.ts's.
+    // the bound and the cost are ios-foreground.ts's. When iOS's system alert
+    // holds the launch (D56), the note names it and its buttons' centres.
     const { note } = await awaitForeground(this.foregroundCheck(bundleId));
     return note === undefined ? {} : { note };
   }
@@ -477,22 +478,25 @@ export class IosAdapter implements DeviceAdapter {
     await this.simctl(['openurl', this.udid, url]);
     const handler = await this.linkHandler(url, opts.appId);
     if (handler === undefined) return {};
-    // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground). The alert
-    // read is the source's own (WDA's short /source); idb has none — its label reads carry the alert's shape.
-    const alert = this.treeSource.systemAlert?.bind(this.treeSource);
-    const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url, alert }));
+    // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground).
+    const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url }));
     if (outcome.note === undefined && outcome.alert === undefined) this.front = { kind: 'launched', bundleId: handler };
     return outcome;
   }
 
-  /** The foreground wait's check of `bundleId` through this adapter's source and caches — launch's and a link's. */
-  private foregroundCheck(bundleId: string, extra: Pick<ForegroundCheck, 'link' | 'alert'> = {}): ForegroundCheck {
+  /**
+   * The foreground wait's check of `bundleId` through this adapter's source and caches — launch's and a link's. The
+   * alert read is the source's own, for both (D54, D56: WDA's short /source); idb has none — its label reads carry the
+   * alert's shape.
+   */
+  private foregroundCheck(bundleId: string, extra: Pick<ForegroundCheck, 'link'> = {}): ForegroundCheck {
     return {
       bundleId,
       label: () => this.treeSource.applicationLabel(),
       names: () => this.appNames(bundleId),
       ownerOf: (label) => this.ownerOf(label),
       source: this.treeSource.kind,
+      alert: this.treeSource.systemAlert?.bind(this.treeSource),
       ...extra,
     };
   }

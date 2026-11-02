@@ -71,7 +71,7 @@ export interface IosTreeSource {
    */
   applicationLabel(): Promise<ApplicationLabel>;
   /**
-   * iOS's system alert in one SHORT read, for the D54 link wait at its bound — WDA's only (WdaTreeSource: one
+   * iOS's system alert in one SHORT read, for the foreground wait at its bound (a link's, D54; a launch's, D56) — WDA's only (WdaTreeSource: one
    * `/source` under its own budget, never a start or a restart; undefined while WDA is not up). Absent on idb, whose
    * label reads already carry the alert's shape (`candidate`).
    */
@@ -88,8 +88,9 @@ export interface IosTreeSource {
  *   included, never trimmed (the caller names it). On SpringBoard's, from
  *   idb, also `candidate` (D54) when that same read has the shape of iOS's
  *   system alert (ios-system-alert.ts#alertShapeInIdb) — plain data, no
- *   device call; whether its title asks to open the link is the caller's to
- *   judge, with the app's names it holds (ios-foreground.ts).
+ *   device call; whether its title asks to open a link is the caller's to
+ *   judge, with the app's names it holds (ios-foreground.ts; a launch's wait
+ *   judges it too, D56).
  * - `unlabelled`: the read cannot say — it lists no Application element, or
  *   one whose label is missing or empty (both unmeasured; the launch's wait
  *   reads on, and says it could not check if nothing better follows).
