@@ -230,8 +230,8 @@ export interface ForegroundCheck {
    */
   link?: string;
   /**
-   * One short tree read for a system alert (D54: IosTreeSource.systemAlert, WDA's; IosAdapter wires it for every wait, D56):
-   * asked at most once per wait, at the bound, when the last bundle named was SpringBoard's; a throw is no alert.
+   * One short tree read for a system alert (D54: IosTreeSource.systemAlert, WDA's; IosAdapter wires it for every
+   * wait, D56): asked at most once per wait, at the bound, when the last bundle named was SpringBoard's; a throw is no alert.
    */
   alert?: () => Promise<SystemAlert | undefined>;
 }
@@ -259,8 +259,8 @@ export async function awaitForeground(check: ForegroundCheck): Promise<DeepLinkO
 /**
  * How a wait ended: the app confirmed; the source does not ask (WDA not up); a system alert found (D54; a launch's too
  * since D56, whose note never says "it asks", so `asksForApp` is a link's alone — on WDA judged with no names for a
- * launch); or a note — `saw` when it read another app (a stale label or bundle), `unchecked` when it could not tell (a read or names
- * error, an unlabelled or empty tree to the bound).
+ * launch); or a note — `saw` when it read another app (a stale label or bundle), `unchecked` when it could not tell (a
+ * read or names error, an unlabelled or empty tree to the bound).
  */
 type WaitEnd = { kind: 'matched' } | { kind: 'declined' } | { kind: 'alert'; alert: LinkAlert } | { kind: 'saw' | 'unchecked'; note: string };
 

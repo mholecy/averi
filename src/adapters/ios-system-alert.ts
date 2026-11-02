@@ -112,7 +112,10 @@ export function namesApp(title: string, appNames: readonly string[]): boolean {
   return appNames.some((name) => name.trim() !== '' && title.includes(name));
 }
 
-/** An alert's buttons as the replies quote them: `buttons "Cancel" at (127, 474), "Open" at (275, 474)` — every label verbatim, in tree order, with its centre. */
+/**
+ * An alert's buttons as the replies quote them: `buttons "Cancel" at (127, 474), "Open" at (275, 474)` — every label
+ * verbatim, in tree order, with its centre.
+ */
 export const alertButtons = (alert: SystemAlert): string =>
   `${alert.buttons.length === 1 ? 'button' : 'buttons'} ${alert.buttons.map((b) => `"${b.label}" at (${b.centre.x}, ${b.centre.y})`).join(', ')}`;
 

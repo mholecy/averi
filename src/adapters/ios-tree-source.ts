@@ -71,9 +71,9 @@ export interface IosTreeSource {
    */
   applicationLabel(): Promise<ApplicationLabel>;
   /**
-   * iOS's system alert in one SHORT read, for the foreground wait at its bound (a link's, D54; a launch's, D56) — WDA's only (WdaTreeSource: one
-   * `/source` under its own budget, never a start or a restart; undefined while WDA is not up). Absent on idb, whose
-   * label reads already carry the alert's shape (`candidate`).
+   * iOS's system alert in one SHORT read, for the foreground wait at its bound (a link's, D54; a launch's, D56) —
+   * WDA's only (WdaTreeSource: one `/source` under its own budget, never a start or a restart; undefined while WDA is
+   * not up). Absent on idb, whose label reads already carry the alert's shape (`candidate`).
    */
   systemAlert?(): Promise<SystemAlert | undefined>;
   dispose(): Promise<void>;
