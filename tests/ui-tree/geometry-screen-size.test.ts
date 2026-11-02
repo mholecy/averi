@@ -13,6 +13,8 @@ const rect = (x: number, y: number, width: number, height: number): Rect => ({ x
 const nodeAt = (frame: Rect, ...children: UiNode[]): UiNode => node({ rect: frame, children });
 /** A root of no area: idb's synthetic root, uiautomator's multi-window dump, WDA's rect-less sheet root. */
 const rectless = (...children: UiNode[]): UiNode => nodeAt(rect(0, 0, 0, 0), ...children);
+/** The walked answer for a 2400x1080 landscape reach with no window rect: its reliability and the inset window offered. */
+const walked = (reliable: boolean, inset: Rect) => ({ width: 2400, height: 1080, reliable, trustworthyHeight: false, insetWindow: inset });
 
 describe('inferScreenSize — the inset window: screen-shaped in the window\'s position, not at the origin (ScreenSize.insetWindow)', () => {
   it("uiautomator's root laid beside a left nav bar (126,0 2274x1080): the walk answers, unreliable, and the root is offered as the inset window", () => {
@@ -38,7 +40,7 @@ describe('inferScreenSize — the inset window: screen-shaped in the window\'s p
     const app = nodeAt(rect(126, 63, 2274, 1017));
     const bar = nodeAt(rect(0, 0, 2400, 63));
     // The bar reaches exactly as far as the window and starts at the origin: the width is reliable whichever is listed first (D47).
-    const size = { width: 2400, height: 1080, reliable: true, trustworthyHeight: false, insetWindow: rect(126, 63, 2274, 1017) };
+    const size = walked(true, rect(126, 63, 2274, 1017));
     expect(inferScreenSize(rectless(app, bar))).toEqual(size);
     expect(inferScreenSize(rectless(bar, app))).toEqual(size);
   });
@@ -122,7 +124,7 @@ describe('inferScreenSize — the edges of the walk and of the window test', () 
   it('rects tying at the furthest reach: the origin-anchored one decides, even against a rect a unit inset (ORIGIN_SLACK is exclusive), in either order (D47)', () => {
     const bar = nodeAt(rect(0, 0, 2400, 63));
     const app = nodeAt(rect(1, 63, 2399, 1017));
-    const size = { width: 2400, height: 1080, reliable: true, trustworthyHeight: false, insetWindow: rect(1, 63, 2399, 1017) };
+    const size = walked(true, rect(1, 63, 2399, 1017));
     expect(inferScreenSize(rectless(bar, app))).toEqual(size);
     expect(inferScreenSize(rectless(app, bar))).toEqual(size);
   });
@@ -130,7 +132,7 @@ describe('inferScreenSize — the edges of the walk and of the window test', () 
   it('rects tying at the furthest reach with none at the origin: a content width, unreliable in either order', () => {
     const app = nodeAt(rect(126, 63, 2274, 1017));
     const bar = nodeAt(rect(50, 0, 2350, 63));
-    const size = { width: 2400, height: 1080, reliable: false, trustworthyHeight: false, insetWindow: rect(126, 63, 2274, 1017) };
+    const size = walked(false, rect(126, 63, 2274, 1017));
     expect(inferScreenSize(rectless(app, bar))).toEqual(size);
     expect(inferScreenSize(rectless(bar, app))).toEqual(size);
   });
@@ -138,7 +140,7 @@ describe('inferScreenSize — the edges of the walk and of the window test', () 
   it('half a root rect is no area: its tie in reach goes to the origin too, in either order (D47)', () => {
     const app = nodeAt(rect(126, 63, 2274, 1017));
     const bar = nodeAt(rect(0, 0, 2400, 63));
-    const size = { width: 2400, height: 1080, reliable: true, trustworthyHeight: false, insetWindow: rect(126, 63, 2274, 1017) };
+    const size = walked(true, rect(126, 63, 2274, 1017));
     for (const root of [rect(0, 0, 0, 1080), rect(126, 0, 2274, 0)]) {
       expect(inferScreenSize(nodeAt(root, app, bar))).toEqual(size);
       expect(inferScreenSize(nodeAt(root, bar, app))).toEqual(size);

@@ -161,9 +161,8 @@ interface Extent {
   height: number;
   /**
    * False when the width cannot be believed: the widest ON-LAYOUT rect starts
-   * inset (a CONTENT width; under a root of no area, a tie in reach goes to an
-   * origin-anchored rect, so listing order never decides it), or a
-   * screen-shaped rect in the same tree reaches materially less far than a
+   * inset (a CONTENT width; walkExtent says which rect wins a tie in reach), or
+   * a screen-shaped rect in the same tree reaches materially less far than a
    * bar-shaped one does (see walkExtent).
    */
   reliable: boolean;
@@ -194,13 +193,16 @@ function walkExtent(tree: UiNode): Extent {
   // would let listing order decide `reliable` (D47). A root WITH area is the
   // window by design (uiautomator's inset app window, A1 in verify/scale.ts),
   // is visited first and keeps the tie: an origin child reaching only as far
-  // must not turn its inset into a reliable screen width.
-  const tieGoesToOrigin = !(tree.rect.width > 0 && tree.rect.height > 0);
+  // must not turn its inset into a reliable screen width. Residual: under a
+  // root with area, a tie between two descendants that both reach past the root
+  // is still decided by tree order; no source produces one today (D47).
+  const tieGoesToOrigin = !hasArea(tree.rect);
   const walk = (n: UiNode): void => {
     if (onLayout(n.rect)) {
       const reach = n.rect.x + n.rect.width;
       const widestReach = widest.x + widest.width;
-      if (reach > widestReach || (tieGoesToOrigin && reach === widestReach && Math.abs(n.rect.x) < ORIGIN_SLACK)) widest = n.rect;
+      const winsTie = tieGoesToOrigin && reach === widestReach && Math.abs(n.rect.x) < ORIGIN_SLACK;
+      if (reach > widestReach || winsTie) widest = n.rect;
       if (n.rect.y + n.rect.height > tallest.y + tallest.height) tallest = n.rect;
       if (isScreenShaped(n.rect) && n.rect.width > 0) {
         sawScreenShaped = true;
@@ -226,6 +228,9 @@ function walkExtent(tree: UiNode): Extent {
     reliable: Math.abs(widest.x) < ORIGIN_SLACK && corroborated,
   };
 }
+
+/** A rect of real size on both axes; a root without one is no window (idb's 0x0 root, a multi-window dump). */
+const hasArea = (rect: Rect): boolean => rect.width > 0 && rect.height > 0;
 
 const onLayout = (rect: Rect): boolean => rect.x > -ORIGIN_SLACK && rect.y > -ORIGIN_SLACK;
 
@@ -280,7 +285,7 @@ function overhangs(tree: UiNode, window: Rect): boolean {
  */
 function windowRect(tree: UiNode): { rect: Rect; leg: 'root' | 'child' } | undefined {
   if (isWindow(tree.rect)) return { rect: tree.rect, leg: 'root' };
-  if (tree.rect.width > 0 && tree.rect.height > 0) return undefined;
+  if (hasArea(tree.rect)) return undefined;
   const candidates = tree.children.map((c) => c.rect).filter((r) => isWindow(r) && isScreenShaped(r));
   if (candidates.length === 0) return undefined;
   const best = candidates.reduce((champion, r) =>
@@ -300,7 +305,7 @@ function windowRect(tree: UiNode): { rect: Rect; leg: 'root' | 'child' } | undef
  */
 function insetWindowRect(tree: UiNode): Rect | undefined {
   const shaped = (r: Rect): boolean => r.width > 0 && r.height > 0 && onLayout(r) && isScreenShaped(r);
-  if (tree.rect.width > 0 && tree.rect.height > 0) return shaped(tree.rect) ? tree.rect : undefined;
+  if (hasArea(tree.rect)) return shaped(tree.rect) ? tree.rect : undefined;
   const candidates = tree.children.map((c) => c.rect).filter(shaped);
   if (candidates.length === 0) return undefined;
   const best = candidates.reduce((champion, r) =>
