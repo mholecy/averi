@@ -1,4 +1,4 @@
-import { ANDROID, IDB_STROKE, IDB_UNDER_KEYBOARD, IOS, keys, NO_CLOSE_IT_FIRST, twice, type KnownFile } from './known.js';
+import { ANDROID, IDB_STROKE, IDB_UNDER_KEYBOARD, idbUnmarkedTap, IOS, keys, NOT_YET_IN_TREE, twice, type KnownFile } from './known.js';
 
 // The forms family's ratchet (fixtures/apps/cells/forms.json, phase 1b).
 
@@ -18,8 +18,8 @@ export const forms: KnownFile = {
   family: 'forms',
   known: Object.fromEntries([
     // The form beneath the country picker sheet: the same, a form's fields and its submit.
-    ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented sheet: the tap times out' }),
-    ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented sheet: scroll_until swipes twice beneath it' }),
+    ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], idbUnmarkedTap('idb lists only the presented sheet: the tap times out')),
+    ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented sheet: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
     // idb lists nothing under the keyboard (src/mcp/tools.ts, tap: "a covered node was absent from idb's tree and the
     // tap timed out waiting for it to appear"): the tap times out — no false Tapped, but no keyboard advice. Its
     // scroll_until (two strokes ABOVE the keyboard, then "never appeared in the tree"), colour and ocr rows were
