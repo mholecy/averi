@@ -18,6 +18,7 @@ Amended 2026-11-02 (D54: when iOS's "Open in …?" alert holds such a link, the 
 centres instead of the ⚠ line — see the amendment below).
 Amended 2026-11-02 (D56: a launch that waits behind iOS's system alert names it and its buttons' centres in its ⚠ note
 — see the amendment below).
+Amended 2026-11-02 (batch-7: D56 device-checked — the D56 amendment's last paragraph).
 
 ## Context
 
@@ -605,3 +606,24 @@ app behind the alert (the same note, the title verbatim); L6 the happy path's ca
 on both sources; L7 a WDA cold launch, no `/source` when matched before the bound; L8 answer the alert, then
 `launch_app` at once on idb, ×3 (is the answered alert named from a stale tree?); L9 a WDA launch behind another
 SpringBoard alert (a permission prompt): named, and does it hold the launch back as "Open in …?" does?
+
+Checked on the device (batch-7, 2026-11-02, lab simulator, main a6410f64 against 21559529, the tree before this change;
+the alert raised as batch-5 did, causally: t0 proven not raised, t1 raised it): PASS on L1–L8 (L1, L2, L5, L6, L7 PASS;
+L3, L4, L8 observed), L9 inconclusive. L1 idb, Contacts in front: the note 2/2, one `idb ui describe-all`, the wait
+ended at 127–130 ms; reply 492/469 ms, against the happy path's 374 ms (L6's main median) and 3287 ms before this change
+(D48's note, 12 describe-alls). L2 WDA: the note 2/2, one `/source` at the bound (560/563 ms, started +2922/+2932 ms),
+no appinfo; reply 3854/3866 ms, against 3250 ms before (D48's note) — the `/source` is the cost. Every quoted centre lay
+in its Button on a fresh read (idb, and WDA's `/source`). L3 and L4: a tap at the quoted Cancel or Open centre dismissed
+it 2/2 each; at once SpringBoard was in front, at 1 s the lab (after Cancel) or the lab's open cell (after Open), on
+both sources — the launch held behind the alert goes through by itself once it is answered, either way. So the open
+question is answered: the tail's "then read again" is right, and "launch again" is not needed (no code change). L5
+(Contacts launched behind it): the note names `com.apple.MobileAddressBook` and the title verbatim on both (485 ms idb,
+3955 ms WDA); after Cancel Contacts came forward at 1 s. L6 (the happy path, 5 runs a side): no D56 extra on either
+source — no note, no `/source`, no added appinfo, no recurring surplus; median idb 374 → 374 ms (Δ +0), WDA 388 → 425 ms
+(Δ +37, within ±150). L7 (WDA cold launch): 3/3 matched at 1942 ms, no `/source`, no note. L8 (Cancel, then `launch_app`
+at once on idb, ×3): the answered alert was named 0/3 — a bare `Launched` in 486–510 ms, the alert no longer listed; the
+stale-tree residual above was not seen in 3 tries, and it stays stated (unmeasured is not disproved). L9: INCONCLUSIVE —
+no SpringBoard alert other than "Open in …?" can be raised on the lab simulator without a lab change (the lab requests
+no permission; `tel:` has no handler there, batch-4), so "every launch stays behind" is still measured for "Open in …?"
+alone. The remembered answer was restored and verified. The same batch tapped the alert's buttons by text (backlog D57,
+an observation; the advice above is unchanged).
