@@ -189,14 +189,17 @@ export const NO_ID_LISTED = "idb's read lists no id on any element";
  * tell them apart): both of idb's dialect notes say them, after their fact, as possible reasons. One phrase with no
  * parenthesis inside, since a one-line reply wraps the note in one (`withMissNote`); the container's forms (SwiftUI's
  * `.contain`, a React Native `testID` on a non-interactive view) are the ui_snapshot description's and the
- * troubleshooting reference's, not each reply's.
+ * troubleshooting reference's, not each reply's. The phrase a judge of the reply reads (scripts/truth/replies.ts).
  */
-const IDB_UNLISTS =
+export const IDB_UNLISTS =
   'idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, ' +
   "any set on a container and a UIKit table cell label's among them";
 
-/** The remedies both notes open with: close what lies over the element; else, if it shows, what each read leaves. */
-const COVERED_FIRST = 'If something covers it, close that first; if it is showing,';
+/**
+ * The remedies both notes open with: close what lies over the element; else, if it shows, what each read leaves. The
+ * phrase a judge of the reply reads (scripts/truth/replies.ts).
+ */
+export const COVERED_FIRST = 'If something covers it, close that first; if it is showing,';
 
 /** The note of a read that lists no identifier (`noIdListed`): the fact, idb's reasons, then the remedies — a `text:`/`label:` selector among them. */
 const noIdListedNote = (id: string): string =>

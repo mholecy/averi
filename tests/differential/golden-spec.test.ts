@@ -5,6 +5,7 @@ import { expectations, formExpectations, pairingOf, taps, touchDowns, type Expec
 import { replyKind } from '../../scripts/truth/replies.js';
 import type { CellTruth, ControlTruth, FieldTruth, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import { missNote } from '../../src/ui-tree/miss.js';
+import { IDB_STROKE_ABOVE_KEYBOARD, twice } from './golden/known.js';
 
 // The golden spec's judges (scripts/differential/golden-spec/*.ts, behind the façade golden-spec.ts), each on the
 // replies that decide it — the real ones, as the committed captures produce them (tests/differential/golden.test.ts
@@ -165,6 +166,54 @@ describe('a target beneath a presented layer', () => {
   });
 });
 
+/** The presented remedy as a miss note says it (src/ui-tree/miss.ts#missNote): a dialog's window, a sheet's layer. */
+const PRESENTED_WINDOW = missNote({ of: 'presented', layer: { kind: 'dialog' }, listed: 'window' })!;
+const PRESENTED_LAYER = missNote({ of: 'presented', layer: { kind: 'screen' }, listed: 'layer' })!;
+
+/**
+ * A target beneath a presented layer that the replayed tree does not list (D32 slice 1): uiautomator dumps the active
+ * window only, idb lists only the presented layer. The colour assert's "not found" is then the honest answer — judged
+ * (`absent`, from the payload: truth.ts#listedIn), not vacuous — but only one that names the way out its row asks: the
+ * presented remedy (as the tap row, never the active-window hint) — or, under idb, idb's reasons. The replies are the
+ * captures' own.
+ */
+describe('a target beneath a presented layer its replayed tree does not list', () => {
+  const capture = (run: string, cell: string, source: 'uiautomator' | 'idb' | 'wda') => {
+    const dir = new URL(`../fixtures/truth/${run}/`, import.meta.url);
+    const truth = JSON.parse(readFileSync(new URL(`${cell}.truth.json`, dir), 'utf8')) as CellTruth;
+    const tree = readFileSync(new URL(source === 'uiautomator' ? `${cell}.xml` : `${cell}.${source}.json`, dir), 'utf8');
+    const A = truth.targets.find((t) => t.tag === 'A')!;
+    return { A, colour: row(expectations(source === 'uiautomator' ? 'android' : 'ios', A, truth, source, tree), 'colour') };
+  };
+  const notFound = (id: string, note?: string) => `1/1 asserts FAILED\nFAIL  element id:"${id}" fill within dE00 8 of #5C1715 — not found within 1 s${note === undefined ? '' : ` (${note})`}\nappAlive: true`;
+
+  it('uiautomator: the presented remedy is green; the active-window hint, idb\'s reasons or a bare not-found is red', () => {
+    const { A, colour } = capture('android-averi_lab-api33', 'alert-dim', 'uiautomator');
+    expect(colour.absent).toBeDefined();
+    expect(colour.judge(out(notFound(A.id, PRESENTED_WINDOW)))).toBeUndefined();
+    expect(colour.judge(out(notFound(A.id, missNote({ of: 'activeWindow' })!)))).toMatch(/^not found, without naming the presented remedy: FAIL/);
+    expect(colour.judge(out(notFound(A.id, missNote({ of: 'idUnlisted', id: A.id })!)))).toMatch(/^not found, without naming the presented remedy: FAIL/);
+    expect(colour.judge(out(notFound(A.id)))).toMatch(/^not found, without naming the presented remedy: FAIL/);
+    expect(colour.judge(out('All 1 asserts passed\nPASS …'))).toMatch(/^passed on /);
+  });
+
+  it("idb: idb's reasons (either note) or the presented remedy are green; the active-window hint or a bare not-found is red", () => {
+    const { A, colour } = capture('ios-iphone17-ios27', 'dim-cover', 'idb');
+    expect(colour.absent).toBeDefined();
+    expect(colour.judge(out(notFound(A.id, missNote({ of: 'idUnlisted', id: A.id })!)))).toBeUndefined();
+    expect(colour.judge(out(notFound(A.id, missNote({ of: 'noIdListed', id: A.id })!)))).toBeUndefined();
+    expect(colour.judge(out(notFound(A.id, PRESENTED_LAYER)))).toBeUndefined();
+    expect(colour.judge(out(notFound(A.id, missNote({ of: 'activeWindow' })!)))).toMatch(/^not found, without naming the presented remedy or idb's reasons: /);
+    expect(colour.judge(out(notFound(A.id)))).toMatch(/^not found, without naming the presented remedy or idb's reasons: /);
+  });
+
+  it('a tree that lists the target (WDA marks the layer and lists what is beneath it): the bare not-found stays vacuous', () => {
+    const { A, colour } = capture('ios-iphone17-ios27', 'alert-dim', 'wda');
+    expect(colour.absent).toBeUndefined();
+    expect(colour.judge(out(notFound(A.id, PRESENTED_WINDOW)))).toMatch(/^not in the tree: /);
+  });
+});
+
 const control = (over: Partial<ControlTruth>): ControlTruth => ({
   tag: 'vs',
   id: 'lab.form-keyboard.vs',
@@ -196,6 +245,66 @@ describe('a field under the keyboard', () => {
     );
     expect(tap.judge(out('ERROR id:"lab.form-keyboard.vs" is under container "keyboard" …'))).toMatch(/^refused without naming the keyboard/);
     expect(tap.judge(out('Tapped id:"lab.form-keyboard.vs"', ['idb ui tap 201 621']))).toMatch(/^Tapped/);
+  });
+});
+
+/**
+ * A field under the keyboard that idb's tree does not list (form-keyboard.idb: idb lists nothing beneath the keyboard).
+ * Its colour, ocr and scroll_until rows judge the "not found" (`absent`, from the payload), as the presented colour
+ * row: green only where it names idb's reasons — and, for scroll_until, the soft keyboard too; the presented remedy is
+ * not this row's way out. The tap
+ * (K1) is not changed: it asks the keyboard named, which the timeout does not. The replies are the capture's own.
+ */
+describe('a field under the keyboard its replayed tree does not list (form-keyboard under idb)', () => {
+  const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
+  const truth = JSON.parse(readFileSync(new URL('form-keyboard.truth.json', IOS), 'utf8')) as CellTruth;
+  const tree = (source: string) => readFileSync(new URL(`form-keyboard.${source}.json`, IOS), 'utf8');
+  const idbRows = formExpectations('ios', truth, 'idb', tree('idb')).filter((r) => r.target === 'vs');
+  const wdaRows = formExpectations('ios', truth, 'wda', tree('wda')).filter((r) => r.target === 'vs');
+  const ID = 'lab.form-keyboard.vs';
+  const REASONS = missNote({ of: 'idUnlisted', id: ID })!;
+  const ABOVE = twice(IDB_STROKE_ABOVE_KEYBOARD);
+  const PRESENTED = PRESENTED_LAYER;
+  const KEYBOARD = 'The soft keyboard was up over [0,590][402,874] in 3 of the 3 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it first';
+  const assertNotFound = (note?: string) => `1/1 asserts FAILED\nFAIL  element id:"${ID}" fill within dE00 8 of #FFFFFF — not found within 1 s${note === undefined ? '' : ` (${note})`}\nappAlive: true`;
+  const stop = (note?: string, keyboard?: string) =>
+    `ERROR scroll_until id:"${ID}" failed after 2 swipes (the last 2, swiping down, did not change the screen) — element never appeared in the tree${note === undefined ? '' : ` (${note})`}.${keyboard === undefined ? '' : ` ${keyboard}`}`;
+
+  it('colour: idb\'s reasons are green; the presented remedy or a bare not-found is red', () => {
+    const c = row(idbRows, 'colour');
+    expect(c.absent).toBeDefined();
+    expect(c.judge(out(assertNotFound(REASONS)))).toBeUndefined();
+    expect(c.judge(out(assertNotFound(PRESENTED)))).toMatch(/^not found, without naming idb's reasons: /);
+    expect(c.judge(out(assertNotFound()))).toMatch(/^not found, without naming idb's reasons: /);
+    expect(c.judge(out('All 1 asserts passed\nPASS …'))).toMatch(/^passed on #FFFFFF/);
+  });
+
+  it('ocr: idb\'s reasons are green; the presented remedy or a bare not-found is red', () => {
+    const o = row(idbRows, 'ocr');
+    expect(o.absent).toBeDefined();
+    expect(o.judge(out(assertNotFound(REASONS)))).toBeUndefined();
+    expect(o.judge(out(assertNotFound(PRESENTED)))).toMatch(/^not found, without naming idb's reasons: /);
+    expect(o.judge(out(assertNotFound()))).toMatch(/^not found, without naming idb's reasons: /);
+  });
+
+  it('scroll_until: idb\'s reasons AND the soft keyboard are green; either alone, the presented remedy with the keyboard, or a bare not-found, is red; a stroke under the keyboard is red whatever it says', () => {
+    const s = row(idbRows, 'scroll_until');
+    expect(s.absent).toBeDefined();
+    expect(s.judge(out(stop(REASONS, KEYBOARD), ABOVE))).toBeUndefined();
+    expect(s.judge(out(stop(REASONS), ABOVE))).toMatch(/^not found, without naming idb's reasons and the soft keyboard: /);
+    expect(s.judge(out(stop(undefined, KEYBOARD), ABOVE))).toMatch(/^not found, without naming idb's reasons and the soft keyboard: /);
+    expect(s.judge(out(stop(PRESENTED, KEYBOARD), ABOVE))).toMatch(/^not found, without naming idb's reasons and the soft keyboard: /);
+    expect(s.judge(out(stop(), ABOVE))).toMatch(/^not found, without naming idb's reasons and the soft keyboard: /);
+    expect(s.judge(out(stop(REASONS, KEYBOARD), ['idb ui swipe 201 699 201 175 --duration 1.502']))).toMatch(/^touched down under the keyboard at \(201,699\)/);
+  });
+
+  it('the tap (K1) is not judged unlisted: it still asks the keyboard named', () => {
+    expect(row(idbRows, 'tap').absent).toBeUndefined();
+  });
+
+  it('under WDA, which lists the field: no row is judged unlisted, and the bare not-found stays vacuous', () => {
+    expect(wdaRows.filter((r) => r.absent !== undefined)).toEqual([]);
+    expect(row(wdaRows, 'colour').judge(out(assertNotFound(REASONS)))).toMatch(/^not in the tree: /);
   });
 });
 

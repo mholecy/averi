@@ -1,4 +1,4 @@
-import { ANDROID, IDB_STROKE, IDB_STROKE_ABOVE_KEYBOARD, IDB_UNDER_KEYBOARD, IOS, keys, NO_CLOSE_IT_FIRST, NOT_IN_TREE, twice, type KnownFile } from './known.js';
+import { ANDROID, IDB_STROKE, IDB_UNDER_KEYBOARD, IOS, keys, NO_CLOSE_IT_FIRST, twice, type KnownFile } from './known.js';
 
 // The forms family's ratchet (fixtures/apps/cells/forms.json, phase 1b).
 
@@ -21,18 +21,12 @@ export const forms: KnownFile = {
     ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented sheet: the tap times out' }),
     ...keys(`${IOS}/form-picker.idb.json`, ['name', 'country', 'submit'], ['scroll_until'], { cls: 'swiped 2× beneath the sheet', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented sheet: scroll_until swipes twice beneath it' }),
     // idb lists nothing under the keyboard (src/mcp/tools.ts, tap: "a covered node was absent from idb's tree and the
-    // tap timed out waiting for it to appear"): the tap times out — no false Tapped, but no keyboard advice;
-    // scroll_until swipes twice ABOVE the keyboard (pinned: a stroke moved under it fails here) and stops "never
-    // appeared in the tree" — its touch-downs are right, but a replayed tree cannot show whether they would bring the
-    // field out (vacuous).
+    // tap timed out waiting for it to appear"): the tap times out — no false Tapped, but no keyboard advice. Its
+    // scroll_until (two strokes ABOVE the keyboard, then "never appeared in the tree"), colour and ocr rows were
+    // vacuous here until D32 slice 1: the replayed tree lists no node of the field (golden-spec.ts#unlistedIn), so
+    // their "not found" is judged — green while it names idb's reasons (and, scroll_until, the soft keyboard) — struck
+    // off.
     ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['tap'], { cls: 'refused without naming the keyboard', kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the tap times out` }),
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['scroll_until'], { cls: NOT_IN_TREE, kind: 'not found', calls: twice(IDB_STROKE_ABOVE_KEYBOARD), note: IDB_UNDER_KEYBOARD }),
-    // …and the colour assert asked for the keyboard's colour over it (ControlTruth.seen, in the iOS truth since the
-    // phase-3 round-3 recapture) finds no node: vacuous, as the tap.
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['colour'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the assert finds no node` }),
-    // …and so does its ocr half (phase 4, golden-spec/text.ts#ocrFailsClosed: asked only where the host's recognizer
-    // reads — golden.ts#ocrAvailability).
-    ...keys(`${IOS}/form-keyboard.idb.json`, ['vs', 'ks', 'ss', 'note'], ['ocr'], { cls: NOT_IN_TREE, kind: 'not found', calls: [], note: `${IDB_UNDER_KEYBOARD}: the ocr assert finds no node` }),
     // LAB FINDING L2, docs/bugs/2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form.md —
     // under idb the submit lifted onto the keyboard over the phone field's centre read as no cover (a key overhanging
     // the screen's bottom by a rounded point cut the keyboard's run short): fixed by round 8, the phone tap and

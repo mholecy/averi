@@ -1,5 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { ACTIVE_WINDOW_HINT, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
@@ -131,6 +131,14 @@ export const windowHintSaid = (reply: string) => reply.includes(ACTIVE_WINDOW_HI
  * (miss.ts#TREE_SOURCE_REMEDY), which the note of an id unlisted among others (`idUnlisted`) says too.
  */
 export const noIdListedSaid = (reply: string) => reply.includes(NO_ID_LISTED);
+
+/**
+ * The reply carries idb's reasons for a miss, as both of its dialect notes say them (src/ui-tree/miss.ts#missNote,
+ * `noIdListed` and `idUnlisted`): why an idb list may lack the element (miss.ts#IDB_UNLISTS: nothing beneath the
+ * keyboard or a presented sheet, alert or cover) and the way out (miss.ts#COVERED_FIRST: "If something covers it,
+ * close that first") — both imported, not copied.
+ */
+export const idbReasonsSaid = (reply: string) => reply.includes(IDB_UNLISTS) && reply.includes(COVERED_FIRST);
 
 /**
  * scroll_until's changed stop (src/interact/scroll-text.ts#changedText, scroll-rounds.ts#ScreenChange): its swipe

@@ -131,8 +131,19 @@ where the row would accept it is it no evidence either way, its mismatch said to
 tree: …`). Except where the capture's tree really did not list the target: an edge row's `Expectation.absent`, set from
 the truth's `TargetTruth.listed` for the replayed source (`scripts/truth/target-contract.ts#unlistedBy` — uiautomator
 dumps no node the user cannot see), makes such a reply green, judged by what it did (nothing tapped, the strokes sent
-for it). A wait whose hint says the selector matched nodes, none usable ("it matched only 0×0 nodes …", "… clipped out
-above its scroll container …"), is no such reply: the target is in the tree, refused for where it lies
+for it). The presented colour row and a form's under-keyboard colour, `ocr` and scroll_until rows read `absent` from
+the replayed payload itself (`golden-spec.ts#unlistedIn`, by `truth.ts#listedIn`: uiautomator's dump of the active
+window, idb's list of the presented layer or of nothing beneath the keyboard), and hold the "not found" to the way out
+each row requires (`judges.ts#judgedUnlisted`, a `WayOut`: a reader of `replies.ts` and its words): the presented
+colour row by its tree source — under uiautomator the presented remedy (`PRESENTED_REMEDY`, `#presentedRemedySaid`;
+never the active-window hint, as its tap row), under idb that or idb's reasons (`IDB_PRESENTED`; `#idbReasonsSaid`, on
+`src/ui-tree/miss.ts#IDB_UNLISTS` and `#COVERED_FIRST`); the under-keyboard colour and `ocr` rows idb's reasons
+(`IDB_REASONS`); the under-keyboard stop idb's reasons and the soft keyboard (`REASONS_AND_KEYBOARD`). A bare "not
+found", or one naming another row's remedy, is a mismatch there. The 16 under-keyboard `ocr` rows are judged so only
+where the host's recognizer reads (outside the sandbox): replayed by hand they answer as the colour rows, but they are
+unproven on a Vision host, and would surface as 16 unknown mismatches if wrong. A wait whose
+hint says the selector matched nodes, none usable ("it matched only 0×0 nodes …", "… clipped out above its scroll
+container …"), is no such reply: the target is in the tree, refused for where it lies
 (replies.ts#notInTree; edges/scroll-collapsing's A, #10). A scroll is asked toward the target (truth.ts#directionOf):
 `right` or `left` for one wholly beside its scroll view's clip and level with it (a carousel's card,
 edges/carousel-in-list), else `down` or `up` by its centre; R-stroke holds every swipe along that direction's axis (its
