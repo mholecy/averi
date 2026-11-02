@@ -47,6 +47,10 @@ export const keys = (file: string, tags: readonly string[], verbs: readonly stri
 /** The note of an idb row under the keyboard (form-keyboard, the toolbar cells): idb lists nothing there. */
 export const IDB_UNDER_KEYBOARD = 'idb lists nothing under the keyboard';
 export const NO_CLOSE_IT_FIRST = 'refused without "close it first"';
+/** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
+export const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
+/** idb's tap beneath a presented layer its list shows no sign of (an alert, a large sheet, a cover, the picker sheet). */
+export const IDB_UNMARKED_TAP = 'residual:ADR 0018 residual 21 — a tap beneath a layer idb shows no sign of times out, without "close it first"';
 /** A tap beneath a presented layer whose reply gives only the active-window hint (uiautomator, a window it does not mark): the judge's own class. */
 export { NOT_IN_TREE_HINTED } from '../../../scripts/differential/golden-spec/judges.js';
 export const twice = (swipe: string) => [swipe, swipe];

@@ -1,4 +1,4 @@
-import { ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, twice, type KnownFile } from './known.js';
+import { ANDROID, IDB_STROKE, IDB_UNMARKED_TAP, IOS, keys, NO_CLOSE_IT_FIRST, NOT_YET_IN_TREE, twice, type KnownFile } from './known.js';
 
 // The presented family's ratchet (fixtures/apps/cells/presented.json): sheet-medium and alert-dim (phase 1/2);
 // sheet-medium-edges, sheet-background, sheet-long-list, dim-cover, blur-menu and blur-menu-grouped (phase 3, B3, iOS);
@@ -18,8 +18,6 @@ import { ANDROID, IDB_STROKE, IOS, keys, NO_CLOSE_IT_FIRST, twice, type KnownFil
 // uiautomator the presented remedy alone — the active-window hint is never accepted, as the tap row's — under idb the
 // presented remedy or idb's reasons. Every one of them names it; struck off.
 const BLUR = 'residual:ADR 0018 residual 9 — an in-window overlay idb or a reading-order run does not show is not seen';
-/** A target not in the tree is still stroked for beneath a layer the tree source did not judge (idb's lists). */
-const NOT_YET_IN_TREE = 'residual:ADR 0018 residual 6 — a target not yet in the tree is stroked for';
 /** A modal row listed before the content drawn under it, a content control holding its centre (ADR 0015's 2026-10-22 amendment), that the eyes cannot tell: white on white. */
 const CHOOSER = 'residual:ADR 0024 residual 1 — alike looks (two white rows): untold, refused';
 /**
@@ -58,7 +56,7 @@ export const presented: KnownFile = {
     // stops before any swipe — ADR 0018 residual 6 closed there (its "Closed on idb for a list holding UIKit's dismiss
     // region"; a residual, no note: nothing in scripts/truth/calibration.json), the 8 rows struck off here. Its colour
     // assert fails "not found" with the presented remedy in its miss note: judged since D32 slice 1, green.
-    ...keys(`${IOS}/alert-dim.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
+    ...keys(`${IOS}/alert-dim.idb.json`, ['A', 'B', 'C', 'D'], ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out', as: IDB_UNMARKED_TAP }),
     ...keys(`${IOS}/alert-dim.idb.json`, ['A', 'B', 'C', 'D'], ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
     // LAB FINDING L1, docs/bugs/2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target.md —
     // uiautomator dumps the active window only, so beneath an AlertDialog or a ModalBottomSheet the targets are not in
@@ -91,7 +89,7 @@ export const presented: KnownFile = {
     ...['sheet-background', 'dim-cover'].flatMap((cell) => {
       const tags = ['A', 'B', 'C', 'D'];
       return [
-        ...keys(`${IOS}/${cell}.idb.json`, tags, ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out' }),
+        ...keys(`${IOS}/${cell}.idb.json`, tags, ['tap'], { cls: NO_CLOSE_IT_FIRST, kind: 'not found', calls: [], note: 'idb lists only the presented layer: the tap times out', as: IDB_UNMARKED_TAP }),
         ...keys(`${IOS}/${cell}.idb.json`, tags, ['scroll_until'], { cls: 'swiped 2× beneath a presented layer', kind: 'not found', calls: twice(IDB_STROKE), note: 'idb lists only the presented layer: scroll_until swipes twice beneath it', as: NOT_YET_IN_TREE }),
       ];
     }),
