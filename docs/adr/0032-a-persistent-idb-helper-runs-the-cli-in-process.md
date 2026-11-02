@@ -516,7 +516,8 @@ Decision (spec-D54, adopting the D54 analysis; review round 1 reshaped the seams
   — and the title and the labels are quoted verbatim, never paraphrased or judged by their words. Only coordinates are advised: batch-5 answered the alert by coordinates, and a selector tap on
   SpringBoard's tree is unverified (D57). `front` does not move: the app is not in front.
 - Unchanged: a link that matches (no `/source`, no extra call on either source), a launch (it looks for no alert; since
-  D56 it does — see that amendment), every link that expects no app (web links, iOS's own schemes, another app's scheme).
+  D56 it does — see that amendment), every link that expects no app (web links, iOS's own schemes, another app's
+  scheme).
 
 A correction to the backlog row: WDA's payload has no `presentation` key, in either `/source` form; `presentation:
 'alert'` is averi's own mark on the layer holding an `Alert` element.
@@ -559,20 +560,26 @@ Decision (spec-D56, adopting the D56 analysis):
   `Launched`, the flow engine and `launchText` are unchanged: they carry the note already, so `launch_app`'s ⚠ line and
   a flow's `⚠ launch` line both show it. The launch never fails: D48's rule holds, the wait only delays, and `simctl
   launch` succeeded (batch-1: a bare "Launched" behind the alert).
-- One wording of the buttons and the advice, in `adapters/ios-system-alert.ts`: `alertButtons(alert)` (`buttons
-  "Cancel" at (127, 474), "Open" at (275, 474)`, "button" for one) and `ANSWER_ALERT` ("Answer it with a tap at the
+- One wording of the buttons and the advice, in `adapters/ios-system-alert.ts`: `alertButtonsText(alert)` (`buttons
+  "Cancel" at (127, 474), "Open" at (275, 474)`, "button" for one) and `ALERT_ADVICE` ("Answer it with a tap at the
   chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered").
   `mcp/tool-text.ts#alertText` (open_deep_link's reply) uses both and stays byte-identical.
 - The note: `iOS has not brought <bundle> forward yet: a system alert is up, "<title>" — buttons "<label>" at (x, y),
-  …. <ANSWER_ALERT> — then read again before trusting a read`. Always "a system alert is up", never "it asks": the alert
+  …. <ALERT_ADVICE> — then read again before trusting a read`. Always "a system alert is up", never "it asks": the alert
   belongs to something earlier (a link) and may name another app (launching Contacts behind "Open in “AveriLab”?"). The
   title is quoted verbatim. No "3 s after": idb ends at once, WDA at the bound. The tail keeps D48's "read again"
   without its parenthesis: what comes forward once the alert is answered is unmeasured.
 - Device calls: the happy path is call-identical on both sources (pinned by call lists in
   `tests/adapters/ios-deep-link.test.ts`). idb makes no extra call: `candidate` rides on the label read. WDA makes at
   most one `quickSourceIfUp` read, only at the bound, only when SpringBoard was the last bundle named; a launch asks no
-  names for it (`asksForApp` is a link's alone), so a WDA launch pays no `simctl appinfo`. A read that throws, times out
-  or holds no alert gives D48's note byte-identical (fail open).
+  names for it, so a WDA launch pays no `simctl appinfo`. The wait's `alert` end carries the alert as the source listed
+  it, with the names its title was judged by; only a link's outcome builds `LinkAlert.asksForApp` from them. A read
+  that throws, times out or holds no alert gives D48's note byte-identical (fail open).
+- The sources differ, as for a link: on WDA any SpringBoard alert found at the bound is named, whatever its title —
+  `alertInWda` has no title gate, and a launch has no names to judge one with (pinned with an "Allow notifications?"
+  title); on idb only one titled `Open in “…”?` or naming the launched app (`titleAsksToOpen`). The advice's "every
+  launch stays behind the alert until it is answered" is measured for "Open in …?" alone (batch-1, batch-2); for
+  another SpringBoard alert WDA names it is unmeasured.
 
 Considered, not chosen: a structured `LaunchOutcome.alert` (new fields in three types and both renderers, and wording
 in `flow/launch.ts`, which may not import `mcp/`, for one line the note already carries); "it asks" for a launch (a
@@ -587,7 +594,14 @@ one read before the same D48 note (batch-4's cold launches matched at 2.0–2.1 
 Residuals, stated: D54's apply (a localised title without the app's name falls back to D48's note on idb; an alert
 shape another iOS lists differently falls back too); a localised alert that names another app than the launched one
 is not found on idb (the title gate judges the launched app's names), and the note is D48's; on idb, when the launched
-app's names cannot be read, a localised alert gives D48's "could not check" note at once. To check on the device (the
-next owner batch): a launch behind the alert on idb and on WDA (the note, the describe-all count, the `/source` time at
-the bound); what comes forward after a tap on each button — which decides whether the note's tail should say "launch
-again"; a launch of another app behind the alert; the happy path's call lists and launch time against main.
+app's names cannot be read, a localised alert gives D48's "could not check" note at once; on idb the wait ends at the
+first read that lists the alert, so a stale tree served just after the alert was answered would name it as up
+(unmeasured); on WDA another SpringBoard alert at the bound is named with the same advice, whose "every launch stays
+behind" is measured only for "Open in …?". To check on the device (the next owner batch, the D56 analysis's cases):
+L1 an idb launch behind the alert (the note, one describe-all, the reply time against main's) and L2 a WDA one (one
+`/source` at the bound, timed; no appinfo); L3 and L4, a tap on Cancel and on Open at the quoted centre, then a read at
+once and at 1 s — what comes forward decides whether the note's tail should say "launch again"; L5 a launch of another
+app behind the alert (the same note, the title verbatim); L6 the happy path's call lists and launch time against main,
+on both sources; L7 a WDA cold launch, no `/source` when matched before the bound; L8 answer the alert, then
+`launch_app` at once on idb, ×3 (is the answered alert named from a stale tree?); L9 a WDA launch behind another
+SpringBoard alert (a permission prompt): named, and does it hold the launch back as "Open in …?" does?
