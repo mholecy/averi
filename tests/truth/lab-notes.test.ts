@@ -40,8 +40,8 @@ const LIVE_ONLY: Readonly<Record<string, string>> = {
   // D31: the forms group's fills of non-ASCII text (live.ts b1d, b7): a replayed tree cannot judge typing.
   '2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md': '`idb ui text` refuses non-ASCII text, the field untouched: typing, live only',
   '2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md': '`input text` types a prefix, then fails on non-ASCII text: typing, live only',
-  // batch-3 (live.ts f11; ensure h2 under idb): typing, and a hold timed over live reads — the golden replays neither.
-  '2026-11-02-lab-fill-fails-a-date-the-field-dots-as-typed-though-the-app-holds-it.md': 'a fill into a field that dots a date fails while the app holds it: typing, live only',
+  // batch-3 (ensure h2 under idb): a hold timed over live reads — the golden replays none. (Its f11 note left with its
+  // three entries, struck off by D51's fix — still excluded, its `why` saying so.)
   '2026-11-02-lab-ios-idb-reads-an-unlabelled-swiftui-spinner-as-content-so-a-held-no-ends-on-it.md': "ensure_state's held \"no\" began on idb's spinner: a hold over live reads, live only",
 };
 

@@ -16,7 +16,7 @@
 import { INPUT_ROLE, type UiNode } from '../adapters/types.js';
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
 import { heldText, type Difference, type Reformat } from './fill-facts.js';
-import { prefixOf, reformatOf, skeleton } from './fill-reformat.js';
+import { maskTemplate, prefixOf, reformatOf, skeleton } from './fill-reformat.js';
 
 /** What the field should hold after the typing, and what the reading is judged against. */
 export interface Expectation {
@@ -139,11 +139,18 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
  *
  * What it adds: a reading whose letters and digits do not start with the earlier text's may pass, or be retyped, as
  * the value alone, under `reformatOf`'s and `prefixOf`'s rules unchanged. A reading that starts with them is judged
- * after the earlier text, never without it. An earlier text with no letters or digits (a `—`, a `__/__/____` mask)
- * keeps the pre-D29 judgment — every reading starts with its empty skeleton — failing safe, as a false mismatch and
- * never a wrong pass: deliberately not loosened (D29 review round 2, MINOR-A). So does an unnamed placeholder whose
- * letters and digits are a prefix of the typed value's (a `+421` placeholder, `421903…` typed): the reading starts
- * with them, the fallback never runs, and the result is the old false mismatch.
+ * after the earlier text, never without it. An earlier text with no letters or digits (a `—`, a `-`) keeps the
+ * pre-D29 judgment — every reading starts with its empty skeleton — failing safe, as a false mismatch and never a
+ * wrong pass: deliberately not loosened (D29 review round 2, MINOR-A). So does an unnamed placeholder whose letters
+ * and digits are a prefix of the typed value's (a `+421` placeholder, `421903…` typed): the reading starts with them,
+ * the fallback never runs, and the result is the old false mismatch.
+ *
+ * A MASK TEMPLATE is the exception (D51, narrowing MINOR-A for a `_` template only): an earlier text of `_` and
+ * separators alone, at least one `_` (`maskTemplate`: `__.__.____`, `__/__/____`), is tried as no earlier text as well,
+ * second, whatever the reading. It is a mask's blanks, never content a fill appends to; idb reads the UIKit date
+ * field's unnamed `__.__.____` as its text before, and judged after it a dotted date the field held failed. The exact
+ * rule already passes a value whose earlier text vanished (`showsExactly`'s `includes`); this gives the reformat and
+ * prefix rules the same reach for a `_` template, and no other text.
  *
  * The earlier text is tried FIRST: a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is then
  * that earlier text's prefix, nothing of the typing landed, and nothing is typed again; tried second, the same reading
@@ -151,7 +158,7 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
  */
 function priorsOf(held: string, e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): readonly string[] {
   const prior = priorText(e);
-  return prior !== '' && !skeleton(held).startsWith(skeleton(prior)) ? [prior, ''] : [prior];
+  return prior !== '' && (maskTemplate(prior) || !skeleton(held).startsWith(skeleton(prior))) ? [prior, ''] : [prior];
 }
 
 /**

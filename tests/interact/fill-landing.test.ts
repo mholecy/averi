@@ -210,8 +210,9 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(tailOf('100,010', e('1000105', '1,000'))).toBeUndefined();
   });
 
-  // D29 review round 2, MINOR-A (the owner's decision): an earlier text with no letters or digits (a dash, a
-  // `__/__/____` mask) keeps the pre-D29 judgment — a false mismatch, never a wrong pass; deliberately not loosened.
+  // D29 review round 2, MINOR-A (the owner's decision): an earlier text with no letters or digits (a dash) keeps the
+  // pre-D29 judgment — a false mismatch, never a wrong pass; deliberately not loosened. A `_` mask template since D51,
+  // below.
   it('an earlier text with no letters or digits: judged after it alone, as before D29', () => {
     expect(landingOf('SK31 1200 0000', expecting(e('SK3112000000', '\u2014')))).toBeUndefined();
   });
@@ -231,6 +232,51 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
   it('tailOf: the earlier text vanished but other text took its place — none', () => {
     expect(tailOf('XY12', e('1234', PH))).toBeUndefined();
     expect(tailOf('SK31 1300', e('SK3112000000', PH))).toBeUndefined();
+  });
+});
+
+/**
+ * D51: idb names no placeholder, so the UIKit date field's `__.__.____` is read as the empty field's text before (D29),
+ * and without clear the reading was judged after it — `31.12.2026` failed against `__.__.____31122026`. An earlier text
+ * of `_` and separators alone, at least one `_` (`fill-reformat.ts#maskTemplate`), is a mask's blanks, never content a
+ * fill appends to: tried as no earlier text as well, second — as a vanished placeholder is (D29). This narrows D29
+ * review round 2's MINOR-A for a `_` template only; a `—` or a `-` keeps it.
+ */
+describe('a mask template is no earlier text (D51)', () => {
+  const MASK = '__.__.____';
+  const e = (value: string, before: string | null, clear = false) => ({ value, clear, before, placeholder: undefined });
+
+  it('landingOf: a dotted date after its vanished template lands reformatted', () => {
+    expect(landingOf('31.12.2026', expecting(e('31122026', MASK)))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
+    expect(landingOf('31/12/2026', expecting(e('31122026', '__/__/____')))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
+  });
+
+  it('landingOf: a dotted date with nothing before, or cleared, lands by the digit grouping alone', () => {
+    expect(landingOf('31.12.2026', expecting(e('31122026', null)))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
+    expect(landingOf('31.12.2026', expecting(e('31122026', MASK, true)))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
+  });
+
+  it('landingOf: a mask still showing blanks, a lost sign, a dash: none', () => {
+    expect(landingOf('31.12.____', expecting(e('31122026', MASK)))).toBeUndefined(); // `_` is no separator
+    expect(landingOf('1.234.567', expecting(e('1234567', '-')))).toBeUndefined(); // `-` is no template: a sign lost
+    expect(landingOf('SK31 1200 0000', expecting(e('SK3112000000', '\u2014')))).toBeUndefined(); // MINOR-A's own case
+  });
+
+  it('landingOf: an earlier date the field kept, or replaced on focus', () => {
+    expect(landingOf('01.01.2000', expecting(e('31122026', '01.01.2000')))).toBeUndefined();
+    expect(differenceOf('01.01.2000', expecting(e('31122026', '01.01.2000')))).toEqual({ kind: 'unchanged' });
+    expect(landingOf('31.12.2026', expecting(e('31122026', '01.01.2000')))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
+  });
+
+  it('tailOf: a dotted date\'s prefix after the template is a dropped tail, the template itself none of the typing', () => {
+    expect(tailOf('31.12.20', e('31122026', MASK))).toEqual({ missing: '26', landed: 6, reformatted: { added: 2, respaced: 0 } });
+    expect(droppedTail('31.12.20', e('31122026', MASK))).toBe('26');
+    expect(tailOf(MASK, e('31122026', MASK))?.landed).toBe(0); // the template tried first: nothing of the typing landed
+    expect(droppedTail(MASK, e('31122026', MASK))).toBeUndefined();
+  });
+
+  it('differenceOf: a typing longer than the date field takes is a dropped tail, grouped', () => {
+    expect(differenceOf('31.12.2026', expecting(e('311220261', null)))).toEqual({ kind: 'dropped-tail', landed: 8, dropped: 1, grouped: true });
   });
 });
 

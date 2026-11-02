@@ -1658,7 +1658,7 @@
     },
     {
       "note": "2026-11-02-lab-fill-fails-a-date-the-field-dots-as-typed-though-the-app-holds-it.md",
-      "why": "lab finding (batch-3 block H, backlog D37/D51): `31122026` typed without clear into form-format's date field, which dots it — the app holds `31.12.2026`, averi replies \"ERROR fill: typed 8 characters but the field shows 10\" under idb, WDA and uiautomator (docs/truth/live-records/*-forms-d37-1.json; ADR 0034 fails a `.` group that is no thousands): typing, live only — the golden never types; open"
+      "why": "lab finding (batch-3 block H, backlog D37/D51): `31122026` typed without clear into form-format's date field, which dots it — the app holds `31.12.2026`, averi replies \"ERROR fill: typed 8 characters but the field shows 10\" under idb, WDA and uiautomator (docs/truth/live-records/*-forms-d37-1.json; ADR 0034 failed a `.` group that is no thousands): typing, live only — the golden never types; fixed by D51 (ADR 0034's amendment), its three live entries struck off, the device check pending"
     }
   ]
 }

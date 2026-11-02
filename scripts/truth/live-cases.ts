@@ -403,7 +403,7 @@ const FORMS: Omit<Case, 'group'>[] = [
   { id: 'f10', cell: F, says: "a flow's tap + `type_pin:` into the amount field that groups by thousands", flows: pinFlow(F, 'amount', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('amount', `1${NBSP}234${NBSP}567`) },
   // D37: a dotted date (schema.ts#FieldFormat's `date`; ADR 0034 fails it by rule) under a placeholder with no letter or
   // digit (`__.__.____`), and a phone that does not reformat under a `+421` placeholder — ADR 0034's D29 gaps. Batch-3
-  // ran them (main 6b4a44df): f11 failed-holds under every source (known in live-known.ts, backlog D51), f12–f14 ok.
+  // ran them (main 6b4a44df): f11 failed-holds under every source, f12–f14 ok; D51 (ADR 0034's amendment) fixed f11.
   { id: 'f11', cell: F, says: 'fill, no clear, a date the field dots as typed', calls: [fill(F, 'date', '31122026'), shows(F, 'date', '31.12.2026')], judge: holdsShown('date', '31.12.2026') },
   { id: 'f12', cell: F, says: 'fill, clear, a date typed with its own dots into the field that dots it', calls: [fill(F, 'date', '31.12.2026', true)], judge: holds('date', '31.12.2026') },
   { id: 'f13', cell: F, says: 'fill, no clear, a phone number under a `+421` placeholder', calls: [fill(F, 'phone', '421903123456')], judge: holds('phone', '421903123456') },
