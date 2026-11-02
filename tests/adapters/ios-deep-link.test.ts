@@ -8,7 +8,7 @@ import type { DeepLinkOutcome, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
 import {
-  bundle, DESCRIBE_ALL, IDB_ALERT, IDB_LAB, idbLab, lab, label, LAB, LAB_INFO, LAB_PATH, LAB_TYPES, LAUNCH_ALERT_NOTE, openurl,
+  APPROVAL, bundle, DESCRIBE_ALL, IDB_ALERT, IDB_LAB, idbLab, lab, label, LAB, LAB_INFO, LAB_PATH, LAB_TYPES, LAUNCH_ALERT_NOTE, openurl,
   PLUTIL, SPRINGBOARD, WDA_ALERT, WRITES,
 } from '../helpers/ios-lab.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
@@ -75,11 +75,12 @@ describe("IosAdapter.openDeepLink — a link nothing expects is opened exactly a
     const d = lab([bundle(LAB)]);
     expect(await d.adapter.openDeepLink('contacts://new', { appId: LAB })).toEqual({});
     expect(await d.adapter.openDeepLink('x-apples://new', { appId: LAB })).toEqual({});
+    // D58: the lookup now runs before the writes (it decides the pre-approval); no pre-approval for a scheme not declared.
     expect(d.calls).toEqual([
-      ...WRITES,
-      openurl('contacts://new'),
       'xcrun simctl appinfo AAAA-1111 dev.averi.lab',
       PLUTIL,
+      ...WRITES,
+      openurl('contacts://new'),
       ...WRITES,
       openurl('x-apples://new'),
     ]);
@@ -174,10 +175,12 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
     expect(d.calls.filter((c) => c.startsWith('plutil'))).toEqual([PLUTIL, PLUTIL]);
   });
 
-  it('the writes and openurl first, as before; the lookup after them', async () => {
+  // D58 rewrote this pin on purpose (it read "the writes and openurl first; the lookup after them"): the lookup decides
+  // the scheme's pre-approval, which must land before openurl.
+  it('the lookup first, then the writes with the pre-approval, then openurl', async () => {
     const d = lab([bundle(LAB)]);
     await d.adapter.openDeepLink('averilab://d49', { appId: LAB });
-    expect(d.calls).toEqual([...WRITES, openurl('averilab://d49'), 'xcrun simctl appinfo AAAA-1111 dev.averi.lab', PLUTIL]);
+    expect(d.calls).toEqual(['xcrun simctl appinfo AAAA-1111 dev.averi.lab', PLUTIL, ...WRITES, APPROVAL, openurl('averilab://d49')]);
   });
 
   it("idb reads SpringBoard's ' ' twice, then the app's name: waited out — three reads, two pauses, no note", async () => {
@@ -263,17 +266,17 @@ const ALERT: DeepLinkOutcome = {
 };
 
 describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)", () => {
-  it('idb, the lab in front: one describe-all, no note — the same calls as before D54', async () => {
+  it('idb, the lab in front: one describe-all, no note — D54 adds no call', async () => {
     const d = idbLab([IDB_LAB]);
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({});
-    expect(d.calls).toEqual([...WRITES, openurl('averilab://d54'), 'xcrun simctl appinfo AAAA-1111 dev.averi.lab', PLUTIL, DESCRIBE_ALL]);
+    expect(d.calls).toEqual(['xcrun simctl appinfo AAAA-1111 dev.averi.lab', PLUTIL, ...WRITES, APPROVAL, openurl('averilab://d54'), DESCRIBE_ALL]);
     expect(sleeps).toEqual([]);
   });
 
   it('idb lists the alert at the first read: the wait ends at once with it — one describe-all, no pause, no note, no extra call', async () => {
     const d = idbLab([IDB_ALERT]);
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual(ALERT);
-    expect(d.calls).toEqual([...WRITES, openurl('averilab://d54'), 'xcrun simctl appinfo AAAA-1111 dev.averi.lab', PLUTIL, DESCRIBE_ALL]);
+    expect(d.calls).toEqual(['xcrun simctl appinfo AAAA-1111 dev.averi.lab', PLUTIL, ...WRITES, APPROVAL, openurl('averilab://d54'), DESCRIBE_ALL]);
     expect(sleeps).toEqual([]);
   });
 
@@ -560,5 +563,130 @@ describe('IosAdapter.openDeepLink — which app the typing goes into', () => {
     await adapter.openDeepLink('averilab://d49', { appId: LAB });
     await adapter.typeText('Jan');
     expect(typed).toEqual(['Jan']);
+  });
+});
+
+// D58 (2026-11-02; ADR 0032's D58 amendment): iOS asks "Open in “AveriLab”?" once per simulator because simctl's opener
+// (CoreSimulatorBridge) has no remembered answer for the scheme. Before a link to the project's own scheme, averi now
+// writes the answer an Open tap records — com.apple.launchservices.schemeapproval,
+// com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab — beside the accessibility writes, so the alert
+// does not come. Every other link, and launch(), writes nothing new; every reply is unchanged; D54's naming stays the
+// fallback when the simulator ignores the write.
+describe("IosAdapter.openDeepLink — the project's own scheme pre-approved for simctl's opener (D58)", () => {
+  const APPINFO = 'xcrun simctl appinfo AAAA-1111 dev.averi.lab';
+  const ANNOUNCED =
+    'averi: recorded iOS\'s "Open" answer for averilab links to dev.averi.lab from simctl openurl on AAAA-1111 ' +
+    '(com.apple.launchservices.schemeapproval com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab; ' +
+    'simulator-wide, not restored; before every link to the app\'s own scheme, so iOS does not ask "Open in “…”?")';
+  const FAILED =
+    'averi: could not pre-approve averilab links to dev.averi.lab for simctl openurl on AAAA-1111 ' +
+    '(simctl spawn: defaults write failed) — iOS may ask "Open in “…”?" first, and the reply names the alert if it ' +
+    'does; not tried again until the app is installed again';
+  const approvalLines = () => stderrLines().filter((l) => l.includes('averilab links'));
+
+  it('one pre-approval beside the accessibility writes, before openurl; the key lower-cased; written on every link, said once', async () => {
+    const d = lab([bundle(LAB)]);
+    expect(await d.adapter.openDeepLink('averilab://d58', { appId: LAB })).toEqual({});
+    expect(await d.adapter.openDeepLink('AveriLab://again', { appId: LAB })).toEqual({});
+    expect(d.calls).toEqual([APPINFO, PLUTIL, ...WRITES, APPROVAL, openurl('averilab://d58'), ...WRITES, APPROVAL, openurl('AveriLab://again')]);
+    expect(stderrLines()).toEqual([ANNOUNCED]);
+  });
+
+  it('the three writes are in flight together, and openurl waits for all three', async () => {
+    const calls: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let done = 0;
+    const exec: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      calls.push(full);
+      const out = (s: string) => ({ stdout: Buffer.from(s), stderr: '' });
+      if (full.startsWith('xcrun simctl appinfo')) return out(LAB_INFO);
+      if (full.startsWith('plutil ')) return out(LAB_TYPES);
+      if (full.includes(' defaults write ')) {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        done += 1;
+      }
+      if (full.includes(' openurl ')) expect(done).toBe(3);
+      return out('');
+    };
+    const source: IosTreeSource = {
+      kind: 'wda',
+      read: () => Promise.reject(new Error('unused')),
+      applicationLabel: async () => bundle(LAB),
+      dispose: () => Promise.resolve(),
+    };
+    await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: source }).openDeepLink('averilab://d58', { appId: LAB });
+    expect(maxInFlight).toBe(3);
+    expect(calls.filter((c) => c.includes(' openurl '))).toHaveLength(1);
+  });
+
+  it("https, tel, no scheme, another app's scheme, no project app: no pre-approval", async () => {
+    const d = lab([bundle(LAB)]);
+    for (const url of ['https://averi.dev/x', 'tel:+421900', 'averilab', 'contacts://new']) await d.adapter.openDeepLink(url, { appId: LAB });
+    await d.adapter.openDeepLink('averilab://d58');
+    expect(d.calls.filter((c) => c.includes('schemeapproval'))).toEqual([]);
+    expect(approvalLines()).toEqual([]);
+  });
+
+  it('schemes that could not be read: no pre-approval', async () => {
+    const d = lab([bundle(LAB)], { types: execErrorLikeExec(PLUTIL, 1, `${LAB_PATH}/Info.plist: (The file couldn’t be opened.)\n`) });
+    await d.adapter.openDeepLink('averilab://d58', { appId: LAB });
+    expect(d.calls.filter((c) => c.includes('schemeapproval'))).toEqual([]);
+  });
+
+  it('the write fails: openurl and the wait run as before, one stderr line, not tried again until install()', async () => {
+    const d = lab([bundle(LAB)], { approval: new Error('simctl spawn: defaults write failed\nmore') });
+    expect(await d.adapter.openDeepLink('averilab://d58', { appId: LAB })).toEqual({});
+    expect(await d.adapter.openDeepLink('averilab://d58', { appId: LAB })).toEqual({});
+    expect(d.calls).toEqual([APPINFO, PLUTIL, ...WRITES, APPROVAL, openurl('averilab://d58'), ...WRITES, openurl('averilab://d58')]);
+    expect(d.asks()).toBe(2);
+    expect(stderrLines()).toEqual([FAILED]);
+    await d.adapter.install('/builds/AveriLab.app');
+    await d.adapter.openDeepLink('averilab://d58', { appId: LAB });
+    expect(d.calls.filter((c) => c === APPROVAL)).toHaveLength(2);
+    expect(stderrLines()).toEqual([FAILED, FAILED]);
+  });
+
+  it('the write fails and iOS asks: the alert named as D54 has it (fails open)', async () => {
+    const d = lab([SPRINGBOARD], { tree: WDA_ALERT, approval: new Error('simctl spawn: defaults write failed') });
+    expect(await d.adapter.openDeepLink('averilab://d58', { appId: LAB })).toEqual(ALERT);
+    expect(d.calls).toContain(openurl('averilab://d58'));
+  });
+
+  it('an accessibility write failing does not hold the pre-approval back, nor say it failed', async () => {
+    const calls: string[] = [];
+    const exec: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      calls.push(full);
+      const out = (s: string) => ({ stdout: Buffer.from(s), stderr: '' });
+      if (full.startsWith('xcrun simctl appinfo')) return out(LAB_INFO);
+      if (full.startsWith('plutil ')) return out(LAB_TYPES);
+      if (full.includes('com.apple.Accessibility')) throw new Error('spawn failed');
+      return out('');
+    };
+    const source: IosTreeSource = {
+      kind: 'wda',
+      read: () => Promise.reject(new Error('unused')),
+      applicationLabel: async () => bundle(LAB),
+      dispose: () => Promise.resolve(),
+    };
+    await new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: source }).openDeepLink('averilab://d58', { appId: LAB });
+    expect(calls).toContain(APPROVAL);
+    expect(approvalLines()).toEqual([ANNOUNCED]);
+    expect(stderrLines().filter((l) => l.startsWith('averi: could not set com.apple.Accessibility AutomationEnabled'))).toHaveLength(1);
+  });
+
+  it('launch() writes no pre-approval — not even after a link wrote one', async () => {
+    const d = lab([bundle(LAB)]);
+    await d.adapter.launch(LAB);
+    await d.adapter.openDeepLink('averilab://d58', { appId: LAB });
+    await d.adapter.launch(LAB);
+    expect(d.calls.filter((c) => c === APPROVAL)).toHaveLength(1);
+    expect(d.calls.slice(-3)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 dev.averi.lab']);
+    expect(d.calls.slice(0, 3)).toEqual([...WRITES, 'xcrun simctl launch AAAA-1111 dev.averi.lab']);
   });
 });

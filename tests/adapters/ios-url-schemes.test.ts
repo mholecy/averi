@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, urlSchemes } from '../../src/adapters/ios-url-schemes.js';
+import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, schemeApprovalWrite, urlSchemes } from '../../src/adapters/ios-url-schemes.js';
 
 describe('linkScheme', () => {
   it('the scheme before the first colon, lower-cased', () => {
@@ -65,5 +65,31 @@ describe('PLUTIL_NO_SUCH_KEY', () => {
   it("matches plutil's missing-key message (measured), not another failure", () => {
     expect(PLUTIL_NO_SUCH_KEY.test('Info.plist: Could not extract value, error: No value at that key path or invalid key path: CFBundleURLTypes')).toBe(true);
     expect(PLUTIL_NO_SUCH_KEY.test('/x/Info.plist: (The file “Info.plist” couldn’t be opened because there is no such file.)')).toBe(false);
+  });
+});
+
+// D58 (ADR 0032's D58 amendment): the answer an Open tap on "Open in “AveriLab”?" records for `simctl openurl`'s opener,
+// as the lab simulator's com.apple.launchservices.schemeapproval held it (batch-5's capture).
+describe('schemeApprovalWrite — the defaults write that pre-approves a scheme for simctl openurl', () => {
+  it("the lab's key and value, as captured", () => {
+    expect(schemeApprovalWrite('averilab', 'dev.averi.lab')).toEqual([
+      'defaults',
+      'write',
+      'com.apple.launchservices.schemeapproval',
+      'com.apple.CoreSimulator.CoreSimulatorBridge-->averilab',
+      '-string',
+      'dev.averi.lab',
+    ]);
+  });
+
+  it('the key holds the scheme lower-cased; the bundle id as given', () => {
+    expect(schemeApprovalWrite('AveriLab', 'Dev.Averi.Lab')).toEqual([
+      'defaults',
+      'write',
+      'com.apple.launchservices.schemeapproval',
+      'com.apple.CoreSimulator.CoreSimulatorBridge-->averilab',
+      '-string',
+      'Dev.Averi.Lab',
+    ]);
   });
 });

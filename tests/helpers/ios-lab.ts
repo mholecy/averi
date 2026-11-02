@@ -26,6 +26,9 @@ export const WRITES = [
   'xcrun simctl spawn AAAA-1111 defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true',
 ];
 export const openurl = (url: string) => `xcrun simctl openurl AAAA-1111 ${url}`;
+/** D58: the lab scheme's pre-approval for simctl's opener, the answer an Open tap on "Open in “AveriLab”?" records. */
+export const APPROVAL =
+  'xcrun simctl spawn AAAA-1111 defaults write com.apple.launchservices.schemeapproval com.apple.CoreSimulator.CoreSimulatorBridge-->averilab -string dev.averi.lab';
 
 export const bundle = (bundleId: string): ApplicationLabel => ({ kind: 'bundle', bundleId });
 export const label = (text: string): ApplicationLabel => ({ kind: 'label', label: text });
@@ -33,12 +36,19 @@ export const SPRINGBOARD = bundle('com.apple.springboard');
 
 /**
  * An IosAdapter over a source whose applicationLabel answers in turn from `answers` (the last repeats) — the
- * `kind` given — and an exec answering `simctl appinfo` with `info` and plutil with `types` (an Error rejects each).
+ * `kind` given — and an exec answering `simctl appinfo` with `info`, plutil with `types` and the scheme pre-approval's
+ * `defaults write` (D58) with `approval` (an Error rejects each).
  * Every exec command line but xcode-env's one-time `xcrun --find simctl` is recorded.
  */
 export function lab(
   answers: Array<ApplicationLabel | Error>,
-  opts: { kind?: IosTreeSourceKind; info?: string | Error | (() => string | Error); types?: string | Error; tree?: UiNode | Error } = {},
+  opts: {
+    kind?: IosTreeSourceKind;
+    info?: string | Error | (() => string | Error);
+    types?: string | Error;
+    tree?: UiNode | Error;
+    approval?: Error;
+  } = {},
 ) {
   const calls: string[] = [];
   let asked = 0;
@@ -69,6 +79,7 @@ export function lab(
     };
     if (full.startsWith('xcrun simctl appinfo')) return answer(typeof opts.info === 'function' ? opts.info() : (opts.info ?? LAB_INFO));
     if (full.startsWith('plutil ')) return answer(opts.types ?? LAB_TYPES);
+    if (full.includes('com.apple.launchservices.schemeapproval')) return answer(opts.approval ?? '');
     return { stdout: Buffer.alloc(0), stderr: '' };
   };
   return { adapter: new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: source }), calls, asks: () => asked, reads: () => reads };
