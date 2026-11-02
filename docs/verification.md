@@ -61,7 +61,9 @@ flows:
   or changed character still fails — the one accepted change is a typed space shown as a no-break
   or narrow no-break space (`respaced`), which is formatting (ADR 0034). A field that grouped
   what landed and dropped the end (`1 234 567,` for `1234567,89`) gets the tail alone typed again
-  on iOS, as an exact prefix does (ADR 0034's D28 amendment). Without clear, an earlier text that
+  on iOS, as an exact prefix does (ADR 0034's D28 amendment). One that shows every typed character
+  with separators the rule refuses (a cents mask's `12.34` for `1234`) fails saying so, the check
+  and the remedy named (ADR 0034's D53 amendment). Without clear, an earlier text that
   vanished (a placeholder the source does not name, read as the empty field's value) no longer
   fails the fill: the reading is judged as the value alone too (ADR 0034's D29 amendment).
   Android types one character per `input text` call: bulk injection races Compose's async state

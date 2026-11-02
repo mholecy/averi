@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FillFailure, FillResult } from '../../src/interact/fill-facts.js';
 import type { Caveat, FillVerdict, Reason } from '../../src/interact/fill-verdict.js';
+import { SEPARATORS } from '../../src/interact/fill-reformat.js';
 import { caveatText, fillFailureText, fillReply, fillStepText, wordingOf } from '../../src/interact/fill-text.js';
 import { charactersText } from '../../src/util/count.js';
 
@@ -364,6 +365,27 @@ describe('fillFailureText — every error a fill throws', () => {
       'fill: typed 9 characters but the field shows 4 — the first 4 typed characters are there, its spaces shown as another kind of space, ' +
         'the last 5 did not land: dropped, or refused by the field (a length cap, a character it does not take) — not a transformed input; content withheld from this error',
     );
+  });
+
+  // D53: every typed character in order, with separators ADR 0034's rules refuse as grouping — the check, the remedy.
+  it('a mismatch on a separated reading names the check and the remedy, counts only', () => {
+    const SEPARATED =
+      "that the fill does not take for the field's grouping (a decimal point or a sign, mixed or trailing marks, groups of one, a word split by autocorrect): " +
+      'check the field holds the value you meant — a cents mask shows a typed 1234 as 12.34 — and if it does, type the value as the field shows it; ' +
+      'content withheld from this error';
+    expect(fillFailureText({ code: 'mismatch', typed: 4, shows: 5, differs: { kind: 'separated', added: 1 }, again: [{ kind: 'whole', wiped: true }] })).toBe(
+      'fill: typed 4 characters (after one wipe and retype) but the field shows 5 — every typed character is there, in order, ' +
+        `with 1 separator added (spaces or . , - /) ${SEPARATED}`,
+    );
+    expect(mismatch({ kind: 'separated', added: 3 }, 13, 16)).toBe(
+      `fill: typed 13 characters but the field shows 16 — every typed character is there, in order, with 3 separators added (spaces or . , - /) ${SEPARATED}`,
+    );
+  });
+
+  it('the separated sentence lists SEPARATORS as they are: the spaces, then every other mark', () => {
+    const marks = [...SEPARATORS].filter((c) => !/\s/u.test(c));
+    expect([...SEPARATORS].filter((c) => /\s/u.test(c))).toEqual([' ', '\u00A0', '\u202F']);
+    expect(mismatch({ kind: 'separated', added: 1 })).toContain(`(spaces or ${marks.join(' ')})`);
   });
 
   it('a mismatch after the clear-fill\'s one retry says so — a wipe and a retype, or a retype alone when the field held nothing (round 8\'s D3 nit: "typed 3 but shows 4" read as the first typing)', () => {

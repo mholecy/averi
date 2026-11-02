@@ -2,18 +2,21 @@
  * The character rules of a field that reformats as it is typed — a pure leaf (D28 review, MINOR-2): whether a reading
  * is a typing with separators of the field's own added (`reformatOf`; D18,
  * docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md), whether it is a strict prefix of a typing,
- * exact or reformatted (`prefixOf`; D28, that ADR's amendment), and a text's letters and digits (`skeleton`). It knows
- * texts, not fields: which text a reading is judged against — the earlier text, the placeholder, clear — is
- * interact/fill-landing.ts's, its one caller. It imports only the facts (fill-facts.ts); nothing here types, reads a
- * device or words a sentence.
+ * exact or reformatted (`prefixOf`; D28, that ADR's amendment), whether it is a typing with separators added that
+ * those rules refuse (`separatedOf`; D53), and a text's letters and digits (`skeleton`). It knows texts, not fields:
+ * which text a reading is judged against — the earlier text, the placeholder, clear — is interact/fill-landing.ts's,
+ * its one caller. It imports only the facts (fill-facts.ts); nothing here types, reads a device or words a sentence.
  */
 
 import { isPoint, type Point, type Reformat } from './fill-facts.js';
 
 /** The spaces a field may show for one another: a space, a no-break (U+00A0) and a narrow no-break (U+202F) space. */
 const SPACES = new Set([' ', '\u00A0', '\u202F']);
-/** What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. */
-const SEPARATORS = new Set([...SPACES, '.', ',', '-', '/']);
+/**
+ * What a formatting field may add between typed characters: the spaces, and `.` `,` `-` `/`. Exported for one test:
+ * fill-text.ts's `separated` sentence lists them, and the test pins that the two agree (D53).
+ */
+export const SEPARATORS: ReadonlySet<string> = new Set([...SPACES, '.', ',', '-', '/']);
 const ALNUM = /^[\p{L}\p{N}]$/u;
 const DIGIT = /\d/;
 const LETTER = /^\p{L}$/u;
@@ -57,8 +60,8 @@ export function reformatOf(observed: string, expected: string, typing: string = 
   const typingChars = [...typing];
   // A code: digits in it and no typed space (an IBAN, a card number) — the one typing whose letters a field may split.
   const code = typingChars.some((c) => DIGIT.test(c)) && !typingChars.some((c) => SPACES.has(c));
-  const walked = walk(observed, expectedChars);
-  if (walked === undefined || walked.matched !== expectedChars.length) return undefined;
+  const walked = walkWhole(observed, expectedChars);
+  if (walked === undefined) return undefined;
   const { tokens, respaced } = walked;
   const chars = [...observed];
   const added = new Set(chars.filter((_, k) => tokens[k] === -1));
@@ -110,7 +113,8 @@ function markKind(
  * The reading walked against `expectedChars`, greedily (see `reformatOf`): each reading character the next expected one
  * (or a space shown for a typed space — `respaced`), else an added separator (-1 in `tokens`, an expected character's
  * index otherwise); undefined at the first character that is neither. `matched`: how many expected characters it
- * showed — all of them for `reformatOf`, fewer for a prefix (`prefixOf`). The one walk both ask.
+ * showed — all of them for `reformatOf` and `separatedOf` (`walkWhole`), fewer for a prefix (`prefixOf`). The one
+ * walk all three ask.
  */
 function walk(observed: string, expectedChars: readonly string[]): { tokens: number[]; matched: number; respaced: number } | undefined {
   const tokens: number[] = [];
@@ -126,6 +130,27 @@ function walk(observed: string, expectedChars: readonly string[]): { tokens: num
     else return undefined;
   }
   return { tokens, matched: j, respaced };
+}
+
+/**
+ * D53: the reading is `expected` — every character of it, in order and unchanged (a typed space may be shown as another
+ * space) — with at least one SEPARATORS character added and nothing else: how many were added (every one, not the
+ * groups), else undefined. `reformatOf`'s walk, without its grouping rules: what those rules refuse (a cents mask's
+ * `12.34` for `1234`, a sign, mixed or trailing marks, groups of one, autocorrect's `a lot` for `alot`) is a separated
+ * reading — and so is what they pass, so ask only of a reading that did not land (fill-landing.ts#differenceOf, its
+ * one caller). Pure, O(reading).
+ */
+export function separatedOf(observed: string, expected: string): number | undefined {
+  const walked = walkWhole(observed, [...expected]);
+  if (walked === undefined) return undefined;
+  const added = walked.tokens.filter((t) => t === -1).length;
+  return added > 0 ? added : undefined;
+}
+
+/** `walk`, when it showed every expected character (`reformatOf`, `separatedOf`); else undefined. */
+function walkWhole(observed: string, expectedChars: readonly string[]): ReturnType<typeof walk> {
+  const walked = walk(observed, expectedChars);
+  return walked !== undefined && walked.matched === expectedChars.length ? walked : undefined;
 }
 
 /** An added `.` or `,` groups digits by thousands (see `reformatOf`); `typing` the whole typing. */
