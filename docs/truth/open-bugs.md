@@ -120,10 +120,12 @@ These steps follow the implementation round the truth lab has used since round 1
    - Module docs say what the module decides and why, and cite notes by path, not task or review history.
 5. **Mutation-check every new test.** Break the fix, see the test fail, then restore it.
 6. **Golden again, against the base.**
-   - Run golden with `--against <base.json>`. It prints every check whose verdict, reply, device calls or faults changed (of the captures both runs replayed), the KNOWN rows to strike — green now, or no longer asked — per family file, and the captures whose check count differs from COUNTS.
+   - Run golden with `--against <base.json>`. It prints every check whose verdict, reply, device calls or faults changed (of the captures both runs replayed), the KNOWN rows to strike — green now, or no longer asked — per family file, the captures whose check count differs from COUNTS, and (Re-pin) the known rows whose reply is not their pin in `tests/differential/golden/pins.json`.
    - The note's rows must turn green, and there must be no new mismatch.
    - Every changed reply must be explained.
    - Strike the listed rows from `tests/differential/golden/*.known.ts` by hand, and write the listed COUNTS. The rows are built with `keys(...)` over tag lists, so the report does not rewrite the files.
+   - Re-pin with `--pin tests/differential/golden/pins.json`: it drops the struck rows' pins and rewrites changed replies. Review its diff — every reworded line on an accepted row is in it.
+   - golden exits 0 only when every mismatch is a standing known one, pinned, with no fault and no broken target.
 7. **Live, if the bug is from a device.**
    - Run the note's live cases on the lab device and commit the record under `docs/truth/live-records/`.
    - Pin it in `tests/truth/live-rejudge.test.ts`, and strike the entry from `scripts/truth/live-known.ts`.
@@ -153,8 +155,10 @@ Run all commands from the repo root (or a worktree) with `node --import tsx`. In
 ```sh
 # golden: replays the committed captures, no device (a few minutes)
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--json] [--side <other checkout>] [--only <cell>]
-# golden against an earlier --json run: changed checks, KNOWN rows to strike, COUNTS to write
+# golden against an earlier --json run: changed checks, KNOWN rows to strike, COUNTS to write, rows to re-pin
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth --against <base.json> [--only <cell>]
+# write the known mismatches' replies to the pins (held for a row skipped here)
+node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth --pin tests/differential/golden/pins.json
 # OCR rows need the host's Vision recognizer: run outside the sandbox, or they are skipped
 
 # unit tests and types

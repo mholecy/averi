@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseOf, diffReport, goldenDiff, type Ratchet } from '../../scripts/differential/golden-diff.js';
+import { baseOf, diffReport, goldenDiff, type FamilyFile } from '../../scripts/differential/golden-diff.js';
 import type { GoldenCheck, GoldenResult } from '../../scripts/differential/golden.js';
 
 // golden --against (scripts/differential/golden-diff.ts) over a two-run fixture: a base run, and a run after a "fix"
@@ -41,14 +41,19 @@ const NOW: GoldenResult[] = [
   // Not in the base: not compared, but its KNOWN row still red is held.
   result('r/d.json', [check('r/d.json', 'A', 'tap'), check('r/d.json', 'B', 'tap', { mismatch: 'not in the tree: y', reply: 'y', kind: 'not found' })]),
 ];
-const RATCHET: Ratchet[] = [
+const RATCHET: FamilyFile[] = [
   // `r/a.json Z tap`: a row its capture no longer asks — the ratchet fails it as fixed.
   { family: 'forms', known: { 'r/a.json A tap': {}, 'r/a.json B tap': {}, 'r/a.json Z tap': {}, 'r/c.json A tap': {}, 'r/d.json B tap': {} }, counts: { 'r/a.json': 3, 'r/c.json': 1 } },
   { family: 'text', known: { 'r/b.json A ocr': {} }, counts: { 'r/b.json': 1 } },
 ];
 
+/** The families' rows aggregated, as tests/differential/golden/files.ts#KNOWN is. */
+const KNOWN = Object.assign({}, ...RATCHET.map((f) => f.known)) as Record<string, unknown>;
+/** The pins: B's as the base answered it, before its rewording; r/b.json A's (skipped now) and r/c.json A's (not replayed). */
+const PINS = { 'r/a.json B tap': ['ERROR was'], 'r/b.json A ocr': ['FAIL'], 'r/c.json A tap': ['x'] };
+
 describe('golden --against: what changed since a base run (goldenDiff)', () => {
-  const d = goldenDiff(BASE, NOW, RATCHET);
+  const d = goldenDiff(BASE, NOW, RATCHET, KNOWN, PINS);
 
   it('every check whose verdict, reply or calls changed, and every check one run asks and the other does not — of the captures both runs replayed', () => {
     expect(d.changed.map((c) => [c.key, c.was?.reply, c.now?.reply])).toEqual([
@@ -62,20 +67,28 @@ describe('golden --against: what changed since a base run (goldenDiff)', () => {
   });
 
   it('the calls alone, or the faults alone, are a change', () => {
-    const calls = goldenDiff([result('r/a.json', [check('r/a.json', 'A', 'tap')])], [result('r/a.json', [check('r/a.json', 'A', 'tap', { calls: [TAP] })])], []);
+    const calls = goldenDiff([result('r/a.json', [check('r/a.json', 'A', 'tap')])], [result('r/a.json', [check('r/a.json', 'A', 'tap', { calls: [TAP] })])], [], {}, {});
     expect(calls.changed.map((c) => c.key)).toEqual(['r/a.json A tap']);
-    const faults = goldenDiff([result('r/a.json', [check('r/a.json', 'A', 'tap')])], [result('r/a.json', [check('r/a.json', 'A', 'tap', { faults: ['UNMODELLED x'] })])], []);
+    const faults = goldenDiff([result('r/a.json', [check('r/a.json', 'A', 'tap')])], [result('r/a.json', [check('r/a.json', 'A', 'tap', { faults: ['UNMODELLED x'] })])], [], {}, {});
     expect(faults.changed.map((c) => c.key)).toEqual(['r/a.json A tap']);
-    expect(goldenDiff(BASE, BASE, []).changed).toEqual([]);
+    expect(goldenDiff(BASE, BASE, [], {}, {}).changed).toEqual([]);
   });
 
   it('a key asked twice is matched by its occurrence', () => {
     const twice = (second: string) => [result('r/a.json', [check('r/a.json', 'A', 'tap'), check('r/a.json', 'A', 'tap', { reply: second })])];
-    expect(goldenDiff(twice('one'), twice('two'), []).changed.map((c) => [c.key, c.was?.reply, c.now?.reply])).toEqual([['r/a.json A tap #2', 'one', 'two']]);
+    expect(goldenDiff(twice('one'), twice('two'), [], {}, {}).changed.map((c) => [c.key, c.was?.reply, c.now?.reply])).toEqual([['r/a.json A tap #2', 'one', 'two']]);
   });
 
   it("the KNOWN rows this run finds green or no longer asks, per family file — one still red, skipped or of a capture not run is held, as by golden.test.ts's ratchet", () => {
     expect(d.strike).toEqual([{ family: 'forms', keys: ['r/a.json A tap', 'r/a.json Z tap'] }]);
+  });
+
+  it('the known mismatches whose reply is not their pin, or that have none — of every capture replayed; a skipped row, or one of a capture not replayed, is not compared', () => {
+    expect(goldenDiff(BASE, NOW, RATCHET, KNOWN, PINS).repin).toEqual([
+      { key: 'r/a.json B tap', pin: ['ERROR was'], now: ['ERROR gone'] },
+      { key: 'r/d.json B tap', now: ['y'] },
+    ]);
+    expect(goldenDiff(BASE, NOW, RATCHET, KNOWN, { ...PINS, 'r/a.json B tap': ['ERROR gone'], 'r/d.json B tap': ['y'] }).repin).toEqual([]);
   });
 
   it("each capture whose checks differ from the ratchet's COUNTS, a capture no file counts among them", () => {
@@ -88,7 +101,7 @@ describe('golden --against: what changed since a base run (goldenDiff)', () => {
 
 describe('golden --against: the report (diffReport)', () => {
   it('the tallies of both runs over the captures both replayed, then the changed checks, the captures not compared, the rows to strike and the COUNTS to write', () => {
-    expect(diffReport('base.json', goldenDiff(BASE, NOW, RATCHET))).toBe(
+    expect(diffReport('base.json', goldenDiff(BASE, NOW, RATCHET, KNOWN, PINS))).toBe(
       [
         '# Golden against base.json: 5 checks (was 5), 1 mismatches (was 3), 0 broken targets (was 0), 1 skipped (was 0)',
         '',
@@ -126,6 +139,12 @@ describe('golden --against: the report (diffReport)', () => {
         'no family file counts it',
         '  r/d.json: 2 (was none)',
         '',
+        '## Re-pin: 2 rows (golden.ts --pin tests/differential/golden/pins.json)',
+        '  - r/a.json B tap',
+        '      - ERROR was',
+        '      + ERROR gone',
+        '  - r/d.json B tap: no pin',
+        '',
       ].join('\n'),
     );
   });
@@ -133,7 +152,7 @@ describe('golden --against: the report (diffReport)', () => {
   it('a fault that came or went is told', () => {
     const was = [result('r/a.json', [check('r/a.json', 'A', 'tap')])];
     const now = [result('r/a.json', [check('r/a.json', 'A', 'tap', { faults: ['UNMODELLED x'] })])];
-    expect(diffReport('b', goldenDiff(was, now, []))).toContain('- r/a.json A tap\n  faults: was []\n          now ["UNMODELLED x"]\n');
+    expect(diffReport('b', goldenDiff(was, now, [], {}, {}))).toContain('- r/a.json A tap\n  faults: was []\n          now ["UNMODELLED x"]\n');
   });
 });
 

@@ -14,6 +14,7 @@ import { consistency, controlConsistency, outOfProcessKeyboard } from '../truth/
 import { hostExec, useRecognizer } from './fake-device.js';
 import { ocrDecision, ocrSkip, probeHarness } from './ocr-probe.js';
 import { isMain } from '../is-main.js';
+import { exitCode, judgeThenPin, PINS_FILE, ratchetLines, readPins, type RatchetVerdict } from './ratchet.js';
 
 /**
  * The golden mode (docs/plans/2026-10-15-ground-truth-lab-app.md): ground-truth captures (scripts/truth/capture.ts)
@@ -22,14 +23,24 @@ import { isMain } from '../is-main.js';
  * device round; a target whose truth's sources disagree is a broken cell, reported and not judged.
  *
  *   node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>]
- *     [--worktrees <dir>] [--only <cell>[,<cell>…]] [--json | --against <base.json>]
+ *     [--worktrees <dir>] [--only <cell>[,<cell>…]] [--json | --against <base.json>] [--pin <pins.json>]
  *
  * The side defaults to this checkout; an older commit's src is loaded by this checkout's harness (side.ts). `--only`
  * keeps the captures a token names (selectRecordings); `--json` prints the results as data (GoldenJson) in place of the
  * report — scripts/truth/calibrate.ts reads it; `--against` a `--json` file of an earlier run prints, in place of the
- * report, what changed since (golden-diff.ts: changed checks, the KNOWN rows to strike, the COUNTS to write). A check
- * whose reply is a harness or JavaScript error, or whose call sent a command the fake device does not model, carries it
- * as `faults` (faultsOf), in the JSON and the report. Exit code 1 on a mismatch, a broken target or a fault.
+ * report, what changed since (golden-diff.ts: changed checks, the KNOWN rows to strike, the COUNTS to write, the known
+ * rows to re-pin); `--pin` writes the known mismatches' replies to a pins file (ratchet.ts#repinned: the pin of a row
+ * skipped here, or of a capture not replayed, held), beside any of them. A check whose reply is a harness or JavaScript
+ * error, or whose call sent a command the fake device does not model, carries it as `faults` (faultsOf), in the JSON and
+ * the report.
+ *
+ * The exit code is the ratchet's (ratchet.ts, as golden.test.ts holds it): this checkout's KNOWN and its COMMITTED pins
+ * (tests/differential/golden/pins.json), over the captures replayed — judged before `--pin` writes anything
+ * (ratchet.ts#judgeThenPin), so a run that rewords a reply exits 1 even as it re-pins; the next, the pins committed, 0.
+ * 1 on a mismatch KNOWN does not list, a known one drifted from its class, reply kind, calls or pin, a fault, or a
+ * broken target; 0 with every mismatch a standing known one — the report heads them `N known, 0 new`. Its findings go
+ * to the report, and to stderr under `--json` and `--against` (there without the re-pins, which the diff shows).
+ * `--pin` refuses `--side`: the pins are this checkout's replies.
  */
 
 export interface GoldenCheck {
@@ -188,15 +199,19 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
   return result;
 }
 
-/** The report: per capture, each target's verbs `ok` or `MISMATCH`, and the broken targets. */
-export function goldenReport(results: readonly GoldenResult[]): string {
+/**
+ * The report: per capture, each target's verbs `ok` or `MISMATCH`, and the broken targets — headed, given the ratchet's
+ * verdict, by how many mismatches are known and new, then what the ratchet has to say (ratchet.ts#ratchetLines).
+ */
+export function goldenReport(results: readonly GoldenResult[], verdict?: RatchetVerdict): string {
   const checks = results.flatMap((r) => r.checks);
   const bad = checks.filter((c) => c.mismatch !== undefined);
   const faulted = checks.filter((c) => c.faults !== undefined);
   const skipped = checks.filter((c) => c.skipped !== undefined);
   const lines = [
-    `# Golden: ${checks.length} checks, ${bad.length} mismatches, ${results.reduce((a, r) => a + r.broken.length, 0)} broken targets${faulted.length > 0 ? `, ${faulted.length} with a harness fault` : ''}${skipped.length > 0 ? `, ${skipped.length} skipped (no OCR on this host: ${skipped[0].skipped})` : ''}`,
+    `# Golden: ${checks.length} checks, ${bad.length} mismatches${verdict === undefined ? '' : ` (${verdict.standing} known, ${verdict.unknown.length} new)`}, ${results.reduce((a, r) => a + r.broken.length, 0)} broken targets${faulted.length > 0 ? `, ${faulted.length} with a harness fault` : ''}${skipped.length > 0 ? `, ${skipped.length} skipped (no OCR on this host: ${skipped[0].skipped})` : ''}`,
     '',
+    ...(verdict === undefined ? [] : ratchetLines(verdict)),
   ];
   for (const r of results) {
     lines.push(`## ${r.recording}`);
@@ -249,19 +264,17 @@ export interface GoldenJson {
   results: GoldenResult[];
 }
 
-/** golden's exit code: 1 on a mismatch, a broken target or a fault. */
-export const exitCode = (results: readonly GoldenResult[]): 0 | 1 =>
-  results.some((r) => r.broken.length > 0 || r.checks.some((c) => c.mismatch !== undefined || c.faults !== undefined)) ? 1 : 0;
-
 // --- the command line ---
 
 if (isMain(import.meta.url)) {
   const { values } = parseArgs({
-    options: { corpus: { type: 'string' }, side: { type: 'string' }, worktrees: { type: 'string' }, only: { type: 'string' }, json: { type: 'boolean' }, against: { type: 'string' } },
+    options: { corpus: { type: 'string' }, side: { type: 'string' }, worktrees: { type: 'string' }, only: { type: 'string' }, json: { type: 'boolean' }, against: { type: 'string' }, pin: { type: 'string' } },
   });
   if (values.corpus === undefined || (values.json === true && values.against !== undefined)) {
-    throw new Error('usage: golden.ts --corpus <dir> [--side <ref|path>] [--worktrees <dir>] [--only <cell>[,<cell>…]] [--json | --against <base.json>]');
+    throw new Error('usage: golden.ts --corpus <dir> [--side <ref|path>] [--worktrees <dir>] [--only <cell>[,<cell>…]] [--json | --against <base.json>] [--pin <pins.json>]');
   }
+  // The pins are this checkout's replies (the ratchet compares this checkout's runs with them): another side's are not.
+  if (values.pin !== undefined && values.side !== undefined) throw new Error("golden --pin: the pins are this checkout's replies — not with --side");
   // The base is read first: a missing file, or one no `--json` run wrote, fails before any replay.
   const against = values.against;
   const base = against === undefined ? undefined : { against, results: (await import('./golden-diff.js')).baseOf(await readFile(resolve(against), 'utf8'), against) };
@@ -281,13 +294,21 @@ if (isMain(import.meta.url)) {
     const corpus = selectRecordings((await loadCorpus(resolve(values.corpus))).filter((r) => r.truth !== undefined), parseOnly(values.only));
     const results: GoldenResult[] = [];
     for (const r of corpus) results.push(await goldenRecording(r, side));
+    // The ratchet's files are this checkout's: KNOWN, the rows to strike and the counts to write are in them.
+    const { KNOWN, KNOWN_FILES } = await import('../../tests/differential/golden/files.js');
+    // Judged against the committed pins, before `--pin` writes (judgeThenPin): `--pin` only writes.
+    const committed = await readPins(PINS_FILE);
+    const pinFile = values.pin === undefined ? undefined : resolve(values.pin);
+    const { verdict, written } = await judgeThenPin(results, KNOWN, committed, pinFile);
+    if (written !== undefined) console.error(`golden --pin: ${Object.keys(written).length} pins written to ${pinFile}`);
     if (base !== undefined) {
-      // The ratchet's files are this checkout's: the rows to strike and the counts to write are in them.
-      const { KNOWN_FILES } = await import('../../tests/differential/golden/files.js');
       const { diffReport, goldenDiff } = await import('./golden-diff.js');
-      console.log(diffReport(base.against, goldenDiff(base.results, results, KNOWN_FILES)));
-    } else console.log(values.json === true ? JSON.stringify({ side: side.root, results } satisfies GoldenJson) : goldenReport(results));
-    process.exitCode = exitCode(results);
+      console.log(diffReport(base.against, goldenDiff(base.results, results, KNOWN_FILES, KNOWN, committed)));
+    } else console.log(values.json === true ? JSON.stringify({ side: side.root, results } satisfies GoldenJson) : goldenReport(results, verdict));
+    // The report carries the ratchet's findings; the JSON and the diff do not, so they go to stderr — but the re-pins,
+    // which the diff's own Re-pin section already shows.
+    if (base !== undefined || values.json === true) for (const l of ratchetLines(verdict, { repin: base === undefined })) console.error(l);
+    process.exitCode = exitCode(verdict);
   } finally {
     cleanup?.();
   }

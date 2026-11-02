@@ -152,7 +152,7 @@ larger leg on it, either way — a turn back too): a stroke across a carousel's 
 
 ```sh
 node --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth [--side <git ref | path>] [--worktrees <dir>] \
-  [--only <cell>[,<cell>…]] [--json | --against <base.json>]
+  [--only <cell>[,<cell>…]] [--json | --against <base.json>] [--pin <pins.json>]
 ```
 
 `--only` keeps the captures a token names (a cell, a capture with or without its extension, either behind its run; a
@@ -161,16 +161,41 @@ a `--json` file of an earlier run (the one before a fix) prints, in place of the
 (`golden-diff.ts`): every check whose verdict, reply, device calls or faults differ, and every check only one run asks —
 of the captures both runs replayed (one only this run replayed is named, not compared); the ratchet's KNOWN rows this
 run finds green or no longer asks, as the keys to strike, per family file (a row skipped for want of OCR, or of a
-capture not replayed, is held, as by the ratchet); and each capture whose check count differs from COUNTS. It rewrites
-no `*.known.ts`: their rows are built over tag lists, edited by hand. A check whose reply is a harness or JavaScript
-error (`THROW`, "is not a function", "Cannot read properties of", the fake device's `differential:`) or whose call sent
-a command the fake does not model (`UNMODELLED`) carries it as `faults` (`golden.ts#faultsOf`) — no evidence about the
-tool either way. Exit code 1 on a mismatch, a broken target or a fault.
-`tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, the checks per
-capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their class, their reply's kind
-(`scripts/truth/replies.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused, other), the taps and swipes they
-sent and their notes — a ratchet both ways (one fixed fails until struck off; a new one fails until fixed or listed; one
-whose class, reply kind or device calls change fails until re-noted). The ratchet is kept per cell family,
+capture not replayed, is held, as by the ratchet); each capture whose check count differs from COUNTS; and, under
+`Re-pin`, each known mismatch whose reply is not its pin, line by line against it. It rewrites no `*.known.ts`: their
+rows are built over tag lists, edited by hand. `--pin <file>` (beside any of the above) writes the known mismatches'
+replies to the pins file (`ratchet.ts#repinned`): the pin of a row skipped here, or of a capture not replayed
+(`--only`), is held from the file, and the pin of a row that ran green or is no longer KNOWN is dropped. The held pins
+come from the file `--pin` targets, so it should normally target `tests/differential/golden/pins.json` — under `--only`
+above all, or the other captures' pins are not there to hold. A check whose reply is a harness or JavaScript error
+(`THROW`, "is not a function", "Cannot read properties of", the fake device's `differential:`) or whose call sent a
+command the fake does not model (`UNMODELLED`) carries it as `faults` (`golden.ts#faultsOf`) — no evidence about the
+tool either way.
+
+The exit code is the ratchet's (`scripts/differential/ratchet.ts`, which golden.test.ts shares), over the captures
+replayed, against this checkout's KNOWN and its COMMITTED `pins.json`, judged before `--pin` writes anything — so a run
+that rewords a reply exits 1 even as it re-pins, and the next one, the new pins committed, exits 0: **1** on a mismatch
+KNOWN does not list, a known one drifted from its class, reply kind, calls or pin, a fault (on any row), or a broken
+target; **0** when every mismatch is a standing known one — the report's header then reads `N mismatches (N known, 0
+new)`. A known row fixed (to strike) or a stale pin is reported, not failed on. The report lists what the ratchet found
+under `## Ratchet`; `--json` and `--against` print it to stderr, keeping stdout theirs (`--against` without the re-pins'
+diffs, which its own Re-pin section shows). `--pin` refuses `--side`: the pins are this checkout's replies. The split is
+deliberate: golden's exit code is about behaviour (a new or drifted answer, a fault, a broken target), so a script may
+gate on it alone; the bookkeeping — a fixed KNOWN row not struck, a stale pin, COUNTS — fails
+`tests/differential/golden.test.ts`, not golden. The merge gate runs both.
+`tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, no check with a
+fault, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their
+class, their reply's kind (`scripts/truth/replies.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused,
+other), the taps and swipes they sent and their notes — and their full reply, pinned in the generated
+`tests/differential/golden/pins.json` (keyed as KNOWN, each reply by line, so a wording change on an accepted row is a
+JSON diff in review). A ratchet both ways: one fixed fails until struck off; a new one fails until fixed or listed; one
+whose class, reply kind or device calls change fails until re-noted; one whose reply changes fails until re-pinned
+(`golden.ts --corpus tests/fixtures/truth --pin tests/differential/golden/pins.json`, and the diff reviewed); a known
+row that ran with no pin fails; a pin of no KNOWN row fails. A skipped `ocr` row (no recognizer here) is neither
+compared nor needs a pin; its pins are written where the rows run — outside the sandbox, `GOLDEN_OCR=require node
+--import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth --pin tests/differential/golden/pins.json`,
+which fails rather than skip them. It rewrites every pin from that run's replies — identical where nothing changed —
+and holds only the pins of rows skipped and of captures not replayed. The ratchet is kept per cell family,
 `tests/differential/golden/<family>.known.ts` (KNOWN and COUNTS of that family's cells only, aggregated by
 golden.test.ts, which refuses a row filed under another family's file); a row may say what it is beside its class — `as:
 bug:<docs/bugs file>` or `residual:<decision>`. `tests/truth/lab-notes.test.ts` ties the notes of both ratchets (this
