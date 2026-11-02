@@ -125,7 +125,7 @@ describe('deepLinkText', () => {
   };
 
   it('an alert that names the app: "iOS has not opened <url> yet: it asks …", every button with its centre, the tap advice', () => {
-    expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, namesApp: true } })).toBe(
+    expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, asksForApp: true } })).toBe(
       'iOS has not opened averilab://d54 yet: it asks "Open in “AveriLab”?" — buttons "Cancel" at (127, 474), "Open" at ' +
         '(275, 474). Answer it with a tap at the chosen button\'s x and y (averi taps nothing itself); every launch stays ' +
         'behind the alert until it is answered',
@@ -133,7 +133,7 @@ describe('deepLinkText', () => {
   });
 
   it('an alert whose title does not name the app: "a system alert", never "Open in" in averi\'s own words', () => {
-    const text = deepLinkText('ios', 'averilab://d54', { alert: { title: 'Allow “Lab” to use your location?', buttons: [{ label: 'Allow Once', centre: { x: 201, y: 500 } }], namesApp: false } });
+    const text = deepLinkText('ios', 'averilab://d54', { alert: { title: 'Allow “Lab” to use your location?', buttons: [{ label: 'Allow Once', centre: { x: 201, y: 500 } }], asksForApp: false } });
     expect(text).toBe(
       'iOS has not opened averilab://d54 yet: a system alert is up, "Allow “Lab” to use your location?" — button ' +
         '"Allow Once" at (201, 500). Answer it with a tap at the chosen button\'s x and y (averi taps nothing itself); ' +
@@ -143,7 +143,7 @@ describe('deepLinkText', () => {
   });
 
   it('no "Opened" headline and no ⚠ line with an alert; a note alone keeps both', () => {
-    expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, namesApp: true } })).not.toMatch(/Opened|⚠|\n/);
+    expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, asksForApp: true } })).not.toMatch(/Opened|⚠|\n/);
     expect(deepLinkText('ios', 'averilab://d54', { note: 'x' })).toBe('Opened averilab://d54 on ios\n⚠ x');
   });
 });

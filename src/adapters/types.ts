@@ -989,11 +989,11 @@ export interface SystemAlert {
 }
 
 /**
- * The alert a link waits behind (D54): `namesApp` — its title contains one of the link's app's names, so the reply may
- * say iOS asks to open the link there; otherwise it calls it a system alert, and no more.
+ * The alert a link waits behind (D54): `asksForApp` — its title contains one of the link's app's names, so the reply
+ * may say iOS asks to open the link there; otherwise it calls it a system alert, and no more.
  */
 export interface LinkAlert extends SystemAlert {
-  namesApp: boolean;
+  asksForApp: boolean;
 }
 
 export interface DeepLinkOptions {

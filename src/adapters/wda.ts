@@ -39,6 +39,14 @@ const BUILD_TIMEOUT_MS = 600_000;
 const ACTIVE_APP_TIMEOUT_MS = 2_000;
 /** /source on deep trees is the known WDA weakness — Phase 4 measures it. */
 const SOURCE_TIMEOUT_MS = 30_000;
+/**
+ * sourceNow's budget (D54): the one /source a deep link's foreground wait reads at its 3 s bound to name iOS's system
+ * alert. 2 s, as ACTIVE_APP_TIMEOUT_MS: a whole app tree read in 0.9–1.25 s (batch-2 D, the lab's), and the alert's
+ * SpringBoard tree is small (about 24 KB of XML, batch-5 D49A) — so 2 s clears a healthy WDA on a loaded host, and
+ * it caps what the aid adds to a link's reply (the bound, one ask in flight, then this) where SOURCE_TIMEOUT_MS's
+ * 30 s would let a wedged runner hold it. A read past it is no alert: the reply falls back to its note.
+ */
+export const SYSTEM_ALERT_SOURCE_TIMEOUT_MS = 2_000;
 /** Post-build: the first app-install on the simulator dominates this. */
 const READY_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 500;
@@ -258,18 +266,32 @@ export class WdaServer {
    * upGeneration() first.
    */
   async activeAppInfo(): Promise<unknown> {
-    const route = '/wda/activeAppInfo';
+    return this.askOnce('/wda/activeAppInfo', ACTIVE_APP_TIMEOUT_MS);
+  }
+
+  /**
+   * GET /source?format=json ONCE, under SYSTEM_ALERT_SOURCE_TIMEOUT_MS (D54): the short read of a deep link's wait at
+   * its bound. Unlike source(), it NEVER starts WDA (no ensureRunning), never probes /status and never restarts it:
+   * the read is an aid to a reply, and a WDA that cannot answer it in time is left as it is — a refusal, a timeout or
+   * an HTTP error fails naming the port and the log, as activeAppInfo's do. Callers ask upGeneration() first.
+   */
+  async sourceNow(): Promise<unknown> {
+    return this.askOnce('/source?format=json', SYSTEM_ALERT_SOURCE_TIMEOUT_MS, '/source');
+  }
+
+  /** One GET of a running WDA under `timeoutMs`, no start and no retry; fails naming `name` (the route), the port and the log. */
+  private async askOnce(route: string, timeoutMs: number, name = route): Promise<unknown> {
     let res: Awaited<ReturnType<FetchFn>>;
     try {
-      res = await this.request(route, ACTIVE_APP_TIMEOUT_MS);
+      res = await this.request(route, timeoutMs);
     } catch (err) {
       throw new Error(
-        `WDA ${route} request failed on port ${this.port} (udid ${this.udid}): ${errorMessage(err)} — ` +
+        `WDA ${name} request failed on port ${this.port} (udid ${this.udid}): ${errorMessage(err)} — ` +
           `xcodebuild log: ${this.logPath}`,
         { cause: err },
       );
     }
-    return this.body(route, res);
+    return this.body(name, res);
   }
 
   /** GET `route` under `timeoutMs`. A request that did not complete throws as fetch threw it: each caller words it (source() decides on a restart). */

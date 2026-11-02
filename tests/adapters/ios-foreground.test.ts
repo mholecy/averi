@@ -513,7 +513,7 @@ describe('awaitForeground — the one alert read, at the bound, for a link only 
 
   it('a link: read once, at the bound — the alert, marked as naming the app', async () => {
     const c = check('averilab://d54');
-    expect(await awaitForeground(c.check)).toEqual({ alert: { ...ALERT, namesApp: true } });
+    expect(await awaitForeground(c.check)).toEqual({ alert: { ...ALERT, asksForApp: true } });
     expect(c.reads()).toBe(1);
   });
 

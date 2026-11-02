@@ -11,7 +11,6 @@ import { errorMessage } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { DeepLinkOptions, DeepLinkOutcome, DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
-import { alertInWda } from './ios-system-alert.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
 import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, urlSchemes } from './ios-url-schemes.js';
 import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
@@ -470,18 +469,19 @@ export class IosAdapter implements DeviceAdapter {
    * as before D49a. The scheme lookup runs after `openurl` (the writes and the open go out as they did): one
    * `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a failed
    * one too. `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link
-   * (D54), the outcome names it instead of a note: on idb from the wait's own reads, on WDA from one `/source` read at
-   * the bound (`alert`: the tree source's read and ios-system-alert.ts#alertInWda) — never a tap.
+   * (D54), the outcome names it instead of a note: on idb from the wait's own reads, on WDA from one short `/source`
+   * read at the bound (IosTreeSource.systemAlert) — never a tap.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<DeepLinkOutcome> {
     await this.enableAccessibilityAutomation(`opening ${url}`);
     await this.simctl(['openurl', this.udid, url]);
     const handler = await this.linkHandler(url, opts.appId);
     if (handler === undefined) return {};
-    // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground). WDA's alert
-    // is read from its tree; idb's comes with the wait's own label reads (IdbTreeSource.applicationLabel).
-    const alert = this.treeSource.kind === 'wda' ? async () => alertInWda(await this.treeSource.read()) : undefined;
-    const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url, ...(alert !== undefined && { alert }) }));
+    // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground). The alert
+    // read is the source's own (WDA's short /source); idb has none — its label reads carry the alert's shape, and the
+    // wait asks this only after a bundle answer, which idb never gives.
+    const alert = async () => this.treeSource.systemAlert?.();
+    const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url, alert }));
     if (outcome.note === undefined && outcome.alert === undefined) this.front = { kind: 'launched', bundleId: handler };
     return outcome;
   }

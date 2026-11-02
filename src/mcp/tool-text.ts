@@ -90,12 +90,12 @@ export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkO
  * the chosen button's coordinates — the one answer proven on a device (batch-5 D49A tapped by coordinates; a selector
  * tap on SpringBoard's tree is unverified, so not offered) — and that averi taps nothing. The title and every label are
  * quoted verbatim, localised as iOS shows them; which button opens the link is the agent's to read. "it asks" only when
- * the title names the link's app (`namesApp`); any other alert is "a system alert", in no words of averi's own about
+ * the title names the link's app (`asksForApp`); any other alert is "a system alert", in no words of averi's own about
  * opening.
  */
 const alertText = (url: string, alert: LinkAlert): string => {
   const buttons = alert.buttons.map((b) => `"${b.label}" at (${b.centre.x}, ${b.centre.y})`).join(', ');
-  const what = alert.namesApp ? `it asks "${alert.title}"` : `a system alert is up, "${alert.title}"`;
+  const what = alert.asksForApp ? `it asks "${alert.title}"` : `a system alert is up, "${alert.title}"`;
   return (
     `iOS has not opened ${url} yet: ${what} — ${alert.buttons.length === 1 ? 'button' : 'buttons'} ${buttons}. ` +
     "Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays behind the " +

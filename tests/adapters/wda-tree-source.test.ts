@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
-import type { FetchFn } from '../../src/adapters/wda.js';
+import { SYSTEM_ALERT_SOURCE_TIMEOUT_MS, type FetchFn } from '../../src/adapters/wda.js';
 import { findAll } from '../../src/ui-tree/selectors.js';
 import { fakeExec, fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 
@@ -45,6 +46,8 @@ const ACTIVE_LAB = { value: { pid: 4242, bundleId: 'dev.averi.lab', name: '', pr
 async function setup(
   activeApp: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: ACTIVE_LAB }),
   sourceAnswer: () => { status: number; body?: unknown } = () => ({ status: 200, body: WDA_ENVELOPE }),
+  /** Wraps the fake fetch the server is given (D54's hung read). */
+  wrap: (fn: FetchFn) => FetchFn = (fn) => fn,
 ) {
   const { dd } = await tempDerivedData(true);
   const spawner = fakeSpawn();
@@ -58,7 +61,7 @@ async function setup(
   });
   const exec = fakeExec();
   const source = new WdaTreeSource({
-    udid: 'AAAA-1111', exec: exec.fn, fetchFn: fetcher.fn, spawnFn: spawner.fn,
+    udid: 'AAAA-1111', exec: exec.fn, fetchFn: wrap(fetcher.fn), spawnFn: spawner.fn,
     derivedDataPath: dd, pollIntervalMs: 5,
   });
   return { source, spawner, fetcher, exec };
@@ -237,6 +240,98 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     expect(await source.applicationLabel()).toEqual({ kind: 'declined' });
     expect(asked(fetcher.urls)).toEqual([]);
     expect(spawner.spawns).toHaveLength(1);
+  });
+});
+
+// D54 (ADR 0032's D54 amendment): at a link's bound, with SpringBoard last named, ONE /source read for iOS's system
+// alert. It is an aid to the reply, not a read the agent asked for: it never starts or restarts WebDriverAgent, never
+// probes /status, and has its own short budget — a hung or failed read fails, and the wait falls back to its note.
+describe('WdaTreeSource.systemAlert — one short /source read, never a start or a restart (D54)', () => {
+  const ALERT_ENVELOPE = JSON.parse(readFileSync(new URL('../fixtures/wda-capture-springboard-open-in-alert.json', import.meta.url), 'utf8')) as unknown;
+  const sources = (urls: string[]) => urls.filter((u) => u.includes('/source'));
+
+  it('WDA not up (before any read): undefined — nothing spawned, nothing fetched', async () => {
+    const { source, spawner, fetcher } = await setup();
+    expect(await source.systemAlert()).toBeUndefined();
+    expect(spawner.spawns).toEqual([]);
+    expect(fetcher.urls).toEqual([]);
+  });
+
+  it('up: one GET /source, no /status — the alert in it (ios-system-alert.ts#alertInWda)', async () => {
+    let body: unknown = WDA_ENVELOPE;
+    const { source, fetcher } = await setup(undefined, () => ({ status: 200, body }));
+    await source.read();
+    body = ALERT_ENVELOPE;
+    const before = fetcher.urls.length;
+    expect(await source.systemAlert()).toEqual({
+      title: 'Open in “AveriLab”?',
+      buttons: [
+        { label: 'Cancel', centre: { x: 127, y: 474 } },
+        { label: 'Open', centre: { x: 275, y: 474 } },
+      ],
+    });
+    expect(fetcher.urls.slice(before)).toEqual([expect.stringMatching(/^http:\/\/127\.0\.0\.1:\d+\/source\?format=json$/)]);
+  });
+
+  it(`under its own budget, ${SYSTEM_ALERT_SOURCE_TIMEOUT_MS} ms — not /source's 30 s`, async () => {
+    const { source } = await setup();
+    await source.read();
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    await source.systemAlert();
+    expect(timeout.mock.calls).toEqual([[SYSTEM_ALERT_SOURCE_TIMEOUT_MS]]);
+    expect(SYSTEM_ALERT_SOURCE_TIMEOUT_MS).toBe(2_000);
+    timeout.mockRestore();
+  });
+
+  it.each([
+    ['refused', () => 'refused' as const, /\/source request failed on port \d+ \(udid AAAA-1111\): ECONNREFUSED/],
+    ['HTTP 500', () => ({ status: 500 }), /\/source failed: HTTP 500 on port \d+ \(udid AAAA-1111\)/],
+  ])('%s: throws in WDA\'s words — one request, no /status probe, no restart', async (_what, answer, words) => {
+    let fail = false;
+    const { source, spawner, fetcher } = await setup(undefined, () => (fail ? (answer() as { status: number }) : { status: 200, body: WDA_ENVELOPE }));
+    await source.read();
+    fail = true;
+    const before = fetcher.urls.length;
+    await expect(source.systemAlert()).rejects.toThrow(words);
+    expect(fetcher.urls.slice(before)).toHaveLength(1);
+    expect(sources(fetcher.urls.slice(before))).toHaveLength(1);
+    expect(spawner.spawns).toHaveLength(1);
+    expect(spawner.kills).toEqual([]);
+  });
+
+  it('a hung /source: aborted at its budget, then throws — no /status probe, no restart', async () => {
+    let hang = false;
+    let seen: AbortSignal | undefined;
+    // Once `hang` is set, /source never answers: it fails only when its signal aborts.
+    const { source, spawner, fetcher } = await setup(undefined, undefined, (fn) => (url, init) => {
+      if (!hang || !url.includes('/source')) return fn(url, init);
+      fetcher.urls.push(url);
+      seen = init?.signal;
+      return new Promise((_ok, fail) => {
+        if (init?.signal?.aborted === true) fail(init.signal.reason);
+        init?.signal?.addEventListener('abort', () => fail(init.signal!.reason));
+      });
+    });
+    await source.read();
+    hang = true;
+    // Its budget runs out at once here: the signal comes pre-aborted, as it is at the budget.
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError')));
+    const before = fetcher.urls.length;
+    await expect(source.systemAlert()).rejects.toThrow(/\/source request failed on port \d+ \(udid AAAA-1111\): .*timeout/);
+    expect(seen?.aborted).toBe(true);
+    expect(fetcher.urls.slice(before)).toHaveLength(1);
+    expect(spawner.spawns).toHaveLength(1);
+    expect(spawner.kills).toEqual([]);
+    timeout.mockRestore();
+  });
+
+  it('after dispose: the released error, nothing fetched', async () => {
+    const { source, fetcher } = await setup();
+    await source.read();
+    await source.dispose();
+    const before = fetcher.urls.length;
+    await expect(source.systemAlert()).rejects.toThrow(/deselected or averi is shutting down/);
+    expect(sources(fetcher.urls.slice(before))).toEqual([]);
   });
 });
 

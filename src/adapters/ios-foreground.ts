@@ -1,6 +1,6 @@
 import { IdbEmptyTreeError, type ApplicationLabel } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import { namesApp } from './ios-system-alert.js';
+import { namesApp, titleAsksToOpen } from './ios-system-alert.js';
 import type { DeepLinkOutcome, LinkAlert, SystemAlert } from './types.js';
 import { errorMessage } from '../util/error-message.js';
 import { formatSeconds } from '../util/duration.js';
@@ -147,11 +147,13 @@ import { sleep } from '../util/sleep.js';
  * its shape as batch-5 D49A captured it (ios-system-alert.ts): a link's wait
  * that finds it ends with it (`alert`), and the reply names its title and its
  * buttons at their centres instead of the note — never a tap. On idb at no
- * cost: the label read that answered SpringBoard's `' '` judges its own
- * elements (`alertIn`, with the names this wait already asks after its first
- * label), so the wait ends at the read that lists it, not at the bound. On
- * WDA its activeAppInfo says only "SpringBoard", so ONE `/source`
- * (ForegroundCheck.alert) is read, and only at the bound, only when the last
+ * cost: the label read that answered SpringBoard's `' '` carries the alert
+ * shape of its own elements (`candidate`), whose title this wait gates with
+ * the names it already asks after its first label (titleAsksToOpen), so the
+ * wait ends at the read that lists it, not at the bound. On WDA its
+ * activeAppInfo says only "SpringBoard", so ONE short `/source`
+ * (ForegroundCheck.alert, WdaTreeSource.systemAlert: its own 2 s budget, no
+ * start, no restart) is read, and only at the bound, only when the last
  * bundle named was SpringBoard: a matched link reads nothing more, and a
  * failed or alert-less read is the note of before (fail open). A launch looks
  * for no alert (its note's wording is D48's; naming the alert there is a row
@@ -221,9 +223,8 @@ export interface ForegroundCheck {
    */
   link?: string;
   /**
-   * One whole-tree read for a system alert (D54: WDA's `/source` and ios-system-alert.ts#alertInWda; IosAdapter wires
-   * it for links): asked at most once per wait, at the bound, when the last bundle named was SpringBoard's; a throw is
-   * no alert.
+   * One short tree read for a system alert (D54: IosTreeSource.systemAlert, WDA's; IosAdapter wires it for links):
+   * asked at most once per wait, at the bound, when the last bundle named was SpringBoard's; a throw is no alert.
    */
   alert?: () => Promise<SystemAlert | undefined>;
 }
@@ -329,9 +330,12 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
           deadline += Date.now() - asked;
         }
         if (names.includes(read.label)) return { kind: 'matched' };
-        // D54: SpringBoard's read judges its own elements — no other call; a launch looks for no alert.
-        const alert = check.link === undefined ? undefined : read.alertIn?.(names);
-        if (alert !== undefined) return { kind: 'alert', alert: { ...alert, namesApp: namesApp(alert.title, names) } };
+        // D54: SpringBoard's read carries its alert shape — no other call; its title is gated with the names held. A
+        // launch looks for no alert.
+        const candidate = check.link === undefined ? undefined : read.candidate;
+        if (candidate !== undefined && titleAsksToOpen(candidate.title, names)) {
+          return { kind: 'alert', alert: { ...candidate, asksForApp: namesApp(candidate.title, names) } };
+        }
         stale = read.label;
       }
     }
@@ -362,7 +366,7 @@ async function alertAtBound(check: ForegroundCheck): Promise<LinkAlert | undefin
   const alert = await check.alert().catch(() => undefined);
   if (alert === undefined) return undefined;
   const names = await check.names().catch((): readonly string[] => []);
-  return { ...alert, namesApp: namesApp(alert.title, names) };
+  return { ...alert, asksForApp: namesApp(alert.title, names) };
 }
 
 /** What a "could not check" note quotes of an error: its first line — the cause, not a stack or a paragraph of advice. */

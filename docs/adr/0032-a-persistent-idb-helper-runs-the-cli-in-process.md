@@ -476,30 +476,39 @@ The alert's shape in both trees is D54's input.
 D49a's note at the bound says only that iOS *may* be asking; the agent then needs a screenshot to learn what is up and
 how to answer it. Batch-5 D49A captured the alert in both trees (above), so it is now named.
 
-Decision (spec-D54, adopting the D54 analysis):
+Decision (spec-D54, adopting the D54 analysis; review round 1 reshaped the seams):
 
-- `adapters/ios-system-alert.ts`, two pure detectors returning the title and the buttons, each label verbatim with
-  its centre (`SystemAlert`), or nothing. `alertInIdb(elements, appNames)`: the first Application is SpringBoard's
-  (label `' '`), every other element is a StaticText or a Button, there are 1–4 Buttons (each labelled and framed),
-  and the first StaticText — the title — contains one of the app's names or reads `Open in “…”?`. idb has no Alert
-  type; the shape is what idb measured (the alert listed alone, no status bar), and the name keeps a home screen of a
-  clock and icons out. `alertInWda(tree)`: in SpringBoard's tree (root labelled `' '`), the first layer averi's parser
-  marks `presentation: 'alert'` (wda-source.ts's `PRESENTATIONS`); its title the Alert's label, else its first text;
-  its buttons the labelled, not-hidden Buttons inside that layer — Contacts' hidden "Return to AveriLab" breadcrumb,
-  in the app-switcher card beneath, is not one of them.
-- idb, no extra call: `IdbTreeSource.applicationLabel`'s answer for SpringBoard's `' '` carries `alertIn(appNames)`
-  over the elements of the same read, and the link's wait — which asks the names after its first label anyway — ends
-  at the read that lists the alert (`WaitEnd` `alert`), not at the 3 s bound.
-- WDA, one `/source` read: `/wda/activeAppInfo` names only `com.apple.springboard`, so at the bound, and only when the
-  last bundle named was SpringBoard's, `ForegroundCheck.alert()` reads the tree once (`IosAdapter.openDeepLink` wires
-  it on the WDA source, for links only). A read that throws or holds no alert fails open: the reply is the D49a note.
+- `adapters/ios-system-alert.ts`, pure functions returning the title and the buttons, each label verbatim with its
+  centre (`SystemAlert`), or nothing. On idb two parts, apart because the source holds the elements and the wait holds
+  the app's names: `alertShapeInIdb(elements)` — the first Application is SpringBoard's (label `' '`), every other
+  element is a StaticText or a Button, the first StaticText (the title) is labelled, and there are 1–4 Buttons, each
+  labelled and framed — and the title gate `titleAsksToOpen(title, appNames)` — one of the app's names in it, or the
+  English `Open in “…”?`. idb has no Alert type; the shape is what idb measured (the alert listed alone, no status
+  bar: SpringBoard's measured launch tree, with its status items, fails it), and the gate keeps another SpringBoard
+  prompt out. `alertInWda(tree)`: in SpringBoard's tree (root labelled `' '`), the first layer averi's parser marks
+  `presentation: 'alert'` (wda-source.ts's `PRESENTATIONS`) that holds a title and a visible button — every marked
+  layer is tried, so a hidden alert in an app-switcher card before the real one does not hide it; its title the
+  Alert's label, else its first text; its buttons the labelled, not-hidden Buttons inside that layer — Contacts'
+  hidden "Return to AveriLab" breadcrumb, in the card beneath, is not one of them.
+- idb, no extra call: `IdbTreeSource.applicationLabel`'s answer for SpringBoard carries, as plain data, the
+  `candidate` alert shape of the same read; the link's wait — which asks the names after its first label anyway —
+  gates its title and ends at the read that lists the alert (`WaitEnd` `alert`), not at the 3 s bound.
+- WDA, one short `/source` read: `/wda/activeAppInfo` names only `com.apple.springboard`, so at the bound, and only
+  when the last bundle named was SpringBoard's, `ForegroundCheck.alert()` asks `IosTreeSource.systemAlert()`
+  (WdaTreeSource's alone; idb has none, and the wait never asks it there, idb naming no bundle). It is
+  `WdaServer.sourceNow()`: one GET under its own `SYSTEM_ALERT_SOURCE_TIMEOUT_MS`, 2 s — not `source()`'s 30 s, and
+  never `ensureRunning`, a `/status` probe or a restart. 2 s because a whole app tree read in 0.9–1.25 s (batch-2 D)
+  and the alert's SpringBoard tree is small (about 24 KB of XML), while the read is an aid to a reply that must not let
+  a wedged runner hold it for 30 s or be restarted by it. WDA not up is no alert, and so is a read that throws, times
+  out or holds no alert: the reply is the D49a note (fail open).
 - The reply (`mcp/tool-text.ts#deepLinkText`, `DeepLinkOutcome.alert`): the "Opened" headline and the ⚠ line give way
   to `iOS has not opened <url> yet: it asks "<title>" — buttons "<label>" at (x, y), … Answer it with a tap at the
   chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered`.
-  "it asks" only when the title contains one of the app's names (`LinkAlert.namesApp`; on WDA the names come from the
-  appinfo the scheme lookup cached, unreadable names are none); any other alert is "a system alert is up, "<title>"",
-  in no words of averi's own about opening. Only coordinates are advised: batch-5 answered the alert by coordinates,
-  and a selector tap on SpringBoard's tree is unverified. `front` does not move: the app is not in front.
+  "it asks" only when the title contains one of the app's names (`LinkAlert.asksForApp`; the English form alone is
+  not enough, its quoted name may be another app's; on WDA the names come from the appinfo the scheme lookup cached,
+  unreadable names are none); any other alert is "a system alert is up, "<title>"", in no words of averi's own about
+  opening. Only coordinates are advised: batch-5 answered the alert by coordinates, and a selector tap on
+  SpringBoard's tree is unverified (D57). `front` does not move: the app is not in front.
 - Unchanged: a link that matches (no `/source`, no extra call on either source), a launch (it looks for no alert), every
   link that expects no app (web links, iOS's own schemes, another app's scheme).
 
@@ -507,13 +516,17 @@ A correction to the backlog row: WDA's payload has no `presentation` key, in eit
 'alert'` is averi's own mark on the layer holding an `Alert` element.
 
 Considered, not chosen: tapping Open, or an opt-in `confirm: true` (a tap on a SpringBoard dialog acts for the agent,
-and which label opens is localised); reading `/source` on every WDA poll (a whole tree per poll for the rare case);
-the same naming in `launch_app`'s D48 note (the detectors fit it, but its wording is D48's — a row of its own).
+and which label opens is localised; D58); reading `/source` on every WDA poll (a whole tree per poll for the rare
+case); reading it through `source()` (its start, its 30 s and its restart are a recovery, not an aid); the same naming
+in `launch_app`'s D48 note (the detectors fit it, but its wording is D48's — D56).
 
 Cost: the happy path none (pinned by call counts in `tests/adapters/ios-deep-link.test.ts`). The alert up: idb ends at
-its first read (about 0.4 s, from about 3.4 s); WDA pays one `/source` of a small tree at the bound (unmeasured,
-bounded by WdaServer's source timeout). Residuals, stated: idb's alert-only shape is one iOS (27.0) and one device
-class — a future iOS that lists the status bar with it falls back to the note; a localised title that omits the
-display name falls back to the note on idb; a short app name contained in another SpringBoard alert's title words that
-alert as asking to open the link. To check on the device (the next owner batch): D49A E2–E4 judged on the new reply,
-the WDA `/source` time at the bound.
+its first read (about 0.4 s, from about 3.4 s); WDA pays one `/source` of a small tree at the bound (unmeasured, at
+most SYSTEM_ALERT_SOURCE_TIMEOUT_MS). Residuals, stated: idb's alert-only shape is one iOS (27.0) and one device class —
+a future iOS that lists the status bar with it falls back to the note; a localised title that omits the display name
+falls back to the note on idb; a short app name contained in another SpringBoard alert's title words that alert as
+asking to open the link; on idb the app's names are asked at the first label, so when they cannot be read (appinfo
+lists no name) the wait ends at once with D49a's "could not check" note before the alert is judged, even while the
+alert is up (as before D54; on WDA the alert is still named, as not asking for the app); a WDA `/source` slower than
+2 s at the bound falls back to the note. To check on the device (the next owner batch): D49A E2–E4 judged on the new
+reply, the WDA `/source` time at the bound.

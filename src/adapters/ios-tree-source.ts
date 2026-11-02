@@ -8,7 +8,7 @@ import { WdaTreeSource } from './wda-tree-source.js';
 import type { WdaServerOptions } from './wda.js';
 import type { IdbHelper } from './idb-helper.js';
 import { PersistentReadError, rectArea, rectIntersection, zeroRect, type Rect, type SystemAlert, type UiNode } from './types.js';
-import { alertInIdb } from './ios-system-alert.js';
+import { alertShapeInIdb } from './ios-system-alert.js';
 import { countOf } from '../util/count.js';
 
 /**
@@ -70,6 +70,12 @@ export interface IosTreeSource {
    * calls nothing.
    */
   applicationLabel(): Promise<ApplicationLabel>;
+  /**
+   * iOS's system alert in one SHORT read, for the D54 link wait at its bound — WDA's only (WdaTreeSource: one
+   * `/source` under its own budget, never a start or a restart; undefined while WDA is not up). Absent on idb, whose
+   * label reads already carry the alert's shape (`candidate`).
+   */
+  systemAlert?(): Promise<SystemAlert | undefined>;
   dispose(): Promise<void>;
 }
 
@@ -80,10 +86,10 @@ export interface IosTreeSource {
  *
  * - `label`: the Application element's label as read — SpringBoard's `' '`
  *   included, never trimmed (the caller names it). On SpringBoard's, from
- *   idb, also `alertIn` (D54): whether that same read lists iOS's system
- *   alert, judged against the app names the caller holds
- *   (ios-system-alert.ts#alertInIdb) — a function, not an answer, since the
- *   launch's wait asks the names only after its first label; no device call.
+ *   idb, also `candidate` (D54) when that same read has the shape of iOS's
+ *   system alert (ios-system-alert.ts#alertShapeInIdb) — plain data, no
+ *   device call; whether its title asks to open the link is the caller's to
+ *   judge, with the app's names it holds (ios-foreground.ts).
  * - `unlabelled`: the read cannot say — it lists no Application element, or
  *   one whose label is missing or empty (both unmeasured; the launch's wait
  *   reads on, and says it could not check if nothing better follows).
@@ -95,7 +101,7 @@ export interface IosTreeSource {
  *   wait then waits for nothing and says nothing.
  */
 export type ApplicationLabel =
-  | { kind: 'label'; label: string; alertIn?: (appNames: readonly string[]) => SystemAlert | undefined }
+  | { kind: 'label'; label: string; candidate?: SystemAlert }
   | { kind: 'bundle'; bundleId: string }
   | { kind: 'unlabelled' }
   | { kind: 'declined' };
@@ -476,14 +482,15 @@ export class IdbTreeSource implements IosTreeSource {
    * here too, so the caller can tell idb's launch transient (no tree yet)
    * from a tree of the wrong app. An empty AXLabel is `unlabelled`, as a
    * missing one is: no app is named by nothing. SpringBoard's answer carries
-   * `alertIn` over the same elements (D54): idb lists iOS's "Open in …?"
-   * alone under SpringBoard's Application.
+   * the `candidate` alert shape of the same elements when they have it (D54):
+   * idb lists iOS's "Open in …?" alone under SpringBoard's Application.
    */
   async applicationLabel(): Promise<ApplicationLabel> {
     const { elements } = await this.readOnce();
     const label = elements.find((el) => el.type === 'Application')?.AXLabel;
     if (label === undefined || label === null || label === '') return { kind: 'unlabelled' };
-    return label === ' ' ? { kind: 'label', label, alertIn: (appNames) => alertInIdb(elements, appNames) } : { kind: 'label', label };
+    const candidate = alertShapeInIdb(elements);
+    return candidate === undefined ? { kind: 'label', label } : { kind: 'label', label, candidate };
   }
 
   private async readOnce(): Promise<{ elements: IdbElement[]; tree: UiNode }> {

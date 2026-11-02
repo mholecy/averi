@@ -6,6 +6,7 @@ import { FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-f
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
+import { alertInWda } from '../../src/adapters/ios-system-alert.js';
 import type { DeepLinkOutcome, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
@@ -51,12 +52,13 @@ function lab(
   let reads = 0;
   const source: IosTreeSource = {
     kind: opts.kind ?? 'wda',
-    // A whole tree read — WDA's /source (D54: asked at the bound only); `tree` answers it, unset it is not expected.
-    read: async () => {
+    read: () => Promise.reject(new Error('unused')),
+    // WdaTreeSource.systemAlert's part (D54: one short /source at the bound): `tree` is what it reads, unset not expected.
+    systemAlert: async () => {
       reads++;
       const tree = opts.tree ?? new Error('unused');
       if (tree instanceof Error) throw tree;
-      return structuredClone(tree);
+      return alertInWda(structuredClone(tree));
     },
     applicationLabel: async () => {
       const a = answers[Math.min(asked++, answers.length - 1)];
@@ -321,13 +323,13 @@ const ALERT: DeepLinkOutcome = {
       { label: 'Cancel', centre: { x: 127, y: 474 } },
       { label: 'Open', centre: { x: 275, y: 474 } },
     ],
-    namesApp: true,
+    asksForApp: true,
   },
 };
 const DESCRIBE_ALL = 'idb ui describe-all --json --udid AAAA-1111';
 
 /** An IosAdapter on the REAL idb source, its describe-all answering from `reads` in turn (the last repeats). */
-function idbLab(reads: string[]) {
+function idbLab(reads: string[], info = LAB_INFO) {
   const calls: string[] = [];
   let read = 0;
   const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
@@ -335,7 +337,7 @@ function idbLab(reads: string[]) {
     if (full !== 'xcrun --find simctl') calls.push(full);
     const out = (s: string) => ({ stdout: Buffer.from(s), stderr: '' });
     if (full === DESCRIBE_ALL) return out(reads[Math.min(read++, reads.length - 1)]);
-    if (full.startsWith('xcrun simctl appinfo')) return out(LAB_INFO);
+    if (full.startsWith('xcrun simctl appinfo')) return out(info);
     if (full.startsWith('plutil ')) return out(LAB_TYPES);
     return out('');
   };
@@ -363,6 +365,18 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual(ALERT);
     expect(d.describeAlls()).toBe(2);
     expect(sleeps).toEqual([FOREGROUND_POLL_MS]);
+  });
+
+  it("idb: an alert found by its English \"Open in “…”?\" form, the app's names not in it (\"Lab Two\"): named, not as asking for the app", async () => {
+    const d = idbLab([IDB_ALERT], appinfo('"Lab Two"', 'LabTwo', { path: LAB_PATH, executable: 'LabTwo' }));
+    expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ alert: { ...ALERT.alert!, asksForApp: false } });
+    expect(d.describeAlls()).toBe(1);
+  });
+
+  it('idb: an alert shape whose title neither names the app nor reads "Open in “…”?": no alert — the note at the bound, as before', async () => {
+    const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'Allow notifications?')]);
+    expect((await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).note).toMatch(/^averi did not see dev\.averi\.lab come forward/);
+    expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
   });
 
   it('a launch (no link) over the same alert is unchanged: it reads to the bound and gives its note, no alert', async () => {
@@ -432,12 +446,12 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
 
   it("the alert's title names none of the app's names: named all the same, marked as not naming the app", async () => {
     const d = lab([SPRINGBOARD], { tree: WDA_ALERT, info: appinfo('Lab Two', 'LabTwo', { path: LAB_PATH, executable: 'LabTwo' }) });
-    expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ alert: { ...ALERT.alert!, namesApp: false } });
+    expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ alert: { ...ALERT.alert!, asksForApp: false } });
   });
 
   it("the app's names cannot be read (appinfo lists only a Path): the alert is named, not as naming the app", async () => {
     const d = lab([SPRINGBOARD], { tree: WDA_ALERT, info: appinfo(undefined, undefined, { path: LAB_PATH }) });
-    expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ alert: { ...ALERT.alert!, namesApp: false } });
+    expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ alert: { ...ALERT.alert!, asksForApp: false } });
   });
 });
 
@@ -451,7 +465,8 @@ describe('IosAdapter.openDeepLink — which app the typing goes into', () => {
     const typed: string[] = [];
     const source: IosTreeSource = {
       kind: 'wda',
-      read: () => (tree === undefined ? Promise.reject(new Error('unused')) : Promise.resolve(structuredClone(tree))),
+      read: () => Promise.reject(new Error('unused')),
+      systemAlert: async () => (tree === undefined ? Promise.reject(new Error('unused')) : alertInWda(structuredClone(tree))),
       applicationLabel: async () => next[Math.min(i++, next.length - 1)],
       dispose: () => Promise.resolve(),
     };
