@@ -20,7 +20,7 @@
  */
 
 import { everyNode, type DeepLinkOutcome, type LinkAlert, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
-import { alertButtons, ANSWER_ALERT } from '../adapters/ios-system-alert.js';
+import { alertButtonsText, ALERT_ADVICE } from '../adapters/ios-system-alert.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
@@ -88,7 +88,7 @@ export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkO
 
 /**
  * `iOS has not opened <url> yet: it asks "<title>" — buttons "<label>" at (x, y), …` (D54), then the advice
- * (ANSWER_ALERT: a tap at the chosen button's coordinates, and that averi taps nothing). The buttons and the advice are
+ * (ALERT_ADVICE: a tap at the chosen button's coordinates, and that averi taps nothing). The buttons and the advice are
  * worded once, in adapters/ios-system-alert.ts, for launch_app's note too (D56). The title and every label are quoted
  * verbatim, localised as iOS shows them; which button opens the link is the agent's to read. "it asks" only when the
  * title names the link's app (`asksForApp`); any other alert is "a system alert", in no words of averi's own about
@@ -96,7 +96,7 @@ export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkO
  */
 const alertText = (url: string, alert: LinkAlert): string => {
   const what = alert.asksForApp ? `it asks "${alert.title}"` : `a system alert is up, "${alert.title}"`;
-  return `iOS has not opened ${url} yet: ${what} — ${alertButtons(alert)}. ${ANSWER_ALERT}`;
+  return `iOS has not opened ${url} yet: ${what} — ${alertButtonsText(alert)}. ${ALERT_ADVICE}`;
 };
 
 /**

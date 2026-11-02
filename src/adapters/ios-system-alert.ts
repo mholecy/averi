@@ -27,8 +27,8 @@ import { everyNode, type Point, type Rect, type SystemAlert, type UiNode } from 
  * reply lists every button with its centre (mcp/tool-text.ts#deepLinkText) and averi taps none of them.
  *
  * The words an alert is quoted in (D56; ADR 0032's D56 amendment), one wording for both replies that name it —
- * open_deep_link's (mcp/tool-text.ts#deepLinkText) and launch_app's ⚠ note (ios-foreground.ts): alertButtons and
- * ANSWER_ALERT.
+ * open_deep_link's (mcp/tool-text.ts#deepLinkText) and launch_app's ⚠ note (ios-foreground.ts): alertButtonsText and
+ * ALERT_ADVICE.
  */
 
 /** SpringBoard's Application label in both sources: a single space (2026-10-09, and batch-5 D49A). */
@@ -116,7 +116,7 @@ export function namesApp(title: string, appNames: readonly string[]): boolean {
  * An alert's buttons as the replies quote them: `buttons "Cancel" at (127, 474), "Open" at (275, 474)` — every label
  * verbatim, in tree order, with its centre.
  */
-export const alertButtons = (alert: SystemAlert): string =>
+export const alertButtonsText = (alert: SystemAlert): string =>
   `${alert.buttons.length === 1 ? 'button' : 'buttons'} ${alert.buttons.map((b) => `"${b.label}" at (${b.centre.x}, ${b.centre.y})`).join(', ')}`;
 
 /**
@@ -124,7 +124,7 @@ export const alertButtons = (alert: SystemAlert): string =>
  * (batch-5 D49A tapped by coordinates; a selector tap on SpringBoard's tree is unverified) — that averi taps nothing,
  * and what the alert holds back (batch-2: every launch after it stayed behind it).
  */
-export const ANSWER_ALERT =
+export const ALERT_ADVICE =
   "Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered";
 
 /** A rect's centre in whole points — where a tap lands. */

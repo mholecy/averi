@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { alertButtons, alertInWda, alertShapeInIdb, ANSWER_ALERT, namesApp, titleAsksToOpen, type IdbAlertElement } from '../../src/adapters/ios-system-alert.js';
+import { alertButtonsText, alertInWda, alertShapeInIdb, ALERT_ADVICE, namesApp, titleAsksToOpen, type IdbAlertElement } from '../../src/adapters/ios-system-alert.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import type { SystemAlert, UiNode } from '../../src/adapters/types.js';
 
@@ -248,9 +248,9 @@ describe('namesApp — whether an alert title names the app (the reply words it 
 
 // D56: one wording of an alert's buttons and of the advice, shared by open_deep_link's reply (mcp/tool-text.ts) and
 // launch_app's note (ios-foreground.ts).
-describe('alertButtons and ANSWER_ALERT — the words both replies quote an alert in (D56)', () => {
+describe('alertButtonsText and ALERT_ADVICE — the words both replies quote an alert in (D56)', () => {
   it('one button: "button", its label quoted verbatim with its centre', () => {
-    expect(alertButtons({ title: 'Allow?', buttons: [{ label: 'Allow Once', centre: { x: 201, y: 500 } }] })).toBe('button "Allow Once" at (201, 500)');
+    expect(alertButtonsText({ title: 'Allow?', buttons: [{ label: 'Allow Once', centre: { x: 201, y: 500 } }] })).toBe('button "Allow Once" at (201, 500)');
   });
 
   it('two buttons: "buttons", in the order listed, comma-separated', () => {
@@ -261,11 +261,11 @@ describe('alertButtons and ANSWER_ALERT — the words both replies quote an aler
         { label: 'Open', centre: { x: 275, y: 474 } },
       ],
     };
-    expect(alertButtons(alert)).toBe('buttons "Cancel" at (127, 474), "Open" at (275, 474)');
+    expect(alertButtonsText(alert)).toBe('buttons "Cancel" at (127, 474), "Open" at (275, 474)');
   });
 
   it('the advice: a tap at the coordinates, none by averi, and what the alert holds back', () => {
-    expect(ANSWER_ALERT).toBe(
+    expect(ALERT_ADVICE).toBe(
       "Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered",
     );
   });

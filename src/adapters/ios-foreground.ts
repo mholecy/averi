@@ -1,6 +1,6 @@
 import { IdbEmptyTreeError, type ApplicationLabel } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import { alertButtons, ANSWER_ALERT, namesApp, titleAsksToOpen } from './ios-system-alert.js';
+import { ALERT_ADVICE, alertButtonsText, namesApp, titleAsksToOpen } from './ios-system-alert.js';
 import type { DeepLinkOutcome, LinkAlert, SystemAlert } from './types.js';
 import { errorMessage } from '../util/error-message.js';
 import { formatSeconds } from '../util/duration.js';
@@ -231,7 +231,8 @@ export interface ForegroundCheck {
   link?: string;
   /**
    * One short tree read for a system alert (D54: IosTreeSource.systemAlert, WDA's; IosAdapter wires it for every
-   * wait, D56): asked at most once per wait, at the bound, when the last bundle named was SpringBoard's; a throw is no alert.
+   * wait, D56): asked at most once per wait, at the bound, when the last bundle named was SpringBoard's; a throw is no
+   * alert.
    */
   alert?: () => Promise<SystemAlert | undefined>;
 }
@@ -250,19 +251,21 @@ export interface ForegroundCheck {
 export async function awaitForeground(check: ForegroundCheck): Promise<DeepLinkOutcome> {
   const end = await poll(check);
   if (end.kind === 'matched') return {};
-  if (end.kind === 'alert') return check.link === undefined ? { note: alertNote(check.bundleId, end.alert) } : { alert: end.alert };
+  if (end.kind === 'alert') return check.link === undefined ? { note: alertNote(check.bundleId, end.alert) } : { alert: linkAlertOf(end) };
   if (check.link === undefined) return end.kind === 'declined' ? {} : { note: end.note };
   if (end.kind === 'declined') return { note: notAsked(check.bundleId) };
   return { note: `${(end.kind === 'saw' ? LINK_SAW : LINK_UNCHECKED)(check.bundleId)}${end.note}` };
 }
 
 /**
- * How a wait ended: the app confirmed; the source does not ask (WDA not up); a system alert found (D54; a launch's too
- * since D56, whose note never says "it asks", so `asksForApp` is a link's alone — on WDA judged with no names for a
- * launch); or a note — `saw` when it read another app (a stale label or bundle), `unchecked` when it could not tell (a
- * read or names error, an unlabelled or empty tree to the bound).
+ * How a wait ended: the app confirmed; the source does not ask (WDA not up); a system alert found (D54; a launch's too,
+ * D56) — the alert as the source listed it, with the app's names the wait held to judge its title by (`names`: none
+ * when they could not be read, or for a WDA launch, which asks none); or a note — `saw` when it read another app (a
+ * stale label or bundle), `unchecked` when it could not tell (a read or names error, an unlabelled or empty tree to
+ * the bound).
  */
-type WaitEnd = { kind: 'matched' } | { kind: 'declined' } | { kind: 'alert'; alert: LinkAlert } | { kind: 'saw' | 'unchecked'; note: string };
+type WaitEnd = { kind: 'matched' } | { kind: 'declined' } | AlertEnd | { kind: 'saw' | 'unchecked'; note: string };
+type AlertEnd = { kind: 'alert'; alert: SystemAlert; names: readonly string[] };
 
 /** What every link lead advises (D49a): the alert averi did not find (D54 names one it finds — the module comment), and what it blocks. */
 const ANSWER_IT = '— take a screenshot, and if it shows a system alert, answer it (every launch stays behind it until then). ';
@@ -335,14 +338,14 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
           } catch (e) {
             // D54: an alert whose title needs no names (the English "Open in “…”?") is named all the same.
             const alert = idbAlert(read, []);
-            return alert === undefined ? unchecked(check, headline(e)) : { kind: 'alert', alert };
+            return alert === undefined ? unchecked(check, headline(e)) : { kind: 'alert', alert, names: [] };
           }
           // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
           deadline += Date.now() - asked;
         }
         if (names.includes(read.label)) return { kind: 'matched' };
         const alert = idbAlert(read, names);
-        if (alert !== undefined) return { kind: 'alert', alert };
+        if (alert !== undefined) return { kind: 'alert', alert, names };
         stale = read.label;
       }
     }
@@ -351,7 +354,7 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
       // The most telling thing read wins: a system alert (D54), a real label (or bundle), then an unlabelled tree,
       // then nothing at all.
       const alert = staleBundle === SPRINGBOARD_BUNDLE ? await alertAtBound(check) : undefined;
-      if (alert !== undefined) return { kind: 'alert', alert };
+      if (alert !== undefined) return alert;
       if (staleBundle !== undefined) return { kind: 'saw', note: stillReads(check, staleBundle) };
       if (stale !== undefined) return { kind: 'saw', note: notInFront(check, stale, names ?? []) };
       if (unlabelled) {
@@ -366,14 +369,15 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
 /**
  * WDA's system alert at the bound (D54; a launch's too, D56): one `check.alert()`, and — for a link only — the names
  * it is judged against (appinfo's, which the link's scheme lookup has cached; unreadable names are no name). A launch
- * asks no names: its note never says "it asks" (WaitEnd), and a WDA launch has none cached. Fails open: a read that
- * throws, or holds no alert, is undefined, and the wait's note is the one of before.
+ * asks no names: its note never judges the title (alertNote), and a WDA launch has none cached. Fails open: a read
+ * that throws, or holds no alert, is undefined, and the wait's note is the one of before.
  */
-async function alertAtBound(check: ForegroundCheck): Promise<LinkAlert | undefined> {
+async function alertAtBound(check: ForegroundCheck): Promise<AlertEnd | undefined> {
   if (check.alert === undefined) return undefined;
   const alert = await check.alert().catch(() => undefined);
   if (alert === undefined) return undefined;
-  return linkAlertOf(alert, check.link === undefined ? [] : await check.names().catch((): readonly string[] => []));
+  const names = check.link === undefined ? [] : await check.names().catch((): readonly string[] => []);
+  return { kind: 'alert', alert, names };
 }
 
 /**
@@ -381,13 +385,13 @@ async function alertAtBound(check: ForegroundCheck): Promise<LinkAlert | undefin
  * other call), when its title asks to open a link judged with `names` (titleAsksToOpen; none when they could not be
  * read, so only the English form passes).
  */
-function idbAlert(read: Extract<ApplicationLabel, { kind: 'label' }>, names: readonly string[]): LinkAlert | undefined {
+function idbAlert(read: Extract<ApplicationLabel, { kind: 'label' }>, names: readonly string[]): SystemAlert | undefined {
   const { candidate } = read;
-  return candidate !== undefined && titleAsksToOpen(candidate.title, names) ? linkAlertOf(candidate, names) : undefined;
+  return candidate !== undefined && titleAsksToOpen(candidate.title, names) ? candidate : undefined;
 }
 
-/** A found alert as the link's outcome carries it: whether its title names the app (`asksForApp`, namesApp). */
-const linkAlertOf = (alert: SystemAlert, names: readonly string[]): LinkAlert => ({ ...alert, asksForApp: namesApp(alert.title, names) });
+/** A found alert as a link's outcome carries it: whether its title names the app (`asksForApp`, namesApp). */
+const linkAlertOf = ({ alert, names }: AlertEnd): LinkAlert => ({ ...alert, asksForApp: namesApp(alert.title, names) });
 
 /**
  * A launch's note when a system alert holds it (D56): iOS has not brought the app forward, the alert's title verbatim
@@ -397,7 +401,7 @@ const linkAlertOf = (alert: SystemAlert, names: readonly string[]): LinkAlert =>
  * lists it, WDA at the bound.
  */
 const alertNote = (bundleId: string, alert: SystemAlert): string =>
-  `iOS has not brought ${bundleId} forward yet: a system alert is up, "${alert.title}" — ${alertButtons(alert)}. ${ANSWER_ALERT} — ` +
+  `iOS has not brought ${bundleId} forward yet: a system alert is up, "${alert.title}" — ${alertButtonsText(alert)}. ${ALERT_ADVICE} — ` +
   'then read again before trusting a read';
 
 /** What a "could not check" note quotes of an error: its first line — the cause, not a stack or a paragraph of advice. */

@@ -1,19 +1,16 @@
-import { readFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IosAdapter } from '../../src/adapters/ios.js';
-import { IdbEmptyTreeError, IdbTreeSource, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { IdbEmptyTreeError, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-foreground.js';
-import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
-import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
+import type { ExecFn } from '../../src/adapters/exec.js';
 import { alertInWda } from '../../src/adapters/ios-system-alert.js';
 import type { DeepLinkOutcome, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
-import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
-import { EngineSession, launchApp } from '../../src/flow/launch.js';
-import { FlowEngine } from '../../src/flow/engine.js';
-import { parseConfig } from '../../src/flow/config.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
+import {
+  bundle, DESCRIBE_ALL, IDB_ALERT, IDB_LAB, idbLab, lab, label, LAB, LAB_INFO, LAB_PATH, LAB_TYPES, LAUNCH_ALERT_NOTE, openurl,
+  PLUTIL, SPRINGBOARD, WDA_ALERT, WRITES,
+} from '../helpers/ios-lab.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 
 // The one sleep owner, recorded and not waited on; under a Date-only fake clock each recorded sleep moves the clock
@@ -26,64 +23,6 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
 // CFBundleURLTypes, read on the host with plutil at appinfo's Path) is now followed by launch's bounded foreground
 // wait (ios-foreground.ts); any other link is opened exactly as before.
 
-const LAB = 'dev.averi.lab';
-const LAB_PATH = '/Sim/Containers/Bundle/Application/5E1F/AveriLab.app';
-const LAB_INFO = appinfo('AveriLab', 'AveriLab', { path: LAB_PATH, executable: 'AveriLab' });
-/** `plutil -extract CFBundleURLTypes json` of the lab app, as measured. */
-const LAB_TYPES = '[{"CFBundleURLName":"dev.averi.lab","CFBundleURLSchemes":["averilab"]}]';
-const PLUTIL = `plutil -extract CFBundleURLTypes json -o - ${LAB_PATH}/Info.plist`;
-const WRITES = [
-  'xcrun simctl spawn AAAA-1111 defaults write com.apple.Accessibility AutomationEnabled -bool true',
-  'xcrun simctl spawn AAAA-1111 defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true',
-];
-const openurl = (url: string) => `xcrun simctl openurl AAAA-1111 ${url}`;
-
-const bundle = (bundleId: string): ApplicationLabel => ({ kind: 'bundle', bundleId });
-const label = (text: string): ApplicationLabel => ({ kind: 'label', label: text });
-const SPRINGBOARD = bundle('com.apple.springboard');
-
-/**
- * An IosAdapter over a source whose applicationLabel answers in turn from `answers` (the last repeats) — the
- * `kind` given — and an exec answering `simctl appinfo` with `info` and plutil with `types` (an Error rejects each).
- * Every exec command line but xcode-env's one-time `xcrun --find simctl` is recorded.
- */
-function lab(
-  answers: Array<ApplicationLabel | Error>,
-  opts: { kind?: IosTreeSourceKind; info?: string | Error | (() => string | Error); types?: string | Error; tree?: UiNode | Error } = {},
-) {
-  const calls: string[] = [];
-  let asked = 0;
-  let reads = 0;
-  const source: IosTreeSource = {
-    kind: opts.kind ?? 'wda',
-    read: () => Promise.reject(new Error('unused')),
-    // WdaTreeSource.systemAlert's part (D54: one short /source at the bound): `tree` is what it reads, unset not expected.
-    systemAlert: async () => {
-      reads++;
-      const tree = opts.tree ?? new Error('unused');
-      if (tree instanceof Error) throw tree;
-      return alertInWda(structuredClone(tree));
-    },
-    applicationLabel: async () => {
-      const a = answers[Math.min(asked++, answers.length - 1)];
-      if (a instanceof Error) throw a;
-      return a;
-    },
-    dispose: () => Promise.resolve(),
-  };
-  const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
-    const full = [cmd, ...args].join(' ');
-    if (full !== 'xcrun --find simctl') calls.push(full);
-    const answer = (out: string | Error) => {
-      if (out instanceof Error) throw out;
-      return { stdout: Buffer.from(out), stderr: '' };
-    };
-    if (full.startsWith('xcrun simctl appinfo')) return answer(typeof opts.info === 'function' ? opts.info() : (opts.info ?? LAB_INFO));
-    if (full.startsWith('plutil ')) return answer(opts.types ?? LAB_TYPES);
-    return { stdout: Buffer.alloc(0), stderr: '' };
-  };
-  return { adapter: new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: source }), calls, asks: () => asked, reads: () => reads };
-}
 
 let stderr: { mock: { calls: unknown[][] } };
 /** The stderr lines other than the accessibility write's announcement. */
@@ -312,14 +251,6 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
 // reply names it — its title and its buttons at their centres — instead of the vague note. Batch-5 D49A's captures
 // (E2): idb lists the alert alone under SpringBoard; WDA's activeAppInfo names com.apple.springboard while it is up,
 // and its /source holds the Alert. The happy path's device calls are unchanged on both sources.
-const fixture = async (name: string): Promise<string> => readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
-const IDB_ALERT = JSON.stringify((JSON.parse(await fixture('idb-springboard-open-in-alert.json')) as { elements: unknown[] }).elements);
-const WDA_ALERT = parseWdaSourceValue(JSON.parse(await fixture('wda-capture-springboard-open-in-alert.json')));
-/** The lab app in front, as idb lists it (batch-5 case-rs-idb-E6, its four targets cut to one). */
-const IDB_LAB = JSON.stringify([
-  { type: 'Application', AXLabel: 'AveriLab', frame: { x: 0, y: 0, width: 402, height: 874 } },
-  { type: 'Button', AXLabel: 'Target A', AXUniqueId: 'lab.open.A', frame: { x: 51, y: 110, width: 300, height: 64 } },
-]);
 const ALERT: DeepLinkOutcome = {
   alert: {
     title: 'Open in “AveriLab”?',
@@ -330,24 +261,6 @@ const ALERT: DeepLinkOutcome = {
     asksForApp: true,
   },
 };
-const DESCRIBE_ALL = 'idb ui describe-all --json --udid AAAA-1111';
-
-/** An IosAdapter on the REAL idb source, its describe-all answering from `reads` in turn (the last repeats). */
-function idbLab(reads: string[], info = LAB_INFO) {
-  const calls: string[] = [];
-  let read = 0;
-  const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
-    const full = [cmd, ...args].join(' ');
-    if (full !== 'xcrun --find simctl') calls.push(full);
-    const out = (s: string) => ({ stdout: Buffer.from(s), stderr: '' });
-    if (full === DESCRIBE_ALL) return out(reads[Math.min(read++, reads.length - 1)]);
-    if (full.startsWith('xcrun simctl appinfo')) return out(info);
-    if (full.startsWith('plutil ')) return out(LAB_TYPES);
-    return out('');
-  };
-  const adapter = new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec }) });
-  return { adapter, calls, describeAlls: () => calls.filter((c) => c === DESCRIBE_ALL).length };
-}
 
 describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)", () => {
   it('idb, the lab in front: one describe-all, no note — the same calls as before D54', async () => {
@@ -478,10 +391,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
 describe("IosAdapter.launch — the system alert it waits behind, named in its note (D56)", () => {
   const LAUNCH = 'xcrun simctl launch AAAA-1111 dev.averi.lab';
   const APPINFO = 'xcrun simctl appinfo AAAA-1111 dev.averi.lab';
-  const ALERT_NOTE =
-    'iOS has not brought dev.averi.lab forward yet: a system alert is up, "Open in “AveriLab”?" — buttons "Cancel" at ' +
-    "(127, 474), \"Open\" at (275, 474). Answer it with a tap at the chosen button's x and y (averi taps nothing itself); " +
-    'every launch stays behind the alert until it is answered — then read again before trusting a read';
+  const ALERT_NOTE = LAUNCH_ALERT_NOTE;
   /** D48's note for a WDA launch that read SpringBoard to the bound, byte for byte. */
   const D48_SPRINGBOARD =
     '3 s after launching dev.averi.lab, WebDriverAgent still read SpringBoard (the home screen, the launch animation or ' +
@@ -563,6 +473,21 @@ describe("IosAdapter.launch — the system alert it waits behind, named in its n
     expect(d.reads()).toBe(1);
   });
 
+  // The asymmetry the amendment states: on WDA any SpringBoard alert at the bound is named — no title gate, and no
+  // names to judge one with (a launch asks none); on idb only "Open in “…”?" or a title naming the app (above).
+  it('WebDriverAgent: a SpringBoard alert titled "Allow notifications?" at the bound is named all the same, no appinfo', async () => {
+    const other = structuredClone(WDA_ALERT);
+    const retitle = (n: UiNode): void => {
+      if (n.label === 'Open in “AveriLab”?') n.label = 'Allow notifications?';
+      n.children.forEach(retitle);
+    };
+    retitle(other);
+    const d = lab([SPRINGBOARD], { tree: other });
+    expect(await d.adapter.launch(LAB)).toEqual({ note: ALERT_NOTE.replace('"Open in “AveriLab”?"', '"Allow notifications?"') });
+    expect(d.reads()).toBe(1);
+    expect(d.calls).toEqual([...WRITES, LAUNCH]);
+  });
+
   it('SpringBoard, then the app before the bound: no /source read, no note', async () => {
     const d = lab([SPRINGBOARD, SPRINGBOARD, bundle(LAB)], { tree: WDA_ALERT });
     expect(await d.adapter.launch(LAB)).toEqual({});
@@ -573,32 +498,6 @@ describe("IosAdapter.launch — the system alert it waits behind, named in its n
     const d = lab([bundle('com.apple.MobileAddressBook')], { tree: WDA_ALERT });
     expect((await d.adapter.launch(LAB)).note).toMatch(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read com\.apple\.MobileAddressBook as the active app/);
     expect(d.reads()).toBe(0);
-  });
-
-  it("launch_app's reply: the Launched headline, then the alert note as its one ⚠ line", async () => {
-    const launched = await launchApp(idbLab([IDB_ALERT]).adapter, undefined, new EngineSession(), { appId: LAB });
-    expect(launchText('ios', launched)).toBe(`Launched dev.averi.lab on ios\n⚠ ${ALERT_NOTE}`);
-  });
-
-  it("a flow's launch: the `⚠ launch` line carries the alert note, and the flow goes on", async () => {
-    const cfg = parseConfig('app:\n  ios: { bundleId: dev.averi.lab }\nflows:\n  open:\n    steps:\n      - launch: {}\n');
-    const trace = await FlowEngine.run(cfg, lab([SPRINGBOARD], { tree: WDA_ALERT }).adapter, { env: {}, session: new EngineSession() }, { flow: 'open' });
-    const at = trace.findIndex((t) => t.action === 'launch');
-    expect(trace.slice(at, at + 2)).toEqual([
-      { action: 'launch', detail: LAB },
-      { action: '⚠ launch', detail: ALERT_NOTE },
-    ]);
-    expect(trace.at(-1)).toEqual({ action: 'flow open', detail: 'done' });
-  });
-
-  // open_deep_link's replies with the alert up, end to end: byte-identical to D54's (the shared wording, extracted).
-  it("open_deep_link's reply over the same alert is D54's, byte for byte — idb and WDA", async () => {
-    const d54 =
-      'iOS has not opened averilab://d54 yet: it asks "Open in “AveriLab”?" — buttons "Cancel" at (127, 474), "Open" at ' +
-      "(275, 474). Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays " +
-      'behind the alert until it is answered';
-    expect(deepLinkText('ios', 'averilab://d54', await idbLab([IDB_ALERT]).adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(d54);
-    expect(deepLinkText('ios', 'averilab://d54', await lab([SPRINGBOARD], { tree: WDA_ALERT }).adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(d54);
   });
 });
 
