@@ -84,8 +84,9 @@ moves the floor with it. Its idb keyboard band survivors are still covered only 
 ## Amendment: ios-liveness.ts joins the run (2026-11-02, backlog D33)
 
 adapters/ios-liveness.ts is the run's seventh module (ADR 0039). It is a pure leaf: the host process pattern for an
-iOS app (its escape, its end anchor, the rule that the Path is this simulator's) and the reading of pgrep's outcome.
-A dropped escape or anchor there would flip a liveness verdict without failing any other test. Its scope.json entry
-names tests/adapters/ios-liveness.test.ts, with a floor of 98 under a first cold baseline of 100 % (38 mutants). One
-mutant survived the first run: the ExecError type check, since a plain Error reads the same. A test now pins that only
-exec's ExecError is read. The cold run took about 71 s.
+iOS app (its escape, its end anchor, the rule that the Path is this simulator's), the reading of pgrep's outcome and
+its reason for the stderr line. A dropped escape or anchor there would flip a liveness verdict without failing any
+other test. Its scope.json entry names tests/adapters/ios-liveness.test.ts, with a floor of 98 under a baseline of
+100 % (70 mutants, 0 survived, 0 without coverage). That 100 % came after one survivor was killed and one string
+covered: the first run's ExecError type check survived (a plain Error reads the same), and a test now pins that only
+exec's ExecError is read; a later run left `pgrepReason`'s "no exit code" uncovered. The cold run takes 60 to 71 s.

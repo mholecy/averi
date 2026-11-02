@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { hostProcessPattern, pgrepVerdict } from '../../src/adapters/ios-liveness.js';
-import { ExecError } from '../../src/adapters/exec.js';
+import { hostProcessPattern, pgrepReason, pgrepVerdict } from '../../src/adapters/ios-liveness.js';
+import { execErrorLikeExec } from '../helpers/exec-error.js';
 
 const U = 'D8DACDE6-1111-2222-3333-444455556666';
 const OTHER = '37956039-94EA-4F51-93E5-94F7723A4578';
@@ -72,6 +72,13 @@ describe('hostProcessPattern — the bundle\'s exact executable path on THIS sim
     expect(hostProcessPattern({ path: `/x/${U}/data/Containers/Data/Application/${G}/A.app`, executable: 'A' }, U)).toBeUndefined();
   });
 
+  it("the UDID is this simulator's whatever its case", () => {
+    const pattern = hostProcessPattern({ path: app(U, G, 'AveriLab'), executable: 'AveriLab' }, U.toLowerCase());
+    expect(matches(pattern, `${app(U, G, 'AveriLab')}/AveriLab`)).toBe(true);
+    expect(hostProcessPattern({ path: app(U.toLowerCase(), G, 'A'), executable: 'A' }, U)).toBeDefined();
+    expect(hostProcessPattern({ path: app(OTHER.toLowerCase(), G, 'A'), executable: 'A' }, U)).toBeUndefined();
+  });
+
   it('no pattern without a path or an executable (an appinfo format drift)', () => {
     expect(hostProcessPattern({ executable: 'AveriLab' }, U)).toBeUndefined();
     expect(hostProcessPattern({ path: app(U, G, 'AveriLab') }, U)).toBeUndefined();
@@ -80,7 +87,7 @@ describe('hostProcessPattern — the bundle\'s exact executable path on THIS sim
 });
 
 describe('pgrepVerdict — what pgrep\'s outcome says about the host process list', () => {
-  const failed = (code: number | null, timedOut = false) => new ExecError('/usr/bin/pgrep -f x', code, 'err', timedOut);
+  const failed = (code: number | null, timedOut = false) => execErrorLikeExec('/usr/bin/pgrep -f x', code, 'err', { timedOut });
 
   it('success is a match', () => {
     expect(pgrepVerdict(undefined)).toBe('yes');
@@ -106,5 +113,29 @@ describe('pgrepVerdict — what pgrep\'s outcome says about the host process lis
   it('a timeout is its own outcome, whatever the exit code reads', () => {
     expect(pgrepVerdict(failed(null, true))).toBe('timeout');
     expect(pgrepVerdict(failed(1, true))).toBe('timeout');
+  });
+});
+
+describe("pgrepReason — pgrep's own words for the stderr line, not its command line", () => {
+  const cmd = '/usr/bin/pgrep -f /a/very/long/pattern\\.app/X( |$)';
+
+  it("an exit: its code and stderr's last non-empty line", () => {
+    expect(pgrepReason(execErrorLikeExec(cmd, 3, 'pgrep: warning\nsysmon request failed with error: sysmond service not found  \n   \n'))).toBe(
+      'exit 3: sysmon request failed with error: sysmond service not found',
+    );
+  });
+
+  it("an exit with nothing on stderr: exec's stand-in message's last line — the code alone when that is the command", () => {
+    expect(pgrepReason(execErrorLikeExec(cmd, 2, ''))).toBe('exit 2');
+  });
+
+  it('no exit code (a spawn failure): the last line alone, or that there was no exit code', () => {
+    expect(pgrepReason(execErrorLikeExec(cmd, null, 'spawn /usr/bin/pgrep ENOENT'))).toBe('spawn /usr/bin/pgrep ENOENT');
+    expect(pgrepReason(execErrorLikeExec(cmd, null, ''))).toBe('no exit code');
+  });
+
+  it("another error: its message's first line", () => {
+    expect(pgrepReason(new Error('boom\nmore'))).toBe('boom');
+    expect(pgrepReason('odd')).toBe('odd');
   });
 });

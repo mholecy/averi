@@ -34,15 +34,20 @@ is never trusted alone: launchctl, now matched exactly, gives the final answer.*
   matches. The pattern never matches its own text: it holds `\.app` where the path has `.app`. So a concurrent pgrep
   never reads as the app.
 - No pattern unless the Path lies under `/<udid>/data/Containers/Bundle/Application/`, the simulator's user-app
-  containers. A system app's Path is in the runtime root, the same on every simulator of that runtime, so the host
+  containers. The comparison ignores case, as APFS does, so a UDID in either case works. A system app's Path is in the runtime root, the same on every simulator of that runtime, so the host
   cannot tell which simulator runs it. Those go to launchctl. averi health-checks only `app.ios.bundleId`, a user app.
 - One `simctl appinfo` per bundle per adapter serves both the launch's foreground wait (its names) and this check (its
-  path), cached in `IosAdapter`. Only an answer that listed names is cached, as before, so a failed or name-less answer
-  is asked again. `install()` clears the cache: a reinstall can move the container. If pgrep says no and launchctl
-  says yes, that bundle's entry is dropped.
+  path), cached in `IosAdapter`. Every answer the call gave is cached, a name-less one too. A failed call is asked
+  again. Before D33 a name-less answer was asked again at every launch; now the launch's foreground note says "listed
+  neither name" from the cache. `install()` clears the cache: a reinstall can move the container. If pgrep says no and
+  launchctl says yes, that bundle's entry is dropped.
+- If that disagreement happens twice in a row for one bundle, the second time after a fresh appinfo, the pattern
+  misses the app's process. That bundle then asks launchctl alone for the rest of the adapter's life, and one stderr
+  line says so. Without this, every check would pay appinfo, pgrep and launchctl. An agreeing check resets the count.
 - pgrep's outcome (`pgrepVerdict`): exit 0 means running. Exit 1 means launchctl decides. A timeout (5 s) means
   launchctl decides this check only. Exit 2 or 3, a spawn failure or any non-exec error means the host's process list
-  is unreadable. Then launchctl decides for the rest of the adapter's life, and one stderr line says so. Measured
+  is unreadable. Then launchctl decides for the rest of the adapter's life, and one stderr line says so. The line
+  gives pgrep's reason (`exit N:` and stderr's last line), not its long command line. Measured
   2026-11-02: inside the Claude Code sandbox `pgrep` exits 3 ("sysmond service not found").
 - The binary is `/usr/bin/pgrep`, by absolute path. A Homebrew procps `pgrep` earlier on PATH has other exit codes and
   another regex flavour.
@@ -63,7 +68,8 @@ is never trusted alone: launchctl, now matched exactly, gives the final answer.*
   the binary. A process being reported as crashed (ReportCrash holds it) may also still match for a short window.
   This is not measured yet. The device check for the next batch adds a real crash (`kill -ABRT`) and a hand
   reinstall.
-- In a sandboxed host, liveness costs what it did before (launchctl), plus one stderr line per adapter. The reply does
+- In a sandboxed host, liveness costs what it did before (launchctl), plus one stderr line per adapter. So does a
+  bundle whose process the pattern misses, after its first two checks. The reply does
   not say which source answered: the verdict means the same either way.
 - Android is untouched (`pidof`).
 - `adapters/ios-liveness.ts` joins the mutation run (ADR 0038) with its direct tests.

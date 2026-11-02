@@ -264,7 +264,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     expect(d.appinfos()).toHaveLength(2);
   });
 
-  it('appinfo lists neither name (a format drift reads the same): a note saying so, not a silent pass — and not cached either', async () => {
+  it('appinfo lists neither name (a format drift reads the same): a note saying so on every launch, not a silent pass — the answer is cached all the same (D33)', async () => {
     const d = device([BANK], '');
     expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toBe(
       'could not check that com.apple.MobileAddressBook is in front (simctl appinfo listed neither CFBundleDisplayName nor ' +
@@ -272,8 +272,8 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
         'before trusting a read',
     );
     expect(d.describeAlls()).toBe(1);
-    await d.adapter.launch('com.apple.MobileAddressBook');
-    expect(d.appinfos()).toHaveLength(2);
+    expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(/listed neither CFBundleDisplayName nor CFBundleName/);
+    expect(d.appinfos()).toHaveLength(1);
   });
 
   it('names found are cached per bundle: a second launch of the same bundle asks appinfo nothing', async () => {
@@ -378,9 +378,9 @@ describe('regression: an assert right after launch_app judges the launched app, 
 
 describe('the launch and the liveness check share one appinfo per bundle (D33)', () => {
   it('an idb launch, then isAppRunning: one appinfo in all, and the check asks pgrep with its Path', async () => {
-    const info =
-      '{\n    CFBundleExecutable = Contacts;\n    CFBundleName = Contacts;\n' +
-      '    Path = "/Users/me/Library/Developer/CoreSimulator/Devices/AAAA-1111/data/Containers/Bundle/Application/G/Contacts.app";\n}\n';
+    const info = appinfo(undefined, 'Contacts', {
+      path: '/Users/me/Library/Developer/CoreSimulator/Devices/AAAA-1111/data/Containers/Bundle/Application/G/Contacts.app',
+    });
     const d = device([CONTACTS], info);
     await d.adapter.launch('com.apple.MobileAddressBook');
     expect(await d.adapter.isAppRunning('com.apple.MobileAddressBook')).toBe(true);

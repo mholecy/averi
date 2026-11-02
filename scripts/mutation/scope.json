@@ -32,6 +32,6 @@
   "src/adapters/ios-liveness.ts": {
     "tests": ["tests/adapters/ios-liveness.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-02 (D33, ADR 0039): 38 mutants, 0 survived"
+    "baseline": "100 % on 2026-11-02 (D33 after review, pgrepReason and the case-free UDID added): 70 mutants, 0 survived, 0 without coverage — after a test killed the first run's one survivor (the ExecError check) and covered one string"
   }
 }

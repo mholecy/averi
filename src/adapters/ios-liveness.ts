@@ -2,17 +2,14 @@
  * iOS app liveness from the HOST's process list (D33, ADR 0039): a
  * simulator app is a macOS process, so `/usr/bin/pgrep -f` of its exact
  * executable path answers "is it running" in ~19 ms where
- * `simctl spawn launchctl list` takes ~240 ms. A pure leaf: the pattern and
- * the reading of pgrep's outcome; IosAdapter owns the calls, the cache and
- * the launchctl confirmation of every "no".
+ * `simctl spawn launchctl list` takes ~240 ms. No I/O here — the pattern,
+ * the reading of pgrep's outcome and its reason (it imports exec.ts only for
+ * the ExecError class its `instanceof` reads); IosAdapter owns the calls,
+ * the cache and the launchctl confirmation of every "no".
  */
 import { ExecError } from './exec.js';
-
-/** What `simctl appinfo` says about where the app's binary is (simctl-appinfo.ts#appInfoBundle). */
-export interface AppBinary {
-  path?: string;
-  executable?: string;
-}
+import type { AppBinary } from './simctl-appinfo.js';
+import { errorMessage } from '../util/error-message.js';
 
 /**
  * The POSIX-ERE pattern `pgrep -f` matches the app's process by: the
@@ -26,14 +23,16 @@ export interface AppBinary {
  * pgrep's argv): it holds `\.app` where the path has `.app`.
  *
  * Undefined — ask launchctl — when either key is missing, or the Path is
- * not one of THIS simulator's user-app bundle containers: a system app's
+ * not one of THIS simulator's user-app bundle containers (compared without
+ * case, as APFS compares paths — a UDID may come in either): a system app's
  * Path is in the runtime root, the same on every simulator of that
  * runtime, so the host list cannot tell which simulator runs it.
  */
 export function hostProcessPattern(info: AppBinary, udid: string): string | undefined {
   const { path, executable } = info;
   if (path === undefined || executable === undefined || executable === '') return undefined;
-  if (!path.includes(`/${udid}/data/Containers/Bundle/Application/`)) return undefined;
+  const containers = `/${udid}/data/Containers/Bundle/Application/`.toLowerCase();
+  if (!path.toLowerCase().includes(containers)) return undefined;
   return `${ereEscape(path)}/${ereEscape(executable)}( |$)`;
 }
 
@@ -59,4 +58,23 @@ export function pgrepVerdict(error: unknown): 'yes' | 'no' | 'timeout' | 'unread
   if (!(error instanceof ExecError)) return 'unreadable';
   if (error.timedOut) return 'timeout';
   return error.exitCode === 1 ? 'no' : 'unreadable';
+}
+
+/**
+ * Why pgrep failed, for the one stderr line that says liveness falls back
+ * to launchctl: `exit N: <stderr's last non-empty line>` — not the error's
+ * message, whose head is the whole command line with its long pattern.
+ * exec puts node's "Command failed: <cmd>" in stderr when the child wrote
+ * nothing; that line is dropped (`exit N` alone). No exit code (a spawn
+ * failure): the line alone. Not exec's error: its message's first line.
+ */
+export function pgrepReason(error: unknown): string {
+  if (!(error instanceof ExecError)) return errorMessage(error).split('\n')[0];
+  const line = error.stderr
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l !== '' && !l.startsWith('Command failed:'))
+    .at(-1);
+  if (error.exitCode === null) return line ?? 'no exit code';
+  return line === undefined ? `exit ${error.exitCode}` : `exit ${error.exitCode}: ${line}`;
 }

@@ -37,6 +37,12 @@ export function appInfoNames(stdout: string): string[] {
   return names;
 }
 
+/** Where an app's binary is: its `.app` directory and the executable's name inside it (appInfoBundle). */
+export interface AppBinary {
+  path?: string;
+  executable?: string;
+}
+
 /**
  * Where the app's executable lives, from the same output (ios-liveness.ts
  * builds the host process pattern from it, ADR 0039): the top-level `Path`
@@ -46,7 +52,7 @@ export function appInfoNames(stdout: string): string[] {
  * `Extensions` dictionary nests its own of both. A missing key — or a
  * dictionary/array where a string belongs — is undefined.
  */
-export function appInfoBundle(stdout: string): { path?: string; executable?: string } {
+export function appInfoBundle(stdout: string): AppBinary {
   const entries = topLevelEntries(stdout);
   return { path: scalar(entries.get('Path')), executable: scalar(entries.get('CFBundleExecutable')) };
 }

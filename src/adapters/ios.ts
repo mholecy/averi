@@ -11,8 +11,8 @@ import { errorMessage } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
 import { awaitForeground } from './ios-foreground.js';
-import { appInfoBundle, appInfoNames } from './simctl-appinfo.js';
-import { hostProcessPattern, pgrepVerdict, type AppBinary } from './ios-liveness.js';
+import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
+import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { sleep } from '../util/sleep.js';
@@ -107,6 +107,13 @@ export const FIRST_KEY_ALONE_MS = 50;
  * answer in 5 s gets launchctl for that check, and pgrep again next time.
  */
 export const PGREP_TIMEOUT_MS = 5_000;
+
+/**
+ * How many checks in a row of one bundle may find pgrep saying no while launchctl says running before its liveness
+ * asks launchctl alone (D33 review): one is a stale path (dropped, appinfo read again); two, the second after a fresh
+ * appinfo, is a pattern that misses the app's process.
+ */
+const DISAGREEMENTS_TO_GIVE_UP = 2;
 
 /** One bundle's `simctl appinfo`, as IosAdapter caches it: the launch's names, the liveness check's binary. */
 interface AppInfo extends AppBinary {
@@ -328,7 +335,8 @@ export class IosAdapter implements DeviceAdapter {
    * One `simctl appinfo` per bundle, read once per adapter (D33: the launch's names and the liveness check's
    * executable path share it) — a name or a path does not change under a session; install() clears it (a reinstall
    * can move the container and rename the app), and a liveness check whose pgrep and launchctl disagree drops that
-   * bundle's entry. Only an answer that listed names is cached (appInfo), so a failed or name-less one is asked again.
+   * bundle's entry. Every answer the call gave is cached, a name-less one too (appNames throws on it from the cache:
+   * the launch's note then says so on every launch without asking again); a failed call is asked again.
    * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter looked up (an idb-source launch — WDA declines the check before asking; a liveness check; this process), so an app never launched or checked through this server is not in it.
    */
   private readonly appInfoCache = new Map<string, AppInfo>();
@@ -351,7 +359,7 @@ export class IosAdapter implements DeviceAdapter {
     const { stdout } = await this.simctl(['appinfo', this.udid, bundleId], 10_000);
     const text = stdout.toString('utf8');
     const info: AppInfo = { names: appInfoNames(text), ...appInfoBundle(text) };
-    if (info.names.length > 0) this.appInfoCache.set(bundleId, info);
+    this.appInfoCache.set(bundleId, info);
     return info;
   }
 
@@ -360,8 +368,8 @@ export class IosAdapter implements DeviceAdapter {
    * call fails or lists neither name, and the foreground wait then says it
    * could not check, quoting the first line (review 2026-10-09: appinfo's
    * format is unmeasured, and a drift must not switch the check off
-   * unseen). Through appInfo: only a lookup that found names is cached, so
-   * a failed one is asked again on the next launch.
+   * unseen). Through appInfo's cache: a failed lookup is asked again on the
+   * next launch; one that listed no name is not, and throws again.
    */
   private async appNames(bundleId: string): Promise<readonly string[]> {
     const { names } = await this.appInfo(bundleId);
@@ -680,6 +688,10 @@ export class IosAdapter implements DeviceAdapter {
 
   /** Set when pgrep could not read the host's process list (exit 2/3, spawn failure): launchctl from then on. */
   private hostListUnreadable = false;
+  /** Per bundle, how many checks in a row pgrep said no and launchctl said running (DISAGREEMENTS_TO_GIVE_UP). */
+  private readonly disagreements = new Map<string, number>();
+  /** The bundles whose liveness asks launchctl alone for the adapter's life (a stuck disagreement). */
+  private readonly launchctlOnly = new Set<string>();
 
   /**
    * Liveness from the HOST's process list first (D33, docs/adr/0039-ios-liveness-asks-the-hosts-process-list.md):
@@ -690,12 +702,15 @@ export class IosAdapter implements DeviceAdapter {
    * produce a false "not running", the verdict SKILL.md has the agent report as a crash. No pattern (appinfo failed,
    * a key missing, a system app whose Path is the same on every simulator of its runtime) → launchctl. A timeout →
    * launchctl this call. An unreadable list (exit 2/3, spawn failure — the Claude Code sandbox, measured
-   * 2026-11-02) → launchctl for the adapter's life, said once on stderr. A launchctl that cannot be asked throws, as
+   * 2026-11-02) → launchctl for the adapter's life, said once on stderr with pgrep's reason. A disagreement twice in a
+   * row for one bundle (pgrep no, launchctl running — even after the second check re-read appinfo) means the pattern
+   * misses that app's process (an argv form not seen yet): launchctl alone for that bundle from then on, said once —
+   * otherwise every check would pay appinfo + pgrep + launchctl. A launchctl that cannot be asked throws, as
    * before (appHealth's `unknown`). `/usr/bin/pgrep`, absolute: a Homebrew procps pgrep earlier on PATH has other exit
    * codes and regex flavour.
    */
   async isAppRunning(bundleId: string): Promise<boolean> {
-    if (this.hostListUnreadable) return this.launchctlLists(bundleId);
+    if (this.hostListUnreadable || this.launchctlOnly.has(bundleId)) return this.launchctlLists(bundleId);
     let info: AppBinary;
     try {
       info = await this.appInfo(bundleId);
@@ -712,22 +727,40 @@ export class IosAdapter implements DeviceAdapter {
     }
     switch (pgrepVerdict(failure)) {
       case 'yes':
+        this.disagreements.delete(bundleId);
         return true;
-      case 'no': {
-        const running = await this.launchctlLists(bundleId);
-        if (running) this.appInfoCache.delete(bundleId);
-        return running;
-      }
+      case 'no':
+        return this.confirmNo(bundleId);
       case 'unreadable':
         this.hostListUnreadable = true;
         console.error(
-          `averi: the host process list is unreadable (${errorMessage(failure).split('\n')[0]}) — ` +
+          `averi: the host process list is unreadable (${pgrepReason(failure)}) — ` +
             `app liveness on ${this.udid} asks launchctl instead (~240 ms a check)`,
         );
         return this.launchctlLists(bundleId);
-      case 'timeout':
+      default: // a timeout: launchctl this call, pgrep again next time
         return this.launchctlLists(bundleId);
     }
+  }
+
+  /** pgrep found no process: launchctl's answer is the verdict; a disagreement drops the cached path, a stuck one pgrep. */
+  private async confirmNo(bundleId: string): Promise<boolean> {
+    const running = await this.launchctlLists(bundleId);
+    if (!running) {
+      this.disagreements.delete(bundleId);
+      return false;
+    }
+    this.appInfoCache.delete(bundleId);
+    const inARow = (this.disagreements.get(bundleId) ?? 0) + 1;
+    this.disagreements.set(bundleId, inARow);
+    if (inARow >= DISAGREEMENTS_TO_GIVE_UP) {
+      this.launchctlOnly.add(bundleId);
+      console.error(
+        `averi: the host process list and launchctl disagree twice in a row on ${bundleId} (pgrep: not running; launchctl: running) — ` +
+          `its liveness on ${this.udid} asks launchctl alone from now on (~240 ms a check)`,
+      );
+    }
+    return true;
   }
 
   /**
