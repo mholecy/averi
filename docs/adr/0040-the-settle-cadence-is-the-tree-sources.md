@@ -1,9 +1,17 @@
 # 40. The settle cadence is the tree source's
 
-Status: proposed — merged only after the batch-4 device gate (performance backlog row D35,
-docs/plans/2026-10-30-performance-backlog.md; loop L5, 2026-11-02): the device A/B and the product-path settle run
-(`d35-motion --settle`, 60 trials, 0 wrong settles). One wrong settle there sets `IDB_SETTLE_CADENCE_MS` to 400 (0 wrong in both batches) and the run is
-repeated. ADR 0029's rule (`pauseAfterRead`) is unchanged. This record adds a fact: which `pollMs` the settle is given.
+Status: accepted 2026-11-02, merged 9b762b4c (performance backlog row D35, docs/plans/2026-10-30-performance-backlog.md;
+loop L5, branch `perf/l5-idb-settle-cadence`, f65475c4 + 9e91f826) after the batch-4 device gate (2026-11-02, lab
+simulator, L5 at f65475c4 against main 7e6d2d47): `L5 verdict: PASS`. The product-path settle run (`d35-motion
+--settle`, M1a/M1b/M2, four alternated halves of 30 trials, 60 a side): 0 wrong settles in 60, every one seen moving
+(20 per motion), L5's adapter reporting cadence 300 in every settle, median last-two-reads gap 302 ms against main's
+502, median settle 2 460 ms after the trigger, 595 ms earlier than main's 3 055. Each half alone logged INCONCLUSIVE
+(exit 1): it holds 10 trials a motion, under the ≥ 15-a-motion rule that gates the combined analysis (20 a motion),
+which passed — not a miss. The baseline A/B (idb, 20 runs a side): tap 670 → 474 ms (−196, settle sleep 410 → 208),
+fill 1 208 → 1 008 (−200), fill-20 −207, ensure-cold −196; the controls — idb ensure-warm and scroll, WDA tap/fill (7
+a side), Android tap/fill (5 a side) — Δ slept ≈ 0 (≤ 3 ms); device calls per run equal everywhere. The fallback (a
+wrong settle sets `IDB_SETTLE_CADENCE_MS` to 400) was not needed. ADR 0029's rule (`pauseAfterRead`) is unchanged.
+This record adds a fact: which `pollMs` the settle is given.
 
 ## Context
 
