@@ -113,13 +113,16 @@ describe('droppedTail — a reformatted strict prefix (D28)', () => {
   });
 
   it('only grouping added: a trailing mark, a changed character, two separator kinds, a lone grouping — nothing', () => {
-    expect(droppedTail('SK31 1200 ', intent('SK3112000000'))).toBeUndefined(); // an eager trailing mark
     expect(droppedTail('SK31 1300', intent('SK3112000000'))).toBeUndefined();
     expect(droppedTail('1 234.567', intent('12345678'))).toBeUndefined();
     expect(droppedTail('1-2', intent('1234'))).toBeUndefined(); // groups of one
     expect(droppedTail('1 2', intent('1234'))).toBeUndefined();
     expect(droppedTail('••• •', intent('12345'))).toBeUndefined(); // bullets
     expect(droppedTail('SK31 1200 0000', intent('SK3112000000'))).toBeUndefined(); // the whole typing: no tail
+  });
+
+  it('the whole typing with an eager trailing mark is no prefix: no tail', () => {
+    expect(droppedTail('SK31 1200 0000 ', intent('SK3112000000'))).toBeUndefined();
   });
 
   it('a typed space the field shows as a no-break space is part of the prefix (respaced)', () => {
@@ -132,6 +135,38 @@ describe('droppedTail — a reformatted strict prefix (D28)', () => {
     expect(droppedTail('1,234', intent('1234,5'))).toBeUndefined(); // the typing's own `,` is its decimal point
     expect(droppedTail('1.234', intent('1234,5'))).toBe(',5');
     expect(droppedTail('a lot', intent('alotmore'))).toBeUndefined(); // prose: autocorrect, not a format
+  });
+});
+
+/**
+ * D60 (ADR 0034's amendment): an EAGER field adds its mark once a group is complete, so a dropped end shows a strict
+ * prefix and that mark (`SK31 1200 ` for `SK3112000000`). The mark is judged as if the next typed character had landed
+ * after it, under every rule of `reformatOf` — so the tail is retyped, and the verdict names it, as any dropped tail.
+ */
+describe('droppedTail — a prefix that ends in an eager trailing mark (D60)', () => {
+  it('an IBAN, a card, a phone, a dotted date: the rest of the typing', () => {
+    expect(droppedTail('SK31 1200 ', intent('SK3112000000', null, true))).toBe('0000');
+    expect(droppedTail('SK31 ', intent('SK3112000000', null, true))).toBe('12000000');
+    expect(droppedTail('4111 1111 ', intent('4111111111111111', null, true))).toBe('11111111');
+    expect(droppedTail('903 123 ', intent('903123456', null, true))).toBe('456');
+    expect(droppedTail('31.12.', intent('31122026', null, true))).toBe('2026');
+  });
+
+  it('without clear: after a vanished placeholder, a vanished mask template, or the earlier text', () => {
+    expect(droppedTail('SK31 1200 ', intent('SK3112000000', 'SK00 0000 0000 \u2026'))).toBe('0000'); // D29
+    expect(droppedTail('31.12.', intent('31122026', '__.__.____'))).toBe('2026'); // D51
+    expect(droppedTail('SK31 1200 ', intent('12000000', 'SK31'))).toBe('0000');
+  });
+
+  it('the earlier text and a mark alone: nothing of the typing landed, no tail', () => {
+    expect(droppedTail('SK31 ', intent('12000000', 'SK31'))).toBeUndefined();
+    expect(tailOf('SK31 ', intent('12000000', 'SK31'))).toEqual({ missing: '12000000', landed: 0, reformatted: { added: 1, respaced: 0 } });
+  });
+
+  it('a mark the typing holds itself, or one the rules refuse: no tail', () => {
+    expect(droppedTail('12/', intent('1234/56', null, true))).toBeUndefined(); // the typed-mark guard
+    expect(droppedTail('SK31 1200-', intent('SK3112000000', null, true))).toBeUndefined();
+    expect(droppedTail('12.', intent('1234', null, true))).toBeUndefined();
   });
 });
 
@@ -348,7 +383,11 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['a reading equal to the text before the typing: unchanged first', { observed: '12.34', before: '12.34', value: '1234', clear: true }, { kind: 'unchanged' }],
     ['bullets with a mark: a partly masked length, never separated', { observed: '•••.•', value: '1234' }, { kind: 'length' }],
     ['a reformatted strict prefix stays a dropped tail', { observed: '12 3', value: '1234', clear: true }, { kind: 'dropped-tail', landed: 3, dropped: 1, grouped: true }],
-    ['a dropped tail ending in an eager trailing mark is neither (still a length)', { observed: 'SK31 1200 ', value: 'SK3112000000', clear: true }, { kind: 'length' }],
+    // D60: a dropped tail ending in an eager trailing mark is a dropped tail (it was a length, the trailing mark refused)
+    ['a dropped tail ending in an eager trailing mark', { observed: 'SK31 1200 ', value: 'SK3112000000', clear: true }, { kind: 'dropped-tail', landed: 8, dropped: 4, grouped: true }],
+    ['the same without clear onto the earlier text', { observed: 'SK31 1200 ', before: 'SK31', value: '12000000' }, { kind: 'dropped-tail', landed: 4, dropped: 4, grouped: true }],
+    ['the earlier text and an eager mark alone: no dropped tail', { observed: 'SK31 ', before: 'SK31', value: '12000000' }, { kind: 'length' }],
+    ['the whole typing with an eager trailing mark stays separated', { observed: 'SK31 1200 0000 ', value: 'SK3112000000', clear: true }, { kind: 'separated', added: 3 }],
     ['a changed separator stays same-length', { observed: '12,34', value: '12.34', clear: true }, { kind: 'same-length', positions: 1 }],
     ['before case: the held text matches but for case only in a run of the earlier text — the typing is all there', { observed: 'x,ABa-b', before: 'xAB', value: 'ab' }, { kind: 'separated', added: 2 }],
   ];
@@ -359,11 +398,14 @@ describe('differenceOf — what a missed read-back differs by, without content',
  * D28's invariant, swept: the typing and the verdict judge a prefix alike. Every reading that `tailOf` says holds some
  * of the typing, reformatted by the field, is a `dropped-tail` to `differenceOf` — with the same count landed. The
  * readings are every prefix of the expected text grouped as fields group it (fours, thousands from the right, pairs;
- * spaces, no-break spaces and the marks), after an earlier text, a vanished unnamed placeholder or none.
+ * spaces, no-break spaces and the marks; D60: eagerly, a mark after every complete group), after an earlier text, a
+ * vanished unnamed placeholder or none.
  */
 describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
   const groupLeft = (t: string, n: number, sep: string) => (t.match(new RegExp(`.{1,${n}}`, 'gu')) ?? []).join(sep);
   const groupRight = (t: string, n: number, sep: string) => [...groupLeft([...t].reverse().join(''), n, sep)].reverse().join('');
+  // D60: an eager field, its mark added once a group is complete — every prefix of it may end in that mark.
+  const eagerLeft = (t: string, n: number, sep: string) => (t.match(new RegExp(`.{1,${n}}`, 'gu')) ?? []).map((g) => ([...g].length === n ? g + sep : g)).join('');
   const cases: Partial<Expectation>[] = [
     { value: 'SK3112000000', clear: true },
     { value: 'SK3112000000', before: 'SK00 0000 0000 …' },
@@ -376,23 +418,28 @@ describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
   ];
   it('every reformatted prefix with some of the typing in it is a dropped tail, the same count landed', () => {
     let swept = 0;
+    let trailing = 0;
+    const MARKS = new Set([' ', '\u00A0', '\u202F', ',', '.', '-']);
     for (const c of cases) {
       const e = expecting({ value: '', ...c });
       const whole = (e.clear ? '' : (e.before ?? '')) + e.value;
       const plain = whole.replace(/[\s.,]/gu, '');
       const shapes = [whole, plain];
       for (const sep of [' ', ' ', ' ', ',', '.', '-'])
-        for (const n of [2, 3, 4]) shapes.push(groupLeft(plain, n, sep), groupRight(plain, n, sep), groupLeft(whole, n, sep));
+        for (const n of [2, 3, 4]) shapes.push(groupLeft(plain, n, sep), groupRight(plain, n, sep), groupLeft(whole, n, sep), eagerLeft(plain, n, sep));
       for (const shape of shapes)
         for (let k = 1; k <= [...shape].length; k++) {
           const reading = [...shape].slice(0, k).join('');
           const tail = tailOf(reading, e);
           if (tail === undefined || tail.landed <= 0 || tail.reformatted === undefined) continue; // some of the typing landed
           swept++;
+          const last = [...reading].at(-1) ?? '';
+          if (MARKS.has(last) && !whole.includes(last)) trailing++; // an added mark last: D60's
           expect(differenceOf(reading, e), JSON.stringify({ reading, c })).toMatchObject({ kind: 'dropped-tail', landed: tail.landed });
         }
     }
     expect(swept).toBeGreaterThan(50); // the sweep is not vacuous
+    expect(trailing).toBeGreaterThan(20); // nor its D60 part: prefixes that end in an eager trailing mark
   });
 });
 
