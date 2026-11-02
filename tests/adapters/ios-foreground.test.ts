@@ -375,3 +375,17 @@ describe('regression: an assert right after launch_app judges the launched app, 
     expect(r.pass).toBe(false);
   });
 });
+
+describe('the launch and the liveness check share one appinfo per bundle (D33)', () => {
+  it('an idb launch, then isAppRunning: one appinfo in all, and the check asks pgrep with its Path', async () => {
+    const info =
+      '{\n    CFBundleExecutable = Contacts;\n    CFBundleName = Contacts;\n' +
+      '    Path = "/Users/me/Library/Developer/CoreSimulator/Devices/AAAA-1111/data/Containers/Bundle/Application/G/Contacts.app";\n}\n';
+    const d = device([CONTACTS], info);
+    await d.adapter.launch('com.apple.MobileAddressBook');
+    expect(await d.adapter.isAppRunning('com.apple.MobileAddressBook')).toBe(true);
+    expect(d.appinfos()).toHaveLength(1);
+    expect(d.calls.filter((c) => c.startsWith('/usr/bin/pgrep'))).toHaveLength(1);
+    expect(d.calls.filter((c) => c.includes('launchctl'))).toEqual([]);
+  });
+});

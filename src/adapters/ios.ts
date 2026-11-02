@@ -11,7 +11,8 @@ import { errorMessage } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
 import type { DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
 import { awaitForeground } from './ios-foreground.js';
-import { appInfoNames } from './simctl-appinfo.js';
+import { appInfoBundle, appInfoNames } from './simctl-appinfo.js';
+import { hostProcessPattern, pgrepVerdict, type AppBinary } from './ios-liveness.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { sleep } from '../util/sleep.js';
@@ -100,6 +101,17 @@ export function iosScreenshotViaSimctl(env: NodeJS.ProcessEnv = process.env): bo
  * of D25), loaded hosts.
  */
 export const FIRST_KEY_ALONE_MS = 50;
+
+/**
+ * The host pgrep's budget in isAppRunning (D33): it answers in ~19 ms (median, lab simulator); a host too loaded to
+ * answer in 5 s gets launchctl for that check, and pgrep again next time.
+ */
+export const PGREP_TIMEOUT_MS = 5_000;
+
+/** One bundle's `simctl appinfo`, as IosAdapter caches it: the launch's names, the liveness check's binary. */
+interface AppInfo extends AppBinary {
+  names: readonly string[];
+}
 
 /**
  * The app the typing goes into, as far as an IosAdapter knows (D24 — what its memory of tail-dropping apps is keyed
@@ -280,6 +292,9 @@ export class IosAdapter implements DeviceAdapter {
   // --- simctl-backed lifecycle ---
 
   async install(appPath: string): Promise<void> {
+    // A reinstall can move the bundle container (a new GUID in Path) and rename the app or its executable: every
+    // appinfo this adapter read may be stale now (D33).
+    this.appInfoCache.clear();
     await this.simctl(['install', this.udid, appPath], 120_000);
   }
 
@@ -310,15 +325,34 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   /**
-   * appInfoNames per bundle, read once per adapter — a name does not change under a session (a reinstall that renames the app is the exception, and costs one stale note at most).
-   * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter's launches looked up (the idb source — WDA declines the check before asking; this process), so an app opened by hand or before the server started is not in it.
+   * One `simctl appinfo` per bundle, read once per adapter (D33: the launch's names and the liveness check's
+   * executable path share it) — a name or a path does not change under a session; install() clears it (a reinstall
+   * can move the container and rename the app), and a liveness check whose pgrep and launchctl disagree drops that
+   * bundle's entry. Only an answer that listed names is cached (appInfo), so a failed or name-less one is asked again.
+   * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter looked up (an idb-source launch — WDA declines the check before asking; a liveness check; this process), so an app never launched or checked through this server is not in it.
    */
-  private readonly appNamesCache = new Map<string, readonly string[]>();
+  private readonly appInfoCache = new Map<string, AppInfo>();
 
-  /** The bundle in `appNamesCache` one of whose names is `label` — the first when several share it; undefined when none does. No device call. */
+  /** The bundle in `appInfoCache` one of whose names is `label` — the first when several share it; undefined when none does. No device call. */
   private ownerOf(label: string): string | undefined {
-    for (const [bundle, names] of this.appNamesCache) if (names.includes(label)) return bundle;
+    for (const [bundle, info] of this.appInfoCache) if (info.names.includes(label)) return bundle;
     return undefined;
+  }
+
+  /**
+   * The bundle's `simctl appinfo`, cached per appInfoCache's rule; throws when the call fails. 10 s, not simctl's
+   * 30 s default: the lookup is an aid to the launch (and to the liveness check, which falls back without it), not
+   * part of it, and a simulator that cannot answer it in 10 s fails the reads that follow anyway (the same reasoning
+   * as the defaults writes below).
+   */
+  private async appInfo(bundleId: string): Promise<AppInfo> {
+    const cached = this.appInfoCache.get(bundleId);
+    if (cached !== undefined) return cached;
+    const { stdout } = await this.simctl(['appinfo', this.udid, bundleId], 10_000);
+    const text = stdout.toString('utf8');
+    const info: AppInfo = { names: appInfoNames(text), ...appInfoBundle(text) };
+    if (info.names.length > 0) this.appInfoCache.set(bundleId, info);
+    return info;
   }
 
   /**
@@ -326,19 +360,12 @@ export class IosAdapter implements DeviceAdapter {
    * call fails or lists neither name, and the foreground wait then says it
    * could not check, quoting the first line (review 2026-10-09: appinfo's
    * format is unmeasured, and a drift must not switch the check off
-   * unseen). Only a lookup that found names is cached, so a failed one is
-   * asked again on the next launch. 10 s, not simctl's 30 s default: the
-   * lookup is an aid to the launch, not part of it, and a simulator that
-   * cannot answer it in 10 s fails the reads that follow anyway (the same
-   * reasoning as the defaults writes below).
+   * unseen). Through appInfo: only a lookup that found names is cached, so
+   * a failed one is asked again on the next launch.
    */
   private async appNames(bundleId: string): Promise<readonly string[]> {
-    const cached = this.appNamesCache.get(bundleId);
-    if (cached !== undefined) return cached;
-    const { stdout } = await this.simctl(['appinfo', this.udid, bundleId], 10_000);
-    const names = appInfoNames(stdout.toString('utf8'));
+    const { names } = await this.appInfo(bundleId);
     if (names.length === 0) throw new Error('simctl appinfo listed neither CFBundleDisplayName nor CFBundleName');
-    this.appNamesCache.set(bundleId, names);
     return names;
   }
 
@@ -651,9 +678,65 @@ export class IosAdapter implements DeviceAdapter {
     );
   }
 
+  /** Set when pgrep could not read the host's process list (exit 2/3, spawn failure): launchctl from then on. */
+  private hostListUnreadable = false;
+
+  /**
+   * Liveness from the HOST's process list first (D33, docs/adr/0039-ios-liveness-asks-the-hosts-process-list.md):
+   * a simulator app is a macOS process, and `/usr/bin/pgrep -f` of the bundle's exact executable path (Path from
+   * the cached appinfo, ios-liveness.ts#hostProcessPattern) answers in ~19 ms where `simctl spawn launchctl list`
+   * takes ~240 ms (D33 measurement, lab simulator). A match is the answer. A NO is never trusted alone: launchctl
+   * confirms it, and when launchctl says running the cached path is stale and dropped — so the new path can never
+   * produce a false "not running", the verdict SKILL.md has the agent report as a crash. No pattern (appinfo failed,
+   * a key missing, a system app whose Path is the same on every simulator of its runtime) → launchctl. A timeout →
+   * launchctl this call. An unreadable list (exit 2/3, spawn failure — the Claude Code sandbox, measured
+   * 2026-11-02) → launchctl for the adapter's life, said once on stderr. A launchctl that cannot be asked throws, as
+   * before (appHealth's `unknown`). `/usr/bin/pgrep`, absolute: a Homebrew procps pgrep earlier on PATH has other exit
+   * codes and regex flavour.
+   */
   async isAppRunning(bundleId: string): Promise<boolean> {
+    if (this.hostListUnreadable) return this.launchctlLists(bundleId);
+    let info: AppBinary;
+    try {
+      info = await this.appInfo(bundleId);
+    } catch {
+      return this.launchctlLists(bundleId);
+    }
+    const pattern = hostProcessPattern(info, this.udid);
+    if (pattern === undefined) return this.launchctlLists(bundleId);
+    let failure: unknown = undefined;
+    try {
+      await this.exec('/usr/bin/pgrep', ['-f', pattern], { timeoutMs: PGREP_TIMEOUT_MS });
+    } catch (err) {
+      failure = err;
+    }
+    switch (pgrepVerdict(failure)) {
+      case 'yes':
+        return true;
+      case 'no': {
+        const running = await this.launchctlLists(bundleId);
+        if (running) this.appInfoCache.delete(bundleId);
+        return running;
+      }
+      case 'unreadable':
+        this.hostListUnreadable = true;
+        console.error(
+          `averi: the host process list is unreadable (${errorMessage(failure).split('\n')[0]}) — ` +
+            `app liveness on ${this.udid} asks launchctl instead (~240 ms a check)`,
+        );
+        return this.launchctlLists(bundleId);
+      case 'timeout':
+        return this.launchctlLists(bundleId);
+    }
+  }
+
+  /**
+   * The simulator's launchd lists the app: `UIKitApplication:<bundle>[` — the bracket makes it exact (D33, a
+   * deliberate verdict change: the old `includes` without it read `com.x.app` running while only `com.x.app.dev` ran).
+   */
+  private async launchctlLists(bundleId: string): Promise<boolean> {
     const { stdout } = await this.simctl(['spawn', this.udid, 'launchctl', 'list']);
-    return stdout.toString('utf8').includes(`UIKitApplication:${bundleId}`);
+    return stdout.toString('utf8').includes(`UIKitApplication:${bundleId}[`);
   }
 
   async logs(sinceMs: number): Promise<string[]> {

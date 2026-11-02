@@ -855,3 +855,147 @@ describe('IosAdapter + fillField — a dropped tail on one fill makes the next f
     expect(typed()).toEqual(['Jan Novak']);
   });
 });
+
+describe('IosAdapter.isAppRunning — the host process list first, a no confirmed by launchctl (D33, ADR 0039)', () => {
+  const UDID = 'AAAA-1111';
+  const BUNDLE = 'com.x.app';
+  const PATH = `/Users/me/Library/Developer/CoreSimulator/Devices/${UDID}/data/Containers/Bundle/Application/G-1/Runner.app`;
+  const INFO = `{\n    CFBundleExecutable = Runner;\n    CFBundleName = Runner;\n    Path = "${PATH}";\n}\n`;
+  const PATTERN = `/Users/me/Library/Developer/CoreSimulator/Devices/${UDID}/data/Containers/Bundle/Application/G-1/Runner\\.app/Runner( |$)`;
+  const LISTED = `PID\tStatus\tLabel\n123\t0\tUIKitApplication:${BUNDLE}[0x1a2b][rb-legacy]\n`;
+  const NOT_LISTED = 'PID\tStatus\tLabel\n1\t0\tcom.apple.springboard\n';
+  const fail = (cmd: string, code: number | null, timedOut = false) => new ExecError(cmd, code, 'err', timedOut);
+
+  type Answer = string | Error;
+  /** An exec answering per command prefix in turn (the last answer repeats); every command line is recorded. */
+  function device(answers: { appinfo?: Answer[]; pgrep?: Answer[]; launchctl?: Answer[] }) {
+    const calls: string[] = [];
+    const turn: Record<string, number> = {};
+    const next = (key: 'appinfo' | 'pgrep' | 'launchctl', fallback: Answer): Answer => {
+      const list = answers[key] ?? [fallback];
+      const i = turn[key] ?? 0;
+      turn[key] = i + 1;
+      return list[Math.min(i, list.length - 1)];
+    };
+    const fn: ExecFn = async (cmd, args, opts): Promise<ExecResult> => {
+      const full = [cmd, ...args].join(' ');
+      if (full.startsWith('xcrun --find')) return { stdout: Buffer.alloc(0), stderr: '' }; // xcode-env's one-time probe
+      calls.push(full);
+      let a: Answer = '';
+      if (full.startsWith(`xcrun simctl appinfo ${UDID} `)) a = next('appinfo', INFO);
+      else if (cmd === '/usr/bin/pgrep') {
+        expect(args).toEqual(['-f', expect.any(String)]);
+        expect(opts?.timeoutMs).toBe(5_000);
+        a = next('pgrep', '');
+      } else if (full.startsWith(`xcrun simctl spawn ${UDID} launchctl list`)) a = next('launchctl', LISTED);
+      if (a instanceof Error) throw a;
+      return { stdout: Buffer.from(a), stderr: '' };
+    };
+    const adapter = new IosAdapter({ udid: UDID, exec: fn, treeSource: NO_TREE });
+    const count = (prefix: string) => calls.filter((c) => c.startsWith(prefix)).length;
+    return {
+      adapter,
+      calls,
+      appinfos: () => count('xcrun simctl appinfo'),
+      pgreps: () => count('/usr/bin/pgrep'),
+      launchctls: () => count(`xcrun simctl spawn ${UDID} launchctl`),
+    };
+  }
+
+  let stderr: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('running: one appinfo, one pgrep of the exact path, no launchctl — and a second check is pgrep alone', async () => {
+    const d = device({});
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(d.calls).toEqual([`xcrun simctl appinfo ${UDID} ${BUNDLE}`, `/usr/bin/pgrep -f ${PATTERN}`]);
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(d.calls.slice(2)).toEqual([`/usr/bin/pgrep -f ${PATTERN}`]);
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
+  it('pgrep finds nothing but launchctl lists the app: running — and the stale path is dropped (appinfo asked again)', async () => {
+    const d = device({ pgrep: [fail('pgrep', 1), ''] });
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(d.launchctls()).toBe(1);
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(d.appinfos()).toBe(2);
+    expect(d.launchctls()).toBe(1);
+  });
+
+  it('pgrep finds nothing and launchctl agrees: not running — the path stays cached', async () => {
+    const d = device({ pgrep: [fail('pgrep', 1)], launchctl: [NOT_LISTED] });
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(false);
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(false);
+    expect(d.appinfos()).toBe(1);
+    expect(d.pgreps()).toBe(2);
+    expect(d.launchctls()).toBe(2);
+  });
+
+  it('appinfo fails: launchctl decides, no pgrep — and the next check asks appinfo again', async () => {
+    const d = device({ appinfo: [new Error('appinfo timed out')] });
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(d.appinfos()).toBe(2);
+    expect(d.pgreps()).toBe(0);
+  });
+
+  it('an unreadable process list (pgrep exit 3): launchctl now and for the adapter\'s life, said once on stderr', async () => {
+    const d = device({ pgrep: [fail('pgrep', 3)] });
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(d.pgreps()).toBe(1);
+    expect(d.appinfos()).toBe(1);
+    expect(d.launchctls()).toBe(2);
+    expect(stderr).toHaveBeenCalledTimes(1);
+    expect(String(stderr.mock.calls[0][0])).toMatch(
+      new RegExp(`^averi: the host process list is unreadable \\(Command failed \\(exit 3\\): pgrep\\) — app liveness on ${UDID} asks launchctl instead`),
+    );
+  });
+
+  it('a spawn failure of pgrep is an unreadable list too', async () => {
+    const d = device({ pgrep: [fail('pgrep', null)] });
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    await d.adapter.isAppRunning(BUNDLE);
+    expect(d.pgreps()).toBe(1);
+  });
+
+  it('pgrep timed out: launchctl decides this check, and the next check asks pgrep again — nothing on stderr', async () => {
+    const d = device({ pgrep: [fail('pgrep', null, true), ''], launchctl: [NOT_LISTED] });
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(false);
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(d.pgreps()).toBe(2);
+    expect(d.launchctls()).toBe(1);
+    expect(d.appinfos()).toBe(1);
+    expect(stderr).not.toHaveBeenCalled();
+  });
+
+  it('pgrep finds nothing and launchctl cannot be asked: the check rejects (appHealth\'s `unknown`), never false', async () => {
+    const d = device({ pgrep: [fail('pgrep', 1)], launchctl: [fail('xcrun simctl spawn', null, true)] });
+    await expect(d.adapter.isAppRunning(BUNDLE)).rejects.toThrow(/timed out/);
+  });
+
+  it('launchctl matches the bundle id exactly: com.x.app.dev running is not com.x.app (a verdict change, ADR 0039)', async () => {
+    const d = device({ pgrep: [fail('pgrep', 1)], launchctl: ['123\t0\tUIKitApplication:com.x.app.dev[0x1][rb-legacy]\n'] });
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(false);
+  });
+
+  it('a Path outside this simulator\'s bundle containers (a system app): launchctl, no pgrep', async () => {
+    const system = '{\n    CFBundleExecutable = Contacts;\n    CFBundleName = Contacts;\n    Path = "/Library/Developer/CoreSimulator/RuntimeRoot/Applications/Contacts.app";\n}\n';
+    const d = device({ appinfo: [system] });
+    expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
+    expect(d.pgreps()).toBe(0);
+    expect(d.launchctls()).toBe(1);
+  });
+
+  it('install() forgets every bundle\'s appinfo: the next check asks it again', async () => {
+    const d = device({});
+    await d.adapter.isAppRunning(BUNDLE);
+    await d.adapter.install('/tmp/App.app');
+    await d.adapter.isAppRunning(BUNDLE);
+    expect(d.appinfos()).toBe(2);
+  });
+});
