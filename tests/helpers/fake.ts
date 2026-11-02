@@ -98,6 +98,28 @@ export function iosLoginFake({
 }
 
 /**
+ * Typing that lands one read late (D35 → L5's value-poll pins, ADR 0040): `typeText` records the text, the field
+ * stays as it was for the first read after it, and the read after that shows the value — so a fill's read-back polls
+ * exactly one round, and the test can pin that round's cadence.
+ */
+export function lateTyping(fake: FakeAdapter): void {
+  let pending: string | undefined;
+  fake.typeText = async (text) => {
+    fake.typed.push(text);
+    pending = text;
+  };
+  const origTree = fake.uiTree.bind(fake);
+  let typedReads = 0;
+  fake.uiTree = async () => {
+    if (pending !== undefined && typedReads++ === 1 && fake.focused) {
+      fake.focused.value = pending;
+      pending = undefined;
+    }
+    return origTree();
+  };
+}
+
+/**
  * What the fake types by default (types.ts#DeviceAdapter.typeable, ADR 0037): printable ASCII, as both real adapters —
  * so a test typing through the fake is refused where the device would refuse it.
  */
@@ -117,6 +139,8 @@ export class FakeAdapter implements DeviceAdapter {
   typingDelivery: TypingDelivery = 'on-return';
   /** Assignable: what typeText types — FAKE_TYPEABLE, printable ASCII; a test of typing a wider set sets PERMISSIVE. */
   typeable: Typeable = FAKE_TYPEABLE;
+  /** Assignable: the settle cadence fact (types.ts#DeviceAdapter.settleCadenceMs) — absent, as on Android and WDA, unless a test sets it (idb's 300). */
+  settleCadenceMs?: number;
   /** Each DeviceAdapter.noteDroppedTail a fill sent, in order with the typing: the index into `typed` it came after. */
   droppedTails: number[] = [];
   current: string;

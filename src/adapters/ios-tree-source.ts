@@ -46,6 +46,14 @@ export interface IosTreeSource {
    * (ios-foreground.ts#ForegroundCheck.source) only; its screenshots do not follow it (ios.ts#screenshotVia).
    */
   readonly kind: IosTreeSourceKind;
+  /**
+   * The cadence at which two of this source's reads may prove an element holds still (types.ts#DeviceAdapter.
+   * settleCadenceMs, which IosAdapter forwards; docs/adr/0040-the-settle-cadence-is-the-tree-sources.md). The SOURCE's
+   * fact, not the kind's: it is where inside a read the snapshot falls. Set only from a measurement of this source
+   * (idb: IDB_SETTLE_CADENCE_MS). Absent: unmeasured, and the settle runs at its default 500 (WDA's /source, which may
+   * snapshot anywhere inside a 0.3–1.7 s read, and the differential harness's recorded source).
+   */
+  readonly settleCadenceMs?: number;
   read(): Promise<UiNode>;
   /**
    * Which app a fresh read is OF. idb: the label of the payload's
@@ -415,6 +423,18 @@ const NO_FRONTMOST = /accessibility service named no frontmost application/i;
 export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
 
 /**
+ * idb's settle cadence (IosTreeSource.settleCadenceMs, ADR 0040): 300 ms, measured (D35, d35-motion). describe-all
+ * snapshots AX at once, in a 20–31 ms read (batch-3 B2 medians), so two reads 300 ms apart compare two snapshots about
+ * 300 ms apart. Back-to-back reads through 105 moving trials (batch-2 B 45, batch-3 B2 60: list flings, a bounded
+ * scroll, a paging carousel in a list), with resolveSettled replayed offline at each cadence: 0 wrong settles at 300,
+ * 400 and 500; 1 at 250 and 1 at 200, both the carousel's last ~100 ms of deceleration. 300 is the least cadence with 0
+ * in both batches — one 50 ms step above a failure, and 0/105 bounds the rate below ≈ 2.9 % (95 %), the same bound as
+ * 500's. False-equal pairs at a 300 ms gap: 3 of 111 694 (2.7·10⁻⁵), no more frequent than at 400 or 500. Sheets and
+ * the keyboard are moot on idb (AX reports the end frame at once, 15/15 each). A new value only from a re-measure.
+ */
+export const IDB_SETTLE_CADENCE_MS = 300;
+
+/**
  * The default tree source: one `idb ui describe-all --json` per read, nothing
  * to start and nothing to dispose. `exec` defaults to the real one — the same
  * function IosAdapter defaults to, so in production the two share the
@@ -423,6 +443,8 @@ export const DESCRIBE_ALL_TIMEOUT_MS = 15_000;
  */
 export class IdbTreeSource implements IosTreeSource {
   readonly kind = 'idb' as const;
+  /** Measured: IDB_SETTLE_CADENCE_MS's doc. */
+  readonly settleCadenceMs = IDB_SETTLE_CADENCE_MS;
   private readonly udid: string;
   private readonly exec: ExecFn;
   /**

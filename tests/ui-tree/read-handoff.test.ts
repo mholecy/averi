@@ -176,6 +176,17 @@ describe('ReadHandOff', () => {
     expect(second.take()).toBeUndefined();
   });
 
+  it('the settle cadence is a fact (ADR 0040): a watched adapter reads it, and the kept read stands', async () => {
+    expect(ADAPTER_SURFACE.settleCadenceMs).toBe('fact');
+    const handOff = new ReadHandOff();
+    const f = fake();
+    f.settleCadenceMs = 300;
+    const adapter = handOff.watch<DeviceAdapter>(f);
+    await handOff.producing(() => adapter.uiTree());
+    expect(adapter.settleCadenceMs).toBe(300);
+    expect(handOff.take()).toBeDefined();
+  });
+
   it('watching its own proxy again returns it, and keeps absent optional members absent', () => {
     const handOff = new ReadHandOff();
     const f = fake();
@@ -183,6 +194,7 @@ describe('ReadHandOff', () => {
     expect(handOff.watch(adapter)).toBe(adapter);
     expect(adapter.focusedWindow).toBeUndefined();
     expect(adapter.keyboard).toBeUndefined();
+    expect(adapter.settleCadenceMs).toBeUndefined();
     expect(adapter.platform).toBe('android');
   });
 });

@@ -14,7 +14,8 @@ export type TapAdapter = KeyboardAdapter;
  * Wait for the target to appear and settle (resolveSettled: one policy for
  * the flow engine's `tap:` step and the MCP `tap` tool), then tap the chosen
  * node at the guard's point. Returns the resolution note, if any, for the caller to
- * surface — the engine's trace does not print it, the MCP tool does.
+ * surface — the engine's trace does not print it, the MCP tool does. The
+ * settle's cadence: resolve.ts#settleCadence.
  *
  * The node comes from resolveClearOfKeyboard (keyboard.ts): on an adapter
  * with a keyboard oracle (Android) a target under the soft keyboard is not

@@ -161,6 +161,7 @@ export const ADAPTER_SURFACE: Record<keyof DeviceAdapter, 'tree' | 'reads' | 'ac
   keyboardAdvice: 'fact',
   dragSpeed: 'fact',
   treeReadSettles: 'fact',
+  settleCadenceMs: 'fact',
   typingDelivery: 'fact',
   typeable: 'fact',
   noteDroppedTail: 'reads',

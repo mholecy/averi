@@ -481,7 +481,10 @@ export class FlowEngine {
   private readonly credentials: Credentials;
   /**
    * How this engine acts on an element, given once (2026-10-09; until then
-   * each call site spelled it out): FLOW_AMBIGUITY, the poll interval, and
+   * each call site spelled it out): FLOW_AMBIGUITY, the poll interval only when
+   * EngineOptions.pollMs pins one (since 2026-11-02, ADR 0040: otherwise a
+   * settle runs at the adapter's cadence, interact/resolve.ts#settleCadence,
+   * and the presence probe at resolve.ts#DEFAULT_POLL_MS), and
    * `app.ios.keyboardDismiss` in interact/'s vocabulary (flow/config.ts#
    * keyboardDismissals), converted once here. Every tap, fill, presence probe
    * and post-fill dismissal gets it; a site adds only what is its own (a
@@ -534,7 +537,9 @@ export class FlowEngine {
     this.pinKeyDelayMs = opts.pinKeyDelayMs ?? 300;
     this.acting = {
       ambiguous: FLOW_AMBIGUITY,
-      pollMs: this.pollMs,
+      // Only a pinned pollMs (tests) is the settle's: otherwise a tap's and a fill's settle runs at the adapter's
+      // measured cadence (interact/resolve.ts#settleCadence, ADR 0040), and the presence probe at its own 500.
+      ...(opts.pollMs !== undefined && { pollMs: opts.pollMs }),
       dismissals: keyboardDismissals(cfg),
       eyes: eyesOn(this.adapter),
     };
@@ -1362,6 +1367,9 @@ export class FlowEngine {
         clear,
         timeoutMs: this.tapTimeoutMs,
         first: this.handOff,
+        // The value poll is the engine's cadence, 500 in production — not the settle's (ADR 0040): its five rounds
+        // are the window a late-arriving value (RN on WDA) has to land in.
+        valuePollMs: this.pollMs,
         // No focus-delay knob: the 350 ms is interact/fill.ts's; the engine
         // tests mock util/sleep instead of threading a test-only option here.
       }),

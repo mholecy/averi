@@ -88,8 +88,20 @@ export interface Resolved {
  */
 export const DEFAULT_SETTLE_TIMEOUT_MS = 5_000;
 
-/** Cadence for the settle poll and the fill's value poll when the caller has none of its own. */
+/**
+ * The settle poll's last fallback (settleCadence), and the presence poll's cadence (resolvePresent) when the caller
+ * has none. The fill's value poll has its own (fill.ts#DEFAULT_VALUE_POLL_MS).
+ */
 export const DEFAULT_POLL_MS = 500;
+
+/**
+ * The settle's cadence — the one owner of the choice (ADR 0040): the caller's `pollMs` when it pins one (tests, and
+ * any caller that must stay deterministic), else the adapter's measured fact (types.ts#DeviceAdapter.settleCadenceMs:
+ * 300 on iOS idb), else DEFAULT_POLL_MS. Pure; 0 is a value at either level. Asked by resolveSettled only:
+ * resolvePresent makes no stability claim, so a source's fact says nothing about its cadence.
+ */
+export const settleCadence = (adapter: Pick<DeviceAdapter, 'settleCadenceMs'>, opts: Pick<SettleOptions, 'pollMs'>): number =>
+  opts.pollMs ?? adapter.settleCadenceMs ?? DEFAULT_POLL_MS;
 
 /**
  * What to do when the policy's tie-breakers are spent and several nodes
@@ -164,7 +176,10 @@ export interface ResolveOptions {
 export interface SettleOptions extends ResolveOptions {
   /** How long the element may take to appear AND hold still (for resolvePresent: to appear). Default DEFAULT_SETTLE_TIMEOUT_MS. */
   timeoutMs?: number;
-  /** Pause between tree reads. Default DEFAULT_POLL_MS. */
+  /**
+   * The cadence of the tree reads (the pause is ui-tree/read-tree.ts#pauseAfterRead of it). resolveSettled: when
+   * absent, settleCadence's doc says what applies. resolvePresent: when absent, DEFAULT_POLL_MS.
+   */
   pollMs?: number;
   /**
    * A read handed on from the step before (ui-tree/read-handoff.ts; the flow engine's taps and fills after a `wait:`,
@@ -267,6 +282,8 @@ export interface ResolvedSettled extends Resolved {
  * The read error, when the last round could not read a tree, rides beneath
  * either so a dead device never looks like a slow screen.
  *
+ * The reads' cadence is settleCadence's (since 2026-11-02; the rule is its doc).
+ *
  * `opts.first` (since 2026-10-31, ADR 0030): a handed-on read is the first
  * sample and nothing else. Its rect is the one the first fresh read must
  * match; it is not a sighting, not a run and never the tree returned — so
@@ -278,7 +295,7 @@ export interface ResolvedSettled extends Resolved {
  * docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md
  */
 export async function resolveSettled(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice' | 'settleCadenceMs'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<ResolvedSettled> {
@@ -308,7 +325,7 @@ export async function resolveSettled(
       lastRect = rect;
       return undefined;
     },
-    { timeoutMs, pollMs: opts.pollMs ?? DEFAULT_POLL_MS, ...(opts.first !== undefined && { first: opts.first }) },
+    { timeoutMs, pollMs: settleCadence(adapter, opts), ...(opts.first !== undefined && { first: opts.first }) },
   );
   if (!outcome.timedOut) return outcome.value;
   let { readError } = outcome;

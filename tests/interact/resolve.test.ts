@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 afterEach(() => {
@@ -9,7 +9,8 @@ import { PersistentReadError, type Rect, type UiNode } from '../../src/adapters/
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { tapText } from '../../src/mcp/tool-text.js';
-import { absenceError, AmbiguityRefusal, DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolveNow, resolvePresent, resolveSettled } from '../../src/interact/resolve.js';
+import { absenceError, AmbiguityRefusal, DEFAULT_POLL_MS, DEFAULT_SETTLE_TIMEOUT_MS, ElementNotFoundError, resolveNow, resolvePresent, resolveSettled, settleCadence } from '../../src/interact/resolve.js';
+import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { ClippedRefusal, CoveredRefusal, OffScreenRefusal } from '../../src/interact/tap-judgement.js';
 import { fillField } from '../../src/interact/fill.js';
 import { scrollUntilVisible } from '../../src/interact/scroll.js';
@@ -1586,5 +1587,86 @@ describe('resolveSettled — a handed-on first sample (ADR 0030)', () => {
     });
     expect(settled.node.rect.y).toBe(100);
     expect(reads()).toBe(2);
+  });
+});
+
+// D35 → L5 (ADR 0040): the settle's cadence is the adapter's fact (types.ts#DeviceAdapter.settleCadenceMs) unless the
+// caller pins one. Date faked, so a fake read costs exactly what its uiTree moves the clock by.
+describe('settleCadence — the settle cadence is the tree source\'s (ADR 0040)', () => {
+  it.each([
+    ['no fact, no pollMs: the default', {}, {}, DEFAULT_POLL_MS],
+    ['the fact alone', { settleCadenceMs: 300 }, {}, 300],
+    ["the caller's pollMs wins over the fact", { settleCadenceMs: 300 }, { pollMs: 2 }, 2],
+    ["the caller's pollMs with no fact", {}, { pollMs: 7 }, 7],
+    ['a pollMs of 0 is a value', { settleCadenceMs: 300 }, { pollMs: 0 }, 0],
+    ['a fact of 0 is a value', { settleCadenceMs: 0 }, {}, 0],
+  ])('%s', (_what, adapter: { settleCadenceMs?: number }, opts: { pollMs?: number }, cadence) => {
+    expect(settleCadence(adapter, opts)).toBe(cadence);
+  });
+
+  it('the default is 500', () => {
+    expect(DEFAULT_POLL_MS).toBe(500);
+  });
+});
+
+describe('resolveSettled — at the adapter\'s settle cadence (ADR 0040)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    resetSleeps();
+    resetLayout();
+  });
+
+  /** A fake holding one static button, whose read costs `readMs` (the clock moved inside uiTree), with `fact` as its cadence. */
+  const holding = (fact: number | undefined, readMs = 0) => {
+    const fake = new FakeAdapter({ s: screen(el({ role: 'button', identifier: 'target' })) }, 's');
+    if (fact !== undefined) fake.settleCadenceMs = fact;
+    const origTree = fake.uiTree.bind(fake);
+    fake.uiTree = async () => {
+      vi.setSystemTime(Date.now() + readMs);
+      return origTree();
+    };
+    return fake;
+  };
+
+  it('a fact of 300 and no pollMs: a target static from the first read settles after one 300 ms pause', async () => {
+    await resolveSettled(holding(300), { id: 'target' }, FIRST);
+    expect(sleeps).toEqual([300]);
+  });
+
+  it('the pause counts the read (ADR 0029): a 40 ms read leaves 260, a 200 ms one the 150 floor', async () => {
+    await resolveSettled(holding(300, 40), { id: 'target' }, FIRST);
+    expect(sleeps).toEqual([260]);
+    resetSleeps();
+    await resolveSettled(holding(300, 200), { id: 'target' }, FIRST);
+    expect(sleeps).toEqual([150]);
+  });
+
+  it("a caller's pollMs wins over the fact", async () => {
+    await resolveSettled(holding(300), { id: 'target' }, { ...FIRST, pollMs: 2 });
+    expect(sleeps).toEqual([2]);
+  });
+
+  it('no fact and no pollMs: the unchanged default, 500', async () => {
+    await resolveSettled(holding(undefined), { id: 'target' }, FIRST);
+    expect(sleeps).toEqual([500]);
+  });
+
+  it('a handed first sample under the fact: the fresh read starts 300 − the handed read − the time since it ended', async () => {
+    const fake = holding(300);
+    const handed = await fake.uiTree();
+    const now = Date.now();
+    let given = false;
+    const first = { take: () => (given ? undefined : ((given = true), { tree: handed, startedAt: now - 50, endedAt: now - 20 })) };
+    await resolveSettled(fake, { id: 'target' }, { ...FIRST, first });
+    expect(sleeps).toEqual([300 - 30 - 20]);
+  });
+
+  it('resolvePresent makes no stability claim: it polls at 500 whatever the fact', async () => {
+    const fake = holding(300);
+    const present = screen(el({ role: 'button', identifier: 'target' }));
+    let reads = 0;
+    fake.uiTree = async () => (reads++ === 0 ? screen() : structuredClone(present));
+    await resolvePresent(fake, { id: 'target' }, FIRST);
+    expect(sleeps).toEqual([500]);
   });
 });

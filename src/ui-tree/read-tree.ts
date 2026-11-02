@@ -314,7 +314,8 @@ export const SETTLE_FLOOR_MS = 150;
  * - Android: a dump snapshots after its own idle wait of at least a second (AOSP DumpCommand's
  *   `waitForIdle(1000, 10000)`, not measured here), so two are ≥ 1 s + the floor apart.
  * - idb: the read is short, so the remainder is slept; two snapshots are at least pollMs − the first read apart,
- *   typically ≈ pollMs.
+ *   typically ≈ pollMs — for the settle, idb's measured cadence, 300 (ios-tree-source.ts#IDB_SETTLE_CADENCE_MS; the
+ *   settle's pollMs is interact/resolve.ts#settleCadence's, docs/adr/0040-the-settle-cadence-is-the-tree-sources.md).
  * - WDA: a /source (0.3–1.7 s) may snapshot anywhere inside its read, so two are at least the floor apart plus
  *   whatever of the reads lies between them. The residual: two snapshots as close as 150 ms may agree on an element
  *   moving too slowly to show a change in that time. Without the floor a slow read followed by a fast one could put

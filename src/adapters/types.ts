@@ -1216,6 +1216,21 @@ export interface DeviceAdapter {
    */
   readonly treeReadSettles?: true;
   /**
+   * The cadence, in ms, at which two reads of this adapter's tree may prove an element holds still: the pollMs the
+   * settle (interact/resolve.ts#resolveSettled, "the same rect on two consecutive reads") runs at when its caller
+   * pins none (resolve.ts#settleCadence). It claims that two SNAPSHOTS about this far apart — reads starting this far
+   * apart, the pause being ui-tree/read-tree.ts#pauseAfterRead — do not show a moving element at one rect, on this
+   * source's motions. Absent: DEFAULT_POLL_MS (500), the cadence the settle always ran at.
+   *
+   * A measurement, never a judgement (docs/adr/0040-the-settle-cadence-is-the-tree-sources.md): a value is set only
+   * from a d35-motion-style run of that source (back-to-back reads through real motions, the settle replayed at each
+   * cadence). The fact is the tree SOURCE's — where in a read its snapshot falls — so IosAdapter forwards its source's
+   * (ios-tree-source.ts#IosTreeSource.settleCadenceMs): idb's describe-all, 300 (IDB_SETTLE_CADENCE_MS); WDA, none
+   * (unmeasured). Android sets none, and needs none: a 2.2–2.5 s dump makes the pause the 150 ms floor at any cadence
+   * up to the read + 150.
+   */
+  readonly settleCadenceMs?: number;
+  /**
    * When text sent by `typeText` has reached the focused field
    * (`TypingDelivery`) — the platform fact the fill's retype of a dropped
    * tail asks (interact/fill-type.ts, docs/adr/0023-fill-types-a-dropped-
