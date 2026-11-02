@@ -9,6 +9,8 @@ placeholder — and rf4's tail, a residual of blind typing; implemented on `fix/
 2026-11-01 (D31: the accepted residuals numbered under "Residuals accepted"; rf4's is residual 2, filed in live-known.ts).
 Amended 2026-11-02 (D51: an added `.`/`,` that groups digits — a dotted date, a lakh — and a `_` mask template that is
 no earlier text, narrowing D29's MINOR-A; residual 4 accepted; implemented on `fix/d51-dotted-date-lands`).
+Amended 2026-11-02 (D53: a reading that shows every typed character in order with only separators the rules refuse
+fails `separated`, naming the check and the remedy; implemented on `fix/d53-separated`).
 
 ## Context
 
@@ -363,6 +365,60 @@ under idb, WDA and uiautomator (docs/truth/live-records/ios-idb-forms-d51-1.json
 android-forms-d51-1.json) — f11 reads `Filled id:"lab.form-format.date" (8 characters, the field shows them
 reformatted: 2 separators added)`. Part two's premise holds: a describe-all of the empty date field shows
 `__.__.____` as its value, no placeholder, so f11 under idb exercises the mask template.
+
+## Amendment: a refused separated reading names the check and the remedy (2026-11-02, D53)
+
+**Context.** Consequences lists the rule's false mismatches — mixed separators (`+421 900-123-456`), an eager trailing
+mark (`SK31 `), groups of one (`1 2 3 4`), autocorrect splitting a word (`a lot`) — and a cents mask's `12.34` for
+`1234` is a refusal by design (one `.` that is no thousands mark: a decimal point changes the amount). Each says "type
+the value as the field shows it", but the reply did not: all of them failed `length`, `typed 4 characters but the
+field shows 5 (content withheld from this error)`, which names no remedy (the D51 amendment said `length`/
+`same-length`; it is `length` in every case, as an added separator makes the reading longer).
+
+**Decision.**
+- `fill-reformat.ts#separatedOf(observed, expected)`: the walk `reformatOf` takes (`walk`) matched every expected
+  character, in order and unchanged (a typed space may be shown as another space), and tagged at least one reading
+  character as an added separator — of `SEPARATORS`, the D18 set, neither widened nor doubled (`:`, `+`, `(`, `€`,
+  `_` stay a `length`). It returns how many were added, every one, not the groups. The grouping rules are not asked:
+  the reading did not land, so they refused it.
+- A new `Difference` kind, `separated` with `added` (fill-facts.ts; eight kinds), classified by
+  `fill-landing.ts#differenceOf` right after `dropped-tail`, over `priorsOf` on the held text as `landedReformat` and
+  `tailOf` judge it: the earlier text first, then none when it vanished (D29) or is a mask template (D51). A reading
+  equal to a named placeholder is held as empty and stays `length`; bullets stay `masked` or a partly masked
+  `length`, which come first.
+- It only re-words a failure: landing (`landingOf`, `reformatOf`, `prefixOf`) is unchanged, so no reading passes or
+  fails differently and nothing new is typed again; with clear the wipe and retype runs first, as before. It is
+  disjoint from `dropped-tail` (all of the typing shown, not a strict prefix) and never `same-length` (it is longer).
+  It re-words `length` but for one contrived `case`: without clear, where the only run that matches the value but for
+  case is of the earlier text (`x,ABa-b` after `xAB`, `ab` typed) — the typing is all there, so `separated` is the
+  true word. A PRECONDITION, not a guard: `differenceOf` runs only on a reading that did not land; asked of one
+  `reformatOf` passes (`1 234` for `1234`) it would read `separated`, so no second walk checks it.
+- The reply, counts only, with the check before the remedy (typing `12.34` into a cents mask passes, and means 12.34):
+  `fill: typed 4 characters but the field shows 5 — every typed character is there, in order, with 1 separator added
+  (spaces or . , - /) that the fill does not take for the field's grouping (a decimal point or a sign, mixed or
+  trailing marks, groups of one, a word split by autocorrect): check the field holds the value you meant — a cents
+  mask shows a typed 1234 as 12.34 — and if it does, type the value as the field shows it; content withheld from this
+  error`. The causes are alternatives, not a diagnosis: the Difference does not know which applies. The list of marks
+  is `SEPARATORS`'s, and a test pins that the two agree. `(after one wipe and retype)` rides on the lengths, as on
+  every mismatch.
+
+**Consequences.** Beyond the four shapes it names a leading `-` (a sign), a leading or trailing `.`, `1.2.3.4`, two
+adjacent separators and smart punctuation's `Hello, world` for `Hello,world` — all true statements, all still
+failures. Out of scope, a backlog row of its own: a dropped tail that ends in an eager trailing mark (`SK31 1200 ` of
+a full IBAN) is neither typed again (`prefixOf` refuses the trailing mark) nor named — it stays `length`; fixing it
+changes the retype, not the wording. No new residual: nothing passes that did not.
+
+**The golden says nothing of this change** (it never types): 0 changed. Live: no lab format produces a refused
+separated reading, and tests/truth/live-rejudge.test.ts re-judges the recorded replies by class and kind, so nothing
+changes there either; the reply stays `refused` (it holds no `not found`).
+
+**Mutation-checked**: hand mutants, each killed by the new tests — `separatedOf` with its `matched` check removed or
+loosened to `>`, `> 0` → `>= 0`, every added separator counted as one, the code points counted as UTF-16 units;
+`differenceOf` without the rule, with the earlier text alone (not `priorsOf`), the value alone (not the earlier text
+and the value), the raw reading (not the held text), the rule moved before `unchanged` or after `case`; the reply
+counting without `countOf`, a mark dropped from its list, a mark or a space added to `SEPARATORS`. Moved before
+`dropped-tail` it is equivalent (the two are disjoint). `npm run mutate` (cold): fill-reformat 94.35 → 94.69 % (floor
+92), fill-landing 95.20 → 95.33 % (floor 93), no survivor in the new code; floors unchanged.
 
 ## Residuals accepted
 
