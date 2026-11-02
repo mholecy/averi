@@ -88,6 +88,6 @@ function lookOf<R extends LookReading>(tree: UiNode, reading: R, seen: SeenOrder
 }
 
 /** The look of `tree` on `adapter`: with the adapter's keyboard reading off that tree (ui-tree/keyboard-cover.ts#readKeyboard — building it asks nothing). */
-export function lookOn(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>, tree: UiNode): Look {
+export function lookOn(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>, tree: UiNode): Look {
   return lookAt(tree, readKeyboard(adapter, tree));
 }

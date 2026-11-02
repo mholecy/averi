@@ -138,11 +138,12 @@ the way out each row requires (`judges.ts#judgedUnlisted`, a `WayOut`: a reader 
 presented colour row by its tree source — under uiautomator the presented remedy (`PRESENTED_REMEDY`,
 `#presentedRemedySaid`; never the active-window hint, as its tap row), under idb that or idb's reasons (`IDB_PRESENTED`;
 `#idbReasonsSaid`, on `src/ui-tree/miss.ts#IDB_UNLISTS` and `#COVERED_FIRST`); the under-keyboard colour and `ocr` rows
-idb's reasons (`IDB_REASONS`); the under-keyboard stop and tap idb's reasons and the soft keyboard
-(`REASONS_AND_KEYBOARD`; the tap's timeout names it where idb's keys are read up by shape, D32 K1). A bare "not found",
-or one naming another row's remedy, is a mismatch there. The 16 under-keyboard `ocr` rows are judged so only
-where the host's recognizer reads (outside the sandbox): replayed by hand they answer as the colour rows, but they are
-unproven on a Vision host, and would surface as 16 unknown mismatches if wrong. A wait whose
+idb's reasons (`IDB_REASONS`); the under-keyboard stop idb's reasons and the soft keyboard (`REASONS_AND_KEYBOARD`),
+its tap idb's reasons and the soft keyboard idb lists nothing beneath (`REASONS_AND_KEYBOARD_UNLISTED`,
+`replies.ts#keyboardUnlistedSaid`: the tap's timeout says it where idb's keys are read up by shape, D32 K1). A bare
+"not found", or one naming another row's remedy, is a mismatch there. The 16 under-keyboard `ocr` rows are judged so
+only where the host's recognizer reads (outside the sandbox): replayed by hand they answer as the colour rows, but they
+are unproven on a Vision host, and would surface as 16 unknown mismatches if wrong. A wait whose
 hint says the selector matched nodes, none usable ("it matched only 0×0 nodes …", "… clipped out above its scroll
 container …"), is no such reply: the target is in the tree, refused for where it lies
 (replies.ts#notInTree; edges/scroll-collapsing's A, #10). A scroll is asked toward the target (truth.ts#directionOf):

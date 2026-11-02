@@ -429,10 +429,9 @@ function once<T>(ask: () => Promise<T>): () => Promise<T> {
  * and without a tree, every question reads `unknown` and nothing is asked.
  * Synchronous, asks nothing until a question is put (the module doc).
  */
-export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>, tree?: UiNode): KeyboardReading {
+export function readKeyboard(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>, tree?: UiNode): KeyboardReading {
   const oracle = adapter.keyboard;
-  const remedy: KeyboardRemedy =
-    oracle === undefined ? { dismissal: 'none', advice: adapter.keyboardAdvice, ...(adapter.keyboardCaution !== undefined && { caution: adapter.keyboardCaution }) } : { dismissal: 'back', advice: undefined };
+  const remedy: KeyboardRemedy = oracle === undefined ? { dismissal: 'none', advice: adapter.keyboardAdvice } : { dismissal: 'back', advice: undefined };
   const inTree: SoftKeyboard = { state: 'unknown' };
   // The three oracle calls, each once (the module doc's order); on the
   // in-tree model the band, read off the tree on first need.

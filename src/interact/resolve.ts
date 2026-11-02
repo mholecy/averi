@@ -278,7 +278,7 @@ export interface ResolvedSettled extends Resolved {
  * docs/bugs/2026-10-09-hold-still-timeout-after-one-read-blames-a-moving-element.md
  */
 export async function resolveSettled(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<ResolvedSettled> {
@@ -378,11 +378,11 @@ export function absenceError(message: string, seen: WaitEvidence): Error {
  * headline, as a plain Error: beneath a presented window listed alone the target is
  * not known absent — nobody saw the screen beneath (an optional step is skipped with
  * this headline, never "(not present)", as scroll_until's stop there).
- * Under idb with its soft keyboard band read up by shape (`keyboardUnlisting`), the keyboard and the way out go first,
+ * Under idb with its soft keyboard band read up by shape (`keyboardMissNote`), the keyboard and the way out go first,
  * on a line of their own above the miss's note (D32 K1).
  */
 async function notFound(
-  adapter: Pick<DeviceAdapter, 'focusedWindow' | 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>,
+  adapter: Pick<DeviceAdapter, 'focusedWindow' | 'keyboard' | 'keyboardAdvice'>,
   target: Target,
   timeoutMs: number,
   outcome: { readError?: Error; treesRead: number; lastTree?: UiNode },
@@ -391,7 +391,7 @@ async function notFound(
   const tree = await markedForMiss(adapter, outcome, target);
   const miss = missOf({ tree, readError: outcome.readError, target });
   if (miss.of === 'presented') return new Error(`Timed out after ${timeoutMs}ms: ${presentedAloneHeadline(`element ${describeTarget(target)}`, miss)}`);
-  const keyboard = tree === undefined || miss.of === 'zeroArea' || miss.of === 'unread' ? undefined : keyboardUnlisting(adapter, tree);
+  const keyboard = tree === undefined || miss.of === 'zeroArea' || miss.of === 'unread' ? undefined : keyboardMissNote(adapter, tree);
   const hints = [keyboard, missNote(miss)].filter((h) => h !== undefined);
   return absenceError(pollTimeoutMessage(`element ${describeTarget(target)} to appear`, timeoutMs, outcome.readError, hints), { sighted: false, ...outcome, miss });
 }
@@ -401,13 +401,13 @@ async function notFound(
  * keyboard (`topLayerOnlySource`: idb's flat list; ADR 0018), and its keys are read up by their shape — the band's
  * line (ui-tree/keyboard-position.ts#KeyboardPosition.line, over draw-order.ts#keyboardBandTop: a position, never a
  * reading of the keyboard shown, K5d). Then `keyboardMayCoverText`, with the adapter's own remedy, short
- * (ui-tree/keyboard-cover.ts#readKeyboard: how to hide it, and its caution). Undefined on any other tree — WDA and
+ * (ui-tree/keyboard-cover.ts#readKeyboard: how it hides it, said briefly). Undefined on any other tree — WDA and
  * uiautomator list what lies beneath the keyboard, so a miss there is not the keyboard's — and on an idb read with no
  * band: today's reply, unchanged. Not said where the target matched only at 0×0 (`zeroArea`: it IS in the tree),
  * after a failed last read (`unread`: the hints are dropped) nor beneath a presented layer's own headline. Asked of
  * the last read only, on a miss only: one draw-order walk.
  */
-function keyboardUnlisting(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>, tree: UiNode): string | undefined {
+function keyboardMissNote(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAdvice'>, tree: UiNode): string | undefined {
   const source = topLayerOnlySource(tree);
   if (source === undefined) return undefined;
   const look = lookOn(adapter, tree);
@@ -430,7 +430,7 @@ function keyboardUnlisting(adapter: Pick<DeviceAdapter, 'keyboard' | 'keyboardAd
  * budget shorter than one read still gets one honest look.
  */
 export async function resolvePresent(
-  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice' | 'keyboardCaution'>,
+  adapter: Pick<DeviceAdapter, 'uiTree' | 'focusedWindow' | 'keyboard' | 'keyboardAdvice'>,
   target: Target,
   opts: SettleOptions,
 ): Promise<Resolved> {

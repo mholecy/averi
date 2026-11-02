@@ -4,7 +4,7 @@ import { claimsTap, isError, namesKeyboard, snapshotNodes, type SnapshotNode } f
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
 import { ocrFailsClosed } from './text.js';
-import { BUDGET_MS, classed, closesItsOwnLayer, failed, first, IDB_REASONS, judgedUnlisted, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, REASONS_AND_KEYBOARD, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, closesItsOwnLayer, failed, first, IDB_REASONS, judgedUnlisted, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, REASONS_AND_KEYBOARD, REASONS_AND_KEYBOARD_UNLISTED, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
 
 /**
  * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
@@ -280,9 +280,9 @@ export function formRows(platform: Platform, truth: CellTruth, unlisted: (id: st
  * A control's rows by its situation. `unlisted`: why the replayed tree does not list it (formRows) — an
  * under-keyboard control's colour, ocr and scroll_until rows then judge its "not found" (judges.ts#judgedUnlisted):
  * colour and ocr must name idb's reasons (judges.ts#IDB_REASONS), scroll_until idb's reasons and the soft keyboard
- * (#REASONS_AND_KEYBOARD). A bare one, or one naming another remedy (the presented one), is a mismatch. Its tap (iOS)
- * as its stop: idb's reasons and the soft keyboard, which the tap's timeout names where idb's keys are read up by shape
- * (src/interact/resolve.ts#notFound, D32 K1).
+ * (#REASONS_AND_KEYBOARD). A bare one, or one naming another remedy (the presented one), is a mismatch. Its tap (iOS):
+ * idb's reasons and the soft keyboard as what idb lists nothing beneath (#REASONS_AND_KEYBOARD_UNLISTED), which the
+ * tap's timeout says where idb's keys are read up by shape (src/interact/resolve.ts#notFound, D32 K1).
  */
 function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unlisted?: string): FormExpectation[] {
   const selector = `id:"${c.id}"`;
@@ -326,7 +326,7 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unli
               judge: (o) => notTapped(o) ?? (namesKeyboard(o.reply) ? undefined : said(o, 'refused without naming the keyboard')),
             },
             unlisted,
-            REASONS_AND_KEYBOARD,
+            REASONS_AND_KEYBOARD_UNLISTED,
           ),
         );
       } else if (c.afterBack?.reached === true) {

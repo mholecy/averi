@@ -1132,9 +1132,9 @@ describe('a tap or fill by an id idb\'s read does not list: the timeout says idb
 /**
  * D32 K1: idb lists nothing beneath the soft keyboard, so a tap or fill on a field under it waits and ends "not found".
  * Where the keys are read up by shape (draw-order.ts#keyboardBandTop, idb's band: the lab's form-keyboard capture, its
- * band's top at y 590), the timeout names the soft keyboard and the way out first, in one short line — how to hide it
- * and the adapter's caution, never its long advice — then idb's reasons as before. A tree with no band keeps today's
- * reply byte for byte.
+ * band's top at y 590), the timeout names the soft keyboard and the way out first, in one short line — how to hide it,
+ * never the adapter's long advice — then idb's reasons as before. A tree with no band keeps today's reply byte for
+ * byte.
  */
 describe('a tap or fill that misses under idb with the soft keyboard read up: the timeout names the keyboard', () => {
   const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
@@ -1147,13 +1147,12 @@ describe('a tap or fill that misses under idb with the soft keyboard read up: th
     const fake = new FakeAdapter({ s: parseIdbDescribeAll(JSON.stringify([listed[0], ...extra, ...listed.slice(1)])) }, 's');
     fake.keyboard = undefined;
     fake.keyboardAdvice = 'ADVICE';
-    fake.keyboardCaution = 'CAUTION';
     fake.viewportSize = { width: 402, height: 874 };
     return fake;
   };
   const KEYBOARD =
     '  (the soft keyboard is up (its top edge at y 590) and idb lists nothing beneath it, so the element may lie there — ' +
-    'hide it first (tap a neutral element such as the screen title — a tap: step in a flow; CAUTION) and try again)';
+    'tap a neutral element such as the screen title to hide it, then try again)';
   const VS = 'id:"lab.form-keyboard.vs"';
   const VS_MISS = { of: 'idUnlisted', id: 'lab.form-keyboard.vs' } as const;
 
@@ -1186,16 +1185,6 @@ describe('a tap or fill that misses under idb with the soft keyboard read up: th
     expect((filled as Error).message).toBe(today);
     const text = await tapElement(await fakeOf('form-keyboard', { band: false }), 'text:"Nowhere"', OPTS).catch((e: unknown) => e);
     expect((text as Error).message).toBe('Timed out after 20ms waiting for element text:"Nowhere" to appear');
-  });
-
-  it('an adapter with no caution: the remedy says how to hide it alone; the long advice is never quoted', async () => {
-    const fake = await fakeOf('form-keyboard');
-    fake.keyboardCaution = undefined;
-    const error = await tapElement(fake, 'text:"Nowhere"', OPTS).catch((e: unknown) => e);
-    expect((error as Error).message).toBe(
-      'Timed out after 20ms waiting for element text:"Nowhere" to appear\n' +
-        '  (the soft keyboard is up (its top edge at y 590) and idb lists nothing beneath it, so the element may lie there — hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and try again)',
-    );
   });
 
   it('the band up, then the last read FAILED: the read error alone beneath the headline, no keyboard line (the fresher fact)', async () => {

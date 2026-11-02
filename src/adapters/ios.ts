@@ -636,9 +636,6 @@ export class IosAdapter implements DeviceAdapter {
    * idb user is the band line's (ADR 0006) — so there the sentence says to
    * tap the dismissal yourself, and that the list applies under WDA.
    */
-  /** The key not to press (DeviceAdapter.keyboardCaution): the return key submitted the form (K5, the advice above). */
-  readonly keyboardCaution = 'the return key submits';
-
   get keyboardAdvice(): string {
     const fix =
       this.treeSource.kind === 'wda'

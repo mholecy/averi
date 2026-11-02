@@ -109,15 +109,29 @@ export interface KeyboardUp {
   readonly remedy: KeyboardRemedy;
 }
 
+/** What hides the soft keyboard where no key does (`KeyboardRemedy.dismissal` `none`): both wordings below say it. */
+const NEUTRAL_TAP = 'tap a neutral element such as the screen title';
+
 /**
  * HOW to hide the soft keyboard, by what the adapter hides it with (`KeyboardRemedy.dismissal`): `press_key back from
  * the MCP tools; \`dismissKeyboard: true\` on the fill before this step in a flow`, or `tap a neutral element such as
  * the screen title — a tap: step in a flow`. The one wording of the clause for `scroll_until`'s whole-screen advice
  * (scroll-text.ts#hideToJudgeWholeScreen), the cut-by remedy (`dismissKeyboardFirstText`) and the tap's refusal of a
- * centre under idb's band (tap-judgement.ts#hideIt); each says the adapter's `cannotHide` where its sentence puts it. Names MCP tools and "a flow", the exception keyboard-window.ts records.
+ * centre under idb's band (tap-judgement.ts#hideIt); each says the adapter's `cannotHide` where its sentence puts it.
+ * Names MCP tools and "a flow", the exception keyboard-window.ts records. Its short form, with no flow clause, is
+ * `hideKeyboardBriefly`.
  */
 export const hideKeyboardHow = ({ dismissal }: KeyboardRemedy): string =>
-  dismissal === 'back' ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow' : 'tap a neutral element such as the screen title — a tap: step in a flow';
+  dismissal === 'back' ? 'press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow' : `${NEUTRAL_TAP} — a tap: step in a flow`;
+
+/**
+ * `hideKeyboardHow`'s SHORT form, for a reply that must stay one actionable line (`keyboardMayCoverText`): the action
+ * alone — `press_key back`, or `tap a neutral element such as the screen title` — no flow clause, no adapter advice.
+ */
+export const hideKeyboardBriefly = ({ dismissal }: KeyboardRemedy): string => (dismissal === 'back' ? 'press_key back' : NEUTRAL_TAP);
+
+/** `the soft keyboard is up (its top edge at y 590)`: the one phrase of `dismissKeyboardFirstText` and `keyboardMayCoverText`. */
+export const keyboardUpText = (lineY: number): string => `the soft keyboard is up (its top edge at y ${lineY})`;
 
 /**
  * `clause` — the sentence that says how to hide the soft keyboard, `hideKeyboardHow`'s words alone by default — then,
@@ -140,29 +154,19 @@ export function hideClause(remedy: KeyboardRemedy, clause: string = hideKeyboard
  * `cannotHide` with the adapter's advice — is unreachable today; it is the composition's, which other sentences reach.
  */
 export function dismissKeyboardFirstText({ lineY, remedy }: KeyboardUp): string {
-  return `the soft keyboard is up (its top edge at y ${lineY}): dismiss it first (${hideClause(remedy)}) — a bar riding on it goes down with it`;
-}
-
-/**
- * `hideClause`'s SHORT variant, for a reply that must stay one actionable line: `hide it first (<hideKeyboardHow>; <the
- * adapter's caution>) and try again` — how to hide it and the key not to press (`KeyboardRemedy.caution`, iOS's "the
- * return key submits"), never the adapter's long advice. One reader today: `keyboardMayCoverText`.
- */
-export function hideFirstBriefly(remedy: KeyboardRemedy): string {
-  const caution = remedy.dismissal === 'back' || remedy.caution === undefined ? '' : `; ${remedy.caution}`;
-  return `hide it first (${hideKeyboardHow(remedy)}${caution}) and try again`;
+  return `${keyboardUpText(lineY)}: dismiss it first (${hideClause(remedy)}) — a bar riding on it goes down with it`;
 }
 
 /**
  * The note of a tap's or fill's wait that never found its target while the soft keyboard band of a tree that lists
  * nothing beneath it was read up by shape (interact/resolve.ts#notFound, D32 K1): `the soft keyboard is up (its top
- * edge at y 590) and idb lists nothing beneath it, so the element may lie there — hide it first (tap a neutral element
- * such as the screen title — a tap: step in a flow; the return key submits) and try again`. "Is up" as
- * `dismissKeyboardFirstText` says it; `unlisted` the source's words (ui-tree/miss.ts#KEYBOARD_UNLISTED); the remedy
- * `hideFirstBriefly`'s. "May": the read cannot say the target lies there — only that it could.
+ * edge at y 590) and idb lists nothing beneath it, so the element may lie there — tap a neutral element such as the
+ * screen title to hide it, then try again`. `keyboardUpText`; `unlisted` the source's words
+ * (ui-tree/miss.ts#KEYBOARD_UNLISTED); how to hide it `hideKeyboardBriefly`'s. "May": the read cannot say the target
+ * lies there — only that it could.
  */
 export function keyboardMayCoverText({ lineY, remedy }: KeyboardUp, unlisted: string): string {
-  return `the soft keyboard is up (its top edge at y ${lineY}) and ${unlisted}, so the element may lie there — ${hideFirstBriefly(remedy)}`;
+  return `${keyboardUpText(lineY)} and ${unlisted}, so the element may lie there — ${hideKeyboardBriefly(remedy)} to hide it, then try again`;
 }
 
 /**

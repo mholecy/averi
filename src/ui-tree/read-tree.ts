@@ -240,11 +240,11 @@ export type PollOutcome<T> =
  * The verifier does not use it: its timeouts are failing results, worded per
  * assert.
  *
- * `hint`, when a caller has one, is a probable cause the caller knows and
+ * `hints`, when a caller has any, are probable causes the caller knows and
  * this layer cannot (2026-10-06: the flow's wait on an id the iOS idb tree
- * never carries). It takes the same indented-parenthesis line as the read
+ * never carries). Each takes the same indented-parenthesis line as the read
  * error, so a reader finds every "why" beneath the headline in one shape —
- * but it is DROPPED when the last read failed: then the reads, not the
+ * but they are DROPPED when the last read failed: then the reads, not the
  * tree's contents, are the story, and a hint about what the trees held
  * would point the reader the wrong way. A read error's own later lines (the
  * idb empty tree's advice) are indented under its first, inside the same
@@ -253,15 +253,15 @@ export type PollOutcome<T> =
  * the rule keys on the LAST read's error, not on `treesRead` — so a single
  * late failure after many good reads also silences the hint, although the
  * outcome could tell that case apart. A missing hint costs a reader less
- * than a misleading one, and the read error is the fresher fact. Several
- * hints (the tap's wait on a target under idb's soft keyboard: the keyboard,
- * then idb's reasons — interact/resolve.ts#notFound) take a line each, in
- * the order given.
+ * than a misleading one, and the read error is the fresher fact. Each hint
+ * takes a line, in the order given (the tap's wait on a target under idb's
+ * soft keyboard: the keyboard, then idb's reasons — interact/resolve.ts
+ * #notFound).
  */
-export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: Error, hint?: string | readonly string[]): string =>
+export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: Error, hints: readonly string[] = []): string =>
   `Timed out after ${timeoutMs}ms waiting for ${what}` +
   (readError === undefined ? '' : `\n${READ_ERROR_OPEN}${readError.message.replace(/\n/g, `\n${READ_ERROR_CONTINUATION}`)})`) +
-  (hint === undefined || readError !== undefined ? '' : [hint].flat().map((h) => `\n  (${h})`).join(''));
+  (readError !== undefined ? '' : hints.map((h) => `\n  (${h})`).join(''));
 
 /** The read-error parenthesis's opening, and the indent of a multi-line read error's later lines inside it. */
 const READ_ERROR_OPEN = '  (last UI tree read failed: ';

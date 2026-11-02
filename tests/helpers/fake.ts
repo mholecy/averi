@@ -188,8 +188,6 @@ export class FakeAdapter implements DeviceAdapter {
 
   /** The in-tree model's sentence (DeviceAdapter.keyboardAdvice), unset until a test sets it — as on IosAdapter, which has one, and AndroidAdapter, which has none. */
   keyboardAdvice: string | undefined = undefined;
-  /** The key not to press (DeviceAdapter.keyboardCaution), unset until a test sets it — as keyboardAdvice. */
-  keyboardCaution: string | undefined = undefined;
 
   /** Attach the oracle, optionally with its first answers; returns it for further scripting. */
   attachKeyboard(window: SoftKeyboard = { state: 'unknown' }, witness: KeyboardWitness = 'unknown'): FakeKeyboard {

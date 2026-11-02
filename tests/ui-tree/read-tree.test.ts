@@ -609,7 +609,7 @@ describe('pollTimeoutMessage — the thrown timeout\'s shape, shared by the flow
     expect(pollTimeoutMessage('element id:"x"', 300, new Error('null root node'))).toBe(
       'Timed out after 300ms waiting for element id:"x"\n  (last UI tree read failed: null root node)',
     );
-    expect(pollTimeoutMessage('element id:"x"', 300, undefined, 'no tree read contained id:"x"')).toBe(
+    expect(pollTimeoutMessage('element id:"x"', 300, undefined, ['no tree read contained id:"x"'])).toBe(
       'Timed out after 300ms waiting for element id:"x"\n  (no tree read contained id:"x")',
     );
   });
@@ -627,7 +627,7 @@ describe('pollTimeoutMessage — the thrown timeout\'s shape, shared by the flow
   // the reads are the story then. Conservative on purpose; the docblock
   // says why.
   it('drops the hint when the last read failed — the read error is the whole "why"', () => {
-    expect(pollTimeoutMessage('element id:"x"', 300, new Error('null root node'), 'no tree read contained id:"x"')).toBe(
+    expect(pollTimeoutMessage('element id:"x"', 300, new Error('null root node'), ['no tree read contained id:"x"'])).toBe(
       'Timed out after 300ms waiting for element id:"x"\n  (last UI tree read failed: null root node)',
     );
   });
@@ -645,7 +645,7 @@ describe('readErrorLine — a poll timeout\'s read error on one line, read back 
 
   it('a message with no read error — a bare timeout, a hint, a one-line error — has none', () => {
     expect(readErrorLine(pollTimeoutMessage('element id:"x"', 300))).toBeUndefined();
-    expect(readErrorLine(pollTimeoutMessage('element id:"x"', 300, undefined, 'no tree read contained id:"x"'))).toBeUndefined();
+    expect(readErrorLine(pollTimeoutMessage('element id:"x"', 300, undefined, ['no tree read contained id:"x"']))).toBeUndefined();
     expect(readErrorLine('fill: typed 5 characters but the field shows 4')).toBeUndefined();
   });
 
