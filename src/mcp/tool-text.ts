@@ -19,7 +19,7 @@
  * agree with — the flow engine may not import this layer.
  */
 
-import { everyNode, type DeepLinkOutcome, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
+import { everyNode, type DeepLinkOutcome, type LinkAlert, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
@@ -77,10 +77,31 @@ export const launchText = (platform: Platform, launched: Launched): string =>
 /**
  * `Opened <url> on <platform>`, and the link's note on its own line as `⚠ <note>` (D49a: iOS's foreground wait after a
  * link to the project's own scheme, adapters/ios-foreground.ts — the note leads with what to do), as launchText lays
- * out a launch's.
+ * out a launch's. When iOS showed a system alert instead of opening it (D54, DeepLinkOutcome.alert), that is the
+ * headline: alertText.
  */
 export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkOutcome): string =>
-  `Opened ${url} on ${platform}` + (outcome.note !== undefined ? `\n⚠ ${outcome.note}` : '');
+  outcome.alert !== undefined
+    ? alertText(url, outcome.alert)
+    : `Opened ${url} on ${platform}` + (outcome.note !== undefined ? `\n⚠ ${outcome.note}` : '');
+
+/**
+ * `iOS has not opened <url> yet: it asks "<title>" — buttons "<label>" at (x, y), …` (D54), then the advice: a tap at
+ * the chosen button's coordinates — the one answer proven on a device (batch-5 D49A tapped by coordinates; a selector
+ * tap on SpringBoard's tree is unverified, so not offered) — and that averi taps nothing. The title and every label are
+ * quoted verbatim, localised as iOS shows them; which button opens the link is the agent's to read. "it asks" only when
+ * the title names the link's app (`asksForApp`); any other alert is "a system alert", in no words of averi's own about
+ * opening.
+ */
+const alertText = (url: string, alert: LinkAlert): string => {
+  const buttons = alert.buttons.map((b) => `"${b.label}" at (${b.centre.x}, ${b.centre.y})`).join(', ');
+  const what = alert.asksForApp ? `it asks "${alert.title}"` : `a system alert is up, "${alert.title}"`;
+  return (
+    `iOS has not opened ${url} yet: ${what} — ${alert.buttons.length === 1 ? 'button' : 'buttons'} ${buttons}. ` +
+    "Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays behind the " +
+    'alert until it is answered'
+  );
+};
 
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array

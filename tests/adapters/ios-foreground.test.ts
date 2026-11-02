@@ -245,7 +245,7 @@ describe('IosAdapter.launch waits until the tree is the launched app\'s', () => 
   });
 
   it('a check whose names() lists none (the ForegroundCheck contract allows it): the note quotes no empty name — "labelled with one of its names", never "labelled :" (code review of fix/r4, S11)', async () => {
-    const note = await awaitForeground({
+    const { note } = await awaitForeground({
       bundleId: 'com.apple.MobileAddressBook',
       label: async () => ({ kind: 'label', label: 'Skeleton Internal' }),
       names: async () => [],
@@ -489,5 +489,37 @@ describe('the launch and the liveness check share one appinfo per bundle (D33)',
     expect(d.appinfos()).toHaveLength(1);
     expect(d.calls.filter((c) => c.startsWith('/usr/bin/pgrep'))).toHaveLength(1);
     expect(d.calls.filter((c) => c.includes('launchctl'))).toEqual([]);
+  });
+});
+
+// D54: the WDA alert read (ForegroundCheck.alert) is a link's alone, and only at the bound with SpringBoard last named.
+describe('awaitForeground — the one alert read, at the bound, for a link only (D54)', () => {
+  const ALERT = { title: 'Open in “AveriLab”?', buttons: [{ label: 'Open', centre: { x: 275, y: 474 } }] };
+  const check = (link: string | undefined) => {
+    let reads = 0;
+    return {
+      reads: () => reads,
+      check: {
+        bundleId: 'dev.averi.lab',
+        label: async () => ({ kind: 'bundle' as const, bundleId: 'com.apple.springboard' }),
+        names: async () => ['AveriLab'],
+        ownerOf: () => undefined,
+        source: 'wda' as const,
+        alert: async () => (reads++, ALERT),
+        ...(link !== undefined && { link }),
+      },
+    };
+  };
+
+  it('a link: read once, at the bound — the alert, marked as naming the app', async () => {
+    const c = check('averilab://d54');
+    expect(await awaitForeground(c.check)).toEqual({ alert: { ...ALERT, asksForApp: true } });
+    expect(c.reads()).toBe(1);
+  });
+
+  it('a launch handed the same read: never asked — its note as before', async () => {
+    const c = check(undefined);
+    expect(await awaitForeground(c.check)).toEqual({ note: expect.stringMatching(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read SpringBoard/) });
+    expect(c.reads()).toBe(0);
   });
 });

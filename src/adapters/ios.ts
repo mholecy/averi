@@ -329,7 +329,7 @@ export class IosAdapter implements DeviceAdapter {
     // until the source names this app (idb: the tree's Application; WDA, once
     // up: its active app's bundle id), bounded and failing open; the facts,
     // the bound and the cost are ios-foreground.ts's.
-    const note = await awaitForeground(this.foregroundCheck(bundleId));
+    const { note } = await awaitForeground(this.foregroundCheck(bundleId));
     return note === undefined ? {} : { note };
   }
 
@@ -468,22 +468,25 @@ export class IosAdapter implements DeviceAdapter {
    * another app's scheme, schemes that could not be read — expects no app and reads nothing of the UI after `openurl`,
    * as before D49a. The scheme lookup runs after `openurl` (the writes and the open go out as they did): one
    * `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a failed
-   * one too. `front` moves to the app only when the wait saw it in front.
+   * one too. `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link
+   * (D54), the outcome names it instead of a note: on idb from the wait's own reads, on WDA from one short `/source`
+   * read at the bound (IosTreeSource.systemAlert) — never a tap.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<DeepLinkOutcome> {
     await this.enableAccessibilityAutomation(`opening ${url}`);
     await this.simctl(['openurl', this.udid, url]);
     const handler = await this.linkHandler(url, opts.appId);
     if (handler === undefined) return {};
-    // A link's wait has a note in every case but a match (ios-foreground.ts#awaitForeground).
-    const note = await awaitForeground(this.foregroundCheck(handler, { link: url }));
-    if (note !== undefined) return { note };
-    this.front = { kind: 'launched', bundleId: handler };
-    return {};
+    // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground). The alert
+    // read is the source's own (WDA's short /source); idb has none — its label reads carry the alert's shape.
+    const alert = this.treeSource.systemAlert?.bind(this.treeSource);
+    const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url, alert }));
+    if (outcome.note === undefined && outcome.alert === undefined) this.front = { kind: 'launched', bundleId: handler };
+    return outcome;
   }
 
   /** The foreground wait's check of `bundleId` through this adapter's source and caches — launch's and a link's. */
-  private foregroundCheck(bundleId: string, extra: Pick<ForegroundCheck, 'link'> = {}): ForegroundCheck {
+  private foregroundCheck(bundleId: string, extra: Pick<ForegroundCheck, 'link' | 'alert'> = {}): ForegroundCheck {
     return {
       bundleId,
       label: () => this.treeSource.applicationLabel(),

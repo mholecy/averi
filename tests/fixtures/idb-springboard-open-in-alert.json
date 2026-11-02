@@ -1,0 +1,68 @@
+{
+ "source": "REAL `idb ui describe-all --json` of iOS's \"Open in “AveriLab”?\" confirmation over SpringBoard: batch-5 D49A E2 (2026-11-02, main 28c1d37d, lab simulator iPhone 17, iOS 27.0, 402x874 pt), case-main-idb-E2-idb-flat. Only the fields averi reads are kept (type, AXLabel, AXUniqueId, AXValue, frame, traits); pid, role, AXFrame and the rest dropped; nothing else changed. idb lists the alert alone: SpringBoard's Application (label a single space), the title, two Buttons — no status bar, no icon.",
+ "elements": [
+  {
+   "type": "Application",
+   "AXLabel": " ",
+   "AXUniqueId": null,
+   "AXValue": null,
+   "frame": {
+    "height": 874,
+    "y": 0,
+    "x": 0,
+    "width": 402
+   },
+   "traits": [
+    "None"
+   ]
+  },
+  {
+   "type": "StaticText",
+   "AXLabel": "Open in “AveriLab”?",
+   "AXUniqueId": null,
+   "AXValue": null,
+   "frame": {
+    "y": 409.6666666666667,
+    "width": 260,
+    "height": 20.333333333333314,
+    "x": 71
+   },
+   "traits": [
+    "StaticText",
+    "Scrollable"
+   ]
+  },
+  {
+   "type": "Button",
+   "AXLabel": "Cancel",
+   "AXUniqueId": null,
+   "AXValue": null,
+   "frame": {
+    "y": 450,
+    "width": 140,
+    "height": 48,
+    "x": 57
+   },
+   "traits": [
+    "Button",
+    "Scrollable"
+   ]
+  },
+  {
+   "type": "Button",
+   "AXLabel": "Open",
+   "AXUniqueId": null,
+   "AXValue": null,
+   "frame": {
+    "x": 205,
+    "width": 140,
+    "height": 48,
+    "y": 450
+   },
+   "traits": [
+    "Button",
+    "Scrollable"
+   ]
+  }
+ ]
+}

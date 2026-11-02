@@ -1,0 +1,1196 @@
+{
+ "_comment": "REAL WebDriverAgent `GET /source?format=json` (WDA 16.1.7, sessionless) of iOS's \"Open in “AveriLab”?\" confirmation raised with Contacts in front: batch-5 D49A E3 (2026-11-02, main 28c1d37d, lab simulator iPhone 17, iOS 27.0, 402x874 pt), case-main-wda-E3-wda-source-format-json. SHRUNK as wda-capture-springboard-open-in-alert.json: kept are the Alert, the StatusBar and every Button with the nodes above them — among them Contacts' app-switcher card with its hidden status-bar breadcrumb Button \"Return to AveriLab\", outside the alert.",
+ "value": {
+  "type": "Application",
+  "label": " ",
+  "value": null,
+  "rawIdentifier": null,
+  "rect": {
+   "y": 0,
+   "x": 0,
+   "width": 402,
+   "height": 874
+  },
+  "isVisible": "1",
+  "isAccessible": "0",
+  "children": [
+   {
+    "type": "Window",
+    "label": null,
+    "value": null,
+    "rawIdentifier": "SBSwitcherWindow:Main",
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    },
+    "isVisible": "0",
+    "isAccessible": "0",
+    "children": [
+     {
+      "type": "Other",
+      "label": null,
+      "value": null,
+      "rawIdentifier": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      },
+      "isVisible": "0",
+      "isAccessible": "0",
+      "children": [
+       {
+        "type": "Other",
+        "label": null,
+        "value": null,
+        "rawIdentifier": null,
+        "rect": {
+         "y": 0,
+         "x": 0,
+         "width": 402,
+         "height": 874
+        },
+        "isVisible": "0",
+        "isAccessible": "0",
+        "children": [
+         {
+          "type": "Other",
+          "label": null,
+          "value": null,
+          "rawIdentifier": null,
+          "rect": {
+           "y": 0,
+           "x": 0,
+           "width": 402,
+           "height": 874
+          },
+          "isVisible": "0",
+          "isAccessible": "0",
+          "children": [
+           {
+            "type": "Other",
+            "label": null,
+            "value": null,
+            "rawIdentifier": null,
+            "rect": {
+             "y": 0,
+             "x": 0,
+             "width": 402,
+             "height": 874
+            },
+            "isVisible": "0",
+            "isAccessible": "0",
+            "children": [
+             {
+              "type": "Other",
+              "label": null,
+              "value": null,
+              "rawIdentifier": "AppSwitcherContentView",
+              "rect": {
+               "y": 0,
+               "x": 0,
+               "width": 402,
+               "height": 874
+              },
+              "isVisible": "0",
+              "isAccessible": "0",
+              "children": [
+               {
+                "type": "Other",
+                "label": "Contacts",
+                "value": null,
+                "rawIdentifier": "card:com.apple.MobileAddressBook:sceneID:com.apple.MobileAddressBook-BD9EF76D-B308-4AA9-842C-9472846B6944",
+                "rect": {
+                 "y": 0,
+                 "x": 0,
+                 "width": 402,
+                 "height": 874
+                },
+                "isVisible": "0",
+                "isAccessible": "0",
+                "children": [
+                 {
+                  "type": "Other",
+                  "label": null,
+                  "value": null,
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 0,
+                   "x": 0,
+                   "width": 402,
+                   "height": 874
+                  },
+                  "isVisible": "0",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 0,
+                     "x": 0,
+                     "width": 402,
+                     "height": 874
+                    },
+                    "isVisible": "0",
+                    "isAccessible": "0",
+                    "children": [
+                     {
+                      "type": "Other",
+                      "label": null,
+                      "value": null,
+                      "rawIdentifier": null,
+                      "rect": {
+                       "y": 0,
+                       "x": 0,
+                       "width": 402,
+                       "height": 874
+                      },
+                      "isVisible": "0",
+                      "isAccessible": "0",
+                      "children": [
+                       {
+                        "type": "Other",
+                        "label": null,
+                        "value": null,
+                        "rawIdentifier": null,
+                        "rect": {
+                         "y": 0,
+                         "x": 0,
+                         "width": 402,
+                         "height": 874
+                        },
+                        "isVisible": "0",
+                        "isAccessible": "0",
+                        "children": [
+                         {
+                          "type": "Other",
+                          "label": null,
+                          "value": null,
+                          "rawIdentifier": null,
+                          "rect": {
+                           "y": 0,
+                           "x": 0,
+                           "width": 402,
+                           "height": 874
+                          },
+                          "isVisible": "0",
+                          "isAccessible": "0",
+                          "children": [
+                           {
+                            "type": "ScrollView",
+                            "label": null,
+                            "value": null,
+                            "rawIdentifier": null,
+                            "rect": {
+                             "y": -437,
+                             "x": 0,
+                             "width": 402,
+                             "height": 1311
+                            },
+                            "isVisible": "0",
+                            "isAccessible": "0",
+                            "children": [
+                             {
+                              "type": "Other",
+                              "label": null,
+                              "value": null,
+                              "rawIdentifier": null,
+                              "rect": {
+                               "y": 0,
+                               "x": 0,
+                               "width": 402,
+                               "height": 874
+                              },
+                              "isVisible": "0",
+                              "isAccessible": "0",
+                              "children": [
+                               {
+                                "type": "Other",
+                                "label": null,
+                                "value": null,
+                                "rawIdentifier": null,
+                                "rect": {
+                                 "y": 0,
+                                 "x": 0,
+                                 "width": 402,
+                                 "height": 874
+                                },
+                                "isVisible": "0",
+                                "isAccessible": "0",
+                                "children": [
+                                 {
+                                  "type": "Other",
+                                  "label": null,
+                                  "value": null,
+                                  "rawIdentifier": null,
+                                  "rect": {
+                                   "y": 0,
+                                   "x": 0,
+                                   "width": 402,
+                                   "height": 874
+                                  },
+                                  "isVisible": "0",
+                                  "isAccessible": "0",
+                                  "children": [
+                                   {
+                                    "type": "Other",
+                                    "label": null,
+                                    "value": null,
+                                    "rawIdentifier": null,
+                                    "rect": {
+                                     "y": 0,
+                                     "x": 0,
+                                     "width": 402,
+                                     "height": 874
+                                    },
+                                    "isVisible": "0",
+                                    "isAccessible": "0",
+                                    "children": [
+                                     {
+                                      "type": "Other",
+                                      "label": null,
+                                      "value": null,
+                                      "rawIdentifier": null,
+                                      "rect": {
+                                       "y": 0,
+                                       "x": 0,
+                                       "width": 402,
+                                       "height": 874
+                                      },
+                                      "isVisible": "0",
+                                      "isAccessible": "0",
+                                      "children": [
+                                       {
+                                        "type": "Other",
+                                        "label": null,
+                                        "value": null,
+                                        "rawIdentifier": null,
+                                        "rect": {
+                                         "y": 0,
+                                         "x": 0,
+                                         "width": 402,
+                                         "height": 874
+                                        },
+                                        "isVisible": "0",
+                                        "isAccessible": "0",
+                                        "children": [
+                                         {
+                                          "type": "Other",
+                                          "label": null,
+                                          "value": null,
+                                          "rawIdentifier": null,
+                                          "rect": {
+                                           "y": 0,
+                                           "x": 0,
+                                           "width": 402,
+                                           "height": 874
+                                          },
+                                          "isVisible": "0",
+                                          "isAccessible": "0",
+                                          "children": [
+                                           {
+                                            "type": "Other",
+                                            "label": null,
+                                            "value": null,
+                                            "rawIdentifier": null,
+                                            "rect": {
+                                             "y": 0,
+                                             "x": 0,
+                                             "width": 402,
+                                             "height": 874
+                                            },
+                                            "isVisible": "0",
+                                            "isAccessible": "0",
+                                            "children": [
+                                             {
+                                              "type": "Other",
+                                              "label": null,
+                                              "value": null,
+                                              "rawIdentifier": null,
+                                              "rect": {
+                                               "y": 0,
+                                               "x": 0,
+                                               "width": 402,
+                                               "height": 874
+                                              },
+                                              "isVisible": "0",
+                                              "isAccessible": "0",
+                                              "children": [
+                                               {
+                                                "type": "StatusBar",
+                                                "label": null,
+                                                "value": null,
+                                                "rawIdentifier": null,
+                                                "rect": {
+                                                 "y": 0,
+                                                 "x": 0,
+                                                 "width": 402,
+                                                 "height": 54
+                                                },
+                                                "isVisible": "1",
+                                                "isAccessible": "0",
+                                                "children": [
+                                                 {
+                                                  "type": "Other",
+                                                  "label": null,
+                                                  "value": null,
+                                                  "rawIdentifier": null,
+                                                  "rect": {
+                                                   "y": 0,
+                                                   "x": 0,
+                                                   "width": 402,
+                                                   "height": 54
+                                                  },
+                                                  "isVisible": "1",
+                                                  "isAccessible": "0",
+                                                  "children": [
+                                                   {
+                                                    "type": "Other",
+                                                    "label": null,
+                                                    "value": null,
+                                                    "rawIdentifier": null,
+                                                    "rect": {
+                                                     "y": 0,
+                                                     "x": 0,
+                                                     "width": 402,
+                                                     "height": 54
+                                                    },
+                                                    "isVisible": "1",
+                                                    "isAccessible": "0",
+                                                    "children": [
+                                                     {
+                                                      "type": "StaticText",
+                                                      "label": "17:55",
+                                                      "value": "17:55",
+                                                      "rawIdentifier": null,
+                                                      "rect": {
+                                                       "y": 14,
+                                                       "x": 50,
+                                                       "width": 48,
+                                                       "height": 22
+                                                      },
+                                                      "isVisible": "0",
+                                                      "isAccessible": "1",
+                                                      "children": []
+                                                     },
+                                                     {
+                                                      "type": "Other",
+                                                      "label": null,
+                                                      "value": null,
+                                                      "rawIdentifier": null,
+                                                      "rect": {
+                                                       "y": 6,
+                                                       "x": 55,
+                                                       "width": 38,
+                                                       "height": 38
+                                                      },
+                                                      "isVisible": "0",
+                                                      "isAccessible": "0",
+                                                      "children": []
+                                                     },
+                                                     {
+                                                      "type": "Other",
+                                                      "label": null,
+                                                      "value": null,
+                                                      "rawIdentifier": null,
+                                                      "rect": {
+                                                       "y": 14,
+                                                       "x": 309,
+                                                       "width": 37,
+                                                       "height": 37
+                                                      },
+                                                      "isVisible": "0",
+                                                      "isAccessible": "0",
+                                                      "children": []
+                                                     },
+                                                     {
+                                                      "type": "Other",
+                                                      "label": "Cellular",
+                                                      "value": "No signal",
+                                                      "rawIdentifier": null,
+                                                      "rect": {
+                                                       "y": 25,
+                                                       "x": 284,
+                                                       "width": 21,
+                                                       "height": 14
+                                                      },
+                                                      "isVisible": "0",
+                                                      "isAccessible": "1",
+                                                      "children": []
+                                                     },
+                                                     {
+                                                      "type": "Button",
+                                                      "label": "Return to AveriLab",
+                                                      "value": null,
+                                                      "rawIdentifier": "breadcrumb",
+                                                      "rect": {
+                                                       "y": 33,
+                                                       "x": 11,
+                                                       "width": 60,
+                                                       "height": 14
+                                                      },
+                                                      "isVisible": "0",
+                                                      "isAccessible": "1",
+                                                      "children": []
+                                                     },
+                                                     {
+                                                      "type": "Other",
+                                                      "label": null,
+                                                      "value": "SSID, 3 of 3 Wi-Fi bars",
+                                                      "rawIdentifier": "3 of 3 Wi-Fi bars",
+                                                      "rect": {
+                                                       "y": 26,
+                                                       "x": 314,
+                                                       "width": 18,
+                                                       "height": 13
+                                                      },
+                                                      "isVisible": "0",
+                                                      "isAccessible": "1",
+                                                      "children": [
+                                                       {
+                                                        "type": "Image",
+                                                        "label": "Wi-Fi",
+                                                        "value": null,
+                                                        "rawIdentifier": "wifi",
+                                                        "rect": {
+                                                         "y": 23,
+                                                         "x": 311,
+                                                         "width": 24,
+                                                         "height": 19
+                                                        },
+                                                        "isVisible": "0",
+                                                        "isAccessible": "0",
+                                                        "children": []
+                                                       }
+                                                      ]
+                                                     },
+                                                     {
+                                                      "type": "Other",
+                                                      "label": "100 % battery power",
+                                                      "value": "Not charging",
+                                                      "rawIdentifier": null,
+                                                      "rect": {
+                                                       "y": 25,
+                                                       "x": 340,
+                                                       "width": 30,
+                                                       "height": 14
+                                                      },
+                                                      "isVisible": "0",
+                                                      "isAccessible": "1",
+                                                      "children": []
+                                                     }
+                                                    ]
+                                                   }
+                                                  ]
+                                                 }
+                                                ]
+                                               }
+                                              ]
+                                             }
+                                            ]
+                                           }
+                                          ]
+                                         }
+                                        ]
+                                       }
+                                      ]
+                                     }
+                                    ]
+                                   }
+                                  ]
+                                 }
+                                ]
+                               }
+                              ]
+                             }
+                            ]
+                           }
+                          ]
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "type": "Window",
+    "label": null,
+    "value": null,
+    "rawIdentifier": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    },
+    "isVisible": "1",
+    "isAccessible": "0",
+    "children": [
+     {
+      "type": "StatusBar",
+      "label": null,
+      "value": null,
+      "rawIdentifier": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 54
+      },
+      "isVisible": "0",
+      "isAccessible": "0",
+      "children": []
+     }
+    ]
+   },
+   {
+    "type": "Window",
+    "label": null,
+    "value": null,
+    "rawIdentifier": null,
+    "rect": {
+     "y": 0,
+     "x": 0,
+     "width": 402,
+     "height": 874
+    },
+    "isVisible": "1",
+    "isAccessible": "0",
+    "children": [
+     {
+      "type": "Other",
+      "label": null,
+      "value": null,
+      "rawIdentifier": null,
+      "rect": {
+       "y": 0,
+       "x": 0,
+       "width": 402,
+       "height": 874
+      },
+      "isVisible": "1",
+      "isAccessible": "0",
+      "children": [
+       {
+        "type": "Alert",
+        "label": "Open in “AveriLab”?",
+        "value": null,
+        "rawIdentifier": null,
+        "rect": {
+         "y": 388,
+         "x": 41,
+         "width": 320,
+         "height": 126
+        },
+        "isVisible": "1",
+        "isAccessible": "0",
+        "children": [
+         {
+          "type": "Other",
+          "label": null,
+          "value": null,
+          "rawIdentifier": null,
+          "rect": {
+           "y": 388,
+           "x": 41,
+           "width": 320,
+           "height": 126
+          },
+          "isVisible": "1",
+          "isAccessible": "0",
+          "children": [
+           {
+            "type": "Other",
+            "label": null,
+            "value": null,
+            "rawIdentifier": null,
+            "rect": {
+             "y": 388,
+             "x": 41,
+             "width": 320,
+             "height": 126
+            },
+            "isVisible": "1",
+            "isAccessible": "0",
+            "children": [
+             {
+              "type": "Other",
+              "label": null,
+              "value": null,
+              "rawIdentifier": null,
+              "rect": {
+               "y": 388,
+               "x": 41,
+               "width": 320,
+               "height": 126
+              },
+              "isVisible": "0",
+              "isAccessible": "0",
+              "children": []
+             },
+             {
+              "type": "Other",
+              "label": null,
+              "value": null,
+              "rawIdentifier": null,
+              "rect": {
+               "y": 388,
+               "x": 41,
+               "width": 320,
+               "height": 126
+              },
+              "isVisible": "1",
+              "isAccessible": "0",
+              "children": [
+               {
+                "type": "ScrollView",
+                "label": null,
+                "value": null,
+                "rawIdentifier": null,
+                "rect": {
+                 "y": 388,
+                 "x": 41,
+                 "width": 320,
+                 "height": 46
+                },
+                "isVisible": "1",
+                "isAccessible": "0",
+                "children": [
+                 {
+                  "type": "Other",
+                  "label": null,
+                  "value": null,
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 388,
+                   "x": 41,
+                   "width": 320,
+                   "height": 46
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "StaticText",
+                    "label": "Open in “AveriLab”?",
+                    "value": "Open in “AveriLab”?",
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 409,
+                     "x": 71,
+                     "width": 260,
+                     "height": 21
+                    },
+                    "isVisible": "1",
+                    "isAccessible": "1",
+                    "children": []
+                   }
+                  ]
+                 },
+                 {
+                  "type": "Other",
+                  "label": null,
+                  "value": null,
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 432,
+                   "x": 41,
+                   "width": 320,
+                   "height": 2
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": []
+                 },
+                 {
+                  "type": "Other",
+                  "label": "Vertical scroll bar, 2 pages",
+                  "value": "0 %",
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 388,
+                   "x": 328,
+                   "width": 30,
+                   "height": 46
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 349,
+                     "x": 355,
+                     "width": 3,
+                     "height": 36
+                    },
+                    "isVisible": "0",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 },
+                 {
+                  "type": "Other",
+                  "label": "Horizontal scroll bar, 1 page",
+                  "value": "0 %",
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 408,
+                   "x": 41,
+                   "width": 320,
+                   "height": 23
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 428,
+                     "x": 2,
+                     "width": 36,
+                     "height": 3
+                    },
+                    "isVisible": "0",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 },
+                 {
+                  "type": "Other",
+                  "label": "Vertical scroll bar, 2 pages",
+                  "value": "0 %",
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 388,
+                   "x": 328,
+                   "width": 30,
+                   "height": 46
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 349,
+                     "x": 355,
+                     "width": 3,
+                     "height": 36
+                    },
+                    "isVisible": "0",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 },
+                 {
+                  "type": "Other",
+                  "label": "Horizontal scroll bar, 1 page",
+                  "value": "0 %",
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 408,
+                   "x": 41,
+                   "width": 320,
+                   "height": 23
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 428,
+                     "x": 2,
+                     "width": 36,
+                     "height": 3
+                    },
+                    "isVisible": "0",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "ScrollView",
+                "label": null,
+                "value": null,
+                "rawIdentifier": null,
+                "rect": {
+                 "y": 434,
+                 "x": 41,
+                 "width": 320,
+                 "height": 80
+                },
+                "isVisible": "1",
+                "isAccessible": "0",
+                "children": [
+                 {
+                  "type": "Other",
+                  "label": null,
+                  "value": null,
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 434,
+                   "x": 41,
+                   "width": 320,
+                   "height": 80
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 450,
+                     "x": 57,
+                     "width": 288,
+                     "height": 48
+                    },
+                    "isVisible": "1",
+                    "isAccessible": "0",
+                    "children": [
+                     {
+                      "type": "Button",
+                      "label": "Cancel",
+                      "value": null,
+                      "rawIdentifier": null,
+                      "rect": {
+                       "y": 450,
+                       "x": 57,
+                       "width": 140,
+                       "height": 48
+                      },
+                      "isVisible": "1",
+                      "isAccessible": "1",
+                      "children": []
+                     },
+                     {
+                      "type": "Button",
+                      "label": "Open",
+                      "value": null,
+                      "rawIdentifier": null,
+                      "rect": {
+                       "y": 450,
+                       "x": 205,
+                       "width": 140,
+                       "height": 48
+                      },
+                      "isVisible": "1",
+                      "isAccessible": "1",
+                      "children": []
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "type": "Other",
+                  "label": "Vertical scroll bar, 1 page",
+                  "value": "0 %",
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 434,
+                   "x": 328,
+                   "width": 30,
+                   "height": 80
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 524,
+                     "x": 355,
+                     "width": 3,
+                     "height": 7
+                    },
+                    "isVisible": "0",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 },
+                 {
+                  "type": "Other",
+                  "label": "Horizontal scroll bar, 1 page",
+                  "value": "0 %",
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 481,
+                   "x": 41,
+                   "width": 320,
+                   "height": 30
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 508,
+                     "x": 131,
+                     "width": 7,
+                     "height": 3
+                    },
+                    "isVisible": "1",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 },
+                 {
+                  "type": "Other",
+                  "label": "Vertical scroll bar, 1 page",
+                  "value": "0 %",
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 434,
+                   "x": 328,
+                   "width": 30,
+                   "height": 80
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 524,
+                     "x": 355,
+                     "width": 3,
+                     "height": 7
+                    },
+                    "isVisible": "0",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 },
+                 {
+                  "type": "Other",
+                  "label": "Horizontal scroll bar, 1 page",
+                  "value": "0 %",
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 481,
+                   "x": 41,
+                   "width": 320,
+                   "height": 30
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 508,
+                     "x": 131,
+                     "width": 7,
+                     "height": 3
+                    },
+                    "isVisible": "1",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         },
+         {
+          "type": "Other",
+          "label": null,
+          "value": null,
+          "rawIdentifier": null,
+          "rect": {
+           "y": 388,
+           "x": 41,
+           "width": 320,
+           "height": 126
+          },
+          "isVisible": "1",
+          "isAccessible": "0",
+          "children": [
+           {
+            "type": "Other",
+            "label": null,
+            "value": null,
+            "rawIdentifier": null,
+            "rect": {
+             "y": 388,
+             "x": 41,
+             "width": 320,
+             "height": 126
+            },
+            "isVisible": "1",
+            "isAccessible": "0",
+            "children": [
+             {
+              "type": "Other",
+              "label": null,
+              "value": null,
+              "rawIdentifier": null,
+              "rect": {
+               "y": 388,
+               "x": 41,
+               "width": 320,
+               "height": 126
+              },
+              "isVisible": "1",
+              "isAccessible": "0",
+              "children": [
+               {
+                "type": "Other",
+                "label": null,
+                "value": null,
+                "rawIdentifier": null,
+                "rect": {
+                 "y": 388,
+                 "x": 41,
+                 "width": 320,
+                 "height": 126
+                },
+                "isVisible": "1",
+                "isAccessible": "0",
+                "children": [
+                 {
+                  "type": "Other",
+                  "label": null,
+                  "value": null,
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 388,
+                   "x": 41,
+                   "width": 320,
+                   "height": 126
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": [
+                   {
+                    "type": "Other",
+                    "label": null,
+                    "value": null,
+                    "rawIdentifier": null,
+                    "rect": {
+                     "y": 388,
+                     "x": 41,
+                     "width": 402,
+                     "height": 874
+                    },
+                    "isVisible": "1",
+                    "isAccessible": "0",
+                    "children": []
+                   }
+                  ]
+                 }
+                ]
+               },
+               {
+                "type": "Other",
+                "label": null,
+                "value": null,
+                "rawIdentifier": null,
+                "rect": {
+                 "y": 388,
+                 "x": 41,
+                 "width": 320,
+                 "height": 126
+                },
+                "isVisible": "1",
+                "isAccessible": "0",
+                "children": [
+                 {
+                  "type": "Other",
+                  "label": null,
+                  "value": null,
+                  "rawIdentifier": null,
+                  "rect": {
+                   "y": 388,
+                   "x": 41,
+                   "width": 402,
+                   "height": 874
+                  },
+                  "isVisible": "1",
+                  "isAccessible": "0",
+                  "children": []
+                 }
+                ]
+               }
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

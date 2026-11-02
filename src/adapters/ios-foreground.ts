@@ -1,5 +1,7 @@
 import { IdbEmptyTreeError, type ApplicationLabel } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
+import { namesApp, titleAsksToOpen } from './ios-system-alert.js';
+import type { DeepLinkOutcome, LinkAlert, SystemAlert } from './types.js';
 import { errorMessage } from '../util/error-message.js';
 import { formatSeconds } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
@@ -139,9 +141,23 @@ import { sleep } from '../util/sleep.js';
  * agent must do: averi did not see the app come forward (it read another app)
  * or could not check — either way iOS may be asking to confirm the link — take
  * a screenshot and answer an alert it shows; a WDA not up yet, which a launch
- * leaves silent, says it did not check. The alert itself is not looked for
- * (no text match, no button, no tap): its shape in either source's tree is
- * unmeasured (D54, after the device check). Not on Android: the previous app's
+ * leaves silent, says it did not check.
+ *
+ * The alert itself, named (D54, 2026-11-02; ADR 0032's D54 amendment), from
+ * its shape as batch-5 D49A captured it (ios-system-alert.ts): a link's wait
+ * that finds it ends with it (`alert`), and the reply names its title and its
+ * buttons at their centres instead of the note — never a tap. On idb at no
+ * cost: the label read that answered SpringBoard's `' '` carries the alert
+ * shape of its own elements (`candidate`), whose title this wait gates with
+ * the names it already asks after its first label (titleAsksToOpen), so the
+ * wait ends at the read that lists it, not at the bound. On WDA its
+ * activeAppInfo says only "SpringBoard", so ONE short `/source`
+ * (ForegroundCheck.alert, WdaTreeSource.systemAlert: its own 2 s budget, no
+ * start, no restart) is read, and only at the bound, only when the last
+ * bundle named was SpringBoard: a matched link reads nothing more, and a
+ * failed or alert-less read is the note of before (fail open). A launch looks
+ * for no alert (its note's wording is D48's; naming the alert there is a row
+ * of its own). Not on Android: the previous app's
  * tree after a switch has not been measured there (uiautomator dumps the
  * focused window), so android.ts waits for nothing.
  */
@@ -206,34 +222,40 @@ export interface ForegroundCheck {
    * (D49a): the notes then say "opening <link> in <bundle>", and lead with the link's own advice (awaitForeground); a WDA that is not up gets a note too.
    */
   link?: string;
+  /**
+   * One short tree read for a system alert (D54: IosTreeSource.systemAlert, WDA's; IosAdapter wires it for links):
+   * asked at most once per wait, at the bound, when the last bundle named was SpringBoard's; a throw is no alert.
+   */
+  alert?: () => Promise<SystemAlert | undefined>;
 }
 
 /**
  * Read until the Application label is one of the bundle's names (see the
  * module comment), and return the note to show when the wait ended without
- * confirming that — or undefined when it confirmed it, or (a launch only) the
+ * confirming that — none when it confirmed it, or (a launch only) the
  * source does not ask. A link (`check.link`, D49a) has a note in every case
- * but the match, led by what the wait knows: it SAW another app or SpringBoard
+ * but the match and the alert, led by what the wait knows: it SAW another app or SpringBoard
  * (LINK_SAW), it could not check (LINK_UNCHECKED), or WebDriverAgent is not
  * running yet and nothing was asked (notAsked) — never a bare "Opened" for a
- * link that may wait behind iOS's "Open in …?".
+ * link that may wait behind iOS's "Open in …?". When it found that alert (D54), the outcome is the alert instead.
  */
-export async function awaitForeground(check: ForegroundCheck): Promise<string | undefined> {
+export async function awaitForeground(check: ForegroundCheck): Promise<DeepLinkOutcome> {
   const end = await poll(check);
-  if (end.kind === 'matched') return undefined;
-  if (check.link === undefined) return end.kind === 'declined' ? undefined : end.note;
-  if (end.kind === 'declined') return notAsked(check.bundleId);
-  return `${(end.kind === 'saw' ? LINK_SAW : LINK_UNCHECKED)(check.bundleId)}${end.note}`;
+  if (end.kind === 'matched') return {};
+  if (end.kind === 'alert') return { alert: end.alert };
+  if (check.link === undefined) return end.kind === 'declined' ? {} : { note: end.note };
+  if (end.kind === 'declined') return { note: notAsked(check.bundleId) };
+  return { note: `${(end.kind === 'saw' ? LINK_SAW : LINK_UNCHECKED)(check.bundleId)}${end.note}` };
 }
 
 /**
- * How a wait ended: the app confirmed; the source does not ask (WDA not up); or a note — `saw` when it read
- * another app (a stale label or bundle), `unchecked` when it could not tell (a read or names error, an unlabelled or
- * empty tree to the bound).
+ * How a wait ended: the app confirmed; the source does not ask (WDA not up); a link's system alert found (D54); or a
+ * note — `saw` when it read another app (a stale label or bundle), `unchecked` when it could not tell (a read or names
+ * error, an unlabelled or empty tree to the bound).
  */
-type WaitEnd = { kind: 'matched' } | { kind: 'declined' } | { kind: 'saw' | 'unchecked'; note: string };
+type WaitEnd = { kind: 'matched' } | { kind: 'declined' } | { kind: 'alert'; alert: LinkAlert } | { kind: 'saw' | 'unchecked'; note: string };
 
-/** What every link lead advises (D49a): the alert averi does not look for (the module comment), and what it blocks. */
+/** What every link lead advises (D49a): the alert averi did not find (D54 names one it finds — the module comment), and what it blocks. */
 const ANSWER_IT = '— take a screenshot, and if it shows a system alert, answer it (every launch stays behind it until then). ';
 
 /**
@@ -302,18 +324,25 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
           try {
             names = await check.names();
           } catch (e) {
-            return unchecked(check, headline(e));
+            // D54: an alert whose title needs no names (the English "Open in “…”?") is named all the same.
+            const alert = idbAlert(check, read, []);
+            return alert === undefined ? unchecked(check, headline(e)) : { kind: 'alert', alert };
           }
           // The window starts when the names have arrived: a slow lookup is added to it, not taken from it.
           deadline += Date.now() - asked;
         }
         if (names.includes(read.label)) return { kind: 'matched' };
+        const alert = idbAlert(check, read, names);
+        if (alert !== undefined) return { kind: 'alert', alert };
         stale = read.label;
       }
     }
     // Pause only if the read after it would START before the deadline.
     if (Date.now() + FOREGROUND_POLL_MS >= deadline) {
-      // The most telling thing read wins: a real label (or bundle), then an unlabelled tree, then nothing at all.
+      // The most telling thing read wins: a system alert (D54), a real label (or bundle), then an unlabelled tree,
+      // then nothing at all.
+      const alert = staleBundle === SPRINGBOARD_BUNDLE ? await alertAtBound(check) : undefined;
+      if (alert !== undefined) return { kind: 'alert', alert };
       if (staleBundle !== undefined) return { kind: 'saw', note: stillReads(check, staleBundle) };
       if (stale !== undefined) return { kind: 'saw', note: notInFront(check, stale, names ?? []) };
       if (unlabelled) {
@@ -324,6 +353,31 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
     await sleep(FOREGROUND_POLL_MS);
   }
 }
+
+/**
+ * WDA's system alert at the bound (D54): one `check.alert()` — for a link only — and the names it is judged against
+ * (appinfo's, which the link's scheme lookup has cached; unreadable names are no name). Fails open: a read that throws,
+ * or holds no alert, is undefined, and the wait's note is the one of before.
+ */
+async function alertAtBound(check: ForegroundCheck): Promise<LinkAlert | undefined> {
+  if (check.link === undefined || check.alert === undefined) return undefined;
+  const alert = await check.alert().catch(() => undefined);
+  if (alert === undefined) return undefined;
+  return linkAlertOf(alert, await check.names().catch((): readonly string[] => []));
+}
+
+/**
+ * idb's system alert in a SpringBoard label read (D54): the read's alert shape (`candidate`, no other call), for a link
+ * only, when its title asks to open the link judged with `names` (titleAsksToOpen; none when they could not be read,
+ * so only the English form passes).
+ */
+function idbAlert(check: ForegroundCheck, read: Extract<ApplicationLabel, { kind: 'label' }>, names: readonly string[]): LinkAlert | undefined {
+  const candidate = check.link === undefined ? undefined : read.candidate;
+  return candidate !== undefined && titleAsksToOpen(candidate.title, names) ? linkAlertOf(candidate, names) : undefined;
+}
+
+/** A found alert as the link's outcome carries it: whether its title names the app (`asksForApp`, namesApp). */
+const linkAlertOf = (alert: SystemAlert, names: readonly string[]): LinkAlert => ({ ...alert, asksForApp: namesApp(alert.title, names) });
 
 /** What a "could not check" note quotes of an error: its first line — the cause, not a stack or a paragraph of advice. */
 const headline = (e: unknown): string => errorMessage(e).split('\n')[0];

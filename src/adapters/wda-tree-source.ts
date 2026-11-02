@@ -1,7 +1,8 @@
 import { WdaServer, type WdaServerOptions } from './wda.js';
 import { parseWdaSourceValue } from './wda-source.js';
+import { alertInWda } from './ios-system-alert.js';
 import type { ApplicationLabel, IosTreeSource } from './ios-tree-source.js';
-import type { UiNode } from './types.js';
+import type { SystemAlert, UiNode } from './types.js';
 
 /**
  * The WebDriverAgent adapter at the iOS tree-source seam (ios-tree-source.ts):
@@ -125,6 +126,25 @@ export class WdaTreeSource implements IosTreeSource {
     }
     const bundleId = (payload as { value?: { bundleId?: unknown } } | null | undefined)?.value?.bundleId;
     return typeof bundleId === 'string' && bundleId !== '' ? { kind: 'bundle', bundleId } : { kind: 'unlabelled' };
+  }
+
+  /**
+   * iOS's system alert in one SHORT `/source` (D54, ADR 0032's D54 amendment): asked by a deep link's foreground wait
+   * at its bound, when activeAppInfo last named SpringBoard. WdaServer.quickSourceIfUp — its own 2 s budget, no start,
+   * no /status probe, no restart, unlike read(): an aid to the reply, never a recovery. WDA not up → undefined, no call;
+   * a failed read throws as WDA said it (the wait then gives its note); released → the released error. Leaves
+   * `failedAsk` alone: this read proves nothing about the ask.
+   */
+  async systemAlert(): Promise<SystemAlert | undefined> {
+    if (this.disposed) throw this.released();
+    let payload: unknown;
+    try {
+      payload = await this.server.quickSourceIfUp();
+    } catch (err) {
+      if (this.disposed) throw this.released(err);
+      throw err;
+    }
+    return payload === undefined ? undefined : alertInWda(parseWdaSourceValue(payload));
   }
 
   private released(cause?: unknown): Error {

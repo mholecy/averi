@@ -303,6 +303,20 @@ describe('IdbTreeSource.applicationLabel — which app a read is of', () => {
     expect(await label([{ type: 'Application', AXLabel: ' ', frame: F }, BUTTON]).answer).toEqual({ kind: 'label', label: ' ' });
   });
 
+  // D54: SpringBoard's answer carries, as plain data, the alert-shaped part of the same read — no second read. Whether
+  // its title asks to open the link is the wait's to judge, with the app's names it holds (ios-foreground.ts).
+  it("SpringBoard's answer carries the alert shape of the same read (ios-system-alert.ts#alertShapeInIdb); no other label does", async () => {
+    const title = { type: 'StaticText', AXLabel: 'Open in “AveriLab”?', frame: { x: 71, y: 409, width: 260, height: 20 } };
+    const { answer, calls } = label([{ type: 'Application', AXLabel: ' ', frame: F }, title, BUTTON]);
+    expect(await answer).toEqual({
+      kind: 'label',
+      label: ' ',
+      candidate: { title: 'Open in “AveriLab”?', buttons: [{ label: 'Cancel', centre: { x: 46, y: 105 } }] },
+    });
+    expect(calls.filter((c) => c.full.startsWith('idb'))).toHaveLength(1);
+    expect(await label([{ type: 'Application', AXLabel: 'Contacts', frame: F }, title, BUTTON]).answer).toStrictEqual({ kind: 'label', label: 'Contacts' });
+  });
+
   it('found by type, not by place', async () => {
     expect(await label([BUTTON, { type: 'Application', AXLabel: 'Contacts', frame: F }]).answer).toEqual({ kind: 'label', label: 'Contacts' });
   });
