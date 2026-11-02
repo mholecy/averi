@@ -572,6 +572,15 @@ describe('launch_app — the entry activity', () => {
     expect(text).toBe('Launched md.bank.app on ios');
   });
 
+  it("a WebDriverAgent launch's note (D48) reaches the reply as its ⚠ line, verbatim", async () => {
+    const ios = home();
+    ios.launchNote =
+      "3 s after launching md.bank.app, WebDriverAgent still read com.apple.MobileAddressBook as the active app — a ui_snapshot now reads that app's tree, on which an absent check passes. Read again; if it repeats, take a screenshot";
+    const { call } = await connect({ ios });
+    const result = await call('launch_app', { platform: 'ios', appId: 'md.bank.app', configPath: await validConfig() });
+    expect(result.text).toBe(`Launched md.bank.app on ios\n⚠ ${ios.launchNote}`);
+  });
+
   it('ios never gets an activity from the config', async () => {
     const { launches } = await launch({ appId: 'md.bank.app' }, { platform: 'ios' });
     expect(launches[0].activity).toBeUndefined();

@@ -274,7 +274,10 @@ function displays(profile: DeviceProfile, keyboard: KeyboardState): string {
   return keyboard === 'hidden' ? API33.hidden : keyboard === 'shown' ? API33.shown : API33_FLOATING;
 }
 
-const appinfo = (name: string) => `{\n    CFBundleDisplayName = "${name}";\n    CFBundleIdentifier = "differential.app";\n    CFBundleName = "${name}";\n}\n`;
+/** The one app the fake device has installed: what a replay's config names and launches (differential.ts), and what a recorded WDA source names as active (recorded-source.ts). */
+export const REPLAYED_APP = 'differential.app';
+
+const appinfo = (name: string) => `{\n    CFBundleDisplayName = "${name}";\n    CFBundleIdentifier = "${REPLAYED_APP}";\n    CFBundleName = "${name}";\n}\n`;
 
 // --- answering a command ---
 
@@ -313,7 +316,7 @@ function answer(cmd: string, args: string[], stdin: string | undefined): Answer 
       writeFileSync(rest[1], frame(profile.frame, device.paint, profile.screenshot));
       return '';
     }
-    if (verb === 'spawn' && rest[0] === 'launchctl') return 'PID\tStatus\tLabel\n1\t0\tUIKitApplication:differential.app[1][rb-legacy]\n';
+    if (verb === 'spawn' && rest[0] === 'launchctl') return `PID\tStatus\tLabel\n1\t0\tUIKitApplication:${REPLAYED_APP}[1][rb-legacy]\n`;
     device.calls.push(`simctl ${verb} ${rest.join(' ')}`);
     if (verb === 'spawn' && rest[0] === 'log') return '';
     if (verb === 'spawn' && rest[0] === 'defaults') return '';

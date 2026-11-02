@@ -511,6 +511,107 @@ describe('WdaServer.source', () => {
   });
 });
 
+describe('WdaServer.upGeneration and activeAppInfo — asked of a running WDA only, never starting one (D48)', () => {
+  async function upSetup(active: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: { value: { bundleId: 'dev.averi.lab' } } })) {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const fetcher = fakeFetch((url) => {
+      // Alive while a spawned child is not yet signalled: a stop() quiets the port, a fresh spawn answers again.
+      if (url.endsWith('/status')) return spawner.kills.length < spawner.spawns.length ? { status: 200, body: WDA_STATUS } : 'refused';
+      if (url.endsWith('/wda/activeAppInfo')) return active();
+      return { status: 200, body: { value: { type: 'Application' } } };
+    });
+    const server = new WdaServer({
+      udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, pollIntervalMs: 5,
+    });
+    return { server, spawner, fetcher };
+  }
+
+  it('upGeneration: none before any start, a number once ensureRunning resolved on our child', async () => {
+    const { server } = await upSetup();
+    expect(server.upGeneration()).toBeUndefined();
+    await server.ensureRunning();
+    expect(server.upGeneration()).toBeDefined();
+    server.stop();
+  });
+
+  it('upGeneration: none while a start is still in flight (spawned, /status not yet answered)', async () => {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    let ready = false;
+    const fetcher = fakeFetch(() => (ready ? { status: 200, body: WDA_STATUS } : 'refused'));
+    const server = new WdaServer({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    const starting = server.ensureRunning();
+    while (spawner.spawns.length === 0) await new Promise((r) => setTimeout(r, 2));
+    expect(server.upGeneration()).toBeUndefined();
+    ready = true;
+    await starting;
+    expect(server.upGeneration()).toBeDefined();
+    server.stop();
+  });
+
+  it('upGeneration: none after stop(), after our child exited, and after shutdown()', async () => {
+    const a = await upSetup();
+    await a.server.ensureRunning();
+    a.server.stop();
+    expect(a.server.upGeneration()).toBeUndefined();
+
+    const b = await upSetup();
+    await b.server.ensureRunning();
+    b.spawner.children[0].exit.forEach((l) => l());
+    expect(b.server.upGeneration()).toBeUndefined();
+
+    const c = await upSetup();
+    await c.server.ensureRunning();
+    await c.server.shutdown();
+    expect(c.server.upGeneration()).toBeUndefined();
+  });
+
+  it('upGeneration after a stop() and a fresh start: up again, under a new generation — and the same one across reuse', async () => {
+    const { server, spawner } = await upSetup();
+    await server.ensureRunning();
+    const first = server.upGeneration();
+    await server.ensureRunning(); // the fast path on our live child: the same start
+    expect(server.upGeneration()).toBe(first);
+    server.stop();
+    await server.ensureRunning();
+    expect(spawner.spawns).toHaveLength(2);
+    expect(server.upGeneration()).toBeDefined();
+    expect(server.upGeneration()).not.toBe(first);
+    server.stop();
+  });
+
+  it('activeAppInfo GETs /wda/activeAppInfo and returns its envelope — no /status, no spawn', async () => {
+    const { server, spawner, fetcher } = await upSetup();
+    await server.ensureRunning();
+    const before = fetcher.urls.length;
+    await expect(server.activeAppInfo()).resolves.toEqual({ value: { bundleId: 'dev.averi.lab' } });
+    expect(fetcher.urls.slice(before)).toEqual([`http://127.0.0.1:${server.port}/wda/activeAppInfo`]);
+    expect(spawner.spawns).toHaveLength(1);
+    server.stop();
+  });
+
+  it('activeAppInfo on a server never started: it fails in WDA\'s words and starts nothing', async () => {
+    const { server, spawner, fetcher } = await upSetup(() => 'refused');
+    const err = await server.activeAppInfo().then(() => undefined, (e: Error) => e);
+    expect(err?.message).toContain(`port ${server.port} (udid AAAA-1111)`);
+    expect(err?.message).toContain(server.logPath);
+    expect(fetcher.urls).toEqual([`http://127.0.0.1:${server.port}/wda/activeAppInfo`]);
+    expect(spawner.spawns).toEqual([]);
+  });
+
+  it('activeAppInfo: a non-200 names the status, port and log path', async () => {
+    const { server } = await upSetup(() => ({ status: 500, body: {} }));
+    await server.ensureRunning();
+    const err = await server.activeAppInfo().then(() => undefined, (e: Error) => e);
+    expect(err?.message).toContain('HTTP 500');
+    expect(err?.message).toContain(String(server.port));
+    expect(err?.message).toContain(server.logPath);
+    server.stop();
+  });
+});
+
 describe('WdaServer.shutdown — the process-shutdown form of stop()', () => {
   // The group kill reaches xcodebuild, not the WebDriverAgentRunner under
   // launchd_sim (measured 2026-09-18): shutdown() must wait for the PORT to

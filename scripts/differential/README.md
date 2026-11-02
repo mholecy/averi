@@ -4,7 +4,7 @@ Replays recorded device trees through two checkouts of averi — OLD and NEW —
 answer differs. It is how a change that should move behaviour only where intended is checked against every tree a
 device check ever saved, without a device.
 
-It depends on each side through two interfaces (`side.ts`), and one shim for older sides:
+It depends on each side through two interfaces (`side.ts`), and two shims for older sides:
 
 - the **tool interface**: the side's own `createAveriServer` over an `AdapterRegistry`, called through an in-memory MCP
   client exactly as `tests/mcp/tools.test.ts` does — the reply an agent would read;
@@ -16,6 +16,12 @@ It depends on each side through two interfaces (`side.ts`), and one shim for old
   discovery }` asks that discovery when it lists devices), and an older side gets a factory that answers the unbound
   call with the discovery. A side picked wrong answers every call "this.factory is not a function"; golden marks such a
   reply as a fault (below).
+- the **WDA foreground-answer shim** (`Side.asksWdaBundle`): since D48 (2026-11-02) a side's `WdaTreeSource` answers the
+  launch's foreground question with WDA's active bundle id; before, it declined. Which a side does is told by its own
+  `src/adapters/wda.ts` (optional; `WdaServer.prototype.activeAppInfo` is a function), and `RecordedTreeSource` takes
+  it as its fourth argument: a side that asks is answered `{ kind: 'bundle', bundleId: REPLAYED_APP }` (fake-device.ts,
+  the app every replay launches), so its wait matches at once; an older side is answered `declined`, whose wait it
+  knows. A side picked wrong would turn every iOS WDA `launch_app` into a 3 s wait and a ⚠ line.
 
 Where the recording meets each side:
 

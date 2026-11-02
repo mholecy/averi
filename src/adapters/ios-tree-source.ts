@@ -42,21 +42,23 @@ export interface IosTreeSource {
   /**
    * The configured kind this source serves (mcp/registry.ts wires it). No reader above the adapter dispatches on it: a
    * tree says its own source by its marks (UiNode.flatList, idb's), which is what a miss reads (ui-tree/miss.ts). The
-   * adapter reads it for its keyboard advice only (ios.ts#keyboardAdvice); its screenshots do not follow it
-   * (ios.ts#screenshotVia).
+   * adapter reads it for its keyboard advice (ios.ts#keyboardAdvice) and the wording of its launch's foreground note
+   * (ios-foreground.ts#ForegroundCheck.source) only; its screenshots do not follow it (ios.ts#screenshotVia).
    */
   readonly kind: IosTreeSourceKind;
   read(): Promise<UiNode>;
   /**
-   * Which app a fresh read is OF: the label of the payload's `Application`
-   * element — its display name ("Skeleton Internal", "Contacts"), or `' '`
-   * for SpringBoard (2026-10-09). Asked by IosAdapter.launch only
-   * (ios-foreground.ts), never by a reader of the tree: the normalized tree
-   * keeps no element types (idb's Application is a plain `other`), so the
-   * question is answered from the raw payload, by the source that has it.
-   * The three answers are ApplicationLabel's. Throws as `read()` throws; one
-   * device read per call, like `read()` — except a `declined` source, which
-   * reads nothing.
+   * Which app a fresh read is OF. idb: the label of the payload's
+   * `Application` element — its display name ("Skeleton Internal",
+   * "Contacts"), or `' '` for SpringBoard (2026-10-09). WDA: the bundle id
+   * of its active app, the app its sessionless `/source` reads (D48;
+   * wda-tree-source.ts), once its WebDriverAgent is up. Asked by
+   * IosAdapter.launch only (ios-foreground.ts), never by a reader of the
+   * tree: the normalized tree keeps no element types (idb's Application is
+   * a plain `other`), so the question is answered by the source that has
+   * the answer. The answers are ApplicationLabel's. Throws as `read()`
+   * throws; one device call per call — except a `declined` answer, which
+   * calls nothing.
    */
   applicationLabel(): Promise<ApplicationLabel>;
   dispose(): Promise<void>;
@@ -72,10 +74,18 @@ export interface IosTreeSource {
  * - `unlabelled`: the read cannot say — it lists no Application element, or
  *   one whose label is missing or empty (both unmeasured; the launch's wait
  *   reads on, and says it could not check if nothing better follows).
- * - `declined`: the source does not ask (WdaTreeSource, which says why) and
- *   read nothing; the launch's wait then waits for nothing and says nothing.
+ * - `bundle`: the bundle id of the app the source reads — an exact answer,
+ *   no display name (WdaTreeSource, from WDA's active app; D48). The
+ *   launch's wait matches it against the launched bundle, no appinfo.
+ * - `declined`: the source does not ask now (WdaTreeSource before its
+ *   WebDriverAgent is up, which says why) and read nothing; the launch's
+ *   wait then waits for nothing and says nothing.
  */
-export type ApplicationLabel = { kind: 'label'; label: string } | { kind: 'unlabelled' } | { kind: 'declined' };
+export type ApplicationLabel =
+  | { kind: 'label'; label: string }
+  | { kind: 'bundle'; bundleId: string }
+  | { kind: 'unlabelled' }
+  | { kind: 'declined' };
 
 /**
  * The seams the two sources already take, for a caller that has fakes: idb

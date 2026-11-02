@@ -41,6 +41,11 @@ export class WdaTreeSource implements IosTreeSource {
   private readonly udid: string;
   private readonly server: WdaServer;
   private disposed = false;
+  /**
+   * The failed activeAppInfo ask, and the WDA start (WdaServer.upGeneration) it failed on: that child is not asked
+   * again — its error is thrown again at once — until a /source read succeeds on it (applicationLabel).
+   */
+  private failedAsk: { generation: number; error: unknown } | undefined;
 
   constructor(opts: WdaServerOptions) {
     this.udid = opts.udid;
@@ -63,24 +68,63 @@ export class WdaTreeSource implements IosTreeSource {
       if (this.disposed) throw this.released(err);
       throw err;
     }
+    this.failedAsk = undefined; // WDA answered a read: the launch's wait may ask it again
     return parseWdaSourceValue(payload);
   }
 
   /**
-   * Not asked: always `declined`, without a read (2026-10-09). The launch's
-   * foreground wait (ios-foreground.ts) was measured on idb only — idb hands
-   * out the previous app's tree for ~1–2 s after an app switch — and WDA's
-   * sessionless `/source` has not been measured doing the same. Asking here
-   * would also move WebDriverAgent's start (a build on first use, then up to
-   * 60 s for /status — wda.ts) into every `launch_app` of a project whose
-   * next call may never read a tree, and the start alone outlasts the
-   * window this check exists for. The answer is possible — WDA's root IS
-   * the Application, labelled with the display name — so a measured lag
-   * would make this a read of `/source` returning the root's label when its
-   * type is `Application`.
+   * Which app WebDriverAgent reads — asked only of a WDA that is up (D48,
+   * 2026-11-02; ADR 0032's D48 amendment). Until 2026-11-02 this declined
+   * always, by decision (2026-10-09): the idb lag after an app switch had not
+   * been measured on WDA's sessionless `/source`. It is now: batch-2 D
+   * (main 39c1fcda) read Contacts' whole tree in 2 of 5 `ui_snapshot`s right
+   * after `launch_app` of the lab app. The mechanism (WDA 16.1.7's source):
+   * with no session, `/source` reads `fb_activeApplication` — the first app
+   * AX lists as active — and AX still lists the previous app for a moment
+   * after `simctl launch` returns.
+   *
+   * So the launch asks the same question `/source` answers, by bundle id:
+   * `GET /wda/activeAppInfo` (WdaServer.activeAppInfo) resolves the app the
+   * same way and walks no tree — not `/source` itself (a full tree read per
+   * poll, 0.9–1.25 s in that run, and display names to match), and not
+   * idb's Application label (another reader, whose lag is not `/source`'s).
+   *
+   * - WDA not up (WdaServer.upGeneration: no start of ours reached /status, or it
+   *   exited or was stopped since) → `declined`, no device call. The
+   *   2026-10-09 objection stands for this case: asking would move WDA's
+   *   start (a build on first use, then up to 60 s for /status) into every
+   *   first `launch_app`, and the first read's own start (7.7 s measured in
+   *   that run) outlasts the switch anyway.
+   * - up → `bundle` with the payload's `value.bundleId`, `unlabelled` when it
+   *   is not a non-empty string; WDA's error (port, log) when the ask fails —
+   *   asked once per WDA child until it proves it answers: after a failed
+   *   ask the same child is not asked again — the remembered error is thrown
+   *   at once, so every later launch still carries its "could not check"
+   *   note (never a silent decline, which is D48's bug) without paying the
+   *   ask's budget again on a wedged runner (review 2026-11-02). A /source
+   *   read that succeeds clears it, and so does a restart (a new
+   *   upGeneration).
+   *   The bundle id is matched exactly by the wait (ios-foreground.ts): WDA
+   *   reports the app's canonical CFBundleIdentifier, the id `simctl launch`
+   *   was given — no case folding, by design.
+   * - released → the released error, as read() (checked first: a shut-down
+   *   server is not up, and `declined` would hide the release).
    */
   async applicationLabel(): Promise<ApplicationLabel> {
-    return { kind: 'declined' };
+    if (this.disposed) throw this.released();
+    const generation = this.server.upGeneration();
+    if (generation === undefined) return { kind: 'declined' };
+    if (this.failedAsk?.generation === generation) throw this.failedAsk.error;
+    let payload: unknown;
+    try {
+      payload = await this.server.activeAppInfo();
+    } catch (err) {
+      if (this.disposed) throw this.released(err);
+      this.failedAsk = { generation, error: err };
+      throw err;
+    }
+    const bundleId = (payload as { value?: { bundleId?: unknown } } | null | undefined)?.value?.bundleId;
+    return typeof bundleId === 'string' && bundleId !== '' ? { kind: 'bundle', bundleId } : { kind: 'unlabelled' };
   }
 
   private released(cause?: unknown): Error {

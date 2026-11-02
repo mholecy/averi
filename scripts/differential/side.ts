@@ -33,6 +33,12 @@ export interface Side {
   IosAdapter: new (opts: ConstructorParameters<typeof IosAdapter>[0]) => DeviceAdapter;
   parseWdaSourceValue: (value: unknown) => UiNode;
   /**
+   * Whether the side's WdaTreeSource names WDA's active app by bundle id for the launch's foreground wait (D48: its
+   * WdaServer has `activeAppInfo`) — what RecordedTreeSource answers it; an older side declined, and its wait cannot
+   * match a bundle. Told by the side's own WdaServer, not by a date.
+   */
+  asksWdaBundle: boolean;
+  /**
    * The side's registry over `deps`, whichever constructor the side has: since 8413120 (2026-10-08) it takes
    * `{ factory, discovery }`; before, the factory alone, and devices were listed by an UNBOUND adapter's
    * `listDevices()` — so an older side gets a factory that answers an unbound call with the listing. Which one is
@@ -81,10 +87,17 @@ export async function loadSide(root: string): Promise<Side> {
     at('src/adapters/ios.ts', ['IosAdapter']),
     at('src/adapters/wda-source.ts', ['parseWdaSourceValue']),
   ]);
-  // Optional: a side without the seam loads all the same (the replay never needs it).
-  const treeSource = (await import(pathToFileURL(resolve(root, 'src/adapters/ios-tree-source.ts')).href).catch(() => ({}))) as Record<string, unknown>;
-  // Optional too: a side before A3 lists through a discovery that is a plain function.
-  const discovery = (await import(pathToFileURL(resolve(root, 'src/adapters/discovery.ts')).href).catch(() => ({}))) as Record<string, unknown>;
+  /** A module a side may lack: its exports, or none. */
+  const optional = async (path: string): Promise<Record<string, unknown>> =>
+    (await import(pathToFileURL(resolve(root, path)).href).catch(() => ({}))) as Record<string, unknown>;
+  // Optional: a side without the seam loads all the same (the replay never needs it); a side before D48 has no
+  // WdaServer.activeAppInfo (RecordedTreeSource then declines, as its WdaTreeSource did); a side before A3 lists
+  // through a discovery that is a plain function.
+  const [treeSource, wdaServer, discovery] = await Promise.all([
+    optional('src/adapters/ios-tree-source.ts'),
+    optional('src/adapters/wda.ts'),
+    optional('src/adapters/discovery.ts'),
+  ]);
   const over = typeof discovery.discoveryOver === 'function' ? (discovery.discoveryOver as DiscoveryOver) : undefined;
   const Registry = registry.AdapterRegistry as new (deps: { factory: AdapterFactory; discovery: DeviceDiscovery }) => AdapterRegistry;
   const discoverySeam = await takesDeps(Registry);
@@ -94,6 +107,7 @@ export async function loadSide(root: string): Promise<Side> {
     defaultFactory: registry.defaultFactory as Side['defaultFactory'],
     IosAdapter: ios.IosAdapter as Side['IosAdapter'],
     parseWdaSourceValue: wda.parseWdaSourceValue as Side['parseWdaSourceValue'],
+    asksWdaBundle: typeof (wdaServer.WdaServer as { prototype?: Record<string, unknown> } | undefined)?.prototype?.activeAppInfo === 'function',
     ...(typeof treeSource.createIosTreeSource === 'function' && { createIosTreeSource: treeSource.createIosTreeSource as NonNullable<Side['createIosTreeSource']> }),
     registry: (deps) => {
       if (discoverySeam) return new Registry({ factory: deps.factory, discovery: discoveryFor(deps.discovery, over) });
@@ -156,7 +170,7 @@ export function recordedAdapter(side: Side, recording: Recording, profile: Devic
   });
   if (recording.platform === 'ios') {
     if (raw && recording.source === 'idb') return side.defaultFactory('ios', IOS_UDID, { treeSource: 'idb' });
-    return new side.IosAdapter({ udid: IOS_UDID, treeSource: new RecordedTreeSource(recording, side.parseWdaSourceValue, logCall) });
+    return new side.IosAdapter({ udid: IOS_UDID, treeSource: new RecordedTreeSource(recording, side.parseWdaSourceValue, logCall, side.asksWdaBundle) });
   }
   const adapter = side.defaultFactory('android', ANDROID_SERIAL);
   if (raw) return adapter;

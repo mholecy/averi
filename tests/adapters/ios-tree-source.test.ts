@@ -504,7 +504,7 @@ describe('createIosTreeSource — which backend a kind gets, pinned by what the 
     expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);
   });
 
-  it("'wda': applicationLabel is not asked — declined, with no WebDriverAgent started and no idb call", async () => {
+  it("'wda': applicationLabel of a WebDriverAgent not up yet is declined — none started, no idb call", async () => {
     const { spawner, fetcher, exec, deps } = await fakes(IDB_DESCRIBE_ALL);
     expect(await createIosTreeSource('wda', 'BBBB-2222', deps).applicationLabel()).toEqual({ kind: 'declined' });
     expect(spawner.spawns).toEqual([]);
