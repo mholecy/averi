@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { holdTracker } from '../../src/flow/hold-tracker.js';
 import { isBareTree } from '../../src/ui-tree/bare-tree.js';
@@ -71,5 +73,18 @@ describe('holdTracker', () => {
     expect(t.observe(LOGIN, 2500)).toBeUndefined();
     const spinning = holdTracker(2000);
     for (const at of [0, 1000, 2000, 3000, 9000]) expect(spinning.observe(SPINNER, at)).toBeUndefined();
+  });
+
+  it("idb's spinner (D50, the recorded describe-all of Held.swift's ProgressView) breaks a run and never holds", () => {
+    const spinner = parseIdbDescribeAll(
+      readFileSync(new URL('../../docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json', import.meta.url), 'utf8'),
+    );
+    expect(showsProgress(spinner)).toBe(true);
+    const t = holdTracker(2000);
+    t.observe(LOGIN, 0);
+    expect(t.observe(spinner, 1000)).toBeUndefined();
+    expect(t.observe(LOGIN, 2500)).toBeUndefined();
+    const spinning = holdTracker(2000);
+    for (const at of [0, 1000, 2000, 3000, 9000]) expect(spinning.observe(structuredClone(spinner), at)).toBeUndefined();
   });
 });

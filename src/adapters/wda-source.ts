@@ -66,8 +66,10 @@ const ROLE_MAP: Record<string, string> = {
   // screen then never holds (flow/hold-tracker.ts, ADR 0033) and a scroll does not call it exhausted
   // (interact/scroll-read.ts `loading`). Until then the type fell through to `other`, a structural role. The spelling
   // is XCUI's enum name less the prefix, which WDA strips (above) — no capture holds one yet. Here and not in the
-  // shared IOS_ROLE_MAP: no idb capture shows what describe-all names a UIActivityIndicatorView, so its spelling
-  // there is unknown (`ProgressIndicator`, already shared, is XCUI's other progress type).
+  // shared IOS_ROLE_MAP: idb names no such type — it lists SwiftUI's ProgressView (a UIActivityIndicatorView beneath)
+  // as an unlabelled `GenericElement` with the `UpdatesFrequently` trait, which its own parser reads as `progress`
+  // since D50 (adapters/ios-tree-source.ts#idbSpinner) (`ProgressIndicator`, already shared, is XCUI's other
+  // progress type).
   // Leaving `other` (structural) changes, beside showsProgress: an unlabelled spinner now covers its rect in
   // ui-tree/draw-order.ts (a structural leaf did not); in ui-tree/bare-tree.ts `progress` is decoration, counted only
   // when LABELLED — so a spinner with a value and no label now counts toward bare, and a labelled screen-sized one

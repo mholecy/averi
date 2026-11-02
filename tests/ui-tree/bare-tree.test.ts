@@ -66,6 +66,14 @@ describe('isBareTree: the empty / unrendered trees each source emits ARE bare', 
     expect(isBareTree(idb(ax('Image', null, { x: 151, y: 200, width: 100, height: 100 })))).toBe(true);
   });
 
+  it("idb, measured (D30/D50): Held.swift's ProgressView alone — the Application and an unlabelled GenericElement that updates frequently — is bare", () => {
+    const tree = parseIdbDescribeAll(
+      readFileSync(new URL('../../docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json', import.meta.url), 'utf8'),
+    );
+    expect(tree.children.map((c) => c.role)).toEqual(['other', 'progress']);
+    expect(isBareTree(tree)).toBe(true);
+  });
+
   it('WDA, measured 2026-10-06 (finportal RN splash, 7 nodes: Application "MyPort" → Window → containers → an IDENTIFIED, unlabeled Image "SplashScreenLogo"): bare', () => {
     const splash = parseWdaSourceValue({
       value: {

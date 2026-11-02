@@ -123,7 +123,10 @@ interface IdbElement {
   AXUniqueId?: string | null;
   AXValue?: string | null;
   frame?: Rect;
-  /** idb's accessibility traits (`["StaticText", "Header", "Scrollable"]`): read for `Header` alone (UiNode.heading). */
+  /**
+   * idb's accessibility traits (`["StaticText", "Header", "Scrollable"]`): read for `Header` (UiNode.heading),
+   * `SecureTextField` (idbSecure) and `UpdatesFrequently` (idbSpinner).
+   */
   traits?: string[] | null;
   /** idb's AX subrole — `AXSecureTextField` on a secure field (UiNode.secure), null elsewhere in the lab's captures. */
   subrole?: string | null;
@@ -167,6 +170,7 @@ function idbTree(elements: IdbElement[]): UiNode {
       IOS_ROLE_MAP,
       [],
     );
+    if (idbSpinner(el)) node.role = 'progress';
     if (el.traits?.includes('Header') === true) node.heading = true;
     const secure = idbSecure(el);
     if (secure !== undefined) node.secure = secure;
@@ -182,6 +186,24 @@ function idbTree(elements: IdbElement[]): UiNode {
     children,
     ...(listsPresentedLayer(elements) && { presentation: 'screen' as const }),
   });
+}
+
+/**
+ * Whether the element is idb's spelling of a SPINNER (backlog D50, ADR 0033's D50 sub-bullet): SwiftUI's
+ * `ProgressView()` — a UIActivityIndicatorView beneath — lists as a `GenericElement` with no label and the
+ * `UpdatesFrequently` trait (docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json: value `'1'`,
+ * traits `["UpdatesFrequently","Scrollable"]`, 20×20). So it reads `progress` — read-tree.ts#showsProgress stops a hold
+ * on it and bare-tree.ts counts it, unlabelled, as decoration — as WDA's `ActivityIndicator` does since D27. Here, not
+ * in the shared IOS_ROLE_MAP: the rule reads a trait, which WDA does not print. All three parts narrow it:
+ * `GenericElement` alone is too wide (the keyboard's unlabelled `["Scrollable","Spacer"]` element, 402×284, would
+ * read as loading on every keyboard-up screen); the trait alone is too wide (a `StaticText` clock or timer carries
+ * it); a label makes it content. No value test: a stopped or older spinner may read `'0'` or a word.
+ * Residuals, stated: a LABELLED idb spinner stays `other` and content; UIKit's and React Native's spinners through idb
+ * are assumed to share this shape (unmeasured, D37); an app-made unlabelled live element (a custom counter carrying
+ * the trait) reads as loading — the safe direction, bounded by `ensureTimeoutMs` / `maxSwipes`.
+ */
+function idbSpinner(el: IdbElement): boolean {
+  return el.type === 'GenericElement' && el.traits?.includes('UpdatesFrequently') === true && (el.AXLabel ?? '') === '';
 }
 
 /**

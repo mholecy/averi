@@ -21,7 +21,9 @@ export interface HoldTracker {
    *
    * A loading screen whose indicator a tree source does not report as `progress` holds like any other. On iOS
    * through WDA an XCUI ActivityIndicator — React Native's ActivityIndicator — read `other` until backlog row D27
-   * (2026-10-31) mapped it to `progress` (adapters/wda-source.ts's role map); through idb its spelling is unmeasured.
+   * (2026-10-31) mapped it to `progress` (adapters/wda-source.ts's role map); through idb a SwiftUI ProgressView read
+   * `other` until backlog row D50 (2026-11-02) read idb's spelling — an unlabelled `GenericElement` that updates
+   * frequently — as `progress` (adapters/ios-tree-source.ts#idbSpinner). A LABELLED idb spinner still holds.
    */
   observe(tree: UiNode | undefined, nowMs: number): number | undefined;
 }

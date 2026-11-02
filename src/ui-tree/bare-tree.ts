@@ -54,7 +54,11 @@ import { countOf } from '../util/count.js';
  * splash tree is the labelled Application, five unlabeled containers and
  * `{ role: image, label: null, identifier: "SplashScreenLogo" }`
  * (expo-splash-screen's id); the Android 12+ system splash icon is
- * likewise expected to carry a resource-id (not yet measured). A "Bank
+ * likewise expected to carry a resource-id (not yet measured). A spinner is
+ * `progress` only where its source names it so: through idb SwiftUI's
+ * ProgressView lists as an unlabelled, valued `GenericElement` — content
+ * here as a valued `other` until D50 (2026-11-02) made the idb parser read
+ * it `progress` (adapters/ios-tree-source.ts#idbSpinner). A "Bank
  * logo" with a label is something to select and counts. A
  * `container`/`other` counts when it has a LABEL or VALUE (an identifier
  * alone does not: that is the Android decor shape) AND is not a wrapper by

@@ -214,11 +214,12 @@ describe('a recorded ensure run, rejudged', () => {
     expect(lines[1]).toBe('# Live golden: 3 cases, 2 ok, 0 loud, 1 mismatches (1 not known), 0 skipped');
     expect(exitCode).toBe(1);
   });
-  it('…under idb the same held-early is known since batch-3 (live-known.ts `ios idb h2`, backlog D50): exit 0', async () => {
+  it('…under idb too since D50 (its `ios idb h2` entry struck off: idb reads the spinner `progress`): not known, exit 1', async () => {
     const { lines, exitCode } = await rejudge(record(), 'r.json', { groups: ['ensure'] });
-    expect(lines[1]).toBe('# Live golden: 3 cases, 2 ok, 0 loud, 1 mismatches (0 not known), 0 skipped');
-    expect(lines.join('\n')).toMatch(/MISMATCH \(held-early\) h2 .*\[known: bug:2026-11-02-lab-ios-idb-reads-an-unlabelled-swiftui-spinner-as-content-so-a-held-no-ends-on-it\.md\]/);
-    expect(exitCode).toBe(0);
+    expect(lines[1]).toBe('# Live golden: 3 cases, 2 ok, 0 loud, 1 mismatches (1 not known), 0 skipped');
+    expect(lines.join('\n')).toMatch(/MISMATCH \(held-early\) h2 /);
+    expect(lines.join('\n')).not.toMatch(/\[known/);
+    expect(exitCode).toBe(1);
   });
   it('a SKIP in the ensure group fails the run too: it proves nothing', async () => {
     const r = record();
