@@ -37,11 +37,13 @@ is never trusted alone: launchctl, now matched exactly, gives the final answer.*
   containers. The comparison ignores case, as APFS does, so a UDID in either case works. A system app's Path is in the runtime root, the same on every simulator of that runtime, so the host
   cannot tell which simulator runs it. Those go to launchctl. averi health-checks only `app.ios.bundleId`, a user app.
 - One `simctl appinfo` per bundle per adapter serves both the launch's foreground wait (its names) and this check (its
-  path), cached in `IosAdapter`. Every answer the call gave is cached, a name-less one too. A failed call is asked
-  again. Before D33 a name-less answer was asked again at every launch; now the launch's foreground note says "listed
-  neither name" from the cache. `install()` clears the cache: a reinstall can move the container. If pgrep says no and
+  path), cached in `IosAdapter`. An answer is cached when it carries a name or a Path. A failed call, or an answer
+  with neither (a format drift, or maybe a bundle that is not installed), is asked again. A name-less answer with a
+  Path is cached, so the launch's foreground note says "listed neither name" from the cache. `install()` clears the
+  cache, the disagreement counts and the bundles given over to launchctl (next bullet): a reinstall can move the
+  container. If pgrep says no and
   launchctl says yes, that bundle's entry is dropped.
-- If that disagreement happens twice in a row for one bundle, the second time after a fresh appinfo, the pattern
+- If that disagreement happens twice (`DISAGREEMENTS_TO_GIVE_UP`) in a row for one bundle, the second time after a fresh appinfo, the pattern
   misses the app's process. That bundle then asks launchctl alone for the rest of the adapter's life, and one stderr
   line says so. Without this, every check would pay appinfo, pgrep and launchctl. An agreeing check resets the count.
 - pgrep's outcome (`pgrepVerdict`): exit 0 means running. Exit 1 means launchctl decides. A timeout (5 s) means

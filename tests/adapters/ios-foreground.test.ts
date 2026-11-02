@@ -264,7 +264,7 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
     expect(d.appinfos()).toHaveLength(2);
   });
 
-  it('appinfo lists neither name (a format drift reads the same): a note saying so on every launch, not a silent pass — the answer is cached all the same (D33)', async () => {
+  it('appinfo lists neither name nor Path (a format drift, or not installed): a note saying so, not a silent pass — and asked again next launch', async () => {
     const d = device([BANK], '');
     expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toBe(
       'could not check that com.apple.MobileAddressBook is in front (simctl appinfo listed neither CFBundleDisplayName nor ' +
@@ -272,6 +272,13 @@ describe('IosAdapter.launch — the wait fails open: it never fails a launch and
         'before trusting a read',
     );
     expect(d.describeAlls()).toBe(1);
+    expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(/listed neither CFBundleDisplayName nor CFBundleName/);
+    expect(d.appinfos()).toHaveLength(2);
+  });
+
+  it('appinfo lists a Path but no name: the note on every launch, from the cache (D33: the liveness check uses that Path)', async () => {
+    const d = device([BANK], appinfo(undefined, undefined, { path: '/x/AAAA-1111/data/Containers/Bundle/Application/G/C.app' }));
+    expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(/listed neither CFBundleDisplayName nor CFBundleName/);
     expect((await d.adapter.launch('com.apple.MobileAddressBook')).note).toMatch(/listed neither CFBundleDisplayName nor CFBundleName/);
     expect(d.appinfos()).toHaveLength(1);
   });

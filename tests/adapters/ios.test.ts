@@ -1015,7 +1015,7 @@ describe('IosAdapter.isAppRunning — the host process list first, a no confirme
     expect([d.appinfos(), d.pgreps(), d.launchctls()]).toEqual([2, 2, 2]);
     expect(stderr).toHaveBeenCalledTimes(1);
     expect(String(stderr.mock.calls[0][0])).toBe(
-      `averi: the host process list and launchctl disagree twice in a row on ${BUNDLE} (pgrep: not running; launchctl: running) — ` +
+      `averi: the host process list and launchctl disagree 2 times in a row on ${BUNDLE} (pgrep: not running; launchctl: running) — ` +
         `its liveness on ${UDID} asks launchctl alone from now on (~240 ms a check)`,
     );
     expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
@@ -1043,6 +1043,26 @@ describe('IosAdapter.isAppRunning — the host process list first, a no confirme
     const d = device({});
     await d.adapter.isAppRunning(BUNDLE);
     await d.adapter.install('/tmp/App.app');
+    await d.adapter.isAppRunning(BUNDLE);
+    expect(d.appinfos()).toBe(2);
+  });
+
+  it('install() also forgets the disagreements: a count in progress and a bundle given over to launchctl', async () => {
+    const d = device({ pgrep: [fail('pgrep', 1)] });
+    await d.adapter.isAppRunning(BUNDLE); // one disagreement
+    await d.adapter.install('/tmp/App.app');
+    await d.adapter.isAppRunning(BUNDLE); // one again, not two
+    expect(stderr).not.toHaveBeenCalled();
+    await d.adapter.isAppRunning(BUNDLE); // two: launchctl alone
+    expect(stderr).toHaveBeenCalledTimes(1);
+    await d.adapter.install('/tmp/App.app');
+    await d.adapter.isAppRunning(BUNDLE);
+    expect(d.pgreps()).toBe(4);
+  });
+
+  it('a name-less, Path-less appinfo answer (maybe not installed) is asked again on the next check', async () => {
+    const d = device({ appinfo: [''] });
+    await d.adapter.isAppRunning(BUNDLE);
     await d.adapter.isAppRunning(BUNDLE);
     expect(d.appinfos()).toBe(2);
   });

@@ -300,8 +300,11 @@ export class IosAdapter implements DeviceAdapter {
 
   async install(appPath: string): Promise<void> {
     // A reinstall can move the bundle container (a new GUID in Path) and rename the app or its executable: every
-    // appinfo this adapter read may be stale now (D33).
+    // appinfo this adapter read may be stale now, and so may what pgrep and launchctl disagreed on (D33). The bundle id
+    // is not known here (an .app path), so every bundle's.
     this.appInfoCache.clear();
+    this.disagreements.clear();
+    this.launchctlOnly.clear();
     await this.simctl(['install', this.udid, appPath], 120_000);
   }
 
@@ -335,8 +338,9 @@ export class IosAdapter implements DeviceAdapter {
    * One `simctl appinfo` per bundle, read once per adapter (D33: the launch's names and the liveness check's
    * executable path share it) — a name or a path does not change under a session; install() clears it (a reinstall
    * can move the container and rename the app), and a liveness check whose pgrep and launchctl disagree drops that
-   * bundle's entry. Every answer the call gave is cached, a name-less one too (appNames throws on it from the cache:
-   * the launch's note then says so on every launch without asking again); a failed call is asked again.
+   * bundle's entry. An answer is cached when it carries a name or a Path — a name-less one with a Path too (appNames
+   * throws on it from the cache: the launch's note says so without asking again); a failed call, or an answer with
+   * neither (a format drift, maybe a bundle not installed), is asked again.
    * Also what the foreground note's `ownerOf` searches (2026-10-09): a stale label that is another app's name from here is that app's tree, not a localized name. It holds only what this adapter looked up (an idb-source launch — WDA declines the check before asking; a liveness check; this process), so an app never launched or checked through this server is not in it.
    */
   private readonly appInfoCache = new Map<string, AppInfo>();
@@ -359,7 +363,7 @@ export class IosAdapter implements DeviceAdapter {
     const { stdout } = await this.simctl(['appinfo', this.udid, bundleId], 10_000);
     const text = stdout.toString('utf8');
     const info: AppInfo = { names: appInfoNames(text), ...appInfoBundle(text) };
-    this.appInfoCache.set(bundleId, info);
+    if (info.names.length > 0 || info.path !== undefined) this.appInfoCache.set(bundleId, info);
     return info;
   }
 
@@ -368,8 +372,8 @@ export class IosAdapter implements DeviceAdapter {
    * call fails or lists neither name, and the foreground wait then says it
    * could not check, quoting the first line (review 2026-10-09: appinfo's
    * format is unmeasured, and a drift must not switch the check off
-   * unseen). Through appInfo's cache: a failed lookup is asked again on the
-   * next launch; one that listed no name is not, and throws again.
+   * unseen). Through appInfo's cache rule: a failed lookup, or one with
+   * neither a name nor a Path, is asked again on the next launch.
    */
   private async appNames(bundleId: string): Promise<readonly string[]> {
     const { names } = await this.appInfo(bundleId);
@@ -756,7 +760,7 @@ export class IosAdapter implements DeviceAdapter {
     if (inARow >= DISAGREEMENTS_TO_GIVE_UP) {
       this.launchctlOnly.add(bundleId);
       console.error(
-        `averi: the host process list and launchctl disagree twice in a row on ${bundleId} (pgrep: not running; launchctl: running) — ` +
+        `averi: the host process list and launchctl disagree ${DISAGREEMENTS_TO_GIVE_UP} times in a row on ${bundleId} (pgrep: not running; launchctl: running) — ` +
           `its liveness on ${this.udid} asks launchctl alone from now on (~240 ms a check)`,
       );
     }
