@@ -165,13 +165,16 @@ capture not replayed, is held, as by the ratchet); each capture whose check coun
 `Re-pin`, each known mismatch whose reply is not its pin, line by line against it. It rewrites no `*.known.ts`: their
 rows are built over tag lists, edited by hand. `--pin <file>` (beside any of the above) writes the known mismatches'
 replies to the pins file (`ratchet.ts#repinned`): the pin of a row skipped here, or of a capture not replayed (`--only`),
-is held from the file, and the pin of a row that ran green or is no longer KNOWN is dropped. A check whose reply is a
+is held from the file, and the pin of a row that ran green or is no longer KNOWN is dropped. The held pins come from
+the file `--pin` targets, so it should normally target `tests/differential/golden/pins.json` — under `--only` above
+all, or the other captures' pins are not there to hold. A check whose reply is a
 harness or JavaScript error (`THROW`, "is not a function", "Cannot read properties of", the fake device's
 `differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
 (`golden.ts#faultsOf`) — no evidence about the tool either way.
 
 The exit code is the ratchet's (`scripts/differential/ratchet.ts`, which golden.test.ts shares), over the captures
-replayed, against this checkout's KNOWN and pins: **1** on a mismatch KNOWN does not list, a known one drifted from its
+replayed, against this checkout's KNOWN and its COMMITTED `pins.json`, judged before `--pin` writes anything — so a
+run that rewords a reply exits 1 even as it re-pins, and the next one, the new pins committed, exits 0: **1** on a mismatch KNOWN does not list, a known one drifted from its
 class, reply kind, calls or pin, a fault (on any row), or a broken target; **0** when every mismatch is a standing known
 one — the report's header then reads `N mismatches (N known, 0 new)`. A known row fixed (to strike) or a stale pin is
 reported, not failed on. The report lists what the ratchet found under `## Ratchet`; `--json` and `--against` print it

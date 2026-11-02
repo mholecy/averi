@@ -1,6 +1,6 @@
 import { captureOf, keyOf } from '../truth/side-run.js';
 import type { GoldenCheck, GoldenResult } from './golden.js';
-import { lineDiff, repinLines, repinsOf, type Pins, type Repin } from './ratchet.js';
+import { lineDiff, plural, REPIN_COMMAND, repinLines, repinsOf, type Pins, type Repin } from './ratchet.js';
 
 /**
  * golden against an earlier run (`golden.ts --against <base.json>`, the base a `--json` run): what a fix changed, in
@@ -26,8 +26,8 @@ import { lineDiff, repinLines, repinsOf, type Pins, type Repin } from './ratchet
  * twice by its occurrence.
  */
 
-/** One family's ratchet as this module reads it (tests/differential/golden/known.ts#KnownFile). */
-export interface Ratchet {
+/** One family's KNOWN file as this module reads it (tests/differential/golden/known.ts#KnownFile). */
+export interface FamilyFile {
   family: string;
   known: Readonly<Record<string, unknown>>;
   counts: Readonly<Record<string, number>>;
@@ -89,7 +89,17 @@ const tallyOf = (results: readonly GoldenResult[]): Tally => {
   };
 };
 
-export function goldenDiff(base: readonly GoldenResult[], now: readonly GoldenResult[], ratchet: readonly Ratchet[], pins: Pins = {}): GoldenDiff {
+/**
+ * `families` the KNOWN files (the rows to strike, the COUNTS, per file); `known` their rows aggregated
+ * (tests/differential/golden/files.ts#KNOWN) and `pins` the committed pins, for the re-pins.
+ */
+export function goldenDiff(
+  base: readonly GoldenResult[],
+  now: readonly GoldenResult[],
+  families: readonly FamilyFile[],
+  known: Readonly<Record<string, unknown>> = {},
+  pins: Pins = {},
+): GoldenDiff {
   const ran = new Set(now.map((r) => r.recording));
   const based = new Set(base.map((r) => r.recording));
   const both = (r: GoldenResult) => ran.has(r.recording) && based.has(r.recording);
@@ -105,21 +115,17 @@ export function goldenDiff(base: readonly GoldenResult[], now: readonly GoldenRe
   // golden.test.ts's "no known mismatch is fixed without being struck off KNOWN", over the captures run here: a KNOWN
   // row that is no mismatch and not skipped is fixed — asked green, or no longer asked.
   const red = new Set(now.flatMap((r) => r.checks).filter((c) => c.mismatch !== undefined || c.skipped !== undefined).map(keyOf));
-  const strike = ratchet
+  const strike = families
     .map((f) => ({ family: f.family, keys: Object.keys(f.known).filter((k) => ran.has(captureOf(k)) && !red.has(k)) }))
     .filter((f) => f.keys.length > 0);
 
   const counts: GoldenDiff['counts'] = now.flatMap((r) => {
-    const file = ratchet.find((f) => Object.hasOwn(f.counts, r.recording));
+    const file = families.find((f) => Object.hasOwn(f.counts, r.recording));
     const counted = file?.counts[r.recording];
     return counted === r.checks.length ? [] : [{ family: file?.family, recording: r.recording, was: counted, now: r.checks.length }];
   });
   const unbased = now.map((r) => r.recording).filter((r) => !based.has(r));
-  const repin = repinsOf(
-    now.flatMap((r) => r.checks),
-    Object.assign({}, ...ratchet.map((f) => f.known)) as Record<string, unknown>,
-    pins,
-  );
+  const repin = repinsOf(now.flatMap((r) => r.checks), known, pins);
   return { tally: { was: tallyOf(base.filter(both)), now: tallyOf(now.filter(both)) }, changed, unbased, strike, counts, repin };
 }
 
@@ -140,7 +146,6 @@ function changeLines({ key, was, now }: CheckChange): string[] {
   return lines;
 }
 
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
 /** The report: this run's tally beside the base's (of the captures both replayed), then the sections of GoldenDiff. */
 export function diffReport(against: string, d: GoldenDiff): string {
@@ -161,7 +166,7 @@ export function diffReport(against: string, d: GoldenDiff): string {
     lines.push(fileOf(family));
     for (const c of d.counts.filter((x) => x.family === family)) lines.push(`  ${c.recording}: ${c.now} (was ${c.was ?? 'none'})`);
   }
-  lines.push('', `## Re-pin: ${plural(d.repin.length, 'row')}${d.repin.length === 0 ? '' : ' (golden.ts --pin tests/differential/golden/pins.json)'}`, ...d.repin.flatMap(repinLines).map((l) => `  ${l}`));
+  lines.push('', `## Re-pin: ${plural(d.repin.length, 'row')}${d.repin.length === 0 ? '' : ` (${REPIN_COMMAND})`}`, ...d.repin.flatMap(repinLines).map((l) => `  ${l}`));
   lines.push('');
   return lines.join('\n');
 }

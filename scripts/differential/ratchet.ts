@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import type { GoldenCheck, GoldenResult } from './golden.js';
+import type { Known } from '../../tests/differential/golden/known.js';
 import { captureOf, keyOf } from '../truth/side-run.js';
 
 /**
@@ -26,20 +27,15 @@ import { captureOf, keyOf } from '../truth/side-run.js';
  * neither pinned, compared, nor fixed.
  */
 
-/** A KNOWN row as the ratchet reads it (tests/differential/golden/known.ts#Known). */
-export interface KnownRow {
-  cls: string;
-  kind: string;
-  calls: readonly string[];
-  note?: string;
-}
-
 /** The pins: each known mismatch's full reply, line by line (a reworded line is one line of the JSON's diff). */
 export type Pins = Readonly<Record<string, readonly string[]>>;
 
-/** The committed pins (the file `golden.ts --pin` is pointed at). */
-export const PINS_FILE = fileURLToPath(new URL('../../tests/differential/golden/pins.json', import.meta.url));
-const PINS_NAME = 'tests/differential/golden/pins.json';
+/** The committed pins, relative to the repo (the file `golden.ts --pin` is normally pointed at). */
+export const PINS_PATH = 'tests/differential/golden/pins.json';
+/** The committed pins, absolute: what golden.test.ts and golden's exit code are judged against. */
+export const PINS_FILE = fileURLToPath(new URL(`../../${PINS_PATH}`, import.meta.url));
+/** The command that rewrites them, as the reports name it. */
+export const REPIN_COMMAND = `golden.ts --pin ${PINS_PATH}`;
 
 /** A reply as pinned. */
 export const pinOf = (reply: string): string[] => reply.split('\n');
@@ -64,6 +60,8 @@ export interface RatchetVerdict {
 }
 
 const red = (c: GoldenCheck) => c.mismatch !== undefined;
+/** Whether a check is a mismatch `known` lists — the rows pinned and compared (`known` only for its keys). */
+export const isKnownRed = (known: Readonly<Record<string, unknown>>) => (c: GoldenCheck) => red(c) && Object.hasOwn(known, keyOf(c));
 
 /**
  * The known mismatches of `checks` whose reply is not pinned as it is — for `--against`'s Re-pin section too. `known`
@@ -71,7 +69,7 @@ const red = (c: GoldenCheck) => c.mismatch !== undefined;
  */
 export function repinsOf(checks: readonly GoldenCheck[], known: Readonly<Record<string, unknown>>, pins: Pins): Repin[] {
   return checks
-    .filter((c) => red(c) && Object.hasOwn(known, keyOf(c)))
+    .filter(isKnownRed(known))
     .flatMap((c) => {
       const pin = Object.hasOwn(pins, keyOf(c)) ? pins[keyOf(c)] : undefined;
       const now = pinOf(c.reply);
@@ -84,10 +82,9 @@ export function repinsOf(checks: readonly GoldenCheck[], known: Readonly<Record<
  * holds a KNOWN row of a capture not replayed, rather than calling it fixed; without it (golden.test.ts, the whole
  * corpus) such a row is fixed — its capture left the corpus.
  */
-export function ratchet(results: readonly GoldenResult[], known: Readonly<Record<string, KnownRow>>, pins: Pins, options: { scope?: 'replayed' } = {}): RatchetVerdict {
+export function ratchet(results: readonly GoldenResult[], known: Readonly<Record<string, Known>>, pins: Pins, options: { scope?: 'replayed' } = {}): RatchetVerdict {
   const checks = results.flatMap((r) => r.checks);
-  const isKnown = (c: GoldenCheck) => Object.hasOwn(known, keyOf(c));
-  const standing = checks.filter((c) => red(c) && isKnown(c));
+  const standing = checks.filter(isKnownRed(known));
   const drifted = standing.flatMap((c) => {
     const k = known[keyOf(c)];
     return [
@@ -102,7 +99,7 @@ export function ratchet(results: readonly GoldenResult[], known: Readonly<Record
   const fixed = Object.keys(known).filter((k) => !held.has(k) && (options.scope !== 'replayed' || ran.has(captureOf(k))));
   return {
     standing: standing.length,
-    unknown: checks.filter((c) => red(c) && !isKnown(c)).map((c) => `${keyOf(c)} — expected ${c.says} — ${c.mismatch}`),
+    unknown: checks.filter((c) => red(c) && !Object.hasOwn(known, keyOf(c))).map((c) => `${keyOf(c)} — expected ${c.says} — ${c.mismatch}`),
     drifted,
     repin: repinsOf(checks, known, pins),
     fixed,
@@ -125,7 +122,8 @@ export function lineDiff(was: readonly string[], now: readonly string[]): string
 /** A re-pin as the reports word it: the key, then its lines against the pin. */
 export const repinLines = (r: Repin): string[] => (r.pin === undefined ? [`- ${r.key}: no pin`] : [`- ${r.key}`, ...lineDiff(r.pin, r.now)]);
 
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+/** `n` and its noun, plural but for one — the reports' counts. */
+export const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
 /**
  * What the ratchet has to say beyond the standing count — nothing when every mismatch stands known and pinned. `repin:
@@ -138,7 +136,7 @@ export function ratchetLines(v: RatchetVerdict, options: { repin?: boolean } = {
     `## Ratchet: exit ${exitCode(v)} — ${v.unknown.length} new, ${v.drifted.length} drifted, ${v.repin.length} to re-pin, ${v.faults.length} with a fault, ${v.broken.length} broken; ${v.fixed.length} to strike, ${plural(v.stalePins.length, 'stale pin')}`,
     ...section('New: not in KNOWN', v.unknown.map((l) => `- ${l}`)),
     ...section('Drifted from KNOWN: class, reply kind or calls', v.drifted.map((l) => `- ${l}`)),
-    ...(options.repin === false ? [] : section(`Re-pin: the reply is not ${PINS_NAME}'s (golden.ts --pin)`, v.repin.flatMap(repinLines))),
+    ...(options.repin === false ? [] : section(`Re-pin: the reply is not ${PINS_PATH}'s (${REPIN_COMMAND})`, v.repin.flatMap(repinLines))),
     ...section('Faults', v.faults.map((l) => `- ${l}`)),
     ...section('Broken', v.broken.map((l) => `- ${l}`)),
     ...section('Strike from KNOWN: fixed', v.fixed.map((l) => `- ${l}`)),
@@ -154,7 +152,7 @@ export function ratchetLines(v: RatchetVerdict, options: { repin?: boolean } = {
  */
 export function repinned(results: readonly GoldenResult[], known: Readonly<Record<string, unknown>>, old: Pins): Record<string, string[]> {
   const checks = results.flatMap((r) => r.checks);
-  const now = new Map(checks.filter((c) => red(c) && Object.hasOwn(known, keyOf(c))).map((c) => [keyOf(c), pinOf(c.reply)]));
+  const now = new Map(checks.filter(isKnownRed(known)).map((c) => [keyOf(c), pinOf(c.reply)]));
   const skipped = new Set(checks.filter((c) => c.skipped !== undefined).map(keyOf));
   const ran = new Set(results.map((r) => r.recording));
   const out: Record<string, string[]> = {};
@@ -176,3 +174,22 @@ export async function readPins(file: string): Promise<Pins> {
 
 /** Writes `pins` to `file` as `--pin` does: one key per line, its reply's lines beneath. */
 export const writePins = (file: string, pins: Pins) => writeFile(file, `${JSON.stringify(pins, null, 2)}\n`);
+
+/**
+ * golden's verdict and `--pin`, in that order: the run is judged against the COMMITTED pins (`committed`, PINS_FILE's),
+ * before anything is written — so a run that rewords a reply exits 1 even as it re-pins (the reply is not what is
+ * committed), and the next one, the new pins committed, exits 0. With `pinFile`, the pins repinned() makes from the run
+ * and that file's own are then written there: `--pin` only writes.
+ */
+export async function judgeThenPin(
+  results: readonly GoldenResult[],
+  known: Readonly<Record<string, Known>>,
+  committed: Pins,
+  pinFile?: string,
+): Promise<{ verdict: RatchetVerdict; written?: Record<string, string[]> }> {
+  const verdict = ratchet(results, known, committed, { scope: 'replayed' });
+  if (pinFile === undefined) return { verdict };
+  const written = repinned(results, known, await readPins(pinFile));
+  await writePins(pinFile, written);
+  return { verdict, written };
+}

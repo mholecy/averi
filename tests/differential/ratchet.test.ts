@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { GoldenCheck, GoldenResult } from '../../scripts/differential/golden.js';
-import { exitCode, pinOf, ratchet, ratchetLines, repinned, type KnownRow, type Pins } from '../../scripts/differential/ratchet.js';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { exitCode, judgeThenPin, pinOf, ratchet, ratchetLines, readPins, repinned, type Pins } from '../../scripts/differential/ratchet.js';
+import type { Known } from './golden/known.js';
 
 // The ratchet golden.test.ts and golden.ts share (scripts/differential/ratchet.ts): what a run's checks say against the
 // known mismatches (tests/differential/golden/<family>.known.ts) and their pinned replies (golden/pins.json) — the
@@ -22,7 +26,7 @@ const TAP = 'idb ui tap 1 2';
 const REFUSED = 'ERROR id:"A" is under the sheet\nclose it first; nothing was tapped';
 /** A standing accepted mismatch: refused, as KNOWN notes it, its reply as pinned. */
 const standing = (over: Partial<GoldenCheck> = {}) => check('A', 'tap', { mismatch: 'not tapped: ERROR id:"A"', reply: REFUSED, kind: 'refused', calls: [], ...over });
-const KNOWN: Record<string, KnownRow> = { 'r/a.json A tap': { cls: 'not tapped', kind: 'refused', calls: [], note: 'under the sheet' } };
+const KNOWN: Record<string, Known> = { 'r/a.json A tap': { cls: 'not tapped', kind: 'refused', calls: [], note: 'under the sheet' } };
 const PINS: Pins = { 'r/a.json A tap': pinOf(REFUSED) };
 
 describe('the ratchet: a run against KNOWN and the pins (ratchet, exitCode)', () => {
@@ -50,7 +54,7 @@ describe('the ratchet: a run against KNOWN and the pins (ratchet, exitCode)', ()
     const v = ratchet([result([standing()])], KNOWN, {});
     expect(v.repin).toEqual([{ key: 'r/a.json A tap', now: pinOf(REFUSED) }]);
     expect(exitCode(v)).toBe(1);
-    const ocr = { ...KNOWN, 'r/a.json T ocr': { cls: 'read wrong', kind: 'FAIL', calls: [], note: 'n' } };
+    const ocr: Record<string, Known> = { ...KNOWN, 'r/a.json T ocr': { cls: 'read wrong', kind: 'FAIL', calls: [], note: 'n' } };
     const skipped = ratchet([result([standing(), check('T', 'ocr', { reply: 'SKIPPED — no OCR', kind: 'other', skipped: 'sandbox' })])], ocr, PINS);
     expect(skipped).toMatchObject({ repin: [], fixed: [], standing: 1 });
     expect(exitCode(skipped)).toBe(0);
@@ -115,7 +119,7 @@ describe('the ratchet in the report (ratchetLines)', () => {
         '## Ratchet: exit 1 — 1 new, 0 drifted, 1 to re-pin, 1 with a fault, 0 broken; 1 to strike, 1 stale pin',
         '### New: not in KNOWN',
         '- r/a.json B tap — expected as the truth implies — m: x',
-        '### Re-pin: the reply is not tests/differential/golden/pins.json\'s (golden.ts --pin)',
+        "### Re-pin: the reply is not tests/differential/golden/pins.json's (golden.ts --pin tests/differential/golden/pins.json)",
         '- r/a.json A tap',
         '    - close it first; nothing was tapped',
         '    + hide it',
@@ -147,5 +151,29 @@ describe('golden --pin: the pins written from a run (repinned)', () => {
     const pins = repinned([result([standing(), check('T', 'ocr', { kind: 'other', skipped: 'sandbox' }), check('F', 'tap')])], known, old);
     expect(pins).toEqual({ 'r/a.json A tap': pinOf(REFUSED), 'r/a.json T ocr': ['read'], 'r/b.json A tap': ['b'] });
     expect(Object.keys(pins)).toEqual(['r/a.json A tap', 'r/a.json T ocr', 'r/b.json A tap']);
+  });
+});
+
+describe("golden's verdict, then --pin (judgeThenPin)", () => {
+  it('judged against the COMMITTED pins before --pin writes: a reworded reply exits 1 even as it is re-pinned; judged against the new pins, 0', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'averi-ratchet-pin-'));
+    try {
+      const file = join(dir, 'pins.json');
+      await writeFile(file, JSON.stringify(PINS));
+      const reworded = [result([standing({ reply: 'ERROR id:"A" is under the sheet\nhide it' })])];
+      const { verdict, written } = await judgeThenPin(reworded, KNOWN, PINS, file);
+      expect(verdict.repin.map((r) => r.key)).toEqual(['r/a.json A tap']);
+      expect(exitCode(verdict)).toBe(1);
+      expect(written).toEqual({ 'r/a.json A tap': ['ERROR id:"A" is under the sheet', 'hide it'] });
+      expect(JSON.parse(await readFile(file, 'utf8'))).toEqual(written);
+      // The next run, the new pins committed.
+      expect(exitCode((await judgeThenPin(reworded, KNOWN, await readPins(file))).verdict)).toBe(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('without a pin file, nothing is written', async () => {
+    expect(await judgeThenPin([result([standing()])], KNOWN, PINS)).toEqual({ verdict: ratchet([result([standing()])], KNOWN, PINS, { scope: 'replayed' }) });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baseOf, diffReport, goldenDiff, type Ratchet } from '../../scripts/differential/golden-diff.js';
+import { baseOf, diffReport, goldenDiff, type FamilyFile } from '../../scripts/differential/golden-diff.js';
 import type { GoldenCheck, GoldenResult } from '../../scripts/differential/golden.js';
 
 // golden --against (scripts/differential/golden-diff.ts) over a two-run fixture: a base run, and a run after a "fix"
@@ -41,12 +41,14 @@ const NOW: GoldenResult[] = [
   // Not in the base: not compared, but its KNOWN row still red is held.
   result('r/d.json', [check('r/d.json', 'A', 'tap'), check('r/d.json', 'B', 'tap', { mismatch: 'not in the tree: y', reply: 'y', kind: 'not found' })]),
 ];
-const RATCHET: Ratchet[] = [
+const RATCHET: FamilyFile[] = [
   // `r/a.json Z tap`: a row its capture no longer asks — the ratchet fails it as fixed.
   { family: 'forms', known: { 'r/a.json A tap': {}, 'r/a.json B tap': {}, 'r/a.json Z tap': {}, 'r/c.json A tap': {}, 'r/d.json B tap': {} }, counts: { 'r/a.json': 3, 'r/c.json': 1 } },
   { family: 'text', known: { 'r/b.json A ocr': {} }, counts: { 'r/b.json': 1 } },
 ];
 
+/** The families' rows aggregated, as tests/differential/golden/files.ts#KNOWN is. */
+const KNOWN = Object.assign({}, ...RATCHET.map((f) => f.known)) as Record<string, unknown>;
 /** The pins: B's as the base answered it, before its rewording; r/b.json A's (skipped now) and r/c.json A's (not replayed). */
 const PINS = { 'r/a.json B tap': ['ERROR was'], 'r/b.json A ocr': ['FAIL'], 'r/c.json A tap': ['x'] };
 
@@ -82,11 +84,11 @@ describe('golden --against: what changed since a base run (goldenDiff)', () => {
   });
 
   it('the known mismatches whose reply is not their pin, or that have none — of every capture replayed; a skipped row, or one of a capture not replayed, is not compared', () => {
-    expect(goldenDiff(BASE, NOW, RATCHET, PINS).repin).toEqual([
+    expect(goldenDiff(BASE, NOW, RATCHET, KNOWN, PINS).repin).toEqual([
       { key: 'r/a.json B tap', pin: ['ERROR was'], now: ['ERROR gone'] },
       { key: 'r/d.json B tap', now: ['y'] },
     ]);
-    expect(goldenDiff(BASE, NOW, RATCHET, { ...PINS, 'r/a.json B tap': ['ERROR gone'], 'r/d.json B tap': ['y'] }).repin).toEqual([]);
+    expect(goldenDiff(BASE, NOW, RATCHET, KNOWN, { ...PINS, 'r/a.json B tap': ['ERROR gone'], 'r/d.json B tap': ['y'] }).repin).toEqual([]);
   });
 
   it("each capture whose checks differ from the ratchet's COUNTS, a capture no file counts among them", () => {
@@ -99,7 +101,7 @@ describe('golden --against: what changed since a base run (goldenDiff)', () => {
 
 describe('golden --against: the report (diffReport)', () => {
   it('the tallies of both runs over the captures both replayed, then the changed checks, the captures not compared, the rows to strike and the COUNTS to write', () => {
-    expect(diffReport('base.json', goldenDiff(BASE, NOW, RATCHET, PINS))).toBe(
+    expect(diffReport('base.json', goldenDiff(BASE, NOW, RATCHET, KNOWN, PINS))).toBe(
       [
         '# Golden against base.json: 5 checks (was 5), 1 mismatches (was 3), 0 broken targets (was 0), 1 skipped (was 0)',
         '',

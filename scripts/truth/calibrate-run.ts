@@ -82,9 +82,9 @@ export interface SideOutcome {
 
 /**
  * One side's run: its checkout (the working tree is `repo` itself), then golden over it. golden exits 1 on a ratchet
- * failure (differential/ratchet.ts: a mismatch this checkout's KNOWN does not list, a known one drifted or re-worded, a
- * fault, a broken target — a calibration side, an older commit, normally fails it), its JSON still on stdout; a process that printed no JSON or was killed failed itself — not the side's tool — and
- * is run once more. A side that still does not load carries why (failureOf, or git's stderr for a checkout).
+ * failure (scripts/differential/ratchet.ts: a mismatch this checkout's KNOWN does not list, a known one drifted or
+ * reworded, a fault, a broken target — a calibration side, an older commit, normally fails it), its JSON still on
+ * stdout; a process that printed no JSON or was killed failed itself — not the side's tool — and is run once more. A side that still does not load carries why (failureOf, or git's stderr for a checkout).
  */
 export async function runSide(side: string, repo: string, deps: SideDeps): Promise<SideOutcome> {
   let code: { root: string; cleanup?: () => void };
