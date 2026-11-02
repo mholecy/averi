@@ -88,11 +88,11 @@ export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkO
 
 /**
  * `iOS has not opened <url> yet: it asks "<title>" — buttons "<label>" at (x, y), …` (D54), then the advice
- * (ALERT_ADVICE: a tap at the chosen button's coordinates, and that averi taps nothing). The buttons and the advice are
- * worded once, in adapters/ios-system-alert.ts, for launch_app's note too (D56). The title and every label are quoted
- * verbatim, localised as iOS shows them; which button opens the link is the agent's to read. "it asks" only when the
- * title names the link's app (`asksForApp`); any other alert is "a system alert", in no words of averi's own about
- * opening.
+ * (ALERT_ADVICE: a tap by the chosen button's label, or at its coordinates (D57), and that averi taps nothing). The
+ * buttons and the advice are worded once, in adapters/ios-system-alert.ts, for launch_app's note too (D56). The title
+ * and every label are quoted verbatim, localised as iOS shows them; which button opens the link is the agent's to
+ * read. "it asks" only when the title names the link's app (`asksForApp`); any other alert is "a system alert", in no
+ * words of averi's own about opening.
  */
 const alertText = (url: string, alert: LinkAlert): string => {
   const what = alert.asksForApp ? `it asks "${alert.title}"` : `a system alert is up, "${alert.title}"`;
