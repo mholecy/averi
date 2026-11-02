@@ -88,7 +88,7 @@ Arguments:
 - With none configured, or none on screen, the tap is REFUSED, nothing tapped or pressed, since no key hides the keyboard without submitting: hide it yourself (tap a neutral, non-interactive element such as a title), then tap again; with every move spent and the keyboard still up it is refused naming each move.
 - The keyboard's own controls — a key, the toolbar's Done, the Passwords bar, dictation — are tappable as always.
 - With treeSource: idb nothing in the tree is marked as the keyboard (on iOS 27 idb lists the keys as plain buttons), so nothing is hidden and app.ios.keyboardDismiss is inert; averi reads where the keyboard's background starts by its shape, and a target whose centre lies below that line is REFUSED, nothing tapped — hide the keyboard yourself (tap a neutral element such as the title), then tap again.
-- Measured twice on iOS 27, a covered node was absent from idb's tree and the tap timed out waiting for it to appear.
+- Measured twice on iOS 27, a covered node was absent from idb's tree and the tap timed out waiting for it to appear; where idb's keys are read up by that shape, the timeout (the tap's and type_text's) says so beneath its headline — "the soft keyboard is up (its top edge at y …) and may cover it — hide it first (tap a neutral element such as the screen title …) and look again" — before idb's reasons.
 - On iOS 27 idb lists the QuickType bar ("Passwords") as a plain button ABOVE that background, not inside it: a tap on the bar presses it, as asked, and an app node whose centre lies behind the bar is left out of the tree the same way.
 
 Arguments:

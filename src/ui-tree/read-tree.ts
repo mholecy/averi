@@ -253,12 +253,15 @@ export type PollOutcome<T> =
  * the rule keys on the LAST read's error, not on `treesRead` — so a single
  * late failure after many good reads also silences the hint, although the
  * outcome could tell that case apart. A missing hint costs a reader less
- * than a misleading one, and the read error is the fresher fact.
+ * than a misleading one, and the read error is the fresher fact. Several
+ * hints (the tap's wait on a target under idb's soft keyboard: the keyboard,
+ * then idb's reasons — interact/resolve.ts#notFound) take a line each, in
+ * the order given.
  */
-export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: Error, hint?: string): string =>
+export const pollTimeoutMessage = (what: string, timeoutMs: number, readError?: Error, hint?: string | readonly string[]): string =>
   `Timed out after ${timeoutMs}ms waiting for ${what}` +
   (readError === undefined ? '' : `\n${READ_ERROR_OPEN}${readError.message.replace(/\n/g, `\n${READ_ERROR_CONTINUATION}`)})`) +
-  (hint === undefined || readError !== undefined ? '' : `\n  (${hint})`);
+  (hint === undefined || readError !== undefined ? '' : [hint].flat().map((h) => `\n  (${h})`).join(''));
 
 /** The read-error parenthesis's opening, and the indent of a multi-line read error's later lines inside it. */
 const READ_ERROR_OPEN = '  (last UI tree read failed: ';

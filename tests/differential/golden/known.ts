@@ -44,8 +44,6 @@ export interface KnownFile {
 export const keys = (file: string, tags: readonly string[], verbs: readonly string[], k: Known) =>
   tags.flatMap((t) => verbs.map((v) => [`${file} ${t} ${v}`, { cls: k.cls, kind: k.kind, calls: k.calls, note: k.note, ...(k.as !== undefined && { as: k.as }) }] as const));
 
-/** The note of an idb row under the keyboard (form-keyboard, the toolbar cells): idb lists nothing there. */
-export const IDB_UNDER_KEYBOARD = 'idb lists nothing under the keyboard';
 export const NO_CLOSE_IT_FIRST = 'refused without "close it first"';
 /** A tap beneath a presented layer whose reply gives only the active-window hint (uiautomator, a window it does not mark): the judge's own class. */
 export { NOT_IN_TREE_HINTED } from '../../../scripts/differential/golden-spec/judges.js';

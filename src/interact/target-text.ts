@@ -144,6 +144,18 @@ export function dismissKeyboardFirstText({ lineY, remedy }: KeyboardUp): string 
 }
 
 /**
+ * The note of a tap's or fill's wait that never found its target while idb's soft keyboard band was read up by shape
+ * (interact/resolve.ts#notFound, D32 K1): `the soft keyboard is up (its top edge at y 590) and may cover it — hide it
+ * first (tap a neutral element such as the screen title — a tap: step in a flow) and look again; this adapter cannot
+ * hide it on its own (…)`. "Is up" as `dismissKeyboardFirstText` says it; "hide it first (…)" as `scroll_until`'s
+ * whole-screen advice (scroll-text.ts#hideToJudgeWholeScreen), with `hideClause`'s composition. "May": idb lists
+ * nothing beneath the keyboard, so the read cannot say the target lies there — only that it could.
+ */
+export function keyboardMayCoverText({ lineY, remedy }: KeyboardUp): string {
+  return `the soft keyboard is up (its top edge at y ${lineY}) and may cover it — ${hideClause(remedy, `hide it first (${hideKeyboardHow(remedy)}) and look again`)}`;
+}
+
+/**
  * The soft keyboard as a cut-by remedy may name it: `keyboard` when the node that cut the target (`Cut.by`) RIDES on
  * it — its bottom edge at or above the keyboard's top edge and within `minPiece` of it, as a submit bar laid on the
  * IME's inset is (the lab's Continue ends at 1370, the line at 1398) — else undefined: hiding the keyboard does not move

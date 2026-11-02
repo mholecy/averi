@@ -280,8 +280,9 @@ export function formRows(platform: Platform, truth: CellTruth, unlisted: (id: st
  * A control's rows by its situation. `unlisted`: why the replayed tree does not list it (formRows) — an
  * under-keyboard control's colour, ocr and scroll_until rows then judge its "not found" (judges.ts#judgedUnlisted):
  * colour and ocr must name idb's reasons (judges.ts#IDB_REASONS), scroll_until idb's reasons and the soft keyboard
- * (#REASONS_AND_KEYBOARD). A bare one, or one naming another remedy (the presented one), is a mismatch. Its tap is
- * not: it asks the keyboard named, which the tap's timeout does not (K1).
+ * (#REASONS_AND_KEYBOARD). A bare one, or one naming another remedy (the presented one), is a mismatch. Its tap (iOS)
+ * as its stop: idb's reasons and the soft keyboard, which the tap's timeout names where idb's keys are read up by shape
+ * (src/interact/resolve.ts#notFound, D32 K1).
  */
 function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unlisted?: string): FormExpectation[] {
   const selector = `id:"${c.id}"`;
@@ -315,13 +316,19 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unli
       const underKeyboard = (p: { x: number; y: number }) => p.y >= top || panels.some((r) => within(p, r));
       const rows: FormExpectation[] = [];
       if (platform !== 'android') {
-        rows.push({
-          target,
-          verb: 'tap',
-          says: 'refused naming the keyboard, nothing tapped',
-          call: tap,
-          judge: (o) => notTapped(o) ?? (namesKeyboard(o.reply) ? undefined : said(o, 'refused without naming the keyboard')),
-        });
+        rows.push(
+          judgedUnlisted<FormExpectation>(
+            {
+              target,
+              verb: 'tap',
+              says: 'refused naming the keyboard, nothing tapped',
+              call: tap,
+              judge: (o) => notTapped(o) ?? (namesKeyboard(o.reply) ? undefined : said(o, 'refused without naming the keyboard')),
+            },
+            unlisted,
+            REASONS_AND_KEYBOARD,
+          ),
+        );
       } else if (c.afterBack?.reached === true) {
         const frame = c.frame!;
         rows.push({

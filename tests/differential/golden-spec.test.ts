@@ -251,9 +251,9 @@ describe('a field under the keyboard', () => {
 /**
  * A field under the keyboard that idb's tree does not list (form-keyboard.idb: idb lists nothing beneath the keyboard).
  * Its colour, ocr and scroll_until rows judge the "not found" (`absent`, from the payload), as the presented colour
- * row: green only where it names idb's reasons — and, for scroll_until, the soft keyboard too; the presented remedy is
- * not this row's way out. The tap
- * (K1) is not changed: it asks the keyboard named, which the timeout does not. The replies are the capture's own.
+ * row: green only where it names idb's reasons — and, for scroll_until and the tap, the soft keyboard too; the presented
+ * remedy is not this row's way out. The tap's timeout names the keyboard where idb's keys are read up by shape (D32
+ * K1, src/interact/resolve.ts#notFound). The replies are the capture's own.
  */
 describe('a field under the keyboard its replayed tree does not list (form-keyboard under idb)', () => {
   const IOS = new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url);
@@ -298,8 +298,16 @@ describe('a field under the keyboard its replayed tree does not list (form-keybo
     expect(s.judge(out(stop(REASONS, KEYBOARD), ['idb ui swipe 201 699 201 175 --duration 1.502']))).toMatch(/^touched down under the keyboard at \(201,699\)/);
   });
 
-  it('the tap (K1) is not judged unlisted: it still asks the keyboard named', () => {
-    expect(row(idbRows, 'tap').absent).toBeUndefined();
+  it('the tap (K1): judged unlisted — idb\'s reasons AND the soft keyboard are green; idb\'s reasons alone (the timeout before K1) or a bare not-found is red; a tap sent is red whatever it says', () => {
+    const t = row(idbRows, 'tap');
+    expect(t.absent).toBeDefined();
+    const wait = (...notes: string[]) => [`ERROR Timed out after 5000ms waiting for element id:"${ID}" to appear`, ...notes.map((n) => `  (${n})`)].join('\n');
+    const KEYS = 'the soft keyboard is up (its top edge at y 590) and may cover it — hide it first (tap a neutral element such as the screen title — a tap: step in a flow) and look again';
+    expect(t.judge(out(wait(KEYS, REASONS)))).toBeUndefined();
+    expect(t.judge(out(wait(REASONS)))).toMatch(/^refused without naming the keyboard: /);
+    expect(t.judge(out(wait(KEYS)))).toMatch(/^not found, without naming idb's reasons and the soft keyboard: /);
+    expect(t.judge(out(wait()))).toMatch(/^refused without naming the keyboard: /);
+    expect(t.judge(out('Tapped id:"lab.form-keyboard.vs"', ['idb ui tap 201 621']))).toMatch(/^Tapped/);
   });
 
   it('under WDA, which lists the field: no row is judged unlisted, and the bare not-found stays vacuous', () => {
