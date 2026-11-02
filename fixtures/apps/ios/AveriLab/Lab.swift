@@ -66,7 +66,7 @@ struct FieldSpec: Decodable, Identifiable {
     let placeholder: String?
     let prefill: String?
     let error: Message?
-    /// group4, thousands (schema.ts#FieldFormat, D18): the field reformats as it is typed (Forms.swift#formatted).
+    /// schema.ts#FieldFormat (D18): the field reformats as it is typed (Forms.swift#formatted).
     let format: String?
     /// `display` (schema.ts#CatalogField.formatIn) is Compose's alone: SwiftUI has no display-only transform, so here
     /// the model is formatted all the same.
