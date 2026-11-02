@@ -292,9 +292,9 @@ Why: the D41 device A/B on a wda project, on the lab simulator. Through the wda 
 `screenshot` tool took a median of 1 087 ms over 10 runs, and 3 of the 10 stalled at about 2.1–2.2 s (2 118, 2 133 and
 2 225 ms). On the same simulator, with that project's WebDriverAgent session live, the idb adapter's helper captured in
 about 440 ms (medians 446.5 and 436 ms over two runs of 10, no stall). The same runs showed no conflict between idb and
-WDA: after those 10 idb captures, the wda adapter's launch-then-tree reads went 5/5, and a wda adapter has driven its
-input (`press_key`, a swipe, typing) through its own idb helper since D7b. Since D41 every wda project has one adapter,
-and that adapter already runs that one helper, so the capture adds no process.
+WDA: after those 10 idb captures, the wda adapter's launch-then-tree reads went 5/5 (re-check pending: batch-2 block
+D), and a wda adapter has driven its input (`press_key`, a swipe, typing) through its own idb helper since D7b. Since
+D41 every wda project has one adapter, and that adapter already runs that one helper, so the capture adds no process.
 
 The one-source rule (`adapters/types.ts#DeviceAdapter.screenshot`) still holds per adapter: the source is fixed when
 the adapter is made, the kill switch is read once then, and there is still no simctl fallback at run time. The status
