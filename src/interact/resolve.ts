@@ -89,8 +89,8 @@ export interface Resolved {
 export const DEFAULT_SETTLE_TIMEOUT_MS = 5_000;
 
 /**
- * Cadence for the settle poll when neither the caller nor the adapter has one (settleCadence), and for the presence
- * poll (resolvePresent) when the caller has none. The fill's value poll has its own (fill.ts#DEFAULT_VALUE_POLL_MS).
+ * The settle poll's last fallback (settleCadence), and the presence poll's cadence (resolvePresent) when the caller
+ * has none. The fill's value poll has its own (fill.ts#DEFAULT_VALUE_POLL_MS).
  */
 export const DEFAULT_POLL_MS = 500;
 
@@ -178,8 +178,7 @@ export interface SettleOptions extends ResolveOptions {
   timeoutMs?: number;
   /**
    * The cadence of the tree reads (the pause is ui-tree/read-tree.ts#pauseAfterRead of it). resolveSettled: when
-   * absent, the adapter's settleCadenceMs, else DEFAULT_POLL_MS (settleCadence, ADR 0040). resolvePresent: when
-   * absent, DEFAULT_POLL_MS.
+   * absent, settleCadence's doc says what applies. resolvePresent: when absent, DEFAULT_POLL_MS.
    */
   pollMs?: number;
   /**
@@ -283,8 +282,7 @@ export interface ResolvedSettled extends Resolved {
  * The read error, when the last round could not read a tree, rides beneath
  * either so a dead device never looks like a slow screen.
  *
- * The reads' cadence is settleCadence's (since 2026-11-02, ADR 0040): the
- * caller's pollMs, else the adapter's measured settleCadenceMs, else 500.
+ * The reads' cadence is settleCadence's (since 2026-11-02; the rule is its doc).
  *
  * `opts.first` (since 2026-10-31, ADR 0030): a handed-on read is the first
  * sample and nothing else. Its rect is the one the first fresh read must

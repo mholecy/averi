@@ -3,7 +3,8 @@ import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
 import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
 import { FlowEngine, FlowError, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
 import { EngineSession } from '../../src/flow/launch.js';
-import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, lateTyping, node, resetLayout, screen } from '../helpers/fake.js';
+import { DEFAULT_FOCUS_DELAY_MS } from '../../src/interact/fill.js';
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
@@ -4394,24 +4395,10 @@ flows:
 
   it('a `fill:` step settles at the fact, and its value poll stays the engine\'s 500', async () => {
     const fake = device(300);
-    // The typing lands one read late: the first read-back sees the field empty, the next sees the value.
-    let pending: string | undefined;
-    fake.typeText = async (text) => {
-      fake.typed.push(text);
-      pending = text;
-    };
-    const origTree = fake.uiTree.bind(fake);
-    let typedReads = 0;
-    fake.uiTree = async () => {
-      if (pending !== undefined && typedReads++ === 1 && fake.focused) {
-        fake.focused.value = pending;
-        pending = undefined;
-      }
-      return origTree();
-    };
+    lateTyping(fake);
     await FlowEngine.run(cfg, fake, PRODUCTION(), { flow: 'fill_it' });
     expect(fake.typed).toEqual(['abc']);
-    expect(sleeps).toEqual([300, 350, 500]); // the settle, the focus delay (fill.ts#DEFAULT_FOCUS_DELAY_MS), one value-poll round
+    expect(sleeps).toEqual([300, DEFAULT_FOCUS_DELAY_MS, 500]); // the settle, the focus delay, one value-poll round
   });
 
   it('a `wait:` step is not a settle: it polls at 500 whatever the fact', async () => {

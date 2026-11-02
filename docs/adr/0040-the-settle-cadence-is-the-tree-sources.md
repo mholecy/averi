@@ -1,8 +1,8 @@
 # 40. The settle cadence is the tree source's
 
-Status: accepted 2026-11-02 (performance backlog row D35, docs/plans/2026-10-30-performance-backlog.md; loop L5).
-Merged only after the batch-4 device A/B and the product-path settle run (`d35-motion --settle`, 60 trials, 0 wrong
-settles). One wrong settle there sets `IDB_SETTLE_CADENCE_MS` to 400 (0 wrong in both batches) and the run is
+Status: proposed — merged only after the batch-4 device gate (performance backlog row D35,
+docs/plans/2026-10-30-performance-backlog.md; loop L5, 2026-11-02): the device A/B and the product-path settle run
+(`d35-motion --settle`, 60 trials, 0 wrong settles). One wrong settle there sets `IDB_SETTLE_CADENCE_MS` to 400 (0 wrong in both batches) and the run is
 repeated. ADR 0029's rule (`pauseAfterRead`) is unchanged. This record adds a fact: which `pollMs` the settle is given.
 
 ## Context
@@ -42,9 +42,6 @@ an element holds still. `settleCadence(adapter, opts) = opts.pollMs ?? adapter.s
   reads through real motions, with the settle replayed offline at each cadence using the product's own
   `pauseAfterRead`. A judgement does not set a value.
 
-What changes in effect: only `resolveSettled`'s pause on iOS idb, from 500 − r to 300 − r (r ≈ 20–40 ms). The 150 ms
-floor binds only for r > 150. That pause comes once per settle that needs a second read: once per tap, once per fill
-plus each keyboard re-look, and once per flow tap or fill. Everything else sleeps as before.
 
 ## The measurement (D35, idb, lab simulator)
 
@@ -76,6 +73,17 @@ when a later read in the window moves the rect.
 - **WDA**: none, so 500. It is unmeasured. At most 200 ms is left to gain, because the floor binds for r ≥ 350
   (follow-up D35b).
 - **Android**: none, and moot. A 2.2–2.5 s dump makes `pauseAfterRead(p, r)` the 150 ms floor for any p ≤ r + 150.
+
+## Consequences
+
+- Only `resolveSettled`'s pause on iOS idb changes, from 500 − r to 300 − r (r ≈ 20–40 ms). The 150 ms floor binds
+  only for r > 150. That pause comes once per settle that needs a second read: once per tap, once per fill plus each
+  keyboard re-look, and once per flow tap or fill. Everything else sleeps as before.
+- Expected saving: about 200 ms a settle on idb (the measured median, 205 ms). WDA and Android sleep exactly as
+  before, and so does every poll that is not a settle: `wait:`, detect, `optional:`, the Verifier, the pixel poll, the
+  fill's value poll and `scroll_until`.
+- Replies are unchanged. They quote budgets, not cadences. The differential main → L5 shows 0 diffs.
+- A test or caller that pins `pollMs` is unaffected. A new tree source that declares no value settles at 500.
 
 ## Risks accepted
 

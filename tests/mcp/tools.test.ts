@@ -11,7 +11,7 @@ import { discoveryOver } from '../../src/adapters/discovery.js';
 import { createAveriServer } from '../../src/mcp/tools.js';
 import { DEFAULT_FOCUS_DELAY_MS } from '../../src/interact/fill.js';
 import { TOOL_CONFIG } from '../../src/mcp/config-policy.js';
-import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, lateTyping, node, resetLayout, screen } from '../helpers/fake.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { boundReads } from '../helpers/terminal-read.js';
 import { TOOL_NAMES } from '../helpers/tool-names.js';
@@ -1694,21 +1694,7 @@ describe('tap and type_text settle at the adapter\'s cadence (ADR 0040)', () => 
 
   it('type_text with a selector: the settle pauses 300, and the value poll after a late typing stays 400', async () => {
     const fake = idbWired();
-    // The typing lands one read late: the first read-back sees the field empty, the next sees the value.
-    let pending: string | undefined;
-    fake.typeText = async (text) => {
-      fake.typed.push(text);
-      pending = text;
-    };
-    const origTree = fake.uiTree.bind(fake);
-    let typedReads = 0;
-    fake.uiTree = async () => {
-      if (pending !== undefined && typedReads++ === 1 && fake.focused) {
-        fake.focused.value = pending;
-        pending = undefined;
-      }
-      return origTree();
-    };
+    lateTyping(fake);
     const { call } = await connect({ ios: fake, android: home() });
     resetSleeps();
     const result = await call('type_text', { platform: 'ios', selector: 'id:amount', text: 'abc', configPath: missing() });
