@@ -20,7 +20,7 @@ import type { Expectation } from './golden-spec/judges.js';
  * | truth | tap | colour assert | scroll_until down |
  * |---|---|---|---|
  * | open: reached, drawn as itself | `Tapped` | passes on its own colour | visible after 0 swipes |
- * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover — naming `close it first`; a fail because the element is not in the tree is no evidence either way — unless the replayed tree lists no node of it: then it must name the way out | stops before any swipe, `close it first` (ADR 0018) |
+ * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover — naming `close it first`; a fail because the element is not in the tree is no evidence either way — unless the replayed tree lists no node of it: then it must name the presented remedy (under idb, or idb's reasons) | stops before any swipe, `close it first` (ADR 0018) |
  *
  * A row is added with the cells that need it — except phase 3's row types (golden-spec/rows.ts), which B1 (the plan's
  * phase 3) declared ahead of their cells so that the families can be built in parallel: a row type asks nothing until a
@@ -33,7 +33,7 @@ import type { Expectation } from './golden-spec/judges.js';
  * — and the judge overruled: a mismatch of one class, said first — `not in the tree:`. A row whose truth says the
  * target may be missing from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply; a
  * row whose replayed tree lists no node of it (unlistedIn: a presented colour row, a form's under-keyboard rows) accepts
- * only one that names the way out (golden-spec/judges.ts#judgedUnlisted).
+ * only one that names the way out that row requires (golden-spec/judges.ts#judgedUnlisted).
  *
  * The form cells (phase 1b) add rows a replayed tree CAN judge — see golden-spec/forms.ts#formRows. What it
  * cannot judge (a fill, a clear: typing changes nothing in a recorded tree) is the live golden's

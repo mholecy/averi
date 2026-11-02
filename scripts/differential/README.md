@@ -133,10 +133,14 @@ the truth's `TargetTruth.listed` for the replayed source (`scripts/truth/target-
 dumps no node the user cannot see), makes such a reply green, judged by what it did (nothing tapped, the strokes sent
 for it). The presented colour row and a form's under-keyboard colour, `ocr` and scroll_until rows read `absent` from
 the replayed payload itself (`golden-spec.ts#unlistedIn`, by `truth.ts#listedIn`: uiautomator's dump of the active
-window, idb's list of the presented layer or of nothing beneath the keyboard), and hold the "not found" to its way out
-(`judges.ts#judgedUnlisted`, `#wayOutSaid`): the presented remedy, the active-window hint, or idb's own words — its
-limit (`replies.ts#noIdListedSaid`) or its reasons (`#idbReasonsSaid`, read off `src/ui-tree/miss.ts#missNote`) — and,
-for the stop under the keyboard, the soft keyboard named too; a bare "not found" there is a mismatch. A wait whose
+window, idb's list of the presented layer or of nothing beneath the keyboard), and hold the "not found" to the way out
+each row requires (`judges.ts#judgedUnlisted`, the row's own reader of `replies.ts`): the presented colour row the
+presented remedy (`#presentedRemedySaid`; never the active-window hint, as its tap row) — under idb, or idb's reasons
+(`#idbReasonsSaid`, on `src/ui-tree/miss.ts#IDB_UNLISTS` and `#COVERED_FIRST`); the under-keyboard colour and `ocr`
+rows idb's reasons; the under-keyboard stop idb's reasons and the soft keyboard (`#namesKeyboard`). A bare "not
+found", or one naming another row's remedy, is a mismatch there. The 16 under-keyboard `ocr` rows are judged so only
+where the host's recognizer reads (outside the sandbox): replayed by hand they answer as the colour rows, but they are
+unproven on a Vision host, and would surface as 16 unknown mismatches if wrong. A wait whose
 hint says the selector matched nodes, none usable ("it matched only 0×0 nodes …", "… clipped out above its scroll
 container …"), is no such reply: the target is in the tree, refused for where it lies
 (replies.ts#notInTree; edges/scroll-collapsing's A, #10). A scroll is asked toward the target (truth.ts#directionOf):

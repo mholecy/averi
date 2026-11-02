@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { PresentationKind } from '../../src/adapters/types.js';
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
-import { ACTIVE_WINDOW_HINT, missNote, withMissNote } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { flushText } from '../../src/interact/scroll-text.js';
-import { flushProbedSide, IDB_REASONS, idbReasonsSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid } from '../../scripts/truth/replies.js';
+import { flushProbedSide, idbReasonsSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid } from '../../scripts/truth/replies.js';
 
 // The two "close it first" the harness reads apart (scripts/truth/replies.ts): the presented remedy, driven here by
 // src's own builders (ui-tree/standing.ts#presentedRemedy, #presentedStop) over every layer they word, and the
@@ -38,11 +38,6 @@ describe('presentedRemedySaid: the presented remedy in every wording src builds'
 });
 
 describe('idbReasonsSaid: idb\'s reasons, read off both of its dialect notes (src/ui-tree/miss.ts#missNote)', () => {
-  it('the reasons are the words between the note\'s fact and its remedy: they name the keyboard and the presented layer, and close what covers it', () => {
-    expect(IDB_REASONS).toMatch(/^Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover\b.*If something covers it, close that first/);
-    expect(IDB_REASONS).not.toContain('id:');
-  });
-
   it.each(['idUnlisted', 'noIdListed'] as const)('the %s note, as a not-found carries it', (of) => {
     const reply = `ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear\n  (${missNote({ of, id: 'lab.x' })})`;
     expect(idbReasonsSaid(reply)).toBe(true);
@@ -54,6 +49,9 @@ describe('idbReasonsSaid: idb\'s reasons, read off both of its dialect notes (sr
     expect(idbReasonsSaid('ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear')).toBe(false);
     expect(idbReasonsSaid(`… (${ACTIVE_WINDOW_HINT})`)).toBe(false);
     expect(idbReasonsSaid(`… (${presentedRemedy('it', { kind: 'alert' })})`)).toBe(false);
+    // the reasons without the remedy, or the remedy alone, are not both
+    expect(idbReasonsSaid(`… (${IDB_UNLISTS})`)).toBe(false);
+    expect(idbReasonsSaid(`… (${COVERED_FIRST})`)).toBe(false);
   });
 });
 
