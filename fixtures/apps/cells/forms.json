@@ -190,7 +190,9 @@
         "fields": [
           { "tag": "iban", "kind": "iban", "title": "IBAN – grouped as typed", "placeholder": "SK00 0000 0000 …", "format": "group4" },
           { "tag": "amount", "kind": "amount", "title": "Amount in EUR – thousands grouped", "placeholder": "0,00", "format": "thousands" },
-          { "tag": "ibanShown", "kind": "iban", "title": "IBAN – grouped on screen only", "placeholder": "SK00 0000 0000 …", "format": "group4", "formatIn": "display" }
+          { "tag": "ibanShown", "kind": "iban", "title": "IBAN – grouped on screen only", "placeholder": "SK00 0000 0000 …", "format": "group4", "formatIn": "display" },
+          { "tag": "date", "kind": "text", "title": "Due date – dotted as typed", "placeholder": "__.__.____", "format": "date" },
+          { "tag": "phone", "kind": "text", "title": "Payee’s phone", "placeholder": "+421" }
         ],
         "submit": { "tag": "submit", "title": "Send payment" }
       }

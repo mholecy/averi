@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedKept } from '../../scripts/truth/live-forms.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import { readLiveRecord, recordedCase, withFieldValue } from '../helpers/live-records.js';
+import { selectCases } from '../../scripts/truth/live-cases.js';
+import { LIVE_KNOWN } from '../../scripts/truth/live-known.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
 // Lab note F2A1's live form cases (scripts/truth/live-forms.ts), over the committed record of round 6's Android device
@@ -248,5 +250,61 @@ describe('refusedKept: p7, a character averi cannot type into a prefilled field'
 
   it('a claim of done: MISMATCH fill-claim', () => {
     expect(refusedKept('name')(left(prefill), ['Filled id:"lab.form-prefilled.name" (1 character)'], 'uiautomator', p1.launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+  });
+});
+
+/**
+ * f11–f14 (D37): form-format's date field (it inserts `.` after the 2nd and 4th digit, digits only; placeholder
+ * `__.__.____`) and phone field (no reformat; placeholder `+421`) — ADR 0034's dotted date and the D29 gaps (a
+ * placeholder with no letter or digit, a `+421`-style prefix). No device has run them yet: judged here over D40's f1
+ * record (iOS WDA), its final state set to what each fill would leave; their device outcome is batch-3's to read.
+ */
+describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () => {
+  const IDS = ['f11', 'f12', 'f13', 'f14'];
+  const f1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'f1');
+  const left = (tag: string, value: string) => withFieldValue(f1, tag, value).state;
+  const DATE_FILLED = 'Filled id:"lab.form-format.date" (8 characters, the field shows them reformatted: 2 separators added)';
+  const DATE_SHOWN = 'All 1 asserts passed\nPASS  element id:"lab.form-format.date" with text "31.12.2026" exists\nappAlive: true';
+  const of = async (platform: 'ios' | 'android') => selectCases({ platform, app: 'native', groups: ['forms'], only: IDS });
+
+  it.each(['ios', 'android'] as const)('%s runs all four, after f10: one fill each of form-format, clear only on f12 and f14; f11 then asserts what the tree shows', async (platform) => {
+    const cases = await of(platform);
+    expect(cases.map((c) => c.id)).toEqual(IDS);
+    expect(cases.every((c) => c.cell === 'form-format' && c.group === 'forms')).toBe(true);
+    expect(cases.map((c) => c.calls[0])).toEqual([
+      { tool: 'type_text', args: { selector: 'id:"lab.form-format.date"', text: '31122026' } },
+      { tool: 'type_text', args: { selector: 'id:"lab.form-format.date"', text: '31.12.2026', clear: true } },
+      { tool: 'type_text', args: { selector: 'id:"lab.form-format.phone"', text: '421903123456' } },
+      { tool: 'type_text', args: { selector: 'id:"lab.form-format.phone"', text: '+421903123456', clear: true } },
+    ]);
+    expect(cases.map((c) => c.calls.length)).toEqual([2, 1, 1, 1]);
+    expect(cases[0].calls[1]).toEqual({ tool: 'assert', args: { asserts: [{ element: { id: 'lab.form-format.date' }, text: '31.12.2026', timeout: 2_000 }] } });
+    const all = (await selectCases({ platform, app: 'native', groups: ['forms'] })).map((c) => c.id);
+    expect(all.indexOf('f11')).toBe(all.indexOf('f10') + 1);
+  });
+
+  it('the date held as the field formats it, whatever was typed: ok; a fill claimed done over the digits alone: MISMATCH', async () => {
+    const [f11, f12] = await of('ios');
+    expect(f11.judge(left('date', '31.12.2026'), [DATE_FILLED, DATE_SHOWN], 'wda', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(f12.judge(left('date', '31.12.2026'), [DATE_FILLED], 'wda', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(f11.judge(left('date', '31122026'), [DATE_FILLED, DATE_SHOWN], 'wda', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    expect(f12.judge(left('date', '31.1'), [DATE_FILLED], 'wda', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    const notShown = '0/1 asserts FAILED\nFAIL  element id:"lab.form-format.date" text "31.12.2026" — read "31122026"';
+    expect(f11.judge(left('date', '31.12.2026'), [DATE_FILLED, notShown], 'wda', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
+  });
+
+  it('the phone held as typed, the placeholder no part of it: ok; the placeholder kept in front, claimed done: MISMATCH; refused: LOUD', async () => {
+    const [, , f13, f14] = await of('android');
+    const filled = 'Filled id:"lab.form-format.phone" (12 characters)';
+    const refused = 'ERROR the field shows "+421421903123456", not the 12 characters typed';
+    expect(f13.judge(left('phone', '421903123456'), [filled], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(f14.judge(left('phone', '+421903123456'), [filled], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(f13.judge(left('phone', '+421421903123456'), [filled], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    expect(f14.judge(left('phone', '421903123456'), [filled], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    expect(f13.judge(left('phone', '+421421903123456'), [refused], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'LOUD' });
+  });
+
+  it('no outcome guessed: none of them is in LIVE_KNOWN until a device run reads it', () => {
+    expect(Object.keys(LIVE_KNOWN).filter((k) => IDS.includes(k.split(' ').at(-1)!))).toEqual([]);
   });
 });
