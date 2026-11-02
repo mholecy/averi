@@ -24,6 +24,9 @@ read after a stroke is the settled read) accepted (1a51687b, cf5c0ac0; merged 4c
 2026-11-01 (performance backlog D17): the amendment "a side uiautomator cut at the screen's edge" (below) accepted
 (orchestrator, owner's mandate; f11ed5f0 … 4d07fc5c and the code review's fixes on `fix/d17-screen-edge-bounds`;
 merged ee517997).
+2026-11-02 (performance backlog D52): the amendment "a target too large for its scroll view" (below) accepted
+(orchestrator, owner's mandate: option A of the D52 analysis; implemented on `fix/d52-unfit-fully`), and its residual,
+numbered 3 under "Residuals accepted".
 
 ## Context
 
@@ -377,6 +380,15 @@ Under WDA at truth/round-6's src (11683c3), four runs of each case:
    (on this cell it flings O out of the clip's top and ends in a turn or a LOUD failure, for a stop that worked); a
    tolerance in the truth harness (it would bend ADR 0020's contract for one wording). The live KNOWN entry stays,
    intermittent (`ios wda scroll:scroll-bounded-footer.O`, stop-claim on `visible`).
+3. **A `fully: true` target with a little more room than its scroll view gives it can still be swung to the bound**
+   (accepted 2026-11-02 with D52's amendment, below, by the orchestrator under the owner's mandate). The `unfit` stop
+   fires only within FIT_ROOM_PX (1 unit) of the scroll view's size. A target with more room than that, but under about
+   the shortest stroke's carry (~53 px on Android: CUT_EDGE_MIN_DRAG, 48 px, at CUT_EDGE_CARRY, 1.11 a px), fits at a
+   window of offsets narrower than any stroke can aim at, and the course may still turn and halve its reach until
+   maxSwipes. So may one as large as a scroll view whose axis the tree does not tell (a Compose LazyRow, a RecyclerView,
+   a ViewPager2), which gets no `unfit`: inferring that axis is performance backlog D59, after a device check. Nothing
+   has measured such a target yet. The bound's failure still says "CLIPPED at …" and by how much, so the reply never
+   claims a stop on it.
 
 ## Amendment: a side uiautomator cut at the screen's edge (2026-10-31, performance backlog D17)
 
@@ -456,3 +468,70 @@ centre 633), then "visible after 1 swipe — CLIPPED at right, at most 93 % …"
 - `cutAtScreen` is set on every uiautomator tree. A source that cuts at the screen only in Compose (a classic View tree
   may cut at the scroll container, LE1's note) does not change the rule: there no side lies on the screen's edge past
   its frame.
+
+## Amendment: a target too large for its scroll view (2026-11-02, performance backlog D52)
+
+**Context.** `fully: true` holds only when nothing of the match is clipped (`clippedEdges`, no slack). Nothing compared
+the match's size with the room its scroll view gives it. Measured on batch-3 E2 (Android API 33, main 6b4a44df): the
+lab's carousel-in-list draws C 948 px wide in a 948-px carousel (66–1014), so C is fully visible at x 66 exactly and at
+no other offset. `left-fully` after a 440-px pre-drag ran 6 strokes and 3 turns (offset 440 → 783 → 1116 → 969 → 825 →
+883 → 938 in run 0) and failed on maxSwipes: "stayed CLIPPED at right, 99 % … turned round 3 times", 3 runs of 3. No
+drag is shorter than CUT_EDGE_MIN_DRAG (48 px), and the reach halves at each turn (decision 4, `course.ts#nextStroke`),
+so the course converges to about ±50 px of the one offset and never to 1 px. On a carousel that does not move, the reply
+was "stuck … a layout defect" instead. Neither reply said why.
+
+**Decision.**
+1. *The predicate* (`interact/scroll-read.ts#unfitAlong`, pure). On one read, a match cannot be shown whole along an
+   axis when all of these hold:
+   - it is clipped on that axis;
+   - both its sides are known there (no `unknownPast` side, the D17 amendment's mark);
+   - its scroll views' drawn frame (`StandingFacts.drawn`) IS the frame it was judged in on that axis
+     (`StandingFacts.screen`), so neither the soft keyboard's line nor a system band cuts it;
+   - the room-giving scroll view — the smallest of its scroll views along that axis (`Clips.drawnIn`'s `scrollers`, the
+     nearest of equals, `scroll-read.ts#scrollViewsOf`) — scrolls ON that axis as the tree tells it (`Clips.axesOf`):
+     the one exact offset is that scroll view's, and across it no swipe of it moves the match at all;
+   - the drawn frame is that scroll view's along the axis within FIT_ROOM_PX: an outer scroll view's position that cuts
+     it shorter (a page list scrolled so its carousel runs past its foot) gives the match more room once the page moves;
+   - its size there is at least that scroll view's less FIT_ROOM_PX (1 unit, a rounding of the source's bounds, as
+     MOTION_EDGE_SLACK reads an edge flush with a frame's).
+   It is judged per axis, vertical first. It lives beside `stops`, not in ui-tree/geometry.ts.
+2. *The stop* (`interact/scroll-rounds.ts#round`, `ScrollOutcome`'s `unfit`). Under `fully: true` only, on the first
+   read that judges the match in the frame and finds the predicate holds, the scroll stops with no further stroke. The
+   check comes after the presented hold and the overlapped stop, and before the stuck turn, so a still carousel fails
+   `unfit` too, never "a layout defect". Under WDA, which lists a row where it lies, that read can be the first, before
+   any swipe. Under uiautomator it is the first read that has both sides inside the screen: E2 run 0's replay fails on
+   its 4th read (C at 45), after 3 strokes, where it ran 6 strokes and 3 turns before
+   (tests/interact/scroll-carousel-android.test.ts).
+3. *The reply* (`interact/scroll-text.ts#unfitText`, a plain Error, as `stuck`). It is a failure, never a "visible"
+   claim, and short: where the match is clipped and how much of it is drawn (said once), its size against the
+   room-giving scroll view's — that scroll view quoted, the one whose size it was judged by — the reason, and the way
+   out. Its head is the stuck sentence's at a scroll view's edge (`scroll-text.ts#clippedDrawnHead`, one spelling for
+   both): "scroll_until … failed after 3 swipes — element is in the viewport but CLIPPED at left: 98% of it is drawn,
+   and it is 948 wide (tree units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one
+   exact scroll offset only, which no swipe can be aimed at — drop fully: true, or accept what it shows. Last rect …".
+   When it is larger, the reason reads "wider than …: no scroll offset shows all of it".
+
+Rejected:
+- a tolerance on "fully" (accept a few px clipped): it breaks the contract, and a 10-px shortfall is not rounding;
+- a precision final approach (an exact-length drag, an overshoot and back): drags under 48 px are below touch slop,
+  and the carry is unmeasured per app;
+- only rewording the bound's text: honest, but it spends the whole budget.
+
+**Consequences.** A match taller than a list the tree tells scrolls vertically, which "stuck" reported as "taller than
+what of its scroll view the screen shows: no scroll shows it whole" after the stuck strokes, now fails `unfit` on its
+first read. The stuck sentence keeps that wording where the screen shows less of the scroll view than the scroll view is
+long, and wherever the tree does not tell the scroll view's axis. There is no cross-axis `unfit`: a row as wide as a
+vertical list it is clipped across (cut at the list's left side) still gets the stuck strokes and the layout-defect
+sentence, since no swipe of that list moves it there. A scroll view whose axis the tree does not tell (on Android a
+Compose LazyRow, a RecyclerView or a ViewPager2, which carry no `scrollAxis`; under WDA one whose content is not laid
+out past its frame) gives no `unfit` either, and its match runs as before: it may still run to the bound (residual 3;
+inferring the axis is backlog D59). The golden says nothing of this change: golden against the base of main 870896f4
+(v3), 0 of 1611 checks changed, 120 mismatches as before. Its `fully` rows judge only "claims visible", and
+carousel-in-list's C at rest is cut at the screen's edge, its right side unknown.
+
+**Residual.** Number 3 under "Residuals accepted": a target with a little more room than FIT_ROOM_PX, under about the
+shortest stroke's carry, or as large as a scroll view whose axis the tree does not tell (backlog D59), can still run to
+the bound.
+
+**Device check.** Optional, for the next owner batch: Android E2 `left-fully` ×3, expecting `unfit` 3 of 3 within 3
+swipes, with the wall time against batch-3's.

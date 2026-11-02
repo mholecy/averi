@@ -11,7 +11,7 @@ import { partlyUnderSystemBar, pinnedUnder, systemBarName, underSystemBar } from
 import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
-import { fullyClaimed, shortOf, type AppliedKeyboard, type Judged } from './scroll-read.js';
+import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
@@ -250,6 +250,15 @@ const shareText = (visible: number, unknownPast: readonly Edge[] | undefined): s
 /** Why a share is only an upper bound (`shareText`), or nothing: the source cut the element at the screen's edge there (D17, adapters/types.ts#UiNode.boundsCutAtScreen — uiautomator's only). */
 const unknownPastText = (unknownPast: readonly Edge[] | undefined): string =>
   boundedBy(unknownPast) ? ` — uiautomator does not say how far it runs past the screen's ${unknownPast.join('/')} edge` : '';
+
+/**
+ * The head of a failure on an element its frame cuts, judged by what of it is drawn: `scroll_until <describe> failed
+ * after N swipes — element is <where> but CLIPPED at <at>: N% of it is drawn` and, where uiautomator cut it at the
+ * screen's edge, why the share is only an upper bound. One spelling for the stuck sentence at a scroll view's edge and
+ * the `unfit` one (`unfitText`), so the two cannot drift apart.
+ */
+const clippedDrawnHead = (describe: string, swipes: number, where: string, at: string, { visible, unknownPast }: Omit<ClipFacts, 'clipped'>): string =>
+  `scroll_until ${describe} failed after ${swipesText(swipes)} — element is ${where} but CLIPPED at ${at}: ${shareText(visible, unknownPast)} of it is drawn${unknownPastText(unknownPast)}`;
 
 /** `1 swipe`, `3 swipes` — the one spelling of the count every scroll sentence quotes. */
 const swipesText = (n: number): string => countOf(n, 'swipe');
@@ -629,7 +638,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
       }
       // Clipped at the end of the content, worded by what cuts it (scroll-read.ts#ClipCause).
       const { facts } = judged.standing;
-      const { clipped, visible, unknownPast } = facts;
+      const { clipped } = facts;
       switch (short.cause.of) {
         // The keyboard's edge: the keyboard, not the layout, is what hides the rest — a container that does not resize
         // for it keeps its last rows under it. Said as such, with how to hide it; the layout-defect wording only when
@@ -657,7 +666,7 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
               : `The rest lies past ${past}: either the swipes do not scroll that scroll view (swipe inside it), or ${CONTENT_STOPS_SHORT[stopsShort]}.`;
           return {
             message:
-              `scroll_until ${describe} failed after ${n} — element is in the viewport but CLIPPED at ${at}: ${shareText(visible, unknownPast)} of it is drawn${unknownPastText(unknownPast)}, and the content is exhausted: ` +
+              `${clippedDrawnHead(describe, o.swipes, 'in the viewport', at, facts)}, and the content is exhausted: ` +
                 `swiping ${o.lastStroke} no longer moves it${neither}. ${rest} ${last}`,
           };
         }
@@ -728,6 +737,8 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
             `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`,
       };
     }
+    case 'unfit':
+      return { message: unfitText(o, describe) };
     case 'bound': {
       const turned =
         o.turns > 0 ? `. It was turned round ${countOf(o.turns, 'time')}: a swipe carried it past the viewport (a fling), or it lay at the edge the swipes push it out through, so the next was drawn the other way` : '';
@@ -751,6 +762,35 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
     case 'changed':
       return { message: changedText(o, describe) };
   }
+}
+
+/** The words of an axis for `unfitText`: how a target's size along it is said. */
+const SIZE_WORDS: Readonly<Record<Unfit['along'], { readonly as: string; readonly more: string }>> = {
+  vertical: { as: 'tall', more: 'taller' },
+  horizontal: { as: 'wide', more: 'wider' },
+};
+
+/**
+ * The `unfit` failure (scroll-read.ts#Unfit, D52): a `fully: true` match as wide or as tall as the scroll view that
+ * scrolls it along that axis, or more — where it is clipped and how much of it is drawn, its size against that scroll
+ * view's (the one whose size it was judged by, quoted), why no swipe shows it whole, and the way out. A plain Error, as
+ * `stuck`: the element was there and seen. Never a claim it is visible.
+ */
+function unfitText(o: Extract<ScrollOutcome, { kind: 'unfit' }>, describe: string): string {
+  const { judged, viewport, unfit } = o;
+  const { facts } = judged.standing;
+  const where = judged.under === undefined ? 'in the viewport' : `in the viewport above the soft keyboard over ${frameText(judged.under.topCover)}`;
+  const view = `its scroll view ${nodeText(unfit.scrollView)}`;
+  const words = SIZE_WORDS[unfit.along];
+  const why =
+    unfit.size > unfitRoom(unfit)
+      ? `${words.more} than ${view}: no scroll offset shows all of it`
+      : `as ${words.as} as ${view}: fully: true holds at one exact scroll offset only, which no swipe can be aimed at`;
+  return (
+    `${clippedDrawnHead(describe, o.swipes, where, facts.clipped.join('/'), facts)}, ` +
+    `and it is ${unfit.size} ${words.as} (tree units), ${why} — drop fully: true, or accept what it shows. ` +
+    `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
+  );
 }
 
 /**

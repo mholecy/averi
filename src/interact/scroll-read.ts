@@ -1,5 +1,5 @@
-import type { DeviceScreen, Rect, UiNode } from '../adapters/types.js';
-import { largestScroller, rectIntersection, rectWithin, type Cut } from '../ui-tree/geometry.js';
+import type { DeviceScreen, Rect, ScrollAxis, UiNode } from '../adapters/types.js';
+import { axisOfEdge, largestScroller, rectIntersection, rectWithin, toldFrame, type Clips, type Cut, type Edge } from '../ui-tree/geometry.js';
 import type { Cover } from '../ui-tree/cover.js';
 import type { SurfaceFinding } from '../ui-tree/eyes.js';
 import type { KeyboardCover } from '../ui-tree/keyboard-cover.js';
@@ -9,7 +9,7 @@ import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '.
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { CarriedUnder } from './motion-ledger.js';
-import { bandRect, farEdgeFrames, type ScrollViewCut, type Standing, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
+import { bandRect, farEdgeFrames, type ScrollViewCut, type Standing, type StandingFacts, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 
 /**
@@ -449,6 +449,83 @@ function better(a: Judged, b: Judged): number {
  * for the round (the claim the eyes confirm, ui-tree/eyes.ts) and the reply (scroll-text.ts#describeScrollResult).
  */
 export const fullyClaimed = ({ clipped, covered }: { readonly clipped: readonly unknown[]; readonly covered: boolean }): boolean => clipped.length === 0 && !covered;
+
+/**
+ * How much less than its scroll view's room a target may be along an axis and still count as filling it (`unfitAlong`),
+ * and how much less than that room the drawn frame may be and still count as the scroll view's own: a pixel, a rounding
+ * of the source's bounds — as geometry.ts's MOTION_EDGE_SLACK reads an edge flush with a frame's. A target with more
+ * room than that fits at a range of offsets, however narrow, and is stroked for as before; one with a little more
+ * (under about the shortest stroke's carry, ~53 px) can still run to the bound (ADR 0021, residual 3).
+ */
+export const FIT_ROOM_PX = 1;
+
+/** One of a target's scroll views as `unfitAlong` asks of it: the node, and the axis the tree tells it scrolls on (geometry.ts#Clips.axesOf), undefined where it cannot tell. */
+export interface ScrollViewOf {
+  readonly node: UiNode;
+  readonly axis: ScrollAxis | undefined;
+}
+
+/** A node's scroll views, nearest first (geometry.ts#Clips.drawnIn's `scrollers`), each with its axis (`Clips.axesOf`); none on a tree that tells none. */
+export function scrollViewsOf(clips: Pick<Clips, 'drawnIn' | 'axesOf'>, node: UiNode): ScrollViewOf[] {
+  return (toldFrame(clips.drawnIn(node))?.scrollers ?? []).map((scroller) => ({ node: scroller, axis: clips.axesOf(scroller.rect)?.axis }));
+}
+
+/**
+ * A `fully: true` target no swipe can show whole (`unfitAlong`): along `along`, its listed `size` is at least the room
+ * its `scrollView` gives it — that scroll view's extent along `along` (`unfitRoom`), the smallest of its scroll views',
+ * one that scrolls on that axis — less FIT_ROOM_PX. Fully shown at one exact scroll offset at most (as large), or at
+ * none (larger), and no stroke lands on one offset: the shortest drag is 48 px on Android (course.ts#CUT_EDGE_MIN_DRAG),
+ * more on WDA, and the reach halves at each turn (course.ts#nextStroke), so the course would only swing it to and fro
+ * to the bound.
+ */
+export interface Unfit {
+  readonly along: ScrollAxis;
+  readonly size: number;
+  readonly scrollView: UiNode;
+}
+
+/** The coordinate and the extent of a rect along an axis. */
+const SPAN: Readonly<Record<ScrollAxis, { readonly at: 'x' | 'y'; readonly extent: 'width' | 'height' }>> = {
+  vertical: { at: 'y', extent: 'height' },
+  horizontal: { at: 'x', extent: 'width' },
+};
+
+/** The room an `Unfit`'s scroll view gives its target: its extent along the axis. */
+export const unfitRoom = ({ along, scrollView }: Unfit): number => scrollView.rect[SPAN[along].extent];
+
+/**
+ * Whether a target standing so (its standing's facts, its listed `rect`, its scroll views nearest first,
+ * `scrollViewsOf`) is too large for its scroll view to show whole (`Unfit`), or undefined — judged along each axis it is
+ * clipped on, vertical first, and only where every fact is known:
+ * - both its sides known on that axis — no side uiautomator cut at the screen (`unknownPast`), whose true size is larger
+ *   than its rect by an unknown distance;
+ * - a drawn frame (`drawn`: its scroll views told, never on idb's flat list) that IS the frame it was judged in on that
+ *   axis (`screen`): not cut short by the soft keyboard's line or a system band, whose remedy is the keyboard sentence
+ *   or another frame, not this one;
+ * - the room-giving scroll view — the smallest of them along that axis, the nearest of equals — scrolls ON that axis
+ *   as the tree tells it: the one exact offset is that scroll view's, and across it no swipe of it moves the target at
+ *   all (the stuck and layout-defect sentences stay theirs);
+ * - the drawn frame is that scroll view's along the axis, within FIT_ROOM_PX: an outer scroll view's position that
+ *   cuts it shorter (a page list scrolled so its carousel runs past its foot) leaves the target more room once the page
+ *   moves, so it may yet fit.
+ * A pure function of one read: it may hold before any swipe (WDA lists a row where it lies), or only once a stroke
+ * brings both sides inside the screen (uiautomator). D52; ADR 0021's amendment "a target too large for its scroll view".
+ */
+export function unfitAlong(facts: Pick<StandingFacts, 'clipped' | 'unknownPast' | 'drawn' | 'screen'>, rect: Rect, views: readonly ScrollViewOf[]): Unfit | undefined {
+  const { drawn, screen, clipped, unknownPast = [] } = facts;
+  if (drawn === undefined) return undefined;
+  for (const along of ['vertical', 'horizontal'] as const) {
+    const on = (edge: Edge): boolean => axisOfEdge(edge) === along;
+    const { at, extent } = SPAN[along];
+    const judgedInDrawn = screen[at] === drawn[at] && screen[extent] === drawn[extent];
+    if (!clipped.some(on) || unknownPast.some(on) || !judgedInDrawn) continue;
+    const roomGiver = views.reduce<ScrollViewOf | undefined>((least, v) => (least === undefined || v.node.rect[extent] < least.node.rect[extent] ? v : least), undefined);
+    if (roomGiver === undefined || roomGiver.axis !== along) continue;
+    const room = roomGiver.node.rect[extent];
+    if (drawn[extent] >= room - FIT_ROOM_PX && rect[extent] >= room - FIT_ROOM_PX) return { along, size: rect[extent], scrollView: roomGiver.node };
+  }
+  return undefined;
+}
 
 /** THE stop condition: the judged match stands `reachable` for the stop (ui-tree/standing.ts#Scene.standing owns the rule). */
 export function stops(j: Judged): boolean {

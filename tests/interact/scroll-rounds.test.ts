@@ -2193,6 +2193,140 @@ describe('round — the far edge at the edge of what the target\'s scroll view d
   });
 });
 
+/**
+ * D52's WDA twin: WDA lists a row where it lies, so a row as tall as its list, clipped at the list's top, reads its true
+ * height on the first read — `fully: true` fails `unfit` before any swipe (on Android it waits for a read that knows
+ * both sides, tests/interact/scroll-carousel-android.test.ts). Only along the axis the room-giving scroll view scrolls on,
+ * as the tree tells it (`scrollAxis`: a WDA Table's type, or content laid out past the frame).
+ */
+describe('round — `fully: true` on a row as tall as its list (D52, WDA)', () => {
+  const SCREEN: Rect = { x: 0, y: 0, width: 402, height: 874 };
+  const LIST: Rect = { x: 0, y: 200, width: 402, height: 400 };
+  const FULLY = { ...IPHONE, fully: true, maxSwipes: 6, timeoutMs: 15_000 };
+  /** A WDA screen of `children`. */
+  const wda = (children: UiNode[]): UiNode => node({ role: 'container', unclippedFrames: true, rect: { ...SCREEN }, children });
+  /** A scroll view `id` at `rect` scrolling on `axis` (undefined: the tree does not tell), holding `children`. */
+  const view = (id: string, rect: Rect, axis: 'vertical' | 'horizontal' | undefined, children: UiNode[]): UiNode =>
+    node({ role: 'scrollable', identifier: id, rect, ...(axis !== undefined && { scrollAxis: axis }), children });
+  /** The row at `y`, `height` tall, in a list at `list` scrolling on `axis` — `list` null: in no scroll view; `axis` null: the tree does not tell. */
+  const tallRow = (y: number, height = 400, list: Rect | null = LIST, axis: 'vertical' | 'horizontal' | null = 'vertical'): Row => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y, width: 354, height } });
+    return { tree: wda(list === null ? [row] : [view('list', list, axis ?? undefined, [row])]), found: [row] };
+  };
+
+  it('a row 400 tall in the 400-pt list, clipped at its top: unfit before any swipe, said so', () => {
+    const played = play(FULLY, [tallRow(190)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stop']);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0, unfit: { along: 'vertical', size: 400, scrollView: { identifier: 'list', rect: LIST } } });
+    expect(failureOf(played, 'id:row').message).toBe(
+      'scroll_until id:row failed after 0 swipes — element is in the viewport but CLIPPED at top: 98% of it is drawn, ' +
+        'and it is 400 tall (tree units), as tall as its scroll view scrollable id:list (0,200 402x400): fully: true holds at one exact scroll offset only, ' +
+        'which no swipe can be aimed at — drop fully: true, or accept what it shows. ' +
+        'Last rect {"x":24,"y":190,"width":354,"height":400} in a 402x874 viewport',
+    );
+  });
+
+  it('a list as tall as the screen, the row taller still: no edge of the list\'s own cuts it (the screen\'s are the same), and the reply still quotes the list whose size it used', () => {
+    const played = play(FULLY, [tallRow(-10, 900, SCREEN)]);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0, unfit: { along: 'vertical', size: 900 } });
+    expect(failureOf(played, 'id:row').message).toContain('and it is 900 tall (tree units), taller than its scroll view scrollable id:list (0,0 402x874): no scroll offset shows all of it');
+  });
+
+  it('a list taller than the 400-pt row, a vertical list of its own holding it: the room is the smallest scroll view\'s, quoted', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 190, width: 354, height: 400 } });
+    const played = play(FULLY, [{ tree: wda([view('page', { x: 0, y: 100, width: 402, height: 700 }, 'vertical', [view('list', LIST, 'vertical', [row])])]), found: [row] }]);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', unfit: { scrollView: { identifier: 'list' } } });
+    expect(failureOf(played, 'id:row').message).toContain('as tall as its scroll view scrollable id:list (0,200 402x400)');
+  });
+
+  it('the room-giving view is the smallest, not the nearest: a nearer scroll view taller than the list it lies in — and the reply quotes that list, not the nearer view its edges cut it by', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 190, width: 354, height: 400 } });
+    const tree = wda([view('list', LIST, 'vertical', [view('inner', { x: 30, y: 100, width: 340, height: 700 }, 'horizontal', [row])])]);
+    const played = play(FULLY, [{ tree, found: [row] }]);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', unfit: { along: 'vertical', scrollView: { identifier: 'list' } } });
+    expect(failureOf(played, 'id:row').message).toContain('as tall as its scroll view scrollable id:list (0,200 402x400)');
+  });
+
+  it('on Android, a side cut at the screen on the other axis only: unfit, its share "at most"', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 100, y: 190, width: 980, height: 400 } });
+    const list = node({ role: 'scrollable', identifier: 'list', clipsDescendants: true, scrollAxis: 'vertical', rect: { x: 100, y: 200, width: 900, height: 400 }, children: [row] });
+    const tree: UiNode = { ...node({ role: 'container', rect: { x: 0, y: 0, width: 1080, height: 2220 }, children: [list] }), boundsCutAtScreen: true };
+    const played = play({ ...ANDROID, fully: true }, [{ tree, found: [row] }]);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', unfit: { along: 'vertical', size: 400 } });
+    expect(failureOf(played, 'id:row').message).toMatch(/CLIPPED at top\/right: at most \d+% of it is drawn — uiautomator does not say how far it runs past the screen's right edge, .*or accept what it shows\. Last rect/);
+  });
+
+  it('B1, nested: a page list (0,100 402x700) scrolled so its carousel (20,700 362x200) runs past its foot, a card filling the carousel — the frame the page leaves is no room of the card\'s: no unfit, the strokes go on', () => {
+    const card = node({ role: 'button', identifier: 'card', rect: { x: 20, y: 700, width: 362, height: 200 } });
+    const tree = wda([view('page', { x: 0, y: 100, width: 402, height: 700 }, 'vertical', [view('carousel', { x: 20, y: 700, width: 362, height: 200 }, 'horizontal', [card])])]);
+    expect(play(FULLY, [{ tree, found: [card] }]).steps.map((s) => s.do)).toEqual(['stroke']);
+    // Across, the same page cuts the carousel along the vertical: asked left, still no unfit.
+    expect(play({ ...FULLY, direction: 'left' }, [{ tree, found: [card] }]).outcome?.kind).not.toBe('unfit');
+  });
+
+  it('B1, the room-giving list scrolls on that axis but an outer page shrinks the frame (an inner list 200 tall, the page showing 100 of it): no unfit', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 700, width: 354, height: 200 } });
+    const tree = wda([view('page', { x: 0, y: 100, width: 402, height: 700 }, 'vertical', [view('list', { x: 20, y: 700, width: 362, height: 200 }, 'vertical', [row])])]);
+    expect(play(FULLY, [{ tree, found: [row] }]).outcome?.kind).not.toBe('unfit');
+  });
+
+  it('M1: the room-giving scroll view scrolls on the other axis, or the tree does not tell: no unfit', () => {
+    expect(play(FULLY, [tallRow(190, 400, LIST, 'horizontal')]).outcome?.kind).not.toBe('unfit');
+    expect(play(FULLY, [tallRow(190, 400, LIST, null)]).outcome?.kind).not.toBe('unfit');
+  });
+
+  it('M1: a row as wide as its vertical list, cut at the list\'s left: no swipe of the list moves it there — the layout-defect reply, never unfit', () => {
+    const row = node({ role: 'button', identifier: 'row_7', rect: { x: 20, y: 850, width: 340, height: 43 } });
+    const tree = wda([view('country_list', { x: 31, y: 456, width: 340, height: 600 }, 'vertical', [node({ role: 'button', identifier: 'row_1', rect: { x: 31, y: 466, width: 340, height: 43 } }), row])]);
+    const r: Row = { tree, found: [row] };
+    const played = play({ ...IPHONE, fully: true }, [r, r, r, r]);
+    expect(played.outcome?.kind).toBe('stuck');
+    expect(failureOf(played, 'id:row_7').message).toContain('its content begins after the element does (no room before it — a layout defect). Last rect');
+  });
+
+  it('the soft keyboard over the list\'s lower part: the clip is the keyboard\'s there, never unfit — the strokes go on', () => {
+    const played = play(FULLY, [{ ...tallRow(190), cover: coverOver(WDA_BAND) }]);
+    expect(played.outcome?.kind).not.toBe('unfit');
+  });
+
+  it('`fully: false`, a bar drawn over its centre so the plain stop does not stop: never unfit — the strokes go on', () => {
+    const bar = node({ role: 'button', label: 'Bar', rect: { x: 0, y: 350, width: 402, height: 100 } });
+    const barred = (row: Row): Row => ({ ...row, tree: { ...row.tree!, children: [...row.tree!.children, bar] } });
+    expect(play(FULLY, [barred(tallRow(190))]).outcome).toMatchObject({ kind: 'unfit' });
+    expect(play({ ...FULLY, fully: false }, [barred(tallRow(190))]).steps.map((s) => s.do)).toEqual(['stroke']);
+  });
+
+  it('a card as wide as its carousel above the soft keyboard: the keyboard cuts the other axis only — unfit, its share said above the keyboard', () => {
+    const card = node({ role: 'button', identifier: 'card', rect: { x: 10, y: 210, width: 362, height: 80 } });
+    const tree = wda([view('carousel', { x: 20, y: 200, width: 362, height: 100 }, 'horizontal', [card])]);
+    const played = play({ ...FULLY, direction: 'left' }, [{ tree, found: [card], cover: coverOver(WDA_BAND) }]);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0, unfit: { along: 'horizontal', size: 362 } });
+    expect(failureOf(played, 'id:card').message).toContain(
+      'element is in the viewport above the soft keyboard over [0,572][402,874] but CLIPPED at left: 97% of it is drawn, and it is 362 wide (tree units), as wide as its scroll view scrollable id:carousel (20,200 362x100)',
+    );
+  });
+
+  it('no scroll view around it (no drawn frame): never unfit', () => {
+    const played = play(FULLY, [tallRow(-10, 900, null)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke']);
+  });
+
+  it('a row 352 tall (48 of room): stroked for, as before', () => {
+    expect(play(FULLY, [tallRow(190, 352)]).steps.map((s) => s.do)).toEqual(['stroke']);
+  });
+
+  it('the country sheet\'s list told vertical, a 400-pt row in its 355 pt: unfit at once, "taller than"', () => {
+    const row = node({ role: 'button', identifier: 'row_7', rect: { x: 31, y: 440, width: 340, height: 400 } });
+    const played = play(FULLY, [{ tree: wda([view('country_list', { x: 31, y: 456, width: 340, height: 355 }, 'vertical', [row])]), found: [row] }]);
+    expect(failureOf(played, 'id:row_7').message).toBe(
+      'scroll_until id:row_7 failed after 0 swipes — element is in the viewport but CLIPPED at top/bottom: 89% of it is drawn, ' +
+        'and it is 400 tall (tree units), taller than its scroll view scrollable id:country_list (31,456 340x355): no scroll offset shows all of it ' +
+        '— drop fully: true, or accept what it shows. ' +
+        'Last rect {"x":31,"y":440,"width":340,"height":400} in a 402x874 viewport',
+    );
+  });
+});
+
 describe('round — a target the strokes never bring into what its scroll view draws', () => {
   it('the at-rest SWIFT form\'s payee_name_input listed below its form, content that no longer moves: the failure says it was never drawn inside that scroll view — not that it never met the viewport it lies on', () => {
     const name = node({ role: 'textfield', identifier: 'payee_name_input', rect: { x: 24, y: 801, width: 354, height: 52 } });
