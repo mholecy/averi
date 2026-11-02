@@ -272,10 +272,10 @@ earlier summaries stay true): the visibility cases are built from each coloured-
 R-direction over the strokes the app logs (LabState.offsets, .strokes: both apps report them), judged along the scroll
 view's axis — across a carousel, whose offset the apps report from its leading edge, for a card asked `right` or `left`
 (live-visibility.ts#distanceAt); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's own
-keyboardDismiss configured. `ensure` (backlog D30, never by default) runs ensure_state on the held cells (bare for 3 s,
-then Welcome; held-no-spinner through 4 s of a spinner): h1 and h2 judge the hold ending the second look ~2 s after
-Welcome, said in one line, h3 the full window before a destructive rung (`scripts/truth/live-ensure.ts`, the app's
-phase events the oracle). `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
+keyboardDismiss configured. `ensure` (backlog D30, never by default) runs ensure_state on the held cells (bare for 6 s,
+then Welcome; held-no-spinner through 4 s of a spinner): each needs the reply's bare entry probe line; h1 and h2 judge
+the hold ending the second look heldS after Welcome, said in one line, h3 the full window before a destructive rung
+(`scripts/truth/live-ensure.ts`, the app's phase events the oracle); a SKIP among them exits 1. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
 calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs
 of one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case,
 with its verdict class and the kind of reply it rests on — a weaker contract than ADR 0020 §4's, no strokes and an

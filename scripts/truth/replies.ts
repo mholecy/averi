@@ -83,6 +83,14 @@ export function heldStill(reply: string): { heldS: number; flow: string } | unde
 }
 
 /**
+ * ensure_state's ENTRY probe read only bare trees — the evidence that a second look was earned (src/flow/engine.ts
+ * #detects: `⚠ detect: <condition> treated as not detected — every UI tree read was bare, …`). The second look's own bare
+ * line names itself (`… (second look over 20 s) — …`) and a failed read says `last UI tree read failed`: neither counts.
+ * Both readers are pinned against the engine's own trace (tests/truth/live-ensure-engine.test.ts).
+ */
+export const bareEntry = (reply: string): boolean => /^⚠ detect: .* treated as not detected — every UI tree read was bare\b/m.test(reply);
+
+/**
  * What kind of reply it is, from a closed set — recorded on every golden check (golden.ts), so a known mismatch whose
  * reply turns into another kind (a timeout into a refusal, a stop into `fully visible`) fails the ratchet though its
  * class and its device calls stay; and what the live judges classify a reply by (live-visibility.ts, LiveVerdict.kind).

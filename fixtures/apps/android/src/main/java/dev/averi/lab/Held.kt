@@ -6,7 +6,8 @@ package dev.averi.lab
 // `ensure` group (scripts/truth/live-ensure.ts) — ensure_state's second look on a device, ADR 0033's held "no".
 //
 // - `held-no`: ready at once while it draws nothing — plain white, no semantics node: a bare dump (the decor chain
-//   alone, src/ui-tree/bare-tree.ts) — for 3 s; then Text "Welcome" and Button "Continue"; Continue shows Text "Home".
+//   alone, src/ui-tree/bare-tree.ts) — for 6 s (long, so the launch rarely outruns the call); then Text "Welcome"
+//   and Button "Continue"; Continue shows Text "Home".
 // - `held-no-spinner`: the same, with 4 s of an unlabelled CircularProgressIndicator between the bare phase and Welcome.
 //
 // Each element is identified lab.<cell>.<tag> (welcome, continue, home). Every phase change is logged (`phase`, `bare`
@@ -62,7 +63,7 @@ internal fun HeldScreen(cell: Cell, lab: Lab) {
         lab.event("phase", "bare")
         // Ready while nothing is drawn: the launch returns into the bare phase.
         lab.settled()
-        delay(3_000)
+        delay(6_000)
         if (cell.id == "held-no-spinner") {
             show("spinner")
             delay(4_000)

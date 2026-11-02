@@ -4,7 +4,8 @@ import SwiftUI
 // `ensure` group (scripts/truth/live-ensure.ts) — ensure_state's second look on a device, ADR 0033's held "no".
 //
 // - `held-no`: ready at once while it draws nothing — plain white, no accessibility element: a bare tree
-//   (src/ui-tree/bare-tree.ts) — for 3 s; then Text "Welcome" and Button "Continue"; Continue shows Text "Home".
+//   (src/ui-tree/bare-tree.ts) — for 6 s (long, so the launch rarely outruns the call); then Text "Welcome" and
+//   Button "Continue"; Continue shows Text "Home".
 // - `held-no-spinner`: the same, with 4 s of an unlabelled ProgressView (UIActivityIndicatorView beneath) between the
 //   bare phase and Welcome.
 //
@@ -44,7 +45,7 @@ struct HeldScreen: View {
             lab.event("phase", "bare")
             // Ready while nothing is drawn: the launch returns into the bare phase.
             lab.settled()
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(6))
             if cell.id == "held-no-spinner" {
                 show("spinner")
                 try? await Task.sleep(for: .seconds(4))

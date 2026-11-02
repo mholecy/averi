@@ -13,7 +13,7 @@ import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-
 import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
-import { callReply } from './replies.js';
+import { callReply, isError } from './replies.js';
 import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.js';
 
 /**
@@ -73,8 +73,9 @@ import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.j
  * calibration of a note (calibration.json `live`) runs its cases at the note's before and after commits.
  *
  * `ensure` (backlog D30, not in the default groups): ensure_state on the held cells — D2's held "no" (ADR 0033) on a
- * device: h1 and h2 (through a spinner) with no wipe ahead, the hold ending the second look ~2 s after Welcome; h3 with
- * a destructive rung ahead, the full window (live-ensure.ts). The app's phase events and Continue's tap are the oracle.
+ * device: h1 and h2 (through a spinner phase) with no wipe ahead, the hold ending the second look heldS after Welcome;
+ * h3 with a destructive rung ahead, the full window — each after an entry probe the reply says was bare
+ * (live-ensure.ts). The app's phase events and Continue's tap are the oracle; a SKIP among them exits 1.
  */
 
 const { values } = parseArgs({
@@ -192,13 +193,15 @@ if (rejudging !== undefined) {
         if (c.sources !== undefined && !c.sources.includes(source)) continue;
         // An ensure case's timing starts at the launch (live-ensure.ts): its tree source is bound first — WDA started,
         // idb's companion up — by one read under the case's own config, its reply discarded, so the entry probe reads
-        // the bare screen rather than a Welcome the binding outran.
-        if (c.group === 'ensure') await callTool(client, { tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await configFor(source, c));
+        // the bare screen rather than a Welcome the binding outran. A warm-up that failed is kept in the record.
+        const warm = c.group === 'ensure' ? await callTool(client, { tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await configFor(source, c)) : undefined;
+        const warmUp = warm !== undefined && isError(warm) ? warm : undefined;
+        if (warmUp !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUp.split('\n')[0]}`);
         const launched = await lab.launch(c.cell);
         if (c.keyboard && launched.keyboard?.visible !== true) {
           const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
           results.push({ source, c, verdict, replies: [] });
-          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined });
+          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined, ...(warmUp !== undefined && { warmUp }) });
           console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
           continue;
         }
@@ -220,7 +223,7 @@ if (rejudging !== undefined) {
         const verdict = judged(c, source, replies, launched, after, state, late);
         if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
         results.push({ source, c, verdict, replies });
-        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }) });
+        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUp !== undefined && { warmUp }) });
         console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
       }
     }

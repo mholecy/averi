@@ -62,7 +62,8 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
  * `ensure-claim` ensure_state did not fail while the app never reached the state; `held-early` Continue tapped before
  * Welcome had held reachRecheckMs (the hold ended on something else — the spinner); `held-late` no wipe ahead and the
  * tap later than the hold allows (the look ran on); `held-unsaid` in time, the held line missing; `held-said` a held
- * line where a wipe lies ahead; `window-cut` a wipe ahead and the look ended well before its window's end.
+ * line where a wipe lies ahead; `window-cut` a wipe ahead and the look ended before its window's end; `entry-not-bare`
+ * the reply shows no bare entry probe, so no second look was earned.
  */
 export type VerdictClass =
   | 'stop-claim'
@@ -88,7 +89,8 @@ export type VerdictClass =
   | 'held-late'
   | 'held-unsaid'
   | 'held-said'
-  | 'window-cut';
+  | 'window-cut'
+  | 'entry-not-bare';
 
 export interface LiveVerdict {
   outcome: Outcome;
