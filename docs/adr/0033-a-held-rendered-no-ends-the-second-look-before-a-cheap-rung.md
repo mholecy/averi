@@ -6,8 +6,8 @@ D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-
 `ActivityIndicator` → `progress`, so a React Native spinner stops a hold — the D27 sub-bullet below; commits 4b5e254f,
 8a4efe1b, 021fade0 and 8999f3ff, merged e26fa898). Amended 2026-11-01 (A7): both checks now live in one module — the
 last section. Amended 2026-11-02 (D50: through idb an unlabelled `GenericElement` with the `UpdatesFrequently` trait →
-`progress`, so SwiftUI's ProgressView stops a hold there too — the D50 sub-bullet below; branch
-`fix/d50-idb-spinner-progress`).
+`progress`, so SwiftUI's ProgressView stops a hold there too — the D50 sub-bullet below; commits 9559a7f9, d0f69f85,
+merge f0bf0d70).
 
 ## Context
 
