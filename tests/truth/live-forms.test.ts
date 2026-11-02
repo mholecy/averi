@@ -256,8 +256,8 @@ describe('refusedKept: p7, a character averi cannot type into a prefilled field'
 
 /**
  * f11–f14 (D37): form-format's `date` (schema.ts#FieldFormat, placeholder `__.__.____`) and `phone` (no format,
- * placeholder `+421`) — ADR 0034's dotted date and its D29 gaps. No device has run them yet: judged here over D40's f1
- * record (iOS WDA), its final state set to what each fill would leave.
+ * placeholder `+421`) — ADR 0034's dotted date and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
+ * final state set to what each fill would leave; batch-3's device records are rejudged in live-rejudge.test.ts.
  */
 describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () => {
   const IDS = ['f11', 'f12', 'f13', 'f14'];
@@ -326,11 +326,18 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
     expect(f13.judge(left('phone', '+421421903123456'), [refused], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'LOUD' });
   });
 
-  // Until a device run reads them, no outcome is guessed. Batch-3's run (block H) replaces this guard with the real
-  // entries of whatever comes back not ok.
-  it('no outcome guessed: none of them is known under any platform or source', () => {
+  // Batch-3's device run (block H, main 6b4a44df; ios-idb-forms-d37-1.json, ios-wda-forms-d37-1.json,
+  // android-forms-d37-1.json): f11 failed-holds under every source — the app held `31.12.2026`, averi replied "ERROR
+  // fill: typed 8 characters but the field shows 10" (ADR 0034 fails a `.` group that is no thousands; backlog D51);
+  // f12–f14 ok everywhere, f13 under idb included. Exactly f11 is known, under each source, by the rule and kind it read.
+  it('what the device read is known: f11 failed-holds on refused under every source, f12–f14 under none', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
-    const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => IDS.filter((id) => knownEntry(platform, source, id) !== undefined).map((id) => `${platform} ${source} ${id}`)));
-    expect(known).toEqual([]);
+    const known = Object.entries(sources).flatMap(([platform, ss]) =>
+      ss.flatMap((source) => IDS.flatMap((id) => {
+        const e = knownEntry(platform, source, id);
+        return e === undefined ? [] : [`${platform} ${source} ${id} ${e.cls} ${e.kind}${e.intermittent ? ' intermittent' : ''}`];
+      })),
+    );
+    expect(known).toEqual(['ios idb f11 failed-holds refused', 'ios wda f11 failed-holds refused', 'android uiautomator f11 failed-holds refused']);
   });
 });

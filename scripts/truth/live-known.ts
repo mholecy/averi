@@ -10,7 +10,8 @@ import type { ReplyKind } from './replies.js';
  * file names (`bug:`) or a residual of a decision (`residual:`), the static KNOWN's own wording; tests/truth/
  * lab-notes.test.ts ties them to docs/bugs and calibration.json. A forms case is filed alike since D31: a fill verdict
  * names its rule (live-forms.ts#holds — `loud-untouched`, `loud-changed`, `fill-claim`, `failed-holds`) and rests on
- * the case's last reply. A LOUD fails no run, so a known LOUD that reads another rule or kind is marked NOT known and
+ * the case's last reply; an ensure case since batch-3 (live-ensure.ts's classes — `held-early`, `held-late`, …) on its one
+ * reply. A LOUD fails no run, so a known LOUD that reads another rule or kind is marked NOT known and
  * no more; tests/truth/live-rejudge.test.ts holds the committed records to their marks.
  *
  * Its contract is weaker than ADR 0020 §4's in two ways, on purpose. The strokes are not pinned: a device's timing
@@ -47,6 +48,9 @@ const IOS_NON_ASCII = 'bug:2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md
 const ANDROID_NON_ASCII = 'bug:2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md';
 const SECURE_CLEARED = 'residual:ADR 0028 residual 2 — iOS clears a secure field when typing resumes: a no-clear fill into a prefilled one leaves what was typed, and averi says so';
 const BLIND_TAIL = 'residual:ADR 0034 residual 2 — a flow\'s blind `type:` cannot type again a tail a reformatting field dropped: `fill:` is the remedy';
+const DOTTED_DATE = 'bug:2026-11-02-lab-fill-fails-a-date-the-field-dots-as-typed-though-the-app-holds-it.md';
+// The ensure group's (D30).
+const IDB_SPINNER = 'bug:2026-11-02-lab-ios-idb-reads-an-unlabelled-swiftui-spinner-as-content-so-a-held-no-ends-on-it.md';
 
 /**
  * A known case: its note, the rule it fails by (live-visibility.ts#VerdictClass), the kind of reply that verdict rests
@@ -239,6 +243,18 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // (`other`); runs of the same commit differ (`SK31 1200 00` at D29's), and a run may type it whole.
     ...each(`ios ${src}`, ['rf4'], BLIND_TAIL, 'loud-changed', 'other', { intermittent: true }),
   ]),
+  // f11 (D37; batch-3 block H at main 6b4a44df: ios-idb-forms-d37-1.json, ios-wda-forms-d37-1.json,
+  // android-forms-d37-1.json): `31122026` typed, no clear, into the field that dots it — the app holds `31.12.2026`, the
+  // assert after it passes, but the fill replied "ERROR fill: typed 8 characters but the field shows 10" under every
+  // source: ADR 0034's rule fails a `.` group that is no thousands (a false mismatch by rule, not idb's unnamed mask —
+  // WDA and uiautomator name it and fail alike). f12–f14 ok everywhere (backlog D51).
+  ...each('android uiautomator', ['f11'], DOTTED_DATE, 'failed-holds', 'refused'),
+  ...['idb', 'wda'].flatMap((src) => each(`ios ${src}`, ['f11'], DOTTED_DATE, 'failed-holds', 'refused')),
+  // The ensure group (D30; batch-3 block G at main 6b4a44df: ios-idb-ensure-d30-1.json). h2 under idb: Continue tapped
+  // 0.92 s after Welcome though averi said the screen held 2.5 s — the hold began on the spinner, which idb lists as an
+  // unlabelled `GenericElement` with a value (`'1'`), content to bare-tree.ts (backlog D50). Ok under WDA (D27's map) and
+  // uiautomator (ios-wda-ensure-d30-1.json, android-ensure-d30-1.json).
+  ...each('ios idb', ['h2'], IDB_SPINNER, 'held-early', 'other'),
 ]);
 
 /** The KNOWN entry of a live case, whatever it failed by. */
