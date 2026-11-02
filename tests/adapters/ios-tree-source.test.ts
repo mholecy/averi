@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { createIosTreeSource, IdbEmptyTreeError, IdbNoFrontmostError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
+import { recordedSpinner } from '../helpers/live-records.js';
 import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
@@ -194,6 +195,48 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
 
   it('a payload that is not an array is a loud error, not an empty screen', () => {
     expect(() => parseIdbDescribeAll('{"elements":[]}')).toThrow(/did not return an array/);
+  });
+});
+
+/**
+ * D50 (docs/adr/0033, the D50 sub-bullet): idb spells SwiftUI's `ProgressView()` — a UIActivityIndicatorView beneath —
+ * as an unlabelled `GenericElement` with the `UpdatesFrequently` trait (docs/truth/live-records/
+ * ios-idb-held-no-spinner-describe-all-d30-1.json, element 2). The idb parser alone reads it as `progress`.
+ */
+describe('parseIdbDescribeAll — an unlabelled GenericElement that updates frequently is a spinner (D50)', () => {
+  const one = (el: Record<string, unknown>): UiNode => parseIdbDescribeAll(JSON.stringify([el])).children[0];
+
+  it.each([false, true])("the recorded spinner (Held.swift's ProgressView, through idb; nested capture: %s) reads `progress`, its value kept", (nested) => {
+    expect(one(recordedSpinner(nested))).toMatchObject({ role: 'progress', label: null, value: '1', rect: { x: 191, y: 427, width: 20, height: 20 } });
+  });
+
+  it('no value test: a spinner valued 0, or with no value, is still progress; an empty label is no label', () => {
+    const spinner = recordedSpinner();
+    expect(one({ ...spinner, AXValue: '0' }).role).toBe('progress');
+    expect(one({ ...spinner, AXValue: null }).role).toBe('progress');
+    expect(one({ ...spinner, AXLabel: '' }).role).toBe('progress');
+    expect(one({ ...spinner, traits: ['UpdatesFrequently'] }).role).toBe('progress');
+  });
+
+  it('a LABELLED GenericElement with the trait stays `other` (residual: a labelled idb spinner is content) — a whitespace label too', () => {
+    expect(one({ ...recordedSpinner(), AXLabel: 'Loading' })).toMatchObject({ role: 'other', label: 'Loading' });
+    expect(one({ ...recordedSpinner(), AXLabel: ' ' }).role).toBe('other');
+  });
+
+  it("a GenericElement without the trait stays `other` — the keyboard's spacer (form-keyboard.idb.json)", async () => {
+    const all = JSON.parse(
+      await readFile(new URL('../fixtures/truth/ios-iphone17-ios27/form-keyboard.idb.json', import.meta.url), 'utf8'),
+    ) as Record<string, unknown>[];
+    const spacer = all.find((e) => e.type === 'GenericElement');
+    expect(spacer).toMatchObject({ traits: ['Scrollable', 'Spacer'] });
+    expect(one(spacer!).role).toBe('other');
+    expect(one({ ...spacer!, traits: null }).role).toBe('other');
+  });
+
+  it('another type with the trait keeps its own role — a StaticText clock is text, an Other a container', () => {
+    const frame = { x: 20, y: 100, width: 80, height: 20 };
+    expect(one({ type: 'StaticText', AXLabel: null, AXValue: '00:12', traits: ['StaticText', 'UpdatesFrequently'], frame }).role).toBe('text');
+    expect(one({ type: 'Other', AXLabel: null, AXValue: '1', traits: ['UpdatesFrequently'], frame }).role).toBe('container');
   });
 });
 

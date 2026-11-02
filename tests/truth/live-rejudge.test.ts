@@ -19,7 +19,7 @@ import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } fr
  * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
  * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
  * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before; ios-rn-*-lr3*.json, round 9's LR3 fix; ios-forms-d40-1.json, ios-rn-forms-d40-1.json and android-forms-d40-1.json, D40's device run at 40ba3dd1, whose forms LOUDs D31 filed; ios-idb-forms-d43a-1.json, ios-wda-forms-d43a-1.json and android-forms-d43a-1.json, D43a's device run at 0262c69d; *-ensure-d30-1.json and *-forms-d37-1.json, batch-3's device run at 6b4a44df — the latter the src before D51's fix) judged again
+ * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before; ios-rn-*-lr3*.json, round 9's LR3 fix; ios-forms-d40-1.json, ios-rn-forms-d40-1.json and android-forms-d40-1.json, D40's device run at 40ba3dd1, whose forms LOUDs D31 filed; ios-idb-forms-d43a-1.json, ios-wda-forms-d43a-1.json and android-forms-d43a-1.json, D43a's device run at 0262c69d; *-ensure-d30-1.json and *-forms-d37-1.json, batch-3's device run at 6b4a44df — ios-idb-ensure-d30-1.json the src before D50's fix, every *-forms-d37-1.json the src before D51's fix) judged again
  * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
  * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
  * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
@@ -365,9 +365,8 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-wda-forms-d43a-1.json', 'forms', { cases: 7, ok: 5, loud: 2, mismatches: 0 }],
     ['android-forms-d43a-1.json', 'forms', { cases: 7, ok: 5, loud: 2, mismatches: 0 }],
     // batch-3's device run at 6b4a44df (2026-11-02). Block G, the ensure group (D30: D2's held "no" on a device; its
-    // cases are not in the default groups — `--groups ensure`): h1–h3 ok under WDA and uiautomator; under idb h1 and h3
-    // ok, h2 held-early (the hold began on the spinner idb lists as a valued GenericElement: known, backlog D50).
-    ['ios-idb-ensure-d30-1.json', 'ensure', { cases: 3, ok: 2, loud: 0, mismatches: 1 }],
+    // cases are not in the default groups — `--groups ensure`): h1–h3 ok under WDA and uiautomator. (Under idb h2 was
+    // held-early — the src before D50's fix, below.)
     ['ios-wda-ensure-d30-1.json', 'ensure', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['android-ensure-d30-1.json', 'ensure', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
@@ -492,6 +491,21 @@ describe('live.ts --rejudge over the committed iOS records of LE2\'s chooser bef
     expect(out).toMatch(new RegExp(`^# Live golden: ${want.cases} cases, ${want.ok} ok, ${want.loud} loud, ${want.mismatches} mismatches \\(1 not known\\), 0 skipped$`, 'm'));
     const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
     expect(unknown).toEqual(['scroll:chooser-over-list.R']);
+    expect(code).toBe(1);
+  });
+});
+
+// D50's fix: the src before it, live (batch-3's block G at 6b4a44df, D30).
+describe('live.ts --rejudge over the committed record of the src before D50\'s fix', () => {
+  // h2 under idb: Continue tapped 0.92 s after Welcome though averi said the screen held 2.5 s — the hold began on the
+  // spinner idb lists as an unlabelled `GenericElement` with a value, content to bare-tree.ts then. D50 (ADR 0033's D50
+  // amendment) reads it `progress` and struck the `ios idb h2` entry off: the recorded replies read as they were, h2 not
+  // known — exit 1, as recorded. h1 and h3 ok.
+  it('ios-idb-ensure-d30-1.json: h2 not known, h1 and h3 ok', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudgeInProcess('ios-idb-ensure-d30-1.json', 'ensure');
+    expect(out).toMatch(/^# Live golden: 3 cases, 2 ok, 0 loud, 1 mismatches \(1 not known\), 0 skipped$/m);
+    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
+    expect(unknown).toEqual(['h2']);
     expect(code).toBe(1);
   });
 });

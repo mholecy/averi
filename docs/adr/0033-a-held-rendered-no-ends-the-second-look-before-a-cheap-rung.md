@@ -5,7 +5,9 @@ D11 analysed"; the orchestrator's decision, variant A). Implemented on `perf/d2-
 (938a8426, 3ab677f3, 52cb2e41, 04ec6000, d0efd6f0, a883e09a), merged 11cb9064. Amended 2026-10-31 (D27: WDA
 `ActivityIndicator` → `progress`, so a React Native spinner stops a hold — the D27 sub-bullet below; commits 4b5e254f,
 8a4efe1b, 021fade0 and 8999f3ff, merged e26fa898). Amended 2026-11-01 (A7): both checks now live in one module — the
-last section.
+last section. Amended 2026-11-02 (D50: through idb an unlabelled `GenericElement` with the `UpdatesFrequently` trait →
+`progress`, so SwiftUI's ProgressView stops a hold there too — the D50 sub-bullet below; branch
+`fix/d50-idb-spinner-progress`).
 
 ## Context
 
@@ -51,8 +53,9 @@ full window, exactly as before.**
   that each saw it). `pollTree` never shows its predicate a failed read, so with a hold `detects` reads through a thin
   wrapper of the adapter that shows the tracker each read that threw.
 - A rendered tree that shows a progress indicator (`ui-tree/read-tree.ts#showsProgress`: a `progress` node with area —
-  Android's ProgressBar, Compose's progress indicators, an iOS `ProgressIndicator`, and through WDA an iOS
-  `ActivityIndicator` since D27) never starts or continues a hold:
+  Android's ProgressBar, Compose's progress indicators, an iOS `ProgressIndicator`, through WDA an iOS
+  `ActivityIndicator` since D27, and through idb an unlabelled `GenericElement` that updates frequently since D50)
+  never starts or continues a hold:
   for the hold it is a bare read, and clears it. It still counts as rendered — the look's answer at its deadline is
   `no`, as before. A spinner keeps a fixed rect and no text, so its screen keeps one fingerprint while it loads; it is
   the one loading screen that says so, and the rule costs nothing on a screen that does not. (The coordinator's
@@ -64,6 +67,27 @@ full window, exactly as before.**
     Residual, by decision (D27 review): an invisible or off-screen spinner also counts as loading — a covered layer's
     0/0 indicator, a list footer's spinner below the viewport — safe direction, bounded by `ensureTimeoutMs` /
     `maxSwipes`.
+  - The same gap through idb, backlog row D50 — closed 2026-11-02: batch-3 block G (main 6b4a44df) measured idb's
+    spelling of SwiftUI's `ProgressView()` (a UIActivityIndicatorView beneath): `type GenericElement`, role
+    `AXGenericElement`, no label, value `'1'`, traits `["UpdatesFrequently","Scrollable"]`
+    (docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json). A valued `other`, it was content to
+    bare-tree.ts and no progress, so the held-no-spinner's hold began on it: h2 under idb tapped Continue 0.92 s after
+    Welcome (ios-idb-ensure-d30-1.json). The idb parser (`adapters/ios-tree-source.ts#idbSpinner`) now reads an element
+    that is a `GenericElement` AND carries `UpdatesFrequently` AND has no label as `progress` — no value test (a stopped
+    or older spinner may read `'0'` or a word), so an unvalued one is re-roled too and, no longer an unlabelled,
+    unvalued structural leaf, now covers its rect in `ui-tree/draw-order.ts` as WDA's does since D27 (a tap under it
+    reads covered: the safe direction). In the idb parser only, not the shared `IOS_ROLE_MAP`: the rule reads a
+    trait, which WDA does not print, and WDA spells its spinner `ActivityIndicator` (above). Each part narrows it:
+    `GenericElement` alone would make the keyboard's unlabelled `["Scrollable","Spacer"]` element (402×284) a spinner
+    on every keyboard-up screen; the trait alone carries a `StaticText` clock or timer; a label makes it content.
+    Of every committed capture, only the two spinner records carry the trait. Like D27's, it also turns
+    `scroll_until`'s `loading` and bare-tree's decoration rule (an unlabelled spinner alone is bare). Residuals, by
+    decision (the orchestrator's, 2026-11-02): (1) a LABELLED idb spinner (`ProgressView("Loading")`) stays `other` and
+    content, and can end a hold — this ADR's "a Loading… label" risk; (2) UIKit's `UIActivityIndicatorView` and React
+    Native's `<ActivityIndicator>` through idb are assumed to share this shape (the same class beneath) — unmeasured,
+    on D37's measure list; (3) an app-made unlabelled element carrying the trait (a hand-drawn live counter or clock)
+    reads as loading: the hold never runs on it, `scroll_until` never calls its list exhausted, alone it reads bare —
+    the safe direction, bounded by `ensureTimeoutMs` / `maxSwipes`, never a wrong pass.
 - A look the hold ended writes one trace line, right before the rung: `state <name>` — `second look: not detected, the
   screen held still <s> — running <rung> before the <ensureTimeoutMs> window's end`, so a rung that runs seconds
   before the deadline is not read as a look cut short for no reason. A `no` at the deadline writes none, as before.
@@ -108,8 +132,8 @@ before the first second look's original deadline, whatever ran in between):
 
 With NO wipe ahead, a rendered loading screen WITHOUT a progress indicator — a "Loading…" label alone, a skeleton of
 placeholder boxes, a static splash drawn as a rendered screen, an indicator a tree source does not report as `progress`
-(a React Native ActivityIndicator through WDA was one until D27 closed it, 2026-10-31, above; through idb its spelling is
-unmeasured) — that holds still for `reachRecheckMs` ends
+(a React Native ActivityIndicator through WDA was one until D27 closed it, 2026-10-31, above; SwiftUI's ProgressView
+through idb until D50, 2026-11-02, above; a labelled idb spinner still is) — that holds still for `reachRecheckMs` ends
 the look as "no" (one with a spinner never holds): the cheap rung runs on it — a wasted relaunch or tap — or fails,
 and the ladder escalates to its next rung, also cheap by construction, or ends in its final wait (`ensureTimeoutMs`).
 The worst case is therefore a wasted cheap rung or a failed call that a retry cures, never a wipe. It is NOT the same

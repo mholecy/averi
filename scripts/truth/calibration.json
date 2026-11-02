@@ -1654,7 +1654,7 @@
     },
     {
       "note": "2026-11-02-lab-ios-idb-reads-an-unlabelled-swiftui-spinner-as-content-so-a-held-no-ends-on-it.md",
-      "why": "lab finding (batch-3 block G, backlog D30/D50): under idb the held-no-spinner's unlabelled SwiftUI ProgressView is a `GenericElement` with a value (`'1'`), content to bare-tree.ts, so ensure_state's held \"no\" (ADR 0033) began on it — h2 Continue tapped 0.92 s after Welcome, held 2.5 s (docs/truth/live-records/ios-idb-ensure-d30-1.json); a hold is wall time over live reads, and the golden replays no ensure_state, so no row asks it; open"
+      "why": "lab finding (batch-3 block G, backlog D30/D50): under idb the held-no-spinner's unlabelled SwiftUI ProgressView is a `GenericElement` with a value (`'1'`), content to bare-tree.ts, so ensure_state's held \"no\" (ADR 0033) began on it — h2 Continue tapped 0.92 s after Welcome, held 2.5 s (docs/truth/live-records/ios-idb-ensure-d30-1.json); a hold is wall time over live reads, and the golden replays no ensure_state, so no row asks it; fixed by D50 (ADR 0033's D50 amendment: idb's unlabelled `GenericElement` with the `UpdatesFrequently` trait reads `progress`, src/adapters/ios-tree-source.ts#idbSpinner), its live entry struck off, the device check pending"
     },
     {
       "note": "2026-11-02-lab-fill-fails-a-date-the-field-dots-as-typed-though-the-app-holds-it.md",

@@ -7,6 +7,7 @@ import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
 import { absenceVerdict, presenceVerdict } from '../../src/ui-tree/verdict.js';
 import { node } from '../helpers/fake.js';
 import { parseDump } from '../helpers/android-dumps.js';
+import { idbSpinnerDescribeAll } from '../helpers/live-records.js';
 
 /**
  * The bare-tree rule against what the three sources REALLY return, run
@@ -64,6 +65,12 @@ describe('isBareTree: the empty / unrendered trees each source emits ARE bare', 
   it('a lone spinner or splash image is a loading screen', () => {
     expect(isBareTree(wda({ type: 'ProgressIndicator', rect: { x: 181, y: 417, width: 40, height: 40 }, children: [] }))).toBe(true);
     expect(isBareTree(idb(ax('Image', null, { x: 151, y: 200, width: 100, height: 100 })))).toBe(true);
+  });
+
+  it("idb, measured (D30/D50): Held.swift's ProgressView alone — the Application and an unlabelled GenericElement that updates frequently — is bare", () => {
+    const tree = parseIdbDescribeAll(idbSpinnerDescribeAll());
+    expect(tree.children.map((c) => c.role)).toEqual(['other', 'progress']);
+    expect(isBareTree(tree)).toBe(true);
   });
 
   it('WDA, measured 2026-10-06 (finportal RN splash, 7 nodes: Application "MyPort" → Window → containers → an IDENTIFIED, unlabeled Image "SplashScreenLogo"): bare', () => {

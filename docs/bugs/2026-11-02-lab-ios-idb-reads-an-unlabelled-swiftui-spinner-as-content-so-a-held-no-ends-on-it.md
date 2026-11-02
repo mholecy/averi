@@ -1,10 +1,18 @@
-# BUG (open): under idb, an unlabelled SwiftUI `ProgressView` reads as content, so `ensure_state`'s held "no" (D2) can end on a loading spinner
+# BUG (fixed): under idb, an unlabelled SwiftUI `ProgressView` reads as content, so `ensure_state`'s held "no" (D2) can end on a loading spinner
 
 **Found 2026-11-02** by batch-3 block G (backlog D30, D37) on the lab simulator (`averi-lab iPhone 17`, iOS 27.0,
 402x874), main `6b4a44df`. Record `docs/truth/live-records/ios-idb-ensure-d30-1.json`, case `h2`; the raw read of the
 spinner `docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json` (flat) and
 `…-nested-d30-1.json` (nested, a moment later).
 
+> **Status (2026-11-02, D50):** FIXED on `fix/d50-idb-spinner-progress` (ADR 0033's D50 amendment), device check
+> pending (the next batch's `live.ts --groups ensure` under idb). The idb parser
+> (`src/adapters/ios-tree-source.ts#idbSpinner`) reads a `GenericElement` that carries `UpdatesFrequently` and no label
+> as `progress`: `showsProgress` then stops the hold on it, and alone it reads bare. The `ios idb h2` live-known.ts
+> entry is struck off; ios-idb-ensure-d30-1.json rejudges h2 not known (the src before the fix). "Fix direction" below
+> is the analysis before the fix; residuals (a labelled idb spinner; UIKit/RN spinners through idb assumed alike) in
+> the ADR.
+>
 > **Status (2026-11-02): open, filed KNOWN** (`scripts/truth/live-known.ts`, `ios idb h2`, held-early on `other`).
 > Backlog row D50. Not on WDA or uiautomator: h2 is ok there.
 
