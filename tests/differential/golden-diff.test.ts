@@ -53,7 +53,7 @@ const KNOWN = Object.assign({}, ...RATCHET.map((f) => f.known)) as Record<string
 const PINS = { 'r/a.json B tap': ['ERROR was'], 'r/b.json A ocr': ['FAIL'], 'r/c.json A tap': ['x'] };
 
 describe('golden --against: what changed since a base run (goldenDiff)', () => {
-  const d = goldenDiff(BASE, NOW, RATCHET);
+  const d = goldenDiff(BASE, NOW, RATCHET, KNOWN, PINS);
 
   it('every check whose verdict, reply or calls changed, and every check one run asks and the other does not — of the captures both runs replayed', () => {
     expect(d.changed.map((c) => [c.key, c.was?.reply, c.now?.reply])).toEqual([
@@ -67,16 +67,16 @@ describe('golden --against: what changed since a base run (goldenDiff)', () => {
   });
 
   it('the calls alone, or the faults alone, are a change', () => {
-    const calls = goldenDiff([result('r/a.json', [check('r/a.json', 'A', 'tap')])], [result('r/a.json', [check('r/a.json', 'A', 'tap', { calls: [TAP] })])], []);
+    const calls = goldenDiff([result('r/a.json', [check('r/a.json', 'A', 'tap')])], [result('r/a.json', [check('r/a.json', 'A', 'tap', { calls: [TAP] })])], [], {}, {});
     expect(calls.changed.map((c) => c.key)).toEqual(['r/a.json A tap']);
-    const faults = goldenDiff([result('r/a.json', [check('r/a.json', 'A', 'tap')])], [result('r/a.json', [check('r/a.json', 'A', 'tap', { faults: ['UNMODELLED x'] })])], []);
+    const faults = goldenDiff([result('r/a.json', [check('r/a.json', 'A', 'tap')])], [result('r/a.json', [check('r/a.json', 'A', 'tap', { faults: ['UNMODELLED x'] })])], [], {}, {});
     expect(faults.changed.map((c) => c.key)).toEqual(['r/a.json A tap']);
-    expect(goldenDiff(BASE, BASE, []).changed).toEqual([]);
+    expect(goldenDiff(BASE, BASE, [], {}, {}).changed).toEqual([]);
   });
 
   it('a key asked twice is matched by its occurrence', () => {
     const twice = (second: string) => [result('r/a.json', [check('r/a.json', 'A', 'tap'), check('r/a.json', 'A', 'tap', { reply: second })])];
-    expect(goldenDiff(twice('one'), twice('two'), []).changed.map((c) => [c.key, c.was?.reply, c.now?.reply])).toEqual([['r/a.json A tap #2', 'one', 'two']]);
+    expect(goldenDiff(twice('one'), twice('two'), [], {}, {}).changed.map((c) => [c.key, c.was?.reply, c.now?.reply])).toEqual([['r/a.json A tap #2', 'one', 'two']]);
   });
 
   it("the KNOWN rows this run finds green or no longer asks, per family file — one still red, skipped or of a capture not run is held, as by golden.test.ts's ratchet", () => {
@@ -152,7 +152,7 @@ describe('golden --against: the report (diffReport)', () => {
   it('a fault that came or went is told', () => {
     const was = [result('r/a.json', [check('r/a.json', 'A', 'tap')])];
     const now = [result('r/a.json', [check('r/a.json', 'A', 'tap', { faults: ['UNMODELLED x'] })])];
-    expect(diffReport('b', goldenDiff(was, now, []))).toContain('- r/a.json A tap\n  faults: was []\n          now ["UNMODELLED x"]\n');
+    expect(diffReport('b', goldenDiff(was, now, [], {}, {}))).toContain('- r/a.json A tap\n  faults: was []\n          now ["UNMODELLED x"]\n');
   });
 });
 

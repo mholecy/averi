@@ -97,8 +97,8 @@ export function goldenDiff(
   base: readonly GoldenResult[],
   now: readonly GoldenResult[],
   families: readonly FamilyFile[],
-  known: Readonly<Record<string, unknown>> = {},
-  pins: Pins = {},
+  known: Readonly<Record<string, unknown>>,
+  pins: Pins,
 ): GoldenDiff {
   const ran = new Set(now.map((r) => r.recording));
   const based = new Set(base.map((r) => r.recording));
@@ -145,7 +145,6 @@ function changeLines({ key, was, now }: CheckChange): string[] {
   if (JSON.stringify(was.faults ?? []) !== JSON.stringify(now.faults ?? [])) lines.push(`  faults: was ${JSON.stringify(was.faults ?? [])}`, `          now ${JSON.stringify(now.faults ?? [])}`);
   return lines;
 }
-
 
 /** The report: this run's tally beside the base's (of the captures both replayed), then the sections of GoldenDiff. */
 export function diffReport(against: string, d: GoldenDiff): string {

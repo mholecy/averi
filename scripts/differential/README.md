@@ -164,24 +164,25 @@ run finds green or no longer asks, as the keys to strike, per family file (a row
 capture not replayed, is held, as by the ratchet); each capture whose check count differs from COUNTS; and, under
 `Re-pin`, each known mismatch whose reply is not its pin, line by line against it. It rewrites no `*.known.ts`: their
 rows are built over tag lists, edited by hand. `--pin <file>` (beside any of the above) writes the known mismatches'
-replies to the pins file (`ratchet.ts#repinned`): the pin of a row skipped here, or of a capture not replayed (`--only`),
-is held from the file, and the pin of a row that ran green or is no longer KNOWN is dropped. The held pins come from
-the file `--pin` targets, so it should normally target `tests/differential/golden/pins.json` — under `--only` above
-all, or the other captures' pins are not there to hold. A check whose reply is a
-harness or JavaScript error (`THROW`, "is not a function", "Cannot read properties of", the fake device's
-`differential:`) or whose call sent a command the fake does not model (`UNMODELLED`) carries it as `faults`
-(`golden.ts#faultsOf`) — no evidence about the tool either way.
+replies to the pins file (`ratchet.ts#repinned`): the pin of a row skipped here, or of a capture not replayed
+(`--only`), is held from the file, and the pin of a row that ran green or is no longer KNOWN is dropped. The held pins
+come from the file `--pin` targets, so it should normally target `tests/differential/golden/pins.json` — under `--only`
+above all, or the other captures' pins are not there to hold. A check whose reply is a harness or JavaScript error
+(`THROW`, "is not a function", "Cannot read properties of", the fake device's `differential:`) or whose call sent a
+command the fake does not model (`UNMODELLED`) carries it as `faults` (`golden.ts#faultsOf`) — no evidence about the
+tool either way.
 
 The exit code is the ratchet's (`scripts/differential/ratchet.ts`, which golden.test.ts shares), over the captures
-replayed, against this checkout's KNOWN and its COMMITTED `pins.json`, judged before `--pin` writes anything — so a
-run that rewords a reply exits 1 even as it re-pins, and the next one, the new pins committed, exits 0: **1** on a mismatch KNOWN does not list, a known one drifted from its
-class, reply kind, calls or pin, a fault (on any row), or a broken target; **0** when every mismatch is a standing known
-one — the report's header then reads `N mismatches (N known, 0 new)`. A known row fixed (to strike) or a stale pin is
-reported, not failed on. The report lists what the ratchet found under `## Ratchet`; `--json` and `--against` print it
-to stderr, keeping stdout theirs (`--against` without the re-pins' diffs, which its own Re-pin section shows). `--pin`
-refuses `--side`: the pins are this checkout's replies. The split is deliberate: golden's exit code is about behaviour
-(a new or drifted answer, a fault, a broken target), so a script may gate on it alone; the bookkeeping — a fixed KNOWN
-row not struck, a stale pin, COUNTS — fails `tests/differential/golden.test.ts`, not golden. The merge gate runs both.
+replayed, against this checkout's KNOWN and its COMMITTED `pins.json`, judged before `--pin` writes anything — so a run
+that rewords a reply exits 1 even as it re-pins, and the next one, the new pins committed, exits 0: **1** on a mismatch
+KNOWN does not list, a known one drifted from its class, reply kind, calls or pin, a fault (on any row), or a broken
+target; **0** when every mismatch is a standing known one — the report's header then reads `N mismatches (N known, 0
+new)`. A known row fixed (to strike) or a stale pin is reported, not failed on. The report lists what the ratchet found
+under `## Ratchet`; `--json` and `--against` print it to stderr, keeping stdout theirs (`--against` without the re-pins'
+diffs, which its own Re-pin section shows). `--pin` refuses `--side`: the pins are this checkout's replies. The split is
+deliberate: golden's exit code is about behaviour (a new or drifted answer, a fault, a broken target), so a script may
+gate on it alone; the bookkeeping — a fixed KNOWN row not struck, a stale pin, COUNTS — fails
+`tests/differential/golden.test.ts`, not golden. The merge gate runs both.
 `tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, no check with a
 fault, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their
 class, their reply's kind (`scripts/truth/replies.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused,

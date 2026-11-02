@@ -36,11 +36,11 @@ import { exitCode, judgeThenPin, PINS_FILE, ratchetLines, readPins, type Ratchet
  *
  * The exit code is the ratchet's (ratchet.ts, as golden.test.ts holds it): this checkout's KNOWN and its COMMITTED pins
  * (tests/differential/golden/pins.json), over the captures replayed — judged before `--pin` writes anything
- * (ratchet.ts#judgeThenPin), so a run that rewords a reply exits 1 even as it re-pins; the next, the pins committed, 0. 1 on a mismatch
- * KNOWN does not list, a known one drifted from its class, reply kind, calls or pin, a fault, or a broken target; 0
- * with every mismatch a standing known one — the report heads them `N known, 0 new`. Its findings go to the report, and
- * to stderr under `--json` and `--against` (there without the re-pins, which the diff shows). `--pin` refuses `--side`:
- * the pins are this checkout's replies.
+ * (ratchet.ts#judgeThenPin), so a run that rewords a reply exits 1 even as it re-pins; the next, the pins committed, 0.
+ * 1 on a mismatch KNOWN does not list, a known one drifted from its class, reply kind, calls or pin, a fault, or a
+ * broken target; 0 with every mismatch a standing known one — the report heads them `N known, 0 new`. Its findings go
+ * to the report, and to stderr under `--json` and `--against` (there without the re-pins, which the diff shows).
+ * `--pin` refuses `--side`: the pins are this checkout's replies.
  */
 
 export interface GoldenCheck {
