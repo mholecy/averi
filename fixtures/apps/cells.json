@@ -776,13 +776,15 @@
       "id": "held-no",
       "family": "held",
       "layer": "none",
-      "targets": []
+      "targets": [],
+      "held": { "bareMs": 6000 }
     },
     {
       "id": "held-no-spinner",
       "family": "held",
       "layer": "none",
-      "targets": []
+      "targets": [],
+      "held": { "bareMs": 6000, "spinnerMs": 4000 }
     }
   ]
 }

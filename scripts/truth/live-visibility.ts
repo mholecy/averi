@@ -59,11 +59,11 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
  * the value not held and the field as the launch left it; `loud-changed` (LOUD) not held and the field changed — a part
  * typed, or cleared; `fill-claim` a fill that claims done while the app holds another value; `failed-holds`, the same
  * rule as the visibility group's, where the app holds the value but averi failed. The ensure group's (live-ensure.ts):
- * `ensure-claim` ensure_state did not fail while the app never reached the state; `held-early` Continue tapped before
- * Welcome had held reachRecheckMs (the hold ended on something else — the spinner); `held-late` no wipe ahead and the
- * tap later than the hold allows (the look ran on); `held-unsaid` in time, the held line missing; `held-said` a held
- * line where a wipe lies ahead; `window-cut` a wipe ahead and the look ended before its window's end; `entry-not-bare`
- * the reply shows no bare entry probe, so no second look was earned.
+ * `ensure-claim` ensure_state did not fail while the app never reached the state; `held-early` Continue tapped sooner
+ * after Welcome than the held line's heldS − EPS_S (the hold began before Welcome — on the spinner); `held-late` no
+ * wipe ahead and the tap later than the hold allows (the look ran on); `held-unsaid` in time, the held line missing;
+ * `held-said` a held line where a wipe lies ahead; `window-cut` a wipe ahead and the look ended before its window's
+ * end; `entry-not-bare` the reply shows no bare entry probe, so no second look was earned.
  */
 export type VerdictClass =
   | 'stop-claim'

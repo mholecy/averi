@@ -266,41 +266,42 @@ node --import tsx scripts/truth/live.ts --udid <lab udid> --groups visibility,di
 node --import tsx scripts/truth/live.ts --udid <lab udid> --groups ensure [--cases h1,h2,h3]   # D30: ADR 0033's held "no"
 ```
 
-Phase 5 (`--groups forms,visibility,dismissal`, any of them; `forms` alone by default, so the reproduce lines of the
-earlier summaries stay true): the visibility cases are built from each coloured-target cell's static truth by
-`scripts/truth/live-visibility.ts` — taps judged by the app's tap log, scroll_until by the target's live geometry and by
-R-direction over the strokes the app logs (LabState.offsets, .strokes: both apps report them), judged along the scroll
-view's axis — across a carousel, whose offset the apps report from its leading edge, for a card asked `right` or `left`
-(live-visibility.ts#distanceAt); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's own
-keyboardDismiss configured. `ensure` (backlog D30, never by default) runs ensure_state on the held cells (bare for 6 s,
-then Welcome; held-no-spinner through 4 s of a spinner): each needs the reply's bare entry probe line; h1 and h2 judge
-the hold ending the second look heldS after Welcome, said in one line, h3 the full window before a destructive rung
-(`scripts/truth/live-ensure.ts`, the app's phase events the oracle); a SKIP among them exits 1. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
-calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs
-of one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case,
-with its verdict class and the kind of reply it rests on — a weaker contract than ADR 0020 §4's, no strokes and an
-`intermittent` case allowed ok, its header says why and what the committed records measured); the exit code is 1 on an
-unknown MISMATCH and, in a run of this checkout (not `--side`), on a known case not marked `intermittent` that comes out
-ok — fixed, to be struck off. `--record <file>` keeps every read of a run (docs/truth/live-records/ holds review round
-1's Android run, round 5's device check's iOS runs and the live calibrations'), and `--rejudge <file>` judges it again
-with this checkout's judges, no device (tests/truth/live-rejudge.test.ts does so for the visibility records). Under iOS,
-idb's companion must be up for the lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock
-/tmp/idb/<udid>_companion.sock`).
+Phase 5 (`--groups forms,visibility,dismissal,ensure`, any of them; `forms` alone by default, so the reproduce lines
+of the earlier summaries stay true): the visibility cases are built from each coloured-target cell's static truth by
+`scripts/truth/live-visibility.ts` — taps judged by the app's tap log, scroll_until by the target's live geometry and
+by R-direction over the strokes the app logs (LabState.offsets, .strokes: both apps report them), judged along the
+scroll view's axis — across a carousel, whose offset the apps report from its leading edge, for a card asked `right`
+or `left` (live-visibility.ts#distanceAt); the dismissal cases tap a field under the keyboard on the toolbar cells,
+the cell's own keyboardDismiss configured. `ensure` (backlog D30, never by default) runs ensure_state on the held
+cells (bare for 6 s, then Welcome; held-no-spinner through 4 s of a spinner): each needs the reply's bare entry probe
+line; h1 and h2 judge the hold ending the second look heldS after Welcome, said in one line, h3 the full window before
+a destructive rung (`scripts/truth/live-ensure.ts`, the app's phase events the oracle); a SKIP among them exits 1.
+`--rejudge` of a record with ensure cases needs `--groups ensure`. `--side <checkout>` runs an older averi's src (a
+calibrate.ts checkout): a note's live calibration, recorded by hand in calibration.json `live` (rendered by
+calibration-report.ts; `intermittent` where runs of one side differ). A not-ok case an existing note explains is KNOWN
+(`scripts/truth/live-known.ts`, keyed by case, with its verdict class and the kind of reply it rests on — a weaker
+contract than ADR 0020 §4's, no strokes and an `intermittent` case allowed ok, its header says why and what the
+committed records measured); the exit code is 1 on an unknown MISMATCH and, in a run of this checkout (not `--side`),
+on a known case not marked `intermittent` that comes out ok — fixed, to be struck off. `--record <file>` keeps every
+read of a run (docs/truth/live-records/ holds review round 1's Android run, round 5's device check's iOS runs and the
+live calibrations'), and `--rejudge <file>` judges it again with this checkout's judges, no device
+(tests/truth/live-rejudge.test.ts does so for the visibility records). Under iOS, idb's companion must be up for the
+lab simulator on its domain socket (`idb_companion --udid <udid> --grpc-domain-sock /tmp/idb/<udid>_companion.sock`).
 
 The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,
-false-covers, text, react-native, held — scripts/truth/schema.ts#FAMILIES); every lab app bundles `fixtures/apps/cells.json`, which
-`node --import tsx scripts/truth/catalog.ts` generates from them (`--check` exits 1 when it is stale;
-tests/truth/catalog.test.ts fails then too), each cell stamped with its `family`, by which each app routes it to its
-family's file (`AveriLab/<Family>.swift`, `dev/averi/lab/<Family>.kt`). A cell's `config` is merged into the averi.yaml
-golden replays it under (`differential.ts#configFor`, through the truth's `config`). A cell may name the platforms that
-build it (`platforms`) and, on Android, the navigation mode it is captured under (`navigation`): capture-run skips it
-elsewhere and says why (`catalog.ts#captureRefusal`, asked before the device's own `LabDevice.unsupported`), so `bands`
-(gesture) and `bands-three-button` sit in one run and neither replaces the other. How to add a cell:
-docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3, B1. The react-native family is built by the third lab app
-alone, the React Native one (`fixtures/apps/rn`, its README; schema.ts#LabApp, #appOf): the capture and the live golden
-drive one app per run (`--app react-native`, lab-device.ts#LAB_APP: its own bundle and package), a cell of the other
-app skipped and said (lab-device.ts#otherApp), and its captures sit in runs of their own (`ios-rn-iphone17-ios27`,
-`android-rn-averi_lab-api33`, the manifest's `app` AveriLabRN).
+false-covers, text, react-native, held — scripts/truth/schema.ts#FAMILIES); every lab app bundles
+`fixtures/apps/cells.json`, which `node --import tsx scripts/truth/catalog.ts` generates from them (`--check` exits 1
+when it is stale; tests/truth/catalog.test.ts fails then too), each cell stamped with its `family`, by which each app
+routes it to its family's file (`AveriLab/<Family>.swift`, `dev/averi/lab/<Family>.kt`). A cell's `config` is merged
+into the averi.yaml golden replays it under (`differential.ts#configFor`, through the truth's `config`). A cell may
+name the platforms that build it (`platforms`) and, on Android, the navigation mode it is captured under
+(`navigation`): capture-run skips it elsewhere and says why (`catalog.ts#captureRefusal`, asked before the device's
+own `LabDevice.unsupported`), so `bands` (gesture) and `bands-three-button` sit in one run and neither replaces the
+other. How to add a cell: docs/plans/2026-10-15-ground-truth-lab-app.md, phase 3, B1. The react-native family is built
+by the third lab app alone, the React Native one (`fixtures/apps/rn`, its README; schema.ts#LabApp, #appOf): the
+capture and the live golden drive one app per run (`--app react-native`, lab-device.ts#LAB_APP: its own bundle and
+package), a cell of the other app skipped and said (lab-device.ts#otherApp), and its captures sit in runs of their own
+(`ios-rn-iphone17-ios27`, `android-rn-averi_lab-api33`, the manifest's `app` AveriLabRN).
 
 The capture is one module, `scripts/truth/capture-run.ts#capture(lab, cells, opts)`, over a `LabDevice`
 (`scripts/truth/lab-device.ts`: launch a cell in a fresh process and wait for its `ready`, read the app's state file,

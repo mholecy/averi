@@ -6,9 +6,10 @@ package dev.averi.lab
 // `ensure` group (scripts/truth/live-ensure.ts) — ensure_state's second look on a device, ADR 0033's held "no".
 //
 // - `held-no`: ready at once while it draws nothing — plain white, no semantics node: a bare dump (the decor chain
-//   alone, src/ui-tree/bare-tree.ts) — for 6 s (long, so the launch rarely outruns the call); then Text "Welcome"
-//   and Button "Continue"; Continue shows Text "Home".
-// - `held-no-spinner`: the same, with 4 s of an unlabelled CircularProgressIndicator between the bare phase and Welcome.
+//   alone, src/ui-tree/bare-tree.ts; tests/truth/held-bare.test.ts) — for the catalog's `held.bareMs` (6 s: long, so
+//   the launch rarely outruns the call); then Text "Welcome" and Button "Continue"; Continue shows Text "Home".
+// - `held-no-spinner`: the same, with `held.spinnerMs` (4 s) of an unlabelled CircularProgressIndicator between the
+//   bare phase and Welcome.
 //
 // Each element is identified lab.<cell>.<tag> (welcome, continue, home). Every phase change is logged (`phase`, `bare`
 // / `spinner` / `welcome` / `home`) before it is drawn, Continue's press as the `tap` `continue` — the judges' clock.
@@ -38,36 +39,41 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
+/** What a held cell draws, its `tag` the one its `phase` event logs. */
+internal enum class HeldPhase(val tag: String) { Bare("bare"), Spinner("spinner"), Welcome("welcome"), Home("home") }
+
 @Composable
 internal fun HeldScreen(cell: Cell, lab: Lab) {
-    var phase by remember { mutableStateOf("bare") }
+    var phase by remember { mutableStateOf(HeldPhase.Bare) }
     /** The next phase, logged before it is drawn. */
-    fun show(next: String) {
-        lab.event("phase", next)
+    fun show(next: HeldPhase) {
+        lab.event("phase", next.tag)
         phase = next
     }
     Box(Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }, contentAlignment = Alignment.Center) {
         when (phase) {
-            "spinner" -> CircularProgressIndicator()
-            "welcome" -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            HeldPhase.Bare -> Unit
+            HeldPhase.Spinner -> CircularProgressIndicator()
+            HeldPhase.Welcome -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 Text("Welcome", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.testTag("lab.${cell.id}.welcome"))
                 Button({
                     lab.event("tap", "continue")
-                    show("home")
+                    show(HeldPhase.Home)
                 }, Modifier.testTag("lab.${cell.id}.continue")) { Text("Continue") }
             }
-            "home" -> Text("Home", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.testTag("lab.${cell.id}.home"))
+            HeldPhase.Home -> Text("Home", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.testTag("lab.${cell.id}.home"))
         }
     }
     LaunchedEffect(Unit) {
-        lab.event("phase", "bare")
+        lab.event("phase", HeldPhase.Bare.tag)
         // Ready while nothing is drawn: the launch returns into the bare phase.
         lab.settled()
-        delay(6_000)
-        if (cell.id == "held-no-spinner") {
-            show("spinner")
-            delay(4_000)
+        val held = cell.held ?: return@LaunchedEffect
+        delay(held.optLong("bareMs"))
+        if (held.has("spinnerMs")) {
+            show(HeldPhase.Spinner)
+            delay(held.optLong("spinnerMs"))
         }
-        show("welcome")
+        show(HeldPhase.Welcome)
     }
 }

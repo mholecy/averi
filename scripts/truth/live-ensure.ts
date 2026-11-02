@@ -40,6 +40,7 @@ export const POLL_S = 0.5;
 export const READ_S: Record<Source, number> = { idb: 0.5, wda: 0.5, uiautomator: 3 };
 /** One tap: idb `ui tap` ~185 ms, WDA's alike; adb `input tap` slower — the same measurements, with room. */
 export const TAP_S: Record<Source, number> = { idb: 0.5, wda: 0.5, uiautomator: 1 };
+// Upper bounds with room on purpose: block G's device run measures tap − Welcome − heldS per source and tightens READ_S / TAP_S.
 /** How long after Welcome + heldS Continue may be tapped: a read in flight, a poll and a read to see Welcome; a read and a tap to tap it. */
 export const heldSlackS = (source: Source) => POLL_S + 3 * READ_S[source] + TAP_S[source];
 
@@ -55,6 +56,8 @@ const continueAt = (s: LabState) => s.events.find((e) => e.kind === 'tap' && e.t
 const secs = (n: number) => `${n.toFixed(2)} s`;
 
 interface Reached {
+  /** The kind of the reply (replies.ts#replyKind), for the verdict. */
+  kind: LiveVerdict['kind'];
   /** Continue's tap, in seconds after Welcome and after the bare phase. */
   afterWelcome: number;
   afterBare: number;
@@ -79,7 +82,7 @@ function reached(s: LabState, reply: string): LiveVerdict | Reached {
   const bare = phaseAt(s, 'bare');
   if (bare === undefined) return { outcome: 'SKIP', kind, why: 'the app logged no bare phase: the case never set up (an old lab app?) — nothing to judge' };
   if (!bareEntry(reply)) return { outcome: 'MISMATCH', cls: 'entry-not-bare', kind, why: `the reply has no bare entry probe line — no second look was earned on a screen bare for ${secs(welcome - bare)}: ${short(reply)}` };
-  return { afterWelcome: tap - welcome, afterBare: tap - bare, held: heldStill(reply) };
+  return { kind, afterWelcome: tap - welcome, afterBare: tap - bare, held: heldStill(reply) };
 }
 
 /**
@@ -90,8 +93,7 @@ function reached(s: LabState, reply: string): LiveVerdict | Reached {
 export function judgeHeldNo(s: LabState, [reply]: string[], source: Source, _launched: LabState): LiveVerdict {
   const r = reached(s, reply);
   if ('outcome' in r) return r;
-  const kind = replyKind(reply);
-  const { afterWelcome, afterBare, held } = r;
+  const { kind, afterWelcome, afterBare, held } = r;
   if (held === undefined) {
     return afterBare >= ENSURE_WINDOW_S - EPS_S ?
         { outcome: 'MISMATCH', cls: 'held-late', kind, why: `no held line, Continue tapped ${secs(afterBare)} after the bare phase: the look ran its whole ${ENSURE_WINDOW_S} s window` }
@@ -113,8 +115,7 @@ export function judgeHeldNo(s: LabState, [reply]: string[], source: Source, _lau
 export function judgeFullWindow(s: LabState, [reply]: string[], _source: Source, _launched: LabState): LiveVerdict {
   const r = reached(s, reply);
   if ('outcome' in r) return r;
-  const kind = replyKind(reply);
-  const { afterWelcome, afterBare, held } = r;
+  const { kind, afterWelcome, afterBare, held } = r;
   if (held !== undefined) return { outcome: 'MISMATCH', cls: 'held-said', kind, why: `a wipe lies ahead, yet the hold ended the look (held ${held.heldS} s, then ${held.flow}); Continue tapped ${secs(afterWelcome)} after Welcome` };
   if (afterBare < ENSURE_WINDOW_S - EPS_S) return { outcome: 'MISMATCH', cls: 'window-cut', kind, why: `a wipe lies ahead, yet Continue was tapped ${secs(afterBare)} after the bare phase — under the ${ENSURE_WINDOW_S} s window` };
   return { outcome: 'ok', kind, why: `the full window: Continue tapped ${secs(afterBare)} after the bare phase (${secs(afterWelcome)} after Welcome), no held line` };

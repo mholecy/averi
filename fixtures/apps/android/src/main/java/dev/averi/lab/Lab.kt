@@ -38,9 +38,9 @@ data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: 
 /**
  * `family`: base, presented, forms, edges, bars, false-covers, text, held — MainActivity's CellRouter routes by it. `form`: a form
  * cell's catalog entry as it stands (Forms.kt reads it) — a form builds its own picker sheet, so its `sheet-large` is
- * supported where a coloured-target cell's is not.
+ * supported where a coloured-target cell's is not. `held`: a held cell's phase lengths as they stand (Held.kt reads them).
  */
-data class Cell(val id: String, val layer: String, val targets: List<Target>, val family: String? = null, val form: JSONObject? = null) {
+data class Cell(val id: String, val layer: String, val targets: List<Target>, val family: String? = null, val form: JSONObject? = null, val held: JSONObject? = null) {
     val supported get() = layer in SUPPORTED_LAYERS || (form != null && layer == "sheet-large")
 }
 
@@ -68,7 +68,7 @@ object Catalog {
                     label = t.optString("label").ifEmpty { null },
                 )
             }
-            Cell(c.optString("id"), c.optString("layer"), targets, c.optString("family").ifEmpty { null }, c.optJSONObject("form"))
+            Cell(c.optString("id"), c.optString("layer"), targets, c.optString("family").ifEmpty { null }, c.optJSONObject("form"), c.optJSONObject("held"))
         }
     }
 }

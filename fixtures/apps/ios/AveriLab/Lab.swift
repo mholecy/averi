@@ -26,6 +26,14 @@ struct Cell: Decodable, Identifiable {
     let targets: [Target]
     /// A form cell (scripts/truth/schema.ts#CatalogForm): fields, a submit, maybe a picker — no coloured targets.
     let form: FormSpec?
+    /// A held cell's phases (scripts/truth/schema.ts#HeldSpec): Held.swift draws them.
+    let held: HeldSpec?
+}
+
+/// How long a held cell draws each phase before Welcome, in ms (scripts/truth/schema.ts#HeldSpec).
+struct HeldSpec: Decodable {
+    let bareMs: Int
+    let spinnerMs: Int?
 }
 
 struct Message: Codable, Equatable {

@@ -131,6 +131,14 @@ export interface CatalogCell {
    * a docked capture is never a floating one's (calibration.json #1).
    */
   ime?: 'floating';
+  /** A held cell's phases (the held family; Held.swift, Held.kt): drawn bare for `bareMs`, then a spinner for `spinnerMs` (none without it), then Welcome. */
+  held?: HeldSpec;
+}
+
+/** How long a held cell draws each phase before Welcome, in ms (CatalogCell.held). */
+export interface HeldSpec {
+  bareMs: number;
+  spinnerMs?: number;
 }
 
 /** averi.yaml settings per platform, merged over the golden mode's own (`bundleId`, `treeSource`, `package`). */

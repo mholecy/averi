@@ -43,6 +43,11 @@ describe('replies.ts: the bare entry line and the held line, read in one place',
     expect(bareEntry(full(ENTRY_FAILED))).toBe(false);
     expect(bareEntry(DONE.join('\n'))).toBe(false);
   });
+  it('bareEntry: the entry probe\'s line is the trace\'s first (after an `environment` line) — a bare rung re-check later is not it', () => {
+    const recheck = ENTRY;
+    expect(bareEntry(['flow continue: start', recheck, 'state home: reached after continue'].join('\n'))).toBe(false);
+    expect(bareEntry(['environment staging: overrides: user', ENTRY, ...DONE].join('\n'))).toBe(true);
+  });
 });
 
 describe('judgeHeldNo (h1, h2): no wipe ahead — the hold ends the look heldS after Welcome', () => {
@@ -56,7 +61,7 @@ describe('judgeHeldNo (h1, h2): no wipe ahead — the hold ends the look heldS a
   });
 
   it('Continue tapped within [Welcome + heldS − ε, Welcome + heldS + slack], the bare entry and the held line said: ok', () => {
-    expect(judgeHeldNo(h1(6 + 2.3), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'ok' });
+    expect(judgeHeldNo(h1(6 + 2.3), [held(2.3)], 'idb', LAUNCHED)).toMatchObject({ outcome: 'ok', kind: 'other' });
     expect(judgeHeldNo(h1(6 + 2.3 - 0.04), [held(2.3)], 'idb', LAUNCHED).outcome).toBe('ok');
     expect(judgeHeldNo(h1(6 + 2.3 + 2.45), [held(2.3)], 'wda', LAUNCHED).outcome).toBe('ok');
     expect(judgeHeldNo(h2(10 + 3), [held(2.1)], 'uiautomator', LAUNCHED).outcome).toBe('ok');
@@ -100,7 +105,7 @@ describe('judgeHeldNo (h1, h2): no wipe ahead — the hold ends the look heldS a
 describe('judgeFullWindow (h3): a wipe ahead — the look keeps its full window', () => {
   it('Continue tapped ≥ the bare phase + the 20 s window, a bare entry, no held line: ok', () => {
     expect(ENSURE_WINDOW_S).toBe(20);
-    expect(judgeFullWindow(h1(21), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'ok' });
+    expect(judgeFullWindow(h1(21), [full()], 'idb', LAUNCHED)).toMatchObject({ outcome: 'ok', kind: 'other' });
     expect(judgeFullWindow(h1(20 - 0.04), [full()], 'idb', LAUNCHED).outcome).toBe('ok');
   });
   it('a held line with a wipe ahead: MISMATCH held-said', () => {
@@ -130,6 +135,8 @@ describe('the ensure group: h1–h3, only when asked', () => {
         ['h2', 'held-no-spinner', ['ensure_state']],
         ['h3', 'held-no', ['ensure_state']],
       ]);
+      // Per case: its tree source bound first (live.ts), and a SKIP of it fails the run (summarize).
+      expect(cases.every((c) => c.warmUp === true && c.skipFails === true)).toBe(true);
     }
     expect(await selectCases({ platform: 'ios', app: 'react-native', groups: ['ensure'] })).toEqual([]);
   });
@@ -174,7 +181,7 @@ describe('a recorded ensure run, rejudged', () => {
     r.results = [r.results[0], { ...r.results[2], state: read({ welcome: 0, home: 21 }, 20.8) }];
     const { lines, exitCode } = await rejudge(r, 'r.json', { groups: ['ensure'] });
     expect(lines[1]).toBe('# Live golden: 2 cases, 1 ok, 0 loud, 0 mismatches (0 not known), 1 skipped');
-    expect(lines).toContain('SKIPPED in the ensure group, which proves nothing then: idb h3');
+    expect(lines).toContain('SKIPPED where a skip proves nothing — the run fails: idb h3');
     expect(exitCode).toBe(1);
   });
   it('all ok: exit 0', async () => {

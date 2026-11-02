@@ -86,9 +86,14 @@ export function heldStill(reply: string): { heldS: number; flow: string } | unde
  * ensure_state's ENTRY probe read only bare trees — the evidence that a second look was earned (src/flow/engine.ts
  * #detects: `⚠ detect: <condition> treated as not detected — every UI tree read was bare, …`). The second look's own bare
  * line names itself (`… (second look over 20 s) — …`) and a failed read says `last UI tree read failed`: neither counts.
- * Both readers are pinned against the engine's own trace (tests/truth/live-ensure-engine.test.ts).
+ * Only the trace's FIRST line is the entry probe's (FlowEngine.run logs an `environment …` line before it, if any): a
+ * rung's re-check later writes the same bare line, which says nothing of the entry. Both readers are pinned against
+ * the engine's own trace (tests/truth/live-ensure-engine.test.ts).
  */
-export const bareEntry = (reply: string): boolean => /^⚠ detect: .* treated as not detected — every UI tree read was bare\b/m.test(reply);
+export function bareEntry(reply: string): boolean {
+  const first = reply.split('\n').find((line) => !line.startsWith('environment '));
+  return first !== undefined && /^⚠ detect: .* treated as not detected — every UI tree read was bare\b/.test(first);
+}
 
 /**
  * What kind of reply it is, from a closed set — recorded on every golden check (golden.ts), so a known mismatch whose

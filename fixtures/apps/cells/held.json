@@ -1,16 +1,18 @@
 {
   "family": "held",
-  "note": "Screens that render late (backlog D30; docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md): the live golden's `ensure` group (scripts/truth/live-ensure.ts) runs ensure_state on them, the app's phase events its oracle. No targets, no form: no truth is captured of them. held-no: `ready` at once while it draws nothing (a bare tree, src/ui-tree/bare-tree.ts) for 6 s, then Text \"Welcome\" (lab.held-no.welcome) and Button \"Continue\" (lab.held-no.continue); Continue shows Text \"Home\" (lab.held-no.home). held-no-spinner: the same, with 4 s of an unlabelled spinner (SwiftUI's ProgressView, Compose's CircularProgressIndicator) between the bare phase and Welcome; its ids lab.held-no-spinner.<tag>. Every phase change is an event (`phase`, `bare` / `spinner` / `welcome` / `home`), Continue's press a `tap` `continue`. App files: AveriLab/Held.swift, Held.kt; built by the native apps only.",
+  "note": "Screens that render late (backlog D30; docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md): the live golden's `ensure` group (scripts/truth/live-ensure.ts) runs ensure_state on them, the app's phase events its oracle. No targets, no form: no truth is captured of them. held-no: `ready` at once while it draws nothing (a bare tree, src/ui-tree/bare-tree.ts) for `held.bareMs` (6 s), then Text \"Welcome\" (lab.held-no.welcome) and Button \"Continue\" (lab.held-no.continue); Continue shows Text \"Home\" (lab.held-no.home). held-no-spinner: the same, with `held.spinnerMs` (4 s) of an unlabelled spinner (SwiftUI's ProgressView, Compose's CircularProgressIndicator) between the bare phase and Welcome; its ids lab.held-no-spinner.<tag>. Every phase change is an event (`phase`, `bare` / `spinner` / `welcome` / `home`), Continue's press a `tap` `continue`. App files: AveriLab/Held.swift, Held.kt; built by the native apps only.",
   "cells": [
     {
       "id": "held-no",
       "layer": "none",
-      "targets": []
+      "targets": [],
+      "held": { "bareMs": 6000 }
     },
     {
       "id": "held-no-spinner",
       "layer": "none",
-      "targets": []
+      "targets": [],
+      "held": { "bareMs": 6000, "spinnerMs": 4000 }
     }
   ]
 }

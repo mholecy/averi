@@ -191,17 +191,17 @@ if (rejudging !== undefined) {
     for (const c of selected) {
       for (const source of sources) {
         if (c.sources !== undefined && !c.sources.includes(source)) continue;
-        // An ensure case's timing starts at the launch (live-ensure.ts): its tree source is bound first — WDA started,
-        // idb's companion up — by one read under the case's own config, its reply discarded, so the entry probe reads
-        // the bare screen rather than a Welcome the binding outran. A warm-up that failed is kept in the record.
-        const warm = c.group === 'ensure' ? await callTool(client, { tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await configFor(source, c)) : undefined;
-        const warmUp = warm !== undefined && isError(warm) ? warm : undefined;
-        if (warmUp !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUp.split('\n')[0]}`);
+        // Case.warmUp (the ensure cases, timed from the launch: live-ensure.ts): the tree source bound first — WDA
+        // started, idb's companion up — by one read under the case's own config, its reply discarded, so the entry probe
+        // reads the bare screen rather than a Welcome the binding outran. A warm-up that failed is kept in the record.
+        const warm = c.warmUp === true ? await callTool(client, { tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await configFor(source, c)) : undefined;
+        const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
+        if (warmUpError !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
         const launched = await lab.launch(c.cell);
         if (c.keyboard && launched.keyboard?.visible !== true) {
           const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
           results.push({ source, c, verdict, replies: [] });
-          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined, ...(warmUp !== undefined && { warmUp }) });
+          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined, ...(warmUpError !== undefined && { warmUpError }) });
           console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
           continue;
         }
@@ -223,7 +223,7 @@ if (rejudging !== undefined) {
         const verdict = judged(c, source, replies, launched, after, state, late);
         if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
         results.push({ source, c, verdict, replies });
-        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUp !== undefined && { warmUp }) });
+        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUpError !== undefined && { warmUpError }) });
         console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
       }
     }

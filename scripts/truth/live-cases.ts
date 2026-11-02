@@ -31,7 +31,7 @@ export interface RunRecord {
   /** The lab app the run drove; absent on records before round 7: the native one. */
   app?: LabApp;
   side: string;
-  results: { source: Source; id: string; skip?: string; replies: string[]; launched: LabState; after: (LabState | undefined)[]; state: LabState | undefined; late?: LabState; warmUp?: string }[];
+  results: { source: Source; id: string; skip?: string; replies: string[]; launched: LabState; after: (LabState | undefined)[]; state: LabState | undefined; late?: LabState; warmUpError?: string }[];
 }
 
 // --- the cases ---
@@ -54,6 +54,14 @@ export interface Case extends RunsUnder {
   states?: Record<string, unknown>;
   /** The case is about the soft keyboard: judged only when the launch shows it (else SKIP). */
   keyboard?: true;
+  /**
+   * Bind the case's tree source before its launch — one `ui_snapshot` under its config, the reply kept only when it
+   * failed (RunRecord `warmUpError`): a case timed from the launch (live-ensure.ts) must not lose its first seconds to
+   * WDA starting or idb's companion coming up.
+   */
+  warmUp?: true;
+  /** A SKIP of the case proves nothing and fails the run (summarize): the ensure cases'. */
+  skipFails?: true;
   /** The platforms it runs on (both when unset). */
   platforms?: readonly Platform[];
   calls: Call[];
@@ -415,18 +423,19 @@ const FORMS: Omit<Case, 'group'>[] = [
  * Home that never runs: Continue reaches Home first) — a wipe ahead, so the second look keeps its full window
  * (live-ensure.ts). Not in the default groups: `--groups ensure`; a SKIP among them fails the run (summarize).
  */
-const ensureConfig = (cell: string, wipe: boolean) => ({
-  states: { home: { detect: { element: { id: labId(cell, 'home') } }, reach: ['continue', ...(wipe ? ['wipe'] : [])] } },
+const ensureConfig = (cell: string, { wipeAhead = false }: { wipeAhead?: boolean } = {}) => ({
+  states: { home: { detect: { element: { id: labId(cell, 'home') } }, reach: ['continue', ...(wipeAhead ? ['wipe'] : [])] } },
   flows: {
     continue: { steps: [{ tap: { id: labId(cell, 'continue') } }, { wait: { element: { id: labId(cell, 'home') }, timeout: '5s' } }] },
-    ...(wipe && { wipe: { destructive: true, steps: [{ wait: { element: { id: labId(cell, 'home') }, timeout: '1s' } }] } }),
+    ...(wipeAhead && { wipe: { destructive: true, steps: [{ wait: { element: { id: labId(cell, 'home') }, timeout: '1s' } }] } }),
   },
 });
-const ENSURE_HOME: Call = { tool: 'ensure_state', args: { state: 'home' } };
+/** What every ensure case shares: its one call, its tree source bound before the launch, a SKIP failing the run. */
+const ENSURE_CASE = { calls: [{ tool: 'ensure_state', args: { state: 'home' } }] as Call[], warmUp: true, skipFails: true } as const;
 const ENSURE: Omit<Case, 'group'>[] = [
-  { id: 'h1', cell: 'held-no', says: 'ensure_state from a bare launch onto Welcome, no wipe ahead: the hold ends the look heldS after Welcome, said in one line', ...ensureConfig('held-no', false), calls: [ENSURE_HOME], judge: judgeHeldNo },
-  { id: 'h2', cell: 'held-no-spinner', says: 'the same through 4 s of an unlabelled spinner: the hold carries across a spinner phase — Continue tapped only once Welcome itself has held (the spinner\'s idb spelling is block G\'s raw describe-all check)', ...ensureConfig('held-no-spinner', false), calls: [ENSURE_HOME], judge: judgeHeldNo },
-  { id: 'h3', cell: 'held-no', says: 'the same with a destructive rung after Continue: no hold — the look keeps its full window', ...ensureConfig('held-no', true), calls: [ENSURE_HOME], judge: judgeFullWindow },
+  { id: 'h1', cell: 'held-no', says: 'ensure_state from a bare launch onto Welcome, no wipe ahead: the hold ends the look heldS after Welcome, said in one line', ...ensureConfig('held-no'), ...ENSURE_CASE, judge: judgeHeldNo },
+  { id: 'h2', cell: 'held-no-spinner', says: 'the same through 4 s of an unlabelled spinner: the hold carries across a spinner phase — Continue tapped only once Welcome itself has held (the spinner\'s idb spelling is block G\'s raw describe-all check)', ...ensureConfig('held-no-spinner'), ...ENSURE_CASE, judge: judgeHeldNo },
+  { id: 'h3', cell: 'held-no', says: 'the same with a destructive rung after Continue: no hold — the look keeps its full window', ...ensureConfig('held-no', { wipeAhead: true }), ...ENSURE_CASE, judge: judgeFullWindow },
 ];
 
 /**
@@ -542,8 +551,8 @@ export async function rejudgedResults(record: RunRecord, selection: RejudgeSelec
 }
 
 // --- the summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on
-// a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), and on an ensure case
-// skipped ---
+// a known case not intermittent that came out ok in a run of this checkout (fixed: strike it off), and on a SKIP of a
+// case marked skipFails ---
 
 /** What a run (or a rejudged record) reports: the summary's lines, as live.ts prints them, and its exit code. */
 export interface Summary {
@@ -570,8 +579,8 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
   const ofThisCheckout = side === THIS_CHECKOUT;
   /** Known, ok this run, and not intermittent: fixed without being struck off (live-known.ts's ratchet). */
   const fixed = ofThisCheckout ? cleared.filter((r) => knownEntry(platform, r.source, r.c.id)?.intermittent !== true) : [];
-  /** An ensure case skipped proves nothing about the hold (live-ensure.ts): the run fails on it. */
-  const ensureSkips = results.filter((r) => r.c.group === 'ensure' && r.verdict.outcome === 'SKIP');
+  /** A case whose SKIP proves nothing (Case.skipFails: the ensure cases, live-ensure.ts): the run fails on it. */
+  const failingSkips = results.filter((r) => r.c.skipFails === true && r.verdict.outcome === 'SKIP');
   const lines = [
     `<!-- averi: ${side}${rejudgedFrom !== undefined ? ` (rejudged from ${rejudgedFrom})` : ''} -->`,
     `# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD')} loud, ${count('MISMATCH')} mismatches (${unknown.length} not known), ${count('SKIP')} skipped`,
@@ -596,8 +605,8 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
   }
   if (cleared.length > 0) lines.push(`Known but ok this run: ${cleared.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
   if (fixed.length > 0) lines.push(`FIXED, not intermittent — strike off live-known.ts: ${fixed.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
-  if (ensureSkips.length > 0) lines.push(`SKIPPED in the ensure group, which proves nothing then: ${ensureSkips.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
-  return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || ensureSkips.length > 0 ? 1 : 0 };
+  if (failingSkips.length > 0) lines.push(`SKIPPED where a skip proves nothing — the run fails: ${failingSkips.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
+  return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 ? 1 : 0 };
 }
 
 /**
