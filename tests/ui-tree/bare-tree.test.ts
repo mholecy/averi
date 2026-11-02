@@ -7,6 +7,7 @@ import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
 import { absenceVerdict, presenceVerdict } from '../../src/ui-tree/verdict.js';
 import { node } from '../helpers/fake.js';
 import { parseDump } from '../helpers/android-dumps.js';
+import { idbSpinnerDescribeAll } from '../helpers/live-records.js';
 
 /**
  * The bare-tree rule against what the three sources REALLY return, run
@@ -67,9 +68,7 @@ describe('isBareTree: the empty / unrendered trees each source emits ARE bare', 
   });
 
   it("idb, measured (D30/D50): Held.swift's ProgressView alone — the Application and an unlabelled GenericElement that updates frequently — is bare", () => {
-    const tree = parseIdbDescribeAll(
-      readFileSync(new URL('../../docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json', import.meta.url), 'utf8'),
-    );
+    const tree = parseIdbDescribeAll(idbSpinnerDescribeAll());
     expect(tree.children.map((c) => c.role)).toEqual(['other', 'progress']);
     expect(isBareTree(tree)).toBe(true);
   });

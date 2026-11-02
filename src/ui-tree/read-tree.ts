@@ -506,9 +506,8 @@ export function sameTreeWithinPixel(a: UiNode, b: UiNode): boolean {
  * CircularProgressIndicator / LinearProgressIndicator also dumps as (its
  * progress-range semantics give the node that class name); iOS's
  * ProgressIndicator; through WDA an ActivityIndicator — React Native's
- * <ActivityIndicator> — since D27 (2026-10-31); through idb an unlabelled
- * GenericElement with the UpdatesFrequently trait — SwiftUI's ProgressView
- * — since D50 (2026-11-02, adapters/ios-tree-source.ts#idbSpinner). A spinner keeps
+ * <ActivityIndicator> — since D27 (2026-10-31); through idb SwiftUI's
+ * ProgressView since D50 (adapters/ios-tree-source.ts#idbSpinner). A spinner keeps
  * a fixed rect and no text, so `treeFingerprint` reads a loading screen as
  * unchanged. Two callers: `scroll_until` (interact/scroll-read.ts's
  * `loading`) asks this so a list still loading its next page is not called

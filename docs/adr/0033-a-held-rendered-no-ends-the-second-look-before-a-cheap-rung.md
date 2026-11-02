@@ -74,7 +74,9 @@ full window, exactly as before.**
     bare-tree.ts and no progress, so the held-no-spinner's hold began on it: h2 under idb tapped Continue 0.92 s after
     Welcome (ios-idb-ensure-d30-1.json). The idb parser (`adapters/ios-tree-source.ts#idbSpinner`) now reads an element
     that is a `GenericElement` AND carries `UpdatesFrequently` AND has no label as `progress` — no value test (a stopped
-    or older spinner may read `'0'` or a word). In the idb parser only, not the shared `IOS_ROLE_MAP`: the rule reads a
+    or older spinner may read `'0'` or a word), so an unvalued one is re-roled too and, no longer an unlabelled,
+    unvalued structural leaf, now covers its rect in `ui-tree/draw-order.ts` as WDA's does since D27 (a tap under it
+    reads covered: the safe direction). In the idb parser only, not the shared `IOS_ROLE_MAP`: the rule reads a
     trait, which WDA does not print, and WDA spells its spinner `ActivityIndicator` (above). Each part narrows it:
     `GenericElement` alone would make the keyboard's unlabelled `["Scrollable","Spacer"]` element (402×284) a spinner
     on every keyboard-up screen; the trait alone carries a `StaticText` clock or timer; a label makes it content.

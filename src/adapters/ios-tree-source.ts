@@ -197,7 +197,9 @@ function idbTree(elements: IdbElement[]): UiNode {
  * in the shared IOS_ROLE_MAP: the rule reads a trait, which WDA does not print. All three parts narrow it:
  * `GenericElement` alone is too wide (the keyboard's unlabelled `["Scrollable","Spacer"]` element, 402×284, would
  * read as loading on every keyboard-up screen); the trait alone is too wide (a `StaticText` clock or timer carries
- * it); a label makes it content. No value test: a stopped or older spinner may read `'0'` or a word.
+ * it); a label makes it content. No value test: a stopped or older spinner may read `'0'` or a word — so an UNVALUED
+ * one is re-roled too and, no longer an unlabelled, unvalued structural leaf, now covers its rect in
+ * ui-tree/draw-order.ts (as WDA's does since D27): a tap under it reads covered — the safe direction.
  * Residuals, stated: a LABELLED idb spinner stays `other` and content; UIKit's and React Native's spinners through idb
  * are assumed to share this shape (unmeasured, D37); an app-made unlabelled live element (a custom counter carrying
  * the trait) reads as loading — the safe direction, bounded by `ensureTimeoutMs` / `maxSwipes`.

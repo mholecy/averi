@@ -36,3 +36,21 @@ export function withFieldValue(r: RecordedCase, tag: string, value: string): Rec
   const set = (s: LabState): LabState => ({ ...s, fields: { ...s.fields, [tag]: { ...s.fields?.[tag]!, value } } });
   return { ...r, state: set(r.state), ...(r.late !== undefined && { late: set(r.late) }) };
 }
+
+/**
+ * batch-3 G's raw `idb ui describe-all --json` inside held-no-spinner's spinner phase (D50): the Application and
+ * SwiftUI's ProgressView — flat as the idb parser reads it, or the `--nested` capture taken a moment later.
+ */
+export const idbSpinnerDescribeAll = (nested = false): string =>
+  readFileSync(new URL(`../../docs/truth/live-records/ios-idb-held-no-spinner-describe-all${nested ? '-nested' : ''}-d30-1.json`, import.meta.url), 'utf8');
+
+type IdbRaw = Record<string, unknown> & { children?: IdbRaw[] };
+
+/** The recorded spinner element itself (the record's one `GenericElement`), from the flat or the nested capture. */
+export const recordedSpinner = (nested = false): Record<string, unknown> => {
+  const all = (els: IdbRaw[]): IdbRaw[] => els.flatMap((e) => [e, ...all(e.children ?? [])]);
+  const spinner = all(JSON.parse(idbSpinnerDescribeAll(nested)) as IdbRaw[]).find((e) => e.type === 'GenericElement');
+  if (spinner === undefined) throw new Error('the spinner record lists no GenericElement');
+  const { children: _children, ...element } = spinner;
+  return element;
+};

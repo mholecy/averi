@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
 import { holdTracker } from '../../src/flow/hold-tracker.js';
 import { isBareTree } from '../../src/ui-tree/bare-tree.js';
 import { showsProgress } from '../../src/ui-tree/read-tree.js';
+import { idbSpinnerDescribeAll } from '../helpers/live-records.js';
 
 /**
  * The second look's hold (D2, docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md), on
@@ -19,6 +19,8 @@ const LOGIN = screen('Sign in');
 const HOME = screen('Overview');
 const BARE = node('container', null, [node('container', null)], 800);
 const SPINNER = node('container', null, [node('text', 'Sign in', [], 40), node('progress', null, [], 40)], 800);
+/** idb's spinner (D50): the recorded describe-all of Held.swift's ProgressView alone, through the idb parser. */
+const IDB_SPINNER = parseIdbDescribeAll(idbSpinnerDescribeAll());
 
 describe('holdTracker', () => {
   it('the fixtures: rendered screens, a bare one, a spinner on the login screen', () => {
@@ -66,19 +68,10 @@ describe('holdTracker', () => {
     expect(t.observe(LOGIN, 4500)).toBe(2000);
   });
 
-  it('a spinner read starts it over, and a spinner never holds', () => {
-    const t = holdTracker(2000);
-    t.observe(LOGIN, 0);
-    expect(t.observe(SPINNER, 1000)).toBeUndefined();
-    expect(t.observe(LOGIN, 2500)).toBeUndefined();
-    const spinning = holdTracker(2000);
-    for (const at of [0, 1000, 2000, 3000, 9000]) expect(spinning.observe(SPINNER, at)).toBeUndefined();
-  });
-
-  it("idb's spinner (D50, the recorded describe-all of Held.swift's ProgressView) breaks a run and never holds", () => {
-    const spinner = parseIdbDescribeAll(
-      readFileSync(new URL('../../docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json', import.meta.url), 'utf8'),
-    );
+  it.each([
+    ['a progress node on the login screen', SPINNER],
+    ["idb's recorded spinner (D50)", IDB_SPINNER],
+  ] as const)('a spinner read starts it over, and a spinner never holds — %s', (_name, spinner) => {
     expect(showsProgress(spinner)).toBe(true);
     const t = holdTracker(2000);
     t.observe(LOGIN, 0);

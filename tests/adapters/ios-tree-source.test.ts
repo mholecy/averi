@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { createIosTreeSource, IdbEmptyTreeError, IdbNoFrontmostError, IdbTreeSource, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { rebootSimulatorAdvice } from '../../src/adapters/simulator-reboot.js';
+import { recordedSpinner } from '../helpers/live-records.js';
 import { fakeFetch, fakeSpawn, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
 import { IOS_ROLE_MAP, type RawIosElement } from '../../src/adapters/ios-node.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
@@ -203,33 +204,23 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
  * ios-idb-held-no-spinner-describe-all-d30-1.json, element 2). The idb parser alone reads it as `progress`.
  */
 describe('parseIdbDescribeAll — an unlabelled GenericElement that updates frequently is a spinner (D50)', () => {
-  const record = async (name: string): Promise<Record<string, unknown>[]> =>
-    JSON.parse(await readFile(new URL(`../../docs/truth/live-records/${name}`, import.meta.url), 'utf8')) as Record<string, unknown>[];
   const one = (el: Record<string, unknown>): UiNode => parseIdbDescribeAll(JSON.stringify([el])).children[0];
 
-  /** Every element of a record, the `--nested` capture's children included (the parser reads the flat list; the nested one shows the same element). */
-  const flat = (els: Record<string, unknown>[]): Record<string, unknown>[] =>
-    els.flatMap((e) => [e, ...flat((e.children as Record<string, unknown>[] | undefined) ?? [])]);
-
-  it("the recorded spinner (Held.swift's ProgressView, through idb — flat and --nested captures) reads `progress`, its value kept", async () => {
-    for (const name of ['ios-idb-held-no-spinner-describe-all-d30-1.json', 'ios-idb-held-no-spinner-describe-all-nested-d30-1.json']) {
-      const spinner = flat(await record(name)).find((e) => e.type === 'GenericElement');
-      expect(spinner).toBeDefined();
-      expect(one(spinner!)).toMatchObject({ role: 'progress', label: null, value: '1', rect: { x: 191, y: 427, width: 20, height: 20 } });
-    }
+  it.each([false, true])("the recorded spinner (Held.swift's ProgressView, through idb; nested capture: %s) reads `progress`, its value kept", (nested) => {
+    expect(one(recordedSpinner(nested))).toMatchObject({ role: 'progress', label: null, value: '1', rect: { x: 191, y: 427, width: 20, height: 20 } });
   });
 
-  it('no value test: a spinner valued 0, or with no value, is still progress; an empty label is no label', async () => {
-    const spinner = (await record('ios-idb-held-no-spinner-describe-all-d30-1.json')).find((e) => e.type === 'GenericElement')!;
+  it('no value test: a spinner valued 0, or with no value, is still progress; an empty label is no label', () => {
+    const spinner = recordedSpinner();
     expect(one({ ...spinner, AXValue: '0' }).role).toBe('progress');
     expect(one({ ...spinner, AXValue: null }).role).toBe('progress');
     expect(one({ ...spinner, AXLabel: '' }).role).toBe('progress');
     expect(one({ ...spinner, traits: ['UpdatesFrequently'] }).role).toBe('progress');
   });
 
-  it('a LABELLED GenericElement with the trait stays `other` (residual: a labelled idb spinner is content)', async () => {
-    const spinner = (await record('ios-idb-held-no-spinner-describe-all-d30-1.json')).find((e) => e.type === 'GenericElement')!;
-    expect(one({ ...spinner, AXLabel: 'Loading' })).toMatchObject({ role: 'other', label: 'Loading' });
+  it('a LABELLED GenericElement with the trait stays `other` (residual: a labelled idb spinner is content) — a whitespace label too', () => {
+    expect(one({ ...recordedSpinner(), AXLabel: 'Loading' })).toMatchObject({ role: 'other', label: 'Loading' });
+    expect(one({ ...recordedSpinner(), AXLabel: ' ' }).role).toBe('other');
   });
 
   it("a GenericElement without the trait stays `other` — the keyboard's spacer (form-keyboard.idb.json)", async () => {
