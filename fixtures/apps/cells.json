@@ -773,6 +773,20 @@
         { "tag": "G", "color": "#B2EBF2", "slot": 0, "declared": "open", "text": "IBAN", "format": "group4" },
         { "tag": "A", "color": "#FFE0B2", "slot": 1, "declared": "open", "text": "Amount", "format": "thousands" }
       ]
+    },
+    {
+      "id": "held-no",
+      "family": "held",
+      "layer": "none",
+      "targets": [],
+      "held": { "bareMs": 6000 }
+    },
+    {
+      "id": "held-no-spinner",
+      "family": "held",
+      "layer": "none",
+      "targets": [],
+      "held": { "bareMs": 6000, "spinnerMs": 4000 }
     }
   ]
 }

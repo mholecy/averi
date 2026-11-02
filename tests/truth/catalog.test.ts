@@ -72,6 +72,16 @@ describe('the cell catalog', () => {
       'react-native/rn-field',
       'react-native/rn-banner',
       'react-native/rn-format',
+      'held/held-no',
+      'held/held-no-spinner',
+    ]);
+  });
+
+  it('the held cells carry their phases\' lengths (Held.swift, Held.kt read them): 6 s bare; the spinner\'s 4 s on held-no-spinner alone', async () => {
+    const c = await loadCatalog();
+    expect(c.cells.filter((x) => x.family === 'held').map((x) => [x.id, x.held])).toEqual([
+      ['held-no', { bareMs: 6000 }],
+      ['held-no-spinner', { bareMs: 6000, spinnerMs: 4000 }],
     ]);
   });
 

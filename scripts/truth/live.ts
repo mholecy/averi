@@ -9,12 +9,12 @@ import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
-import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
-import { type Call, type Case, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from './live-cases.js';
+import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
+import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
-import { callReply } from './replies.js';
-import { parseLabApp, type LabApp, type LabState } from './schema.js';
+import { callReply, isError } from './replies.js';
+import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.js';
 
 /**
  * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
@@ -71,6 +71,11 @@ import { parseLabApp, type LabApp, type LabState } from './schema.js';
  * `--side <checkout>` runs another averi's src (a calibration checkout, calibrate.ts's `differential-cal-<sha>`): its
  * tools, registry, iOS adapter and tree source, loaded as scripts/differential/side.ts loads a side — the live
  * calibration of a note (calibration.json `live`) runs its cases at the note's before and after commits.
+ *
+ * `ensure` (backlog D30, not in the default groups): ensure_state on the held cells — D2's held "no" (ADR 0033) on a
+ * device: h1 and h2 (through a spinner phase) with no wipe ahead, the hold ending the second look heldS after Welcome;
+ * h3 with a destructive rung ahead, the full window — each after an entry probe the reply says was bare
+ * (live-ensure.ts). The app's phase events and Continue's tap are the oracle; a SKIP among them exits 1.
  */
 
 const { values } = parseArgs({
@@ -92,7 +97,7 @@ const { values } = parseArgs({
 // `--rejudge`'s record (live-cases.ts#RunRecord): read here, judged by live-cases.ts#rejudge.
 const rejudging = values.rejudge === undefined ? undefined : (JSON.parse(await readFile(values.rejudge, 'utf8')) as RunRecord);
 if (rejudging === undefined && (values.udid === undefined) === (values.serial === undefined)) {
-  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
+  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
 }
 const platform: Platform = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
 const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
@@ -156,11 +161,10 @@ async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
 const configDir = join(tmpdir(), `averi-live-${process.pid}`);
 await mkdir(configDir, { recursive: true });
 async function configFor(source: Source, c: Case): Promise<string> {
-  const { dismiss, flows } = c;
-  const path = join(configDir, `averi-${source}${dismiss === undefined ? '' : '-dismiss'}${flows === undefined ? '' : `-${c.id}`}.yaml`);
-  const ios = source === 'uiautomator' ? {} : { ios: { bundleId: LAB_APP[app].bundle, treeSource: source, ...(dismiss !== undefined && { keyboardDismiss: dismiss }) } };
-  // JSON is YAML.
-  await writeFile(path, JSON.stringify({ app: { android: { package: LAB_APP[app].package }, ...ios }, ...(flows !== undefined && { flows }) }));
+  const { dismiss, flows, states } = c;
+  const path = join(configDir, `averi-${source}${dismiss === undefined ? '' : '-dismiss'}${flows === undefined && states === undefined ? '' : `-${c.id}`}.yaml`);
+  // JSON is YAML (live-cases.ts#caseConfig).
+  await writeFile(path, JSON.stringify(caseConfig(source, c, app)));
   return path;
 }
 
@@ -187,11 +191,17 @@ if (rejudging !== undefined) {
     for (const c of selected) {
       for (const source of sources) {
         if (c.sources !== undefined && !c.sources.includes(source)) continue;
+        // Case.warmUp (the ensure cases, timed from the launch: live-ensure.ts): the tree source bound first — WDA
+        // started, idb's companion up — by one read under the case's own config, its reply discarded, so the entry probe
+        // reads the bare screen rather than a Welcome the binding outran. A warm-up that failed is kept in the record.
+        const warm = c.warmUp === true ? await callTool(client, { tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await configFor(source, c)) : undefined;
+        const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
+        if (warmUpError !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
         const launched = await lab.launch(c.cell);
         if (c.keyboard && launched.keyboard?.visible !== true) {
           const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
           results.push({ source, c, verdict, replies: [] });
-          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined });
+          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined, ...(warmUpError !== undefined && { warmUpError }) });
           console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
           continue;
         }
@@ -204,16 +214,18 @@ if (rejudging !== undefined) {
           if (c.group === 'visibility' && i < c.calls.length - 1) after.push(await lab.state());
         }
         await pause(800);
-        const state = (await lab.state())!;
+        // Stamped with when it was read (LabState.readAt): the ensure judges ask it.
+        const stamped = (s: LabState | undefined) => (s === undefined ? s : { ...s, readAt: Date.now() / 1000 });
+        const state = stamped(await lab.state())!;
         let late: LabState | undefined;
         if (c.group !== 'visibility' && c.judge(state, replies, source, launched, after).outcome !== 'ok') {
           await pause(3_000);
-          late = await lab.state();
+          late = stamped(await lab.state());
         }
         const verdict = judged(c, source, replies, launched, after, state, late);
         if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
         results.push({ source, c, verdict, replies });
-        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }) });
+        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUpError !== undefined && { warmUpError }) });
         console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
       }
     }

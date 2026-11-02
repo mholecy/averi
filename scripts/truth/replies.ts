@@ -71,6 +71,31 @@ export const notInTree = (reply: string) => /waiting for element .* to appear(?!
 export const missedTarget = (reply: string) => notInTree(reply) || /^ERROR Timed out after \d+ms waiting for element /.test(reply);
 
 /**
+ * ensure_state's held "no" (D2, docs/adr/0033-a-held-rendered-no-ends-the-second-look-before-a-cheap-rung.md): the trace
+ * line a second look the hold ended writes before its rung (src/flow/engine.ts:772, "second look: not detected, the
+ * screen held still <s> — running <rung> before the <window> window's end") — how long the screen held and the rung it
+ * ran; undefined when the reply has none (a look that ran its full window, or none at all). The live ensure cases
+ * (live-ensure.ts) ask it.
+ */
+export function heldStill(reply: string): { heldS: number; flow: string } | undefined {
+  const m = /second look: not detected, the screen held still ([\d.]+) s — running (\S+) before /.exec(reply);
+  return m === null ? undefined : { heldS: Number(m[1]), flow: m[2] };
+}
+
+/**
+ * ensure_state's ENTRY probe read only bare trees — the evidence that a second look was earned (src/flow/engine.ts
+ * #detects: `⚠ detect: <condition> treated as not detected — every UI tree read was bare, …`). The second look's own bare
+ * line names itself (`… (second look over 20 s) — …`) and a failed read says `last UI tree read failed`: neither counts.
+ * Only the trace's FIRST line is the entry probe's (FlowEngine.run logs an `environment …` line before it, if any): a
+ * rung's re-check later writes the same bare line, which says nothing of the entry. Both readers are pinned against
+ * the engine's own trace (tests/truth/live-ensure-engine.test.ts).
+ */
+export function bareEntry(reply: string): boolean {
+  const first = reply.split('\n').find((line) => !line.startsWith('environment '));
+  return first !== undefined && /^⚠ detect: .* treated as not detected — every UI tree read was bare\b/.test(first);
+}
+
+/**
  * What kind of reply it is, from a closed set — recorded on every golden check (golden.ts), so a known mismatch whose
  * reply turns into another kind (a timeout into a refusal, a stop into `fully visible`) fails the ratchet though its
  * class and its device calls stay; and what the live judges classify a reply by (live-visibility.ts, LiveVerdict.kind).

@@ -61,9 +61,11 @@ export interface CatalogTarget {
  * screen's edge; `bars` system bands and app chrome (tab bars, a FAB); `false-covers` a target's own parts or a bar
  * that is no cover; `text` text targets carrying P5's sample strings, open and under the bands and chrome (phase 4: the
  * tree's text and OCR on the real pixels); `react-native` React Native's own controls (round 7: its text fields), which
- * only the React Native lab app builds (appOf). In this order in the generated catalog (scripts/truth/catalog.ts).
+ * only the React Native lab app builds (appOf); `held` screens that render late (backlog D30: bare for seconds, then a
+ * screen outside a state — the live golden's `ensure` group, ADR 0033's held "no"), no targets, no truth captured. In
+ * this order in the generated catalog (scripts/truth/catalog.ts).
  */
-export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text', 'react-native'] as const;
+export const FAMILIES = ['base', 'presented', 'forms', 'edges', 'bars', 'false-covers', 'text', 'react-native', 'held'] as const;
 export type Family = (typeof FAMILIES)[number];
 
 /**
@@ -129,6 +131,14 @@ export interface CatalogCell {
    * a docked capture is never a floating one's (calibration.json #1).
    */
   ime?: 'floating';
+  /** A held cell's phases (the held family; Held.swift, Held.kt): drawn bare for `bareMs`, then a spinner for `spinnerMs` (none without it), then Welcome. */
+  held?: HeldSpec;
+}
+
+/** How long a held cell draws each phase before Welcome, in ms (CatalogCell.held). */
+export interface HeldSpec {
+  bareMs: number;
+  spinnerMs?: number;
 }
 
 /** averi.yaml settings per platform, merged over the golden mode's own (`bundleId`, `treeSource`, `package`). */
@@ -295,6 +305,12 @@ export interface LabState {
   offsets?: Record<string, number>;
   /** Each stroke a scroll view took, in order: from where it left rest to where it came to rest. */
   strokes?: Stroke[];
+  /**
+   * Not the app's: when the live golden read this state (live.ts, seconds since the epoch, the host's clock — the
+   * simulator's own; the emulator's set from it). The ensure judges ask whether a held cell was read after its Welcome
+   * was due (live-ensure.ts). Absent from captures and from records before it.
+   */
+  readAt?: number;
 }
 
 /**
@@ -328,9 +344,12 @@ export interface KeyboardState {
 
 /**
  * `tab` a tab bar's item was chosen (`tag` its name) — app chrome firing, phase 3's bars. A chrome's own button (a
- * toolbar's, a FAB) logs `button`, `tag` `<chrome>.<name>` (the chrome's name in LabState.chrome).
+ * toolbar's, a FAB) logs `button`, `tag` `<chrome>.<name>` (the chrome's name in LabState.chrome). `phase` a held cell
+ * changed what it draws (`tag` `bare`, `spinner`, `welcome`, `home`; `unconfigured` when its catalog entry has no
+ * `held`; Held.swift, Held.kt) — the live ensure group's
+ * clock (live-ensure.ts).
  */
-export type EventKind = 'tap' | 'dismissed' | 'button' | 'focus' | 'submit' | 'select' | 'touch' | 'tab';
+export type EventKind = 'tap' | 'dismissed' | 'button' | 'focus' | 'submit' | 'select' | 'touch' | 'tab' | 'phase';
 
 /** One thing the app logged, as the truth keeps it. */
 export interface ProbeEvent {
