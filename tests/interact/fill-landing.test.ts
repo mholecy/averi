@@ -236,11 +236,9 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
 });
 
 /**
- * D51: idb names no placeholder, so the UIKit date field's `__.__.____` is read as the empty field's text before (D29),
- * and without clear the reading was judged after it — `31.12.2026` failed against `__.__.____31122026`. An earlier text
- * of `_` and separators alone, at least one `_` (`fill-reformat.ts#maskTemplate`), is a mask's blanks, never content a
- * fill appends to: tried as no earlier text as well, second — as a vanished placeholder is (D29). This narrows D29
- * review round 2's MINOR-A for a `_` template only; a `—` or a `-` keeps it.
+ * D51: an earlier text of `_` and separators alone, at least one `_` (`fill-reformat.ts#maskTemplate`), is tried as no
+ * earlier text as well, second — idb reads the date field's unnamed `__.__.____` as its text before (D29). Why, and how
+ * it narrows D29's MINOR-A: ADR 0034's D51 amendment.
  */
 describe('a mask template is no earlier text (D51)', () => {
   const MASK = '__.__.____';

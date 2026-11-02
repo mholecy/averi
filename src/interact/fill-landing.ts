@@ -145,12 +145,8 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
  * and digits are a prefix of the typed value's (a `+421` placeholder, `421903…` typed): the reading starts with them,
  * the fallback never runs, and the result is the old false mismatch.
  *
- * A MASK TEMPLATE is the exception (D51, narrowing MINOR-A for a `_` template only): an earlier text of `_` and
- * separators alone, at least one `_` (`maskTemplate`: `__.__.____`, `__/__/____`), is tried as no earlier text as well,
- * second, whatever the reading. It is a mask's blanks, never content a fill appends to; idb reads the UIKit date
- * field's unnamed `__.__.____` as its text before, and judged after it a dotted date the field held failed. The exact
- * rule already passes a value whose earlier text vanished (`showsExactly`'s `includes`); this gives the reformat and
- * prefix rules the same reach for a `_` template, and no other text.
+ * A MASK TEMPLATE (`maskTemplate`: `_` and separators alone, at least one `_` — `__.__.____`) is tried as no earlier
+ * text as well, second, whatever the reading — why, and how it narrows MINOR-A: ADR 0034's D51 amendment.
  *
  * The earlier text is tried FIRST: a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is then
  * that earlier text's prefix, nothing of the typing landed, and nothing is typed again; tried second, the same reading

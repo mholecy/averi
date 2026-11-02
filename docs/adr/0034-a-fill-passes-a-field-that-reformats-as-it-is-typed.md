@@ -93,8 +93,7 @@ beside `retyped`, or the `reformatted-point` caveat), counts only — a value ma
   - a no-clear fill whose earlier text the field regroups (`1 234` + `5` → `12 345`), or one typed into the middle of
     the text;
   - a `.`/`,` grouping that is not by thousands (Indian lakh grouping), and a dotted date (`31.12.2026` for
-    `31122026`: its `.` groups are no thousands) — both pass since D51 (the amendment below); a single `.`/`,` that is
-    no thousands mark (`12.34` for `1234`) and a thousands shape with a short tail (`1.234.56`) still fail;
+    `31122026`: its `.` groups are no thousands) (see the D51 amendment below);
   - mixed separators (`+421 900-123-456`: one separator character per reading);
   - an eager trailing mark (`SK31 ` after four characters, `31/`);
   - spaced single characters (`1 2 3 4`: groups of one);
@@ -234,8 +233,9 @@ app held `SK31 1200 00`).
   never without it. The earlier text is tried first: a reading that is a prefix of it too (`SK` of `SK00 …`) shows
   nothing of the typing landed, and nothing is typed again. An earlier text with no letters or digits (a `—`, a
   `__/__/____` mask) keeps the pre-D29 judgment — a false mismatch, never a wrong pass — deliberately not loosened
-  (review round 2, MINOR-A, the owner's decision; narrowed for a `_` template by D51, below). So does an unnamed placeholder whose letters and digits are a
-  prefix of the typed value's (a `+421` placeholder, `421903…` typed): the fallback never runs, the old false mismatch.
+  (review round 2, MINOR-A, the owner's decision; see the D51 amendment below). So does an unnamed placeholder whose
+  letters and digits are a prefix of the typed value's (a `+421` placeholder, `421903…` typed): the fallback never
+  runs, the old false mismatch.
   This widens ADR 0023's decision 2 in that one case (its header says so).
   **Where it reaches** (review round 1, MINOR-2): every source that names no placeholder — idb, and the API 33
   uiautomator dump (a classic EditText's hint dumped as its `text`, android.ts; the Android lab's fields are Compose,
@@ -336,8 +336,9 @@ one when it is a single mark that is no thousands, or a thousands shape with a s
 blanks while typed (`31.12.____`) is a false mismatch, as `_` is no separator. A reading that shows every typed
 character with only separators the rules refuse still fails with `length`/`same-length` and no remedy named — a
 separate backlog row (D53). **Residual 4 (accepted):** a digit grouping by `.`/`,` that no known format uses
-(`1,2345,678`, `1.23.456`, `1.23.456.789`) passes as a reformat, said in the aside: the typed digits are all there,
-in order, and no reading of two marks makes a decimal of them. Whitelisting date shapes (2-2-4, 2-2-2, 4-2-2) was
+(`1,2345,678`, `1.23.456`, `1.23.456.789`) passes as a reformat, said in the aside: the typed digits are all there, in
+order, and no reading of two marks makes a decimal of them. So does `12.34.56` for `123456`, a grouping in twos,
+while a single `12.34` for `1234` still fails. Whitelisting date shapes (2-2-4, 2-2-2, 4-2-2) was
 considered and rejected: arbitrary, leaves the lakh failing, and a partial date would have to match a shape's prefix.
 
 **Live.** The three f11 entries of live-known.ts (`android uiautomator f11`, `ios idb f11`, `ios wda f11`) are struck
@@ -345,15 +346,17 @@ off, and the note's live-only exemption with them (tests/truth/lab-notes.test.ts
 its `why` saying so). The three `*-forms-d37-1.json` records are the src before the fix: tests/truth/live-rejudge.test.ts
 reads f11 there not known, exit 1. **The golden says nothing of this change** (it never types).
 
-**Mutation-checked**: nineteen hand mutants, each killed by the new tests — `digitGrouping` always false; its
-`DIGITS.test(typing)` removed, negated, or asked of `expected` instead of the whole typing; `.some` → `.every`;
+**Mutation-checked**: twenty-five hand mutants, each killed by the new tests — `digitGrouping` always false; its
+`DIGITS.test(typing)` removed, negated, or asked of the shown prefix instead of the whole typing; `.some` → `.every`;
 `!== 3` → `=== 3`; the inner-group conjunct removed; `slice(1, -1)` → `slice(1)`, `slice(0, -1)` or the whole
-`groups`; `point` kept on the new path; `maskTemplate`'s `includes('_')` removed, `every` → `some`, `SEPARATORS` →
-`SPACES`, `_` dropped from its characters, `:` added; `priorsOf` without `maskTemplate`, with its order reversed, or
-asking it of the reading. A `groups.length >= 3` conjunct the spec proposed was dropped as redundant (an inner group
-exists only with three groups or more; its mutants were equivalent). `npm run mutate` (cold): fill-reformat 94.03 → 94.37 %
-(floor 92; its one new survivor equivalent: `mark !== undefined` → true before `thousands` — with no mark the point
-is undefined either way), fill-landing 95.16 → 95.20 % (floor 93); floors unchanged.
+`groups`; `markKind`'s `isPoint` negated, its thousands path removed, a neither passing as `'none'` or as
+`'thousands'`, its refusal ignored; `point` set for a grouping, or never; `maskTemplate`'s `includes('_')` removed,
+`every` → `some`, `SEPARATORS` → `SPACES`, `_` dropped from its characters, `:` added; `priorsOf` without
+`maskTemplate`, with its order reversed, or asking it of the reading. A `groups.length >= 3` conjunct the spec
+proposed was dropped as redundant (an inner group exists only with three groups or more; its mutants were
+equivalent). `npm run mutate` (cold; a Stryker timeout counts as killed, as Stryker scores it): fill-reformat
+94.03 → 94.35 % (floor 92; its two new survivors equivalent — `markKind`'s `'none'` and `'grouping'` emptied:
+`reformatOf` tells only `'thousands'` and undefined apart), fill-landing 95.16 → 95.20 % (floor 93); floors unchanged.
 
 **Not checked on the device.** The next batch runs `live.ts --groups forms` on idb, WDA and uiautomator: f11 should read
 `Filled … (8 characters, the field shows them reformatted: 2 separators added)`, f1–f14 otherwise as at D37/D40.
@@ -369,5 +372,6 @@ its value, no placeholder — inferred from D29's iban field (the same `Formatti
 3. **The placeholder asymmetry** (A2's amendment): a named placeholder shown grouped for an ungrouped value is held as
    empty and fails `unchanged`.
 4. **A digit grouping by `.`/`,` that no known format uses passes as a reformat** (D51's amendment): `1,2345,678`,
-   `1.23.456` — said in the reply's aside, no ⚠ caveat. Every typed digit is there, in order, and two marks cannot be
-   a decimal point.
+   `1.23.456`, `1.23.456.789` — said in the reply's aside, no ⚠ caveat. Every typed digit is there, in order, and two
+   marks cannot be a decimal point. So does `12.34.56` for `123456` (a grouping in twos), though one `12.34` for `1234`
+   still fails.

@@ -152,6 +152,7 @@ describe('reformatOf — a digit grouping by `.` or `,` (D51)', () => {
     expect(reformatOf('1.23.456', '123456')).toEqual({ added: 2, respaced: 0 });
     expect(reformatOf('1,2345,678', '12345678')).toEqual({ added: 2, respaced: 0 });
     expect(reformatOf('1.23.456.789', '123456789')).toEqual({ added: 3, respaced: 0 }); // one inner group not three is enough
+    expect(reformatOf('12.34.56', '123456')).toEqual({ added: 2, respaced: 0 }); // a grouping in twos; one mark (`12.34`) still fails
   });
 
   it('one added mark is never a digit grouping: it may be a decimal point', () => {

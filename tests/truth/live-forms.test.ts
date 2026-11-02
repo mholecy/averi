@@ -256,7 +256,7 @@ describe('refusedKept: p7, a character averi cannot type into a prefilled field'
 
 /**
  * f11–f14 (D37): form-format's `date` (schema.ts#FieldFormat, placeholder `__.__.____`) and `phone` (no format,
- * placeholder `+421`) — ADR 0034's dotted date and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
+ * placeholder `+421`) — at D37, ADR 0034's dotted date (a false mismatch until D51) and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
  * final state set to what each fill would leave; batch-3's device records are rejudged in live-rejudge.test.ts.
  */
 describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () => {
@@ -331,8 +331,9 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
 
   // Batch-3's device run (block H, main 6b4a44df; ios-idb-forms-d37-1.json, ios-wda-forms-d37-1.json,
   // android-forms-d37-1.json): f11 failed-holds under every source — the app held `31.12.2026`, averi replied "ERROR
-  // fill: typed 8 characters but the field shows 10" (ADR 0034 fails a `.` group that is no thousands; backlog D51);
-  // f12–f14 ok everywhere, f13 under idb included. Exactly f11 is known, under each source, by the rule and kind it read.
+  // fill: typed 8 characters but the field shows 10" (ADR 0034 then failed a `.` group that is no thousands); f12–f14 ok
+  // everywhere, f13 under idb included. f11 was known under each source until D51 fixed it and struck the three entries
+  // off; none is known now.
   it('none of f11–f14 is known under any source: f11 fixed by D51 (its three entries struck off), f12–f14 ok', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
     const known = Object.entries(sources).flatMap(([platform, ss]) =>

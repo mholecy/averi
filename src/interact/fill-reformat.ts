@@ -8,7 +8,7 @@
  * device or words a sentence.
  */
 
-import { isPoint, type Reformat } from './fill-facts.js';
+import { isPoint, type Point, type Reformat } from './fill-facts.js';
 
 /** The spaces a field may show for one another: a space, a no-break (U+00A0) and a narrow no-break (U+202F) space. */
 const SPACES = new Set([' ', '\u00A0', '\u202F']);
@@ -84,13 +84,26 @@ export function reformatOf(observed: string, expected: string, typing: string = 
   const singles = groups.map((n, k) => (n < 2 ? k : -1)).filter((k) => k !== -1);
   const atAnEnd = (k: number) => k === 0 || k === groups.length - 1;
   if (singles.length > 1 || (singles.length === 1 && !atAnEnd(singles[0]))) return undefined;
-  const mark = isPoint(sep) ? sep : undefined;
-  // Thousands first, so a thousands grouping keeps its caveat; else a digit grouping (D51), which carries none.
-  const point = mark !== undefined && thousands(chars, tokens, typing, mark) ? mark : undefined;
-  if (mark !== undefined && point === undefined && !digitGrouping(groups, typing)) return undefined;
+  const kind = markKind(sep, { chars, tokens, groups, typing });
+  if (kind === undefined) return undefined;
   const count = groups.length - 1;
   if (count + respaced === 0) return undefined;
-  return { added: count, respaced, ...(point !== undefined && { point }) };
+  return { added: count, respaced, ...(kind === 'thousands' && { point: sep as Point }) };
+}
+
+/**
+ * What the added separator `sep` is, for the `.`/`,` rule: `'none'` — no `.` or `,` (or nothing) added, the rule says
+ * nothing; `'thousands'` — a thousands mark (`thousands`), which the reading cannot tell from a decimal point
+ * (`Reformat.point`, the caveat); `'grouping'` — a digit grouping (D51, `digitGrouping`), no caveat; undefined — a
+ * `.`/`,` that is neither, and the reading fails. The two kinds are disjoint (every inner group three long, or one not).
+ */
+function markKind(
+  sep: string | undefined,
+  r: { chars: string[]; tokens: number[]; groups: readonly number[]; typing: string },
+): 'none' | 'thousands' | 'grouping' | undefined {
+  if (!isPoint(sep)) return 'none';
+  if (thousands(r.chars, r.tokens, r.typing, sep)) return 'thousands';
+  return digitGrouping(r.groups, r.typing) ? 'grouping' : undefined;
 }
 
 /**
@@ -146,9 +159,8 @@ function digitGrouping(groups: readonly number[], typing: string): boolean {
 }
 
 /**
- * D51: a text of `_` and separators alone, at least one `_` (`__.__.____`, `__/__/____`) — a mask's blanks, never
- * content a fill appends to. fill-landing.ts#priorsOf tries such an earlier text as none as well (idb reads an unnamed
- * mask placeholder as the empty field's text, D29).
+ * D51: a text of `_` and separators alone, at least one `_` (`__.__.____`, `__/__/____`) — a mask's blanks.
+ * fill-landing.ts#priorsOf tries such an earlier text as none as well (why: ADR 0034's D51 amendment).
  */
 export const maskTemplate = (text: string): boolean => text.includes('_') && [...text].every((c) => c === '_' || SEPARATORS.has(c));
 
