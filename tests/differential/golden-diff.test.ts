@@ -47,6 +47,9 @@ const RATCHET: Ratchet[] = [
   { family: 'text', known: { 'r/b.json A ocr': {} }, counts: { 'r/b.json': 1 } },
 ];
 
+/** The pins: B's as the base answered it, before its rewording; r/b.json A's (skipped now) and r/c.json A's (not replayed). */
+const PINS = { 'r/a.json B tap': ['ERROR was'], 'r/b.json A ocr': ['FAIL'], 'r/c.json A tap': ['x'] };
+
 describe('golden --against: what changed since a base run (goldenDiff)', () => {
   const d = goldenDiff(BASE, NOW, RATCHET);
 
@@ -78,6 +81,14 @@ describe('golden --against: what changed since a base run (goldenDiff)', () => {
     expect(d.strike).toEqual([{ family: 'forms', keys: ['r/a.json A tap', 'r/a.json Z tap'] }]);
   });
 
+  it('the known mismatches whose reply is not their pin, or that have none — of every capture replayed; a skipped row, or one of a capture not replayed, is not compared', () => {
+    expect(goldenDiff(BASE, NOW, RATCHET, PINS).repin).toEqual([
+      { key: 'r/a.json B tap', pin: ['ERROR was'], now: ['ERROR gone'] },
+      { key: 'r/d.json B tap', now: ['y'] },
+    ]);
+    expect(goldenDiff(BASE, NOW, RATCHET, { ...PINS, 'r/a.json B tap': ['ERROR gone'], 'r/d.json B tap': ['y'] }).repin).toEqual([]);
+  });
+
   it("each capture whose checks differ from the ratchet's COUNTS, a capture no file counts among them", () => {
     expect(d.counts).toEqual([
       { family: 'forms', recording: 'r/a.json', was: 3, now: 4 },
@@ -88,7 +99,7 @@ describe('golden --against: what changed since a base run (goldenDiff)', () => {
 
 describe('golden --against: the report (diffReport)', () => {
   it('the tallies of both runs over the captures both replayed, then the changed checks, the captures not compared, the rows to strike and the COUNTS to write', () => {
-    expect(diffReport('base.json', goldenDiff(BASE, NOW, RATCHET))).toBe(
+    expect(diffReport('base.json', goldenDiff(BASE, NOW, RATCHET, PINS))).toBe(
       [
         '# Golden against base.json: 5 checks (was 5), 1 mismatches (was 3), 0 broken targets (was 0), 1 skipped (was 0)',
         '',
@@ -125,6 +136,12 @@ describe('golden --against: the report (diffReport)', () => {
         '  r/a.json: 4 (was 3)',
         'no family file counts it',
         '  r/d.json: 2 (was none)',
+        '',
+        '## Re-pin: 2 rows (golden.ts --pin tests/differential/golden/pins.json)',
+        '  - r/a.json B tap',
+        '      - ERROR was',
+        '      + ERROR gone',
+        '  - r/d.json B tap: no pin',
         '',
       ].join('\n'),
     );

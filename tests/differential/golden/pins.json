@@ -1,0 +1,497 @@
+{
+  "android-averi_lab-api33/fab.xml K colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.fab.K\" fill within dE00 8 of #FB8C00 — container id:lab.fab.host (0,1758 1080x352) is drawn over the element (element 716,1846 320x176) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run — or, if no scroll moves it out from under that, assert something in it that lies clear of that; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "android-averi_lab-api33/fab.xml K scroll_until": [
+    "ERROR scroll_until id:\"lab.fab.K\" failed after 3 swipes — element is in the viewport but under container id:lab.fab.host (0,1758 1080x352) at its centre (876,1934), drawn over it — 0% of it shows — and the content is exhausted: swiping down no longer moves it, nor does swiping up. The app draws that over it at the end of the content — a layout defect (no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {\"x\":716,\"y\":1846,\"width\":320,\"height\":176} in a 1080x2220 viewport"
+  ],
+  "android-averi_lab-api33/fab.xml K tap": [
+    "ERROR id:\"lab.fab.K\" is under container id:lab.fab.host (0,1758 1080x352) at its centre (876,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped"
+  ],
+  "android-averi_lab-api33/fab.xml L colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.fab.L\" fill within dE00 8 of #E53935 — container id:lab.fab.host (0,1758 1080x352) is drawn over the element (element 44,1846 320x176) — the capture would show it, not the element; scroll_until the element with `fully: true` first and re-run — or, if no scroll moves it out from under that, assert something in it that lies clear of that; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "android-averi_lab-api33/fab.xml L scroll_until": [
+    "ERROR scroll_until id:\"lab.fab.L\" failed after 3 swipes — element is in the viewport but under container id:lab.fab.host (0,1758 1080x352) at its centre (204,1934), drawn over it — 0% of it shows — and the content is exhausted: swiping down no longer moves it, nor does swiping up. The app draws that over it at the end of the content — a layout defect (no clearance for a pinned bar?), not a scroll that needs more swipes. Last rect {\"x\":44,\"y\":1846,\"width\":320,\"height\":176} in a 1080x2220 viewport"
+  ],
+  "android-averi_lab-api33/fab.xml L tap": [
+    "ERROR id:\"lab.fab.L\" is under container id:lab.fab.host (0,1758 1080x352) at its centre (204,1934), drawn over it; nothing of it shows — scroll_until it first; nothing was tapped"
+  ],
+  "android-averi_lab-api33/form-picker.xml country scroll_until": [
+    "ERROR scroll_until id:\"lab.form-picker.country\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (a sheet or modal is presented over it, and the tree lists only that window — close it first)"
+  ],
+  "android-averi_lab-api33/form-picker.xml name scroll_until": [
+    "ERROR scroll_until id:\"lab.form-picker.name\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (a sheet or modal is presented over it, and the tree lists only that window — close it first)"
+  ],
+  "android-averi_lab-api33/form-picker.xml submit scroll_until": [
+    "ERROR scroll_until id:\"lab.form-picker.submit\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (a sheet or modal is presented over it, and the tree lists only that window — close it first)"
+  ],
+  "android-averi_lab-api33/scroll-sticky-cut.xml R colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.scroll-sticky-cut.R\" fill within dE00 8 of #00897B — sampled #00897B (dominant, 100% of region) vs expected #00897B → dE00 0.00 ≤ 8; scale 1.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/alert-dim.idb.json A scroll_until": [
+    "ERROR scroll_until id:\"lab.alert-dim.A\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.alert-dim.A\", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/alert-dim.idb.json A tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.alert-dim.A\" to appear",
+    "  (no tree read contained id:\"lab.alert-dim.A\", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/alert-dim.idb.json B scroll_until": [
+    "ERROR scroll_until id:\"lab.alert-dim.B\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.alert-dim.B\", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/alert-dim.idb.json B tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.alert-dim.B\" to appear",
+    "  (no tree read contained id:\"lab.alert-dim.B\", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/alert-dim.idb.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.alert-dim.C\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.alert-dim.C\", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/alert-dim.idb.json C tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.alert-dim.C\" to appear",
+    "  (no tree read contained id:\"lab.alert-dim.C\", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/alert-dim.idb.json D scroll_until": [
+    "ERROR scroll_until id:\"lab.alert-dim.D\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.alert-dim.D\", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/alert-dim.idb.json D tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.alert-dim.D\" to appear",
+    "  (no tree read contained id:\"lab.alert-dim.D\", and idb's read lists no id on any element. Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, ask for it by text: or label:, or set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json A colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-grouped.A\" fill within dE00 8 of #AC2B28 — sampled #AC2B28 (dominant, 86% of region) vs expected #AC2B28 → dE00 0.00 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json A scroll_until": [
+    "Element id:\"lab.blur-menu-grouped.A\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json A tap": [
+    "Tapped id:\"lab.blur-menu-grouped.A\""
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json B colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-grouped.B\" fill within dE00 8 of #1766AC — sampled #1866AC (dominant, 92% of region) vs expected #1766AC → dE00 0.07 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json B scroll_until": [
+    "Element id:\"lab.blur-menu-grouped.B\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json B tap": [
+    "Tapped id:\"lab.blur-menu-grouped.B\""
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json C colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.blur-menu-grouped.C\" fill within dE00 8 of #00897B — button \"Target W\" (51,448 300x64) is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order) — the capture would show it, not the element; if it is a menu or a popover, close it first; else assert something in the element that lies clear of it; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.blur-menu-grouped.C\" stopped before any swipe — element is in the viewport but under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order) — 34% of it shows; no swipe was sent — if it is a menu or a popover, close it first; no scroll moves it out from under it. Last rect {\"x\":51,\"y\":470,\"width\":300,\"height\":64} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json C tap": [
+    "ERROR id:\"lab.blur-menu-grouped.C\" is under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, under the 24x24 a tap may be moved to — if it is a menu or a popover, close it first; no scroll moves it out from under it; nothing was tapped"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json D colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-grouped.D\" fill within dE00 8 of #BC6900 — sampled #BC6A02 (dominant, 96% of region) vs expected #BC6900 → dE00 0.34 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json D scroll_until": [
+    "Element id:\"lab.blur-menu-grouped.D\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-grouped.idb.json D tap": [
+    "Tapped id:\"lab.blur-menu-grouped.D\""
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json A colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-stacked.A\" fill within dE00 8 of #AC2B28 — sampled #AC2B28 (dominant, 86% of region) vs expected #AC2B28 → dE00 0.00 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json A scroll_until": [
+    "Element id:\"lab.blur-menu-stacked.A\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json A tap": [
+    "Tapped id:\"lab.blur-menu-stacked.A\""
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json B colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-stacked.B\" fill within dE00 8 of #1766AC — sampled #1866AC (dominant, 92% of region) vs expected #1766AC → dE00 0.07 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json B scroll_until": [
+    "Element id:\"lab.blur-menu-stacked.B\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json B tap": [
+    "Tapped id:\"lab.blur-menu-stacked.B\""
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json C colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.blur-menu-stacked.C\" fill within dE00 8 of #00897B — button \"Target W\" (51,448 300x64) is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order) — the capture would show it, not the element; if it is a menu or a popover, close it first; else assert something in the element that lies clear of it; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.blur-menu-stacked.C\" stopped before any swipe — element is in the viewport but under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order) — 34% of it shows; no swipe was sent — if it is a menu or a popover, close it first; no scroll moves it out from under it. Last rect {\"x\":51,\"y\":470,\"width\":300,\"height\":64} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json C tap": [
+    "ERROR id:\"lab.blur-menu-stacked.C\" is under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, under the 24x24 a tap may be moved to — if it is a menu or a popover, close it first; no scroll moves it out from under it; nothing was tapped"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json D colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-stacked.D\" fill within dE00 8 of #BC6900 — sampled #BC6A02 (dominant, 96% of region) vs expected #BC6900 → dE00 0.34 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json D scroll_until": [
+    "Element id:\"lab.blur-menu-stacked.D\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-stacked.idb.json D tap": [
+    "Tapped id:\"lab.blur-menu-stacked.D\""
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json A colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-unhidden.A\" fill within dE00 8 of #AC2B28 — sampled #AC2B28 (dominant, 86% of region) vs expected #AC2B28 → dE00 0.00 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json A scroll_until": [
+    "Element id:\"lab.blur-menu-unhidden.A\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json A tap": [
+    "Tapped id:\"lab.blur-menu-unhidden.A\""
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json B colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-unhidden.B\" fill within dE00 8 of #1766AC — sampled #1866AC (dominant, 92% of region) vs expected #1766AC → dE00 0.07 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json B scroll_until": [
+    "Element id:\"lab.blur-menu-unhidden.B\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json B tap": [
+    "Tapped id:\"lab.blur-menu-unhidden.B\""
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json C colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.blur-menu-unhidden.C\" fill within dE00 8 of #00897B — button \"Target W\" (51,448 300x64) is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order) — the capture would show it, not the element; if it is a menu or a popover, close it first; else assert something in the element that lies clear of it; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.blur-menu-unhidden.C\" stopped before any swipe — element is in the viewport but under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order) — 34% of it shows; no swipe was sent — if it is a menu or a popover, close it first; no scroll moves it out from under it. Last rect {\"x\":51,\"y\":470,\"width\":300,\"height\":64} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json C tap": [
+    "ERROR id:\"lab.blur-menu-unhidden.C\" is under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, under the 24x24 a tap may be moved to — if it is a menu or a popover, close it first; no scroll moves it out from under it; nothing was tapped"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json D colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu-unhidden.D\" fill within dE00 8 of #BC6900 — sampled #BC6A02 (dominant, 96% of region) vs expected #BC6900 → dE00 0.34 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json D scroll_until": [
+    "Element id:\"lab.blur-menu-unhidden.D\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu-unhidden.idb.json D tap": [
+    "Tapped id:\"lab.blur-menu-unhidden.D\""
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json A colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu.A\" fill within dE00 8 of #AC2B28 — sampled #AC2B28 (dominant, 86% of region) vs expected #AC2B28 → dE00 0.00 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json A scroll_until": [
+    "Element id:\"lab.blur-menu.A\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json A tap": [
+    "Tapped id:\"lab.blur-menu.A\""
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json B colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu.B\" fill within dE00 8 of #1766AC — sampled #1866AC (dominant, 92% of region) vs expected #1766AC → dE00 0.07 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json B scroll_until": [
+    "Element id:\"lab.blur-menu.B\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json B tap": [
+    "Tapped id:\"lab.blur-menu.B\""
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json C colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.blur-menu.C\" fill within dE00 8 of #00897B — button \"Target W\" (51,448 300x64) is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order) — the capture would show it, not the element; if it is a menu or a popover, close it first; else assert something in the element that lies clear of it; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.blur-menu.C\" stopped before any swipe — element is in the viewport but under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order) — 34% of it shows; no swipe was sent — if it is a menu or a popover, close it first; no scroll moves it out from under it. Last rect {\"x\":51,\"y\":470,\"width\":300,\"height\":64} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json C tap": [
+    "ERROR id:\"lab.blur-menu.C\" is under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, under the 24x24 a tap may be moved to — if it is a menu or a popover, close it first; no scroll moves it out from under it; nothing was tapped"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json D colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu.D\" fill within dE00 8 of #BC6900 — sampled #BC6A02 (dominant, 96% of region) vs expected #BC6900 → dE00 0.34 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json D scroll_until": [
+    "Element id:\"lab.blur-menu.D\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu.idb.json D tap": [
+    "Tapped id:\"lab.blur-menu.D\""
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json A colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu.A\" fill within dE00 8 of #AC2B28 — sampled #AC2B28 (dominant, 86% of region) vs expected #AC2B28 → dE00 0.00 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json A scroll_until": [
+    "Element id:\"lab.blur-menu.A\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json A tap": [
+    "Tapped id:\"lab.blur-menu.A\""
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json B colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu.B\" fill within dE00 8 of #1766AC — sampled #1866AC (dominant, 92% of region) vs expected #1766AC → dE00 0.07 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json B scroll_until": [
+    "Element id:\"lab.blur-menu.B\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json B tap": [
+    "Tapped id:\"lab.blur-menu.B\""
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json C colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.blur-menu.C\" fill within dE00 8 of #00897B — button \"Target W\" (51,448 300x64) is drawn over the element (element 51,470 300x64) as a screenshot shows (the two are listed in reading order) — the capture would show it, not the element; if it is a menu or a popover, close it first; else assert something in the element that lies clear of it; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.blur-menu.C\" stopped before any swipe — element is in the viewport but under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order) — 34% of it shows; no swipe was sent — if it is a menu or a popover, close it first; no scroll moves it out from under it. Last rect {\"x\":51,\"y\":470,\"width\":300,\"height\":64} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json C tap": [
+    "ERROR id:\"lab.blur-menu.C\" is under button \"Target W\" (51,448 300x64) at its centre (201,502), drawn over it as a screenshot shows (the two are listed in reading order); only a 300x22 part of it shows, under the 24x24 a tap may be moved to — if it is a menu or a popover, close it first; no scroll moves it out from under it; nothing was tapped"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json D colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.blur-menu.D\" fill within dE00 8 of #BC6900 — sampled #BC6A02 (dominant, 96% of region) vs expected #BC6900 → dE00 0.34 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json D scroll_until": [
+    "Element id:\"lab.blur-menu.D\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/blur-menu.wda.json D tap": [
+    "Tapped id:\"lab.blur-menu.D\""
+  ],
+  "ios-iphone17-ios27/carousel-in-list.idb.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.carousel-in-list.C\" failed after 3 swipes — element is in the viewport but CLIPPED at right, 7% of it is in the viewport, and the content is exhausted: swiping right no longer moves it, nor does swiping left. The element cannot be fully revealed — that is a layout defect (no clearance for an overlay?), not a scroll that needs more swipes. Last rect {\"x\":378,\"y\":138,\"width\":354,\"height\":85} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/chooser-over-list.idb.json R colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.chooser-over-list.R\" fill within dE00 8 of #FFFFFF — button \"SWIFT payment\" (45,453 312x52) overlaps the element (element 24,435 354x52), the two listed in reading order: which is drawn on top is not told — the capture may show it, not the element; no scroll tells which is on top: a screenshot could not tell either (it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there) — if the other is drawn over the element (a menu, a popover), close it first; if the element is the one on top, assert something in it that lies clear of the other; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/chooser-over-list.idb.json R scroll_until": [
+    "ERROR scroll_until id:\"lab.chooser-over-list.R\" stopped before any swipe — element is in the viewport but overlapped by button \"SWIFT payment\" (45,453 312x52) at its centre (201,461), the two listed in reading order: which is drawn on top is not told — 19% of it shows; no swipe was sent — no scroll tells which is on top: a screenshot could not tell either (it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there) — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates. Last rect {\"x\":24,\"y\":435,\"width\":354,\"height\":52} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/chooser-over-list.idb.json R tap": [
+    "ERROR id:\"lab.chooser-over-list.R\" is overlapped by button \"SWIFT payment\" (45,453 312x52) at its centre (201,461), the two listed in reading order: which is drawn on top is not told; only a 354x4 part of it shows, under the 24x24 a tap may be moved to — no scroll tells which is on top: a screenshot could not tell either (it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there) — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates; nothing was tapped"
+  ],
+  "ios-iphone17-ios27/chooser-over-list.idb.json S colour": [
+    "1/1 asserts FAILED",
+    "FAIL  element id:\"lab.chooser-over-list.S\" fill within dE00 8 of #FFFFFF — button \"Loan repayment, 17.07.2026, +602,00 EUR\" (24,435 354x52) overlaps the element (element 45,453 312x52), the two listed in reading order: which is drawn on top is not told — the capture may show it, not the element; no scroll tells which is on top: a screenshot could not tell either (it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there) — if the other is drawn over the element (a menu, a popover), close it first; if the element is the one on top, assert something in it that lies clear of the other; failing closed, color unchecked",
+    "appAlive: true"
+  ],
+  "ios-iphone17-ios27/chooser-over-list.idb.json S scroll_until": [
+    "ERROR scroll_until id:\"lab.chooser-over-list.S\" stopped before any swipe — element is in the viewport but overlapped by button \"Loan repayment, 17.07.2026, +602,00 EUR\" (24,435 354x52) at its centre (201,479), the two listed in reading order: which is drawn on top is not told — 35% of it shows; no swipe was sent — no scroll tells which is on top: a screenshot could not tell either (it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there) — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates. Last rect {\"x\":45,\"y\":453,\"width\":312,\"height\":52} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/chooser-over-list.idb.json S tap": [
+    "ERROR id:\"lab.chooser-over-list.S\" is overlapped by button \"Loan repayment, 17.07.2026, +602,00 EUR\" (24,435 354x52) at its centre (201,479), the two listed in reading order: which is drawn on top is not told; only a 312x18 part of it shows, under the 24x24 a tap may be moved to — no scroll tells which is on top: a screenshot could not tell either (it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there) — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates; nothing was tapped"
+  ],
+  "ios-iphone17-ios27/dim-cover.idb.json A scroll_until": [
+    "ERROR scroll_until id:\"lab.dim-cover.A\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.dim-cover.A\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/dim-cover.idb.json A tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.dim-cover.A\" to appear",
+    "  (no tree read contained id:\"lab.dim-cover.A\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/dim-cover.idb.json B scroll_until": [
+    "ERROR scroll_until id:\"lab.dim-cover.B\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.dim-cover.B\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/dim-cover.idb.json B tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.dim-cover.B\" to appear",
+    "  (no tree read contained id:\"lab.dim-cover.B\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/dim-cover.idb.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.dim-cover.C\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.dim-cover.C\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/dim-cover.idb.json C tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.dim-cover.C\" to appear",
+    "  (no tree read contained id:\"lab.dim-cover.C\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/dim-cover.idb.json D scroll_until": [
+    "ERROR scroll_until id:\"lab.dim-cover.D\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.dim-cover.D\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/dim-cover.idb.json D tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.dim-cover.D\" to appear",
+    "  (no tree read contained id:\"lab.dim-cover.D\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-keyboard.idb.json ks tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.form-keyboard.ks\" to appear",
+    "  (no tree read contained id:\"lab.form-keyboard.ks\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-keyboard.idb.json note tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.form-keyboard.note\" to appear",
+    "  (no tree read contained id:\"lab.form-keyboard.note\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-keyboard.idb.json ss tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.form-keyboard.ss\" to appear",
+    "  (no tree read contained id:\"lab.form-keyboard.ss\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-keyboard.idb.json vs tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.form-keyboard.vs\" to appear",
+    "  (no tree read contained id:\"lab.form-keyboard.vs\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-picker.idb.json country scroll_until": [
+    "ERROR scroll_until id:\"lab.form-picker.country\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.form-picker.country\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-picker.idb.json country tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.form-picker.country\" to appear",
+    "  (no tree read contained id:\"lab.form-picker.country\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-picker.idb.json name scroll_until": [
+    "ERROR scroll_until id:\"lab.form-picker.name\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.form-picker.name\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-picker.idb.json name tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.form-picker.name\" to appear",
+    "  (no tree read contained id:\"lab.form-picker.name\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-picker.idb.json submit scroll_until": [
+    "ERROR scroll_until id:\"lab.form-picker.submit\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.form-picker.submit\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/form-picker.idb.json submit tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.form-picker.submit\" to appear",
+    "  (no tree read contained id:\"lab.form-picker.submit\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/scroll-bounded-footer.idb.json O scroll_until": [
+    "ERROR scroll_until id:\"lab.scroll-bounded-footer.O\" stopped before any swipe — element is in the viewport but overlapped by button \"Continue\" (16,600 370x56) at its centre (201,652), the two listed in reading order: which is drawn on top is not told — 44% of it shows; no swipe was sent — no scroll tells which is on top: a screenshot could not tell either (it shows the colour around it #FFFFFF beside the overlap: it may draw nothing there) — if the other is drawn over it (a menu, a popover), close it first; if it is the one on top, tap it by coordinates. Last rect {\"x\":51,\"y\":620,\"width\":300,\"height\":64} in a 402x874 viewport"
+  ],
+  "ios-iphone17-ios27/scroll-bounded-footer.idb.json O tap": [
+    "Tapped id:\"lab.scroll-bounded-footer.O\" at (201,670) — its centre (201,652) is overlapped by button \"Continue\" (16,600 370x56), the two listed in reading order: which is drawn on top is not told; tapped the uncovered part 300x28"
+  ],
+  "ios-iphone17-ios27/scroll-bounded.idb.json F scroll_until": [
+    "ERROR scroll_until id:\"lab.scroll-bounded.F\" failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 402x874 viewport (last rect {\"x\":51,\"y\":1380,\"width\":300,\"height\":64})"
+  ],
+  "ios-iphone17-ios27/scroll-bounded.idb.json O scroll_until": [
+    "Element id:\"lab.scroll-bounded.O\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/scroll-bounded.idb.json O tap": [
+    "Tapped id:\"lab.scroll-bounded.O\""
+  ],
+  "ios-iphone17-ios27/scroll-bounded.idb.json S scroll_until": [
+    "Element id:\"lab.scroll-bounded.S\" fully visible after 0 swipes"
+  ],
+  "ios-iphone17-ios27/scroll-bounded.idb.json S tap": [
+    "Tapped id:\"lab.scroll-bounded.S\""
+  ],
+  "ios-iphone17-ios27/sheet-background.idb.json A scroll_until": [
+    "ERROR scroll_until id:\"lab.sheet-background.A\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.sheet-background.A\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/sheet-background.idb.json A tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.sheet-background.A\" to appear",
+    "  (no tree read contained id:\"lab.sheet-background.A\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/sheet-background.idb.json B scroll_until": [
+    "ERROR scroll_until id:\"lab.sheet-background.B\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.sheet-background.B\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/sheet-background.idb.json B tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.sheet-background.B\" to appear",
+    "  (no tree read contained id:\"lab.sheet-background.B\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/sheet-background.idb.json C scroll_until": [
+    "ERROR scroll_until id:\"lab.sheet-background.C\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.sheet-background.C\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/sheet-background.idb.json C tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.sheet-background.C\" to appear",
+    "  (no tree read contained id:\"lab.sheet-background.C\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/sheet-background.idb.json D scroll_until": [
+    "ERROR scroll_until id:\"lab.sheet-background.D\" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree (no tree read contained id:\"lab.sheet-background.D\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/sheet-background.idb.json D tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.sheet-background.D\" to appear",
+    "  (no tree read contained id:\"lab.sheet-background.D\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss-bar.idb.json ks tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss-bar.ks\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss-bar.ks\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss-bar.idb.json note tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss-bar.note\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss-bar.note\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss-bar.idb.json ss tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss-bar.ss\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss-bar.ss\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss-bar.idb.json vs tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss-bar.vs\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss-bar.vs\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss-short.idb.json ks tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss-short.ks\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss-short.ks\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss-short.idb.json note tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss-short.note\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss-short.note\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss-short.idb.json ss tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss-short.ss\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss-short.ss\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss-short.idb.json vs tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss-short.vs\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss-short.vs\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss.idb.json ks tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss.ks\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss.ks\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss.idb.json note tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss.note\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss.note\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss.idb.json ss tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss.ss\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss.ss\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-iphone17-ios27/toolbar-dismiss.idb.json vs tap": [
+    "ERROR Timed out after 5000ms waiting for element id:\"lab.toolbar-dismiss.vs\" to appear",
+    "  (no tree read contained id:\"lab.toolbar-dismiss.vs\". Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, and drops some ids, any set on a container and a UIKit table cell label's among them. If something covers it, close that first; if it is showing, set app.ios.treeSource: wda in averi.yaml)"
+  ],
+  "ios-rn-iphone17-ios27/rn-banner.idb.json C colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.rn-banner.C\" fill within dE00 8 of #263238 — sampled #263238 (dominant, 95% of region) vs expected #263238 → dE00 0.00 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-rn-iphone17-ios27/rn-banner.idb.json C tap": [
+    "Tapped id:\"lab.rn-banner.C\""
+  ],
+  "ios-rn-iphone17-ios27/rn-banner.idb.json T colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.rn-banner.T\" fill within dE00 8 of #263238 — sampled #263238 (dominant, 70% of region) vs expected #263238 → dE00 0.00 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-rn-iphone17-ios27/rn-banner.idb.json T tap": [
+    "Tapped id:\"lab.rn-banner.T\""
+  ],
+  "ios-rn-iphone17-ios27/rn-banner.idb.json U colour": [
+    "All 1 asserts passed",
+    "PASS  element id:\"lab.rn-banner.U\" fill within dE00 8 of #263238 — sampled #263238 (dominant, 71% of region) vs expected #263238 → dE00 0.00 ≤ 8; scale 3.000",
+    "appAlive: true"
+  ],
+  "ios-rn-iphone17-ios27/rn-banner.idb.json U tap": [
+    "Tapped id:\"lab.rn-banner.U\""
+  ]
+}
