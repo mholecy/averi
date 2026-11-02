@@ -19,6 +19,8 @@ centres instead of the ⚠ line — see the amendment below).
 Amended 2026-11-02 (D56: a launch that waits behind iOS's system alert names it and its buttons' centres in its ⚠ note
 — see the amendment below).
 Amended 2026-11-02 (batch-7: D56 device-checked — the D56 amendment's last paragraph).
+Amended 2026-11-02 (D57: the alert's advice leads with a tap by the button's label, its x and y the fallback — see the
+amendment below).
 
 ## Context
 
@@ -514,8 +516,10 @@ Decision (spec-D54, adopting the D54 analysis; review round 1 reshaped the seams
   not enough, its quoted name may be another app's; on WDA the names come from the appinfo the scheme lookup cached,
   unreadable names are none); any other alert is "a system alert is up, "<title>"". Either way the headline says iOS
   has not opened the link yet — true whenever the alert holds it, which is when the wait found it in place of the app
-  — and the title and the labels are quoted verbatim, never paraphrased or judged by their words. Only coordinates are advised: batch-5 answered the alert by coordinates, and a selector tap on
-  SpringBoard's tree is unverified (D57). `front` does not move: the app is not in front.
+  — and the title and the labels are quoted verbatim, never paraphrased or judged by their words. Only coordinates are
+  advised (until D57; since then a tap by the label leads — see that amendment): batch-5 answered the alert by
+  coordinates, and a selector tap on SpringBoard's tree is unverified (D57). `front` does not move: the app is not in
+  front.
 - Unchanged: a link that matches (no `/source`, no extra call on either source), a launch (it looks for no alert; since
   D56 it does — see that amendment), every link that expects no app (web links, iOS's own schemes, another app's
   scheme).
@@ -563,7 +567,8 @@ Decision (spec-D56, adopting the D56 analysis):
   launch` succeeded (batch-1: a bare "Launched" behind the alert).
 - One wording of the buttons and the advice, in `adapters/ios-system-alert.ts`: `alertButtonsText(alert)` (`buttons
   "Cancel" at (127, 474), "Open" at (275, 474)`, "button" for one) and `ALERT_ADVICE` ("Answer it with a tap at the
-  chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered").
+  chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered";
+  reworded by D57 — see that amendment).
   `mcp/tool-text.ts#alertText` (open_deep_link's reply) uses both and stays byte-identical.
 - The note: `iOS has not brought <bundle> forward yet: a system alert is up, "<title>" — buttons "<label>" at (x, y),
   …. <ALERT_ADVICE> — then read again before trusting a read`. Always "a system alert is up", never "it asks": the alert
@@ -627,3 +632,41 @@ no SpringBoard alert other than "Open in …?" can be raised on the lab simulato
 no permission; `tel:` has no handler there, batch-4), so "every launch stays behind" is still measured for "Open in …?"
 alone. The remembered answer was restored and verified. The same batch tapped the alert's buttons by text (backlog D57,
 an observation; the advice above is unchanged).
+
+## Amendment: the alert's advice names a tap by the button's label (2026-11-02, backlog D57)
+
+D54 advised only a tap at a button's coordinates, the one answer then proven on a device; a tap by text on
+SpringBoard's tree was unverified. Batch-7 block B (2026-11-02, lab simulator, iOS 27.0, main a6410f64 — the same tap
+code as this change's base) tapped the "Open in “AveriLab”?" alert by text: `tap text:"Cancel"` and `tap text:"Open"`
+dismissed it 8/8, under idb and WDA, over SpringBoard and over Contacts — one Button matched each time, tapped at its
+centre, never the other button and no refusal. A tap by text is also the steadier answer: it waits for two reads that
+agree on the rect (which absorbs the alert's appear animation) and is judged, where coordinates are sent as given; and
+it is what an agent reaches for first.
+
+Decision (spec-D57, adopting the D57 analysis's option A with a test that pins today's tap):
+
+- Only `ALERT_ADVICE` (`adapters/ios-system-alert.ts`) changes, to "Answer it with tap text:"<label>" for the button you
+  mean, or a tap at its x and y (averi taps nothing itself); every launch stays behind the alert until it is
+  answered". `<label>` is literal: the button list before it already quotes every label, so the agent copies one. Both
+  replies follow the one constant — open_deep_link's (`mcp/tool-text.ts#alertText`) and launch_app's ⚠ note
+  (`ios-foreground.ts#alertNote`) — and change together on purpose.
+- No tap code. The selector path already lands on the alert's own Button: idb lists the alert alone (the title and its
+  Buttons, nothing of the app or the status bar beneath), and on WDA the alert's layer is the marked top layer
+  (`presentation: 'alert'`), so a target behind it — Contacts' hidden "Return to AveriLab" breadcrumb — is refused
+  "an alert is presented over it (…) — close it first; nothing was tapped". Pinned by
+  `tests/interact/tap-system-alert.test.ts`: the real `tapElement`, with the MCP tap's `ambiguous: 'refuse'`, over the
+  three committed alert captures.
+- No "alert layer first" guard in the resolution: its only effect would be to turn today's honest ambiguity refusal
+  into a guess. "averi taps nothing itself" stands (an opt-in confirm is D58's).
+- Unchanged, byte for byte: the detection, the headline (`iOS has not opened <url> yet: …`, `iOS has not brought
+  <bundle> forward yet: …`), the button list with its centres, launch_app's tail ("then read again before trusting a
+  read"), the happy-path replies, D48's and D49a's ⚠ notes, every call list, the cost.
+
+Residuals, stated: measured on one iOS (27.0), with English labels, for this one alert — another SpringBoard alert gets
+the same advice untested; a label that cannot be written as a selector (it contains `"`: the grammar has no escape),
+or two buttons sharing a label, needs the coordinates the same reply quotes; another Button with the same label
+elsewhere in SpringBoard's tree (none measured) makes the tap refuse as ambiguous and name both — averi never taps it
+instead; on idb a tap at an app element while the alert is up times out "to appear" without naming the alert (WDA
+refuses it "close it first"; outside D57); on WDA a tap by text costs two `/source` reads for its settle, about
+1.2–1.6 s, against about 0.6 s on idb. To check on the device (the next owner batch): D49A E2 under idb and WDA, the
+new reply read once and its first remedy followed.
