@@ -36,7 +36,7 @@ val SUPPORTED_LAYERS = setOf("none", "sheet-medium", "alert", "dialog-fullscreen
 data class Target(val tag: String, val color: Long, val slot: Int, val onLayer: Boolean, val text: String? = null, val label: String? = null)
 
 /**
- * `family`: base, presented, forms, edges, bars, false-covers — MainActivity's CellRouter routes by it. `form`: a form
+ * `family`: base, presented, forms, edges, bars, false-covers, text, held — MainActivity's CellRouter routes by it. `form`: a form
  * cell's catalog entry as it stands (Forms.kt reads it) — a form builds its own picker sheet, so its `sheet-large` is
  * supported where a coloured-target cell's is not.
  */

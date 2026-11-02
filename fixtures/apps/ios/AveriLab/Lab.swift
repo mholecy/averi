@@ -20,7 +20,7 @@ struct Catalog: Decodable {
 
 struct Cell: Decodable, Identifiable {
     let id: String
-    /// base, presented, forms, edges, bars, false-covers — CellRouter (AveriLabApp.swift) routes by it.
+    /// base, presented, forms, edges, bars, false-covers, text, held — CellRouter (AveriLabApp.swift) routes by it.
     let family: String?
     let layer: String
     let targets: [Target]
@@ -118,7 +118,7 @@ struct LabEvent: Codable {
     /// "tap" (a target's action fired), "dismissed" (a layer went away), "button" (a layer's own button); on a form
     /// "focus" (the field `tag` took the focus, "" none), "submit" (`tag` valid / invalid), "select" (a picker row);
     /// "touch" (a touch began in one of the app's windows, `tag` "x,y" in screen points — the probe's positive
-    /// control).
+    /// control); on a held cell "phase" (what it draws now: bare, spinner, welcome, home — Held.swift).
     let kind: String
     let tag: String
     let at: Double

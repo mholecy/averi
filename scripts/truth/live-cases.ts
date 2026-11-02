@@ -5,6 +5,7 @@ import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
 import { LAB_APP } from './lab-device.js';
 import { knownEntry, knownLive } from './live-known.js';
+import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedKept, short, type Source, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
@@ -36,19 +37,21 @@ export interface RunRecord {
 // --- the cases ---
 
 export interface Call {
-  tool: 'type_text' | 'tap' | 'scroll_until' | 'assert' | 'run_flow' | 'press_key';
+  tool: 'type_text' | 'tap' | 'scroll_until' | 'assert' | 'run_flow' | 'press_key' | 'ensure_state' | 'ui_snapshot';
   args: Record<string, unknown>;
 }
 
 export interface Case extends RunsUnder {
   id: string;
-  group: 'forms' | 'visibility' | 'dismissal';
+  group: 'forms' | 'visibility' | 'dismissal' | 'ensure';
   cell: string;
   says: string;
   /** averi.yaml `app.ios.keyboardDismiss` for this case. */
   dismiss?: unknown[];
-  /** averi.yaml `flows` for this case: what its `run_flow` calls name. */
+  /** averi.yaml `flows` for this case: what its `run_flow` calls name, and its `states`' reach rungs. */
   flows?: Record<string, unknown>;
+  /** averi.yaml `states` for this case: what its `ensure_state` calls name. */
+  states?: Record<string, unknown>;
   /** The case is about the soft keyboard: judged only when the launch shows it (else SKIP). */
   keyboard?: true;
   /** The platforms it runs on (both when unset). */
@@ -404,6 +407,38 @@ const FORMS: Omit<Case, 'group'>[] = [
   { id: 'rf5', cell: RF, says: "a flow's tap + `type_pin:` into the RN amount field", flows: pinFlow(RF, 'A.field', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('A', `1${NBSP}234${NBSP}567`) },
 ];
 
+// --- the ensure group (backlog D30, ADR 0033): D2's held "no" on a device ---
+
+/**
+ * ensure_state on the held cells (fixtures/apps/cells/held.json): `home` detects Home, its ladder's first rung
+ * `continue` taps Continue and waits for Home; h3's ladder ends in `wipe`, a flow marked `destructive: true` (a wait on
+ * Home that never runs: Continue reaches Home first) — a wipe ahead, so the second look keeps its full window
+ * (live-ensure.ts). Not in the default groups: `--groups ensure`.
+ */
+const ensureConfig = (cell: string, wipe: boolean) => ({
+  states: { home: { detect: { element: { id: labId(cell, 'home') } }, reach: ['continue', ...(wipe ? ['wipe'] : [])] } },
+  flows: {
+    continue: { steps: [{ tap: { id: labId(cell, 'continue') } }, { wait: { element: { id: labId(cell, 'home') }, timeout: '5s' } }] },
+    ...(wipe && { wipe: { destructive: true, steps: [{ wait: { element: { id: labId(cell, 'home') }, timeout: '1s' } }] } }),
+  },
+});
+const ENSURE_HOME: Call = { tool: 'ensure_state', args: { state: 'home' } };
+const ENSURE: Omit<Case, 'group'>[] = [
+  { id: 'h1', cell: 'held-no', says: 'ensure_state from a bare launch onto Welcome, no wipe ahead: the hold ends the look ~2 s after Welcome, said in one line', ...ensureConfig('held-no', false), calls: [ENSURE_HOME], judge: judgeHeldNo },
+  { id: 'h2', cell: 'held-no-spinner', says: 'the same through 4 s of a spinner: the hold never ends on the spinner — Continue tapped only once Welcome has held (D37: idb\'s spelling of it)', ...ensureConfig('held-no-spinner', false), calls: [ENSURE_HOME], judge: judgeHeldNo },
+  { id: 'h3', cell: 'held-no', says: 'the same with a destructive rung after Continue: no hold — the look keeps its full window', ...ensureConfig('held-no', true), calls: [ENSURE_HOME], judge: judgeFullWindow },
+];
+
+/**
+ * The averi.yaml a case runs under, as live.ts#configFor writes it (JSON is YAML): the lab app's identity, on iOS its
+ * tree source and the case's `keyboardDismiss`, and the case's `flows` and `states`.
+ */
+export function caseConfig(source: Source, c: Pick<Case, 'dismiss' | 'flows' | 'states'>, app: LabApp): Record<string, unknown> {
+  const { dismiss, flows, states } = c;
+  const ios = source === 'uiautomator' ? {} : { ios: { bundleId: LAB_APP[app].bundle, treeSource: source, ...(dismiss !== undefined && { keyboardDismiss: dismiss }) } };
+  return { app: { android: { package: LAB_APP[app].package }, ...ios }, ...(states !== undefined && { states }), ...(flows !== undefined && { flows }) };
+}
+
 // --- phase 5: the visibility cells, from their static truth ---
 
 let catalogRead: Promise<Catalog> | undefined;
@@ -432,10 +467,10 @@ export interface Selection {
   onlyCells?: readonly string[];
 }
 
-/** The cases of a run, in the order it runs them: the forms, then the visibility cells', then the dismissal's. */
+/** The cases of a run, in the order it runs them: the forms, the ensure group's, then the visibility cells', then the dismissal's. */
 export async function selectCases({ platform, app, groups, only, onlyCells }: Selection): Promise<Case[]> {
   const catalog = await catalogOf();
-  const cases: Case[] = FORMS.map((c) => ({ ...c, group: 'forms' }));
+  const cases: Case[] = [...FORMS.map((c) => ({ ...c, group: 'forms' as const })), ...ENSURE.map((c) => ({ ...c, group: 'ensure' as const }))];
   if (groups.includes('visibility')) {
     for (const truth of await truthsOf(platform, app)) {
       if (truth.targets.length === 0 || (onlyCells !== undefined && !onlyCells.includes(truth.cell))) continue;

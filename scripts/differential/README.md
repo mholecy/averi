@@ -263,6 +263,7 @@ keyboard preferences):
 node --import tsx scripts/truth/live.ts --udid <lab udid> [--wda-port 8120] [--sources idb,wda] [--cases k1,b1]
 node --import tsx scripts/truth/live.ts --serial <averi_lab serial> [--cases k1,b1]     # Android (phase 2b), adb outside the sandbox
 node --import tsx scripts/truth/live.ts --udid <lab udid> --groups visibility,dismissal [--cells scroll-bounded] [--side <checkout>]
+node --import tsx scripts/truth/live.ts --udid <lab udid> --groups ensure [--cases h1,h2,h3]   # D30: ADR 0033's held "no"
 ```
 
 Phase 5 (`--groups forms,visibility,dismissal`, any of them; `forms` alone by default, so the reproduce lines of the
@@ -271,7 +272,10 @@ earlier summaries stay true): the visibility cases are built from each coloured-
 R-direction over the strokes the app logs (LabState.offsets, .strokes: both apps report them), judged along the scroll
 view's axis — across a carousel, whose offset the apps report from its leading edge, for a card asked `right` or `left`
 (live-visibility.ts#distanceAt); the dismissal cases tap a field under the keyboard on the toolbar cells, the cell's own
-keyboardDismiss configured. `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
+keyboardDismiss configured. `ensure` (backlog D30, never by default) runs ensure_state on the held cells (bare for 3 s,
+then Welcome; held-no-spinner through 4 s of a spinner): h1 and h2 judge the hold ending the second look ~2 s after
+Welcome, said in one line, h3 the full window before a destructive rung (`scripts/truth/live-ensure.ts`, the app's
+phase events the oracle). `--side <checkout>` runs an older averi's src (a calibrate.ts checkout): a note's live
 calibration, recorded by hand in calibration.json `live` (rendered by calibration-report.ts; `intermittent` where runs
 of one side differ). A not-ok case an existing note explains is KNOWN (`scripts/truth/live-known.ts`, keyed by case,
 with its verdict class and the kind of reply it rests on — a weaker contract than ADR 0020 §4's, no strokes and an
@@ -284,7 +288,7 @@ idb's companion must be up for the lab simulator on its domain socket (`idb_comp
 /tmp/idb/<udid>_companion.sock`).
 
 The cell catalog is one file per family, `fixtures/apps/cells/<family>.json` (base, presented, forms, edges, bars,
-false-covers, text, react-native — scripts/truth/schema.ts#FAMILIES); every lab app bundles `fixtures/apps/cells.json`, which
+false-covers, text, react-native, held — scripts/truth/schema.ts#FAMILIES); every lab app bundles `fixtures/apps/cells.json`, which
 `node --import tsx scripts/truth/catalog.ts` generates from them (`--check` exits 1 when it is stale;
 tests/truth/catalog.test.ts fails then too), each cell stamped with its `family`, by which each app routes it to its
 family's file (`AveriLab/<Family>.swift`, `dev/averi/lab/<Family>.kt`). A cell's `config` is merged into the averi.yaml

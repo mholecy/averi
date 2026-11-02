@@ -72,6 +72,8 @@ describe('the cell catalog', () => {
       'react-native/rn-field',
       'react-native/rn-banner',
       'react-native/rn-format',
+      'held/held-no',
+      'held/held-no-spinner',
     ]);
   });
 
