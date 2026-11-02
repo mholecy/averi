@@ -81,9 +81,9 @@ export function urlSchemes(json: string): string[] {
  * `com.apple.launchservices.schemeapproval`, one key per opener and scheme, `<opener>--><scheme>`, whose value is the
  * bundle id the answer opens. Batch-5 captured the lab simulator's (iOS 27.0) after Open was tapped:
  * `com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab` (and one such key for another project's
- * scheme); deleting that key raised the alert again on the next `simctl openurl`, with no reboot. The opener is
- * CoreSimulatorBridge, the caller behind `simctl openurl` — Safari and other openers have keys of their own. Whether a
- * key written before the link stops the alert is batch-8's device check.
+ * scheme); batch-7 deleted that key, and the next `simctl openurl` raised the alert again, with no reboot. The opener
+ * is CoreSimulatorBridge, the caller behind `simctl openurl` — Safari and other openers have keys of their own.
+ * Whether a key written before the link stops the alert is batch-8's device check.
  */
 export const SCHEME_APPROVAL_DOMAIN = 'com.apple.launchservices.schemeapproval';
 /** The opener behind `simctl openurl`, as the key names it. */

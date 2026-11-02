@@ -531,10 +531,10 @@ A correction to the backlog row: WDA's payload has no `presentation` key, in eit
 'alert'` is averi's own mark on the layer holding an `Alert` element.
 
 Considered, not chosen: tapping Open, or an opt-in `confirm: true` (a tap on a SpringBoard dialog acts for the agent,
-and which label opens is localised; D58 — since then not built: D58 prevents the alert instead, see that amendment);
-reading `/source` on every WDA poll (a whole tree per poll for the rare case); reading it through `source()` (its start, its 30 s and its restart are a recovery, not an aid); the same naming
-in `launch_app`'s D48 note (the detectors fit it, but its wording is D48's — D56; since then done — see that
-amendment).
+and which label opens is localised; D58) — since then not built, D58 prevents the alert instead (see that amendment);
+reading `/source` on every WDA poll (a whole tree per poll for the rare case); reading it through `source()` (its start,
+its 30 s and its restart are a recovery, not an aid); the same naming in `launch_app`'s D48 note (the detectors fit it,
+but its wording is D48's — D56; since then done — see that amendment).
 
 Cost: the happy path none (pinned by call counts in `tests/adapters/ios-deep-link.test.ts`). The alert up: idb ends at
 its first read (about 0.4 s, from about 3.4 s); WDA pays one `/source` of a small tree at the bound (unmeasured, at
@@ -661,8 +661,8 @@ Decision (spec-D57, adopting the D57 analysis's option A with a test that pins t
   `tests/interact/tap-system-alert.test.ts`: the real `tapElement`, with its `ambiguous` option `'refuse'` (as the MCP
   tap passes it), over the three committed alert captures.
 - No "alert layer first" guard in the resolution: its only effect would be to turn today's honest ambiguity refusal
-  into a guess. "averi taps nothing itself" stands (an opt-in confirm is D58's; since then not built — D58 prevents the
-  alert instead, see that amendment).
+  into a guess. "averi taps nothing itself" stands (an opt-in confirm is D58's). Since then D58 builds no confirm and
+  prevents the alert instead — see that amendment.
 - Unchanged, byte for byte: the detection, the headline (`iOS has not opened <url> yet: …`, `iOS has not brought
   <bundle> forward yet: …`), the button list with its centres, launch_app's tail ("then read again before trusting a
   read"), the happy-path replies, D48's and D49a's ⚠ notes, every call list, the cost.
@@ -682,10 +682,10 @@ iOS asks "Open in “AveriLab”?" when `simctl openurl` opens a scheme its open
 lives in the simulator's `com.apple.launchservices.schemeapproval` domain, one key per opener and scheme: batch-5's
 capture of the lab simulator (iOS 27.0) held `com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab`
 after Open was tapped, and deleting the key raised the alert again on the next `simctl openurl`, with no reboot
-(batch-7).
-The opener is CoreSimulatorBridge, the caller behind `simctl openurl`; Safari and other openers have keys of their own.
-So the alert comes once per simulator per scheme, on a fresh or erased simulator or after the key is deleted. Since D54
-and D57 the reply names it and a tap by its label; that still costs the agent one turn, and on WDA the 3 s bound first.
+(batch-7). The opener is CoreSimulatorBridge, the caller behind `simctl openurl`; Safari and other openers have keys of
+their own. So the alert comes once per simulator per scheme, on a fresh or erased simulator or after the key is deleted.
+Since D54 and D57 the reply names it and a tap by its label; that still costs the agent one turn, and on WDA the 3 s
+bound first.
 
 Decision (spec-D58, adopting the D58 analysis's option D; its confirm tap, options B and C, is not built):
 

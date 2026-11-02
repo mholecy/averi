@@ -121,6 +121,13 @@ interface AppInfo extends AppBinary {
   names: readonly string[];
 }
 
+/** A link's scheme (lower-cased) and the project's app that declares it: what D58 pre-approves for simctl's opener. */
+interface SchemeApproval {
+  scheme: string;
+  bundleId: string;
+}
+const schemeApprovalKey = ({ scheme, bundleId }: SchemeApproval): string => `${bundleId}-->${scheme}`;
+
 /**
  * The app the typing goes into, as far as an IosAdapter knows (D24 — what its memory of tail-dropping apps is keyed
  * by):
@@ -132,13 +139,6 @@ interface AppInfo extends AppBinary {
  * - `forgotten`: that bundle was terminated through this adapter — NOT known, so nothing is split and nothing learned
  *   until the next launch (D24 review: a key must not outlive its app).
  */
-/** A link's scheme (lower-cased) and the project's app that declares it: what D58 pre-approves for simctl's opener. */
-interface SchemeApproval {
-  scheme: string;
-  bundleId: string;
-}
-const schemeApprovalKey = ({ scheme, bundleId }: SchemeApproval): string => `${bundleId}-->${scheme}`;
-
 type FrontApp = { kind: 'unlaunched' } | { kind: 'launched'; bundleId: string } | { kind: 'forgotten' };
 
 /** The key of the app in front before any launch — no bundle id can equal it. */
@@ -440,7 +440,7 @@ export class IosAdapter implements DeviceAdapter {
    *
    * A link to the project's own scheme (`approval`, D58) adds a third write
    * to the same batch: the scheme's pre-approval for simctl's opener
-   * (approveScheme). It runs beside the two, so it costs no wall time of its
+   * (judgeSchemeApproval). It runs beside the two, so it costs no wall time of its
    * own, and its result is judged apart from theirs.
    */
   private async prepareForOpen(what: string, approval?: SchemeApproval): Promise<void> {
@@ -503,7 +503,7 @@ export class IosAdapter implements DeviceAdapter {
     console.error(
       `averi: recorded iOS's "Open" answer for ${scheme} links to ${bundleId} from simctl openurl on ${this.udid} ` +
         `(${schemeApprovalWrite(scheme, bundleId).slice(2, 4).join(' ')} = ${bundleId}; simulator-wide, not restored; ` +
-        `before every link to the app's own scheme, so iOS does not ask "Open in “…”?")`,
+        `before every link to the app's own scheme, so iOS should not ask "Open in “…”?")`,
     );
   }
 
@@ -522,8 +522,9 @@ export class IosAdapter implements DeviceAdapter {
    * as before D49a. The scheme lookup runs first (D58: it decides the pre-approval, which must land before `openurl`):
    * one `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a
    * failed one too. For an own-scheme link the accessibility writes carry the scheme's pre-approval for simctl's opener
-   * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes what it wrote before. `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link
-   * (D54), the outcome names it instead of a note: on idb from the wait's own reads, on WDA from one short `/source`
+   * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes what it wrote before.
+   * `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link (D54), the
+   * outcome names it instead of a note: on idb from the wait's own reads, on WDA from one short `/source`
    * read at the bound (IosTreeSource.systemAlert) — never a tap.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<DeepLinkOutcome> {
@@ -586,7 +587,7 @@ export class IosAdapter implements DeviceAdapter {
     const unread = (e: unknown, then: string): undefined => {
       console.error(
         `averi: could not read ${bundleId}'s URL schemes (${errorMessage(e).split('\n')[0]}) — ` +
-          `opened ${url} without waiting for ${bundleId} to come forward${then}`,
+          `opening ${url} without waiting for ${bundleId} to come forward${then}`,
       );
       return undefined;
     };

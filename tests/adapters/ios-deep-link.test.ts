@@ -101,11 +101,11 @@ describe("IosAdapter.openDeepLink — a link nothing expects is opened exactly a
 });
 
 const couldNotRead = (why: string) =>
-  `averi: could not read dev.averi.lab's URL schemes (${why}) — opened averilab://d49 without waiting for dev.averi.lab ` +
+  `averi: could not read dev.averi.lab's URL schemes (${why}) — opening averilab://d49 without waiting for dev.averi.lab ` +
   'to come forward, and will not wait for it on later links until the app is installed again';
 /** The line of a failure that is not cached (appinfo's: the app may be installed later outside averi) — asked again next link. */
 const notYetRead = (why: string) =>
-  `averi: could not read dev.averi.lab's URL schemes (${why}) — opened averilab://d49 without waiting for dev.averi.lab ` +
+  `averi: could not read dev.averi.lab's URL schemes (${why}) — opening averilab://d49 without waiting for dev.averi.lab ` +
   'to come forward; asked again on the next link';
 
 describe('IosAdapter.openDeepLink — the schemes could not be read: opened as before, one stderr line, the failure cached until install()', () => {
@@ -577,7 +577,7 @@ describe("IosAdapter.openDeepLink — the project's own scheme pre-approved for 
   const ANNOUNCED =
     'averi: recorded iOS\'s "Open" answer for averilab links to dev.averi.lab from simctl openurl on AAAA-1111 ' +
     '(com.apple.launchservices.schemeapproval com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab; ' +
-    'simulator-wide, not restored; before every link to the app\'s own scheme, so iOS does not ask "Open in “…”?")';
+    'simulator-wide, not restored; before every link to the app\'s own scheme, so iOS should not ask "Open in “…”?")';
   const FAILED =
     'averi: could not pre-approve averilab links to dev.averi.lab for simctl openurl on AAAA-1111 ' +
     '(simctl spawn: defaults write failed) — iOS may ask "Open in “…”?" first, and the reply names the alert if it ' +
