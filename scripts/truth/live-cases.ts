@@ -390,10 +390,9 @@ const FORMS: Omit<Case, 'group'>[] = [
   { id: 'f8', cell: F, says: "a flow's tap + `type:` into the grouping field", flows: typeFlow(F, 'iban', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'type_it' } }], judge: holds('iban', 'SK31 1200 0000') },
   { id: 'f9', cell: F, says: "a flow's `fill:` (clear) into the grouping field", flows: fillFlow(F, 'iban', 'SK3112000000'), calls: [{ tool: 'run_flow', args: { flow: 'fill_it' } }], judge: holds('iban', 'SK31 1200 0000') },
   { id: 'f10', cell: F, says: "a flow's tap + `type_pin:` into the amount field that groups by thousands", flows: pinFlow(F, 'amount', '1234567'), calls: [{ tool: 'run_flow', args: { flow: 'pin_it' } }], judge: holds('amount', `1${NBSP}234${NBSP}567`) },
-  // D37: a dotted date (date: digits only, a `.` after the 2nd and 4th digit; ADR 0034 fails it by rule — its `.` groups
-  // are no thousands) under a placeholder with no letter or digit (`__.__.____`), and a phone that does not reformat
-  // under a `+421` placeholder (ADR 0034's D29 gaps: both kept false mismatches where a source names no placeholder).
-  // Not yet run on a device: what each source answers is batch-3's to read, so none is in live-known.ts yet.
+  // D37: a dotted date (schema.ts#FieldFormat's `date`; ADR 0034 fails it by rule) under a placeholder with no letter or
+  // digit (`__.__.____`), and a phone that does not reformat under a `+421` placeholder — ADR 0034's D29 gaps. Not yet
+  // run on a device: what each source answers is batch-3's to read, so none is in live-known.ts yet.
   { id: 'f11', cell: F, says: 'fill, no clear, a date the field dots as typed', calls: [fill(F, 'date', '31122026'), shows(F, 'date', '31.12.2026')], judge: holdsShown('date', '31.12.2026') },
   { id: 'f12', cell: F, says: 'fill, clear, a date typed with its own dots into the field that dots it', calls: [fill(F, 'date', '31.12.2026', true)], judge: holds('date', '31.12.2026') },
   { id: 'f13', cell: F, says: 'fill, no clear, a phone number under a `+421` placeholder', calls: [fill(F, 'phone', '421903123456')], judge: holds('phone', '421903123456') },

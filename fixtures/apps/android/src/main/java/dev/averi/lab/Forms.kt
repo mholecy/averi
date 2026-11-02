@@ -108,7 +108,7 @@ internal data class FieldSpec(
     val placeholder: String,
     val prefill: String?,
     val error: Message?,
-    /** schema.ts#FieldFormat: `group4`, `thousands`, `date`, or none. */
+    /** schema.ts#FieldFormat, or none. */
     val format: String?,
     /** The format only shown (a VisualTransformation), the model as typed. */
     val formatShownOnly: Boolean,
@@ -164,7 +164,7 @@ private fun isGap(c: Char) = c == ' ' || c == '\u00A0' || c == '\u202F'
 
 /**
  * `group4`: whitespace dropped, groups of four joined by a space; `thousands`: the whole part grouped in threes by a
- * no-break space; `date` (D37): digits only, a `.` after the 2nd and the 4th digit once a digit follows it.
+ * no-break space; `date` a dotted date (schema.ts#FieldFormat).
  */
 internal fun formatted(format: String?, text: String): String = when (format) {
     "group4" -> text.filterNot(::isGap).chunked(4).joinToString(" ")
@@ -174,7 +174,7 @@ internal fun formatted(format: String?, text: String): String = when (format) {
         whole.reversed().chunked(3).joinToString("\u00A0").reversed() + (if (cut < 0) "" else text.substring(cut))
     }
     "date" -> {
-        val digits = text.filter { it in '0'..'9' }
+        val digits = text.filter { it in '0'..'9' }.take(8)
         listOf(digits.take(2), digits.drop(2).take(2), digits.drop(4)).filter { it.isNotEmpty() }.joinToString(".")
     }
     else -> text

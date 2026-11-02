@@ -388,8 +388,7 @@ private func groups(_ s: String, _ n: Int) -> [String] {
 }
 
 /// `group4`: whitespace dropped, groups of four joined by a space; `thousands`: the whole part before the first `,` or
-/// `.` grouped in threes from the right by a no-break space, the rest kept; `date` (D37): digits only, a `.` after the
-/// 2nd and the 4th digit once a digit follows it.
+/// `.` grouped in threes from the right by a no-break space, the rest kept; `date` a dotted date (schema.ts#FieldFormat).
 func formatted(_ format: String?, _ text: String) -> String {
     switch format {
     case "group4":
@@ -399,7 +398,7 @@ func formatted(_ format: String?, _ text: String) -> String {
         let whole = String(text[..<cut].filter { !isGap($0) })
         return groups(String(whole.reversed()), 3).map { String($0.reversed()) }.reversed().joined(separator: "\u{00A0}") + text[cut...]
     case "date":
-        let digits = text.filter { $0.isASCII && $0.isNumber }
+        let digits = text.filter { $0.isASCII && $0.isNumber }.prefix(8)
         return [String(digits.prefix(2)), String(digits.dropFirst(2).prefix(2)), String(digits.dropFirst(4))].filter { !$0.isEmpty }.joined(separator: ".")
     default:
         return text
