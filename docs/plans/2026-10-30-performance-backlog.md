@@ -26,7 +26,7 @@ measured before and after.
 | P5 | `sampleDominant` / `nearCount` on typed arrays | CPU | won't do — real bands cost 0.1 ms |
 | P6 | OCR toolchain probe memoised per module, not per `VisionOcr` | spawn | done (5731c309) |
 | P7 | Selector regexes compiled once in `parseSelector` | CPU | won't do — cosmetic |
-| T1 | Fake the settle/poll timers in the slowest test files | tests | deferred — after the D rows |
+| T1 | Fake the settle/poll timers in the slowest test files | tests | done d9b0918f: full `npx vitest run` 45.7 → ~14 s (sum of file times 192 → ~70 s); slow settle/poll waits faked via tests/helpers/{sleep,pause}-recorder + a Date fake; live-rejudge in-process (scripts/truth/live-cases.ts#rejudge; 44.9 → 1 s); eyes-order/eyes-apart deterministic; wda shutdown tests stay on the real clock on purpose |
 | D0 | Baseline on `averi_lab` and the iPhone 17 iOS 27.0 simulator | measure | done — Android (0119d76d), iOS 2026-10-31 ("D0 on iOS") |
 | D1 | Settle sleeps `max(0, pollMs − readDuration)` | device | done (0d551270; with a 150 ms floor, ADR 0029) |
 | D2 | `ensure_state`'s second look ends on a held "no" | device | done (11cb9064, ADR 0033: before a cheap rung with no wipe ahead — transitively, nor in an enclosing ladder — the second look ends once a rendered not-"yes" screen without a spinner held still 2 s; a wipe ahead keeps the full 20 s; proven in fakes, the lab app cannot trigger it) |
