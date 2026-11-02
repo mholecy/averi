@@ -1,5 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import type { UiNode } from '../../src/adapters/types.js';
+import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
+import { parseConfig } from '../../src/flow/config.js';
+import { FlowEngine, FlowError, type TraceEntry } from '../../src/flow/engine.js';
+import { EngineSession } from '../../src/flow/launch.js';
+import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
+import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
+import { showsProgress } from '../../src/ui-tree/read-tree.js';
+import { Verifier } from '../../src/verify/assert.js';
+import { FakeAdapter } from '../helpers/fake.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 // The one sleep owner recorded, not waited on, as in engine.test.ts
 // (tests/helpers/sleep-recorder.ts): every poll cadence collapses to one
@@ -13,18 +25,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
 });
-import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import type { UiNode } from '../../src/adapters/types.js';
-import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import { parseConfig } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, type TraceEntry } from '../../src/flow/engine.js';
-import { EngineSession } from '../../src/flow/launch.js';
-import { isBareTree, treeShape } from '../../src/ui-tree/bare-tree.js';
-import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
-import { showsProgress } from '../../src/ui-tree/read-tree.js';
-import { Verifier } from '../../src/verify/assert.js';
-import { FakeAdapter } from '../helpers/fake.js';
-import { parseDump } from '../helpers/android-dumps.js';
 
 /**
  * The ladder against a cold launch's BARE trees (docs/bugs/2026-10-06-second-

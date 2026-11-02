@@ -1,16 +1,16 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
+import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, IosLab, LAB_APP, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
-import { type Call, type Case, judged, rejudge, type Result, type RunRecord, selectCases, summarize } from './live-cases.js';
+import { type Call, type Case, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
 import { callReply } from './replies.js';
@@ -94,7 +94,7 @@ const rejudging = values.rejudge === undefined ? undefined : (JSON.parse(await r
 if (rejudging === undefined && (values.udid === undefined) === (values.serial === undefined)) {
   throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
 }
-const platform: 'ios' | 'android' = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
+const platform: Platform = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
 const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
 const device = (values.udid ?? values.serial ?? 'rejudged')!;
 const port = Number(values['wda-port'] ?? 8120);
@@ -115,8 +115,6 @@ const android = rejudging === undefined && platform === 'android' ? new AndroidL
 if (rejudging === undefined) console.error(`lab: ${ios !== undefined ? await ios.guard() : (await android!.guard(), `${device}, AVD ${LAB_AVD}`)}`);
 
 // --- the server: a real registry, the lab simulator only, WDA on a port of its own ---
-
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 /**
  * The averi under test: this checkout's src, or `--side`'s (a checkout of another commit) — its tools, registry, iOS
@@ -177,7 +175,7 @@ if (rejudging !== undefined) {
   process.exitCode = exitCode;
 } else {
   const results: Result[] = [];
-  const record: RunRecord = { platform, ...(app !== 'native' && { app }), side: values.side ?? 'this checkout', results: [] };
+  const record: RunRecord = { platform, ...(app !== 'native' && { app }), side: values.side ?? THIS_CHECKOUT, results: [] };
   const selected = await selectCases({ platform, app, groups, only, onlyCells });
   const lab = (ios ?? android)!;
   if (platform === 'ios') console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
@@ -226,7 +224,7 @@ if (rejudging !== undefined) {
   }
   // The summary: every case, a known one marked with its note (live-known.ts); exit 1 on an unknown MISMATCH, and on a
   // known case not intermittent that came out ok in a run of this checkout (fixed: strike it off).
-  const { lines, exitCode } = summarize({ platform, sources, results, side: values.side ?? 'this checkout' });
+  const { lines, exitCode } = summarize({ platform, sources, results, side: values.side ?? THIS_CHECKOUT });
   console.log(lines.join('\n'));
   process.exitCode = exitCode;
 }

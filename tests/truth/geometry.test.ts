@@ -24,14 +24,11 @@ import {
   visibleOf,
   type GeometryContext,
 } from '../../scripts/truth/truth.js';
+import { pauses, resetPauses } from '../helpers/pause-recorder.js';
 
-// The probe's 1 s for the app to log (capture-run.ts#probe) goes through the harness's one wait, lab-device.ts#pause:
-// recorded here, not waited on — the fake lab logs a tap's events as it taps.
-const pauses = vi.hoisted((): number[] => []);
-vi.mock('../../scripts/truth/lab-device.js', async (original) => ({
-  ...(await original<typeof import('../../scripts/truth/lab-device.js')>()),
-  pause: async (ms: number) => void pauses.push(ms),
-}));
+// The probe's 1 s for the app to log (capture-run.ts#probe) is recorded, not waited on (tests/helpers/pause-recorder.ts):
+// the fake lab logs a tap's events as it taps.
+vi.mock('../../scripts/truth/lab-device.js', async (original) => ({ ...(await original<object>()), ...(await import('../helpers/pause-recorder.js')) }));
 
 // Phase 3's measured geometry (scripts/truth/truth.ts#geometryOf): where a target's frame lies against the screen, its
 // scroll view's clip, the system bands and the app's chrome — and the capture that measures it only when the app's
@@ -343,6 +340,7 @@ class GeometryLab implements LabDevice {
 describe('capture with a measured geometry', () => {
   let out: string;
   beforeEach(async () => {
+    resetPauses();
     out = await mkdtemp(join(tmpdir(), 'averi-geometry-'));
   });
   afterEach(async () => {
@@ -366,6 +364,7 @@ describe('capture with a measured geometry', () => {
       [20, 20],
       [20, 32],
     ]);
+    expect(pauses).toEqual([1_000, 1_000]); // each probe its own second for the app to log
     const t = await truthOf();
     expect(t.safeArea).toEqual({ top: 4, left: 0, bottom: 0, right: 0 });
     expect(t.chrome).toEqual({ bar: rect(0, 34, 40, 6) });

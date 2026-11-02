@@ -416,7 +416,7 @@ export function judgePresentedAssert([assert]: readonly string[], state: LabStat
 
 /**
  * The colour assert case of a target beneath a presented window the uiautomator parser does not mark (round 7's cells,
- * ADR 0018's residual 19 — live.ts adds it for PRESENTED_WINDOW_CELLS alone, the cells it was asked of).
+ * ADR 0018's residual 19 — live-cases.ts#selectCases adds it for PRESENTED_WINDOW_CELLS alone, the cells it was asked of).
  */
 export function presentedAssertCase(cell: string, t: TargetTruth): VisibilityCase {
   return {
@@ -438,7 +438,7 @@ export interface VisibilityCall {
   args: Record<string, unknown>;
 }
 
-/** Where a live case runs: the one declaration of a case's tree sources, live.ts's cases and this module's alike. */
+/** Where a live case runs: the one declaration of a case's tree sources, live-cases.ts's forms cases and this module's alike. */
 export interface RunsUnder {
   /** The tree sources the case runs under (`--sources`' every one, the platform's, when unset): the carry case is WDA's alone. */
   sources?: readonly string[];

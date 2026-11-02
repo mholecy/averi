@@ -27,14 +27,11 @@ import {
   touchTargetOf,
   touchesAt,
 } from '../../scripts/truth/truth.js';
+import { pauses, resetPauses } from '../helpers/pause-recorder.js';
 
-// The probe's 1 s for the app to log (capture-run.ts#probe) goes through the harness's one wait, lab-device.ts#pause:
-// recorded here, not waited on — the fake lab logs a tap's events as it taps.
-const pauses = vi.hoisted((): number[] => []);
-vi.mock('../../scripts/truth/lab-device.js', async (original) => ({
-  ...(await original<typeof import('../../scripts/truth/lab-device.js')>()),
-  pause: async (ms: number) => void pauses.push(ms),
-}));
+// The probe's 1 s for the app to log (capture-run.ts#probe) is recorded, not waited on (tests/helpers/pause-recorder.ts):
+// the fake lab logs a tap's events as it taps.
+vi.mock('../../scripts/truth/lab-device.js', async (original) => ({ ...(await original<object>()), ...(await import('../helpers/pause-recorder.js')) }));
 
 // The truth's arithmetic (scripts/truth/truth.ts) and the one capture (capture-run.ts) behind a fake LabDevice: where a
 // form control lies from the app's frames, what a probe's events say, when a cell is broken — no device.
@@ -368,7 +365,7 @@ class FakeLab implements LabDevice {
 
 let out: string;
 beforeEach(async () => {
-  pauses.length = 0;
+  resetPauses();
   out = await mkdtemp(join(tmpdir(), 'averi-truth-'));
 });
 afterEach(async () => {

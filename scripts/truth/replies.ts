@@ -95,7 +95,7 @@ export function replyKind(reply: string): ReplyKind {
 
 /**
  * A form call claims it did what it was asked: `Filled …`, `Cleared …`, `Tapped …`, and not `NOT verified` (src/mcp/
- * tool-text.ts: a fill whose read-back did not confirm it says so) — the live forms cases' claim (live.ts#holds).
+ * tool-text.ts: a fill whose read-back did not confirm it says so) — the live forms cases' claim (live-forms.ts#holds).
  */
 export const claimsDone = (reply: string) => /^(Filled|Cleared|Tapped)/.test(reply) && !/NOT verified/.test(reply);
 

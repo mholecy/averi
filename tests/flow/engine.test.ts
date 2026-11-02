@@ -1,4 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
+import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
+import { FlowEngine, FlowError, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
+import { EngineSession } from '../../src/flow/launch.js';
+import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
+import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
+import { parseDump } from '../helpers/android-dumps.js';
+import { ACTIVE_WINDOW_HINT, missNote } from '../../src/ui-tree/miss.js';
+import { boundReads } from '../helpers/terminal-read.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
 // (tests/helpers/sleep-recorder.ts): every poll cadence and the fill's 350 ms
@@ -14,17 +25,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
 });
-import { PersistentReadError, type UiNode } from '../../src/adapters/types.js';
-import { parseConfig, type AveriConfig, type Step } from '../../src/flow/config.js';
-import { FlowEngine, FlowError, runRequestOf, stepSummary, waitTimeoutHint, type EngineOptions, type RunRequest, type TraceEntry } from '../../src/flow/engine.js';
-import { EngineSession } from '../../src/flow/launch.js';
-import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, node, resetLayout, screen } from '../helpers/fake.js';
-import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { parseDump } from '../helpers/android-dumps.js';
-import { ACTIVE_WINDOW_HINT, missNote } from '../../src/ui-tree/miss.js';
-import { boundReads } from '../helpers/terminal-read.js';
 
 const CONFIG = parseConfig(`
 app:

@@ -18,9 +18,15 @@ import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, t
  * tests/truth/live-rejudge.test.ts reads without a node process a record.
  */
 
+/** The side of a run of this checkout's own src (`--side` unset): the one live-known.ts holds to its entries. */
+export const THIS_CHECKOUT = 'this checkout';
+
+/** The averi checkout (its root): the catalog, the truth runs, and live.ts's own src when no `--side` is given. */
+export const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
 /** What a run read, case by case (`--record`): judged again without a device by `--rejudge`. */
 export interface RunRecord {
-  platform: 'ios' | 'android';
+  platform: Platform;
   /** The lab app the run drove; absent on records before round 7: the native one. */
   app?: LabApp;
   side: string;
@@ -400,7 +406,6 @@ const FORMS: Omit<Case, 'group'>[] = [
 
 // --- phase 5: the visibility cells, from their static truth ---
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 let catalogRead: Promise<Catalog> | undefined;
 /** The lab's catalog (fixtures/apps/cells.json), read once. */
 export const catalogOf = (): Promise<Catalog> => (catalogRead ??= readFile(join(ROOT, 'fixtures/apps/cells.json'), 'utf8').then((t) => JSON.parse(t) as Catalog));
@@ -418,7 +423,7 @@ async function truthsOf(p: Platform, a: LabApp): Promise<CellTruth[]> {
 
 /** Which cases a run takes: `--groups`, `--cases`, `--cells`, the platform, and the run's lab app (schema.ts#appOf). */
 export interface Selection {
-  platform: 'ios' | 'android';
+  platform: Platform;
   app: LabApp;
   groups: readonly string[];
   /** `--cases`: these ids only. */
@@ -472,6 +477,9 @@ export async function selectCases({ platform, app, groups, only, onlyCells }: Se
 
 export type Result = { source: Source; c: Case; verdict: LiveVerdict; replies: string[] };
 
+/** What a rejudge selects by: a selection whose platform is the record's, and its app the record's when it names one. */
+export type RejudgeSelection = Omit<Selection, 'platform' | 'app'> & { app?: LabApp };
+
 /**
  * Judge one case's reads: the state after the calls; a forms case not ok is read again 3 s later (`late`: a model that
  * catches up was the app's lag, not a lost value) — never a visibility case, whose stop is judged on the state read
@@ -486,7 +494,7 @@ export function judged(c: Case, source: Source, replies: string[], launched: Lab
 }
 
 /** A recorded run judged again with this checkout's judges, no device: the cases `selection` takes, in record order. */
-export async function rejudgedResults(record: RunRecord, selection: Omit<Selection, 'platform' | 'app'> & { app?: LabApp }): Promise<Result[]> {
+export async function rejudgedResults(record: RunRecord, selection: RejudgeSelection): Promise<Result[]> {
   const selected = await selectCases({ ...selection, platform: record.platform, app: record.app ?? selection.app ?? parseLabApp(undefined) });
   const results: Result[] = [];
   for (const r of record.results) {
@@ -508,10 +516,10 @@ export interface Summary {
 }
 
 /**
- * The summary of a run's results. `side`: the averi the run drove ('this checkout', or a `--side` checkout — a
+ * The summary of a run's results. `side`: the averi the run drove (THIS_CHECKOUT, or a `--side` checkout — a
  * calibration, never held to live-known.ts); `rejudgedFrom`: the record's path, when the results are a record's.
  */
-export function summarize({ platform, sources, results, side, rejudgedFrom }: { platform: 'ios' | 'android'; sources: readonly Source[]; results: readonly Result[]; side: string; rejudgedFrom?: string }): Summary {
+export function summarize({ platform, sources, results, side, rejudgedFrom }: { platform: Platform; sources: readonly Source[]; results: readonly Result[]; side: string; rejudgedFrom?: string }): Summary {
   /**
    * The note a not-ok case is known by — only when it failed by the rule, on the kind of reply, its KNOWN entry pins
    * (live-known.ts).
@@ -523,7 +531,7 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
   const unknown = results.filter((r) => r.verdict.outcome === 'MISMATCH' && known(r) === undefined);
   const cleared = results.filter((r) => r.verdict.outcome === 'ok' && knownEntry(platform, r.source, r.c.id) !== undefined);
   /** live-known.ts is HEAD's: a `--side` run (or a rejudged record of one) is a calibration, never held to it. */
-  const ofThisCheckout = side === 'this checkout';
+  const ofThisCheckout = side === THIS_CHECKOUT;
   /** Known, ok this run, and not intermittent: fixed without being struck off (live-known.ts's ratchet). */
   const fixed = ofThisCheckout ? cleared.filter((r) => knownEntry(platform, r.source, r.c.id)?.intermittent !== true) : [];
   const lines = [
@@ -557,7 +565,7 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
  * `live.ts --rejudge <record>`, in process: the record judged again by this checkout's judges and summarized — the
  * lines the CLI prints and its exit code. `from` is the record's path as the CLI was given it (the summary's header).
  */
-export async function rejudge(record: RunRecord, from: string, selection: Omit<Selection, 'platform' | 'app'> & { app?: LabApp }): Promise<Summary> {
+export async function rejudge(record: RunRecord, from: string, selection: RejudgeSelection): Promise<Summary> {
   const results = await rejudgedResults(record, selection);
   const sources = [...new Set(record.results.map((r) => r.source))];
   return summarize({ platform: record.platform, sources, results, side: record.side, rejudgedFrom: from });

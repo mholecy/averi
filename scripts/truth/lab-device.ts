@@ -53,7 +53,7 @@ export function otherApp(cell: Pick<CatalogCell, 'family'>, app: LabApp): string
   const builder = appOf(cell.family);
   return builder === app ? undefined : `a cell of the ${builder} lab app (${LAB_APP[builder].name}), not of ${LAB_APP[app].name}`;
 }
-/** The harness's wait — the lab drivers' and the capture's probe (capture-run.ts); the capture's tests mock it. */
+/** The harness's one wait: the lab drivers', live.ts's, and the capture's probe (capture-run.ts#probe). */
 export const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** One raw tree of the screen as it is now: a capture of the run, its file `<cell><suffix>`. */
