@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Difference } from '../../src/interact/fill-facts.js';
 import { differenceOf, droppedTail, landingOf, needsHeldCount, tailOf, type Expectation } from '../../src/interact/fill-landing.js';
+import { SEPARATORS } from '../../src/interact/fill-reformat.js';
 
 /**
  * Did the fill land? — interact/fill-landing.ts, the one judge of a field's reading. `landingOf`'s table first, then
@@ -399,14 +400,15 @@ describe('differenceOf — what a missed read-back differs by, without content',
  * D28's invariant, swept: the typing and the verdict judge a prefix alike. Every reading that `tailOf` says holds some
  * of the typing, reformatted by the field, is a `dropped-tail` to `differenceOf` — with the same count landed. The
  * readings are every prefix of the expected text grouped as fields group it (fours, thousands from the right, pairs;
- * spaces, no-break spaces and the marks; D60: eagerly, a mark after every complete group), after an earlier text, a
- * vanished unnamed placeholder or none.
+ * spaces, no-break spaces and the marks), after an earlier text, a vanished unnamed placeholder or none. D60: a prefix
+ * that ends in a mark is what an eager field (a mark once a group is complete) shows after a drop, so the same prefixes
+ * sweep it — an eager grouping adds no prefix of its own (only the full reading with its mark, which is no prefix).
  */
 describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
   const groupLeft = (t: string, n: number, sep: string) => (t.match(new RegExp(`.{1,${n}}`, 'gu')) ?? []).join(sep);
   const groupRight = (t: string, n: number, sep: string) => [...groupLeft([...t].reverse().join(''), n, sep)].reverse().join('');
-  // D60: an eager field, its mark added once a group is complete — every prefix of it may end in that mark.
-  const eagerLeft = (t: string, n: number, sep: string) => (t.match(new RegExp(`.{1,${n}}`, 'gu')) ?? []).map((g) => ([...g].length === n ? g + sep : g)).join('');
+  // A mark's kind, all spaces one (as fill-reformat.ts#holdsMark): an added mark is one the typing holds no kind of.
+  const kindOf = (c: string) => (/\s/u.test(c) ? ' ' : c);
   const cases: Partial<Expectation>[] = [
     { value: 'SK3112000000', clear: true },
     { value: 'SK3112000000', before: 'SK00 0000 0000 …' },
@@ -420,14 +422,13 @@ describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
   it('every reformatted prefix with some of the typing in it is a dropped tail, the same count landed', () => {
     let swept = 0;
     let trailing = 0;
-    const MARKS = new Set([' ', '\u00A0', '\u202F', ',', '.', '-', '/']);
     for (const c of cases) {
       const e = expecting({ value: '', ...c });
       const whole = (e.clear ? '' : (e.before ?? '')) + e.value;
       const plain = whole.replace(/[\s.,]/gu, '');
       const shapes = [whole, plain];
       for (const sep of [' ', ' ', ' ', ',', '.', '-', '/'])
-        for (const n of [2, 3, 4]) shapes.push(groupLeft(plain, n, sep), groupRight(plain, n, sep), groupLeft(whole, n, sep), eagerLeft(plain, n, sep));
+        for (const n of [2, 3, 4]) shapes.push(groupLeft(plain, n, sep), groupRight(plain, n, sep), groupLeft(whole, n, sep));
       for (const shape of shapes)
         for (let k = 1; k <= [...shape].length; k++) {
           const reading = [...shape].slice(0, k).join('');
@@ -435,12 +436,12 @@ describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
           if (tail === undefined || tail.landed <= 0 || tail.reformatted === undefined) continue; // some of the typing landed
           swept++;
           const last = [...reading].at(-1) ?? '';
-          if (MARKS.has(last) && !whole.includes(last)) trailing++; // an added mark last: D60's
+          if (SEPARATORS.has(last) && ![...whole].some((c) => kindOf(c) === kindOf(last))) trailing++; // an added mark last: D60's
           expect(differenceOf(reading, e), JSON.stringify({ reading, c })).toMatchObject({ kind: 'dropped-tail', landed: tail.landed });
         }
     }
     expect(swept).toBeGreaterThan(50); // the sweep is not vacuous
-    expect(trailing).toBeGreaterThan(20); // nor its D60 part: prefixes that end in an eager trailing mark
+    expect(trailing).toBeGreaterThan(200); // nor its D60 part: prefixes that end in an added (eager) trailing mark
   });
 });
 

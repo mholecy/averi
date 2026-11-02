@@ -217,10 +217,14 @@ export function prefixOf(held: string, whole: string): { prefix: string; reforma
   // D60: an eager trailing mark, judged with the next typed character after it (one the strict prefix leaves).
   const mark = walked.tokens.at(-1) === -1 ? [...held].at(-1) : undefined;
   const next = mark !== undefined && !holdsMark(wholeChars, mark) ? wholeChars[walked.matched] : '';
+  // With `next === ''` the call is exactly the pre-D60 judgment: why the change is additive.
   const reformatted = reformatOf(held + next, prefix + next, whole);
   return reformatted === undefined ? undefined : { prefix, reformatted };
 }
 
-/** The typing holds `mark` itself — any space for a space (D60's typed-mark guard, as `thousands`' rule). */
+/**
+ * The typing holds `mark` itself (D60's typed-mark guard): `thousands`' "a character the typing holds itself", but with
+ * all spaces as one kind — a typed space may be shown as another (`respaced`), which `thousands`' `.`/`,` never are.
+ */
 const holdsMark = (typing: readonly string[], mark: string): boolean =>
   typing.some((c) => c === mark || (SPACES.has(c) && SPACES.has(mark)));

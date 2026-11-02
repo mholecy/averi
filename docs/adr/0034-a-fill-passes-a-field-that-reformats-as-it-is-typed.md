@@ -460,12 +460,13 @@ type only characters that are provably missing (ADR 0023).
   mark always failed `reformatOf`), so nothing `prefixOf` accepted, and no pass, changes. Two behaviours change, by
   intent, for the readings it now accepts: on iOS the tail alone is typed again where, with clear, the wipe and the
   whole retype ran; and on Android with clear a sibling that gained part of the tail now reads `elsewhere`, so the
-  wipe and retype are skipped (Consequences). The pass rule
-  (`landingOf`, `reformatOf` of the final reading) does not move: a FULL reading with a trailing mark
-  (`SK31 1200 0000 `) still fails `separated`, and `SK31 ` for `SK31` still does not land.
+  wipe and retype are skipped (Consequences). The pass rule (`landingOf`, `reformatOf` of the final reading) does not
+  move: a FULL reading with a trailing mark (`SK31 1200 0000 `) still fails `separated`, and `SK31 ` for `SK31` still
+  does not land.
 - No code change in fill-landing.ts: `tailOf`, `droppedTail`, `differenceOf` and `whereTyped` get it through
   `prefixOf` — one definition of a dropped tail, so D28's invariant holds (what is retyped and what is named judge a
-  prefix alike; the `tailOf` sweep now generates eager readings too).
+  prefix alike; the `tailOf` sweep's prefixes that end in an added mark — an eager field's readings — now agree too,
+  over 200 of them).
 
 **Consequences.**
 - iOS: the tail alone is typed again under ADR 0023's every condition, then the read-back judges the whole: a field
@@ -515,5 +516,6 @@ iOS React Native, is a later batch's.
 5. **An eager trailing mark of a kind the typing holds itself is no dropped tail** (D60's amendment, the typed-mark
    guard): `+421 903 ` for a typed `+421 903123456`, any space for a space, fails `length` — no tail typed again; with
    clear the wipe and the whole retype run, as before D60. The walk cannot tell the field's mark from the typing's own
-   shown after a drop from the middle (`12/` of `1234/56`), so a false mismatch, the safe side. Remedy: type the value
-   without its own separators (`+421903123456`), as the field shows them anyway.
+   shown after a drop from the middle (`12/` of `1234/56`), so a false mismatch, the safe side. Remedy, for a field
+   that regroups the value the way it shows it: type the value without its own separators (`+421903123456`) — the
+   field's marks are then all added, and a dropped tail is typed again.

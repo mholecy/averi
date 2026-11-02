@@ -298,23 +298,24 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
 
   // D60: an EAGER field adds its mark once a group of four is complete (none at the IBAN's full length here), so a
   // dropped end shows `SK31 1200 ` — a strict prefix and a trailing mark, retyped as any dropped tail (ADR 0034).
+  const IBAN = 'SK3112000000';
   const eager4 = (atEnd = false) => (t: string) => {
     const plain = t.replace(/ /g, '');
     const groups = plain.match(/.{1,4}/g) ?? [];
-    const marked = (k: number) => k < groups.length - 1 || (groups[k].length === 4 && (atEnd || plain.length < 12));
+    const marked = (k: number) => k < groups.length - 1 || (groups[k].length === 4 && (atEnd || plain.length < IBAN.length));
     return groups.map((g, k) => (marked(k) ? `${g} ` : g)).join('');
   };
 
   it('an eager field that dropped the tail after its mark (iOS): the tail alone, reported, landed — with clear or without', async () => {
     for (const clear of [false, true]) {
       const { io, intent, typed, dropped } = scripted({ format: eager4(), keep: [8] });
-      expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000', clear })).toEqual({
+      expect(await typeAndConfirm(io, { ...intent, value: IBAN, clear })).toEqual({
         kind: 'landed',
         observed: 'SK31 1200 0000',
         again: [{ kind: 'tail', length: 4 }],
         reformatted: { added: 2, respaced: 0 },
       });
-      expect(typed).toEqual(['SK3112000000', '0000']); // with clear too: no wipe, no whole retype
+      expect(typed).toEqual([IBAN, '0000']); // with clear too: no wipe, no whole retype
       expect(dropped).toEqual([2]);
     }
   });
@@ -322,39 +323,39 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
   it('an eager field that keeps its prefix for good (capped): the tail once, then missed as a dropped tail — not reported', async () => {
     const capped = (t: string) => eager4()(t.replace(/ /g, '').slice(0, 8));
     const { io, intent, typed, dropped } = scripted({ format: capped });
-    expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000' })).toEqual({
+    expect(await typeAndConfirm(io, { ...intent, value: IBAN })).toEqual({
       kind: 'missed',
       observed: 'SK31 1200 ',
       differs: { kind: 'dropped-tail', landed: 8, dropped: 4, grouped: true },
       again: [{ kind: 'tail', length: 4 }],
     });
-    expect(typed).toEqual(['SK3112000000', '0000']);
+    expect(typed).toEqual([IBAN, '0000']);
     expect(dropped).toEqual([]);
   });
 
   it('an eager field that adds its mark at the end too: the tail once, then missed as separated — no loop', async () => {
     const { io, intent, typed, dropped } = scripted({ format: eager4(true), keep: [8] });
-    expect(await typeAndConfirm(io, { ...intent, value: 'SK3112000000' })).toEqual({
+    expect(await typeAndConfirm(io, { ...intent, value: IBAN })).toEqual({
       kind: 'missed',
       observed: 'SK31 1200 0000 ',
       differs: { kind: 'separated', added: 3 },
       again: [{ kind: 'tail', length: 4 }],
     });
-    expect(typed).toEqual(['SK3112000000', '0000']);
+    expect(typed).toEqual([IBAN, '0000']);
     expect(dropped).toEqual([]);
   });
 
   it('on Android an eager field\'s dropped tail is named, never typed; a sibling that gained part of it stops the clear', async () => {
     const plain = scripted({ format: eager4(), keep: [8] });
-    expect(await typeAndConfirm(plain.io, { ...plain.intent, value: 'SK3112000000', delivery: 'may-arrive-late' })).toEqual({
+    expect(await typeAndConfirm(plain.io, { ...plain.intent, value: IBAN, delivery: 'may-arrive-late' })).toEqual({
       kind: 'missed',
       observed: 'SK31 1200 ',
       differs: { kind: 'dropped-tail', landed: 8, dropped: 4, grouped: true },
       again: [],
     });
-    expect(plain.typed).toEqual(['SK3112000000']);
+    expect(plain.typed).toEqual([IBAN]);
     const moved = scripted({ format: eager4(), keep: [8], elsewhere: () => '00' });
-    expect(await typeAndConfirm(moved.io, { ...moved.intent, value: 'SK3112000000', clear: true, delivery: 'may-arrive-late' })).toMatchObject({
+    expect(await typeAndConfirm(moved.io, { ...moved.intent, value: IBAN, clear: true, delivery: 'may-arrive-late' })).toMatchObject({
       kind: 'missed',
       again: [],
       elsewhere: { identifier: 'o' },
