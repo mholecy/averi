@@ -57,9 +57,11 @@ window at the root's bounds is presented, the activity's own window alone drops 
 narrowed). Amended again 2026-10-31 (performance backlog D20): on idb's flat list every full `scroll_until` stroke is
 PACED at 349 pt/s, so a SwiftUI List no longer flings past every row the read before listed and Decision 2's
 changed-screen stop no longer fires on a list that only scrolled; the scroll's two limits now reach less under idb
-(estimated; see "Amendment: idb's presented layer", Decision 4).
-Amended 2026-11-02 (D32: on idb the tap's and fill's not-found names the soft keyboard where its keys are read up by
-shape — see the amendment "the soft keyboard on idb's tap and fill miss" below; residual 20 narrowed for those waits).
+(estimated; see "Amendment: idb's presented layer", Decision 4). Amended again 2026-11-02 (D32: residual 21 numbers the
+tap's wait beneath a layer idb shows no sign of, which the amendments "idb's presented layer" and "an idb read that
+lists no identifier" left unnumbered; no behaviour changes). Amended again 2026-11-02 (D32: on idb the tap's and fill's
+not-found names the soft keyboard where its keys are read up by shape — see the amendment "the soft keyboard on idb's
+tap and fill miss" below; residual 20 narrowed for those waits).
 
 ## Context
 
@@ -1548,6 +1550,18 @@ the rule but unmeasured (no lab cell).
    paragraph on the band, which says how hard hiding it is under idb — accepted: the paragraph is the measured one, and
    a note without the keyboard for that one reply would be a variant for a wording's sake. Remedy: close what lies over
    it, a `text:`/`label:` selector, or `treeSource: wda`.
+21. **On idb, a tap beneath a layer the list shows no sign of times out with idb's reasons, not the presented remedy**
+   (2026-11-02, D32; what the amendments "idb's presented layer" (its Residuals) and "an idb read that lists no
+   identifier" accepted, numbered). A presentation UIKit lays with no dismiss region in idb's list (a large-detent
+   sheet, an alert, a transparent cover, the form's picker sheet) is no presented layer there. A target beneath it is
+   not in the tree, so the tap waits its full wait (5 s by default) and times out "to appear". The reply gives idb's
+   reasons (`noIdListed` on the alert's read, which lists no id; `idUnlisted` elsewhere), among them "If something
+   covers it, close that first", rather than the presented remedy. No gesture is sent and nothing is claimed `Tapped`.
+   The cost is the wait, and a hint that names every reason rather than the cause. Closed where idb's list holds UIKit's
+   dismiss region (the medium sheet, the amendment "idb's presented layer") and under WDA, whose tree marks these
+   layers. `scroll_until` for the same targets is residual 6 (strokes for a target not yet in the tree). Golden: the tap
+   rows of alert-dim, dim-cover and sheet-background (A–D; tests/differential/golden/presented.known.ts) and of
+   form-picker (name, country, submit; tests/differential/golden/forms.known.ts) are filed as this residual.
 
 ## Bug notes
 
