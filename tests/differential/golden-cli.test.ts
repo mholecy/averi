@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -239,5 +239,30 @@ describe("golden's exit code and --pin: the ratchet's (scripts/differential/ratc
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  }, 60_000);
+
+  it('a mismatch KNOWN does not list exits 1, the report naming it under "### New": fab replayed under a run no KNOWN row names', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'averi-golden-new-'));
+    try {
+      const from = join(ROOT, 'tests/fixtures/truth', ANDROID);
+      const run = join(dir, 'android-unknown-run');
+      await mkdir(run);
+      const manifest = JSON.parse(await readFile(join(from, 'manifest.json'), 'utf8')) as { captures: { file: string }[] };
+      await writeFile(join(run, 'manifest.json'), JSON.stringify({ ...manifest, captures: manifest.captures.filter((c) => c.file === 'fab.xml') }));
+      for (const f of ['fab.xml', 'fab.png', 'fab.truth.json']) await copyFile(join(from, f), join(run, f));
+      const failed = (await promisify(execFile)(process.execPath, ['--import', 'tsx', 'scripts/differential/golden.ts', '--corpus', dir], { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 }).then(
+        () => undefined,
+        (e: unknown) => e,
+      )) as { code?: number; stdout?: string } | undefined;
+      expect(failed?.code).toBe(1);
+      expect(failed?.stdout).toContain('9 checks, 6 mismatches (0 known, 6 new)');
+      expect(failed?.stdout).toContain('### New: not in KNOWN\n- android-unknown-run/fab.xml ');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('refuses --pin beside --side: the pins are of this checkout', async () => {
+    await expect(golden('--side', 'HEAD', '--pin', join(tmpdir(), 'never-written.json'))).rejects.toThrow('golden --pin: the pins are this checkout\'s replies — not with --side');
   }, 60_000);
 });

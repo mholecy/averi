@@ -175,7 +175,10 @@ replayed, against this checkout's KNOWN and pins: **1** on a mismatch KNOWN does
 class, reply kind, calls or pin, a fault (on any row), or a broken target; **0** when every mismatch is a standing known
 one — the report's header then reads `N mismatches (N known, 0 new)`. A known row fixed (to strike) or a stale pin is
 reported, not failed on. The report lists what the ratchet found under `## Ratchet`; `--json` and `--against` print it
-to stderr, keeping stdout theirs. So a script may gate on golden's exit code alone.
+to stderr, keeping stdout theirs (`--against` without the re-pins' diffs, which its own Re-pin section shows). `--pin`
+refuses `--side`: the pins are this checkout's replies. The split is deliberate: golden's exit code is about behaviour
+(a new or drifted answer, a fault, a broken target), so a script may gate on it alone; the bookkeeping — a fixed KNOWN
+row not struck, a stale pin, COUNTS — fails `tests/differential/golden.test.ts`, not golden. The merge gate runs both.
 `tests/differential/golden.test.ts` runs it over the committed truth on this checkout: no broken target, no check with a
 fault, the checks per capture pinned, and the known mismatches listed by `<run>/<file> <target> <verb>` with their
 class, their reply's kind (`scripts/truth/replies.ts#replyKind`: not found, Tapped, visible, PASS, FAIL, refused,
@@ -187,7 +190,8 @@ whose class, reply kind or device calls change fails until re-noted; one whose r
 row that ran with no pin fails; a pin of no KNOWN row fails. A skipped `ocr` row (no recognizer here) is neither
 compared nor needs a pin; its pins are written where the rows run — outside the sandbox, `GOLDEN_OCR=require node
 --import tsx scripts/differential/golden.ts --corpus tests/fixtures/truth --pin tests/differential/golden/pins.json`,
-which holds every other pin as it is and fails rather than skip them. The ratchet is kept per cell family,
+which fails rather than skip them. It rewrites every pin from that run's replies — identical where nothing changed —
+and holds only the pins of rows skipped and of captures not replayed. The ratchet is kept per cell family,
 `tests/differential/golden/<family>.known.ts` (KNOWN and COUNTS of that family's cells only, aggregated by
 golden.test.ts, which refuses a row filed under another family's file); a row may say what it is beside its class — `as:
 bug:<docs/bugs file>` or `residual:<decision>`. `tests/truth/lab-notes.test.ts` ties the notes of both ratchets (this

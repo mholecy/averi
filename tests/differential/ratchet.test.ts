@@ -130,6 +130,11 @@ describe('the ratchet in the report (ratchetLines)', () => {
     );
   });
 
+  it("without the re-pins' diffs (--against shows them itself): still counted", () => {
+    const v = ratchet([result([standing({ reply: 'other' })])], KNOWN, PINS);
+    expect(ratchetLines(v, { repin: false })).toEqual(['## Ratchet: exit 1 — 0 new, 0 drifted, 1 to re-pin, 0 with a fault, 0 broken; 0 to strike, 0 stale pins', '']);
+  });
+
   it('a missing pin says so', () => {
     expect(ratchetLines(ratchet([result([standing()])], KNOWN, {}))).toContain('- r/a.json A tap: no pin');
   });

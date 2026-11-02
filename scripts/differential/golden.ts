@@ -38,7 +38,8 @@ import { exitCode, PINS_FILE, ratchet, ratchetLines, readPins, repinned, writePi
  * (tests/differential/golden/pins.json, or the file `--pin` just wrote), over the captures replayed. 1 on a mismatch
  * KNOWN does not list, a known one drifted from its class, reply kind, calls or pin, a fault, or a broken target; 0
  * with every mismatch a standing known one — the report heads them `N known, 0 new`. Its findings go to the report, and
- * to stderr under `--json` and `--against`.
+ * to stderr under `--json` and `--against` (there without the re-pins, which the diff shows). `--pin` refuses `--side`:
+ * the pins are this checkout's replies.
  */
 
 export interface GoldenCheck {
@@ -271,6 +272,8 @@ if (isMain(import.meta.url)) {
   if (values.corpus === undefined || (values.json === true && values.against !== undefined)) {
     throw new Error('usage: golden.ts --corpus <dir> [--side <ref|path>] [--worktrees <dir>] [--only <cell>[,<cell>…]] [--json | --against <base.json>] [--pin <pins.json>]');
   }
+  // The pins are this checkout's replies (the ratchet compares this checkout's runs with them): another side's are not.
+  if (values.pin !== undefined && values.side !== undefined) throw new Error("golden --pin: the pins are this checkout's replies — not with --side");
   // The base is read first: a missing file, or one no `--json` run wrote, fails before any replay.
   const against = values.against;
   const base = against === undefined ? undefined : { against, results: (await import('./golden-diff.js')).baseOf(await readFile(resolve(against), 'utf8'), against) };
@@ -304,8 +307,9 @@ if (isMain(import.meta.url)) {
       const { diffReport, goldenDiff } = await import('./golden-diff.js');
       console.log(diffReport(base.against, goldenDiff(base.results, results, KNOWN_FILES, pins)));
     } else console.log(values.json === true ? JSON.stringify({ side: side.root, results } satisfies GoldenJson) : goldenReport(results, v));
-    // The report carries the ratchet's findings; the JSON and the diff do not, so they go to stderr.
-    if (base !== undefined || values.json === true) for (const l of ratchetLines(v)) console.error(l);
+    // The report carries the ratchet's findings; the JSON and the diff do not, so they go to stderr — but the re-pins,
+    // which the diff's own Re-pin section already shows.
+    if (base !== undefined || values.json === true) for (const l of ratchetLines(v, { repin: base === undefined })) console.error(l);
     process.exitCode = exitCode(v);
   } finally {
     cleanup?.();

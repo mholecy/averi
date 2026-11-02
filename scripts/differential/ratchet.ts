@@ -127,15 +127,18 @@ export const repinLines = (r: Repin): string[] => (r.pin === undefined ? [`- ${r
 
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
-/** What the ratchet has to say beyond the standing count — nothing when every mismatch stands known and pinned. */
-export function ratchetLines(v: RatchetVerdict): string[] {
+/**
+ * What the ratchet has to say beyond the standing count — nothing when every mismatch stands known and pinned. `repin:
+ * false` leaves out the re-pins' diffs (still counted), for a report that shows them itself (`--against`).
+ */
+export function ratchetLines(v: RatchetVerdict, options: { repin?: boolean } = {}): string[] {
   if (exitCode(v) === 0 && v.fixed.length === 0 && v.stalePins.length === 0) return [];
   const section = (title: string, lines: readonly string[]) => (lines.length === 0 ? [] : [`### ${title}`, ...lines]);
   return [
     `## Ratchet: exit ${exitCode(v)} — ${v.unknown.length} new, ${v.drifted.length} drifted, ${v.repin.length} to re-pin, ${v.faults.length} with a fault, ${v.broken.length} broken; ${v.fixed.length} to strike, ${plural(v.stalePins.length, 'stale pin')}`,
     ...section('New: not in KNOWN', v.unknown.map((l) => `- ${l}`)),
     ...section('Drifted from KNOWN: class, reply kind or calls', v.drifted.map((l) => `- ${l}`)),
-    ...section(`Re-pin: the reply is not ${PINS_NAME}'s (golden.ts --pin)`, v.repin.flatMap(repinLines)),
+    ...(options.repin === false ? [] : section(`Re-pin: the reply is not ${PINS_NAME}'s (golden.ts --pin)`, v.repin.flatMap(repinLines))),
     ...section('Faults', v.faults.map((l) => `- ${l}`)),
     ...section('Broken', v.broken.map((l) => `- ${l}`)),
     ...section('Strike from KNOWN: fixed', v.fixed.map((l) => `- ${l}`)),
