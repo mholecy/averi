@@ -531,10 +531,10 @@ A correction to the backlog row: WDA's payload has no `presentation` key, in eit
 'alert'` is averi's own mark on the layer holding an `Alert` element.
 
 Considered, not chosen: tapping Open, or an opt-in `confirm: true` (a tap on a SpringBoard dialog acts for the agent,
-and which label opens is localised; D58) — since then not built, D58 prevents the alert instead (see that amendment);
-reading `/source` on every WDA poll (a whole tree per poll for the rare case); reading it through `source()` (its start,
-its 30 s and its restart are a recovery, not an aid); the same naming in `launch_app`'s D48 note (the detectors fit it,
-but its wording is D48's — D56; since then done — see that amendment).
+and which label opens is localised; D58); reading `/source` on every WDA poll (a whole tree per poll for the rare
+case); reading it through `source()` (its start, its 30 s and its restart are a recovery, not an aid); the same naming
+in `launch_app`'s D48 note (the detectors fit it, but its wording is D48's — D56; since then done — see that
+amendment). Since then D58 builds no confirm tap and prevents the alert instead — see that amendment.
 
 Cost: the happy path none (pinned by call counts in `tests/adapters/ios-deep-link.test.ts`). The alert up: idb ends at
 its first read (about 0.4 s, from about 3.4 s); WDA pays one `/source` of a small tree at the bound (unmeasured, at

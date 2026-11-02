@@ -37,7 +37,7 @@ export const SPRINGBOARD = bundle('com.apple.springboard');
 /**
  * An IosAdapter over a source whose applicationLabel answers in turn from `answers` (the last repeats) — the
  * `kind` given — and an exec answering `simctl appinfo` with `info`, plutil with `types` and the scheme pre-approval's
- * `defaults write` (D58) with `approval` (an Error rejects each).
+ * `defaults write` (D58) with `approval` (an Error rejects each); `hook`, when given, runs first on every one.
  * Every exec command line but xcode-env's one-time `xcrun --find simctl` is recorded.
  */
 export function lab(
@@ -48,6 +48,8 @@ export function lab(
     types?: string | Error;
     tree?: UiNode | Error;
     approval?: Error;
+    /** Runs first on every recorded command line: it may wait, or throw to reject the command. */
+    hook?: (full: string) => Promise<void>;
   } = {},
 ) {
   const calls: string[] = [];
@@ -73,6 +75,7 @@ export function lab(
   const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
     const full = [cmd, ...args].join(' ');
     if (full !== 'xcrun --find simctl') calls.push(full);
+    if (full !== 'xcrun --find simctl') await opts.hook?.(full);
     const answer = (out: string | Error) => {
       if (out instanceof Error) throw out;
       return { stdout: Buffer.from(out), stderr: '' };

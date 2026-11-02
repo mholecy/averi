@@ -68,8 +68,8 @@ describe('PLUTIL_NO_SUCH_KEY', () => {
   });
 });
 
-// D58 (ADR 0032's D58 amendment): the answer an Open tap on "Open in “AveriLab”?" records for `simctl openurl`'s opener,
-// as the lab simulator's com.apple.launchservices.schemeapproval held it (batch-5's capture).
+// D58 (ADR 0032's D58 amendment): the answer an Open tap on "Open in “AveriLab”?" records for `simctl openurl`'s
+// opener, as the lab simulator's com.apple.launchservices.schemeapproval held it (batch-5's capture).
 describe('schemeApprovalWrite — the defaults write that pre-approves a scheme for simctl openurl', () => {
   it("the lab's key and value, as captured", () => {
     expect(schemeApprovalWrite('averilab', 'dev.averi.lab')).toEqual([

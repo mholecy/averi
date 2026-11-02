@@ -89,10 +89,14 @@ export const SCHEME_APPROVAL_DOMAIN = 'com.apple.launchservices.schemeapproval';
 /** The opener behind `simctl openurl`, as the key names it. */
 export const SIMCTL_OPENER = 'com.apple.CoreSimulator.CoreSimulatorBridge';
 
+/** The key, in SCHEME_APPROVAL_DOMAIN, of simctl's opener's answer for `scheme` (lower-cased, as captured). */
+export const schemeApprovalKey = (scheme: string): string => `${SIMCTL_OPENER}-->${scheme.toLowerCase()}`;
+
 /**
  * The `defaults write` argv (run in the simulator with `simctl spawn <udid>`) that records the answer an Open tap
  * records: `scheme` (lower-cased, as the captured key holds it) approved for `bundleId` when `simctl openurl` opens it.
  */
 export function schemeApprovalWrite(scheme: string, bundleId: string): string[] {
-  return ['defaults', 'write', SCHEME_APPROVAL_DOMAIN, `${SIMCTL_OPENER}-->${scheme.toLowerCase()}`, '-string', bundleId];
+  return ['defaults', 'write', SCHEME_APPROVAL_DOMAIN, schemeApprovalKey(scheme), '-string', bundleId];
 }
+
