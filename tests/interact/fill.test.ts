@@ -1489,10 +1489,18 @@ describe('fillField — the mismatch error says what differs, without content (2
   });
 
   // Until D18 the mask here inserted a space (`1234 5`) — a reformat that passes now (fill-reformat.ts#reformatOf). A cents
-  // mask's decimal point changes the amount, so it still fails.
-  it('a length difference says the lengths alone, as before (a cents mask that inserts a decimal point)', async () => {
+  // mask's decimal point changes the amount, so it still fails — since D53 naming the check and the remedy, not the
+  // value.
+  it('a cents mask that inserts a decimal point fails separated: every typed character there, the check, the remedy', async () => {
     const message = await failureOf(fillField(transforming(null, (s) => s.replace(/^(\d{3})(\d+)$/, '$1.$2')), { id: 'notes' }, '12345', FAST));
-    expect(message).toBe('fill: typed 5 characters but the field shows 6 (content withheld from this error)');
+    expect(message).toBe(
+      'fill: typed 5 characters but the field shows 6 — every typed character is there, in order, with 1 separator added (spaces or . , - /) ' +
+        "that the fill does not take for the field's grouping (a decimal point or a sign, mixed or trailing marks, groups of one, a word split by autocorrect): " +
+        'check the field holds the value you meant — a cents mask shows a typed 1234 as 12.34 — and if it does, type the value as the field shows it; ' +
+        'content withheld from this error',
+    );
+    expect(message).not.toContain('12345');
+    expect(message).not.toContain('123.45');
   });
 });
 

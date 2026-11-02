@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { maskTemplate, prefixOf, reformatOf, skeleton } from '../../src/interact/fill-reformat.js';
+import { maskTemplate, prefixOf, reformatOf, separatedOf, skeleton } from '../../src/interact/fill-reformat.js';
 
 /**
  * D18: a field that reformats as it is typed (an IBAN grouped in fours, an amount's thousands) shows every typed
@@ -231,6 +231,54 @@ describe('prefixOf — a strict prefix of the typing, exactly or reformatted', (
     expect(prefixOf('12', '12')).toBeUndefined();
     expect(prefixOf('SK31 1300', 'SK3112000000')).toBeUndefined();
     expect(prefixOf('SK31 ', 'SK3112000000')).toBeUndefined(); // a trailing mark (ADR 0034: a false mismatch, the safe side)
+  });
+});
+
+/**
+ * D53: a reading that shows every typed character, in order, with only SEPARATORS added — the separators `reformatOf`
+ * refuses as grouping (a decimal point, a sign, mixed or trailing marks, groups of one, a word split by autocorrect).
+ * Counts every added separator, not groups; says nothing of whether the rules would pass it (the caller asks only of a
+ * reading that did not land).
+ */
+describe('separatedOf — every typed character in order, separators alone added', () => {
+  it('the refused shapes: a cents mask, mixed marks, an eager trailing mark, groups of one', () => {
+    expect(separatedOf('12.34', '1234')).toBe(1);
+    expect(separatedOf('+421 900-123-456', '+421900123456')).toBe(3);
+    expect(separatedOf('SK31 ', 'SK31')).toBe(1);
+    expect(separatedOf('1 2 3 4', '1234')).toBe(3);
+    expect(separatedOf('SK31 1200 0000 ', 'SK3112000000')).toBe(3);
+  });
+
+  it('a leading sign, autocorrect splitting a word, a no-break space, two adjacent, an astral pair', () => {
+    expect(separatedOf('-1234', '1234')).toBe(1);
+    expect(separatedOf('a lot', 'alot')).toBe(1);
+    expect(separatedOf('12\u00A034', '1234')).toBe(1);
+    expect(separatedOf('12  34', '1234')).toBe(2); // every added separator counts, not the groups
+    expect(separatedOf('\u{1D400}.\u{1D401}', '\u{1D400}\u{1D401}')).toBe(1); // code points, not UTF-16 units
+  });
+
+  it('a substituted, dropped or added letter or digit: none', () => {
+    expect(separatedOf('12.35', '1234')).toBeUndefined();
+    expect(separatedOf('12.3', '1234')).toBeUndefined(); // a strict prefix: dropped-tail's, not separated
+    expect(separatedOf('12.345', '1234')).toBeUndefined();
+    expect(separatedOf('1a2.34', '1234')).toBeUndefined();
+  });
+
+  it('a mark outside SEPARATORS, a mask\'s blanks, bullets, an empty reading: none', () => {
+    expect(separatedOf('12:34', '1234')).toBeUndefined();
+    expect(separatedOf('31.12.____', '31122026')).toBeUndefined();
+    expect(separatedOf('•••.•', '1234')).toBeUndefined();
+    expect(separatedOf('', '1234')).toBeUndefined();
+  });
+
+  it('a reading equal to the typing, or only respaced: nothing added, none', () => {
+    expect(separatedOf('1234', '1234')).toBeUndefined();
+    expect(separatedOf('Jan\u00A0Novak', 'Jan Novak')).toBeUndefined();
+  });
+
+  it('a D51 grouping still passes `reformatOf` (it lands, and differenceOf never sees it)', () => {
+    expect(reformatOf('31.12.2026', '31122026')).toEqual({ added: 2, respaced: 0 });
+    expect(reformatOf('12.34', '1234')).toBeUndefined(); // the cents mask stays refused
   });
 });
 

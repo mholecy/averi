@@ -316,7 +316,9 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['with clear the field must EQUAL the value: longer but for case is a length', { observed: 'Re: Hello', value: 'hello', clear: true }, { kind: 'length' }],
     ['autocorrect `teh` → `the`: same length, how many differ', { observed: 'the', value: 'teh' }, { kind: 'same-length', positions: 2 }],
     ['held `HELLo` is not the typing: only `hxllo` after it is compared', { observed: 'HELLohxllo', before: 'HELLo', value: 'hello' }, { kind: 'same-length', positions: 1 }],
-    ['a mask that inserts a space', { observed: '1234 5', value: '12345' }, { kind: 'length' }],
+    // D53: `1234 5` stood here until D53 — a reformat that passes since D18, which differenceOf never sees (it reads
+    // `separated` called directly); a mark outside SEPARATORS keeps the row a length
+    ['a mask that inserts marks the fill does not take (`(`, `)`)', { observed: '(12) 345', value: '12345' }, { kind: 'length' }],
     ['typing onto a field showing only its placeholder: the placeholder is no held text, so nothing is sliced off', { observed: 'Searchx', before: 'Search', value: 'searchx', placeholder: 'Search' }, { kind: 'case', positions: 1 }],
     ['a field that fell back to its named placeholder holds no text: never "but for case"', { observed: 'Company', before: 'Zed', value: 'company', placeholder: 'Company' }, { kind: 'length' }],
     ['a pair equal only upper-cased (dotless `ı`, `i`) is case too', { observed: 'ıd', value: 'id', clear: true }, { kind: 'case', positions: 1 }],
@@ -332,6 +334,22 @@ describe('differenceOf — what a missed read-back differs by, without content',
     ['an exact prefix stays a length (the field grouped nothing)', { observed: '12345', value: '1234567', clear: true }, { kind: 'length' }],
     ['a grouped reading with a changed character is no prefix', { observed: '1 235 5', value: '1234567', clear: true }, { kind: 'same-length', positions: 5 }],
     ['a grouped reading that holds nothing of the typing is no dropped tail', { observed: '1 234', before: '1234', value: '5' }, { kind: 'length' }],
+    // D53: every typed character, in order, with separators ADR 0034's rules refuse as grouping — after dropped-tail
+    ['a cents mask (`12.34` for `1234`): separated, not a length', { observed: '12.34', value: '1234', clear: true }, { kind: 'separated', added: 1 }],
+    ['mixed marks (`+421 900-123-456`)', { observed: '+421 900-123-456', value: '+421900123456', clear: true }, { kind: 'separated', added: 3 }],
+    ['an eager trailing mark (`SK31 `)', { observed: 'SK31 ', value: 'SK31', clear: true }, { kind: 'separated', added: 1 }],
+    ['groups of one (`1 2 3 4`)', { observed: '1 2 3 4', value: '1234', clear: true }, { kind: 'separated', added: 3 }],
+    ['no clear, the field empty before', { observed: '12.34', before: '', value: '1234' }, { kind: 'separated', added: 1 }],
+    ['no clear onto held text: judged after it (`priorsOf`, the earlier text first)', { observed: 'ab12.34', before: 'ab', value: '1234' }, { kind: 'separated', added: 1 }],
+    ['an unnamed placeholder that vanished (D29): judged as no earlier text', { observed: '12.34', before: 'SK00 0000 0000 \u2026', value: '1234' }, { kind: 'separated', added: 1 }],
+    ['after a vanished mask template (D51)', { observed: '12.34', before: '__.__', value: '1234' }, { kind: 'separated', added: 1 }],
+    ['a field showing its named placeholder holds no text: a length, never separated', { observed: '0.00', value: '000', placeholder: '0.00' }, { kind: 'length' }],
+    ['a reading equal to the text before the typing: unchanged first', { observed: '12.34', before: '12.34', value: '1234', clear: true }, { kind: 'unchanged' }],
+    ['bullets with a mark: a partly masked length, never separated', { observed: '•••.•', value: '1234' }, { kind: 'length' }],
+    ['a reformatted strict prefix stays a dropped tail', { observed: '12 3', value: '1234', clear: true }, { kind: 'dropped-tail', landed: 3, dropped: 1, grouped: true }],
+    ['a dropped tail ending in an eager trailing mark is neither (still a length)', { observed: 'SK31 1200 ', value: 'SK3112000000', clear: true }, { kind: 'length' }],
+    ['a changed separator stays same-length', { observed: '12,34', value: '12.34', clear: true }, { kind: 'same-length', positions: 1 }],
+    ['before case: the held text matches but for case only in a run of the earlier text — the typing is all there', { observed: 'x,ABa-b', before: 'xAB', value: 'ab' }, { kind: 'separated', added: 2 }],
   ];
   for (const [shape, f, kind] of rows) it(shape, () => expect(differs(f)).toEqual(kind));
 });

@@ -316,7 +316,7 @@ export interface OtherInput {
 /**
  * What differs between the typed value and a read-back that did not match
  * it, without carrying either string — classified by ONE function,
- * interact/fill-landing.ts#differenceOf, all seven kinds (until 2026-10-09
+ * interact/fill-landing.ts#differenceOf, all eight kinds (until 2026-10-09
  * fill.ts chose `unchanged`, `masked` and a partly masked `length` in a
  * ternary at the throw, and a helper of its own the rest):
  * - `masked`: the field shows bullets, compared by length only; `held` the
@@ -351,6 +351,12 @@ export interface OtherInput {
  *   `1 234 567,` for `1234567,89` and was told "as many characters as were
  *   typed, 9 differing: the app transformed the input" (2026-10-31). An
  *   EXACT prefix stays `length`, as it always was.
+ * - `separated` (D53): every typed character is there, in order, with
+ *   `added` separators (interact/fill-reformat.ts#SEPARATORS) and nothing
+ *   else — separators ADR 0034's rules refuse as the field's grouping (a
+ *   cents mask's `12.34` for `1234`, a sign, mixed or trailing marks, groups
+ *   of one, autocorrect's `a lot` for `alot`). Read `typed 4 characters but
+ *   the field shows 5` and no remedy until D53 (2026-11-02).
  * - `length`: none of these — the lengths are all that can be said (also
  *   a partly masked reading, `•••••t`, whose content is not comparable).
  * Still a FAILURE in every case: a field that shows `Hello` for `hello` does
@@ -364,4 +370,5 @@ export type Difference =
   | { kind: 'same-length'; positions: number }
   | { kind: 'unchanged' }
   | { kind: 'dropped-tail'; landed: number; dropped: number; grouped: boolean }
+  | { kind: 'separated'; added: number }
   | { kind: 'length' };

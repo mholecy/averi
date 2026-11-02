@@ -16,7 +16,7 @@
 import { INPUT_ROLE, type UiNode } from '../adapters/types.js';
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
 import { heldText, type Difference, type Reformat } from './fill-facts.js';
-import { maskTemplate, prefixOf, reformatOf, skeleton } from './fill-reformat.js';
+import { maskTemplate, prefixOf, reformatOf, separatedOf, skeleton } from './fill-reformat.js';
 
 /** What the field should hold after the typing, and what the reading is judged against. */
 export interface Expectation {
@@ -228,14 +228,20 @@ export function droppedTail(observed: string, e: TextExpectation): string | unde
  *    not comparable either (hasBullet: • and ● only — `*` and `·` are ordinary text too).
  * 4. `dropped-tail` (D28): the held text is a strict prefix of what the field should hold, grouped by the field
  *    (`tailOf`), with some of the typing in it — the tail dropped.
- * 5. Otherwise the HELD text is compared (a named placeholder is no text): with clear the field must EQUAL the value,
+ * 5. `separated` (D53): the held text is what the field should hold (over `priorsOf`, as `landedReformat` and
+ *    `tailOf` judge it) with separators alone added (`separatedOf`) — ones the grouping rules refused, since the
+ *    reading did not land. Disjoint from `dropped-tail` (all of the typing shown, not a strict prefix) and never `same-length`
+ *    (it is longer): it re-words what read `length` — and the contrived `case` whose one case-matching run is of the
+ *    earlier text (`x,ABa-b` after `xAB`, `ab` typed), where the typing is all there.
+ * 6. Otherwise the HELD text is compared (a named placeholder is no text): with clear the field must EQUAL the value,
  *    so the two are compared whole; without, it must CONTAIN it, so every run of the new text (`typedPartOf`) as long
  *    as the value is compared and the closest one counts — `case` when one differs only in letter case, else
  *    `same-length` when the lengths match, else `length`. Only position-for-position: an inserted or dropped character
  *    is a length difference. Letter case by toLowerCase/toUpperCase of each UTF-16 unit — enough for the measured
  *    auto-capitalisation; a case pair whose forms differ in length (`ß`/`SS`) reads as a plain difference, never as a
  *    pass.
- * Pure, O(observed × value) — run once, for a typing that missed.
+ * Pure, O(observed × value) — run once, for a typing that missed: a PRECONDITION, not checked — a reading that lands
+ * (`landingOf`) is never classified, and one `reformatOf` passes (`1 234` for `1234`) would read `separated` here.
  */
 export function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>): Difference {
   const { value, clear } = e;
@@ -248,7 +254,13 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
   if (landedSome(tail) && tail.reformatted !== undefined) {
     return { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 };
   }
-  const typed = typedPartOf(heldText(observed, e.placeholder), priorText(e));
+  const held = heldText(observed, e.placeholder);
+  // D53: every typed character there, in order, with separators the rules refused as grouping — never "a length".
+  for (const prior of priorsOf(held, e)) {
+    const added = separatedOf(held, prior + value);
+    if (added !== undefined) return { kind: 'separated', added };
+  }
+  const typed = typedPartOf(held, priorText(e));
   let caseOnly: number | undefined; // fewest case-only differing characters over the runs compared
   const starts = clear ? (typed.length === value.length ? [0] : []) : Array.from({ length: Math.max(0, typed.length - value.length + 1) }, (_, i) => i);
   for (const at of starts) {

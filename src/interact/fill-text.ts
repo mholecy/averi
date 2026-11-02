@@ -348,6 +348,13 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
     (grouped ? 'grouped by the field (separators of its own added)' : 'its spaces shown as another kind of space') +
     `, the last ${dropped} did not land: dropped, or refused by the field (a length cap, a character it does not take) — ` +
     'not a transformed input; content withheld from this error',
+  // D53: the marks as fill-reformat.ts#SEPARATORS holds them (a test pins the two agree); the check before the remedy —
+  // typing `12.34` into a cents mask passes and means 12.34.
+  separated: ({ added }) =>
+    ` — every typed character is there, in order, with ${countOf(added, 'separator')} added (spaces or . , - /) ` +
+    "that the fill does not take for the field's grouping (a decimal point or a sign, mixed or trailing marks, groups of one, a word split by autocorrect): " +
+    'check the field holds the value you meant — a cents mask shows a typed 1234 as 12.34 — and if it does, type the value as the field shows it; ' +
+    'content withheld from this error',
   unchanged: () => ' — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
   length: () => ' (content withheld from this error)',
 };
