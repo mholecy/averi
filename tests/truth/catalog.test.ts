@@ -106,6 +106,18 @@ describe('the cell catalog', () => {
   });
 });
 
+describe('form-format\'s date and phone fields (D37): what f11–f14 fill', () => {
+  it('date reformats as a dotted date under a mask placeholder with no letter or digit; phone does not, under a `+421` placeholder', async () => {
+    const form = (await loadCatalog()).cells.find((c) => c.id === 'form-format')!.form!;
+    expect(form.fields.map((f) => f.tag)).toEqual(['iban', 'amount', 'ibanShown', 'date', 'phone']);
+    const field = (tag: string) => form.fields.find((f) => f.tag === tag)!;
+    expect(field('date')).toMatchObject({ kind: 'text', placeholder: '__.__.____', format: 'date' });
+    expect(field('phone')).toMatchObject({ kind: 'text', placeholder: '+421' });
+    expect(field('phone').format).toBeUndefined();
+    expect(field('date').formatIn).toBeUndefined();
+  });
+});
+
 describe('captureRefusal: a cell captured only where it is built, and on Android under its navigation mode', () => {
   it('platforms, and the navigation mode on Android only', () => {
     expect(captureRefusal({}, 'ios', undefined)).toBeUndefined();

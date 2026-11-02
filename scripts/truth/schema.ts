@@ -144,10 +144,12 @@ export type FieldKind = 'text' | 'email' | 'iban' | 'amount' | 'pin' | 'country'
  * How a field reformats its text as it is typed (D18, docs/plans/2026-10-30-performance-backlog.md): `group4` an IBAN's
  * — every whitespace dropped, the rest in groups of four joined by a space (`SK3112000000` → `SK31 1200 0000`);
  * `thousands` an amount's — the whole part before the first `,` or `.` stripped of whitespace and grouped in threes from
- * the right by a no-break space (U+00A0), the rest kept (`1234,56` → `1 234,56`). The lab apps each spell the same two
- * rules (Forms.kt, Forms.swift, the React Native app's src/format.ts).
+ * the right by a no-break space (U+00A0), the rest kept (`1234,56` → `1 234,56`); `date` a dotted date's (D37) — every
+ * character but a digit dropped, the first eight kept (dd mm yyyy), a `.` after the 2nd and the 4th digit once a digit
+ * follows it (`31122026` → `31.12.2026`, `31.12.2026` alike, `3112202699` → `31.12.2026`). The lab apps each spell the same rules (Forms.kt, Forms.swift, the React Native
+ * app's src/format.ts — `date` the native apps' only: no React Native cell asks it).
  */
-export type FieldFormat = 'group4' | 'thousands';
+export type FieldFormat = 'group4' | 'thousands' | 'date';
 
 /** A message the app shows, and the accessibility identifier it carries — the convention averi pairs it by. */
 export interface Message {
