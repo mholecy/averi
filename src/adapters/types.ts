@@ -955,8 +955,10 @@ export interface LaunchOptions {
  * caveat the caller shows as a `⚠` line — the launch_app reply's second line
  * (mcp/tool-text.ts#launchText), a flow's `⚠ launch` trace line — and is set
  * today by one rule: iOS's foreground wait, when the tree was not seen to be
- * the launched app's within its bound (adapters/ios-foreground.ts). A launch
- * never FAILS for that: the app was launched, the caveat is about the next read.
+ * the launched app's within its bound (adapters/ios-foreground.ts) — naming
+ * iOS's system alert and its buttons' centres when that holds the launch
+ * (D56). A launch never FAILS for that: the app was launched, the caveat is
+ * about the next read.
  */
 export interface LaunchOutcome {
   note?: string;

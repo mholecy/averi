@@ -492,20 +492,34 @@ describe('the launch and the liveness check share one appinfo per bundle (D33)',
   });
 });
 
-// D54: the WDA alert read (ForegroundCheck.alert) is a link's alone, and only at the bound with SpringBoard last named.
-describe('awaitForeground — the one alert read, at the bound, for a link only (D54)', () => {
+// D54: the WDA alert read (ForegroundCheck.alert) is asked only at the bound with SpringBoard last named; since D56 for
+// a launch too, whose note then names the alert (ADR 0032's D56 amendment).
+describe('awaitForeground — the one alert read, at the bound with SpringBoard last named (D54, D56)', () => {
   const ALERT = { title: 'Open in “AveriLab”?', buttons: [{ label: 'Open', centre: { x: 275, y: 474 } }] };
-  const check = (link: string | undefined) => {
+  /** D48's note for a launch that read SpringBoard to the bound — what a launch says when no alert is found. */
+  const D48_SPRINGBOARD =
+    '3 s after launching dev.averi.lab, WebDriverAgent still read SpringBoard (the home screen, the launch animation or ' +
+    "a system alert) as the active app — a ui_snapshot now reads that app's tree, on which an absent check passes. " +
+    'Read again; if it repeats, take a screenshot';
+  const check = (
+    link: string | undefined,
+    opts: { bundles?: string[]; alert?: (() => Promise<typeof ALERT | undefined>) | null } = {},
+  ) => {
     let reads = 0;
+    let names = 0;
+    let asked = 0;
+    const bundles = opts.bundles ?? ['com.apple.springboard'];
+    const alert = opts.alert === undefined ? async () => ALERT : opts.alert;
     return {
       reads: () => reads,
+      names: () => names,
       check: {
         bundleId: 'dev.averi.lab',
-        label: async () => ({ kind: 'bundle' as const, bundleId: 'com.apple.springboard' }),
-        names: async () => ['AveriLab'],
+        label: async () => ({ kind: 'bundle' as const, bundleId: bundles[Math.min(asked++, bundles.length - 1)] }),
+        names: async () => (names++, ['AveriLab']),
         ownerOf: () => undefined,
         source: 'wda' as const,
-        alert: async () => (reads++, ALERT),
+        ...(alert !== null && { alert: async () => (reads++, alert()) }),
         ...(link !== undefined && { link }),
       },
     };
@@ -517,9 +531,44 @@ describe('awaitForeground — the one alert read, at the bound, for a link only 
     expect(c.reads()).toBe(1);
   });
 
-  it('a launch handed the same read: never asked — its note as before', async () => {
+  it("a launch: read once, at the bound — the alert named in its note, its buttons' centres, no names asked", async () => {
     const c = check(undefined);
-    expect(await awaitForeground(c.check)).toEqual({ note: expect.stringMatching(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read SpringBoard/) });
+    expect(await awaitForeground(c.check)).toEqual({
+      note:
+        'iOS has not brought dev.averi.lab forward yet: a system alert is up, "Open in “AveriLab”?" — button "Open" at ' +
+        "(275, 474). Answer it with a tap at the chosen button's x and y (averi taps nothing itself); every launch stays " +
+        'behind the alert until it is answered — then read again before trusting a read',
+    });
+    expect(c.reads()).toBe(1);
+    expect(c.names()).toBe(0);
+  });
+
+  it("a launch whose alert read throws: fails open — D48's note, byte-identical", async () => {
+    const c = check(undefined, { alert: () => Promise.reject(new Error('WDA /source request failed: ECONNRESET')) });
+    expect(await awaitForeground(c.check)).toEqual({ note: D48_SPRINGBOARD });
+    expect(c.reads()).toBe(1);
+  });
+
+  it("a launch whose alert read finds none: D48's note, byte-identical", async () => {
+    const c = check(undefined, { alert: async () => undefined });
+    expect(await awaitForeground(c.check)).toEqual({ note: D48_SPRINGBOARD });
+    expect(c.reads()).toBe(1);
+  });
+
+  it('a launch that read another app to the bound: no alert read — its note names that app', async () => {
+    const c = check(undefined, { bundles: ['com.apple.MobileAddressBook'] });
+    expect((await awaitForeground(c.check)).note).toMatch(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read com\.apple\.MobileAddressBook/);
     expect(c.reads()).toBe(0);
+  });
+
+  it('a launch that matches after SpringBoard: no alert read, no note', async () => {
+    const c = check(undefined, { bundles: ['com.apple.springboard', 'dev.averi.lab'] });
+    expect(await awaitForeground(c.check)).toEqual({});
+    expect(c.reads()).toBe(0);
+  });
+
+  it("a launch with no alert read wired, SpringBoard to the bound: D48's note, as before", async () => {
+    const c = check(undefined, { alert: null });
+    expect(await awaitForeground(c.check)).toEqual({ note: D48_SPRINGBOARD });
   });
 });

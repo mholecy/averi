@@ -1,15 +1,16 @@
-import { readFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IosAdapter } from '../../src/adapters/ios.js';
-import { IdbEmptyTreeError, IdbTreeSource, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
+import { IdbEmptyTreeError, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-foreground.js';
-import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
-import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
+import type { ExecFn } from '../../src/adapters/exec.js';
 import { alertInWda } from '../../src/adapters/ios-system-alert.js';
 import type { DeepLinkOutcome, UiNode } from '../../src/adapters/types.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
+import {
+  bundle, DESCRIBE_ALL, IDB_ALERT, IDB_LAB, idbLab, lab, label, LAB, LAB_INFO, LAB_PATH, LAB_TYPES, LAUNCH_ALERT_NOTE, openurl,
+  PLUTIL, SPRINGBOARD, WDA_ALERT, WRITES,
+} from '../helpers/ios-lab.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 
 // The one sleep owner, recorded and not waited on; under a Date-only fake clock each recorded sleep moves the clock
@@ -22,64 +23,6 @@ vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'))
 // CFBundleURLTypes, read on the host with plutil at appinfo's Path) is now followed by launch's bounded foreground
 // wait (ios-foreground.ts); any other link is opened exactly as before.
 
-const LAB = 'dev.averi.lab';
-const LAB_PATH = '/Sim/Containers/Bundle/Application/5E1F/AveriLab.app';
-const LAB_INFO = appinfo('AveriLab', 'AveriLab', { path: LAB_PATH, executable: 'AveriLab' });
-/** `plutil -extract CFBundleURLTypes json` of the lab app, as measured. */
-const LAB_TYPES = '[{"CFBundleURLName":"dev.averi.lab","CFBundleURLSchemes":["averilab"]}]';
-const PLUTIL = `plutil -extract CFBundleURLTypes json -o - ${LAB_PATH}/Info.plist`;
-const WRITES = [
-  'xcrun simctl spawn AAAA-1111 defaults write com.apple.Accessibility AutomationEnabled -bool true',
-  'xcrun simctl spawn AAAA-1111 defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true',
-];
-const openurl = (url: string) => `xcrun simctl openurl AAAA-1111 ${url}`;
-
-const bundle = (bundleId: string): ApplicationLabel => ({ kind: 'bundle', bundleId });
-const label = (text: string): ApplicationLabel => ({ kind: 'label', label: text });
-const SPRINGBOARD = bundle('com.apple.springboard');
-
-/**
- * An IosAdapter over a source whose applicationLabel answers in turn from `answers` (the last repeats) — the
- * `kind` given — and an exec answering `simctl appinfo` with `info` and plutil with `types` (an Error rejects each).
- * Every exec command line but xcode-env's one-time `xcrun --find simctl` is recorded.
- */
-function lab(
-  answers: Array<ApplicationLabel | Error>,
-  opts: { kind?: IosTreeSourceKind; info?: string | Error | (() => string | Error); types?: string | Error; tree?: UiNode | Error } = {},
-) {
-  const calls: string[] = [];
-  let asked = 0;
-  let reads = 0;
-  const source: IosTreeSource = {
-    kind: opts.kind ?? 'wda',
-    read: () => Promise.reject(new Error('unused')),
-    // WdaTreeSource.systemAlert's part (D54: one short /source at the bound): `tree` is what it reads, unset not expected.
-    systemAlert: async () => {
-      reads++;
-      const tree = opts.tree ?? new Error('unused');
-      if (tree instanceof Error) throw tree;
-      return alertInWda(structuredClone(tree));
-    },
-    applicationLabel: async () => {
-      const a = answers[Math.min(asked++, answers.length - 1)];
-      if (a instanceof Error) throw a;
-      return a;
-    },
-    dispose: () => Promise.resolve(),
-  };
-  const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
-    const full = [cmd, ...args].join(' ');
-    if (full !== 'xcrun --find simctl') calls.push(full);
-    const answer = (out: string | Error) => {
-      if (out instanceof Error) throw out;
-      return { stdout: Buffer.from(out), stderr: '' };
-    };
-    if (full.startsWith('xcrun simctl appinfo')) return answer(typeof opts.info === 'function' ? opts.info() : (opts.info ?? LAB_INFO));
-    if (full.startsWith('plutil ')) return answer(opts.types ?? LAB_TYPES);
-    return { stdout: Buffer.alloc(0), stderr: '' };
-  };
-  return { adapter: new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: source }), calls, asks: () => asked, reads: () => reads };
-}
 
 let stderr: { mock: { calls: unknown[][] } };
 /** The stderr lines other than the accessibility write's announcement. */
@@ -308,14 +251,6 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
 // reply names it — its title and its buttons at their centres — instead of the vague note. Batch-5 D49A's captures
 // (E2): idb lists the alert alone under SpringBoard; WDA's activeAppInfo names com.apple.springboard while it is up,
 // and its /source holds the Alert. The happy path's device calls are unchanged on both sources.
-const fixture = async (name: string): Promise<string> => readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
-const IDB_ALERT = JSON.stringify((JSON.parse(await fixture('idb-springboard-open-in-alert.json')) as { elements: unknown[] }).elements);
-const WDA_ALERT = parseWdaSourceValue(JSON.parse(await fixture('wda-capture-springboard-open-in-alert.json')));
-/** The lab app in front, as idb lists it (batch-5 case-rs-idb-E6, its four targets cut to one). */
-const IDB_LAB = JSON.stringify([
-  { type: 'Application', AXLabel: 'AveriLab', frame: { x: 0, y: 0, width: 402, height: 874 } },
-  { type: 'Button', AXLabel: 'Target A', AXUniqueId: 'lab.open.A', frame: { x: 51, y: 110, width: 300, height: 64 } },
-]);
 const ALERT: DeepLinkOutcome = {
   alert: {
     title: 'Open in “AveriLab”?',
@@ -326,24 +261,6 @@ const ALERT: DeepLinkOutcome = {
     asksForApp: true,
   },
 };
-const DESCRIBE_ALL = 'idb ui describe-all --json --udid AAAA-1111';
-
-/** An IosAdapter on the REAL idb source, its describe-all answering from `reads` in turn (the last repeats). */
-function idbLab(reads: string[], info = LAB_INFO) {
-  const calls: string[] = [];
-  let read = 0;
-  const exec: ExecFn = async (cmd, args): Promise<ExecResult> => {
-    const full = [cmd, ...args].join(' ');
-    if (full !== 'xcrun --find simctl') calls.push(full);
-    const out = (s: string) => ({ stdout: Buffer.from(s), stderr: '' });
-    if (full === DESCRIBE_ALL) return out(reads[Math.min(read++, reads.length - 1)]);
-    if (full.startsWith('xcrun simctl appinfo')) return out(info);
-    if (full.startsWith('plutil ')) return out(LAB_TYPES);
-    return out('');
-  };
-  const adapter = new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec }) });
-  return { adapter, calls, describeAlls: () => calls.filter((c) => c === DESCRIBE_ALL).length };
-}
 
 describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)", () => {
   it('idb, the lab in front: one describe-all, no note — the same calls as before D54', async () => {
@@ -376,12 +293,6 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
   it('idb: an alert shape whose title neither names the app nor reads "Open in “…”?": no alert — the note at the bound, as before', async () => {
     const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'Allow notifications?')]);
     expect((await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).note).toMatch(/^averi did not see dev\.averi\.lab come forward/);
-    expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
-  });
-
-  it('a launch (no link) over the same alert is unchanged: it reads to the bound and gives its note, no alert', async () => {
-    const d = idbLab([IDB_ALERT]);
-    expect(await d.adapter.launch(LAB)).toEqual({ note: expect.stringMatching(/the UI tree was still SpringBoard's/) });
     expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
   });
 
@@ -437,13 +348,6 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     expect(d.reads()).toBe(0);
   });
 
-  it('a launch (no link) that reads SpringBoard to the bound: no /source read, its note as before', async () => {
-    const d = lab([SPRINGBOARD], { tree: WDA_ALERT });
-    const outcome = await d.adapter.launch(LAB);
-    expect(outcome).toEqual({ note: expect.stringMatching(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read SpringBoard/) });
-    expect(d.reads()).toBe(0);
-  });
-
   it("the alert's title names none of the app's names: named all the same, marked as not naming the app", async () => {
     const d = lab([SPRINGBOARD], { tree: WDA_ALERT, info: appinfo('Lab Two', 'LabTwo', { path: LAB_PATH, executable: 'LabTwo' }) });
     expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ alert: { ...ALERT.alert!, asksForApp: false } });
@@ -478,10 +382,122 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     const d = idbLab([IDB_LAB], NO_NAMES);
     expect((await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).note).toMatch(/^averi could not check that dev\.averi\.lab came forward/);
   });
+});
 
-  it('a launch with the names unreadable over the same alert: unchanged — its "could not check" note, no alert', async () => {
+// D56 (2026-11-02; ADR 0032's D56 amendment): a launch behind iOS's system alert — an unanswered "Open in “AveriLab”?"
+// keeps every launch behind it (batch-2) — names it and its buttons' centres in its ⚠ note, from the same reads as a
+// link's (D54): on idb the label read that lists it, on WDA one short /source at the bound. The launch still never
+// fails, and its happy path makes the same calls as before.
+describe("IosAdapter.launch — the system alert it waits behind, named in its note (D56)", () => {
+  const LAUNCH = 'xcrun simctl launch AAAA-1111 dev.averi.lab';
+  const APPINFO = 'xcrun simctl appinfo AAAA-1111 dev.averi.lab';
+  const ALERT_NOTE = LAUNCH_ALERT_NOTE;
+  /** D48's note for a WDA launch that read SpringBoard to the bound, byte for byte. */
+  const D48_SPRINGBOARD =
+    '3 s after launching dev.averi.lab, WebDriverAgent still read SpringBoard (the home screen, the launch animation or ' +
+    "a system alert) as the active app — a ui_snapshot now reads that app's tree, on which an absent check passes. " +
+    'Read again; if it repeats, take a screenshot';
+  const NO_NAMES = appinfo(undefined, undefined, { path: LAB_PATH });
+
+  it('idb, the lab in front: one describe-all, then the names, no note — the same calls as before D56', async () => {
+    const d = idbLab([IDB_LAB]);
+    expect(await d.adapter.launch(LAB)).toEqual({});
+    expect(d.calls).toEqual([...WRITES, LAUNCH, DESCRIBE_ALL, APPINFO]);
+    expect(sleeps).toEqual([]);
+  });
+
+  it('idb lists the alert at the first read: the wait ends at once with the alert note — one describe-all, no pause, no extra call', async () => {
+    const d = idbLab([IDB_ALERT]);
+    expect(await d.adapter.launch(LAB)).toEqual({ note: ALERT_NOTE });
+    expect(d.calls).toEqual([...WRITES, LAUNCH, DESCRIBE_ALL, APPINFO]);
+    expect(sleeps).toEqual([]);
+  });
+
+  it('idb reads another app, then the alert: ends at the read that lists it', async () => {
+    const d = idbLab([IDB_LAB.replace('AveriLab', 'Contacts'), IDB_ALERT]);
+    expect(await d.adapter.launch(LAB)).toEqual({ note: ALERT_NOTE });
+    expect(d.describeAlls()).toBe(2);
+    expect(sleeps).toEqual([FOREGROUND_POLL_MS]);
+  });
+
+  it("idb: a SpringBoard prompt titled \"Allow notifications?\": no alert — D48's SpringBoard note at the bound, as before", async () => {
+    const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'Allow notifications?')]);
+    expect(await d.adapter.launch(LAB)).toEqual({ note: expect.stringMatching(/^3 s after launching dev\.averi\.lab \("AveriLab"\), the UI tree was still SpringBoard's/) });
+    expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
+  });
+
+  it("idb, the app's names unreadable: the English-form alert is named all the same — one describe-all, one appinfo", async () => {
     const d = idbLab([IDB_ALERT], NO_NAMES);
+    expect(await d.adapter.launch(LAB)).toEqual({ note: ALERT_NOTE });
+    expect(d.describeAlls()).toBe(1);
+    expect(d.calls.filter((c) => c.includes('appinfo'))).toHaveLength(1);
+  });
+
+  it("idb, the app's names unreadable and a localised title that needs them: \"could not check\" at once, as before", async () => {
+    const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'In „AveriLab“ öffnen?')], NO_NAMES);
     expect(await d.adapter.launch(LAB)).toEqual({ note: expect.stringMatching(/^could not check that dev\.averi\.lab is in front/) });
+    expect(d.describeAlls()).toBe(1);
+  });
+
+  it('WebDriverAgent names the app at once: the same calls as before — no /source, no appinfo', async () => {
+    const d = lab([bundle(LAB)], { tree: WDA_ALERT });
+    expect(await d.adapter.launch(LAB)).toEqual({});
+    expect(d.calls).toEqual([...WRITES, LAUNCH]);
+    expect(d.asks()).toBe(1);
+    expect(d.reads()).toBe(0);
+  });
+
+  it('WebDriverAgent reads SpringBoard to the bound: the same asks, then exactly one /source — the alert note, no appinfo', async () => {
+    const d = lab([SPRINGBOARD], { tree: WDA_ALERT });
+    expect(await d.adapter.launch(LAB)).toEqual({ note: ALERT_NOTE });
+    expect(d.asks()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
+    expect(d.reads()).toBe(1);
+    expect(d.calls).toEqual([...WRITES, LAUNCH]);
+  });
+
+  it("the /source read fails: fails open — D48's note, byte-identical", async () => {
+    const d = lab([SPRINGBOARD], { tree: new Error('WDA /source request failed: ECONNRESET') });
+    expect(await d.adapter.launch(LAB)).toEqual({ note: D48_SPRINGBOARD });
+    expect(d.reads()).toBe(1);
+  });
+
+  it("/source holds no alert (the home screen): D48's note, byte-identical", async () => {
+    const home = structuredClone(WDA_ALERT);
+    const unmark = (n: UiNode): void => {
+      delete n.presentation;
+      n.children.forEach(unmark);
+    };
+    unmark(home);
+    const d = lab([SPRINGBOARD], { tree: home });
+    expect(await d.adapter.launch(LAB)).toEqual({ note: D48_SPRINGBOARD });
+    expect(d.reads()).toBe(1);
+  });
+
+  // The asymmetry the amendment states: on WDA any SpringBoard alert at the bound is named — no title gate, and no
+  // names to judge one with (a launch asks none); on idb only "Open in “…”?" or a title naming the app (above).
+  it('WebDriverAgent: a SpringBoard alert titled "Allow notifications?" at the bound is named all the same, no appinfo', async () => {
+    const other = structuredClone(WDA_ALERT);
+    const retitle = (n: UiNode): void => {
+      if (n.label === 'Open in “AveriLab”?') n.label = 'Allow notifications?';
+      n.children.forEach(retitle);
+    };
+    retitle(other);
+    const d = lab([SPRINGBOARD], { tree: other });
+    expect(await d.adapter.launch(LAB)).toEqual({ note: ALERT_NOTE.replace('"Open in “AveriLab”?"', '"Allow notifications?"') });
+    expect(d.reads()).toBe(1);
+    expect(d.calls).toEqual([...WRITES, LAUNCH]);
+  });
+
+  it('SpringBoard, then the app before the bound: no /source read, no note', async () => {
+    const d = lab([SPRINGBOARD, SPRINGBOARD, bundle(LAB)], { tree: WDA_ALERT });
+    expect(await d.adapter.launch(LAB)).toEqual({});
+    expect(d.reads()).toBe(0);
+  });
+
+  it('another app to the bound (not SpringBoard): no /source read — its note as before', async () => {
+    const d = lab([bundle('com.apple.MobileAddressBook')], { tree: WDA_ALERT });
+    expect((await d.adapter.launch(LAB)).note).toMatch(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read com\.apple\.MobileAddressBook as the active app/);
+    expect(d.reads()).toBe(0);
   });
 });
 
