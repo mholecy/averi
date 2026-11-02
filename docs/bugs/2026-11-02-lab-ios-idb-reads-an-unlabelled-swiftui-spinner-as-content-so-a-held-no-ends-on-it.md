@@ -5,8 +5,10 @@
 spinner `docs/truth/live-records/ios-idb-held-no-spinner-describe-all-d30-1.json` (flat) and
 `…-nested-d30-1.json` (nested, a moment later).
 
-> **Status (2026-11-02, D50):** FIXED on `fix/d50-idb-spinner-progress` (ADR 0033's D50 amendment), device check
-> pending (the next batch's `live.ts --groups ensure` under idb). The idb parser
+> **Status (2026-11-02, D50):** FIXED on `fix/d50-idb-spinner-progress` (ADR 0033's D50 amendment, merged
+> f0bf0d70), device-checked by batch-4 (main 7e6d2d47, `live.ts --groups ensure` under idb:
+> docs/truth/live-records/ios-idb-ensure-d50-1.json, 3/3 ok — h2 held 2.016 s on Welcome, Continue 2.79 s after it).
+> The idb parser
 > (`src/adapters/ios-tree-source.ts#idbSpinner`) reads a `GenericElement` that carries `UpdatesFrequently` and no label
 > as `progress`: `showsProgress` then stops the hold on it, and alone it reads bare. The `ios idb h2` live-known.ts
 > entry is struck off; ios-idb-ensure-d30-1.json rejudges h2 not known (the src before the fix). "Fix direction" below

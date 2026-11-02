@@ -390,6 +390,14 @@ To check on the device (the next batch): Q2 ×10 A/B main vs this change, judged
 a launch before WDA is up; an idb project unchanged. Android has the same shape of code (no wait after `am start`) but a
 different read (`uiautomator dump` waits for 1 s of accessibility idle) — not changed until measured.
 
+Checked on the device (batch-4, 2026-11-02, lab simulator; main 7e6d2d47 against 9d8b57dc, the src before this change;
+`d48-probe.ts`, four alternated runs): Q2 — main read the lab's tree in 10/10 (⚠ 0), before read Contacts silently in 4
+of 10; the happy path — `launch_app` median 342.5 ms before, 361 ms main (+18.5, within the +150 accepted), about one
+ask a launch, no ⚠; one raw `/wda/activeAppInfo` with the lab in front: median 11.8 ms, p90 18.5 ms (n 20), the lab
+named 20/20 — the "tens of ms" estimate above holds; the lag (`simctl launch` → WDA names the lab, 50 ms polls): 0 ms
+in 10/10, never Contacts at the first poll, so the 3 s bound was not approached; a cold launch 5/5 the lab's tree
+(two asks, 2.0–2.1 s); WDA not up 3/3 (no ask, the lab's tree); an idb project unchanged (5/5 both sides, no ask).
+
 ## Amendment: a deep link to the project's own scheme waits as a launch does (2026-11-02, backlog D49a)
 
 `open_deep_link` replied `Opened <url> on ios` once `simctl openurl` returned, and read nothing after it. Batch-1 D's
@@ -441,3 +449,12 @@ no read of the device's UI, no wait, no note — the review accepted this as "as
 one ask when the app is already in front, the stale window when the link brings it forward, the 3 s bound and a note
 when it never comes. Android unchanged: a link with two handlers starts the chooser, which `am start` reports as
 started — a separate row, after a device check.
+
+Checked on the device (batch-4, 2026-11-02, lab simulator; main 7e6d2d47 against d3aa6818, `d49-probe.ts`): the happy
+path holds — E1 (the lab in front) no ⚠ under idb and WDA, main adding one `simctl appinfo`, one `plutil` and the ask
+(idb 367 → 470 ms, WDA 359 → 467 ms); https and tel the same calls as before, byte for byte, no ⚠. The alert path is
+NOT verified: in E2–E4 (SpringBoard, Contacts, a cold start) iOS raised no "Open in" alert — idb listed none, WDA's
+`/source` held no Alert and `/wda/activeAppInfo` named the lab, whose opened cell was in front after the link; E6 (raw,
+no averi) saw no alert in 27 polls over 3 s — so the link went straight through and the reply's bare "Opened" was
+right. Likely iOS remembered an earlier "Open" tap. The ⚠ line has not yet been seen on a device; raising the alert
+reproducibly is part of D54.

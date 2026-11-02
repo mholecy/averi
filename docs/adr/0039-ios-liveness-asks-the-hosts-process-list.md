@@ -2,7 +2,8 @@
 
 Status: accepted 2026-11-02 (backlog row D33, docs/plans/2026-10-30-performance-backlog.md). The `DeviceAdapter`
 contract, `run/verify.ts#appHealth` and every reply line are unchanged. One verdict changes on purpose: launchctl's
-match is now exact (below).
+match is now exact (below). Amended 2026-11-02 (batch-4's device check: the A/B shown, the agreement before a
+reinstall — the last section).
 
 ## Context
 
@@ -75,3 +76,20 @@ is never trusted alone: launchctl, now matched exactly, gives the final answer.*
   not say which source answered: the verdict means the same either way.
 - Android is untouched (`pidof`).
 - `adapters/ios-liveness.ts` joins the mutation run (ADR 0038) with its direct tests.
+
+## Amendment: the device check (2026-11-02, batch-4)
+
+The A/B (`scripts/perf/baseline.ts --scenarios color,ocr,ensure-cold,ensure-warm --repeat 10`, lab simulator, main
+7e6d2d47 against 05e21766, the src before this change): the saving is shown on color and ocr under both sources,
+about −200 ms against the ≈ 220 estimated above — idb color 803 → 601 ms (−202), ocr 930 → 732 (−198); WDA color
+829 → 613 (−217), ocr 980 → 765 (−215). ensure-cold
+and ensure-warm moved ≈ 0 (idb +9 / +3, WDA −62 / +2): the check hides beside the frame there, as above. Main ran
+launchctl 0 and pgrep 1 a run where the app was alive, before launchctl 1.
+
+The agreement probe (v2, main's own `IosAdapter.isAppRunning` against exact raw launchctl): 56/56 over S1–S5 (in
+front, home, terminated, `kill -9`, Contacts in front) and S8-pre, S1 median 20.6 ms; S1 and S2 fell back to launchctl
+0 times, S3–S5 once a check, as designed. The launch race (S6, 0/150/400 ms) and a real crash (S7, `kill -ABRT` at
+0/300/1000 ms) agreed too, 5/5 each: the crash window of the residual above did not show at those delays. NOT
+measured: the agreement after a hand reinstall (S8). The reinstall moved the container (`…/Application/37588271…/` →
+`…/B913B894…/`), the case the exact-path pattern is most exposed to, and the probe's next cell open did not report
+ready within 10 s, so no check ran after it. Pending (batch-5).

@@ -87,7 +87,9 @@ full window, exactly as before.**
     Native's `<ActivityIndicator>` through idb are assumed to share this shape (the same class beneath) — unmeasured,
     on D37's measure list; (3) an app-made unlabelled element carrying the trait (a hand-drawn live counter or clock)
     reads as loading: the hold never runs on it, `scroll_until` never calls its list exhausted, alone it reads bare —
-    the safe direction, bounded by `ensureTimeoutMs` / `maxSwipes`, never a wrong pass.
+    the safe direction, bounded by `ensureTimeoutMs` / `maxSwipes`, never a wrong pass. Device-checked (batch-4,
+    2026-11-02, main 7e6d2d47, idb): docs/truth/live-records/ios-idb-ensure-d50-1.json, h1–h3 ok — h2 tapped Continue
+    2.79 s after Welcome, having held 2.016 s on Welcome itself, not on the spinner.
 - A look the hold ended writes one trace line, right before the rung: `state <name>` — `second look: not detected, the
   screen held still <s> — running <rung> before the <ensureTimeoutMs> window's end`, so a rung that runs seconds
   before the deadline is not read as a look cut short for no reason. A `no` at the deadline writes none, as before.

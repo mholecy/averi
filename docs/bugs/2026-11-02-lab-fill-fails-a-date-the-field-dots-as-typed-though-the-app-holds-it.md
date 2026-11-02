@@ -4,8 +4,10 @@
 `averi_lab` AVD (API 33), main `6b4a44df`. Records `docs/truth/live-records/ios-idb-forms-d37-1.json`,
 `ios-wda-forms-d37-1.json`, `android-forms-d37-1.json`, case `f11`.
 
-> **Status (2026-11-02, D51):** FIXED on `fix/d51-dotted-date-lands` (ADR 0034's D51 amendment), device check pending
-> (the next batch's `live.ts --groups forms` on idb, WDA and uiautomator). Two causes, both fixed: an added `.`/`,`
+> **Status (2026-11-02, D51):** FIXED on `fix/d51-dotted-date-lands` (ADR 0034's D51 amendment, merged 0a34980c),
+> device-checked by batch-4 (main 7e6d2d47, `live.ts --groups forms`: docs/truth/live-records/ios-idb-forms-d51-1.json,
+> ios-wda-forms-d51-1.json, android-forms-d51-1.json, 4/4 ok each; under idb the empty field reads `__.__.____` as its
+> value, no placeholder, as part two assumed). Two causes, both fixed: an added `.`/`,`
 > passes as a digit grouping (two or more marks over a digits-only typing, a group between two of them not three
 > long: no decimal point, no thousands), and — idb only — the unnamed `__.__.____` read as the field's text before is a
 > mask template, tried as no earlier text as well (narrowing D29's MINOR-A). "Why" below is the code before the fix;

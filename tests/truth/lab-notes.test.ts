@@ -34,8 +34,8 @@ const table = JSON.parse(readFileSync(`${ROOT}scripts/truth/calibration.json`, '
  * its three, struck off by round 14's bugs/r14-lv1 — fixed live, still excluded, its `why` saying so; LV3's with its idb
  * one, struck off by round 14's bugs/r14-lv3 — fixed live, still excluded; LV2's with its two, struck off by round
  * 1023's bugs/r1023-lv2 — fixed live, still excluded; batch-3's dotted-date note with its three f11 entries, struck off
- * by D51's fix — fixed, still excluded, its `why` saying so, the device check pending; batch-3's idb-spinner note with
- * its `ios idb h2` entry, struck off by D50's fix — fixed, still excluded, its `why` saying so, the device check pending.)
+ * by D51's fix — fixed, still excluded, its `why` saying so, device-checked by batch-4; batch-3's idb-spinner note with
+ * its `ios idb h2` entry, struck off by D50's fix — fixed, still excluded, its `why` saying so, device-checked by batch-4.)
  */
 const LIVE_ONLY: Readonly<Record<string, string>> = {
   '2026-10-22-lab-ios-wda-plain-stop-on-a-row-resting-a-fraction-of-a-point-centre-out.md': "a fling's rest a fraction of a point centre-out under WDA, live only (and intermittent)",

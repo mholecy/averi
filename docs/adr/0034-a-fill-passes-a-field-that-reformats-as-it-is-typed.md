@@ -358,10 +358,11 @@ equivalent). `npm run mutate` (cold; a Stryker timeout counts as killed, as Stry
 94.03 → 94.35 % (floor 92; its two new survivors equivalent — `markKind`'s `'none'` and `'grouping'` emptied:
 `reformatOf` tells only `'thousands'` and undefined apart), fill-landing 95.16 → 95.20 % (floor 93); floors unchanged.
 
-**Not checked on the device.** The next batch runs `live.ts --groups forms` on idb, WDA and uiautomator: f11 should read
-`Filled … (8 characters, the field shows them reformatted: 2 separators added)`, f1–f14 otherwise as at D37/D40.
-Under idb it should also confirm part two's premise — a `ui_snapshot` of the empty date field shows `__.__.____` as
-its value, no placeholder — inferred from D29's iban field (the same `FormattingTextField`), never captured.
+**Checked on the device** (batch-4, 2026-11-02, main 7e6d2d47; `live.ts --groups forms`, f11–f14): 4 cases, 4 ok
+under idb, WDA and uiautomator (docs/truth/live-records/ios-idb-forms-d51-1.json, ios-wda-forms-d51-1.json,
+android-forms-d51-1.json) — f11 reads `Filled id:"lab.form-format.date" (8 characters, the field shows them
+reformatted: 2 separators added)`. Part two's premise holds: a describe-all of the empty date field shows
+`__.__.____` as its value, no placeholder, so f11 under idb exercises the mask template.
 
 ## Residuals accepted
 
