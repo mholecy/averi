@@ -247,6 +247,8 @@ describe('prefixOf — a strict prefix of the typing, exactly or reformatted', (
     expect(prefixOf('31/12/', '31122026')).toEqual({ prefix: '3112', reformatted: { added: 2, respaced: 0 } });
     // the whole typing's rules: a letter split is a code's when the WHOLE typing is one (digits later in it)
     expect(prefixOf('ab ', 'abcd12')).toEqual({ prefix: 'ab', reformatted: { added: 1, respaced: 0 } });
+    // a typing that holds a space of its own: another mark may still be the field's
+    expect(prefixOf('+421 903-', '+421 903123456')).toEqual({ prefix: '+421 903', reformatted: { added: 1, respaced: 0 } });
   });
 
   it('a trailing mark `reformatOf` would refuse before the next typed character (D60): none', () => {
@@ -258,6 +260,7 @@ describe('prefixOf — a strict prefix of the typing, exactly or reformatted', (
     expect(prefixOf('1 234 ', '1234567')).toBeUndefined(); // two single-character groups
     expect(prefixOf('1 2 ', '1234')).toBeUndefined(); // groups of one
     expect(prefixOf('1 234 ', '1234,56')).toBeUndefined(); // before typed punctuation
+    expect(prefixOf('12 345 ', '12345,67')).toBeUndefined(); // the same, judged by THE next typed character: `,`
     expect(prefixOf('Jan ', 'JanNovak')).toBeUndefined(); // prose: autocorrect splitting a word
     expect(prefixOf(' ', 'SK3112000000')).toBeUndefined(); // a leading mark: an empty prefix
     expect(prefixOf('-', '12')).toBeUndefined();
