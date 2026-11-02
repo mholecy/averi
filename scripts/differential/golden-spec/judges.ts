@@ -1,5 +1,5 @@
 import type { Call, Outcome } from '../differential.js';
-import { allPassed, claimsTap, firstLine, isError, notInTree, presentedRemedySaid, windowHintSaid } from '../../truth/replies.js';
+import { allPassed, claimsTap, firstLine, idbReasonsSaid, isError, noIdListedSaid, notInTree, presentedRemedySaid, windowHintSaid } from '../../truth/replies.js';
 import type { CellTruth, Rect } from '../../truth/schema.js';
 import { bandsOf, pointText, within } from '../../truth/truth.js';
 import type { StopAsk, TapAsk } from '../../truth/target-contract.js';
@@ -99,6 +99,40 @@ export const presentedRemedyMissing = (o: Outcome, missing: string): string | un
  */
 export const closesItsOwnLayer = (o: Outcome): string | undefined =>
   presentedRemedySaid(o.reply) && !o.reply.includes('scroll_until') ? said(o, 'told to close the layer it lies in, no scroll_until offered') : undefined;
+
+/**
+ * A not-found that says nothing of why is a mismatch where the truth says the source cannot list the target: undefined
+ * when the reply names `what` (`named`: by default idb's limit on a read that lists no identifier, replies.ts
+ * #noIdListedSaid — golden-spec/base.ts's open target unlisted), else why not, `why` first.
+ */
+export const limitUnsaid = (o: Outcome, why: string, named: (reply: string) => boolean = noIdListedSaid, what = "the source's limit"): string | undefined =>
+  named(o.reply) ? undefined : said(o, `${why}, without naming ${what}`);
+
+/**
+ * A not-found's way out, where the replayed tree does not list the target because something lies over it: the
+ * presented remedy (replies.ts#presentedRemedySaid), the active-window hint (#windowHintSaid), or idb's own words —
+ * its limit on a read that lists no identifier (#noIdListedSaid) or its reasons, which say what idb lists nothing
+ * beneath and to close what covers it (#idbReasonsSaid).
+ */
+export const wayOutSaid = (reply: string) => presentedRemedySaid(reply) || windowHintSaid(reply) || noIdListedSaid(reply) || idbReasonsSaid(reply);
+
+/**
+ * A row whose target the replayed tree does not list (`absent`, golden-spec.ts#unlistedIn: the harness's own reading of
+ * the payload, truth.ts#listedIn): a "not found" is then the honest answer, not vacuous (classed) — but only one that
+ * names the way out (`named`, wayOutSaid by default, `what` its words in the mismatch and in `says`; the
+ * under-keyboard stop asks the soft keyboard too). The row's own judge goes first, as classed's. `absent` undefined:
+ * the row as it was.
+ */
+export function judgedUnlisted<E extends Expectation>(e: E, absent: string | undefined, named: (reply: string) => boolean = wayOutSaid, what = 'the way out'): E {
+  if (absent === undefined) return e;
+  const judge = e.judge;
+  return {
+    ...e,
+    says: `${e.says}; or (${absent}) not found, naming ${what}`,
+    absent,
+    judge: (o: Outcome) => judge(o) ?? (notInTree(o.reply) ? limitUnsaid(o, 'not found', named, what) : undefined),
+  };
+}
 
 const NOT_IN_TREE = 'not in the tree: ';
 /**

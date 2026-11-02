@@ -172,7 +172,7 @@ export async function goldenRecording(recording: Recording, side: Side): Promise
     result.broken.push(...brokenControls);
     if (brokenControls.length === 0) {
       // A live-only form row (Expectation.live) is the live golden's, never asked here — as a target's.
-      for (const e of formExpectations(recording.platform, truth, recording.source).filter((x) => x.live === undefined)) {
+      for (const e of formExpectations(recording.platform, truth, recording.source, recording.payload).filter((x) => x.live === undefined)) {
         const why = e.verb === 'ocr' ? await ocrAvailability() : undefined;
         if (why !== undefined) {
           result.checks.push(skippedCheck(recording.id, e.target, e.verb, e.says, why));

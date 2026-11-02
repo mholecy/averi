@@ -4,7 +4,7 @@ import { claimsTap, isError, namesKeyboard, snapshotNodes, type SnapshotNode } f
 import type { CellTruth, ControlTruth, FieldTruth, Rect } from '../../truth/schema.js';
 import { nearPoint, otherControlsFired, probePoint } from '../../truth/truth.js';
 import { ocrFailsClosed } from './text.js';
-import { BUDGET_MS, classed, closesItsOwnLayer, failed, first, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, within, type Expectation } from './judges.js';
+import { BUDGET_MS, classed, closesItsOwnLayer, failed, first, judgedUnlisted, notTapped, passed, passes, pointsText, presentedRemedyMissing, reachedWithNoSwipe, said, swipes, tappedInside, tapPoints, touchDowns, wayOutSaid, within, type Expectation } from './judges.js';
 
 /**
  * The forms family's rows (fixtures/apps/cells/forms.json, phase 1b) — see formRows; golden-spec.ts#formExpectations
@@ -196,7 +196,11 @@ function snapshotRow(platform: Platform, fields: readonly FieldTruth[], f: Field
   };
 }
 
-export function formRows(platform: Platform, truth: CellTruth): FormExpectation[] {
+/**
+ * `unlisted`: why the replayed tree may not list the element identified as `id` (golden-spec.ts#unlistedIn), undefined
+ * where it lists it — read by the under-keyboard rows (controlRows): idb lists nothing beneath the keyboard.
+ */
+export function formRows(platform: Platform, truth: CellTruth, unlisted: (id: string) => string | undefined = () => undefined): FormExpectation[] {
   const form = truth.form;
   if (form === undefined) return [];
   const out: FormExpectation[] = [];
@@ -268,11 +272,20 @@ export function formRows(platform: Platform, truth: CellTruth): FormExpectation[
     }
   }
   const sharedId = (c: ControlTruth) => form.fields.filter((f) => f.id === c.id).length > 1;
-  for (const c of form.controls) if (!sharedId(c)) out.push(...controlRows(platform, c, truth));
+  for (const c of form.controls) if (!sharedId(c)) out.push(...controlRows(platform, c, truth, unlisted(c.id)));
   return out.map(classed);
 }
 
-function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): FormExpectation[] {
+/** The scroll_until's way out under the keyboard: the source's (wayOutSaid) AND the soft keyboard named (namesKeyboard). */
+const wayOutAndKeyboardSaid = (reply: string) => wayOutSaid(reply) && namesKeyboard(reply);
+
+/**
+ * A control's rows by its situation. `unlisted`: why the replayed tree does not list it (formRows) — an under-keyboard
+ * control's colour, ocr and scroll_until rows then judge its "not found" (judges.ts#judgedUnlisted): it must name the
+ * way out (idb's reasons, which say idb lists nothing beneath the keyboard), and scroll_until's the soft keyboard too —
+ * a bare one is a mismatch. Its tap is not: it asks the keyboard named, which the tap's timeout does not (K1).
+ */
+function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth, unlisted?: string): FormExpectation[] {
   const selector = `id:"${c.id}"`;
   const tap: Call = { tool: 'tap', args: { platform, selector } };
   const scroll: Call = { tool: 'scroll_until', args: { platform, selector, direction: 'down' } };
@@ -340,30 +353,40 @@ function controlRows(platform: Platform, c: ControlTruth, truth: CellTruth): For
       }
       if (c.seen !== undefined) {
         const expected = c.seen;
-        rows.push({
-          target,
-          verb: 'colour',
-          says: `fails: the keyboard over it (asked for the colour the screen shows there, ${expected})`,
-          call: { tool: 'assert', args: { platform, asserts: [{ element: { id: c.id }, color: { expected }, timeout: BUDGET_MS }] } },
-          judge: (o) => (passed(o) ? `passed on ${expected}, the keyboard's: ${first(o)}` : undefined),
-        });
+        rows.push(
+          judgedUnlisted(
+            {
+              target,
+              verb: 'colour',
+              says: `fails: the keyboard over it (asked for the colour the screen shows there, ${expected})`,
+              call: { tool: 'assert', args: { platform, asserts: [{ element: { id: c.id }, color: { expected }, timeout: BUDGET_MS }] } },
+              judge: (o) => (passed(o) ? `passed on ${expected}, the keyboard's: ${first(o)}` : undefined),
+            },
+            unlisted,
+          ),
+        );
         // Its OCR half (phase 4): the recognizer on the real pixels reads the keyboard there.
         const field = truth.form?.fields.find((f) => f.tag === c.tag);
-        rows.push({ target, ...ocrFailsClosed(platform, { id: c.id }, field === undefined ? c.tag : field.value !== '' ? field.value : field.title, 'the soft keyboard over it') });
+        rows.push(judgedUnlisted({ target, ...ocrFailsClosed(platform, { id: c.id }, field === undefined ? c.tag : field.value !== '' ? field.value : field.title, 'the soft keyboard over it') }, unlisted));
       }
       return [
         ...rows,
-        {
-          target,
-          verb: 'scroll_until',
-          says: `not reached without a swipe; every touch-down above the keyboard's top (y ${top})${panels.length === 0 ? '' : ` and off its panel${panels.length === 1 ? '' : 's'} ${panels.map((r) => `${r.x},${r.y} ${r.width}x${r.height}`).join(', ')}`}`,
-          call: scroll,
-          judge: (o) => {
-            if (!isError(o.reply) && swipes(o) === 0) return `reached with no swipe, under the keyboard: ${first(o)}`;
-            const under = touchDowns(o).filter(underKeyboard);
-            return under.length > 0 ? `touched down under the keyboard at ${pointsText(under)}: ${first(o)}` : undefined;
+        judgedUnlisted<FormExpectation>(
+          {
+            target,
+            verb: 'scroll_until',
+            says: `not reached without a swipe; every touch-down above the keyboard's top (y ${top})${panels.length === 0 ? '' : ` and off its panel${panels.length === 1 ? '' : 's'} ${panels.map((r) => `${r.x},${r.y} ${r.width}x${r.height}`).join(', ')}`}`,
+            call: scroll,
+            judge: (o) => {
+              if (!isError(o.reply) && swipes(o) === 0) return `reached with no swipe, under the keyboard: ${first(o)}`;
+              const under = touchDowns(o).filter(underKeyboard);
+              return under.length > 0 ? `touched down under the keyboard at ${pointsText(under)}: ${first(o)}` : undefined;
+            },
           },
-        },
+          unlisted,
+          wayOutAndKeyboardSaid,
+          'the way out and the soft keyboard',
+        ),
       ];
     }
     case 'presented-over':

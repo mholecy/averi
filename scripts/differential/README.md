@@ -131,8 +131,14 @@ where the row would accept it is it no evidence either way, its mismatch said to
 tree: …`). Except where the capture's tree really did not list the target: an edge row's `Expectation.absent`, set from
 the truth's `TargetTruth.listed` for the replayed source (`scripts/truth/target-contract.ts#unlistedBy` — uiautomator
 dumps no node the user cannot see), makes such a reply green, judged by what it did (nothing tapped, the strokes sent
-for it). A wait whose hint says the selector matched nodes, none usable ("it matched only 0×0 nodes …", "… clipped out
-above its scroll container …"), is no such reply: the target is in the tree, refused for where it lies
+for it). The presented colour row and a form's under-keyboard colour, `ocr` and scroll_until rows read `absent` from
+the replayed payload itself (`golden-spec.ts#unlistedIn`, by `truth.ts#listedIn`: uiautomator's dump of the active
+window, idb's list of the presented layer or of nothing beneath the keyboard), and hold the "not found" to its way out
+(`judges.ts#judgedUnlisted`, `#wayOutSaid`): the presented remedy, the active-window hint, or idb's own words — its
+limit (`replies.ts#noIdListedSaid`) or its reasons (`#idbReasonsSaid`, read off `src/ui-tree/miss.ts#missNote`) — and,
+for the stop under the keyboard, the soft keyboard named too; a bare "not found" there is a mismatch. A wait whose
+hint says the selector matched nodes, none usable ("it matched only 0×0 nodes …", "… clipped out above its scroll
+container …"), is no such reply: the target is in the tree, refused for where it lies
 (replies.ts#notInTree; edges/scroll-collapsing's A, #10). A scroll is asked toward the target (truth.ts#directionOf):
 `right` or `left` for one wholly beside its scroll view's clip and level with it (a carousel's card,
 edges/carousel-in-list), else `down` or `up` by its centre; R-stroke holds every swipe along that direction's axis (its

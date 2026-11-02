@@ -1,5 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { ACTIVE_WINDOW_HINT, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
+import { ACTIVE_WINDOW_HINT, missNote, NO_ID_LISTED, TREE_SOURCE_REMEDY } from '../../src/ui-tree/miss.js';
 
 /**
  * averi's reply wording, read in ONE place: every judge that reads what averi said — the replayed golden
@@ -131,6 +131,28 @@ export const windowHintSaid = (reply: string) => reply.includes(ACTIVE_WINDOW_HI
  * (miss.ts#TREE_SOURCE_REMEDY), which the note of an id unlisted among others (`idUnlisted`) says too.
  */
 export const noIdListedSaid = (reply: string) => reply.includes(NO_ID_LISTED);
+
+/**
+ * idb's reasons, as both of its dialect notes say them (src/ui-tree/miss.ts#missNote, `noIdListed` and `idUnlisted`):
+ * "Possible reasons: idb lists nothing beneath the keyboard or a presented sheet, alert or cover, … If something covers
+ * it, close that first; if it is showing," — the words between the note's fact (the id no read contained) and the
+ * remedy both end on (miss.ts#TREE_SOURCE_REMEDY). Read off the note miss.ts exports, not copied: a rewording there
+ * moves this with it.
+ */
+export const IDB_REASONS = ((): string => {
+  const id = JSON.stringify('');
+  const note = missNote({ of: 'idUnlisted', id: '' }) ?? '';
+  const from = note.indexOf(id) + id.length;
+  const to = note.lastIndexOf(TREE_SOURCE_REMEDY);
+  return note.slice(from, to).replace(/^\.\s*/, '').trim();
+})();
+
+/**
+ * The reply carries idb's reasons for a miss (IDB_REASONS) — the note of an id idb's reads never listed, whether the
+ * read lists no identifier at all (noIdListedSaid) or lists others: why an idb list may lack it (beneath the keyboard,
+ * beneath a presented layer) and the way out ("If something covers it, close that first").
+ */
+export const idbReasonsSaid = (reply: string) => IDB_REASONS !== '' && reply.includes(IDB_REASONS);
 
 /**
  * scroll_until's changed stop (src/interact/scroll-text.ts#changedText, scroll-rounds.ts#ScreenChange): its swipe

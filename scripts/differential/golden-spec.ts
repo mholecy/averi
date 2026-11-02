@@ -1,6 +1,6 @@
 import type { Platform, SourceKind } from './corpus.js';
 import type { CellTruth, TargetTruth } from '../truth/schema.js';
-import { elementOf, nodeFramesIn } from '../truth/truth.js';
+import { elementOf, listedIn, nodeFramesIn } from '../truth/truth.js';
 import { askedUnlistedBy, contractOf, unlistedBy } from '../truth/target-contract.js';
 import { barRows } from './golden-spec/bars.js';
 import { openRows } from './golden-spec/base.js';
@@ -20,7 +20,7 @@ import type { Expectation } from './golden-spec/judges.js';
  * | truth | tap | colour assert | scroll_until down |
  * |---|---|---|---|
  * | open: reached, drawn as itself | `Tapped` | passes on its own colour | visible after 0 swipes |
- * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover — naming `close it first`; a fail because the element is not in the tree is no evidence either way | stops before any swipe, `close it first` (ADR 0018) |
+ * | presented-over: not reached | refused, `close it first`, nothing tapped (ADR 0018) | fails, asked for the colour the screen shows there — a pass measured the cover — naming `close it first`; a fail because the element is not in the tree is no evidence either way — unless the replayed tree lists no node of it: then it must name the way out | stops before any swipe, `close it first` (ADR 0018) |
  *
  * A row is added with the cells that need it — except phase 3's row types (golden-spec/rows.ts), which B1 (the plan's
  * phase 3) declared ahead of their cells so that the families can be built in parallel: a row type asks nothing until a
@@ -31,7 +31,9 @@ import type { Expectation } from './golden-spec/judges.js';
  * keyboard), the mismatch is the judge's own reason, as for any other reply — so the ratchet sees what the reply DID.
  * Only where the judge would accept it (a refusal, a FAIL) is the reply vacuous — no evidence of what the truth implies
  * — and the judge overruled: a mismatch of one class, said first — `not in the tree:`. A row whose truth says the
- * target may be missing from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply.
+ * target may be missing from the tree (`absent`: a lazy row not laid out, a row off the screen) accepts such a reply; a
+ * row whose replayed tree lists no node of it (unlistedIn: a presented colour row, a form's under-keyboard rows) accepts
+ * only one that names the way out (golden-spec/judges.ts#judgedUnlisted).
  *
  * The form cells (phase 1b) add rows a replayed tree CAN judge — see golden-spec/forms.ts#formRows. What it
  * cannot judge (a fill, a clear: typing changes nothing in a recorded tree) is the live golden's
@@ -85,7 +87,7 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
   // A measured geometry is judged on its capture's screen: without it (a unit test of one row) no geometry row is asked.
   if (cell === undefined && t.declared === 'open' && t.geometry !== undefined && t.geometry !== 'whole') return [];
   const c = contractOf(platform, t, cell);
-  if (t.declared === 'presented-over') return c.tap === undefined ? [] : presentedOverRows(platform, t, c.tap);
+  if (t.declared === 'presented-over') return c.tap === undefined ? [] : presentedOverRows(platform, t, c.tap, unlistedIn(tree, source)(t.id));
   if (t.declared === 'covered') return c.tap === undefined ? [] : coveredRows(platform, t, c.tap);
   const nodes = tree === undefined ? [] : nodeFramesIn(tree, source, elementOf(t));
   // A text target's own rows (golden-spec/text.ts, phase 4: its string from the tree and, by the host's recognizer, from
@@ -101,9 +103,22 @@ export function expectations(platform: Platform, t: TargetTruth, cell: CellTruth
 /**
  * A form cell's rows (golden-spec/forms.ts#formRows) — and, on a cell whose config taps its title to hide the
  * keyboard, R-dismiss (golden-spec/false-covers.ts#dismissRows) in place of each under-keyboard field's tap row, for
- * the capture's tree `source` (the dismissal acts under WDA only).
+ * the capture's tree `source` (the dismissal acts under WDA only). `tree`, the replayed tree's payload: a control under
+ * the keyboard that it does not list (unlistedIn: idb lists nothing beneath the keyboard) has its not-found judged
+ * (forms.ts#formRows); without it, none is.
  */
-export function formExpectations(platform: Platform, truth: CellTruth, source: SourceKind): FormExpectation[] {
+export function formExpectations(platform: Platform, truth: CellTruth, source: SourceKind, tree?: string): FormExpectation[] {
   const dismiss = dismissRows(platform, truth, source);
-  return [...formRows(platform, truth).filter((e) => !(e.verb === 'tap' && dismiss.replaces.has(e.target))), ...dismiss.rows];
+  return [...formRows(platform, truth, unlistedIn(tree, source)).filter((e) => !(e.verb === 'tap' && dismiss.replaces.has(e.target))), ...dismiss.rows];
 }
+
+/**
+ * Why the replayed tree's payload `tree` may not list the element identified as `id` — it lists no node so identified
+ * (truth.ts#listedIn, the harness's own reading of the payload, no averi code) — or undefined: it lists one, or there
+ * is no payload to read (a unit test of a row's choice). The presented colour row (presented.ts) and the form's
+ * under-keyboard rows (forms.ts) read it as their `absent`, which TargetTruth.listed does not hold for those captures.
+ */
+export const unlistedIn =
+  (tree: string | undefined, source: SourceKind) =>
+  (id: string): string | undefined =>
+    tree === undefined || listedIn(tree, source, id) ? undefined : `the replayed ${source} tree lists no node ${id}`;
