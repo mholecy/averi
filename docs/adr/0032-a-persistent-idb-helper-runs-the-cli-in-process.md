@@ -517,9 +517,9 @@ Decision (spec-D54, adopting the D54 analysis; review round 1 reshaped the seams
   unreadable names are none); any other alert is "a system alert is up, "<title>"". Either way the headline says iOS
   has not opened the link yet — true whenever the alert holds it, which is when the wait found it in place of the app
   — and the title and the labels are quoted verbatim, never paraphrased or judged by their words. Only coordinates are
-  advised (until D57; since then a tap by the label leads — see that amendment): batch-5 answered the alert by
-  coordinates, and a selector tap on SpringBoard's tree is unverified (D57). `front` does not move: the app is not in
-  front.
+  advised, since batch-5 answered the alert by coordinates and a selector tap on SpringBoard's tree was then unverified;
+  D57 proved it, and the advice now leads with a tap by the label (see that amendment). `front` does not move: the app
+  is not in front.
 - Unchanged: a link that matches (no `/source`, no extra call on either source), a launch (it looks for no alert; since
   D56 it does — see that amendment), every link that expects no app (web links, iOS's own schemes, another app's
   scheme).
@@ -631,17 +631,18 @@ stale-tree residual above was not seen in 3 tries, and it stays stated (unmeasur
 no SpringBoard alert other than "Open in …?" can be raised on the lab simulator without a lab change (the lab requests
 no permission; `tel:` has no handler there, batch-4), so "every launch stays behind" is still measured for "Open in …?"
 alone. The remembered answer was restored and verified. The same batch tapped the alert's buttons by text (backlog D57,
-an observation; the advice above is unchanged).
+an observation; the advice above is unchanged here — D57 rewords it, see that amendment).
 
 ## Amendment: the alert's advice names a tap by the button's label (2026-11-02, backlog D57)
 
 D54 advised only a tap at a button's coordinates, the one answer then proven on a device; a tap by text on
 SpringBoard's tree was unverified. Batch-7 block B (2026-11-02, lab simulator, iOS 27.0, main a6410f64 — the same tap
 code as this change's base) tapped the "Open in “AveriLab”?" alert by text: `tap text:"Cancel"` and `tap text:"Open"`
-dismissed it 8/8, under idb and WDA, over SpringBoard and over Contacts — one Button matched each time, tapped at its
-centre, never the other button and no refusal. A tap by text is also the steadier answer: it waits for two reads that
-agree on the rect (which absorbs the alert's appear animation) and is judged, where coordinates are sent as given; and
-it is what an agent reaches for first.
+dismissed it in 8 cases (Cancel and Open × idb and WDA × over SpringBoard and over Contacts), one run each — one Button
+matched each time, tapped at its centre, never the other button and no refusal. A tap by text is also the steadier
+answer, by reasoning rather than measure: it waits for two reads that agree on the rect, so it should ride out the
+alert's appear animation, and it is judged, where coordinates are sent as given; and it is what an agent reaches for
+first.
 
 Decision (spec-D57, adopting the D57 analysis's option A with a test that pins today's tap):
 
@@ -654,7 +655,7 @@ Decision (spec-D57, adopting the D57 analysis's option A with a test that pins t
   Buttons, nothing of the app or the status bar beneath), and on WDA the alert's layer is the marked top layer
   (`presentation: 'alert'`), so a target behind it — Contacts' hidden "Return to AveriLab" breadcrumb — is refused
   "an alert is presented over it (…) — close it first; nothing was tapped". Pinned by
-  `tests/interact/tap-system-alert.test.ts`: the real `tapElement`, with the MCP tap's `ambiguous: 'refuse'`, over the
+  `tests/interact/tap-system-alert.test.ts`: the real `tapElement`, with its `ambiguous` option `'refuse'` (as the MCP tap passes it), over the
   three committed alert captures.
 - No "alert layer first" guard in the resolution: its only effect would be to turn today's honest ambiguity refusal
   into a guess. "averi taps nothing itself" stands (an opt-in confirm is D58's).

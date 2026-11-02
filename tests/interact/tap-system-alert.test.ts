@@ -8,14 +8,18 @@ import { AmbiguityRefusal } from '../../src/interact/resolve.js';
 import { tapElement, type TapAdapter } from '../../src/interact/tap.js';
 import { OffScreenRefusal } from '../../src/interact/tap-judgement.js';
 
-// D57 (ADR 0032's D57 amendment): the alert replies advise `tap text:"<label>"` first, so the real tapElement — the MCP
-// `tap` tool's selector path, with its `ambiguous: 'refuse'` — is pinned over the captured "Open in “AveriLab”?" trees
-// (batch-5 D49A: idb over SpringBoard, WDA over SpringBoard, WDA with Contacts beneath). No tap code is D57's: idb lists
-// the alert alone, and on WDA the alert is the marked top layer, so each label resolves to the alert's own Button at
-// its centre (batch-7 B observed the same on a device, 8/8). A minimal tap adapter, since the fake's tap needs an id.
+// D57 (ADR 0032's D57 amendment): the alert replies advise `tap text:"<label>"` first, so the real tapElement — the
+// MCP `tap` tool's selector path, with its `ambiguous` option `'refuse'` — is pinned over the captured "Open in
+// “AveriLab”?" trees (batch-5 D49A: idb over SpringBoard, WDA over SpringBoard, WDA with Contacts beneath). No tap code
+// is D57's: idb lists the alert alone, and on WDA the alert is the marked top layer, so each label resolves to the
+// alert's own Button at its centre (batch-7 B observed the same on a device in 8 cases, one run each). A minimal tap
+// adapter, since the fake's tap needs an id.
 
-const json = async (name: string): Promise<unknown> => JSON.parse(await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
-const IDB_SB = JSON.stringify(((await json('idb-springboard-open-in-alert.json')) as { elements: unknown[] }).elements);
+const json = async (name: string): Promise<unknown> =>
+  JSON.parse(await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8'));
+const IDB_SB = JSON.stringify(
+  ((await json('idb-springboard-open-in-alert.json')) as { elements: unknown[] }).elements,
+);
 const WDA_SB = await json('wda-capture-springboard-open-in-alert.json');
 const WDA_CT = ((await json('wda-capture-contacts-open-in-alert.json')) as { value: unknown }).value;
 
@@ -45,7 +49,7 @@ function alertDevice(read: () => UiNode) {
   return { adapter, taps };
 }
 
-/** The MCP tap's options (mcp/tools.ts: ambiguity refused), with a short timeout and cadence for a static tree. */
+/** Its `ambiguous` option `'refuse'`, as the MCP tap passes it (mcp/tools.ts), with a short timeout and cadence. */
 const OPTS = { ambiguous: 'refuse', timeoutMs: 300, pollMs: 1 } as const;
 
 describe("tap text:\"<label>\" over iOS's system alert — the alert's own Button, at its centre (D57)", () => {
@@ -62,23 +66,39 @@ describe("tap text:\"<label>\" over iOS's system alert — the alert's own Butto
     });
   }
 
-  it('WDA over Contacts: the hidden "Return to AveriLab" breadcrumb beneath is refused — the alert named, nothing tapped', async () => {
+  it('WDA over Contacts: the hidden breadcrumb "Return to AveriLab" is refused, the alert named', async () => {
     const { adapter, taps } = alertDevice(TREES['WDA over Contacts']);
     const refused = tapElement(adapter, 'text:"Return to AveriLab"', OPTS);
     await expect(refused).rejects.toThrow(OffScreenRefusal);
-    await expect(refused).rejects.toThrow(/an alert is presented over it \("Open in “AveriLab”\?"\) — close it first; nothing was tapped/);
+    await expect(refused).rejects.toThrow(
+      /an alert is presented over it \("Open in “AveriLab”\?"\) — close it first; nothing was tapped/,
+    );
     expect(taps).toEqual([]);
   });
 
-  it('a second, hidden "Cancel" Button outside the alert: refused as ambiguous, both named, nothing tapped', async () => {
+  it('a second, hidden "Cancel" Button outside the alert: refused as ambiguous, both named', async () => {
     const { adapter, taps } = alertDevice(() => {
       const tree = TREES['WDA over Contacts']();
-      const behind: UiNode = { role: 'button', label: 'Cancel', identifier: null, value: null, rect: { x: 10, y: 600, width: 80, height: 40 }, children: [], hidden: true };
+      const behind: UiNode = {
+        role: 'button',
+        label: 'Cancel',
+        identifier: null,
+        value: null,
+        rect: { x: 10, y: 600, width: 80, height: 40 },
+        children: [],
+        hidden: true,
+      };
       return { ...tree, children: [behind, ...tree.children] };
     });
-    const refused = tapElement(adapter, 'text:"Cancel"', OPTS);
-    await expect(refused).rejects.toThrow(AmbiguityRefusal);
-    await expect(refused).rejects.toThrow(/^Selector matches 2 elements: text:"Cancel"/);
+    const refusal = await tapElement(adapter, 'text:"Cancel"', OPTS).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(refusal).toBeInstanceOf(AmbiguityRefusal);
+    // Both matches named, one line each: the one behind and the alert's own.
+    const named = (refusal as Error).message.split('\n').filter((l) => l.trim() === 'button id=null label="Cancel"');
+    expect((refusal as Error).message).toMatch(/^Selector matches 2 elements: text:"Cancel"\n/);
+    expect(named).toHaveLength(2);
     expect(taps).toEqual([]);
   });
 });

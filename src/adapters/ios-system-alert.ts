@@ -121,11 +121,11 @@ export const alertButtonsText = (alert: SystemAlert): string =>
 
 /**
  * The advice after an alert's buttons (D57; ADR 0032's D57 amendment): a tap by the chosen button's label first —
- * proven on a device (batch-7 B: `tap text:"Cancel"` and `text:"Open"` 8/8, idb and WDA, over SpringBoard and over
- * Contacts, one Button matched each time) and settled and judged as every selector tap is — or a tap at its x and y,
- * the fallback for a label the selector grammar cannot write or two buttons sharing one (batch-5 D49A tapped by
- * coordinates); that averi taps nothing; and what the alert holds back (batch-2: every launch after it stayed behind
- * it). `<label>` is literal: the button list before it quotes every label.
+ * proven on a device (batch-7 B: `tap text:"Cancel"` and `text:"Open"` in 8 cases — Cancel and Open × idb and WDA ×
+ * over SpringBoard and over Contacts, one run each — one Button matched each time) and settled and judged as every
+ * selector tap is — or a tap at its x and y, the fallback for a label the selector grammar cannot write or two buttons
+ * sharing one (batch-5 D49A tapped by coordinates); that averi taps nothing; and what the alert holds back (batch-2:
+ * every launch after it stayed behind it). `<label>` is literal: the button list before it quotes every label.
  */
 export const ALERT_ADVICE =
   'Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps nothing itself); ' +
