@@ -5,7 +5,8 @@
  * exact or reformatted (`prefixOf`; D28 and D60, that ADR's amendments), whether it is a typing with separators added
  * that those rules refuse (`separatedOf`; D53), and a text's letters and digits (`skeleton`). It knows texts, not
  * fields: which text a reading is judged against — the earlier text, the placeholder, clear — is
- * interact/fill-landing.ts's, its one caller. It imports only the facts (fill-facts.ts); nothing here types, reads a device or words a sentence.
+ * interact/fill-landing.ts's, its one caller. It imports only the facts (fill-facts.ts); nothing here types, reads a
+ * device or words a sentence.
  */
 
 import { isPoint, type Point, type Reformat } from './fill-facts.js';

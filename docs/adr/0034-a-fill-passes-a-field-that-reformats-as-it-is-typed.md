@@ -451,10 +451,16 @@ type only characters that are provably missing (ADR 0023).
 - **The typed-mark guard:** the trailing mark is not a character the whole typing holds itself, all spaces one kind —
   as `thousands`' rule. Greedy, the walk takes a typed separator later in the value for an added one: `12/` of
   `1234/56` would retype `34/56`, wrong if the field had dropped `34` from the middle and kept the typed `/`. A typing
-  that holds its own separators is an exact prefix anyway (the trailing mark is typed), so the guard costs nothing
-  measured; `+421 903-` for `+421 903123456` still passes (a typed space beside an added `-`).
-- **Strictly additive.** The branch is reached only where `prefixOf` returned undefined (a trailing added mark always
-  failed `reformatOf`), so no reading that was retyped, named or passed behaves differently. The pass rule
+  that holds its own separators where the field shows them is an exact prefix anyway (the trailing mark is typed).
+  The guard's cost is a field that adds the same kind of mark the typing holds elsewhere: `+421 903 ` for a typed
+  `+421 903123456` is refused — a `length`, no tail typed again (with clear, the wipe and the whole retype, as before
+  D60) — residual 5 below. Another kind still passes: `+421 903-` for `+421 903123456` (a typed space beside an added
+  `-`).
+- **Additive in what it accepts.** The branch is reached only where `prefixOf` returned undefined (a trailing added
+  mark always failed `reformatOf`), so nothing `prefixOf` accepted, and no pass, changes. Two behaviours change, by
+  intent, for the readings it now accepts: on iOS the tail alone is typed again where, with clear, the wipe and the
+  whole retype ran; and on Android with clear a sibling that gained part of the tail now reads `elsewhere`, so the
+  wipe and retype are skipped (Consequences). The pass rule
   (`landingOf`, `reformatOf` of the final reading) does not move: a FULL reading with a trailing mark
   (`SK31 1200 0000 `) still fails `separated`, and `SK31 ` for `SK31` still does not land.
 - No code change in fill-landing.ts: `tailOf`, `droppedTail`, `differenceOf` and `whereTyped` get it through
@@ -475,9 +481,9 @@ type only characters that are provably missing (ADR 0023).
   `SK31 ` after `SK31` holds nothing of the typing, so no tail (the D29 rule).
 - A caret left before the mark, or a mask that inserts it again, puts the tail where the final rule refuses it
   (`SK31 1200000 `, `SK31 1200  000`): a false mismatch, the safe side (D28's caret argument).
-- No new residual: nothing passes that did not. The guard keeps `12/` of `1234/56` a `length` (the value's own `/`
-  may be the one shown), the safe side. Not in this change: `1 2 ` for `1234` reads `same-length`, and `31.` stays a
-  refused prefix (D51's one-mark residual).
+- Nothing passes that did not. The guard keeps `12/` of `1234/56` a `length` (the value's own `/` may be the one
+  shown), the safe side, and `+421 903 ` for a typed `+421 903123456` too: residual 5 below. Not in this change:
+  `1 2 ` for `1234` reads `same-length`, and `31.` stays a refused prefix (D51's one-mark residual).
 
 **Mutation-checked**: hand mutants, each killed by the new tests — the branch removed, the `-1` check negated or asked
 of the token before, the mark taken one character early, the guard removed, asked of the reading instead of the
@@ -506,3 +512,8 @@ iOS React Native, is a later batch's.
    `1.23.456`, `1.23.456.789` — said in the reply's aside, no ⚠ caveat. Every typed digit is there, in order, and two
    marks cannot be a decimal point. So does `12.34.56` for `123456` (a grouping in twos), though one `12.34` for `1234`
    still fails.
+5. **An eager trailing mark of a kind the typing holds itself is no dropped tail** (D60's amendment, the typed-mark
+   guard): `+421 903 ` for a typed `+421 903123456`, any space for a space, fails `length` — no tail typed again; with
+   clear the wipe and the whole retype run, as before D60. The walk cannot tell the field's mark from the typing's own
+   shown after a drop from the middle (`12/` of `1234/56`), so a false mismatch, the safe side. Remedy: type the value
+   without its own separators (`+421903123456`), as the field shows them anyway.

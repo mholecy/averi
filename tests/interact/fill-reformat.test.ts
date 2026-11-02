@@ -273,6 +273,8 @@ describe('prefixOf — a strict prefix of the typing, exactly or reformatted', (
     expect(prefixOf('12 ', '1234 5678')).toBeUndefined();
     expect(prefixOf('12\u00A0', '1234 5678')).toBeUndefined(); // another space for the typing's own
     expect(prefixOf('12 ', '1234\u00A05678')).toBeUndefined();
+    // ADR 0034 residual 5: an eager mark of the kind the typing holds elsewhere — a false mismatch, the safe side
+    expect(prefixOf('+421 903 ', '+421 903123456')).toBeUndefined();
   });
 });
 

@@ -165,6 +165,7 @@ describe('droppedTail — a prefix that ends in an eager trailing mark (D60)', (
 
   it('a mark the typing holds itself, or one the rules refuse: no tail', () => {
     expect(droppedTail('12/', intent('1234/56', null, true))).toBeUndefined(); // the typed-mark guard
+    expect(droppedTail('+421 903 ', intent('+421 903123456', null, true))).toBeUndefined(); // ADR 0034 residual 5
     expect(droppedTail('SK31 1200-', intent('SK3112000000', null, true))).toBeUndefined();
     expect(droppedTail('12.', intent('1234', null, true))).toBeUndefined();
   });
@@ -419,13 +420,13 @@ describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
   it('every reformatted prefix with some of the typing in it is a dropped tail, the same count landed', () => {
     let swept = 0;
     let trailing = 0;
-    const MARKS = new Set([' ', '\u00A0', '\u202F', ',', '.', '-']);
+    const MARKS = new Set([' ', '\u00A0', '\u202F', ',', '.', '-', '/']);
     for (const c of cases) {
       const e = expecting({ value: '', ...c });
       const whole = (e.clear ? '' : (e.before ?? '')) + e.value;
       const plain = whole.replace(/[\s.,]/gu, '');
       const shapes = [whole, plain];
-      for (const sep of [' ', ' ', ' ', ',', '.', '-'])
+      for (const sep of [' ', ' ', ' ', ',', '.', '-', '/'])
         for (const n of [2, 3, 4]) shapes.push(groupLeft(plain, n, sep), groupRight(plain, n, sep), groupLeft(whole, n, sep), eagerLeft(plain, n, sep));
       for (const shape of shapes)
         for (let k = 1; k <= [...shape].length; k++) {
