@@ -345,3 +345,97 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
     expect(known).toEqual([]);
   });
 });
+
+/**
+ * g1–g5 and rfe1–rfe2 (L7): form-grouped's ibanEager (group4eager: a space as soon as a group of four is complete, none
+ * at 24) and phoneGrouped (phone3: a leading `+`, the digits in threes, under a `+421` placeholder), and rn-format-eager's
+ * E (group4eager on React Native) — D60's eager trailing mark and D37's `+421` grouping field. No device has run them
+ * yet: judged over D40's records (form-format's f1 under WDA, rn-format's rf1 under idb), their final state set to what
+ * each fill would leave; what each source answers is batch-9's to read.
+ */
+describe('g1–g5 and rfe1–rfe2 (L7): an eager-spaced IBAN and a grouped `+421` phone, native and React Native', () => {
+  const G_IDS = ['g1', 'g2', 'g3', 'g4', 'g5'];
+  const RFE_IDS = ['rfe1', 'rfe2'];
+  const f1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'f1');
+  const left = (tag: string, value: string) => withFieldValue(f1, tag, value).state;
+  const rf1 = recordedCase(readLiveRecord('ios-rn-forms-d40-1.json'), 'idb', 'rf1');
+  /** rf1's launch as rn-format-eager's would read: its fields E and P, both empty. */
+  const rnLaunched: LabState = { ...rf1.launched, cell: 'rn-format-eager', fields: { E: { value: '', focused: false, error: null }, P: { value: '', focused: false, error: null } } };
+  const rnLeft = (value: string): LabState => ({ ...rnLaunched, fields: { ...rnLaunched.fields, E: { value, focused: true, error: null } } });
+  const native = async (platform: 'ios' | 'android') => selectCases({ platform, app: 'native', groups: ['forms'], only: G_IDS });
+  const rn = async (platform: 'ios' | 'android') => selectCases({ platform, app: 'react-native', groups: ['forms'], only: RFE_IDS });
+  const SHOWN = 'All 1 asserts passed\nPASS  element id:"lab.form-grouped.ibanEager" with text "SK31 1200 0000 123" exists\nappAlive: true';
+
+  it.each(['ios', 'android'] as const)('%s runs g1–g5 after f14, one fill each of form-grouped, clear on g1 and g4; g1 then asserts what the tree shows', async (platform) => {
+    const cases = await native(platform);
+    expect(cases.map((c) => c.id)).toEqual(G_IDS);
+    expect(cases.every((c) => c.cell === 'form-grouped' && c.group === 'forms')).toBe(true);
+    expect(cases.map((c) => c.calls[0])).toEqual([
+      { tool: 'type_text', args: { selector: 'id:"lab.form-grouped.ibanEager"', text: 'SK3112000000123', clear: true } },
+      { tool: 'type_text', args: { selector: 'id:"lab.form-grouped.ibanEager"', text: 'SK3112000000' } },
+      { tool: 'type_text', args: { selector: 'id:"lab.form-grouped.phoneGrouped"', text: '421903123456' } },
+      { tool: 'type_text', args: { selector: 'id:"lab.form-grouped.phoneGrouped"', text: '+421903123456', clear: true } },
+      { tool: 'type_text', args: { selector: 'id:"lab.form-grouped.phoneGrouped"', text: '+421 903 123 456' } },
+    ]);
+    expect(cases.map((c) => c.calls.length)).toEqual([2, 1, 1, 1, 1]);
+    expect(cases[0].calls[1]).toEqual({ tool: 'assert', args: { asserts: [{ element: { id: 'lab.form-grouped.ibanEager' }, text: 'SK31 1200 0000 123', timeout: 2_000 }] } });
+    const all = (await selectCases({ platform, app: 'native', groups: ['forms'] })).map((c) => c.id);
+    expect(all.indexOf('g1')).toBe(all.indexOf('f14') + 1);
+    // Native cases only: rfe1–rfe2 are the React Native app's.
+    expect(all.filter((id) => RFE_IDS.includes(id))).toEqual([]);
+  });
+
+  it.each(['ios', 'android'] as const)('%s runs rfe1–rfe2 on the React Native app after rf5: clear on rfe1 alone, into E\'s field', async (platform) => {
+    const cases = await rn(platform);
+    expect(cases.map((c) => c.id)).toEqual(RFE_IDS);
+    expect(cases.every((c) => c.cell === 'rn-format-eager' && c.group === 'forms')).toBe(true);
+    expect(cases.map((c) => c.calls)).toEqual([
+      [{ tool: 'type_text', args: { selector: 'id:"lab.rn-format-eager.E.field"', text: 'SK3112000000123', clear: true } }],
+      [{ tool: 'type_text', args: { selector: 'id:"lab.rn-format-eager.E.field"', text: 'SK3112000000' } }],
+    ]);
+    const all = (await selectCases({ platform, app: 'react-native', groups: ['forms'] })).map((c) => c.id);
+    expect(all.indexOf('rfe1')).toBe(all.indexOf('rf5') + 1);
+    expect(all.filter((id) => G_IDS.includes(id))).toEqual([]);
+  });
+
+  it('g1/g2: the IBAN held as the eager field spaces it — ok; the eager space missing, or a claim over the text as typed — MISMATCH', async () => {
+    const [g1, g2] = await native('ios');
+    const filled = 'Filled id:"lab.form-grouped.ibanEager" (15 characters, the field shows them reformatted: 3 separators added)';
+    expect(g1.judge(left('ibanEager', 'SK31 1200 0000 123'), [filled, SHOWN], 'wda', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(g1.judge(left('ibanEager', 'SK3112000000123'), [filled, SHOWN], 'wda', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    const notShown = '0/1 asserts FAILED\nFAIL  element id:"lab.form-grouped.ibanEager" text "SK31 1200 0000 123" — read "SK3112000000123"';
+    expect(g1.judge(left('ibanEager', 'SK31 1200 0000 123'), [filled, notShown], 'wda', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
+    const twelve = 'Filled id:"lab.form-grouped.ibanEager" (12 characters, the field shows them reformatted: 3 separators added)';
+    expect(g2.judge(left('ibanEager', 'SK31 1200 0000 '), [twelve], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(g2.judge(left('ibanEager', 'SK31 1200 0000'), [twelve], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    expect(g2.judge(left('ibanEager', 'SK31 1200 0000 '), ['ERROR typed 12 characters but the field shows "SK31 1200 0000 "'], 'idb', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
+  });
+
+  it('g3–g5: the phone held in threes, its `+` kept when typed — ok; the `+421` placeholder kept in front, or the digits ungrouped, claimed done — MISMATCH; refused — LOUD', async () => {
+    const [, , g3, g4, g5] = await native('android');
+    const filled = (n: number) => `Filled id:"lab.form-grouped.phoneGrouped" (${n} characters, the field shows them reformatted: 3 separators added)`;
+    expect(g3.judge(left('phoneGrouped', '421 903 123 456'), [filled(12)], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(g4.judge(left('phoneGrouped', '+421 903 123 456'), [filled(13)], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(g5.judge(left('phoneGrouped', '+421 903 123 456'), ['Filled id:"lab.form-grouped.phoneGrouped" (16 characters)'], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(g3.judge(left('phoneGrouped', '+421 421 903 123 456'), [filled(12)], 'idb', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    expect(g4.judge(left('phoneGrouped', '+421903123456'), [filled(13)], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    const refused = 'ERROR the field shows "+421 421 903 123 456", not the 12 characters typed';
+    expect(g3.judge(left('phoneGrouped', '+421 421 903 123 456'), [refused], 'idb', f1.launched, [])).toMatchObject({ outcome: 'LOUD' });
+  });
+
+  it('rfe1/rfe2: E held as the eager field spaces it — ok, a dropped tail typed again included (D60\'s live reply); a tail left dropped, claimed done — MISMATCH', async () => {
+    const [rfe1, rfe2] = await rn('ios');
+    const retyped = 'Filled id:"lab.rn-format-eager.E.field" (15 characters, the last 3 characters typed again after the field dropped them, the field shows them reformatted: 3 separators added)';
+    expect(rfe1.judge(rnLeft('SK31 1200 0000 123'), [retyped], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'ok' });
+    expect(rfe1.judge(rnLeft('SK31 1200 0000 '), [retyped], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    const twelve = 'Filled id:"lab.rn-format-eager.E.field" (12 characters, the field shows them reformatted: 3 separators added)';
+    expect(rfe2.judge(rnLeft('SK31 1200 0000 '), [twelve], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'ok' });
+    expect(rfe2.judge(rnLeft('SK31 1200 00'), ['ERROR the field shows "SK31 1200 00", not the 12 characters typed'], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed' });
+  });
+
+  it('no outcome guessed: none of g1–g5 or rfe1–rfe2 is known under any source until a device run reads it', () => {
+    const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
+    const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => [...G_IDS, ...RFE_IDS].filter((id) => knownEntry(platform, source, id) !== undefined)));
+    expect(known).toEqual([]);
+  });
+});

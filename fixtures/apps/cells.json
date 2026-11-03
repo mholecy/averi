@@ -400,6 +400,20 @@
       }
     },
     {
+      "id": "form-grouped",
+      "family": "forms",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "New payment",
+        "fields": [
+          { "tag": "ibanEager", "kind": "iban", "title": "IBAN – spaced as each group ends", "placeholder": "SK00 0000 0000 …", "format": "group4eager" },
+          { "tag": "phoneGrouped", "kind": "text", "title": "Payee’s phone – grouped as typed", "placeholder": "+421", "format": "phone3" }
+        ],
+        "submit": { "tag": "submit", "title": "Send payment" }
+      }
+    },
+    {
       "id": "scroll-bounded",
       "family": "edges",
       "layer": "none",
@@ -772,6 +786,15 @@
       "targets": [
         { "tag": "G", "color": "#B2EBF2", "slot": 0, "declared": "open", "text": "IBAN", "format": "group4" },
         { "tag": "A", "color": "#FFE0B2", "slot": 1, "declared": "open", "text": "Amount", "format": "thousands" }
+      ]
+    },
+    {
+      "id": "rn-format-eager",
+      "family": "react-native",
+      "layer": "none",
+      "targets": [
+        { "tag": "E", "color": "#C8E6C9", "slot": 0, "declared": "open", "text": "IBAN", "format": "group4eager" },
+        { "tag": "P", "color": "#F8BBD0", "slot": 1, "declared": "open", "text": "Phone", "format": "phone3" }
       ]
     },
     {

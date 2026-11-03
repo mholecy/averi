@@ -1,6 +1,6 @@
 {
   "family": "forms",
-  "note": "The form cells (phase 1b): form-format (D18) fields that reformat as they are typed (`format`: iban grouped in fours, the amount's thousands; ibanShown grouped by Compose's VisualTransformation alone, its model as typed — `formatIn: display`, elsewhere as iban); form-keyboard-floating (round 4, Android only) is form-keyboard captured with Gboard floating (`ime`: its panel over the fields, the inset only the 132-px strip — calibration.json #1; its form a copy of form-keyboard's: the catalog has no way to share one cell's form with another); fields, errors, the keyboard, prefilled values, the picker sheet; a design-system component sharing one identifier across every field and its floating title (form-shared-id, FE2); the app's model is the oracle (#2, #16, the field-error notes). App files: AveriLab/Forms.swift, Forms.kt (Android, phase 2b: the IME drawn over the form, which keeps its height; only the pinned submit bar rides above it). A pinned submit reports its bar as `<submit>.bar` (truth.ts#situationOf).",
+  "note": "The form cells (phase 1b): form-format (D18) fields that reformat as they are typed (`format`: iban grouped in fours, the amount's thousands; ibanShown grouped by Compose's VisualTransformation alone, its model as typed — `formatIn: display`, elsewhere as iban); form-keyboard-floating (round 4, Android only) is form-keyboard captured with Gboard floating (`ime`: its panel over the fields, the inset only the 132-px strip — calibration.json #1; its form a copy of form-keyboard's: the catalog has no way to share one cell's form with another); fields, errors, the keyboard, prefilled values, the picker sheet; a design-system component sharing one identifier across every field and its floating title (form-shared-id, FE2); the app's model is the oracle (#2, #16, the field-error notes). form-grouped (L7, both platforms; a copy of form-format's shape, its own fields: form-format has captures) — ibanEager an IBAN grouped in fours with an eager space as each group ends (`format: group4eager`, D60's eager trailing mark: `SK31` shows `SK31 `, none at 24 characters) and phoneGrouped a phone number grouped in threes under a `+421` placeholder (`format: phone3`, D37's `+421` grouping field: `+421903123456` shows `+421 903 123 456`); App files: AveriLab/Forms.swift, Forms.kt (Android, phase 2b: the IME drawn over the form, which keeps its height; only the pinned submit bar rides above it). A pinned submit reports its bar as `<submit>.bar` (truth.ts#situationOf).",
   "cells": [
     {
       "id": "form-basic",
@@ -193,6 +193,19 @@
           { "tag": "ibanShown", "kind": "iban", "title": "IBAN – grouped on screen only", "placeholder": "SK00 0000 0000 …", "format": "group4", "formatIn": "display" },
           { "tag": "date", "kind": "text", "title": "Due date – dotted as typed", "placeholder": "__.__.____", "format": "date" },
           { "tag": "phone", "kind": "text", "title": "Payee’s phone", "placeholder": "+421" }
+        ],
+        "submit": { "tag": "submit", "title": "Send payment" }
+      }
+    },
+    {
+      "id": "form-grouped",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "New payment",
+        "fields": [
+          { "tag": "ibanEager", "kind": "iban", "title": "IBAN – spaced as each group ends", "placeholder": "SK00 0000 0000 …", "format": "group4eager" },
+          { "tag": "phoneGrouped", "kind": "text", "title": "Payee’s phone – grouped as typed", "placeholder": "+421", "format": "phone3" }
         ],
         "submit": { "tag": "submit", "title": "Send payment" }
       }

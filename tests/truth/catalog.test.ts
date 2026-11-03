@@ -42,6 +42,7 @@ describe('the cell catalog', () => {
       'forms/form-picker',
       'forms/form-shared-id',
       'forms/form-format',
+      'forms/form-grouped',
       'edges/scroll-bounded',
       'edges/scroll-bounded-footer',
       'edges/scroll-sticky',
@@ -72,6 +73,7 @@ describe('the cell catalog', () => {
       'react-native/rn-field',
       'react-native/rn-banner',
       'react-native/rn-format',
+      'react-native/rn-format-eager',
       'held/held-no',
       'held/held-no-spinner',
     ]);
@@ -125,6 +127,36 @@ describe('form-format\'s date and phone fields (D37): what f11–f14 fill', () =
     expect(field('phone')).toMatchObject({ kind: 'text', placeholder: '+421' });
     expect(field('phone').format).toBeUndefined();
     expect(field('date').formatIn).toBeUndefined();
+  });
+});
+
+describe('L7: form-grouped and rn-format-eager, their own cells beside the captured form-format and rn-format (D60, D37 `+421`)', () => {
+  it('form-grouped: ibanEager (group4eager) under form-format\'s IBAN placeholder, phoneGrouped (phone3) under a `+421` one, the submit; on both platforms', async () => {
+    const cell = (await loadCatalog()).cells.find((c) => c.id === 'form-grouped')!;
+    expect(cell).toMatchObject({ family: 'forms', layer: 'none', targets: [] });
+    expect(cell.platforms).toBeUndefined();
+    const form = cell.form!;
+    expect(form.fields.map((f) => f.tag)).toEqual(['ibanEager', 'phoneGrouped']);
+    const field = (tag: string) => form.fields.find((f) => f.tag === tag)!;
+    expect(field('ibanEager')).toMatchObject({ kind: 'iban', placeholder: 'SK00 0000 0000 …', format: 'group4eager' });
+    expect(field('phoneGrouped')).toMatchObject({ kind: 'text', placeholder: '+421', format: 'phone3' });
+    expect(form.fields.map((f) => f.formatIn)).toEqual([undefined, undefined]);
+    expect(form.submit).toEqual({ tag: 'submit', title: 'Send payment' });
+  });
+
+  it('rn-format-eager: E an IBAN (group4eager) and P a phone (phone3), text targets laid as rn-format\'s', async () => {
+    const cell = (await loadCatalog()).cells.find((c) => c.id === 'rn-format-eager')!;
+    expect(cell.family).toBe('react-native');
+    expect(cell.targets.map((t) => [t.tag, t.slot, t.text, t.format, t.declared])).toEqual([
+      ['E', 0, 'IBAN', 'group4eager', 'open'],
+      ['P', 1, 'Phone', 'phone3', 'open'],
+    ]);
+  });
+
+  it('form-format and rn-format keep their fields: the captured cells do not move', async () => {
+    const cells = (await loadCatalog()).cells;
+    expect(cells.find((c) => c.id === 'form-format')!.form!.fields.map((f) => [f.tag, f.format])).toEqual([['iban', 'group4'], ['amount', 'thousands'], ['ibanShown', 'group4'], ['date', 'date'], ['phone', undefined]]);
+    expect(cells.find((c) => c.id === 'rn-format')!.targets.map((t) => [t.tag, t.format])).toEqual([['G', 'group4'], ['A', 'thousands']]);
   });
 });
 
