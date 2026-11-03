@@ -1090,16 +1090,19 @@ describe('AndroidAdapter interactions', () => {
     const FOCUS = ['-s', 'e', 'shell', "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='"];
     /** The one `** ` line batch-10's E4c reply quotes of monkey's stdout. */
     const MONKEY_LINE = '** SYS_KEYS has no physical keys but with factor 2.0%.';
+    const ADVICE =
+      'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
+      "changes the device's default for the intent it answers); press_key back drops the chooser. averi taps nothing itself.";
     const NOTE =
       'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
-      "is in front, asking which of dev.averi.lab's activities takes the intent. Take a ui_snapshot, tap the app you " +
-      'mean, then its "Just once" button if it shows one (never "Always": it changes the device\'s default for this ' +
-      'intent); press_key back drops the launch. averi taps nothing itself. Naming the activity (`activity:` on the ' +
-      'launch step / launch_app) starts it without the chooser.';
-    const MONKEY_CHOOSER =
+      `is in front, and dev.averi.lab is not. ${ADVICE} Naming the activity (\`activity:\` on the launch step / ` +
+      'launch_app) starts it without the chooser.';
+    /** The chooser named as the cause of monkey's refusal, its actual exit code, and `said` when monkey gave a real reason. */
+    const monkeyChooser = (exit: number, said?: string) =>
       "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) " +
-      'is in front, and monkey starts nothing over it (exit 251 on API 33). Answer it (ui_snapshot, the app, "Just ' +
-      'once") or press_key back to drop it, then launch again. averi taps nothing itself.';
+      `is in front, and monkey starts nothing over it (it exited ${exit}).` +
+      (said === undefined ? '' : ` monkey said: ${said}`) +
+      ` ${ADVICE} Then launch again.`;
     /** Today's monkey refusal, quoting `said` — the reply when the focus read names no chooser. */
     const monkeyRefused = (said: string) =>
       'monkey started nothing in dev.averi.lab — check that dev.averi.lab is installed and has a launcher activity, ' +
@@ -1195,7 +1198,7 @@ describe('AndroidAdapter interactions', () => {
       });
       const { adapter, argvs, timeouts } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt') });
       const error = await failureOf(adapter.launch('dev.averi.lab'));
-      expect(error?.message).toBe(MONKEY_CHOOSER);
+      expect(error?.message).toBe(monkeyChooser(251));
       expect(error?.cause).toBe(failure);
       expect(argvs).toEqual([MONKEY, FOCUS]);
       expect(timeouts[1]).toBe(2_000);
@@ -1205,7 +1208,18 @@ describe('AndroidAdapter interactions', () => {
       const failure = execErrorLikeExec('adb -s e shell monkey', 252, '', { stdout: `${MONKEY_LINE}\n` });
       const { adapter, argvs } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b10-after-launch-monkey.txt') });
       const error = await failureOf(adapter.launch('dev.averi.lab'));
-      expect(error?.message).toBe(MONKEY_CHOOSER);
+      expect(error?.message).toBe(monkeyChooser(252));
+      expect(error?.message).not.toContain('SYS_KEYS');
+      expect(error?.cause).toBe(failure);
+      expect(argvs).toEqual([MONKEY, FOCUS]);
+    });
+
+    it("monkey refused with a real reason under the chooser: the chooser named, and monkey's own line quoted — the warning still not", async () => {
+      const noActivities = '** No activities found to run, monkey aborted.';
+      const failure = execErrorLikeExec('adb -s e shell monkey', 252, `${MONKEY_LINE}\n`, { stdout: `${noActivities}\n` });
+      const { adapter, argvs } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt') });
+      const error = await failureOf(adapter.launch('dev.averi.lab'));
+      expect(error?.message).toBe(monkeyChooser(252, noActivities));
       expect(error?.message).not.toContain('SYS_KEYS');
       expect(error?.cause).toBe(failure);
       expect(argvs).toEqual([MONKEY, FOCUS]);

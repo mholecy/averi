@@ -332,29 +332,55 @@ describe('CHOOSER_ADVICE — what the reply advises, and that averi taps nothing
 // note after `launch_app`'s `-p` start, and monkey's refusal — each pinned whole (D55's first mutation run lost two
 // mutants to unpinned advice strings).
 describe('D55b — the launch\'s chooser wording: chooserAdvice, launchChooserNote, monkeyChooserRefusal', () => {
-  it('chooserAdvice is CHOOSER_ADVICE for a link, and names the intent and the launch for a launch', () => {
+  /** The advice both launch paths share: neutral on whose intent the chooser answers (it may be another link's). */
+  const LAUNCH_ADVICE =
+    'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
+    "changes the device's default for the intent it answers); press_key back drops the chooser. averi taps nothing itself.";
+  const SYS_KEYS = '** SYS_KEYS has no physical keys but with factor 2.0%.';
+  const NO_ACTIVITIES = '** No activities found to run, monkey aborted.';
+  const MONKEY_HEAD = "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) is in front, and monkey starts nothing over it";
+
+  it('chooserAdvice is CHOOSER_ADVICE for a link, and the launch wording for a launch', () => {
     expect(chooserAdvice('such links', 'the link')).toBe(CHOOSER_ADVICE);
-    expect(chooserAdvice('this intent', 'the launch')).toBe(
-      'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
-        "changes the device's default for this intent); press_key back drops the launch. averi taps nothing itself.",
-    );
+    expect(chooserAdvice('the intent it answers', 'the chooser')).toBe(LAUNCH_ADVICE);
   });
 
-  it("launchChooserNote: Android has not brought the package forward, the chooser's component, the advice, and naming the activity", () => {
+  it("launchChooserNote: the chooser in front and the package not — no claim whose intent it answers — the advice, naming the activity", () => {
     expect(launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app')).toBe(
       'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
-        "is in front, asking which of dev.averi.lab's activities takes the intent. Take a ui_snapshot, tap the app you " +
-        'mean, then its "Just once" button if it shows one (never "Always": it changes the device\'s default for this ' +
-        'intent); press_key back drops the launch. averi taps nothing itself. Naming the activity (`activity:` on the ' +
-        'launch step / launch_app) starts it without the chooser.',
+        `is in front, and dev.averi.lab is not. ${LAUNCH_ADVICE} Naming the activity (\`activity:\` on the launch step / ` +
+        'launch_app) starts it without the chooser.',
     );
   });
 
-  it("monkeyChooserRefusal: the chooser as the cause monkey started nothing, and the way out — no install blamed", () => {
-    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER)).toBe(
-      "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) " +
-        'is in front, and monkey starts nothing over it (exit 251 on API 33). Answer it (ui_snapshot, the app, "Just ' +
-        'once") or press_key back to drop it, then launch again. averi taps nothing itself.',
+  it("monkeyChooserRefusal: the chooser as the cause, monkey's actual exit code, the shared advice — SYS_KEYS's warning unquoted", () => {
+    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 251, lines: [SYS_KEYS] })).toBe(
+      `${MONKEY_HEAD} (it exited 251). ${LAUNCH_ADVICE} Then launch again.`,
+    );
+    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 252, lines: [SYS_KEYS] })).toBe(
+      `${MONKEY_HEAD} (it exited 252). ${LAUNCH_ADVICE} Then launch again.`,
+    );
+  });
+
+  it('monkeyChooserRefusal with no exit code (exit 0, or a signal): no exit clause', () => {
+    for (const exitCode of [undefined, null]) {
+      expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode, lines: [SYS_KEYS] })).toBe(
+        `${MONKEY_HEAD}. ${LAUNCH_ADVICE} Then launch again.`,
+      );
+    }
+  });
+
+  it("monkeyChooserRefusal quotes monkey's real reasons — every `** ` line but SYS_KEYS's warning, in order", () => {
+    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 252, lines: [SYS_KEYS, NO_ACTIVITIES] })).toBe(
+      `${MONKEY_HEAD} (it exited 252). monkey said: ${NO_ACTIVITIES} ${LAUNCH_ADVICE} Then launch again.`,
+    );
+    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 252, lines: [NO_ACTIVITIES, '** Error: x', SYS_KEYS] })).toBe(
+      `${MONKEY_HEAD} (it exited 252). monkey said: ${NO_ACTIVITIES} / ** Error: x ${LAUNCH_ADVICE} Then launch again.`,
+    );
+    // Only the warning itself is dropped: a line that merely mentions SYS_KEYS, or has it later, is a reason.
+    const mentions = ['** Error: SYS_KEYS has no physical keys', '**  SYS_KEYS x', '** echo: ** SYS_KEYS has no physical keys'];
+    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 252, lines: mentions })).toBe(
+      `${MONKEY_HEAD} (it exited 252). monkey said: ${mentions.join(' / ')} ${LAUNCH_ADVICE} Then launch again.`,
     );
   });
 });

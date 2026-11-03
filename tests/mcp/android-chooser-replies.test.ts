@@ -37,10 +37,10 @@ async function chooserUp(): Promise<AndroidAdapter> {
 
 const NOTE =
   'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
-  "is in front, asking which of dev.averi.lab's activities takes the intent. Take a ui_snapshot, tap the app you " +
-  'mean, then its "Just once" button if it shows one (never "Always": it changes the device\'s default for this ' +
-  'intent); press_key back drops the launch. averi taps nothing itself. Naming the activity (`activity:` on the ' +
-  'launch step / launch_app) starts it without the chooser.';
+  'is in front, and dev.averi.lab is not. Take a ui_snapshot, tap the app you mean, then its "Just once" button if it ' +
+  'shows one (never "Always": it changes the device\'s default for the intent it answers); press_key back drops the ' +
+  'chooser. averi taps nothing itself. Naming the activity (`activity:` on the launch step / launch_app) starts it ' +
+  'without the chooser.';
 
 // The replies with Android's chooser in front, end to end — a real AndroidAdapter through flow/launch.ts and the reply
 // text (tool-text.ts): launch_app's ⚠ line and the flow's `⚠ launch` line name the chooser (D55b; ADR 0041's D55b

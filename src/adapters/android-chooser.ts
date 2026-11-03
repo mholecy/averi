@@ -112,8 +112,8 @@ export const CHOOSER_ADVICE = chooserAdvice('such links', 'the link');
 
 /**
  * The advice, for what the chooser holds: `defaultFor` is what "Always" would change the default for (`such links`
- * after a link, `this intent` after a launch), `drops` what one BACK drops (`the link`, `the launch`). One wording for
- * open_deep_link (CHOOSER_ADVICE) and launch_app's `-p` start (launchChooserNote): D55b.
+ * after a link, `the intent it answers` after a launch), `drops` what one BACK drops (`the link`, `the chooser`). One
+ * wording for open_deep_link (CHOOSER_ADVICE) and both launch paths (launchChooserNote, monkeyChooserRefusal): D55b.
  */
 export function chooserAdvice(defaultFor: string, drops: string): string {
   return (
@@ -123,29 +123,48 @@ export function chooserAdvice(defaultFor: string, drops: string): string {
 }
 
 /**
- * launch_app's ⚠ note when the chooser is in front after its `-p` start (D55b; ADR 0041's D55b amendment): an intent
- * scoped to the package that two of its activities handle, none preferred (batch-11: 10 of 10, averi_lab API 33). The
- * headline stays "Launched" — D56's shape on iOS (ADR 0032's D56 amendment), the start did happen. `-p` scopes the
- * intent to the package, so the chooser offers only that app's own activities, and naming one (`nameTheActivity`:
- * where the call names it, the adapter's wording) starts it with `-n`, no chooser.
+ * The advice after a launch. Neutral on whose intent the chooser answers: after a `-p` start it is most likely the
+ * launch's own (two of the package's activities, none preferred; batch-11 10 of 10), but a chooser left up by another
+ * app's link reads the same.
+ */
+const LAUNCH_ADVICE = chooserAdvice('the intent it answers', 'the chooser');
+
+/**
+ * launch_app's ⚠ note when the chooser is in front after its `-p` start (D55b; ADR 0041's D55b amendment). The
+ * headline stays "Launched" — D56's shape on iOS (ADR 0032's D56 amendment), the start did happen. It says only what
+ * the read saw: the chooser in front, the package not. Naming an activity (`nameTheActivity`: where the call names
+ * it, the adapter's wording) starts it with `-n`, which a package's own chooser cannot stop.
  */
 export function launchChooserNote(packageName: string, component: string, nameTheActivity: string): string {
   return (
-    `Android has not brought ${packageName} forward yet: its chooser (${component}) is in front, asking which of ` +
-    `${packageName}'s activities takes the intent. ${chooserAdvice('this intent', 'the launch')} Naming the activity ` +
-    `(${nameTheActivity}) starts it without the chooser.`
+    `Android has not brought ${packageName} forward yet: its chooser (${component}) is in front, and ${packageName} ` +
+    `is not. ${LAUNCH_ADVICE} Naming the activity (${nameTheActivity}) starts it without the chooser.`
   );
 }
 
 /**
- * monkey's refusal when the chooser is in front (D55b): monkey starts nothing over it — exit 251 on API 33, 3 of 3 in
- * batch-11 — and its only `** ` line is the emulator's `** SYS_KEYS …` warning, not a reason, so the message names the
- * chooser as the cause instead of the install, and quotes no line (the ExecError cause keeps monkey's output).
+ * monkey's emulator warning: printed on an emulator whatever the outcome (fact 14), never a reason. Only a line that
+ * IS the warning, from its start; one that mentions SYS_KEYS later is monkey's own and is quoted.
  */
-export function monkeyChooserRefusal(packageName: string, component: string): string {
+const SYS_KEYS_WARNING = /^\*\* SYS_KEYS /;
+
+/**
+ * monkey's refusal when the chooser is in front (D55b): monkey starts nothing over it (exit 251 3 of 3 in batch-11,
+ * averi_lab API 33; batch-10's reply came from a refusal recorded as 252), so the message names the chooser as the
+ * cause instead of the install, with monkey's actual exit code when it had one (`exitCode`: the ExecError's; none at
+ * exit 0 or on a signal). Of monkey's `** ` lines (`lines`, runStart's) every real reason is quoted, in order; the
+ * SYS_KEYS warning is not. The ExecError, the caller's cause, keeps the whole output.
+ */
+export function monkeyChooserRefusal(
+  packageName: string,
+  component: string,
+  { exitCode, lines }: { exitCode?: number | null; lines: readonly string[] },
+): string {
+  const reasons = lines.filter((line) => !SYS_KEYS_WARNING.test(line));
   return (
     `monkey started nothing in ${packageName}: Android's chooser (${component}) is in front, and monkey starts ` +
-    'nothing over it (exit 251 on API 33). Answer it (ui_snapshot, the app, "Just once") or press_key back to drop ' +
-    'it, then launch again. averi taps nothing itself.'
+    `nothing over it${exitCode == null ? '' : ` (it exited ${exitCode})`}.` +
+    (reasons.length > 0 ? ` monkey said: ${reasons.join(' / ')}` : '') +
+    ` ${LAUNCH_ADVICE} Then launch again.`
   );
 }

@@ -64,9 +64,11 @@ export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string
  * handler 2026-10-03: wording, not delegation.
  *
  * And on their own lines below, as swipeText lays out its note: `⚠ <note>`
- * when the launch said one (LaunchOutcome.note, 2026-10-09 — today iOS's
- * foreground wait, adapters/ios-foreground.ts), then `⚠ clearState: <…>`
- * when it wiped (since 2026-10-09, with the session's count) — the flow's
+ * when the launch said one (LaunchOutcome.note, 2026-10-09 — iOS's
+ * foreground wait, adapters/ios-foreground.ts; since D55b also Android's
+ * chooser after a `-p` start, adapters/android-chooser.ts), then
+ * `⚠ clearState: <…>` when it wiped (since 2026-10-09, with the session's
+ * count) — the flow's
  * `⚠ launch` and `⚠ clearState` trace lines, in the same words and order.
  * The `clearState:` label is kept because the flow line reads exactly so;
  * the note's `launch:` is not, the reply's first line already saying it.

@@ -47,7 +47,10 @@ const KEYBOARD_WITNESS_TIMEOUT_MS = 2_000;
 const STATUS_BAND_QUERY_TIMEOUT_MS = 2_000;
 /** The same reasoning for the window manager's word on a miss (focusedWindow): past it, `unknown` — the active-window hint. */
 const FOCUSED_WINDOW_TIMEOUT_MS = 2_000;
-/** The focus read after a deep link's or a `-p` launch's start, or monkey's refusal (D55, D55b, android-chooser.ts): its bound, as the other focus reads'. */
+/**
+ * The focus read after a deep link's or a `-p` launch's start, or monkey's refusal (D55, D55b, android-chooser.ts): its
+ * bound, as the other focus reads'.
+ */
 const CHOOSER_FOCUS_TIMEOUT_MS = 2_000;
 
 /**
@@ -327,9 +330,13 @@ export class AndroidAdapter implements DeviceAdapter {
       if (outcome.kind === 'refused') {
         // D55b: with Android's chooser in front monkey starts nothing (exit 251 on API 33, batch-11) and its one `** `
         // line is the emulator's SYS_KEYS warning, not a reason. So one focus read, on the refusal only (a monkey that
-        // started something pays nothing): the chooser named is the cause. A failed or unmatched read: today's error.
+        // started something pays nothing): the chooser named is the cause, with monkey's exit code and any real
+        // reason it printed. A failed or unmatched read: today's error.
         const chooser = await this.chooserInFront();
-        if (chooser !== undefined) throw new Error(monkeyChooserRefusal(packageName, chooser), causeOf(outcome));
+        if (chooser !== undefined) {
+          const said = { exitCode: outcome.cause?.exitCode, lines: outcome.lines };
+          throw new Error(monkeyChooserRefusal(packageName, chooser, said), causeOf(outcome));
+        }
         // monkey's reason may be on its stdout, which the ExecError's
         // message drops — read here, or this would fail with no reason at
         // all. Not every reason is the package's: monkey itself may have
