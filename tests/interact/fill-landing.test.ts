@@ -555,8 +555,12 @@ describe('without clear, the value must be in the typing past the earlier text (
   });
 
   // ADR 0034's D64 amendment, residual R-a: on the safe side
-  it('residual: the caret at the start, an earlier text the typing re-forms (`aba` for `ab` after `a`), is refused', () => {
-    expect(landingOf('aba', e('ab', 'a'))).toBeUndefined();
+  it.each([
+    ['aba', 'ab', 'a', 'the caret at the start'],
+    ['aaba', 'ab', 'aa', 'the caret inside the text'],
+    ['abab', 'ba', 'ab', 'the caret inside the text'],
+  ])('residual 9: `%s` for `%s` after `%s` (%s), the reading still starting with the earlier text, is refused', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toBeUndefined();
   });
 });
 
