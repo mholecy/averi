@@ -90,6 +90,29 @@ export const refusedUnchanged =
   };
 
 /**
+ * f16 (D64): a field at its length cap that keeps only the head of the typing while its earlier text holds the value —
+ * form-format's `date` holding `31.12.202` after a first fill, typed `12` without clear, keeps the `1`: `31.12.2021`.
+ * Before D64 averi passed that reading by containment (the `12` inside `31.12`), and `holds` cannot catch it: the app
+ * does hold `kept`. Ok only when the app holds `kept`, the first fill did not fail, and the last reply is an error. A
+ * claim of done is a MISMATCH `fill-claim`; the field other than `kept` is LOUD `loud-changed`; the first fill failed
+ * over `kept` is a MISMATCH `failed-holds` (its kind); kept, but no error and no claim either is LOUD `loud-untouched`.
+ * The error's wording is not judged: a tail typed again on iOS and the poll on Android word it alike, by length.
+ */
+export const refusedCapped =
+  (tag: string, kept: string) =>
+  (s: LabState, replies: string[], _source: Source, _launched: LabState): LiveVerdict => {
+    const got = valueOf(s, tag);
+    const [first] = replies;
+    const last = replies[replies.length - 1];
+    const kind = replyKind(last);
+    if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the field kept only the head of the typing; the app holds ${JSON.stringify(got)}` };
+    if (got !== kept) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(kept)}; averi: ${short(last)}` };
+    if (isError(first)) return { outcome: 'MISMATCH', cls: 'failed-holds', kind: replyKind(first), why: `the app holds ${JSON.stringify(kept)}, but averi failed the first fill: ${short(first)}` };
+    if (!isError(last)) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the field kept ${JSON.stringify(kept)}, but not refused: ${short(last)}` };
+    return { outcome: 'ok', kind, why: `refused, the field kept ${JSON.stringify(kept)} at its cap: ${short(last)}` };
+  };
+
+/**
  * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds, over the fill's reply), AND the tree shows
  * the same text (the `shows` assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's
  * binding setter may leave the TextField showing what was typed), is a MISMATCH here even when the fill passed:
