@@ -405,8 +405,7 @@ private val L7_CAROUSELS = mapOf(
     "carousel-recycler-free" to CarouselSpec(CarouselKind.RECYCLER, snap = false),
 )
 
-/** The state's key of the card an L7 carousel rests on (Lab.index, LabState.offsets): the one under the clip's centre,
- * 0 the first. */
+/** `carousel.index` (Lab.index, LabState.offsets): the card under the clip's centre at rest, 0 the first. */
 private const val CAROUSEL_INDEX = "carousel.index"
 
 /**

@@ -415,10 +415,10 @@ const FORMS: Omit<Case, 'group'>[] = [
   // run on a device: what each source answers is batch-9's to read, so none is in live-known.ts. g2 ends on a complete
   // group: the field shows the eager space after it, a reading that does not land (fill-landing.ts) and reads D53's
   // `separated` — averi refuses it by design while the app holds the value: an EXPECTED MISMATCH failed-holds under
-  // iOS's idb and wda, said in its `says` (Android's uiautomator may judge it ok); not in live-known.ts, whose entries
+  // iOS's idb and wda, said in its `says` (Android not yet read); not in live-known.ts, whose entries
   // name a filed note and the kind a device run read.
   { id: 'g1', cell: G, says: 'fill, clear, an IBAN into the field that spaces each group as it ends', calls: [fill(G, 'ibanEager', 'SK3112000000123', true), shows(G, 'ibanEager', 'SK31 1200 0000 123')], judge: holdsShown('ibanEager', 'SK31 1200 0000 123') },
-  { id: 'g2', cell: G, says: 'fill, no clear, an IBAN ending on a complete group: the field shows the eager space after it — expected MISMATCH failed-holds by design on iOS (idb, wda; D53 `separated`: averi refuses the trailing mark, the app holds the value); Android (uiautomator) may judge ok', calls: [fill(G, 'ibanEager', 'SK3112000000')], judge: holds('ibanEager', 'SK31 1200 0000 ') },
+  { id: 'g2', cell: G, says: 'fill, no clear, an IBAN ending on a complete group: the field shows the eager space after it — expected MISMATCH failed-holds by design on iOS (idb, wda; D53 `separated`: averi refuses the trailing mark, the app holds the value); Android not yet read', calls: [fill(G, 'ibanEager', 'SK3112000000')], judge: holds('ibanEager', 'SK31 1200 0000 ') },
   { id: 'g3', cell: G, says: 'fill, no clear, a phone number the field groups in threes under a `+421` placeholder', calls: [fill(G, 'phoneGrouped', '421903123456')], judge: holds('phoneGrouped', '421 903 123 456') },
   { id: 'g4', cell: G, says: 'fill, clear, a phone number with its `+421` into the field that groups it', calls: [fill(G, 'phoneGrouped', '+421903123456', true)], judge: holds('phoneGrouped', '+421 903 123 456') },
   { id: 'g5', cell: G, says: 'fill, no clear, a phone number typed with its own spaces into the field that groups it', calls: [fill(G, 'phoneGrouped', '+421 903 123 456')], judge: holds('phoneGrouped', '+421 903 123 456') },

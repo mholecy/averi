@@ -470,7 +470,7 @@ truth corpus and the golden do not move: an uncaptured cell makes no golden row)
   group is complete, none at 24 characters — D60's eager trailing mark) and `phoneGrouped` (`format: phone3`: a
   leading `+` kept, the digits in threes, under a `+421` placeholder — D37's `+421` grouping field), and the submit.
   Live forms cases g1–g5 (scripts/truth/live-cases.ts); g2, which ends on a complete group, is an expected MISMATCH
-  by design under iOS's idb and wda (the reading's trailing mark is D53's `separated`; Android may judge it ok), said
+  by design under iOS's idb and wda (the reading's trailing mark is D53's `separated`; Android not yet read), said
   in its `says`. group4eager's backspace trap, by
   design: a backspace over the eager space has it added straight back (`SK31 ` stays `SK31 `), so only a select-all
   clear empties a field ending in it; the cases fill from empty.

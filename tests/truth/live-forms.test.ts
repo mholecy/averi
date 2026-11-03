@@ -451,7 +451,7 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
   it('g2 says its expected MISMATCH by design, as rfe3 does; no other g or rfe case does', async () => {
     const all = [...(await native('ios')), ...(await rn('ios'))];
     expect(all.filter((c) => /expected MISMATCH/.test(c.says)).map((c) => c.id)).toEqual(['g2', 'rfe3']);
-    expect(all.find((c) => c.id === 'g2')!.says).toMatch(/by design on iOS \(idb, wda; D53 `separated`.*Android \(uiautomator\) may judge ok/);
+    expect(all.find((c) => c.id === 'g2')!.says).toMatch(/by design on iOS \(idb, wda; D53 `separated`.*Android not yet read/);
   });
 
   it('no outcome guessed: none of g1–g5 or rfe1–rfe3 is known under any source until a device run reads it', () => {
