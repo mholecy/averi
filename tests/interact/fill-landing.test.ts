@@ -319,6 +319,12 @@ describe('an unnamed placeholder whose letters and digits start the value\'s (D6
     expect(differenceOf('421 903-123-456', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'separated', added: 3 });
   });
 
+  // the wording only, never a pass: a full reading with an eager trailing mark (D60's `separated`) under the unnamed `+421`
+  it('differenceOf: a full reading with an eager trailing mark after the unnamed `+421` is separated, not a length', () => {
+    expect(differenceOf('421 903 123 456 ', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'separated', added: 4 });
+    expect(landingOf('421 903 123 456 ', expecting(e('421903123456', '+421')))).toBeUndefined();
+  });
+
   // residual 6: the equality form — a dropped tail under the unnamed placeholder is not typed again; clear: true is the remedy
   it('tailOf: a dropped tail under the unnamed `+421` is no tail — not typed again (ADR 0034 residual 6)', () => {
     expect(tailOf('421 903 123', e('421903123456', '+421'))).toBeUndefined();
