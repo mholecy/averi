@@ -171,11 +171,12 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
   fill-landing and fill-text are untouched.
 - **The replies**: `Typeable.otherPath`, the remedy sentence true for the adapter, replaces the hard-coded "averi has
   no other typing path yet (ADR 0037): use a value without it, or enter it by hand." `Typeable.widerPath` lets idb's
-  name the WDA tree source only for a character WDA's set takes:
-  - idb, such a character: "A project with `ios.treeSource: wda` types it through WebDriverAgent (ADR 0037);
-    otherwise use a value without it, or enter it by hand."
-  - idb, any other (an emoji): "averi has no typing path for it on iOS (WebDriverAgent's `/wda/keys` is not measured
-    for it; ADR 0037): use a value without it, or enter it by hand."
+  name the WDA tree source only for a value WDA's set takes whole — not one it would refuse a later character of
+  (`Šťastný 😀`, or © followed by U+FE0F):
+  - idb, such a value: "A project with `ios.treeSource: wda` types it through WebDriverAgent (ADR 0037); otherwise
+    use a value without it, or enter it by hand."
+  - idb, any other: "averi has no typing path on iOS for this value (WebDriverAgent's `/wda/keys` is not measured for
+    all of it; ADR 0037): use a value without it, or enter it by hand."
   - Android: "averi has no typing path for it on Android (no shell clipboard setter on API 33; ADR 0037): use a value
     without it, or enter it by hand."
   - WDA: "Use a value without it, or enter it by hand."

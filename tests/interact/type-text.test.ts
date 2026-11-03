@@ -181,7 +181,7 @@ describe('assertTypeable ends each refusal with its adapter\'s remedy', () => {
 
   it('iOS (idb): an emoji, which WebDriverAgent\'s set does not take — no path on iOS, no wda claim', () => {
     const msg = refusal('a😀', IOS);
-    expect(msg).toMatch(/nothing tapped, cleared or typed\. averi has no typing path for it on iOS \(WebDriverAgent's `\/wda\/keys` is not measured for it; ADR 0037\): use a value without it, or enter it by hand\.$/);
+    expect(msg).toMatch(/nothing tapped, cleared or typed\. averi has no typing path on iOS for this value \(WebDriverAgent's `\/wda\/keys` is not measured for all of it; ADR 0037\): use a value without it, or enter it by hand\.$/);
     expect(msg).not.toContain('ios.treeSource');
   });
 

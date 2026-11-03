@@ -95,7 +95,16 @@ describe('the refusals\' remedies', () => {
   it('idb, a character /wda/keys does not take either (an emoji): no path, and no claim that wda types it', () => {
     const msg = refusalOf('a😀', IDB_TYPEABLE)!;
     expect(msg).not.toContain('ios.treeSource: wda');
-    expect(msg).toMatch(/averi has no typing path for it on iOS .*: use a value without it, or enter it by hand\.$/);
+    expect(msg).toMatch(/averi has no typing path on iOS for this value .*: use a value without it, or enter it by hand\.$/);
+  });
+
+  it.each([
+    ['a value WDA types only in part (Š, then an emoji)', 'Šťastný 😀'],
+    ['© followed by a variation selector (U+FE0F, a combining mark)', '\u00a9\ufe0f'],
+  ])('idb, %s: no wda claim — WDA would refuse the value too (review round 1)', (_name, text) => {
+    const msg = refusalOf(text, IDB_TYPEABLE)!;
+    expect(msg).not.toContain('ios.treeSource: wda');
+    expect(msg).toMatch(/averi has no typing path on iOS for this value .*: use a value without it, or enter it by hand\.$/);
   });
 
   it('wda: says what it types and that the rest is not measured through /wda/keys; names no other path', () => {

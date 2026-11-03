@@ -26,7 +26,8 @@ export interface Typeable {
   /**
    * Another configuration of the same platform that types part of what this one refuses (D43: an iOS project on the
    * idb tree source, whose characters WebDriverAgent's `/wda/keys` may take): `refuses` is that path's own set, and
-   * `otherPath` the remedy said for a character it does NOT refuse — in place of the remedy above. Absent: no such path.
+   * `otherPath` the remedy said for a value it refuses NO character of — in place of the remedy above: a path that would
+   * refuse a later character of the value is no way out (review round 1). Absent: no such path.
    */
   readonly widerPath?: { readonly refuses: RegExp; readonly otherPath: string };
 }
@@ -60,12 +61,12 @@ function named(ch: string): string {
  * cannot type (whole: a surrogate pair is one), never the value around it (a value may be a credential); says nothing
  * was sent — true at both places that throw it: before the fill's field is resolved (interact/type-text.ts) and before
  * Android's first `input text` — what the adapter types, and the remedy true for it (`otherPath`, or `widerPath`'s
- * where that path types the character).
+ * where that path types the whole value).
  */
 export function refusalOf(text: string, typeable: Typeable): string | undefined {
   const ch = text.match(typeable.refuses)?.[0];
   if (ch === undefined) return undefined;
   const wider = typeable.widerPath;
-  const remedy = wider !== undefined && !wider.refuses.test(ch) ? wider.otherPath : typeable.otherPath;
+  const remedy = wider !== undefined && !wider.refuses.test(text) ? wider.otherPath : typeable.otherPath;
   return `cannot type ${named(ch)}: ${typeable.says}. Refused before anything was sent — nothing tapped, cleared or typed. ${remedy}`;
 }
