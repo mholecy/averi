@@ -19,8 +19,9 @@
  * agree with — the flow engine may not import this layer.
  */
 
-import { everyNode, type DeepLinkOutcome, type LinkAlert, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
+import { everyNode, type DeepLinkOutcome, type LinkAlert, type LinkChooser, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { alertButtonsText, ALERT_ADVICE } from '../adapters/ios-system-alert.js';
+import { CHOOSER_ADVICE } from '../adapters/android-chooser.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
@@ -79,12 +80,24 @@ export const launchText = (platform: Platform, launched: Launched): string =>
  * `Opened <url> on <platform>`, and the link's note on its own line as `⚠ <note>` (D49a: iOS's foreground wait after a
  * link to the project's own scheme, adapters/ios-foreground.ts — the note leads with what to do), as launchText lays
  * out a launch's. When iOS showed a system alert instead of opening it (D54, DeepLinkOutcome.alert), that is the
- * headline: alertText.
+ * headline: alertText. When Android's chooser is in front instead of an app (D55, DeepLinkOutcome.chooser), so is
+ * that: chooserText.
  */
 export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkOutcome): string =>
-  outcome.alert !== undefined
-    ? alertText(url, outcome.alert)
-    : `Opened ${url} on ${platform}` + (outcome.note !== undefined ? `\n⚠ ${outcome.note}` : '');
+  outcome.chooser !== undefined
+    ? chooserText(url, outcome.chooser)
+    : outcome.alert !== undefined
+      ? alertText(url, outcome.alert)
+      : `Opened ${url} on ${platform}` + (outcome.note !== undefined ? `\n⚠ ${outcome.note}` : '');
+
+/**
+ * `Android has not opened <url> yet: its chooser (<component>) is in front, asking which app opens it.`, then the
+ * advice (CHOOSER_ADVICE: pick the app, "Just once", never "Always"; BACK drops the link; averi taps nothing) — D55,
+ * worded once in adapters/android-chooser.ts. Named by its component only: the chooser's labels and their centres
+ * are backlog D55c's.
+ */
+const chooserText = (url: string, chooser: LinkChooser): string =>
+  `Android has not opened ${url} yet: its chooser (${chooser.component}) is in front, asking which app opens it. ${CHOOSER_ADVICE}`;
 
 /**
  * `iOS has not opened <url> yet: it asks "<title>" — buttons "<label>" at (x, y), …` (D54), then the advice

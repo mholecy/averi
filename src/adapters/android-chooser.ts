@@ -65,3 +65,13 @@ export function chooserInFocus(dump: string): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * What the reply advises once the chooser is named (mcp/tool-text.ts#deepLinkText): the agent picks the app, "Just
+ * once" (never "Always", which writes a preferred activity: a device change every later run would inherit), or BACK
+ * (measured: one BACK dismissed it, batch-9). averi taps nothing: which handler is meant is the test's business. The
+ * labels are AOSP's English ones, and the reply does not claim what a launch_app does with the chooser up (unmeasured).
+ */
+export const CHOOSER_ADVICE =
+  'Take a ui_snapshot, tap the app you mean, then its "Just once" button (never "Always": it changes the ' +
+  "device's default for such links); press_key back drops the link. averi taps nothing itself.";
