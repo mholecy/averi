@@ -398,7 +398,7 @@ match in its place), has proved the cut — content lay past that edge, and part
    px for 297) cannot carry the uncut edge out; at a content-START edge (top, left) still capped by
    PROBE_MAX_TRAVEL_FRACTION — the pull-to-refresh lies that way after a probe too; a bottom or right edge has no such
    gesture. In every other respect it is a probe: held after it → `checked`; more showing, still flush → another
-   reveal, the room taken anew; out of the flush → the ordinary stop;
+   reveal, the room taken anew; out of the flush → the ordinary stop; See the D62 amendment below.
 3. at the bound (no swipe or time for the reveal) is NOT "fully visible": the bound fails, its shortfall the cut the
    probe proved (`FlushCut`) — `element reached the viewport but its bottom edge still lies on its scroll container's
    (…), where Android cuts a node's bounds to the container, and a probe swipe toward it showed N px more of it
@@ -406,7 +406,7 @@ match in its place), has proved the cut — content lay past that edge, and part
    "it is cut": the probe proved part of it lay past the edge BEFORE it, not after — the last row of a list cut by
    40 px is whole after a 40-px probe that brought the list to its end, and still flush (the next reveal, had there
    been budget, would have moved nothing and said `checked`). `flush.why: 'budget'` stays for a flush stop never
-   probed;
+   probed; See the D62 amendment below.
 4. is remembered: the proof is KEPT (`flush-check.ts#ProvenCut`, in the check the round holds, `scroll-rounds.ts#State.flush`) while every later flush check finds the match
    flush on that edge of that container, and let go when one finds it anywhere else. So a read that cannot send the
    reveal — no swipe or time (`budget`), or a tree changed between the probe and its read: no room for a stroke (a
@@ -427,6 +427,46 @@ tens of px it may carry the uncut edge out — the row then reads flush at both 
 bound ends it as a failure; never a claim.
 
 Bug note: docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
+
+## Amendment: D62 — a reveal that moved nothing right after a stroke that carried the match its whole length is doubted once (2026-11-03)
+
+**Cause.** Batch-9 run 0 (the lab's `carousel-recycler-free`, a 440-px pre-drag, then `left fully: true`): C lay at
+`573,380 441x234`, flush with its carousel's right edge (`66,380 948x234`). The probe moved it 135 px and C grew by
+135 (`438,380 576x234`): the cut was proved. The reveal after it — half the 372-px room — was never taken by the app
+(its own log counts the pre-drag and the probe only), so the read after it found C where the reveal left from, held,
+and LV2's point 2 said `checked`: "fully visible after 2 swipes … a probe swipe toward it moved nothing". The 2 swipes
+were the probe and the reveal. The stroke before the wrong pass DID move the target, so "a pass only when the stroke
+before it moved the target" would not have caught it.
+
+**Decision.** A stroke that proves the cut (`revealedBy`) also records whether it CARRIED the match its whole drawn
+length: `grown > strokeLength(drawn) − 2 × TOUCH_SLOP` (`flush-check.ts#ProvenCut.carried`; no stroke handed back →
+not carried). Measured carry losses lie within one TOUCH_SLOP (batch-10's RecyclerView strokes 48→24, 54→33, 87→67;
+batch-9's probe ~142→135; the lab's 74-px probe on S 74→57–61), so the threshold leaves a 24-px margin; a stroke that
+stops more than 48 px short of its length means the content ended under it (Settings' 177→100, VA1's R 177→66,
+formRead's 177→40, LV2's 40-px probe that brought the list to its end).
+
+1. A reveal that moved nothing (held, drawn as a stroke) right after a carried stroke is DOUBTED once: no `checked`.
+   The cut stays proven, marked (`ProvenCut.unmoved`), and the same reveal is sent again (it counts as a swipe), at
+   once — the read neither waits nor confirms. With none to send, the read is short of the cut (`FlushCut`: `budget`,
+   `room` or `axis`), in LV2 point 3's existing words: `… a probe swipe toward it showed N px more of it — part of it
+   lay past that edge, so it may still be cut there …`. No new wording.
+2. A second held reveal in a row is accepted as `checked` (today's reply, its swipe count one higher). A retry that
+   moves and grows the match is a fresh proof (no `unmoved`), judged by the same rule.
+3. Unchanged: a held reveal after a stroke that ran short (the content ended under it — LV2 point 3's row cut by 40
+   px), every first probe that held, a reveal too short to tell from a tap (`tap`). Every reveal that held is NOT sent
+   again: that rule turned Settings' "Network", VA1's R and formRead from "after 2 swipes" to "after 3", about 2.5–2.9
+   s more on the 2026-10-09 case, on the legitimate path.
+4. iOS, idb and WDA unchanged: no clipping container, never a probe.
+
+**Cost.** None on a legitimate pass (a first probe that held; a reveal after a stroke the content ended under). In the
+doubted case one stroke and one read (~2.5–2.9 s on Android) before it moves (the call goes on) or holds again
+(`checked`); the same in a legitimate case whose content ended within 48 px of the stroke's full length. No device call
+of another kind. Golden 0 changed: a replayed tree never moves, so no proof forms.
+
+**Residuals, stated.** (a) A FIRST probe the app did not take still reads `checked`: no stroke before it to doubt by,
+and doubting it would cost a second probe on every checked stop (4 golden rows from "after 1 swipe" to "after 2").
+(b) A reveal dropped after a stroke that ran short for another reason (a loaded host: a 74-px probe moved 21 or 38
+px, LV2's table) still passes. (c) Two strokes dropped in a row still pass.
 
 ## Residuals accepted
 
