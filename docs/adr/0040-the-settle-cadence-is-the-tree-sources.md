@@ -12,6 +12,7 @@ fill 1 208 → 1 008 (−200), fill-20 −207, ensure-cold −196; the controls 
 a side), Android tap/fill (5 a side) — Δ slept ≈ 0 (≤ 3 ms); device calls per run equal everywhere. The fallback (a
 wrong settle sets `IDB_SETTLE_CADENCE_MS` to 400) was not needed. ADR 0029's rule (`pauseAfterRead`) is unchanged.
 This record adds a fact: which `pollMs` the settle is given.
+Amended 2026-11-03 (T5: the batch-11 trace replayed through resolveSettled — see the amendment below).
 
 ## Context
 
@@ -104,3 +105,34 @@ when a later read in the window moves the rect.
   landing. The product-path run (`d35-motion --settle`) is the check before merge.
 - The floor and the run-of-one late read (~150–167 ms back to back, ADR 0029) are unchanged. 300 is still twice the
   gap the proof already accepts there.
+
+## Amendment: T5 — the batch-11 trace replayed through the production settle (2026-11-03)
+
+**What.** `tests/fixtures/d35-b11-settle.json` (253 KB) is batch-11 B2's d35-motion run (2026-11-03, lab simulator,
+idb, main a5fefd32), trimmed from a device batch: 60 trials (20 each of sheet-long-list M1a, scroll-bounded M1b,
+carousel-in-list M2), every read for 3 s after the trigger (8569, all ok), times at 0.1 ms, each id's rects as per-id
+equality classes. A whole-read digest would be unfaithful: the settle compares the resolved target's rect alone, so
+one moving id would hold back every other. The host checkout, the device id, the trigger's coordinates and the app's
+evidence are dropped. Batch-2's and batch-3's raw traces are not kept, so the measurement above is not replayed.
+
+**The replay.** `tests/interact/settle-trace.test.ts` runs production `resolveSettled` (with `settleCadence`,
+`pollTree` and `pauseAfterRead` unmodified) once per (trial, id) through a fake adapter whose `settleCadenceMs` is
+`IDB_SETTLE_CADENCE_MS` and no `pollMs`. Only Date is faked: a read asked for at trace time T is the first recorded
+read that starts at or after T, and the clock advances by that read's own length. The settle starts at the first read
+after the trigger, the worst case named above. A settle is wrong when a later read in the window has the id at another
+rect (vanishing later is not wrong in a motion corpus). The test does not re-implement the settle. d35's own replay
+re-implemented it.
+
+**The pin.** At the fact: 0 wrong settles in 160 (M1a 0, M1b 100, M2 60). That equals d35's own replay of the same
+batch, the same (trial, id, read) settles. Sensitivity: at `pollMs: 100` exactly one is wrong (M2#14, the carousel's C,
+in its late deceleration, the mechanism above). So the fixture can fail.
+
+**The limit.** On this batch no cadence from 125 to 500 shows a wrong settle, so the corpus cannot show 300 is
+necessary. A cut of the fact is caught only as a changed settle count, which is change detection and not safety
+evidence. A raise to 400 keeps 160 settles and is not caught. R3 stands: a new value is set only by a product-path
+run; the fixture pins the shipped one.
+
+**Residuals.**
+- The probe kept only `lab.*` ids and the tracked labels, the last node winning on a duplicate key, and no roles. A
+  duplicate match in the real tree, which `ambiguous` would judge, is not recorded.
+- Date is whole ms, while the probe's clock was fractional. Below 250 ms this moves a few settles against d35's replay.
