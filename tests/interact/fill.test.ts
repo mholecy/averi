@@ -52,6 +52,25 @@ const appendBullets = (fake: FakeAdapter, drop = 0) => {
   };
 };
 
+/**
+ * A field that groups what it holds in `groupSize`s, spaces between, and shows `placeholder` as its value while empty —
+ * as idb reads a field whose placeholder it does not name (D29, D61). Typing and deleting act on the held text alone.
+ */
+function groupingFake(placeholder: string, groupSize: number) {
+  const fake = formFake(placeholder);
+  const held = () => (fake.focused === undefined || fake.focused.value === placeholder ? '' : (fake.focused.value ?? ''));
+  const group = (t: string) => (t.replace(/ /g, '').match(new RegExp(`.{1,${groupSize}}`, 'g')) ?? []).join(' ');
+  fake.typeText = async (text: string) => {
+    fake.typed.push(text);
+    if (fake.focused) fake.focused.value = group(held() + text) || placeholder;
+  };
+  fake.clearText = async (count: number) => {
+    fake.deletes.push(count);
+    if (fake.focused) fake.focused.value = held().slice(0, Math.max(0, held().length - count)) || placeholder;
+  };
+  return fake;
+}
+
 describe('fillField — focus, clear, type, verify', () => {
   // D18 (docs/adr/0034-a-fill-passes-a-field-that-reformats-as-it-is-typed.md): the lab's IBAN field groups what it is
   // typed in fours — the model and the tree both show `SK31 1200 0000` for a typed `SK3112000000`.
@@ -76,17 +95,7 @@ describe('fillField — focus, clear, type, verify', () => {
   // characters but the field shows 14".
   it('f7: a grouping field whose unnamed placeholder shows while empty — fill, clear alone, fill: both fills land reformatted', async () => {
     const PH = 'SK00 0000 0000 \u2026';
-    const fake = formFake(PH);
-    const held = () => (fake.focused === undefined || fake.focused.value === PH ? '' : (fake.focused.value ?? ''));
-    const group4 = (t: string) => (t.replace(/ /g, '').match(/.{1,4}/g) ?? []).join(' ');
-    fake.typeText = async (text: string) => {
-      fake.typed.push(text);
-      if (fake.focused) fake.focused.value = group4(held() + text) || PH;
-    };
-    fake.clearText = async (count: number) => {
-      fake.deletes.push(count);
-      if (fake.focused) fake.focused.value = held().slice(0, Math.max(0, held().length - count)) || PH;
-    };
+    const fake = groupingFake(PH, 4);
     const first = await fillField(fake, { id: 'amount_input' }, 'SK3112', FAST);
     expect(fillReply(first, 'id:amount_input')).toContain('the field shows them reformatted: 1 separator added');
     expect(fake.focused?.value).toBe('SK31 12');
@@ -103,14 +112,7 @@ describe('fillField — focus, clear, type, verify', () => {
   // `421903123456` without clear, the app held `421 903 123 456`, and the fill failed "typed 12 characters but the
   // field shows 15" after the whole poll budget.
   it('g3: a field that groups in threes under an unnamed `+421` placeholder — a fill without clear lands reformatted, nothing deleted or typed again', async () => {
-    const PH = '+421';
-    const fake = formFake(PH);
-    const held = () => (fake.focused === undefined || fake.focused.value === PH ? '' : (fake.focused.value ?? ''));
-    const group3 = (t: string) => (t.replace(/ /g, '').match(/.{1,3}/g) ?? []).join(' ');
-    fake.typeText = async (text: string) => {
-      fake.typed.push(text);
-      if (fake.focused) fake.focused.value = group3(held() + text) || PH;
-    };
+    const fake = groupingFake('+421', 3);
     const result = await fillField(fake, { id: 'amount_input' }, '421903123456', FAST);
     expect(fillReply(result, 'id:amount_input')).toContain('Filled');
     expect(fillReply(result, 'id:amount_input')).toContain('the field shows them reformatted: 3 separators added');
