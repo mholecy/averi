@@ -3311,6 +3311,26 @@ flows:
     expect(fake.tapPoints).toEqual([{ x: 120, y: 210 }]);
   });
 
+  // D66 review round 2, decided: quiet suppresses the tap line, not the warning — as the keyboard's ⚠ tap line.
+  it('an optional tap: on a present node marked disabled, the ⚠ tap line too, the tap sent', async () => {
+    const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'promo_close', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
+    const trace = await FlowEngine.run(flow('optional:\n          - tap: { id: promo_close }'), fake, FAST, { flow: 'f' });
+    expect(trace.filter((t) => t.action.startsWith('⚠') || t.action === 'tap')).toEqual([
+      { action: '⚠ tap', detail: 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.' },
+      { action: 'tap', detail: 'id:"promo_close"' },
+    ]);
+    expect(fake.taps).toEqual(['promo_close']);
+  });
+
+  it('type_pin\'s keypad: a digit key marked disabled gets the ⚠ tap line though its tap line is quiet; an unmarked one none', async () => {
+    const key = (d: string, disabled: boolean) =>
+      node({ role: 'button', identifier: `k${d}`, label: d, rect: { x: 100 * Number(d), y: 200, width: 40, height: 20 }, ...(disabled && { disabled: true as const }) });
+    const fake = new FakeAdapter({ s: screen(key('1', false), key('2', true)) }, 's');
+    const trace = await FlowEngine.run(flow('type_pin: { value: "12", keypad: { id_pattern: "k{digit}" } }'), fake, FAST, { flow: 'f' });
+    expect(trace.filter((t) => t.action.startsWith('⚠') || t.action === 'tap')).toEqual([{ action: '⚠ tap', detail: 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.' }]);
+    expect(fake.taps).toEqual(['k1', 'k2']);
+  });
+
   it('a tap on an unmarked node: the trace as before, no ⚠ line', async () => {
     const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 } })) }, 's');
     const trace = await FlowEngine.run(flow('tap: { id: go }'), fake, FAST, { flow: 'f' });

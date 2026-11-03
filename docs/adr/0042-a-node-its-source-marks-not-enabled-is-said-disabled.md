@@ -61,7 +61,10 @@ The tap is sent all the same. Reasons:
   harms nothing; the dishonesty was the bare "Tapped", and the ⚠ line removes it.
 
 A flow's `tap:` step (`flow/engine.ts#tapSpec`, the same `tapElement`, no extra read) logs the same words as a
-`⚠ tap` line, after the keyboard's and the moved tap's lines and before the `tap` line; the flow goes on. A tap by
+`⚠ tap` line, after the keyboard's and the moved tap's lines and before the `tap` line; the flow goes on. It fires on
+every tap that goes through there: an `optional:` step's tap on a present node, and each `type_pin` keypad digit's,
+whose own `tap` line is quiet. Quiet suppresses the tap line, not the warning, as it leaves the keyboard's `⚠ tap` line:
+a disabled keypad key is worth seeing. A tap by
 coordinates resolves no node and never warns. Only those two read the mark: `fill`, `scroll_until`, selectors,
 asserts, draw order and the tap's judgement (`tap-judgement.ts`: a disabled bar still covers) are unchanged. There is
 no `enabled:` selector field.

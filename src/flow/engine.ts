@@ -1605,6 +1605,9 @@ export class FlowEngine {
    * Likewise, D66: a tapped node the tree marks disabled gets a `⚠ tap` line
    * in the MCP reply's words (interact/tap.ts#DISABLED_TAP), after the
    * keyboard's and the moved tap's; the tap was sent and the flow goes on.
+   * On every tap through here — an optional step's and a type_pin keypad
+   * digit's too: `quiet` suppresses the tap line, not the warning, as it
+   * leaves the keyboard's `⚠ tap` line (a disabled keypad key is worth seeing).
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
     const { disabled } = await this.tracingDismissal('⚠ tap', describeElementSpec(spec), () =>
