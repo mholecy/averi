@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { type DeviceAdapter, PersistentReadError, type UiNode } from '../../src/adapters/types.js';
+import { IDB_SETTLE_CADENCE_MS } from '../../src/adapters/ios-tree-source.js';
+import { resolveSettled } from '../../src/interact/resolve.js';
 
 // No-yield sleep: the fake never reacts on a timer, so a sleep only moves the faked clock (sleep-recorder.ts's
 // setTimeout(0) per sleep costs ~30 s over this corpus, with identical results).
@@ -7,15 +11,10 @@ vi.mock('../../src/util/sleep.js', () => ({
     vi.setSystemTime(Date.now() + ms);
   },
 }));
-import { readFileSync } from 'node:fs';
-import { type DeviceAdapter, PersistentReadError, type UiNode } from '../../src/adapters/types.js';
-import { IDB_SETTLE_CADENCE_MS } from '../../src/adapters/ios-tree-source.js';
-import { resolveSettled } from '../../src/interact/resolve.js';
 
 /**
- * T5 (ADR 0040, amendment T5): batch-11 B2's d35-motion trace, replayed through the production settle —
- * resolveSettled → settleCadence → pollTree → pauseAfterRead, all unmodified — at the iOS idb adapter's fact
- * (IDB_SETTLE_CADENCE_MS, no pollMs).
+ * T5: batch-11 B2's d35-motion trace, replayed through the production settle — resolveSettled → settleCadence →
+ * pollTree → pauseAfterRead, all unmodified — at the iOS idb adapter's fact (IDB_SETTLE_CADENCE_MS, no pollMs).
  *
  * The fixture (tests/fixtures/d35-b11-settle.json) is trimmed from a device batch: 60 trials (20 each of
  * sheet-long-list M1a, scroll-bounded M1b, carousel-in-list M2), every idb read for 3 s after the trigger, its times
@@ -23,15 +22,14 @@ import { resolveSettled } from '../../src/interact/resolve.js';
  * One resolveSettled per (trial, id), over every id recorded.
  *
  * Virtual time: only Date is faked. A read asked for at trace time T is the first recorded read starting at or after
- * T; the clock then advances by that read's own length, so pollTree's readMs is the device's. The settle starts at the
- * first read after the trigger ended (d35's rule, the worst case). When the recorded window ends the fake throws a
- * PersistentReadError, which ends the settle at once: not settled in the window.
+ * T; the clock then advances by that read's own length, so pollTree's readMs is the device's. The served read can
+ * start up to one read (~30 ms) after the requested time and the cadence restarts from it, so replayed reads are
+ * ~300–330 ms apart: the pin is slightly optimistic. The settle starts at the trial's first read, which starts as the
+ * trigger ends (d35's rule, the worst case). When the recorded window ends the fake throws a PersistentReadError,
+ * which ends the settle at once: not settled in the window.
  *
- * The limit, stated: on this batch no cadence from 125 to 500 shows a wrong settle (100 shows one), so the corpus
- * cannot show 300 is necessary. A cut of the fact is caught only as a changed settle count (change detection, not
- * safety evidence); a raise to 400 keeps 160 settles and is not caught. Residuals: the probe kept lab.* ids and the
- * tracked labels only, last node winning on a duplicate key, and no roles — a duplicate match in the real tree is not
- * recorded; Date is whole ms where the probe's clock was fractional.
+ * Limit and residuals: ADR 0040's T5 amendment. In one line: no cadence from 125 to 500 settles wrong on this batch,
+ * so a cut of the fact is caught only as a changed settle count, and a raise to 400 is not caught.
  */
 
 interface Trial {
@@ -39,10 +37,13 @@ interface Trial {
   cell: string;
   trial: number;
   trigger: [number, number];
+  /** The app's own log saw the motion (kept from the probe; true in every trial). */
+  appMoved: boolean | null;
   reads: [number, number][];
   rects: Record<string, string>;
 }
 const FIXTURE = JSON.parse(readFileSync(new URL('../fixtures/d35-b11-settle.json', import.meta.url), 'utf8')) as {
+  windowMs: number;
   trials: Trial[];
 };
 
@@ -72,14 +73,22 @@ function classesOf(t: Trial): Record<string, number>[] {
 const settledWrong = (classes: Record<string, number>[], id: string, k: number): boolean =>
   classes.slice(k + 1).some((c) => c[id] !== undefined && c[id] !== classes[k][id]);
 
+/** A fixture id: a `lab.*` identifier, or `label:<text>` (sheet-long-list's rows, which idb lists without one). */
+const parseId = (id: string): { kind: 'identifier' | 'label'; text: string } =>
+  id.startsWith('label:') ? { kind: 'label', text: id.slice('label:'.length) } : { kind: 'identifier', text: id };
+
 /** The class as a rect: equal JSON iff the device's rects were equal, and every rect has area. */
 const leaf = (id: string, cls: number): UiNode => {
+  const { kind, text } = parseId(id);
   const rect = { x: cls, y: 0, width: 1, height: 1 };
-  return id.startsWith('label:')
-    ? { role: 'text', label: id.slice('label:'.length), identifier: null, value: null, rect, children: [] }
-    : { role: 'other', label: null, identifier: id, value: null, rect, children: [] };
+  return kind === 'label'
+    ? { role: 'text', label: text, identifier: null, value: null, rect, children: [] }
+    : { role: 'other', label: null, identifier: text, value: null, rect, children: [] };
 };
-const selectorOf = (id: string): string => (id.startsWith('label:') ? `text:"${id.slice('label:'.length)}"` : `id:${id}`);
+const selectorOf = (id: string): string => {
+  const { kind, text } = parseId(id);
+  return kind === 'label' ? `text:"${text}"` : `id:${text}`;
+};
 
 class WindowEnded extends PersistentReadError {}
 
@@ -122,10 +131,9 @@ async function replay(opts: { pollMs?: number }): Promise<Pass> {
       }),
     );
     const readOf = new Map(trees.map((tree, k) => [tree, k]));
-    const first = t.reads.findIndex(([start]) => start >= t.trigger[1] - 1);
     for (const id of Object.keys(t.rects).sort()) {
       vi.useFakeTimers({ toFake: ['Date'] });
-      vi.setSystemTime(t.reads[first][0]);
+      vi.setSystemTime(t.reads[0][0]);
       try {
         const settled = await resolveSettled(tracedAdapter(t, trees), selectorOf(id), {
           ambiguous: 'refuse',
@@ -146,15 +154,16 @@ async function replay(opts: { pollMs?: number }): Promise<Pass> {
 }
 
 describe('T5: batch-11 B2 settle corpus through production resolveSettled (ADR 0040)', () => {
-  it('the fixture is the batch: 60 trials, 20 per motion, 8569 reads', () => {
+  it('the fixture is the batch: 60 trials, 20 per motion, 8569 reads, each first read as the trigger ends', () => {
     const per = { M1a: 0, M1b: 0, M2: 0 };
     for (const t of FIXTURE.trials) per[t.motion]++;
     expect(per).toEqual({ M1a: 20, M1b: 20, M2: 20 });
     expect(FIXTURE.trials.reduce((n, t) => n + t.reads.length, 0)).toBe(8569);
+    expect(FIXTURE.trials.filter((t) => t.reads[0][0] < t.trigger[1]).map((t) => `${t.motion}#${t.trial}`)).toEqual([]);
   });
 
-  // M1a's rows (sheet-long-list's fling) never hold still for two reads 300 ms apart inside the 3 s window, as in
-  // d35's own replay; they do resolve (at 100, below, they settle).
+  // M1a's sheet fling decelerates through nearly the whole window, its rows at rest only in the last ~0.3 s: at 300
+  // it pins only that the fling is never taken as settled (at 100, below, its rows settle 245 times, none wrong).
   it('at the idb fact (300, no pollMs): 0 wrong settles in 160 (M1a 0, M1b 100, M2 60)', async () => {
     const pass = await replay({});
     expect(pass).toEqual({ settles: { M1a: 0, M1b: 100, M2: 60 }, wrong: [] });
@@ -162,7 +171,6 @@ describe('T5: batch-11 B2 settle corpus through production resolveSettled (ADR 0
 
   it('sensitivity — at pollMs 100 the carousel settles wrong once, in its late deceleration (M2#14, C)', async () => {
     const pass = await replay({ pollMs: 100 });
-    expect(pass.wrong).toEqual(['M2#14 lab.carousel-in-list.C @20']);
-    expect(pass.settles.M1a, "sheet-long-list's label rows resolve and settle").toBeGreaterThan(0);
+    expect(pass).toEqual({ settles: { M1a: 245, M1b: 100, M2: 60 }, wrong: ['M2#14 lab.carousel-in-list.C @20'] });
   });
 });
