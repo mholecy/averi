@@ -162,9 +162,17 @@ internal fun formOf(o: JSONObject): FormSpec {
 
 private fun isGap(c: Char) = c == ' ' || c == '\u00A0' || c == '\u202F'
 
+/** group4eager's longest text, its spaces aside (an IBAN's 24 characters). */
+private const val EAGER_MAX = 24
+
 /**
  * `group4`: whitespace dropped, groups of four joined by a space; `thousands`: the whole part grouped in threes by a
- * no-break space; `date` a dotted date (schema.ts#FieldFormat).
+ * no-break space; `date` a dotted date; `group4eager` (L7) `group4` on the first 24 characters, a space after a
+ * complete group while under 24; `phone3` (L7) a leading `+` kept, the digits alone in threes (schema.ts#FieldFormat).
+ * The table tests/truth/lab-format.test.ts pins on the React Native app's src/format.ts, which this spells too:
+ * group4eager `SK31` → `SK31 `, `SK3112000000` → `SK31 1200 0000 `, `SK3112000000123` → `SK31 1200 0000 123`, 24
+ * characters → six groups and no space; phone3 `421903123456` → `421 903 123 456`, `+421903123456` and
+ * `+421 903 123 456` → `+421 903 123 456`, `+4219` → `+421 9`.
  */
 internal fun formatted(format: String?, text: String): String = when (format) {
     "group4" -> text.filterNot(::isGap).chunked(4).joinToString(" ")
@@ -176,6 +184,15 @@ internal fun formatted(format: String?, text: String): String = when (format) {
     "date" -> {
         val digits = text.filter { it in '0'..'9' }.take(8)
         listOf(digits.take(2), digits.drop(2).take(2), digits.drop(4)).filter { it.isNotEmpty() }.joinToString(".")
+    }
+    "group4eager" -> {
+        val kept = text.filterNot(::isGap).take(EAGER_MAX)
+        val eager = kept.isNotEmpty() && kept.length % 4 == 0 && kept.length < EAGER_MAX
+        kept.chunked(4).joinToString(" ") + (if (eager) " " else "")
+    }
+    "phone3" -> {
+        val plus = text.dropWhile(::isGap).startsWith('+')
+        (if (plus) "+" else "") + text.filter { it in '0'..'9' }.chunked(3).joinToString(" ")
     }
     else -> text
 }
