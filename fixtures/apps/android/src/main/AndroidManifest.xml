@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md): one cell of fixtures/apps/cells.json per
      launch, chosen by the string intent extra `cell` (scripts/truth/capture-android.ts starts it with `am start`) or
-     the deep link averilab://cell/<id>. averilab://shared/… (L7, D55) resolves to two components and opens no cell.
+     the deep link averilab://cell/<id>. averilab://shared/… (L7, D55) and averilab://pair/… (D55c) each resolve to two
+     components and open no cell.
      No login, no network, no data. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
@@ -32,8 +33,18 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="averilab" android:host="shared" />
             </intent-filter>
+            <!-- D55c: averilab://pair/… has the same two handlers, for a fresh chooser: "Just once" on `shared`'s left a
+                 last-chosen entry the lab AVD keeps (the lab plan's device fact 5), so its chooser is no longer the
+                 fresh layout. The app opens no cell for it. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="averilab" android:host="pair" />
+            </intent-filter>
         </activity>
-        <!-- The second handler of averilab://shared/… (D55): another component, the same activity. -->
+        <!-- The second handler of averilab://shared/… (D55) and averilab://pair/… (D55c): another component, the same
+             activity. -->
         <activity-alias
             android:name=".Twin"
             android:label="AveriLab twin"
@@ -44,6 +55,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="averilab" android:host="shared" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="averilab" android:host="pair" />
             </intent-filter>
         </activity-alias>
     </application>
