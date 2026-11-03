@@ -1,0 +1,3 @@
+  Display: mDisplayId=0 (organized)
+  mCurrentFocus=Window{db9d8fb u0 android/com.android.internal.app.ResolverActivity}
+  mFocusedApp=ActivityRecord{7512801 u0 android/com.android.internal.app.ResolverActivity} t2851}
