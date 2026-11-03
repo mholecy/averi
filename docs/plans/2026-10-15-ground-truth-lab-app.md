@@ -526,24 +526,41 @@ vertical page (D59b). carousel-recycler-free's false "fully visible" (D62) did n
 taken at rest.
 Records: docs/truth/live-records/{android,ios-idb,ios-wda}-forms-d61-1.json, -2.json and -whole.json.
 
-### Device facts (batches 1–10)
+Read on the device (batch-11, 2026-11-03, main a5fefd32, the iOS simulator 27.0 and averi_lab API 33; the outcomes are
+in the performance backlog's rows). D43's live cases, two runs on each source: wda p7w, b1d and b7 ok 2/2, idb and
+uiautomator p7 ok 2/2 (refused before any tap, the prefill kept). kf1–kf3 SKIPPED again, this time with Gboard floated
+by hand: the panel lay at 87,1243 937×792, a position the judge's fixed `LAB_FLOATING_PANELS` lacks, so its SKIP said
+"not floating" wrongly; at that position the submit lay under the panel, so kf1/kf2's premise did not hold either
+(D67). D55: averi's own focus read named the chooser 30/30 through `mFocusedApp`; on the fresh chooser one row tap only
+selects, and "Just once" started `.Twin`, leaving a last-chosen entry the lab AVD keeps (fact 5 below); `launch_app`'s
+`-p` start replied "Launched" with the chooser up 10/10 (D55b). The free carousels from a fresh launch (D59b): averi
+stroked the page centre, 496 px below the carousel band, 6/6, while a stroke inside the band moved it 4/4. D62's
+pre-call fling never met a probe swipe (0/12 triggered). B2 re-sampled the idb settle (D35, T5's corpus).
+
+### Device facts (batches 1–11)
 
 Measured on the lab devices (the iOS 27.0 simulator, averi_lab API 33) and written nowhere else before; the batch's raw
 evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is named; it is not edited from here.
 
 1. A WebDriverAgent runner exit changes simulator-wide `com.apple.Accessibility`: `AccessibilityEnabled` true → false,
    `ApplicationAccessibilityEnabled` and `AutomationEnabled` true → 0, their type bool → int. Creating a session and
-   `/wda/keys` change none of them (batch-10, D43's G4 and its restore). ADR 0037's D43 amendment, residual 5.
+   `/wda/keys` change none of them (batch-10, D43's G4 and its restore; the exit's flip seen again in batch-11). ADR
+   0037's D43 amendment, residual 5.
 2. The host's `ConnectHardwareKeyboard` was never read in D43's gate (batch-10, G4). ADR 0037's D43 amendment, residual 6.
 3. `cmd package resolve-activity --brief` prints `priority=0 preferredOrder=0 match=0x0 specificIndex=-1
    isDefault=false` and `android/com.android.internal.app.ResolverActivity` for a link with two handlers and no
    default, `… match=0x308000 … isDefault=true` and `dev.averi.lab/.MainActivity` for one handler, in 21–28 ms
-   (batch-10, D55's E3). ADR 0041's fallback.
+   (batch-10, D55's E3; 32–62 ms, median 50, interleaved with focus reads in batch-11). ADR 0041's fallback, not
+   needed (fact 12).
 4. On API 33 `dumpsys package preferred-activities` names no section and prints the whole package dump (the sections are
    `preferred` / `pref` and `preferred-xml`); `cmd role get-role-holders` answers "Unknown command" (`dumpsys role`
    reads the holder); `cmd clipboard help` answers "No shell command implementation." (batch-9, D55 and D43).
-5. AOSP's "Just once" records a last-chosen entry (`mAlways=false`), not a default — from AOSP's source, not measured:
-   E2's tap never ran (batch-10, D55). Every preferred entry the lab AVD holds is `mAlways=true`, none the lab's.
+5. "Just once" on the chooser records a last-chosen entry, not a default, under `Preferred Activities User 0:` →
+   `Schemes:` → `averilab:`: `dev.averi.lab/.Twin mMatch=0x300000 mAlways=false`, filter VIEW / DEFAULT / averilab /
+   `shared`, with no "Selected from:" set (batch-11, D55's E2). On API 33 it survives `adb uninstall` + `install` (the
+   same entry hash before and after): AOSP 13's `clearPackagePreferredActivities` removes only `mAlways=true` entries.
+   Resolution skips it (`resolve-activity` still names ResolverActivity); the chooser reads it to promote that target.
+   The lab AVD keeps it, accepted; every other preferred entry it holds is `mAlways=true`, none the lab's.
 6. `defaults read com.apple.launchservices.schemeapproval <key>` of an absent key exits 1 with "Could not find key … in
    domain …" — absent, not unreadable (batch-8's voided first run).
 7. The emulator guest's `/proc/uptime` (24.8 h) and the host emulator process's elapsed time (15.2 h) differ; the
@@ -557,6 +574,24 @@ evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is na
 11. On averi_lab a 48 px stroke moves a RecyclerView carousel about 25–27 px, so `fully: true` on a card exactly the
     clip's width converges below the stroke floor and ends `maxSwipes` 15–28 px short, 13/13 (batch-10, D62's
     measurement). ADR 0021's D52 amendment's territory.
+12. On API 33, at averi's focus read right after `am start` returns (0 ms) with the chooser coming, `mCurrentFocus` is
+    `null` (25/30) or still the previous window (5/30), never the chooser, while `mFocusedApp` already names
+    ResolverActivity (30/30); the same after `launch_app`'s `-p` start (10/10: the window `null` 7, stale 3) (batch-11,
+    D55's E1, D55b). ADR 0041's D55r amendment.
+13. For the activity-alias `.Twin` (target `.MainActivity`), the window and the ActivityRecord name the alias
+    (`dev.averi.lab/dev.averi.lab.Twin`, `ActivityRecord{… dev.averi.lab/.Twin}`); `dumpsys activity activities` grep'd
+    for `ResumedActivity|intent=\{|Hist #` prints only the `topResumedActivity`/`ResumedActivity` lines. On the fresh
+    chooser one row tap only selects: the chooser stays, both buttons become enabled, no node marks the row; "Just once"
+    then starts the chosen component in a new task (batch-11, D55's E2).
+14. With the chooser up, `monkey -p dev.averi.lab -c android.intent.category.LAUNCHER 1` exits 251: stdout holds only its
+    `bash arg:` echo, stderr echoes the args and ends `** SYS_KEYS has no physical keys but with factor 2.0%.` (batch-11,
+    D55b, 3/3).
+15. averi's first uiautomator dump in a `scroll_until` takes about 2.2–2.5 s, and each later round about 2.2 s (6 reads
+    13.2–13.9 s); on carousel-recycler-free a 440-px fling in 100 ms settles about 0.8 s after it ends, so it is over
+    before averi's first stroke (batch-11, D62).
+16. Gboard's floating panel, dragged by hand, lay at 87,1243 937×792 (the strip 132 px tall at 0,2088): a third
+    position, the same size as 2026-10-16's 71,1092. At that position form-keyboard-floating's submit (55,1928
+    970×132) lies 107 px under the panel (bottom 2035), only 53 px of gap above the strip (batch-11, kf; D67).
 
 ## Workflow per bug, once phase 3 is in
 

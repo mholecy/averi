@@ -6,6 +6,7 @@ reply is byte-identical, D54's iOS alert text included. The `DeviceAdapter` cont
 `DeepLinkOutcome.chooser`.
 Amended 2026-11-03 (D55r: `mFocusedApp` is read in API 33's shape, `<component>} t<task>}`, which the first regex
 never matched; implemented on `fix/d55r-focused-app-api33`).
+Amended 2026-11-03 (batch-11: D55 device-verified with D55r's fix — the last paragraph of the D55r amendment).
 
 ## Context
 
@@ -135,6 +136,7 @@ whose chooser is already the focused activity but not yet the focused window is 
 is that averi's own read is such a read often enough to turn the 25 false `Opened` into chooser replies; the next E1
 checks it. A one-handler link whose app is the focused activity under a `null` window stays `Opened`, as the
 control did.
+See the batch-11 paragraph below.
 
 **Mutation-checked**: hand mutants on the two regexes, each killed but one. On `FOCUSED_APP_RE`'s terminator: a
 space only (the old regex; 12 tests fail), a brace only (8: the API 36 shape), `[\s}]` (1: the record cut right
@@ -156,3 +158,13 @@ Residuals, stated:
   add a prediction (`cmd package resolve-activity`) or a bounded poll.
 - Out of scope, unchanged: D55b (`launch_app` with `intent:` and no `activity`) and D55c (the chooser's labels from the
   ui tree).
+
+**Device-verified** (batch-11, 2026-11-03, main a5fefd32, averi_lab API 33; E1 with averi's own read recorded, its raw
+output and time): PASS. averi named the chooser in 30 of 30 shared runs (20 from the launcher, 10 with the lab in
+front), and the one-handler control replied `Opened` 10 of 10; every reply matched main's `chooserInFocus` of averi's
+own read. That read began 0 ms after `am start` returned. In it `mCurrentFocus` was `null` in 25 of the 30 shared reads
+and still the previous window in 5, never the chooser, while `mFocusedApp` named ResolverActivity in 30 of 30: the
+activity line D55r reads is what names the chooser at the start's return. The first two residuals above are answered:
+the one read suffices, and no `resolve-activity` prediction or bounded poll is needed. Latency: shared median 127 ms
+(72–183), control 159 ms (132–202). E3, a fact only: `cmd package resolve-activity --brief` predicted 40 of 40, median
+50 ms (32–57), interleaved with E1's calls.

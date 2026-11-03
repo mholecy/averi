@@ -7,6 +7,7 @@ behaviour: a non-ASCII value is refused before the tap. It used to fail on the d
 Amended 2026-11-02 (D43a device run: the refusal holds on iOS idb, iOS wda and Android — see the amendment below).
 Amended 2026-11-03 (D43: a project with the WDA tree source types what idb cannot through WebDriverAgent's `/wda/keys`;
 every refusal names the remedy true for its adapter — see the D43 amendment below).
+Amended 2026-11-03 (batch-11: D43 proven live — the last paragraph of the D43 amendment).
 
 ## Context
 
@@ -240,6 +241,7 @@ Changed 0 against main. Live (not yet run on a device): b1d and b7 under `ios wd
 scripts/truth/live-known.ts, ok expected; every WDA forms record committed before D43 reads them as a LOUD no entry
 holds (tests/truth/live-rejudge.test.ts, `PRE_D43_WDA_LOUD`). p7 runs under idb and uiautomator only. A new p7w, the
 same no-clear fill of `Š` into form-prefilled's name under WDA, must hold the prefill with `Š` appended (`holds`).
+See the batch-11 paragraph below.
 
 **Residuals, stated:**
 1. Measured on iOS 27.0 only, on the iPhone 17 simulator with WDA 16.1.7: the native SwiftUI form-basic name field and
@@ -277,3 +279,10 @@ tests/adapters/wda-tree-source.test.ts (the delegation, the released error), tes
 adapter's remedy), tests/interact/fill.test.ts, tests/mcp/tools.test.ts and tests/flow/engine.test.ts (typed over
 WDA's set, refused over idb's), tests/mcp/tool-descriptions.test.ts, and tests/truth/live-forms.test.ts and
 live-rejudge.test.ts (b1d, b7, p7, p7w).
+
+**Proven live** (batch-11, 2026-11-03, main a5fefd32, the lab simulator iOS 27.0 and averi_lab API 33; `live.ts --groups
+forms` with the D43 cases, two runs on each of wda, idb and uiautomator): p7w, b1d and b7 ok 2/2 under `ios wda` —
+`Filled …` (11, 19 and 1 character[s]), `/wda/keys` landing `Š`, the diacritics and the typographic text; p7 ok 2/2
+under idb and under uiautomator — refused before anything was sent, the prefill kept, the reply naming U+0160 and the
+adapter. The WDA window's settings were restored key by key — the runner exit flipped com.apple.Accessibility's three
+keys again (residual 5) — and still equalled their backups at the end. Residual 8 (Android) stands.
