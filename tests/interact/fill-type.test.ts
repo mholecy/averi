@@ -14,11 +14,11 @@ vi.mock('../../src/util/sleep.js', () => ({ sleep: async () => undefined }));
 /**
  * A scripted field: `typeText` lands what `keep` lets through of each typing (in order), a read returns the field's
  * text, and the screen is the field and one other input whose value the script may change while typing. `unnamed`: the
- * placeholder an empty field reads as its value, not named as one (idb, D29).
+ * placeholder an empty field reads as its value, not named as one (idb, D29). `prefilled`: what the field holds before.
  */
-function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string | null; grows?: boolean; moves?: boolean; otherHeld?: string; format?: (text: string) => string; unnamed?: string } = {}) {
+function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string | null; grows?: boolean; moves?: boolean; otherHeld?: string; format?: (text: string) => string; unnamed?: string; prefilled?: string } = {}) {
   const keeps = [...(opts.keep ?? [])];
-  const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: null });
+  const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: opts.prefilled ?? null });
   const other = node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: opts.otherHeld ?? null });
   const tree = node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field, other] });
   const typed: string[] = [];
@@ -385,5 +385,62 @@ describe('retypesTail — ADR 0023\'s retype condition, asked by the typing and 
   it('only an adapter whose typing has arrived when its call returns types a dropped tail again', () => {
     expect(retypesTail('on-return')).toBe(true);
     expect(retypesTail('may-arrive-late')).toBe(false);
+  });
+});
+
+/**
+ * D63: a reading still exactly what the field showed when typing began has not landed, however much of the value that
+ * earlier text holds (fill-landing.ts#landingOf) — so the poll goes on reading, and a typing that never reached the
+ * field ends on `unchanged` instead of passing at the first read.
+ */
+describe('typeAndConfirm — a reading unchanged since typing began is no landing (D63)', () => {
+  /** A field holding `before` whose typing appears in it from read `arrives` on (1: the first), or never. */
+  function arriving(before: string, value: string, arrives: number | 'never') {
+    let reads = 0;
+    const typed: string[] = [];
+    const wipes: number[] = [];
+    const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: before });
+    const io: FieldIo = {
+      type: async (text) => {
+        typed.push(text);
+      },
+      wipe: async (count) => {
+        wipes.push(count);
+      },
+      read: async () => {
+        reads++;
+        return arrives !== 'never' && reads >= arrives ? before + value : before;
+      },
+      screen: () => undefined,
+      reportDroppedTail: () => {},
+    };
+    const intent: TypingIntent = { value, clear: false, isInput: true, resolvedValue: null, before, placeholder: undefined, held: 0, pollMs: 1, field, delivery: 'may-arrive-late' };
+    return { io, intent, typed, wipes, reads: () => reads };
+  }
+
+  it('keys that arrive on the second read land there, not on the first, unchanged reading', async () => {
+    const late = arriving('Hello world', 'world', 2);
+    expect(await typeAndConfirm(late.io, late.intent)).toEqual({ kind: 'landed', observed: 'Hello worldworld', again: [] });
+    expect(late.reads()).toBe(2);
+  });
+
+  it('keys that never arrive: the whole poll, then missed as unchanged — nothing wiped or sent again', async () => {
+    const lost = arriving('Hello world', 'world', 'never');
+    expect(await typeAndConfirm(lost.io, lost.intent)).toEqual({ kind: 'missed', observed: 'Hello world', again: [], differs: { kind: 'unchanged' } });
+    expect(lost.typed).toEqual(['world']);
+    expect(lost.wipes).toEqual([]);
+    expect(lost.reads()).toBe(5);
+  });
+
+  it('keys that went into another input: missed as unchanged, and the other input is named', async () => {
+    const { io, intent, typed } = scripted({ prefilled: 'Hello world', keep: [0], elsewhere: (t) => t });
+    expect(await typeAndConfirm(io, { ...intent, value: 'world', before: 'Hello world' })).toEqual({
+      kind: 'missed',
+      observed: 'Hello world',
+      again: [],
+      differs: { kind: 'unchanged' },
+      elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } },
+    });
+    expect(typed).toEqual(['world']);
   });
 });

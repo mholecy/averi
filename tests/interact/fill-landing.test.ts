@@ -377,6 +377,49 @@ describe('a mask template is no earlier text (D51)', () => {
 });
 
 /**
+ * D63: without clear, the exact rule asked only that the reading CONTAIN the value, so a reading still exactly what the
+ * field showed when typing began passed whenever that earlier text held the value — a field that refused the keys (the
+ * lab's date at its 8-digit cap: `31.12.2026` typed `2026`), keys that went into another input, idb's unnamed
+ * placeholder holding the value (`+421` typed `421`). Such a reading has not landed — unless it is the value itself —
+ * and the poll ends on `differenceOf`'s `unchanged`.
+ */
+describe('a reading unchanged since typing began has not landed (D63)', () => {
+  const e = (value: string, before: string | null, clear = false) => ({ value, clear, before, placeholder: undefined });
+
+  it.each([
+    ['Hello world', 'world', 'an earlier text that holds the value'],
+    ['+421', '421', "idb's unnamed placeholder (D61 left this guard to D63)"],
+    ['SK00 0000 0000 …', '0000', "idb's unnamed iban placeholder"],
+    ['Jan Šťastný', 'Jan', 'a form-prefilled name'],
+    ['31.12.2026', '2026', 'the date field at its 8-digit cap'],
+  ])('landingOf: `%s` typed `%s` (%s), nothing landed: none, and the difference is unchanged', (shown, value) => {
+    expect(landingOf(shown, expecting(e(value, shown)))).toBeUndefined();
+    expect(differenceOf(shown, expecting(e(value, shown)))).toEqual({ kind: 'unchanged' });
+  });
+
+  // residual: a reading that is both the earlier text and the value cannot be told from a select-all field that retyped
+  // it, or a placeholder equal to the value — it lands as before
+  it('landingOf: the reading is the value itself — landed, and a named placeholder equal to it stays `placeholder`', () => {
+    expect(landingOf('421', expecting(e('421', '421')))).toEqual({ kind: 'landed' });
+    expect(landingOf('Search', expecting({ value: 'Search', before: 'Search', placeholder: 'Search' }))).toEqual({ kind: 'placeholder' });
+  });
+
+  it('landingOf: a reading that moved still lands by containment', () => {
+    expect(landingOf('Hello worldworld', expecting(e('world', 'Hello world')))).toEqual({ kind: 'landed' });
+    expect(landingOf('Hello world', expecting(e('world', 'Hello')))).toEqual({ kind: 'landed' });
+  });
+
+  it('landingOf: with clear the rule is the value alone, unchanged by D63', () => {
+    expect(landingOf('1 234', expecting(e('1234', '1 234', true)))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
+  });
+
+  it('landingOf: a masked reading unchanged since typing began is judged by its length, as before', () => {
+    expect(landingOf('•••••', expecting({ value: '•••', before: '•••••', held: 5 }))).toBeUndefined();
+    expect(differenceOf('•••••', expecting({ value: '•••', before: '•••••', held: 5 }))).toEqual({ kind: 'unchanged' });
+  });
+});
+
+/**
  * The mismatch's classification, as `Difference` codes — the wording is
  * fill-text.test.ts's, and fill.test.ts pins a few end to end. One row per
  * rule of differenceOf, in its order, each row naming the shape it stands
