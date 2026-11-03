@@ -541,7 +541,8 @@ placeholder from a filled one: the type, label, traits and role are the same, on
 - `landedReformat`, `tailOf` and `differenceOf`'s `separated` rule get it through `overPriors`, as they get D29's
   fallback. g3's `421 903 123 456` after `+421` lands `reformatted`, 3 added; g4's reading without clear
   (`+421 903 123 456` for `+421903123456` after `+421`) lands too; `421 903-123-456` after `+421` now reads D53's
-  `separated` (3 added), which names a remedy, instead of `length`.
+  `separated` (3 added), which names a remedy, instead of `length`; so does a full reading with an eager trailing
+  mark (`421 903 123 456 ` after `+421`: `separated`, 4 added) — the wording only, never a pass.
 - **D29's pinned `1234 5678` after `1` flips, on purpose**, from refused to landing (`reformatted`, 1 added). The exact
   rule already passes the same shape ungrouped — `12345678` after `1`, typed `12345678`, lands by `includes` — so D29's
   guard was stricter on a grouped reading than the exact rule is on a plain one.
@@ -559,10 +560,13 @@ placeholder from a filled one: the type, label, traits and role are the same, on
   when the field holds the value grouped, as wda and uiautomator do, on the first read-back instead of after the whole
   poll and an agent's retry.
 - The pass it adds is one shape: an earlier text of real content whose letters and digits start the value's, a field
-  that dropped exactly the HEAD of the typing, as many characters as the earlier text has and equal to it, and the
-  rest landed grouped. No head drop has been measured (ADR 0023's drops are tails, and D24 sends the first key alone so
-  that the head lands), and the exact rule already accepts the same shape ungrouped. A select-all field, which replaces
-  the earlier text on focus, really holds the value, as D29 already accepts.
+  that dropped keys whose remainder equals the value's tail — the head, or with repeated characters an equal run
+  anywhere, as many characters as the earlier text has — and the rest landed grouped. With `1` held and `1100` typed
+  without clear, a lost second key leaves `1` + `100`, shown `1,100`: Filled, with the ⚠ point line, where main read
+  `same-length`; so does `1,000` after `1`, typed `1000`. The exact rule already accepts the same readings ungrouped
+  (`1100` after `1` contains the typed `1100`). No head drop has been measured (ADR 0023's drops are tails, and D24
+  sends the first key alone so that the head lands). A select-all field, which replaces the earlier text on focus,
+  really holds the value, as D29 already accepts.
 - Out of scope: a fill without clear whose reading is unchanged from `before` but already contains the value
   (`Hello world` typed `world`, `+421` typed `421`) passes by the exact rule's `includes` — not this rule; a backlog row
   of its own (D63).
