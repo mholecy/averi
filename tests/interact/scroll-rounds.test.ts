@@ -1212,13 +1212,36 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     );
   });
 
-  it('the lab tree as batch-11 read it: every stroke now goes inside the carousel (of unknown axis), none across the page — where batch-11\'s went, its reply the generic one', () => {
+  it('the lab tree as batch-11 read it: every stroke now goes inside the carousel (of unknown axis), none across the page — and with a carousel that lists no content (the derived tree, no card), no stroke is proven unmoved: the stop is maxSwipes, saying its motion was not shown (review round 1)', () => {
     const tree = parseDump(LAZY);
     const played = play(RIGHT, [{ tree }, { tree }, { tree }, { tree }, { tree }]);
-    expect(strokes(played).length).toBeGreaterThan(0);
+    expect(played.steps.map((st) => st.do)).toEqual(['stroke', 'stroke', 'stroke', 'stroke', 'stop']);
     for (const st of strokes(played)) expect(st.box).toEqual(CAROUSEL);
-    for (const r of B11.records.filter((x) => x.leg === 'averi')) expect(r.reply).toContain('swiping right, did not change the screen: content exhausted, still loading, or the swipes were not taken)');
-    expect(failureOf(played, 'id:lab.carousel-lazy-free.C').message).not.toContain('went across');
+    // batch-11's, over the page: exhausted after 2, the generic causes.
+    for (const r of B11.records.filter((x) => x.leg === 'averi')) expect(r.reply).toContain('failed after 2 swipes (the last 2, swiping right, did not change the screen: content exhausted, still loading, or the swipes were not taken)');
+    expect(failureOf(played, 'id:lab.carousel-lazy-free.C').message).toBe(
+      'scroll_until id:lab.carousel-lazy-free.C failed after 4 swipes (maxSwipes) — element never appeared in the tree (the tree lists only the active window: if a sheet or a dialog is open over the screen, close it first); after the last 4 swipes over the scroll container 66,380 948x234 the tree listed none of its content where a swipe\'s motion would show (blank space, content with no node, or a node cut at both of the container\'s edges), so how far they moved it is unknown — the element may lie further right: raise maxSwipes or timeoutMs',
+    );
+  });
+
+  it('a scroll view told along the stroke beside the page (review round 1\'s probe: a chips row, a sibling of the page, never a candidate): named, with the way into it — not "the tree shows none"', () => {
+    const row = node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 1100 } });
+    const chips = node({ role: 'scrollable', identifier: 'feed.chips', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2000, width: 1080, height: 150 } });
+    const tree = node({ role: 'container', rect: { ...PAGE }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE }, children: [row] }), chips] });
+    const played = play(RIGHT, [{ tree }, { tree }, { tree }]);
+    expect(strokes(played).map((st) => st.box)).toEqual([PAGE, PAGE]);
+    expect(failureOf(played, 'id:t').message).toBe(
+      'scroll_until id:t failed after 2 swipes (the last 2, swiping right, did not change the screen: each went across the scroll view it was drawn over, 0,0 1080x2220, which scrolls vertically, and the tree shows scrollable id:feed.chips (0,2000 1080x150), which scrolls horizontally and the swipes did not go over — swipe inside it (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading) — element never appeared in the tree',
+    );
+  });
+
+  it('…one nested along the stroke that had no room for a swipe (residual c): named with that', () => {
+    const row = node({ role: 'other', rect: { x: 0, y: 0, width: 1080, height: 1100 } });
+    const strip = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 1200, width: 60, height: 200 } });
+    const tree = node({ role: 'container', rect: { ...PAGE }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE }, children: [row, strip] })] });
+    expect(failureOf(play(RIGHT, [{ tree }, { tree }, { tree }]), 'id:t').message).toContain(
+      'which scrolls vertically, and the tree shows scrollable (0,1200 60x200), which scrolls horizontally but had no room for a swipe — swipe inside it (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading)',
+    );
   });
 
   it('a stroke along the page (`down`) over the same tree: no across clause — the exhausted words as before', () => {

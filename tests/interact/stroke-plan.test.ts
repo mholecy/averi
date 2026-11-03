@@ -422,6 +422,13 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(planOn(tree, 'right').stroke).toMatchObject({ box: PAGE, points: swipeVector(PAGE, 'right', 'content') });
   });
 
+  it('a nested one TOLD along the stroke outranks a larger one of unknown axis (review round 1): a chips row (a HorizontalScrollView) above a feed (a RecyclerView) — the chips row', () => {
+    const chips: Rect = { x: 0, y: 200, width: 1080, height: 150 };
+    const feed: Rect = { x: 0, y: 400, width: 1080, height: 1800 };
+    const tree = page(node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { ...chips } }), node({ role: 'scrollable', clipsDescendants: true, rect: { ...feed } }));
+    expect(planOn(tree, 'right').stroke.box).toEqual(chips);
+  });
+
   it('two nested of unknown axis: the larger first; one off the gesture box is passed for the next', () => {
     const small: Rect = { x: 66, y: 1200, width: 948, height: 150 };
     expect(planOn(page(unknown(small), unknown(CAROUSEL)), 'right').stroke.box).toEqual(CAROUSEL);
@@ -465,6 +472,21 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     expect(strokedAcross(strokeSent(planOn(lazy, 'right').memory), factsOf(lazy), 'right')).toBeUndefined();
     const none = screenOf([]);
     expect(strokedAcross(strokeSent(planOn(none, 'right').memory), factsOf(none), 'right')).toBeUndefined();
+  });
+
+  it('strokedAcross asks the WHOLE tree for a scroll view told along the stroke (review round 1): a chips row beside the page, never a candidate, is named — the swipes did not go over it', () => {
+    const chips = node({ role: 'scrollable', identifier: 'feed.chips', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2000, width: 1080, height: 150 } });
+    const small = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2160, width: 500, height: 60 } });
+    const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE } }), small, chips]);
+    const sent = strokeSent(planOn(tree, 'right').memory);
+    expect(strokedAcross(sent, factsOf(tree), 'right')).toEqual({ rect: PAGE, axis: 'vertical', along: { view: { role: 'scrollable', label: null, identifier: 'feed.chips', rect: chips.rect } } });
+  });
+
+  it('…and one that WAS a candidate along the stroke but had no room (a 60-px-wide strip nested in the page) is named with that', () => {
+    const strip = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 900, width: 60, height: 200 } });
+    const tree = page(strip);
+    const sent = strokeSent(planOn(tree, 'right').memory);
+    expect(strokedAcross(sent, factsOf(tree), 'right')).toEqual({ rect: PAGE, axis: 'vertical', along: { view: { role: 'scrollable', label: null, identifier: null, rect: strip.rect }, noRoom: true } });
   });
 });
 

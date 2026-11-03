@@ -314,7 +314,7 @@ export interface StrokePlan {
  */
 export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, gesture, read, still, screenBox, kind }: StrokeAsk): StrokePlan {
   const m = open(memory);
-  const candidates = candidatesOf(m, read?.facts);
+  const candidates = candidatesOf(m, read?.facts, toward);
   const kept = m.line?.y;
   // On a tree that tells no scroll view, only a stroke carrying content back over where it was seen moving goes over
   // that region; one moving it the way it was first seen moving keeps the screen box (`screenBox`).
@@ -437,16 +437,24 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
   return { at: { ...drawn.from }, on: quoted(on), container };
 }
 
-/** The scroll view a sent stroke went across (`strokedAcross`): its rect and the axis its tree tells. */
+/**
+ * The scroll view a sent stroke went across (`strokedAcross`): its rect and the axis its tree tells; and `along`, the
+ * largest scroll view anywhere in the tree told to scroll the stroke's way, when there is one — `noRoom` when it was
+ * among the candidates the plan judged (so the stroke box had no room in it: under MIN_STROKE_BOX, off the gesture box,
+ * or cut to nothing), else the strokes were never for it (a sibling of the page, a target's stranger).
+ */
 export interface StrokedAcross {
   readonly rect: Rect;
   readonly axis: ScrollAxis;
+  readonly along?: { readonly view: QuotedNode; readonly noRoom?: true };
 }
 
 /**
  * The scroll view the last stroke SENT went over (`within`) when THIS read's tree tells its axis and it is the other
  * one than `toward`'s — the stroke went across it, which `strokeRoom` does only when no candidate along the stroke (or
- * of unknown axis) had room: so no scroll view the tree shows may scroll that way. For the exhausted stop's sentence
+ * of unknown axis) had room — with the largest scroll view of the WHOLE tree told to scroll that way, when there is
+ * one (ui-tree/geometry.ts#Clips.toldOn; review round 1: a chips row beside the page is no candidate, and "the tree
+ * shows none" would be false of it). For the exhausted stop's sentence
  * (scroll-text.ts#boundText): what the strokes did is said, not only "content exhausted" — batch-11's carousel the
  * dump marked as nothing that scrolls would read so. Undefined when the stroke went over the gesture box whole, over a
  * scroll view of unknown axis or along it, or when this tree holds no scroll view of that rect (idb's region is none).
@@ -455,8 +463,13 @@ export interface StrokedAcross {
 export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, toward: Direction): StrokedAcross | undefined {
   const { within } = open(memory);
   if (within === undefined) return undefined;
-  const axis = facts.scene.clips.axesOf(within)?.axis;
-  return axis !== undefined && axis !== axisOf(toward) ? { rect: within, axis } : undefined;
+  const { clips } = facts.scene;
+  const axis = clips.axesOf(within)?.axis;
+  if (axis === undefined || axis === axisOf(toward)) return undefined;
+  const [view] = [...clips.toldOn(axisOf(toward))].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
+  if (view === undefined) return { rect: within, axis };
+  const judged = open(memory).last.some((c) => sameRect(c.rect, view.rect));
+  return { rect: within, axis, along: { view: quoted(view), ...(judged && { noRoom: true as const }) } };
 }
 
 /**
@@ -606,8 +619,11 @@ function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonl
  * The scroll views a round's stroke toward the target may go over, nearest first (`planStroke` judges their room):
  * with no read this round (`facts` undefined), the last plan's; once a read found the target, its scroll views — each
  * cut by what this read draws over it, or by what it carried, when this read has lost its rect — none when it was
- * found in none (the screen box); else the screen's largest scroller, then the scroll views nested in it, largest
- * first (its `ScrollAxes.nested`, text inputs left out: ui-tree/geometry.ts#Clips.axesOf), or none.
+ * found in none (the screen box); else the screen's largest scroller, then the scroll views nested in it — those the
+ * tree tells scroll along `toward` first, then the rest, each largest first (its `ScrollAxes.nested`, text inputs left
+ * out: ui-tree/geometry.ts#Clips.axesOf) — or none. Told along before unknown (review round 1): a chips row (a
+ * HorizontalScrollView) above a larger feed of unknown axis (a RecyclerView, most likely vertical) is the one a
+ * sideways stroke is for.
  *
  * Why the nested ones (D59b): before a read finds the target the largest scroller alone was the candidate, so a
  * sideways stroke for a card of a carousel nested in a vertical page — C not laid out at launch, so no read finds it —
@@ -619,14 +635,14 @@ function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonl
  * amendment): a nested scroll view of unknown axis that is really vertical is stroked sideways; of two carousels the
  * larger is stroked, which may not hold the target.
  */
-function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'> | undefined): readonly ScrollView[] {
+function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'> | undefined, toward: Direction): readonly ScrollView[] {
   if (facts === undefined) return m.last;
   if (m.target !== undefined) return m.target.map(({ rect, over, axes }) => ({ rect, over: overIn(facts, rect) ?? over, axes: facts.scene.clips.axesOf(rect) ?? axes }));
   const main = facts.mainScroller;
   if (main === undefined) return [];
   const axes = facts.scene.clips.axesOf(main);
   const nested = [...(axes?.nested ?? [])]
-    .sort((a, b) => rectArea(b.rect) - rectArea(a.rect))
+    .sort((a, b) => Number(b.axis === axisOf(toward)) - Number(a.axis === axisOf(toward)) || rectArea(b.rect) - rectArea(a.rect))
     .map(({ rect }) => ({ rect, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) }));
   return [{ rect: main, over: overIn(facts, main) ?? [], axes }, ...nested];
 }
