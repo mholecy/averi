@@ -14,7 +14,7 @@ import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
-import type { PresentedTouchDown, TouchedOn } from './stroke-plan.js';
+import type { PresentedTouchDown, StrokedAcross, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
 import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
@@ -876,7 +876,14 @@ export function boundText(by: BoundBy, swipes: number): string {
         return `after ${swipesText(swipes)} (${which} ${verb}: ${endText(by.ends)} — content exhausted)`;
       }
       const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
-      const why = by.touched !== undefined ? `${touchedText(by.touched)} (else: ${others})` : `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
+      // `across` (D59b): the strokes went across the scroll view they were drawn over, for want of one along them —
+      // said first, with the way out, after a node named under the touch-down.
+      const why =
+        by.touched !== undefined
+          ? `${touchedText(by.touched)} (else: ${others})`
+          : by.across !== undefined
+            ? `${acrossText(by.across)}; else: ${others}`
+            : `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
       return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${verb}: ${why})`;
     }
     case 'movesWith':
@@ -901,6 +908,17 @@ export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: num
   const { count, totalMs, lastMs } = by.reads;
   const reads = `${countOf(count, 'tree read')} took ${totalMs}ms${count > 1 ? `, the last ${lastMs}ms` : ''}`;
   return `after ${by.elapsedMs}ms (timeout ${by.timeoutMs}ms; ${sent}; ${reads})`;
+}
+
+/**
+ * The strokes went across the scroll view they were drawn over (scroll-rounds.ts#BoundBy's `across`): `each went
+ * across the scroll view it was drawn over, <rect>, which scrolls vertically, and the tree shows no scroll view that
+ * may scroll horizontally — if the element lies in a horizontal list the tree does not show as one, swipe inside that
+ * list (swipe, its coordinates), then scroll_until it`. Exported for the troubleshooting reference.
+ */
+export function acrossText({ rect, axis }: StrokedAcross): string {
+  const way = axis === 'vertical' ? 'horizontal' : 'vertical';
+  return `each went across the scroll view it was drawn over, ${rectText(rect)}, which scrolls ${axis}ly, and the tree shows no scroll view that may scroll ${way}ly — if the element lies in a ${way} list the tree does not show as one, swipe inside that list (swipe, its coordinates), then scroll_until it`;
 }
 
 /** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which may have taken them`. */

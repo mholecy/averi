@@ -1,0 +1,397 @@
+{
+  "note": "D59b, batch-11 (averi_lab emulator, Android 13 API 33, 1080x2220), d59b-measure on main a5fefd32: scroll_until right for C from a fresh launch (averi) and a raw in-band swipe (control). Trimmed: timestamps, window focus and device paths dropped.",
+  "probe": "d59b-measure",
+  "commit": "a5fefd32",
+  "cells": [
+    "carousel-lazy-free",
+    "carousel-recycler-free"
+  ],
+  "runs": 3,
+  "controlRuns": 2,
+  "records": [
+    {
+      "leg": "averi",
+      "cell": "carousel-lazy-free",
+      "i": 0,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 0
+      },
+      "hasC": {
+        "launch": false,
+        "after": false
+      },
+      "swipes": [
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        },
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        }
+      ],
+      "reply": "ERROR scroll_until id:lab.carousel-lazy-free.C failed after 2 swipes (the last 2, swiping right, did not change the screen: content exhausted, still loading, or the swipes were not taken) \u2014 element never appeared in the tree"
+    },
+    {
+      "leg": "averi",
+      "cell": "carousel-lazy-free",
+      "i": 1,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 0
+      },
+      "hasC": {
+        "launch": false,
+        "after": false
+      },
+      "swipes": [
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        },
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        }
+      ],
+      "reply": "ERROR scroll_until id:lab.carousel-lazy-free.C failed after 2 swipes (the last 2, swiping right, did not change the screen: content exhausted, still loading, or the swipes were not taken) \u2014 element never appeared in the tree"
+    },
+    {
+      "leg": "averi",
+      "cell": "carousel-lazy-free",
+      "i": 2,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 0
+      },
+      "hasC": {
+        "launch": false,
+        "after": false
+      },
+      "swipes": [
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        },
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        }
+      ],
+      "reply": "ERROR scroll_until id:lab.carousel-lazy-free.C failed after 2 swipes (the last 2, swiping right, did not change the screen: content exhausted, still loading, or the swipes were not taken) \u2014 element never appeared in the tree"
+    },
+    {
+      "leg": "control",
+      "cell": "carousel-lazy-free",
+      "i": 0,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 549
+      },
+      "hasC": {
+        "launch": false,
+        "after": true
+      },
+      "stroke": {
+        "from": {
+          "x": 872,
+          "y": 497
+        },
+        "to": {
+          "x": 208,
+          "y": 497
+        },
+        "ms": 300
+      }
+    },
+    {
+      "leg": "control",
+      "cell": "carousel-lazy-free",
+      "i": 1,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 1000
+      },
+      "hasC": {
+        "launch": false,
+        "after": true
+      },
+      "stroke": {
+        "from": {
+          "x": 872,
+          "y": 497
+        },
+        "to": {
+          "x": 208,
+          "y": 497
+        },
+        "ms": 300
+      }
+    },
+    {
+      "leg": "averi",
+      "cell": "carousel-recycler-free",
+      "i": 0,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 0
+      },
+      "hasC": {
+        "launch": false,
+        "after": false
+      },
+      "swipes": [
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        },
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        }
+      ],
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 2 swipes (the last 2, swiping right, did not change the screen: content exhausted, still loading, or the swipes were not taken) \u2014 element never appeared in the tree"
+    },
+    {
+      "leg": "averi",
+      "cell": "carousel-recycler-free",
+      "i": 1,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 0
+      },
+      "hasC": {
+        "launch": false,
+        "after": false
+      },
+      "swipes": [
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        },
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        }
+      ],
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 2 swipes (the last 2, swiping right, did not change the screen: content exhausted, still loading, or the swipes were not taken) \u2014 element never appeared in the tree"
+    },
+    {
+      "leg": "averi",
+      "cell": "carousel-recycler-free",
+      "i": 2,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 0
+      },
+      "hasC": {
+        "launch": false,
+        "after": false
+      },
+      "swipes": [
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        },
+        {
+          "from": {
+            "x": 864,
+            "y": 1110
+          },
+          "to": {
+            "x": 216,
+            "y": 1110
+          },
+          "durationMs": 649
+        }
+      ],
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 2 swipes (the last 2, swiping right, did not change the screen: content exhausted, still loading, or the swipes were not taken) \u2014 element never appeared in the tree"
+    },
+    {
+      "leg": "control",
+      "cell": "carousel-recycler-free",
+      "i": 0,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 950
+      },
+      "hasC": {
+        "launch": false,
+        "after": true
+      },
+      "stroke": {
+        "from": {
+          "x": 872,
+          "y": 497
+        },
+        "to": {
+          "x": 208,
+          "y": 497
+        },
+        "ms": 300
+      }
+    },
+    {
+      "leg": "control",
+      "cell": "carousel-recycler-free",
+      "i": 1,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "launch": 0,
+        "after": 454
+      },
+      "hasC": {
+        "launch": false,
+        "after": true
+      },
+      "stroke": {
+        "from": {
+          "x": 872,
+          "y": 497
+        },
+        "to": {
+          "x": 208,
+          "y": 497
+        },
+        "ms": 300
+      }
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { sameRect, type Point, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
+import { rectArea, sameRect, type Point, type Rect, type ScrollAxis, type Stroke, type UiNode } from '../adapters/types.js';
 import { containsPoint, isUntold, quoted, rectIntersection, toldFrame, type ListedContent, type QuotedNode, type ScrollAxes } from '../ui-tree/geometry.js';
 import type { PresentedPress } from '../ui-tree/presentation.js';
 import type { KeyboardLine } from '../ui-tree/keyboard-position.js';
@@ -434,6 +434,28 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
   return { at: { ...drawn.from }, on: quoted(on), container };
 }
 
+/** The scroll view a sent stroke went across (`strokedAcross`): its rect and the axis its tree tells. */
+export interface StrokedAcross {
+  readonly rect: Rect;
+  readonly axis: ScrollAxis;
+}
+
+/**
+ * The scroll view the last stroke SENT went over (`within`) when THIS read's tree tells its axis and it is the other
+ * one than `toward`'s — the stroke went across it, which `strokeRoom` does only when no candidate along the stroke (or
+ * of unknown axis) had room: so no scroll view the tree shows may scroll that way. For the exhausted stop's sentence
+ * (scroll-text.ts#boundText): what the strokes did is said, not only "content exhausted" — batch-11's carousel the
+ * dump marked as nothing that scrolls would read so. Undefined when the stroke went over the gesture box whole, over a
+ * scroll view of unknown axis or along it, or when this tree holds no scroll view of that rect (idb's region is none).
+ * One walk of the tree, at the stop only.
+ */
+export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, toward: Direction): StrokedAcross | undefined {
+  const { within } = open(memory);
+  if (within === undefined) return undefined;
+  const axis = facts.scene.clips.axesOf(within)?.axis;
+  return axis !== undefined && axis !== axisOf(toward) ? { rect: within, axis } : undefined;
+}
+
 /**
  * What THIS read's tree lists of the content of the scroll view the last stroke sent went over (`within`), toward the
  * edge `toward` reveals (ui-tree/geometry.ts#Clips.contentToward: for content that lies up, its top): `ends` when
@@ -581,13 +603,29 @@ function targetScrollers(facts: Pick<TreeFacts, 'scene'>, node: UiNode): readonl
  * The scroll views a round's stroke toward the target may go over, nearest first (`planStroke` judges their room):
  * with no read this round (`facts` undefined), the last plan's; once a read found the target, its scroll views — each
  * cut by what this read draws over it, or by what it carried, when this read has lost its rect — none when it was
- * found in none (the screen box); else the screen's largest scroller, or none.
+ * found in none (the screen box); else the screen's largest scroller, then the scroll views nested in it, largest
+ * first (its `ScrollAxes.nested`, text inputs left out: ui-tree/geometry.ts#Clips.axesOf), or none.
+ *
+ * Why the nested ones (D59b): before a read finds the target the largest scroller alone was the candidate, so a
+ * sideways stroke for a card of a carousel nested in a vertical page — C not laid out at launch, so no read finds it —
+ * went over the page, which scrolls across it (`strokeRoom`'s fallback), on its centre row: batch-11 measured every
+ * stroke at (864,1110)→(216,1110), 496 px below the carousel's band (y 380–614), the carousel never moved, while a raw
+ * stroke inside the band moved it. The page stays FIRST, so `strokeRoom`'s axis rule takes a nested one only when
+ * the page scrolls across the stroke: every stroke along the page, a page of unknown axis and the all-across fallback
+ * are as before; the lab's carousel is now stroked inside, (824,497)→(256,497). Residuals (ADR 0010, the D59b
+ * amendment): a nested scroll view of unknown axis that is really vertical is stroked sideways; of two carousels the
+ * larger is stroked, which may not hold the target.
  */
 function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'> | undefined): readonly ScrollView[] {
   if (facts === undefined) return m.last;
   if (m.target !== undefined) return m.target.map(({ rect, over, axes }) => ({ rect, over: overIn(facts, rect) ?? over, axes: facts.scene.clips.axesOf(rect) ?? axes }));
   const main = facts.mainScroller;
-  return main === undefined ? [] : [{ rect: main, over: overIn(facts, main) ?? [], axes: facts.scene.clips.axesOf(main) }];
+  if (main === undefined) return [];
+  const axes = facts.scene.clips.axesOf(main);
+  const nested = [...(axes?.nested ?? [])]
+    .sort((a, b) => rectArea(b.rect) - rectArea(a.rect))
+    .map(({ rect }) => ({ rect, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) }));
+  return [{ rect: main, over: overIn(facts, main) ?? [], axes }, ...nested];
 }
 
 /**

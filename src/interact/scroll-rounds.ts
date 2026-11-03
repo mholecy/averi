@@ -14,7 +14,7 @@ import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, scrollViewsOf, shortOf, stops, strokeLine, unfitAlong, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
 import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
-import { carried, planStroke, seeRead, startStrokes, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
+import { carried, planStroke, seeRead, startStrokes, strokedAcross, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokedAcross, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, unknownCentreNeeds, type Course, type EndProof, type EndTurn, type NextStroke, type PastSide } from './course.js';
 import { probing, seeFlush, startFlush, type Flush, type FlushCheck, type FlushCut, type FlushVerdict, type ProbeMeans } from './flush-check.js';
 import type { Direction } from './swipe.js';
@@ -353,9 +353,12 @@ export interface DetentMove {
  * (margin-memo.ts#carriedCover) — the text scrolls with it, so no stroke brings it out from under the text; the
  * shortfall the `covered` one.
  * docs/bugs/2026-10-23-lab-android-scroll-until-fully-strokes-to-its-timeout-under-a-margin-text-seen-drawn-over-it.md
+ * `across`: the scroll view the last stroke went over scrolls, as the tree tells, on the other axis than the stroke
+ * (stroke-plan.ts#strokedAcross: no candidate along it had room, so the plan's fallback drew it across) — said where
+ * no end is proven and nothing is named under the touch-down (scroll-text.ts#boundText), D59b; no device call.
  */
 export type BoundBy =
-  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof; unlisted?: TopLayerOnlySource }
+  | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof; unlisted?: TopLayerOnlySource; across?: StrokedAcross }
   | { of: 'movesWith'; offset: Offset }
   | { of: 'maxSwipes' }
   | { of: 'timeout'; timeoutMs: number; elapsedMs: number; reads: ReadTime };
@@ -1159,12 +1162,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       unlocated = seen.unlocated;
     }
     const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s.strokes, now.facts, lastDrawn(s.motion));
+    const course = courseFacts(s.course);
+    const across = exhausted === undefined || now === undefined ? undefined : strokedAcross(s.strokes, now.facts, course.lastStroke);
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
     // since the reader's next step would otherwise be another scroll that lands there (the plan's `presented`).
     // Quoted only on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe
     // would land.
     const onPresented = best === undefined ? undefined : plan.presented;
-    const course = courseFacts(s.course);
     const miss = missed();
     const by: BoundBy =
       exhausted !== undefined
@@ -1175,6 +1179,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           ...(touched !== undefined && { touched }),
           ...(ends !== undefined && observed !== undefined && { ends: { way: course.lastStroke, ...endProof(s, ends, exhausted, observed.streaks) } }),
           ...(learnt.of === 'unfelt' && (miss === undefined || !saysTopLayerOnly(miss)) && { unlisted: learnt.source }),
+          ...(across !== undefined && { across }),
         }
       : movesWith !== undefined
         ? { of: 'movesWith', offset: movesWith }
