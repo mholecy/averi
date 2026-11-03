@@ -45,7 +45,7 @@ const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.i
 const CHOOSER_CLASS = /\.(?:Resolver|Chooser)Activity$/;
 
 // The component capture is written twice below on purpose: Stryker mutates only regex literals (code review, D55).
-// It ends where the component does, at whitespace or `}`, in both (D55r).
+// The component must be seen to end: at `}` in both, or at the space before the task on API 36 (D55r).
 /** The focused window's component; a window named by a title (`Window{… u0 NotificationShade}`) has none. */
 const FOCUS_WINDOW_RE = /mCurrentFocus=Window\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)\}/;
 
@@ -54,9 +54,10 @@ const FOCUS_WINDOW_RE = /mCurrentFocus=Window\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+
  * and later, inside `AppWindowToken{… token=Token{… ActivityRecord{…}}}` on API 29 (AOSP 10's dump, not captured).
  * The component ends at a brace on API 33 (`…ResolverActivity} t2641}`: batch-9's and batch-10's every read) and at a
  * space on API 36 (`…NexusLauncherActivity t2}`). Until D55r the capture wanted the space, so on API 33 the line
- * never matched (0 of batch-10's 40 reads) and the window alone decided.
+ * never matched (0 of batch-10's 40 reads) and the window alone decided. Only a space or `}` ends it: a line cut
+ * right after the component, at a newline or the end, names nothing.
  */
-const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)[\s}]/;
+const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)[ }]/;
 
 /** What opens each display's block in the dump, its id after it: `Display: mDisplayId=0 (organized)`. */
 const DISPLAY_HEADER = 'Display: mDisplayId=';
