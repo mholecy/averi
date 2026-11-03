@@ -64,6 +64,67 @@ describe('chooserInFocus — batch-10\'s reads at averi\'s reply (D55r, API 33, 
   });
 });
 
+// T4: more of the batches' real reads, as the device printed them (`dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'`,
+// no display header), each fed to chooserInFocus:
+// - dumpsys-window-focus-api33-b10-launcher.txt: batch-10's D55 E2 read before the link (averi_lab, API 33, main
+//   139256a2), the launcher in front, `mFocusedApp` in API 33's brace shape (`…NexusLauncherActivity} t1620}`);
+// - dumpsys-window-focus-api33-b4-chrome-firstrun.txt: batch-4's D55 read after `am start -a VIEW -d
+//   https://example.com` (averi_lab, API 33), one handler, Chrome's FirstRunActivity in front;
+// - dumpsys-window-focus-api33-b10-after-launch-{intent,monkey}.txt: batch-10's D55 E4 reads 1.5 s after a launch_app
+//   (D55b's red cases, pinned in android.test.ts): the chooser still in front;
+// - cmd-package-resolve-activity-api33-b10-{two,one}-handler(s).txt: batch-10's D55 E3 reads of `cmd package
+//   resolve-activity --brief -a android.intent.action.VIEW -d <url>` (the same bytes 3 of 3 times each, 21–28 ms).
+//   These are SHAPE RECORDS for a parser that does not exist yet (ADR 0041's documented fallback, not built): averi
+//   never asks resolve-activity, so their pins guard no averi code and kill no mutant.
+describe('chooserInFocus — T4: the batches\' other real focus reads (API 33, brace shape, no display header)', () => {
+  it('the launcher in front, both lines its own (batch-10, before the link): undefined', async () => {
+    const read = await fixture('dumpsys-window-focus-api33-b10-launcher.txt');
+    expect(read).toContain('mFocusedApp=ActivityRecord{c72a554 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity} t1620}\n');
+    expect(chooserInFocus(read)).toBeUndefined();
+  });
+
+  it('the launcher\'s brace-shape activity line decides over the chooser\'s window: undefined (a chooser on its way out)', async () => {
+    const [, launcher = ''] = focusLines(await fixture('dumpsys-window-focus-api33-b10-launcher.txt'));
+    expect(chooserInFocus(`  mCurrentFocus=${CHOOSER_WINDOW}\n${launcher}\n`)).toBeUndefined();
+  });
+
+  it('a third-party activity in front that is not the chooser (Chrome\'s FirstRunActivity, batch-4): undefined', async () => {
+    const read = await fixture('dumpsys-window-focus-api33-b4-chrome-firstrun.txt');
+    expect(read).toContain('com.android.chrome/org.chromium.chrome.browser.firstrun.FirstRunActivity} t2549}\n');
+    expect(chooserInFocus(read)).toBeUndefined();
+  });
+
+  it('the chooser still in front 1.5 s after each launch_app of batch-10\'s E4: the chooser', async () => {
+    expect(chooserInFocus(await fixture('dumpsys-window-focus-api33-b10-after-launch-intent.txt'))).toBe(RESOLVER);
+    expect(chooserInFocus(await fixture('dumpsys-window-focus-api33-b10-after-launch-monkey.txt'))).toBe(RESOLVER);
+  });
+
+  it('an app activity under the chooser\'s brace-shape window: the activity line read, so undefined', async () => {
+    const [window = ''] = focusLines(await fixture('dumpsys-window-focus-api33-b10-after-launch-intent.txt'));
+    const [, chrome = ''] = focusLines(await fixture('dumpsys-window-focus-api33-b4-chrome-firstrun.txt'));
+    expect(chooserInFocus(`${window}\n${chrome}\n`)).toBeUndefined();
+  });
+});
+
+describe('`cmd package resolve-activity --brief` — batch-10\'s two shapes, records for a parser not built yet (ADR 0041\'s fallback)', () => {
+  it('two handlers, none preferred: the resolver, `match=0x0 … isDefault=false`', async () => {
+    expect(await fixture('cmd-package-resolve-activity-api33-b10-two-handlers.txt')).toBe(
+      'priority=0 preferredOrder=0 match=0x0 specificIndex=-1 isDefault=false\n' + `${RESOLVER}\n`,
+    );
+  });
+
+  it('one handler: the lab\'s activity, `match=0x308000 … isDefault=true`', async () => {
+    expect(await fixture('cmd-package-resolve-activity-api33-b10-one-handler.txt')).toBe(
+      'priority=0 preferredOrder=0 match=0x308000 specificIndex=-1 isDefault=true\n' + `${LAB}\n`,
+    );
+  });
+
+  it('is no focus read: chooserInFocus names nothing in either, though the two-handler answer names the resolver', async () => {
+    expect(chooserInFocus(await fixture('cmd-package-resolve-activity-api33-b10-two-handlers.txt'))).toBeUndefined();
+    expect(chooserInFocus(await fixture('cmd-package-resolve-activity-api33-b10-one-handler.txt'))).toBeUndefined();
+  });
+});
+
 describe('chooserInFocus — a whole API 33 dump, with its `Display: mDisplayId=0` header', () => {
   /** The keyboard-hidden dump with each focus line the given read holds put in place of the dump's own. */
   const withFocus = async (read: string) =>

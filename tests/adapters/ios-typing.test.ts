@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { IDB_TYPEABLE, typingPathOf, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
@@ -138,5 +139,47 @@ describe('the refusals\' remedies', () => {
       expect(msg).not.toContain('heslo');
       expect(msg).not.toContain('123');
     }
+  });
+});
+
+// T4: the gate's own corpus. tests/fixtures/wda-keys-gate-b10-g2.json is batch-10's D43 gate record trimmed to what
+// the pin needs (averi-lab iPhone 17 simulator, iOS 27.0, WDA 16.1.7, form-basic's name field): each G2 value with its
+// category, the `/wda/keys` HTTP status and the app model's read-back after it; and batch-9's two D43 tries
+// (`b9`, the same simulator). latin … symbols are the gate's required categories (each exact: latin 3/3,
+// typographic 3/3, cyrillic 2/2, greek 2/2, cjk 2/2, symbols 2/2); spaces, emoji and combining were info only.
+describe('WDA_TYPEABLE against the gate\'s measured corpus (batch-10 G2, batch-9 D43)', () => {
+  interface Typed { value: string; category: string; keysHttp: number; readBack: string }
+  const corpus = JSON.parse(readFileSync(new URL('../fixtures/wda-keys-gate-b10-g2.json', import.meta.url), 'utf8')) as {
+    g2: Typed[];
+    b9: { value: string; status: string; landed: string }[];
+  };
+  const REQUIRED = ['latin', 'typographic', 'cyrillic', 'greek', 'cjk', 'symbols'];
+  const required = corpus.g2.filter((t) => REQUIRED.includes(t.category));
+
+  it('the record: 14 required values, each typed (HTTP 200) and read back exact; the info ones too', () => {
+    expect(required).toHaveLength(14);
+    expect(corpus.g2.map((t) => t.category).filter((c) => !REQUIRED.includes(c))).toEqual(['spaces', 'spaces', 'emoji', 'combining']);
+    for (const t of corpus.g2) expect([t.keysHttp, t.readBack]).toEqual([200, t.value]);
+    for (const t of corpus.b9) expect([t.status, t.landed]).toEqual(['ok', t.value]);
+  });
+
+  it('every required value, NBSP and U+202F, and batch-9\'s two: WDA_TYPEABLE takes it whole, and it routes through WDA', () => {
+    for (const { value } of [...required, ...corpus.g2.filter((t) => t.category === 'spaces'), ...corpus.b9]) {
+      expect([value, refused(value, WDA_TYPEABLE)]).toEqual([value, undefined]);
+      expect([value, typingPathOf(value)]).toEqual([value, 'wda']);
+      expect([value, refused(value, IDB_TYPEABLE)]).not.toEqual([value, undefined]);
+    }
+  });
+
+  it('typed exact once each, still refused: the emoji (1/1, too thin) and the decomposed Š (a combining mark is not judged)', () => {
+    const value = (category: string) => corpus.g2.find((t) => t.category === category)!.value;
+    expect(value('emoji')).toBe('\u{1F600}');
+    expect(value('combining')).toBe('Š');
+    expect(refused(value('emoji'), WDA_TYPEABLE)).toBe('U+1F600');
+    expect(refused(value('combining'), WDA_TYPEABLE)).toBe('U+030C');
+  });
+
+  it('idb routing unchanged: the gate\'s ASCII G3 texts (typed through WDA by the gate) go to idb under averi', () => {
+    for (const text of ['q', 'qx7Wz3k', 'qx7Wz3kV9pj2Mb8ty5Hn', 'qx7Wz3kV9pj2Mb8ty5Hn4dG6rc1fL0sxe5uA2yQ8']) expect(typingPathOf(text)).toBe('idb');
   });
 });

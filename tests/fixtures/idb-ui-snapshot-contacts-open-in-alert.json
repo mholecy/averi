@@ -1,0 +1,68 @@
+{
+  "role": "container",
+  "label": null,
+  "identifier": null,
+  "value": null,
+  "rect": {
+    "x": 0,
+    "y": 0,
+    "width": 0,
+    "height": 0
+  },
+  "children": [
+    {
+      "role": "other",
+      "label": " ",
+      "identifier": null,
+      "value": null,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 402,
+        "height": 874
+      },
+      "children": []
+    },
+    {
+      "role": "text",
+      "label": "Open in “AveriLab”?",
+      "identifier": null,
+      "value": null,
+      "rect": {
+        "x": 71,
+        "y": 410,
+        "width": 260,
+        "height": 20
+      },
+      "children": []
+    },
+    {
+      "role": "button",
+      "label": "Cancel",
+      "identifier": null,
+      "value": null,
+      "rect": {
+        "x": 57,
+        "y": 450,
+        "width": 140,
+        "height": 48
+      },
+      "children": []
+    },
+    {
+      "role": "button",
+      "label": "Open",
+      "identifier": null,
+      "value": null,
+      "rect": {
+        "x": 205,
+        "y": 450,
+        "width": 140,
+        "height": 48
+      },
+      "children": []
+    }
+  ],
+  "flatList": true,
+  "readingOrder": true
+}

@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { runStart, type StartCommand } from '../../src/adapters/android-start.js';
 import { ExecError, type ExecResult } from '../../src/adapters/exec.js';
@@ -58,6 +59,19 @@ describe('runStart — am start', () => {
       lines: [DENIAL],
       cause: failure,
     });
+  });
+
+  // T4: batch-4's D55 `am start -W -a android.intent.action.VIEW -d <url>` (averi_lab, API 33), stdout as the device
+  // printed it: a one-handler https link that brought Chrome's FirstRunActivity to the front (WARM), and the lab's own
+  // averilab://cell/open (COLD). averi's starts send no `-W`; these pin that the wait's `Status: ok` / `LaunchState:` /
+  // `Activity:` / `Complete` lines are read as a start that happened.
+  it.each([
+    ['WARM, Chrome\'s FirstRunActivity', 'am-start-w-api33-b4-warm-chrome-firstrun.txt'],
+    ['COLD, the lab\'s MainActivity', 'am-start-w-api33-b4-cold-lab.txt'],
+  ])('`am start -W` at exit 0 (batch-4, %s) → started', async (_what, name) => {
+    const printed = await readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
+    expect(printed).toMatch(/^Starting: Intent \{ act=android\.intent\.action\.VIEW dat=\S+ \}\nStatus: ok\nLaunchState: (?:WARM|COLD)\nActivity: \S+\nTotalTime: \d+\nWaitTime: \d+\nComplete\n$/);
+    expect(await runStart(AM, prints(printed))).toEqual({ kind: 'started' });
   });
 
   // What a SUCCESSFUL start may print. Every row is a start that happened.

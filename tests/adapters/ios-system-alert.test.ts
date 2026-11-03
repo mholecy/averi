@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { alertButtonsText, alertInWda, alertShapeInIdb, ALERT_ADVICE, namesApp, titleAsksToOpen, type IdbAlertElement } from '../../src/adapters/ios-system-alert.js';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
-import type { SystemAlert, UiNode } from '../../src/adapters/types.js';
+import { everyNode, type SystemAlert, type UiNode } from '../../src/adapters/types.js';
 
 // D54 (D49b, 2026-11-02; ADR 0032's D54 amendment): iOS's "Open in “AveriLab”?" confirmation, as both tree sources
 // list it — batch-5 D49A's captures (E2 over SpringBoard, E3 with Contacts in front), cut to the fields averi reads.
@@ -269,5 +269,26 @@ describe('alertButtonsText and ALERT_ADVICE — the words both replies quote an 
       'Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps nothing itself); ' +
         'every launch stays behind the alert until it is answered',
     );
+  });
+});
+
+// T4: the trees once Cancel answered the alert (batch-6 A, WDA's /source about 1 s after the tap: the
+// wda-capture-*-after-open-in-cancel.json fixtures' `_comment`). Cancel opens nothing, so the tree is the app that was
+// in front before the link: SpringBoard's home screen, or Contacts — never the alert, and never the lab. That the
+// tree right after the tap is SpringBoard's and the lab's ~1 s after Open (batch-7 A, L3/L4) was summarised by the
+// probe, its trees not kept.
+describe('alertInWda — WDA\'s tree after Cancel answered "Open in “AveriLab”?" (batch-6 A, real captures)', () => {
+  const treeAfterCancel = async (name: string): Promise<UiNode> => parseWdaSourceValue(((await json(`wda-capture-${name}-after-open-in-cancel.json`)) as { value: unknown }).value);
+  /** Every node's label and identifier, in walk order. */
+  const labels = (tree: UiNode): (string | null)[] => [...everyNode(tree)].flatMap((n) => [n.label, n.identifier]);
+
+  it.each([
+    ['springboard', ' '],
+    ['contacts', 'Contacts'],
+  ])('%s beneath: no alert, the root the previous app (%j), no node naming the alert or the lab', async (name, root) => {
+    const tree = await treeAfterCancel(name);
+    expect(tree.label).toBe(root);
+    expect(alertInWda(tree)).toBeUndefined();
+    expect(labels(tree).filter((l) => l !== null && /Open in|^lab\./.test(l))).toEqual([]);
   });
 });

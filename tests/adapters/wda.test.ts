@@ -692,6 +692,26 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     server.stop();
   });
 
+  // T4: batch-10's G4 (D43 gate, iOS 27.0, WDA 16.1.7): after a runner restart the old session's `/wda/keys` got HTTP 404
+  // with nothing typed. tests/fixtures/wda-keys-404-invalid-session-b10.json is that body's `value.error` and
+  // `value.message` as the gate recorded them ("HTTP 404 invalid session id: Session does not exist"); any other field
+  // of the body (a traceback, a sessionId) was not kept.
+  it('G4\'s real 404 body is read as a lost session: one new session, the typing sent once more', async () => {
+    const body = JSON.parse(await readFile(new URL('../fixtures/wda-keys-404-invalid-session-b10.json', import.meta.url), 'utf8')) as unknown;
+    const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 404, body } : { status: 200, body: { value: null } }));
+    await server.keys('Šťastný');
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session', '/session/S2/wda/keys']);
+    server.stop();
+  });
+
+  // T4 review: the status alone decides too — any 404 is a lost session, whatever its body says (wda.ts#postKeys).
+  it('a bare HTTP 404, its body naming no "invalid session id": a lost session too — one new session, sent once more', async () => {
+    const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 404, body: { value: { error: 'unknown command', message: 'Unhandled endpoint' } } } : { status: 200, body: { value: null } }));
+    await server.keys('Šťastný');
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session', '/session/S2/wda/keys']);
+    server.stop();
+  });
+
   it('an "invalid session id" under another status is a lost session too', async () => {
     const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 500, body: { value: { error: 'invalid session id', message: 'Session does not exist' } } } : { status: 200, body: { value: null } }));
     await server.keys('Šťastný');

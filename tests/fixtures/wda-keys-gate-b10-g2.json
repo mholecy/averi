@@ -1,0 +1,125 @@
+{
+  "source": "REAL batch-10 D43 gate record (2026-11-03, averi-lab iPhone 17 simulator, iOS 27.0, WDA 16.1.7, form-basic's name field), TRIMMED: per G2 value only its category, the HTTP status of its `/wda/keys` and the app model's read-back after it (`keysHttp`, `readBack`); the focus, timings, udid and paths dropped. `b9`: batch-9's two D43 tries on the same simulator (value, status, what landed). Values as recorded, nothing else changed.",
+  "g2": [
+    {
+      "value": "Šťastný",
+      "category": "latin",
+      "keysHttp": 200,
+      "readBack": "Šťastný"
+    },
+    {
+      "value": "Žluťoučký kůň",
+      "category": "latin",
+      "keysHttp": 200,
+      "readBack": "Žluťoučký kůň"
+    },
+    {
+      "value": "Ångström Øre",
+      "category": "latin",
+      "keysHttp": 200,
+      "readBack": "Ångström Øre"
+    },
+    {
+      "value": "O’Brien",
+      "category": "typographic",
+      "keysHttp": 200,
+      "readBack": "O’Brien"
+    },
+    {
+      "value": "“Jr.” – Co…",
+      "category": "typographic",
+      "keysHttp": 200,
+      "readBack": "“Jr.” – Co…"
+    },
+    {
+      "value": "‘quoted’ — dash",
+      "category": "typographic",
+      "keysHttp": 200,
+      "readBack": "‘quoted’ — dash"
+    },
+    {
+      "value": "Ђорђе",
+      "category": "cyrillic",
+      "keysHttp": 200,
+      "readBack": "Ђорђе"
+    },
+    {
+      "value": "Привет мир",
+      "category": "cyrillic",
+      "keysHttp": 200,
+      "readBack": "Привет мир"
+    },
+    {
+      "value": "Καλημέρα",
+      "category": "greek",
+      "keysHttp": 200,
+      "readBack": "Καλημέρα"
+    },
+    {
+      "value": "Ωμέγα λ",
+      "category": "greek",
+      "keysHttp": 200,
+      "readBack": "Ωμέγα λ"
+    },
+    {
+      "value": "東京",
+      "category": "cjk",
+      "keysHttp": 200,
+      "readBack": "東京"
+    },
+    {
+      "value": "北京市朝阳区",
+      "category": "cjk",
+      "keysHttp": 200,
+      "readBack": "北京市朝阳区"
+    },
+    {
+      "value": "€ 1 234 §",
+      "category": "symbols",
+      "keysHttp": 200,
+      "readBack": "€ 1 234 §"
+    },
+    {
+      "value": "© ® ™ §",
+      "category": "symbols",
+      "keysHttp": 200,
+      "readBack": "© ® ™ §"
+    },
+    {
+      "value": "1 234",
+      "category": "spaces",
+      "keysHttp": 200,
+      "readBack": "1 234"
+    },
+    {
+      "value": "1 234",
+      "category": "spaces",
+      "keysHttp": 200,
+      "readBack": "1 234"
+    },
+    {
+      "value": "😀",
+      "category": "emoji",
+      "keysHttp": 200,
+      "readBack": "😀"
+    },
+    {
+      "value": "Š",
+      "category": "combining",
+      "keysHttp": 200,
+      "readBack": "Š"
+    }
+  ],
+  "b9": [
+    {
+      "value": "Šťastný",
+      "status": "ok",
+      "landed": "Šťastný"
+    },
+    {
+      "value": "O’Brien",
+      "status": "ok",
+      "landed": "O’Brien"
+    }
+  ]
+}

@@ -1,0 +1,375 @@
+{
+  "role": "container",
+  "label": null,
+  "identifier": null,
+  "value": null,
+  "rect": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "children": [
+    {
+      "role": "container",
+      "label": null,
+      "identifier": null,
+      "value": null,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1080,
+        "height": 2220
+      },
+      "children": [
+        {
+          "role": "container",
+          "label": null,
+          "identifier": "content",
+          "value": null,
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 1080,
+            "height": 2220
+          },
+          "children": [
+            {
+              "role": "scrollable",
+              "label": null,
+              "identifier": "contentPanel",
+              "value": null,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "width": 1080,
+                "height": 2220
+              },
+              "children": [
+                {
+                  "role": "container",
+                  "label": null,
+                  "identifier": "title_container",
+                  "value": null,
+                  "rect": {
+                    "x": 0,
+                    "y": 1472,
+                    "width": 1080,
+                    "height": 175
+                  },
+                  "children": [
+                    {
+                      "role": "text",
+                      "label": "Open with",
+                      "identifier": "title",
+                      "value": null,
+                      "rect": {
+                        "x": 66,
+                        "y": 1522,
+                        "width": 948,
+                        "height": 59
+                      },
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "role": "other",
+                  "label": null,
+                  "identifier": "divider",
+                  "value": null,
+                  "rect": {
+                    "x": 0,
+                    "y": 1647,
+                    "width": 1080,
+                    "height": 3
+                  },
+                  "children": []
+                },
+                {
+                  "role": "container",
+                  "label": null,
+                  "identifier": "profile_tabhost",
+                  "value": null,
+                  "rect": {
+                    "x": 0,
+                    "y": 1650,
+                    "width": 1080,
+                    "height": 308
+                  },
+                  "children": [
+                    {
+                      "role": "container",
+                      "label": null,
+                      "identifier": null,
+                      "value": null,
+                      "rect": {
+                        "x": 0,
+                        "y": 1650,
+                        "width": 1080,
+                        "height": 308
+                      },
+                      "children": [
+                        {
+                          "role": "container",
+                          "label": null,
+                          "identifier": "tabcontent",
+                          "value": null,
+                          "rect": {
+                            "x": 0,
+                            "y": 1650,
+                            "width": 1080,
+                            "height": 308
+                          },
+                          "children": [
+                            {
+                              "role": "scrollable",
+                              "label": null,
+                              "identifier": "profile_pager",
+                              "value": null,
+                              "rect": {
+                                "x": 0,
+                                "y": 1650,
+                                "width": 1080,
+                                "height": 308
+                              },
+                              "children": [
+                                {
+                                  "role": "container",
+                                  "label": null,
+                                  "identifier": null,
+                                  "value": null,
+                                  "rect": {
+                                    "x": 0,
+                                    "y": 1650,
+                                    "width": 1080,
+                                    "height": 308
+                                  },
+                                  "children": [
+                                    {
+                                      "role": "scrollable",
+                                      "label": null,
+                                      "identifier": "resolver_list",
+                                      "value": null,
+                                      "rect": {
+                                        "x": 0,
+                                        "y": 1650,
+                                        "width": 1080,
+                                        "height": 308
+                                      },
+                                      "children": [
+                                        {
+                                          "role": "container",
+                                          "label": null,
+                                          "identifier": null,
+                                          "value": null,
+                                          "rect": {
+                                            "x": 0,
+                                            "y": 1650,
+                                            "width": 1080,
+                                            "height": 154
+                                          },
+                                          "children": [
+                                            {
+                                              "role": "image",
+                                              "label": null,
+                                              "identifier": "icon",
+                                              "value": null,
+                                              "rect": {
+                                                "x": 22,
+                                                "y": 1683,
+                                                "width": 88,
+                                                "height": 88
+                                              },
+                                              "children": []
+                                            },
+                                            {
+                                              "role": "container",
+                                              "label": null,
+                                              "identifier": null,
+                                              "value": null,
+                                              "rect": {
+                                                "x": 132,
+                                                "y": 1697,
+                                                "width": 237,
+                                                "height": 59
+                                              },
+                                              "children": [
+                                                {
+                                                  "role": "text",
+                                                  "label": "AveriLab",
+                                                  "identifier": "text1",
+                                                  "value": null,
+                                                  "rect": {
+                                                    "x": 132,
+                                                    "y": 1697,
+                                                    "width": 171,
+                                                    "height": 59
+                                                  },
+                                                  "children": []
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "role": "container",
+                                          "label": null,
+                                          "identifier": null,
+                                          "value": null,
+                                          "rect": {
+                                            "x": 0,
+                                            "y": 1804,
+                                            "width": 1080,
+                                            "height": 154
+                                          },
+                                          "children": [
+                                            {
+                                              "role": "image",
+                                              "label": null,
+                                              "identifier": "icon",
+                                              "value": null,
+                                              "rect": {
+                                                "x": 22,
+                                                "y": 1837,
+                                                "width": 88,
+                                                "height": 88
+                                              },
+                                              "children": []
+                                            },
+                                            {
+                                              "role": "container",
+                                              "label": null,
+                                              "identifier": null,
+                                              "value": null,
+                                              "rect": {
+                                                "x": 132,
+                                                "y": 1825,
+                                                "width": 299,
+                                                "height": 112
+                                              },
+                                              "children": [
+                                                {
+                                                  "role": "text",
+                                                  "label": "AveriLab",
+                                                  "identifier": "text1",
+                                                  "value": null,
+                                                  "rect": {
+                                                    "x": 132,
+                                                    "y": 1825,
+                                                    "width": 171,
+                                                    "height": 59
+                                                  },
+                                                  "children": []
+                                                },
+                                                {
+                                                  "role": "text",
+                                                  "label": "AveriLab twin",
+                                                  "identifier": "text2",
+                                                  "value": null,
+                                                  "rect": {
+                                                    "x": 132,
+                                                    "y": 1884,
+                                                    "width": 233,
+                                                    "height": 53
+                                                  },
+                                                  "children": []
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ],
+                                      "scrollAxis": "vertical"
+                                    }
+                                  ]
+                                }
+                              ],
+                              "scrollAxis": "horizontal"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "role": "container",
+                  "label": null,
+                  "identifier": "button_bar_container",
+                  "value": null,
+                  "rect": {
+                    "x": 0,
+                    "y": 1958,
+                    "width": 1080,
+                    "height": 262
+                  },
+                  "children": [
+                    {
+                      "role": "other",
+                      "label": null,
+                      "identifier": "resolver_button_bar_divider",
+                      "value": null,
+                      "rect": {
+                        "x": 0,
+                        "y": 1958,
+                        "width": 1080,
+                        "height": 3
+                      },
+                      "children": []
+                    },
+                    {
+                      "role": "container",
+                      "label": null,
+                      "identifier": "button_bar",
+                      "value": null,
+                      "rect": {
+                        "x": 0,
+                        "y": 1961,
+                        "width": 1080,
+                        "height": 259
+                      },
+                      "children": [
+                        {
+                          "role": "button",
+                          "label": "Just once",
+                          "identifier": "button_once",
+                          "value": null,
+                          "rect": {
+                            "x": 604,
+                            "y": 1983,
+                            "width": 238,
+                            "height": 149
+                          },
+                          "children": []
+                        },
+                        {
+                          "role": "button",
+                          "label": "Always",
+                          "identifier": "button_always",
+                          "value": null,
+                          "rect": {
+                            "x": 842,
+                            "y": 1983,
+                            "width": 188,
+                            "height": 149
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "clipsDescendants": true,
+              "scrollAxis": "vertical"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "paddedTouchTargets": true,
+  "activeWindowOnly": true,
+  "boundsCutAtScreen": true
+}

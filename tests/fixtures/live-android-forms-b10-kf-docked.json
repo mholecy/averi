@@ -1,0 +1,2256 @@
+{
+  "platform": "android",
+  "side": "this checkout",
+  "results": [
+    {
+      "source": "uiautomator",
+      "id": "kf1",
+      "replies": [
+        "1/1 asserts FAILED\nFAIL  element id:\"lab.form-keyboard-floating.ks\" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1644 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run; failing closed, color unchecked\nappAlive: true",
+        "Element id:\"lab.form-keyboard-floating.submit\" fully visible after 0 swipes"
+      ],
+      "launched": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 314,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 386,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 496,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 568,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 678,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 750,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 860,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 932,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 1042,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 1114,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1224,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1296,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1406,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1478,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 1588,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 1660,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 1770,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 1842,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 1952,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 2024,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708498.747
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": null
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": null
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": []
+      },
+      "after": [],
+      "state": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 314,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 386,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 496,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 568,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 678,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 750,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 860,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 932,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 1042,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 1114,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1224,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1296,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1406,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1478,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 1588,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 1660,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 1770,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 1842,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 1952,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 2024,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708498.747
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": null
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": null
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": [],
+        "readAt": 1793708510.583
+      },
+      "late": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 314,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 386,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 496,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 568,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 678,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 750,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 860,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 932,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 1042,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 1114,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1224,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1296,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1406,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1478,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 1588,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 1660,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 1770,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 1842,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 1952,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 2024,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708498.747
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": null
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": null
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": [],
+        "readAt": 1793708513.624
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "kf2",
+      "replies": [
+        "1/1 asserts FAILED\nFAIL  element id:\"lab.form-keyboard-floating.ks\" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1644 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or press back) and re-run; failing closed, color unchecked\nappAlive: true",
+        "Element id:\"lab.form-keyboard-floating.submit\" fully visible after 0 swipes",
+        "Tapped id:\"lab.form-keyboard-floating.submit\""
+      ],
+      "launched": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 314,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 386,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 496,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 568,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 678,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 750,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 860,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 932,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 1042,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 1114,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1224,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1296,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1406,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1478,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 1588,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 1660,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 1770,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 1842,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 1952,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 2024,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708513.936
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": null
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": null
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": []
+      },
+      "after": [],
+      "state": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 314,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 386,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 568,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 640,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 822,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 894,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 1076,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 1148,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 1330,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 1402,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1584,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1656,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1838,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1910,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 2092,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 2164,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 2346,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 2418,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 2600,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 2672,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          },
+          "reference.error": {
+            "x": 55,
+            "y": 491,
+            "width": 152,
+            "height": 66
+          },
+          "message.error": {
+            "x": 55,
+            "y": 745,
+            "width": 152,
+            "height": 66
+          },
+          "street.error": {
+            "x": 55,
+            "y": 999,
+            "width": 152,
+            "height": 66
+          },
+          "city.error": {
+            "x": 55,
+            "y": 1253,
+            "width": 152,
+            "height": 66
+          },
+          "postcode.error": {
+            "x": 55,
+            "y": 1507,
+            "width": 152,
+            "height": 66
+          },
+          "phone.error": {
+            "x": 55,
+            "y": 1761,
+            "width": 152,
+            "height": 66
+          },
+          "vs.error": {
+            "x": 55,
+            "y": 2015,
+            "width": 152,
+            "height": 66
+          },
+          "ks.error": {
+            "x": 55,
+            "y": 2269,
+            "width": 152,
+            "height": 66
+          },
+          "ss.error": {
+            "x": 55,
+            "y": 2523,
+            "width": 152,
+            "height": 66
+          },
+          "note.error": {
+            "x": 55,
+            "y": 2777,
+            "width": 152,
+            "height": 66
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708513.936
+          },
+          {
+            "kind": "touch",
+            "tag": "540,1304",
+            "at": 1793708528.475
+          },
+          {
+            "kind": "submit",
+            "tag": "invalid",
+            "at": 1793708528.48
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.reference_error"
+            }
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.message_error"
+            }
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.street_error"
+            }
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.city_error"
+            }
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.postcode_error"
+            }
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.phone_error"
+            }
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.vs_error"
+            }
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.ks_error"
+            }
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.ss_error"
+            }
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.note_error"
+            }
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": [
+          {
+            "at": 1793708528.48,
+            "valid": false,
+            "values": {
+              "reference": "",
+              "message": "",
+              "street": "",
+              "city": "",
+              "postcode": "",
+              "phone": "",
+              "vs": "",
+              "ks": "",
+              "ss": "",
+              "note": ""
+            }
+          }
+        ],
+        "readAt": 1793708529.899
+      },
+      "late": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 314,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 386,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 568,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 640,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 822,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 894,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 1076,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 1148,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 1330,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 1402,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1584,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1656,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1838,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1910,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 2092,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 2164,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 2346,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 2418,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 2600,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 2672,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          },
+          "reference.error": {
+            "x": 55,
+            "y": 491,
+            "width": 152,
+            "height": 66
+          },
+          "message.error": {
+            "x": 55,
+            "y": 745,
+            "width": 152,
+            "height": 66
+          },
+          "street.error": {
+            "x": 55,
+            "y": 999,
+            "width": 152,
+            "height": 66
+          },
+          "city.error": {
+            "x": 55,
+            "y": 1253,
+            "width": 152,
+            "height": 66
+          },
+          "postcode.error": {
+            "x": 55,
+            "y": 1507,
+            "width": 152,
+            "height": 66
+          },
+          "phone.error": {
+            "x": 55,
+            "y": 1761,
+            "width": 152,
+            "height": 66
+          },
+          "vs.error": {
+            "x": 55,
+            "y": 2015,
+            "width": 152,
+            "height": 66
+          },
+          "ks.error": {
+            "x": 55,
+            "y": 2269,
+            "width": 152,
+            "height": 66
+          },
+          "ss.error": {
+            "x": 55,
+            "y": 2523,
+            "width": 152,
+            "height": 66
+          },
+          "note.error": {
+            "x": 55,
+            "y": 2777,
+            "width": 152,
+            "height": 66
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708513.936
+          },
+          {
+            "kind": "touch",
+            "tag": "540,1304",
+            "at": 1793708528.475
+          },
+          {
+            "kind": "submit",
+            "tag": "invalid",
+            "at": 1793708528.48
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.reference_error"
+            }
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.message_error"
+            }
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.street_error"
+            }
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.city_error"
+            }
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.postcode_error"
+            }
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.phone_error"
+            }
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.vs_error"
+            }
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.ks_error"
+            }
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.ss_error"
+            }
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": {
+              "text": "Required",
+              "id": "lab.form-keyboard-floating.note_error"
+            }
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": [
+          {
+            "at": 1793708528.48,
+            "valid": false,
+            "values": {
+              "reference": "",
+              "message": "",
+              "street": "",
+              "city": "",
+              "postcode": "",
+              "phone": "",
+              "vs": "",
+              "ks": "",
+              "ss": "",
+              "note": ""
+            }
+          }
+        ],
+        "readAt": 1793708532.932
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "kf3",
+      "replies": [
+        "ERROR scroll_until id:\"lab.form-keyboard-floating.ks\" failed after 3 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect {\"x\":55,\"y\":1477,\"width\":970,\"height\":132}). The soft keyboard was up over [0,1398][1080,2220] in 4 of the 4 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again"
+      ],
+      "launched": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 314,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 386,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 496,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 568,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 678,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 750,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 860,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 932,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 1042,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 1114,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1224,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1296,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1406,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1478,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 1588,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 1660,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 1770,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 1842,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 1952,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 2024,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708533.245
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": null
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": null
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": []
+      },
+      "after": [],
+      "state": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 147,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 219,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 329,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 401,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 511,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 583,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 693,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 765,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 875,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 947,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1057,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1129,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1239,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1311,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 1421,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 1493,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 1603,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 1675,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 1785,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 1857,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708533.245
+          },
+          {
+            "kind": "touch",
+            "tag": "540,1034",
+            "at": 1793708537.21
+          },
+          {
+            "kind": "touch",
+            "tag": "540,1034",
+            "at": 1793708539.966
+          },
+          {
+            "kind": "touch",
+            "tag": "540,1034",
+            "at": 1793708542.719
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": null
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": null
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": [],
+        "readAt": 1793708546.897
+      },
+      "late": {
+        "cell": "form-keyboard-floating",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "frames": {
+          "reference.title": {
+            "x": 55,
+            "y": 147,
+            "width": 302,
+            "height": 66
+          },
+          "reference": {
+            "x": 55,
+            "y": 219,
+            "width": 970,
+            "height": 99
+          },
+          "message.title": {
+            "x": 55,
+            "y": 329,
+            "width": 412,
+            "height": 66
+          },
+          "message": {
+            "x": 55,
+            "y": 401,
+            "width": 970,
+            "height": 99
+          },
+          "street.title": {
+            "x": 55,
+            "y": 511,
+            "width": 261,
+            "height": 66
+          },
+          "street": {
+            "x": 55,
+            "y": 583,
+            "width": 970,
+            "height": 99
+          },
+          "city.title": {
+            "x": 55,
+            "y": 693,
+            "width": 175,
+            "height": 66
+          },
+          "city": {
+            "x": 55,
+            "y": 765,
+            "width": 970,
+            "height": 99
+          },
+          "postcode.title": {
+            "x": 55,
+            "y": 875,
+            "width": 153,
+            "height": 66
+          },
+          "postcode": {
+            "x": 55,
+            "y": 947,
+            "width": 970,
+            "height": 99
+          },
+          "phone.title": {
+            "x": 55,
+            "y": 1057,
+            "width": 275,
+            "height": 66
+          },
+          "phone": {
+            "x": 55,
+            "y": 1129,
+            "width": 970,
+            "height": 99
+          },
+          "vs.title": {
+            "x": 55,
+            "y": 1239,
+            "width": 258,
+            "height": 66
+          },
+          "vs": {
+            "x": 55,
+            "y": 1311,
+            "width": 970,
+            "height": 99
+          },
+          "ks.title": {
+            "x": 55,
+            "y": 1421,
+            "width": 271,
+            "height": 66
+          },
+          "ks": {
+            "x": 55,
+            "y": 1493,
+            "width": 970,
+            "height": 99
+          },
+          "ss.title": {
+            "x": 55,
+            "y": 1603,
+            "width": 256,
+            "height": 66
+          },
+          "ss": {
+            "x": 55,
+            "y": 1675,
+            "width": 970,
+            "height": 99
+          },
+          "note.title": {
+            "x": 55,
+            "y": 1785,
+            "width": 219,
+            "height": 66
+          },
+          "note": {
+            "x": 55,
+            "y": 1857,
+            "width": 970,
+            "height": 99
+          },
+          "submit.bar": {
+            "x": 0,
+            "y": 1210,
+            "width": 1080,
+            "height": 188
+          },
+          "submit": {
+            "x": 55,
+            "y": 1238,
+            "width": 970,
+            "height": 132
+          }
+        },
+        "events": [
+          {
+            "kind": "focus",
+            "tag": "postcode",
+            "at": 1793708533.245
+          },
+          {
+            "kind": "touch",
+            "tag": "540,1034",
+            "at": 1793708537.21
+          },
+          {
+            "kind": "touch",
+            "tag": "540,1034",
+            "at": 1793708539.966
+          },
+          {
+            "kind": "touch",
+            "tag": "540,1034",
+            "at": 1793708542.719
+          }
+        ],
+        "fields": {
+          "reference": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "message": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "street": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "city": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "postcode": {
+            "value": "",
+            "focused": true,
+            "error": null
+          },
+          "phone": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "vs": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ks": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "ss": {
+            "value": "",
+            "focused": false,
+            "error": null
+          },
+          "note": {
+            "value": "",
+            "focused": false,
+            "error": null
+          }
+        },
+        "focus": "postcode",
+        "keyboard": {
+          "frame": {
+            "x": 0,
+            "y": 1398,
+            "width": 1080,
+            "height": 822
+          },
+          "visible": true,
+          "field": "postcode"
+        },
+        "submits": [],
+        "readAt": 1793708549.931
+      }
+    }
+  ]
+}

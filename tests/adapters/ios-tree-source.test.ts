@@ -10,6 +10,8 @@ import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec
 import { PersistentReadError } from '../../src/adapters/types.js';
 import type { IdbHelper } from '../../src/adapters/idb-helper.js';
 import type { UiNode } from '../../src/adapters/types.js';
+import { landingOf } from '../../src/interact/fill-landing.js';
+import { maskTemplate } from '../../src/interact/fill-reformat.js';
 
 /**
  * One element in the vocabulary both backends share, spelled the two ways
@@ -195,6 +197,53 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
 
   it('a payload that is not an array is a loud error, not an empty screen', () => {
     expect(() => parseIdbDescribeAll('{"elements":[]}')).toThrow(/did not return an array/);
+  });
+});
+
+// T4: idb-lab-form-format-empty.json is batch-4's D51 premise read (`idb ui describe-all --json` on the lab's
+// form-format cell, empty, averi-lab iPhone 17 simulator, iOS 27.0): every element and field as idb printed them, under
+// `elements`. D51's premise: idb hands the date field's mask `__.__.____` out as its AXValue, with no label and no
+// placeholder of its own — so every empty UIKit field's placeholder reads as its value under idb. Pinned as today's
+// reading; ADR 0034's D51 amendment is what makes the fill land over it (fill-reformat.ts#maskTemplate,
+// fill-landing.ts#priorsOf). Each field's `subrole` is null: no field reads as secure (idbSecure).
+describe('parseIdbDescribeAll — batch-4\'s real form-format dump: an empty field\'s mask or placeholder is its value', () => {
+  /**
+   * The capture's elements, as one describe-all answer: whole, every field idb printed (idbSecure reads `subrole`, so a
+   * trimmed copy would hide what the parser sees). idb-springboard-open-in-alert.json, older, keeps only the fields its
+   * `source` lists, `subrole` not among them — a different convention, kept as it is: it holds no TextField, so
+   * idbSecure has nothing to read there.
+   */
+  const raw = async () => JSON.stringify((JSON.parse(await readFile(new URL('../fixtures/idb-lab-form-format-empty.json', import.meta.url), 'utf8')) as { elements: unknown[] }).elements);
+  const field = (tree: UiNode, id: string) => tree.children.find((n) => n.identifier === `lab.form-format.${id}`);
+
+  it('the record: the date field\'s AXValue the mask, no AXLabel, subrole null, traits TextEntry and Scrollable', async () => {
+    const date = (JSON.parse(await raw()) as Record<string, unknown>[]).find((e) => e.AXUniqueId === 'lab.form-format.date');
+    expect(date).toMatchObject({ type: 'TextField', AXLabel: null, AXValue: '__.__.____', subrole: null, traits: ['TextEntry', 'Scrollable', 'TextOperationsAvailable'] });
+  });
+
+  it('13 elements, flat; each empty field a textfield whose value is what the field shows empty, never a label', async () => {
+    const tree = parseIdbDescribeAll(await raw());
+    expect(tree.children).toHaveLength(13);
+    expect(tree.flatList).toBe(true);
+    const fields = ['iban', 'amount', 'ibanShown', 'date', 'phone'].map((id) => {
+      const n = field(tree, id);
+      return [id, n?.role, n?.label, n?.value, n?.secure];
+    });
+    expect(fields).toEqual([
+      ['iban', 'textfield', null, 'SK00 0000 0000 …', false],
+      ['amount', 'textfield', null, '0,00', false],
+      ['ibanShown', 'textfield', null, 'SK00 0000 0000 …', false],
+      ['date', 'textfield', null, '__.__.____', false],
+      ['phone', 'textfield', null, '+421', false],
+    ]);
+    expect(field(tree, 'date')?.rect).toEqual({ x: 20, y: 382, width: 362, height: 34 });
+  });
+
+  it('the parsed mask is a mask template (D51): the dotted landing over it lands, reformatted', async () => {
+    const before = field(parseIdbDescribeAll(await raw()), 'date')!.value!;
+    expect(maskTemplate(before)).toBe(true);
+    const reading = { value: '31122026', clear: false, before, placeholder: undefined, isInput: true, resolvedValue: before, held: 0 as const };
+    expect(landingOf('31.12.2026', reading)).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
   });
 });
 
