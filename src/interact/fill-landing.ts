@@ -161,7 +161,9 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
 function priorsOf(held: string, e: Pick<Expectation, 'value' | 'clear' | 'before' | 'placeholder'>): readonly string[] {
   const prior = priorText(e);
   const shown = skeleton(held);
-  const vanished = !shown.startsWith(skeleton(prior)) || (shown === skeleton(e.value) && !skeleton(prior + e.value).startsWith(shown));
+  const notShown = !shown.startsWith(skeleton(prior)); // D29: the earlier text is not in the reading
+  const valueAlone = shown === skeleton(e.value) && !skeleton(prior + e.value).startsWith(shown); // D61: the value exactly, no start of the earlier text plus the value
+  const vanished = notShown || valueAlone;
   return prior !== '' && (maskTemplate(prior) || vanished) ? [prior, ''] : [prior];
 }
 
