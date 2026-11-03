@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
-import { AndroidLab, DEVICE_CHECK_SIMULATOR, IosLab, type Exec } from '../../scripts/truth/lab-device.js';
-import { parseLabApp, type CatalogCell } from '../../scripts/truth/schema.js';
+import { AndroidLab, DEVICE_CHECK_SIMULATOR, IosLab, withMeasuredPanel, type Exec } from '../../scripts/truth/lab-device.js';
+import { TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
+import { parseLabApp, type CatalogCell, type LabState } from '../../scripts/truth/schema.js';
 
 // The lab devices' guards (scripts/truth/lab-device.ts): a capture or a live run touches the lab's own simulator or
 // AVD, or nothing — checked against what simctl and adb report, through a fake exec (no device).
@@ -24,6 +25,9 @@ const SIMCTL = JSON.stringify({
     'com.apple.CoreSimulator.SimRuntime.iOS-26-2': [{ udid: OLD_LAB_UDID, name: 'averi-lab iPhone 16', state: 'Shutdown' }],
   },
 });
+
+/** A touchable dump of the shape averi's query prints (batch-11's panel). */
+const B11_DUMP = '  mShowRequested=true mShowExplicitlyRequested=true mShowForced=false mInputShown=true\n    touchable region=SkRegion((87,1243,1024,2035)(0,2088,1080,2220))\n';
 
 /** A fake exec answering simctl's list and adb's AVD name and getprop; every other command recorded and refused. */
 function fakeExec(avd = 'averi_lab\r\nOK') {
@@ -152,6 +156,41 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     }
     const refused = fakeExec('Pixel_7_API_34\r\nOK');
     await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).navigation()).rejects.toThrow(/refused/);
+  });
+
+  it('imeTouchable(): averi\'s own TOUCHABLE_COMMAND, its output raw, only of the lab AVD (D67, the kf launch read)', async () => {
+    const { exec, calls } = fakeExec();
+    const answering: Exec = async (file, args) => (args.includes(TOUCHABLE_COMMAND) ? (calls.push(`${file} ${args.join(' ')}`), { stdout: B11_DUMP }) : exec(file, args));
+    expect(await new AndroidLab('emulator-5556', { exec: answering }).imeTouchable()).toBe(B11_DUMP);
+    expect(calls).toEqual(['adb -s emulator-5556 emu avd name', `adb -s emulator-5556 shell ${TOUCHABLE_COMMAND}`]);
+    const refused = fakeExec('Pixel_7_API_34\r\nOK');
+    await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).imeTouchable()).rejects.toThrow(/refused/);
+  });
+});
+
+describe('withMeasuredPanel: the kf launch read kept on the launch (D67)', () => {
+  const launched = { cell: 'form-keyboard-floating', ready: true, screen: { x: 0, y: 0, width: 1080, height: 2220 }, scale: 1, frames: {}, events: [] } satisfies LabState;
+
+  it('a read that answers: its output raw on the launch, nothing said', async () => {
+    const said: string[] = [];
+    const lab = { guard: async () => undefined, imeTouchable: async () => B11_DUMP };
+    expect(await withMeasuredPanel(launched, lab, (l) => said.push(l))).toEqual({ ...launched, imeTouchable: B11_DUMP });
+    expect(said).toEqual([]);
+  });
+
+  it('a read that fails past the guard: kept as its error, said on the log — the run goes on', async () => {
+    const said: string[] = [];
+    const lab = { guard: async () => undefined, imeTouchable: async () => Promise.reject(new Error('adb: device offline')) };
+    expect(await withMeasuredPanel(launched, lab, (l) => said.push(l))).toEqual({ ...launched, imeTouchable: { error: 'adb: device offline' } });
+    expect(said).toEqual(['the IME region read failed: adb: device offline']);
+  });
+
+  it('a device the guard refuses: rethrown, never read, nothing kept', async () => {
+    const said: string[] = [];
+    const { exec, calls } = fakeExec('Pixel_7_API_34\r\nOK');
+    await expect(withMeasuredPanel(launched, new AndroidLab('emulator-5554', { exec }), (l) => said.push(l))).rejects.toThrow(/not the lab's averi_lab: refused/);
+    expect(calls.filter((c) => !c.endsWith('emu avd name'))).toEqual([]);
+    expect(said).toEqual([]);
   });
 });
 

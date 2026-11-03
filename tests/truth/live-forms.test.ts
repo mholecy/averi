@@ -139,35 +139,175 @@ describe('c5–c7: an assert and a flow\'s wait: on name beneath form-picker\'s 
   });
 });
 
+/**
+ * D67: the kf cases' floating panel is the one the IME window's touchable region names at launch (LabState.imeTouchable,
+ * read by live.ts through LabDevice.imeTouchable, parsed by averi's own src/adapters/android.ts#parseTouchableRegion),
+ * not a fixed list of hand placements. The dump's shape is the committed capture's (form-keyboard-floating.ime.json,
+ * `shown.touchable`), its region set per test: the records below read none, so each test gives its launch the region of
+ * the panel its replies quote.
+ */
+const SHOWN_DUMP = (JSON.parse(readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/form-keyboard-floating.ime.json', import.meta.url), 'utf8')) as { shown: { touchable: string } }).shown.touchable;
+const STRIP = '(0,2088,1080,2220)';
+/** The launch with the IME region `region` (an SkRegion body) read at it, the input method saying `shown` or not. */
+const withRegion = (launched: LabState, region: string, shown = true): LabState => {
+  const dump = SHOWN_DUMP.replace(/SkRegion\([^\n]*\)\)/, `SkRegion(${region})`).replace('mInputShown=true', `mInputShown=${shown}`);
+  expect(dump).toContain(`SkRegion(${region})`);
+  return { ...launched, imeTouchable: dump };
+};
+/** A recorded kf case, its launch given the IME region `region` (withRegion). */
+const floated = (record: LiveRecord, id: string, region: string) => {
+  const r = recordedCase(record, 'uiautomator', id);
+  return { ...r, launched: withRegion(r.launched, region) };
+};
+/** r1023b fu1's region (docs/truth/live-android-2026-10-23-floating-gap.md, read on the device that day): bottom 1912. */
+const FU1_REGION = `(359,1269,1040,1912)${STRIP}`;
+/**
+ * batch-11's region REBUILT from the panel every reply of the run quotes (`keyboard 87,1243 937x792`, `over [87,1243]
+ * [1024,2035]`): bottom 2035. Batch-11 never read the region, so a verdict over it pins the judge on that run's replies;
+ * it is no proof of a measurement.
+ */
+const B11_REGION = `(87,1243,1024,2035)${STRIP}`;
+
 describe('kf1–kf2: the submit between a floating panel and its strip — the panel evidenced by the case\'s own first reply', () => {
   // docs/truth/live-records/android-forms-r1023b-fu1-cr-1.json: Gboard floated by hand; each case begins with a colour
   // assert on ks whose refusal quotes the panel over it.
   const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
-  const kf = (id: string) => fu1.results.find((r) => r.id === id)!;
+  const kf = (id: string) => floated(fu1, id, FU1_REGION);
   const noPanel = 'FAIL  element id:"lab.form-keyboard-floating.ks" fill within dE00 8 of #FFFFFF — measured #FFFFFF';
 
-  it('the record: the panel quoted, the submit visible with no stroke, tapped once — ok', () => {
+  it('the record, the panel measured above the submit (bottom 1912 ≤ its top 1928): the panel quoted, the submit visible with no stroke, tapped once — ok', () => {
     for (const id of ['kf1', 'kf2'] as const) {
       const { replies, launched, state } = kf(id);
       expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched).outcome).toBe('ok');
     }
   });
 
-  it('no panel quoted (an IME collapsed to its strip reads the same to the app): SKIP, never ok', () => {
+  it('the measured panel not quoted over ks: SKIP naming it, never ok', () => {
     for (const id of ['kf1', 'kf2'] as const) {
       const { replies, launched, state } = kf(id);
-      expect(judgeFloatingGap(id)(state, [noPanel, ...replies.slice(1)], 'uiautomator', launched)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^no measured panel quoted over ks/) });
+      expect(judgeFloatingGap(id)(state, [noPanel, ...replies.slice(1)], 'uiautomator', launched)).toEqual({
+        outcome: 'SKIP',
+        why: `averi's reply does not quote the measured panel 359,1269 681x643 over ks: ${noPanel}`,
+      });
     }
   });
 
-  it('a submit the case never asked for is a MISMATCH before any evidence: kf1 with one, kf2 with two, panel quoted or not', () => {
+  it('a submit the case never asked for is a MISMATCH before any evidence: kf1 with one, kf2 with two, panel quoted or not, measured or not', () => {
     for (const [id, n] of [['kf1', 1], ['kf2', 2]] as const) {
       const { replies, launched, state } = kf(id);
       const submitted = { ...state, submits: Array.from({ length: n }, (_, i) => ({ at: i })) } as LabState;
       for (const first of [replies[0], noPanel]) {
-        expect(judgeFloatingGap(id)(submitted, [first, ...replies.slice(1)], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^the form was SUBMITTED/) });
+        for (const at of [launched, { ...launched, imeTouchable: undefined }]) {
+          expect(judgeFloatingGap(id)(submitted, [first, ...replies.slice(1)], 'uiautomator', at)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^the form was SUBMITTED/) });
+        }
       }
     }
+  });
+});
+
+describe('kf1–kf3 with no measured panel: SKIP "no measured panel", whatever the replies quote (D67)', () => {
+  const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
+  const kf = (id: string) => recordedCase(fu1, 'uiautomator', id);
+
+  it('a rect off the screen beside the panel: dropped, as averi drops it — the panel left is measured, kf1–kf3 ok', () => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { replies, launched, state } = floated(fu1, id, `(359,1269,1040,1912)(2000,0,2100,50)${STRIP}`);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched).outcome).toBe('ok');
+    }
+  });
+
+  it.each([
+    ['no region read at launch (a record before D67)', (l: LabState) => l, 'no measured panel (no IME region read at launch)'],
+    ['a read that failed (withMeasuredPanel kept its error)', (l: LabState) => ({ ...l, imeTouchable: { error: 'adb: device offline' } }), 'no measured panel (the IME region read failed)'],
+    ['an empty read', (l: LabState) => ({ ...l, imeTouchable: '' }), 'no measured panel (the input method did not say shown)'],
+    ['the input method not saying shown', (l: LabState) => withRegion(l, FU1_REGION, false), 'no measured panel (the input method did not say shown)'],
+    ['a region that does not read', (l: LabState) => withRegion(l, '(359,1269,1040'), 'no measured panel (the IME region unreadable)'],
+    ['the strip alone (no panel beyond it)', (l: LabState) => withRegion(l, STRIP), 'no measured panel (the region holds no rect beyond the strip 0,2088 1080x132)'],
+    ['two panels beyond the strip', (l: LabState) => withRegion(l, `(359,1269,1040,1912)(0,100,50,150)${STRIP}`), 'no measured panel (2 panels beyond the strip: 359,1269 681x643, 0,100 50x50)'],
+    ['a region that does not hold the strip (averi ignores it whole)', (l: LabState) => withRegion(l, '(359,1269,1040,1912)(0,2080,1080,2220)'), 'no measured panel (the region does not hold the strip 0,2088 1080x132)'],
+    ['its one rect beyond the strip off the screen the strip spans', (l: LabState) => withRegion(l, `(2000,0,2100,50)${STRIP}`), 'no measured panel (1 rect(s) of the region off the screen or of no area)'],
+  ] as const)('%s: kf1, kf2 and kf3 SKIP', (_says, at, why) => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { replies, launched, state } = kf(id);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', at(launched))).toEqual({ outcome: 'SKIP', why });
+    }
+  });
+});
+
+describe('kf1–kf3 on batch-11\'s real run: the panel dragged over the submit (D67)', () => {
+  // tests/fixtures/live-android-forms-b11-kf-floated.json: batch-11's ONLY=kf run (averi_lab, API 33, main a5fefd32),
+  // trimmed from the device batch. Gboard floated, its panel at 87,1243 937x792 — bottom 2035, 107 px below the submit's
+  // top (55,1928 970x132) — so kf1/kf2's premise did not hold, and averi's refusal was ADR 0027's fail-closed case.
+  // The run read no region: B11_REGION is rebuilt from the panel its replies quote, so these verdicts are regression
+  // pins on the run's replies (kf3's ok included), not proof of a measurement.
+  const b11 = JSON.parse(readFileSync(new URL('../fixtures/live-android-forms-b11-kf-floated.json', import.meta.url), 'utf8')) as LiveRecord;
+  const kf = (id: string) => floated(b11, id, B11_REGION);
+
+  it('the record: launched floating (the 132-px strip), the submit and ks where the note says, every reply quoting the panel', () => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { launched, replies } = recordedCase(b11, 'uiautomator', id);
+      expect(launched.keyboard).toEqual({ frame: { x: 0, y: 2088, width: 1080, height: 132 }, visible: true, field: 'postcode' });
+      expect(launched.frames.submit).toEqual({ x: 55, y: 1928, width: 970, height: 132 });
+      expect(launched.frames.ks).toEqual({ x: 55, y: 1660, width: 970, height: 99 });
+      expect(launched.imeTouchable).toBeUndefined();
+      expect(replies.join('\n')).toMatch(/keyboard 87,1243 937x792|over \[87,1243\]\[1024,2035\]/);
+    }
+  });
+
+  it('kf1 and kf2: SKIP naming the cover — not "not floating", not a false MISMATCH on the refusal', () => {
+    for (const id of ['kf1', 'kf2'] as const) {
+      const { replies, launched, state } = kf(id);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched)).toEqual({
+        outcome: 'SKIP',
+        why: 'the measured panel 87,1243 937x792 covers the submit 55,1928 970x132 by 107 px — not the case\'s premise (the submit wholly between the panel and the strip)',
+      });
+    }
+  });
+
+  it('kf3: judged over the rebuilt region (a regression pin) — ks\'s centre under the panel, no stop, the panel named, postcode untouched: ok', () => {
+    const { replies, launched, state } = kf('kf3');
+    expect(judgeFloatingGap('kf3')(state, replies, 'uiautomator', launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/^no stop \(ks \d+–\d+\), postcode untouched; /) });
+  });
+
+  it('the strip over the submit\'s foot, or a submit beside the panel\'s rows, is not the premise either', () => {
+    const { replies, launched, state } = kf('kf1');
+    const lower = { ...launched, frames: { ...launched.frames, submit: { x: 55, y: 2040, width: 970, height: 132 } } };
+    expect(judgeFloatingGap('kf1')(state, replies, 'uiautomator', lower)).toEqual({
+      outcome: 'SKIP',
+      why: 'the strip 0,2088 1080x132 covers the submit 55,2040 970x132 by 84 px — not the case\'s premise (the submit wholly between the panel and the strip)',
+    });
+    const beside = withRegion({ ...launched, frames: { ...launched.frames, submit: { x: 0, y: 1928, width: 80, height: 132 } } }, B11_REGION);
+    expect(judgeFloatingGap('kf1')(state, replies, 'uiautomator', beside)).toEqual({
+      outcome: 'SKIP',
+      why: 'the submit 0,1928 80x132 is not wholly between the measured panel 87,1243 937x792 and the strip 0,2088 1080x132 — not the case\'s premise',
+    });
+    const unlaid = { ...launched, frames: Object.fromEntries(Object.entries(launched.frames).filter(([k]) => k !== 'submit')) };
+    expect(judgeFloatingGap('kf1')(state, replies, 'uiautomator', unlaid)).toEqual({ outcome: 'SKIP', why: 'the submit not laid out at launch' });
+  });
+
+  it('the panel dragged above the submit (bottom 1928, the gap\'s edge): kf1 and kf2 judged, not skipped — the refusal now a MISMATCH', () => {
+    for (const id of ['kf1', 'kf2'] as const) {
+      const { replies, state, launched } = recordedCase(b11, 'uiautomator', id);
+      const above = withRegion(launched, `(87,1136,1024,1928)${STRIP}`);
+      // The evidence reply quoting the panel where it now is: what averi would say of it.
+      const evidence = replies[0].replace('keyboard 87,1243 937x792', 'keyboard 87,1136 937x792');
+      expect(judgeFloatingGap(id)(state, [evidence, ...replies.slice(1)], 'uiautomator', above)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^refused, though the submit lies wholly between the panel and the strip/) });
+    }
+  });
+
+  it('kf3 with ks\'s centre (540,1709) outside the measured panel: SKIP naming it', () => {
+    const { replies, state, launched } = recordedCase(b11, 'uiautomator', 'kf3');
+    expect(judgeFloatingGap('kf3')(state, replies, 'uiautomator', withRegion(launched, `(87,1243,1024,1700)${STRIP}`))).toEqual({
+      outcome: 'SKIP',
+      why: 'ks\'s centre at launch lies outside the measured panel 87,1243 937x457',
+    });
+  });
+
+  it('kf3: a reply that does not name the measured panel is SKIP naming it; a visible claim with ks under it a MISMATCH', () => {
+    const { replies, state, launched } = kf('kf3');
+    const other = replies[0].replaceAll('[87,1243][1024,2035]', '[71,1092][1008,1884]');
+    expect(judgeFloatingGap('kf3')(state, [other], 'uiautomator', launched)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^averi's reply does not name the measured panel over \[87,1243\]\[1024,2035\]: ERROR scroll_until/) });
+    expect(judgeFloatingGap('kf3')(state, ['Element id:"lab.form-keyboard-floating.ks" fully visible after 0 swipes'], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/ks's centre lies in the measured panel/) });
   });
 });
 
@@ -178,6 +318,7 @@ describe('kf1–kf3 on a real DOCKED run: the precondition reads docked and ever
   const docked = JSON.parse(readFileSync(new URL('../fixtures/live-android-forms-b10-kf-docked.json', import.meta.url), 'utf8')) as LiveRecord;
   const kf = (record: LiveRecord, id: string) => recordedCase(record, 'uiautomator', id);
   const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
+  const floatedKf = (id: string) => floated(fu1, id, FU1_REGION);
   const DOCKED = { outcome: 'SKIP', why: 'keyboard docked (the app hears an IME 822 px tall, not the floating strip)' };
 
   it('the record: each case launched under the docked IME, kf1\'s evidence reply quoting it', () => {
@@ -187,30 +328,31 @@ describe('kf1–kf3 on a real DOCKED run: the precondition reads docked and ever
     expect(kf(docked, 'kf1').replies[0]).toContain('(element 55,1644 970x132, keyboard 0,1398 1080x822)');
   });
 
-  it('kf1, kf2 and kf3: SKIP, "keyboard docked", before any reply is read', () => {
+  it('kf1, kf2 and kf3: SKIP, "keyboard docked", before any reply is read — a measured region or not', () => {
     for (const id of ['kf1', 'kf2', 'kf3'] as const) {
       const { replies, launched, state } = kf(docked, id);
       expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched)).toEqual(DOCKED);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', withRegion(launched, FU1_REGION))).toEqual(DOCKED);
     }
   });
 
-  it('a docked evidence reply never counts as a quoted panel: 822 px matches no LAB_FLOATING_PANELS entry — SKIP on a floated launch too', () => {
+  it('a docked evidence reply never counts as the measured panel quoted: 822 px is not it — SKIP on a floated launch too', () => {
     for (const id of ['kf1', 'kf2'] as const) {
-      const floated = kf(fu1, id);
+      const floated = floatedKf(id);
       expect(judgeFloatingGap(id)(floated.state, kf(docked, id).replies, 'uiautomator', floated.launched)).toMatchObject({
         outcome: 'SKIP',
-        why: expect.stringMatching(/^no measured panel quoted over ks — the IME was not floating there: 1\/1 asserts FAILED/),
+        why: expect.stringMatching(/^averi's reply does not quote the measured panel 359,1269 681x643 over ks: 1\/1 asserts FAILED/),
       });
     }
-    const floated = kf(fu1, 'kf3');
+    const floated = floatedKf('kf3');
     expect(judgeFloatingGap('kf3')(floated.state, kf(docked, 'kf3').replies, 'uiautomator', floated.launched)).toMatchObject({
       outcome: 'SKIP',
-      why: expect.stringMatching(/^no measured panel named in the reply — the IME was not floating there: ERROR scroll_until/),
+      why: expect.stringMatching(/^averi's reply does not name the measured panel over \[359,1269\]\[1040,1912\]: ERROR scroll_until/),
     });
   });
 
   it('kf3 on the floated record (r1023b fu1): ok — no stop, the panel named, postcode untouched', () => {
-    const { replies, launched, state } = kf(fu1, 'kf3');
+    const { replies, launched, state } = floatedKf('kf3');
     expect(launched.keyboard?.frame).toEqual({ x: 0, y: 2088, width: 1080, height: 132 });
     expect(judgeFloatingGap('kf3')(state, replies, 'uiautomator', launched)).toMatchObject({
       outcome: 'ok',

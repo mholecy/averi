@@ -9,7 +9,7 @@ import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
-import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
+import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause, withMeasuredPanel } from './lab-device.js';
 import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
@@ -197,7 +197,7 @@ if (rejudging !== undefined) {
         const warm = c.warmUp === true ? await callTool(client, { tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await configFor(source, c)) : undefined;
         const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
         if (warmUpError !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
-        const launched = await lab.launch(c.cell);
+        let launched = await lab.launch(c.cell);
         if (c.keyboard && launched.keyboard?.visible !== true) {
           const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
           results.push({ source, c, verdict, replies: [] });
@@ -205,6 +205,8 @@ if (rejudging !== undefined) {
           console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
           continue;
         }
+        // The one device read the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel).
+        if (c.measuresPanel && android !== undefined) launched = await withMeasuredPanel(launched, android);
         const config = await configFor(source, c);
         const replies: string[] = [];
         const after: (LabState | undefined)[] = [];

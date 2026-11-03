@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
 import { appOf, type CatalogCell, type ImeCapture, type ImeWitness, type LabApp, type LabState, type NavigationMode, WINDOW_MANAGER_WORD } from './schema.js';
@@ -93,6 +94,11 @@ export interface LabDevice {
    * Absent on iOS (its keyboard is in the tree).
    */
   ime?(): Promise<ImeCapture>;
+  /**
+   * Android: averi's touchable query (src/adapters/android.ts#TOUCHABLE_COMMAND) now, raw — the IME window's touchable region beside `mInputShown`,
+   * read once at a kf case's launch (live.ts; LabState.imeTouchable). Leaves the keyboard up. Absent on iOS.
+   */
+  imeTouchable?(): Promise<string>;
   /**
    * Android: `dumpsys window displays` now — the dump averi's Android adapter reads its system bands from (the status
    * bar's height, the navigation bar's top: src/adapters/android.ts#systemBands) and its keyboard. Absent on iOS.
@@ -282,11 +288,31 @@ export class IosLab implements LabDevice {
 // --- Android: adb ---
 
 /**
- * averi's keyboard queries (src/adapters/android.ts: INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND), word for word — copied,
- * not imported, so the capture asks what averi asks without loading the code it judges.
+ * averi's witness query (src/adapters/android.ts: INPUT_SHOWN_COMMAND), word for word. The touchable query is averi's
+ * own TOUCHABLE_COMMAND, imported: the capture (`ime`) and the live kf read (`imeTouchable`) send it as averi does.
  */
 export const IME_INPUT_SHOWN = 'dumpsys input_method | grep -m1 -w mInputShown';
-export const IME_TOUCHABLE = `${IME_INPUT_SHOWN}; dumpsys window InputMethod | grep -F 'touchable region='; true`;
+
+/**
+ * The kf cases' one device read (live.ts; LabState.imeTouchable): `launched` with what averi's touchable query answered
+ * right after the launch. A device the guard refuses rethrows — the run stops, as any other call there would; a read
+ * that fails past the guard is said on stderr (`log`) and kept as `{ error }`, which live-forms.ts#measuredPanel reads
+ * as "no measured panel (the IME region read failed)".
+ */
+export async function withMeasuredPanel(
+  launched: LabState,
+  lab: { guard(): Promise<unknown>; imeTouchable(): Promise<string> },
+  log: (line: string) => void = console.error,
+): Promise<LabState> {
+  await lab.guard();
+  try {
+    return { ...launched, imeTouchable: await lab.imeTouchable() };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    log(`the IME region read failed: ${error}`);
+    return { ...launched, imeTouchable: { error } };
+  }
+}
 
 export class AndroidLab implements LabDevice {
   readonly platform = 'android';
@@ -370,11 +396,16 @@ export class AndroidLab implements LabDevice {
     await this.guard();
     const witness = async (): Promise<ImeWitness> => ({
       inputShown: (await this.adb('shell', IME_INPUT_SHOWN).catch(() => ({ stdout: '' }))).stdout,
-      touchable: (await this.adb('shell', IME_TOUCHABLE)).stdout,
+      touchable: (await this.adb('shell', TOUCHABLE_COMMAND)).stdout,
     });
     const shown = { displays: (await this.adb('shell', 'dumpsys', 'window', 'displays')).stdout, ...(await witness()) };
     await this.hideKeyboard();
     return { shown, hidden: await witness() };
+  }
+
+  async imeTouchable(): Promise<string> {
+    await this.guard();
+    return (await this.adb('shell', TOUCHABLE_COMMAND)).stdout;
   }
 
   async displays(): Promise<string> {

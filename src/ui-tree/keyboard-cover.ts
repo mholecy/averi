@@ -245,7 +245,7 @@ const witnessDenies = (witness: KeyboardWitness): boolean => witness === 'hidden
  *   spans or have no area (the rest are admitted).
  * Rendered in one place, `refusalText`.
  */
-type RegionRefusal =
+export type RegionRefusal =
   | { kind: 'unreadable' }
   | { kind: 'witness-not-shown'; witness: Exclude<KeyboardWitness, 'shown'> }
   | { kind: 'no-band-rect' }
@@ -309,8 +309,11 @@ function refusalText(refusal: RegionRefusal): string {
  * tap of the device check, no worse than with no panel read. None of these is
  * measured; each refusal is SAID once (`refused`), so a device check can
  * tell them apart.
+ *
+ * Exported for the live golden's kf judges (measuredPanel in scripts/truth/live-forms.ts), which admit a floating panel
+ * by these rules and no others.
  */
-function panelsBeyond(band: Rect, touchable: KeyboardTouchable): { panels: readonly Rect[]; refused?: RegionRefusal } {
+export function panelsBeyond(band: Rect, touchable: KeyboardTouchable): { panels: readonly Rect[]; refused?: RegionRefusal } {
   const { witness, region } = touchable;
   if (region === undefined) {
     // Said only when the input method answered: then the call ran, and the region line was missing or unreadable.

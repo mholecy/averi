@@ -55,6 +55,11 @@ export interface Case extends RunsUnder {
   /** The case is about the soft keyboard: judged only when the launch shows it (else SKIP). */
   keyboard?: true;
   /**
+   * Android: right after the launch, the IME window's touchable region is read (LabDevice.imeTouchable) into
+   * `launched.imeTouchable` — the floating panel the kf cases are judged against (live-forms.ts#measuredPanel).
+   */
+  measuresPanel?: true;
+  /**
    * Bind the case's tree source before its launch — one `ui_snapshot` under its config, the reply kept only when it
    * failed (RunRecord `warmUpError`): a case timed from the launch (live-ensure.ts) must not lose its first seconds to
    * WDA starting or idb's companion coming up.
@@ -207,11 +212,13 @@ const FORMS: Omit<Case, 'group'>[] = [
   },
   // FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md):
   // Gboard floated by hand (no adb setting does it), its panel over the form and the pinned submit in the strip below it
-  // — live-forms.ts#judgeFloatingGap; a run whose Gboard came up docked is SKIP.
+  // — live-forms.ts#judgeFloatingGap, against the panel the IME's region names at launch (measuresPanel); a run whose
+  // Gboard came up docked is SKIP, and so is one where the panel does not lie as the case's premise needs.
   {
     id: 'kf1',
     cell: KF,
     keyboard: true,
+    measuresPanel: true,
     platforms: ['android'],
     says: 'scroll_until the submit between a floating keyboard\'s panel and its strip: visible with no stroke (the panel evidenced over ks first)',
     calls: [FLOATING_PANEL_EVIDENCE, { tool: 'scroll_until', args: { selector: id(KF, 'submit'), direction: 'down' } }],
@@ -221,6 +228,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     id: 'kf2',
     cell: KF,
     keyboard: true,
+    measuresPanel: true,
     platforms: ['android'],
     says: 'scroll_until the submit there, then tap it: one submit, the IME still up',
     calls: [
@@ -234,6 +242,7 @@ const FORMS: Omit<Case, 'group'>[] = [
     id: 'kf3',
     cell: KF,
     keyboard: true,
+    measuresPanel: true,
     platforms: ['android'],
     says: 'scroll_until ks, under the floating panel: never visible while its centre lies in the panel, no key typed',
     calls: [{ tool: 'scroll_until', args: { selector: id(KF, 'ks'), direction: 'down' } }],

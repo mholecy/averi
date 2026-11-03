@@ -2,7 +2,10 @@ import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
 import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
+import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
+import { rectIntersection } from '../../src/adapters/types.js';
+import { panelsBeyond } from '../../src/ui-tree/keyboard-cover.js';
 import type { SourceKind } from '../differential/corpus.js';
 import type { LabState, Rect } from './schema.js';
 import { probePoint, within } from './truth.js';
@@ -283,25 +286,11 @@ export const judgeMissUnderSheet =
   };
 
 /**
- * Where the lab's hand-floated Gboard panel was measured (the IME window's touchable region beside its 132-px strip):
- * the capture's `SkRegion((71,1092,1008,1884)(0,2088,1080,2220))`
- * (tests/fixtures/truth/android-averi_lab-api33/form-keyboard-floating.ime.json) and the 2026-10-23 live run's
- * `SkRegion((359,1269,1040,1912)(0,2088,1080,2220))` (docs/truth/live-android-2026-10-23-floating-gap.md, also the
- * 2026-10-08 device check's). No adb setting places it; a run that finds it elsewhere reads its region and adds it here.
- * kf3 refuses a visible claim on ks whose centre lies in ANY of them.
- */
-export const LAB_FLOATING_PANELS: readonly Rect[] = [
-  { x: 71, y: 1092, width: 937, height: 792 },
-  { x: 359, y: 1269, width: 681, height: 643 },
-];
-
-/**
  * The kf cases' precondition: the IME is FLOATING at launch — the app hears of only its strip (the inset the panel's
  * window gives, 132 px on the lab AVD), not a docked keyboard's 822 px. No adb setting floats Gboard, so a run whose
  * Gboard came up docked is not run, never ok. WEAK on its own: the app's state cannot tell a floating panel from an
  * IME collapsed to its strip with no panel (a hardware-keyboard toolbar), where kf1 and kf2 would pass with no gap
- * rule at all; the record keeps no region. So each case evidences the panel in a reply of its own, which must quote a
- * measured one (`judgeFloatingGap`).
+ * rule at all. So the panel is measured at launch (`measuredPanel`), and each case evidences it in a reply of its own.
  */
 export function floatingAtLaunch(launched: LabState): LiveVerdict | undefined {
   const ime = launched.keyboard;
@@ -309,25 +298,83 @@ export function floatingAtLaunch(launched: LabState): LiveVerdict | undefined {
   return ime.frame.height > 200 ? { outcome: 'SKIP', why: `keyboard docked (the app hears an IME ${ime.frame.height} px tall, not the floating strip)` } : undefined;
 }
 
-/** Whether a frame's centre, as a probe taps it, lies in any measured panel. */
-const inAPanel = (r: Rect | undefined | null): boolean => r != null && LAB_FLOATING_PANELS.some((p) => within(probePoint(r), p));
+/**
+ * The floating panel, as the IME window's touchable region named it right after the launch (LabState.imeTouchable,
+ * live.ts's one device read for the kf cases — averi's own query, src/adapters/android.ts#TOUCHABLE_COMMAND), read by
+ * averi's own readers (src/adapters/android.ts#parseInputShown, #parseTouchableRegion) and admitted by averi's own
+ * rules (src/ui-tree/keyboard-cover.ts#panelsBeyond, beside `strip`, the inset the app hears of) — no second parser,
+ * no rule of the harness's. The panel lies wherever the hand dragged it: no list of placements. Anything but one
+ * admitted panel is "no measured panel", saying why: no read (a record before D67), a failed read, the input method
+ * not saying shown, a region that does not read, one that does not hold the strip, rects off the screen, no rect
+ * beyond the strip, or several panels.
+ */
+export function measuredPanel(launched: LabState, strip: Rect): { panel: Rect } | { why: string } {
+  const dump = launched.imeTouchable;
+  const none = (why: string) => ({ why: `no measured panel (${why})` });
+  if (dump === undefined) return none('no IME region read at launch');
+  if (typeof dump !== 'string') return none('the IME region read failed');
+  const region = parseTouchableRegion(dump);
+  const { panels, refused } = panelsBeyond(strip, { witness: parseInputShown(dump), region });
+  if (panels.length === 1) return { panel: panels[0] };
+  if (panels.length > 1) return none(`${panels.length} panels beyond the strip: ${panels.map(rectText).join(', ')}`);
+  switch (refused?.kind) {
+    case 'unreadable':
+      return none('the IME region unreadable');
+    case 'witness-not-shown':
+      return none('the input method did not say shown');
+    case 'no-band-rect':
+      return none(`the region does not hold the strip ${rectText(strip)}`);
+    case 'rects-dropped':
+      return none(`${refused.dropped} rect(s) of the region off the screen or of no area`);
+    case undefined:
+      return none(region === undefined ? 'the input method did not say shown' : `the region holds no rect beyond the strip ${rectText(strip)}`);
+  }
+}
 
-/** Whether a reply quotes a measured panel, as its sentence spells a rect (`spell`): the run's evidence that the IME was floating. */
-const panelQuoted = (reply: string | undefined, spell: (p: Rect) => string): boolean => LAB_FLOATING_PANELS.some((p) => reply?.includes(spell(p)) === true);
+/** The measured panel and the strip beside it, or the SKIP that says why there is none: both kf branches' one read. */
+function panelAtLaunch(launched: LabState): { panel: Rect; strip: Rect } | { skip: LiveVerdict } {
+  const strip = launched.keyboard?.frame;
+  if (strip === undefined) return { skip: { outcome: 'SKIP', why: 'no IME at launch' } };
+  const measured = measuredPanel(launched, strip);
+  return 'why' in measured ? { skip: { outcome: 'SKIP', why: measured.why } } : { panel: measured.panel, strip };
+}
+
+const NOT_THE_PREMISE = "not the case's premise (the submit wholly between the panel and the strip)";
+
+/**
+ * kf1/kf2's premise, at launch: the submit lies wholly in the gap — its top at or below the measured panel's bottom,
+ * its bottom at or above the strip's top. Else why not, naming what covers it and by how many px (the rows they share):
+ * batch-11's panel at 87,1243 937x792 covered the submit 55,1928 970x132 by 107 px, and averi's refusal there is ADR
+ * 0027's fail-closed case, not a MISMATCH.
+ */
+export function gapPremise(submit: Rect | undefined, panel: Rect, strip: Rect): { holds: true } | { why: string } {
+  if (submit === undefined) return { why: 'the submit not laid out at launch' };
+  if (submit.y >= panel.y + panel.height && submit.y + submit.height <= strip.y) return { holds: true };
+  const underPanel = rectIntersection(submit, panel);
+  if (underPanel !== undefined) return { why: `the measured panel ${rectText(panel)} covers the submit ${rectText(submit)} by ${underPanel.height} px — ${NOT_THE_PREMISE}` };
+  const underStrip = rectIntersection(submit, strip);
+  if (underStrip !== undefined) return { why: `the strip ${rectText(strip)} covers the submit ${rectText(submit)} by ${underStrip.height} px — ${NOT_THE_PREMISE}` };
+  return { why: `the submit ${rectText(submit)} is not wholly between the measured panel ${rectText(panel)} and the strip ${rectText(strip)} — not the case's premise` };
+}
+
+/** Whether a frame's centre, as a probe taps it, lies in the measured panel. */
+const inPanel = (r: Rect | undefined | null, panel: Rect): boolean => r != null && within(probePoint(r), panel);
 
 /** The kf1/kf2 evidence call, sent first (a submit lays the form out again): a colour assert on ks, which the pixel poll refuses naming the panel over it (`keyboard x,y wxh`) — no touch, no key, the IME left up. */
 export const FLOATING_PANEL_EVIDENCE = { tool: 'assert', args: { asserts: [{ element: { id: 'lab.form-keyboard-floating.ks' }, color: { expected: '#FFFFFF' }, timeout: 5_000 }] } } as const;
 
 /**
- * kf1–kf3, form-keyboard-floating under a floating Gboard: the pinned submit lies wholly in the strip between the panel
- * and the strip the app hears of, drawn and tappable (ADR 0027).
+ * kf1–kf3, form-keyboard-floating under a floating Gboard, judged against the panel measured at launch
+ * (`measuredPanel`; none: SKIP "no measured panel"): the pinned submit lies wholly in the strip between the panel and
+ * the strip the app hears of, drawn and tappable (ADR 0027).
  * - `kf1` scroll_until submit: a visible claim with no stroke (0 swipes, no touch the app logged); a refusal is the
  *   false refusal of the note, a stroke one the bar never needed.
  * - `kf2` scroll_until submit, then tap it: one submit, the IME still up (no `back` sent for it), the tap the one
  *   touch the app logged.
- * - kf1 and kf2 start with `FLOATING_PANEL_EVIDENCE`: SKIP unless its reply quotes a measured panel over ks.
- * - `kf3` scroll_until ks: never a visible claim while ks's centre lies in the panel; postcode, focused under it, as
- *   the launch left it (no key typed).
+ * - kf1 and kf2 are SKIP unless the submit lies wholly in the gap at launch (`gapPremise`, naming the cover), and
+ *   start with `FLOATING_PANEL_EVIDENCE`: SKIP unless its reply quotes the measured panel over ks.
+ * - `kf3` scroll_until ks: SKIP unless ks's centre lies in the measured panel at launch; never a visible claim while it
+ *   lies there; postcode, focused under it, as the launch left it (no key typed).
  * docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md
  */
 export const judgeFloatingGap =
@@ -342,19 +389,28 @@ export const judgeFloatingGap =
       const [scroll] = replies;
       if (valueOf(s, 'postcode') !== valueOf(launched, 'postcode')) return { outcome: 'MISMATCH', why: `postcode CHANGED to ${JSON.stringify(valueOf(s, 'postcode'))} — a key was typed; averi: ${short(scroll)}` };
       if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×); averi: ${short(scroll)}` };
-      // Not run unless ks starts under a measured panel: elsewhere a visible claim is no evidence either way.
-      if (!inAPanel(launched.frames.ks)) return { outcome: 'SKIP', why: 'ks\'s centre at launch lies in no measured panel' };
+      const measured = panelAtLaunch(launched);
+      if ('skip' in measured) return measured.skip;
+      const { panel } = measured;
+      // Not run unless ks starts under the measured panel: elsewhere a visible claim is no evidence either way.
+      if (!inPanel(launched.frames.ks, panel)) return { outcome: 'SKIP', why: `ks's centre at launch lies outside the measured panel ${rectText(panel)}` };
       const ks = s.frames.ks;
       const where = ks == null ? 'ks not laid out' : `ks ${ks.y}–${ks.y + ks.height}`;
-      if (replyKind(scroll) === 'visible' && (ks == null || inAPanel(ks))) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — ks's centre lies in a measured panel (${where}); ${logged}` };
-      // An ok refusal names a panel (not the 132-px strip alone): the run's evidence that the IME was floating.
-      if (!panelQuoted(scroll, (p) => `over [${p.x},${p.y}][${p.x + p.width},${p.y + p.height}]`)) return { outcome: 'SKIP', why: `no measured panel named in the reply — the IME was not floating there: ${short(scroll)}` };
-      return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panels (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
+      if (replyKind(scroll) === 'visible' && (ks == null || inPanel(ks, panel))) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — ks's centre lies in the measured panel (${where}); ${logged}` };
+      // An ok refusal names the panel (not the 132-px strip alone): averi read the panel the launch measured.
+      const panelAsNamed = `over [${panel.x},${panel.y}][${panel.x + panel.width},${panel.y + panel.height}]`;
+      if (scroll?.includes(panelAsNamed) !== true) return { outcome: 'SKIP', why: `averi's reply does not name the measured panel ${panelAsNamed}: ${short(scroll)}` };
+      return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panel (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
     }
     const [evidence, scroll, tap] = replies;
     // Damage is judged before the evidence: a submit the case never asked for is wrong with a panel up or not.
     if (submits > (kind === 'kf2' ? 1 : 0)) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×) — more than the case's ${kind === 'kf2' ? 'one tap' : 'none'}: ${short(scroll)}${kind === 'kf2' ? ` / ${short(tap)}` : ''}` };
-    if (!panelQuoted(evidence, (p) => `keyboard ${rectText(p)}`)) return { outcome: 'SKIP', why: `no measured panel quoted over ks — the IME was not floating there: ${short(evidence)}` };
+    const measured = panelAtLaunch(launched);
+    if ('skip' in measured) return measured.skip;
+    const { panel, strip } = measured;
+    const premise = gapPremise(launched.frames.submit, panel, strip);
+    if ('why' in premise) return { outcome: 'SKIP', why: premise.why };
+    if (evidence?.includes(`keyboard ${rectText(panel)}`) !== true) return { outcome: 'SKIP', why: `averi's reply does not quote the measured panel ${rectText(panel)} over ks: ${short(evidence)}` };
     if (replyKind(scroll) !== 'visible') return { outcome: 'MISMATCH', why: `refused, though the submit lies wholly between the panel and the strip: ${short(scroll)}` };
     // kf2's one touch is its tap, sent after the scroll; any other is a stroke.
     if (swipesOf(scroll) !== 0 || touches.length > (kind === 'kf2' ? 1 : 0)) return { outcome: 'MISMATCH', why: `a stroke the pinned submit never needed (${swipesOf(scroll) ?? '?'} swipes; ${logged}): ${short(scroll)}` };

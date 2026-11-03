@@ -1194,9 +1194,10 @@ export function parseInputShown(out: string): KeyboardWitness {
  * then every `touchable region=` line of the IME window's dump (no `-m1`:
  * two that disagree must be seen, parseTouchableRegion reads them as none),
  * then `true`, so a grep that matched nothing does not fail the call. Every
- * word a constant.
+ * word a constant. Exported for the live golden's kf launch read
+ * (AndroidLab.imeTouchable in scripts/truth/lab-device.ts), which asks it word for word.
  */
-const TOUCHABLE_COMMAND = `${INPUT_SHOWN_COMMAND}; dumpsys window InputMethod | grep -F 'touchable region='; true`;
+export const TOUCHABLE_COMMAND = `${INPUT_SHOWN_COMMAND}; dumpsys window InputMethod | grep -F 'touchable region='; true`;
 
 /**
  * The window manager's word on the focused window, in one shell line: the focus and the display's size out of `dumpsys
