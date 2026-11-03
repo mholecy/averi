@@ -593,7 +593,7 @@ should move from MISMATCH failed-holds to ok (it is not in live-known.ts); f13 p
 clear, g5 is exact, and wda and uiautomator dump no `+421` as `before`, so nothing else moves. Not checked on the
 device: `live.ts --groups forms --cases g3,g4,g5,f13` on idb and wda, a later batch's (g3 should read `Filled … (12
 characters, the field shows them reformatted: 3 separators added)`).
-Since then batch-10 ran it and it passed: see the next paragraph.
+See the batch-10 paragraph below.
 
 **Proven live** (batch-10, 2026-11-03, main 139256a2, the lab simulator iOS 27.0 and averi_lab API 33; `live.ts --groups
 forms`, two runs of the new cases and one whole-group run on each of uiautomator, idb and wda): g3 ok 3/3 on every
@@ -671,7 +671,7 @@ did not change and the app still holds `31.12.2026`) runs after f14 on idb, wda 
 read MISMATCH `fill-claim`; with D63 ok. No existing case's verdict moves; g1 now runs after f15. Not checked on the
 device: `live.ts --groups forms --cases f15` on idb, wda and uiautomator, and a regression pass of p1, f13, g3–g5, a
 later batch's.
-Since then batch-10 ran it and it passed: see this amendment's last paragraph.
+See the batch-10 paragraph below.
 
 Residuals, stated: residuals 7 and 8 below — the guard is byte equality with `before`, so a reading that moved
 without any of the typing, or whose `before` was not what the field showed when typing began, still passes by
@@ -796,7 +796,7 @@ nothing. A `loud-changed` there points to the caret landing inside the text, as 
 reading is refused by the folded rule, the same `unchanged` reply); no existing case's verdict moves; g1 now runs after
 f16. Not checked on the device: `live.ts --groups forms --cases f15,f16` and a regression pass of p1, f13, g1–g5 on
 idb, wda and uiautomator, a later batch's.
-Since then batch-10 ran it and it passed: see this amendment's last paragraph.
+See the batch-10 paragraph below.
 
 Residuals, stated: residual 9 below; residual 8 (A) is closed; residual 8 (B) stays, moved where the skip lives (ADR 0028's D64 amendment,
 residual 3; follow-up D64b). Pre-existing, not D64's: a plain dropped tail on Android, and a capped field's on both
