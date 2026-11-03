@@ -522,6 +522,38 @@ carousels from a fresh launch (D59): 12/12 `stuck`, the lab counting 0 carousel 
 vertical page (D59b). carousel-recycler-free's false "fully visible" (D62) did not recur in 13 runs, every stroke
 taken at rest.
 
+### Device facts (batches 1–10)
+
+Measured on the lab devices (the iOS 27.0 simulator, averi_lab API 33) and written nowhere else before; the batch's raw
+evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is named; it is not edited from here.
+
+1. A WebDriverAgent runner exit changes simulator-wide `com.apple.Accessibility`: `AccessibilityEnabled` true → false,
+   `ApplicationAccessibilityEnabled` and `AutomationEnabled` true → 0, their type bool → int. Creating a session and
+   `/wda/keys` change none of them (batch-10, D43's G4 and its restore). ADR 0037's D43 amendment, residual 5.
+2. The host's `ConnectHardwareKeyboard` was never read in D43's gate (batch-10, G4). ADR 0037's D43 amendment, residual 6.
+3. `cmd package resolve-activity --brief` prints `priority=0 preferredOrder=0 match=0x0 specificIndex=-1
+   isDefault=false` and `android/com.android.internal.app.ResolverActivity` for a link with two handlers and no
+   default, `… match=0x308000 … isDefault=true` and `dev.averi.lab/.MainActivity` for one handler, in 21–28 ms
+   (batch-10, D55's E3). ADR 0041's fallback.
+4. On API 33 `dumpsys package preferred-activities` names no section and prints the whole package dump (the sections are
+   `preferred` / `pref` and `preferred-xml`); `cmd role get-role-holders` answers "Unknown command" (`dumpsys role`
+   reads the holder); `cmd clipboard help` answers "No shell command implementation." (batch-9, D55 and D43).
+5. AOSP's "Just once" records a last-chosen entry (`mAlways=false`), not a default — from AOSP's source, not measured:
+   E2's tap never ran (batch-10, D55). Every preferred entry the lab AVD holds is `mAlways=true`, none the lab's.
+6. `defaults read com.apple.launchservices.schemeapproval <key>` of an absent key exits 1 with "Could not find key … in
+   domain …" — absent, not unreadable (batch-8's voided first run).
+7. The emulator guest's `/proc/uptime` (24.8 h) and the host emulator process's elapsed time (15.2 h) differ; the
+   uptime block gated on the smaller (batch-2, D37).
+8. ensure_state's held "no" under uiautomator: the largest residual 5.06 → 5.07 → 5.12 s over three runs against half
+   its slack, 5.25 s — a 0.13 s margin, trending up (batch-9, D30).
+9. Every chooser focus read was grep'd: no whole `dumpsys window displays` with the chooser in front exists (batch-9,
+   batch-10, D55).
+10. `/wda/keys` on iOS 27.0 typed U+1F600 (1/1), NBSP and U+202F (2/2) exactly, and kept U+0053 U+030C decomposed
+    (1/1) — info only, outside the gate's verdict (batch-10, D43's G2). ADR 0037's D43 amendment decides the set.
+11. On averi_lab a 48 px stroke moves a RecyclerView carousel about 25–27 px, so `fully: true` on a card exactly the
+    clip's width converges below the stroke floor and ends `maxSwipes` 15–28 px short, 13/13 (batch-10, D62's
+    measurement). ADR 0021's D52 amendment's territory.
+
 ## Workflow per bug, once phase 3 is in
 
 1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,
