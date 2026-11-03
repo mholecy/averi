@@ -100,9 +100,50 @@ describe('chooserInFocus — the components that are the chooser, and no others 
   });
 });
 
-describe('CHOOSER_FOCUS_COMMAND — the two focus lines of `dumpsys window displays`, every word a constant', () => {
+describe('chooserInFocus — API 29\'s `mFocusedApp`, an ActivityRecord inside an AppWindowToken (synthetic lines, AOSP 10\'s shape)', () => {
+  /** API 29 prints the focused app as its window token: `AppWindowToken{… token=Token{… ActivityRecord{… u0 <component> t5}}}`. */
+  const api29 = (window: string, app: string) =>
+    `  mCurrentFocus=${window}\n  mFocusedApp=AppWindowToken{8a2c1f0 token=Token{4b3e2d1 ActivityRecord{6909a9c u0 ${app} t5}}}\n`;
+
+  it('no focus window yet, the chooser the focused activity (the race): the chooser', () => {
+    expect(chooserInFocus(api29('null', RESOLVER))).toBe(RESOLVER);
+  });
+
+  it('the chooser the focus window, an app the focused activity (a chooser on its way out): undefined — "Opened"', () => {
+    expect(chooserInFocus(api29(`Window{56b9ca0 u0 ${RESOLVER}}`, 'dev.averi.lab/.MainActivity'))).toBeUndefined();
+  });
+});
+
+describe('chooserInFocus — one focus pair per display: the default display\'s alone (synthetic dumps)', () => {
+  const display = (id: number, window: string, app: string) =>
+    `  Display: mDisplayId=${id} (organized)\n  mCurrentFocus=${window}\n  mFocusedApp=${app}\n`;
+  const CHOOSER_WINDOW = `Window{56b9ca0 u0 ${RESOLVER}}`;
+  const CHOOSER_APP = `ActivityRecord{6909a9c u0 ${RESOLVER} t2590}`;
+  const LAB_WINDOW = 'Window{c6f91da u0 dev.averi.lab/dev.averi.lab.MainActivity}';
+  const LAB_APP = 'ActivityRecord{59ce9b8 u0 dev.averi.lab/.MainActivity t8}';
+
+  it('display 0 with no focused activity, display 1 showing a chooser: undefined', () => {
+    expect(chooserInFocus(display(0, LAB_WINDOW, 'null') + display(1, CHOOSER_WINDOW, CHOOSER_APP))).toBeUndefined();
+    expect(chooserInFocus(display(0, 'null', 'null') + display(1, CHOOSER_WINDOW, CHOOSER_APP))).toBeUndefined();
+  });
+
+  it('the chooser on display 0, an app on display 1: the chooser', () => {
+    expect(chooserInFocus(display(0, CHOOSER_WINDOW, CHOOSER_APP) + display(1, LAB_WINDOW, LAB_APP))).toBe(RESOLVER);
+  });
+
+  it('display 0 listed after another: still display 0\'s pair', () => {
+    expect(chooserInFocus(display(1, LAB_WINDOW, LAB_APP) + display(0, 'null', CHOOSER_APP))).toBe(RESOLVER);
+    expect(chooserInFocus(display(1, CHOOSER_WINDOW, CHOOSER_APP) + display(0, LAB_WINDOW, LAB_APP))).toBeUndefined();
+  });
+
+  it('headers but no display 0: undefined', () => {
+    expect(chooserInFocus(display(1, CHOOSER_WINDOW, CHOOSER_APP))).toBeUndefined();
+  });
+});
+
+describe('CHOOSER_FOCUS_COMMAND — each display\'s header and focus lines of `dumpsys window displays`, every word a constant', () => {
   it('is the one line averi asks', () => {
-    expect(CHOOSER_FOCUS_COMMAND).toBe("dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='");
+    expect(CHOOSER_FOCUS_COMMAND).toBe("dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='");
   });
 });
 

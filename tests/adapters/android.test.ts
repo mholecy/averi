@@ -1009,7 +1009,7 @@ describe('AndroidAdapter interactions', () => {
       '  mFocusedApp=ActivityRecord{59ce9b8 u0 dev.averi.lab/.MainActivity} t8}\n'
     );
     const START = ['-s', 'e', 'shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'averilab://shared/open'];
-    const FOCUS = ['-s', 'e', 'shell', "dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='"];
+    const FOCUS = ['-s', 'e', 'shell', "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='"];
     type Answer = { stdout?: string; stderr?: string } | Error;
     /** Records each call's argv and timeout; `am start` and the focus read answer as given, anything else empty. */
     const scripted = (start: Answer, focus: Answer) => {

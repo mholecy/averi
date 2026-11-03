@@ -122,7 +122,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     // the device, so only grep's record reaches stdout (dumpsys's went into the pipe), as for the keyboard witness.
     expect(commands).toEqual([
       ['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url],
-      ['grep', '-E', 'mCurrentFocus=|mFocusedApp='],
+      ['grep', '-E', 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='],
     ]);
   });
 
