@@ -141,9 +141,15 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
  * the value alone, under `reformatOf`'s and `prefixOf`'s rules unchanged. A reading that starts with them is judged
  * after the earlier text, never without it. An earlier text with no letters or digits (a `—`, a `-`) keeps the
  * pre-D29 judgment — every reading starts with its empty skeleton — failing safe, as a false mismatch and never a
- * wrong pass: deliberately not loosened (D29 review round 2, MINOR-A). So does an unnamed placeholder whose letters
- * and digits are a prefix of the typed value's (a `+421` placeholder, `421903…` typed): the reading starts with them,
- * the fallback never runs, and the result is the old false mismatch.
+ * wrong pass: deliberately not loosened (D29 review round 2, MINOR-A).
+ *
+ * D61: an unnamed placeholder whose letters and digits START the typed value's (idb's `+421`, `421903123456` typed)
+ * starts the reading too. No earlier text is tried as well, second, when the reading's letters and digits are EXACTLY
+ * the value's and are no start of the earlier text's plus the value's: the reading holds no more than the value, so the
+ * earlier text is not in it, and it is no earlier text with a dropped tail of the typing either. `421 903 123 456` after
+ * `+421` then lands; a regrouped earlier text still there (`10,001,000` after `1,000`: a start of `1,000` +
+ * `10001000`) does not. Equality, not a prefix: a dropped tail under such a placeholder is not typed again — ADR 0034's
+ * D61 amendment and residual 6.
  *
  * A MASK TEMPLATE (`maskTemplate`: `_` and separators alone, at least one `_` — `__.__.____`) is tried as no earlier
  * text as well, second, whatever the reading — why, and how it narrows MINOR-A: ADR 0034's D51 amendment.
@@ -152,9 +158,13 @@ const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): st
  * that earlier text's prefix, nothing of the typing landed, and nothing is typed again; tried second, the same reading
  * would read as two typed characters and retype the rest. Pure.
  */
-function priorsOf(held: string, e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): readonly string[] {
+function priorsOf(held: string, e: Pick<Expectation, 'value' | 'clear' | 'before' | 'placeholder'>): readonly string[] {
   const prior = priorText(e);
-  return prior !== '' && (maskTemplate(prior) || !skeleton(held).startsWith(skeleton(prior))) ? [prior, ''] : [prior];
+  const shown = skeleton(held);
+  const notShown = !shown.startsWith(skeleton(prior)); // D29: the earlier text is not in the reading
+  const valueAlone = shown === skeleton(e.value) && !skeleton(prior + e.value).startsWith(shown); // D61: the value exactly, no start of the earlier text plus the value
+  const vanished = notShown || valueAlone;
+  return prior !== '' && (maskTemplate(prior) || vanished) ? [prior, ''] : [prior];
 }
 
 /**
