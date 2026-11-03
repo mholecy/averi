@@ -248,12 +248,25 @@ export function tailOf(observed: string, e: TextExpectation): Tail | undefined {
 
 /**
  * The characters the field dropped from the END of the typing (`tailOf`, with some of the typing landed: `landedSome`),
- * or undefined when its reading does not prove that. What fill-type.ts types again (ADR 0023). Pure.
+ * or undefined when its reading does not prove that — also when it holds the value across the seam
+ * (`holdsValueAcrossSeam`). What fill-type.ts types again (ADR 0023). Pure.
  */
 export function droppedTail(observed: string, e: TextExpectation): string | undefined {
   const tail = tailOf(observed, e);
-  return landedSome(tail) ? tail.missing : undefined;
+  return landedSome(tail) && !holdsValueAcrossSeam(heldText(observed, e.placeholder), e) ? tail.missing : undefined;
 }
+
+/**
+ * D64 review round 1, m-2: the held reading holds the value at an occurrence that ends past the earlier text — not
+ * wholly inside it. Such a reading has not landed (`showsExactly` finds no value past the earlier text), but it is
+ * explained as a whole landing as well as a dropped tail: `11 ` for `11` after `1` is a select-all field's `11` with an
+ * eager trailing mark, or `1` landed with that mark and `1` dropped; `a1 1` for `1 ` after `a1` is the typing at a caret
+ * inside the text. Typed again, the "tail" could leave `111`, and the fill end Filled over content the retype made
+ * wrong; so nothing is typed again and the fill fails — the safe side. Until D64 such readings passed by containment.
+ * A value found only inside the earlier text (`Note: hellohe` for `hello` after `Note: hello`) is no landing of the
+ * typing, and its tail is typed again.
+ */
+const holdsValueAcrossSeam = (held: string, e: TextExpectation): boolean => held.indexOf(e.value, priorText(e).length - e.value.length + 1) !== -1;
 
 /**
  * What can be said of a reading that missed the value — ONE classification of the kinds (fill-facts.ts#Difference),
