@@ -98,8 +98,8 @@ adapters/typeable.ts and adapters/ios-typing.ts are pure leaves of the typing re
 amendment): which characters each iOS path types, which path a text goes to, and the refusal's words and remedy. A
 flipped router or a remedy that names the wrong path would fail no device test. typeable.ts's entry names
 tests/adapters/typeable.test.ts, ios-typing.test.ts and tests/interact/type-text.test.ts, with a floor of 88 under a
-baseline of 90.24 % (41 mutants, 4 survived): the four are `named()`'s class tests with an anchor dropped, equivalent,
+baseline of 89.74 % (39 mutants, 4 survived): the four are `named()`'s class tests with an anchor dropped, equivalent,
 since the character a refusal names is one code point. ios-typing.ts's names tests/adapters/ios-typing.test.ts and
-typeable.test.ts, with a floor of 98 under a baseline of 100 % (23 valid mutants; 2 runtime errors). Stryker does not
+typeable.test.ts, with a floor of 98 under a baseline of 100 % (24 valid mutants; 2 runtime errors). Stryker does not
 mutate a RegExp built with `new RegExp`, as both iOS sets are, so their character classes are held by hand mutants and
-per-character tests instead. The cold run of all ten modules took 91 s.
+per-character tests instead. The cold run of all ten modules took 74 s.

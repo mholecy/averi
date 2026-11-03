@@ -225,7 +225,7 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
 - Agents on WDA projects get `Filled …`, verified by the existing read-back, where they got a refusal; idb projects get
   a true remedy; Android says plainly that there is none.
 
-**Mutation-checked**: adapters/ios-typing.ts (100 %, floor 98) and adapters/typeable.ts (90.24 %, floor 88: four
+**Mutation-checked**: adapters/ios-typing.ts (100 %, floor 98) and adapters/typeable.ts (89.74 %, floor 88: four
 equivalent anchor survivors in `named()`) join the mutation run (ADR 0038's D43 amendment). Stryker does not reach the
 two iOS sets, built with `new RegExp` (residual 9); 22 hand mutants, each killed: the router always idb, always wda or
 flipped; the set by the source's kind, or always idb's; WDA's set without the BMP guard, with `\p{M}`, with `\p{Cf}`,
