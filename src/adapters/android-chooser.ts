@@ -1,4 +1,5 @@
 import type { StartRefused } from './android-start.js';
+import { everyNode, type ChooserButton, type ChooserSheet, type Point, type Rect, type UiNode } from './types.js';
 
 /**
  * Android's "Open with" chooser in front after a deep link (D55; docs/adr/0041-an-android-link-names-the-chooser-in-front.md),
@@ -135,13 +136,16 @@ const LAUNCH_ADVICE = chooserAdvice('the intent it answers', 'the chooser');
  * launch_app's ⚠ note when the chooser is in front after its `-p` start (D55b; ADR 0041's D55b amendment). The
  * headline stays "Launched" — D56's shape on iOS (ADR 0032's D56 amendment), the start did happen. It says only what
  * the read saw: the chooser in front, the package not. Naming an activity (`nameTheActivity`: where the call names
- * it, the adapter's wording) starts it with `-n`, which a package's own chooser cannot stop.
+ * it, the adapter's wording) starts it with `-n`, which a package's own chooser cannot stop. With the chooser's
+ * `sheet` read (D55c) the note quotes it and advises the tap by coordinates (sheetAdvice); without it, D55b's note.
  */
-export function launchChooserNote(packageName: string, component: string, nameTheActivity: string): string {
-  return (
-    `Android has not brought ${packageName} forward yet: its chooser (${component}) is in front, and ${packageName} ` +
-    `is not. ${LAUNCH_ADVICE} Naming the activity (${nameTheActivity}) starts it without the chooser.`
-  );
+export function launchChooserNote(packageName: string, component: string, nameTheActivity: string, sheet?: ChooserSheet): string {
+  const inFront = `Android has not brought ${packageName} forward yet: its chooser (${component}) is in front, `;
+  const said =
+    sheet === undefined
+      ? `and ${packageName} is not. ${LAUNCH_ADVICE}`
+      : `${chooserSheetSays(sheet, `and ${packageName} is not`)}. ${LAUNCH_SHEET_ADVICE}`;
+  return `${inFront}${said} Naming the activity (${nameTheActivity}) starts it without the chooser.`;
 }
 
 /**
@@ -166,3 +170,95 @@ export function monkeyChooserRefusal(packageName: string, component: string, ref
 export function chooserAlsoInFront(component: string): string {
   return `Android's chooser (${component}) is also in front. ${LAUNCH_ADVICE}`;
 }
+
+/**
+ * The chooser's fresh layout in its tree (D55c; ADR 0041's D55c amendment), the counterpart of
+ * ios-system-alert.ts#alertInWda: read by resource id alone (`UiNode.identifier` is the id's last segment, so
+ * `android:id/text1` is `text1` — safe here, as the tree is read only after the focus read named the platform's
+ * chooser), never by a label's words. The guard accepts only the measured shape (batch-10's and batch-11's E2,
+ * tests/fixtures/uiautomator-lab-resolver*.xml): exactly one `resolver_list`; at least one row, each a direct child of
+ * it holding exactly one labelled `text1` and at most one `text2`; exactly one labelled `button_once` and one labelled
+ * `button_always`; and no `icon` and no `text1` outside the list. The last rule is `resolver_list_with_default`'s
+ * (AOSP android13, core/res/res/layout/resolver_list_with_default.xml, checked at build time; never captured): it heads
+ * the sheet with the last-chosen app's `icon` and `title` above the list, and quoting the list's rows alone there would
+ * hide the preselected app. Anything else is undefined: the reply is then D55's, by the component alone.
+ */
+export function chooserSheet(tree: UiNode): ChooserSheet | undefined {
+  const nodes = [...everyNode(tree)];
+  const lists = withId(nodes, 'resolver_list');
+  if (lists.length !== 1) return undefined;
+  const list = lists[0];
+  const inList = new Set(everyNode(list));
+  if (nodes.some((n) => !inList.has(n) && (n.identifier === 'icon' || n.identifier === 'text1'))) return undefined;
+  const once = buttonOf(nodes, 'button_once');
+  const always = buttonOf(nodes, 'button_always');
+  if (once === undefined || always === undefined || list.children.length === 0) return undefined;
+  const apps: ChooserSheet['apps'] = [];
+  for (const row of list.children) {
+    const inRow = [...everyNode(row)];
+    const [text1, ...moreText1] = withId(inRow, 'text1');
+    const text2 = withId(inRow, 'text2');
+    const label = labelOf(text1);
+    if (label === undefined || moreText1.length > 0 || text2.length > 1) return undefined;
+    const detail = labelOf(text2[0]);
+    apps.push({ label, ...(detail !== undefined && { detail }), centre: centreOf(row.rect) });
+  }
+  const titles = withId(nodes, 'title');
+  const title = titles.length === 1 ? labelOf(titles[0]) : undefined;
+  return { ...(title !== undefined && { title }), apps, once, always };
+}
+
+/** The nodes among `nodes` with resource id `id` (its last segment). */
+const withId = (nodes: readonly UiNode[], id: string): UiNode[] => nodes.filter((n) => n.identifier === id);
+
+/** The one button with id `id` and a label, as the sheet quotes it; undefined when there is none, or more than one. */
+function buttonOf(nodes: readonly UiNode[], id: string): ChooserButton | undefined {
+  const buttons = withId(nodes, id);
+  const label = labelOf(buttons[0]);
+  if (buttons.length !== 1 || label === undefined) return undefined;
+  return { label, centre: centreOf(buttons[0].rect), disabled: buttons[0].disabled === true };
+}
+
+/** A rect's centre in whole pixels — where a tap lands (as ios-system-alert.ts rounds it). */
+const centreOf = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
+
+/** A non-empty label, or undefined. */
+const labelOf = (n: UiNode | undefined): string | undefined => (n?.label !== null && n?.label !== undefined && n.label !== '' ? n.label : undefined);
+
+/**
+ * The sheet as both replies quote it (D55c): its title when it has one, then `asks` — what the reply says the chooser
+ * is doing (`asking which app opens it` after a link, `and <package> is not` after a launch) — then the apps with their
+ * rows' centres and the buttons with theirs, "(disabled)" on a button the tree marks so:
+ * `"Open with", asking which app opens it: apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540,
+ * 1881); buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058) (disabled)`. Every label verbatim; two
+ * rows may share one, which is why the advice taps by coordinates.
+ */
+export function chooserSheetSays(sheet: ChooserSheet, asks: string): string {
+  const title = sheet.title === undefined ? '' : `"${sheet.title}", `;
+  const apps = sheet.apps.map((a) => `"${a.label}"${a.detail === undefined ? '' : ` ("${a.detail}")`} at ${at(a.centre)}`);
+  const button = (b: ChooserButton) => `"${b.label}" at ${at(b.centre)}${b.disabled ? ' (disabled)' : ''}`;
+  return `${title}${asks}: ${apps.length === 1 ? 'app' : 'apps'} ${apps.join(', ')}; buttons ${button(sheet.once)}, ${button(sheet.always)}`;
+}
+
+/** A point as the replies write it: `(x, y)`. */
+const at = (p: Point): string => `(${p.x}, ${p.y})`;
+
+/**
+ * The advice beside a quoted sheet (D55c), chooserAdvice's counterpart with the same `defaultFor` and `drops`: tap the
+ * app's row at its x and y — by coordinates, as two rows may share a label (the lab's both say "AveriLab"); one tap
+ * only selects the row and enables the buttons (batch-11, lab fact 13) — then "Just once" by its id, language-free
+ * (`id:button_once`, never `id:button_always`, which writes a preferred activity); BACK drops it; averi taps nothing.
+ */
+export function sheetAdvice(defaultFor: string, drops: string): string {
+  return (
+    "Tap the app's row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once " +
+    `(never id:button_always: it changes the device's default for ${defaultFor}); press_key back drops ${drops}. averi ` +
+    'taps nothing itself.'
+  );
+}
+
+/** The sheet advice after a link (mcp/tool-text.ts#chooserText): CHOOSER_ADVICE's counterpart. */
+export const CHOOSER_SHEET_ADVICE = sheetAdvice('such links', 'the link');
+
+/** The sheet advice after a launch (launchChooserNote): LAUNCH_ADVICE's counterpart. */
+const LAUNCH_SHEET_ADVICE = sheetAdvice('the intent it answers', 'the chooser');

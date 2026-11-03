@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, chooserAdvice, chooserAlsoInFront, chooserInFocus, launchChooserNote, monkeyChooserRefusal } from '../../src/adapters/android-chooser.js';
+import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, CHOOSER_SHEET_ADVICE, chooserAdvice, chooserAlsoInFront, chooserInFocus, chooserSheet, chooserSheetSays, launchChooserNote, monkeyChooserRefusal } from '../../src/adapters/android-chooser.js';
+import { everyNode, type ChooserSheet, type UiNode } from '../../src/adapters/types.js';
 import type { StartRefused } from '../../src/adapters/android-start.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
+import { parseDump } from '../helpers/android-dumps.js';
 
 // D55 (ADR 0041): Android's "Open with" chooser in front after a deep link, judged by the focused component alone.
 // dumpsys-window-focus-api33-resolver.txt is the two focus lines batch-9's D55 probe recorded (averi_lab, API 33,
@@ -379,5 +381,170 @@ describe('D55b — the launch\'s chooser wording: chooserAdvice, launchChooserNo
 
   it('chooserAlsoInFront: the chooser named beside a reason of its own, with the shared advice', () => {
     expect(chooserAlsoInFront(RESOLVER)).toBe(`Android's chooser (android/com.android.internal.app.ResolverActivity) is also in front. ${LAUNCH_ADVICE}`);
+  });
+});
+
+// D55c (ADR 0041's D55c amendment): the chooser's own tree, judged by resource id alone (chooserSheet), and the replies'
+// words for it — the sheet quoted, and the advice to tap a row's centre and then id:button_once. Read only after the
+// focus read named the chooser (android.test.ts pins the calls). uiautomator-lab-resolver.xml is batch-10's E2 capture
+// of the fresh layout (android-resolver-tree.test.ts pins its parse); uiautomator-lab-resolver-selected.xml is batch-11's
+// E2 dump of the same chooser after one tap at row 2's centre: the buttons enabled, nothing else changed.
+describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', () => {
+  const dumped = async (name: string): Promise<UiNode> => {
+    const raw = await fixture(name);
+    return parseDump(raw.slice(0, raw.lastIndexOf('>') + 1));
+  };
+  /** The fixture's tree, parsed fresh for each case (a case may change it). */
+  const fresh = () => dumped('uiautomator-lab-resolver.xml');
+  const byId = (root: UiNode, id: string) => [...everyNode(root)].filter((n) => n.identifier === id);
+  const one = (root: UiNode, id: string): UiNode => {
+    const [node] = byId(root, id);
+    if (node === undefined) throw new Error(`no ${id}`);
+    return node;
+  };
+  const leaf = (id: string, label: string): UiNode => ({ role: 'text', label, identifier: id, value: null, rect: { x: 22, y: 1500, width: 88, height: 88 }, children: [] });
+  const SHEET: ChooserSheet = {
+    title: 'Open with',
+    apps: [
+      { label: 'AveriLab', centre: { x: 540, y: 1727 } },
+      { label: 'AveriLab', detail: 'AveriLab twin', centre: { x: 540, y: 1881 } },
+    ],
+    once: { label: 'Just once', centre: { x: 723, y: 2058 }, disabled: true },
+    always: { label: 'Always', centre: { x: 936, y: 2058 }, disabled: true },
+  };
+
+  it('batch-10\'s fresh chooser: the title, both rows at their ROW\'s centre (not the label\'s), both buttons disabled; 2057.5 rounds to 2058', async () => {
+    const tree = await fresh();
+    expect(one(tree, 'button_once').rect).toEqual({ x: 604, y: 1983, width: 238, height: 149 });
+    expect(chooserSheet(tree)).toEqual(SHEET);
+  });
+
+  it('batch-11\'s selected chooser (one row tapped): the same sheet, neither button disabled', async () => {
+    expect(chooserSheet(await dumped('uiautomator-lab-resolver-selected.xml'))).toEqual({
+      ...SHEET,
+      once: { ...SHEET.once, disabled: false },
+      always: { ...SHEET.always, disabled: false },
+    });
+  });
+
+  it('no `title` node, or an empty one: the sheet without a title (no key)', async () => {
+    for (const unset of [(t: UiNode) => { t.identifier = null; }, (t: UiNode) => { t.label = ''; }, (t: UiNode) => { t.label = null; }]) {
+      const tree = await fresh();
+      unset(one(tree, 'title'));
+      const sheet = chooserSheet(tree);
+      expect(sheet).toEqual({ apps: SHEET.apps, once: SHEET.once, always: SHEET.always });
+      expect(sheet !== undefined && 'title' in sheet).toBe(false);
+    }
+  });
+
+  it('two `title` nodes: no title — which one heads the sheet is not known', async () => {
+    const tree = await fresh();
+    one(tree, 'title_container').children.push(leaf('title', 'Another'));
+    expect(chooserSheet(tree)).toEqual({ apps: SHEET.apps, once: SHEET.once, always: SHEET.always });
+  });
+
+  it('one row alone: one app', async () => {
+    const tree = await fresh();
+    one(tree, 'resolver_list').children.splice(1);
+    expect(chooserSheet(tree)?.apps).toEqual([SHEET.apps[0]]);
+  });
+
+  it('an empty `text2`: the app with no detail', async () => {
+    const tree = await fresh();
+    one(tree, 'text2').label = '';
+    expect(chooserSheet(tree)?.apps[1]).toEqual({ label: 'AveriLab', centre: { x: 540, y: 1881 } });
+  });
+
+  /** Each shape the guard refuses: anything but the measured layout fails open (undefined, today's reply). */
+  const UNRECOGNISED: [string, (tree: UiNode) => void][] = [
+    ['no `resolver_list`', (t) => { one(t, 'resolver_list').identifier = null; }],
+    ['two `resolver_list`s', (t) => { one(t, 'profile_pager').children.push({ ...one(t, 'resolver_list'), children: [] }); }],
+    ['a list with no rows', (t) => { one(t, 'resolver_list').children = []; }],
+    ['a row with no `text1`', (t) => { one(t, 'text1').identifier = null; }],
+    ['a row whose `text1` is empty', (t) => { one(t, 'text1').label = ''; }],
+    ['a row whose `text1` has no label', (t) => { one(t, 'text1').label = null; }],
+    ['a row with two `text1`s', (t) => { one(t, 'text2').identifier = 'text1'; }],
+    ['a row with two `text2`s', (t) => { one(t, 'resolver_list').children[1].children[1].children.push(leaf('text2', 'Another')); }],
+    ['no `button_once`', (t) => { one(t, 'button_once').identifier = null; }],
+    ['two `button_once`s', (t) => { one(t, 'button_bar').children.push(leaf('button_once', 'Just once')); }],
+    ['no `button_always`', (t) => { one(t, 'button_always').identifier = null; }],
+    ['two `button_always`s', (t) => { one(t, 'button_bar').children.push(leaf('button_always', 'Always')); }],
+    ['a `button_once` with no label', (t) => { one(t, 'button_once').label = ''; }],
+    ['a `button_always` with no label', (t) => { one(t, 'button_always').label = null; }],
+    // resolver_list_with_default (AOSP android13 core/res/res/layout/resolver_list_with_default.xml): the last-chosen
+    // app's `icon` and `title` in a header above the list — never captured. Quoting the list's rows alone there would
+    // hide the preselected app, so an `icon` or a `text1` outside the list is not the fresh layout.
+    ['an `icon` outside the list (the with_default header)', (t) => { one(t, 'title_container').children.unshift(leaf('icon', '')); }],
+    ['a `text1` outside the list', (t) => { one(t, 'button_bar').children.push(leaf('text1', 'AveriLab')); }],
+  ];
+
+  it.each(UNRECOGNISED)('%s: undefined', async (_shape, change) => {
+    const tree = await fresh();
+    change(tree);
+    expect(chooserSheet(tree)).toBeUndefined();
+  });
+
+  it('a tree that is not a chooser (a dump of the lab\'s own screen): undefined', async () => {
+    expect(chooserSheet(await dumped('uiautomator-lab-open.xml'))).toBeUndefined();
+  });
+});
+
+describe('D55c — the sheet\'s words: chooserSheetSays and the sheet advice, pinned whole', () => {
+  const SHEET: ChooserSheet = {
+    title: 'Open with',
+    apps: [
+      { label: 'AveriLab', centre: { x: 540, y: 1727 } },
+      { label: 'AveriLab', detail: 'AveriLab twin', centre: { x: 540, y: 1881 } },
+    ],
+    once: { label: 'Just once', centre: { x: 723, y: 2058 }, disabled: true },
+    always: { label: 'Always', centre: { x: 936, y: 2058 }, disabled: true },
+  };
+  const LIST =
+    'apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at (723, 2058) ' +
+    '(disabled), "Always" at (936, 2058) (disabled)';
+
+  it('the title, what the chooser asks, the apps with their rows\' centres, the buttons with theirs and "(disabled)" where marked', () => {
+    expect(chooserSheetSays(SHEET, 'asking which app opens it')).toBe(`"Open with", asking which app opens it: ${LIST}`);
+  });
+
+  it('no title: no quoted head; one app: "app"; enabled buttons: no "(disabled)"', () => {
+    const sheet: ChooserSheet = {
+      apps: [SHEET.apps[1]],
+      once: { ...SHEET.once, disabled: false },
+      always: { ...SHEET.always, disabled: false },
+    };
+    expect(chooserSheetSays(sheet, 'and dev.averi.lab is not')).toBe(
+      'and dev.averi.lab is not: app "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at (723, 2058), "Always" at (936, 2058)',
+    );
+  });
+
+  it('one button disabled, the other not: the mark on that one alone', () => {
+    expect(chooserSheetSays({ ...SHEET, title: undefined, always: { ...SHEET.always, disabled: false } }, 'x')).toBe(
+      'x: apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058)',
+    );
+  });
+
+  it('CHOOSER_SHEET_ADVICE: tap the row by its x and y, then id:button_once, never id:button_always; BACK drops the link', () => {
+    expect(CHOOSER_SHEET_ADVICE).toBe(
+      "Tap the app's row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once " +
+        "(never id:button_always: it changes the device's default for such links); press_key back drops the link. averi " +
+        'taps nothing itself.',
+    );
+  });
+
+  it('launchChooserNote with a sheet: the sheet quoted, the launch\'s advice, naming the activity', () => {
+    expect(launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app', SHEET)).toBe(
+      'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
+        `is in front, "Open with", and dev.averi.lab is not: ${LIST}. Tap the app's row at its x and y (one tap only ` +
+        "selects it and enables the buttons), then tap id:button_once (never id:button_always: it changes the device's " +
+        'default for the intent it answers); press_key back drops the chooser. averi taps nothing itself. Naming the ' +
+        'activity (`activity:` on the launch step / launch_app) starts it without the chooser.',
+    );
+  });
+
+  it('launchChooserNote with no sheet (undefined): D55b\'s note byte for byte', () => {
+    const note = launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app');
+    expect(launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app', undefined)).toBe(note);
+    expect(note).toContain('Take a ui_snapshot, tap the app you mean');
   });
 });

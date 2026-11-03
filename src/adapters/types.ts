@@ -998,11 +998,34 @@ export interface DeepLinkOutcome extends LaunchOutcome {
 
 /**
  * Android's chooser a link waits behind (D55, adapters/android-chooser.ts): its component as the window manager names
- * it (`android/com.android.internal.app.ResolverActivity`). Only the component: its labels and their centres, from
- * the tree, are a later change's (backlog D55c).
+ * it (`android/com.android.internal.app.ResolverActivity`), and, since D55c, `sheet`: what its tree shows, read once
+ * the component named it (android-chooser.ts#chooserSheet; ADR 0041's D55c amendment). No `sheet` when the dump
+ * failed or was not the measured layout: the reply is then D55's, by the component alone.
  */
 export interface LinkChooser {
   component: string;
+  sheet?: ChooserSheet;
+}
+
+/**
+ * The chooser's fresh layout as its tree lists it (D55c, adapters/android-chooser.ts#chooserSheet), found by resource
+ * id, every label verbatim: its `title` when it has one ("Open with"), each row of `resolver_list` (`text1` its label,
+ * `text2` its `detail` when Android tells two targets of one app apart) at the ROW's centre — the ListView takes the
+ * touch, measured on row 2 (batch-11) — and the "Just once" (`once`) and "Always" (`always`) buttons, each `disabled`
+ * when the tree marks it so (D66: both, until a row is selected).
+ */
+export interface ChooserSheet {
+  title?: string;
+  apps: { label: string; detail?: string; centre: Point }[];
+  once: ChooserButton;
+  always: ChooserButton;
+}
+
+/** One of the chooser's two buttons (ChooserSheet): its label verbatim, its centre, and whether the tree marks it disabled. */
+export interface ChooserButton {
+  label: string;
+  centre: Point;
+  disabled: boolean;
 }
 
 /**
