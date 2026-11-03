@@ -21,6 +21,18 @@ describe('chooserInFocus — the chooser named by the focused component (batch-9
   });
 });
 
+describe('chooserInFocus — a whole API 33 dump, with its `Display: mDisplayId=0` header', () => {
+  it('the keyboard-hidden dump with batch-9\'s chooser pair on its focus lines: the chooser', async () => {
+    const recorded = (await fixture('dumpsys-window-focus-api33-resolver.txt')).split('\n');
+    const dump = (await fixture('dumpsys-window-displays-api33-keyboard-hidden.txt'))
+      .replace(/^ {2}mCurrentFocus=.*$/m, recorded[0] ?? '')
+      .replace(/^ {2}mFocusedApp=.*$/m, recorded[1] ?? '');
+    expect(dump).toMatch(/^ {2}Display: mDisplayId=0 /m);
+    expect(dump).toContain('mFocusedApp=ActivityRecord{6909a9c u0 android/com.android.internal.app.ResolverActivity} t2590}');
+    expect(chooserInFocus(dump)).toBe(RESOLVER);
+  });
+});
+
 describe('chooserInFocus — an app, the launcher or no focus in front is no chooser', () => {
   it('an app in front (whole `dumpsys window displays` dumps, API 33): undefined', async () => {
     expect(chooserInFocus(await fixture('dumpsys-window-displays-api33-keyboard-hidden.txt'))).toBeUndefined();
