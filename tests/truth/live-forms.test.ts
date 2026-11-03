@@ -154,19 +154,25 @@ const withRegion = (launched: LabState, region: string, shown = true): LabState 
   expect(dump).toContain(`SkRegion(${region})`);
   return { ...launched, imeTouchable: dump };
 };
+/** A recorded kf case, its launch given the IME region `region` (withRegion). */
+const floated = (record: LiveRecord, id: string, region: string) => {
+  const r = recordedCase(record, 'uiautomator', id);
+  return { ...r, launched: withRegion(r.launched, region) };
+};
 /** r1023b fu1's region (docs/truth/live-android-2026-10-23-floating-gap.md, read on the device that day): bottom 1912. */
 const FU1_REGION = `(359,1269,1040,1912)${STRIP}`;
-/** batch-11's panel as every reply of the run quotes it (`keyboard 87,1243 937x792`, `over [87,1243][1024,2035]`): bottom 2035. */
+/**
+ * batch-11's region REBUILT from the panel every reply of the run quotes (`keyboard 87,1243 937x792`, `over [87,1243]
+ * [1024,2035]`): bottom 2035. Batch-11 never read the region, so a verdict over it pins the judge on that run's replies;
+ * it is no proof of a measurement.
+ */
 const B11_REGION = `(87,1243,1024,2035)${STRIP}`;
 
 describe('kf1–kf2: the submit between a floating panel and its strip — the panel evidenced by the case\'s own first reply', () => {
   // docs/truth/live-records/android-forms-r1023b-fu1-cr-1.json: Gboard floated by hand; each case begins with a colour
   // assert on ks whose refusal quotes the panel over it.
   const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
-  const kf = (id: string) => {
-    const r = fu1.results.find((c) => c.id === id)!;
-    return { ...r, launched: withRegion(r.launched, FU1_REGION) };
-  };
+  const kf = (id: string) => floated(fu1, id, FU1_REGION);
   const noPanel = 'FAIL  element id:"lab.form-keyboard-floating.ks" fill within dE00 8 of #FFFFFF — measured #FFFFFF';
 
   it('the record, the panel measured above the submit (bottom 1912 ≤ its top 1928): the panel quoted, the submit visible with no stroke, tapped once — ok', () => {
@@ -201,15 +207,25 @@ describe('kf1–kf2: the submit between a floating panel and its strip — the p
 
 describe('kf1–kf3 with no measured panel: SKIP "no measured panel", whatever the replies quote (D67)', () => {
   const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
-  const kf = (id: string) => fu1.results.find((c) => c.id === id)!;
+  const kf = (id: string) => recordedCase(fu1, 'uiautomator', id);
+
+  it('a rect off the screen beside the panel: dropped, as averi drops it — the panel left is measured, kf1–kf3 ok', () => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { replies, launched, state } = floated(fu1, id, `(359,1269,1040,1912)(2000,0,2100,50)${STRIP}`);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched).outcome).toBe('ok');
+    }
+  });
 
   it.each([
-    ['no region read at launch (a record before D67, a failed read)', (l: LabState) => l, 'no measured panel (no IME region read at launch)'],
+    ['no region read at launch (a record before D67)', (l: LabState) => l, 'no measured panel (no IME region read at launch)'],
+    ['a read that failed (withMeasuredPanel kept its error)', (l: LabState) => ({ ...l, imeTouchable: { error: 'adb: device offline' } }), 'no measured panel (the IME region read failed)'],
     ['an empty read', (l: LabState) => ({ ...l, imeTouchable: '' }), 'no measured panel (the input method did not say shown)'],
     ['the input method not saying shown', (l: LabState) => withRegion(l, FU1_REGION, false), 'no measured panel (the input method did not say shown)'],
     ['a region that does not read', (l: LabState) => withRegion(l, '(359,1269,1040'), 'no measured panel (the IME region unreadable)'],
-    ['the band alone (no panel beyond the strip)', (l: LabState) => withRegion(l, STRIP), 'no measured panel (the region holds the strip 0,2088 1080x132 alone)'],
-    ['two panels beyond the band', (l: LabState) => withRegion(l, `(359,1269,1040,1912)(0,100,50,150)${STRIP}`), 'no measured panel (2 panels beyond the strip: 359,1269 681x643, 0,100 50x50)'],
+    ['the strip alone (no panel beyond it)', (l: LabState) => withRegion(l, STRIP), 'no measured panel (the region holds no rect beyond the strip 0,2088 1080x132)'],
+    ['two panels beyond the strip', (l: LabState) => withRegion(l, `(359,1269,1040,1912)(0,100,50,150)${STRIP}`), 'no measured panel (2 panels beyond the strip: 359,1269 681x643, 0,100 50x50)'],
+    ['a region that does not hold the strip (averi ignores it whole)', (l: LabState) => withRegion(l, '(359,1269,1040,1912)(0,2080,1080,2220)'), 'no measured panel (the region does not hold the strip 0,2088 1080x132)'],
+    ['its one rect beyond the strip off the screen the strip spans', (l: LabState) => withRegion(l, `(2000,0,2100,50)${STRIP}`), 'no measured panel (1 rect(s) of the region off the screen or of no area)'],
   ] as const)('%s: kf1, kf2 and kf3 SKIP', (_says, at, why) => {
     for (const id of ['kf1', 'kf2', 'kf3'] as const) {
       const { replies, launched, state } = kf(id);
@@ -222,11 +238,10 @@ describe('kf1–kf3 on batch-11\'s real run: the panel dragged over the submit (
   // tests/fixtures/live-android-forms-b11-kf-floated.json: batch-11's ONLY=kf run (averi_lab, API 33, main a5fefd32),
   // trimmed from the device batch. Gboard floated, its panel at 87,1243 937x792 — bottom 2035, 107 px below the submit's
   // top (55,1928 970x132) — so kf1/kf2's premise did not hold, and averi's refusal was ADR 0027's fail-closed case.
+  // The run read no region: B11_REGION is rebuilt from the panel its replies quote, so these verdicts are regression
+  // pins on the run's replies (kf3's ok included), not proof of a measurement.
   const b11 = JSON.parse(readFileSync(new URL('../fixtures/live-android-forms-b11-kf-floated.json', import.meta.url), 'utf8')) as LiveRecord;
-  const kf = (id: string) => {
-    const r = recordedCase(b11, 'uiautomator', id);
-    return { ...r, launched: withRegion(r.launched, B11_REGION) };
-  };
+  const kf = (id: string) => floated(b11, id, B11_REGION);
 
   it('the record: launched floating (the 132-px strip), the submit and ks where the note says, every reply quoting the panel', () => {
     for (const id of ['kf1', 'kf2', 'kf3'] as const) {
@@ -249,7 +264,7 @@ describe('kf1–kf3 on batch-11\'s real run: the panel dragged over the submit (
     }
   });
 
-  it('kf3: judged — ks\'s centre under the measured panel, no stop, the panel named, postcode untouched: ok', () => {
+  it('kf3: judged over the rebuilt region (a regression pin) — ks\'s centre under the panel, no stop, the panel named, postcode untouched: ok', () => {
     const { replies, launched, state } = kf('kf3');
     expect(judgeFloatingGap('kf3')(state, replies, 'uiautomator', launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/^no stop \(ks \d+–\d+\), postcode untouched; /) });
   });
@@ -303,10 +318,7 @@ describe('kf1–kf3 on a real DOCKED run: the precondition reads docked and ever
   const docked = JSON.parse(readFileSync(new URL('../fixtures/live-android-forms-b10-kf-docked.json', import.meta.url), 'utf8')) as LiveRecord;
   const kf = (record: LiveRecord, id: string) => recordedCase(record, 'uiautomator', id);
   const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
-  const floatedKf = (id: string) => {
-    const r = kf(fu1, id);
-    return { ...r, launched: withRegion(r.launched, FU1_REGION) };
-  };
+  const floatedKf = (id: string) => floated(fu1, id, FU1_REGION);
   const DOCKED = { outcome: 'SKIP', why: 'keyboard docked (the app hears an IME 822 px tall, not the floating strip)' };
 
   it('the record: each case launched under the docked IME, kf1\'s evidence reply quoting it', () => {

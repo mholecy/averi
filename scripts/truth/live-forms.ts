@@ -4,7 +4,8 @@ import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './l
 import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
-import { sameRect } from '../../src/adapters/types.js';
+import { rectIntersection } from '../../src/adapters/types.js';
+import { panelsBeyond } from '../../src/ui-tree/keyboard-cover.js';
 import type { SourceKind } from '../differential/corpus.js';
 import type { LabState, Rect } from './schema.js';
 import { probePoint, within } from './truth.js';
@@ -299,43 +300,61 @@ export function floatingAtLaunch(launched: LabState): LiveVerdict | undefined {
 
 /**
  * The floating panel, as the IME window's touchable region named it right after the launch (LabState.imeTouchable,
- * live.ts's one device read for the kf cases — averi's own query, lab-device.ts#IME_TOUCHABLE): the region's one rect
- * beyond `strip`, the band the app hears of. Read by averi's own readers — src/adapters/android.ts#parseInputShown and
- * #parseTouchableRegion — not a second parser. The panel lies wherever the hand dragged it: no list of placements.
- * Anything else is "no measured panel", saying why: no read (a record before D67), the input method not saying shown
- * (a failed read is ''), a region that does not read, the strip alone, or more than one rect beyond it.
+ * live.ts's one device read for the kf cases — averi's own query, src/adapters/android.ts#TOUCHABLE_COMMAND), read by
+ * averi's own readers (src/adapters/android.ts#parseInputShown, #parseTouchableRegion) and admitted by averi's own
+ * rules (src/ui-tree/keyboard-cover.ts#panelsBeyond, beside `strip`, the inset the app hears of) — no second parser,
+ * no rule of the harness's. The panel lies wherever the hand dragged it: no list of placements. Anything but one
+ * admitted panel is "no measured panel", saying why: no read (a record before D67), a failed read, the input method
+ * not saying shown, a region that does not read, one that does not hold the strip, rects off the screen, no rect
+ * beyond the strip, or several panels.
  */
 export function measuredPanel(launched: LabState, strip: Rect): { panel: Rect } | { why: string } {
   const dump = launched.imeTouchable;
-  if (dump === undefined) return { why: 'no measured panel (no IME region read at launch)' };
-  if (parseInputShown(dump) !== 'shown') return { why: 'no measured panel (the input method did not say shown)' };
+  const none = (why: string) => ({ why: `no measured panel (${why})` });
+  if (dump === undefined) return none('no IME region read at launch');
+  if (typeof dump !== 'string') return none('the IME region read failed');
   const region = parseTouchableRegion(dump);
-  if (region === undefined) return { why: 'no measured panel (the IME region unreadable)' };
-  const beyond = region.filter((r) => !sameRect(r, strip) && r.width > 0 && r.height > 0);
-  if (beyond.length === 1) return { panel: beyond[0] };
-  return {
-    why: beyond.length === 0 ? `no measured panel (the region holds the strip ${rectText(strip)} alone)` : `no measured panel (${beyond.length} panels beyond the strip: ${beyond.map(rectText).join(', ')})`,
-  };
+  const { panels, refused } = panelsBeyond(strip, { witness: parseInputShown(dump), region });
+  if (panels.length === 1) return { panel: panels[0] };
+  if (panels.length > 1) return none(`${panels.length} panels beyond the strip: ${panels.map(rectText).join(', ')}`);
+  switch (refused?.kind) {
+    case 'unreadable':
+      return none('the IME region unreadable');
+    case 'witness-not-shown':
+      return none('the input method did not say shown');
+    case 'no-band-rect':
+      return none(`the region does not hold the strip ${rectText(strip)}`);
+    case 'rects-dropped':
+      return none(`${refused.dropped} rect(s) of the region off the screen or of no area`);
+    case undefined:
+      return none(region === undefined ? 'the input method did not say shown' : `the region holds no rect beyond the strip ${rectText(strip)}`);
+  }
 }
 
-const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+/** The measured panel and the strip beside it, or the SKIP that says why there is none: both kf branches' one read. */
+function panelAtLaunch(launched: LabState): { panel: Rect; strip: Rect } | { skip: LiveVerdict } {
+  const strip = launched.keyboard?.frame;
+  if (strip === undefined) return { skip: { outcome: 'SKIP', why: 'no IME at launch' } };
+  const measured = measuredPanel(launched, strip);
+  return 'why' in measured ? { skip: { outcome: 'SKIP', why: measured.why } } : { panel: measured.panel, strip };
+}
+
 const NOT_THE_PREMISE = "not the case's premise (the submit wholly between the panel and the strip)";
 
 /**
  * kf1/kf2's premise, at launch: the submit lies wholly in the gap — its top at or below the measured panel's bottom,
- * its bottom at or above the strip's top. Undefined when it holds; else why not, naming what covers it and by how many
- * px (the rows they share): batch-11's panel at 87,1243 937x792 covered the submit 55,1928 970x132 by 107 px, and
- * averi's refusal there is ADR 0027's fail-closed case, not a MISMATCH.
+ * its bottom at or above the strip's top. Else why not, naming what covers it and by how many px (the rows they share):
+ * batch-11's panel at 87,1243 937x792 covered the submit 55,1928 970x132 by 107 px, and averi's refusal there is ADR
+ * 0027's fail-closed case, not a MISMATCH.
  */
-export function gapPremise(submit: Rect | undefined, panel: Rect, strip: Rect): string | undefined {
-  if (submit === undefined) return 'the submit not laid out at launch';
-  const top = submit.y;
-  const bottom = submit.y + submit.height;
-  if (top >= panel.y + panel.height && bottom <= strip.y) return undefined;
-  const by = (r: Rect) => Math.min(bottom, r.y + r.height) - Math.max(top, r.y);
-  if (overlaps(submit, panel)) return `the measured panel ${rectText(panel)} covers the submit ${rectText(submit)} by ${by(panel)} px — ${NOT_THE_PREMISE}`;
-  if (overlaps(submit, strip)) return `the strip ${rectText(strip)} covers the submit ${rectText(submit)} by ${by(strip)} px — ${NOT_THE_PREMISE}`;
-  return `the submit ${rectText(submit)} is not wholly between the measured panel ${rectText(panel)} and the strip ${rectText(strip)} — not the case's premise`;
+export function gapPremise(submit: Rect | undefined, panel: Rect, strip: Rect): { holds: true } | { why: string } {
+  if (submit === undefined) return { why: 'the submit not laid out at launch' };
+  if (submit.y >= panel.y + panel.height && submit.y + submit.height <= strip.y) return { holds: true };
+  const underPanel = rectIntersection(submit, panel);
+  if (underPanel !== undefined) return { why: `the measured panel ${rectText(panel)} covers the submit ${rectText(submit)} by ${underPanel.height} px — ${NOT_THE_PREMISE}` };
+  const underStrip = rectIntersection(submit, strip);
+  if (underStrip !== undefined) return { why: `the strip ${rectText(strip)} covers the submit ${rectText(submit)} by ${underStrip.height} px — ${NOT_THE_PREMISE}` };
+  return { why: `the submit ${rectText(submit)} is not wholly between the measured panel ${rectText(panel)} and the strip ${rectText(strip)} — not the case's premise` };
 }
 
 /** Whether a frame's centre, as a probe taps it, lies in the measured panel. */
@@ -363,7 +382,6 @@ export const judgeFloatingGap =
   (s: LabState, replies: string[], _source: string, launched: LabState): LiveVerdict => {
     const docked = floatingAtLaunch(launched);
     if (docked !== undefined) return docked;
-    const strip = launched.keyboard!.frame;
     const submits = (s.submits ?? []).length;
     const touches = touchesSince(s, launched);
     const logged = `${touches.length} touch(es) the app logged${touches.length === 0 ? '' : ` at ${touchPointsText(touches)}`}`;
@@ -371,8 +389,8 @@ export const judgeFloatingGap =
       const [scroll] = replies;
       if (valueOf(s, 'postcode') !== valueOf(launched, 'postcode')) return { outcome: 'MISMATCH', why: `postcode CHANGED to ${JSON.stringify(valueOf(s, 'postcode'))} — a key was typed; averi: ${short(scroll)}` };
       if (submits > 0) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×); averi: ${short(scroll)}` };
-      const measured = measuredPanel(launched, strip);
-      if ('why' in measured) return { outcome: 'SKIP', why: measured.why };
+      const measured = panelAtLaunch(launched);
+      if ('skip' in measured) return measured.skip;
       const { panel } = measured;
       // Not run unless ks starts under the measured panel: elsewhere a visible claim is no evidence either way.
       if (!inPanel(launched.frames.ks, panel)) return { outcome: 'SKIP', why: `ks's centre at launch lies outside the measured panel ${rectText(panel)}` };
@@ -380,18 +398,18 @@ export const judgeFloatingGap =
       const where = ks == null ? 'ks not laid out' : `ks ${ks.y}–${ks.y + ks.height}`;
       if (replyKind(scroll) === 'visible' && (ks == null || inPanel(ks, panel))) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — ks's centre lies in the measured panel (${where}); ${logged}` };
       // An ok refusal names the panel (not the 132-px strip alone): averi read the panel the launch measured.
-      const over = `over [${panel.x},${panel.y}][${panel.x + panel.width},${panel.y + panel.height}]`;
-      if (scroll?.includes(over) !== true) return { outcome: 'SKIP', why: `averi's reply does not name the measured panel ${over}: ${short(scroll)}` };
+      const panelAsNamed = `over [${panel.x},${panel.y}][${panel.x + panel.width},${panel.y + panel.height}]`;
+      if (scroll?.includes(panelAsNamed) !== true) return { outcome: 'SKIP', why: `averi's reply does not name the measured panel ${panelAsNamed}: ${short(scroll)}` };
       return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panel (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
     }
     const [evidence, scroll, tap] = replies;
     // Damage is judged before the evidence: a submit the case never asked for is wrong with a panel up or not.
     if (submits > (kind === 'kf2' ? 1 : 0)) return { outcome: 'MISMATCH', why: `the form was SUBMITTED (${submits}×) — more than the case's ${kind === 'kf2' ? 'one tap' : 'none'}: ${short(scroll)}${kind === 'kf2' ? ` / ${short(tap)}` : ''}` };
-    const measured = measuredPanel(launched, strip);
-    if ('why' in measured) return { outcome: 'SKIP', why: measured.why };
-    const { panel } = measured;
+    const measured = panelAtLaunch(launched);
+    if ('skip' in measured) return measured.skip;
+    const { panel, strip } = measured;
     const premise = gapPremise(launched.frames.submit, panel, strip);
-    if (premise !== undefined) return { outcome: 'SKIP', why: premise };
+    if ('why' in premise) return { outcome: 'SKIP', why: premise.why };
     if (evidence?.includes(`keyboard ${rectText(panel)}`) !== true) return { outcome: 'SKIP', why: `averi's reply does not quote the measured panel ${rectText(panel)} over ks: ${short(evidence)}` };
     if (replyKind(scroll) !== 'visible') return { outcome: 'MISMATCH', why: `refused, though the submit lies wholly between the panel and the strip: ${short(scroll)}` };
     // kf2's one touch is its tap, sent after the scroll; any other is a stroke.

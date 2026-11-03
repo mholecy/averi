@@ -321,11 +321,11 @@ export interface LabState {
   readAt?: number;
   /**
    * Not the app's: Android, a case that measures the floating panel (live-cases.ts Case.measuresPanel) — what averi's
-   * touchable query (lab-device.ts#IME_TOUCHABLE, LabDevice.imeTouchable) answered right after the launch, raw; `''`
-   * when the read failed. live-forms.ts#measuredPanel reads it. Absent from captures, from every other case and from
-   * records before D67.
+   * touchable query (src/adapters/android.ts#TOUCHABLE_COMMAND, LabDevice.imeTouchable) answered right after the
+   * launch, raw; `{ error }` when the read failed past the device guard (lab-device.ts#withMeasuredPanel).
+   * live-forms.ts#measuredPanel reads it. Absent from captures, from every other case and from records before D67.
    */
-  imeTouchable?: string;
+  imeTouchable?: string | { error: string };
 }
 
 /**
