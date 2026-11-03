@@ -52,22 +52,19 @@ const FOCUS_WINDOW_RE = /mCurrentFocus=Window\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+
  */
 const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+) /;
 
-/** A display's block header in the dump. */
-const DISPLAY_HEADER_RE = /^ *Display: mDisplayId=(\d+)/gm;
+/** What opens each display's block in the dump, its id after it: `Display: mDisplayId=0 (organized)`. */
+const DISPLAY_HEADER = 'Display: mDisplayId=';
 
 /** The id of the default display, where `am start` with no `--display` starts the link. */
-const DEFAULT_DISPLAY = '0';
+const DEFAULT_DISPLAY = 0;
 
 /**
- * The default display's block of the dump: from its header to the next header. A dump with no header (lines read
- * alone) is one display's, whole. A dump with headers and none for display 0 has no block: no chooser.
+ * The default display's block of the dump, from its header to the next one: display 0's, else the first display's
+ * (no dump of averi's has lacked a display 0). A dump with no header (focus lines read alone) is one display's, whole.
  */
-function defaultDisplayBlock(dump: string): string | undefined {
-  const headers = [...dump.matchAll(DISPLAY_HEADER_RE)];
-  if (headers.length === 0) return dump;
-  const i = headers.findIndex((h) => h[1] === DEFAULT_DISPLAY);
-  if (i === -1) return undefined;
-  return dump.slice(headers[i]?.index, headers[i + 1]?.index);
+function defaultDisplayBlock(dump: string): string {
+  const [whole = dump, ...displays] = dump.split(DISPLAY_HEADER);
+  return displays.find((block) => Number.parseInt(block, 10) === DEFAULT_DISPLAY) ?? displays[0] ?? whole;
 }
 
 /** Whether `pkg/class` is the platform's chooser. */
@@ -89,7 +86,6 @@ const isChooser = (component: string): boolean => {
  */
 export function chooserInFocus(dump: string): string | undefined {
   const block = defaultDisplayBlock(dump);
-  if (block === undefined) return undefined;
   const component = FOCUSED_APP_RE.exec(block)?.[1] ?? FOCUS_WINDOW_RE.exec(block)?.[1];
   return component !== undefined && isChooser(component) ? component : undefined;
 }
