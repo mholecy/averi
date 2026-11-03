@@ -69,6 +69,10 @@ flows:
   widened by D61: an unnamed placeholder whose letters and digits start the value's).
   Without clear, a reading unchanged since typing began fails as `did not change` unless it is
   the value itself (ADR 0034's D63 amendment).
+  Without clear, the value must be in what was typed after the earlier text, not anywhere in the
+  reading: a field that kept its earlier text and only the start of the typing (a length cap, a
+  dropped tail) is no fill, though its text holds the value; on iOS the tail is typed again
+  (ADR 0034's D64 amendment).
   Android types one character per `input text` call: bulk injection races Compose's async state
   and drops most characters (measured 3 of 11 landing). Today averi types only printable ASCII
   (U+0020–U+007E) on both platforms: a value holding any other character — `Š`, `’`,

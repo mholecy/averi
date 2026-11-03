@@ -4,6 +4,8 @@ Status: accepted 2026-10-31 (performance backlog item D8, docs/plans/2026-10-30-
 orchestrator's decision on the owner's standing: fast AND stable — a fill that reports success on the wrong field or
 misses a transformed value is unacceptable). Implemented in 5ea9bfd2…546c8804, merged 1083523e. Amended 2026-11-01
 (D31: the residuals numbered under "Residuals accepted", p5's secure field that iOS clears accepted as residual 2).
+Amended 2026-11-03 (D64, docs only: the safety claim and cost C1 corrected — a focus-inserted prefix that holds the
+value passes with no key landed; residual 3 accepted; follow-up D64b).
 
 ## Context
 
@@ -62,7 +64,9 @@ The 350 ms focus delay stays.
 - The skip adds no way for a fill to pass that the re-read would have failed, except the residual (R1) below. A plain
   read-back is compared to the value from fresh reads of the field found by its id, as before (the pre-typing count
   is not part of that comparison). A masked read-back passes only at exactly the typed length — the one reading that
-  needs no count. A dropped tail is never retyped on Android, so `whereTyped` decides nothing there.
+  needs no count. A dropped tail is never retyped on Android, so `whereTyped` decides nothing there. Wrong in one more
+  case: a prefix inserted on focus that holds the value passes with none of the typing landed (the D64 amendment
+  below, residual 3).
 - A wrong `false` (a source that says plain of a field that masks) turns the masked-append warning the re-read would
   have given into a failure — fail-safe, except (R1).
 
@@ -70,7 +74,8 @@ The 350 ms focus delay stays.
 
 - (C1) A plain field that INSERTS text on focus (a `+421 ` prefix) and takes none of the typing is reported as a
   length mismatch, not as "the field did not change" (`shownBeforeTyping` was the empty pre-tap reading). Every key
-  landing still passes (`includes`).
+  landing still passes (`includes`). Only where the inserted text does not hold the value: one that holds it passes
+  with no key landed (the D64 amendment below, residual 3).
 - (C2) An autofilled field said plain fails where the re-read would have passed it with the masked-append warning.
 
 ## Residual
@@ -133,6 +138,41 @@ focus)`. LOUD under idb and WDA in every iOS forms run (docs/truth/live-ios-2026
 docs/truth/live-records/ios-forms-d40-1.json). What iOS clears no typing can keep; the remedy is the whole value with
 `clear: true` (p6, ok).
 
+## Amendment: a focus-inserted prefix that holds the value passes (2026-11-03, D64, docs only)
+
+**Context.** D64's analysis (2026-11-03; ADR 0034's residual 8 B). Where the re-read is skipped, the field's text when
+typing began is the pre-tap reading of the empty field, `''` (`interact/fill.ts`, `shownBeforeTyping`), and the typing
+is told so (`before: ''`, `held: 'unread'`). A plain field that inserts text on focus and takes none of the keys reads
+only that text. "Why it is safe" and (C1) hold where that text does not hold the value — tests/interact/fill.test.ts
+pins (C1) with `903123456` after an inserted `+421 `, a length mismatch. Where it does hold it, the reading passes: the
+earlier text is `''`, so the whole reading is the typing (fill-landing.ts#showsExactly; ADR 0034's D64 amendment), and
+`+421 ` holds a typed `421`. The re-read would have read `+421 ` as `before` and failed the same reading as "did not
+change" (ADR 0034's D63 amendment). So the skip adds a second way to pass that the re-read would have failed, beside
+(R1). uiautomator only: iOS keeps the re-read, so idb and wda never skip.
+
+**Decision.** No code change. The landing rule takes a `before` of `''` at its word — an eager formatter can turn a
+typed `421` into `+421 ` from a truly empty field, and that reading has landed — so a fix, if one is needed, is the
+gate's (fill.ts), not the landing's. Accepted as residual 3 below and pinned as today's behaviour:
+tests/interact/fill.test.ts "accepted residual 3 (ADR 0028's D64 amendment)…", and fill-landing.test.ts's residual 8
+(B). Follow-up: backlog row D64b, which waits for a measurement — a lab field that inserts a prefix on focus while
+empty, and two Android cases: every key landing (ok today) and none (the false Filled).
+
+**Consequences.**
+- A fill into an empty plain field by sole id on Android, whose field inserts on focus a text that holds the typed
+  value and takes none of the keys, replies Filled, verified. No lab field does so (Forms.kt, Forms.swift and the RN
+  app's focus hooks only report focus), and no live record shows it; real apps insert a dial code on focus, but one
+  that also refuses every key has not been seen.
+- D64b's options, with their costs: re-read always (+1 dump, about 2.3–2.5 s on every skipped fill: this ADR's gain
+  given back; about 2.0 s with the read replacing the 350 ms focus delay, unmeasured whether `uiautomator dump`'s idle
+  wait covers the keyboard), or land such a reading with a caveat line that the field's text after focus was not read
+  (no device cost; a new fill fact across four modules).
+- (C1)'s other half is unchanged: an inserted prefix that does not hold the value, no key landed, is still worded as a
+  length mismatch.
+
+Residuals, stated: residual 3 below. Wider, on every source and not D64's: a NON-empty plain field's `before` is its
+pre-tap reading, never re-read (fill.ts), so a field that inserts on focus a prefix holding the value has the same hole
+there; noted for D64b.
+
 ## Residuals accepted
 
 1. **A source that wrongly says plain of a masking field**, an autofill of N bullets on focus and exactly N dropped
@@ -140,3 +180,6 @@ docs/truth/live-records/ios-forms-d40-1.json). What iOS clears no typing can kee
 2. **iOS clears a secure field when typing resumes.** A no-clear fill into a prefilled secure field leaves only what
    was typed; the read-back's length rule fails it and averi says so (LOUD, the amendment above). Filed in
    live-known.ts as `ios idb|wda p5` (`loud-changed` on `refused`).
+3. **A prefix inserted on focus that holds the value passes the skipped re-read** (the D64 amendment): on Android, an
+   empty plain field by sole id that shows `+421 ` once focused and takes none of a typed `421` replies Filled — the
+   re-read would have read `+421 ` first and failed it as "did not change". Unmeasured; follow-up D64b.
