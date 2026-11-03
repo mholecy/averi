@@ -681,6 +681,17 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     server.stop();
   });
 
+  // Review round 1: two typings in flight on the old session, both lost — the second must not forget the session the
+  // first just made (WDA ends every other session when one is made, so a third would end the first's).
+  it('two concurrent typings that both meet a lost session make ONE new session between them', async () => {
+    const { server, posts } = await keysSetup((req) => (req.url.includes('/session/S1/') ? { status: 404, body: { value: { error: 'invalid session id' } } } : { status: 200, body: { value: null } }));
+    await server.ensureRunning();
+    await Promise.all([server.keys('Šťastný'), server.keys('O’Brien')]);
+    expect(posts().filter((p) => p === '/session')).toHaveLength(2);
+    expect(posts().filter((p) => p.endsWith('/wda/keys'))).toEqual(['/session/S1/wda/keys', '/session/S1/wda/keys', '/session/S2/wda/keys', '/session/S2/wda/keys']);
+    server.stop();
+  });
+
   it('an "invalid session id" under another status is a lost session too', async () => {
     const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 500, body: { value: { error: 'invalid session id', message: 'Session does not exist' } } } : { status: 200, body: { value: null } }));
     await server.keys('Šťastný');

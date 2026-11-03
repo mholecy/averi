@@ -330,9 +330,11 @@ export class WdaServer {
    */
   async keys(text: string): Promise<void> {
     await this.ensureRunning();
-    let answer = await this.postKeys(await this.sessionId(), text);
+    const id = this.sessionId();
+    let answer = await this.postKeys(await id, text);
     if (answer.kind === 'lost') {
-      this.session = undefined;
+      // Only the session this typing was sent on: a typing beside it may already have made the next one (review round 1).
+      if (this.session?.id === id) this.session = undefined;
       answer = await this.postKeys(await this.sessionId(), text);
     }
     if (answer.kind === 'typed') return;
