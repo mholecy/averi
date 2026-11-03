@@ -26,7 +26,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -58,6 +61,9 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.LinearLayout
 import androidx.core.widget.NestedScrollView
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.PagerSnapHelper
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.appbar.MaterialToolbar
@@ -195,7 +201,7 @@ internal fun EdgesScreen(cell: Cell, lab: Lab) {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.White).semantics { testTagsAsResourceId = true }) {
         if (cell.id == "scroll-sticky" || cell.id in MERGED_HEADER_CELLS) {
             StickyList(cell, lab)
-        } else if (cell.id == "carousel-in-list") {
+        } else if (cell.id in CAROUSEL_CELLS) {
             CarouselInList(cell, lab, maxWidth, maxHeight)
         } else if (cell.id == "scroll-collapsing") {
             CollapsingList(cell, lab)
@@ -296,6 +302,9 @@ private fun StickyList(cell: Cell, lab: Lab) {
  * scroll toward it `right`). The banking screen of docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-
  * targets-scroll-view.md (its residual: the carousel `24,138 354x85` near the top, a long list below).
  */
+/** The cells laid as carousel-in-list: its page and rows, each with its own carousel (CarouselInList). */
+private val CAROUSEL_CELLS = setOf("carousel-in-list", "carousel-lazy", "carousel-recycler")
+
 private object CarouselLayout {
     val CONTENT = 2400.dp
     val OFFSET = 300.dp
@@ -318,10 +327,8 @@ private fun CarouselInList(cell: Cell, lab: Lab, screenWidth: Dp, screenHeight: 
     val density = LocalDensity.current
     val l = CarouselLayout
     val page = rememberScrollState(with(density) { l.OFFSET.roundToPx() })
-    val carousel = rememberScrollState(0)
     val cardWidth = screenWidth - l.CAROUSEL_X * 2
     ReportScroll(lab, "page", { page.isScrollInProgress }, { page.value })
-    ReportScroll(lab, "carousel", { carousel.isScrollInProgress }, { carousel.value })
     Box(
         Modifier
             .fillMaxWidth()
@@ -340,26 +347,142 @@ private fun CarouselInList(cell: Cell, lab: Lab, screenWidth: Dp, screenHeight: 
                 val t = cell.targets.firstOrNull { it.tag == tag } ?: continue
                 EdgeBox(cell, t, lab, Modifier.align(Alignment.TopCenter).offset(y = y))
             }
-            Box(
-                Modifier
-                    .offset(x = l.CAROUSEL_X, y = l.CAROUSEL_TOP)
-                    .size(cardWidth, l.CARD_HEIGHT)
-                    .onGloballyPositioned { lab.scrollView("carousel", screenFrame(view, it)) }
-                    .horizontalScroll(carousel),
-            ) {
-                Row {
-                    val c = cell.targets.firstOrNull { it.tag == "C" }
-                    for (i in 0 until l.CARDS) {
-                        if (i == 1 && c != null) {
-                            CardBox(cell, c, lab, Modifier.size(cardWidth, l.CARD_HEIGHT))
-                        } else {
-                            Box(Modifier.size(cardWidth, l.CARD_HEIGHT).background(Color(0xFF90A4AE)))
-                        }
-                    }
+            // The carousel's clip, where the layout puts it; what scrolls inside it is the cell's (CAROUSEL_CELLS).
+            val clip = Modifier
+                .offset(x = l.CAROUSEL_X, y = l.CAROUSEL_TOP)
+                .size(cardWidth, l.CARD_HEIGHT)
+                .onGloballyPositioned { lab.scrollView("carousel", screenFrame(view, it)) }
+            when (cell.id) {
+                "carousel-lazy" -> LazyCarousel(cell, lab, clip, cardWidth)
+                "carousel-recycler" -> RecyclerCarousel(cell, lab, clip)
+                else -> ScrollCarousel(cell, lab, clip, cardWidth)
+            }
+        }
+    }
+}
+
+/** carousel-in-list's carousel: a Row in a horizontalScroll, no snapping. */
+@Composable
+private fun ScrollCarousel(cell: Cell, lab: Lab, clip: Modifier, cardWidth: Dp) {
+    val l = CarouselLayout
+    val carousel = rememberScrollState(0)
+    ReportScroll(lab, "carousel", { carousel.isScrollInProgress }, { carousel.value })
+    Box(clip.horizontalScroll(carousel)) {
+        Row {
+            val c = cell.targets.firstOrNull { it.tag == "C" }
+            for (i in 0 until l.CARDS) {
+                if (i == 1 && c != null) {
+                    CardBox(cell, c, lab, Modifier.size(cardWidth, l.CARD_HEIGHT))
+                } else {
+                    Box(Modifier.size(cardWidth, l.CARD_HEIGHT).background(Color(0xFF90A4AE)))
                 }
             }
         }
     }
+}
+
+/**
+ * carousel-lazy (L7; D59, D37's snapping pager): carousel-in-list's cards in a LazyRow under a snap fling
+ * (rememberSnapFlingBehavior: a fling comes to rest with a card filling the clip) — a container whose node carries no
+ * scroll axis in the dump. A lazy list composes only what its clip shows, so C (the second card, as wide as the clip,
+ * its left edge on the clip's right one at rest) is composed — its node dumped, its frame reported — once a part of it
+ * scrolls in. The offset is the cards' (all CARD wide) before the first one shown plus how far that one is scrolled.
+ */
+@Composable
+private fun LazyCarousel(cell: Cell, lab: Lab, clip: Modifier, cardWidth: Dp) {
+    val l = CarouselLayout
+    val state = rememberLazyListState()
+    val card = with(LocalDensity.current) { cardWidth.roundToPx() }
+    val offset = { state.firstVisibleItemIndex * card + state.firstVisibleItemScrollOffset }
+    ReportScroll(lab, "carousel", { state.isScrollInProgress }, offset)
+    ReportSnap(lab, { state.isScrollInProgress }) { (offset() + card / 2) / card }
+    val c = cell.targets.firstOrNull { it.tag == "C" }
+    LazyRow(clip, state = state, flingBehavior = rememberSnapFlingBehavior(state)) {
+        items(l.CARDS) { i ->
+            if (i == 1 && c != null) {
+                CardBox(cell, c, lab, Modifier.size(cardWidth, l.CARD_HEIGHT))
+            } else {
+                Box(Modifier.size(cardWidth, l.CARD_HEIGHT).background(Color(0xFF90A4AE)))
+            }
+        }
+    }
+}
+
+/** The state's key of the card a snapping carousel rests on (LabState.offsets): its index, 0 the first. */
+private const val CAROUSEL_INDEX = "carousel.index"
+
+/** Reports the card a snapping carousel rests on (CAROUSEL_INDEX), each time it comes to rest. */
+@Composable
+private fun ReportSnap(lab: Lab, moving: () -> Boolean, index: () -> Int) {
+    LaunchedEffect(lab) { snapshotFlow { moving() to index() }.collect { (m, i) -> if (!m) lab.scroll(CAROUSEL_INDEX, false, i) } }
+}
+
+/**
+ * carousel-recycler (L7; D59, D37's snapping pager): carousel-in-list's cards in a RecyclerView (a horizontal
+ * LinearLayoutManager, each card MATCH_PARENT: as wide as the clip) under a PagerSnapHelper, in an AndroidView — the
+ * View carousel a banking app builds, its node carrying no scroll axis in the dump. As on carousel-lazy, C is laid out
+ * (and dumped) once a part of it scrolls in. C's id is its accessibility node's viewIdResourceName (as scroll-collapsing
+ * sets its rows'), its frame its unclipped place on the screen, reported as it moves; the offset is
+ * computeHorizontalScrollOffset, a stroke from a drag's start to the IDLE after its settle (Lab.scroll).
+ */
+@Composable
+private fun RecyclerCarousel(cell: Cell, lab: Lab, clip: Modifier) {
+    AndroidView(factory = { context -> recyclerCarousel(context, cell, lab) }, modifier = clip)
+}
+
+private fun recyclerCarousel(context: android.content.Context, cell: Cell, lab: Lab): View {
+    val l = CarouselLayout
+    val c = cell.targets.firstOrNull { it.tag == "C" }
+    val list = RecyclerView(context).apply { setBackgroundColor(0xFFEEEEEE.toInt()) }
+    list.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+    val onScreen = { v: View -> IntArray(2).also(v::getLocationOnScreen).let { android.graphics.Rect(it[0], it[1], it[0] + v.width, it[1] + v.height) } }
+    var card: View? = null
+    val report = { card?.let { if (it.isAttachedToWindow && c != null) lab.frame(c.tag, onScreen(it)) } }
+    list.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        override fun getItemCount() = l.CARDS
+        override fun getItemViewType(position: Int) = if (position == 1 && c != null) 1 else 0
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+            val v = View(parent.context)
+            v.layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            if (viewType == 1 && c != null) {
+                v.setBackgroundColor(c.color.toInt())
+                v.contentDescription = "Target ${c.tag}"
+                v.setOnClickListener { lab.event("tap", c.tag) }
+                val id = "lab.${cell.id}.${c.tag}"
+                v.accessibilityDelegate = object : View.AccessibilityDelegate() {
+                    override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                        super.onInitializeAccessibilityNodeInfo(host, info)
+                        info.viewIdResourceName = id
+                    }
+                }
+                v.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> report() }
+                card = v
+            } else {
+                v.setBackgroundColor(0xFF90A4AE.toInt())
+            }
+            return object : RecyclerView.ViewHolder(v) {}
+        }
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {}
+    }
+    PagerSnapHelper().attachToRecyclerView(list)
+    val width = { list.width.coerceAtLeast(1) }
+    list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+        override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+            lab.scroll("carousel", recyclerView.scrollState != RecyclerView.SCROLL_STATE_IDLE, recyclerView.computeHorizontalScrollOffset())
+            report()
+        }
+        override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+            val at = recyclerView.computeHorizontalScrollOffset()
+            lab.scroll("carousel", newState != RecyclerView.SCROLL_STATE_IDLE, at)
+            if (newState == RecyclerView.SCROLL_STATE_IDLE) lab.scroll(CAROUSEL_INDEX, false, (at + width() / 2) / width())
+            report()
+        }
+    })
+    list.post {
+        lab.scroll("carousel", false, list.computeHorizontalScrollOffset())
+        lab.scroll(CAROUSEL_INDEX, false, 0)
+    }
+    return list
 }
 
 /** A carousel card: EdgeBox at the card's size. */

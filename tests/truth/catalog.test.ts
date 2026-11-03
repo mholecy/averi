@@ -54,6 +54,8 @@ describe('the cell catalog', () => {
       'edges/scroll-top-edge-end',
       'edges/carousel-in-list',
       'edges/scroll-collapsing',
+      'edges/carousel-lazy',
+      'edges/carousel-recycler',
       'bars/bands',
       'bars/bands-three-button',
       'bars/pinned-bar',
@@ -157,6 +159,20 @@ describe('L7: form-grouped and rn-format-eager, their own cells beside the captu
     const cells = (await loadCatalog()).cells;
     expect(cells.find((c) => c.id === 'form-format')!.form!.fields.map((f) => [f.tag, f.format])).toEqual([['iban', 'group4'], ['amount', 'thousands'], ['ibanShown', 'group4'], ['date', 'date'], ['phone', undefined]]);
     expect(cells.find((c) => c.id === 'rn-format')!.targets.map((t) => [t.tag, t.format])).toEqual([['G', 'group4'], ['A', 'thousands']]);
+  });
+});
+
+describe('L7: carousel-lazy and carousel-recycler, Android only (D59, D37\'s snapping pager)', () => {
+  it('each carousel-in-list\'s targets exactly (C in the carousel, B and U in the page), built on Android alone', async () => {
+    const cells = (await loadCatalog()).cells;
+    const of = (id: string) => cells.find((c) => c.id === id)!;
+    for (const id of ['carousel-lazy', 'carousel-recycler']) {
+      expect(of(id)).toMatchObject({ family: 'edges', layer: 'none', platforms: ['android'] });
+      expect(of(id).targets).toEqual(of('carousel-in-list').targets);
+      expect(captureRefusal(of(id), 'ios', undefined)).toBe('built for android only');
+      expect(captureRefusal(of(id), 'android', 'gesture')).toBeUndefined();
+    }
+    expect(of('carousel-in-list').platforms).toBeUndefined();
   });
 });
 
