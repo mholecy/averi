@@ -306,8 +306,9 @@ export interface LabState {
   /**
    * Each scroll view's content offset now, by id (CatalogTarget.scrollView): down its content from its top — across it
    * from its leading edge for a horizontal one (carousel-in-list's `carousel`), which live-visibility.ts#judgeScroll
-   * judges along that axis. A snapping carousel (L7: carousel-lazy, carousel-recycler) also writes `carousel.index`, the
-   * card it last came to rest on (0 the first) — no scroll view's id.
+   * judges along that axis. The four L7 carousels (carousel-lazy, carousel-recycler and their free twins
+   * carousel-lazy-free, carousel-recycler-free — snapping or not) also write `carousel.index`, the card under the
+   * carousel's clip centre when it last came to rest (0 the first; the Android lab's Lab.index) — no scroll view's id.
    */
   offsets?: Record<string, number>;
   /** Each stroke a scroll view took, in order: from where it left rest to where it came to rest. */
