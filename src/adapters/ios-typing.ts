@@ -53,12 +53,13 @@ const BY_HAND = 'use a value without it, or enter it by hand.';
  * refuses it before this set is asked, as a control character (type-text.ts — the Return key is `pressKey('enter')`).
  *
  * The remedy names the WDA tree source only for a value WDA_TYPEABLE takes whole (`widerPath`); for any other (one
- * holding an emoji, or © followed by U+FE0F) there is no path on iOS, and it says so.
+ * holding an emoji, or © followed by U+FE0F) there is no path on iOS, and it says so, naming the first character WDA
+ * refuses too (`{char}`, typeable.ts#refusalOf) — the one to leave out, which may not be the one idb refused first.
  */
 export const IDB_TYPEABLE: Typeable = {
   refuses: IDB_REFUSES,
   says: "on iOS averi types only printable ASCII (U+0020–U+007E): `idb ui text` has no key for any other character and fails the whole call",
-  otherPath: `averi has no typing path on iOS for this value (WebDriverAgent's \`/wda/keys\` is not measured for all of it; ADR 0037): ${BY_HAND}`,
+  otherPath: `averi has no typing path on iOS for this value (WebDriverAgent's \`/wda/keys\` is not measured for {char}; ADR 0037): ${BY_HAND}`,
   widerPath: {
     refuses: WDA_REFUSES,
     otherPath: `A project with \`ios.treeSource: wda\` types it through WebDriverAgent (ADR 0037); otherwise ${BY_HAND}`,

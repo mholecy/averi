@@ -20,7 +20,9 @@ export interface Typeable {
   readonly says: string;
   /**
    * The remedy the refusal ends with, true for this adapter: whole sentences, ending with a full stop (D43). Where no
-   * other typing path of averi takes the character, it says so — and what to do instead.
+   * other typing path of averi takes the character, it says so — and what to do instead. With a `widerPath`, this is
+   * the remedy for a value that path refuses too, and its `{char}` is the first character of the value that path
+   * refuses, named as the refusal names one (`U+1F600 '😀'`): the one that blocks every path (review round 2).
    */
   readonly otherPath: string;
   /**
@@ -61,12 +63,16 @@ function named(ch: string): string {
  * cannot type (whole: a surrogate pair is one), never the value around it (a value may be a credential); says nothing
  * was sent — true at both places that throw it: before the fill's field is resolved (interact/type-text.ts) and before
  * Android's first `input text` — what the adapter types, and the remedy true for it (`otherPath`, or `widerPath`'s
- * where that path types the whole value).
+ * where that path types the whole value; else `otherPath` naming the first character that path refuses too).
  */
 export function refusalOf(text: string, typeable: Typeable): string | undefined {
   const ch = text.match(typeable.refuses)?.[0];
   if (ch === undefined) return undefined;
   const wider = typeable.widerPath;
-  const remedy = wider !== undefined && !wider.refuses.test(text) ? wider.otherPath : typeable.otherPath;
+  const blocking = wider === undefined ? undefined : text.match(wider.refuses)?.[0];
+  const remedy =
+    wider === undefined ? typeable.otherPath
+    : blocking === undefined ? wider.otherPath
+    : typeable.otherPath.replace('{char}', named(blocking));
   return `cannot type ${named(ch)}: ${typeable.says}. Refused before anything was sent — nothing tapped, cleared or typed. ${remedy}`;
 }

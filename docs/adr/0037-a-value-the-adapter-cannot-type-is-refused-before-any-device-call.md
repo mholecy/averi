@@ -178,7 +178,9 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
   - idb, such a value: "A project with `ios.treeSource: wda` types it through WebDriverAgent (ADR 0037); otherwise
     use a value without it, or enter it by hand."
   - idb, any other: "averi has no typing path on iOS for this value (WebDriverAgent's `/wda/keys` is not measured for
-    all of it; ADR 0037): use a value without it, or enter it by hand."
+    U+1F600 '😀'; ADR 0037): use a value without it, or enter it by hand." It names the first character WDA refuses
+    too, in the refusal's own form — for `Šťastný 😀` the refusal leads with `U+0160 'Š'`, which WDA types, and this
+    names `U+1F600 '😀'`, the one that blocks every iOS path. Never the value.
   - Android: "averi has no typing path for it on Android (no shell clipboard setter on API 33; ADR 0037): use a value
     without it, or enter it by hand."
   - WDA: "Use a value without it, or enter it by hand."
