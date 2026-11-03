@@ -380,46 +380,51 @@ a candidate.
    larger feed of unknown axis (a RecyclerView) gets the sideways stroke. Text inputs (`INPUT_ROLE`) are left out of
    `nested` (`Clips.axesOf`): a Compose text field dumps as a scrolling (Horizontal)ScrollView, role `textfield`, and a
    sideways stroke must not land in one. This matters on Android only: WDA marks no node clipping, so it has no
-   largest scroller. The page stays FIRST, so residual 7's axis rule takes a
-   nested one only when the page scrolls across the stroke. Every stroke along the page, a page of unknown axis and the
-   all-across fallback are as before; so are iOS (WDA marks no node clipping, so there is no largest scroller) and idb.
-   The lab's carousel is now stroked inside, `swipeVector(66,380 948x234, right)` = `(824,497)→(256,497)`.
+   largest scroller. The page stays FIRST, so residual 7's axis rule takes a nested one only when the page scrolls
+   across the stroke. Every stroke along the page, a page of unknown axis and the all-across fallback are as before;
+   so are iOS and idb. The lab's carousel is now stroked inside, `swipeVector(66,380 948x234, right)` =
+   `(824,497)→(256,497)`.
 2. When the strokes still went across a scroll view whose axis the tree tells (`stroke-plan.ts#strokedAcross`), the
    exhausted stop says so first, after a node named under the touch-down and below an end the tree proves
    (`scroll-rounds.ts#BoundBy`'s `across`, `scroll-text.ts#acrossText`). What it says the other way is asked of the
-   WHOLE tree (`Clips.toldOn`), not of the candidates (review round 1: a chips row beside the page is no candidate).
-   The largest scroll view told to scroll the stroke's way is named: `… which scrolls vertically, and the tree shows
-   scrollable id:feed.chips (0,2000 1080x150), which scrolls horizontally and the swipes did not go over — swipe inside
-   it (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading)`. When the plan judged it
-   and found no room for the stroke box, it says `… but had no room for a swipe — …`. Only when the tree tells none:
-   `failed after 2 swipes (the last 2, swiping right, did not change the screen: each went across the scroll view it
-   was drawn over, 0,0 1080x2220, which scrolls vertically, and the tree shows no scroll view that may scroll
-   horizontally — if the element lies in a horizontal list the tree does not show as one, swipe inside that list
-   (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading)`. The clause does not depend
-   on whether a read found the target: it describes the strokes.
+   whole tree (`Clips.toldOn`), not of the candidates (review round 1: a chips row beside the page is no candidate).
+   Only scroll views that meet the usable screen (the round's box less the status and navigation bands) count, and
+   none of the keyboard's own (`soft-keyboard.ts#keyboardSideNodes`, the reading's `ofKeyboard`: WDA's suggestion
+   strip is no list of the app's) (review round 2). The largest such scroll view told to scroll the stroke's way is
+   named: `… which scrolls vertically, and the tree shows scrollable id:feed.chips (0,2000 1080x150), which scrolls
+   horizontally, and which the swipes did not go over — swipe inside it (swipe, its coordinates), then scroll_until
+   it; else: content exhausted, still loading)`. When the plan judged it and found no room for the stroke box, it says
+   `…, which scrolls horizontally, but which had no room for a swipe — …`. Only when the tree tells none: `failed
+   after 2 swipes (the last 2, swiping right, did not change the screen: each went across the scroll view it was
+   drawn over, 0,0 1080x2220, which scrolls vertically, and the tree shows no scroll view that may scroll horizontally
+   — if the element lies in a horizontal list the tree does not show as one, swipe inside that list (swipe, its
+   coordinates), then scroll_until it; else: content exhausted, still loading)`. The clause does not depend on
+   whether a read found the target: it describes the strokes.
 3. No change to `swipeVector` or to the stroke's length.
 
 **Residuals.** (a) A nested scroll view of unknown axis that really scrolls vertically (a RecyclerView list inside a
 NestedScrollView) is now stroked sideways, and the reply stays the generic one. (b) On a page with two carousels the
 larger is stroked, and it may not hold the target. (c) A scroll view of UNKNOWN axis does not count for the across
 clause, so "the tree shows no scroll view that may scroll horizontally" can sit beside a RecyclerView that does. The
-plan strokes such a view only when it is nested in the page; a sibling one is never stroked. (d) A carousel the dump marks neither scrolling nor clipping is no candidate. Only the across clause
-helps there. (e) Golden does not catch D59b: its stroke row skips the in-scroll-view check when the target is absent
-(T6), and no truth capture has an absent target with a sideways direction, so golden is Changed 0. (f) Where the
-nested view does not take the strokes, the stop changes. Over the page, batch-11's run stopped exhausted after 2
-swipes. Inside a carousel whose dump lists no content (the derived lab tree: no card under it), no read can show the
-strokes' motion, so no stroke counts as unmoved. The call runs to maxSwipes: `failed after 4 swipes (maxSwipes) — …
-after the last 4 swipes over the scroll container 66,380 948x234 the tree listed none of its content where a swipe's
-motion would show (…), so how far they moved it is unknown — the element may lie further right: raise maxSwipes or
-timeoutMs`. That costs 4 swipes instead of 2, and it advises raising maxSwipes although nothing visibly moved. The
-reply says the motion is unknown, not that the carousel moved, so it stays honest. On the device the carousel lists
-its cards, so this applies only where it lists none.
+plan strokes such a view only when it is nested in the page; a sibling one is never stroked. (d) A carousel the dump
+marks neither scrolling nor clipping is no candidate. Only the across clause helps there. (e) Golden does not catch
+D59b: its stroke row skips the in-scroll-view check when the target is absent (T6), and no truth capture has an
+absent target with a sideways direction, so golden is Changed 0. (f) Where the nested view does not take the strokes,
+the stop changes. Over the page, batch-11's run stopped exhausted after 2 swipes. Inside a carousel whose dump lists
+no content (the derived lab tree: no card under it), no read can show the strokes' motion, so no stroke counts as
+unmoved. The call runs to maxSwipes: `failed after 6 swipes (maxSwipes) — … after the last 6 swipes over the scroll
+container 66,380 948x234 the tree listed none of its content where a swipe's motion would show (…), so how far they
+moved it is unknown — the element may lie further right: raise maxSwipes or timeoutMs` (a default call,
+DEFAULT_MAX_SWIPES 6; the test pins it at its own maxSwipes, 4). That costs 6 swipes instead of 2, and it advises
+raising maxSwipes although nothing visibly moved. The reply says the motion is unknown, not that the carousel moved,
+so it stays honest. On the device the carousel lists its cards, so this applies only where it lists none.
 
-**Tests.** tests/interact/stroke-plan.test.ts (the derived lab trees `tests/fixtures/uiautomator-lab-carousel-*-launch.xml`,
-made from the committed `carousel-in-list` capture, since the batches kept no dump, and batch-11's strokes,
-`tests/fixtures/d59b-b11-strokes.json`, trimmed), tests/interact/scroll-rounds.test.ts (the across clause and its
-order, the whole tree's along view named, the maxSwipes stop of the derived tree), tests/ui-tree/geometry-clips.test.ts
-(the text input left out, `toldOn`). Hand mutants: 13, then 9 more after review round 1, all killed. Device gate:
+**Tests.** tests/interact/stroke-plan.test.ts (the derived lab trees
+`tests/fixtures/uiautomator-lab-carousel-*-launch.xml`, made from the committed `carousel-in-list` capture, since the
+batches kept no dump, and batch-11's strokes, `tests/fixtures/d59b-b11-strokes.json`, trimmed),
+tests/interact/scroll-rounds.test.ts (the across clause and its order, the whole tree's along view named, the maxSwipes
+stop of the derived tree), tests/ui-tree/geometry-clips.test.ts (the text input left out, `toldOn` and its screen and
+keyboard filters). Hand mutants: 13, then 9 after review round 1 and 6 after round 2, all killed. Device gate:
 `d59b-measure` rerun in the next batch, FAIL → PASS.
 
 ## Bug note
