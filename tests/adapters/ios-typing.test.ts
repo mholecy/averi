@@ -101,7 +101,11 @@ describe('the refusals\' remedies', () => {
   it('wda: says what it types and that the rest is not measured through /wda/keys; names no other path', () => {
     const msg = refusalOf('a😀', WDA_TYPEABLE)!;
     expect(msg).toMatch(/^cannot type U\+1F600 '😀': on iOS with WebDriverAgent /);
-    expect(msg).toContain('not measured through `/wda/keys`');
+    expect(msg).toContain(
+      'on iOS with WebDriverAgent averi types printable ASCII, and through `/wda/keys` the letters of the Latin, Greek, Cyrillic and Han scripts, ' +
+        'common punctuation, symbols and numbers, NBSP and U+202F of the Basic Multilingual Plane; an emoji, a combining mark, a format character, ' +
+        'another space or another script is not measured through `/wda/keys`.',
+    );
     expect(msg).toMatch(/Refused before anything was sent — nothing tapped, cleared or typed\. Use a value without it, or enter it by hand\.$/);
     expect(msg).not.toContain('ios.treeSource');
   });
