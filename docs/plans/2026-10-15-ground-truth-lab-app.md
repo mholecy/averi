@@ -470,7 +470,8 @@ truth corpus and the golden do not move: an uncaptured cell makes no golden row)
   group is complete, none at 24 characters — D60's eager trailing mark) and `phoneGrouped` (`format: phone3`: a
   leading `+` kept, the digits in threes, under a `+421` placeholder — D37's `+421` grouping field), and the submit.
   Live forms cases g1–g5 (scripts/truth/live-cases.ts); g2, which ends on a complete group, is an expected MISMATCH
-  by design (the reading's trailing mark is D53's `separated`), said in its `says`. group4eager's backspace trap, by
+  by design under iOS's idb and wda (the reading's trailing mark is D53's `separated`; Android may judge it ok), said
+  in its `says`. group4eager's backspace trap, by
   design: a backspace over the eager space has it added straight back (`SK31 ` stays `SK31 `), so only a select-all
   clear empties a field ending in it; the cases fill from empty.
 - `react-native/rn-format-eager`: E (`group4eager`) and P (`phone3`) laid as rn-format's text targets — D60's live
@@ -485,7 +486,9 @@ truth corpus and the golden do not move: an uncaptured cell makes no golden row)
   `carousel.index` in LabState.offsets. C is absent at launch on all four (a lazy list lays out only what its clip
   shows: no node, no frame) until part of it scrolls in, and its frame stays in the state, stale, once it scrolls out
   — a probe reading `frames.C` must not take it for C's place. B and U are carousel-in-list's rows, not its outcomes:
-  whether a vertical stroke touching down on the RecyclerView (U's `up`) reaches the page is unmeasured.
+  whether a vertical stroke touching down on the RecyclerView (U's `up`) reaches the page is unmeasured. The stroke
+  count is read from the state's existing `strokes` list (no counter of its own); RecyclerView and PagerSnapHelper
+  come in through material's dependency (compiled offline), no explicit `androidx.recyclerview` line.
 - The Android manifest: `averilab://shared` resolves to two components (MainActivity and its alias `.Twin`) — D55's
   second handler; `averilab://cell` keeps one.
 
