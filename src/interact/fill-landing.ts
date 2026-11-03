@@ -263,13 +263,13 @@ export function droppedTail(observed: string, e: TextExpectation): string | unde
  * is typed again and the fill fails — the safe side. Two shapes:
  * - the value at an occurrence that ends past the earlier text, not wholly inside it: `11 ` for `11` after `1` (a
  *   select-all field's `11` with an eager trailing mark, or `1` landed with the mark and `1` dropped — typed again,
- *   `111`); `a1 1` for `1 ` after `a1` (the typing at a caret inside the text); `Hello world` for `world` after `Hello
- *   wor` (only `ld` landed, or a whole landing that re-formed the text);
+ *   `111`); `a1 1` for `1 ` after `a1` (the typing at a caret inside the text);
  * - the value, decorated, and no other letter or digit — `skeleton` equal — though inside the earlier text's span: the
  *   value typed again over itself (residual 7's shape) into a select-all field that adds a mark (`-5-` for `-5` after
  *   `-5`).
  * A value found only inside the earlier text among more of it (`Note: hellohe` for `hello` after `Note: hello`, f16's
- * `31.12.2021`) is no whole landing, and its tail is typed again. Brute-forced (D64 review round 1) over small
+ * `31.12.2021`) is no whole landing, and its tail is typed again. `differenceOf` marks such a dropped tail `wholeToo`,
+ * and its reply names the select-all reading and `clear: true`. Brute-forced (D64 review round 1) over small
  * alphabets: no reading that a select-all field, a caret anywhere in the earlier text, or a leading or trailing mark
  * makes of a whole landing is typed into again.
  */

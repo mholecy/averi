@@ -495,7 +495,7 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
   // dropped `1` — typing `1` again could leave `111`, said Filled; refused honestly instead, nothing typed again
   it('on-return: a reading that holds the value across the seam is not typed into again — missed', async () => {
     const { io, intent, typed } = scripted({ prefilled: '1', format: () => '11 ' });
-    expect((await typeAndConfirm(io, { ...intent, value: '11', before: '1' })).kind).toBe('missed');
+    expect(await typeAndConfirm(io, { ...intent, value: '11', before: '1' })).toMatchObject({ kind: 'missed', differs: { kind: 'dropped-tail', wholeToo: true } });
     expect(typed).toEqual(['11']);
   });
 });
