@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { selectCases } from '../../scripts/truth/live-cases.js';
 import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedKept } from '../../scripts/truth/live-forms.js';
@@ -5,7 +6,7 @@ import { knownEntry } from '../../scripts/truth/live-known.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 import { differenceOf, landingOf } from '../../src/interact/fill-landing.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
-import { readLiveRecord, recordedCase, withFieldValue } from '../helpers/live-records.js';
+import { readLiveRecord, recordedCase, withFieldValue, type LiveRecord } from '../helpers/live-records.js';
 
 // Lab note F2A1's live form cases (scripts/truth/live-forms.ts), over the committed record of round 6's Android device
 // check (docs/truth/live-records/android-vis.json, src e98b87e): k3, a fill into note once back hid the IME — refused
@@ -167,6 +168,54 @@ describe('kf1–kf2: the submit between a floating panel and its strip — the p
         expect(judgeFloatingGap(id)(submitted, [first, ...replies.slice(1)], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^the form was SUBMITTED/) });
       }
     }
+  });
+});
+
+describe('kf1–kf3 on a real DOCKED run: the precondition reads docked and every case SKIPs (T4)', () => {
+  // tests/fixtures/live-android-forms-b10-kf-docked.json: batch-10's uiautomator whole-group run (averi_lab, API 33,
+  // main 139256a2), its kf1–kf3 results as recorded (`launched.keyboard` the docked Gboard, frame 0,1398 1080x822).
+  // Every batch so far has run docked: a weakened threshold or panel match would turn kf1/kf2 into a vacuous ok here.
+  const docked = JSON.parse(readFileSync(new URL('../fixtures/live-android-forms-b10-kf-docked.json', import.meta.url), 'utf8')) as LiveRecord;
+  const kf = (record: LiveRecord, id: string) => recordedCase(record, 'uiautomator', id);
+  const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
+  const DOCKED = { outcome: 'SKIP', why: 'keyboard docked (the app hears an IME 822 px tall, not the floating strip)' };
+
+  it('the record: each case launched under the docked IME, kf1\'s evidence reply quoting it', () => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      expect(kf(docked, id).launched.keyboard).toEqual({ frame: { x: 0, y: 1398, width: 1080, height: 822 }, visible: true, field: 'postcode' });
+    }
+    expect(kf(docked, 'kf1').replies[0]).toContain('(element 55,1644 970x132, keyboard 0,1398 1080x822)');
+  });
+
+  it('kf1, kf2 and kf3: SKIP, "keyboard docked", before any reply is read', () => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { replies, launched, state } = kf(docked, id);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched)).toEqual(DOCKED);
+    }
+  });
+
+  it('a docked evidence reply never counts as a quoted panel: 822 px matches no LAB_FLOATING_PANELS entry — SKIP on a floated launch too', () => {
+    for (const id of ['kf1', 'kf2'] as const) {
+      const floated = kf(fu1, id);
+      expect(judgeFloatingGap(id)(floated.state, kf(docked, id).replies, 'uiautomator', floated.launched)).toMatchObject({
+        outcome: 'SKIP',
+        why: expect.stringMatching(/^no measured panel quoted over ks — the IME was not floating there: 1\/1 asserts FAILED/),
+      });
+    }
+    const floated = kf(fu1, 'kf3');
+    expect(judgeFloatingGap('kf3')(floated.state, kf(docked, 'kf3').replies, 'uiautomator', floated.launched)).toMatchObject({
+      outcome: 'SKIP',
+      why: expect.stringMatching(/^no measured panel named in the reply — the IME was not floating there: ERROR scroll_until/),
+    });
+  });
+
+  it('kf3 on the floated record (r1023b fu1): ok — no stop, the panel named, postcode untouched', () => {
+    const { replies, launched, state } = kf(fu1, 'kf3');
+    expect(launched.keyboard?.frame).toEqual({ x: 0, y: 2088, width: 1080, height: 132 });
+    expect(judgeFloatingGap('kf3')(state, replies, 'uiautomator', launched)).toMatchObject({
+      outcome: 'ok',
+      why: expect.stringMatching(/^no stop \(ks 1493–1592\), postcode untouched; 3 touch\(es\) the app logged at \(540,1060\) \(540,1060\) \(540,1060\): ERROR scroll_until/),
+    });
   });
 });
 
