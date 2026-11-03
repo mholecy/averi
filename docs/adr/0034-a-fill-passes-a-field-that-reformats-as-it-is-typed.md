@@ -576,8 +576,8 @@ placeholder from a filled one: the type, label, traits and role are the same, on
 form (2: D29's `1234 5` and residual 6's tail); compared on the text as typed, not the skeleton (5); `skeleton(prior +
 value)` as `skeleton(value)` (5); the D29 disjunct's `||` as `&&` (9); the order reversed, no earlier text first (1);
 the conjunct's `!` dropped (10). `skeleton(prior) + skeleton(value)` is equivalent (the skeleton distributes over
-concatenation). `npm run mutate` (cold): fill-landing 95.33 → 95.51 %
-(floor 93; 267 mutants, 12 survived, 4 timeouts — none in the new condition), fill-reformat 94.80 % (floor 92, no code
+concatenation). `npm run mutate` (cold): fill-landing 95.33 → 95.52 %
+(floor 93; 268 mutants, 12 survived, 4 timeouts — none in the new condition), fill-reformat 94.80 % (floor 92, no code
 change); floors unchanged.
 
 **Golden and live.** The golden replays tree reads and never types: Changed 0, which is no evidence either way; the
