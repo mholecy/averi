@@ -1,0 +1,3 @@
+  Display: mDisplayId=0 (organized)
+  mCurrentFocus=null
+  mFocusedApp=ActivityRecord{10e4bcf u0 dev.averi.lab/.MainActivity} t2681}

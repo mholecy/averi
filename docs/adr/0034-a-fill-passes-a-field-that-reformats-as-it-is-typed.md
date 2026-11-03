@@ -23,6 +23,7 @@ field showed when typing began; residuals 7 and 8 accepted; implemented on `fix/
 Amended 2026-11-03 (D64: without clear, the value must be in what was typed past the earlier text, not anywhere in the
 reading — a capped, dropped or misdirected typing whose earlier text holds the value no longer passes; D63's guard
 folded into the rule; residual 8 (A) closed, residual 9 accepted; implemented on `fix/d64-typed-past-prior`).
+Amended 2026-11-03 (batch-10: D61, D63 and D64 proven live — the last paragraph of each of those amendments).
 
 ## Context
 
@@ -592,6 +593,14 @@ should move from MISMATCH failed-holds to ok (it is not in live-known.ts); f13 p
 clear, g5 is exact, and wda and uiautomator dump no `+421` as `before`, so nothing else moves. Not checked on the
 device: `live.ts --groups forms --cases g3,g4,g5,f13` on idb and wda, a later batch's (g3 should read `Filled … (12
 characters, the field shows them reformatted: 3 separators added)`).
+See the batch-10 paragraph below.
+
+**Proven live** (batch-10, 2026-11-03, main 139256a2, the lab simulator iOS 27.0 and averi_lab API 33; `live.ts --groups
+forms`, two runs of the new cases and one whole-group run on each of uiautomator, idb and wda): g3 ok 3/3 on every
+source — `Filled id:"lab.form-grouped.phoneGrouped" (12 characters, the field shows them reformatted: 3 separators
+added)`, idb included, where batch-9's idb read was MISMATCH failed-holds; g4, g5 and f13 ok 3/3 on every source. The
+whole-group runs held the rest of the group: idb and wda as known (b1d, b7 and p5; g2 the expected D53 MISMATCH),
+uiautomator 49 ok with b1d and b7 known and nothing unexpected.
 
 ## Amendment: a reading unchanged since typing began has not landed (2026-11-03, D63)
 
@@ -662,12 +671,18 @@ did not change and the app still holds `31.12.2026`) runs after f14 on idb, wda 
 read MISMATCH `fill-claim`; with D63 ok. No existing case's verdict moves; g1 now runs after f15. Not checked on the
 device: `live.ts --groups forms --cases f15` on idb, wda and uiautomator, and a regression pass of p1, f13, g3–g5, a
 later batch's.
+See the batch-10 paragraph below.
 
 Residuals, stated: residuals 7 and 8 below — the guard is byte equality with `before`, so a reading that moved
 without any of the typing, or whose `before` was not what the field showed when typing began, still passes by
 containment (residual 8, follow-up D64); the late-key race is unmeasured since the paced typing, so how often a first read
 predated the keys, and what D63 now costs there, is not known; a field that commits its accessibility value only on
 blur is refused, as it already was when `before` was empty.
+
+**Proven live** (batch-10, 2026-11-03, main 139256a2, the lab simulator iOS 27.0 and averi_lab API 33; `live.ts --groups
+forms`, two runs of the new cases and one whole-group run on each of uiautomator, idb and wda): f15 ok 3/3 on every
+source — refused as "did not change", the field keeping `31.12.2026`. The regression pass of p1, f13 and g3–g5 was ok on
+every source.
 
 ## Amendment: without clear, the value must be in the typing past the earlier text (2026-11-03, D64)
 
@@ -781,6 +796,7 @@ nothing. A `loud-changed` there points to the caret landing inside the text, as 
 reading is refused by the folded rule, the same `unchanged` reply); no existing case's verdict moves; g1 now runs after
 f16. Not checked on the device: `live.ts --groups forms --cases f15,f16` and a regression pass of p1, f13, g1–g5 on
 idb, wda and uiautomator, a later batch's.
+See the batch-10 paragraph below.
 
 Residuals, stated: residual 9 below; residual 8 (A) is closed; residual 8 (B) stays, moved where the skip lives (ADR 0028's D64 amendment,
 residual 3; follow-up D64b). Pre-existing, not D64's: a plain dropped tail on Android, and a capped field's on both
@@ -793,6 +809,13 @@ end. The real-world shape (review round 2): a fill without clear whose digits re
 after `5`), on iOS only, where a dropped tail is typed again: it fails loudly, by length, and never ends in a wrong
 Filled. Remedy: fill with `clear: true`. Every such reply says so, since the typing may all have landed (`wholeToo`:
 the `dropped-tail` and `length` hedges above).
+
+**Proven live** (batch-10, 2026-11-03, main 139256a2, the lab simulator iOS 27.0 and averi_lab API 33; `live.ts --groups
+forms`, two runs of the new cases and one whole-group run on each of uiautomator, idb and wda): f16 ok 3/3 on every
+source — refused, the field keeping `31.12.2021`; on idb and wda after one tail retype that moved nothing ("typed 2
+characters (the last character typed again after the field dropped it) but the field shows 10"), as the Golden and live
+paragraph expects. f15 and g3 ok 3/3 on every source. The regression pass of p1, f13 and g1–g5 as expected: g2 the D53
+MISMATCH on idb and wda and ok on uiautomator, every other case ok. Residual 8 (B) is D64b's, not checked here.
 
 ## Residuals accepted
 

@@ -4,6 +4,8 @@ Status: accepted 2026-11-03 (performance backlog row D55, docs/plans/2026-10-30-
 changes on purpose: `open_deep_link` on Android, when the platform's chooser is in front after the start. Every other
 reply is byte-identical, D54's iOS alert text included. The `DeviceAdapter` contract gains one optional field,
 `DeepLinkOutcome.chooser`.
+Amended 2026-11-03 (D55r: `mFocusedApp` is read in API 33's shape, `<component>} t<task>}`, which the first regex
+never matched; implemented on `fix/d55r-focused-app-api33`).
 
 ## Context
 
@@ -44,6 +46,7 @@ the platform's chooser, the outcome is `{ chooser: { component } }` and the repl
   chooser not drawn yet, and an app as the activity under the chooser's window is an earlier chooser on its way out,
   which is no chooser. (The code review changed this from "either line": the analysis's rule would warn for a
   chooser on its way out.)
+  See the D55r amendment below: on API 33 the activity line was never read until then.
 - The list's provenance is in the module: `android/com.android.internal.app.ResolverActivity` was measured (batch-9,
   API 33). `ChooserActivity` and the `com.android.intentresolver` package (the IntentResolver module of later
   releases) are AOSP's, not measured.
@@ -80,6 +83,7 @@ Residuals, stated:
   later. On API 28 and earlier they may not print there, and the read then fails open. The repo has no such device.
 - The race: if neither focus line names the chooser yet at the one read, the reply is `Opened` as before. Batch-9's
   read found both lines naming it. The next batch's E1 runs it 20 times, with a one-handler control.
+  Batch-10's E1 ran it: see the D55r amendment below.
 - The reply names the chooser by its component only. Its title, its apps' labels and their centres come from the ui
   tree in a later change (backlog D55c), once the next batch's E2 has captured the chooser's real tree.
 - `launch_app` with `intent:` and no `activity` (`am start -p`) can raise the same chooser when the app itself
@@ -90,3 +94,65 @@ Residuals, stated:
   open a moment later. averi does not read the focus before the start, because that would be a third call on every
   link. The chooser IS in front at the read, and the advice's `ui_snapshot` shows which.
 - `adapters/android-chooser.ts` joins the mutation run (ADR 0038) with its direct tests.
+
+## Amendment: API 33's `mFocusedApp` is read (2026-11-03, D55r)
+
+**Context.** Batch-10's E1 (2026-11-03, averi_lab emulator, API 33, main 139256a2) ran the race:
+`averilab://shared/open` 20 times from the launcher and 10 with the lab in front, and `averilab://cell/open` (one
+handler) 10 times as the control. It failed: 25 of the 30 shared runs replied `Opened` with the chooser in front (17
+of 20 from the launcher, 8 of 10 from the lab), no reply named a chooser falsely, and the control replied `Opened`
+10 of 10. A parser bug was found: `FOCUSED_APP_RE` wanted a space after the component, which is API 36's shape
+(`…NexusLauncherActivity t2}`). API 33 closes the component with a brace: `mFocusedApp=ActivityRecord{6dd03d6 u0
+android/com.android.internal.app.ResolverActivity} t2641}`. So on API 33 the activity line matched in none of the 40
+reads, and every reply rested on `mCurrentFocus`, which named the chooser in time in 5 of the 30 shared runs. The unit
+tests missed it: their synthetic `focus()` wrote API 36's shape, and batch-9's one API 33 fixture names the chooser in
+its window too, so its whole-dump test passed through the window and never read `mFocusedApp`. averi's own read was
+not recorded. The probe read the same `CHOOSER_FOCUS_COMMAND` right after averi's reply: there `mFocusedApp` named the
+started activity in 40 of 40 reads, while the window was still `null` in 1 of the 30 shared reads and in all 10
+control reads.
+
+**Decision.**
+- `FOCUSED_APP_RE`'s component ends at a space or `}`: `…([^\s/}]+\/[^\s}]+)[ }]`. It reads both shapes, and a
+  record cut right after the component (at a newline or the end of the answer) names nothing. `FOCUS_WINDOW_RE`'s
+  capture is the same and keeps its `\}`, since a window record closes right after its component. Both stay literals
+  (Stryker mutates only regex literals). This corrects a real parser bug: over batch-10's 40 reads taken right after
+  the reply, the old regex matched 0 `mFocusedApp` lines and the fixed one 40 (the chooser in 30 of 30 shared reads,
+  `dev.averi.lab/.MainActivity` in 10 of 10 control reads). It still matches the API 36 fixture.
+- Those reads do not tell the two parsers apart. Over them the old parser also names the chooser in 29 of 30 shared
+  runs, through the window, against the fixed one's 30 of 30. Yet averi replied `Opened` 25 times, so averi's own
+  read came well before them. Whether that earlier read now names the chooser is unproven: the next E1, which records
+  averi's own read, is the test.
+- The rule is unchanged: the focused activity decides, the window only when no activity is named. Everything else is
+  unchanged too: the one read, its command and bound, the component list, the fail-open, the reply.
+- Tests: three fixtures are batch-10's reads as recorded (`dumpsys-window-focus-api33-b10-*.txt`): both lines the
+  chooser; the window `null` under the chooser's activity; the window `null` under the lab's activity after
+  `averilab://cell/open`. Whole-dump cases now need the activity line: batch-10's window-`null` pair gives the chooser,
+  and the chooser's window over the dump's own app activity gives none. Every synthetic case runs in both the API 33
+  and the API 36 shape.
+
+**Consequences.** No added call, wait or cost: the happy path is still the start plus one focus read. On API 33 a link
+whose chooser is already the focused activity but not yet the focused window is now named. The hypothesis, unproven,
+is that averi's own read is such a read often enough to turn the 25 false `Opened` into chooser replies; the next E1
+checks it. A one-handler link whose app is the focused activity under a `null` window stays `Opened`, as the
+control did.
+
+**Mutation-checked**: hand mutants on the two regexes, each killed but one. On `FOCUSED_APP_RE`'s terminator: a
+space only (the old regex; 12 tests fail), a brace only (8: the API 36 shape), `[\s}]` (1: the record cut right
+after the component, then a newline), negated (31), the class part admitting a brace (18), the terminator dropped or
+any character (1 each, the record cut at the end of the answer). On `FOCUS_WINDOW_RE`'s: dropped (1). Equivalent:
+`FOCUS_WINDOW_RE`'s `\}` as `[\s}]`, since no printed window record has whitespace after its component. `npm run
+mutate` (cold): android-chooser 100 % (floor 98; 51 mutants, 0 survived); every other module's score unchanged;
+floors unchanged.
+
+**Golden.** The golden replays tree reads, not focus reads: Changed 0, which is no evidence either way. The unit tests
+are the evidence.
+
+Residuals, stated:
+- The race remains for the one read, but narrower: if neither line names the chooser yet when averi reads, the reply is
+  `Opened` as before. Batch-10 found `mFocusedApp` already naming the started activity in 40 of 40 reads right after
+  the reply, but averi's own read was not recorded. The next batch re-runs E1 with averi's own read recorded (its raw
+  output and time). It passes when all 30 shared runs name the chooser and the 10 controls reply `Opened`.
+- If averi's read precedes the chooser on both lines, the fix alone leaves the false `Opened`. A follow-up must then
+  add a prediction (`cmd package resolve-activity`) or a bounded poll.
+- Out of scope, unchanged: D55b (`launch_app` with `intent:` and no `activity`) and D55c (the chooser's labels from the
+  ui tree).
