@@ -347,9 +347,9 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
 });
 
 /**
- * g1–g5 and rfe1–rfe3 (L7): form-grouped's ibanEager (group4eager: a space as soon as a group of four is complete, none
- * at 24) and phoneGrouped (phone3: a leading `+`, the digits in threes, under a `+421` placeholder), and rn-format-eager's
- * E (group4eager on React Native) — D60's eager trailing mark and D37's `+421` grouping field. No device has run them
+ * g1–g5 and rfe1–rfe3 (L7): form-grouped's ibanEager (group4eager: a space as soon as a group of four is complete,
+ * none at 24) and phoneGrouped (phone3: a leading `+`, the digits in threes, under a `+421` placeholder), and
+ * rn-format-eager's E (group4eager on React Native) — D60's eager trailing mark and D37's `+421` grouping field. No device has run them
  * yet: judged over D40's records (form-format's f1 under WDA, rn-format's rf1 under idb), their final state set to what
  * each fill would leave; what each source answers is batch-9's to read.
  */
@@ -381,7 +381,7 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
     expect(cases[0].calls[1]).toEqual({ tool: 'assert', args: { asserts: [{ element: { id: 'lab.form-grouped.ibanEager' }, text: 'SK31 1200 0000 123', timeout: 2_000 }] } });
     const all = (await selectCases({ platform, app: 'native', groups: ['forms'] })).map((c) => c.id);
     expect(all.indexOf('g1')).toBe(all.indexOf('f14') + 1);
-    // Native cases only: rfe1–rfe2 are the React Native app's.
+    // Native cases only: rfe1–rfe3 are the React Native app's.
     expect(all.filter((id) => RFE_IDS.includes(id))).toEqual([]);
   });
 
@@ -443,7 +443,7 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
     const ten = 'Filled id:"lab.rn-format-eager.E.field" (10 characters, the last 2 characters typed again after the field dropped them, the field shows them reformatted: 2 separators added)';
     expect(rfe2.judge(rnLeft('SK31 1200 00'), [ten], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'ok' });
     expect(rfe2.judge(rnLeft('SK31 1200 '), ['ERROR the field shows "SK31 1200 ", not the 10 characters typed'], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed' });
-    expect(rfe3.says).toMatch(/expected MISMATCH failed-holds by design \(D53 `separated`/);
+    expect(rfe3.says).toMatch(/expected MISMATCH failed-holds by design on iOS \(idb, wda; D53 `separated`/);
     const separated = 'ERROR typed 12 characters but the field shows 15 — every typed character is there, in order, with 3 separators added';
     expect(rfe3.judge(rnLeft('SK31 1200 0000 '), [separated], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
   });
@@ -451,9 +451,10 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
   it('g2 says its expected MISMATCH by design, as rfe3 does; no other g or rfe case does', async () => {
     const all = [...(await native('ios')), ...(await rn('ios'))];
     expect(all.filter((c) => /expected MISMATCH/.test(c.says)).map((c) => c.id)).toEqual(['g2', 'rfe3']);
+    expect(all.find((c) => c.id === 'g2')!.says).toMatch(/by design on iOS \(idb, wda; D53 `separated`.*Android \(uiautomator\) may judge ok/);
   });
 
-  it('no outcome guessed: none of g1–g5 or rfe1–rfe2 is known under any source until a device run reads it', () => {
+  it('no outcome guessed: none of g1–g5 or rfe1–rfe3 is known under any source until a device run reads it', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
     const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => [...G_IDS, ...RFE_IDS].filter((id) => knownEntry(platform, source, id) !== undefined)));
     expect(known).toEqual([]);
