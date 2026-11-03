@@ -68,8 +68,17 @@ describe('WDA_TYPEABLE: idb\'s set and what the gate measured exact through /wda
     ['a fullwidth Latin letter (fullwidth forms not measured)', 'Ａ', 'U+FF21'],
     ['a fullwidth digit', '１', 'U+FF11'],
     ['a lone surrogate', 'a\ud800b', 'U+D800'],
+    ['the replacement character (the Specials block, not measured)', 'a\ufffdb', 'U+FFFD'],
+    ['the object replacement character (Specials)', 'a\ufffcb', 'U+FFFC'],
+    ['a Common letter (µ, U+00B5: not Latin by script)', 'aµb', 'U+00B5'],
   ])('%s: refused (%j)', (_name, text, code) => {
     expect(refused(text, WDA_TYPEABLE)).toBe(code);
+  });
+
+  it('µ, a Common letter, is refused as a character not measured — not as "another script"', () => {
+    const msg = refusalOf('µ', WDA_TYPEABLE)!;
+    expect(msg).toContain('or any other character is not measured through `/wda/keys`');
+    expect(msg).not.toContain('another script');
   });
 
   it('the first refused character, after the typeable ones', () => {
@@ -112,8 +121,8 @@ describe('the refusals\' remedies', () => {
     expect(msg).toMatch(/^cannot type U\+1F600 '😀': on iOS with WebDriverAgent /);
     expect(msg).toContain(
       'on iOS with WebDriverAgent averi types printable ASCII, and through `/wda/keys` the letters of the Latin, Greek, Cyrillic and Han scripts, ' +
-        'common punctuation, symbols and numbers, NBSP and U+202F of the Basic Multilingual Plane; an emoji, a combining mark, a format character, ' +
-        'another space or another script is not measured through `/wda/keys`.',
+        'common punctuation, symbols and numbers, NBSP and U+202F of the Basic Multilingual Plane; an emoji, a combining mark, a format character ' +
+        'or any other character is not measured through `/wda/keys`.',
     );
     expect(msg).toMatch(/Refused before anything was sent — nothing tapped, cleared or typed\. Use a value without it, or enter it by hand\.$/);
     expect(msg).not.toContain('ios.treeSource');

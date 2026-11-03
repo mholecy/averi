@@ -15,21 +15,25 @@ import { PRINTABLE_ASCII, type Typeable } from './typeable.js';
 const IDB_REFUSES = new RegExp(`[^${PRINTABLE_ASCII}\\n]`, 'u');
 
 /**
- * What WebDriverAgent's `/wda/keys` types, on top of idb's set — every class measured exact by batch-10's gate (iOS 27.0,
+ * What WebDriverAgent's `/wda/keys` types, on top of idb's set: the classes batch-10's gate measured exact (iOS 27.0,
  * iPhone 17 simulator, WDA 16.1.7; form-basic's name field and the RN lab's rn-field), each a Basic Multilingual Plane
  * character:
- * - a letter (`\p{L}`) of the Latin, Greek, Cyrillic or Han script (Šťastný, Ångström, Łódź, Καλημέρα, Ђорђе, 東京);
- * - a number, punctuation mark or symbol of the Common script (’ “ ” – — … € § ½);
+ * - a letter (`\p{L}`) of the Latin, Greek, Cyrillic or Han script (measured: Šťastný, Žluťoučký kůň, Ångström Øre,
+ *   Καλημέρα, Ωμέγα, Ђорђе, Привет мир, 東京, 北京市朝阳区);
+ * - a number, punctuation mark or symbol of the Common script (measured: ’ “ ” ‘ – — … € § © ® ™);
  * - NBSP (U+00A0) and the narrow NBSP (U+202F), the two spaces measured beside U+0020.
+ * The rest of each class is inferred from its measured members, not measured itself (½ and the other numbers, arrows,
+ * box drawing, ∑ ✓ ★, …): ADR 0037's D43 amendment, residual 2.
  * Taken out of it again: an emoji (`\p{Extended_Pictographic}`, measured 1/1 — too thin), except © ® ™, which the
- * gate typed exact; and the Halfwidth and Fullwidth Forms (U+FF00–U+FFEF), Latin and Common by script but not
- * measured. Everything else is refused: outside the BMP, a combining mark (`\p{M}`: a decomposed value's normalisation
- * is not judged), a format character (`\p{Cf}`), private use, unassigned, any other space, and every script not
- * measured (Arabic, Hebrew, Devanagari, Thai, Hangul, kana, …). BMP-only also keeps every count and tail slice of a
- * fill exact in UTF-16 (fill-landing.ts, fill-type.ts).
+ * gate typed exact; the Halfwidth and Fullwidth Forms (U+FF00–U+FFEF), Latin and Common by script, and the Specials
+ * (U+FFF0–U+FFFF: U+FFFC, U+FFFD), Common by script — neither measured. Everything else is refused: outside the BMP, a
+ * combining mark (`\p{M}`: a decomposed value's normalisation is not judged), a format character (`\p{Cf}`), private
+ * use, unassigned, any other space, a Common letter (µ), and every script not measured (Arabic, Hebrew, Devanagari,
+ * Thai, Hangul, kana, …). BMP-only also keeps every count and tail slice of a fill exact in UTF-16 (fill-landing.ts,
+ * fill-type.ts).
  */
 const WDA_ONLY = [
-  '(?![\\p{Extended_Pictographic}\\uFF00-\\uFFEF])(?=[\\u0000-\\uFFFF])(?:',
+  '(?![\\p{Extended_Pictographic}\\uFF00-\\uFFFF])(?=[\\u0000-\\uFFFF])(?:',
   '(?=\\p{L})[\\p{Script=Latin}\\p{Script=Greek}\\p{Script=Cyrillic}\\p{Script=Han}]',
   '|(?=\\p{Script=Common})[\\p{N}\\p{P}\\p{S}]',
   '|[\\u00A0\\u202F]',
@@ -67,7 +71,7 @@ export const WDA_TYPEABLE: Typeable = {
   says:
     'on iOS with WebDriverAgent averi types printable ASCII, and through `/wda/keys` the letters of the Latin, Greek, ' +
     'Cyrillic and Han scripts, common punctuation, symbols and numbers, NBSP and U+202F of the Basic Multilingual Plane; ' +
-    'an emoji, a combining mark, a format character, another space or another script is not measured through `/wda/keys`',
+    'an emoji, a combining mark, a format character or any other character is not measured through `/wda/keys`',
   otherPath: 'Use a value without it, or enter it by hand.',
 };
 

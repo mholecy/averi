@@ -165,10 +165,11 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
   `WdaTreeSource.typeText` delegates to it and gives the released error after `dispose()`, as `read()` does.
 - **The set** (`IosAdapter.typeable`, decided by the source's typer, not its kind): over WDA's source `WDA_TYPEABLE` —
   idb's set, plus the BMP letters of the Latin, Greek, Cyrillic and Han scripts, Common-script numbers, punctuation and
-  symbols, NBSP and U+202F; minus `\p{Extended_Pictographic}` except © ® ™ (measured), and minus the Halfwidth and
-  Fullwidth Forms. Refused: outside the BMP, combining marks, format characters, private use, unassigned, any other
-  space, every script not measured (Arabic, Hebrew, Devanagari, Thai, Hangul, kana, …). Its refusal says they are not
-  measured through `/wda/keys`. BMP-only keeps every UTF-16 count and tail slice of a fill exact, so fill-type,
+  symbols, NBSP and U+202F; minus `\p{Extended_Pictographic}` except © ® ™ (measured), minus the Halfwidth and
+  Fullwidth Forms, and minus the Specials (U+FFF0–U+FFFF, U+FFFC and U+FFFD among them). Refused: outside the BMP,
+  combining marks, format characters, private use, unassigned, any other space, a Common letter (µ), every script not
+  measured (Arabic, Hebrew, Devanagari, Thai, Hangul, kana, …). Its refusal says such a character is not measured
+  through `/wda/keys`. BMP-only keeps every UTF-16 count and tail slice of a fill exact, so fill-type,
   fill-landing and fill-text are untouched.
 - **The replies**: `Typeable.otherPath`, the remedy sentence true for the adapter, replaces the hard-coded "averi has
   no other typing path yet (ADR 0037): use a value without it, or enter it by hand." `Typeable.widerPath` lets idb's
@@ -212,13 +213,16 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
 **Residuals.**
 1. Measured on iOS 27.0 only, on the iPhone 17 simulator with WDA 16.1.7: the native SwiftUI form-basic name field and
    the RN lab's `rn-field`. Other iOS versions, UIKit fields, multi-line and secure fields are unmeasured.
-2. The categories are measured by 2–3 values each. Characters of those classes outside the measured values (Han's
-   Extension A, Common numbers beyond the digits such as ½) are inferred from their class. An emoji (1/1) and a
+2. The classes are measured by 2–3 values each (adapters/ios-typing.ts lists them). Their other members are inferred
+   from the class, not measured: Han's Extension A, Common numbers beyond the digits (½ ² ³), arrows, box drawing,
+   mathematical and other symbols (∑ ✓ ★), and the punctuation not among the measured ’ “ ” ‘ – — …. An emoji (1/1) and a
    combining mark (1/1, kept decomposed; normalisation not judged) stay refused as too thin. A later row may widen the
    set with a corpus run.
 3. The session: one per WDA start, the one averi holds (making it ends any other session on that WDA, whose port is
    averi's own). A `/wda/keys` past its budget is never retried, so a very slow runner may leave part of a text, said
-   so in the error.
+   so in the error. An MCP call cancelled while it types does not stop it: the request runs on until it answers or
+   `keysTimeoutMs` runs out, as an `idb ui text` runs on to its end. Two typings at once that both meet a lost session
+   make one new session between them (the second keeps the session the first made).
 4. React Native: `rn-field` 10/10 with no tail dropped, so no D24 split on the WDA path; other RN versions and fields
    are unmeasured.
 5. A WDA runner exit clears com.apple.Accessibility's `AccessibilityEnabled`, `ApplicationAccessibilityEnabled` and
