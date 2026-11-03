@@ -31,7 +31,7 @@ the platform's chooser, the outcome is `{ chooser: { component } }` and the repl
   with a 2 s bound, like the adapter's other focus reads. It is a new constant beside `FOCUSED_WINDOW_COMMAND`, whose
   contract (a window TYPE for a miss) its callers keep unchanged. The dump prints one focus pair per display, so
   both lines are read from display 0's block alone (the default display, where `am start` with no `--display`
-  starts the link); a dump with display headers and none for display 0 names no chooser. API 29 prints
+  starts the link), or the first display's when none is display 0. API 29 prints
   `mFocusedApp` as a window token, `AppWindowToken{… token=Token{… ActivityRecord{…}}}`, so the activity is read
   anywhere on that line (AOSP 10's shape, synthetic in the tests, not captured). (Both added after review round 1.)
 - The judgement is pure: `adapters/android-chooser.ts#chooserInFocus`. It takes the focused activity's component
