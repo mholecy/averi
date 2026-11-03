@@ -39,7 +39,10 @@ interface StopShown {
 }
 
 /** The stop the round shows the check: the match at `rect` in a clipping list at `list`, judged `fully`. */
-function stopAt(rect: Rect, { list = LIST, axis, after = [], drawn = SWIPE, budget = true, gesture = SCREEN_BOX, offered, corroborated }: StopShown = {}): FlushStop {
+function stopAt(rect: Rect, shown: StopShown = {}): FlushStop {
+  const { list = LIST, axis, after = [], budget = true, gesture = SCREEN_BOX, offered, corroborated } = shown;
+  // `drawn: undefined` given is no stroke handed back; left out, the default swipe.
+  const drawn = 'drawn' in shown ? shown.drawn : SWIPE;
   const row = node({ role: 'button', identifier: 'S', rect: { ...rect } });
   const scrollable = node({ role: 'scrollable', clipsDescendants: true, ...(axis !== undefined && { scrollAxis: axis }), rect: { ...list }, children: [row, ...after] });
   const tree = node({ role: 'container', rect: SCREEN_BOX, children: [scrollable] });
@@ -209,5 +212,92 @@ describe('the flush check', () => {
       of: 'flush',
       flush: { edge: 'top', container: strip, checked: false, why: 'room' },
     });
+  });
+});
+
+/**
+ * D62: a reveal that moved nothing right after a stroke that CARRIED the match its whole drawn length (less twice the
+ * slop) is doubted once — the same reveal sent again — and accepted only when that one holds too. A held reveal after
+ * a stroke that ran short (the content ended under it) is accepted at once, as is every first probe that held.
+ */
+describe('the flush check doubts a reveal that held right after a stroke that carried the match its whole length (D62)', () => {
+  /** A 74-px probe: the lab's bounded list's (tests/interact/scroll-flush-reveal.test.ts). Carried past 74 − 2·24 = 26 px. */
+  const PROBE: Stroke = { from: { x: 540, y: 1480 }, to: { x: 540, y: 1406 } };
+  /** The check with the cut proved by `PROBE`, which showed `grown` px more of a row showing 22 at the list's bottom. */
+  function provedBy(grown: number, drawn: Stroke | undefined = PROBE): FlushSeen {
+    const inFlight = sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22))).verdict);
+    return seeFlush(inFlight, stopAt(flushOn('bottom', 22 + grown), { drawn }));
+  }
+  const REVEAL = (shows: number): unknown => ({ of: 'probe', toward: 'down', reach: 1, maxTravel: Math.floor((LIST.height - shows) / 2) });
+
+  it('the carry rule\'s boundary: 26 px of a 74-px probe ran short — the held reveal is checked; 27 px carried — it is sent again, no wait', () => {
+    const short = provedBy(26);
+    expect(said(seeFlush(sent(short.verdict), stopAt(flushOn('bottom', 48))))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
+    const carried = provedBy(27);
+    const doubted = seeFlush(sent(carried.verdict), stopAt(flushOn('bottom', 49)));
+    expect(doubted).toMatchObject({ settles: true, waits: false });
+    expect(said(doubted)).toEqual(REVEAL(49));
+  });
+
+  it('a proving read with no stroke handed back: not carried — the held reveal is checked, as before', () => {
+    const proved = provedBy(60, undefined);
+    expect(said(seeFlush(sent(proved.verdict), stopAt(flushOn('bottom', 82))))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
+  });
+
+  it('doubted once: the retry held again — checked; no swipe left for the retry — the cut (`FlushCut` budget)', () => {
+    const doubted = seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82)));
+    expect(said(doubted)).toEqual(REVEAL(82));
+    expect(said(seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 82))))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
+    expect(seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82), { budget: false })).verdict).toMatchObject({
+      of: 'cut',
+      cut: { of: 'flushCut', edge: 'bottom', container: LIST, revealed: 60, why: 'budget' },
+    });
+  });
+
+  it('a retry that moved and grew it is a fresh proof: a reveal that holds after it, carried, is doubted again', () => {
+    const doubted = seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82)));
+    // 100 px drawn, 68 px more of it showing: carried (68 > 52).
+    const retry: Stroke = { from: { x: 540, y: 1480 }, to: { x: 540, y: 1380 } };
+    const fresh = seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 150), { drawn: retry }));
+    expect(said(fresh)).toEqual(REVEAL(150));
+    const again = seeFlush(sent(fresh.verdict), stopAt(flushOn('bottom', 150)));
+    expect(said(again)).toEqual(REVEAL(150));
+    expect(said(seeFlush(sent(again.verdict), stopAt(flushOn('bottom', 150))))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
+  });
+
+  it('a reveal drawn too short to tell from a tap after a carried proof: the cut (`tap`), not a retry', () => {
+    expect(seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82), { drawn: TAP })).verdict).toMatchObject({ of: 'cut', cut: { why: 'tap', revealed: 60 } });
+  });
+
+  it('a first probe that held is checked whatever came before it: no proof, nothing to doubt', () => {
+    const inFlight = sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22))).verdict);
+    expect(said(seeFlush(inFlight, stopAt(flushOn('bottom', 22), { drawn: PROBE })))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
+  });
+
+  // batch-9 run 0 (carousel-recycler-free, the 440-px pre-drag, then `left fully: true`): C flush with its carousel's
+  // right edge; the probe (batch-10's points at that geometry, 142 px) moved it 135 px and proved the cut; the reveal
+  // (half the 372-px room) was never taken by the app, and the read after it — C where the reveal left from — passed.
+  it('batch-9: the reveal the app never took after a probe that carried C 135 of 142 px is no pass — the reveal again, or the cut at the bound', () => {
+    const CLIP: Rect = { x: 66, y: 380, width: 948, height: 234 };
+    const carouselStop = (rect: Rect, drawn: Stroke | undefined, budget = true): FlushStop => {
+      const row = node({ role: 'button', identifier: 'lab.carousel-recycler-free.C', rect: { ...rect } });
+      const carousel = node({ role: 'scrollable', clipsDescendants: true, rect: { ...CLIP }, children: [row] });
+      const page = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: SCREEN_BOX, children: [carousel] });
+      const judged = judgeRead({ tree: node({ role: 'container', rect: SCREEN_BOX, children: [page] }), found: [row], ofKeyboard: () => false, remedy: { dismissal: 'none' } }, SCREEN, true);
+      if ('ask' in judged || judged.best === undefined) throw new Error('no stop judged');
+      return { judged: judged.best, facts: judged.facts, drawn, means: { screen: SCREEN_BOX, gesture: SCREEN_BOX, strokes: startStrokes(), cover: undefined, offered: undefined, corroborated: undefined, budget } };
+    };
+    const probe: Stroke = { from: { x: 824, y: 497 }, to: { x: 682, y: 497 } };
+    const reveal: Stroke = { from: { x: 824, y: 497 }, to: { x: 638, y: 497 } };
+    const before: Rect = { x: 573, y: 380, width: 441, height: 234 };
+    const after: Rect = { x: 438, y: 380, width: 576, height: 234 };
+    const first = seeFlush(startFlush('left'), carouselStop(before, undefined));
+    expect(first.verdict).toMatchObject({ of: 'probe', toward: 'right' });
+    const proved = seeFlush(sent(first.verdict), carouselStop(after, probe));
+    expect(proved.verdict).toMatchObject({ of: 'probe', toward: 'right' });
+    const held = seeFlush(sent(proved.verdict), carouselStop(after, reveal));
+    expect(held).toMatchObject({ waits: false, verdict: { of: 'probe', toward: 'right' } });
+    expect(seeFlush(sent(proved.verdict), carouselStop(after, reveal, false)).verdict).toMatchObject({ of: 'cut', cut: { revealed: 135, why: 'budget', edge: 'right', container: CLIP } });
+    expect(seeFlush(sent(held.verdict), carouselStop(after, reveal)).verdict).toEqual({ of: 'flush', flush: { edge: 'right', container: CLIP, checked: true } });
   });
 });
