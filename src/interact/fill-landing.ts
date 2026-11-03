@@ -317,8 +317,9 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
 
 /**
  * The typing in a held reading — what `differenceOf` compares, and where `showsExactly` looks for the value without
- * clear (D64): what came AFTER the earlier text (`prior`), when the reading still starts with it LITERALLY (typing appends at the cursor, which the focus tap leaves at the end), else the whole
- * reading — the limit: a run of the old text can then be named as the "transformed" typing.
+ * clear (D64): what came AFTER the earlier text (`prior`), when the reading still starts with it LITERALLY (typing
+ * appends at the cursor, which the focus tap leaves at the end), else the whole reading — the limit: a run of the old
+ * text can then be named as the "transformed" typing.
  *
  * Deliberately not `priorsOf`'s letters-and-digits rule: a skeleton match cannot be sliced back to reading positions
  * (an earlier `1,000` that a regrouping field shows, with `5678` typed, as `10,005,678` starts with `1000` by its
