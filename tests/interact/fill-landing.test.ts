@@ -503,6 +503,34 @@ describe('without clear, the value must be in the typing past the earlier text (
     expect(landingOf('Hello worldw', e('Hello worldw', 'Hello world', { clear: true }))).toEqual({ kind: 'landed' });
   });
 
+  // review round 1, M-1: the earlier text is judged over D61's priors — a reading whose letters and digits are exactly
+  // the value's, and no start of the earlier text's plus the value's, is judged as the value alone too (`valueAlone`)
+  it.each([
+    ['+421903123456', '421903123456', '+421', "a leading `+` the field adds, under idb's unnamed `+421`"],
+    ['SK31 ', 'SK31', 'SK3', 'a select-all field and an eager trailing mark'],
+    ['abc ', 'abc', 'ab', 'a select-all field and a trailing space'],
+    ['50%', '50', '5', 'a select-all field and a decoration'],
+  ])('`%s` typed `%s` after `%s` lands (%s): the value alone (D61)', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toEqual({ kind: 'landed' });
+  });
+
+  // review round 1, m-2: a reading that holds the value across the seam (an occurrence that ends past the earlier
+  // text) is also explained as a full landing — a select-all field with an eager mark, a caret not at the end — so its
+  // "tail" is not typed again: retyped, the field could end Filled over content the retype made wrong
+  it.each([
+    ['11 ', '11', '1', 'a select-all field and an eager trailing mark, or `1` landed with a mark'],
+    ['a1 1', '1 ', 'a1', 'the caret inside the text'],
+    ['Hello world', 'world', 'Hello wor', 'only `ld` landed, the value across the seam'],
+  ])('`%s` typed `%s` after `%s` (%s): no landing, and no tail to type again', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toBeUndefined();
+    expect(droppedTail(shown, e(value, before))).toBeUndefined();
+  });
+
+  it('a value only inside the earlier text is no full landing: the tail is still typed again (`Note: hellohe`, f16)', () => {
+    expect(droppedTail('Note: hellohe', e('hello', 'Note: hello'))).toBe('llo');
+    expect(droppedTail('31.12.2021', e('12', '31.12.202'))).toBe('2');
+  });
+
   // ADR 0034's D64 amendment, residual R-a: on the safe side
   it('residual: the caret at the start, an earlier text the typing re-forms (`aba` for `ab` after `a`), is refused', () => {
     expect(landingOf('aba', e('ab', 'a'))).toBeUndefined();
