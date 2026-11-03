@@ -9,7 +9,9 @@ import { describe, expect, it } from 'vitest';
  * `it.each` table whose own callback passes its first parameter to one of them (`replayed`, below, read off the
  * syntax tree: a commented-out row names nothing) — or it is exempt below, with the reason it cannot be judged by
  * `live.ts --rejudge`. A record a test only reads is not replayed. Without this, a row dropped from
- * live-rejudge.test.ts left a record no test rejudges, and nothing failed (T3's review rounds 1 to 3).
+ * live-rejudge.test.ts left a record no test rejudges, and nothing failed (T3's review rounds 1 to 4). What it cannot
+ * see, being read off the source and not the run: a helper that names a record but is never called, and an early
+ * return at run time that skips the rejudge.
  */
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -34,7 +36,7 @@ const parse = (source: string) => ts.createSourceFile('live-rejudge.test.ts', so
 const stringOf = (node: ts.Node | undefined): string | undefined => (node !== undefined && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined);
 
 /** The record a table row names: a bare string, or an array literal's first element. */
-const rowRecord = (row: ts.Expression): string | undefined => (ts.isArrayLiteralExpression(row) ? stringOf(row.elements[0]) : stringOf(row));
+const rowRecord = (row: ts.Expression): string | undefined => (ts.isArrayLiteralExpression(row) ? stringOf(row.elements[0]) : stringOf(row))?.split('/').pop();
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -45,6 +47,21 @@ const templateOf = (node: ts.TemplateExpression): RegExp =>
 /** A call to `rejudgeInProcess` or `rejudgeCli`. */
 const isRejudge = (node: ts.Node): node is ts.CallExpression =>
   ts.isCallExpression(node) && ts.isIdentifier(node.expression) && (node.expression.text === 'rejudgeInProcess' || node.expression.text === 'rejudgeCli');
+
+/** The names along a call's callee: `it.skip.each(…)(…)` → each, skip, it. */
+function calleeNames(expr: ts.Expression): string[] {
+  if (ts.isIdentifier(expr)) return [expr.text];
+  if (ts.isPropertyAccessExpression(expr)) return [expr.name.text, ...calleeNames(expr.expression)];
+  if (ts.isCallExpression(expr)) return calleeNames(expr.expression);
+  return [];
+}
+
+/** A call vitest does not run: its callee chain holds `skip` or `todo`, or one of its arguments is `{ …, skip: true }`. */
+const isSkipped = (node: ts.CallExpression): boolean =>
+  calleeNames(node.expression).some((name) => name === 'skip' || name === 'todo') ||
+  node.arguments.some(
+    (arg) => ts.isObjectLiteralExpression(arg) && arg.properties.some((p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === 'skip' && p.initializer.kind === ts.SyntaxKind.TrueKeyword),
+  );
 
 /** `expr` without `as const`, `satisfies …` or parentheses around it. */
 const bare = (expr: ts.Expression): ts.Expression =>
@@ -80,12 +97,14 @@ function rejudgesItsParameter(callback: ts.ArrowFunction | ts.FunctionExpression
  * The records a rejudge runs on in `source` (live-rejudge.test.ts), read off its syntax tree — comments are no nodes:
  * (1) a `rejudgeInProcess`/`rejudgeCli` call's first argument, a string or a template of run numbers; (2) every row of
  * an `it.each` table (a bare string, or an array literal's first element) whose own callback passes its first parameter
- * to one of them. Nothing else names a record: a false failure here is a nuisance, a false pass hides a record.
+ * to one of them. A skipped or todo call (`.skip`, `.todo` on its callee, or `{ skip: true }`) and all it holds name
+ * nothing; nor does anything else: a false failure here is a nuisance, a false pass hides a record.
  */
 function replayed(source: string): { names: Set<string>; templates: RegExp[] } {
   const names = new Set<string>();
   const templates: RegExp[] = [];
   const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && isSkipped(node)) return;
     if (isRejudge(node)) {
       const first = node.arguments[0];
       const name = stringOf(first);
@@ -176,6 +195,32 @@ describe('every committed live record is replayed by live-rejudge.test.ts, or ex
     const d1 = "it.each([['a-1.json']] as const)('%s', (r) => expect(r).toBeDefined());\nit('x', async (record) => { await rejudgeInProcess(record, 'forms'); });\n" + table("  ['b-1.json', 'forms'],");
     expect(isNamed(d1, 'a-1.json')).toBe(false);
     expect(isNamed(d1, 'b-1.json')).toBe(true);
+  });
+
+  // T3's review round 4: a skipped or todo call runs no rejudge.
+  it.each([
+    ['describe.skip (e1)', "describe.skip('d', () => {\n  it('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });\n});"],
+    ['it.skip (e2)', "it.skip('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });"],
+    ['test.skip', "test.skip('x', async () => { await rejudgeCli('a-1.json', 'forms'); });"],
+    ['it.skip.each', "it.skip.each([['a-1.json']] as const)('%s', async (record) => { await rejudgeInProcess(record, 'forms'); });"],
+    ['describe.skip.each', "describe.skip.each([['a-1.json']] as const)('%s', (record) => {\n  it('x', async () => { await rejudgeInProcess(record, 'forms'); });\n});"],
+    ['describe.todo', "describe.todo('d', () => {\n  it('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });\n});"],
+    ['it.todo', "it.todo('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });"],
+    ['{ skip: true } on it', "it('x', { skip: true }, async () => { await rejudgeInProcess('a-1.json', 'forms'); });"],
+    ['{ skip: true } on an it.each', "it.each([['a-1.json']] as const)('%s', { timeout: 1, skip: true }, async (record) => { await rejudgeInProcess(record, 'forms'); });"],
+    ['{ skip: true } on describe', "describe('d', { skip: true }, () => {\n  it('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });\n});"],
+  ] as const)('a rejudge under %s names nothing', (_, src) => {
+    expect(isNamed(src, 'a-1.json')).toBe(false);
+  });
+
+  it('…while the same calls not skipped do, `{ skip: false }` included', () => {
+    expect(isNamed("describe('d', () => {\n  it('x', async () => { await rejudgeInProcess('a-1.json', 'forms'); });\n});", 'a-1.json')).toBe(true);
+    expect(isNamed("it('x', { skip: false, timeout: 1 }, async () => { await rejudgeInProcess('a-1.json', 'forms'); });", 'a-1.json')).toBe(true);
+    expect(isNamed("it.each([['a-1.json']] as const)('%s', { timeout: 1 }, async (record) => { await rejudgeInProcess(record, 'forms'); });", 'a-1.json')).toBe(true);
+  });
+
+  it('a row that names its record by a path names the record (its last part), as a direct call does', () => {
+    expect(isNamed(table("  ['docs/truth/live-records/a-1.json', 'forms'],"), 'a-1.json')).toBe(true);
   });
 
   it('a row spread over lines, or a bare string row, still names its record (b3)', () => {
