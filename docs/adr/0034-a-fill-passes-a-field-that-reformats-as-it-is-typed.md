@@ -613,11 +613,11 @@ change: the typing did not reach it, or the field refused it"), never reached be
 `landingOf('+421', … '421' after '+421')` guard was red for this reason and was left to D63.
 
 **Decision.**
-- `fill-landing.ts#landingOf` alone changes: right after `tookText`, a reading for which `unmoved` holds has not landed
-  — `!clear && observed === before && observed !== value`. It extends `tookText`'s "a non-input proves it took the text
-  only by changing" to an input typed without clear, and covers the reformat route and the exact rule alike, stated
-  once. Raw equality, as `before` is the raw reading when typing began (for an empty or masked field, the post-focus
-  re-read).
+- `fill-landing.ts#landingOf` alone changes: right after `tookText`, a reading for which `unchangedSinceTyping` holds
+  has not landed — `!clear && observed === before && observed !== value`. It extends `tookText`'s "a non-input proves
+  it took the text only by changing" to an input typed without clear, and covers the reformat route and the exact rule
+  alike, stated once. Raw equality, as `before` is the raw reading when typing began (for an empty or masked field,
+  the post-focus re-read, unless skipped: residual 8 B).
 - **The value itself is excepted.** A reading that is both the earlier text and the value cannot be told from a
   select-all field that replaced its text with the typing (the D29 amendment), an unnamed placeholder equal to the value,
   or a named one (`placeholder`, not verified, pinned end to end). It lands as before: residual 7.
@@ -641,14 +641,14 @@ change: the typing did not reach it, or the field refused it"), never reached be
 - A value typed again into a field that holds it among more text, without clear: a field that takes the keys reads
   `Jan ŠťastnýJan` and still lands by containment; one that refuses them is refused, which is true.
 
-**Mutation-checked**: hand mutants on `unmoved`, each killed but one — the guard line removed (10 tests fail); the value
-exception dropped, the strict form (2: D63's value-itself test and fill.test.ts's named `Search` typed `Search`);
-`!clear` dropped (1: with clear `1 234` after `1 234`, typed `1234`, still lands reformatted); `observed === before` as
-the reading containing `before` (25); `before` as `resolvedValue` (8); `observed !== value` as `===` (12); the first
-`&&` as `||` (72). Equivalent: raw equality as `heldText(observed) === heldText(before)` — the two differ only where a
-named placeholder is held as empty against an empty side, and an empty held text contains no non-empty value, while a
-reading equal to the value is excepted anyway. `npm run mutate` (cold): fill-landing 95.52 → 95.73 % (floor 93; 281
-mutants, 12 survived, 4 timeouts — none in the new guard); every other module's score unchanged; floors unchanged.
+**Mutation-checked**: hand mutants on `unchangedSinceTyping`, each killed but one — the guard line removed (10 tests
+fail); the value exception dropped, the strict form (2: D63's value-itself test and fill.test.ts's named `Search` typed
+`Search`); `!clear` dropped (1: with clear `1 234` after `1 234`, typed `1234`, still lands reformatted); `observed ===
+before` as the reading containing `before` (25); `before` as `resolvedValue` (8); `observed !== value` as `===` (12);
+the first `&&` as `||` (72). Equivalent: raw equality as `heldText(observed) === heldText(before)` — the two differ only
+where a named placeholder is held as empty against an empty side, and an empty held text contains no non-empty value,
+while a reading equal to the value is excepted anyway. `npm run mutate` (cold): fill-landing 95.52 → 95.73 % (floor 93;
+281 mutants, 12 survived, 4 timeouts — none in the new guard); every other module's score unchanged; floors unchanged.
 
 **Golden and live.** The golden replays tree reads and never types: Changed 0, which is no evidence either way; the
 unit tests are (fill-landing.test.ts's D63 group, fill-type.test.ts's late, lost and elsewhere keys, and fill.test.ts's

@@ -62,7 +62,7 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
  * Whether a reading landed, and how; undefined when it did not. The rules:
  * - a non-input proves it took the text only by CHANGING to show it (`tookText`);
  * - without clear, a reading still exactly what the field showed when typing began has not landed, unless it is the
- *   value itself (`unmoved`, D63);
+ *   value itself (`unchangedSinceTyping`, D63);
  * - a field that reformats as it is typed (D18) lands when it shows what it should hold — its earlier text, unless
  *   cleared, then the value — every typed character in order, separators of its own added (`landedReformat`);
  * - else the reading must show the value exactly (`showsExactly`): with clear the whole reading, without it inside what
@@ -72,7 +72,7 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
  */
 export function landingOf(observed: string, e: Expectation): Landing | undefined {
   if (!tookText(observed, e)) return undefined;
-  if (unmoved(observed, e)) return undefined;
+  if (unchangedSinceTyping(observed, e)) return undefined;
   const reformatted = landedReformat(observed, e);
   if (reformatted === undefined && !showsExactly(observed, e)) return undefined;
   if (bulletsSaidPlain(observed, e) && observed.length !== e.value.length) return { kind: 'said-plain' };
@@ -101,7 +101,7 @@ export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInp
  * the earlier text and the value cannot be told from a select-all field that retyped it, or a placeholder equal to it —
  * it still lands (ADR 0034's D63 amendment, residual 7).
  */
-const unmoved = (observed: string, e: Pick<Expectation, 'value' | 'clear' | 'before'>): boolean => !e.clear && observed === e.before && observed !== e.value;
+const unchangedSinceTyping = (observed: string, e: Pick<Expectation, 'value' | 'clear' | 'before'>): boolean => !e.clear && observed === e.before && observed !== e.value;
 
 /**
  * The reading shows the value as typed.
