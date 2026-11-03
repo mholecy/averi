@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseWdaSource, parseWdaSourceValue } from '../../src/adapters/wda-source.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { everyNode, type UiNode } from '../../src/adapters/types.js';
+import { wdaSourceRoot } from '../helpers/wda-source-root.js';
 
 // What the WDA parser reads of WDA's own visibility flags, `isVisible` and `isAccessible` (strings "0"/"1"), beyond the
 // keyboard: the HIDDEN SUBTREE (`UiNode.hidden`) and the PARKED content of a cell UIKit has not laid out.
@@ -287,8 +288,9 @@ describe('PARKED cell content of a SCROLLED table — the parked frame lies abov
     const counts: Record<string, number> = {};
     for (const file of (await readdir(dir)).filter((f) => /^wda-.*\.json$/.test(f)).sort()) {
       const raw = JSON.parse(await readFile(new URL(file, dir), 'utf8')) as RawEl & { value?: unknown };
-      const root = (typeof raw.type === 'string' ? raw : raw.value) as RawEl | undefined;
-      if (typeof root?.type !== 'string') continue; // a ui_snapshot capture, not a /source payload
+      const root = wdaSourceRoot(raw);
+      // No element root: averi's own ui_snapshot, or one of WDA's other answers (activeAppInfo, /wda/keys) — no /source payload.
+      if (root === undefined) continue;
       let count = 0;
       const zip = (e: RawEl, n: UiNode): void => {
         if (e.rect !== undefined && at(n) !== `${e.rect.x},${e.rect.y} ${e.rect.width}x${e.rect.height}`) count++;

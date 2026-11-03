@@ -1,4 +1,5 @@
 {
+  "source": "REAL batch-10 D43 gate record (2026-11-03, averi-lab iPhone 17 simulator, iOS 27.0, WDA 16.1.7, form-basic's name field), TRIMMED: per G2 value only its category, the HTTP status of its `/wda/keys` and the app model's read-back after it (`keysHttp`, `readBack`); the focus, timings, udid and paths dropped. `b9`: batch-9's two D43 tries on the same simulator (value, status, what landed). Values as recorded, nothing else changed.",
   "g2": [
     {
       "value": "Šťastný",

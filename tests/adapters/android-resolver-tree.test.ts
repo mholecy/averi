@@ -14,10 +14,10 @@ import { parseDump } from '../helpers/android-dumps.js';
 // raise of the same link, the same main): the fixture's parse is that reply byte for byte.
 
 const raw = readFileSync(new URL('../fixtures/uiautomator-lab-resolver.xml', import.meta.url), 'utf8');
-/** The chooser's tree as the adapter parses it (any status line after the last `>` cut, as AndroidAdapter.uiTree does). */
-const tree = (): UiNode => parseDump(raw.slice(0, raw.lastIndexOf('>') + 1));
+/** The chooser's tree as the adapter parses it (any status line after the last `>` cut, as AndroidAdapter.uiTree does), parsed once: no test changes it. */
+const chooserTree: UiNode = parseDump(raw.slice(0, raw.lastIndexOf('>') + 1));
 const byId = (root: UiNode, id: string): UiNode[] => [...everyNode(root)].filter((n) => n.identifier === id);
-const one = (root: UiNode, id: string): UiNode => {
+const oneById = (root: UiNode, id: string): UiNode => {
   const [node, ...more] = byId(root, id);
   expect(more).toEqual([]);
   if (node === undefined) throw new Error(`no ${id}`);
@@ -27,13 +27,13 @@ const one = (root: UiNode, id: string): UiNode => {
 describe('the chooser\'s real tree (batch-10 E2, API 33): what the uiautomator parser yields today', () => {
   it('is averi\'s ui_snapshot reply on the chooser, byte for byte (batch-10 E4a)', () => {
     const reply = readFileSync(new URL('../fixtures/android-ui-snapshot-lab-resolver.json', import.meta.url), 'utf8');
-    expect(JSON.stringify(tree(), null, 2)).toBe(reply);
+    expect(JSON.stringify(chooserTree, null, 2)).toBe(reply);
   });
 
   it('27 nodes, every package `android`, the root the active window\'s whole screen, marked as uiautomator\'s', () => {
     expect(raw.match(/<node /g)).toHaveLength(27);
     expect(raw.match(/package="android"/g)).toHaveLength(27);
-    const root = tree();
+    const root = chooserTree;
     expect([...everyNode(root)]).toHaveLength(27);
     expect(root.rect).toEqual({ x: 0, y: 0, width: 1080, height: 2220 });
     expect(root).toMatchObject({ paddedTouchTargets: true, activeWindowOnly: true, boundsCutAtScreen: true });
@@ -42,21 +42,21 @@ describe('the chooser\'s real tree (batch-10 E2, API 33): what the uiautomator p
   it('no presentation mark: the sheet\'s window spans the screen from 0,0 with no scrim node — no recognizer knows it', () => {
     // Today's reading: the chooser is a sheet over the launcher, yet its window dumps as a plain screen (D55's focus
     // read names it instead: android-chooser.ts). No row plans a mark from the tree.
-    expect(tree().presentation).toBeUndefined();
+    expect(chooserTree.presentation).toBeUndefined();
   });
 
   it('the title by its id, "Open with"', () => {
-    expect(one(tree(), 'title')).toMatchObject({ role: 'text', label: 'Open with', rect: { x: 66, y: 1522, width: 948, height: 59 } });
+    expect(oneById(chooserTree, 'title')).toMatchObject({ role: 'text', label: 'Open with', rect: { x: 66, y: 1522, width: 948, height: 59 } });
   });
 
   it('`resolver_list` a vertical scrollable though the dump says scrollable="false" (a ListView: its class decides)', () => {
     expect(raw).toContain('resource-id="android:id/resolver_list" class="android.widget.ListView" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="true" focused="false" scrollable="false"');
-    expect(one(tree(), 'resolver_list')).toMatchObject({ role: 'scrollable', scrollAxis: 'vertical', rect: { x: 0, y: 1650, width: 1080, height: 308 } });
-    expect(one(tree(), 'profile_pager')).toMatchObject({ role: 'scrollable', scrollAxis: 'horizontal' });
+    expect(oneById(chooserTree, 'resolver_list')).toMatchObject({ role: 'scrollable', scrollAxis: 'vertical', rect: { x: 0, y: 1650, width: 1080, height: 308 } });
+    expect(oneById(chooserTree, 'profile_pager')).toMatchObject({ role: 'scrollable', scrollAxis: 'horizontal' });
   });
 
   it('a row is a direct child of `resolver_list`, a plain container (not clickable in the dump), labelled by its `text1` and, on the alias row, `text2`', () => {
-    const rows = one(tree(), 'resolver_list').children;
+    const rows = oneById(chooserTree, 'resolver_list').children;
     expect(rows.map((row) => [row.role, row.label, row.identifier, row.rect])).toEqual([
       ['container', null, null, { x: 0, y: 1650, width: 1080, height: 154 }],
       ['container', null, null, { x: 0, y: 1804, width: 1080, height: 154 }],
@@ -69,12 +69,13 @@ describe('the chooser\'s real tree (batch-10 E2, API 33): what the uiautomator p
   });
 
   it('"Just once" and "Always" by their ids, plain buttons: the dump\'s enabled="false" is not carried (UiNode has no enabled field)', () => {
-    // Only the dump says they are disabled until a row is selected; what T2's safe chooser tap relies on is read from
-    // the raw XML, not from averi's tree.
+    // KNOWN-WRONG, pinned as today's: only the dump says they are disabled until a row is selected, and a tap on one
+    // replies "Tapped" while nothing happens. Backlog D66 will carry an enabled mark in UiNode (and D55c needs it).
+    // What T2's safe chooser tap relies on is read from the raw XML, not from averi's tree.
     expect(raw).toMatch(/text="Just once" resource-id="android:id\/button_once" class="android.widget.Button" [^>]*clickable="true" enabled="false"/);
     expect(raw).toMatch(/text="Always" resource-id="android:id\/button_always" class="android.widget.Button" [^>]*clickable="true" enabled="false"/);
-    const root = tree();
-    expect(one(root, 'button_once')).toEqual({ role: 'button', label: 'Just once', identifier: 'button_once', value: null, rect: { x: 604, y: 1983, width: 238, height: 149 }, children: [] });
-    expect(one(root, 'button_always')).toEqual({ role: 'button', label: 'Always', identifier: 'button_always', value: null, rect: { x: 842, y: 1983, width: 188, height: 149 }, children: [] });
+    const root = chooserTree;
+    expect(oneById(root, 'button_once')).toEqual({ role: 'button', label: 'Just once', identifier: 'button_once', value: null, rect: { x: 604, y: 1983, width: 238, height: 149 }, children: [] });
+    expect(oneById(root, 'button_always')).toEqual({ role: 'button', label: 'Always', identifier: 'button_always', value: null, rect: { x: 842, y: 1983, width: 188, height: 149 }, children: [] });
   });
 });

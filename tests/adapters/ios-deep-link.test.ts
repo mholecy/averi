@@ -206,10 +206,11 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
     expect(d.asks()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
   });
 
-  // T4: batch-5's D49A E2 reply (main 28c1d37d, WDA, the "Open in “AveriLab”?" alert up, its activeAppInfo naming
-  // SpringBoard: wda-activeappinfo-springboard-b5.json, read in wda-tree-source.test.ts), before D54 read the alert.
-  // Today the same wording is the reply only when the alert read at the bound finds none (or fails); with the alert
-  // found the link's outcome is the alert instead.
+  // T4: a HISTORICAL WORDING pin over a synthetic source: batch-5's D49A E2 reply (main 28c1d37d, WDA, the "Open in
+  // “AveriLab”?" alert up, its activeAppInfo naming SpringBoard: wda-activeappinfo-springboard-b5.json, read in
+  // wda-tree-source.test.ts), before D54 read the alert. On that device today the alert IS found at the bound (D54:
+  // WDA_ALERT, the same run's /source) and the reply is the alert instead; this wording is today's only when the alert
+  // read finds none or fails, as the synthetic source here makes it.
   it('SpringBoard to the bound and no alert read: batch-5 E2\'s reply, byte for byte', async () => {
     const d = lab([SPRINGBOARD], { tree: new Error('no alert read') });
     const outcome = await d.adapter.openDeepLink('averilab://cell/open', { appId: LAB });

@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
 import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import type { UiNode } from '../../src/adapters/types.js';
+import { wdaSourceRoot } from './wda-source-root.js';
 
 /**
  * Every iOS tree the committed fixtures hold (tests/fixtures, the native and React Native truth captures), as its parser
@@ -23,10 +24,9 @@ export async function iosTrees(): Promise<[string, UiNode][]> {
         if (lists.length === 0) throw new Error(`${file}: an idb fixture of no known shape`);
         lists.forEach((list, i) => trees.push([`${file}#${i}`, parseIdbDescribeAll(JSON.stringify(list))]));
       } else if (file.startsWith('wda-') || file.endsWith('.wda.json')) {
-        // By shape, as wda-source-visibility.test.ts's sweep: a payload whose root (itself, or its `value`) is no element
-        // is one of WDA's other answers, never a tree.
-        const raw = JSON.parse(text) as { type?: unknown; value?: { type?: unknown } | null };
-        if (typeof (typeof raw.type === 'string' ? raw : raw.value)?.type !== 'string') skipped.push(file);
+        // By shape (wdaSourceRoot, as wda-source-visibility.test.ts's sweep): a payload with no element root is one of
+        // WDA's other answers, never a tree.
+        if (wdaSourceRoot(JSON.parse(text) as { type?: unknown; value?: unknown }) === undefined) skipped.push(file);
         else trees.push([file, parseWdaSource(text)]);
       }
     }

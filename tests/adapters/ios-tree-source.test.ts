@@ -207,7 +207,12 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
 // reading; ADR 0034's D51 amendment is what makes the fill land over it (fill-reformat.ts#maskTemplate,
 // fill-landing.ts#priorsOf). Each field's `subrole` is null: no field reads as secure (idbSecure).
 describe('parseIdbDescribeAll — batch-4\'s real form-format dump: an empty field\'s mask or placeholder is its value', () => {
-  /** The capture's elements, as idb printed them (the fields averi reads), as one describe-all answer. */
+  /**
+   * The capture's elements, as one describe-all answer: whole, every field idb printed (idbSecure reads `subrole`, so a
+   * trimmed copy would hide what the parser sees). idb-springboard-open-in-alert.json, older, keeps only the fields its
+   * `source` lists, `subrole` not among them — a different convention, kept as it is: it holds no TextField, so
+   * idbSecure has nothing to read there.
+   */
   const raw = async () => JSON.stringify((JSON.parse(await readFile(new URL('../fixtures/idb-lab-form-format-empty.json', import.meta.url), 'utf8')) as { elements: unknown[] }).elements);
   const field = (tree: UiNode, id: string) => tree.children.find((n) => n.identifier === `lab.form-format.${id}`);
 
