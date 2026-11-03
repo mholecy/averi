@@ -792,12 +792,14 @@ export interface Clips {
   axesOf(container: Rect): ScrollAxes | undefined;
   /**
    * Every scroll view of the tree that the tree TELLS scrolls on `axis` (scroll-containers.ts#scrollAxis on this tree's
-   * dialect), at any depth, in tree order — text inputs left out, as `axesOf`'s `nested` leaves them; none on a tree
-   * that lists no ancestry (idb's flat list lists no scroll view). For the exhausted stop's sentence when the strokes
+   * dialect), at any depth, in tree order, that meets `screen` (the caller's usable screen: one wholly off it, or under
+   * a band the caller cut out, is no list a swipe can reach) and is none of the keyboard's own (`ofKeyboard`, the
+   * caller's reading: WDA's suggestion strip) — text inputs left out, as `axesOf`'s `nested` leaves them; none on a
+   * tree that lists no ancestry (idb's flat list lists no scroll view). For the exhausted stop's sentence when the strokes
    * went across their scroll view (interact/stroke-plan.ts#strokedAcross, D59b): one the tree shows that scrolls the
    * stroke's way is named, wherever it lies. One walk of the tree a call.
    */
-  toldOn(axis: ScrollAxis): readonly UiNode[];
+  toldOn(axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[];
   /**
    * What this tree lists of the content of the scroll view of rect `scroller` toward its `edge` (`ListedContent`) —
    * the scroll view found as `axesOf` finds its scroll view (scroll-containers.ts#isScrollViewOf, that exact rect — the
@@ -1137,8 +1139,10 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     };
     return under.some((d) => past[edge](d.rect)) ? LISTED : { kind: 'ends', view };
   };
-  const toldOn = (axis: ScrollAxis): readonly UiNode[] =>
-    ancestry ? [...everyNode(tree)].filter((n) => n.role !== INPUT_ROLE && scrollAxis(n, unclipped) === axis) : [];
+  const toldOn = (axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[] =>
+    ancestry
+      ? [...everyNode(tree)].filter((n) => n.role !== INPUT_ROLE && scrollAxis(n, unclipped) === axis && rectIntersection(n.rect, screen) !== undefined && !ofKeyboard(n))
+      : [];
   return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, toldOn, contentToward };
 }
 

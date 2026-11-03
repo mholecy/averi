@@ -229,9 +229,12 @@ describe('Clips.axesOf — a scroll view\'s axis and those of the scroll views n
     const field = node({ role: 'textfield', rect: rect(24, 300, 354, 60), clipsDescendants: true, scrollAxis: 'horizontal' });
     const tree = iphone(chips, scroller(PAGE, 'vertical', inner, field, scroller(rect(0, 500, 402, 100), undefined)), box(rect(0, 700, 402, 100)));
     const clips = clipsOf(tree, UIAUTOMATOR);
-    expect(clips.toldOn('horizontal')).toEqual([chips, inner]);
-    expect(clips.toldOn('vertical').map((n) => n.rect)).toEqual([PAGE]);
-    expect(clipsOf(tree, FLAT).toldOn('horizontal')).toEqual([]);
+    expect(clips.toldOn('horizontal', PAGE, () => false)).toEqual([chips, inner]);
+    expect(clips.toldOn('vertical', PAGE, () => false).map((n) => n.rect)).toEqual([PAGE]);
+    expect(clipsOf(tree, FLAT).toldOn('horizontal', PAGE, () => false)).toEqual([]);
+    // Only those meeting the screen given, and none the caller says are the keyboard's own (review round 2).
+    expect(clips.toldOn('horizontal', rect(0, 200, 402, 600), () => false)).toEqual([inner]);
+    expect(clips.toldOn('horizontal', PAGE, (n) => n === chips)).toEqual([inner]);
   });
 
   it("each axis as the tree's dialect reads it: inferred from content on unclipped frames, unknown on cut ones", () => {
