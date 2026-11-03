@@ -174,15 +174,15 @@ the one read suffices, and no `resolve-activity` prediction or bounded poll is n
 ## Amendment: `launch_app`'s `-p` start and monkey's refusal read the same focus (2026-11-03, D55b)
 
 **Context.** Batch-10's E4 and batch-11's D55b (2026-11-03, averi_lab emulator, API 33; batch-11 on main a5fefd32)
-measured the residual above. From the launcher, `launch_app {intent: VIEW averilab://shared/x}` (no activity, so
-`am start -p dev.averi.lab …`) raised the chooser 10 of 10: two activities of the package (`.MainActivity` and its
-alias `.Twin`) handle the intent and none is preferred. `am start` printed
-`Starting: Intent { act=android.intent.action.VIEW dat=averilab://shared/... pkg=dev.averi.lab }` and averi replied
-`Launched dev.averi.lab on android` 10 of 10 with the chooser up. A focus read with `CHOOSER_FOCUS_COMMAND` at the start's return named ResolverActivity as `mFocusedApp` 10
+measured the residual above. From the launcher, `launch_app {intent: VIEW averilab://shared/x}` (no activity, so `am
+start -p dev.averi.lab …`) raised the chooser 10 of 10: two activities of the package (`.MainActivity` and its alias
+`.Twin`) handle the intent and none is preferred. `am start` printed `Starting: Intent { act=android.intent.action.VIEW
+dat=averilab://shared/... pkg=dev.averi.lab }` and averi replied `Launched dev.averi.lab on android` 10 of 10 with the
+chooser up. A focus read with `CHOOSER_FOCUS_COMMAND` at the start's return named ResolverActivity as `mFocusedApp` 10
 of 10; `mCurrentFocus` was `null` in 7 and the chooser's own window in 3. With the chooser up, a plain `launch_app
 dev.averi.lab` (monkey) exited 251 3 of 3: its stdout only its `bash arg:` echoes, its stderr its arguments and `**
-SYS_KEYS has no physical keys but with factor 2.0%.`, an emulator warning. averi failed with "monkey started nothing
-in dev.averi.lab — check that dev.averi.lab is installed and has a launcher activity … monkey said: ** SYS_KEYS has no
+SYS_KEYS has no physical keys but with factor 2.0%.`, an emulator warning. averi failed with "monkey started nothing in
+dev.averi.lab — check that dev.averi.lab is installed and has a launcher activity … monkey said: ** SYS_KEYS has no
 physical keys but with factor 2.0%.": the wrong cause, and a warning quoted as the reason.
 
 **Decision.**
@@ -204,18 +204,29 @@ physical keys but with factor 2.0%.": the wrong cause, and a warning quoted as t
   note claims no more than the read saw (review round 1): the chooser in front and the package not. A chooser left up
   by another app's link reads the same, so the note does not say whose intent it answers.
 - On monkey's refusal only (a non-zero exit with a `** ` line, `runStart`'s `refused`), the same one read. When it
-  names the chooser, the error is `launchChooserNote`'s sibling `monkeyChooserRefusal`, the ExecError still its cause:
+  names the chooser and monkey gave no reason of its own (`refusalReasons`, android-start.ts: its `** ` lines without
+  the emulator's `** SYS_KEYS …` warning, from the line's start, are none), the chooser is the cause:
+  `monkeyChooserRefusal`, the ExecError still the error's cause:
 
   > monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) is
   > in front, and monkey starts nothing over it (it exited 251). Take a ui_snapshot, tap the app you mean, then its
   > "Just once" button if it shows one (never "Always": it changes the device's default for the intent it answers);
   > press_key back drops the chooser. averi taps nothing itself. Then launch again.
 
-  The exit code is monkey's own (the ExecError's; batch-10's refusal was recorded as 252), left out when there is none.
-  Of monkey's `** ` lines every real reason is quoted after the exit, `monkey said: <line> / <line>`, e.g. `** No
-  activities found to run, monkey aborted.`; only a line that is the emulator's `** SYS_KEYS …` warning, from its
-  start, is not. The exit code's meaning was not traced in Monkey.java, so nothing depends on it beyond the
-  observation.
+  The exit code is monkey's own (the ExecError's; batch-10's refusal was recorded as 252), left out when there is
+  none. Its meaning was not traced in Monkey.java, so nothing depends on it beyond the observation.
+- When the chooser is named beside a real reason of monkey's (code review), the chooser is not claimed as THE cause.
+  monkey's reason leads: the old error, quoting its real lines only (the warning left out), then `chooserAlsoInFront`:
+
+  > monkey started nothing in dev.averi.lab — check that dev.averi.lab is installed and has a launcher activity, or
+  > name the activity to start: `activity:` on the launch step / launch_app, or app.android.activity in averi.yaml —
+  > or monkey itself could not run; its line says which. monkey said: ** No activities found to run, monkey aborted.
+  > Android's chooser (android/com.android.internal.app.ResolverActivity) is also in front. Take a ui_snapshot, …
+  > press_key back drops the chooser. averi taps nothing itself.
+
+- The advice after a launch says "press_key back drops the chooser", not "drops the launch" (review round 1): the
+  chooser in front may be another app's link's, left up, and then BACK drops that one; what one BACK drops is the
+  chooser either way (batch-9, batch-11).
 - Fail open: a failed, timed-out or unmatched read gives today's reply byte for byte, `Launched …` or monkey's old
   error. `-n` (an activity named) reads nothing, nor does a monkey that started something, nor a thrown monkey or
   `am start` failure with no diagnosis (adb gone, a timeout), nor a refused `-p` start, which throws `launchRefused`
@@ -236,29 +247,34 @@ and 78 ms (65–100, n = 10, the control). It is paid on `-p` launches only, cho
 (about 62 ms there). `-n` and monkey's success pay nothing. A hung adb adds up to the 2 s bound, then fails open.
 
 **Tests.** android.test.ts's known-wrong T4 pins flipped: E4d (batch-10's read 1.5 s after the `-p` launch) now
-expects the note and the focus read after the start; E4c expects the chooser error, on batch-11's real exit-251
-output (its stdout and stderr kept as fixtures) as well as batch-10's quoted line. New: batch-11's `-p` stdout and
-averi's own read at its return (the window `null`, and the chooser's), the one-handler control read, each fail-open
-answer, a refused `-p` start, `clearState`'s order, `-n` with the intent, monkey's success, monkey refused with no
-chooser named, monkey refused with a real reason under the chooser (quoted, the warning not), a monkey failure with no
-diagnosis; `tests/mcp/android-chooser-replies.test.ts` runs a real adapter
-through `launch_app`'s reply, the flow's `⚠ launch` line and `open_deep_link`'s unchanged reply. Hand mutants on
-`android.ts` (the `-p` read dropped, a read on `-n`, a read before the refusal check, the fail-open dropped, monkey
+expects the note and the focus read after the start; E4c expects the chooser error, on batch-11's real exit-251 output
+(its stdout and stderr kept as fixtures) as well as batch-10's quoted line. New: batch-11's `-p` stdout and averi's
+own read at its return (the window `null`, and the chooser's), the one-handler control read, each fail-open answer, a
+refused `-p` start, `clearState`'s order, `-n` with the intent, monkey's success, monkey refused with no chooser named
+(the warning quoted whole, as before), monkey refused with a real reason and the chooser in front (the reason leads,
+the warning unquoted, the chooser also in front), a monkey failure with no diagnosis; `startSaid` and
+`refusalReasons` in android-start.test.ts; `tests/mcp/android-chooser-replies.test.ts` runs a real adapter through
+`launch_app`'s reply, the flow's `⚠ launch` line and `open_deep_link`'s unchanged reply. Hand mutants, each killed: on
+`android.ts`, the `-p` read dropped, a read on `-n`, a read before the refusal check, the fail-open dropped, monkey
 ignoring the chooser, a read after monkey's success or on its thrown failure, the cause dropped, the wrong activity
-hint) and on the advice arguments: each killed. Review round 1's, the same way: the SYS_KEYS filter dropped or
-unanchored, real reasons never quoted, a fixed exit code, no exit code or no lines passed from the adapter, a `null`
-exit printed, monkey's old advice, the note's old claim, the launch advice in the link's wording: each killed. `npm run
-mutate` (cold, after review round 1): android-chooser 100 % (floor 98; 79 mutants, 0 survived; 64 before it), every
-other module's score unchanged, floors unchanged. Golden Changed 0 (it replays tree
-reads, not focus reads).
+hint; on the wording, the advice arguments, the note's old claim, monkey's old advice, a fixed exit code, a `null`
+exit printed; on the code review's split, the warning kept or matched unanchored, am's lines filtered, `startSaid`
+ignoring the lines given, the chooser always THE cause, the also-in-front sentence or its advice dropped, the warning
+quoted beside a real reason, the warning dropped when no chooser is named. `npm run mutate` (cold, after the code
+review): android-chooser 100 % (floor 98; 70 mutants, 0 survived; 79 after review round 1, 64 before it), every other
+module's score unchanged, floors unchanged. Golden Changed 0 (it replays tree reads, not focus reads).
 
 Residuals, stated:
 - One read, so D55's race: batch-11 named the chooser 10 of 10 at the start's return, through `mFocusedApp`. No `-p`
   one-handler control was run; the read's specificity rests on E1's control (10 of 10 `Opened`) and the package rule.
 - A chooser already up before a `-p` launch is named, even if the launch alone would have opened one handler (the
   same as the link's residual above). It IS in front at the read.
-- `** SYS_KEYS` still counts as a monkey diagnosis when no chooser is named: another refusal on an emulator quotes it
-  beside its real `** ` line, if that prints. A separate row if wanted.
+- `** SYS_KEYS` still counts as a monkey diagnosis (a non-zero exit with it is `refused`, so the read can ask why),
+  and with no chooser named it is still quoted, beside a real line or alone: the fail-open keeps today's reply byte for
+  byte, and a refusal with no chooser whose only line is the warning is unmeasured. Dropping it there is a separate
+  row if wanted.
+- With a chooser and a real reason both seen, which of them stopped monkey is not known; the reply names both, the
+  reason first. A chooser named with no reason of monkey's is called the cause, as batch-11 measured (3 of 3).
 - The note names the chooser by its component only; its labels and centres stay D55c's.
 - Device check: none yet for the new replies. Proposed live cases (T7's "launch and deep link" group, not built):
   lc1 `launch_app {intent: VIEW averilab://shared/x}` names the chooser; lc2 the one-handler `averilab://cell/x`, no
