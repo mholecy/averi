@@ -67,8 +67,8 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
  *   was typed past the earlier text (D64); a masked reading by length.
  * D63's rule — without clear, a reading still exactly what the field showed when typing began has not landed, unless it
  * is the value itself — is D64's at its limit: such a reading starts with the earlier text and holds nothing past it.
- * No reading tells the two apart, through the reformat route either (a reformat needs the whole of the earlier text
- * plus the value), so it is no separate guard.
+ * No reading tells the two apart for any Expectation fill.ts builds, through the reformat route either (a reformat
+ * needs the whole of the earlier text plus the value), so it is no separate guard.
  * A landed reading is `said-plain` when it shows bullets said plain (`bulletsSaidPlain`) and is longer than typed (a
  * shorter one has not landed), else `placeholder` when it is exactly the named placeholder. Pure.
  */
@@ -114,7 +114,11 @@ export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInp
  * typed `12` keeps `31.12.2021`), an iOS React Native burst that kept a prefix (`Note: hellohe`), keys that went into
  * another input. Such a reading is now a dropped tail — typed again on iOS — or a miss that names where the keys went.
  * A reading that no longer starts with the earlier text literally is judged whole, as before: an earlier text that
- * vanished (D29), was replaced (select-all), autocorrected, or a caret not at the end. D63 at its limit: a reading still
+ * vanished (D29), was replaced (select-all), autocorrected, or a caret not at the end. The earlier texts are
+ * `priorsOf`'s, as for a reformat (review round 1, M-1): a reading whose letters and digits are exactly the value's and
+ * no start of the earlier text's plus the value's is judged as the value alone too (D61) — a field that adds a leading
+ * `+` under idb's unnamed `+421` (`+421903123456`), a select-all field that adds a mark (`SK31 ` after `SK3`, `50%`
+ * after `5`). D63 at its limit: a reading still
  * the earlier text holds nothing past it (`unchanged`, a field that refused the keys or never got them). The value
  * itself is excepted: a reading that is both the earlier text and the value cannot be told from a select-all field
  * that retyped it, or a placeholder equal to it — it still lands (ADR 0034's D63 amendment, residual 7). The limit, on
@@ -124,7 +128,9 @@ export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInp
 function showsExactly(observed: string, e: Expectation): boolean {
   const { value, clear } = e;
   if (isMaskedValue(observed)) return clear ? observed.length === value.length : observed.length >= heldCount(e) + value.length;
-  return clear ? observed === value : observed === value || typedPartOf(heldText(observed, e.placeholder), priorText(e)).includes(value);
+  if (clear) return observed === value;
+  const held = heldText(observed, e.placeholder);
+  return observed === value || priorsOf(held, e).some((prior) => typedPartOf(held, prior).includes(value));
 }
 
 /** The bullets the field held after focus, an unread count as none. */
