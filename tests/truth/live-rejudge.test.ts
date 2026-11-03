@@ -171,6 +171,10 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-keyboard-fallbacks-k-run2.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['ios-keyboard-fallbacks-k-run3.json', 'forms', { cases: 3, ok: 3, loud: 0, mismatches: 0 }],
     ['ios-keyboard-fallbacks-dismissal.json', 'dismissal', { cases: 24, ok: 24, loud: 0, mismatches: 0 }],
+    // #7's live calibration (a --side run of d928789, before its fix): toolbar-dismiss's and toolbar-dismiss-short's taps
+    // under WDA's keyboard, keyboardDismiss on the title — ks, ss and note tapped on the tall cell; vs timed out never
+    // holding still, and the short cell's four refused under the keyboard: LOUD, no claim, no mismatch.
+    ['cal7-d928789-1.json', 'dismissal', { cases: 8, ok: 3, loud: 5, mismatches: 0 }],
     // round 7's A9 (src arch/r23-fill-tail through --side; docs/truth/live-rn-2026-10-19.md): the RN forms group under
     // idb and WDA, five runs — every single-line fill whole; rn4 (the label tap under WDA) LOUD, LR1's at that src;
     // run 4's rn1 LOUD (the wait for N's field timed out after launch, nothing typed)
@@ -893,6 +897,19 @@ describe('live.ts --rejudge over the committed Android visibility records of the
     expect(notKnown(out).sort()).toEqual(unknown.sort());
     expect(code).toBe(1);
   });
+  // The first run of that device check (android-vis-e98b87e-run1.json), whose three tool calls hung past the client's
+  // 300 s — bands' Q, bands-three-button's O and tabbar-floating's F, each LOUD "Request timed out" — so those cells
+  // were run again into android-vis.json. Its cases not known are android-vis.json's but tabbar-floating's F (LOUD
+  // here, the hang) and bands' N, refused while the app logged a tap of Q: the hung tap of Q landing during N's case.
+  it('android-vis-e98b87e-run1.json: as android-vis.json, but the three hung calls LOUD and bands N reading the hung tap of Q', { timeout: 60_000 }, async () => {
+    const { code, out } = await rejudgeInProcess('android-vis-e98b87e-run1.json', 'visibility');
+    const unknown = [...LE1_CASES, VA1_CASE, ...LV1_CASES.filter((c) => c !== 'scroll:tabbar-floating.F'), 'tap:bands.N'];
+    expect(out).toMatch(new RegExp(`^# Live golden: 111 cases, 95 ok, 6 loud, 10 mismatches \\(${unknown.length} not known\\), 0 skipped$`, 'm'));
+    expect(notKnown(out).sort()).toEqual(unknown.sort());
+    expect(out.match(/^- LOUD .*MCP error -32001: Request timed out$/gm)).toHaveLength(3);
+    expect(out).toMatch(/^- MISMATCH \(tap-refused-fired\) tap:bands\.N .*yet the app logged tap Q/m);
+    expect(code).toBe(1);
+  });
 });
 
 // Before VA1's fix (round 14).
@@ -954,11 +971,25 @@ describe('live.ts --rejudge over a committed calibration record of the src befor
   // own defect at that commit. P.fully and S.fully were known by LV2's intermittent entries until round 1023 fixed LV2
   // and struck them off; they never were LV2's at that src (no probe was sent), so all three read not known now — a
   // calibration, not HEAD's KNOWN: exit 1, as recorded.
-  it('cal12-d043e65-1.json: S, P.fully and S.fully not known', { timeout: 60_000 }, async () => {
-    const { code, out } = await rejudgeInProcess('cal12-d043e65-1.json', 'visibility');
+  it.each([['cal12-d043e65-1.json'], ['cal12-d043e65-2.json']] as const)('%s: S, P.fully and S.fully not known', { timeout: 60_000 }, async (record) => {
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
     expect(out).toMatch(/^# Live golden: 7 cases, 4 ok, 0 loud, 3 mismatches \(3 not known\), 0 skipped$/m);
     expect(notKnown(out).sort()).toEqual(['scroll:scroll-bounded-flush.P.fully', 'scroll:scroll-bounded-flush.S', 'scroll:scroll-bounded-flush.S.fully']);
     expect(out).toMatch(/^- MISMATCH \(stop-claim\) scroll:scroll-bounded-flush\.S\.fully .*fully visible after 0 swipes/m);
+    expect(code).toBe(1);
+  });
+});
+
+describe('live.ts --rejudge over the committed calibration records of #12\'s fix, before the flush probe', () => {
+  // cal12-9c7885e-1…3.json (#12's live calibration at its fix, 9c7885e, three runs): P.fully and S.fully ok — "fully
+  // visible" where each is drawn whole (LV2's two cases read `visible` in all of them: live-known.ts's header) — but the
+  // plain stop on S, the sliver, claimed "fully visible after 0 swipes" before the flush probe existed: no live-known.ts
+  // entry ever filed it, so it reads not known — a calibration of that src, not HEAD's KNOWN: exit 1, as recorded.
+  it.each([['cal12-9c7885e-1.json'], ['cal12-9c7885e-2.json'], ['cal12-9c7885e-3.json']] as const)('%s: S\'s plain stop not known, the rest ok', { timeout: 60_000 }, async (record) => {
+    const { code, out } = await rejudgeInProcess(record, 'visibility');
+    expect(out).toMatch(/^# Live golden: 7 cases, 6 ok, 0 loud, 1 mismatches \(1 not known\), 0 skipped$/m);
+    expect(notKnown(out)).toEqual(['scroll:scroll-bounded-flush.S']);
+    expect(out).toMatch(/^- MISMATCH \(stop-claim\) scroll:scroll-bounded-flush\.S .*fully visible after 0 swipes/m);
     expect(code).toBe(1);
   });
 });
