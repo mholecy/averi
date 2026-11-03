@@ -217,6 +217,26 @@ describe('Clips.axesOf — a scroll view\'s axis and those of the scroll views n
     expect(clipsOf(iphone(box(LOWER)), UIAUTOMATOR).axesOf(LOWER)).toBeUndefined();
   });
 
+  it('a text input is no nested scroll view (D59b): a Compose text field dumps as a scrolling (Horizontal)ScrollView, its role textfield — left out, a scroll view beside it kept', () => {
+    const field = node({ role: 'textfield', rect: rect(24, 300, 354, 60), clipsDescendants: true });
+    const page = scroller(PAGE, 'vertical', field, scroller(CAROUSEL, undefined));
+    expect(clipsOf(iphone(page), UIAUTOMATOR).axesOf(PAGE)).toEqual({ axis: 'vertical', nested: [{ rect: CAROUSEL, axis: undefined }] });
+  });
+
+  it('toldOn: every scroll view of the tree told to scroll on that axis, at any depth, in tree order — of unknown axis, a text input, a plain container not; none on a flat list', () => {
+    const chips = scroller(rect(0, 100, 402, 60), 'horizontal');
+    const inner = scroller(CAROUSEL, 'horizontal');
+    const field = node({ role: 'textfield', rect: rect(24, 300, 354, 60), clipsDescendants: true, scrollAxis: 'horizontal' });
+    const tree = iphone(chips, scroller(PAGE, 'vertical', inner, field, scroller(rect(0, 500, 402, 100), undefined)), box(rect(0, 700, 402, 100)));
+    const clips = clipsOf(tree, UIAUTOMATOR);
+    expect(clips.toldOn('horizontal', PAGE, () => false)).toEqual([chips, inner]);
+    expect(clips.toldOn('vertical', PAGE, () => false).map((n) => n.rect)).toEqual([PAGE]);
+    expect(clipsOf(tree, FLAT).toldOn('horizontal', PAGE, () => false)).toEqual([]);
+    // Only those meeting the screen given, and none the caller says are the keyboard's own (review round 2).
+    expect(clips.toldOn('horizontal', rect(0, 200, 402, 600), () => false)).toEqual([inner]);
+    expect(clips.toldOn('horizontal', PAGE, (n) => n === chips)).toEqual([inner]);
+  });
+
   it("each axis as the tree's dialect reads it: inferred from content on unclipped frames, unknown on cut ones", () => {
     const { tree } = scrollBounded({ axis: 'untold' });
     expect(clipsOf(tree, WDA).axesOf(LOWER)).toEqual({ axis: 'vertical', nested: [] });

@@ -352,13 +352,117 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
    views alone says so, `flush.why: 'axis'` — Android only in practice: WDA's clipping chain is empty). Still
    UNMEASURED on a device: what a carousel hands the outer scroller of a cross-axis drag (~51 pt a stroke, inferred);
    the lab's `carousel-in-list` cell (harness task H2) is to show it, and a lazy-row carousel there reads of unknown
-   axis on Android.
+   axis on Android. See the D59b amendment below.
 8. **An ocr assert on a text line cut at its scroll view's edge** reads only the drawn part, so its glyphs may be cut (a
    21-pt line with 15 pt drawn is read on clipped glyphs). Android's glyph readers fail closed on a node that may be cut
    at the navigation bar (`ui-tree/standing.ts#cutAtNavigationBar`); there is no counterpart at a scroll view's edge yet.
 9. **A scroll view that draws past its frame** (SwiftUI's `.scrollClipDisabled()`, a UIKit scroll view with
    `clipsToBounds = NO`) is judged as one that clips: content it draws outside its frame is refused, never measured —
    the safe direction.
+
+## Amendment: D59b — before the target is found, the largest scroller's nested scroll views (2026-11-03)
+
+**Context.** Residual 7's rule chose among the TARGET's scroll views; before a read finds the target the only
+candidate was the screen's largest scroller (`ui-tree/geometry.ts#largestScroller`). Batch-11 (the averi_lab emulator,
+API 33, 1080x2220, `d59b-measure` on main a5fefd32): `scroll_until` right for card C of the L7 cells
+`carousel-lazy-free` and `carousel-recycler-free` from a fresh launch, where C is not laid out, so no read finds it.
+6/6 runs stroked `(864,1110)→(216,1110)`, the page's centre row, 496 px below the carousel's band (y 380–614). The
+carousel never moved, and the call failed "content exhausted, still loading, or the swipes were not taken". A raw stroke
+in the band, `(872,497)→(208,497)`, moved it 4/4. Cause: the page `0,0 1080x2220` (a ScrollView, told vertical) scrolls
+across a `right` stroke, so `strokeRoom` dropped it, found no other candidate and took it anyway through the
+`'any axis'` fallback. The carousel (a LazyRow dumped as `android.view.View` or a RecyclerView, no told axis) was never
+a candidate.
+
+**Decision.**
+1. Before a read finds the target, the candidates are the largest scroller, then the scroll views nested in it
+   (`interact/stroke-plan.ts#candidatesOf`, from the `ScrollAxes.nested` it already reads). The nested ones the tree
+   tells scroll along the stroke come first, then the rest, each group largest first. Text inputs (`INPUT_ROLE`) are
+   left out (`Clips.axesOf`, through the one predicate `toldOn` shares): a Compose text field dumps as a scrolling
+   (Horizontal)ScrollView, role `textfield`, and a sideways stroke must not land in one. That is an Android matter:
+   WDA marks no node clipping, so it has no largest scroller. The page stays FIRST, so residual 7's axis rule takes a
+   nested one only when the page scrolls across the stroke. Every stroke along the page, a page of unknown axis and
+   the all-across fallback are as before; so are iOS and idb. The lab's carousel is now stroked inside,
+   `swipeVector(66,380 948x234, right)` = `(824,497)→(256,497)`.
+2. The rule is symmetric, on purpose: a page told HORIZONTAL (a pager) stroked `down` or `up` before the target is
+   found now strokes the list nested in it (of unknown axis or told vertical), where it stroked the pager across its
+   axis before. It changed for the same reason as the carousel: a stroke across the pager moves nothing of it, and
+   the list inside is the one a vertical stroke is for. The stroke there is cut above what is drawn over the list, as
+   any stroke (tests/interact/stroke-plan.test.ts, "the same rule the other way").
+3. When the strokes still went across a scroll view whose axis the tree tells (`stroke-plan.ts#strokedAcross`), the
+   exhausted stop says so first, after a node named under the touch-down and below an end the tree proves
+   (`scroll-rounds.ts#BoundBy`'s `across`, `scroll-text.ts#boundText`). What it says of the other way is asked of the
+   WHOLE tree (`Clips.toldOn`), counting only scroll views that meet the usable screen (the round's box less the
+   status and navigation bands, `geometry.ts#clearOfSystemBands`) and none of the keyboard's own
+   (`soft-keyboard.ts#keyboardSideNodes`, the reading's `ofKeyboard`: WDA's suggestion strip). Three wordings:
+   - one such view the swipes did not go over (the largest is named): `… which scrolls vertically, and the tree shows
+     scrollable id:feed.chips (0,2000 1080x150), which scrolls horizontally, and which the swipes did not go over —
+     swipe inside it (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading, or the
+     swipes were not taken)`;
+   - one the plan judged without room (`StrokeRoom.roomless`, recorded where the plan judges room): `…, which scrolls
+     horizontally, but which had no room for a swipe — …`;
+   - none: `failed after 2 swipes (the last 2, swiping right, did not change the screen: each went across the scroll
+     view it was drawn over, 0,0 1080x2220, which scrolls vertically, and the tree shows no scroll view that may
+     scroll horizontally — if the element lies in a horizontal list the tree does not show as one, swipe inside that
+     list (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading, or the swipes were
+     not taken)`.
+   After the `else:` the generic stop's causes stand whole, idb's top-layer hint (`TOP_LAYER_ONLY_HINT`) included.
+   The clause does not depend on whether a read found the target: it describes the strokes.
+4. No change to `swipeVector` or to the stroke's length.
+
+**Departures decided in review.** The spec asked for the page's nested scroll views largest first and an across
+clause saying no scroll view on screen scrolls that way. The reviews changed three things, each for an honest reply
+or the stroke that reply implies: `Clips.toldOn` asks the whole tree, so a chips row beside the page is not denied
+(round 1); the three wordings above, so a view that exists is named and one without room is said to have none
+(rounds 1 and 2, with the screen and keyboard filters of round 2); and told-along nested views rank before
+unknown-axis ones, so a chips row is stroked before a larger feed that is most likely vertical (round 1).
+
+**Residuals.** (a) A nested scroll view of unknown axis that really scrolls vertically (a RecyclerView list inside a
+NestedScrollView) is now stroked sideways when no told-along one has room, and the reply stays the generic one. (b)
+On a page with two carousels of one kind the larger is stroked, and it may not hold the target. (c) A scroll view of
+UNKNOWN axis does not count for the across clause, so "the tree shows no scroll view that may scroll horizontally"
+can sit beside a RecyclerView that does. The plan strokes such a view only when it is nested in the page; a sibling
+one is never stroked. (d) A carousel the dump marks neither scrolling nor clipping is no candidate. Only the across
+clause helps there. (e) Where the nested view does not take the strokes, the stop changes. Over the page, batch-11's
+run stopped exhausted after 2 swipes. Inside a carousel whose dump lists no content (the derived lab tree: no card
+under it), no read can show the strokes' motion, so no stroke counts as unmoved. The call runs to maxSwipes: `failed
+after 6 swipes (maxSwipes) — … after the last 6 swipes over the scroll container 66,380 948x234 the tree listed none
+of its content where a swipe's motion would show (…), so how far they moved it is unknown — the element may lie
+further right: raise maxSwipes or timeoutMs` (a default call, DEFAULT_MAX_SWIPES 6; the test pins it at its own
+maxSwipes, 4). That costs 6 swipes instead of 2, and it advises raising maxSwipes although nothing visibly moved. The
+reply says the motion is unknown, not that the carousel moved, so it stays honest. On the device the carousel lists
+its cards, so this applies only where it lists none.
+
+**Golden.** Changed 0 against main's baseline after each round: Android truth's only sideways target
+(carousel-in-list C) is listed, so its strokes take the target's path, untouched; iOS has no largest scroller; no
+capture holds an absent target with a sideways direction. Golden would not catch D59b anyway: its stroke row skips
+the in-scroll-view check when the target is absent (T6). The shared band helper (`clearOfSystemBands`, now also
+`standing.ts#systemBands`' `clear`) changed no row.
+
+**Tests.** tests/interact/stroke-plan.test.ts (the derived lab trees
+`tests/fixtures/uiautomator-lab-carousel-*-launch.xml`, made from the committed `carousel-in-list` capture, since the
+batches kept no dump, and batch-11's strokes, `tests/fixtures/d59b-b11-strokes.json`, trimmed),
+tests/interact/scroll-rounds.test.ts (the across clause, its order and wordings, the screen bands, the maxSwipes stop
+of the derived tree), tests/ui-tree/geometry-clips.test.ts (the text input left out, `toldOn` and its filters),
+tests/ui-tree/geometry-viewport.test.ts (`clearOfSystemBands`). Hand mutants, each from a saved copy, each killed:
+- M1 page only → the lazy-free stroke; M2 nested smallest first → "two nested of unknown axis"; M3 nested before the
+  page → the `down`/`up` control; M4 text-input filter removed → geometry's text-input test; M5 unknown axis as
+  across → the carousel `down` group; M6 `strokedAcross` on an unknown axis and M7 `===` for `!==` → its test; M8 the
+  across clause before `touched` → `boundText`'s order; M9 `across` dropped from the bound and M13 the bound asked
+  for `down` → the across reply; M10 nested `over` emptied → the pager `down` under a bar; M11 nested axes undefined →
+  the told-vertical-list control; M12 the axis word fixed → `boundText`'s horizontal-page case.
+- Round 1: N1 ranking dropped and N2 inverted → chips before feed; N3 `toldOn` keeps text inputs and N4 its flat-list
+  guard removed → `toldOn`'s test; N5 `along` never set, N6 smallest picked, N7 `noRoom` inverted, N9 asked of the
+  page's own axis → `strokedAcross`' tests; N8 the two wordings swapped → the rounds replies.
+- Round 2: R1 the screen filter removed and R2 the keyboard filter → `toldOn`'s test; R3 no bands, R4 no navigation
+  band, R5 no status band → the rounds bands test; R6 no keyboard predicate → the WDA keyboard test.
+- Code review: S1 and S2 the generic causes or idb's hint dropped after the `else:` → across with `unlisted`; S3
+  `roomless` never recorded and S4 always set → the no-room and sibling tests; S5 the shared predicate without the
+  text-input clause → the text-field form page; S6 and S7 `clearOfSystemBands` without its navigation band or its
+  `shape` → its test; S8 `systemBands`' `clear` without the navigation band → the navigation-band standing tests. One
+  equivalent survivor: `strokeRoom`'s `along.length === candidates.length` guard removed (with no candidate across,
+  the fallback's pass is the first pass again).
+
+Device gate: `d59b-measure` rerun in the next batch, FAIL → PASS.
 
 ## Bug note
 

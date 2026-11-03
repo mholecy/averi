@@ -1,5 +1,5 @@
 import { clips, isScrollViewOf, scrollAxis, scrolls } from './scroll-containers.js';
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
+import { everyNode, INPUT_ROLE, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -594,6 +594,16 @@ export function belowStatusBand(box: Rect, screen: { statusBand?: number } | und
 }
 
 /**
+ * `box` less both system bands — `belowStatusBand`, then `aboveNavigationBand`, `shape` as there: the part of the
+ * screen a swipe can reach and a reader sees (`scroll_until`'s across clause, interact/scroll-rounds.ts;
+ * ui-tree/standing.ts#systemBands' `clear`). A navigation band reaching above the status band's bottom fails open, as
+ * `aboveNavigationBand` says.
+ */
+export function clearOfSystemBands(box: Rect, screen: { statusBand?: number; navigationBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
+  return aboveNavigationBand(belowStatusBand(box, screen, shape), screen, shape);
+}
+
+/**
  * `box` less the screen's navigation band (`DeviceScreen.navigationBand`,
  * the band's TOP line, carried as ui-tree/usable-screen.ts#UsableScreen's) at its
  * bottom when `box` is portrait — `belowStatusBand`'s twin at the other
@@ -781,12 +791,25 @@ export interface Clips {
    * The axis facts of the scroll view of rect `container` — the first node in tree order that scrolls with exactly
    * that rect, as `DrawOrder.drawnOver` finds its container — for `scroll_until`'s stroke plan
    * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
-   * that scroll, at any depth; one of its own rect left out) with theirs, each as scroll-containers.ts#scrollAxis says
+   * that scroll, at any depth; one of its own rect left out; a text input left out — a Compose text field dumps as a
+   * scrolling (Horizontal)ScrollView, role `textfield` (`INPUT_ROLE`), adapters/android.ts — so a stroke the plan sends
+   * inside a nested scroll view never lands in a field, D59b; Android's case: WDA marks no node clipping, and a
+   * scrolling WDA text view is a scroll view of its own role) with theirs, each as scroll-containers.ts#scrollAxis says
    * on this tree's dialect (`unclipped`), undefined where it cannot tell. Undefined when the tree holds no scroll
    * view of that rect (the list moved). Found as draw order finds its container (scroll-containers.ts#isScrollViewOf).
    * Cost: a walk of the tree to find it on each ask; its facts kept for the life of the `Clips`.
    */
   axesOf(container: Rect): ScrollAxes | undefined;
+  /**
+   * Every scroll view of the tree that the tree TELLS scrolls on `axis` (scroll-containers.ts#scrollAxis on this tree's
+   * dialect), at any depth, in tree order, that meets `screen` (the caller's usable screen: one wholly off it, or under
+   * a band the caller cut out, is no list a swipe can reach) and is none of the keyboard's own (`ofKeyboard`, the
+   * caller's reading: WDA's suggestion strip) — text inputs left out, as `axesOf`'s `nested` leaves them; none on a
+   * tree that lists no ancestry (idb's flat list lists no scroll view). For the exhausted stop's sentence when the strokes
+   * went across their scroll view (interact/stroke-plan.ts#strokedAcross, D59b): one the tree shows that scrolls the
+   * stroke's way is named, wherever it lies. One walk of the tree a call.
+   */
+  toldOn(axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[];
   /**
    * What this tree lists of the content of the scroll view of rect `scroller` toward its `edge` (`ListedContent`) —
    * the scroll view found as `axesOf` finds its scroll view (scroll-containers.ts#isScrollViewOf, that exact rect — the
@@ -1088,6 +1111,12 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     return { told: true, frame, scrollers: within.scrollers, listedWhereItLies: unclipped, ...(unknownPast.length > 0 && { unknownPast }) };
   };
   const axes = new Map<UiNode, ScrollAxes>();
+  /**
+   * A scroll view as the stroke plan counts one, nested or anywhere in the tree (`axesOf`'s `nested`, `toldOn`): it
+   * scrolls (scroll-containers.ts#scrolls) and is no text input (`INPUT_ROLE` — a Compose text field dumps as a
+   * scrolling (Horizontal)ScrollView: an Android matter, WDA marking no node clipping), so no stroke lands in a field.
+   */
+  const scrollViewNode = (n: UiNode): boolean => scrolls(n) && n.role !== INPUT_ROLE;
   const axesOf = (container: Rect): ScrollAxes | undefined => {
     const found = [...everyNode(tree)].find((n) => isScrollViewOf(n, container));
     if (found === undefined) return undefined;
@@ -1095,7 +1124,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     if (kept !== undefined) return kept;
     const facts: ScrollAxes = {
       axis: scrollAxis(found, unclipped),
-      nested: [...everyNode(found)].filter((n) => n !== found && scrolls(n) && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
+      nested: [...everyNode(found)].filter((n) => n !== found && scrollViewNode(n) && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
     };
     axes.set(found, facts);
     return facts;
@@ -1126,7 +1155,11 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     };
     return under.some((d) => past[edge](d.rect)) ? LISTED : { kind: 'ends', view };
   };
-  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, contentToward };
+  const toldOn = (axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[] =>
+    ancestry
+      ? [...everyNode(tree)].filter((n) => scrollViewNode(n) && scrollAxis(n, unclipped) === axis && rectIntersection(n.rect, screen) !== undefined && !ofKeyboard(n))
+      : [];
+  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, toldOn, contentToward };
 }
 
 /**

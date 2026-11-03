@@ -3,6 +3,7 @@ import type { DeviceScreen, Rect, UiNode } from '../../src/adapters/types.js';
 import {
   aboveNavigationBand,
   belowStatusBand,
+  clearOfSystemBands,
   clippedEdges,
   collectRects,
   cutAtScreenEdges,
@@ -199,6 +200,20 @@ describe('visibleFractionInViewport — how much of a rect a box holds, as a fra
     expect(visibleFractionInViewport(rect(0, 824, 100, 100), { y: 62, width: 402, height: 812 })).toBe(0.5);
     expect(visibleFractionInViewport(rect(50, 0, 100, 100), { x: 100, width: 300, height: 800 })).toBe(0.5);
     expect(visibleFractionInViewport(rect(350, 0, 100, 100), { x: 100, width: 300, height: 800 })).toBe(0.5);
+  });
+});
+
+describe('clearOfSystemBands — a portrait box less both system bands (D59b code review: the one helper)', () => {
+  it('the status band off its top and the navigation band off its bottom, each as its own helper cuts it; a landscape box keeps both', () => {
+    const box: Rect = { x: 0, y: 0, width: 1080, height: 2220 };
+    expect(clearOfSystemBands(box, { statusBand: 66, navigationBand: 2088 })).toEqual({ x: 0, y: 66, width: 1080, height: 2022 });
+    expect(clearOfSystemBands(box, { statusBand: 66 })).toEqual({ x: 0, y: 66, width: 1080, height: 2154 });
+    expect(clearOfSystemBands(box, { navigationBand: 2088 })).toEqual({ x: 0, y: 0, width: 1080, height: 2088 });
+    expect(clearOfSystemBands(box, undefined)).toEqual(box);
+    const wide: Rect = { x: 0, y: 0, width: 2220, height: 1080 };
+    expect(clearOfSystemBands(wide, { statusBand: 66, navigationBand: 1000 })).toEqual(wide);
+    // `shape` says portrait for a box cut from the screen (above a keyboard), as for each band's own helper.
+    expect(clearOfSystemBands({ x: 0, y: 0, width: 1080, height: 900 }, { statusBand: 66, navigationBand: 850 }, box)).toEqual({ x: 0, y: 66, width: 1080, height: 784 });
   });
 });
 
