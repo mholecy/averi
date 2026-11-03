@@ -73,8 +73,9 @@ describe('chooserInFocus — batch-10\'s reads at averi\'s reply (D55r, API 33, 
 // - dumpsys-window-focus-api33-b10-after-launch-{intent,monkey}.txt: batch-10's D55 E4 reads 1.5 s after a launch_app
 //   (D55b's red cases, pinned in android.test.ts): the chooser still in front;
 // - cmd-package-resolve-activity-api33-b10-{two,one}-handler(s).txt: batch-10's D55 E3 reads of `cmd package
-//   resolve-activity --brief -a android.intent.action.VIEW -d <url>` (the same bytes 3 of 3 times each, 21–28 ms),
-//   ADR 0041's documented fallback. averi never asks it today (no parser): only their shapes are pinned.
+//   resolve-activity --brief -a android.intent.action.VIEW -d <url>` (the same bytes 3 of 3 times each, 21–28 ms).
+//   These are SHAPE RECORDS for a parser that does not exist yet (ADR 0041's documented fallback, not built): averi
+//   never asks resolve-activity, so their pins guard no averi code and kill no mutant.
 describe('chooserInFocus — T4: the batches\' other real focus reads (API 33, brace shape, no display header)', () => {
   it('the launcher in front, both lines its own (batch-10, before the link): undefined', async () => {
     const read = await fixture('dumpsys-window-focus-api33-b10-launcher.txt');
@@ -105,7 +106,7 @@ describe('chooserInFocus — T4: the batches\' other real focus reads (API 33, b
   });
 });
 
-describe('`cmd package resolve-activity --brief` — batch-10\'s two shapes (ADR 0041\'s fallback, not built: no parser)', () => {
+describe('`cmd package resolve-activity --brief` — batch-10\'s two shapes, records for a parser not built yet (ADR 0041\'s fallback)', () => {
   it('two handlers, none preferred: the resolver, `match=0x0 … isDefault=false`', async () => {
     expect(await fixture('cmd-package-resolve-activity-api33-b10-two-handlers.txt')).toBe(
       'priority=0 preferredOrder=0 match=0x0 specificIndex=-1 isDefault=false\n' + `${RESOLVER}\n`,

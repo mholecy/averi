@@ -704,6 +704,14 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     server.stop();
   });
 
+  // T4 review: the status alone decides too — any 404 is a lost session, whatever its body says (wda.ts#postKeys).
+  it('a bare HTTP 404, its body naming no "invalid session id": a lost session too — one new session, sent once more', async () => {
+    const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 404, body: { value: { error: 'unknown command', message: 'Unhandled endpoint' } } } : { status: 200, body: { value: null } }));
+    await server.keys('Šťastný');
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session', '/session/S2/wda/keys']);
+    server.stop();
+  });
+
   it('an "invalid session id" under another status is a lost session too', async () => {
     const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 500, body: { value: { error: 'invalid session id', message: 'Session does not exist' } } } : { status: 200, body: { value: null } }));
     await server.keys('Šťastný');

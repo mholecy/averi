@@ -1,57 +1,89 @@
 {
- "source": "REAL `idb ui describe-all --json` of the lab's form-format cell, every field empty: batch-4 D51's premise read (2026-11-02, lab simulator iPhone 17, iOS 27.0, 402x874 pt), idb-form-format-empty. Only the fields averi reads are kept (type, AXLabel, AXUniqueId, AXValue, frame, traits); pid, role, AXFrame and the rest dropped; nothing else changed. The date field's AXValue is its mask `__.__.____`, with no AXLabel.",
+ "source": "REAL `idb ui describe-all --json` of the lab's form-format cell, every field empty: batch-4 D51's premise read (2026-11-02, lab simulator iPhone 17, iOS 27.0, 402x874 pt), idb-form-format-empty. Every element and every field as idb printed them (pid, role, subrole, AXFrame and the rest included), wrapped under `elements`; nothing changed. The date field's AXValue is its mask `__.__.____`, with no AXLabel; every TextField's subrole is null.",
  "elements": [
   {
+   "role_description": "application",
    "type": "Application",
-   "AXLabel": "AveriLab",
-   "AXUniqueId": null,
+   "subrole": null,
    "AXValue": null,
+   "pid": 47359,
+   "enabled": true,
+   "AXLabel": "AveriLab",
+   "custom_actions": [],
+   "AXFrame": "{{0, 0}, {402, 874}}",
+   "content_required": false,
    "frame": {
     "width": 402,
     "x": 0,
     "y": 0,
     "height": 874
    },
+   "role": "AXApplication",
+   "AXUniqueId": null,
+   "help": null,
    "traits": [
     "None"
-   ]
+   ],
+   "title": null
   },
   {
-   "type": "Heading",
-   "AXLabel": "New payment",
    "AXUniqueId": null,
-   "AXValue": null,
    "frame": {
     "height": 20.66666666666667,
     "y": 73.66666666666666,
     "width": 109.33333333333334,
     "x": 146.33333333333334
    },
+   "custom_actions": [],
+   "role": "AXHeading",
+   "AXFrame": "{{146.33333333333334, 73.666666666666657}, {109.33333333333334, 20.666666666666671}}",
+   "subrole": null,
+   "pid": 47359,
+   "AXLabel": "New payment",
    "traits": [
     "Header",
     "Scrollable"
-   ]
+   ],
+   "content_required": false,
+   "AXValue": null,
+   "role_description": "heading",
+   "title": null,
+   "help": null,
+   "type": "Heading",
+   "enabled": true
   },
   {
-   "type": "StaticText",
-   "AXLabel": "IBAN – grouped as typed",
+   "role": "AXStaticText",
+   "title": null,
+   "enabled": true,
+   "help": null,
+   "content_required": false,
    "AXUniqueId": "lab.form-format.iban.title",
-   "AXValue": null,
+   "traits": [
+    "StaticText",
+    "Scrollable"
+   ],
+   "custom_actions": [],
+   "type": "StaticText",
    "frame": {
     "y": 136,
     "width": 171.33333333333331,
     "height": 18,
     "x": 20
    },
-   "traits": [
-    "StaticText",
-    "Scrollable"
-   ]
+   "pid": 47359,
+   "AXLabel": "IBAN – grouped as typed",
+   "AXFrame": "{{20, 136}, {171.33333333333331, 18}}",
+   "AXValue": null,
+   "subrole": null,
+   "role_description": "text"
   },
   {
+   "role": "AXTextField",
+   "subrole": null,
+   "role_description": "text field",
    "type": "TextField",
-   "AXLabel": null,
-   "AXUniqueId": "lab.form-format.iban",
+   "enabled": true,
    "AXValue": "SK00 0000 0000 …",
    "frame": {
     "x": 20,
@@ -59,32 +91,56 @@
     "height": 34,
     "y": 160
    },
+   "custom_actions": [],
+   "pid": 47359,
+   "help": null,
+   "title": null,
    "traits": [
     "TextEntry",
     "Scrollable",
     "TextOperationsAvailable"
-   ]
+   ],
+   "AXFrame": "{{20, 160}, {362, 34}}",
+   "AXLabel": null,
+   "content_required": false,
+   "AXUniqueId": "lab.form-format.iban"
   },
   {
-   "type": "StaticText",
+   "help": null,
    "AXLabel": "Amount in EUR – thousands grouped",
-   "AXUniqueId": "lab.form-format.amount.title",
-   "AXValue": null,
    "frame": {
     "width": 252.66666666666663,
     "x": 20,
     "height": 18,
     "y": 210
    },
+   "title": null,
+   "AXFrame": "{{20, 210}, {252.66666666666663, 18}}",
+   "custom_actions": [],
+   "role": "AXStaticText",
+   "AXValue": null,
+   "pid": 47359,
    "traits": [
     "StaticText",
     "Scrollable"
-   ]
+   ],
+   "type": "StaticText",
+   "AXUniqueId": "lab.form-format.amount.title",
+   "enabled": true,
+   "role_description": "text",
+   "subrole": null,
+   "content_required": false
   },
   {
-   "type": "TextField",
+   "subrole": null,
    "AXLabel": null,
+   "role": "AXTextField",
+   "pid": 47359,
+   "role_description": "text field",
+   "title": null,
+   "content_required": false,
    "AXUniqueId": "lab.form-format.amount",
+   "AXFrame": "{{20, 234}, {362, 34}}",
    "AXValue": "0,00",
    "frame": {
     "x": 20,
@@ -92,6 +148,10 @@
     "height": 34,
     "y": 234
    },
+   "enabled": true,
+   "type": "TextField",
+   "help": null,
+   "custom_actions": [],
    "traits": [
     "TextEntry",
     "Scrollable",
@@ -99,32 +159,52 @@
    ]
   },
   {
-   "type": "StaticText",
-   "AXLabel": "IBAN – grouped on screen only",
-   "AXUniqueId": "lab.form-format.ibanShown.title",
+   "title": null,
+   "AXFrame": "{{20, 284}, {212.33333333333331, 18}}",
    "AXValue": null,
+   "subrole": null,
+   "traits": [
+    "StaticText",
+    "Scrollable"
+   ],
+   "role_description": "text",
+   "custom_actions": [],
+   "help": null,
+   "AXLabel": "IBAN – grouped on screen only",
+   "pid": 47359,
+   "AXUniqueId": "lab.form-format.ibanShown.title",
+   "role": "AXStaticText",
+   "type": "StaticText",
    "frame": {
     "y": 284,
     "x": 20,
     "width": 212.33333333333331,
     "height": 18
    },
-   "traits": [
-    "StaticText",
-    "Scrollable"
-   ]
+   "enabled": true,
+   "content_required": false
   },
   {
-   "type": "TextField",
-   "AXLabel": null,
+   "AXFrame": "{{20, 308}, {362, 34}}",
+   "subrole": null,
+   "enabled": true,
+   "help": null,
+   "custom_actions": [],
    "AXUniqueId": "lab.form-format.ibanShown",
-   "AXValue": "SK00 0000 0000 …",
+   "pid": 47359,
+   "role": "AXTextField",
+   "AXLabel": null,
+   "content_required": false,
    "frame": {
     "height": 34,
     "y": 308,
     "x": 20,
     "width": 362
    },
+   "title": null,
+   "type": "TextField",
+   "role_description": "text field",
+   "AXValue": "SK00 0000 0000 …",
    "traits": [
     "TextEntry",
     "Scrollable",
@@ -132,86 +212,136 @@
    ]
   },
   {
-   "type": "StaticText",
-   "AXLabel": "Due date – dotted as typed",
-   "AXUniqueId": "lab.form-format.date.title",
-   "AXValue": null,
    "frame": {
     "x": 20,
     "y": 358,
     "width": 187,
     "height": 18
    },
+   "AXFrame": "{{20, 358}, {187, 18}}",
+   "custom_actions": [],
+   "AXValue": null,
+   "role_description": "text",
+   "title": null,
+   "enabled": true,
+   "subrole": null,
+   "role": "AXStaticText",
+   "pid": 47359,
    "traits": [
     "StaticText",
     "Scrollable"
-   ]
+   ],
+   "help": null,
+   "AXUniqueId": "lab.form-format.date.title",
+   "type": "StaticText",
+   "content_required": false,
+   "AXLabel": "Due date – dotted as typed"
   },
   {
+   "role": "AXTextField",
+   "title": null,
    "type": "TextField",
-   "AXLabel": null,
-   "AXUniqueId": "lab.form-format.date",
-   "AXValue": "__.__.____",
    "frame": {
     "width": 362,
     "y": 382,
     "height": 34,
     "x": 20
    },
+   "custom_actions": [],
+   "help": null,
+   "AXLabel": null,
+   "AXFrame": "{{20, 382}, {362, 34}}",
+   "content_required": false,
+   "pid": 47359,
+   "role_description": "text field",
+   "AXUniqueId": "lab.form-format.date",
+   "AXValue": "__.__.____",
+   "subrole": null,
    "traits": [
     "TextEntry",
     "Scrollable",
     "TextOperationsAvailable"
-   ]
+   ],
+   "enabled": true
   },
   {
-   "type": "StaticText",
-   "AXLabel": "Payee’s phone",
-   "AXUniqueId": "lab.form-format.phone.title",
+   "role_description": "text",
    "AXValue": null,
+   "title": null,
+   "custom_actions": [],
+   "traits": [
+    "StaticText",
+    "Scrollable"
+   ],
+   "AXFrame": "{{20, 432}, {99, 18}}",
    "frame": {
     "height": 18,
     "width": 99,
     "x": 20,
     "y": 432
    },
-   "traits": [
-    "StaticText",
-    "Scrollable"
-   ]
+   "enabled": true,
+   "subrole": null,
+   "type": "StaticText",
+   "AXLabel": "Payee’s phone",
+   "AXUniqueId": "lab.form-format.phone.title",
+   "content_required": false,
+   "help": null,
+   "pid": 47359,
+   "role": "AXStaticText"
   },
   {
-   "type": "TextField",
+   "custom_actions": [],
    "AXLabel": null,
-   "AXUniqueId": "lab.form-format.phone",
-   "AXValue": "+421",
    "frame": {
     "x": 20,
     "y": 456,
     "width": 362,
     "height": 34
    },
+   "AXFrame": "{{20, 456}, {362, 34}}",
+   "role": "AXTextField",
+   "role_description": "text field",
+   "AXUniqueId": "lab.form-format.phone",
    "traits": [
     "TextEntry",
     "Scrollable",
     "TextOperationsAvailable"
-   ]
+   ],
+   "type": "TextField",
+   "enabled": true,
+   "subrole": null,
+   "pid": 47359,
+   "content_required": false,
+   "AXValue": "+421",
+   "title": null,
+   "help": null
   },
   {
-   "type": "Button",
+   "title": null,
+   "subrole": null,
+   "pid": 47359,
+   "role": "AXButton",
    "AXLabel": "Send payment",
-   "AXUniqueId": "lab.form-format.submit",
-   "AXValue": null,
+   "help": null,
    "frame": {
     "y": 514,
     "x": 20,
     "height": 46.33333333333326,
     "width": 362
    },
+   "content_required": false,
+   "role_description": "button",
    "traits": [
     "Button",
     "Scrollable"
-   ]
+   ],
+   "AXUniqueId": "lab.form-format.submit",
+   "custom_actions": [],
+   "AXValue": null,
+   "enabled": true,
+   "type": "Button",
+   "AXFrame": "{{20, 514}, {362, 46.333333333333258}}"
   }
  ]
 }

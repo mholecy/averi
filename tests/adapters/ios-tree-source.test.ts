@@ -200,25 +200,20 @@ describe('parseIdbDescribeAll — the flat list and what only it needs', () => {
   });
 });
 
-/**
- * D50 (docs/adr/0033, the D50 sub-bullet): idb spells SwiftUI's `ProgressView()` — a UIActivityIndicatorView beneath —
- * as an unlabelled `GenericElement` with the `UpdatesFrequently` trait (docs/truth/live-records/
- * ios-idb-held-no-spinner-describe-all-d30-1.json, element 2). The idb parser alone reads it as `progress`.
- */
 // T4: idb-lab-form-format-empty.json is batch-4's D51 premise read (`idb ui describe-all --json` on the lab's
-// form-format cell, empty, averi-lab iPhone 17 simulator, iOS 27.0), the whole flat list, its `source` says what was
-// trimmed (the parse is the raw list's). D51's
-// premise: idb hands the date field's mask `__.__.____` out as its AXValue, with no label and no placeholder of its
-// own — so every empty UIKit field's placeholder reads as its value under idb. Pinned as today's reading; ADR 0034's
-// D51 amendment is what makes the fill land over it (fill-reformat.ts#maskTemplate, fill-landing.ts#priorsOf).
+// form-format cell, empty, averi-lab iPhone 17 simulator, iOS 27.0): every element and field as idb printed them, under
+// `elements`. D51's premise: idb hands the date field's mask `__.__.____` out as its AXValue, with no label and no
+// placeholder of its own — so every empty UIKit field's placeholder reads as its value under idb. Pinned as today's
+// reading; ADR 0034's D51 amendment is what makes the fill land over it (fill-reformat.ts#maskTemplate,
+// fill-landing.ts#priorsOf). Each field's `subrole` is null: no field reads as secure (idbSecure).
 describe('parseIdbDescribeAll — batch-4\'s real form-format dump: an empty field\'s mask or placeholder is its value', () => {
   /** The capture's elements, as idb printed them (the fields averi reads), as one describe-all answer. */
   const raw = async () => JSON.stringify((JSON.parse(await readFile(new URL('../fixtures/idb-lab-form-format-empty.json', import.meta.url), 'utf8')) as { elements: unknown[] }).elements);
   const field = (tree: UiNode, id: string) => tree.children.find((n) => n.identifier === `lab.form-format.${id}`);
 
-  it('the record: the date field\'s AXValue the mask, no AXLabel, traits TextEntry and Scrollable', async () => {
+  it('the record: the date field\'s AXValue the mask, no AXLabel, subrole null, traits TextEntry and Scrollable', async () => {
     const date = (JSON.parse(await raw()) as Record<string, unknown>[]).find((e) => e.AXUniqueId === 'lab.form-format.date');
-    expect(date).toMatchObject({ type: 'TextField', AXLabel: null, AXValue: '__.__.____', traits: ['TextEntry', 'Scrollable', 'TextOperationsAvailable'] });
+    expect(date).toMatchObject({ type: 'TextField', AXLabel: null, AXValue: '__.__.____', subrole: null, traits: ['TextEntry', 'Scrollable', 'TextOperationsAvailable'] });
   });
 
   it('13 elements, flat; each empty field a textfield whose value is what the field shows empty, never a label', async () => {
@@ -247,6 +242,11 @@ describe('parseIdbDescribeAll — batch-4\'s real form-format dump: an empty fie
   });
 });
 
+/**
+ * D50 (docs/adr/0033, the D50 sub-bullet): idb spells SwiftUI's `ProgressView()` — a UIActivityIndicatorView beneath —
+ * as an unlabelled `GenericElement` with the `UpdatesFrequently` trait (docs/truth/live-records/
+ * ios-idb-held-no-spinner-describe-all-d30-1.json, element 2). The idb parser alone reads it as `progress`.
+ */
 describe('parseIdbDescribeAll — an unlabelled GenericElement that updates frequently is a spinner (D50)', () => {
   const one = (el: Record<string, unknown>): UiNode => parseIdbDescribeAll(JSON.stringify([el])).children[0];
 

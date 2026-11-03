@@ -1,0 +1,355 @@
+{
+ "source": "REAL batch-4 D48 Q2 runs (2026-11-02, averi-lab iPhone 17 simulator, iOS 27.0, WDA tree source): Contacts in front, then averi's launch_app dev.averi.lab and the ui_snapshot right after it, through the MCP tools. `before` is the src before D48's fix (9d8b57dc), `main` after it (7e6d2d47). Per run: the launch's reply and its ms, the snapshot's ms, the root label the harness read off the snapshot, whether it was the lab's tree, whether the reply warned, and how many /wda/activeAppInfo asks the launch made. `treeHead` is the snapshot reply as the harness kept it, cut by the harness after its first characters (the whole trees were not kept). Paths and the udid dropped; nothing else changed.",
+ "sides": {
+  "before": {
+   "commit": "9d8b57dc",
+   "runs": [
+    {
+     "file": "before-1",
+     "i": 0,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 372,
+     "treeMs": 90,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "before-1",
+     "i": 1,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 377,
+     "treeMs": 89,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "before-1",
+     "i": 2,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 328,
+     "treeMs": 2064,
+     "root": "\"Contacts\"",
+     "labTree": false,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"Contacts\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(140633 chars)"
+    },
+    {
+     "file": "before-1",
+     "i": 3,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 371,
+     "treeMs": 91,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "before-1",
+     "i": 4,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 364,
+     "treeMs": 1223,
+     "root": "\"Contacts\"",
+     "labTree": false,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"Contacts\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(142577 chars)"
+    },
+    {
+     "file": "before-2",
+     "i": 0,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 360,
+     "treeMs": 92,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "before-2",
+     "i": 1,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 358,
+     "treeMs": 1221,
+     "root": "\"Contacts\"",
+     "labTree": false,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"Contacts\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(142581 chars)"
+    },
+    {
+     "file": "before-2",
+     "i": 2,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 359,
+     "treeMs": 95,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "before-2",
+     "i": 3,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 357,
+     "treeMs": 1957,
+     "root": "\"Contacts\"",
+     "labTree": false,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"Contacts\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(140723 chars)"
+    },
+    {
+     "file": "before-2",
+     "i": 4,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 362,
+     "treeMs": 89,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 0,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    }
+   ]
+  },
+  "main": {
+   "commit": "7e6d2d47",
+   "runs": [
+    {
+     "file": "main-1",
+     "i": 0,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 407,
+     "treeMs": 50,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 1,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-1",
+     "i": 1,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 413,
+     "treeMs": 49,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 1,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-1",
+     "i": 2,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 674,
+     "treeMs": 46,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 2,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-1",
+     "i": 3,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 392,
+     "treeMs": 48,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 1,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-1",
+     "i": 4,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 636,
+     "treeMs": 47,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 2,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-2",
+     "i": 0,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 648,
+     "treeMs": 45,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 2,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-2",
+     "i": 1,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 630,
+     "treeMs": 38,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 2,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-2",
+     "i": 2,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 410,
+     "treeMs": 49,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 1,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-2",
+     "i": 3,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 636,
+     "treeMs": 48,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 2,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    },
+    {
+     "file": "main-2",
+     "i": 4,
+     "pre": {
+      "app": "Contacts",
+      "labId": false,
+      "contacts": true
+     },
+     "reply": "Launched dev.averi.lab on ios",
+     "launchMs": 614,
+     "treeMs": 34,
+     "root": "\"AveriLab\"",
+     "labTree": true,
+     "warned": false,
+     "asks": 2,
+     "treeHead": "{\n  \"role\": \"container\",\n  \"label\": \"AveriLab\",\n  \"identifier\": null,\n  \"value\": null,\n  \"rect\": {\n    \"x\": 0,\n    \"y\": 0,\n    \"width\": 402,\n    \"height\": 874\n  },\n  \"children\": [\n    {\n      \"role\": \"container\",\n      \"label\": null,\n      \"identifier\": null,\n      \"value\": null,\n      \"rect\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"width\": 402,\n        \"height\": 874\n      },\n      \"children\": …(4038 chars)"
+    }
+   ]
+  }
+ }
+}

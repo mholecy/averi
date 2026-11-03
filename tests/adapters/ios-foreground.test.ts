@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IosAdapter } from '../../src/adapters/ios.js';
 import { IdbTreeSource, type ApplicationLabel, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
@@ -6,6 +7,7 @@ import { Verifier } from '../../src/verify/assert.js';
 import type { ExecFn, ExecResult } from '../../src/adapters/exec.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
+import { launchText } from '../../src/mcp/tool-text.js';
 
 // The one sleep owner, recorded and not waited on; under a Date-only fake
 // clock each recorded sleep moves the clock by its length, so the wait's
@@ -403,6 +405,37 @@ describe('IosAdapter.launch on the WDA source waits until WebDriverAgent names t
     expect(d.asks()).toBe(3);
     expect(sleeps).toEqual([FOREGROUND_POLL_MS, FOREGROUND_POLL_MS]);
     expect(d.calls.filter((c) => c.includes('appinfo'))).toEqual([]);
+  });
+
+  // T4: batch-4's D48 Q2 runs (tests/fixtures/ios-launch-d48-stale-reads-b4.json; its `source` says what was kept). The
+  // PRE-FIX record: before D48 (9d8b57dc) the launch asked nothing and replied "Launched dev.averi.lab on ios" while the
+  // snapshot right after it was rooted at Contacts, 4 of 10 — the reply was wrong. D48's fix (code done, ADR 0032's D48
+  // amendment) changed what follows the reply, not its words: after it (7e6d2d47) every launch asked WDA and the
+  // snapshot was the lab's, 10 of 10, under the same reply — the reply today, pinned below on the asks such a switch gives.
+  it('the pre-fix record (batch-4 D48 Q2): the same "Launched" reply over Contacts\' tree 4/10 before; asked, and the lab\'s tree 10/10, after', () => {
+    type Run = { reply: string; root: string; labTree: boolean; warned: boolean; asks: number; treeHead: string };
+    const record = JSON.parse(readFileSync(new URL('../fixtures/ios-launch-d48-stale-reads-b4.json', import.meta.url), 'utf8')) as {
+      sides: Record<'before' | 'main', { commit: string; runs: Run[] }>;
+    };
+    const { before, main } = record.sides;
+    expect([before.commit, main.commit]).toEqual(['9d8b57dc', '7e6d2d47']);
+    for (const side of [before, main]) {
+      expect(side.runs).toHaveLength(10);
+      expect(new Set(side.runs.map((r) => r.reply))).toEqual(new Set(['Launched dev.averi.lab on ios']));
+      expect(side.runs.some((r) => r.warned)).toBe(false);
+    }
+    const stale = before.runs.filter((r) => !r.labTree);
+    expect(stale.map((r) => [r.root, r.asks])).toEqual(Array.from({ length: 4 }, () => ['"Contacts"', 0]));
+    for (const r of stale) expect(r.treeHead).toMatch(/^\{\n {2}"role": "container",\n {2}"label": "Contacts",/);
+    expect(main.runs.every((r) => r.labTree && r.root === '"AveriLab"' && r.asks >= 1)).toBe(true);
+  });
+
+  it('today, on the asks a switch like it gives (Contacts, then the lab): the wait, then batch-4 main\'s reply byte for byte', async () => {
+    const d = wdaDevice([CONTACTS_APP, LAB]);
+    const outcome = await d.adapter.launch('dev.averi.lab');
+    expect(outcome).toEqual({});
+    expect(launchText('ios', { app: 'dev.averi.lab' })).toBe('Launched dev.averi.lab on ios');
+    expect(d.asks()).toBe(2);
   });
 
   it('another bundle throughout: asks until the bound and no longer, then a note naming the app WebDriverAgent still reads — no localized-name reading', async () => {
