@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, chooserInFocus } from '../../src/adapters/android-chooser.js';
+import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, chooserAdvice, chooserInFocus, launchChooserNote, monkeyChooserRefusal } from '../../src/adapters/android-chooser.js';
 
 // D55 (ADR 0041): Android's "Open with" chooser in front after a deep link, judged by the focused component alone.
 // dumpsys-window-focus-api33-resolver.txt is the two focus lines batch-9's D55 probe recorded (averi_lab, API 33,
@@ -71,7 +71,11 @@ describe('chooserInFocus — batch-10\'s reads at averi\'s reply (D55r, API 33, 
 // - dumpsys-window-focus-api33-b4-chrome-firstrun.txt: batch-4's D55 read after `am start -a VIEW -d
 //   https://example.com` (averi_lab, API 33), one handler, Chrome's FirstRunActivity in front;
 // - dumpsys-window-focus-api33-b10-after-launch-{intent,monkey}.txt: batch-10's D55 E4 reads 1.5 s after a launch_app
-//   (D55b's red cases, pinned in android.test.ts): the chooser still in front;
+//   (D55b's cases, android.test.ts): the chooser still in front;
+// - dumpsys-window-focus-api33-b11-after-launch-{intent-start,intent-start-chooser-window,monkey}.txt: batch-11's
+//   D55b reads, averi's own CHOOSER_FOCUS_COMMAND (display header and all) right where D55b reads it — at the `-p`
+//   start's return (run 1, the window `null`, as in 7 of 10; run 2, the chooser's own window, as in the other 3) and
+//   after monkey's exit 251 (run 1 of 3);
 // - cmd-package-resolve-activity-api33-b10-{two,one}-handler(s).txt: batch-10's D55 E3 reads of `cmd package
 //   resolve-activity --brief -a android.intent.action.VIEW -d <url>` (the same bytes 3 of 3 times each, 21–28 ms).
 //   These are SHAPE RECORDS for a parser that does not exist yet (ADR 0041's documented fallback, not built): averi
@@ -97,6 +101,17 @@ describe('chooserInFocus — T4: the batches\' other real focus reads (API 33, b
   it('the chooser still in front 1.5 s after each launch_app of batch-10\'s E4: the chooser', async () => {
     expect(chooserInFocus(await fixture('dumpsys-window-focus-api33-b10-after-launch-intent.txt'))).toBe(RESOLVER);
     expect(chooserInFocus(await fixture('dumpsys-window-focus-api33-b10-after-launch-monkey.txt'))).toBe(RESOLVER);
+  });
+
+  it('averi\'s own read at the `-p` start\'s return and after monkey\'s refusal (batch-11, D55b): the chooser, either window', async () => {
+    const atStart = await fixture('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt');
+    expect(atStart).toBe(
+      '  Display: mDisplayId=0 (organized)\n  mCurrentFocus=null\n' +
+        `  mFocusedApp=ActivityRecord{4d8b71b u0 ${RESOLVER}} t2841}\n`,
+    );
+    expect(chooserInFocus(atStart)).toBe(RESOLVER);
+    expect(chooserInFocus(await fixture('dumpsys-window-focus-api33-b11-after-launch-intent-start-chooser-window.txt'))).toBe(RESOLVER);
+    expect(chooserInFocus(await fixture('dumpsys-window-focus-api33-b11-after-launch-monkey.txt'))).toBe(RESOLVER);
   });
 
   it('an app activity under the chooser\'s brace-shape window: the activity line read, so undefined', async () => {
@@ -309,6 +324,37 @@ describe('CHOOSER_ADVICE — what the reply advises, and that averi taps nothing
     expect(CHOOSER_ADVICE).toBe(
       'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
         "changes the device's default for such links); press_key back drops the link. averi taps nothing itself.",
+    );
+  });
+});
+
+// D55b (ADR 0041's D55b amendment): the launch's replies with the chooser in front, worded here beside the link's — the
+// note after `launch_app`'s `-p` start, and monkey's refusal — each pinned whole (D55's first mutation run lost two
+// mutants to unpinned advice strings).
+describe('D55b — the launch\'s chooser wording: chooserAdvice, launchChooserNote, monkeyChooserRefusal', () => {
+  it('chooserAdvice is CHOOSER_ADVICE for a link, and names the intent and the launch for a launch', () => {
+    expect(chooserAdvice('such links', 'the link')).toBe(CHOOSER_ADVICE);
+    expect(chooserAdvice('this intent', 'the launch')).toBe(
+      'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
+        "changes the device's default for this intent); press_key back drops the launch. averi taps nothing itself.",
+    );
+  });
+
+  it("launchChooserNote: Android has not brought the package forward, the chooser's component, the advice, and naming the activity", () => {
+    expect(launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app')).toBe(
+      'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
+        "is in front, asking which of dev.averi.lab's activities takes the intent. Take a ui_snapshot, tap the app you " +
+        'mean, then its "Just once" button if it shows one (never "Always": it changes the device\'s default for this ' +
+        'intent); press_key back drops the launch. averi taps nothing itself. Naming the activity (`activity:` on the ' +
+        'launch step / launch_app) starts it without the chooser.',
+    );
+  });
+
+  it("monkeyChooserRefusal: the chooser as the cause monkey started nothing, and the way out — no install blamed", () => {
+    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER)).toBe(
+      "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) " +
+        'is in front, and monkey starts nothing over it (exit 251 on API 33). Answer it (ui_snapshot, the app, "Just ' +
+        'once") or press_key back to drop it, then launch again. averi taps nothing itself.',
     );
   });
 });

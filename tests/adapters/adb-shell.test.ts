@@ -135,11 +135,13 @@ describe('AndroidAdapter — every user value reaches the device command as one 
         extras: { 'qr payload': 'hello world', note: "it's `x` $(y)" },
       },
     });
-    expect(commands).toEqual([[
+    expect(commands[0]).toEqual([
       'am', 'start', '-p', 'md.bank.app', '-a', 'android.intent.action.VIEW',
       '-d', 'bank://pay?to=a b&amount=1;id',
       '--es', 'qr payload', 'hello world', '--es', 'note', "it's `x` $(y)",
-    ]]);
+    ]);
+    // D55b's focus read after the `-p` start: a constant line, no user value in it.
+    expect(commands.slice(1)).toEqual([['grep', '-E', 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp=']]);
   });
 
   it('launch with clearState, terminate and the monkey launch go through the same quoting', async () => {
