@@ -12,7 +12,7 @@ fill 1 208 → 1 008 (−200), fill-20 −207, ensure-cold −196; the controls 
 a side), Android tap/fill (5 a side) — Δ slept ≈ 0 (≤ 3 ms); device calls per run equal everywhere. The fallback (a
 wrong settle sets `IDB_SETTLE_CADENCE_MS` to 400) was not needed. ADR 0029's rule (`pauseAfterRead`) is unchanged.
 This record adds a fact: which `pollMs` the settle is given.
-Amended 2026-11-03 (T5: the batch-11 trace replayed through resolveSettled — see the amendment below).
+Amended 2026-11-03 (T5: the batch-11 trace replayed through resolveSettled) — see the amendment below.
 
 ## Context
 
@@ -118,14 +118,22 @@ evidence are dropped. Batch-2's and batch-3's raw traces are not kept, so the me
 **The replay.** `tests/interact/settle-trace.test.ts` runs production `resolveSettled` (with `settleCadence`,
 `pollTree` and `pauseAfterRead` unmodified) once per (trial, id) through a fake adapter whose `settleCadenceMs` is
 `IDB_SETTLE_CADENCE_MS` and no `pollMs`. Only Date is faked: a read asked for at trace time T is the first recorded
-read that starts at or after T, and the clock advances by that read's own length. The settle starts at the first read
-after the trigger, the worst case named above. A settle is wrong when a later read in the window has the id at another
+read that starts at or after T, and the clock advances by that read's own length. The served read can start up to one
+read (~30 ms) after the requested time and the cadence restarts from it, so replayed reads are ~300–330 ms apart: the
+pin is slightly optimistic. The settle starts at the first read after the trigger, the worst case named above. A settle is wrong when a later read in the window has the id at another
 rect (vanishing later is not wrong in a motion corpus). The test does not re-implement the settle. d35's own replay
 re-implemented it.
 
 **The pin.** At the fact: 0 wrong settles in 160 (M1a 0, M1b 100, M2 60). That equals d35's own replay of the same
 batch, the same (trial, id, read) settles. Sensitivity: at `pollMs: 100` exactly one is wrong (M2#14, the carousel's C,
-in its late deceleration, the mechanism above). So the fixture can fail.
+in its late deceleration, the mechanism above). So the fixture can fail. M1a is 0 at 300 because its sheet fling
+decelerates through nearly the whole window, its rows at rest only in the last ~0.3 s: at the fact M1a pins only that
+the fling is never taken as settled (at 100 its rows settle 245 times, none wrong). Hand mutants: 14 of 18 killed. H3
+(the check looks at the next read only) is equivalent on this corpus, since the one wrong settle is moved by the very
+next read; H5 (the settle started at the trigger's start) too, since every trial's first read starts as the trigger
+ends. S4 (`pauseAfterRead` returns `pollMs` whole) and S6 (no rect reset on a miss) survive because the corpus cannot
+tell them apart: S4 is killed in read-tree.test.ts, and S6 would need an id that vanishes and returns between two
+compared reads.
 
 **The limit.** On this batch no cadence from 125 to 500 shows a wrong settle, so the corpus cannot show 300 is
 necessary. A cut of the fact is caught only as a changed settle count, which is change detection and not safety
