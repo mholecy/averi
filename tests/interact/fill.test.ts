@@ -679,6 +679,19 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     );
   });
 
+  it('accepted residual 3 (ADR 0028\'s D64 amendment): a "+421 " prefix inserted on focus that holds the typed `421`, none of the typing taken, passes', async () => {
+    // With the re-read, `before` would be `+421 ` and the unchanged reading fail as "did not change"; skipped, `before`
+    // is the pre-tap `''`, so the whole reading is the typing and holds the value. Recorded, not wanted (follow-up D64b):
+    // if this ever fails, the residual is closed and ADR 0028 must say so.
+    const fake = field({ secure: false });
+    onFocus(fake, (f) => (f.value = '+421 '));
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text); // nothing reaches the field
+    };
+    const { readBack } = await fillField(fake, { id: 'amount_input' }, '421', FAST);
+    expect(readBack).toEqual({ kind: 'landed' });
+  });
+
   it('skipped: a masked read-back of exactly the typed length passes, with no append', async () => {
     const fake = field({ secure: false });
     appendBullets(fake);

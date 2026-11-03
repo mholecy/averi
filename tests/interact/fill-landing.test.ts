@@ -422,6 +422,8 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
     expect(droppedTail('Hello worldw', e('world', 'Hello world'))).toBe('orld');
   });
 
+  // a `before` of `''` is taken at its word (an eager formatter can turn a typed `421` into `+421 ` from a truly empty
+  // field): the focus-inserted case is fill.ts's skipped re-read, ADR 0028's residual 3 since D64 (follow-up D64b)
   it('residual 8 (B): Android\'s skipped post-focus re-read takes `before` as empty; a `+421 ` inserted on focus, no key landed, lands', () => {
     expect(landingOf('+421 ', expecting(e('421', '')))).toEqual({ kind: 'landed' });
   });
