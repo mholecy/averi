@@ -461,6 +461,27 @@ From round 6's iOS device check (docs/truth/live-ios-2026-10-18-visibility.md; i
   waits on "Pending captures (round 6)" — both captured: under WDA C's stroke goes inside the carousel along its axis
   (the replay `307 181 → 95 181`; live one stroke at (307,181) moving the carousel 447–532 pt).
 
+### L7 — cells for batch-9 (2026-11-03), not captured
+
+New cells beside the captured ones (form-format, rn-format and carousel-in-list keep their fields and layout, so the
+truth corpus and the golden do not move: an uncaptured cell makes no golden row). Built for batch-9's device blocks:
+
+- `forms/form-grouped` (both platforms): `ibanEager` (`format: group4eager`: groups of four and a space as soon as a
+  group is complete, none at 24 characters — D60's eager trailing mark) and `phoneGrouped` (`format: phone3`: a
+  leading `+` kept, the digits in threes, under a `+421` placeholder — D37's `+421` grouping field), and the submit.
+  Live forms cases g1–g5 (scripts/truth/live-cases.ts).
+- `react-native/rn-format-eager`: E (`group4eager`) and P (`phone3`) laid as rn-format's text targets — D60's live
+  path, React Native on iOS dropping a fill's tail behind an eager mark. Live forms cases rfe1–rfe2.
+- `edges/carousel-lazy`, `edges/carousel-recycler` (Android only): carousel-in-list's page, rows and targets, its
+  carousel a Compose LazyRow under a snap fling and a RecyclerView under a PagerSnapHelper — carousels whose node
+  carries no scroll axis (D59) and snapping pagers (D37). Each card as wide as the clip, C the second; the carousel
+  reports its clip, offset and strokes, and the card it rests on as `carousel.index` in LabState.offsets.
+- The Android manifest: `averilab://shared` resolves to two components (MainActivity and its alias `.Twin`) — D55's
+  second handler; `averilab://cell` keeps one.
+
+The three apps spell the two formats alike (Forms.kt, Forms.swift, the RN app's src/format.ts); the table is
+tests/truth/lab-format.test.ts. No LIVE_KNOWN entry: the cases' device outcomes are batch-9's to read.
+
 ## Workflow per bug, once phase 3 is in
 
 1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,
