@@ -51,15 +51,16 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * read each — ~5.1 s a round — ended cut at the deadline in 2 of the runs recorded. Moves it otherwise: the round
  * judges the new read like any other, and a stop flush again after it is a new candidate with a probe of its own.
  *
- * A REVEAL THAT MOVED NOTHING right after a stroke that CARRIED the match its whole drawn length — less twice
- * TOUCH_SLOP, the most a drag loses to the slop and the content's give (measured 7–24 px) — is DOUBTED once (D62): that
+ * A REVEAL THAT MOVED NOTHING right after a stroke that CARRIED the match its whole drawn length — less CARRY_LOSS,
+ * twice the most a drag was measured to lose to the slop and the content's give — is DOUBTED once (D62): that
  * stroke did not end at the content's end, so the stillness after it says the app did not take the reveal, not that
  * nothing lies past the edge (measured, batch-9: a 142-px probe carried a carousel card 135 px, and the reveal after it
  * was never delivered — read as "fully visible"). No `checked`: the cut stays proven (`ProvenCut.unmoved`) and the same
  * reveal is sent again, or, with none to send, the read is short of the cut. A second held reveal is checked; a held
- * reveal after a stroke that ran short (the content ended under it: a row cut at the content's edge revealed to its end)
- * and every first probe that held are checked at once, as before. Cost: one stroke and one read, in the doubted case
- * only. Residuals: a first probe the app did not take still reads checked (no stroke before it to doubt by); so does a
+ * reveal after a stroke that ran short (the content ended more than CARRY_LOSS before the stroke's end) and every
+ * first probe that held are checked at once, as before. Cost: one stroke and one read, in the doubted case only — a
+ * legitimate one too when the content ended within CARRY_LOSS of the stroke's end (a row cut by 40 px, which a 74-px
+ * probe brings whole, pays one retry before `checked`, and at the bound fails hedged). Residuals: a first probe the app did not take still reads checked (no stroke before it to doubt by); so does a
  * reveal dropped after a stroke that ran short for another reason (a loaded host), or two strokes dropped in a row.
  *
  * Toward the edge, never the caller's way (course.ts#probeOf). Along the scroll's axis only (the caller's
@@ -164,7 +165,7 @@ interface ProvenCut {
   readonly container: Rect;
   readonly revealed: number;
   /**
-   * The stroke that proved it (`revealedBy`) carried the match its whole drawn length less twice TOUCH_SLOP: the content
+   * The stroke that proved it (`revealedBy`) carried the match its whole drawn length less `CARRY_LOSS`: the content
    * did not end under it, so a reveal that then moves nothing is doubted once (D62). False with no stroke drawn (the
    * round requires the stroke after every one, scroll-rounds.ts#RoundSeen.drawn, so a proving read always has its own).
    */
@@ -198,6 +199,13 @@ interface Memory {
 
 const open = (check: FlushCheck): Memory => check as unknown as Memory;
 const close = (m: Memory): FlushCheck => m as unknown as FlushCheck;
+
+/**
+ * The most px a stroke that carried the match its whole way may fall short of its drawn length (`ProvenCut.carried`,
+ * D62): twice TOUCH_SLOP — measured losses to the slop and the content's give 7–24 px; batch-9's probe carried C 135 px
+ * of 142 (or of the 177-px cap, which one slop would miss).
+ */
+const CARRY_LOSS = 2 * TOUCH_SLOP;
 
 /** The check before the first read, for a scroll toward `direction`: no probe in flight, no cut proven. */
 export function startFlush(direction: Direction): FlushCheck {
@@ -289,7 +297,8 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
   // The probe moved it and it lies flush on the same edge with more of it showing (`revealedBy`), or it still lies
   // flush on a cut an earlier probe proved (`stillProven`).
   const at = flushOf(stop.judged, stop.facts, m.direction);
-  const kept = (probed !== undefined && !held ? revealedBy(probed, rect, at, stop.drawn) : undefined) ?? stillProven(m.proven, at);
+  const revealed = probed !== undefined && !held ? revealedBy(probed, rect, at, stop.drawn) : undefined;
+  const kept = revealed ?? stillProven(m.proven, at);
   // A reveal that moved nothing right after a stroke that carried the match its whole length: doubted once — the cut
   // stays proven, marked, and the same reveal goes again (D62).
   const doubted = stroked && kept !== undefined && kept.carried && kept.unmoved !== true;
@@ -358,7 +367,7 @@ function revealedBy(probed: SentProbe, now: Rect, { chain, flushed }: FlushAt, d
   const was = probed.rect;
   const grown = axisOfEdge(probed.edge) === 'vertical' ? now.height - was.height : now.width - was.width;
   const uncutMoved = uncutToward(now, probed.edge) - uncutToward(was, probed.edge);
-  const carried = drawn !== undefined && grown > strokeLength(drawn) - 2 * TOUCH_SLOP;
+  const carried = drawn !== undefined && grown > strokeLength(drawn) - CARRY_LOSS;
   return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? { edge: probed.edge, container: chain[flushed.at], revealed: grown, carried } : undefined;
 }
 
