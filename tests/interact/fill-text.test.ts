@@ -367,6 +367,16 @@ describe('fillFailureText — every error a fill throws', () => {
     );
   });
 
+  // D64 review round 2 (NIT-2): a dropped tail that is a whole landing too (fill-landing.ts#wholeLandingToo: `11 ` for
+  // `11` after `1`) was typed nothing again; the reply says the other reading and its remedy
+  it('a dropped tail that is a whole landing too adds the select-all reading and `clear: true`', () => {
+    expect(mismatch({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true }, 2, 3)).toBe(
+      'fill: typed 2 characters but the field shows 3 — the first 1 typed character is there, grouped by the field (separators of its own added), ' +
+        'the last 1 did not land: dropped, or refused by the field (a length cap, a character it does not take) — ' +
+        'or the field replaced its text (select-all): fill with `clear: true` — not a transformed input; content withheld from this error',
+    );
+  });
+
   // D53: every typed character in order, with separators ADR 0034's rules refuse as grouping — the check, the remedy.
   it('a mismatch on a separated reading names the check and the remedy, counts only', () => {
     const SEPARATED =

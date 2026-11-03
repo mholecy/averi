@@ -549,6 +549,12 @@ describe('without clear, the value must be in the typing past the earlier text (
     expect(droppedTail('Note: 12', e('12/', 'Note: '))).toBe('/');
   });
 
+  // review round 2, NIT-2: the miss keeps its kind, and says it is a whole landing too, for the wording
+  it('differenceOf: `11 ` after `1` and `a1 1` after `a1` are dropped tails that are whole landings too', () => {
+    expect(differenceOf('11 ', e('11', '1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
+    expect(differenceOf('a1 1', e('1 ', 'a1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
+  });
+
   it('a value only inside the earlier text is no full landing: the tail is still typed again (`Note: hellohe`, f16)', () => {
     expect(droppedTail('Note: hellohe', e('hello', 'Note: hello'))).toBe('llo');
     expect(droppedTail('31.12.2021', e('12', '31.12.202'))).toBe('2');
