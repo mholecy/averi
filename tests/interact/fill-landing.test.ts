@@ -526,6 +526,16 @@ describe('without clear, the value must be in the typing past the earlier text (
     expect(droppedTail(shown, e(value, before))).toBeUndefined();
   });
 
+  // the value typed again over itself (residual 7's shape) into a select-all field that adds a mark: the reading is the
+  // value, decorated, wholly inside the earlier text's span — a whole landing as much as a dropped tail
+  it.each([
+    ['-5-', '-5', '-5'],
+    [' 42 ', ' 42', ' 42'],
+  ])('`%s` typed `%s` after `%s`: the value alone, decorated — no tail to type again', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toBeUndefined();
+    expect(droppedTail(shown, e(value, before))).toBeUndefined();
+  });
+
   it('a value only inside the earlier text is no full landing: the tail is still typed again (`Note: hellohe`, f16)', () => {
     expect(droppedTail('Note: hellohe', e('hello', 'Note: hello'))).toBe('llo');
     expect(droppedTail('31.12.2021', e('12', '31.12.202'))).toBe('2');
