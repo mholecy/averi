@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -302,9 +303,6 @@ private fun StickyList(cell: Cell, lab: Lab) {
  * scroll toward it `right`). The banking screen of docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-
  * targets-scroll-view.md (its residual: the carousel `24,138 354x85` near the top, a long list below).
  */
-/** The cells laid as carousel-in-list: its page and rows, each with its own carousel (CarouselInList). */
-private val CAROUSEL_CELLS = setOf("carousel-in-list", "carousel-lazy", "carousel-recycler")
-
 private object CarouselLayout {
     val CONTENT = 2400.dp
     val OFFSET = 300.dp
@@ -352,14 +350,24 @@ private fun CarouselInList(cell: Cell, lab: Lab, screenWidth: Dp, screenHeight: 
                 .offset(x = l.CAROUSEL_X, y = l.CAROUSEL_TOP)
                 .size(cardWidth, l.CARD_HEIGHT)
                 .onGloballyPositioned { lab.scrollView("carousel", screenFrame(view, it)) }
+            val snap = cell.id in SNAPPING_CAROUSELS
             when (cell.id) {
-                "carousel-lazy" -> LazyCarousel(cell, lab, clip, cardWidth)
-                "carousel-recycler" -> RecyclerCarousel(cell, lab, clip)
+                "carousel-lazy", "carousel-lazy-free" -> LazyCarousel(cell, lab, clip, cardWidth, snap)
+                "carousel-recycler", "carousel-recycler-free" -> RecyclerCarousel(cell, lab, clip, snap)
                 else -> ScrollCarousel(cell, lab, clip, cardWidth)
             }
         }
     }
 }
+
+/**
+ * The cells laid as carousel-in-list: its page and rows, each with its own carousel (CarouselInList) — the snapping
+ * pair (D37) and their free twins, the same carousel with no snap (D59: a fling or a stroke can leave C cut by the clip).
+ */
+private val CAROUSEL_CELLS = setOf("carousel-in-list", "carousel-lazy", "carousel-recycler", "carousel-lazy-free", "carousel-recycler-free")
+
+/** The snapping carousels (D37); the `-free` twins of CAROUSEL_CELLS come to rest where a fling leaves them. */
+private val SNAPPING_CAROUSELS = setOf("carousel-lazy", "carousel-recycler")
 
 /** carousel-in-list's carousel: a Row in a horizontalScroll, no snapping. */
 @Composable
@@ -382,14 +390,17 @@ private fun ScrollCarousel(cell: Cell, lab: Lab, clip: Modifier, cardWidth: Dp) 
 }
 
 /**
- * carousel-lazy (L7; D59, D37's snapping pager): carousel-in-list's cards in a LazyRow under a snap fling
- * (rememberSnapFlingBehavior: a fling comes to rest with a card filling the clip) — a container whose node carries no
- * scroll axis in the dump. A lazy list composes only what its clip shows, so C (the second card, as wide as the clip,
- * its left edge on the clip's right one at rest) is composed — its node dumped, its frame reported — once a part of it
- * scrolls in. The offset is the cards' (all CARD wide) before the first one shown plus how far that one is scrolled.
+ * carousel-lazy (L7, D37's snapping pager) and carousel-lazy-free (L7, D59): carousel-in-list's cards in a LazyRow — a
+ * container whose node carries no scroll axis in the dump — under a snap fling (`snap`: rememberSnapFlingBehavior, a
+ * fling comes to rest with a card filling the clip) or the default fling (the free twin: it rests where the fling
+ * leaves it, C possibly cut by the clip). A lazy list composes only what its clip shows, so C (the second card, as wide
+ * as the clip, its left edge on the clip's right one at rest) is ABSENT at launch — no node in the dump, no frame in the
+ * state — until a part of it scrolls in; once it scrolls out again its last frame stays in the state, stale (Lab.frame
+ * keeps a tag's last report). The offset is the cards' (all CARD wide) before the first one shown plus how far that one
+ * is scrolled; `carousel.index` the card under the clip's centre at rest.
  */
 @Composable
-private fun LazyCarousel(cell: Cell, lab: Lab, clip: Modifier, cardWidth: Dp) {
+private fun LazyCarousel(cell: Cell, lab: Lab, clip: Modifier, cardWidth: Dp, snap: Boolean) {
     val l = CarouselLayout
     val state = rememberLazyListState()
     val card = with(LocalDensity.current) { cardWidth.roundToPx() }
@@ -397,7 +408,8 @@ private fun LazyCarousel(cell: Cell, lab: Lab, clip: Modifier, cardWidth: Dp) {
     ReportScroll(lab, "carousel", { state.isScrollInProgress }, offset)
     ReportSnap(lab, { state.isScrollInProgress }) { (offset() + card / 2) / card }
     val c = cell.targets.firstOrNull { it.tag == "C" }
-    LazyRow(clip, state = state, flingBehavior = rememberSnapFlingBehavior(state)) {
+    val fling = if (snap) rememberSnapFlingBehavior(state) else ScrollableDefaults.flingBehavior()
+    LazyRow(clip, state = state, flingBehavior = fling) {
         items(l.CARDS) { i ->
             if (i == 1 && c != null) {
                 CardBox(cell, c, lab, Modifier.size(cardWidth, l.CARD_HEIGHT))
@@ -408,29 +420,33 @@ private fun LazyCarousel(cell: Cell, lab: Lab, clip: Modifier, cardWidth: Dp) {
     }
 }
 
-/** The state's key of the card a snapping carousel rests on (LabState.offsets): its index, 0 the first. */
+/** The state's key of the card a carousel rests on (LabState.offsets): the one under the clip's centre, 0 the first. */
 private const val CAROUSEL_INDEX = "carousel.index"
 
-/** Reports the card a snapping carousel rests on (CAROUSEL_INDEX), each time it comes to rest. */
+/** Reports the card a carousel rests on (CAROUSEL_INDEX), each time it comes to rest. */
 @Composable
 private fun ReportSnap(lab: Lab, moving: () -> Boolean, index: () -> Int) {
     LaunchedEffect(lab) { snapshotFlow { moving() to index() }.collect { (m, i) -> if (!m) lab.scroll(CAROUSEL_INDEX, false, i) } }
 }
 
 /**
- * carousel-recycler (L7; D59, D37's snapping pager): carousel-in-list's cards in a RecyclerView (a horizontal
- * LinearLayoutManager, each card MATCH_PARENT: as wide as the clip) under a PagerSnapHelper, in an AndroidView — the
- * View carousel a banking app builds, its node carrying no scroll axis in the dump. As on carousel-lazy, C is laid out
- * (and dumped) once a part of it scrolls in. C's id is its accessibility node's viewIdResourceName (as scroll-collapsing
- * sets its rows'), its frame its unclipped place on the screen, reported as it moves; the offset is
- * computeHorizontalScrollOffset, a stroke from a drag's start to the IDLE after its settle (Lab.scroll).
+ * carousel-recycler (L7, D37's snapping pager) and carousel-recycler-free (L7, D59): carousel-in-list's cards in a
+ * RecyclerView (a horizontal LinearLayoutManager, each card MATCH_PARENT: as wide as the clip) in an AndroidView — the
+ * View carousel a banking app builds, its node carrying no scroll axis in the dump — under a PagerSnapHelper (`snap`)
+ * or none (the free twin: a fling rests where it ends). As on carousel-lazy, C is absent at launch (not laid out, not
+ * dumped, no frame) until a part of it scrolls in, and its last frame stays in the state once it scrolls out. C's id is
+ * its accessibility node's viewIdResourceName (as scroll-collapsing sets its rows'), its frame its unclipped place on
+ * the screen, reported as it moves; the offset is computeHorizontalScrollOffset, a stroke from a drag's start to the
+ * IDLE after its settle (Lab.scroll). Unmeasured: whether the page's vertical strokes that touch down on the carousel
+ * (U's `up`) reach the page through the AndroidView as they do through carousel-in-list's Compose carousel — the
+ * RecyclerView may take them; carousel-in-list's U and B outcomes are not this cell's facts.
  */
 @Composable
-private fun RecyclerCarousel(cell: Cell, lab: Lab, clip: Modifier) {
-    AndroidView(factory = { context -> recyclerCarousel(context, cell, lab) }, modifier = clip)
+private fun RecyclerCarousel(cell: Cell, lab: Lab, clip: Modifier, snap: Boolean) {
+    AndroidView(factory = { context -> recyclerCarousel(context, cell, lab, snap) }, modifier = clip)
 }
 
-private fun recyclerCarousel(context: android.content.Context, cell: Cell, lab: Lab): View {
+private fun recyclerCarousel(context: android.content.Context, cell: Cell, lab: Lab, snap: Boolean): View {
     val l = CarouselLayout
     val c = cell.targets.firstOrNull { it.tag == "C" }
     val list = RecyclerView(context).apply { setBackgroundColor(0xFFEEEEEE.toInt()) }
@@ -464,7 +480,7 @@ private fun recyclerCarousel(context: android.content.Context, cell: Cell, lab: 
         }
         override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {}
     }
-    PagerSnapHelper().attachToRecyclerView(list)
+    if (snap) PagerSnapHelper().attachToRecyclerView(list)
     val width = { list.width.coerceAtLeast(1) }
     list.addOnScrollListener(object : RecyclerView.OnScrollListener() {
         override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {

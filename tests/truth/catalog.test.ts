@@ -56,6 +56,8 @@ describe('the cell catalog', () => {
       'edges/scroll-collapsing',
       'edges/carousel-lazy',
       'edges/carousel-recycler',
+      'edges/carousel-lazy-free',
+      'edges/carousel-recycler-free',
       'bars/bands',
       'bars/bands-three-button',
       'bars/pinned-bar',
@@ -162,11 +164,11 @@ describe('L7: form-grouped and rn-format-eager, their own cells beside the captu
   });
 });
 
-describe('L7: carousel-lazy and carousel-recycler, Android only (D59, D37\'s snapping pager)', () => {
+describe('L7: carousel-lazy and carousel-recycler (D37\'s snapping pager) and their free twins (D59), Android only', () => {
   it('each carousel-in-list\'s targets exactly (C in the carousel, B and U in the page), built on Android alone', async () => {
     const cells = (await loadCatalog()).cells;
     const of = (id: string) => cells.find((c) => c.id === id)!;
-    for (const id of ['carousel-lazy', 'carousel-recycler']) {
+    for (const id of ['carousel-lazy', 'carousel-recycler', 'carousel-lazy-free', 'carousel-recycler-free']) {
       expect(of(id)).toMatchObject({ family: 'edges', layer: 'none', platforms: ['android'] });
       expect(of(id).targets).toEqual(of('carousel-in-list').targets);
       expect(captureRefusal(of(id), 'ios', undefined)).toBe('built for android only');
