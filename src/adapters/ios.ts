@@ -12,7 +12,7 @@ import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from '
 import type { DeepLinkOptions, DeepLinkOutcome, DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
-import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, urlSchemes } from './ios-url-schemes.js';
+import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, SCHEME_APPROVAL_DOMAIN, schemeApprovalKey, schemeApprovalWrite, urlSchemes } from './ios-url-schemes.js';
 import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
@@ -120,6 +120,14 @@ const DISAGREEMENTS_TO_GIVE_UP = 2;
 interface AppInfo extends AppBinary {
   names: readonly string[];
 }
+
+/** A link's scheme (lower-cased) and the project's app that declares it: what D58 pre-approves for simctl's opener. */
+interface SchemeApproval {
+  scheme: string;
+  bundleId: string;
+}
+/** The key schemeApprovals keeps a pre-approval's state under — this adapter's, not iOS's `<opener>--><scheme>`. */
+const approvalCacheKey = ({ scheme, bundleId }: SchemeApproval): string => `${bundleId}-->${scheme}`;
 
 /**
  * The app the typing goes into, as far as an IosAdapter knows (D24 — what its memory of tail-dropping apps is keyed
@@ -306,6 +314,7 @@ export class IosAdapter implements DeviceAdapter {
     // is not known here (an .app path), so every bundle's.
     this.appInfoCache.clear();
     this.urlSchemesCache.clear();
+    this.schemeApprovals.clear();
     this.disagreements.clear();
     this.launchctlOnly.clear();
     await this.simctl(['install', this.udid, appPath], 120_000);
@@ -319,7 +328,7 @@ export class IosAdapter implements DeviceAdapter {
       );
     }
     if (opts.clearState) await this.clearAppData(bundleId);
-    await this.enableAccessibilityAutomation(`launching ${bundleId}`);
+    await this.prepareForOpen(`launching ${bundleId}`);
     await this.simctl(['launch', this.udid, bundleId]);
     this.front = { kind: 'launched', bundleId };
     // `simctl launch` returns before the app is in front: for ~1–2 s idb (and
@@ -429,12 +438,21 @@ export class IosAdapter implements DeviceAdapter {
    * both land — cfprefsd applies each key on its own (20/20 on a scratch
    * domain on the lab simulator, both keys read back) — and the launch
    * still waits for both.
+   *
+   * A link to the project's own scheme (`approval`, D58) adds a third
+   * write to the same batch: the scheme's pre-approval for simctl's opener
+   * (judgeSchemeApproval). It runs beside the two, so it costs no wall
+   * time of its own, and its result is judged apart from theirs.
    */
-  private async enableAccessibilityAutomation(what: string): Promise<void> {
+  private async prepareForOpen(what: string, approval?: SchemeApproval): Promise<void> {
     const keys = ['AutomationEnabled', 'ApplicationAccessibilityEnabled'] as const;
-    const writes = await Promise.allSettled(
-      keys.map((key) => this.simctl(['spawn', this.udid, 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000)),
-    );
+    const approving = approval !== undefined && this.schemeApprovals.get(approvalCacheKey(approval)) !== 'failed';
+    const results = await Promise.allSettled([
+      ...keys.map((key) => this.simctl(['spawn', this.udid, 'defaults', 'write', 'com.apple.Accessibility', key, '-bool', 'true'], 10_000)),
+      ...(approving ? [this.simctl(['spawn', this.udid, ...schemeApprovalWrite(approval.scheme, approval.bundleId)], 10_000)] : []),
+    ]);
+    const writes = results.slice(0, keys.length);
+    if (approving) this.judgeSchemeApproval(approval, results[keys.length]);
     const failed = writes.findIndex((w) => w.status === 'rejected');
     const write = writes[failed];
     if (write?.status === 'rejected') {
@@ -455,6 +473,41 @@ export class IosAdapter implements DeviceAdapter {
     }
   }
 
+  /**
+   * Each pre-approval (D58) this adapter wrote, by `<bundleId>--><scheme>`: `'written'` once said on stderr, `'failed'`
+   * once a write failed — not tried again until install(), as the scheme cache (a simulator that refused one write
+   * refuses the next, and one stderr line per bundle, not one per link, says so). A written one is written again on
+   * every link: the write is idempotent, runs beside the accessibility writes, and a key deleted under the session
+   * (by hand, or a check like batch-7's) is restored by the next link rather than raising the alert.
+   */
+  private readonly schemeApprovals = new Map<string, 'written' | 'failed'>();
+
+  /**
+   * One pre-approval's result (D58): the first success per key said on stderr (the keys are simulator-wide and persist,
+   * as the accessibility write's announcement); a failure said once and remembered. A failure never fails the link —
+   * `openurl` runs as before, and if iOS then asks "Open in “…”?", the wait names the alert (D54/D56).
+   */
+  private judgeSchemeApproval(approval: SchemeApproval, result: PromiseSettledResult<unknown> | undefined): void {
+    const key = approvalCacheKey(approval);
+    const { scheme, bundleId } = approval;
+    if (result?.status === 'rejected') {
+      this.schemeApprovals.set(key, 'failed');
+      console.error(
+        `averi: could not pre-approve ${scheme} links to ${bundleId} for simctl openurl on ${this.udid} ` +
+          `(${errorMessage(result.reason).split('\n')[0]}) — iOS may ask "Open in “…”?" first, and the reply names the ` +
+          'alert if it does; not tried again until the app is installed again',
+      );
+      return;
+    }
+    if (this.schemeApprovals.get(key) === 'written') return;
+    this.schemeApprovals.set(key, 'written');
+    console.error(
+      `averi: recorded iOS's "Open" answer for ${scheme} links to ${bundleId} from simctl openurl on ${this.udid} ` +
+        `(${SCHEME_APPROVAL_DOMAIN} ${schemeApprovalKey(scheme)} = ${bundleId}; simulator-wide, not restored; ` +
+        `before every link to the app's own scheme, so iOS should not ask "Open in “…”?")`,
+    );
+  }
+
   async terminate(bundleId: string): Promise<void> {
     // simctl terminate fails if the app is not running — that's fine.
     await this.simctl(['terminate', this.udid, bundleId]).catch(() => undefined);
@@ -467,17 +520,20 @@ export class IosAdapter implements DeviceAdapter {
    * ios-foreground.ts: iOS may ask "Open in …?" first, and `openurl` returns either way) — with a note whenever it did
    * not confirm the app, a WDA not up yet included; every other link — none given, `http(s)`, iOS's own schemes,
    * another app's scheme, schemes that could not be read — expects no app and reads nothing of the UI after `openurl`,
-   * as before D49a. The scheme lookup runs after `openurl` (the writes and the open go out as they did): one
-   * `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a failed
-   * one too. `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link
-   * (D54), the outcome names it instead of a note: on idb from the wait's own reads, on WDA from one short `/source`
+   * as before D49a. The scheme lookup runs first (D58: it decides the pre-approval, which must land before `openurl`):
+   * one `simctl appinfo` (shared with launch's cache) and one host `plutil` per bundle, cached until install() — a
+   * failed one too. For an own-scheme link the accessibility writes carry the scheme's pre-approval for simctl's opener
+   * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes what it wrote before.
+   * `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link (D54), the
+   * outcome names it instead of a note: on idb from the wait's own reads, on WDA from one short `/source`
    * read at the bound (IosTreeSource.systemAlert) — never a tap.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<DeepLinkOutcome> {
-    await this.enableAccessibilityAutomation(`opening ${url}`);
+    const approval = await this.linkHandler(url, opts.appId);
+    await this.prepareForOpen(`opening ${url}`, approval);
     await this.simctl(['openurl', this.udid, url]);
-    const handler = await this.linkHandler(url, opts.appId);
-    if (handler === undefined) return {};
+    if (approval === undefined) return {};
+    const handler = approval.bundleId;
     // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground).
     const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url }));
     if (outcome.note === undefined && outcome.alert === undefined) this.front = { kind: 'launched', bundleId: handler };
@@ -502,13 +558,14 @@ export class IosAdapter implements DeviceAdapter {
   }
 
   /**
-   * `appId` when the link's scheme is one it declares; undefined otherwise — no app, no scheme, a web or system scheme
-   * (no lookup at all), another app's, or schemes that could not be read.
+   * `appId` and the link's (lower-cased) scheme when it is one `appId` declares — the app the link waits for and the
+   * scheme D58 pre-approves; undefined otherwise — no app, no scheme, a web or system scheme (no lookup at all), another
+   * app's, or schemes that could not be read.
    */
-  private async linkHandler(url: string, appId: string | undefined): Promise<string | undefined> {
+  private async linkHandler(url: string, appId: string | undefined): Promise<SchemeApproval | undefined> {
     const scheme = linkScheme(url);
     if (appId === undefined || scheme === undefined || isWebScheme(scheme) || isSystemScheme(scheme)) return undefined;
-    return (await this.urlSchemes(appId, url))?.includes(scheme) === true ? appId : undefined;
+    return (await this.urlSchemes(appId, url))?.includes(scheme) === true ? { scheme, bundleId: appId } : undefined;
   }
 
   /**
@@ -532,7 +589,7 @@ export class IosAdapter implements DeviceAdapter {
     const unread = (e: unknown, then: string): undefined => {
       console.error(
         `averi: could not read ${bundleId}'s URL schemes (${errorMessage(e).split('\n')[0]}) — ` +
-          `opened ${url} without waiting for ${bundleId} to come forward${then}`,
+          `opening ${url} without waiting for ${bundleId} to come forward${then}`,
       );
       return undefined;
     };
