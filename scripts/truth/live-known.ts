@@ -48,6 +48,7 @@ const IOS_NON_ASCII = 'bug:2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md
 const ANDROID_NON_ASCII = 'bug:2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md';
 const SECURE_CLEARED = 'residual:ADR 0028 residual 2 — iOS clears a secure field when typing resumes: a no-clear fill into a prefilled one leaves what was typed, and averi says so';
 const BLIND_TAIL = 'residual:ADR 0034 residual 2 — a flow\'s blind `type:` cannot type again a tail a reformatting field dropped: `fill:` is the remedy';
+const EAGER_FULL = 'residual:ADR 0034 residual 10 — a full reading that ends in an eager trailing mark fails `separated`: averi refuses it by design, the app holds the value';
 
 /**
  * A known case: its note, the rule it fails by (live-visibility.ts#VerdictClass), the kind of reply that verdict rests
@@ -241,6 +242,14 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // rf4 (the RN app): the flow's blind `type:` left `SK31 1200 0` and said `flow type_it: done` — no claim
     // (`other`); runs of the same commit differ (`SK31 1200 00` at D29's), and a run may type it whole.
     ...each(`ios ${src}`, ['rf4'], BLIND_TAIL, 'loud-changed', 'other', { intermittent: true }),
+    // g2 and rfe3 (L7): `SK3112000000` typed without clear into an eager field (form-grouped's ibanEager, the RN app's
+    // rn-format-eager E) — the app holds `SK31 1200 0000 `, its full reading ending in the eager space, and averi
+    // refuses it, "… with 3 separators added …" (D53 `separated`): a MISMATCH failed-holds by design, the last reply
+    // `refused`. g2 under both sources in batch-9 (ios-idb-forms-l7-1.json, ios-wda-forms-l7-1.json) and batch-10
+    // (ios-idb-forms-d61-whole.json, ios-wda-forms-d61-whole.json); rfe3 ×5 under each (ios-rn-idb-forms-l7-1…5.json,
+    // ios-rn-wda-forms-l7-1…5.json). Under uiautomator g2 is ok (android-forms-l7-1.json, android-forms-d61-whole.json:
+    // the reading judged there had no trailing space), so no Android entry; React Native on Android unread.
+    ...each(`ios ${src}`, ['g2', 'rfe3'], EAGER_FULL, 'failed-holds', 'refused'),
   ]),
 ]);
 

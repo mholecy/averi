@@ -422,14 +422,14 @@ const FORMS: Omit<Case, 'group'>[] = [
   // digits), not to D64.
   { id: 'f16', cell: F, says: 'fill, clear, a date one digit short; then, no clear, two digits the field keeps only the first of, though its text holds them: refused', calls: [fill(F, 'date', '3112202', true), fill(F, 'date', '12')], judge: refusedCapped('date', '31.12.2021') },
   // L7: form-grouped (D60, D37's `+421`) — ibanEager adds a space as soon as a group of four is complete (group4eager:
-  // `SK31` shows `SK31 `), phoneGrouped groups a phone number in threes under a `+421` placeholder (phone3). Not yet
-  // run on a device: what each source answers is batch-9's to read, so none is in live-known.ts. g2 ends on a complete
-  // group: the field shows the eager space after it, a reading that does not land (fill-landing.ts) and reads D53's
-  // `separated` — averi refuses it by design while the app holds the value: an EXPECTED MISMATCH failed-holds under
-  // iOS's idb and wda, said in its `says` (Android not yet read); not in live-known.ts, whose entries
-  // name a filed note and the kind a device run read.
+  // `SK31` shows `SK31 `), phoneGrouped groups a phone number in threes under a `+421` placeholder (phone3). Read on
+  // the device by batch-9 and batch-10 (docs/truth/live-records/*-forms-l7-1.json, *-forms-d61-*.json). g2 ends on a
+  // complete group: the field shows the eager space after it, a reading that does not land (fill-landing.ts) and reads
+  // D53's `separated` — averi refuses it by design while the app holds the value: an EXPECTED MISMATCH failed-holds
+  // under iOS's idb and wda, said in its `says` and filed in live-known.ts (ADR 0034 residual 10); ok on Android, where
+  // the reading judged had no trailing space.
   { id: 'g1', cell: G, says: 'fill, clear, an IBAN into the field that spaces each group as it ends', calls: [fill(G, 'ibanEager', 'SK3112000000123', true), shows(G, 'ibanEager', 'SK31 1200 0000 123')], judge: holdsShown('ibanEager', 'SK31 1200 0000 123') },
-  { id: 'g2', cell: G, says: 'fill, no clear, an IBAN ending on a complete group: the field shows the eager space after it — expected MISMATCH failed-holds by design on iOS (idb, wda; D53 `separated`: averi refuses the trailing mark, the app holds the value); Android not yet read', calls: [fill(G, 'ibanEager', 'SK3112000000')], judge: holds('ibanEager', 'SK31 1200 0000 ') },
+  { id: 'g2', cell: G, says: 'fill, no clear, an IBAN ending on a complete group: the field shows the eager space after it — expected MISMATCH failed-holds by design on iOS (idb, wda; D53 `separated`: averi refuses the trailing mark, the app holds the value); ok on Android (the reading judged there has no trailing space)', calls: [fill(G, 'ibanEager', 'SK3112000000')], judge: holds('ibanEager', 'SK31 1200 0000 ') },
   { id: 'g3', cell: G, says: 'fill, no clear, a phone number the field groups in threes under a `+421` placeholder', calls: [fill(G, 'phoneGrouped', '421903123456')], judge: holds('phoneGrouped', '421 903 123 456') },
   { id: 'g4', cell: G, says: 'fill, clear, a phone number with its `+421` into the field that groups it', calls: [fill(G, 'phoneGrouped', '+421903123456', true)], judge: holds('phoneGrouped', '+421 903 123 456') },
   { id: 'g5', cell: G, says: 'fill, no clear, a phone number typed with its own spaces into the field that groups it', calls: [fill(G, 'phoneGrouped', '+421 903 123 456')], judge: holds('phoneGrouped', '+421 903 123 456') },
@@ -450,8 +450,9 @@ const FORMS: Omit<Case, 'group'>[] = [
   // values put those drops on a group's end, so the reading at the drop ends in the eager space (prefixOf's eager-mark
   // dropped tail) and the full one lands: rfe1 24 characters (4 dropped → 20, `… 4263 `; the full 24 take no mark),
   // rfe2 10 (2 dropped → 8, `SK31 1200 `; the full 10 end mid-group). rfe3 is g2 on React Native: 12 characters, the
-  // full reading ends in the mark — an EXPECTED MISMATCH by design on iOS (D53 `separated`). Not yet run on a
-  // device: none is in live-known.ts.
+  // full reading ends in the mark — an EXPECTED MISMATCH by design on iOS (D53 `separated`), filed in live-known.ts
+  // (ADR 0034 residual 10). Read on the device by batch-9 under idb and wda, ×5 each (docs/truth/live-records/
+  // ios-rn-*-forms-l7-*.json): rfe1 and rfe2 ok 20 of 20, rfe3 that MISMATCH ×10.
   { id: 'rfe1', cell: RFE, says: 'fill, clear, 24 characters into the RN eager field: a drop of the last 4 leaves `… 4263 ` (the eager mark), the full value takes none', calls: [fill(RFE, 'E.field', 'SK3112000000198742637541', true)], judge: holds('E', 'SK31 1200 0000 1987 4263 7541') },
   { id: 'rfe2', cell: RFE, says: 'fill, no clear, 10 characters into the RN eager field: a drop of the last 2 leaves `SK31 1200 ` (the eager mark), the full value ends mid-group', calls: [fill(RFE, 'E.field', 'SK31120000')], judge: holds('E', 'SK31 1200 00') },
   { id: 'rfe3', cell: RFE, says: 'fill, no clear, an IBAN ending on a complete group into the RN eager field — expected MISMATCH failed-holds by design on iOS (idb, wda; D53 `separated`: averi refuses the trailing mark, the app holds the value); React Native on Android unread', calls: [fill(RFE, 'E.field', 'SK3112000000')], judge: holds('E', 'SK31 1200 0000 ') },
