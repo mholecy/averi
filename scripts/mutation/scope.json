@@ -7,7 +7,7 @@
   "src/interact/fill-reformat.ts": {
     "tests": ["tests/interact/fill-reformat.test.ts"],
     "floor": 92,
-    "baseline": "94.80 % on 2026-11-03 (T4's cold run, its tests unchanged since D60: the move is D60's, not recorded then): 346 mutants, 18 survived, 1 timeout (counted killed); 94.69 % on 2026-11-02 (D53, separatedOf; the same after review round 1's walkWhole): 320 mutants, 17 survived, 1 timeout (counted killed) — none of them in separatedOf; 94.35 % on 2026-11-02 (D51, markKind, digitGrouping and maskTemplate): 301 mutants, 17 survived, 1 timeout — the two survivors D51 added equivalent (markKind's `'none'` and `'grouping'` emptied: reformatOf tells only `'thousands'` and undefined apart)"
+    "baseline": "94.80 % on 2026-11-03 (T4's cold run, its tests unchanged since D60: the move is D60's, not recorded then): 346 mutants, 18 survived, 1 timeout (counted killed) — the 18th is D60's new line 218, prefixOf's `walked.tokens.at(-1) === -1` emptied to true, equivalent: a last token that is no added mark is a character the typing holds (holdsMark, all spaces one kind), so `next` stays '' and the judgment is the pre-D60 one; 94.69 % on 2026-11-02 (D53, separatedOf; the same after review round 1's walkWhole): 320 mutants, 17 survived, 1 timeout (counted killed) — none of them in separatedOf; 94.35 % on 2026-11-02 (D51, markKind, digitGrouping and maskTemplate): 301 mutants, 17 survived, 1 timeout — the two survivors D51 added equivalent (markKind's `'none'` and `'grouping'` emptied: reformatOf tells only `'thousands'` and undefined apart)"
   },
   "src/interact/fill-verdict.ts": {
     "tests": ["tests/interact/fill-verdict.test.ts"],
