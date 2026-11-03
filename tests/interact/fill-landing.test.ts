@@ -226,6 +226,13 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(landingOf('1234 5678', expecting(e('12345678', '1')))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
   });
 
+  // D61 review round 1, MINOR: accepted, not a guard — with repeated characters a dropped key other than the head
+  // leaves the same reading (`1` held, `1100` typed, the second key lost: `1` + `100`, shown `1,100`). It now passes,
+  // with the point line (main: same-length), as the exact rule already passes the ungrouped `1100` after the same `1`.
+  it('landingOf: `1,100` after `1`, typed `1100` — an accepted pass, as the exact rule accepts it ungrouped (D61)', () => {
+    expect(landingOf('1,100', expecting(e('1100', '1')))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0, point: ',' } });
+  });
+
   it('landingOf: with clear the earlier text never counts', () => {
     expect(landingOf('SK31 1200 0000', expecting(e('SK3112000000', PH, true)))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
     // cleared, the field must hold the value alone: `SK31` shown before it is no earlier text to judge after
