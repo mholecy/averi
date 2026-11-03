@@ -996,6 +996,76 @@ describe('AndroidAdapter interactions', () => {
     });
   });
 
+  // D55 (ADR 0041): after a start, ONE focus read asks whether Android's chooser is in front instead of an app. The
+  // classification is android-chooser.test.ts's; these pin the calls, their order and each fallback to `{}`.
+  describe('openDeepLink — the chooser in front (D55)', () => {
+    const STARTED = 'Starting: Intent { act=android.intent.action.VIEW dat=averilab://shared/... }\n';
+    const RESOLVER_FOCUS = (
+      '  mCurrentFocus=Window{56b9ca0 u0 android/com.android.internal.app.ResolverActivity}\n' +
+      '  mFocusedApp=ActivityRecord{6909a9c u0 android/com.android.internal.app.ResolverActivity} t2590}\n'
+    );
+    const LAB_FOCUS = (
+      '  mCurrentFocus=Window{c6f91da u0 dev.averi.lab/dev.averi.lab.MainActivity}\n' +
+      '  mFocusedApp=ActivityRecord{59ce9b8 u0 dev.averi.lab/.MainActivity} t8}\n'
+    );
+    const START = ['-s', 'e', 'shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'averilab://shared/open'];
+    const FOCUS = ['-s', 'e', 'shell', "dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='"];
+    type Answer = { stdout?: string; stderr?: string } | Error;
+    /** Records each call's argv and timeout; `am start` and the focus read answer as given, anything else empty. */
+    const scripted = (start: Answer, focus: Answer) => {
+      const argvs: string[][] = [];
+      const timeouts: (number | undefined)[] = [];
+      const fn: ExecFn = async (_cmd, args, opts) => {
+        argvs.push(args);
+        timeouts.push(opts?.timeoutMs);
+        const reply = args.includes('am') ? start : args.some((a) => a.startsWith('dumpsys window displays')) ? focus : {};
+        if (reply instanceof Error) throw reply;
+        return { stdout: Buffer.from(reply.stdout ?? ''), stderr: reply.stderr ?? '' };
+      };
+      return { adapter: new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }), argvs, timeouts };
+    };
+
+    it('an app in front: the start, then one focus read — two calls in that order, no tree — and `{}`', async () => {
+      const { adapter, argvs, timeouts } = scripted({ stdout: STARTED }, { stdout: LAB_FOCUS });
+      await expect(adapter.openDeepLink('averilab://shared/open')).resolves.toEqual({});
+      expect(argvs).toEqual([START, FOCUS]);
+      expect(timeouts[1]).toBe(2_000);
+    });
+
+    it('the chooser in front: `{ chooser: { component } }`, after the same two calls', async () => {
+      const { adapter, argvs } = scripted({ stdout: STARTED }, { stdout: RESOLVER_FOCUS });
+      await expect(adapter.openDeepLink('averilab://shared/open')).resolves.toEqual({
+        chooser: { component: 'android/com.android.internal.app.ResolverActivity' },
+      });
+      expect(argvs).toEqual([START, FOCUS]);
+    });
+
+    it('a focus read that fails (grep found neither line, adb gone, a timeout) or says nothing: `{}`, today\'s reply', async () => {
+      const failed = execErrorLikeExec('adb -s e shell dumpsys', 1, '');
+      for (const focus of [failed, new Error('timed out'), {}, { stdout: 'garbage\n' }]) {
+        const { adapter, argvs } = scripted({ stdout: STARTED }, focus);
+        await expect(adapter.openDeepLink('averilab://shared/open')).resolves.toEqual({});
+        expect(argvs).toEqual([START, FOCUS]);
+      }
+    });
+
+    it('a refused start still throws, before any focus read', async () => {
+      const unresolved = 'Error: Activity not started, unable to resolve Intent { act=android.intent.action.VIEW dat=nosuch://x flg=0x10000000 }';
+      const { adapter, argvs } = scripted({ stderr: `${unresolved}\n` }, { stdout: RESOLVER_FOCUS });
+      await expect(adapter.openDeepLink('nosuch://x')).rejects.toThrow(/^Android opened nothing for nosuch:\/\/x/);
+      expect(argvs).toHaveLength(1);
+    });
+
+    it('launch_app is unchanged: one `am start`, no focus read — `-p` (backlog D55b) and `-n` alike', async () => {
+      for (const opts of [{ intent: { action: 'android.intent.action.VIEW', data: 'averilab://shared/x' } }, { activity: '.Twin' }]) {
+        const { adapter, argvs } = scripted({ stdout: STARTED }, { stdout: RESOLVER_FOCUS });
+        await expect(adapter.launch('dev.averi.lab', opts)).resolves.toEqual({});
+        expect(argvs).toHaveLength(1);
+        expect(argvs[0]?.slice(3, 5)).toEqual(['am', 'start']);
+      }
+    });
+  });
+
   it('viewport parses wm size (Override beats Physical), says Android windows may sit beside system bars, and caches', async () => {
     const { fn, calls } = fakeExec({
       'adb -s emulator-5554 shell wm size': 'Physical size: 1080x2280\nOverride size: 1000x2000\n',
