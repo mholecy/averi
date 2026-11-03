@@ -17,6 +17,19 @@ export type TapAdapter = KeyboardAdapter;
  */
 export const DISABLED_TAP = 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
 
+/** What a tap by selector says of itself (tapElement): the resolution note, the keyboard's sentence, where it went, the mark. */
+export interface Tapped {
+  note?: string;
+  /** The keyboard guard's sentence alone, for the one caller that prints no notes (the flow trace's `⚠ tap`). */
+  keyboardHidden?: string;
+  moved?: string;
+  /** The tapped node's own mark (adapters/types.ts#UiNode.disabled). */
+  disabled?: true;
+}
+
+/** What the MCP reply prints of a tap (mcp/tool-text.ts#tapText). */
+export type TapMarks = Pick<Tapped, 'note' | 'moved' | 'disabled'>;
+
 /**
  * Wait for the target to appear and settle (resolveSettled: one policy for
  * the flow engine's `tap:` step and the MCP `tap` tool), then tap the chosen
@@ -60,11 +73,7 @@ export const DISABLED_TAP = 'The tree marks the target disabled, the tap may do 
  * all the same, and the MCP reply and the flow's trace warn (DISABLED_TAP).
  * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
  */
-export async function tapElement(
-  adapter: TapAdapter,
-  target: Target,
-  opts: GuardOptions,
-): Promise<{ note?: string; keyboardHidden?: string; moved?: string; disabled?: true }> {
+export async function tapElement(adapter: TapAdapter, target: Target, opts: GuardOptions): Promise<Tapped> {
   const { note, keyboardHidden, point, moved, node } = await resolveClearOfKeyboard(adapter, target, opts);
   await adapter.tap(point.x, point.y);
   return { note, keyboardHidden, moved, disabled: node.disabled };

@@ -110,15 +110,15 @@ describe("tap's reply on Android's chooser (D66): warned on a disabled button, n
     ['text:"Always"', 'input tap 936 2058'],
   ])('%s: tapped at its centre, and the ⚠ line follows the Tapped line', async (selector, sent) => {
     const { adapter, taps } = await chooserTree();
-    const { note, moved, disabled } = await tapElement(adapter, selector, { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    const tapped = await tapElement(adapter, selector, { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
     expect(taps).toEqual([sent]);
-    expect(tapText(selector, note, moved, disabled)).toBe(`Tapped ${selector}\n${WARN}`);
+    expect(tapText(selector, tapped)).toBe(`Tapped ${selector}\n${WARN}`);
   });
 
   it('a row\'s app name (enabled): the reply is the one Tapped line, byte for byte as before D66', async () => {
     const { adapter, taps } = await chooserTree();
-    const { note, moved, disabled } = await tapElement(adapter, 'text:"AveriLab twin"', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    const tapped = await tapElement(adapter, 'text:"AveriLab twin"', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
     expect(taps).toHaveLength(1);
-    expect(tapText('text:"AveriLab twin"', note, moved, disabled)).toBe('Tapped text:"AveriLab twin"');
+    expect(tapText('text:"AveriLab twin"', tapped)).toBe('Tapped text:"AveriLab twin"');
   });
 });

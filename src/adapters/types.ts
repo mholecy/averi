@@ -642,12 +642,13 @@ export interface UiNode {
   hidden?: true;
   /**
    * Set on a node its source says is NOT ENABLED, as dumped and per node (no inheritance): uiautomator's
-   * `enabled="false"` (adapters/android.ts#normalizeNode), WDA's `isEnabled` "0" or 0 (adapters/wda-source.ts#toUiNode),
-   * idb's `enabled: false` (adapters/ios-tree-source.ts#idbTree). Any other value — the attribute missing, true,
-   * anything else — leaves it absent: absent is enabled OR unknown, never false (fail open). Read by a tap by
-   * selector alone, which still taps and warns in the MCP reply and the flow's trace (interact/tap.ts#DISABLED_TAP);
-   * printed by `ui_snapshot` with the tree's JSON. Selectors, asserts, draw order and the tap's judgement are as before: a disabled bar still covers. A mark of
-   * the source, like `heading`: ui-tree knows no platform.
+   * `enabled="false"` (adapters/android.ts#normalizeNode), WDA's `isEnabled` "0" or 0
+   * (adapters/wda-source.ts#toUiNode), idb's `enabled: false` (adapters/ios-tree-source.ts#idbTree). Any other value —
+   * the attribute missing, true, anything else — leaves it absent: absent is enabled OR unknown, never false (fail
+   * open). Read by a tap by selector alone, which still taps and warns in the MCP reply and the flow's trace
+   * (interact/tap.ts#DISABLED_TAP); printed by `ui_snapshot` with the tree's JSON. Selectors, asserts, draw order and
+   * the tap's judgement are as before: a disabled bar still covers. A mark of the source, like `heading`: ui-tree knows
+   * no platform.
    * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
    */
   disabled?: true;

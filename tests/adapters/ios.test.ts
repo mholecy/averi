@@ -76,9 +76,9 @@ describe('IosAdapter interactions', () => {
     const wda: IosTreeSource = { ...WDA_NO_TREE, read: async () => parseWdaSource(capture) };
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda });
     const selector = 'id:swift_payment.form.continue_button';
-    const { note, moved, disabled } = await tapElement(adapter, selector, { ambiguous: 'refuse' });
+    const tapped = await tapElement(adapter, selector, { ambiguous: 'refuse' });
     expect(calls.at(-1)?.full).toBe('idb ui tap 201 802 --udid AAAA-1111');
-    expect(tapText(selector, note, moved, disabled)).toBe(`Tapped ${selector}\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.`);
+    expect(tapText(selector, tapped)).toBe(`Tapped ${selector}\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.`);
   });
 
   it('end to end on the idb source: tapElement resolves against describe-all and taps the center through idb', async () => {

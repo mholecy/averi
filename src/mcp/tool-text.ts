@@ -28,18 +28,25 @@ import type { Direction } from '../interact/swipe.js';
 import { launchedLine, WIPE_LABEL, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
-import { DISABLED_TAP } from '../interact/tap.js';
+import { DISABLED_TAP, type TapMarks } from '../interact/tap.js';
+
+/**
+ * A reply's warning on its own line below: `\n⚠ <note>`, or nothing when there is none. The one spelling of that
+ * line's shape for the tap, swipe, launch and deep-link replies (the flow's `⚠ …` trace lines carry the same words).
+ */
+const warnLine = (note: string | undefined): string => (note !== undefined ? `\n⚠ ${note}` : '');
 
 /**
  * `Tapped <selector>`, then — when the tap went elsewhere than the centre
  * (interact/tap-judgement.ts#TapJudge.aim, 2026-10-09) — where and why, then
  * the resolution note in parentheses when there was one. And on its own line
- * below, as swipeText lays out its note, `⚠ <DISABLED_TAP>` when the tapped node
- * is marked disabled (adapters/types.ts#UiNode.disabled, D66): the tap was sent
- * all the same. Unmarked, the reply is one line.
+ * below (warnLine), `⚠ <DISABLED_TAP>` when the tapped node is marked disabled
+ * (adapters/types.ts#UiNode.disabled, D66): the tap was sent all the same.
+ * Unmarked, the reply is one line. `tapped` is what interact/tap.ts#tapElement
+ * returned, passed whole.
  */
-export const tapText = (selector: string, note: string | undefined, moved?: string, disabled?: true): string =>
-  `Tapped ${selector}${moved ? ` ${moved}` : ''}${note ? ` (${note})` : ''}` + (disabled === true ? `\n⚠ ${DISABLED_TAP}` : '');
+export const tapText = (selector: string, { note, moved, disabled }: TapMarks): string =>
+  `Tapped ${selector}${moved ? ` ${moved}` : ''}${note ? ` (${note})` : ''}` + warnLine(disabled === true ? DISABLED_TAP : undefined);
 
 /**
  * `Typed N characters` — type_text without a selector: the focused field
@@ -58,7 +65,7 @@ export const typedText = (length: number): string => `Typed ${charactersText(len
 export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string }): string =>
   `Swiped ${swipe.direction !== undefined ? `${swipe.direction} ` : ''}` +
   `(${swipe.from.x},${swipe.from.y}) → (${swipe.to.x},${swipe.to.y})` +
-  (swipe.note !== undefined ? `\n⚠ ${swipe.note}` : '');
+  warnLine(swipe.note);
 
 /**
  * `Launched <appId>[/<Activity>] on <platform>[ (state cleared)]` — after
@@ -79,7 +86,7 @@ export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string
  */
 export const launchText = (platform: Platform, launched: Launched): string =>
   `Launched ${launchedLine(launched, platform)}` +
-  (launched.note !== undefined ? `\n⚠ ${launched.note}` : '') +
+  warnLine(launched.note) +
   (launched.wiped !== undefined ? `\n${WIPE_LABEL}: ${launched.wiped}` : '');
 
 /**
@@ -94,7 +101,7 @@ export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkO
     ? chooserText(url, outcome.chooser)
     : outcome.alert !== undefined
       ? alertText(url, outcome.alert)
-      : `Opened ${url} on ${platform}` + (outcome.note !== undefined ? `\n⚠ ${outcome.note}` : '');
+      : `Opened ${url} on ${platform}` + warnLine(outcome.note);
 
 /**
  * `Android has not opened <url> yet: its chooser (<component>) is in front, asking which app opens it.`, then the
