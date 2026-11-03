@@ -97,9 +97,9 @@ exec's ExecError is read; a later run left `pgrepReason`'s "no exit code" uncove
 adapters/typeable.ts and adapters/ios-typing.ts are pure leaves of the typing refusal and its routing (ADR 0037's D43
 amendment): which characters each iOS path types, which path a text goes to, and the refusal's words and remedy. A
 flipped router or a remedy that names the wrong path would fail no device test. typeable.ts's entry names
-tests/adapters/typeable.test.ts, ios-typing.test.ts and tests/interact/type-text.test.ts, with a floor of 86 under a
-baseline of 88.89 % (36 mutants, 4 survived): the four are `named()`'s class tests with an anchor dropped, equivalent,
+tests/adapters/typeable.test.ts, ios-typing.test.ts and tests/interact/type-text.test.ts, with a floor of 88 under a
+baseline of 90.24 % (41 mutants, 4 survived): the four are `named()`'s class tests with an anchor dropped, equivalent,
 since the character a refusal names is one code point. ios-typing.ts's names tests/adapters/ios-typing.test.ts and
 typeable.test.ts, with a floor of 98 under a baseline of 100 % (23 valid mutants; 2 runtime errors). Stryker does not
 mutate a RegExp built with `new RegExp`, as both iOS sets are, so their character classes are held by hand mutants and
-per-character tests instead. The cold run of all ten modules took 92 s.
+per-character tests instead. The cold run of all ten modules took 91 s.
