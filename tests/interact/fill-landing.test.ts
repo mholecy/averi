@@ -555,6 +555,21 @@ describe('without clear, the value must be in the typing past the earlier text (
     expect(differenceOf('a1 1', e('1 ', 'a1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
   });
 
+  // D64 code review: every shape whose tail is not typed again is marked, whatever its kind — an exact prefix reads
+  // `length`
+  it.each([
+    ['-5-', '-5', '-5'],
+    [' 42 ', ' 42', ' 42'],
+    ['55', '55', '5'],
+  ])('differenceOf: `%s` for `%s` after `%s`, no tail typed again, is a length that is a whole landing too', (shown, value, before) => {
+    expect(differenceOf(shown, e(value, before))).toEqual({ kind: 'length', wholeToo: true });
+  });
+
+  it('differenceOf: a length whose tail is typed again is not marked (`Hello worldwor`, the seam `Hello world`)', () => {
+    expect(differenceOf('Hello worldwor', e('world', 'Hello world'))).toEqual({ kind: 'length' });
+    expect(differenceOf('Hello world', e('world', 'Hello wor'))).toEqual({ kind: 'length' });
+  });
+
   it('a value only inside the earlier text is no full landing: the tail is still typed again (`Note: hellohe`, f16)', () => {
     expect(droppedTail('Note: hellohe', e('hello', 'Note: hello'))).toBe('llo');
     expect(droppedTail('31.12.2021', e('12', '31.12.202'))).toBe('2');

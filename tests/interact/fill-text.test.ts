@@ -377,6 +377,14 @@ describe('fillFailureText — every error a fill throws', () => {
     );
   });
 
+  // D64 code review: the same for a plain length (an exact prefix: `-5-` for `-5` after `-5`, `55` after `5`)
+  it('a length that is a whole landing too says the field may have replaced its text, and `clear: true`', () => {
+    expect(mismatch({ kind: 'length', wholeToo: true }, 2, 3)).toBe(
+      'fill: typed 2 characters but the field shows 3 — the field may have replaced its text (select-all): fill with `clear: true` (content withheld from this error)',
+    );
+    expect(mismatch({ kind: 'length' }, 2, 3)).toBe('fill: typed 2 characters but the field shows 3 (content withheld from this error)');
+  });
+
   // D53: every typed character in order, with separators ADR 0034's rules refuse as grouping — the check, the remedy.
   it('a mismatch on a separated reading names the check and the remedy, counts only', () => {
     const SEPARATED =
