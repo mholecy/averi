@@ -1,4 +1,4 @@
-import { everyNode, labelOf, rectCentre, type Point, type Rect, type SystemAlert, type UiNode } from './types.js';
+import { everyNode, labelOf, rectCentre, type Rect, type SystemAlert, type UiNode } from './types.js';
 
 /**
  * iOS's system alert in a tree — "Open in “AveriLab”?", raised over SpringBoard when a link to an app's own scheme
