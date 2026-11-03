@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, CHOOSER_SHEET_ADVICE, chooserAdvice, chooserAlsoInFront, chooserInFocus, chooserSheet, chooserSheetSays, launchChooserNote, monkeyChooserRefusal } from '../../src/adapters/android-chooser.js';
+import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, chooserAdvice, chooserAlsoInFront, chooserInFocus, chooserSheet, chooserSheetSays, chooserSheetText, launchChooserNote, monkeyChooserRefusal, sheetAdvice } from '../../src/adapters/android-chooser.js';
 import { everyNode, type ChooserSheet, type UiNode } from '../../src/adapters/types.js';
 import type { StartRefused } from '../../src/adapters/android-start.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
@@ -349,7 +349,7 @@ describe('D55b — the launch\'s chooser wording: chooserAdvice, launchChooserNo
   });
 
   it("launchChooserNote: the chooser in front and the package not — no claim whose intent it answers — the advice, naming the activity", () => {
-    expect(launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app')).toBe(
+    expect(launchChooserNote('dev.averi.lab', { component: RESOLVER }, '`activity:` on the launch step / launch_app')).toBe(
       'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
         `is in front, and dev.averi.lab is not. ${LAUNCH_ADVICE} Naming the activity (\`activity:\` on the launch step / ` +
         'launch_app) starts it without the chooser.',
@@ -493,7 +493,7 @@ describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', (
   });
 });
 
-describe('D55c — the sheet\'s words: chooserSheetSays and the sheet advice, pinned whole', () => {
+describe('D55c — the sheet\'s words: chooserSheetSays, sheetAdvice and chooserSheetText, pinned whole', () => {
   const SHEET: ChooserSheet = {
     title: 'Open with',
     apps: [
@@ -503,52 +503,60 @@ describe('D55c — the sheet\'s words: chooserSheetSays and the sheet advice, pi
     once: { label: 'Just once', centre: { x: 723, y: 2058 }, disabled: true },
     always: { label: 'Always', centre: { x: 936, y: 2058 }, disabled: true },
   };
-  const LIST =
-    'apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at (723, 2058) ' +
-    '(disabled), "Always" at (936, 2058) (disabled)';
+  /** The same chooser with a row selected (batch-11's selected tree): neither button marked. */
+  const SELECTED: ChooserSheet = { ...SHEET, once: { ...SHEET.once, disabled: false }, always: { ...SHEET.always, disabled: false } };
+  const SAYS =
+    'Its sheet "Open with" lists the apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881) and ' +
+    'the buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058) (disabled)';
+  const LINK_ADVICE =
+    "Tap the app's row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once " +
+    "(never id:button_always: it changes the device's default for such links); press_key back drops the link. averi " +
+    'taps nothing itself.';
 
-  it('the title, what the chooser asks, the apps with their rows\' centres, the buttons with theirs and "(disabled)" where marked', () => {
-    expect(chooserSheetSays(SHEET, 'asking which app opens it')).toBe(`"Open with", asking which app opens it: ${LIST}`);
+  it('the title, the apps with their rows\' centres, the buttons with theirs and "(disabled)" where marked', () => {
+    expect(chooserSheetSays(SHEET)).toBe(SAYS);
   });
 
-  it('no title: no quoted head; one app: "app"; enabled buttons: no "(disabled)"', () => {
-    const sheet: ChooserSheet = {
-      apps: [SHEET.apps[1]],
-      once: { ...SHEET.once, disabled: false },
-      always: { ...SHEET.always, disabled: false },
-    };
-    expect(chooserSheetSays(sheet, 'and dev.averi.lab is not')).toBe(
-      'and dev.averi.lab is not: app "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at (723, 2058), "Always" at (936, 2058)',
+  it('no title: no quoted name; one app: "app"; enabled buttons: no "(disabled)"', () => {
+    const sheet: ChooserSheet = { apps: [SHEET.apps[1]], once: SELECTED.once, always: SELECTED.always };
+    expect(chooserSheetSays(sheet)).toBe(
+      'Its sheet lists the app "AveriLab" ("AveriLab twin") at (540, 1881) and the buttons "Just once" at (723, 2058), "Always" at (936, 2058)',
     );
   });
 
   it('one button disabled, the other not: the mark on that one alone', () => {
-    expect(chooserSheetSays({ ...SHEET, title: undefined, always: { ...SHEET.always, disabled: false } }, 'x')).toBe(
-      'x: apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058)',
+    expect(chooserSheetSays({ ...SHEET, always: SELECTED.always })).toBe(
+      'Its sheet "Open with" lists the apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881) and the buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058)',
     );
   });
 
-  it('CHOOSER_SHEET_ADVICE: tap the row by its x and y, then id:button_once, never id:button_always; BACK drops the link', () => {
-    expect(CHOOSER_SHEET_ADVICE).toBe(
-      "Tap the app's row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once " +
-        "(never id:button_always: it changes the device's default for such links); press_key back drops the link. averi " +
-        'taps nothing itself.',
-    );
+  it('sheetAdvice: tap the row by its x and y, then id:button_once, never id:button_always; BACK drops the link', () => {
+    expect(sheetAdvice(SHEET, 'such links', 'the link')).toBe(LINK_ADVICE);
   });
 
-  it('launchChooserNote with a sheet: the sheet quoted, the launch\'s advice, naming the activity', () => {
-    expect(launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app', SHEET)).toBe(
+  it('sheetAdvice with either button marked disabled says the tap enables the buttons; with neither, not', () => {
+    expect(sheetAdvice({ ...SHEET, once: SELECTED.once }, 'such links', 'the link')).toBe(LINK_ADVICE);
+    expect(sheetAdvice({ ...SHEET, always: SELECTED.always }, 'such links', 'the link')).toBe(LINK_ADVICE);
+    expect(sheetAdvice(SELECTED, 'such links', 'the link')).toBe(LINK_ADVICE.replace(' and enables the buttons', ''));
+  });
+
+  it('sheetAdvice ends as chooserAdvice does, for the same arguments (one ending, D55\'s and D55b\'s byte for byte)', () => {
+    const ending = (advice: string) => advice.slice(advice.indexOf(': it changes'));
+    expect(ending(sheetAdvice(SHEET, 'the intent it answers', 'the chooser'))).toBe(ending(chooserAdvice('the intent it answers', 'the chooser')));
+    expect(ending(CHOOSER_ADVICE)).toBe(": it changes the device's default for such links); press_key back drops the link. averi taps nothing itself.");
+  });
+
+  it('chooserSheetText: the sheet, then its advice', () => {
+    expect(chooserSheetText(SHEET, 'such links', 'the link')).toBe(`${SAYS}. ${LINK_ADVICE}`);
+  });
+
+  it('launchChooserNote with a sheet: D55b\'s first sentence, the sheet, the launch\'s sheet advice, naming the activity', () => {
+    expect(launchChooserNote('dev.averi.lab', { component: RESOLVER, sheet: SHEET }, '`activity:` on the launch step / launch_app')).toBe(
       'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
-        `is in front, "Open with", and dev.averi.lab is not: ${LIST}. Tap the app's row at its x and y (one tap only ` +
-        "selects it and enables the buttons), then tap id:button_once (never id:button_always: it changes the device's " +
-        'default for the intent it answers); press_key back drops the chooser. averi taps nothing itself. Naming the ' +
-        'activity (`activity:` on the launch step / launch_app) starts it without the chooser.',
+        `is in front, and dev.averi.lab is not. ${SAYS}. Tap the app's row at its x and y (one tap only selects it and ` +
+        "enables the buttons), then tap id:button_once (never id:button_always: it changes the device's default for the " +
+        'intent it answers); press_key back drops the chooser. averi taps nothing itself. Naming the activity ' +
+        '(`activity:` on the launch step / launch_app) starts it without the chooser.',
     );
-  });
-
-  it('launchChooserNote with no sheet (undefined): D55b\'s note byte for byte', () => {
-    const note = launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app');
-    expect(launchChooserNote('dev.averi.lab', RESOLVER, '`activity:` on the launch step / launch_app', undefined)).toBe(note);
-    expect(note).toContain('Take a ui_snapshot, tap the app you mean');
   });
 });

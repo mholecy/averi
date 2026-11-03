@@ -1205,9 +1205,9 @@ describe('AndroidAdapter interactions', () => {
       await expect(adapter.launch('dev.averi.lab', { intent: INTENT })).resolves.toEqual({
         note:
           'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
-          'is in front, "Open with", and dev.averi.lab is not: apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") ' +
-          'at (540, 1881); buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058) (disabled). Tap the app\'s ' +
-          'row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once (never ' +
+          'is in front, and dev.averi.lab is not. Its sheet "Open with" lists the apps "AveriLab" at (540, 1727), "AveriLab" ' +
+          '("AveriLab twin") at (540, 1881) and the buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058) ' +
+          '(disabled). Tap the app\'s row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once (never ' +
           "id:button_always: it changes the device's default for the intent it answers); press_key back drops the chooser. " +
           'averi taps nothing itself. Naming the activity (`activity:` on the launch step / launch_app) starts it without ' +
           'the chooser.',
@@ -1222,7 +1222,9 @@ describe('AndroidAdapter interactions', () => {
         execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', null, '', { timedOut: true }),
         new Error('boom'),
         '',
+        'Killed\n',
         'ERROR: null root node returned by UiTestAutomationBridge.\n',
+        '<hierarchy rotation="0"></hierarchy>',
         await fixtureText('uiautomator-lab-open.xml'),
       ];
       for (const dump of failures) {
@@ -1241,6 +1243,12 @@ describe('AndroidAdapter interactions', () => {
       const named = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt'), dump: xml });
       await expect(named.adapter.launch('dev.averi.lab', { activity: '.Twin', intent: INTENT })).resolves.toEqual({});
       expect(named.argvs).toHaveLength(1);
+    });
+
+    it("D55c: monkey's success never dumps — one call, `{}`, even with the chooser's focus and tree on offer", async () => {
+      const { adapter, argvs } = scripted({ monkey: 'Events injected: 1\n', focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt'), dump: await fixtureText('uiautomator-lab-resolver.xml') });
+      await expect(adapter.launch('dev.averi.lab')).resolves.toEqual({});
+      expect(argvs).toEqual([MONKEY]);
     });
 
     it("D55c: monkey's refusal under the chooser never dumps — its error is D55b's, two calls", async () => {

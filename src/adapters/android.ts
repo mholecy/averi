@@ -10,7 +10,7 @@ import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOutcome, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ChooserSheet, type ScreenCapture, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOutcome, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ChooserSheet, type LinkChooser, type ScreenCapture, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -53,9 +53,9 @@ const FOCUSED_WINDOW_TIMEOUT_MS = 2_000;
  */
 const CHOOSER_FOCUS_TIMEOUT_MS = 2_000;
 /**
- * The chooser's one tree read once the focus read named it (D55c, chooserSheetInFront): twice the 2.2–2.5 s a
- * uiautomator dump took on the lab (batch-11's three chooser dumps 2514, 2020 and 2054 ms; lab fact 15), under
- * waitForIdle's 10 s give-up. Past it, no sheet: the reply is D55's.
+ * The chooser's one tree read once the focus read named it (D55c, chooserSheetInFront): twice the ≈ 2.5 s a
+ * uiautomator dump takes on the lab — the chooser's own three dumps took 2514, 2020 and 2054 ms (batch-11's E2), and
+ * scroll_until's 2.2–2.5 s (lab fact 15) — under waitForIdle's 10 s give-up. Past it, no sheet: the reply is D55's.
  */
 const CHOOSER_TREE_TIMEOUT_MS = 5_000;
 
@@ -393,11 +393,10 @@ export class AndroidAdapter implements DeviceAdapter {
     // Android's chooser, and am reports it `started` (batch-11: 10 of 10). So D55's one focus read after a `-p` start
     // (≈ 70 ms measured, batch-11) — never after `-n`, which names the activity and cannot raise it. The chooser named
     // is a ⚠ note under "Launched" (D56's shape on iOS: the start happened); a failed or unmatched read is `{}`.
-    // D55c: the chooser named, one dump of its tree quotes its sheet in the note (chooserSheetInFront; none: D55b's note).
+    // D55c: the chooser named, one dump of its tree quotes its sheet in the note (linkChooserInFront; none: D55b's note).
     if (component !== undefined) return {};
-    const chooser = await this.chooserInFront();
-    if (chooser === undefined) return {};
-    return { note: launchChooserNote(packageName, chooser, NAME_THE_ACTIVITY, await this.chooserSheetInFront()) };
+    const chooser = await this.linkChooserInFront();
+    return chooser === undefined ? {} : { note: launchChooserNote(packageName, chooser, NAME_THE_ACTIVITY) };
   }
 
   async terminate(packageName: string): Promise<void> {
@@ -428,11 +427,21 @@ export class AndroidAdapter implements DeviceAdapter {
     // "Open with" chooser, which am reports as `started` (android-start.ts; measured, batch-9 D55): so ONE focus read
     // after the start asks whether the chooser is in front (D55, android-chooser.ts; ADR 0041). Only a positive
     // match changes the outcome; a failed or unreadable read, or a chooser not in front yet, is today's `{}`.
-    // D55c: the chooser named, one dump of its tree quotes its sheet (chooserSheetInFront); none is D55's `{ component }`.
-    const chooser = await this.chooserInFront();
-    if (chooser === undefined) return {};
+    // D55c: the chooser named, one dump of its tree quotes its sheet (linkChooserInFront); none is D55's `{ component }`.
+    const chooser = await this.linkChooserInFront();
+    return chooser === undefined ? {} : { chooser };
+  }
+
+  /**
+   * The chooser after averi's own start (openDeepLink, a `-p` launch): the focus read (chooserInFront) and, only once
+   * it named the chooser, the one dump of its tree (chooserSheetInFront, D55c) — `{ component, sheet? }`, or undefined
+   * when the focus names no chooser. monkey's refusal asks chooserInFront alone.
+   */
+  private async linkChooserInFront(): Promise<LinkChooser | undefined> {
+    const component = await this.chooserInFront();
+    if (component === undefined) return undefined;
     const sheet = await this.chooserSheetInFront();
-    return { chooser: { component: chooser, ...(sheet !== undefined && { sheet }) } };
+    return { component, ...(sheet !== undefined && { sheet }) };
   }
 
   /**

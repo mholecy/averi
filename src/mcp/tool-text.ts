@@ -21,7 +21,7 @@
 
 import { everyNode, type DeepLinkOutcome, type LinkAlert, type LinkChooser, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { alertButtonsText, ALERT_ADVICE } from '../adapters/ios-system-alert.js';
-import { CHOOSER_ADVICE, CHOOSER_SHEET_ADVICE, chooserSheetSays } from '../adapters/android-chooser.js';
+import { CHOOSER_ADVICE, chooserSheetText } from '../adapters/android-chooser.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
 import type { Direction } from '../interact/swipe.js';
@@ -107,16 +107,13 @@ export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkO
  * `Android has not opened <url> yet: its chooser (<component>) is in front, asking which app opens it.`, then the
  * advice (CHOOSER_ADVICE: pick the app, "Just once", never "Always"; BACK drops the link; averi taps nothing) — D55,
  * worded once in adapters/android-chooser.ts. With the chooser's sheet read (D55c, LinkChooser.sheet; ADR 0041's D55c
- * amendment) the reply quotes it — the title, each app at its row's centre, the buttons at theirs, "(disabled)" where
- * marked (chooserSheetSays) — and the advice is to tap a row by its x and y, then id:button_once
- * (CHOOSER_SHEET_ADVICE); with no sheet, D55's reply byte for byte.
+ * amendment) the advice gives way to the sheet — its title, each app at its row's centre, the buttons at theirs,
+ * "(disabled)" where marked — and the advice to tap a row by its x and y, then id:button_once (chooserSheetText); with
+ * no sheet, D55's reply byte for byte.
  */
-const chooserText = (url: string, chooser: LinkChooser): string => {
-  const inFront = `Android has not opened ${url} yet: its chooser (${chooser.component}) is in front, `;
-  return chooser.sheet === undefined
-    ? `${inFront}asking which app opens it. ${CHOOSER_ADVICE}`
-    : `${inFront}${chooserSheetSays(chooser.sheet, 'asking which app opens it')}. ${CHOOSER_SHEET_ADVICE}`;
-};
+const chooserText = (url: string, chooser: LinkChooser): string =>
+  `Android has not opened ${url} yet: its chooser (${chooser.component}) is in front, asking which app opens it. ` +
+  (chooser.sheet === undefined ? CHOOSER_ADVICE : chooserSheetText(chooser.sheet, 'such links', 'the link'));
 
 /**
  * `iOS has not opened <url> yet: it asks "<title>" — buttons "<label>" at (x, y), …` (D54), then the advice
