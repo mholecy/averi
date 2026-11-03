@@ -1,8 +1,10 @@
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tapElement } from '../../src/interact/tap.js';
+import { tapText } from '../../src/mcp/tool-text.js';
+import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { FIRST_KEY_ALONE_MS, IDB_EMPTY_RETRY_MS, IosAdapter, PGREP_TIMEOUT_MS } from '../../src/adapters/ios.js';
 import { IDB_SETTLE_CADENCE_MS, IdbEmptyTreeError, IdbTreeSource, parseIdbDescribeAll, type IosTreeSource } from '../../src/adapters/ios-tree-source.js';
 import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
@@ -65,6 +67,20 @@ const IDB_DESCRIBE_ALL = JSON.stringify([
 ]);
 
 describe('IosAdapter interactions', () => {
+  // D66 review: a real IosAdapter over the WDA parser on the committed SWIFT form capture (wda-capture-swift-form-pushed.json,
+  // CONTINUE `isEnabled` "0"): the tap is sent through idb at its centre and the reply warns. No device: the tree
+  // source answers the capture, idb's exec answers nothing but the screen size.
+  it('end to end on the WDA source: the SWIFT form\'s disabled CONTINUE is tapped all the same, and the reply warns', async () => {
+    const capture = await readFile(new URL('../fixtures/wda-capture-swift-form-pushed.json', import.meta.url), 'utf8');
+    const { fn, calls } = fakeExec({ 'idb describe': JSON.stringify({ screen_dimensions: { width_points: 402, height_points: 874 } }) });
+    const wda: IosTreeSource = { ...WDA_NO_TREE, read: async () => parseWdaSource(capture) };
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: wda });
+    const selector = 'id:swift_payment.form.continue_button';
+    const { note, moved, disabled } = await tapElement(adapter, selector, { ambiguous: 'refuse' });
+    expect(calls.at(-1)?.full).toBe('idb ui tap 201 802 --udid AAAA-1111');
+    expect(tapText(selector, note, moved, disabled)).toBe(`Tapped ${selector}\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.`);
+  });
+
   it('end to end on the idb source: tapElement resolves against describe-all and taps the center through idb', async () => {
     const { fn, calls } = fakeExec({ 'idb ui describe-all': IDB_DESCRIBE_ALL });
     const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: new IdbTreeSource({ udid: 'AAAA-1111', exec: fn }) });
