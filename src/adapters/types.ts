@@ -972,13 +972,24 @@ export interface LaunchOutcome {
  * ignores it.
  */
 /**
- * What a deep link has to say beyond "opened" — a launch's shape (LaunchOutcome) and one more: `note` is iOS's
+ * What a deep link has to say beyond "opened" — a launch's shape (LaunchOutcome) and two more: `note` is iOS's
  * foreground-wait caveat for a link to the project's own scheme (D49a), shown as the open_deep_link reply's `⚠` line;
  * `alert` (D54) is the system alert iOS shows instead of opening it ("Open in “AveriLab”?"), which replaces the reply's
- * "Opened" headline (mcp/tool-text.ts#deepLinkText). At most one of the two is set.
+ * "Opened" headline (mcp/tool-text.ts#deepLinkText); `chooser` (D55) is Android's "Open with" chooser in front instead
+ * of an app, which replaces it too. At most one of the three is set: `note` and `alert` on iOS, `chooser` on Android.
  */
 export interface DeepLinkOutcome extends LaunchOutcome {
   alert?: LinkAlert;
+  chooser?: LinkChooser;
+}
+
+/**
+ * Android's chooser a link waits behind (D55, adapters/android-chooser.ts): its component as the window manager names
+ * it (`android/com.android.internal.app.ResolverActivity`). Only the component: its labels and their centres, from
+ * the tree, are a later change's (backlog D55c).
+ */
+export interface LinkChooser {
+  component: string;
 }
 
 /**
