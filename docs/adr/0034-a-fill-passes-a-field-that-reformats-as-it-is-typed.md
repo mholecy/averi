@@ -14,6 +14,9 @@ fails `separated`, naming the check and the remedy; implemented on `fix/d53-sepa
 Amended 2026-11-02 (D60: a dropped tail that ends in an eager trailing mark is typed again; implemented on
 `fix/d60-eager-trailing-tail`).
 Amended 2026-11-03 (batch-9: D60's live proof on iOS React Native — the D60 amendment's last paragraph).
+Amended 2026-11-03 (D61: an unnamed placeholder whose letters and digits start the value's — idb's `+421` — no longer
+turns a correct grouped fill into `length`; D29's pinned `1234 5678` after `1` lands; residual 6 accepted; implemented
+on `fix/d61-placeholder-prior`).
 
 ## Context
 
@@ -256,6 +259,8 @@ app held `SK31 1200 00`).
   first (1); fill-type's old landing expression (2).
   **The golden says nothing of this change**: it replays tree reads and never runs a fill, so its `Changed 0` is no
   evidence either way; the unit tests and the owner's device re-run are.
+  Since D61 the `+421` case above lands when the reading's letters and digits are exactly the value's: see the D61
+  amendment below.
 - **rf4 is a residual of blind typing — `fill:` is its remedy.** The companion log shows D24's split ran: the first
   key alone (`S`, one idb `hid` call at 07:19:08.880), the other eleven in one burst at 07:19:09.127 (24 HID frames),
   after rf1/rf2 had reported the app's drop — and the React Native field, reformatting on every keystroke, still
@@ -513,6 +518,71 @@ two inner spaces and the eager one); g1 was ok on idb, WDA and uiautomator. On A
 added`) while the app held `SK31 1200 0000 `: the reading judged there had no trailing space, and whether the dump or
 averi drops it is unread.
 
+## Amendment: an unnamed placeholder whose letters and digits start the value's (2026-11-03, D61)
+
+**Context.** batch-9 (2026-11-03, main e734fedf, iOS simulator 27.0), live case g3: `fill(form-grouped, phoneGrouped,
+'421903123456')` without clear — format `phone3`, placeholder `+421`. The app held `421 903 123 456`; on idb averi
+replied "ERROR fill: typed 12 characters but the field shows 15", after the whole read-back poll (about 4 s). wda and
+uiautomator replied `Filled … 3 separators added`; g4 (with clear) and g5 (own spaces) were ok everywhere. idb names no
+placeholder (adapters/types.ts, `UiNode.placeholder`): the empty field's `AXValue` is `+421`, read as the field's
+value, so the fill's `before` is `+421`. The reading's letters and digits (`421903123456`) START with the earlier
+text's (`421`), so `priorsOf` judged it after `+421` alone, as the D29 amendment says ("the fallback never runs, the
+old false mismatch"): no reformat of `+421421903123456`, no prefix of it, and `differenceOf` read `length`, naming no
+remedy. Not residual 5 (no typed separator, no trailing mark). Nothing in idb's tree tells an empty field showing its
+placeholder from a filled one: the type, label, traits and role are the same, only `AXValue` differs.
+
+**Decision.**
+- `fill-landing.ts#priorsOf` alone changes. Without clear, no earlier text is tried as well, second, also when the
+  reading's letters and digits are EXACTLY the value's — `skeleton(held) === skeleton(value)` — AND they are no start
+  of the earlier text's plus the value's — `!skeleton(prior + value).startsWith(skeleton(held))`. The reading then
+  holds no more letters and digits than the value, so the earlier text is not in it; and it is no earlier text followed
+  by a typing that lost its tail, which the second conjunct excludes. What is left is an earlier text that vanished.
+  The order is unchanged: the earlier text first.
+- `landedReformat`, `tailOf` and `differenceOf`'s `separated` rule get it through `overPriors`, as they get D29's
+  fallback. g3's `421 903 123 456` after `+421` lands `reformatted`, 3 added; g4's reading without clear
+  (`+421 903 123 456` for `+421903123456` after `+421`) lands too; `421 903-123-456` after `+421` now reads D53's
+  `separated` (3 added), which names a remedy, instead of `length`.
+- **D29's pinned `1234 5678` after `1` flips, on purpose**, from refused to landing (`reformatted`, 1 added). The exact
+  rule already passes the same shape ungrouped — `12345678` after `1`, typed `12345678`, lands by `includes` — so D29's
+  guard was stricter on a grouped reading than the exact rule is on a plain one.
+- Still refused: D29's MAJOR-1 periodic case (`10,001,000` after `1,000`, typed `10001000`): its letters and digits
+  are the value's, but a start of `1000` + `10001000` — the earlier text, regrouped, may still be there. So is an
+  earlier text alone regrouped (`1 234` after `1234`, typed `1234`). MINOR-A's dash (`—`) keeps its refusal through the
+  same conjunct: with no letters or digits the earlier text's plus the value's skeleton IS the value's.
+- **Equality, not a prefix** (B-prefix, deferred): a strict prefix of the value under such a placeholder
+  (`421 903 123` after `+421`) is still judged after the earlier text alone — no tail typed again, `length` — residual
+  6 below. Widening the rule to a prefix would move ADR 0023's retype ("only provably missing characters") and flip
+  D29's `tailOf('1234 5', … '1')`; no live drop under an unnamed prefix placeholder has been seen.
+
+**Consequences.**
+- On idb, a fill without clear under an unnamed placeholder whose letters and digits start the value's says Filled
+  when the field holds the value grouped, as wda and uiautomator do, on the first read-back instead of after the whole
+  poll and an agent's retry.
+- The pass it adds is one shape: an earlier text of real content whose letters and digits start the value's, a field
+  that dropped exactly the HEAD of the typing, as many characters as the earlier text has and equal to it, and the
+  rest landed grouped. No head drop has been measured (ADR 0023's drops are tails, and D24 sends the first key alone so
+  that the head lands), and the exact rule already accepts the same shape ungrouped. A select-all field, which replaces
+  the earlier text on focus, really holds the value, as D29 already accepts.
+- Out of scope: a fill without clear whose reading is unchanged from `before` but already contains the value
+  (`Hello world` typed `world`, `+421` typed `421`) passes by the exact rule's `includes` — not this rule; a backlog row
+  of its own (D63).
+
+**Mutation-checked**: hand mutants, each killed — the new disjunct removed (5 tests fail); the second conjunct removed
+(5: MAJOR-1, an earlier text alone regrouped, MINOR-A's dash); `===` as `skeleton(value).startsWith(…)`, the prefix
+form (2: D29's `1234 5` and residual 6's tail); compared on the text as typed, not the skeleton (5); `skeleton(prior +
+value)` as `skeleton(value)` (5); the D29 disjunct's `||` as `&&` (9); the order reversed, no earlier text first (1);
+the conjunct's `!` dropped (10). `skeleton(prior) + skeleton(value)` is equivalent (the skeleton distributes over
+concatenation). `npm run mutate` (cold): fill-landing 95.33 → 95.51 %
+(floor 93; 267 mutants, 12 survived, 4 timeouts — none in the new condition), fill-reformat 94.80 % (floor 92, no code
+change); floors unchanged.
+
+**Golden and live.** The golden replays tree reads and never types: Changed 0, which is no evidence either way; the
+unit tests are (fill-landing.test.ts's D29 and D61 groups, and fill.test.ts's idb-like `+421` field). Live: g3 on idb
+should move from MISMATCH failed-holds to ok (it is not in live-known.ts); f13 passes by the exact rule, g4 runs with
+clear, g5 is exact, and wda and uiautomator dump no `+421` as `before`, so nothing else moves. Not checked on the
+device: `live.ts --groups forms --cases g3,g4,g5,f13` on idb and wda, a later batch's (g3 should read `Filled … (12
+characters, the field shows them reformatted: 3 separators added)`).
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
@@ -531,3 +601,7 @@ averi drops it is unread.
    shown after a drop from the middle (`12/` of `1234/56`), so a false mismatch, the safe side. Remedy, for a field
    that regroups the value the way it shows it: type the value without its own separators (`+421903123456`) — the
    field's marks are then all added, and a dropped tail is typed again.
+6. **A dropped tail under an unnamed placeholder whose letters and digits start the value's is not typed again**
+   (D61's amendment, the equality form): on idb, `421 903 123` for a typed `421903123456` after the empty field's
+   `+421` is judged after the placeholder alone — no prefix of `+421421903123456` — and fails `length`, no tail typed
+   again. Remedy: fill with `clear: true`, so the earlier text is none and the tail is typed again.
