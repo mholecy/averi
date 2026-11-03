@@ -499,6 +499,12 @@ describe('without clear, the value must be in the typing past the earlier text (
     expect(landingOf('Hello world', e('Hello ', 'world'))).toEqual({ kind: 'landed' });
   });
 
+  // the same where the reading's letters and digits still start with the earlier text's, so no prior but it is tried
+  // (`priorsOf`): a sign typed at the caret before the number
+  it('the caret at the start: `-` typed before `5` reads `-5`, which lands', () => {
+    expect(landingOf('-5', e('-', '5'))).toEqual({ kind: 'landed' });
+  });
+
   it('with clear the rule is equality, untouched', () => {
     expect(landingOf('Hello worldw', e('Hello worldw', 'Hello world', { clear: true }))).toEqual({ kind: 'landed' });
   });
@@ -534,6 +540,13 @@ describe('without clear, the value must be in the typing past the earlier text (
   ])('`%s` typed `%s` after `%s`: the value alone, decorated — no tail to type again', (shown, value, before) => {
     expect(landingOf(shown, e(value, before))).toBeUndefined();
     expect(droppedTail(shown, e(value, before))).toBeUndefined();
+  });
+
+  // the decorated-value clause asks that the reading hold the value: a dropped trailing mark has the value's letters
+  // and digits but not the value, and is typed again
+  it('a typed `12/` that kept `12` (with or without an earlier text) still has its `/` typed again', () => {
+    expect(droppedTail('12', e('12/', null))).toBe('/');
+    expect(droppedTail('Note: 12', e('12/', 'Note: '))).toBe('/');
   });
 
   it('a value only inside the earlier text is no full landing: the tail is still typed again (`Note: hellohe`, f16)', () => {
