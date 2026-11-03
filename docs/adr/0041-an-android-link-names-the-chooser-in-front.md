@@ -192,31 +192,38 @@ physical keys but with factor 2.0%.": the wrong cause, and a warning quoted as t
   `adapters/android-chooser.ts#launchChooserNote`:
 
   > Android has not brought dev.averi.lab forward yet: its chooser
-  > (android/com.android.internal.app.ResolverActivity) is in front, asking which of dev.averi.lab's activities takes
-  > the intent. Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always":
-  > it changes the device's default for this intent); press_key back drops the launch. averi taps nothing itself.
-  > Naming the activity (`activity:` on the launch step / launch_app) starts it without the chooser.
+  > (android/com.android.internal.app.ResolverActivity) is in front, and dev.averi.lab is not. Take a ui_snapshot, tap
+  > the app you mean, then its "Just once" button if it shows one (never "Always": it changes the device's default for
+  > the intent it answers); press_key back drops the chooser. averi taps nothing itself. Naming the activity
+  > (`activity:` on the launch step / launch_app) starts it without the chooser.
 
   This is D56's shape on iOS (ADR 0032's D56 amendment): the start happened, so a launch never fails for what holds
   it (`LaunchOutcome`). No type, `launchText` or engine change: `flow/launch.ts` already carries `note` to
   `launch_app`, the flow's `launch` step and the ensure_state ladder. The last sentence is the usable part: `-p`
-  scopes the intent to the package, so the chooser offers only that app's activities, and `-n` skips it.
+  scopes the intent to the package, so a chooser it raises offers only that app's activities, and `-n` skips it. The
+  note claims no more than the read saw (review round 1): the chooser in front and the package not. A chooser left up
+  by another app's link reads the same, so the note does not say whose intent it answers.
 - On monkey's refusal only (a non-zero exit with a `** ` line, `runStart`'s `refused`), the same one read. When it
   names the chooser, the error is `launchChooserNote`'s sibling `monkeyChooserRefusal`, the ExecError still its cause:
 
   > monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) is
-  > in front, and monkey starts nothing over it (exit 251 on API 33). Answer it (ui_snapshot, the app, "Just once")
-  > or press_key back to drop it, then launch again. averi taps nothing itself.
+  > in front, and monkey starts nothing over it (it exited 251). Take a ui_snapshot, tap the app you mean, then its
+  > "Just once" button if it shows one (never "Always": it changes the device's default for the intent it answers);
+  > press_key back drops the chooser. averi taps nothing itself. Then launch again.
 
-  It quotes no monkey line. The exit code's meaning was not traced in Monkey.java, so nothing depends on it beyond
-  the observation.
+  The exit code is monkey's own (the ExecError's; batch-10's refusal was recorded as 252), left out when there is none.
+  Of monkey's `** ` lines every real reason is quoted after the exit, `monkey said: <line> / <line>`, e.g. `** No
+  activities found to run, monkey aborted.`; only a line that is the emulator's `** SYS_KEYS …` warning, from its
+  start, is not. The exit code's meaning was not traced in Monkey.java, so nothing depends on it beyond the
+  observation.
 - Fail open: a failed, timed-out or unmatched read gives today's reply byte for byte, `Launched …` or monkey's old
   error. `-n` (an activity named) reads nothing, nor does a monkey that started something, nor a thrown monkey or
   `am start` failure with no diagnosis (adb gone, a timeout), nor a refused `-p` start, which throws `launchRefused`
   as before.
 - One advice builder: `chooserAdvice(defaultFor, drops)` in `adapters/android-chooser.ts`. `CHOOSER_ADVICE` is
-  `chooserAdvice('such links', 'the link')`, so `open_deep_link`'s reply is byte-identical; the launch note uses
-  `chooserAdvice('this intent', 'the launch')`. The strings live in the mutated module and are pinned whole.
+  `chooserAdvice('such links', 'the link')`, so `open_deep_link`'s reply is byte-identical; both launch paths use
+  `chooserAdvice('the intent it answers', 'the chooser')`, so monkey's error keeps the never-"Always" warning too. The
+  strings live in the mutated module and are pinned whole.
 - Not taken: a headline that is never `Launched` (batch-10's wording of the candidate). It would change `LaunchOutcome`,
   `launchText`, the engine's trace and iOS's D56 shape together: a cross-platform reply decision, a separate item only
   if an agent misreads the note. Also not taken: a throw (the start happened, and the ensure_state ladder would be
@@ -233,12 +240,16 @@ expects the note and the focus read after the start; E4c expects the chooser err
 output (its stdout and stderr kept as fixtures) as well as batch-10's quoted line. New: batch-11's `-p` stdout and
 averi's own read at its return (the window `null`, and the chooser's), the one-handler control read, each fail-open
 answer, a refused `-p` start, `clearState`'s order, `-n` with the intent, monkey's success, monkey refused with no
-chooser named, a monkey failure with no diagnosis; `tests/mcp/android-chooser-replies.test.ts` runs a real adapter
+chooser named, monkey refused with a real reason under the chooser (quoted, the warning not), a monkey failure with no
+diagnosis; `tests/mcp/android-chooser-replies.test.ts` runs a real adapter
 through `launch_app`'s reply, the flow's `⚠ launch` line and `open_deep_link`'s unchanged reply. Hand mutants on
 `android.ts` (the `-p` read dropped, a read on `-n`, a read before the refusal check, the fail-open dropped, monkey
 ignoring the chooser, a read after monkey's success or on its thrown failure, the cause dropped, the wrong activity
-hint) and on the advice arguments: each killed. `npm run mutate` (cold): android-chooser 100 % (floor 98; 64
-mutants, 0 survived), every other module's score unchanged, floors unchanged. Golden Changed 0 (it replays tree
+hint) and on the advice arguments: each killed. Review round 1's, the same way: the SYS_KEYS filter dropped or
+unanchored, real reasons never quoted, a fixed exit code, no exit code or no lines passed from the adapter, a `null`
+exit printed, monkey's old advice, the note's old claim, the launch advice in the link's wording: each killed. `npm run
+mutate` (cold, after review round 1): android-chooser 100 % (floor 98; 79 mutants, 0 survived; 64 before it), every
+other module's score unchanged, floors unchanged. Golden Changed 0 (it replays tree
 reads, not focus reads).
 
 Residuals, stated:
