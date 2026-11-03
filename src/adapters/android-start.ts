@@ -54,7 +54,8 @@ import { ExecError, type ExecResult } from './exec.js';
  *
  * `Warning:` lines are NOT refusals ("Activity not started, its current task
  * has been brought to the front" is a successful warm launch). A url two
- * apps handle starts the system chooser — an activity started, so `started`.
+ * apps handle starts the system chooser — an activity started, so `started`;
+ * the deep link then reads the focus to name it (D55, android-chooser.ts).
  *
  * `monkey` — its exit status IS the verdict (the review's measurement: exit
  * 252 for a package with nothing to launch), and its own diagnoses are the
