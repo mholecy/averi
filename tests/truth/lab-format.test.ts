@@ -7,14 +7,23 @@ import { describe, expect, it } from 'vitest';
 // table in their comments: a change to one rule is a change to all three apps and to this table.
 //
 // The file is transpiled here, not imported: the RN app's tsconfig extends a package only its own node_modules hold
-// (the RN README's install), which a checkout of averi alone has not got.
+// (the RN README's install), which a checkout of averi alone has not got. Its module is evaluated from a data: URL, so
+// src/format.ts must stay import-free (no relative or package import resolves there): the first test says so loudly.
 type Format = (format: string | undefined, text: string) => string;
 const source = readFileSync(new URL('../../fixtures/apps/rn/src/format.ts', import.meta.url), 'utf8');
+/** Every import or re-export the RN format module would need resolved — none may be there. */
+const imports = ts.preProcessFile(source, true, true).importedFiles.map((f) => f.fileName);
 const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const { formatted } = (await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)) as { formatted: Format };
+const { formatted } = (imports.length > 0 ? { formatted: () => { throw new Error(`rn/src/format.ts imports ${imports.join(', ')}: it cannot be evaluated alone`); } } : await import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`)) as { formatted: Format };
 
 const NBSP = '\u00A0';
 const NNBSP = '\u202F';
+
+describe('rn/src/format.ts, as this test reads it', () => {
+  it('imports nothing: it is evaluated alone, from a data: URL (keep it so, or load it another way)', () => {
+    expect(imports).toEqual([]);
+  });
+});
 
 describe('group4eager (L7, D60): groups of four, and a space as soon as a group is complete, but none at 24 characters', () => {
   it.each([
@@ -26,6 +35,10 @@ describe('group4eager (L7, D60): groups of four, and a space as soon as a group 
     ['SK311', 'SK31 1'],
     ['SK3112000000', 'SK31 1200 0000 '],
     ['SK3112000000123', 'SK31 1200 0000 123'],
+    ['SK31120000', 'SK31 1200 00'],
+    ['SK3112000000198742637541', 'SK31 1200 0000 1987 4263 7541'],
+    ['SK31120000001987426375', 'SK31 1200 0000 1987 4263 75'],
+    ['SK311200000019874263', 'SK31 1200 0000 1987 4263 '],
     ['SK31 1200 0000 123', 'SK31 1200 0000 123'],
     [`SK31${NBSP}1200${NNBSP}0000`, 'SK31 1200 0000 '],
     ['SK31120000001234567890', 'SK31 1200 0000 1234 5678 90'],
