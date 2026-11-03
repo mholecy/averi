@@ -159,8 +159,9 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
   10 s, the typing 2 s + 50 ms a character (about three times G3's). A lost session (HTTP 404, or "invalid session
   id") is made again once and the text sent once more — G4 measured that nothing was typed then. A request that did not
   complete (its budget ran out, or the connection went) is never sent again, because it may have typed part of the
-  text: it fails saying so. Any other error answer fails with WDA's error and message (the typed text cut out of it),
-  the port and the log. `FetchFn` takes a POST's method, headers and body; its GET callers are unchanged.
+  text: it fails saying so. Any other error answer fails with its HTTP status and WDA's `value.error` alone, the port
+  and the log — not WDA's message, which is NSError's description and may hold the value escaped (`\U0161`) or in
+  part. `FetchFn` takes a POST's method, headers and body; its GET callers are unchanged.
   `WdaTreeSource.typeText` delegates to it and gives the released error after `dispose()`, as `read()` does.
 - **The set** (`IosAdapter.typeable`, decided by the source's typer, not its kind): over WDA's source `WDA_TYPEABLE` —
   idb's set, plus the BMP letters of the Latin, Greek, Cyrillic and Han scripts, Common-script numbers, punctuation and

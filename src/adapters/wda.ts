@@ -93,14 +93,14 @@ export type FetchFn = (
 const defaultFetch: FetchFn = (url, init) => fetch(url, init);
 
 /**
- * WDA's error answer as a reply says it: the status, and the W3C body's `value.error` and `value.message` (cut to 200
- * characters) when it has them — with every occurrence of `text`, the typed value, replaced by `…`.
+ * WDA's error answer as a reply says it: the status, and the W3C body's `value.error`; its `value.message` (cut to 200
+ * characters) only `withMessage` — never for `/wda/keys`, whose message is NSError's description and may hold the typed
+ * value, escaped (`\U0161`) or in part, where no cut of the text can find it (review round 1).
  */
-function wdaAnswer(status: number, body: unknown, text?: string): string {
+function wdaAnswer(status: number, body: unknown, withMessage: boolean): string {
   const value = (body as { value?: { error?: unknown; message?: unknown } } | undefined)?.value;
   const error = typeof value?.error === 'string' ? ` ${value.error}` : '';
-  let message = typeof value?.message === 'string' ? value.message : '';
-  if (text !== undefined && text !== '') message = message.split(text).join('…');
+  const message = withMessage && typeof value?.message === 'string' ? value.message : '';
   return `HTTP ${status}${error}${message === '' ? '' : `: ${message.slice(0, 200)}`}`;
 }
 
@@ -325,8 +325,8 @@ export class WdaServer {
    *   made again once and the text sent once more; a second loss fails.
    * - A request that did not complete (its budget, keysTimeoutMs, ran out, or the connection went) is NEVER sent again:
    *   it may have typed part of the text, and a retry could type it twice. It fails saying so.
-   * - Any other error answer fails quoting WDA's error and message — with the text cut out of it: a value may be a
-   *   credential — naming the port and the log, as askOnce does.
+   * - Any other error answer fails with its status and WDA's error alone — not WDA's message, which may hold the value
+   *   (a credential, perhaps) — naming the port and the log, as askOnce does.
    */
   async keys(text: string): Promise<void> {
     await this.ensureRunning();
@@ -336,7 +336,7 @@ export class WdaServer {
       answer = await this.postKeys(await this.sessionId(), text);
     }
     if (answer.kind === 'typed') return;
-    throw new Error(`WDA /wda/keys failed: ${wdaAnswer(answer.status, answer.body, text)} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`);
+    throw new Error(`WDA /wda/keys failed: ${wdaAnswer(answer.status, answer.body, false)} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`);
   }
 
   /** This WDA start's session for keys(): the one made on it, or a new one (KEYS_SESSION), single-flight. */
@@ -361,7 +361,7 @@ export class WdaServer {
     }
     const body = (await res.json().catch(() => undefined)) as { sessionId?: unknown; value?: { sessionId?: unknown } } | undefined;
     const id = body?.sessionId ?? body?.value?.sessionId;
-    if (!res.ok || typeof id !== 'string' || id === '') throw new Error(`WDA POST /session failed: ${wdaAnswer(res.status, body)} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`);
+    if (!res.ok || typeof id !== 'string' || id === '') throw new Error(`WDA POST /session failed: ${wdaAnswer(res.status, body, true)} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`);
     return id;
   }
 

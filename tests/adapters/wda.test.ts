@@ -692,7 +692,7 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     const { server, posts } = await keysSetup(() => ({ status: 404, body: { value: { error: 'invalid session id', message: 'Session does not exist' } } }));
     const err = await server.keys('Šťastný').then(() => undefined, (e: Error) => e);
     expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session', '/session/S2/wda/keys']);
-    expect(err?.message).toMatch(/^WDA \/wda\/keys failed: HTTP 404 invalid session id: Session does not exist on port \d+ \(udid AAAA-1111\) — /);
+    expect(err?.message).toMatch(/^WDA \/wda\/keys failed: HTTP 404 invalid session id on port \d+ \(udid AAAA-1111\) — /);
     expect(err?.message).toContain(server.logPath);
     server.stop();
   });
@@ -716,12 +716,18 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     server.stop();
   });
 
-  it('a 500 "invalid element state" fails quoting WDA\'s error and message, the port and the log — never the text', async () => {
-    const { server } = await keysSetup(() => ({ status: 500, body: { value: { error: 'invalid element state', message: 'Failed to type "Šťastný": no keyboard focus' } } }));
+  // Review round 1: WDA's message is NSError's description, which may hold the value escaped (`\\U0161`) or a part of
+  // it — no cut of the text can be sure of it, so /wda/keys' error quotes the status and `value.error` alone.
+  it.each([
+    ['the value quoted whole', 'Failed to type "Šťastný": no keyboard focus'],
+    ['the value escaped (NSError\'s description)', 'Error Domain=XCTDaemonErrorDomain "Failed to type \\U0160\\U0165astn\\U00fd"'],
+    ['a part of the value quoted', 'typing stopped after "Šťas"'],
+  ])('a 500 "invalid element state", its message %s: fails with the status and WDA\'s error alone, the port and the log', async (_what, message) => {
+    const { server } = await keysSetup(() => ({ status: 500, body: { value: { error: 'invalid element state', message } } }));
     const err = await server.keys('Šťastný').then(() => undefined, (e: Error) => e);
-    expect(err?.message).toMatch(/^WDA \/wda\/keys failed: HTTP 500 invalid element state: Failed to type "…": no keyboard focus on port \d+ \(udid AAAA-1111\) — /);
+    expect(err?.message).toMatch(/^WDA \/wda\/keys failed: HTTP 500 invalid element state on port \d+ \(udid AAAA-1111\) — xcodebuild log: /);
     expect(err?.message).toContain(server.logPath);
-    expect(err?.message).not.toContain('Šťastný');
+    for (const leak of ['Šťas', 'U0160', 'astn', message]) expect(err?.message).not.toContain(leak);
     server.stop();
   });
 

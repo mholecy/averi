@@ -372,7 +372,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
 
   it('a failure is WDA\'s, in its words', async () => {
     const { source } = await typingSetup(() => ({ status: 500, body: { value: { error: 'invalid element state', message: 'no focus' } } }));
-    await expect(source.typeText('Šťastný')).rejects.toThrow(/^WDA \/wda\/keys failed: HTTP 500 invalid element state: no focus on port/);
+    await expect(source.typeText('Šťastný')).rejects.toThrow(/^WDA \/wda\/keys failed: HTTP 500 invalid element state on port/);
     await source.dispose();
   });
 
