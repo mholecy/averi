@@ -1013,15 +1013,17 @@ describe('AndroidAdapter interactions', () => {
     );
     const START = ['-s', 'e', 'shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'averilab://shared/open'];
     const FOCUS = ['-s', 'e', 'shell', "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='"];
+    /** D55c: the chooser's tree, read once the focus read named it. */
+    const DUMP = ['-s', 'e', 'exec-out', 'uiautomator', 'dump', '/dev/tty'];
     type Answer = { stdout?: string; stderr?: string } | Error;
-    /** Records each call's argv and timeout; `am start` and the focus read answer as given, anything else empty. */
-    const scripted = (start: Answer, focus: Answer) => {
+    /** Records each call's argv and timeout; `am start`, the focus read and the dump answer as given, anything else empty. */
+    const scripted = (start: Answer, focus: Answer, dump: Answer = {}) => {
       const argvs: string[][] = [];
       const timeouts: (number | undefined)[] = [];
       const fn: ExecFn = async (_cmd, args, opts) => {
         argvs.push(args);
         timeouts.push(opts?.timeoutMs);
-        const reply = args.includes('am') ? start : args.some((a) => a.startsWith('dumpsys window displays')) ? focus : {};
+        const reply = args.includes('am') ? start : args.some((a) => a.startsWith('dumpsys window displays')) ? focus : args.includes('uiautomator') ? dump : {};
         if (reply instanceof Error) throw reply;
         return { stdout: Buffer.from(reply.stdout ?? ''), stderr: reply.stderr ?? '' };
       };
@@ -1035,12 +1037,59 @@ describe('AndroidAdapter interactions', () => {
       expect(timeouts[1]).toBe(2_000);
     });
 
-    it('the chooser in front: `{ chooser: { component } }`, after the same two calls', async () => {
-      const { adapter, argvs } = scripted({ stdout: STARTED }, { stdout: RESOLVER_FOCUS });
+    it('the chooser in front, its dump printing no XML: `{ chooser: { component } }`, after the two calls and the one dump (5 s)', async () => {
+      const { adapter, argvs, timeouts } = scripted({ stdout: STARTED }, { stdout: RESOLVER_FOCUS });
       await expect(adapter.openDeepLink('averilab://shared/open')).resolves.toEqual({
         chooser: { component: 'android/com.android.internal.app.ResolverActivity' },
       });
-      expect(argvs).toEqual([START, FOCUS]);
+      // D55c: the pin changed on purpose — the chooser named, its tree is read once.
+      expect(argvs).toEqual([START, FOCUS, DUMP]);
+      expect(timeouts[2]).toBe(5_000);
+    });
+
+    // D55c (ADR 0041's D55c amendment): the chooser named, ONE dump of its tree (5 s, never uiTree's 15 s, its retry or
+    // its `get-state`), judged by android-chooser.ts#chooserSheet. Anything but the measured layout is today's outcome.
+    it('the chooser in front, its dump batch-10\'s fresh chooser: the sheet beside the component', async () => {
+      const xml = await readFile(new URL('../fixtures/uiautomator-lab-resolver.xml', import.meta.url), 'utf8');
+      const { adapter, argvs, timeouts } = scripted({ stdout: STARTED }, { stdout: RESOLVER_FOCUS }, { stdout: `${xml}\nUI hierchary dumped to: /dev/tty\n` });
+      await expect(adapter.openDeepLink('averilab://shared/open')).resolves.toEqual({
+        chooser: {
+          component: 'android/com.android.internal.app.ResolverActivity',
+          sheet: {
+            title: 'Open with',
+            apps: [
+              { label: 'AveriLab', centre: { x: 540, y: 1727 } },
+              { label: 'AveriLab', detail: 'AveriLab twin', centre: { x: 540, y: 1881 } },
+            ],
+            once: { label: 'Just once', centre: { x: 723, y: 2058 }, disabled: true },
+            always: { label: 'Always', centre: { x: 936, y: 2058 }, disabled: true },
+          },
+        },
+      });
+      expect(argvs).toEqual([START, FOCUS, DUMP]);
+      expect(timeouts[2]).toBe(5_000);
+    });
+
+    it('a dump that fails, times out, prints no XML, says "null root node", or is not the chooser\'s layout: `{ chooser: { component } }` exactly — one dump, no retry, no get-state', async () => {
+      const other = await readFile(new URL('../fixtures/uiautomator-lab-open.xml', import.meta.url), 'utf8');
+      const failures: Answer[] = [
+        execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', 255, "adb: device 'e' not found\n"),
+        execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', null, '', { timedOut: true }),
+        new Error('boom'),
+        {},
+        { stdout: 'Killed\n' },
+        { stdout: 'ERROR: null root node returned by UiTestAutomationBridge.\n' },
+        { stdout: '<hierarchy rotation="0"></hierarchy>' },
+        { stdout: other },
+      ];
+      for (const dump of failures) {
+        const { adapter, argvs } = scripted({ stdout: STARTED }, { stdout: RESOLVER_FOCUS }, dump);
+        const outcome = await adapter.openDeepLink('averilab://shared/open');
+        expect(outcome).toEqual({ chooser: { component: 'android/com.android.internal.app.ResolverActivity' } });
+        expect(outcome.chooser !== undefined && 'sheet' in outcome.chooser).toBe(false);
+        expect(argvs).toEqual([START, FOCUS, DUMP]);
+      }
+      expect(sleeps).toEqual([]);
     });
 
     it('a focus read that fails (grep found neither line, adb gone, a timeout) or says nothing: `{}`, today\'s reply', async () => {
@@ -1088,6 +1137,8 @@ describe('AndroidAdapter interactions', () => {
     const START_P = ['-s', 'e', 'shell', 'am', 'start', '-p', 'dev.averi.lab', '-a', 'android.intent.action.VIEW', '-d', 'averilab://shared/x'];
     const MONKEY = ['-s', 'e', 'shell', 'monkey', '-p', 'dev.averi.lab', '-c', 'android.intent.category.LAUNCHER', '1'];
     const FOCUS = ['-s', 'e', 'shell', "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='"];
+    /** D55c: the chooser's tree, read once the focus read named it after a `-p` start. */
+    const DUMP = ['-s', 'e', 'exec-out', 'uiautomator', 'dump', '/dev/tty'];
     /** The one `** ` line batch-10's E4c reply quotes of monkey's stdout. */
     const MONKEY_LINE = '** SYS_KEYS has no physical keys but with factor 2.0%.';
     const ADVICE =
@@ -1107,8 +1158,8 @@ describe('AndroidAdapter interactions', () => {
       'or name the activity to start: `activity:` on the launch step / launch_app, or app.android.activity in ' +
       `averi.yaml — or monkey itself could not run; its line says which. monkey said: ${said}`;
     type Answer = string | Error;
-    /** Each call's argv and timeout; `am start` answers `start`, monkey `monkey`, the focus read `focus`, anything else ''. */
-    const scripted = (answers: { start?: Answer; monkey?: Answer; focus: Answer }) => {
+    /** Each call's argv and timeout; `am start` answers `start`, monkey `monkey`, the focus read `focus`, the dump `dump`, anything else ''. */
+    const scripted = (answers: { start?: Answer; monkey?: Answer; focus: Answer; dump?: Answer }) => {
       const argvs: string[][] = [];
       const timeouts: (number | undefined)[] = [];
       const fn: ExecFn = async (_cmd, args, opts) => {
@@ -1116,7 +1167,8 @@ describe('AndroidAdapter interactions', () => {
         timeouts.push(opts?.timeoutMs);
         const answer = args.includes('monkey') ? (answers.monkey ?? '')
           : args.includes('am') ? (answers.start ?? '')
-            : args.some((a) => a.startsWith('dumpsys window')) ? answers.focus : '';
+            : args.some((a) => a.startsWith('dumpsys window')) ? answers.focus
+              : args.includes('uiautomator') ? (answers.dump ?? '') : '';
         if (answer instanceof Error) throw answer;
         return { stdout: Buffer.from(answer), stderr: '' };
       };
@@ -1129,8 +1181,10 @@ describe('AndroidAdapter interactions', () => {
       const { adapter, argvs, timeouts } = scripted({ start: STARTED, focus });
       const outcome = await adapter.launch('dev.averi.lab', { intent: INTENT });
       expect(outcome).toEqual({ note: NOTE });
-      expect(argvs).toEqual([START_P, FOCUS]);
+      // D55c: the pin changed on purpose — the chooser named, its tree is read once (here it prints no XML: the note as before).
+      expect(argvs).toEqual([START_P, FOCUS, DUMP]);
       expect(timeouts[1]).toBe(2_000);
+      expect(timeouts[2]).toBe(5_000);
       expect(launchText('android', { app: 'dev.averi.lab', note: outcome.note })).toBe(`Launched dev.averi.lab on android\n⚠ ${NOTE}`);
       expect(focus).toContain(`mFocusedApp=ActivityRecord{484f3c8 u0 ${RESOLVER}} t2694}`);
     });
@@ -1141,8 +1195,61 @@ describe('AndroidAdapter interactions', () => {
       for (const read of ['dumpsys-window-focus-api33-b11-after-launch-intent-start.txt', 'dumpsys-window-focus-api33-b11-after-launch-intent-start-chooser-window.txt']) {
         const { adapter, argvs } = scripted({ start, focus: await fixtureText(read) });
         await expect(adapter.launch('dev.averi.lab', { intent: INTENT })).resolves.toEqual({ note: NOTE });
-        expect(argvs).toEqual([START_P, FOCUS]);
+        expect(argvs).toEqual([START_P, FOCUS, DUMP]);
       }
+    });
+
+    it('D55c: the `-p` start raised the chooser and its dump is batch-10\'s fresh chooser — the note quotes the sheet', async () => {
+      const xml = await fixtureText('uiautomator-lab-resolver.xml');
+      const { adapter, argvs, timeouts } = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt'), dump: xml });
+      await expect(adapter.launch('dev.averi.lab', { intent: INTENT })).resolves.toEqual({
+        note:
+          'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
+          'is in front, "Open with", and dev.averi.lab is not: apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") ' +
+          'at (540, 1881); buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058) (disabled). Tap the app\'s ' +
+          'row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once (never ' +
+          "id:button_always: it changes the device's default for the intent it answers); press_key back drops the chooser. " +
+          'averi taps nothing itself. Naming the activity (`activity:` on the launch step / launch_app) starts it without ' +
+          'the chooser.',
+      });
+      expect(argvs).toEqual([START_P, FOCUS, DUMP]);
+      expect(timeouts[2]).toBe(5_000);
+    });
+
+    it('D55c: after the `-p` start a dump that fails, times out, prints no XML, says "null root node", or is not the chooser\'s: D55b\'s note byte for byte — one dump, no retry, no get-state', async () => {
+      const failures: Answer[] = [
+        execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', 255, "adb: device 'e' not found\n"),
+        execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', null, '', { timedOut: true }),
+        new Error('boom'),
+        '',
+        'ERROR: null root node returned by UiTestAutomationBridge.\n',
+        await fixtureText('uiautomator-lab-open.xml'),
+      ];
+      for (const dump of failures) {
+        const { adapter, argvs } = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt'), dump });
+        await expect(adapter.launch('dev.averi.lab', { intent: INTENT })).resolves.toEqual({ note: NOTE });
+        expect(argvs).toEqual([START_P, FOCUS, DUMP]);
+      }
+      expect(sleeps).toEqual([]);
+    });
+
+    it('D55c: an app in front after the `-p` start, or `-n`, never dumps — even with a dump that would quote a sheet', async () => {
+      const xml = await fixtureText('uiautomator-lab-resolver.xml');
+      const lab = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b10-lab-window-null.txt'), dump: xml });
+      await expect(lab.adapter.launch('dev.averi.lab', { intent: INTENT })).resolves.toEqual({});
+      expect(lab.argvs).toEqual([START_P, FOCUS]);
+      const named = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt'), dump: xml });
+      await expect(named.adapter.launch('dev.averi.lab', { activity: '.Twin', intent: INTENT })).resolves.toEqual({});
+      expect(named.argvs).toHaveLength(1);
+    });
+
+    it("D55c: monkey's refusal under the chooser never dumps — its error is D55b's, two calls", async () => {
+      const failure = execErrorLikeExec('adb -s e shell monkey', 251, await fixtureText('monkey-api33-b11-chooser-exit251-stderr.txt'), {
+        stdout: await fixtureText('monkey-api33-b11-chooser-exit251-stdout.txt'),
+      });
+      const { adapter, argvs } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt'), dump: await fixtureText('uiautomator-lab-resolver.xml') });
+      expect((await failureOf(adapter.launch('dev.averi.lab')))?.message).toBe(monkeyChooser(251));
+      expect(argvs).toEqual([MONKEY, FOCUS]);
     });
 
     it('the `-p` start with an app in front (batch-10\'s one-handler control read): `{}`, today\'s "Launched" byte for byte', async () => {
@@ -1175,7 +1282,7 @@ describe('AndroidAdapter interactions', () => {
     it('clearState with a `-p` start: `pm clear`, the start, then the focus read — in that order', async () => {
       const { adapter, argvs } = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt') });
       await expect(adapter.launch('dev.averi.lab', { intent: INTENT, clearState: true })).resolves.toEqual({ note: NOTE });
-      expect(argvs).toEqual([['-s', 'e', 'shell', 'pm', 'clear', 'dev.averi.lab'], START_P, FOCUS]);
+      expect(argvs).toEqual([['-s', 'e', 'shell', 'pm', 'clear', 'dev.averi.lab'], START_P, FOCUS, DUMP]);
     });
 
     it('`-n` with the same intent pays nothing: one `am start`, `{}` though the chooser is in front (the route around it)', async () => {

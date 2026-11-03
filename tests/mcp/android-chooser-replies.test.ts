@@ -9,6 +9,7 @@ import { deepLinkText, launchText, tapText } from '../../src/mcp/tool-text.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
+import { execErrorLikeExec } from '../helpers/exec-error.js';
 
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
 
@@ -26,11 +27,12 @@ const fixture = (name: string) => readFile(new URL(`../fixtures/${name}`, import
  * A real AndroidAdapter over batch-11's D55b replies (averi_lab, API 33): every `am start` answers the `-p` start's real
  * stdout, the focus read averi's own read at its return — the chooser in front.
  */
-async function chooserUp(): Promise<AndroidAdapter> {
+async function chooserUp(dump: string | Error = ''): Promise<AndroidAdapter> {
   const start = await fixture('am-start-p-api33-b11-chooser.txt');
   const focus = await fixture('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt');
   const exec: ExecFn = async (_cmd, args) => {
-    const stdout = args.includes('am') ? start : args.some((a) => a.startsWith('dumpsys window')) ? focus : '';
+    if (args.includes('uiautomator') && dump instanceof Error) throw dump;
+    const stdout = args.includes('am') ? start : args.some((a) => a.startsWith('dumpsys window')) ? focus : args.includes('uiautomator') ? (dump as string) : '';
     return { stdout: Buffer.from(stdout), stderr: '' };
   };
   return new AndroidAdapter({ drawnOverStrip, serial: 'e', exec });
@@ -82,6 +84,89 @@ flows:
         'if it shows one (never "Always": it changes the device\'s default for such links); press_key back drops the ' +
         'link. averi taps nothing itself.',
     );
+  });
+});
+
+/** The `uiautomator dump`s D55c fails open on: each leaves the replies above byte for byte. */
+const failedDumps = async (): Promise<[string, string | Error][]> => [
+  ['no XML', ''],
+  ['"null root node"', 'ERROR: null root node returned by UiTestAutomationBridge.\n'],
+  ['a failed dump', execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', 255, "adb: device 'e' not found\n")],
+  ['a timed-out dump', execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', null, '', { timedOut: true })],
+  ['another layout (the lab\'s own screen)', await fixture('uiautomator-lab-open.xml')],
+];
+
+// D55c (ADR 0041's D55c amendment): the same replies when the chooser's dump is batch-10's fresh layout — the sheet
+// quoted with the rows' and the buttons' centres, and the advice to tap a row and then id:button_once.
+describe("open_deep_link's, launch_app's and the flow's replies quote the chooser's sheet (D55c)", () => {
+  const SHEET =
+    '"Open with", %: apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at ' +
+    '(723, 2058) (disabled), "Always" at (936, 2058) (disabled). Tap the app\'s row at its x and y (one tap only selects ' +
+    'it and enables the buttons), then tap id:button_once (never id:button_always: it changes the device\'s default for ';
+  const LINK_REPLY =
+    'Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
+    `is in front, ${SHEET.replace('%', 'asking which app opens it')}such links); press_key back drops the link. averi taps ` +
+    'nothing itself.';
+  const SHEET_NOTE =
+    'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
+    `is in front, ${SHEET.replace('%', 'and dev.averi.lab is not')}the intent it answers); press_key back drops the ` +
+    'chooser. averi taps nothing itself. Naming the activity (`activity:` on the launch step / launch_app) starts it ' +
+    'without the chooser.';
+
+  it("open_deep_link's reply: the chooser's title, its rows and buttons with their centres, then the advice", async () => {
+    const adapter = await chooserUp(await fixture('uiautomator-lab-resolver.xml'));
+    expect(deepLinkText('android', 'averilab://shared/open', await adapter.openDeepLink('averilab://shared/open'))).toBe(LINK_REPLY);
+  });
+
+  it("batch-11's selected chooser (a row tapped): the same reply, no \"(disabled)\"", async () => {
+    const adapter = await chooserUp(await fixture('uiautomator-lab-resolver-selected.xml'));
+    expect(deepLinkText('android', 'averilab://shared/open', await adapter.openDeepLink('averilab://shared/open'))).toBe(
+      LINK_REPLY.replaceAll(' (disabled)', ''),
+    );
+  });
+
+  it("launch_app's reply: Launched, then the note quoting the sheet as its one ⚠ line", async () => {
+    const launched = await launchApp(await chooserUp(await fixture('uiautomator-lab-resolver.xml')), undefined, new EngineSession(), {
+      appId: 'dev.averi.lab',
+      intent: { action: 'android.intent.action.VIEW', data: 'averilab://shared/x' },
+    });
+    expect(launchText('android', launched)).toBe(`Launched dev.averi.lab on android\n⚠ ${SHEET_NOTE}`);
+  });
+
+  it("a flow's launch: the `⚠ launch` line quotes the sheet, and the flow goes on", async () => {
+    const cfg = parseConfig(`
+app:
+  android: { package: dev.averi.lab }
+flows:
+  open:
+    steps:
+      - launch:
+          intent: { action: android.intent.action.VIEW, data: "averilab://shared/x" }
+`);
+    const trace = await FlowEngine.run(cfg, await chooserUp(await fixture('uiautomator-lab-resolver.xml')), { env: {}, session: new EngineSession() }, { flow: 'open' });
+    const at = trace.findIndex((t) => t.action === 'launch');
+    expect(trace.slice(at, at + 2)).toEqual([
+      { action: 'launch', detail: 'dev.averi.lab' },
+      { action: '⚠ launch', detail: SHEET_NOTE },
+    ]);
+    expect(trace.at(-1)).toEqual({ action: 'flow open', detail: 'done' });
+  });
+
+  it('every failed or unrecognised dump: open_deep_link\'s and launch_app\'s replies are D55\'s and D55b\'s, byte for byte', async () => {
+    for (const [, dump] of await failedDumps()) {
+      const linked = await (await chooserUp(dump)).openDeepLink('averilab://shared/open');
+      expect(deepLinkText('android', 'averilab://shared/open', linked)).toBe(
+        'Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
+          'is in front, asking which app opens it. Take a ui_snapshot, tap the app you mean, then its "Just once" button ' +
+          'if it shows one (never "Always": it changes the device\'s default for such links); press_key back drops the ' +
+          'link. averi taps nothing itself.',
+      );
+      const launched = await launchApp(await chooserUp(dump), undefined, new EngineSession(), {
+        appId: 'dev.averi.lab',
+        intent: { action: 'android.intent.action.VIEW', data: 'averilab://shared/x' },
+      });
+      expect(launchText('android', launched)).toBe(`Launched dev.averi.lab on android\n⚠ ${NOTE}`);
+    }
   });
 });
 
