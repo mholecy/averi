@@ -310,7 +310,7 @@ describe('an unnamed placeholder whose letters and digits start the value\'s (D6
 
   // the second conjunct: a reading that is only the earlier text, regrouped, is a start of the earlier text plus the
   // value — none of the typing is shown, and it is never judged as the value alone. (`+421` read for a typed `421` after
-  // `+421` passes the exact rule's `includes`, not this one: outside D61.)
+  // `+421` passed the exact rule's `includes`, not this one: outside D61; since D63 it is no landing — D63's group.)
   it('landingOf: a reading that is still the earlier text alone, regrouped, is no landing', () => {
     expect(landingOf('1 234', expecting(e('1234', '1234')))).toBeUndefined();
   });
