@@ -178,6 +178,11 @@ export class IosAdapter implements DeviceAdapter {
    * harness's recorded source is of kind `wda` and types nothing. Fixed for the adapter's life.
    */
   readonly typeable: Typeable;
+  /**
+   * The source's typer (IosTreeSource.typeText, WDA's), bound once here: what `typeable` and typeText's route both come
+   * from — undefined over a source that types nothing, where every text goes to idb.
+   */
+  private readonly sourceTyper: ((text: string) => Promise<void>) | undefined;
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;
@@ -223,7 +228,8 @@ export class IosAdapter implements DeviceAdapter {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
-    this.typeable = opts.treeSource.typeText !== undefined ? WDA_TYPEABLE : IDB_TYPEABLE;
+    this.sourceTyper = opts.treeSource.typeText?.bind(opts.treeSource);
+    this.typeable = this.sourceTyper !== undefined ? WDA_TYPEABLE : IDB_TYPEABLE;
     this.idbHelper = opts.idbHelper;
     this.screenshotVia = iosScreenshotViaSimctl() ? 'simctl' : 'idb';
   }
@@ -741,8 +747,8 @@ export class IosAdapter implements DeviceAdapter {
     // on return (batch-10's G1: 20/20), so `typingDelivery` holds for it too. No D24 split there: batch-10's G5 typed
     // 10/10 into the RN field with no tail dropped, and the fill's retype stays the net. Every text idb can type stays
     // on idb, byte for byte; over a source without a typer every text does, as before D43.
-    if (this.treeSource.typeText !== undefined && typingPathOf(text) === 'wda') {
-      await this.treeSource.typeText(text);
+    if (this.sourceTyper !== undefined && typingPathOf(text) === 'wda') {
+      await this.sourceTyper(text);
       return;
     }
     // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
