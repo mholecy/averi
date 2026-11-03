@@ -1,0 +1,6 @@
+{
+  "value": {
+    "error": "invalid session id",
+    "message": "Session does not exist"
+  }
+}
