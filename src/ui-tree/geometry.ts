@@ -1,5 +1,5 @@
 import { clips, isScrollViewOf, scrollAxis, scrolls } from './scroll-containers.js';
-import { everyNode, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
+import { everyNode, INPUT_ROLE, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -782,13 +782,22 @@ export interface Clips {
    * that rect, as `DrawOrder.drawnOver` finds its container — for `scroll_until`'s stroke plan
    * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
    * that scroll, at any depth; one of its own rect left out; a text input left out — a Compose text field dumps as a
-   * scrolling (Horizontal)ScrollView, role `textfield`, adapters/android.ts — so a stroke the plan sends inside a nested
-   * scroll view never lands in a field, D59b) with theirs, each as scroll-containers.ts#scrollAxis says
+   * scrolling (Horizontal)ScrollView, role `textfield` (`INPUT_ROLE`), adapters/android.ts — so a stroke the plan sends
+   * inside a nested scroll view never lands in a field, D59b; Android's case: WDA marks no node clipping, and a
+   * scrolling WDA text view is a scroll view of its own role) with theirs, each as scroll-containers.ts#scrollAxis says
    * on this tree's dialect (`unclipped`), undefined where it cannot tell. Undefined when the tree holds no scroll
    * view of that rect (the list moved). Found as draw order finds its container (scroll-containers.ts#isScrollViewOf).
    * Cost: a walk of the tree to find it on each ask; its facts kept for the life of the `Clips`.
    */
   axesOf(container: Rect): ScrollAxes | undefined;
+  /**
+   * Every scroll view of the tree that the tree TELLS scrolls on `axis` (scroll-containers.ts#scrollAxis on this tree's
+   * dialect), at any depth, in tree order — text inputs left out, as `axesOf`'s `nested` leaves them; none on a tree
+   * that lists no ancestry (idb's flat list lists no scroll view). For the exhausted stop's sentence when the strokes
+   * went across their scroll view (interact/stroke-plan.ts#strokedAcross, D59b): one the tree shows that scrolls the
+   * stroke's way is named, wherever it lies. One walk of the tree a call.
+   */
+  toldOn(axis: ScrollAxis): readonly UiNode[];
   /**
    * What this tree lists of the content of the scroll view of rect `scroller` toward its `edge` (`ListedContent`) —
    * the scroll view found as `axesOf` finds its scroll view (scroll-containers.ts#isScrollViewOf, that exact rect — the
@@ -1097,7 +1106,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     if (kept !== undefined) return kept;
     const facts: ScrollAxes = {
       axis: scrollAxis(found, unclipped),
-      nested: [...everyNode(found)].filter((n) => n !== found && scrolls(n) && n.role !== 'textfield' && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
+      nested: [...everyNode(found)].filter((n) => n !== found && scrolls(n) && n.role !== INPUT_ROLE && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
     };
     axes.set(found, facts);
     return facts;
@@ -1128,7 +1137,9 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     };
     return under.some((d) => past[edge](d.rect)) ? LISTED : { kind: 'ends', view };
   };
-  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, contentToward };
+  const toldOn = (axis: ScrollAxis): readonly UiNode[] =>
+    ancestry ? [...everyNode(tree)].filter((n) => n.role !== INPUT_ROLE && scrollAxis(n, unclipped) === axis) : [];
+  return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, toldOn, contentToward };
 }
 
 /**
