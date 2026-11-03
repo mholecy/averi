@@ -292,7 +292,8 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
   'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
   mismatch: ({ typed, shows, differs, notInput, again, elsewhere }) =>
     `fill: typed ${charactersText(typed)}${again === undefined ? '' : ` (${againText(again)})`} but the field shows ${shows}` +
-    DIFFERENCE_TEXT[differs.kind](differs as never) +
+    // D64: keys proven typed elsewhere are no select-all, so a whole landing's hedge is not said beside that clause
+    DIFFERENCE_TEXT[differs.kind]((elsewhere === undefined ? differs : { ...differs, wholeToo: undefined }) as never) +
     (elsewhere === undefined
       ? ''
       : `; the typing left the field: ${elsewhere.role}${elsewhere.identifier === null ? '' : ` id:"${elsewhere.identifier}"`} ` +

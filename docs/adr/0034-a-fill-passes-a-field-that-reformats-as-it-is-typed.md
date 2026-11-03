@@ -726,7 +726,8 @@ part of it landing (p1 appends ` Jr.`, which `Jan Šťastný` does not hold; f15
   `wholeLandingToo`, set by `differenceOf` on every such miss): a `dropped-tail` (a grouped prefix: `11 ` after `1`)
   adds "or the field replaced its text (select-all): fill with `clear: true`" (review round 2), a `length` (an exact
   prefix: `-5-` after `-5`, `55` after `5`) adds "the field may have replaced its text (select-all): fill with `clear:
-  true`" (the code review); every other reply byte for byte as before.
+  true`" (the code review). Neither is said when the typing is proven to have left the field (`elsewhere`): the reply
+  names that input instead (round 3). Every other reply byte for byte as before.
 
 **Consequences.**
 - Under the append premise (the caret at the end), each newly refused reading is a strict prefix of the earlier text
