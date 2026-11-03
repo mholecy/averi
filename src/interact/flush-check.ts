@@ -165,7 +165,8 @@ interface ProvenCut {
   readonly revealed: number;
   /**
    * The stroke that proved it (`revealedBy`) carried the match its whole drawn length less twice TOUCH_SLOP: the content
-   * did not end under it, so a reveal that then moves nothing is doubted once (D62). False with no stroke handed back.
+   * did not end under it, so a reveal that then moves nothing is doubted once (D62). False with no stroke drawn (the
+   * round requires the stroke after every one, scroll-rounds.ts#RoundSeen.drawn, so a proving read always has its own).
    */
   readonly carried: boolean;
   /** A reveal on this cut came back with the match where it was sent from, and was doubted (D62): the next one that does is checked. */

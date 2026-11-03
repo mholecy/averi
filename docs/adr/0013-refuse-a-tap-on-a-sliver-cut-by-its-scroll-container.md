@@ -439,8 +439,8 @@ were the probe and the reveal. The stroke before the wrong pass DID move the tar
 before it moved the target" would not have caught it.
 
 **Decision.** A stroke that proves the cut (`revealedBy`) also records whether it CARRIED the match its whole drawn
-length: `grown > strokeLength(drawn) − 2 × TOUCH_SLOP` (`flush-check.ts#ProvenCut.carried`; no stroke handed back →
-not carried). Measured carry losses lie within one TOUCH_SLOP (batch-10's RecyclerView strokes 48→24, 54→33, 87→67;
+length: `grown > strokeLength(drawn) − 2 × TOUCH_SLOP` (`flush-check.ts#ProvenCut.carried`, `drawn` the stroke the
+round is handed back after every stroke, the probe's own on a proving read; none → not carried). Measured carry losses lie within one TOUCH_SLOP (batch-10's RecyclerView strokes 48→24, 54→33, 87→67;
 batch-9's probe ~142→135; the lab's 74-px probe on S 74→57–61), so the threshold leaves a 24-px margin; a stroke that
 stops more than 48 px short of its length means the content ended under it (Settings' 177→100, VA1's R 177→66,
 formRead's 177→40, LV2's 40-px probe that brought the list to its end).
@@ -460,8 +460,10 @@ formRead's 177→40, LV2's 40-px probe that brought the list to its end).
 
 **Cost.** None on a legitimate pass (a first probe that held; a reveal after a stroke the content ended under). In the
 doubted case one stroke and one read (~2.5–2.9 s on Android) before it moves (the call goes on) or holds again
-(`checked`); the same in a legitimate case whose content ended within 48 px of the stroke's full length. No device call
-of another kind. Golden 0 changed: a replayed tree never moves, so no proof forms.
+(`checked`); the same in a legitimate case whose content ended within 48 px of the stroke's full length — and there, with
+no swipe or time left for the retry, the bound fails hedged ("… may still be cut there …; raise maxSwipes or
+timeoutMs") where it said `checked` before: a failure that names the cut, never a false pass. No device call of
+another kind. Golden 0 changed: a replayed tree never moves, so no proof forms.
 
 **Residuals, stated.** (a) A FIRST probe the app did not take still reads `checked`: no stroke before it to doubt by,
 and doubting it would cost a second probe on every checked stop (4 golden rows from "after 1 swipe" to "after 2").
