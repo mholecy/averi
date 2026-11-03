@@ -23,6 +23,7 @@ Amended 2026-11-02 (D57: the alert's advice leads with a tap by the button's lab
 amendment below).
 Amended 2026-11-02 (D58: before a link to the project's own scheme, averi records the answer an Open tap records, so iOS
 should not ask "Open in …?" — see the amendment below).
+Amended 2026-11-03 (batch-8: D58's gate device-checked — the D58 amendment's last paragraph).
 
 ## Context
 
@@ -710,8 +711,22 @@ language. A tap made for the agent would guess a localised label, break "averi t
 field that means nothing on Android (D55's "Open with" is a chooser, not a confirm).
 
 Residuals, stated: the key and its effect are measured on one iOS (27.0) and one Xcode; whether a live write before the
-link stops the alert is the merge gate's device check (batch-8), and the end-to-end check through averi is a later
-batch's. The write is persistent and simulator-wide: the same answer an Open tap writes, scoped to CoreSimulatorBridge
-and the scheme the project's own app declares, and averi never removes it. An alert for another app's scheme is not
-prevented, and is still named (D54). A change in the key's format on another iOS or Xcode fails open: the alert comes,
-and D54's reply and D56's note name it as before.
+link stops the alert is the merge gate's device check (batch-8: passed, see below), and the end-to-end check through
+averi is a later batch's. The write is persistent and simulator-wide: the same answer an Open tap writes, scoped to
+CoreSimulatorBridge and the scheme the project's own app declares, and averi never removes it. An alert for another
+app's scheme is not prevented, and is still named (D54). A change in the key's format on another iOS or Xcode fails
+open: the alert comes, and D54's reply and D56's note name it as before.
+
+Checked on the device (batch-8, 2026-11-03, lab simulator, main 0133247c, the tree before this change, the batch making
+D58's write itself; the alert raised as batch-5 did, causally: t0 proven not raised, t1 raised it; a first run was void,
+no verdict, by a bug in the batch's key-absent check): the gate PASS 5/5. With the key deleted and no write, four
+controls (over SpringBoard, over Contacts, a cold start, and one at the end) each raised the alert from the first read
+(30 of 30 reads over ~3 s each). With the key deleted and then written (the `defaults write` 215–245 ms) before `simctl
+openurl`, the alert never came in five cases: over SpringBoard, over Contacts and on a cold start, each 1 s after the
+write; at once (no pause); and at once beside the two `com.apple.Accessibility` writes (`prepareForOpen`'s shape) — 0 of
+20–29 reads over ~3 s listed it, the lab's open cell was in front at the first read (at 1058 ms on the cold start), and
+the key read back `dev.averi.lab`. So a live write just before the link stops the alert, with no reboot and no pause.
+The same batch read D57's reply on the device: open_deep_link's alert reply was main's text verbatim on idb (457 ms) and
+WDA (3916 ms), and `tap text:"Cancel"` dismissed it 2/2. The remembered answer was restored and verified. Still open, a
+later batch's: the end-to-end check through averi (a bare `Opened` with the key deleted, no write for https and tel
+links, the happy path's Δ, a second link with the key present).
