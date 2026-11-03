@@ -43,6 +43,7 @@ const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.i
  */
 const CHOOSER_CLASS = /\.(?:Resolver|Chooser)Activity$/;
 
+// The component capture is written twice below on purpose: Stryker mutates only regex literals (code review, D55).
 /** The focused window's component; a window named by a title (`Window{… u0 NotificationShade}`) has none. */
 const FOCUS_WINDOW_RE = /mCurrentFocus=Window\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)\}/;
 
