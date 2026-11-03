@@ -4,6 +4,7 @@ Status: accepted, 2026-10-10 (owner). Refined 2026-10-17 (owner, lab note F2A1).
 way past kept after the remedy, a fill into the strip refused by design, k7's "fully" a residual (below). Refined
 2026-10-19 (orchestrator, round 7 A6, the owner's delegation): k7's residual closed by the eyes (below). Refined
 2026-10-20 (round 14, LE2): the eyes look for a clip line under idb (below).
+Amended 2026-11-03 (D62: a held reveal after a carried proof is doubted once — see the amendment below).
 
 ## Context
 
@@ -439,35 +440,40 @@ were the probe and the reveal. The stroke before the wrong pass DID move the tar
 before it moved the target" would not have caught it.
 
 **Decision.** A stroke that proves the cut (`revealedBy`) also records whether it CARRIED the match its whole drawn
-length: `grown > strokeLength(drawn) − CARRY_LOSS`, `CARRY_LOSS` = 2 × TOUCH_SLOP (`flush-check.ts#ProvenCut.carried`, `drawn` the stroke the
-round is handed back after every stroke, the probe's own on a proving read; none → not carried). Measured carry losses lie within one TOUCH_SLOP (batch-10's RecyclerView strokes 48→24, 54→33, 87→67;
-batch-9's probe ~142→135; the lab's 74-px probe on S 74→57–61), so the threshold leaves a 24-px margin; a stroke that
-stops more than 48 px short of its length means the content ended under it (Settings' 177→100, VA1's R 177→66,
-formRead's 177→40). Not LV2 point 3's row cut by 40 px under the lab's 74-px probe: 40 > 74 − 48 = 26, so that
-probe carried it, and the reveal that then holds is doubted (Cost, below). One slop instead of two would spare it, and
-would miss batch-9 had its probe been the 177-px cap (135 < 153).
+length: `grown > strokeLength(drawn) − CARRY_LOSS`, `CARRY_LOSS` = 2 × TOUCH_SLOP (`flush-check.ts#ProvenCut.carry`:
+`short`, `carried`, `doubted`; `drawn` the stroke the round is handed back after every stroke, the probe's own on a
+proving read; none → `short`). Measured carry losses lie within one TOUCH_SLOP (batch-10's RecyclerView strokes 48→24,
+54→33, 87→67; batch-9's probe ~142→135; the lab's 74-px probe on S 74→57–61), so the threshold leaves a 24-px margin;
+a stroke that stops more than 48 px short of its length means the content ended under it (Settings' 177→100, VA1's R
+177→66, formRead's 177→40). Not LV2 point 3's row cut by 40 px under the lab's 74-px probe: 40 > 74 − 48 = 26, so
+that probe carried it, and the reveal that then holds is doubted (Cost, below). One slop instead of two would spare
+it, and would miss batch-9 had its probe been the 177-px cap (135 < 153).
 
-1. A reveal that moved nothing (held, drawn as a stroke) right after a carried stroke is DOUBTED once: no `checked`.
-   The cut stays proven, marked (`ProvenCut.unmoved`), and the same reveal is sent again (it counts as a swipe), at
+1. A reveal that moved nothing (held, drawn as a stroke) after a carried stroke is DOUBTED once: no `checked`. The cut
+   stays proven, its doubt spent (`carry` `doubted`), and the same reveal is sent again (it counts as a swipe), at
    once — the read neither waits nor confirms. With none to send, the read is short of the cut (`FlushCut`: `budget`,
    `room` or `axis`), in LV2 point 3's existing words: `… a probe swipe toward it showed N px more of it — part of it
    lay past that edge, so it may still be cut there …`. No new wording.
 2. A second held reveal in a row is accepted as `checked` (today's reply, its swipe count one higher). A retry that
-   moves and grows the match is a fresh proof (no `unmoved`), judged by the same rule.
-3. Unchanged: a held reveal after a stroke that ran short (the content ended more than 48 px before its end — Settings'
-   "Network", VA1's R, formRead), every first probe that held, a reveal too short to tell from a tap (`tap`). Every reveal that held is NOT sent
-   again: that rule turned Settings' "Network", VA1's R and formRead from "after 2 swipes" to "after 3", about 2.5–2.9
-   s more on the 2026-10-09 case, on the legitimate path.
-4. iOS, idb and WDA unchanged: no clipping container, never a probe.
+   moves and grows the match is a fresh proof, its `carry` judged anew by the same rule.
+3. The doubt is the proof's and is kept with it (`stillProven`): a read between that moved the match without proving
+   the cut anew (a stroke that was no reveal, the match still flush on that edge) leaves it owed, so the next held
+   reveal is doubted all the same — once per proof, at most one extra stroke.
+4. Unchanged: a held reveal after a stroke that ran short (the content ended more than CARRY_LOSS before its end —
+   Settings' "Network", VA1's R, formRead), every first probe that held, a reveal too short to tell from a tap
+   (`tap`). Every reveal that held is NOT sent again: that rule turned Settings' "Network", VA1's R and formRead from
+   "after 2 swipes" to "after 3", about 2.5–2.9 s more on the 2026-10-09 case, on the legitimate path.
+5. iOS, idb and WDA unchanged: no clipping container, never a probe.
 
-**Cost.** None on a legitimate pass (a first probe that held; a reveal after a stroke the content ended under). In the
-doubted case one stroke and one read (~2.5–2.9 s on Android) before it moves (the call goes on) or holds again
-(`checked`); the same in a legitimate case whose content ended within 48 px of the stroke's full length — the main
-example LV2 point 3's row cut by 40 px, which a 74-px probe brings whole: one retry (stroke and read, the swipe count
-one higher) before `checked` — and there, with
-no swipe or time left for the retry, the bound fails hedged ("… may still be cut there …; raise maxSwipes or
-timeoutMs") where it said `checked` before: a failure that names the cut, never a false pass. No device call of
-another kind. Golden 0 changed: a replayed tree never moves, so no proof forms.
+**Cost.** None on a legitimate pass whose content ended more than CARRY_LOSS short of the stroke (a first probe that
+held; a reveal after a stroke the content ended under). A pass of LV2's or S's kind — the content ending within
+CARRY_LOSS of the stroke's full length, the main example LV2 point 3's row cut by 40 px, which a 74-px probe brings
+whole, or the lab's S, whose 74-px probe carries it 57–61 px — pays one retry (a stroke and a read, ~2.5–2.9 s on
+Android, the swipe count one higher) before `checked` whenever a held reveal follows the proof; with no swipe or time
+left for that retry, the bound fails hedged ("… may still be cut there …; raise maxSwipes or timeoutMs") where it
+said `checked` before: a failure that names the cut, never a false pass. In the doubted case proper (batch-9) the same
+one stroke and one read, before it moves (the call goes on) or holds again (`checked`). No device call of another
+kind. Golden 0 changed: a replayed tree never moves, so no proof forms.
 
 **Residuals, stated.** (a) A FIRST probe the app did not take still reads `checked`: no stroke before it to doubt by,
 and doubting it would cost a second probe on every checked stop (4 golden rows from "after 1 swipe" to "after 2").
