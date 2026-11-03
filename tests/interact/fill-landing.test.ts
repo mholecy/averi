@@ -409,6 +409,21 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
     expect(landingOf('Hello world', expecting(e('world', 'Hello')))).toEqual({ kind: 'landed' });
   });
 
+  // equality, not trimmed: a typed space after the earlier text moves the reading
+  it('landingOf: a typed space after `Hello world` lands — the reading moved, though only by whitespace', () => {
+    expect(landingOf('Hello world ', expecting(e(' ', 'Hello world')))).toEqual({ kind: 'landed' });
+  });
+
+  // ADR 0034 residual 8 (follow-up D64): what D63 does not refuse — pinned as today's behaviour, not as wanted
+  it('residual 8 (A): a reading that moved but holds no new typing still lands by containment in the earlier text', () => {
+    // `w` landed, `orld` went elsewhere: the value is found inside the earlier text `Hello world`
+    expect(landingOf('Hello worldw', expecting(e('world', 'Hello world')))).toEqual({ kind: 'landed' });
+  });
+
+  it('residual 8 (B): Android\'s skipped post-focus re-read takes `before` as empty; a `+421 ` inserted on focus, no key landed, lands', () => {
+    expect(landingOf('+421 ', expecting(e('421', '')))).toEqual({ kind: 'landed' });
+  });
+
   it('landingOf: with clear the rule is the value alone, unchanged by D63', () => {
     expect(landingOf('1 234', expecting(e('1234', '1 234', true)))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
   });
