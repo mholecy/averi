@@ -98,6 +98,27 @@ describe('fillField — focus, clear, type, verify', () => {
     expect(fake.typed).toEqual(['SK3112', '', 'CZ6508000000']); // nothing typed again
   });
 
+  // D61: the form-grouped cell's phoneGrouped (format phone3, placeholder `+421`) on idb, which names no placeholder:
+  // `+421` is the empty field's value, and its letters and digits start the typed value's. batch-9 g3: typed
+  // `421903123456` without clear, the app held `421 903 123 456`, and the fill failed "typed 12 characters but the
+  // field shows 15" after the whole poll budget.
+  it('g3: a field that groups in threes under an unnamed `+421` placeholder — a fill without clear lands reformatted, nothing deleted or typed again', async () => {
+    const PH = '+421';
+    const fake = formFake(PH);
+    const held = () => (fake.focused === undefined || fake.focused.value === PH ? '' : (fake.focused.value ?? ''));
+    const group3 = (t: string) => (t.replace(/ /g, '').match(/.{1,3}/g) ?? []).join(' ');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = group3(held() + text) || PH;
+    };
+    const result = await fillField(fake, { id: 'amount_input' }, '421903123456', FAST);
+    expect(fillReply(result, 'id:amount_input')).toContain('Filled');
+    expect(fillReply(result, 'id:amount_input')).toContain('the field shows them reformatted: 3 separators added');
+    expect(fake.focused?.value).toBe('421 903 123 456');
+    expect(fake.typed).toEqual(['421903123456']);
+    expect(fake.deletes).toEqual([]);
+  });
+
   it('taps the field then types; no clearing by default (pre-filled login fields must survive)', async () => {
     const fake = formFake('9.99');
     const result = await fillField(fake, { id: 'amount_input' }, '2.50', FAST);

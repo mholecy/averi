@@ -215,8 +215,15 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
 
   it('landingOf: an earlier text still shown is judged after it, never without it', () => {
     expect(landingOf('SK31 1200 0000', expecting(e('000000', 'SK31 12')))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
-    // `1` is still there: `1234 5678` is no reformat of `1` + `12345678`, and not judged as the value alone.
-    expect(landingOf('1234 5678', expecting(e('12345678', '1')))).toBeUndefined();
+    // the earlier text still there, its letters and digits a prefix of the value's: judged after it, not the fallback
+    expect(landingOf('421 421 903 123 456', expecting(e('421903123456', '421')))).toEqual({ kind: 'landed', reformatted: { added: 4, respaced: 0 } });
+  });
+
+  // D61: the reading's letters and digits are the value's exactly, and no start of the earlier text's plus the value's:
+  // the earlier text is not in it. Pinned refused by D29 (`1` still there), it lands as the value alone — as the exact
+  // rule already passes the ungrouped `12345678` after the same `1` (ADR 0034's D61 amendment).
+  it('landingOf: the value grouped, its letters and digits exactly the value\'s, after an earlier text that starts them (D61)', () => {
+    expect(landingOf('1234 5678', expecting(e('12345678', '1')))).toEqual({ kind: 'landed', reformatted: { added: 1, respaced: 0 } });
   });
 
   it('landingOf: with clear the earlier text never counts', () => {
@@ -269,6 +276,47 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
   it('tailOf: the earlier text vanished but other text took its place — none', () => {
     expect(tailOf('XY12', e('1234', PH))).toBeUndefined();
     expect(tailOf('SK31 1300', e('SK3112000000', PH))).toBeUndefined();
+  });
+});
+
+/**
+ * D61: idb names no placeholder, so the form-grouped cell's phoneGrouped (format phone3, placeholder `+421`) read `+421`
+ * as the empty field's value — fill's `before`. batch-9 g3: typed `421903123456` without clear, the field held `421 903
+ * 123 456`, and the fill failed "typed 12 characters but the field shows 15": the reading's letters and digits START
+ * with the placeholder's, so D29's fallback never ran. Since D61 a reading whose letters and digits are exactly the
+ * value's, and no start of the earlier text's plus the value's, is judged as the value alone as well.
+ */
+describe('an unnamed placeholder whose letters and digits start the value\'s (D61)', () => {
+  const e = (value: string, before: string | null, clear = false) => ({ value, clear, before, placeholder: undefined });
+
+  it('landingOf: g3 — `421 903 123 456` after the unnamed `+421` lands reformatted', () => {
+    expect(landingOf('421 903 123 456', expecting(e('421903123456', '+421')))).toEqual({ kind: 'landed', reformatted: { added: 3, respaced: 0 } });
+  });
+
+  it('landingOf: g4 without clear — `+421 903 123 456` for `+421903123456` after `+421` lands reformatted', () => {
+    expect(landingOf('+421 903 123 456', expecting(e('+421903123456', '+421')))).toEqual({ kind: 'landed', reformatted: { added: 3, respaced: 0 } });
+  });
+
+  it('landingOf: with clear unchanged — the earlier text never counts', () => {
+    expect(landingOf('421 903 123 456', expecting(e('421903123456', '+421', true)))).toEqual({ kind: 'landed', reformatted: { added: 3, respaced: 0 } });
+  });
+
+  // the second conjunct: a reading that is only the earlier text, regrouped, is a start of the earlier text plus the
+  // value — none of the typing is shown, and it is never judged as the value alone. (`+421` read for a typed `421` after
+  // `+421` passes the exact rule's `includes`, not this one: outside D61.)
+  it('landingOf: a reading that is still the earlier text alone, regrouped, is no landing', () => {
+    expect(landingOf('1 234', expecting(e('1234', '1234')))).toBeUndefined();
+  });
+
+  it('differenceOf: mixed marks after the unnamed `+421` are separated, not a length', () => {
+    expect(differenceOf('421 903-123-456', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'separated', added: 3 });
+  });
+
+  // residual 6: the equality form — a dropped tail under the unnamed placeholder is not typed again; clear: true is the remedy
+  it('tailOf: a dropped tail under the unnamed `+421` is no tail — not typed again (ADR 0034 residual 6)', () => {
+    expect(tailOf('421 903 123', e('421903123456', '+421'))).toBeUndefined();
+    expect(droppedTail('421 903 123', e('421903123456', '+421'))).toBeUndefined();
+    expect(differenceOf('421 903 123', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'length' });
   });
 });
 
