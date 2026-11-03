@@ -28,9 +28,10 @@
 /**
  * Each display's focus lines, in one shell line, under its header (`Display: mDisplayId=0 …`): `mCurrentFocus` (the
  * focused window, `Window{<hash> u0 <component>}`, or `null` in a transition) and `mFocusedApp` (the focused
- * activity, `ActivityRecord{<hash> u0 <component> t<task>}`; API 29 wraps it in its window token). `dumpsys window
- * displays` prints one pair per display, on API 29 and later (measured on 33; the API 36 fixture holds them too).
- * When nothing prints, grep exits 1 and the call fails: no chooser. Every word a constant.
+ * activity: `ActivityRecord{<hash> u0 <component>} t<task>}` on API 33, `… u0 <component> t<task>}` on API 36; API 29
+ * wraps it in its window token). `dumpsys window displays` prints one pair per display, on API 29 and later
+ * (measured on 33; the API 36 fixture holds them too). When nothing prints, grep exits 1 and the call fails: no
+ * chooser. Every word a constant.
  */
 export const CHOOSER_FOCUS_COMMAND = "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='";
 
@@ -44,14 +45,20 @@ const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.i
 const CHOOSER_CLASS = /\.(?:Resolver|Chooser)Activity$/;
 
 // The component capture is written twice below on purpose: Stryker mutates only regex literals (code review, D55).
-/** The focused window's component; a window named by a title (`Window{… u0 NotificationShade}`) has none. */
+/**
+ * The focused window's component, ended by the record's `}`; a window named by a title (`Window{… u0
+ * NotificationShade}`) has none.
+ */
 const FOCUS_WINDOW_RE = /mCurrentFocus=Window\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)\}/;
 
 /**
  * The focused activity's component: an ActivityRecord anywhere on the `mFocusedApp` line — the line itself on API 30
  * and later, inside `AppWindowToken{… token=Token{… ActivityRecord{…}}}` on API 29 (AOSP 10's dump, not captured).
+ * Only a space or `}` ends the component: `}` on API 33 (`…ResolverActivity} t2641}`: batch-9's and batch-10's every
+ * read), the space before the task on API 36 (`…NexusLauncherActivity t2}`). A line cut right after the component,
+ * at a newline or the end, names nothing. Why API 33's brace was missed until D55r: ADR 0041's D55r amendment.
  */
-const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+) /;
+const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)[ }]/;
 
 /** What opens each display's block in the dump, its id after it: `Display: mDisplayId=0 (organized)`. */
 const DISPLAY_HEADER = 'Display: mDisplayId=';
@@ -78,12 +85,12 @@ const isChooser = (component: string): boolean => {
  * The chooser's component (`android/com.android.internal.app.ResolverActivity`, as the dump names it) when the focus
  * names it, else undefined. The focused ACTIVITY decides when its line names one; the focused window only when it
  * does not. `am start` returns without waiting for a window, and the focused activity is set as the start resumes it
- * while the focused window follows once it is drawn (AOSP's reasoning, not measured; batch-9's read found both lines
- * naming the chooser). So right after a start the activity is the newer word: the chooser as the activity under the
- * launcher's or a `null` window is the link's chooser not drawn yet, and an app as the activity under the chooser's
- * window is a chooser on its way out (an earlier one, the link's app resumed over it), which is no chooser. Both
- * lines are read from the default display's block only (defaultDisplayBlock), so they are one display's pair: another
- * display's chooser is not this link's.
+ * while the focused window follows once it is drawn (AOSP's order; batch-10's read right after averi's reply found the
+ * focused activity the started one in 40 of 40, the window still `null` in 11). So right after a start the activity
+ * is the newer word: the chooser as the activity under the launcher's or a `null` window is the link's chooser not
+ * drawn yet, and an app as the activity under the chooser's window is a chooser on its way out (an earlier one, the
+ * link's app resumed over it), which is no chooser. Both lines are read from the default display's block only
+ * (defaultDisplayBlock), so they are one display's pair: another display's chooser is not this link's.
  */
 export function chooserInFocus(dump: string): string | undefined {
   const block = defaultDisplayBlock(dump);
