@@ -177,8 +177,8 @@ the one read suffices, and no `resolve-activity` prediction or bounded poll is n
 measured the residual above. From the launcher, `launch_app {intent: VIEW averilab://shared/x}` (no activity, so
 `am start -p dev.averi.lab …`) raised the chooser 10 of 10: two activities of the package (`.MainActivity` and its
 alias `.Twin`) handle the intent and none is preferred. `am start` printed
-`Starting: Intent { act=android.intent.action.VIEW dat=averilab://shared/... pkg=dev.averi.lab }` and averi replied `Launched dev.averi.lab on android` 10 of 10 with the
-chooser up. A focus read with `CHOOSER_FOCUS_COMMAND` at the start's return named ResolverActivity as `mFocusedApp` 10
+`Starting: Intent { act=android.intent.action.VIEW dat=averilab://shared/... pkg=dev.averi.lab }` and averi replied
+`Launched dev.averi.lab on android` 10 of 10 with the chooser up. A focus read with `CHOOSER_FOCUS_COMMAND` at the start's return named ResolverActivity as `mFocusedApp` 10
 of 10; `mCurrentFocus` was `null` in 7 and the chooser's own window in 3. With the chooser up, a plain `launch_app
 dev.averi.lab` (monkey) exited 251 3 of 3: its stdout only its `bash arg:` echoes, its stderr its arguments and `**
 SYS_KEYS has no physical keys but with factor 2.0%.`, an emulator warning. averi failed with "monkey started nothing
