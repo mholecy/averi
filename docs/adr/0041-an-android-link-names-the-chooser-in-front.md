@@ -27,9 +27,13 @@ reply is byte-identical, D54's iOS alert text included. The `DeviceAdapter` cont
 **After a `started` outcome, `openDeepLink` reads the window manager's focus once. When the focused component is
 the platform's chooser, the outcome is `{ chooser: { component } }` and the reply says the link is not opened yet.**
 
-- The read is `CHOOSER_FOCUS_COMMAND`, `dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='`, with a 2 s
-  bound, like the adapter's other focus reads. It is a new constant beside `FOCUSED_WINDOW_COMMAND`, whose contract
-  (a window TYPE for a miss) its callers keep unchanged.
+- The read is `CHOOSER_FOCUS_COMMAND`, `dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='`,
+  with a 2 s bound, like the adapter's other focus reads. It is a new constant beside `FOCUSED_WINDOW_COMMAND`, whose
+  contract (a window TYPE for a miss) its callers keep unchanged. The dump prints one focus pair per display, so
+  both lines are read from display 0's block alone (the default display, where `am start` with no `--display`
+  starts the link); a dump with display headers and none for display 0 names no chooser. API 29 prints
+  `mFocusedApp` as a window token, `AppWindowToken{… token=Token{… ActivityRecord{…}}}`, so the activity is read
+  anywhere on that line (AOSP 10's shape, synthetic in the tests, not captured). (Both added after review round 1.)
 - The judgement is pure: `adapters/android-chooser.ts#chooserInFocus`. It takes the focused activity's component
   (`mFocusedApp`), or the focused window's (`mCurrentFocus`) when no activity is named, and names it a chooser when
   the package is exactly `android` or `com.android.intentresolver` and the class is `ResolverActivity` or
@@ -66,7 +70,8 @@ the platform's chooser, the outcome is `{ chooser: { component } }` and the repl
 - Cost: the happy path goes from one adb call to two. It is estimated at about +20–26 ms (54 ms to about 80 ms), from
   the measured cost of `dumpsys window windows` (21–23 ms) and `FOCUSED_WINDOW_COMMAND` (25–26 ms; android.ts). The
   repo's perf scripts have no deep-link seam and no device was used, so the filtered command itself is not measured.
-  The next batch's E1 control measures it.
+  The next batch's E1 control measures it. The worst case is a hung adb: the read then adds up to its 2 s bound to a
+  link that has already started, and the reply falls back to `Opened`.
 - The `-p` start of `launch_app` (an intent with no activity) is unchanged and unchecked, and so is the `-n` start.
   The monkey start is unchanged too, and neither `-n` nor monkey can raise the chooser.
 
