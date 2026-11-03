@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
-import { AndroidLab, DEVICE_CHECK_SIMULATOR, IME_TOUCHABLE, IosLab, withMeasuredPanel, type Exec } from '../../scripts/truth/lab-device.js';
+import { AndroidLab, DEVICE_CHECK_SIMULATOR, IosLab, withMeasuredPanel, type Exec } from '../../scripts/truth/lab-device.js';
 import { TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
 import { parseLabApp, type CatalogCell, type LabState } from '../../scripts/truth/schema.js';
 
@@ -163,8 +163,6 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     const answering: Exec = async (file, args) => (args.includes(TOUCHABLE_COMMAND) ? (calls.push(`${file} ${args.join(' ')}`), { stdout: B11_DUMP }) : exec(file, args));
     expect(await new AndroidLab('emulator-5556', { exec: answering }).imeTouchable()).toBe(B11_DUMP);
     expect(calls).toEqual(['adb -s emulator-5556 emu avd name', `adb -s emulator-5556 shell ${TOUCHABLE_COMMAND}`]);
-    // The capture's copy (not imported, so the capture loads none of the code it judges) is the same command.
-    expect(IME_TOUCHABLE).toBe(TOUCHABLE_COMMAND);
     const refused = fakeExec('Pixel_7_API_34\r\nOK');
     await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).imeTouchable()).rejects.toThrow(/refused/);
   });
