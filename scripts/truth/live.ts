@@ -197,7 +197,7 @@ if (rejudging !== undefined) {
         const warm = c.warmUp === true ? await callTool(client, { tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await configFor(source, c)) : undefined;
         const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
         if (warmUpError !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
-        const launched = await lab.launch(c.cell);
+        let launched = await lab.launch(c.cell);
         if (c.keyboard && launched.keyboard?.visible !== true) {
           const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
           results.push({ source, c, verdict, replies: [] });
@@ -205,6 +205,8 @@ if (rejudging !== undefined) {
           console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
           continue;
         }
+        // The one device read the kf judges rest on (LabState.imeTouchable): a failed read is '' — "no measured panel".
+        if (c.measuresPanel && android !== undefined) launched = { ...launched, imeTouchable: await android.imeTouchable().catch(() => '') };
         const config = await configFor(source, c);
         const replies: string[] = [];
         const after: (LabState | undefined)[] = [];

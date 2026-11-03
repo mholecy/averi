@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
-import { AndroidLab, DEVICE_CHECK_SIMULATOR, IosLab, type Exec } from '../../scripts/truth/lab-device.js';
+import { AndroidLab, DEVICE_CHECK_SIMULATOR, IME_TOUCHABLE, IosLab, type Exec } from '../../scripts/truth/lab-device.js';
 import { parseLabApp, type CatalogCell } from '../../scripts/truth/schema.js';
 
 // The lab devices' guards (scripts/truth/lab-device.ts): a capture or a live run touches the lab's own simulator or
@@ -152,6 +152,17 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     }
     const refused = fakeExec('Pixel_7_API_34\r\nOK');
     await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).navigation()).rejects.toThrow(/refused/);
+  });
+
+  it('imeTouchable(): averi\'s touchable query word for word, its output raw, only of the lab AVD (D67, the kf launch read)', async () => {
+    const dump = '  mShowRequested=true mShowExplicitlyRequested=true mShowForced=false mInputShown=true\n    touchable region=SkRegion((87,1243,1024,2035)(0,2088,1080,2220))\n';
+    const { exec, calls } = fakeExec();
+    const answering: Exec = async (file, args) => (args.includes(IME_TOUCHABLE) ? (calls.push(`${file} ${args.join(' ')}`), { stdout: dump }) : exec(file, args));
+    expect(await new AndroidLab('emulator-5556', { exec: answering }).imeTouchable()).toBe(dump);
+    expect(calls).toEqual(['adb -s emulator-5556 emu avd name', `adb -s emulator-5556 shell ${IME_TOUCHABLE}`]);
+    expect(IME_TOUCHABLE).toBe("dumpsys input_method | grep -m1 -w mInputShown; dumpsys window InputMethod | grep -F 'touchable region='; true");
+    const refused = fakeExec('Pixel_7_API_34\r\nOK');
+    await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).imeTouchable()).rejects.toThrow(/refused/);
   });
 });
 

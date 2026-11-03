@@ -94,6 +94,11 @@ export interface LabDevice {
    */
   ime?(): Promise<ImeCapture>;
   /**
+   * Android: averi's touchable query (IME_TOUCHABLE) now, raw — the IME window's touchable region beside `mInputShown`,
+   * read once at a kf case's launch (live.ts; LabState.imeTouchable). Leaves the keyboard up. Absent on iOS.
+   */
+  imeTouchable?(): Promise<string>;
+  /**
    * Android: `dumpsys window displays` now — the dump averi's Android adapter reads its system bands from (the status
    * bar's height, the navigation bar's top: src/adapters/android.ts#systemBands) and its keyboard. Absent on iOS.
    */
@@ -375,6 +380,11 @@ export class AndroidLab implements LabDevice {
     const shown = { displays: (await this.adb('shell', 'dumpsys', 'window', 'displays')).stdout, ...(await witness()) };
     await this.hideKeyboard();
     return { shown, hidden: await witness() };
+  }
+
+  async imeTouchable(): Promise<string> {
+    await this.guard();
+    return (await this.adb('shell', IME_TOUCHABLE)).stdout;
   }
 
   async displays(): Promise<string> {
