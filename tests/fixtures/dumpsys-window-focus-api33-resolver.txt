@@ -1,0 +1,2 @@
+  mCurrentFocus=Window{56b9ca0 u0 android/com.android.internal.app.ResolverActivity}
+  mFocusedApp=ActivityRecord{6909a9c u0 android/com.android.internal.app.ResolverActivity} t2590}
