@@ -55,18 +55,17 @@ const isChooser = (component: string): boolean => {
 };
 
 /**
- * The chooser's component (`android/com.android.internal.app.ResolverActivity`, as the dump names it) when either
- * focus line names it — the focused window's first — else undefined. Either line, because `am start` returns without
- * waiting for the chooser's window: right after it the focused window may still be the launcher or `null` while the
- * focused activity, set as the start resumes it, is already the chooser (AOSP's reasoning, not measured; batch-9's
- * read found both lines naming it).
+ * The chooser's component (`android/com.android.internal.app.ResolverActivity`, as the dump names it) when the focus
+ * names it, else undefined. The focused ACTIVITY decides when its line names one; the focused window only when it
+ * does not. `am start` returns without waiting for a window, and the focused activity is set as the start resumes it
+ * while the focused window follows once it is drawn (AOSP's reasoning, not measured; batch-9's read found both lines
+ * naming the chooser). So right after a start the activity is the newer word: the chooser as the activity under the
+ * launcher's or a `null` window is the link's chooser not drawn yet, and an app as the activity under the chooser's
+ * window is a chooser on its way out (an earlier one, the link's app resumed over it), which is no chooser.
  */
 export function chooserInFocus(dump: string): string | undefined {
-  for (const re of [FOCUS_WINDOW_RE, FOCUSED_APP_RE]) {
-    const component = re.exec(dump)?.[1];
-    if (component !== undefined && isChooser(component)) return component;
-  }
-  return undefined;
+  const component = FOCUSED_APP_RE.exec(dump)?.[1] ?? FOCUS_WINDOW_RE.exec(dump)?.[1];
+  return component !== undefined && isChooser(component) ? component : undefined;
 }
 
 /**
@@ -74,7 +73,9 @@ export function chooserInFocus(dump: string): string | undefined {
  * once" (never "Always", which writes a preferred activity: a device change every later run would inherit), or BACK
  * (measured: one BACK dismissed it, batch-9). averi taps nothing: which handler is meant is the test's business. The
  * labels are AOSP's English ones, and the reply does not claim what a launch_app does with the chooser up (unmeasured).
+ * "if it shows one": ResolverActivity asks for an app and then "Just once" or "Always" (batch-9); ChooserActivity, a
+ * share sheet's chooser, opens the app tapped and has neither button (AOSP, not measured).
  */
 export const CHOOSER_ADVICE =
-  'Take a ui_snapshot, tap the app you mean, then its "Just once" button (never "Always": it changes the ' +
-  "device's default for such links); press_key back drops the link. averi taps nothing itself.";
+  'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
+  "changes the device's default for such links); press_key back drops the link. averi taps nothing itself.";
