@@ -345,6 +345,60 @@ describe('WdaTreeSource.systemAlert — one short /source read, never a start or
   });
 });
 
+// D43 (ADR 0037's D43 amendment): the source also types what idb cannot — WdaServer.keys, on the one server it owns.
+describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server (D43)', () => {
+  async function typingSetup(keys: () => 'refused' | { status: number; body?: unknown } = () => ({ status: 200, body: { value: null } })) {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const fetcher = fakeFetch((url, req) => {
+      if (url.endsWith('/status')) return spawner.kills.length < spawner.spawns.length ? { status: 200, body: WDA_STATUS } : 'refused';
+      if (url.endsWith('/session') && req.method === 'POST') return { status: 200, body: { value: { sessionId: 'S1' }, sessionId: 'S1' } };
+      if (url.endsWith('/wda/keys')) return keys();
+      return { status: 200, body: WDA_ENVELOPE };
+    });
+    const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    const keyBodies = () => fetcher.requests.filter((r) => r.url.endsWith('/wda/keys')).map((r) => (r.body as { value: string[] }).value.join(''));
+    return { source, spawner, fetcher, keyBodies };
+  }
+
+  it('types the text through the one server it owns: a session, then /wda/keys with the text — after a read, no second spawn', async () => {
+    const { source, spawner, keyBodies } = await typingSetup();
+    await source.read();
+    await source.typeText('Jan Šťastný');
+    expect(keyBodies()).toEqual(['Jan Šťastný']);
+    expect(spawner.spawns).toHaveLength(1);
+    await source.dispose();
+  });
+
+  it('a failure is WDA\'s, in its words', async () => {
+    const { source } = await typingSetup(() => ({ status: 500, body: { value: { error: 'invalid element state', message: 'no focus' } } }));
+    await expect(source.typeText('Šťastný')).rejects.toThrow(/^WDA \/wda\/keys failed: HTTP 500 invalid element state on port/);
+    await source.dispose();
+  });
+
+  it('after dispose: the released error, nothing fetched', async () => {
+    const { source, fetcher } = await typingSetup();
+    await source.read();
+    await source.dispose();
+    const before = fetcher.urls.length;
+    const err = (await source.typeText('Šťastný').catch((e: unknown) => e)) as Error;
+    expect(err.message).toMatch(/deselected or averi is shutting down/);
+    expect(err.cause).toBeUndefined(); // released before the server is asked: no WdaServer error behind it
+    expect(fetcher.urls.slice(before)).toEqual([]);
+  });
+
+  it('disposed while typing: the released error, WdaServer\'s words only as its cause', async () => {
+    const { source } = await typingSetup(() => 'refused');
+    await source.read();
+    const typing = source.typeText('Šťastný').catch((e: Error) => e);
+    const disposing = source.dispose();
+    const err = (await typing) as Error;
+    expect(err.message).toMatch(/deselected or averi is shutting down/);
+    expect(String((err.cause as Error | undefined)?.message)).toMatch(/WDA|shut down/);
+    await disposing;
+  });
+});
+
 describe('WdaTreeSource — a read already in flight when the source is disposed', () => {
   // The common case during run_flow: the flow's adapter is mid-read when a
   // select_device evicts and disposes it. WdaServer fails the read in its

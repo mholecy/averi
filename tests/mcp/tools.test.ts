@@ -15,6 +15,7 @@ import { el, FakeAdapter, hidesKeyboardOn, idbFloatingLabelFake, iosLoginFake, l
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { boundReads } from '../helpers/terminal-read.js';
 import { TOOL_NAMES } from '../helpers/tool-names.js';
+import { IDB_TYPEABLE, WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 
 /**
  * The MCP layer through its interface: every call here goes client →
@@ -825,6 +826,47 @@ describe('type_text refuses a character the adapter cannot type before anything 
       expect(fake.typed).toEqual([]);
     });
   }
+});
+
+// D43 (ADR 0037's D43 amendment): an iOS adapter over WDA's source declares WDA_TYPEABLE — type_text types `Šťastný` and
+// `O’Brien` there, with and without a selector; over idb's source the refusal stays, naming the WDA tree source.
+describe('type_text with non-ASCII on iOS: typed over WDA\'s set, refused over idb\'s with the remedy', () => {
+  const form = () => {
+    const fake = new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'amount_input', value: '' })) }, 'form');
+    fake.platform = 'ios';
+    return fake;
+  };
+
+  it('WDA, with a selector: typed and verified', async () => {
+    const fake = form();
+    fake.typeable = WDA_TYPEABLE;
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', { platform: 'ios', selector: 'id:amount_input', text: 'Jan Šťastný', configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Filled id:amount_input (11 characters)');
+    expect(fake.typed).toEqual(['Jan Šťastný']);
+  });
+
+  it('WDA, without a selector: typed into the focused field', async () => {
+    const fake = form();
+    fake.typeable = WDA_TYPEABLE;
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', { platform: 'ios', text: 'O’Brien', configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(fake.typed).toEqual(['O’Brien']);
+  });
+
+  it('idb: refused before anything was sent, naming `ios.treeSource: wda` as the way', async () => {
+    const fake = form();
+    fake.typeable = IDB_TYPEABLE;
+    const { call } = await connect({ ios: fake });
+    const result = await call('type_text', { platform: 'ios', selector: 'id:amount_input', text: 'Jan Šťastný', configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toContain("cannot type U+0160 'Š'");
+    expect(result.text).toContain('A project with `ios.treeSource: wda` types it through WebDriverAgent (ADR 0037)');
+    expect(fake.taps).toEqual([]);
+    expect(fake.typed).toEqual([]);
+  });
 });
 
 describe('the config-optional tree tools (ui_snapshot, tap, type_text, scroll_until — and assert on ios)', () => {

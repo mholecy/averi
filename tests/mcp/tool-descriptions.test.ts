@@ -661,6 +661,9 @@ describe('every description keeps the rules an agent must not break', () => {
     ['type_text', '"Typed … — NOT verified"'],
     ['type_text', 'FAILS the read-back, saying whether only letter case differs — never the text'],
     ['type_text', 'The keyboard is NOT dismissed afterwards'],
+    // D43 (ADR 0037's D43 amendment): what each path types, not "on both platforms" (the code points: tools.md).
+    ['type_text', 'Types printable ASCII, and under `ios.treeSource: wda` also Latin, Greek, Cyrillic and Han letters, punctuation and symbols'],
+    ['type_text', 'anything else is refused before anything is sent (ADR 0037)'],
     ['scroll_until', 'Pass fully: true when the next step MEASURES the element'],
     ['scroll_until', 'It never swipes on a screen presented over the target'],
     ['scroll_until', 'a swipe that CHANGES THE SCREEN stops the call'],
@@ -691,5 +694,13 @@ describe('every description keeps the rules an agent must not break', () => {
   it.each(KEPT)('%s: "%s"', (tool, phrase) => {
     const where = tool === 'instructions' ? [instructions] : [description(tool), ...Object.keys(tools.get(tool)?.inputSchema.properties ?? {}).map((p) => property(tool, p).description ?? '')];
     expect(where.some((text) => text.includes(phrase)), `${tool} no longer says: ${phrase}`).toBe(true);
+  });
+});
+
+// D43 (ADR 0037's D43 amendment): a wda project types non-ASCII, so the description no longer says one set for both.
+describe('type_text says what each path types', () => {
+  it('not "only printable ASCII … on both platforms"', () => {
+    expect(description('type_text')).not.toMatch(/on both platforms/);
+    expect(description('type_text')).not.toContain('Today averi types only printable ASCII');
   });
 });

@@ -32,16 +32,36 @@ export function fakeExec(onCall?: (full: string) => Promise<void> | void) {
   return { fn, calls };
 }
 
-/** handler returns 'refused' (nothing listening) or an HTTP response. */
-export function fakeFetch(handler: (url: string) => 'refused' | { status: number; body?: unknown }) {
+/** One request a fake fetch was sent: its URL, its method (GET when the init named none) and its body, parsed. */
+export interface FakeRequest {
+  url: string;
+  method: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+}
+
+/**
+ * handler returns 'refused' (nothing listening), 'timeout' (the request's budget ran out: a TimeoutError, as
+ * AbortSignal.timeout's) or an HTTP response; it is handed the request (method and parsed body) too.
+ */
+export function fakeFetch(handler: (url: string, req: FakeRequest) => 'refused' | 'timeout' | { status: number; body?: unknown }) {
   const urls: string[] = [];
-  const fn: FetchFn = async (url) => {
+  const requests: FakeRequest[] = [];
+  const fn: FetchFn = async (url, init) => {
     urls.push(url);
-    const r = handler(url);
+    const req: FakeRequest = {
+      url,
+      method: init?.method ?? 'GET',
+      ...(init?.headers !== undefined && { headers: init.headers }),
+      ...(init?.body !== undefined && { body: JSON.parse(init.body) as unknown }),
+    };
+    requests.push(req);
+    const r = handler(url, req);
     if (r === 'refused') throw new Error('ECONNREFUSED');
+    if (r === 'timeout') throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
     return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body };
   };
-  return { fn, urls };
+  return { fn, urls, requests };
 }
 
 interface FakeChildListeners {

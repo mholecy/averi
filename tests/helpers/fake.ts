@@ -123,10 +123,10 @@ export function lateTyping(fake: FakeAdapter): void {
  * What the fake types by default (types.ts#DeviceAdapter.typeable, ADR 0037): printable ASCII, as both real adapters —
  * so a test typing through the fake is refused where the device would refuse it.
  */
-export const FAKE_TYPEABLE: Typeable = { refuses: NOT_PRINTABLE_ASCII, says: 'the fake types only printable ASCII (U+0020–U+007E)' };
+export const FAKE_TYPEABLE: Typeable = { refuses: NOT_PRINTABLE_ASCII, says: 'the fake types only printable ASCII (U+0020–U+007E)', otherPath: 'The fake has no other typing path.' };
 
 /** A fake that types anything: for a test of what is typed, not of what an adapter refuses. */
-export const PERMISSIVE: Typeable = { refuses: /(?!)/u, says: 'the fake types anything' };
+export const PERMISSIVE: Typeable = { refuses: /(?!)/u, says: 'the fake types anything', otherPath: 'The fake has no other typing path.' };
 
 /**
  * Programmable fake device: named screens, tap-driven transitions.

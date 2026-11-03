@@ -265,8 +265,10 @@ const FORMS: Omit<Case, 'group'>[] = [
     judge: holds('pin', '25801'),
   },
   { id: 'p6', cell: P, says: 'a clear fill on the prefilled secure PIN', calls: [fill(P, 'pin', '4821', true)], judge: holds('pin', '4821') },
-  // D43a (ADR 0037): a character averi cannot type, into the prefill — refused before the tap, the prefill kept.
-  { id: 'p7', cell: P, says: 'a no-clear fill of a character averi cannot type (Š) is refused, the prefill kept', calls: [fill(P, 'name', 'Š')], judge: refusedKept('name') },
+  // D43a (ADR 0037): a character averi cannot type, into the prefill — refused before the tap, the prefill kept. Under
+  // idb and uiautomator only since D43 (ADR 0037's D43 amendment): WDA types `Š` through `/wda/keys` — p7w.
+  { id: 'p7', cell: P, sources: ['idb', 'uiautomator'], says: 'a no-clear fill of a character averi cannot type (Š) is refused, the prefill kept', calls: [fill(P, 'name', 'Š')], judge: refusedKept('name') },
+  { id: 'p7w', cell: P, platforms: ['ios'], sources: ['wda'], says: 'a no-clear fill of Š under WDA (/wda/keys) keeps the prefill and appends it', calls: [fill(P, 'name', 'Š')], judge: holds('name', 'Jan ŠťastnýŠ') },
   {
     id: 'e1',
     cell: 'form-errors',

@@ -13,6 +13,12 @@ const IOS = new IosAdapter({
   treeSource: { kind: 'idb', read: noExec, applicationLabel: noExec, dispose: () => Promise.resolve() },
 });
 const ANDROID = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec: noExec });
+/** An iOS adapter over a source that types (IosTreeSource.typeText — WDA's, D43). */
+const IOS_WDA = new IosAdapter({
+  udid: 'AAAA-1111',
+  exec: noExec,
+  treeSource: { kind: 'wda', read: noExec, applicationLabel: noExec, dispose: () => Promise.resolve(), typeText: () => Promise.resolve() },
+});
 
 /** The refusal's text, or a failure when nothing was refused. */
 function refusal(value: string, adapter: Pick<DeviceAdapter, 'typeable'> = new FakeAdapter({}, 'none')): string {
@@ -159,5 +165,49 @@ describe('assertTypeable refuses a character the adapter cannot type', () => {
 
   it('printable ASCII passes, on both', () => {
     for (const adapter of [IOS, ANDROID]) expect(() => assertTypeable('Jan Novak & Co. <jan@example.com> ~!', adapter.typeable)).not.toThrow();
+  });
+});
+
+/**
+ * D43 (ADR 0037's D43 amendment): every refusal ends with the remedy true for its adapter (Typeable.otherPath) — no
+ * longer "averi has no other typing path yet" on every one. idb's names the WDA tree source for a character
+ * WebDriverAgent types, and no path for one it does not; Android names none on API 33; WDA's names none, its set saying
+ * what is not measured. None of them quotes the value.
+ */
+describe('assertTypeable ends each refusal with its adapter\'s remedy', () => {
+  it('iOS (idb): a character WebDriverAgent types — names `ios.treeSource: wda`', () => {
+    expect(refusal('Jan Šťastný', IOS)).toMatch(/nothing tapped, cleared or typed\. A project with `ios\.treeSource: wda` types it through WebDriverAgent \(ADR 0037\); otherwise use a value without it, or enter it by hand\.$/);
+  });
+
+  it('iOS (idb): an emoji, which WebDriverAgent\'s set does not take — no path on iOS, no wda claim', () => {
+    const msg = refusal('a😀', IOS);
+    expect(msg).toMatch(/nothing tapped, cleared or typed\. averi has no typing path on iOS for this value \(WebDriverAgent's `\/wda\/keys` is not measured for U\+1F600 '😀'; ADR 0037\): use a value without it, or enter it by hand\.$/);
+    expect(msg).not.toContain('ios.treeSource');
+  });
+
+  it('Android: no path on API 33, said so', () => {
+    const msg = refusal('Jan Šťastný', ANDROID);
+    expect(msg).toMatch(/nothing tapped, cleared or typed\. averi has no typing path for it on Android \(no shell clipboard setter on API 33; ADR 0037\): use a value without it, or enter it by hand\.$/);
+    expect(msg).not.toContain('WebDriverAgent');
+  });
+
+  it('iOS (WDA): Šťastný and O’Brien are not refused; an emoji is, as not measured through /wda/keys, with no other path', () => {
+    expect(() => assertTypeable('Jan Šťastný', IOS_WDA.typeable)).not.toThrow();
+    expect(() => assertTypeable('O’Brien “Jr.” – Co…', IOS_WDA.typeable)).not.toThrow();
+    const msg = refusal('a😀', IOS_WDA);
+    expect(msg).toMatch(/^cannot type U\+1F600 '😀': on iOS with WebDriverAgent .*not measured through `\/wda\/keys`\. Refused before anything was sent — nothing tapped, cleared or typed\. Use a value without it, or enter it by hand\.$/);
+  });
+
+  it('no refusal says "no other typing path yet" any more, and none quotes the value', () => {
+    for (const [adapter, value] of [[IOS, 'heslo-Š-123'], [IOS, 'heslo-😀-123'], [ANDROID, 'heslo-Š-123'], [IOS_WDA, 'heslo-😀-123']] as const) {
+      const msg = refusal(value, adapter);
+      expect(msg).not.toContain('no other typing path yet');
+      expect(msg).not.toContain('heslo');
+      expect(msg).not.toContain('123');
+    }
+  });
+
+  it('the control-character refusal still comes first over WDA\'s set', () => {
+    expect(refusal('Š\n', IOS_WDA)).toMatch(/^cannot type U\+000A \("\\n", a control character\)/);
   });
 });

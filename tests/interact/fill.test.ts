@@ -5,6 +5,7 @@ import type { ReadBack } from '../../src/interact/fill-facts.js';
 import { judgeFill } from '../../src/interact/fill-verdict.js';
 import { fillReply, wordingOf } from '../../src/interact/fill-text.js';
 import { el, FakeAdapter, idbFloatingLabelFake, node, PERMISSIVE, resetLayout, screen } from '../helpers/fake.js';
+import { WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on: a cadence
 // is a sequence of delays, and asserting the sequence is exact where a wall
@@ -919,6 +920,64 @@ describe('fillField refuses a character the adapter cannot type before anything 
     fake.typeable = PERMISSIVE;
     await fillField(fake, { id: 'amount_input' }, 'Šťastný', FAST);
     expect(fake.typed).toEqual(['Šťastný']);
+  });
+});
+
+/**
+ * D43 (ADR 0037's D43 amendment): on an iOS project with the WDA tree source the adapter declares WDA_TYPEABLE and types
+ * what idb cannot through `/wda/keys`. The fill is untouched in kind: it types once, reads back as before, types a
+ * dropped tail again (by the tail's own characters, per call), and words a garbled landing without its content.
+ */
+describe('fillField over an adapter that types non-ASCII (WDA_TYPEABLE, D43)', () => {
+  const wdaFake = () => {
+    const fake = formFake(null);
+    fake.platform = 'ios';
+    fake.typeable = WDA_TYPEABLE;
+    return fake;
+  };
+
+  it('Jan Šťastný: typed once, whole, lands — `Filled … (11 characters)`', async () => {
+    const fake = wdaFake();
+    const result = await fillField(fake, { id: 'amount_input' }, 'Jan Šťastný', FAST);
+    expect(fake.typed).toEqual(['Jan Šťastný']);
+    expect(result.readBack).toEqual({ kind: 'landed' });
+    expect(fillReply(result, 'id:amount_input')).toBe('Filled id:amount_input (11 characters)');
+  });
+
+  it('a dropped tail `ný` is typed again whole, lands, and the reply says so', async () => {
+    const fake = wdaFake();
+    const keeps = [9];
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      const keep = keeps.shift() ?? text.length;
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + text.slice(0, keep);
+    };
+    const result = await fillField(fake, { id: 'amount_input' }, 'Jan Šťastný', FAST);
+    expect(fake.typed).toEqual(['Jan Šťastný', 'ný']);
+    expect(result).toMatchObject({ readBack: { kind: 'landed' }, retyped: [2] });
+    expect(fillReply(result, 'id:amount_input')).toBe('Filled id:amount_input (11 characters, the last 2 characters typed again after the field dropped them)');
+  });
+
+  it('a garbled landing (Jan Stastny for Jan Šťastný) fails as the same length, the content withheld', async () => {
+    const fake = wdaFake();
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      if (fake.focused) fake.focused.value = (fake.focused.value ?? '') + text.normalize('NFD').replace(/\p{M}/gu, '');
+    };
+    const result = await fillField(fake, { id: 'amount_input' }, 'Jan Šťastný', FAST).catch((e: unknown) => e);
+    const text = result instanceof Error ? result.message : fillReply(result as never, 'id:amount_input');
+    expect(text).toContain('typed 11 characters but the field shows 11 — as many characters as were typed, 3 differing');
+    expect(text).not.toContain('Stastny');
+    expect(text).not.toContain('Šťastný');
+  });
+
+  it('an emoji is still refused before anything is sent, as not measured through /wda/keys', async () => {
+    const fake = wdaFake();
+    const error = await fillField(fake, { id: 'amount_input' }, 'Jan 😀', FAST).catch((e: unknown) => e);
+    expect(error).toMatchObject({ name: 'FillValueFailure', fillValue: 'refused' });
+    expect((error as Error).message).toMatch(/^cannot type U\+1F600 '😀': on iOS with WebDriverAgent .*not measured through `\/wda\/keys`/);
+    expect(fake.typed).toEqual([]);
+    expect(fake.taps).toEqual([]);
   });
 });
 

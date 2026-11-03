@@ -11,6 +11,7 @@ import { markIdbDialect, parseIdbDescribeAll } from '../../src/adapters/ios-tree
 import { parseDump } from '../helpers/android-dumps.js';
 import { ACTIVE_WINDOW_HINT, missNote } from '../../src/ui-tree/miss.js';
 import { boundReads } from '../helpers/terminal-read.js';
+import { WDA_TYPEABLE } from '../../src/adapters/ios-typing.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 
 // The one sleep owner (util/sleep.ts) is recorded, not waited on
@@ -2500,6 +2501,23 @@ flows:
     await expect(FlowEngine.run(c, fake, FAST, { flow: 'f' })).rejects.toThrow("cannot type U+0160 'Š'");
     expect(fake.typed).toEqual([]);
     expect(fake.taps).toEqual([]);
+  });
+
+  // D43 (ADR 0037's D43 amendment): over an adapter that types it (WDA_TYPEABLE), the same steps type the value.
+  it('over WDA\'s set, a type: and a fill: step with Šťastný are typed, not refused', async () => {
+    const c = parseConfig(`
+app: { ios: { bundleId: md.bank.app } }
+flows:
+  f:
+    steps:
+      - fill: { id: amount_input, value: "Jan Šťastný" }
+      - type: { value: " O’Brien" }
+`);
+    const fake = formFake();
+    fake.platform = 'ios';
+    fake.typeable = WDA_TYPEABLE;
+    await FlowEngine.run(c, fake, FAST, { flow: 'f' });
+    expect(fake.typed).toEqual(['Jan Šťastný', ' O’Brien']);
   });
 
   it('redacts credential values in the fill trace', async () => {

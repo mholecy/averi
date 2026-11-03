@@ -496,7 +496,7 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
         'typed — APPENDING to pre-filled content unless clear: true deletes it first — then read back. "Filled …" only when the field shows the text (a dropped clear-fill is retried once); otherwise "Typed … — NOT verified" (or "Cleared …"/"Focused … — NOT verified") with the reason; a match that is not a textfield gets a ⚠ naming the nearest input. ' +
         'A text the app transforms (auto-capitalisation, autocorrect, a mask) FAILS the read-back, saying whether only letter case differs — never the text. If the tree cannot be re-read after typing, the call FAILS. ' +
         'A placeholder the tree reports as the value is not content. The keyboard is NOT dismissed afterwards (a flow\'s fill: has dismissKeyboard). ' +
-        'Today averi types only printable ASCII (U+0020–U+007E) on both platforms; any other character is refused before anything is sent ("cannot type U+…", nothing tapped or typed; ADR 0037). ' +
+        'Types printable ASCII, and under `ios.treeSource: wda` also Latin, Greek, Cyrillic and Han letters, punctuation and symbols; anything else is refused before anything is sent (ADR 0037). ' +
         'Every case in full: references/tools.md#type_text.',
       inputSchema: {
         platform,

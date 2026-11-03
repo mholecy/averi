@@ -8,10 +8,11 @@ import {
   WdaServer,
   wdaPortFor,
   wdaProjectPath,
+  keysTimeoutMs,
   type FetchFn,
 } from '../../src/adapters/wda.js';
 import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
-import { fakeExec, fakeFetch, fakeSpawn, IMPOSTER_STATUS, tempDerivedData, WDA_STATUS } from '../helpers/fake-wda.js';
+import { fakeExec, fakeFetch, fakeSpawn, IMPOSTER_STATUS, tempDerivedData, WDA_STATUS, type FakeRequest } from '../helpers/fake-wda.js';
 
 describe('wdaPortFor / port selection', () => {
   it('allocates sequential ports from 8100 — first UDID 8100, second 8101', () => {
@@ -609,6 +610,172 @@ describe('WdaServer.upGeneration and activeAppInfo — asked of a running WDA on
     expect(err?.message).toContain(String(server.port));
     expect(err?.message).toContain(server.logPath);
     server.stop();
+  });
+});
+
+/**
+ * D43 (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md, the D43 amendment): WDA types
+ * what idb cannot through `POST /session/:id/wda/keys`, which is session-bound. One session per WDA start, made with
+ * `forceSimulatorSoftwareKeyboardPresence: false` (batch-10's G4: it changes no keyboard pref, simulator domain or
+ * tree); after a runner restart the old session answers HTTP 404 "invalid session id" with nothing typed, so a new one
+ * is made and the typing sent once more; a request that did not complete is never sent again — it may have typed.
+ */
+describe('WdaServer.keys — one session per WDA start, one retry on a lost session, none after a timeout (D43)', () => {
+  type Reply = 'refused' | 'timeout' | { status: number; body?: unknown };
+  async function keysSetup(keys: (req: FakeRequest, n: number) => Reply = () => ({ status: 200, body: { value: null } })) {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    let sessions = 0;
+    let keyCalls = 0;
+    const fetcher = fakeFetch((url, req) => {
+      if (url.endsWith('/status')) return spawner.kills.length < spawner.spawns.length ? { status: 200, body: WDA_STATUS } : 'refused';
+      if (url.endsWith('/session') && req.method === 'POST') {
+        sessions++;
+        return { status: 200, body: { value: { sessionId: `S${sessions}`, capabilities: {} }, sessionId: `S${sessions}` } };
+      }
+      if (url.endsWith('/wda/keys')) return keys(req, ++keyCalls);
+      return { status: 200, body: { value: { type: 'Application' } } };
+    });
+    const server = new WdaServer({
+      udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn,
+      derivedDataPath: dd, pollIntervalMs: 5,
+    });
+    const posts = () => fetcher.requests.filter((r) => r.method === 'POST').map((r) => r.url.replace(`http://127.0.0.1:${server.port}`, ''));
+    return { server, spawner, fetcher, posts };
+  }
+
+  it('the first keys starts WDA, makes a session with forceSimulatorSoftwareKeyboardPresence: false, then posts the text as its characters', async () => {
+    const { server, fetcher, posts, spawner } = await keysSetup();
+    await server.keys('Jan Šťastný');
+    expect(spawner.spawns).toHaveLength(1);
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys']);
+    const [session, keys] = fetcher.requests.filter((r) => r.method === 'POST');
+    expect(session.body).toEqual({ capabilities: { alwaysMatch: { forceSimulatorSoftwareKeyboardPresence: false }, firstMatch: [{}] } });
+    // `value` is joined by WDA (FBElementCommands.m: componentsJoinedByString), so `[text]` and `[...text]` are one typing.
+    expect((keys.body as { value: string[] }).value.join('')).toBe('Jan Šťastný');
+    for (const r of [session, keys]) expect(r.headers).toEqual({ 'content-type': 'application/json' });
+    server.stop();
+  });
+
+  it('a second keys on the same start reuses the session', async () => {
+    const { server, posts } = await keysSetup();
+    await server.keys('Šťastný');
+    await server.keys('O’Brien');
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session/S1/wda/keys']);
+    server.stop();
+  });
+
+  it('after a restart (a new WDA start) a new session is made', async () => {
+    const { server, posts } = await keysSetup();
+    await server.keys('Šťastný');
+    server.stop();
+    await server.keys('Šťastný');
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session', '/session/S2/wda/keys']);
+    server.stop();
+  });
+
+  it('a lost session (HTTP 404 "invalid session id", nothing typed): one new session, the typing sent once more, done', async () => {
+    const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 404, body: { value: { error: 'invalid session id', message: 'Session does not exist' } } } : { status: 200, body: { value: null } }));
+    await server.keys('Šťastný');
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session', '/session/S2/wda/keys']);
+    server.stop();
+  });
+
+  // Review round 1: two typings in flight on the old session, both lost — the second must not forget the session the
+  // first just made (WDA ends every other session when one is made, so a third would end the first's).
+  it('two concurrent typings that both meet a lost session make ONE new session between them', async () => {
+    const { server, posts } = await keysSetup((req) => (req.url.includes('/session/S1/') ? { status: 404, body: { value: { error: 'invalid session id' } } } : { status: 200, body: { value: null } }));
+    await server.ensureRunning();
+    await Promise.all([server.keys('Šťastný'), server.keys('O’Brien')]);
+    expect(posts().filter((p) => p === '/session')).toHaveLength(2);
+    expect(posts().filter((p) => p.endsWith('/wda/keys'))).toEqual(['/session/S1/wda/keys', '/session/S1/wda/keys', '/session/S2/wda/keys', '/session/S2/wda/keys']);
+    server.stop();
+  });
+
+  it('an "invalid session id" under another status is a lost session too', async () => {
+    const { server, posts } = await keysSetup((_req, n) => (n === 1 ? { status: 500, body: { value: { error: 'invalid session id', message: 'Session does not exist' } } } : { status: 200, body: { value: null } }));
+    await server.keys('Šťastný');
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session', '/session/S2/wda/keys']);
+    server.stop();
+  });
+
+  it('a second lost session fails, naming the port and the log — no third try', async () => {
+    const { server, posts } = await keysSetup(() => ({ status: 404, body: { value: { error: 'invalid session id', message: 'Session does not exist' } } }));
+    const err = await server.keys('Šťastný').then(() => undefined, (e: Error) => e);
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys', '/session', '/session/S2/wda/keys']);
+    expect(err?.message).toMatch(/^WDA \/wda\/keys failed: HTTP 404 invalid session id on port \d+ \(udid AAAA-1111\) — /);
+    expect(err?.message).toContain(server.logPath);
+    server.stop();
+  });
+
+  it('a timeout: no retry — it may have typed part of the text; the message says so and names the port and the log', async () => {
+    const { server, posts } = await keysSetup(() => 'timeout');
+    const err = await server.keys('Šťastný').then(() => undefined, (e: Error) => e);
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys']);
+    expect(err?.message).toContain('/wda/keys did not complete');
+    expect(err?.message).toContain('may have typed part of the text');
+    expect(err?.message).toContain(`port ${server.port} (udid AAAA-1111)`);
+    expect(err?.message).toContain(server.logPath);
+    expect(err?.message).not.toContain('Šťastný');
+    server.stop();
+  });
+
+  it('a lost connection mid-typing: no retry either', async () => {
+    const { server, posts } = await keysSetup(() => 'refused');
+    await expect(server.keys('Šťastný')).rejects.toThrow('may have typed part of the text');
+    expect(posts()).toEqual(['/session', '/session/S1/wda/keys']);
+    server.stop();
+  });
+
+  // Review round 1: WDA's message is NSError's description, which may hold the value escaped (`\\U0161`) or a part of
+  // it — no cut of the text can be sure of it, so /wda/keys' error quotes the status and `value.error` alone.
+  it.each([
+    ['the value quoted whole', 'Failed to type "Šťastný": no keyboard focus'],
+    ['the value escaped (NSError\'s description)', 'Error Domain=XCTDaemonErrorDomain "Failed to type \\U0160\\U0165astn\\U00fd"'],
+    ['a part of the value quoted', 'typing stopped after "Šťas"'],
+  ])('a 500 "invalid element state", its message %s: fails with the status and WDA\'s error alone, the port and the log', async (_what, message) => {
+    const { server } = await keysSetup(() => ({ status: 500, body: { value: { error: 'invalid element state', message } } }));
+    const err = await server.keys('Šťastný').then(() => undefined, (e: Error) => e);
+    expect(err?.message).toMatch(/^WDA \/wda\/keys failed: HTTP 500 invalid element state on port \d+ \(udid AAAA-1111\) — xcodebuild log: /);
+    expect(err?.message).toContain(server.logPath);
+    for (const leak of ['Šťas', 'U0160', 'astn', message]) expect(err?.message).not.toContain(leak);
+    server.stop();
+  });
+
+  it('a session WDA refuses to make fails naming it, and no typing is sent', async () => {
+    const { dd } = await tempDerivedData(true);
+    const spawner = fakeSpawn();
+    const fetcher = fakeFetch((url, req) => {
+      if (url.endsWith('/status')) return spawner.spawns.length > 0 ? { status: 200, body: WDA_STATUS } : 'refused';
+      if (url.endsWith('/session') && req.method === 'POST') return { status: 500, body: { value: { error: 'session not created', message: 'no' } } };
+      return { status: 200, body: {} };
+    });
+    const server = new WdaServer({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
+    const err = await server.keys('Šťastný').then(() => undefined, (e: Error) => e);
+    expect(err?.message).toMatch(/^WDA POST \/session failed: HTTP 500 session not created: no on port/);
+    expect(fetcher.urls.filter((u) => u.endsWith('/wda/keys'))).toEqual([]);
+    server.stop();
+  });
+
+  it('budgets: the session 10 s; the typing 2 s + 50 ms a character (by code points), about three times batch-10\'s 300 + 16 ms', async () => {
+    const { server } = await keysSetup();
+    await server.ensureRunning();
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    await server.keys('Šťastný😀');
+    const budgets = timeout.mock.calls.map(([ms]) => ms);
+    timeout.mockRestore();
+    expect(budgets.slice(-2)).toEqual([10_000, 2_400]);
+    expect(keysTimeoutMs(40)).toBe(4_000);
+    server.stop();
+  });
+
+  it('after shutdown() a keys is refused before any request — the session went with the server', async () => {
+    const { server, posts } = await keysSetup();
+    await server.keys('Šťastný');
+    await server.shutdown();
+    const sent = posts().length;
+    await expect(server.keys('Šťastný')).rejects.toThrow('has been shut down');
+    expect(posts()).toHaveLength(sent);
   });
 });
 

@@ -255,6 +255,45 @@ describe('refusedKept: p7, a character averi cannot type into a prefilled field'
 });
 
 /**
+ * D43 (ADR 0037's D43 amendment): under WDA averi types `Š` through `/wda/keys`, so p7 — the refusal with the prefill kept
+ * — runs under idb and uiautomator only, and p7w under WDA holds the prefill with `Š` appended (no clear). b1d and b7
+ * under WDA are held to `holds` with no KNOWN entry (live-known.ts): ok expected, a LOUD there is no longer known.
+ */
+describe('p7 and p7w (D43): refused under idb and uiautomator, typed under WDA', () => {
+  const p1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'p1');
+  const prefill = p1.launched.fields!.name.value;
+  const left = (value: string) => withFieldValue(p1, 'name', value).state;
+  const byId = async (platform: 'ios' | 'android', id: string) => (await selectCases({ platform, app: 'native', groups: ['forms'], only: [id] }))[0];
+
+  it('p7 runs under idb and uiautomator only; p7w is iOS\'s, under WDA only, the same fill of `Š` with no clear', async () => {
+    const [p7ios, p7android, p7w, p7wAndroid] = [await byId('ios', 'p7'), await byId('android', 'p7'), await byId('ios', 'p7w'), await byId('android', 'p7w')];
+    expect(p7ios.sources).toEqual(['idb', 'uiautomator']);
+    expect(p7android.sources).toEqual(['idb', 'uiautomator']);
+    expect(p7w.sources).toEqual(['wda']);
+    expect(p7wAndroid).toBeUndefined();
+    expect(p7w.calls).toEqual(p7ios.calls);
+    expect(p7w.calls).toEqual([{ tool: 'type_text', args: { selector: 'id:"lab.form-prefilled.name"', text: 'Š' } }]);
+  });
+
+  it('p7w: the prefill with Š appended and Filled: ok; the prefill alone, refused: LOUD; a claim over the prefill alone: MISMATCH', async () => {
+    const p7w = await byId('ios', 'p7w');
+    expect(prefill).toBe('Jan Šťastný');
+    const filled = 'Filled id:"lab.form-prefilled.name" (1 character)';
+    expect(p7w.judge(left(`${prefill}Š`), [filled], 'wda', p1.launched, [])).toMatchObject({ outcome: 'ok' });
+    expect(p7w.judge(left(prefill), ["ERROR cannot type U+0160 'Š': … Refused before anything was sent — nothing tapped, cleared or typed."], 'wda', p1.launched, [])).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
+    expect(p7w.judge(left(prefill), [filled], 'wda', p1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+  });
+
+  it('b1d and b7 have no KNOWN entry under WDA any more; under idb and uiautomator they keep theirs', () => {
+    for (const id of ['b1d', 'b7']) {
+      expect(knownEntry('ios', 'wda', id)).toBeUndefined();
+      expect(knownEntry('ios', 'idb', id)).toMatchObject({ cls: 'loud-untouched', kind: 'refused' });
+      expect(knownEntry('android', 'uiautomator', id)).toMatchObject({ cls: 'loud-untouched', kind: 'refused' });
+    }
+  });
+});
+
+/**
  * f11–f14 (D37): form-format's `date` (schema.ts#FieldFormat, placeholder `__.__.____`) and `phone` (no format,
  * placeholder `+421`) — at D37, ADR 0034's dotted date (a false mismatch until D51) and its D29 gaps. Judged here over D40's f1 record (iOS WDA), its
  * final state set to what each fill would leave; batch-3's device records are rejudged in live-rejudge.test.ts.

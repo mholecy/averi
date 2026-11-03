@@ -38,6 +38,8 @@ import { countOf } from '../util/count.js';
  * Only the tree read lives behind this seam. Taps, typing, install and launch
  * stay on idb/simctl whichever source is configured (plan, decision 4): WDA
  * frames are points, the same units idb rects use, so the coordinates agree.
+ * One exception since D43: WDA's source types what idb cannot (`typeText`,
+ * optional, as `systemAlert`), on the WebDriverAgent it already owns.
  */
 export interface IosTreeSource {
   /**
@@ -76,6 +78,13 @@ export interface IosTreeSource {
    * not up). Absent on idb, whose label reads already carry the alert's shape (`candidate`).
    */
   systemAlert?(): Promise<SystemAlert | undefined>;
+  /**
+   * Types `text` into whatever holds keyboard focus — WDA's only (WdaTreeSource: `POST /session/:id/wda/keys`, D43;
+   * ADR 0037's D43 amendment). IosAdapter sends it only what idb cannot type (ios-typing.ts#typingPathOf), and declares
+   * WDA_TYPEABLE when it is present. Absent on idb and on the differential harness's recorded source: their adapter
+   * types through idb alone.
+   */
+  typeText?(text: string): Promise<void>;
   dispose(): Promise<void>;
 }
 

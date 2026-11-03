@@ -17,7 +17,8 @@ import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js
 import { ViewportMemo } from './viewport-memo.js';
 import { iosStatusBand } from './ios-status-band.js';
 import { sleep } from '../util/sleep.js';
-import { PRINTABLE_ASCII, type Typeable } from './typeable.js';
+import type { Typeable } from './typeable.js';
+import { IDB_TYPEABLE, typingPathOf, WDA_TYPEABLE } from './ios-typing.js';
 
 /**
  * How long uiTree({ settle: true }) waits before its one re-read of an idb
@@ -159,18 +160,6 @@ function appKey(front: FrontApp): AppKey | undefined {
 }
 
 /**
- * What `idb ui text` can type (types.ts#DeviceAdapter.typeable, ADR 0037): printable ASCII and `\n`. idb maps the whole
- * string through its KEY_MAP before it sends anything (fb-idb idb/common/hid.py), and KEY_MAP holds exactly U+0020–U+007E
- * and `\n` (the Return key): any other character fails the whole call — exit 1, a Python trace, nothing typed
- * (docs/bugs/2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md). The `\n` is idb's fact, kept here; interact/
- * refuses it before this set is asked, as a control character (type-text.ts — the Return key is `pressKey('enter')`).
- */
-const IDB_TYPEABLE: Typeable = {
-  refuses: new RegExp(`[^${PRINTABLE_ASCII}\\n]`, 'u'),
-  says: "on iOS averi types only printable ASCII (U+0020–U+007E): `idb ui text` has no key for any other character and fails the whole call",
-};
-
-/**
  * iOS adapter: `xcrun simctl` for lifecycle, `idb` for input and screenshots (screenshotVia), and an
  * injected IosTreeSource for the accessibility tree (ios-tree-source.ts —
  * idb's describe-all or WebDriverAgent's /source, chosen by the registry from
@@ -183,8 +172,17 @@ export class IosAdapter implements DeviceAdapter {
   readonly platform = 'ios' as const;
   /** `idb ui text` delivers its HID events before it returns (types.ts#TypingDelivery, measured 2026-10-19). */
   readonly typingDelivery = 'on-return' as const;
-  /** What `idb ui text` types, under either tree source (WDA's types through idb too): IDB_TYPEABLE. */
-  readonly typeable = IDB_TYPEABLE;
+  /**
+   * What this adapter types (ios-typing.ts, ADR 0037's D43 amendment): WDA_TYPEABLE over a tree source that types
+   * (IosTreeSource.typeText — WDA's), else IDB_TYPEABLE. Decided by the source's typer, not its kind: the differential
+   * harness's recorded source is of kind `wda` and types nothing. Fixed for the adapter's life.
+   */
+  readonly typeable: Typeable;
+  /**
+   * The source's typer (IosTreeSource.typeText, WDA's), bound once here: what `typeable` and typeText's route both come
+   * from — undefined over a source that types nothing, where every text goes to idb.
+   */
+  private readonly sourceTyper: ((text: string) => Promise<void>) | undefined;
   private readonly exec: ExecFn;
   private readonly udid: string;
   private readonly treeSource: IosTreeSource;
@@ -230,6 +228,8 @@ export class IosAdapter implements DeviceAdapter {
     this.udid = opts.udid;
     this.exec = opts.exec ?? defaultExec;
     this.treeSource = opts.treeSource;
+    this.sourceTyper = opts.treeSource.typeText?.bind(opts.treeSource);
+    this.typeable = this.sourceTyper !== undefined ? WDA_TYPEABLE : IDB_TYPEABLE;
     this.idbHelper = opts.idbHelper;
     this.screenshotVia = iosScreenshotViaSimctl() ? 'simctl' : 'idb';
   }
@@ -743,6 +743,14 @@ export class IosAdapter implements DeviceAdapter {
     // Guarded here, once, because the refusal is idb's, a platform fact no
     // caller owns, and every caller hands its text through unexamined.
     if (text === '') return;
+    // D43 (ios-typing.ts): a text idb cannot type goes whole to the source's typer — WDA's `/wda/keys`, which delivers
+    // on return (batch-10's G1: 20/20), so `typingDelivery` holds for it too. No D24 split there: batch-10's G5 typed
+    // 10/10 into the RN field with no tail dropped, and the fill's retype stays the net. Every text idb can type stays
+    // on idb, byte for byte; over a source without a typer every text does, as before D43.
+    if (this.sourceTyper !== undefined && typingPathOf(text) === 'wda') {
+      await this.sourceTyper(text);
+      return;
+    }
     // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
     // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
     // split between two idb calls. A one-character text has no rest: one call, no wait.

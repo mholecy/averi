@@ -18,12 +18,28 @@ export interface Typeable {
   readonly refuses: RegExp;
   /** What the adapter types and why nothing else, completing the refusal's "cannot type U+…: " — one clause, no full stop. */
   readonly says: string;
+  /**
+   * The remedy the refusal ends with, true for this adapter: whole sentences, ending with a full stop (D43). Where no
+   * other typing path of averi takes the character, it says so — and what to do instead. With a `widerPath`, this is
+   * the remedy for a value that path types whole.
+   */
+  readonly otherPath: string;
+  /**
+   * Another configuration of the same platform that types part of what this one refuses (D43: an iOS project on the
+   * idb tree source, whose characters WebDriverAgent's `/wda/keys` may take): `refuses` is that path's own set, and
+   * `blockedBy(char)` the remedy said in place of `otherPath` for a value that path would refuse too — a path that
+   * refuses a later character of the value is no way out (review round 1). `char` is the first character of the value
+   * that path refuses, named as the refusal names one (`U+1F600 '😀'`): the one that blocks every path (review round
+   * 2). A function inside the declaration, not a method of the adapter: the read hand-off's Proxy wraps only the
+   * adapter's own methods. Absent: no such path.
+   */
+  readonly widerPath?: Pick<Typeable, 'refuses'> & { blockedBy(char: string): string };
 }
 
-/** Printable ASCII (U+0020–U+007E) as the body of a RegExp character class — the set both adapters type today. */
+/** Printable ASCII (U+0020–U+007E) as the body of a RegExp character class — what Android's `input text` and idb's `ui text` type. */
 export const PRINTABLE_ASCII = '\\x20-\\x7e';
 
-/** Every character outside printable ASCII — Android's `refuses`, and the test fake's; iOS adds `\n` (adapters/ios.ts). */
+/** Every character outside printable ASCII — Android's `refuses`, and the test fake's; iOS's idb adds `\n` (adapters/ios-typing.ts). */
 export const NOT_PRINTABLE_ASCII = new RegExp(`[^${PRINTABLE_ASCII}]`, 'u');
 
 /**
@@ -44,17 +60,22 @@ function named(ch: string): string {
   return codePoint(ch);
 }
 
+/** The wider path's remedy for `text` when that path refuses a character of it too, naming the first; else undefined. */
+function blockedRemedy(text: string, wider: NonNullable<Typeable['widerPath']>): string | undefined {
+  const ch = text.match(wider.refuses)?.[0];
+  return ch === undefined ? undefined : wider.blockedBy(named(ch));
+}
+
 /**
  * The refusal of `text` by `typeable`, or undefined when it can type all of it. The refusal names the FIRST character it
  * cannot type (whole: a surrogate pair is one), never the value around it (a value may be a credential); says nothing
  * was sent — true at both places that throw it: before the fill's field is resolved (interact/type-text.ts) and before
- * Android's first `input text` — and what the adapter types.
+ * Android's first `input text` — what the adapter types, and the remedy true for it (`otherPath`; with a `widerPath` that would
+ * refuse the value too, its `blockedBy`, naming the first character that path refuses).
  */
 export function refusalOf(text: string, typeable: Typeable): string | undefined {
   const ch = text.match(typeable.refuses)?.[0];
   if (ch === undefined) return undefined;
-  return (
-    `cannot type ${named(ch)}: ${typeable.says}. Refused before anything was sent — nothing tapped, cleared or typed. ` +
-    'averi has no other typing path yet (ADR 0037): use a value without it, or enter it by hand.'
-  );
+  const remedy = (typeable.widerPath && blockedRemedy(text, typeable.widerPath)) ?? typeable.otherPath;
+  return `cannot type ${named(ch)}: ${typeable.says}. Refused before anything was sent — nothing tapped, cleared or typed. ${remedy}`;
 }

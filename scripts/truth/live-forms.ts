@@ -52,7 +52,8 @@ export const holds =
  * anything is sent — its words, "Refused before anything was sent" — and the prefill must stay as the launch left it:
  * ok only so. The field changed is LOUD `loud-changed` (a tap, a clear or a part typed reached it); kept, but the
  * refusal not said so — another error, or none — is LOUD `loud-untouched`; a claim of done is a MISMATCH `fill-claim`.
- * When a platform gains a typing path for `Š` (ADR 0037's later work), this case's judge becomes `holds` again.
+ * Since D43 (ADR 0037's D43 amendment) iOS under WDA types `Š` through `/wda/keys`: p7 runs under idb and uiautomator
+ * only, and p7w, the same fill under WDA, is judged by `holds` (live-cases.ts).
  */
 export const refusedKept =
   (tag: string) =>
