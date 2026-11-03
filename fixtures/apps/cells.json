@@ -400,6 +400,20 @@
       }
     },
     {
+      "id": "form-grouped",
+      "family": "forms",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "New payment",
+        "fields": [
+          { "tag": "ibanEager", "kind": "iban", "title": "IBAN – spaced as each group ends", "placeholder": "SK00 0000 0000 …", "format": "group4eager" },
+          { "tag": "phoneGrouped", "kind": "text", "title": "Payee’s phone – grouped as typed", "placeholder": "+421", "format": "phone3" }
+        ],
+        "submit": { "tag": "submit", "title": "Send payment" }
+      }
+    },
+    {
       "id": "scroll-bounded",
       "family": "edges",
       "layer": "none",
@@ -502,6 +516,50 @@
       "targets": [
         { "tag": "A", "color": "#5E35B1", "slot": 0, "declared": "open", "scrollView": "list" },
         { "tag": "D", "color": "#F4511E", "slot": 1, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "carousel-lazy",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
+      "id": "carousel-recycler",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
+      "id": "carousel-lazy-free",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
+      "id": "carousel-recycler-free",
+      "family": "edges",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
       ]
     },
     {
@@ -772,6 +830,15 @@
       "targets": [
         { "tag": "G", "color": "#B2EBF2", "slot": 0, "declared": "open", "text": "IBAN", "format": "group4" },
         { "tag": "A", "color": "#FFE0B2", "slot": 1, "declared": "open", "text": "Amount", "format": "thousands" }
+      ]
+    },
+    {
+      "id": "rn-format-eager",
+      "family": "react-native",
+      "layer": "none",
+      "targets": [
+        { "tag": "E", "color": "#C8E6C9", "slot": 0, "declared": "open", "text": "IBAN", "format": "group4eager" },
+        { "tag": "P", "color": "#F8BBD0", "slot": 1, "declared": "open", "text": "Phone", "format": "phone3" }
       ]
     },
     {

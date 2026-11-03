@@ -387,8 +387,16 @@ private func groups(_ s: String, _ n: Int) -> [String] {
     return out
 }
 
+/// group4eager's longest text, its spaces aside (an IBAN's 24 characters).
+private let eagerMax = 24
+
 /// `group4`: whitespace dropped, groups of four joined by a space; `thousands`: the whole part before the first `,` or
-/// `.` grouped in threes from the right by a no-break space, the rest kept; `date` a dotted date (schema.ts#FieldFormat).
+/// `.` grouped in threes from the right by a no-break space, the rest kept; `date` a dotted date; `group4eager` (L7)
+/// `group4` on the first 24 characters, a space after a complete group while under 24; `phone3` (L7) a leading `+`
+/// kept, the digits alone in threes (schema.ts#FieldFormat). The table tests/truth/lab-format.test.ts pins on the React
+/// Native app's src/format.ts, which this spells too: group4eager `SK31` → `SK31 `, `SK3112000000` →
+/// `SK31 1200 0000 `, `SK3112000000123` → `SK31 1200 0000 123`, 24 characters → six groups and no space; phone3
+/// `421903123456` → `421 903 123 456`, `+421903123456` and `+421 903 123 456` → `+421 903 123 456`, `+4219` → `+421 9`.
 func formatted(_ format: String?, _ text: String) -> String {
     switch format {
     case "group4":
@@ -400,6 +408,13 @@ func formatted(_ format: String?, _ text: String) -> String {
     case "date":
         let digits = text.filter { $0.isASCII && $0.isNumber }.prefix(8)
         return [String(digits.prefix(2)), String(digits.dropFirst(2).prefix(2)), String(digits.dropFirst(4))].filter { !$0.isEmpty }.joined(separator: ".")
+    case "group4eager":
+        let kept = String(text.filter { !isGap($0) }.prefix(eagerMax))
+        let eager = !kept.isEmpty && kept.count % 4 == 0 && kept.count < eagerMax
+        return groups(kept, 4).joined(separator: " ") + (eager ? " " : "")
+    case "phone3":
+        let plus = text.drop(while: isGap).first == "+"
+        return (plus ? "+" : "") + groups(String(text.filter { $0.isASCII && $0.isNumber }), 3).joined(separator: " ")
     default:
         return text
     }

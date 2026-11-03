@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Android lab app (docs/plans/2026-10-15-ground-truth-lab-app.md): one cell of fixtures/apps/cells.json per
      launch, chosen by the string intent extra `cell` (scripts/truth/capture-android.ts starts it with `am start`) or
-     the deep link averilab://cell/<id>. No login, no network, no data. -->
+     the deep link averilab://cell/<id>. averilab://shared/… (L7, D55) resolves to two components and opens no cell.
+     No login, no network, no data. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:label="AveriLab"
@@ -23,6 +24,27 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="averilab" android:host="cell" />
             </intent-filter>
+            <!-- L7 (D55): averilab://shared/… has two handlers, this activity and the alias below, so the system's
+                 resolver (a chooser) answers it; averilab://cell/… keeps one. The app opens no cell for it. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="averilab" android:host="shared" />
+            </intent-filter>
         </activity>
+        <!-- The second handler of averilab://shared/… (D55): another component, the same activity. -->
+        <activity-alias
+            android:name=".Twin"
+            android:label="AveriLab twin"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="averilab" android:host="shared" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

@@ -178,6 +178,16 @@ class Lab(context: Context, private val screen: Rect) {
         write()
     }
 
+    /**
+     * A value read out under `key` in the state's offsets that is no scroll container's offset and takes no stroke —
+     * L7's carousels' `carousel.index`, the card they rest on (Edges.kt). No cell before L7 writes one.
+     */
+    fun index(key: String, value: Int) {
+        if (offsets[key] == value) return
+        offsets[key] = value
+        write()
+    }
+
     // --- the form oracle (Forms.kt): what the MODEL holds, never what a tree reports ---
 
     /** One field as the model holds it: its value, whether it has the focus, the error it shows (text and id) or none. */

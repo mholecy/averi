@@ -461,6 +461,40 @@ From round 6's iOS device check (docs/truth/live-ios-2026-10-18-visibility.md; i
   waits on "Pending captures (round 6)" — both captured: under WDA C's stroke goes inside the carousel along its axis
   (the replay `307 181 → 95 181`; live one stroke at (307,181) moving the carousel 447–532 pt).
 
+### L7 — cells for batch-9 (2026-11-03), not captured
+
+New cells beside the captured ones (form-format, rn-format and carousel-in-list keep their fields and layout, so the
+truth corpus and the golden do not move: an uncaptured cell makes no golden row). Built for batch-9's device blocks:
+
+- `forms/form-grouped` (both platforms): `ibanEager` (`format: group4eager`: groups of four and a space as soon as a
+  group is complete, none at 24 characters — D60's eager trailing mark) and `phoneGrouped` (`format: phone3`: a
+  leading `+` kept, the digits in threes, under a `+421` placeholder — D37's `+421` grouping field), and the submit.
+  Live forms cases g1–g5 (scripts/truth/live-cases.ts); g2, which ends on a complete group, is an expected MISMATCH
+  by design under iOS's idb and wda (the reading's trailing mark is D53's `separated`; Android not yet read), said
+  in its `says`. group4eager's backspace trap, by
+  design: a backspace over the eager space has it added straight back (`SK31 ` stays `SK31 `), so only a select-all
+  clear empties a field ending in it; the cases fill from empty.
+- `react-native/rn-format-eager`: E (`group4eager`) and P (`phone3`) laid as rn-format's text targets — D60's live
+  path, React Native on iOS dropping a fill's tail behind an eager mark. Live forms cases rfe1–rfe3: rfe1 (24
+  characters) and rfe2 (10) chosen so D40's measured drops (4 under idb, 2 under wda) leave the reading on a group's
+  end, in the eager mark, while the full value lands; rfe3 (12) is g2 on React Native, an expected MISMATCH by design.
+- `edges/carousel-lazy`, `edges/carousel-recycler` (Android only): carousel-in-list's page, rows and targets, its
+  carousel a Compose LazyRow under a snap fling and a RecyclerView under a PagerSnapHelper — snapping pagers (D37),
+  whose node carries no scroll axis. Their free twins `edges/carousel-lazy-free`, `edges/carousel-recycler-free` (D59)
+  are the same carousels with no snap, so a stroke can leave C cut by the clip. Each card as wide as the clip, C the
+  second; the carousel reports its clip, offset and strokes, and the card under the clip's centre at rest as
+  `carousel.index` in LabState.offsets. C is absent at launch on all four (a lazy list lays out only what its clip
+  shows: no node, no frame) until part of it scrolls in, and its frame stays in the state, stale, once it scrolls out
+  — a probe reading `frames.C` must not take it for C's place. B and U are carousel-in-list's rows, not its outcomes:
+  whether a vertical stroke touching down on the RecyclerView (U's `up`) reaches the page is unmeasured. The stroke
+  count is read from the state's existing `strokes` list (no counter of its own); RecyclerView and PagerSnapHelper
+  come in through material's dependency (compiled offline), no explicit `androidx.recyclerview` line.
+- The Android manifest: `averilab://shared` resolves to two components (MainActivity and its alias `.Twin`) — D55's
+  second handler; `averilab://cell` keeps one.
+
+The three apps spell the two formats alike (Forms.kt, Forms.swift, the RN app's src/format.ts); the table is
+tests/truth/lab-format.test.ts. No LIVE_KNOWN entry: the cases' device outcomes are batch-9's to read.
+
 ## Workflow per bug, once phase 3 is in
 
 1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,

@@ -1,6 +1,6 @@
 {
   "family": "edges",
-  "note": "Targets at an edge: of their scroll view (cut, a sliver, outside its clip, a sticky header) or of the screen (off it, resting in the status band) — phase 3 B2 (calibration.json: #4, #9, #10, #12, #13, #17, #29). Each target lies in a scroll view (`scrollView`, the clip LabState.scrollViews reports) at a fixed place in its content, scrolled to a fixed offset on appear, so its measured geometry (truth.ts#geometryOf) is what its comment in the app files says. `slot` is only the target's order. App files: AveriLab/Edges.swift, Edges.kt (the layout tables: the same numbers, points on iOS, dp on Android). Android-only variants (round 3, `platforms`): scroll-bounded-flush (scroll-bounded's W, P, S as rows whose identified container is not clickable, so uiautomator cuts its bounds flush with the scroll container's edge: #12, #13) scroll-sticky-cut (scroll-sticky with such a row under a header that is one accessibility element: #9) and scroll-sticky-view (round 4: scroll-sticky-cut with the row's content an Android View, AndroidView, whose bounds Compose does not cut at the header: #9's shape). Round 16 (iOS only, LE2's rest): scroll-bounded-footer — scroll-bounded's lower scroll view with O alone, and a Continue button (16,600 370x56, `button footer.continue`, not a target) just under its clip, listed after O in idb's flat list with its top above O's and holding O's centre: the probe at O's centre fires Continue (AveriLab/EdgesFooter.swift). Round 14: scroll-sticky-rest (Android only, VA1) — scroll-sticky-cut at rest, its list at offset 0: R whole and flush under the merged header, dumped exactly as the row it cuts — the case that refused round 9's overlay rule; `fully: true` must stop on it after the flush probe moves nothing. Round 4 (phase 5, both platforms): scroll-top-edge-end, scroll-top-edge's page with its content ending at the screen's bottom (scrolled to its end): T rests in the status band with nothing to scroll toward the content's end — #17's turn-back, judged live (scripts/truth/live.ts, live-visibility.ts#TURN_BACK). Round 6: carousel-in-list (both platforms) — a page scrolled 300 holding a horizontal card carousel (24,138 354x85 on the iPhone 17, the banking screen of docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md) above a list: C the card right of the carousel's clip (outside-scroll-view, scrolled toward `right`: truth.ts#directionOf), B a list row below the screen, U a row above it whose `up` stroke touches down over the carousel; both scroll views report their offset along their axis (LabState.offsets). scroll-collapsing (Android only, #10) — Settings' View shape: a NestedScrollView under a collapsed CollapsingToolbarLayout app bar, neither it nor its CoordinatorLayout clipping children, so A, a row scrolled above the list's top, is dumped with inverted bounds; D cut by the list's top.",
+  "note": "Targets at an edge: of their scroll view (cut, a sliver, outside its clip, a sticky header) or of the screen (off it, resting in the status band) — phase 3 B2 (calibration.json: #4, #9, #10, #12, #13, #17, #29). Each target lies in a scroll view (`scrollView`, the clip LabState.scrollViews reports) at a fixed place in its content, scrolled to a fixed offset on appear, so its measured geometry (truth.ts#geometryOf) is what its comment in the app files says. `slot` is only the target's order. App files: AveriLab/Edges.swift, Edges.kt (the layout tables: the same numbers, points on iOS, dp on Android). Android-only variants (round 3, `platforms`): scroll-bounded-flush (scroll-bounded's W, P, S as rows whose identified container is not clickable, so uiautomator cuts its bounds flush with the scroll container's edge: #12, #13) scroll-sticky-cut (scroll-sticky with such a row under a header that is one accessibility element: #9) and scroll-sticky-view (round 4: scroll-sticky-cut with the row's content an Android View, AndroidView, whose bounds Compose does not cut at the header: #9's shape). Round 16 (iOS only, LE2's rest): scroll-bounded-footer — scroll-bounded's lower scroll view with O alone, and a Continue button (16,600 370x56, `button footer.continue`, not a target) just under its clip, listed after O in idb's flat list with its top above O's and holding O's centre: the probe at O's centre fires Continue (AveriLab/EdgesFooter.swift). Round 14: scroll-sticky-rest (Android only, VA1) — scroll-sticky-cut at rest, its list at offset 0: R whole and flush under the merged header, dumped exactly as the row it cuts — the case that refused round 9's overlay rule; `fully: true` must stop on it after the flush probe moves nothing. Round 4 (phase 5, both platforms): scroll-top-edge-end, scroll-top-edge's page with its content ending at the screen's bottom (scrolled to its end): T rests in the status band with nothing to scroll toward the content's end — #17's turn-back, judged live (scripts/truth/live.ts, live-visibility.ts#TURN_BACK). Round 6: carousel-in-list (both platforms) — a page scrolled 300 holding a horizontal card carousel (24,138 354x85 on the iPhone 17, the banking screen of docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md) above a list: C the card right of the carousel's clip (outside-scroll-view, scrolled toward `right`: truth.ts#directionOf), B a list row below the screen, U a row above it whose `up` stroke touches down over the carousel; both scroll views report their offset along their axis (LabState.offsets). scroll-collapsing (Android only, #10) — Settings' View shape: a NestedScrollView under a collapsed CollapsingToolbarLayout app bar, neither it nor its CoordinatorLayout clipping children, so A, a row scrolled above the list's top, is dumped with inverted bounds; D cut by the list's top. Round L7 (Android only, D37's snapping pager and D59): carousel-lazy and carousel-recycler — carousel-in-list's page, rows and targets with the carousel swapped for a Compose LazyRow under a snap fling (rememberSnapFlingBehavior) and for a RecyclerView under a PagerSnapHelper (an AndroidView): containers whose dump carries no scroll axis, each card as wide as the carousel's clip, C the second; a lazy list lays out only what its clip shows, so C is ABSENT at launch (no node dumped, no frame in the state) until a part of it scrolls in, and once it scrolls out its last frame stays in the state, stale. Their free twins carousel-lazy-free and carousel-recycler-free (D59) are the same carousels with no snap (the default fling, no PagerSnapHelper): a stroke or fling can leave C cut by the clip. The carousel reports its offset and strokes as carousel-in-list's does, and the card under the clip's centre at rest (`carousel.index` in LabState.offsets). B and U are carousel-in-list's rows, not its outcomes: unmeasured whether a vertical stroke touching down on the RecyclerView (U's `up`) reaches the page, or the AndroidView takes it.",
   "cells": [
     {
       "id": "scroll-bounded",
@@ -94,6 +94,46 @@
       "targets": [
         { "tag": "A", "color": "#5E35B1", "slot": 0, "declared": "open", "scrollView": "list" },
         { "tag": "D", "color": "#F4511E", "slot": 1, "declared": "open", "scrollView": "list" }
+      ]
+    },
+    {
+      "id": "carousel-lazy",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
+      "id": "carousel-recycler",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
+      "id": "carousel-lazy-free",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
+      ]
+    },
+    {
+      "id": "carousel-recycler-free",
+      "layer": "none",
+      "platforms": ["android"],
+      "targets": [
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel" },
+        { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
+        { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
       ]
     }
   ]

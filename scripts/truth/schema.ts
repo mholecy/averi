@@ -156,10 +156,16 @@ export type FieldKind = 'text' | 'email' | 'iban' | 'amount' | 'pin' | 'country'
  * `thousands` an amount's — the whole part before the first `,` or `.` stripped of whitespace and grouped in threes from
  * the right by a no-break space (U+00A0), the rest kept (`1234,56` → `1 234,56`); `date` a dotted date's (D37) — every
  * character but a digit dropped, the first eight kept (dd mm yyyy), a `.` after the 2nd and the 4th digit once a digit
- * follows it (`31122026` → `31.12.2026`, `31.12.2026` alike, `3112202699` → `31.12.2026`). The lab apps each spell the same rules (Forms.kt, Forms.swift, the React Native
- * app's src/format.ts — `date` the native apps' only: no React Native cell asks it).
+ * follows it (`31122026` → `31.12.2026`, `31.12.2026` alike, `3112202699` → `31.12.2026`); `group4eager` an IBAN's that
+ * marks a group's end eagerly (L7, D60) — every whitespace dropped, the first 24 characters kept in groups of four
+ * joined by a space, and a space after the last group as soon as it is complete while under 24 (`SK31` → `SK31 `,
+ * `SK3112000000` → `SK31 1200 0000 `, 24 characters: six groups, no trailing space); `phone3` a phone number's (L7,
+ * D37's `+421`) — a leading `+` kept, every other character but a digit dropped, the digits in threes from the left
+ * joined by a space (`+421903123456` → `+421 903 123 456`, `421903123456` → `421 903 123 456`). The lab apps each spell
+ * the same rules (Forms.kt, Forms.swift, the React Native app's src/format.ts — `date` the native apps' only: no React
+ * Native cell asks it); tests/truth/lab-format.test.ts pins group4eager's and phone3's table on src/format.ts.
  */
-export type FieldFormat = 'group4' | 'thousands' | 'date';
+export type FieldFormat = 'group4' | 'thousands' | 'date' | 'group4eager' | 'phone3';
 
 /** A message the app shows, and the accessibility identifier it carries — the convention averi pairs it by. */
 export interface Message {
@@ -300,7 +306,9 @@ export interface LabState {
   /**
    * Each scroll view's content offset now, by id (CatalogTarget.scrollView): down its content from its top — across it
    * from its leading edge for a horizontal one (carousel-in-list's `carousel`), which live-visibility.ts#judgeScroll
-   * judges along that axis.
+   * judges along that axis. The four L7 carousels (carousel-lazy, carousel-recycler and their free twins
+   * carousel-lazy-free, carousel-recycler-free — snapping or not) also write `carousel.index`, the card under the
+   * carousel's clip centre when it last came to rest (0 the first; the Android lab's Lab.index) — no scroll view's id.
    */
   offsets?: Record<string, number>;
   /** Each stroke a scroll view took, in order: from where it left rest to where it came to rest. */

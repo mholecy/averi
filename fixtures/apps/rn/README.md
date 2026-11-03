@@ -4,7 +4,10 @@ The third lab app (docs/plans/2026-10-15-ground-truth-lab-app.md, round 7): Reac
 native lab apps (`fixtures/apps/ios`, SwiftUI; `fixtures/apps/android`, Compose) cannot build. It builds the
 `react-native` family of the cell catalog alone (`fixtures/apps/cells/react-native.json`;
 `scripts/truth/schema.ts#appOf`) — first `rn-field`, calibration.json #18's field half: an RN `TextInput` under its
-floating label, the field with an icon, a multiline field.
+floating label, the field with an icon, a multiline field. Then `rn-banner` (round 9, LR3), `rn-format` (D18: fields
+that reformat as typed, src/format.ts) and `rn-format-eager` (L7: an IBAN with an eager space as each group of four
+ends, D60's live path, and a phone in threes; the live forms cases rfe1–rfe3). Its eager field has a backspace trap
+by design: a backspace over the eager space has it added straight back.
 
 React Native 0.88.0 from the community CLI's bare template (`@react-native-community/cli@20.2.0 init`), the new
 architecture, Hermes; no Expo. Bundle `dev.averi.lab.rn` on iOS, package `dev.averi.lab.rn` on Android — beside the
