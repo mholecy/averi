@@ -594,6 +594,16 @@ export function belowStatusBand(box: Rect, screen: { statusBand?: number } | und
 }
 
 /**
+ * `box` less both system bands — `belowStatusBand`, then `aboveNavigationBand`, `shape` as there: the part of the
+ * screen a swipe can reach and a reader sees (`scroll_until`'s across clause, interact/scroll-rounds.ts;
+ * ui-tree/standing.ts#systemBands' `clear`). A navigation band reaching above the status band's bottom fails open, as
+ * `aboveNavigationBand` says.
+ */
+export function clearOfSystemBands(box: Rect, screen: { statusBand?: number; navigationBand?: number } | undefined, shape: { width: number; height: number } = box): Rect {
+  return aboveNavigationBand(belowStatusBand(box, screen, shape), screen, shape);
+}
+
+/**
  * `box` less the screen's navigation band (`DeviceScreen.navigationBand`,
  * the band's TOP line, carried as ui-tree/usable-screen.ts#UsableScreen's) at its
  * bottom when `box` is portrait — `belowStatusBand`'s twin at the other
@@ -1101,6 +1111,12 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     return { told: true, frame, scrollers: within.scrollers, listedWhereItLies: unclipped, ...(unknownPast.length > 0 && { unknownPast }) };
   };
   const axes = new Map<UiNode, ScrollAxes>();
+  /**
+   * A scroll view as the stroke plan counts one, nested or anywhere in the tree (`axesOf`'s `nested`, `toldOn`): it
+   * scrolls (scroll-containers.ts#scrolls) and is no text input (`INPUT_ROLE` — a Compose text field dumps as a
+   * scrolling (Horizontal)ScrollView: an Android matter, WDA marking no node clipping), so no stroke lands in a field.
+   */
+  const scrollViewNode = (n: UiNode): boolean => scrolls(n) && n.role !== INPUT_ROLE;
   const axesOf = (container: Rect): ScrollAxes | undefined => {
     const found = [...everyNode(tree)].find((n) => isScrollViewOf(n, container));
     if (found === undefined) return undefined;
@@ -1108,7 +1124,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     if (kept !== undefined) return kept;
     const facts: ScrollAxes = {
       axis: scrollAxis(found, unclipped),
-      nested: [...everyNode(found)].filter((n) => n !== found && scrolls(n) && n.role !== INPUT_ROLE && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
+      nested: [...everyNode(found)].filter((n) => n !== found && scrollViewNode(n) && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
     };
     axes.set(found, facts);
     return facts;
@@ -1141,7 +1157,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
   };
   const toldOn = (axis: ScrollAxis, screen: Rect, ofKeyboard: (node: UiNode) => boolean): readonly UiNode[] =>
     ancestry
-      ? [...everyNode(tree)].filter((n) => n.role !== INPUT_ROLE && scrollAxis(n, unclipped) === axis && rectIntersection(n.rect, screen) !== undefined && !ofKeyboard(n))
+      ? [...everyNode(tree)].filter((n) => scrollViewNode(n) && scrollAxis(n, unclipped) === axis && rectIntersection(n.rect, screen) !== undefined && !ofKeyboard(n))
       : [];
   return { scrollersOf, cutSliver, inScroller, drawnIn, axesOf, toldOn, contentToward };
 }

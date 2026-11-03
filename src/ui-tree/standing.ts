@@ -16,6 +16,7 @@ import {
   across,
   axisOfEdge,
   belowStatusBand,
+  clearOfSystemBands,
   clippedEdges,
   clipsOf,
   containsPoint,
@@ -1107,15 +1108,15 @@ type Bands = Pick<JudgedBoxes, 'statusBand' | 'navigationBand'> | undefined;
 
 /**
  * THE system bands of `box`, derived once for every judgement: `clear`,
- * the box less both, judged on its own shape (geometry.ts#belowStatusBand,
- * then geometry.ts#aboveNavigationBand — a navigation band reaching above
+ * the box less both, judged on its own shape (geometry.ts#clearOfSystemBands:
+ * belowStatusBand, then aboveNavigationBand — a navigation band reaching above
  * the status band's bottom fails open); and each band only where it has
  * height on the box (portrait, and a band read) — the status band at its
  * top, the navigation band at its bottom, each with its bar.
  */
 function systemBands(box: Rect, bands: Bands): { clear: Rect; top?: SystemBand<StatusBar>; bottom?: SystemBand<NavigationBar> } {
   const below = belowStatusBand(box, bands);
-  const clear = aboveNavigationBand(below, bands, box);
+  const clear = clearOfSystemBands(box, bands);
   const boxBottom = box.y + box.height;
   const bottomTop = clear.y + clear.height;
   return {
