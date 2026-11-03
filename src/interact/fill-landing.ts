@@ -3,7 +3,8 @@
  * Until then that was judged in four modules by three rules of the earlier text, and D28 and D29 were both bugs of
  * the typing and the verdict judging the same reading differently. Three questions, one answer each:
  * - `landingOf`: did this reading land — exactly, reformatted, or only as the field's placeholder — or is it a masked
- *   reading that proves the field was wrongly said plain?
+ *   reading that proves the field was wrongly said plain? Without clear, a reading unchanged since typing began has not
+ *   landed unless it is the value itself (D63).
  * - `tailOf` (and `droppedTail`): is it a strict prefix of what the field should hold — the tail a field dropped?
  * - `differenceOf`: what can be said of a reading that missed, without content?
  * interact/fill-type.ts asks the first two as it types, polls and retypes; it asks the third once, for a typing that
