@@ -576,8 +576,8 @@ evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is na
     measurement). ADR 0021's D52 amendment's territory.
 12. On API 33, at averi's focus read right after `am start` returns (0 ms) with the chooser coming, `mCurrentFocus` is
     `null` (25/30) or still the previous window (5/30), never the chooser, while `mFocusedApp` already names
-    ResolverActivity (30/30); the same after `launch_app`'s `-p` start (10/10: the window `null` 7, stale 3) (batch-11,
-    D55's E1, D55b). ADR 0041's D55r amendment.
+    ResolverActivity (30/30); the same after `launch_app`'s `-p` start (10/10: the window `null` 7, the chooser's own
+    3) (batch-11, D55's E1, D55b). ADR 0041's D55r amendment.
 13. For the activity-alias `.Twin` (target `.MainActivity`), the window and the ActivityRecord name the alias
     (`dev.averi.lab/dev.averi.lab.Twin`, `ActivityRecord{… dev.averi.lab/.Twin}`); `dumpsys activity activities` grep'd
     for `ResumedActivity|intent=\{|Hist #` prints only the `topResumedActivity`/`ResumedActivity` lines. On the fresh

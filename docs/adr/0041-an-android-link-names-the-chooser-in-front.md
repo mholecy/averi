@@ -7,6 +7,8 @@ reply is byte-identical, D54's iOS alert text included. The `DeviceAdapter` cont
 Amended 2026-11-03 (D55r: `mFocusedApp` is read in API 33's shape, `<component>} t<task>}`, which the first regex
 never matched; implemented on `fix/d55r-focused-app-api33`).
 Amended 2026-11-03 (batch-11: D55 device-verified with D55r's fix — the last paragraph of the D55r amendment).
+Amended 2026-11-03 (D55b: `launch_app`'s `-p` start and monkey's refusal read the same focus; implemented on
+`fix/d55b-launch-chooser`).
 
 ## Context
 
@@ -77,7 +79,7 @@ the platform's chooser, the outcome is `{ chooser: { component } }` and the repl
   The next batch's E1 control measures it. The worst case is a hung adb: the read then adds up to its 2 s bound to a
   link that has already started, and the reply falls back to `Opened`.
 - The `-p` start of `launch_app` (an intent with no activity) is unchanged and unchecked, and so is the `-n` start.
-  The monkey start is unchanged too, and neither `-n` nor monkey can raise the chooser.
+  The monkey start is unchanged too, and neither `-n` nor monkey can raise the chooser. See the D55b amendment below.
 
 Residuals, stated:
 - Measured on API 33 only, one emulator. The focus lines are expected in `dumpsys window displays` on API 29 and
@@ -168,3 +170,86 @@ activity line D55r reads is what names the chooser at the start's return. The fi
 the one read suffices, and no `resolve-activity` prediction or bounded poll is needed. Latency: shared median 127 ms
 (72–183), control 159 ms (132–202). E3, a fact only: `cmd package resolve-activity --brief` predicted 40 of 40, median
 50 ms (32–57), interleaved with E1's calls.
+
+## Amendment: `launch_app`'s `-p` start and monkey's refusal read the same focus (2026-11-03, D55b)
+
+**Context.** Batch-10's E4 and batch-11's D55b (2026-11-03, averi_lab emulator, API 33; batch-11 on main a5fefd32)
+measured the residual above. From the launcher, `launch_app {intent: VIEW averilab://shared/x}` (no activity, so
+`am start -p dev.averi.lab …`) raised the chooser 10 of 10: two activities of the package (`.MainActivity` and its
+alias `.Twin`) handle the intent and none is preferred. `am start` printed
+`Starting: Intent { act=android.intent.action.VIEW dat=averilab://shared/... pkg=dev.averi.lab }` and averi replied `Launched dev.averi.lab on android` 10 of 10 with the
+chooser up. A focus read with `CHOOSER_FOCUS_COMMAND` at the start's return named ResolverActivity as `mFocusedApp` 10
+of 10; `mCurrentFocus` was `null` in 7 and the chooser's own window in 3. With the chooser up, a plain `launch_app
+dev.averi.lab` (monkey) exited 251 3 of 3: its stdout only its `bash arg:` echoes, its stderr its arguments and `**
+SYS_KEYS has no physical keys but with factor 2.0%.`, an emulator warning. averi failed with "monkey started nothing
+in dev.averi.lab — check that dev.averi.lab is installed and has a launcher activity … monkey said: ** SYS_KEYS has no
+physical keys but with factor 2.0%.": the wrong cause, and a warning quoted as the reason.
+
+**Decision.**
+- After a `started` `-p` start, `launchApp` reads the focus once (`chooserInFront`, D55's read: the same command, 2 s
+  bound, `chooserInFocus` and fail-open). When it names the chooser, the launch returns `{ note }`: the headline
+  stays `Launched`, and the reply's ⚠ line and the flow's `⚠ launch` line carry
+  `adapters/android-chooser.ts#launchChooserNote`:
+
+  > Android has not brought dev.averi.lab forward yet: its chooser
+  > (android/com.android.internal.app.ResolverActivity) is in front, asking which of dev.averi.lab's activities takes
+  > the intent. Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always":
+  > it changes the device's default for this intent); press_key back drops the launch. averi taps nothing itself.
+  > Naming the activity (`activity:` on the launch step / launch_app) starts it without the chooser.
+
+  This is D56's shape on iOS (ADR 0032's D56 amendment): the start happened, so a launch never fails for what holds
+  it (`LaunchOutcome`). No type, `launchText` or engine change: `flow/launch.ts` already carries `note` to
+  `launch_app`, the flow's `launch` step and the ensure_state ladder. The last sentence is the usable part: `-p`
+  scopes the intent to the package, so the chooser offers only that app's activities, and `-n` skips it.
+- On monkey's refusal only (a non-zero exit with a `** ` line, `runStart`'s `refused`), the same one read. When it
+  names the chooser, the error is `launchChooserNote`'s sibling `monkeyChooserRefusal`, the ExecError still its cause:
+
+  > monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) is
+  > in front, and monkey starts nothing over it (exit 251 on API 33). Answer it (ui_snapshot, the app, "Just once")
+  > or press_key back to drop it, then launch again. averi taps nothing itself.
+
+  It quotes no monkey line. The exit code's meaning was not traced in Monkey.java, so nothing depends on it beyond
+  the observation.
+- Fail open: a failed, timed-out or unmatched read gives today's reply byte for byte, `Launched …` or monkey's old
+  error. `-n` (an activity named) reads nothing, nor does a monkey that started something, nor a thrown monkey or
+  `am start` failure with no diagnosis (adb gone, a timeout), nor a refused `-p` start, which throws `launchRefused`
+  as before.
+- One advice builder: `chooserAdvice(defaultFor, drops)` in `adapters/android-chooser.ts`. `CHOOSER_ADVICE` is
+  `chooserAdvice('such links', 'the link')`, so `open_deep_link`'s reply is byte-identical; the launch note uses
+  `chooserAdvice('this intent', 'the launch')`. The strings live in the mutated module and are pinned whole.
+- Not taken: a headline that is never `Launched` (batch-10's wording of the candidate). It would change `LaunchOutcome`,
+  `launchText`, the engine's trace and iOS's D56 shape together: a cross-platform reply decision, a separate item only
+  if an agent misreads the note. Also not taken: a throw (the start happened, and the ensure_state ladder would be
+  pushed past the rung), `cmd package resolve-activity` before the start (it predicts the chooser, costs the same on
+  every `-p` launch, and misses a chooser already up, which the monkey half needs), and `am start -W`.
+
+**Consequences.** Cost, measured (batch-11, the focus read after the `-p` start): a median 70 ms (58–99, n = 10). This
+corrects the Consequences' estimate of about 20–26 ms for the read; E1's link reads measured 59 ms (30–95, n = 30)
+and 78 ms (65–100, n = 10, the control). It is paid on `-p` launches only, chooser or not, and after monkey's refusal
+(about 62 ms there). `-n` and monkey's success pay nothing. A hung adb adds up to the 2 s bound, then fails open.
+
+**Tests.** android.test.ts's known-wrong T4 pins flipped: E4d (batch-10's read 1.5 s after the `-p` launch) now
+expects the note and the focus read after the start; E4c expects the chooser error, on batch-11's real exit-251
+output (its stdout and stderr kept as fixtures) as well as batch-10's quoted line. New: batch-11's `-p` stdout and
+averi's own read at its return (the window `null`, and the chooser's), the one-handler control read, each fail-open
+answer, a refused `-p` start, `clearState`'s order, `-n` with the intent, monkey's success, monkey refused with no
+chooser named, a monkey failure with no diagnosis; `tests/mcp/android-chooser-replies.test.ts` runs a real adapter
+through `launch_app`'s reply, the flow's `⚠ launch` line and `open_deep_link`'s unchanged reply. Hand mutants on
+`android.ts` (the `-p` read dropped, a read on `-n`, a read before the refusal check, the fail-open dropped, monkey
+ignoring the chooser, a read after monkey's success or on its thrown failure, the cause dropped, the wrong activity
+hint) and on the advice arguments: each killed. `npm run mutate` (cold): android-chooser 100 % (floor 98; 64
+mutants, 0 survived), every other module's score unchanged, floors unchanged. Golden Changed 0 (it replays tree
+reads, not focus reads).
+
+Residuals, stated:
+- One read, so D55's race: batch-11 named the chooser 10 of 10 at the start's return, through `mFocusedApp`. No `-p`
+  one-handler control was run; the read's specificity rests on E1's control (10 of 10 `Opened`) and the package rule.
+- A chooser already up before a `-p` launch is named, even if the launch alone would have opened one handler (the
+  same as the link's residual above). It IS in front at the read.
+- `** SYS_KEYS` still counts as a monkey diagnosis when no chooser is named: another refusal on an emulator quotes it
+  beside its real `** ` line, if that prints. A separate row if wanted.
+- The note names the chooser by its component only; its labels and centres stay D55c's.
+- Device check: none yet for the new replies. Proposed live cases (T7's "launch and deep link" group, not built):
+  lc1 `launch_app {intent: VIEW averilab://shared/x}` names the chooser; lc2 the one-handler `averilab://cell/x`, no
+  note; lc3 `activity: .Twin` with the same intent, no note and one start; lc4 the chooser raised by
+  `open_deep_link averilab://shared/open`, then `launch_app dev.averi.lab` (monkey), the error naming the chooser.
