@@ -146,4 +146,23 @@ describe('deepLinkText', () => {
     expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, asksForApp: true } })).not.toMatch(/Opened|⚠|\n/);
     expect(deepLinkText('ios', 'averilab://d54', { note: 'x' })).toBe('Opened averilab://d54 on ios\n⚠ x');
   });
+
+  // D55 (ADR 0041): Android's "Open with" chooser in front — the headline says the link is not open yet, names the
+  // chooser by its component, and advises the pick, "Just once" and never "Always"; averi taps nothing.
+  const RESOLVER = 'android/com.android.internal.app.ResolverActivity';
+
+  it('the chooser in front: "Android has not opened <url> yet: its chooser (<component>) is in front …", the advice', () => {
+    expect(deepLinkText('android', 'averilab://shared/open', { chooser: { component: RESOLVER } })).toBe(
+      'Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
+        'is in front, asking which app opens it. Take a ui_snapshot, tap the app you mean, then its "Just once" button ' +
+        'if it shows one (never "Always": it changes the device\'s default for such links); press_key back drops the ' +
+        'link. averi taps nothing itself.',
+    );
+  });
+
+  it('no "Opened" headline and no ⚠ line with the chooser; the chooser\'s headline before any other field', () => {
+    const text = deepLinkText('android', 'bank://home', { chooser: { component: RESOLVER }, note: 'x', alert: { ...alert, asksForApp: true } });
+    expect(text).toMatch(/^Android has not opened bank:\/\/home yet: its chooser /);
+    expect(text).not.toMatch(/Opened|⚠|\n|iOS/);
+  });
 });

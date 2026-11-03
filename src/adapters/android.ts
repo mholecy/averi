@@ -4,6 +4,7 @@ import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
 import { causeOf, runStart, type StartRefused } from './android-start.js';
+import { CHOOSER_FOCUS_COMMAND, chooserInFocus } from './android-chooser.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -46,6 +47,8 @@ const KEYBOARD_WITNESS_TIMEOUT_MS = 2_000;
 const STATUS_BAND_QUERY_TIMEOUT_MS = 2_000;
 /** The same reasoning for the window manager's word on a miss (focusedWindow): past it, `unknown` — the active-window hint. */
 const FOCUSED_WINDOW_TIMEOUT_MS = 2_000;
+/** The focus read after a deep link's start (D55, android-chooser.ts): its bound, as the other focus reads'. */
+const CHOOSER_FOCUS_TIMEOUT_MS = 2_000;
 
 /**
  * typeText's wait after each character's `input text` call. Measured on Compose (and, in the 2026-10-31 run, React
@@ -396,9 +399,26 @@ export class AndroidAdapter implements DeviceAdapter {
         causeOf(outcome),
       );
     }
-    // No wait and no note (D49a is iOS's): a link with two handlers starts Android's chooser, which am reports as
-    // `started` (android-start.ts) — unmeasured on a device, its own backlog row.
-    return {};
+    // No wait and no note (D49a is iOS's). A link two activities handle, none of them preferred, starts Android's
+    // "Open with" chooser, which am reports as `started` (android-start.ts; measured, batch-9 D55): so ONE focus read
+    // after the start asks whether the chooser is in front (D55, android-chooser.ts; ADR 0041). Only a positive
+    // match changes the outcome; a failed or unreadable read, or a chooser not in front yet, is today's `{}`.
+    const chooser = await this.chooserInFront();
+    return chooser === undefined ? {} : { chooser: { component: chooser } };
+  }
+
+  /**
+   * The chooser's component when the window manager's focus names it (android-chooser.ts#chooserInFocus), else
+   * undefined. One `dumpsys window displays | grep` (≈ 20–26 ms, estimated from FOCUSED_WINDOW_COMMAND's measured
+   * 25–26 ms; ADR 0041). Never throws: a failed or timed-out call is undefined, so the link's reply falls back to
+   * "Opened" as before D55.
+   */
+  private async chooserInFront(): Promise<string | undefined> {
+    try {
+      return chooserInFocus((await this.rawShell(CHOOSER_FOCUS_COMMAND, { timeoutMs: CHOOSER_FOCUS_TIMEOUT_MS })).stdout.toString('utf8'));
+    } catch {
+      return undefined;
+    }
   }
 
   /**
