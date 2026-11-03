@@ -315,28 +315,32 @@ started `.Twin`, row 2's app. Its three dumps on the chooser took 2514, 2020 and
   preselected app.
 - The sheet (`LinkChooser.sheet`, `ChooserSheet` in types.ts): the title when exactly one labelled `title` exists;
   each row's `text1`, its `text2` as `detail`, at the ROW's centre (the ListView takes the touch, E2); both buttons'
-  labels verbatim, centres (`Math.round`) and `disabled`. Anything else, or any throw, timeout or XML-less dump, is
+  labels verbatim, centres (`rectCentre`, now in `adapters/types.ts` beside `Rect`, re-exported by
+  `ui-tree/geometry.ts`; the alert judge uses it too) and `disabled`. Anything else, or any throw, timeout or XML-less dump, is
   no sheet, and the reply is D55's (or D55b's) byte for byte.
-- The reply (`mcp/tool-text.ts#chooserText`; `launchChooserNote` with its new optional `sheet`), its sheet worded once
-  by `chooserSheetSays` and its advice by `sheetAdvice` next to `chooserAdvice`. On the fixture:
+- The reply (`mcp/tool-text.ts#chooserText`; `launchChooserNote`, which now takes the `LinkChooser`) keeps D55's or
+  D55b's first sentence and replaces the advice with the sheet and its own advice (`chooserSheetText`:
+  `chooserSheetSays`, then `sheetAdvice`, beside `chooserAdvice`, whose ending both share). On the fixture:
 
   > Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity)
-  > is in front, "Open with", asking which app opens it: apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin")
-  > at (540, 1881); buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058) (disabled). Tap the app's
-  > row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once (never
-  > id:button_always: it changes the device's default for such links); press_key back drops the link. averi taps
-  > nothing itself.
+  > is in front, asking which app opens it. Its sheet "Open with" lists the apps "AveriLab" at (540, 1727), "AveriLab"
+  > ("AveriLab twin") at (540, 1881) and the buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058)
+  > (disabled). Tap the app's row at its x and y (one tap only selects it and enables the buttons), then tap
+  > id:button_once (never id:button_always: it changes the device's default for such links); press_key back drops the
+  > link. averi taps nothing itself.
 
   and after a `-p` start:
 
   > Android has not brought dev.averi.lab forward yet: its chooser
-  > (android/com.android.internal.app.ResolverActivity) is in front, "Open with", and dev.averi.lab is not: apps
-  > "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at (723, 2058)
-  > (disabled), "Always" at (936, 2058) (disabled). Tap the app's row at its x and y (one tap only selects it and
-  > enables the buttons), then tap id:button_once (never id:button_always: it changes the device's default for the
-  > intent it answers); press_key back drops the chooser. averi taps nothing itself. Naming the activity (`activity:`
-  > on the launch step / launch_app) starts it without the chooser.
+  > (android/com.android.internal.app.ResolverActivity) is in front, and dev.averi.lab is not. Its sheet "Open with"
+  > lists the apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881) and the buttons "Just once"
+  > at (723, 2058) (disabled), "Always" at (936, 2058) (disabled). Tap the app's row at its x and y (one tap only
+  > selects it and enables the buttons), then tap id:button_once (never id:button_always: it changes the device's
+  > default for the intent it answers); press_key back drops the chooser. averi taps nothing itself. Naming the
+  > activity (`activity:` on the launch step / launch_app) starts it without the chooser.
 
+  "and enables the buttons" only while a button is marked disabled: on batch-11's selected tree neither is, and the
+  clause is left out with the "(disabled)" marks.
   Coordinates, not `text:`, for the row: the lab's two rows share "AveriLab". The button by id: `id:button_once` is
   language-free and hits (723,2058) (tests/mcp/android-chooser-replies.test.ts); the labels are quoted, never
   matched. "(disabled)" only on a node marked so (in the selected tree it is absent).
@@ -351,18 +355,22 @@ then fails open.
 selected tree (no `disabled`); the title absent, empty or doubled; one row; an empty `text2`; every fail-open shape
 (no or two `resolver_list`s, no rows, a row with no, an empty, an unlabelled or two `text1`s or two `text2`s, a
 button missing, doubled or unlabelled, an `icon` or a `text1` outside the list, the lab's own screen); the sheet text,
-both advice variants and the note pinned whole. android.test.ts: the chooser cases' pins changed on purpose to
+both advice variants (with and without "and enables the buttons") and the note pinned whole; the two advices'
+shared ending. android.test.ts: the chooser cases' pins changed on purpose to
 `[START, FOCUS, DUMP]` with the dump's 5 s; the happy path and a failed focus read stay two calls; each dump failure
 (a failed or timed-out exec, a throw, no XML, `Killed`, "null root node", an empty hierarchy, another layout) is `{
-chooser: { component } }` exactly, one dump, no sleep, no `get-state`; the same for `-p`; `-n` and monkey's refusal
-never dump. tests/mcp/android-chooser-replies.test.ts runs a real adapter through `open_deep_link`'s reply,
+chooser: { component } }` exactly, one dump, no sleep, no `get-state`; the same for `-p`; `-n`, monkey's success and monkey's
+refusal never dump. tests/mcp/android-chooser-replies.test.ts runs a real adapter through `open_deep_link`'s reply,
 `launch_app`'s and the flow's `⚠ launch` line on both fixtures, and each fail-open dump gives the old replies byte for
 byte. Hand mutants on `android.ts`, each killed: a dump on the happy path (link and `-p`), before the focus read, on
 `-n`, on monkey's refusal; `uiTree()` reused; the 15 s bound; the fail-open's catch dropped; the sheet dropped from
 the outcome or the note; on the pure code, the with_default rule removed, the sheet ignored by `chooserText` or by
-`launchChooserNote`. `npm run mutate` (cold): android-chooser 100 % (floor 98; 221 mutants, 0 survived, after a test
-pinned that a row with no `text2` has no `detail` key — the first run's one survivor), every other module's score and
-floor unchanged. Golden Changed 0 (no Android deep-link seam in the corpus).
+`launchChooserNote`. Review round 1's hand mutants, each killed: "and enables the buttons" always, or only when both buttons are
+disabled; a dump after monkey's success; the sheet dropped in `linkChooserInFront`; `rectCentre` flooring; `labelOf`
+taking an empty label; `chooserAdvice` ending with the id. `npm run mutate` (cold, after review round 1):
+android-chooser 100 % (floor 98; 204 mutants, 0 survived; 221 before the round, after a test pinned that a row with
+no `text2` has no `detail` key — the first run's one survivor); geometry 95.30 % (floor 93; the same 55 survivors,
+`rectCentre`'s 6 mutants now in types.ts, outside the mutated files); every other module's score and floor unchanged. Golden Changed 0 (no Android deep-link seam in the corpus).
 
 Residuals, stated:
 - The `resolver_list_with_default` layout is unmeasured on a device; the guard rests on AOSP's layout file. The lab
