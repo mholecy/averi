@@ -6,7 +6,8 @@ native lab apps (`fixtures/apps/ios`, SwiftUI; `fixtures/apps/android`, Compose)
 `scripts/truth/schema.ts#appOf`) — first `rn-field`, calibration.json #18's field half: an RN `TextInput` under its
 floating label, the field with an icon, a multiline field. Then `rn-banner` (round 9, LR3), `rn-format` (D18: fields
 that reformat as typed, src/format.ts) and `rn-format-eager` (L7: an IBAN with an eager space as each group of four
-ends, D60's live path, and a phone in threes; the live forms cases rfe1–rfe2).
+ends, D60's live path, and a phone in threes; the live forms cases rfe1–rfe3). Its eager field has a backspace trap
+by design: a backspace over the eager space has it added straight back.
 
 React Native 0.88.0 from the community CLI's bare template (`@react-native-community/cli@20.2.0 init`), the new
 architecture, Hermes; no Expo. Bundle `dev.averi.lab.rn` on iOS, package `dev.averi.lab.rn` on Android — beside the
