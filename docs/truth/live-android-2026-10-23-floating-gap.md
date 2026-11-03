@@ -61,3 +61,18 @@ recorded). Then `adb -s emulator-5554 emu kill`.
 
 The first three records (-1, -2 and -3, without the evidence call) now rejudge as kf1 and kf2 SKIP and kf3 ok. They are
 pinned that way in tests/truth/live-rejudge.test.ts.
+
+## 2026-11-03 — D67: the judge reads the panel at launch
+
+The judge no longer matches the reply against a fixed list of hand placements (`LAB_FLOATING_PANELS`, this note's two
+regions). Batch-11 floated Gboard to a third place (87,1243 937×792), and the list's miss read as "the IME was not
+floating there". Now live.ts reads averi's touchable query once, right after each kf case's launch
+(`LabState.imeTouchable`). `live-forms.ts#measuredPanel` takes the one rect beyond the strip, read by averi's own
+`parseTouchableRegion`, and the replies are held to that rect. With no read, no `mInputShown=true`, an unreadable region,
+the strip alone or several rects, the case is SKIP "no measured panel (…)". kf1 and kf2 also check their premise first
+(`gapPremise`): the submit wholly between the panel and the strip. Batch-11's panel covered the submit by 107 px, so they
+SKIP naming the cover. kf3 checks that ks's centre lies under the panel.
+
+None of the records above read the region, so every one of them, the -cr runs included, now rejudges as kf1–kf3 SKIP
+"no measured panel (no IME region read at launch)". tests/truth/live-forms.test.ts judges their replies against the
+region read that day (above): kf1–kf3 are ok there.
