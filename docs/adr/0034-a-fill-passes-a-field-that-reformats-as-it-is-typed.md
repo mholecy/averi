@@ -630,8 +630,8 @@ change: the typing did not reach it, or the field refused it"), never reached be
   clear nothing is wiped. A typing that went into another input now reaches `whereTyped`, and the miss names that input.
 - Not changed: `priorsOf` and D61's condition in it, `showsExactly`, `tailOf`, `differenceOf`, the clear path (a reading
   with clear must equal the value), the masked rule (a masked reading unchanged since typing began already failed by its
-  length). No new Difference kind, wording, verdict reason or module. Superseded in form by D64: the guard is folded
-  into the exact rule, whose limit it is (the D64 amendment below); the behaviour stated here is unchanged.
+  length). No new Difference kind, wording, verdict reason or module. Superseded in form by D64: see the D64
+  amendment below.
 
 **Consequences.**
 - A fill without clear whose typing changed nothing replies "ERROR fill: typed N characters but the field shows M — the
@@ -715,7 +715,8 @@ part of it landing (p1 appends ` Jr.`, which `Jan Šťastný` does not hold; f15
   and a named placeholder equal to the value stays `placeholder`. No input tells the two apart, through the reformat
   route either (it needs the whole of the earlier text plus the value; separator-only values, mask templates, `1,000`
   and `+421` were tried): with D64's rule, the guard was an equivalent mutant. `unchangedSinceTyping` is removed and
-  `landingOf`'s doc says D63's rule is D64's at its limit. Every D63 test stays green, unchanged.
+  `landingOf`'s doc says D63's rule is D64's at its limit. Every D63 test stays green, unchanged. D63's Decision is
+  superseded in form only: the behaviour it states is unchanged.
 - **Residual 8 (A)'s pin flips on purpose** (fill-landing.test.ts, renamed): `Hello worldw` for `world` after `Hello
   world` has not landed, its dropped tail `orld`.
 - Not changed: the reformat route (`landedReformat`, `priorsOf` itself, D29's and D61's fallbacks, D51's mask
@@ -777,7 +778,7 @@ reading is refused by the folded rule, the same `unchanged` reply); no existing 
 f16. Not checked on the device: `live.ts --groups forms --cases f15,f16` and a regression pass of p1, f13, g1–g5 on
 idb, wda and uiautomator, a later batch's.
 
-Residuals, stated: residual 9 below; residual 8 (B) stays, moved where the skip lives (ADR 0028's D64 amendment,
+Residuals, stated: residual 9 below; residual 8 (A) is closed; residual 8 (B) stays, moved where the skip lives (ADR 0028's D64 amendment,
 residual 3; follow-up D64b). Pre-existing, not D64's: a plain dropped tail on Android, and a capped field's on both
 platforms, is worded `length` with content withheld and no remedy named — the dropped-tail wording is D28's, for a
 grouped prefix only; a candidate follow-up (wording only). The newly refused readings' poll cost is unmeasured on a
@@ -822,8 +823,7 @@ replaced its text (select-all): fill with `clear: true`" (`wholeToo`, review rou
    would close it. (B) On Android, fill.ts skips the post-focus re-read for a sole-id selector on an empty plain field
    and takes `before` as empty; a field that inserts `+421 ` on focus and takes no key reads `+421 `, which contains a
    typed `421`, and replies Filled. Both are pinned as today's behaviour in fill-landing.test.ts. Follow-up: backlog
-   row D64. (A) is closed by the D64 amendment; (B) stays, stated where the skip lives as ADR 0028's residual 3
-   (follow-up D64b).
+   row D64. See the D64 amendment below, and ADR 0028's D64 amendment.
 9. **A caret not at the end, whose typing leaves the reading starting with the earlier text, is refused** (D64's
    amendment, restated in review round 1): without clear, `ab` typed before an earlier `a` reads `aba`, `ab` typed
    inside `aa` reads `aaba`, `ba` typed inside `ab` reads `abab` — each starts with the earlier text and holds no value

@@ -64,9 +64,8 @@ The 350 ms focus delay stays.
 - The skip adds no way for a fill to pass that the re-read would have failed, except the residual (R1) below. A plain
   read-back is compared to the value from fresh reads of the field found by its id, as before (the pre-typing count
   is not part of that comparison). A masked read-back passes only at exactly the typed length — the one reading that
-  needs no count. A dropped tail is never retyped on Android, so `whereTyped` decides nothing there. Wrong in one more
-  case: a prefix inserted on focus that holds the value passes with none of the typing landed (the D64 amendment
-  below, residual 3).
+  needs no count. A dropped tail is never retyped on Android, so `whereTyped` decides nothing there. See the D64
+  amendment below.
 - A wrong `false` (a source that says plain of a field that masks) turns the masked-append warning the re-read would
   have given into a failure — fail-safe, except (R1).
 
@@ -74,8 +73,7 @@ The 350 ms focus delay stays.
 
 - (C1) A plain field that INSERTS text on focus (a `+421 ` prefix) and takes none of the typing is reported as a
   length mismatch, not as "the field did not change" (`shownBeforeTyping` was the empty pre-tap reading). Every key
-  landing still passes (`includes`). Only where the inserted text does not hold the value: one that holds it passes
-  with no key landed (the D64 amendment below, residual 3).
+  landing still passes (`includes`). See the D64 amendment below.
 - (C2) An autofilled field said plain fails where the re-read would have passed it with the masked-append warning.
 
 ## Residual
@@ -149,6 +147,12 @@ earlier text is `''`, so the whole reading is the typing (fill-landing.ts#showsE
 `+421 ` holds a typed `421`. The re-read would have read `+421 ` as `before` and failed the same reading as "did not
 change" (ADR 0034's D63 amendment). So the skip adds a second way to pass that the re-read would have failed, beside
 (R1). uiautomator only: iOS keeps the re-read, so idb and wda never skip.
+
+**Corrections.** "Why it is safe", its first bullet: the skip adds a second way for a fill to pass that the re-read
+would have failed, beside (R1) — a prefix inserted on focus that holds the value passes with none of the typing
+landed (residual 3 below). (C1): a plain field that inserts text on focus and takes none of the typing is worded as a
+length mismatch only where the inserted text does not hold the value; one that holds it passes with no key landed
+(residual 3 below).
 
 **Decision.** No code change. The landing rule takes a `before` of `''` at its word — an eager formatter can turn a
 typed `421` into `+421 ` from a truly empty field, and that reading has landed — so a fix, if one is needed, is the
