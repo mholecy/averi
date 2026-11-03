@@ -88,7 +88,8 @@ Residuals, stated:
   read found both lines naming it. The next batch's E1 runs it 20 times, with a one-handler control.
   Batch-10's E1 ran it: see the D55r amendment below.
 - The reply names the chooser by its component only. Its title, its apps' labels and their centres come from the ui
-  tree in a later change (backlog D55c), once the next batch's E2 has captured the chooser's real tree.
+  tree in a later change (backlog D55c), once the next batch's E2 has captured the chooser's real tree. See the D55c
+  amendment below.
 - `launch_app` with `intent:` and no `activity` (`am start -p`) can raise the same chooser when the app itself
   declares two handlers, as the lab does (inference, unmeasured). It still answers `Launched` (backlog D55b).
 - An OEM's own chooser component, outside the list, is not named. The reply is then `Opened`, as before.
@@ -159,7 +160,7 @@ Residuals, stated:
 - If averi's read precedes the chooser on both lines, the fix alone leaves the false `Opened`. A follow-up must then
   add a prediction (`cmd package resolve-activity`) or a bounded poll.
 - Out of scope, unchanged: D55b (`launch_app` with `intent:` and no `activity`) and D55c (the chooser's labels from the
-  ui tree).
+  ui tree). See the D55c amendment below.
 
 **Device-verified** (batch-11, 2026-11-03, main a5fefd32, averi_lab API 33; E1 with averi's own read recorded, its raw
 output and time): PASS. averi named the chooser in 30 of 30 shared runs (20 from the launcher, 10 with the lab in
@@ -275,8 +276,105 @@ Residuals, stated:
   row if wanted.
 - With a chooser and a real reason both seen, which of them stopped monkey is not known; the reply names both, the
   reason first. A chooser named with no reason of monkey's is called the cause, as batch-11 measured (3 of 3).
-- The note names the chooser by its component only; its labels and centres stay D55c's.
+- The note names the chooser by its component only; its labels and centres stay D55c's. See the D55c amendment below.
 - Device check: none yet for the new replies. Proposed live cases (T7's "launch and deep link" group, not built):
   lc1 `launch_app {intent: VIEW averilab://shared/x}` names the chooser; lc2 the one-handler `averilab://cell/x`, no
   note; lc3 `activity: .Twin` with the same intent, no note and one start; lc4 the chooser raised by
   `open_deep_link averilab://shared/open`, then `launch_app dev.averi.lab` (monkey), the error naming the chooser.
+
+## Amendment: the chooser's own tree is quoted, from one dump on the chooser path (2026-11-03, D55c)
+
+**Context.** The replies above name the chooser by its component and send the agent to a `ui_snapshot` to find its
+apps. Batch-10's E2 captured the fresh layout's tree (`tests/fixtures/uiautomator-lab-resolver.xml`, 27 nodes, all
+package `android`): `title` "Open with"; `resolver_list` with one direct-child row per app, its label `text1` and,
+when Android tells two targets of one app apart, `text2` (both rows say "AveriLab", the alias's `text2` "AveriLab
+twin"); `button_once` "Just once" and `button_always` "Always", both `enabled="false"`, so `disabled: true` since D66
+(ADR 0042). Batch-11's E2 (main a5fefd32) tapped row 2's centre (540,1881), a point outside every text node: the
+chooser stayed, and the only change in the tree was both buttons enabled
+(`tests/fixtures/uiautomator-lab-resolver-selected.xml`, committed with this change); "Just once" at (723,2058) then
+started `.Twin`, row 2's app. Its three dumps on the chooser took 2514, 2020 and 2054 ms.
+
+**Decision.**
+- Only `openDeepLink` and the `-p` launch read the tree, and only after `chooserInFront` named the chooser: one
+  `uiautomator dump /dev/tty` (`AndroidAdapter#chooserSheetInFront`) with its own 5 s bound
+  (`CHOOSER_TREE_TIMEOUT_MS`, twice the measured 2.5 s). The happy path stays two calls; `-n`, monkey's success and
+  monkey's refusal never dump (monkey's is an error path whose chooser predates the call, and its strings stay
+  pinned as they are).
+- Not `uiTree()`: its 15 s bound, its "null root node" retry and its diagnosis (an extra `adb get-state`, 5 s) are
+  the costs of a read the caller needs, not of an optional enrichment. The XML slice and parse are one helper both
+  use (`dumpedTree`).
+- The pure judge is `adapters/android-chooser.ts#chooserSheet`, the counterpart of `alertInWda` (D54), by resource id
+  alone. Its guard accepts only the measured shape: exactly one `resolver_list`; at least one row, each a direct
+  child holding exactly one labelled `text1` and at most one `text2`; exactly one labelled `button_once` and one
+  labelled `button_always`; no `icon` and no `text1` outside the list. The last rule is the
+  `resolver_list_with_default` guard. AOSP android13's `core/res/res/layout/resolver_list_with_default.xml`, read at
+  build time, confirms what it guards against: that layout heads the sheet with an `@+id/icon` ImageView and an
+  `@+id/title` TextView (the last-chosen app) in a LinearLayout above the TabHost that holds the list, with
+  `button_bar` in the same header; its `profile_button` (`icon` and `text1`) is `gone`. So its header `icon` lies
+  outside `resolver_list` and the guard fails open on it. Quoting the list's rows alone there would hide the
+  preselected app.
+- The sheet (`LinkChooser.sheet`, `ChooserSheet` in types.ts): the title when exactly one labelled `title` exists;
+  each row's `text1`, its `text2` as `detail`, at the ROW's centre (the ListView takes the touch, E2); both buttons'
+  labels verbatim, centres (`Math.round`) and `disabled`. Anything else, or any throw, timeout or XML-less dump, is
+  no sheet, and the reply is D55's (or D55b's) byte for byte.
+- The reply (`mcp/tool-text.ts#chooserText`; `launchChooserNote` with its new optional `sheet`), its sheet worded once
+  by `chooserSheetSays` and its advice by `sheetAdvice` next to `chooserAdvice`. On the fixture:
+
+  > Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity)
+  > is in front, "Open with", asking which app opens it: apps "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin")
+  > at (540, 1881); buttons "Just once" at (723, 2058) (disabled), "Always" at (936, 2058) (disabled). Tap the app's
+  > row at its x and y (one tap only selects it and enables the buttons), then tap id:button_once (never
+  > id:button_always: it changes the device's default for such links); press_key back drops the link. averi taps
+  > nothing itself.
+
+  and after a `-p` start:
+
+  > Android has not brought dev.averi.lab forward yet: its chooser
+  > (android/com.android.internal.app.ResolverActivity) is in front, "Open with", and dev.averi.lab is not: apps
+  > "AveriLab" at (540, 1727), "AveriLab" ("AveriLab twin") at (540, 1881); buttons "Just once" at (723, 2058)
+  > (disabled), "Always" at (936, 2058) (disabled). Tap the app's row at its x and y (one tap only selects it and
+  > enables the buttons), then tap id:button_once (never id:button_always: it changes the device's default for the
+  > intent it answers); press_key back drops the chooser. averi taps nothing itself. Naming the activity (`activity:`
+  > on the launch step / launch_app) starts it without the chooser.
+
+  Coordinates, not `text:`, for the row: the lab's two rows share "AveriLab". The button by id: `id:button_once` is
+  language-free and hits (723,2058) (tests/mcp/android-chooser-replies.test.ts); the labels are quoted, never
+  matched. "(disabled)" only on a node marked so (in the selected tree it is absent).
+- No tap, no poll, no tool-description change.
+
+**Consequences.** The reply's latency on the chooser path moves from about 127 ms (batch-11 E1) to about 2–2.5 s, the
+dump's measured cost. It is paid on the chooser path only, and it saves a round trip rather than adding one: the
+advice it replaces made the agent's next call a `ui_snapshot`, the same dump. A hung dump adds up to the 5 s bound,
+then fails open.
+
+**Tests.** android-chooser.test.ts: the exact sheet from batch-10's fixture (2057.5 rounds to 2058) and batch-11's
+selected tree (no `disabled`); the title absent, empty or doubled; one row; an empty `text2`; every fail-open shape
+(no or two `resolver_list`s, no rows, a row with no, an empty, an unlabelled or two `text1`s or two `text2`s, a
+button missing, doubled or unlabelled, an `icon` or a `text1` outside the list, the lab's own screen); the sheet text,
+both advice variants and the note pinned whole. android.test.ts: the chooser cases' pins changed on purpose to
+`[START, FOCUS, DUMP]` with the dump's 5 s; the happy path and a failed focus read stay two calls; each dump failure
+(a failed or timed-out exec, a throw, no XML, `Killed`, "null root node", an empty hierarchy, another layout) is `{
+chooser: { component } }` exactly, one dump, no sleep, no `get-state`; the same for `-p`; `-n` and monkey's refusal
+never dump. tests/mcp/android-chooser-replies.test.ts runs a real adapter through `open_deep_link`'s reply,
+`launch_app`'s and the flow's `⚠ launch` line on both fixtures, and each fail-open dump gives the old replies byte for
+byte. Hand mutants on `android.ts`, each killed: a dump on the happy path (link and `-p`), before the focus read, on
+`-n`, on monkey's refusal; `uiTree()` reused; the 15 s bound; the fail-open's catch dropped; the sheet dropped from
+the outcome or the note; on the pure code, the with_default rule removed, the sheet ignored by `chooserText` or by
+`launchChooserNote`. `npm run mutate` (cold): android-chooser 100 % (floor 98; 221 mutants, 0 survived, after a test
+pinned that a row with no `text2` has no `detail` key — the first run's one survivor), every other module's score and
+floor unchanged. Golden Changed 0 (no Android deep-link seam in the corpus).
+
+Residuals, stated:
+- The `resolver_list_with_default` layout is unmeasured on a device; the guard rests on AOSP's layout file. The lab
+  AVD's last-chosen `.Twin` entry for `shared` (the lab plan's device fact 5) should show it; batch-12 captures it.
+- A scrolled list quotes only the rows on screen (the dump lists what is drawn).
+- Row 1's tap is unproven: E2 tapped row 2 only. The lab gains `averilab://pair` (the same two handlers, no
+  last-chosen entry) for a fresh chooser to tap it on.
+- An OEM's own chooser layout, or another resource-id set, fails open to D55's reply.
+- monkey's refusal is unchanged.
+- The dump starts about 70 ms after `am start` returns, while `mCurrentFocus` may still be `null` (fact 12).
+  uiautomator's idle wait should cover the window being drawn; if it dumps the launcher instead, the guard fails open.
+  Unmeasured.
+- Device check: none yet. Proposed for batch-12 (E5): the with_default fail-open on `shared`, then `open_deep_link
+  averilab://pair/open` × 10 and `launch_app` `-p` × 5 from the launcher (the sheet quoted n/10, the latency), then a
+  tap at row 1's quoted centre and `tap id:button_once`, `.MainActivity` expected.
