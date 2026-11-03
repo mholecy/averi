@@ -212,7 +212,7 @@ export async function fillField(
   // - what the field showed before typing (`shownBeforeTyping`): empty before the tap, and taken as empty. The cost:
   //   a plain field that inserts text on focus (a `+421 ` prefix) and takes none of the typing PASSES when the inserted
   //   text holds the value (`421` typed: ADR 0034 residual 8, follow-up D64), and otherwise is worded as a length
-  //   mismatch, not as "did not change".
+  //   mismatch (or same-length), not as "did not change".
   // undefined: the re-read is made. Else `from`, the screen the field was resolved on — the wording of a `lost`
   // alone (refetch).
   const delivery = adapter.typingDelivery ?? 'may-arrive-late';
