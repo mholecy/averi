@@ -64,10 +64,32 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     expect(strokes(played).map((s) => s.do === 'stroke' && s.maxTravel)).toEqual([177, 206, 176]);
   });
 
-  it('a reveal after which it holds is checked, as a probe that held is', () => {
-    const played = play(RULES, [sAt(0), sAt(60), sAt(60)]);
-    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stop']);
-    expect(resultOf(played).flush).toEqual({ edge: 'bottom', container: LOWER, checked: true });
+  // Rewritten on purpose (D62): this was "a reveal after which it holds is checked" — but the 74-px probe carried S
+  // 60 px, its whole length less twice the slop, so the content did not end under it, and a reveal that then moved
+  // nothing may not have been taken by the app (batch-9). Doubted once: sent again, and checked only if that one holds.
+  it('D62: a reveal that held right after a probe that carried S its whole stroke is sent again — checked when that one holds too, the cut when no swipe is left', () => {
+    const played = play(RULES, [sAt(0), sAt(60), sAt(60), sAt(60)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
+    expect(strokes(played).map((s) => s.do === 'stroke' && s.maxTravel)).toEqual([177, 206, 206]);
+    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'bottom', container: LOWER, checked: true } });
+    const moved = play(RULES, [sAt(0), sAt(60), sAt(60), sAt(280), sAt(280)]);
+    expect(moved.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'confirm', 'stop']);
+    expect(describeScrollResult(resultOf(moved))).toBe('fully visible after 3 swipes');
+    const spent = play({ ...RULES, maxSwipes: 2 }, [sAt(0), sAt(60), sAt(60)]);
+    expect(spent.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' }, short: { of: 'flushCut', revealed: 60, why: 'budget' } });
+    expect(failureOf(spent, `id:"${S_ID}"`).message).toBe(
+      `scroll_until id:"${S_ID}" failed after 2 swipes (maxSwipes) — ` +
+        "element reached the viewport but its bottom edge still lies on its scroll container's (0,1046 1080x495), where Android cuts a node's bounds to the container, " +
+        'and a probe swipe toward it showed 60 px more of it — part of it lay past that edge, so it may still be cut there (last rect {"x":128,"y":1459,"width":825,"height":82}); raise maxSwipes or timeoutMs',
+    );
+  });
+
+  // ADR 0013 LV2 point 3's row cut by 40 px, revealed whole by the 74-px probe (40 > 74 − 48: carried): the legitimate
+  // case D62's doubt costs one retry — a stroke and a read, the swipe count one higher.
+  it('D62: a probe that carried S 40 px and a reveal that then held: one retry, checked after 3 swipes (was 2)', () => {
+    const played = play(RULES, [sAt(0), sAt(40), sAt(40), sAt(40)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
+    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'bottom', container: LOWER, checked: true } });
   });
 
   it('no swipe or time left for the reveal: the bound fails naming the cut the probe proved — never "fully visible"', () => {
