@@ -58,6 +58,8 @@ describe('WDA_TYPEABLE: idb\'s set and what the gate measured exact through /wda
     ['an unassigned code point', 'a͸b', 'U+0378'],
     ['an ideographic space (a Zs not measured)', 'a　b', 'U+3000'],
     ['an em space (a Zs not measured)', 'a b', 'U+2003'],
+    ['an en space (a Zs not measured)', 'a\u2002b', 'U+2002'],
+    ['the ideographic zero (U+3007: a Han number, neither a letter nor Common)', 'a\u3007b', 'U+3007'],
     ['the line separator', 'a b', 'U+2028'],
     ['Arabic (RTL, not measured)', 'مرحبا', 'U+0645'],
     ['Hebrew (RTL, not measured)', 'שלום', 'U+05E9'],

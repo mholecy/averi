@@ -43,7 +43,7 @@ control-character check and before any device call.**
 - **What each platform types:**
   - iOS, both tree sources: printable ASCII (U+0020–U+007E) and `\n`, which is idb's `KEY_MAP`. The `\n` is idb's fact,
     kept in the declaration. interact/ still refuses it first as a control character, so the Return key stays
-    `pressKey('enter')`, as before. Under the WDA tree source since D43: the D43 amendment below.
+    `pressKey('enter')`, as before. See the D43 amendment below.
   - Android: printable ASCII (U+0020–U+007E). This is conservative. An extended letter in the virtual key map (`é`) is
     unmeasured, so it is refused too.
 - **Where:** `assertTypeable(value, adapter.typeable)`. Its two callers cover every path that ends in
@@ -90,10 +90,9 @@ control-character check and before any device call.**
 
 - **WDA `/wda/keys`** is the candidate real path for projects on the WDA tree source. It types Unicode text through
   XCTest. It is bound to a WDA session, and adapters/wda.ts keeps all input on idb ("WDA input would drag in session
-  management"). That project would then declare a wider `typeable` for those adapters. No caller changes. Done for
-  the WDA tree source: the D43 amendment below.
+  management"). That project would then declare a wider `typeable` for those adapters. No caller changes. See the D43 amendment below.
 - An Android path for non-ASCII is open: none of the options above is acceptable as it stands.
-- The two bug notes stay open until one of these lands. The iOS note: the D43 amendment below.
+- The two bug notes stay open until one of these lands. See the D43 amendment below.
 
 ## Consequences
 
@@ -107,12 +106,12 @@ control-character check and before any device call.**
   with the prefill kept (`refusedKept` in scripts/truth/live-forms.ts). No device has run it yet.
 - The test fake types printable ASCII by default. A test of what is typed, rather than what is refused, sets
   `PERMISSIVE`.
-- Golden replay never types, so its rows do not move. Corrected by the D43 amendment below.
+- Golden replay never types, so its rows do not move. See the D43 amendment below.
 
 Pinned by tests/adapters/typeable.test.ts (each adapter's declaration, both iOS tree sources; Android's direct
 `typeText`), tests/interact/type-text.test.ts (the message), tests/interact/fill.test.ts (no device call at all,
 through a recording proxy), tests/mcp/tools.test.ts (type_text with and without a selector), tests/flow/engine.test.ts
-(`type:` and `fill:`), and tests/truth/live-forms.test.ts (p7's judge). The D43 amendment names its own.
+(`type:` and `fill:`), and tests/truth/live-forms.test.ts (p7's judge). See the D43 amendment below.
 
 ## Amendment: device run (2026-11-02, backlog D43)
 
@@ -121,7 +120,7 @@ Android (docs/truth/live-records/ios-idb-forms-d43a-1.json, ios-wda-forms-d43a-1
 record rejudges to 7 cases, 5 ok, 2 loud, 0 mismatches. b1d and b7 were refused before anything was sent, the field
 untouched (`loud-untouched`, known); on Android that replaces D40's half-typed `loud-changed`. p7 was refused with the
 prefill kept. The ASCII cases b2, b3, p1 and p2 are ok. tests/truth/live-rejudge.test.ts pins the three records. The
-real typing path ("Later") stays open. For the WDA tree source: the D43 amendment below.
+real typing path ("Later") stays open. See the D43 amendment below.
 
 ## Amendment: a WDA project types non-ASCII text through `/wda/keys` (2026-11-03, D43)
 
@@ -146,41 +145,56 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
 
 **Decision.** Option A of the analysis, narrowed to what the gate measured:
 - **Routing, per call** (adapters/ios-typing.ts#typingPathOf): idb for every text idb can type — unchanged byte for
-  byte, the D24 split and the D25 timings included — and `IosTreeSource.typeText` for any other. Only WDA's source has a
-  typer (optional, as `systemAlert`); over a source without one (idb's, the differential harness's recorded one) every
-  text goes to idb, as before. Per call, not per fill: a fill's dropped tail is routed by the tail's own characters, and
-  both paths type at the caret of the same first responder. G3 is why ASCII stays on idb: 1.7× faster at one
-  character, 4.3× at 40.
+  byte, the D24 split and the D25 timings included — and the tree source's typer for any other. Only WDA's source has
+  one (`IosTreeSource.typeText`, optional, as `systemAlert`); IosAdapter binds it once, in its constructor, and both its
+  `typeable` and its route come from that one choice. Over a source without a typer (idb's, the differential harness's
+  recorded one) every text goes to idb, as before. Per call, not per fill: a fill's dropped tail is routed by the tail's
+  own characters, and both paths type at the caret of the same first responder. G3 is why ASCII stays on idb: 1.7×
+  faster at one character, 4.3× at 40.
 - **No D24 split on the WDA path**: one call, whole (G5 dropped no tail). The fill's retype stays the net, and
   `typingDelivery: on-return` holds for it (G1).
 - **`WdaServer.keys(text)`** (adapters/wda.ts): it starts WDA when it is not up, then sends
   `POST /session/:id/wda/keys {value: [...text]}` on one session per WDA start (`upGeneration`), made once with
   `forceSimulatorSoftwareKeyboardPresence: false` (G4) and forgotten by `stop()` and `shutdown()`. Budgets: the session
-  10 s, the typing 2 s + 50 ms a character (about three times G3's). A lost session (HTTP 404, or "invalid session
-  id") is made again once and the text sent once more — G4 measured that nothing was typed then. A request that did not
-  complete (its budget ran out, or the connection went) is never sent again, because it may have typed part of the
-  text: it fails saying so. Any other error answer fails with its HTTP status and WDA's `value.error` alone, the port
-  and the log — not WDA's message, which is NSError's description and may hold the value escaped (`\U0161`) or in
-  part. `FetchFn` takes a POST's method, headers and body; its GET callers are unchanged.
-  `WdaTreeSource.typeText` delegates to it and gives the released error after `dispose()`, as `read()` does.
+  10 s, the typing 2 s + 50 ms a character (about three times G3's).
+  - A lost session is made again once and the text sent once more. Lost means HTTP 404 — any 404, not only one saying
+    "invalid session id" — or "invalid session id" under any status. Decided as safe though only G4's 404 was
+    measured: a 404 is WDA's routing refusing the request before any handler runs, so nothing is typed on one (an
+    unknown route answers 404 too, and its retry fails the same way, nothing typed). Two typings at once that both meet
+    a lost session make one new session between them: a typing forgets only the session it was sent on.
+  - A request that did not complete (its budget ran out, or the connection went) is never sent again, because it may
+    have typed part of the text: it fails saying so.
+  - Any other error answer fails with its HTTP status and WDA's `value.error` alone, the port and the log — not WDA's
+    message, which is NSError's description and may hold the value escaped (`\U0161`) or in part.
+
+  `FetchFn` takes a POST's method, headers and body; its GET callers are unchanged. `WdaTreeSource.typeText` delegates
+  to `keys` and gives the released error after `dispose()`, as `read()` does.
 - **The set** (`IosAdapter.typeable`, decided by the source's typer, not its kind): over WDA's source `WDA_TYPEABLE` —
-  idb's set, plus the BMP letters of the Latin, Greek, Cyrillic and Han scripts, Common-script numbers, punctuation and
-  symbols, NBSP and U+202F; minus `\p{Extended_Pictographic}` except © ® ™ (measured), minus the Halfwidth and
-  Fullwidth Forms, and minus the Specials (U+FFF0–U+FFFF, U+FFFC and U+FFFD among them). Refused: outside the BMP,
-  combining marks, format characters, private use, unassigned, any other space, a Common letter (µ), every script not
-  measured (Arabic, Hebrew, Devanagari, Thai, Hangul, kana, …). Its refusal says such a character is not measured
-  through `/wda/keys`. BMP-only keeps every UTF-16 count and tail slice of a fill exact, so fill-type,
-  fill-landing and fill-text are untouched.
-- **The replies**: `Typeable.otherPath`, the remedy sentence true for the adapter, replaces the hard-coded "averi has
-  no other typing path yet (ADR 0037): use a value without it, or enter it by hand." `Typeable.widerPath` lets idb's
-  name the WDA tree source only for a value WDA's set takes whole — not one it would refuse a later character of
-  (`Šťastný 😀`, or © followed by U+FE0F):
-  - idb, such a value: "A project with `ios.treeSource: wda` types it through WebDriverAgent (ADR 0037); otherwise
-    use a value without it, or enter it by hand."
-  - idb, any other: "averi has no typing path on iOS for this value (WebDriverAgent's `/wda/keys` is not measured for
-    U+1F600 '😀'; ADR 0037): use a value without it, or enter it by hand." It names the first character WDA refuses
-    too, in the refusal's own form — for `Šťastný 😀` the refusal leads with `U+0160 'Š'`, which WDA types, and this
-    names `U+1F600 '😀'`, the one that blocks every iOS path. Never the value.
+  idb's set, plus, of the Basic Multilingual Plane:
+  - the letters (`\p{L}`) of the Latin, Greek, Cyrillic and Han scripts;
+  - numbers, punctuation and symbols (`\p{N}`, `\p{P}`, `\p{S}`) of the Common script only: a number, mark or symbol
+    of another script stays refused — U+3007 (〇, Han's number zero) among them;
+  - of the spaces (`\p{Zs}`) only NBSP (U+00A0) and the narrow NBSP (U+202F), beside U+0020: every other space stays
+    refused — U+2002 and U+3000 among them;
+  - minus `\p{Extended_Pictographic}` except © ® ™ (measured);
+  - minus the Halfwidth and Fullwidth Forms (U+FF00–U+FFEF), Latin and Common by script but unmeasured, and the
+    Specials (U+FFF0–U+FFFF, U+FFFC and U+FFFD among them), unmeasured too.
+
+  Everything else is refused: outside the BMP, combining marks, format characters, private use, unassigned, a Common
+  letter (µ), every script not measured (Arabic, Hebrew, Devanagari, Thai, Hangul, kana, …). The script and space limits
+  are decisions, not measurements: none of the characters they keep out was typed by the gate. The refusal says such a
+  character is not measured through `/wda/keys`. BMP-only keeps every UTF-16 count and tail slice of a fill exact, so
+  fill-type, fill-landing and fill-text are untouched.
+- **The replies**: `Typeable.otherPath`, a plain sentence true for the adapter, replaces the hard-coded "averi has no
+  other typing path yet (ADR 0037): use a value without it, or enter it by hand." `Typeable.widerPath`
+  (`Pick<Typeable, 'refuses'>` and `blockedBy(char)`) is idb's: WDA's set, and the remedy said in its place for a value
+  WDA would refuse too — not only its first character (`Šťastný 😀`, or © followed by U+FE0F):
+  - idb, a value WDA's set takes whole (`otherPath`): "A project with `ios.treeSource: wda` types it through
+    WebDriverAgent (ADR 0037); otherwise use a value without it, or enter it by hand."
+  - idb, any other (`blockedBy`): "averi has no typing path on iOS for this value (WebDriverAgent's `/wda/keys` is not
+    measured for U+1F600 '😀'; ADR 0037): use a value without it, or enter it by hand." It names the first character
+    WDA refuses, in the refusal's own form — for `Šťastný 😀` the refusal leads with `U+0160 'Š'`, which WDA types, and
+    this names `U+1F600 '😀'`, the one that blocks every iOS path. Never the value.
   - Android: "averi has no typing path for it on Android (no shell clipboard setter on API 33; ADR 0037): use a value
     without it, or enter it by hand."
   - WDA: "Use a value without it, or enter it by hand."
@@ -194,37 +208,53 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
 - Context's iOS bullet and the Decision's "iOS, both tree sources": over WDA's tree source the adapter declares
   `WDA_TYPEABLE` and types through `/wda/keys` what idb cannot; idb's set (now in adapters/ios-typing.ts) holds for
   idb's source and for the differential harness's recorded one.
-- "The message" ends with the adapter's `otherPath`, not with "averi has no other typing path yet".
-- Consequences, "Golden replay never types": the replay types `'1'` into every textfield it fills
-  (scripts/differential/differential.ts). That is ASCII, so it stays on idb, and the recorded source has no typer; the
-  rows do not move (golden Changed 0 against main).
+- "The message" ends with the adapter's `otherPath` (or idb's `blockedBy`), not with "averi has no other typing path
+  yet".
 - "Later", WDA `/wda/keys`: done for projects on the WDA tree source. The iOS bug note stays open for idb projects; for
   WDA projects it closes with the device run of b1d, b7 and p7w.
+- Consequences, "Golden replay never types": the replay types `'1'` into every textfield it fills
+  (scripts/differential/differential.ts). See Golden/Live below.
+- The Pinned-by paragraph: D43's tests are listed at the end of this amendment.
+- The D43a amendment's "The real typing path ("Later") stays open": done for the WDA tree source, as above.
 
 **Consequences.**
-- The live golden (not yet run on a device): b1d and b7 under `ios wda` are struck off scripts/truth/live-known.ts, ok
-  expected; every WDA forms record committed before D43 reads them as a LOUD no entry holds (tests/truth/live-rejudge.
-  test.ts, `PRE_D43_WDA_LOUD`). p7 runs under idb and uiautomator only. A new p7w, the same no-clear fill of `Š` into
-  form-prefilled's name under WDA, must hold the prefill with `Š` appended (`holds`).
 - The cost falls only on a value idb refuses, which was refused before: about 300 ms + 16 ms a character for each
   typing through WDA, against idb's ~200 ms (G3) — `Šťastný` about 0.33 s, 20 characters about 0.64 s, 40 about 0.97 s
   — plus one session per WDA start (2–3 ms). A `type_text` without a selector as the first call after the server
   starts brings WDA up first (minutes on a first build), as a WDA project's first `ui_snapshot` does.
-- adapters/ios-typing.ts and adapters/typeable.ts join the mutation run (ADR 0038's D43 amendment).
+- Agents on WDA projects get `Filled …`, verified by the existing read-back, where they got a refusal; idb projects get
+  a true remedy; Android says plainly that there is none.
 
-**Residuals.**
+**Mutation-checked**: adapters/ios-typing.ts (100 %, floor 98) and adapters/typeable.ts (90.24 %, floor 88: four
+equivalent anchor survivors in `named()`) join the mutation run (ADR 0038's D43 amendment). Stryker does not reach the
+two iOS sets, built with `new RegExp` (residual 9); 22 hand mutants, each killed: the router always idb, always wda or
+flipped; the set by the source's kind, or always idb's; WDA's set without the BMP guard, with `\p{M}`, with `\p{Cf}`,
+with the Specials; a new session on every typing; a retry after a timeout; no retry on a lost session; a lost session
+forgotten though a typing beside it made the next; the keyboard capability dropped; the D24 split on the WDA path;
+Android's and idb's remedies swapped; `dispose` unchecked; idb's wider remedy never or always said, judged by the first
+character, or naming the first refused character instead of the one WDA refuses; WDA's message quoted. One equivalent
+mutant, `value: [text]` for `[...text]` (WDA joins `value[]`), is noted and not pinned.
+
+**Golden/Live.** The golden replay types `'1'`, ASCII, so it stays on idb, and the recorded source has no typer: golden
+Changed 0 against main. Live (not yet run on a device): b1d and b7 under `ios wda` are struck off
+scripts/truth/live-known.ts, ok expected; every WDA forms record committed before D43 reads them as a LOUD no entry
+holds (tests/truth/live-rejudge.test.ts, `PRE_D43_WDA_LOUD`). p7 runs under idb and uiautomator only. A new p7w, the
+same no-clear fill of `Š` into form-prefilled's name under WDA, must hold the prefill with `Š` appended (`holds`).
+
+**Residuals, stated:**
 1. Measured on iOS 27.0 only, on the iPhone 17 simulator with WDA 16.1.7: the native SwiftUI form-basic name field and
    the RN lab's `rn-field`. Other iOS versions, UIKit fields, multi-line and secure fields are unmeasured.
 2. The classes are measured by 2–3 values each (adapters/ios-typing.ts lists them). Their other members are inferred
    from the class, not measured: Han's Extension A, Common numbers beyond the digits (½ ² ³), arrows, box drawing,
    mathematical and other symbols (∑ ✓ ★), and the punctuation not among the measured ’ “ ” ‘ – — …. An emoji (1/1) and a
-   combining mark (1/1, kept decomposed; normalisation not judged) stay refused as too thin. A later row may widen the
-   set with a corpus run.
+   combining mark (1/1, kept decomposed; normalisation not judged) stay refused as too thin. What the set keeps out by
+   decision (another script's numbers and marks, the other spaces, the Halfwidth and Fullwidth Forms, the Specials) is
+   unmeasured too. A later row may widen the set with a corpus run.
 3. The session: one per WDA start, the one averi holds (making it ends any other session on that WDA, whose port is
    averi's own). A `/wda/keys` past its budget is never retried, so a very slow runner may leave part of a text, said
    so in the error. An MCP call cancelled while it types does not stop it: the request runs on until it answers or
-   `keysTimeoutMs` runs out, as an `idb ui text` runs on to its end. Two typings at once that both meet a lost session
-   make one new session between them (the second keeps the session the first made).
+   `keysTimeoutMs` runs out, as an `idb ui text` runs on to its end. The retry on a plain 404 rests on WDA's routing,
+   not on a measurement beyond G4's.
 4. React Native: `rn-field` 10/10 with no tail dropped, so no D24 split on the WDA path; other RN versions and fields
    are unmeasured.
 5. A WDA runner exit clears com.apple.Accessibility's `AccessibilityEnabled`, `ApplicationAccessibilityEnabled` and
@@ -242,7 +272,7 @@ simulator, iPhone 17, raw `/wda/keys`) passed:
 Pinned by tests/adapters/ios-typing.test.ts (the router, both sets per character and category, the remedies),
 tests/adapters/typeable.test.ts (the set by the source's typer, not its kind), tests/adapters/ios.test.ts (the routing,
 the D24 split on idb only), tests/adapters/wda.test.ts (`keys`: the session, its capabilities, reuse, a restart, the
-retry on a lost session, none after a timeout, the budgets, WDA's error without the text),
+retry on a lost session, two at once, none after a timeout, the budgets, WDA's error without its message),
 tests/adapters/wda-tree-source.test.ts (the delegation, the released error), tests/interact/type-text.test.ts (each
 adapter's remedy), tests/interact/fill.test.ts, tests/mcp/tools.test.ts and tests/flow/engine.test.ts (typed over
 WDA's set, refused over idb's), tests/mcp/tool-descriptions.test.ts, and tests/truth/live-forms.test.ts and
