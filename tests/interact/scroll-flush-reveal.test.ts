@@ -84,6 +84,14 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     );
   });
 
+  // ADR 0013 LV2 point 3's row cut by 40 px, revealed whole by the 74-px probe (40 > 74 − 48: carried): the legitimate
+  // case D62's doubt costs one retry — a stroke and a read, the swipe count one higher.
+  it('D62: a probe that carried S 40 px and a reveal that then held: one retry, checked after 3 swipes (was 2)', () => {
+    const played = play(RULES, [sAt(0), sAt(40), sAt(40), sAt(40)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
+    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'bottom', container: LOWER, checked: true } });
+  });
+
   it('no swipe or time left for the reveal: the bound fails naming the cut the probe proved — never "fully visible"', () => {
     const late = play(RULES, [sAt(0), { ...sAt(60), elapsedMs: 15_000 }]);
     expect(late.steps.map((s) => s.do)).toEqual(['stroke', 'stop']);

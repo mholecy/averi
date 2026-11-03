@@ -265,6 +265,27 @@ describe('the flush check doubts a reveal that held right after a stroke that ca
     expect(said(seeFlush(sent(again.verdict), stopAt(flushOn('bottom', 150))))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
   });
 
+  // ADR 0013 LV2 point 3's row cut by 40 px, which the 74-px probe brings whole at the list's end: 40 > 26, carried —
+  // the legitimate case D62 pays for: one retry before `checked`.
+  it('LV2\'s row cut by 40 px, revealed whole by the 74-px probe: carried — the held reveal is sent again, and checked when that one holds', () => {
+    const doubted = seeFlush(sent(provedBy(40).verdict), stopAt(flushOn('bottom', 62)));
+    expect(said(doubted)).toEqual(REVEAL(62));
+    expect(said(seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 62))))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
+  });
+
+  it('a doubted reveal with a keyboard the moot rule offered and never asked about: the witness first, then the reveal — the read shown again with the check from before the witness doubts it again', () => {
+    // A keyboard whose line lies below the list: stood by, the reveal still has room above it.
+    const offered: AppliedKeyboard = { topCover: { x: 0, y: 1700, width: 1080, height: 520 }, above: undefined, remedy: { dismissal: 'none' }, line: { y: 1700, witnessed: true } };
+    const inFlight = sent(provedBy(60).verdict);
+    const ask = seeFlush(inFlight, stopAt(flushOn('bottom', 82), { offered }));
+    expect(said(ask)).toEqual({ of: 'witness' });
+    const answered = seeFlush(inFlight, stopAt(flushOn('bottom', 82), { offered, corroborated: true }));
+    expect(answered).toMatchObject({ settles: true, waits: false });
+    expect(said(answered)).toEqual(REVEAL(82));
+    // That reveal held too: checked.
+    expect(said(seeFlush(sent(answered.verdict), stopAt(flushOn('bottom', 82))))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
+  });
+
   it('a reveal drawn too short to tell from a tap after a carried proof: the cut (`tap`), not a retry', () => {
     expect(seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82), { drawn: TAP })).verdict).toMatchObject({ of: 'cut', cut: { why: 'tap', revealed: 60 } });
   });
