@@ -105,6 +105,13 @@ describe('chooserInFocus — an app, the launcher or no focus in front is no cho
   it('a window named by its title, not a component (`Window{… u0 NotificationShade}`): undefined', () => {
     expect(chooserInFocus('  mCurrentFocus=Window{f61dea2 u0 NotificationShade}\n')).toBeUndefined();
   });
+
+  it('an answer cut inside a record (no `}` or space after the component): that line names nothing', () => {
+    expect(chooserInFocus(`  mCurrentFocus=Window{56b9ca0 u0 ${RESOLVER}`)).toBeUndefined();
+    const cut = `  mCurrentFocus=null\n  mFocusedApp=ActivityRecord{6dd03d6 u0 ${RESOLVER}`;
+    expect(chooserInFocus(cut)).toBeUndefined();
+    expect(chooserInFocus(`  mCurrentFocus=Window{56b9ca0 u0 ${RESOLVER}}\n  mFocusedApp=ActivityRecord{10e4bcf u0 ${LAB}`)).toBe(RESOLVER);
+  });
 });
 
 describe.each(SHAPES)('chooserInFocus — synthetic `mFocusedApp` lines, the %s shape', (_api, record) => {
