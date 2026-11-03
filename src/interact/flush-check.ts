@@ -15,7 +15,7 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * its way, reach and travel the course's (interact/course.ts#probeOf); whether a read may settle otherwise, the
  * round's and the motion ledger's.
  * docs/bugs/2026-10-09-android-scroll-until-fully-trusts-bounds-clipped-to-scroll-container.md
- * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md (refined 2026-10-20, 2026-10-23)
+ * docs/adr/0013-refuse-a-tap-on-a-sliver-cut-by-its-scroll-container.md (refined 2026-10-20, 2026-10-23; D62 amendment)
  *
  * The interface, which is also the test surface (tests/interact/flush-check.test.ts; the wiring in the round's play
  * tables, tests/interact/scroll-flush-reveal.test.ts, scroll-rounds.test.ts — all of it but two guards no play reaches:
@@ -50,6 +50,17 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * 74-px probe moved S 57–61 px of its 154-px cut (21 or 38 on a loaded host), and quarter-strokes with a confirming
  * read each — ~5.1 s a round — ended cut at the deadline in 2 of the runs recorded. Moves it otherwise: the round
  * judges the new read like any other, and a stop flush again after it is a new candidate with a probe of its own.
+ *
+ * A REVEAL THAT MOVED NOTHING right after a stroke that CARRIED the match its whole drawn length — less twice
+ * TOUCH_SLOP, the most a drag loses to the slop and the content's give (measured 7–24 px) — is DOUBTED once (D62): that
+ * stroke did not end at the content's end, so the stillness after it says the app did not take the reveal, not that
+ * nothing lies past the edge (measured, batch-9: a 142-px probe carried a carousel card 135 px, and the reveal after it
+ * was never delivered — read as "fully visible"). No `checked`: the cut stays proven (`ProvenCut.unmoved`) and the same
+ * reveal is sent again, or, with none to send, the read is short of the cut. A second held reveal is checked; a held
+ * reveal after a stroke that ran short (the content ended under it: a row cut at the content's edge revealed to its end)
+ * and every first probe that held are checked at once, as before. Cost: one stroke and one read, in the doubted case
+ * only. Residuals: a first probe the app did not take still reads checked (no stroke before it to doubt by); so does a
+ * reveal dropped after a stroke that ran short for another reason (a loaded host), or two strokes dropped in a row.
  *
  * Toward the edge, never the caller's way (course.ts#probeOf). Along the scroll's axis only (the caller's
  * direction's): a vertical list's cell flush with the left edge of its container is the ordinary grid layout, and a
@@ -152,6 +163,13 @@ interface ProvenCut {
   readonly edge: Edge;
   readonly container: Rect;
   readonly revealed: number;
+  /**
+   * The stroke that proved it (`revealedBy`) carried the match its whole drawn length less twice TOUCH_SLOP: the content
+   * did not end under it, so a reveal that then moves nothing is doubted once (D62). False with no stroke handed back.
+   */
+  readonly carried: boolean;
+  /** A reveal on this cut came back with the match where it was sent from, and was doubted (D62): the next one that does is checked. */
+  readonly unmoved?: true;
 }
 
 declare const opaque: unique symbol;
@@ -270,9 +288,13 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
   // The probe moved it and it lies flush on the same edge with more of it showing (`revealedBy`), or it still lies
   // flush on a cut an earlier probe proved (`stillProven`).
   const at = flushOf(stop.judged, stop.facts, m.direction);
-  const proven = (probed !== undefined && !held ? revealedBy(probed, rect, at) : undefined) ?? stillProven(m.proven, at);
+  const kept = (probed !== undefined && !held ? revealedBy(probed, rect, at, stop.drawn) : undefined) ?? stillProven(m.proven, at);
+  // A reveal that moved nothing right after a stroke that carried the match its whole length: doubted once — the cut
+  // stays proven, marked, and the same reveal goes again (D62).
+  const doubted = stroked && kept !== undefined && kept.carried && kept.unmoved !== true;
+  const proven = doubted ? { ...kept, unmoved: true as const } : kept;
   const after: Memory = { ...m, probe: undefined, proven };
-  return { check: close(after), settles: held, waits: proven === undefined, verdict: verdictOf(after, stop, at, { held, stroked }) };
+  return { check: close(after), settles: held, waits: proven === undefined, verdict: verdictOf(after, stop, at, { held, stroked, doubted }) };
 }
 
 /** A flush edge of the match: on its container's own edge, or on a node `pinned` in its nearest at that side (`Flush`). */
@@ -327,14 +349,16 @@ function flushOf(best: Judged, facts: TreeFacts, direction: Direction): FlushAt 
  * pixel, and its uncut edge moved toward revealing the flush one by that growth, within a pixel — the content carried
  * it out from past that edge. Undefined otherwise: no longer flush, flush on another edge or filling its container, no
  * more of it showing (a match that moved but did not grow says nothing of a cut), or grown with its uncut edge where
- * the content did not carry it (a container that grew, another match in its place).
+ * the content did not carry it (a container that grew, another match in its place). `carried`: it grew by more than
+ * `drawn`'s length less twice the slop (`ProvenCut.carried`) — a fresh proof, never `unmoved`.
  */
-function revealedBy(probed: SentProbe, now: Rect, { chain, flushed }: FlushAt): ProvenCut | undefined {
+function revealedBy(probed: SentProbe, now: Rect, { chain, flushed }: FlushAt, drawn: Stroke | undefined): ProvenCut | undefined {
   if (flushed === undefined || 'fills' in flushed || flushed.edge !== probed.edge) return undefined;
   const was = probed.rect;
   const grown = axisOfEdge(probed.edge) === 'vertical' ? now.height - was.height : now.width - was.width;
   const uncutMoved = uncutToward(now, probed.edge) - uncutToward(was, probed.edge);
-  return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? { edge: probed.edge, container: chain[flushed.at], revealed: grown } : undefined;
+  const carried = drawn !== undefined && grown > strokeLength(drawn) - 2 * TOUCH_SLOP;
+  return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? { edge: probed.edge, container: chain[flushed.at], revealed: grown, carried } : undefined;
 }
 
 /** `cut` (`Memory.proven`) while the match still lies flush on its edge of its container (`flushed`, of `chain`), within a pixel; undefined once it lies anywhere else. */
@@ -370,9 +394,11 @@ function uncutToward(rect: Rect, edge: Edge): number {
  * (`FlushCut`), or the step that answers it first: the witness asked about a band the moot rule left unasked, or the
  * probe sent, as the stroke plan makes it (interact/stroke-plan.ts#planProbe: over the first of the ancestors from the
  * flush one outward with room above the keyboard — none, and no probe is sent). `held`, `stroked`: the probe in
- * flight came back with the match where it was sent from, and was drawn as a stroke, not a tap.
+ * flight came back with the match where it was sent from, and was drawn as a stroke, not a tap; `doubted`: it was a
+ * reveal right after a stroke that carried the match its whole length, held for the first time — no stop, the reveal
+ * again (D62).
  */
-function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, flushed }: FlushAt, { held, stroked }: { held: boolean; stroked: boolean }): FlushVerdict {
+function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, flushed }: FlushAt, { held, stroked, doubted }: { held: boolean; stroked: boolean; doubted: boolean }): FlushVerdict {
   if (flushed === undefined) return { of: 'none' };
   const { proven } = after;
   if ('fills' in flushed) return { of: 'flush', flush: { edges: flushed.fills, container: chain[0], ...(flushed.pinned !== undefined && { pinned: flushed.pinned }), checked: false, why: 'fills' } };
@@ -384,8 +410,8 @@ function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, 
   const unchecked = (why: 'budget' | 'room' | 'axis' | 'tap'): FlushVerdict =>
     proven === undefined ? { of: 'flush', flush: { ...where, checked: false, why } } : { of: 'cut', cut: { of: 'flushCut', judged, ...where, revealed: proven.revealed, why } };
   // A probe or reveal that moved nothing: checked — nothing lies past the edge now — unless drawn too short to tell
-  // from a tap, which on a proven cut is no stop but that cut.
-  if (held) return stroked ? { of: 'flush', flush: { ...where, checked: true } } : unchecked('tap');
+  // from a tap, which on a proven cut is no stop but that cut; or doubted (D62), when the reveal goes again below.
+  if (held && !doubted) return stroked ? { of: 'flush', flush: { ...where, checked: true } } : unchecked('tap');
   // With no gesture box (`RoundSeen.screen` absent) nothing has room and the stop says `room` — the wrong reason (it
   // is "no screen box"), accepted as unreachable in practice: screenBox throws only when the device's size is
   // unusable AND the tree has no window, and adapters/viewport-memo.ts keeps a successful size for the session — so it

@@ -224,7 +224,7 @@ describe('the flush check doubts a reveal that held right after a stroke that ca
   /** A 74-px probe: the lab's bounded list's (tests/interact/scroll-flush-reveal.test.ts). Carried past 74 − 2·24 = 26 px. */
   const PROBE: Stroke = { from: { x: 540, y: 1480 }, to: { x: 540, y: 1406 } };
   /** The check with the cut proved by `PROBE`, which showed `grown` px more of a row showing 22 at the list's bottom. */
-  function provedBy(grown: number, drawn: Stroke | undefined = PROBE): FlushSeen {
+  function provedBy(grown: number, { drawn }: { drawn: Stroke | undefined } = { drawn: PROBE }): FlushSeen {
     const inFlight = sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 22))).verdict);
     return seeFlush(inFlight, stopAt(flushOn('bottom', 22 + grown), { drawn }));
   }
@@ -240,7 +240,7 @@ describe('the flush check doubts a reveal that held right after a stroke that ca
   });
 
   it('a proving read with no stroke handed back: not carried — the held reveal is checked, as before', () => {
-    const proved = provedBy(60, undefined);
+    const proved = provedBy(60, { drawn: undefined });
     expect(said(seeFlush(sent(proved.verdict), stopAt(flushOn('bottom', 82))))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } });
   });
 
