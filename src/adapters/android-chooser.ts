@@ -43,14 +43,20 @@ const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.i
  */
 const CHOOSER_CLASS = /\.(?:Resolver|Chooser)Activity$/;
 
+/**
+ * The body both focus lines share after `Window` or `ActivityRecord`: `{<hash> u<user> <package>/<class>`, the
+ * component captured. A regex source, for the two below.
+ */
+const RECORD_COMPONENT = String.raw`\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)`;
+
 /** The focused window's component; a window named by a title (`Window{… u0 NotificationShade}`) has none. */
-const FOCUS_WINDOW_RE = /mCurrentFocus=Window\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)\}/;
+const FOCUS_WINDOW_RE = new RegExp(String.raw`mCurrentFocus=Window${RECORD_COMPONENT}\}`);
 
 /**
  * The focused activity's component: an ActivityRecord anywhere on the `mFocusedApp` line — the line itself on API 30
  * and later, inside `AppWindowToken{… token=Token{… ActivityRecord{…}}}` on API 29 (AOSP 10's dump, not captured).
  */
-const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+) /;
+const FOCUSED_APP_RE = new RegExp(String.raw`mFocusedApp=[^\n]*?ActivityRecord${RECORD_COMPONENT} `);
 
 /** What opens each display's block in the dump, its id after it: `Display: mDisplayId=0 (organized)`. */
 const DISPLAY_HEADER = 'Display: mDisplayId=';
