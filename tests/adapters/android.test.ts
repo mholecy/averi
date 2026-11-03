@@ -1097,12 +1097,10 @@ describe('AndroidAdapter interactions', () => {
       'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
       `is in front, and dev.averi.lab is not. ${ADVICE} Naming the activity (\`activity:\` on the launch step / ` +
       'launch_app) starts it without the chooser.';
-    /** The chooser named as the cause of monkey's refusal, its actual exit code, and `said` when monkey gave a real reason. */
-    const monkeyChooser = (exit: number, said?: string) =>
+    /** The chooser named as THE cause of monkey's refusal (monkey gave no reason of its own), its actual exit code. */
+    const monkeyChooser = (exit: number) =>
       "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) " +
-      `is in front, and monkey starts nothing over it (it exited ${exit}).` +
-      (said === undefined ? '' : ` monkey said: ${said}`) +
-      ` ${ADVICE} Then launch again.`;
+      `is in front, and monkey starts nothing over it (it exited ${exit}). ${ADVICE} Then launch again.`;
     /** Today's monkey refusal, quoting `said` — the reply when the focus read names no chooser. */
     const monkeyRefused = (said: string) =>
       'monkey started nothing in dev.averi.lab — check that dev.averi.lab is installed and has a launcher activity, ' +
@@ -1214,15 +1212,25 @@ describe('AndroidAdapter interactions', () => {
       expect(argvs).toEqual([MONKEY, FOCUS]);
     });
 
-    it("monkey refused with a real reason under the chooser: the chooser named, and monkey's own line quoted — the warning still not", async () => {
+    it("monkey refused with a real reason AND the chooser in front: monkey's reason leads (today's error, the warning unquoted), the chooser named as also in front", async () => {
       const noActivities = '** No activities found to run, monkey aborted.';
       const failure = execErrorLikeExec('adb -s e shell monkey', 252, `${MONKEY_LINE}\n`, { stdout: `${noActivities}\n` });
       const { adapter, argvs } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt') });
       const error = await failureOf(adapter.launch('dev.averi.lab'));
-      expect(error?.message).toBe(monkeyChooser(252, noActivities));
+      expect(error?.message).toBe(
+        `${monkeyRefused(noActivities)} Android's chooser (android/com.android.internal.app.ResolverActivity) is also in front. ${ADVICE}`,
+      );
       expect(error?.message).not.toContain('SYS_KEYS');
+      expect(error?.message).not.toContain('monkey starts nothing over it');
       expect(error?.cause).toBe(failure);
       expect(argvs).toEqual([MONKEY, FOCUS]);
+    });
+
+    it('with no chooser named, the refusal is quoted whole, the emulator warning included: today\'s error byte for byte (the fail-open)', async () => {
+      const noActivities = '** No activities found to run, monkey aborted.';
+      const failure = execErrorLikeExec('adb -s e shell monkey', 252, `${MONKEY_LINE}\n`, { stdout: `${noActivities}\n` });
+      const { adapter } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b10-launcher.txt') });
+      expect((await failureOf(adapter.launch('dev.averi.lab')))?.message).toBe(monkeyRefused(`${noActivities} / ${MONKEY_LINE}`));
     });
 
     it('monkey refused with no chooser named (an app or launcher in front, a failed or empty read): today\'s error byte for byte, two calls', async () => {

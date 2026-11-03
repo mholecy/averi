@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, chooserAdvice, chooserInFocus, launchChooserNote, monkeyChooserRefusal } from '../../src/adapters/android-chooser.js';
+import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, chooserAdvice, chooserAlsoInFront, chooserInFocus, launchChooserNote, monkeyChooserRefusal } from '../../src/adapters/android-chooser.js';
+import type { StartRefused } from '../../src/adapters/android-start.js';
+import { execErrorLikeExec } from '../helpers/exec-error.js';
 
 // D55 (ADR 0041): Android's "Open with" chooser in front after a deep link, judged by the focused component alone.
 // dumpsys-window-focus-api33-resolver.txt is the two focus lines batch-9's D55 probe recorded (averi_lab, API 33,
@@ -337,7 +339,6 @@ describe('D55b — the launch\'s chooser wording: chooserAdvice, launchChooserNo
     'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
     "changes the device's default for the intent it answers); press_key back drops the chooser. averi taps nothing itself.";
   const SYS_KEYS = '** SYS_KEYS has no physical keys but with factor 2.0%.';
-  const NO_ACTIVITIES = '** No activities found to run, monkey aborted.';
   const MONKEY_HEAD = "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) is in front, and monkey starts nothing over it";
 
   it('chooserAdvice is CHOOSER_ADVICE for a link, and the launch wording for a launch', () => {
@@ -353,34 +354,30 @@ describe('D55b — the launch\'s chooser wording: chooserAdvice, launchChooserNo
     );
   });
 
-  it("monkeyChooserRefusal: the chooser as the cause, monkey's actual exit code, the shared advice — SYS_KEYS's warning unquoted", () => {
-    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 251, lines: [SYS_KEYS] })).toBe(
+  /** monkey's refusal as runStart reports it: its `** ` lines, and the ExecError of its exit when it had one. */
+  const refusedBy = (lines: string[], exitCode?: number | null): StartRefused => ({
+    kind: 'refused',
+    command: 'monkey',
+    lines,
+    ...(exitCode !== undefined && { cause: execErrorLikeExec('adb -s e shell monkey', exitCode, '') }),
+  });
+
+  it("monkeyChooserRefusal: the chooser as THE cause, monkey's actual exit code, the shared advice — no line quoted", () => {
+    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, refusedBy([SYS_KEYS], 251))).toBe(
       `${MONKEY_HEAD} (it exited 251). ${LAUNCH_ADVICE} Then launch again.`,
     );
-    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 252, lines: [SYS_KEYS] })).toBe(
+    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, refusedBy([SYS_KEYS], 252))).toBe(
       `${MONKEY_HEAD} (it exited 252). ${LAUNCH_ADVICE} Then launch again.`,
     );
   });
 
-  it('monkeyChooserRefusal with no exit code (exit 0, or a signal): no exit clause', () => {
-    for (const exitCode of [undefined, null]) {
-      expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode, lines: [SYS_KEYS] })).toBe(
-        `${MONKEY_HEAD}. ${LAUNCH_ADVICE} Then launch again.`,
-      );
+  it('monkeyChooserRefusal with no exit code (exit 0, so no cause; or a signal, `null`): no exit clause', () => {
+    for (const refused of [refusedBy([SYS_KEYS]), refusedBy([SYS_KEYS], null)]) {
+      expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, refused)).toBe(`${MONKEY_HEAD}. ${LAUNCH_ADVICE} Then launch again.`);
     }
   });
 
-  it("monkeyChooserRefusal quotes monkey's real reasons — every `** ` line but SYS_KEYS's warning, in order", () => {
-    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 252, lines: [SYS_KEYS, NO_ACTIVITIES] })).toBe(
-      `${MONKEY_HEAD} (it exited 252). monkey said: ${NO_ACTIVITIES} ${LAUNCH_ADVICE} Then launch again.`,
-    );
-    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 252, lines: [NO_ACTIVITIES, '** Error: x', SYS_KEYS] })).toBe(
-      `${MONKEY_HEAD} (it exited 252). monkey said: ${NO_ACTIVITIES} / ** Error: x ${LAUNCH_ADVICE} Then launch again.`,
-    );
-    // Only the warning itself is dropped: a line that merely mentions SYS_KEYS, or has it later, is a reason.
-    const mentions = ['** Error: SYS_KEYS has no physical keys', '**  SYS_KEYS x', '** echo: ** SYS_KEYS has no physical keys'];
-    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, { exitCode: 252, lines: mentions })).toBe(
-      `${MONKEY_HEAD} (it exited 252). monkey said: ${mentions.join(' / ')} ${LAUNCH_ADVICE} Then launch again.`,
-    );
+  it('chooserAlsoInFront: the chooser named beside a reason of its own, with the shared advice', () => {
+    expect(chooserAlsoInFront(RESOLVER)).toBe(`Android's chooser (android/com.android.internal.app.ResolverActivity) is also in front. ${LAUNCH_ADVICE}`);
   });
 });

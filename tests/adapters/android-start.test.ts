@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { runStart, type StartCommand } from '../../src/adapters/android-start.js';
+import { refusalReasons, runStart, startSaid, type StartCommand, type StartRefused } from '../../src/adapters/android-start.js';
 import { ExecError, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 
@@ -212,5 +212,28 @@ describe('runStart — the argv picks the reading, and is sent as it is', () => 
     };
     await expect(runStart(argv, send)).rejects.toThrow(/runStart reads `am start` and `monkey` only/);
     expect(sent).toBe(false);
+  });
+});
+
+// D55b (ADR 0041's D55b amendment): a refusal's lines as the messages quote them, and which of monkey's are reasons.
+// `** SYS_KEYS has no physical keys but with factor 2.0%.` is monkey's emulator warning, printed whatever the outcome
+// (batch-10's E4c reply, batch-11's three exit-251 refusals under the chooser: its only `** ` line each time).
+describe('startSaid and refusalReasons — what a refusal quotes (D55b)', () => {
+  const SYS_KEYS = '** SYS_KEYS has no physical keys but with factor 2.0%.';
+  const refused = (command: StartCommand, lines: string[]): StartRefused => ({ kind: 'refused', command, lines });
+
+  it("startSaid: `<command> said: a / b`, all the lines or the ones given", () => {
+    expect(startSaid(refused('monkey', [MONKEY_ABORTED, SYS_KEYS]))).toBe(`monkey said: ${MONKEY_ABORTED} / ${SYS_KEYS}`);
+    expect(startSaid(refused('am start', [UNRESOLVED_VIEW]))).toBe(`am start said: ${UNRESOLVED_VIEW}`);
+    expect(startSaid(refused('monkey', [MONKEY_ABORTED, SYS_KEYS]), [MONKEY_ABORTED])).toBe(`monkey said: ${MONKEY_ABORTED}`);
+  });
+
+  it("refusalReasons: monkey's lines without its emulator warning, in order; am's all", () => {
+    expect(refusalReasons(refused('monkey', [SYS_KEYS]))).toEqual([]);
+    expect(refusalReasons(refused('monkey', [MONKEY_ABORTED, SYS_KEYS, '** Error: x']))).toEqual([MONKEY_ABORTED, '** Error: x']);
+    // Only a line that IS the warning, from its start: one that mentions SYS_KEYS otherwise is monkey's own.
+    const mentions = ['** Error: SYS_KEYS has no physical keys', '**  SYS_KEYS x', '** echo: ** SYS_KEYS has no physical keys'];
+    expect(refusalReasons(refused('monkey', mentions))).toEqual(mentions);
+    expect(refusalReasons(refused('am start', [SYS_KEYS]))).toEqual([SYS_KEYS]);
   });
 });

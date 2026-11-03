@@ -1,3 +1,5 @@
+import type { StartRefused } from './android-start.js';
+
 /**
  * Android's "Open with" chooser in front after a deep link (D55; docs/adr/0041-an-android-link-names-the-chooser-in-front.md),
  * judged from the focused component alone, with no device call here: Android's counterpart of ios-system-alert.ts.
@@ -143,28 +145,24 @@ export function launchChooserNote(packageName: string, component: string, nameTh
 }
 
 /**
- * monkey's emulator warning: printed on an emulator whatever the outcome (fact 14), never a reason. Only a line that
- * IS the warning, from its start; one that mentions SYS_KEYS later is monkey's own and is quoted.
+ * monkey's refusal when the chooser is in front and monkey gave no reason of its own (D55b; refusalReasons empty, its
+ * only `** ` line the emulator's SYS_KEYS warning): monkey starts nothing over the chooser (exit 251 3 of 3 in
+ * batch-11, averi_lab API 33; batch-10's refusal was recorded as 252), so the message names the chooser as the cause
+ * instead of the install, with monkey's actual exit code when it had one (the refusal's ExecError; none at exit 0, and
+ * `null` on a signal). It quotes no line; the ExecError, the caller's cause, keeps the whole output.
  */
-const SYS_KEYS_WARNING = /^\*\* SYS_KEYS /;
-
-/**
- * monkey's refusal when the chooser is in front (D55b): monkey starts nothing over it (exit 251 3 of 3 in batch-11,
- * averi_lab API 33; batch-10's reply came from a refusal recorded as 252), so the message names the chooser as the
- * cause instead of the install, with monkey's actual exit code when it had one (`exitCode`: the ExecError's; none at
- * exit 0 or on a signal). Of monkey's `** ` lines (`lines`, runStart's) every real reason is quoted, in order; the
- * SYS_KEYS warning is not. The ExecError, the caller's cause, keeps the whole output.
- */
-export function monkeyChooserRefusal(
-  packageName: string,
-  component: string,
-  { exitCode, lines }: { exitCode?: number | null; lines: readonly string[] },
-): string {
-  const reasons = lines.filter((line) => !SYS_KEYS_WARNING.test(line));
+export function monkeyChooserRefusal(packageName: string, component: string, refused: StartRefused): string {
+  const exitCode = refused.cause?.exitCode;
   return (
     `monkey started nothing in ${packageName}: Android's chooser (${component}) is in front, and monkey starts ` +
-    `nothing over it${exitCode == null ? '' : ` (it exited ${exitCode})`}.` +
-    (reasons.length > 0 ? ` monkey said: ${reasons.join(' / ')}` : '') +
-    ` ${LAUNCH_ADVICE} Then launch again.`
+    `nothing over it${exitCode == null ? '' : ` (it exited ${exitCode})`}. ${LAUNCH_ADVICE} Then launch again.`
   );
+}
+
+/**
+ * The chooser beside a refusal with a reason of its own (D55b: monkey's real `** ` line, e.g. `** No activities found
+ * to run`): not claimed as the cause, only named as also in front, with the advice. The caller's message leads.
+ */
+export function chooserAlsoInFront(component: string): string {
+  return `Android's chooser (${component}) is also in front. ${LAUNCH_ADVICE}`;
 }

@@ -3,8 +3,8 @@ import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
-import { causeOf, runStart, type StartRefused } from './android-start.js';
-import { CHOOSER_FOCUS_COMMAND, chooserInFocus, launchChooserNote, monkeyChooserRefusal } from './android-chooser.js';
+import { causeOf, refusalReasons, runStart, startSaid, type StartRefused } from './android-start.js';
+import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, launchChooserNote, monkeyChooserRefusal } from './android-chooser.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -72,11 +72,6 @@ const CHOOSER_FOCUS_TIMEOUT_MS = 2_000;
 const TYPING_PACE_MS = 100;
 /** typeText's wait after the DPAD left/right nudge that commits Gboard's composing character (see typeText). */
 const COMMIT_SETTLE_MS = 150;
-
-/** A refusal's lines as the messages below quote them: `<command> said: a / b`. */
-function startSaid(refused: StartRefused): string {
-  return `${refused.command} said: ${refused.lines.join(' / ')}`;
-}
 
 // The advice the start refusals below share, written once (launchRefused
 // says why an adapter message may name config keys and tools).
@@ -330,22 +325,25 @@ export class AndroidAdapter implements DeviceAdapter {
       if (outcome.kind === 'refused') {
         // D55b: with Android's chooser in front monkey starts nothing (exit 251 on API 33, batch-11) and its one `** `
         // line is the emulator's SYS_KEYS warning, not a reason. So one focus read, on the refusal only (a monkey that
-        // started something pays nothing): the chooser named is the cause, with monkey's exit code and any real
-        // reason it printed. A failed or unmatched read: today's error.
+        // started something pays nothing). The chooser named and no reason of monkey's own: the chooser is the cause.
+        // The chooser named beside a real reason: that reason leads, the chooser is also in front. No chooser named
+        // (a failed or unmatched read): today's error byte for byte, the warning quoted as before.
         const chooser = await this.chooserInFront();
-        if (chooser !== undefined) {
-          const said = { exitCode: outcome.cause?.exitCode, lines: outcome.lines };
-          throw new Error(monkeyChooserRefusal(packageName, chooser, said), causeOf(outcome));
+        const reasons = refusalReasons(outcome);
+        if (chooser !== undefined && reasons.length === 0) {
+          throw new Error(monkeyChooserRefusal(packageName, chooser, outcome), causeOf(outcome));
         }
         // monkey's reason may be on its stdout, which the ExecError's
         // message drops — read here, or this would fail with no reason at
         // all. Not every reason is the package's: monkey itself may have
         // failed to run (android-start.ts lists its lines), and its line says.
-        throw new Error(
+        const monkeyRefusal =
           `monkey started nothing in ${packageName} — check that ${packageName} is installed and has a launcher ` +
-            `activity, or name the activity to start: ${NAME_THE_ACTIVITY}, or ` +
-            `${ACTIVITY_IN_CONFIG} — or monkey itself could not run; its line says which. ` +
-            startSaid(outcome),
+          `activity, or name the activity to start: ${NAME_THE_ACTIVITY}, or ` +
+          `${ACTIVITY_IN_CONFIG} — or monkey itself could not run; its line says which. ` +
+          startSaid(outcome, chooser === undefined ? outcome.lines : reasons);
+        throw new Error(
+          chooser === undefined ? monkeyRefusal : `${monkeyRefusal} ${chooserAlsoInFront(chooser)}`,
           causeOf(outcome),
         );
       }
