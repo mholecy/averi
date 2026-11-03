@@ -105,6 +105,14 @@ describe('judged — the first read, and the late one 3 s after it', () => {
  */
 const PRE_D43A_LOUD = /^- LOUD \(loud-changed\) (b1d|b7) .*\[NOT known: loud-changed on refused, where KNOWN pins loud-untouched on refused \(bug:2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii\.md\)\]$/gm;
 
+/**
+ * A pre-D43 WDA b1d or b7 line: refused before anything was sent (`loud-untouched`), a LOUD no KNOWN entry holds since
+ * D43 (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md, the D43 amendment) — WDA types
+ * them through `/wda/keys`, ok expected. Unmarked: under idb the same lines stay `[known: …]`, so only WDA's match.
+ * Every forms record with a WDA leg committed before D43 reads them.
+ */
+const PRE_D43_WDA_LOUD = /^- LOUD \(loud-untouched\) (b1d|b7) (?!.*\[known).*$/gm;
+
 describe('live.ts --rejudge over the committed visibility records', () => {
   it.each([
     // round 6's closing review: the active-window hint run live (src and lab app ea070d2) — form-picker's c2–c4 ok with
@@ -118,7 +126,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // (b1, b4, p2 five times under each source); c2–c4 ok under both sources (idb: not in its tree, all it can say);
     // b1d and b7 (idb ui text has no keycode for them), p5 (the secure field iOS clears) and k2/k3 under WDA LOUD; the
     // run itself read c2–c4 under idb LOUD, by the judge before it was made per source
-    ['ios-forms-r7-lab-1.json', 'forms', { cases: 46, ok: 38, loud: 8, mismatches: 0 }],
+    ['ios-forms-r7-lab-1.json', 'forms', { cases: 46, ok: 38, loud: 8, mismatches: 0, preD43Wda: true }],
     ['ios-forms-r7-lab-2.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-forms-r7-lab-3.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-forms-r7-lab-4.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
@@ -152,8 +160,8 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-wda-stop-carousel-r23-3.json', 'visibility', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     ['ios-wda-stop-carousel-r23-4.json', 'visibility', { cases: 2, ok: 2, loud: 0, mismatches: 0 }],
     // …the keyboard forms under WDA at A1's src and at arch/round-23 before it (review round 1, MAJOR-1): the same
-    ['ios-wda-forms-r23-ios-stop.json', 'forms', { cases: 23, ok: 18, loud: 5, mismatches: 0 }],
-    ['ios-wda-forms-r23.json', 'forms', { cases: 23, ok: 18, loud: 5, mismatches: 0 }],
+    ['ios-wda-forms-r23-ios-stop.json', 'forms', { cases: 23, ok: 18, loud: 5, mismatches: 0, preD43Wda: true }],
+    ['ios-wda-forms-r23.json', 'forms', { cases: 23, ok: 18, loud: 5, mismatches: 0, preD43Wda: true }],
     // …the visibility cells whose replayed first stroke the unmeasured carry cuts, at both srcs: 16 of 16 ok
     ['ios-wda-cut-cells-r23-ios-stop.json', 'visibility', { cases: 16, ok: 16, loud: 0, mismatches: 0 }],
     ['ios-wda-cut-cells-r23.json', 'visibility', { cases: 16, ok: 16, loud: 0, mismatches: 0 }],
@@ -172,7 +180,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-rn-forms-a9-4.json', 'forms', { cases: 12, ok: 10, loud: 2, mismatches: 0 }],
     ['ios-rn-forms-a9-5.json', 'forms', { cases: 12, ok: 11, loud: 1, mismatches: 0 }],
     // …and the native forms group at the same src: unchanged (b1d, b7, p5 and k2/k3 under WDA LOUD as before A4)
-    ['ios-forms-a9.json', 'forms', { cases: 46, ok: 38, loud: 8, mismatches: 0 }],
+    ['ios-forms-a9.json', 'forms', { cases: 46, ok: 38, loud: 8, mismatches: 0, preD43Wda: true }],
     // round 7's A5 (src arch/r23-idb-sheet through --side; docs/truth/live-ios-2026-10-18-visibility.md): idb's
     // presented layer — sheet-medium's and sheet-background's cells twice: sheet-medium's A–D stopped before any swipe,
     // ok; sheet-background's A and B LOUD, the changed stop (the stroke dismissed the large sheet, averi said the swipe
@@ -197,7 +205,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // (its visibility groups, ios-wda-vis-r7final.json and ios-idb-vis-r7final.json: below, before L4's fix)
     ['ios-wda-dismissal-r7final.json', 'dismissal', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
     ['ios-idb-dismissal-r7final.json', 'dismissal', { cases: 12, ok: 12, loud: 0, mismatches: 0 }],
-    ['ios-wda-forms-r7final.json', 'forms', { cases: 23, ok: 20, loud: 3, mismatches: 0 }],
+    ['ios-wda-forms-r7final.json', 'forms', { cases: 23, ok: 20, loud: 3, mismatches: 0, preD43Wda: true }],
     ['ios-rn-wda-r7final-1.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
     ['ios-rn-wda-r7final-2.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
     ['ios-rn-wda-r7final-3.json', 'forms,visibility', { cases: 9, ok: 9, loud: 0, mismatches: 0 }],
@@ -355,14 +363,14 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // cleared when typing resumed, averi says so); the RN app's rf4 under both (a blind `type:` dropped the tail);
     // Android b1d and b7 (input text typed a prefix, then exit 255: LOUD, NOT known since D43a — pinned below) and
     // kf1–kf3 skipped (Gboard docked).
-    ['ios-forms-d40-1.json', 'forms', { cases: 68, ok: 62, loud: 6, mismatches: 0 }],
+    ['ios-forms-d40-1.json', 'forms', { cases: 68, ok: 62, loud: 6, mismatches: 0, preD43Wda: true }],
     ['ios-rn-forms-d40-1.json', 'forms', { cases: 10, ok: 8, loud: 2, mismatches: 0 }],
     ['android-forms-d40-1.json', 'forms', { cases: 42, ok: 37, loud: 2, mismatches: 0, skipped: 3, preD43a: true }],
     // D43a's device run at 0262c69d (2026-11-02, ADR 0037's amendment): b1d, b7 and p7 under iOS idb, iOS wda and
-    // Android — b1d and b7 refused before anything was sent (loud-untouched, known), p7 refused with the prefill kept;
-    // b2, b3, p1, p2 ok.
+    // Android — b1d and b7 refused before anything was sent (loud-untouched, known; under WDA known no more since D43,
+    // preD43Wda), p7 refused with the prefill kept; b2, b3, p1, p2 ok.
     ['ios-idb-forms-d43a-1.json', 'forms', { cases: 7, ok: 5, loud: 2, mismatches: 0 }],
-    ['ios-wda-forms-d43a-1.json', 'forms', { cases: 7, ok: 5, loud: 2, mismatches: 0 }],
+    ['ios-wda-forms-d43a-1.json', 'forms', { cases: 7, ok: 5, loud: 2, mismatches: 0, preD43Wda: true }],
     ['android-forms-d43a-1.json', 'forms', { cases: 7, ok: 5, loud: 2, mismatches: 0 }],
     // batch-3's device run at 6b4a44df (2026-11-02). Block G, the ensure group (D30: D2's held "no" on a device; its
     // cases are not in the default groups — `--groups ensure`): h1–h3 ok under WDA and uiautomator. (Under idb h2 was
@@ -381,7 +389,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
     expect(header, out.slice(0, 2000)).not.toBeNull();
     const [, cases, ok, loud, mismatches, notKnown, skipped] = header!.map(Number);
-    const { preD43a, ...counts } = want as typeof want & { preD43a?: true };
+    const { preD43a, preD43Wda, ...counts } = want as typeof want & { preD43a?: true; preD43Wda?: true };
     expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ notKnown: 0, skipped: 0, ...counts });
     // An Android forms record from before D43a: b1d and b7 read as `input text` left them (a prefix typed, then exit
     // 255 — loud-changed), NOT known against the entry D43a pins (loud-untouched: refused before the tap). Those two
@@ -389,6 +397,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     const stale = [...out.matchAll(PRE_D43A_LOUD)].map((m) => m[1]);
     expect(stale.sort()).toEqual(preD43a ? ['b1d', 'b7'] : []);
     expect(out.replace(PRE_D43A_LOUD, '')).not.toMatch(/NOT known|FIXED, not intermittent/);
+    // A forms record with a WDA leg from before D43: b1d and b7 refused before anything was sent, a LOUD known no more
+    // (WDA types them since) — those two lines, exactly, unmarked; a LOUD fails no run.
+    expect([...out.matchAll(PRE_D43_WDA_LOUD)].map((m) => m[1]).sort()).toEqual(preD43Wda ? ['b1d', 'b7'] : []);
     expect(code, out.slice(-2000)).toBe(0);
   });
 });
@@ -1034,13 +1045,15 @@ describe('live.ts --rejudge over the committed record of absent:scroll-top-edge-
  */
 describe('live.ts --rejudge over D40\'s forms records: every LOUD known by its rule and its kind', () => {
   it.each([
-    ['ios-forms-d40-1.json', ['b1d', 'b7', 'p5', 'b1d', 'b7', 'p5']],
-    ['ios-rn-forms-d40-1.json', ['rf4', 'rf4']],
-  ] as const)('%s: each LOUD [known:', { timeout: 60_000 }, async (record, louds) => {
+    // D43: WDA's b1d and b7 known no more (PRE_D43_WDA_LOUD) — their LOUD lines unmarked.
+    ['ios-forms-d40-1.json', ['b1d', 'b7', 'p5', 'p5'], ['b1d', 'b7']],
+    ['ios-rn-forms-d40-1.json', ['rf4', 'rf4'], []],
+  ] as const)('%s: each LOUD [known:', { timeout: 60_000 }, async (record, louds, unmarked) => {
     const { code, out } = await rejudgeInProcess(record, 'forms');
     const marked = [...out.matchAll(/^- LOUD \((loud-untouched|loud-changed)\) (\S+) .*\[known: (?:bug|residual):[^\]]+\]$/gm)].map((m) => m[2]);
     expect(marked.sort()).toEqual([...louds].sort());
-    expect(out.match(/^- LOUD /gm)).toHaveLength(louds.length);
+    expect([...out.matchAll(PRE_D43_WDA_LOUD)].map((m) => m[1]).sort()).toEqual([...unmarked]);
+    expect(out.match(/^- LOUD /gm)).toHaveLength(louds.length + unmarked.length);
     expect(out).not.toMatch(/NOT known|FIXED, not intermittent/);
     expect(code).toBe(0);
   });
