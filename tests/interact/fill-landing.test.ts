@@ -414,10 +414,12 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
     expect(landingOf('Hello world ', expecting(e(' ', 'Hello world')))).toEqual({ kind: 'landed' });
   });
 
-  // ADR 0034 residual 8 (follow-up D64): what D63 does not refuse — pinned as today's behaviour, not as wanted
-  it('residual 8 (A): a reading that moved but holds no new typing still lands by containment in the earlier text', () => {
-    // `w` landed, `orld` went elsewhere: the value is found inside the earlier text `Hello world`
-    expect(landingOf('Hello worldw', expecting(e('world', 'Hello world')))).toEqual({ kind: 'landed' });
+  // ADR 0034 residual 8 (A), pinned here as D63 left it (landed: the value found inside the earlier text), flipped on
+  // purpose by D64: without clear the value must be in what was typed past the earlier text, and `w` is all of it here
+  it('D64 (A): a reading that moved but holds none of the typing past the earlier text has not landed; its tail is dropped', () => {
+    // `w` landed, `orld` went elsewhere: the value is only inside the earlier text `Hello world`
+    expect(landingOf('Hello worldw', expecting(e('world', 'Hello world')))).toBeUndefined();
+    expect(droppedTail('Hello worldw', e('world', 'Hello world'))).toBe('orld');
   });
 
   it('residual 8 (B): Android\'s skipped post-focus re-read takes `before` as empty; a `+421 ` inserted on focus, no key landed, lands', () => {
@@ -441,6 +443,70 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
  * for; `before` defaults to null (nothing shown when typing began), `clear`
  * to false.
  */
+/**
+ * D64 (A): without clear, the exact rule searched the WHOLE reading, earlier text included, for the value — so a reading
+ * that moved but held none of the typing passed whenever the earlier text held the value: a length cap (the lab's date
+ * `31.12.202` typed `12` keeps `31.12.2021`), an iOS React Native burst that kept a prefix (`Note: hellohe`), keys that
+ * went into another input. The value must now be in what was typed past the earlier text — `differenceOf`'s own notion
+ * of the typing (`typedPartOf`): what follows the earlier text when the reading still starts with it literally, else the
+ * whole reading. Such a reading is a dropped tail, which iOS types again.
+ */
+describe('without clear, the value must be in the typing past the earlier text (D64)', () => {
+  const e = (value: string, before: string | null, f: Partial<Expectation> = {}) => expecting({ value, before, ...f });
+
+  it.each([
+    ['Hello worldwor', 'world', 'Hello world', 'ld', 'a 14-character cap'],
+    ['31.12.2021', '12', '31.12.202', '2', "the lab's date at its 8-digit cap (f16)"],
+    ['Note: hellohe', 'hello', 'Note: hello', 'llo', 'an iOS React Native burst that kept a prefix'],
+  ])('`%s` typed `%s` after `%s`: no landing, the tail `%s` dropped, the difference a length (%s)', (shown, value, before, tail) => {
+    expect(landingOf(shown, e(value, before))).toBeUndefined();
+    expect(droppedTail(shown, e(value, before))).toBe(tail);
+    expect(differenceOf(shown, e(value, before))).toEqual({ kind: 'length' });
+  });
+
+  // the overlap form (an occurrence that only ENDS past the earlier text) would pass this: only `ld` landed
+  it('a typing whose value is found only across the seam is no landing (`Hello wor` typed `world` reads `Hello world`)', () => {
+    expect(landingOf('Hello world', e('world', 'Hello wor'))).toBeUndefined();
+  });
+
+  it.each([
+    ['Hello worldworld', 'world', 'Hello world', 'the whole typing after the earlier text'],
+    ['Hello world', 'world', 'Hello', 'an earlier text that does not hold the value'],
+    ['Jan ŠťastnýJan', 'Jan', 'Jan Šťastný', 'a prefilled name that holds the value'],
+    ['world', 'world', 'Hello world', 'a select-all field that replaced its text with the value'],
+    ['421903123456', '421903123456', '+421', "idb's unnamed placeholder replaced (f13)"],
+    ['+421421903123456', '421903123456', '+421', "idb's unnamed placeholder kept"],
+    ['Hello woworldrld', 'world', 'Hello world', 'the caret inside the text: the reading no longer starts with it, judged whole'],
+    ['Hello world', 'world', 'hello ', 'an earlier text autocorrected: judged whole'],
+    ['SK31 1200 ', 'SK31 1200', '', 'an eager trailing mark, nothing before'],
+    ['Note SK31 1200 ', 'SK31 1200', 'Note ', 'an eager trailing mark after an earlier text'],
+    ['ear', 'ear', 'Search', "idb's unnamed placeholder vanished"],
+    ['Searchear', 'ear', 'Search', "idb's unnamed placeholder kept"],
+    ['+421 421', '421', '+421 ', 'an earlier text that holds the value, the typing after it'],
+  ])('`%s` typed `%s` after `%s` lands as before (%s)', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toEqual({ kind: 'landed' });
+  });
+
+  it('a named placeholder is no earlier text: `Searchear` and `Search ear` for `ear` land', () => {
+    expect(landingOf('Searchear', e('ear', 'Search', { placeholder: 'Search' }))).toEqual({ kind: 'landed' });
+    expect(landingOf('Search ear', e('ear', null, { placeholder: 'Search' }))).toEqual({ kind: 'landed' });
+  });
+
+  // the earlier text must START the reading to be cut off: one found later is part of the typing
+  it('the caret at the start: `Hello ` typed before `world` reads `Hello world`, which lands', () => {
+    expect(landingOf('Hello world', e('Hello ', 'world'))).toEqual({ kind: 'landed' });
+  });
+
+  it('with clear the rule is equality, untouched', () => {
+    expect(landingOf('Hello worldw', e('Hello worldw', 'Hello world', { clear: true }))).toEqual({ kind: 'landed' });
+  });
+
+  // ADR 0034's D64 amendment, residual R-a: on the safe side
+  it('residual: the caret at the start, an earlier text the typing re-forms (`aba` for `ab` after `a`), is refused', () => {
+    expect(landingOf('aba', e('ab', 'a'))).toBeUndefined();
+  });
+});
+
 describe('differenceOf — what a missed read-back differs by, without content', () => {
   /** A row: the reading, and what it is judged against. */
   type Row = { observed: string } & Partial<Expectation> & Pick<Expectation, 'value'>;

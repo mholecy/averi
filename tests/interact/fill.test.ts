@@ -1986,6 +1986,25 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     expect(fake.droppedTails).toEqual([]); // nothing learned: Android's typing stays as it is (D24)
   });
 
+  // D64 (ADR 0034's D64 amendment): without clear, an earlier text that holds the value no longer passes a typing that
+  // kept only its head — the value must be in what was typed past the earlier text.
+  it('a prefilled `Hello world` whose earlier text holds `world`, the first typing keeping `w`: the tail typed again, landed (D64)', async () => {
+    const fake = formFake('Hello world');
+    dropping(fake, 1);
+    const result = await fillField(fake, { id: 'amount_input' }, 'world', FAST);
+    expect(fake.typed).toEqual(['world', 'orld']);
+    expect(fake.focused?.value).toBe('Hello worldworld');
+    expect(result).toMatchObject({ readBack: { kind: 'landed' }, retyped: [4] });
+  });
+
+  it('the same on an adapter whose keys may arrive late: no retype, the fill fails by length, not Filled (D64)', async () => {
+    const fake = formFake('Hello world');
+    fake.typingDelivery = 'may-arrive-late';
+    dropping(fake, 1);
+    await expect(fillField(fake, { id: 'amount_input' }, 'world', FAST)).rejects.toThrow('fill: typed 5 characters but the field shows 12 (content withheld from this error)');
+    expect(fake.typed).toEqual(['world']);
+  });
+
   /** Two auto-advancing one-digit code boxes and a note under them: a box that has its digit moves the focus on. */
   const otpFake = () => {
     resetLayout();

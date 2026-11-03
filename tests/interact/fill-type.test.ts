@@ -444,3 +444,50 @@ describe('typeAndConfirm — a reading unchanged since typing began is no landin
     expect(typed).toEqual(['world']);
   });
 });
+
+/**
+ * D64 (A): without clear, the value must be in what was typed past the earlier text (fill-landing.ts#landingOf), not
+ * anywhere in the reading. A field whose earlier text holds the value no longer passes at the first read when only part
+ * of the typing landed: on iOS the dropped tail is typed again, as for any other field; a capped field and keys that
+ * went into another input end in a miss.
+ */
+describe('typeAndConfirm — an earlier text that holds the value is no landing for a typing that did not land past it (D64)', () => {
+  const counted = (io: FieldIo) => {
+    let reads = 0;
+    const read = io.read;
+    return { io: { ...io, read: async () => (reads++, read()) }, reads: () => reads };
+  };
+
+  it('on-return: an iOS React Native burst kept `he` of `hello` after `Note: hello` — the tail typed again, landed', async () => {
+    const { io, intent, typed, dropped } = scripted({ prefilled: 'Note: hello', keep: [2] });
+    expect(await typeAndConfirm(io, { ...intent, value: 'hello', before: 'Note: hello' })).toEqual({ kind: 'landed', observed: 'Note: hellohello', again: [{ kind: 'tail', length: 3 }] });
+    expect(typed).toEqual(['hello', 'llo']);
+    expect(dropped).toEqual([2]);
+  });
+
+  it('on-return: a 12-character cap kept `w` of `world` after `Hello world` — one tail retype that moved nothing, missed', async () => {
+    const { io, intent, typed } = scripted({ prefilled: 'Hello world', keep: [1, 0] });
+    expect(await typeAndConfirm(io, { ...intent, value: 'world', before: 'Hello world' })).toEqual({ kind: 'missed', observed: 'Hello worldw', again: [{ kind: 'tail', length: 4 }], differs: { kind: 'length' } });
+    expect(typed).toEqual(['world', 'orld']);
+  });
+
+  it.each(['on-return', 'may-arrive-late'] as const)('%s: `w` landed and `orld` went into another input — missed, the other input named, nothing typed again', async (delivery) => {
+    const { io, intent, typed } = scripted({ prefilled: 'Hello world', keep: [1], elsewhere: (t) => t.slice(1) });
+    expect(await typeAndConfirm(io, { ...intent, value: 'world', before: 'Hello world', delivery })).toEqual({
+      kind: 'missed',
+      observed: 'Hello worldw',
+      again: [],
+      differs: { kind: 'length' },
+      elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } },
+    });
+    expect(typed).toEqual(['world']);
+  });
+
+  it('may-arrive-late: the lab date at its cap kept `1` of `12` after `31.12.202` — the whole poll, missed, nothing typed again', async () => {
+    const s = scripted({ prefilled: '31.12.202', keep: [1] });
+    const { io, reads } = counted(s.io);
+    expect(await typeAndConfirm(io, { ...s.intent, value: '12', before: '31.12.202', delivery: 'may-arrive-late' })).toEqual({ kind: 'missed', observed: '31.12.2021', again: [], differs: { kind: 'length' } });
+    expect(s.typed).toEqual(['12']);
+    expect(reads()).toBe(5);
+  });
+});
