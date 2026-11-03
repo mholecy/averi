@@ -24,6 +24,8 @@ Amended 2026-11-03 (D64: without clear, the value must be in what was typed past
 reading — a capped, dropped or misdirected typing whose earlier text holds the value no longer passes; D63's guard
 folded into the rule; residual 8 (A) closed, residual 9 accepted; implemented on `fix/d64-typed-past-prior`).
 Amended 2026-11-03 (batch-10: D61, D63 and D64 proven live — the last paragraph of each of those amendments).
+Amended 2026-11-03 (T3: the eager trailing mark on a full reading numbered, residual 10; g2 and rfe3 filed in
+live-known.ts).
 
 ## Context
 
@@ -817,6 +819,16 @@ characters (the last character typed again after the field dropped it) but the f
 paragraph expects. f15 and g3 ok 3/3 on every source. The regression pass of p1, f13 and g1–g5 as expected: g2 the D53
 MISMATCH on idb and wda and ok on uiautomator, every other case ok. Residual 8 (B) is D64b's, not checked here.
 
+## Amendment: the eager trailing mark on a full reading numbered, g2 and rfe3 filed (2026-11-03, T3)
+
+Consequences lists an eager trailing mark on a FULL reading (`SK31 1200 0000 ` for a typed `SK3112000000`) among the
+rule's false mismatches, `separated` since D53, and the D60 amendment's live proof read it so on the device: g2 and
+rfe3 under idb and WDA, the app holding the value. As D31 numbered the residuals to file rf4, that accepted false
+mismatch is numbered below, residual 10, and filed in scripts/truth/live-known.ts as `ios idb|wda g2` and
+`ios idb|wda rfe3`, `failed-holds` on `refused`. Nothing else changes: no rule, no reply. The records are
+docs/truth/live-records/*-forms-l7-1.json, ios-rn-*-forms-l7-*.json and *-forms-d61-whole.json, replayed by
+tests/truth/live-rejudge.test.ts.
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
@@ -857,3 +869,8 @@ MISMATCH on idb and wda and ok on uiautomator, every other case ok. Residual 8 (
    past it, though the field holds the value. The focus tap leaves the caret at the end (the premise of ADR 0023's
    retype); a caret inside the text that breaks the literal start is judged whole, as before. Remedy: fill with
    `clear: true`.
+10. **A full reading that ends in an eager trailing mark fails `separated`** (Consequences; D53's amendment; numbered by
+   T3's amendment): `SK31 1200 0000 ` for a typed `SK3112000000` — every typed character is there, in order, and the
+   field holds the value, but the trailing mark is no grouping the rules take, so averi refuses it and the reply names
+   the check and the remedy. The safe side: a false mismatch, never a wrong Filled. Filed in live-known.ts as
+   `ios idb|wda g2` and `ios idb|wda rfe3`; on Android g2 passes, the reading judged there having no trailing space.

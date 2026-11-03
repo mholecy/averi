@@ -525,9 +525,10 @@ describe('f16 (D64): digits the date field at its cap keeps only the head of, th
 /**
  * g1–g5 and rfe1–rfe3 (L7): form-grouped's ibanEager (group4eager: a space as soon as a group of four is complete,
  * none at 24) and phoneGrouped (phone3: a leading `+`, the digits in threes, under a `+421` placeholder), and
- * rn-format-eager's E (group4eager on React Native) — D60's eager trailing mark and D37's `+421` grouping field. No device has run them
- * yet: judged over D40's records (form-format's f1 under WDA, rn-format's rf1 under idb), their final state set to what
- * each fill would leave; what each source answers is batch-9's to read.
+ * rn-format-eager's E (group4eager on React Native) — D60's eager trailing mark and D37's `+421` grouping field. Judged here
+ * over D40's records (form-format's f1 under WDA, rn-format's rf1 under idb), their final state set to what each fill
+ * would leave; what each source answered on the device is batch-9's and batch-10's records (tests/truth/
+ * live-rejudge.test.ts): g2 and rfe3 the D53 `separated` MISMATCH under idb and WDA, known since (ADR 0034 residual 10).
  */
 describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421` phone, native and React Native', () => {
   const G_IDS = ['g1', 'g2', 'g3', 'g4', 'g5'];
@@ -627,12 +628,20 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
   it('g2 says its expected MISMATCH by design, as rfe3 does; no other g or rfe case does', async () => {
     const all = [...(await native('ios')), ...(await rn('ios'))];
     expect(all.filter((c) => /expected MISMATCH/.test(c.says)).map((c) => c.id)).toEqual(['g2', 'rfe3']);
-    expect(all.find((c) => c.id === 'g2')!.says).toMatch(/by design on iOS \(idb, wda; D53 `separated`.*Android not yet read/);
+    const g2 = all.find((c) => c.id === 'g2')!.says;
+    expect(g2).toMatch(/by design on iOS \(idb, wda; D53 `separated`/);
+    // Android read since batch-9: ok, the reading judged there had no trailing space.
+    expect(g2).not.toMatch(/not yet read/);
+    expect(g2).toMatch(/ok on Android/);
   });
 
-  it('no outcome guessed: none of g1–g5 or rfe1–rfe3 is known under any source until a device run reads it', () => {
+  it('known as the device read them: g2 and rfe3 under idb and WDA alone, failed-holds on a refusal, ADR 0034 residual 10; none of the others under any source', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
-    const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => [...G_IDS, ...RFE_IDS].filter((id) => knownEntry(platform, source, id) !== undefined)));
-    expect(known).toEqual([]);
+    const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => [...G_IDS, ...RFE_IDS].filter((id) => knownEntry(platform, source, id) !== undefined).map((id) => `${platform} ${source} ${id}`)));
+    expect(known.sort()).toEqual(['ios idb g2', 'ios idb rfe3', 'ios wda g2', 'ios wda rfe3']);
+    for (const key of known) {
+      const [platform, source, id] = key.split(' ');
+      expect(knownEntry(platform, source, id), key).toEqual({ note: expect.stringMatching(/^residual:ADR 0034 residual 10 — /), cls: 'failed-holds', kind: 'refused' });
+    }
   });
 });
