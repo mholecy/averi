@@ -9,7 +9,7 @@ import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
-import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause } from './lab-device.js';
+import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause, withMeasuredPanel } from './lab-device.js';
 import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
@@ -205,8 +205,8 @@ if (rejudging !== undefined) {
           console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
           continue;
         }
-        // The one device read the kf judges rest on (LabState.imeTouchable): a failed read is '' — "no measured panel".
-        if (c.measuresPanel && android !== undefined) launched = { ...launched, imeTouchable: await android.imeTouchable().catch(() => '') };
+        // The one device read the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel).
+        if (c.measuresPanel && android !== undefined) launched = await withMeasuredPanel(launched, android);
         const config = await configFor(source, c);
         const replies: string[] = [];
         const after: (LabState | undefined)[] = [];
