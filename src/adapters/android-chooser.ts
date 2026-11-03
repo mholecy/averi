@@ -26,12 +26,13 @@
  */
 
 /**
- * The two focus lines, in one shell line: `mCurrentFocus` (the focused window, `Window{<hash> u0 <component>}`, or
- * `null` in a transition) and `mFocusedApp` (the focused activity, `ActivityRecord{<hash> u0 <component> t<task>}`).
- * Both are in `dumpsys window displays` on API 29 and later (measured on 33; the API 36 fixture holds them too).
- * When neither prints, grep exits 1 and the call fails: no chooser. Every word a constant.
+ * Each display's focus lines, in one shell line, under its header (`Display: mDisplayId=0 …`): `mCurrentFocus` (the
+ * focused window, `Window{<hash> u0 <component>}`, or `null` in a transition) and `mFocusedApp` (the focused
+ * activity, `ActivityRecord{<hash> u0 <component> t<task>}`; API 29 wraps it in its window token). `dumpsys window
+ * displays` prints one pair per display, on API 29 and later (measured on 33; the API 36 fixture holds them too).
+ * When nothing prints, grep exits 1 and the call fails: no chooser. Every word a constant.
  */
-export const CHOOSER_FOCUS_COMMAND = "dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='";
+export const CHOOSER_FOCUS_COMMAND = "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='";
 
 /** The packages the platform's chooser runs in: the framework's, and the IntentResolver module's (later APIs). */
 const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.intentresolver']);
@@ -45,8 +46,29 @@ const CHOOSER_CLASS = /\.(?:Resolver|Chooser)Activity$/;
 /** The focused window's component; a window named by a title (`Window{… u0 NotificationShade}`) has none. */
 const FOCUS_WINDOW_RE = /mCurrentFocus=Window\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)\}/;
 
-/** The focused activity's component. */
-const FOCUSED_APP_RE = /mFocusedApp=ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+) /;
+/**
+ * The focused activity's component: an ActivityRecord anywhere on the `mFocusedApp` line — the line itself on API 30
+ * and later, inside `AppWindowToken{… token=Token{… ActivityRecord{…}}}` on API 29 (AOSP 10's dump, not captured).
+ */
+const FOCUSED_APP_RE = /mFocusedApp=[^\n]*?ActivityRecord\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+) /;
+
+/** A display's block header in the dump. */
+const DISPLAY_HEADER_RE = /^ *Display: mDisplayId=(\d+)/gm;
+
+/** The id of the default display, where `am start` with no `--display` starts the link. */
+const DEFAULT_DISPLAY = '0';
+
+/**
+ * The default display's block of the dump: from its header to the next header. A dump with no header (lines read
+ * alone) is one display's, whole. A dump with headers and none for display 0 has no block: no chooser.
+ */
+function defaultDisplayBlock(dump: string): string | undefined {
+  const headers = [...dump.matchAll(DISPLAY_HEADER_RE)];
+  if (headers.length === 0) return dump;
+  const i = headers.findIndex((h) => h[1] === DEFAULT_DISPLAY);
+  if (i === -1) return undefined;
+  return dump.slice(headers[i]?.index, headers[i + 1]?.index);
+}
 
 /** Whether `pkg/class` is the platform's chooser. */
 const isChooser = (component: string): boolean => {
@@ -61,10 +83,14 @@ const isChooser = (component: string): boolean => {
  * while the focused window follows once it is drawn (AOSP's reasoning, not measured; batch-9's read found both lines
  * naming the chooser). So right after a start the activity is the newer word: the chooser as the activity under the
  * launcher's or a `null` window is the link's chooser not drawn yet, and an app as the activity under the chooser's
- * window is a chooser on its way out (an earlier one, the link's app resumed over it), which is no chooser.
+ * window is a chooser on its way out (an earlier one, the link's app resumed over it), which is no chooser. Both
+ * lines are read from the default display's block only (defaultDisplayBlock), so they are one display's pair: another
+ * display's chooser is not this link's.
  */
 export function chooserInFocus(dump: string): string | undefined {
-  const component = FOCUSED_APP_RE.exec(dump)?.[1] ?? FOCUS_WINDOW_RE.exec(dump)?.[1];
+  const block = defaultDisplayBlock(dump);
+  if (block === undefined) return undefined;
+  const component = FOCUSED_APP_RE.exec(block)?.[1] ?? FOCUS_WINDOW_RE.exec(block)?.[1];
   return component !== undefined && isChooser(component) ? component : undefined;
 }
 
