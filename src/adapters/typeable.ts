@@ -60,6 +60,12 @@ function named(ch: string): string {
   return codePoint(ch);
 }
 
+/** The wider path's remedy for `text` when that path refuses a character of it too, naming the first; else undefined. */
+function blockedRemedy(text: string, wider: NonNullable<Typeable['widerPath']>): string | undefined {
+  const ch = text.match(wider.refuses)?.[0];
+  return ch === undefined ? undefined : wider.blockedBy(named(ch));
+}
+
 /**
  * The refusal of `text` by `typeable`, or undefined when it can type all of it. The refusal names the FIRST character it
  * cannot type (whole: a surrogate pair is one), never the value around it (a value may be a credential); says nothing
@@ -70,8 +76,6 @@ function named(ch: string): string {
 export function refusalOf(text: string, typeable: Typeable): string | undefined {
   const ch = text.match(typeable.refuses)?.[0];
   if (ch === undefined) return undefined;
-  const wider = typeable.widerPath;
-  const blocking = wider === undefined ? undefined : text.match(wider.refuses)?.[0];
-  const remedy = wider === undefined || blocking === undefined ? typeable.otherPath : wider.blockedBy(named(blocking));
+  const remedy = (typeable.widerPath && blockedRemedy(text, typeable.widerPath)) ?? typeable.otherPath;
   return `cannot type ${named(ch)}: ${typeable.says}. Refused before anything was sent — nothing tapped, cleared or typed. ${remedy}`;
 }
