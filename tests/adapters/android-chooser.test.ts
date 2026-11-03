@@ -7,22 +7,28 @@ import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, chooserInFocus } from '../../src
 // main e734fedf) right after averi's open_deep_link of averilab://shared/open, a link two lab activities handle: the
 // values as recorded, the two-space indent of `dumpsys window displays` restored. The probe kept no more of the dump.
 // The keyboard fixtures are whole `dumpsys window displays` dumps with an app in front.
-// D55r: the dumpsys-window-focus-api33-b10-*.txt fixtures are batch-10's E1 reads (averi_lab, API 33, main 139256a2),
-// CHOOSER_FOCUS_COMMAND's answer as recorded the moment averi's open_deep_link replied ("Opened" each time): -chooser
-// after averilab://shared/open from the launcher with both lines naming the chooser (run 2), -chooser-window-null the
-// one run whose window was still `null` (run 1), -lab-window-null after averilab://cell/open, one handler (control 1).
+// D55r: the dumpsys-window-focus-api33-b10-*.txt fixtures are batch-10's E1 reads (averi_lab, API 33, main 139256a2):
+// CHOOSER_FOCUS_COMMAND as the probe read it right after averi's open_deep_link replied ("Opened" each time; averi's
+// own read was not recorded): -chooser after averilab://shared/open from the launcher with both lines naming the
+// chooser (run 2), -chooser-window-null the one run whose window was still `null` (run 1), -lab-window-null after
+// averilab://cell/open, one handler (control 1).
 
 const fixture = (name: string) => readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
 const RESOLVER = 'android/com.android.internal.app.ResolverActivity';
 const LAB = 'dev.averi.lab/.MainActivity';
+/** The chooser as the focused window, batch-9's record. */
+const CHOOSER_WINDOW = `Window{56b9ca0 u0 ${RESOLVER}}`;
 /** The launcher's focus as batch-9 recorded it before the link (its `homeFocus`). */
 const LAUNCHER_FOCUS = '  mCurrentFocus=Window{9d5e433 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}\n';
 
 /**
  * `mFocusedApp`'s ActivityRecord in each API's shape: API 33 closes the component with a brace
  * (`… <component>} t2590}`: batch-9's and batch-10's every read), API 36 with a space (`… <component> t2}`: the
- * API 36 fixture). Every synthetic test below runs against both.
+ * API 36 fixture). Every synthetic case below that writes an `mFocusedApp` line runs against both.
  */
+/** A read's focus lines alone (`mCurrentFocus`, `mFocusedApp`), in order: its header and blank tail dropped. */
+const focusLines = (read: string) => read.split('\n').filter((line) => /mCurrentFocus=|mFocusedApp=/.test(line));
+
 const SHAPES = [
   ['API 33', (app: string, user = 'u0') => `ActivityRecord{6909a9c ${user} ${app}} t2590}`],
   ['API 36', (app: string, user = 'u0') => `ActivityRecord{6909a9c ${user} ${app} t2590}`],
@@ -50,21 +56,21 @@ describe('chooserInFocus — batch-10\'s reads at averi\'s reply (D55r, API 33, 
   });
 
   it('batch-10\'s brace-shape activity line decides over the chooser\'s window: the lab under it is undefined', async () => {
-    const lab = (await fixture('dumpsys-window-focus-api33-b10-lab-window-null.txt')).split('\n')[2] ?? '';
-    const chooser = (await fixture('dumpsys-window-focus-api33-b10-chooser.txt')).split('\n');
+    const [, lab = ''] = focusLines(await fixture('dumpsys-window-focus-api33-b10-lab-window-null.txt'));
+    const [chooserWindow = ''] = focusLines(await fixture('dumpsys-window-focus-api33-b10-chooser.txt'));
     expect(lab).toBe('  mFocusedApp=ActivityRecord{10e4bcf u0 dev.averi.lab/.MainActivity} t2681}');
-    expect(chooserInFocus([chooser[0], chooser[1], lab, ''].join('\n'))).toBeUndefined();
+    expect(chooserWindow).toContain(`mCurrentFocus=Window{db0395f u0 ${RESOLVER}}`);
+    expect(chooserInFocus(`${chooserWindow}\n${lab}\n`)).toBeUndefined();
   });
 });
 
 describe('chooserInFocus — a whole API 33 dump, with its `Display: mDisplayId=0` header', () => {
-  /** The keyboard-hidden dump with its two focus lines replaced by a recorded pair. */
-  const withFocus = async (pair: string) => {
-    const [window = '', app = ''] = pair.split('\n').filter((line) => /mCurrentFocus=|mFocusedApp=/.test(line));
-    return (await fixture('dumpsys-window-displays-api33-keyboard-hidden.txt'))
-      .replace(/^ {2}mCurrentFocus=.*$/m, window)
-      .replace(/^ {2}mFocusedApp=.*$/m, app);
-  };
+  /** The keyboard-hidden dump with each focus line the given read holds put in place of the dump's own. */
+  const withFocus = async (read: string) =>
+    focusLines(read).reduce(
+      (dump, line) => dump.replace(line.includes('mCurrentFocus=') ? /^ {2}mCurrentFocus=.*$/m : /^ {2}mFocusedApp=.*$/m, line),
+      await fixture('dumpsys-window-displays-api33-keyboard-hidden.txt'),
+    );
 
   it('the keyboard-hidden dump with batch-9\'s chooser pair on its focus lines: the chooser', async () => {
     const dump = await withFocus(await fixture('dumpsys-window-focus-api33-resolver.txt'));
@@ -80,8 +86,7 @@ describe('chooserInFocus — a whole API 33 dump, with its `Display: mDisplayId=
   });
 
   it('the dump\'s own pair, the chooser\'s window over its app activity: undefined — `mFocusedApp` read in the dump', async () => {
-    const dump = (await fixture('dumpsys-window-displays-api33-keyboard-hidden.txt'))
-      .replace(/^ {2}mCurrentFocus=.*$/m, `  mCurrentFocus=Window{56b9ca0 u0 ${RESOLVER}}`);
+    const dump = await withFocus(`  mCurrentFocus=${CHOOSER_WINDOW}\n`);
     expect(dump).toContain('mFocusedApp=ActivityRecord{59ce9b8 u0 com.example.app/.MainActivity} t8}');
     expect(chooserInFocus(dump)).toBeUndefined();
   });
@@ -111,7 +116,13 @@ describe('chooserInFocus — an app, the launcher or no focus in front is no cho
     const cut = `  mCurrentFocus=null\n  mFocusedApp=ActivityRecord{6dd03d6 u0 ${RESOLVER}`;
     expect(chooserInFocus(cut)).toBeUndefined();
     expect(chooserInFocus(`${cut}\n`)).toBeUndefined();
-    expect(chooserInFocus(`  mCurrentFocus=Window{56b9ca0 u0 ${RESOLVER}}\n  mFocusedApp=ActivityRecord{10e4bcf u0 ${LAB}`)).toBe(RESOLVER);
+    expect(chooserInFocus(`  mCurrentFocus=${CHOOSER_WINDOW}\n  mFocusedApp=ActivityRecord{10e4bcf u0 ${LAB}`)).toBe(RESOLVER);
+  });
+});
+
+describe('chooserInFocus — no `mFocusedApp` line: the focused window decides', () => {
+  it('the chooser the focus window and no focused activity line: the chooser', () => {
+    expect(chooserInFocus(`  mCurrentFocus=${CHOOSER_WINDOW}\n`)).toBe(RESOLVER);
   });
 });
 
@@ -139,11 +150,7 @@ describe.each(SHAPES)('chooserInFocus — synthetic `mFocusedApp` lines, the %s 
     });
 
     it('the chooser the focus window, an app the focused activity (a chooser on its way out, the link\'s app resumed): undefined', () => {
-      expect(chooserInFocus(focus(`Window{56b9ca0 u0 ${RESOLVER}}`, LAB))).toBeUndefined();
-    });
-
-    it('the chooser the focus window and no focused activity line: the chooser', () => {
-      expect(chooserInFocus(`  mCurrentFocus=Window{56b9ca0 u0 ${RESOLVER}}\n`)).toBe(RESOLVER);
+      expect(chooserInFocus(focus(CHOOSER_WINDOW, LAB))).toBeUndefined();
     });
 
     it('the focused activity\'s component, when the two lines name two choosers', () => {
@@ -198,14 +205,13 @@ describe.each(SHAPES)('chooserInFocus — synthetic `mFocusedApp` lines, the %s 
     });
 
     it('the chooser the focus window, an app the focused activity (a chooser on its way out): undefined — "Opened"', () => {
-      expect(chooserInFocus(api29(`Window{56b9ca0 u0 ${RESOLVER}}`, LAB))).toBeUndefined();
+      expect(chooserInFocus(api29(CHOOSER_WINDOW, LAB))).toBeUndefined();
     });
   });
 
   describe('one focus pair per display: the default display\'s alone', () => {
     const display = (id: number, window: string, app: string) =>
       `  Display: mDisplayId=${id} (organized)\n  mCurrentFocus=${window}\n  mFocusedApp=${app}\n`;
-    const CHOOSER_WINDOW = `Window{56b9ca0 u0 ${RESOLVER}}`;
     const CHOOSER_APP = record(RESOLVER);
     const LAB_WINDOW = 'Window{c6f91da u0 dev.averi.lab/dev.averi.lab.MainActivity}';
     const LAB_APP = record(LAB);
