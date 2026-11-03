@@ -1,0 +1,7 @@
+Starting: Intent { act=android.intent.action.VIEW dat=https://example.com/... }
+Status: ok
+LaunchState: WARM
+Activity: com.android.chrome/org.chromium.chrome.browser.firstrun.FirstRunActivity
+TotalTime: 141
+WaitTime: 144
+Complete

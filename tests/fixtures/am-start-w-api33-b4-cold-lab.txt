@@ -1,0 +1,7 @@
+Starting: Intent { act=android.intent.action.VIEW dat=averilab://cell/... }
+Status: ok
+LaunchState: COLD
+Activity: dev.averi.lab/.MainActivity
+TotalTime: 253
+WaitTime: 254
+Complete
