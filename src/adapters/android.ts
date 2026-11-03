@@ -801,11 +801,13 @@ export class AndroidAdapter implements DeviceAdapter {
    * virtual key map makes `KeyCharacterMap.getEvents` return null and `input` exit 255 on an NPE — after every
    * character before it has landed, the field half-typed (docs/bugs/2026-10-16-lab-android-type-text-types-a-prefix-
    * then-fails-on-non-ascii.md). Conservative: an extended letter the virtual key map may hold (`é`) is unmeasured, so
-   * refused too.
+   * refused too. No other path types it (D43, ADR 0037's D43 amendment): API 33's shell has no clipboard setter, and
+   * API 34+'s `cmd clipboard` is unmeasured.
    */
   readonly typeable: Typeable = {
     refuses: NOT_PRINTABLE_ASCII,
     says: 'on Android averi types only printable ASCII (U+0020–U+007E): `input text` crashes on another character after typing the ones before it',
+    otherPath: 'averi has no typing path for it on Android (no shell clipboard setter on API 33; ADR 0037): use a value without it, or enter it by hand.',
   };
 
   /** `durationMs` defaults to 300 ms, kept equal to interact/swipe.ts#MIN_DRAG_MS — change both. */

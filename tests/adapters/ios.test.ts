@@ -809,6 +809,83 @@ describe('IosAdapter.typeText — the first key alone, on an app seen dropping a
   });
 });
 
+// D43 (docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-call.md, the D43 amendment): over a
+// tree source that types (IosTreeSource.typeText: WDA's), each typeText is routed by its own characters — idb for every
+// text idb can type, unchanged (the D24 split included); WebDriverAgent's `/wda/keys`, whole, for any other.
+describe('IosAdapter.typeText — routed per call: idb for what idb types, the source\'s typer for the rest (D43)', () => {
+  beforeEach(() => {
+    resetSleeps();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  /** A WDA-kind source with a typer, and an exec, both recording into one log — the order of idb calls, waits and WDA typings. */
+  function routed() {
+    const log: (string | number)[] = [];
+    const fn: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.startsWith('idb ui text')) log.push(...sleeps.splice(0), full);
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    const source: IosTreeSource = {
+      ...WDA_NO_TREE,
+      typeText: async (text: string) => {
+        log.push(...sleeps.splice(0), `wda ${text}`);
+      },
+    };
+    const adapter = new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source });
+    return { adapter, log: () => [...log.splice(0), ...sleeps.splice(0)] };
+  }
+
+  it('an ASCII text goes to idb ui text and never to the source\'s typer', async () => {
+    const { adapter, log } = routed();
+    await adapter.typeText('Jan Novak');
+    expect(log()).toEqual(['idb ui text Jan Novak --udid AAAA-1111']);
+  });
+
+  it('a text idb cannot type goes to the source\'s typer once, whole, and no idb ui text is sent', async () => {
+    const { adapter, log } = routed();
+    await adapter.typeText('Jan Šťastný');
+    expect(log()).toEqual(['wda Jan Šťastný']);
+  });
+
+  it('one character outside idb\'s set is enough: the whole text goes to WDA, never split between the two', async () => {
+    const { adapter, log } = routed();
+    await adapter.typeText('O’Brien');
+    expect(log()).toEqual(['wda O’Brien']);
+  });
+
+  it('"" types nothing on either path', async () => {
+    const { adapter, log } = routed();
+    await adapter.typeText('');
+    expect(log()).toEqual([]);
+  });
+
+  it('in an app seen dropping a tail: ASCII still splits on idb (D24); the WDA path sends one call, with no FIRST_KEY_ALONE_MS wait', async () => {
+    const { adapter, log } = routed();
+    await adapter.launch('com.lab.rn');
+    adapter.noteDroppedTail();
+    resetSleeps();
+    await adapter.typeText('Jan Novak');
+    expect(log()).toEqual(['idb ui text J --udid AAAA-1111', FIRST_KEY_ALONE_MS, 'idb ui text an Novak --udid AAAA-1111']);
+    await adapter.typeText('Jan Šťastný');
+    expect(log()).toEqual(['wda Jan Šťastný']);
+  });
+
+  it('over a source without a typer (idb\'s, the recorded one), a non-ASCII text still goes to idb — as before D43', async () => {
+    const { fn, calls } = fakeExec({});
+    await new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: WDA_NO_TREE }).typeText('Šťastný');
+    expect(calls.at(-1)?.full).toBe('idb ui text Šťastný --udid AAAA-1111');
+  });
+
+  it('a failure of the source\'s typer is the typing\'s failure, as WDA said it', async () => {
+    const source: IosTreeSource = { ...WDA_NO_TREE, typeText: () => Promise.reject(new Error('WDA /wda/keys failed: HTTP 500')) };
+    const { fn, calls } = fakeExec({});
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec: fn, treeSource: source }).typeText('Šťastný')).rejects.toThrow('WDA /wda/keys failed: HTTP 500');
+    expect(calls).toEqual([]);
+  });
+});
+
 // D24 end to end: interact/fill.ts reports what the field showed, the adapter decides how it types — through the real
 // IosAdapter, idb faked: an RN-like field that keeps only the first `keep` characters of each `idb ui text` burst.
 describe('IosAdapter + fillField — a dropped tail on one fill makes the next fill into that app send its first key alone', () => {
