@@ -217,6 +217,12 @@ describe('Clips.axesOf — a scroll view\'s axis and those of the scroll views n
     expect(clipsOf(iphone(box(LOWER)), UIAUTOMATOR).axesOf(LOWER)).toBeUndefined();
   });
 
+  it('a text input is no nested scroll view (D59b): a Compose text field dumps as a scrolling (Horizontal)ScrollView, its role textfield — left out, a scroll view beside it kept', () => {
+    const field = node({ role: 'textfield', rect: rect(24, 300, 354, 60), clipsDescendants: true });
+    const page = scroller(PAGE, 'vertical', field, scroller(CAROUSEL, undefined));
+    expect(clipsOf(iphone(page), UIAUTOMATOR).axesOf(PAGE)).toEqual({ axis: 'vertical', nested: [{ rect: CAROUSEL, axis: undefined }] });
+  });
+
   it("each axis as the tree's dialect reads it: inferred from content on unclipped frames, unknown on cut ones", () => {
     const { tree } = scrollBounded({ axis: 'untold' });
     expect(clipsOf(tree, WDA).axesOf(LOWER)).toEqual({ axis: 'vertical', nested: [] });

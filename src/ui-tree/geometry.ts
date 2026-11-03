@@ -781,7 +781,9 @@ export interface Clips {
    * The axis facts of the scroll view of rect `container` — the first node in tree order that scrolls with exactly
    * that rect, as `DrawOrder.drawnOver` finds its container — for `scroll_until`'s stroke plan
    * (interact/stroke-plan.ts#strokeRoom): the axis it scrolls on, and every scroll view nested in it (its descendants
-   * that scroll, at any depth; one of its own rect left out) with theirs, each as scroll-containers.ts#scrollAxis says
+   * that scroll, at any depth; one of its own rect left out; a text input left out — a Compose text field dumps as a
+   * scrolling (Horizontal)ScrollView, role `textfield`, adapters/android.ts — so a stroke the plan sends inside a nested
+   * scroll view never lands in a field, D59b) with theirs, each as scroll-containers.ts#scrollAxis says
    * on this tree's dialect (`unclipped`), undefined where it cannot tell. Undefined when the tree holds no scroll
    * view of that rect (the list moved). Found as draw order finds its container (scroll-containers.ts#isScrollViewOf).
    * Cost: a walk of the tree to find it on each ask; its facts kept for the life of the `Clips`.
@@ -1095,7 +1097,7 @@ export function clipsOf(tree: UiNode, { ancestry, unclipped = false, cutAtScreen
     if (kept !== undefined) return kept;
     const facts: ScrollAxes = {
       axis: scrollAxis(found, unclipped),
-      nested: [...everyNode(found)].filter((n) => n !== found && scrolls(n) && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
+      nested: [...everyNode(found)].filter((n) => n !== found && scrolls(n) && n.role !== 'textfield' && !sameRect(n.rect, container)).map((n) => ({ rect: { ...n.rect }, axis: scrollAxis(n, unclipped) })),
     };
     axes.set(found, facts);
     return facts;
