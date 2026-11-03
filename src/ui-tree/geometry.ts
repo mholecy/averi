@@ -1,5 +1,5 @@
 import { clips, isScrollViewOf, scrollAxis, scrolls } from './scroll-containers.js';
-import { everyNode, INPUT_ROLE, rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
+import { everyNode, INPUT_ROLE, rectArea, rectCentre, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel, usableSize, zeroRect, type ClippedSide as Edge, type DeviceScreen, type Point, type Rect, type ScrollAxis, type UiNode } from '../adapters/types.js';
 
 /**
  * Geometry questions asked of a normalized UI tree, independent of what the
@@ -509,12 +509,12 @@ export function visibleFractionInViewport(
 }
 
 /**
- * `rectArea`, `rectsOverlap`, `rectIntersection`, `sameRect`, `sameRectWithinPixel` and `sameSizeWithinPixel` live
- * beside `Rect` in adapters/types.ts — the idb tree source and the WDA parser (its keyboard band test,
- * wda-source.ts#isTextEcho) need them and may not import this layer — and are re-exported here, where the rect
- * arithmetic's callers look for them.
+ * `rectArea`, `rectCentre`, `rectsOverlap`, `rectIntersection`, `sameRect`, `sameRectWithinPixel` and
+ * `sameSizeWithinPixel` live beside `Rect` in adapters/types.ts — the idb tree source, the WDA parser (its keyboard
+ * band test, wda-source.ts#isTextEcho) and the system-alert and chooser judges (a button's centre) need them and may
+ * not import this layer — and are re-exported here, where the rect arithmetic's callers look for them.
  */
-export { rectArea, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel };
+export { rectArea, rectCentre, rectIntersection, rectsOverlap, sameRect, sameRectWithinPixel, sameSizeWithinPixel };
 
 /**
  * Is the point inside the rect — left and top inclusive, right and bottom
@@ -565,13 +565,6 @@ export function subtract(from: Rect, cut: Rect): Rect[] {
 /** The largest of `rects` by area — the first of equals; undefined for none. */
 export const largestRect = (rects: readonly Rect[]): Rect | undefined =>
   rects.reduce<Rect | undefined>((best, r) => (best === undefined || rectArea(r) > rectArea(best) ? r : best), undefined);
-
-/**
- * The centre of a rect as a tap presses it: each coordinate rounded to a
- * whole unit, as every tap is sent. selectors.ts#tapPoint is it of a node's
- * rect; draw-order.ts#exposure of the piece a moved tap aims at.
- */
-export const rectCentre = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
 
 /**
  * `box` less the screen's status band (`DeviceScreen.statusBand`, carried as

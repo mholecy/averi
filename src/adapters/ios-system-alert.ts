@@ -1,4 +1,4 @@
-import { everyNode, type Point, type Rect, type SystemAlert, type UiNode } from './types.js';
+import { everyNode, labelOf, rectCentre, type Rect, type SystemAlert, type UiNode } from './types.js';
 
 /**
  * iOS's system alert in a tree — "Open in “AveriLab”?", raised over SpringBoard when a link to an app's own scheme
@@ -66,7 +66,7 @@ export function alertShapeInIdb(elements: readonly IdbAlertElement[]): SystemAle
   const listed: SystemAlert['buttons'][number][] = [];
   for (const b of buttons) {
     if (typeof b.AXLabel !== 'string' || b.AXLabel === '' || b.frame === undefined) return undefined;
-    listed.push({ label: b.AXLabel, centre: centreOf(b.frame) });
+    listed.push({ label: b.AXLabel, centre: rectCentre(b.frame) });
   }
   return { title, buttons: listed };
 }
@@ -100,7 +100,7 @@ function alertOfLayer(layer: UiNode): SystemAlert | undefined {
   const inside = [...everyNode(layer)];
   const title = labelOf(inside.find((n) => n.presentationElement === true)) ?? labelOf(inside.find((n) => n.role === 'text' && labelOf(n) !== undefined));
   if (title === undefined) return undefined;
-  const buttons = inside.filter((n) => n.role === 'button' && n.hidden !== true && labelOf(n) !== undefined).map((b) => ({ label: b.label!, centre: centreOf(b.rect) }));
+  const buttons = inside.filter((n) => n.role === 'button' && n.hidden !== true && labelOf(n) !== undefined).map((b) => ({ label: b.label!, centre: rectCentre(b.rect) }));
   return buttons.length === 0 ? undefined : { title, buttons };
 }
 
@@ -131,8 +131,3 @@ export const ALERT_ADVICE =
   'Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps nothing itself); ' +
   'every launch stays behind the alert until it is answered';
 
-/** A rect's centre in whole points — where a tap lands. */
-const centreOf = (r: Rect): Point => ({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
-
-/** A non-empty label, or undefined. */
-const labelOf = (n: UiNode | undefined): string | undefined => (n?.label !== null && n?.label !== undefined && n.label !== '' ? n.label : undefined);

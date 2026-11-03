@@ -4,13 +4,13 @@ import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
 import { causeOf, refusalReasons, runStart, startSaid, type StartRefused } from './android-start.js';
-import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, launchChooserNote, monkeyChooserRefusal } from './android-chooser.js';
+import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet, launchChooserNote, monkeyChooserRefusal } from './android-chooser.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOutcome, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ScreenCapture, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOutcome, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ChooserSheet, type LinkChooser, type ScreenCapture, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -52,6 +52,12 @@ const FOCUSED_WINDOW_TIMEOUT_MS = 2_000;
  * bound, as the other focus reads'.
  */
 const CHOOSER_FOCUS_TIMEOUT_MS = 2_000;
+/**
+ * The chooser's one tree read once the focus read named it (D55c, chooserSheetInFront): twice the ≈ 2.5 s a
+ * uiautomator dump takes on the lab — the chooser's own three dumps took 2514, 2020 and 2054 ms (batch-11's E2), and
+ * scroll_until's 2.2–2.5 s (lab fact 15) — under waitForIdle's 10 s give-up. Past it, no sheet: the reply is D55's.
+ */
+const CHOOSER_TREE_TIMEOUT_MS = 5_000;
 
 /**
  * typeText's wait after each character's `input text` call. Measured on Compose (and, in the 2026-10-31 run, React
@@ -387,8 +393,9 @@ export class AndroidAdapter implements DeviceAdapter {
     // Android's chooser, and am reports it `started` (batch-11: 10 of 10). So D55's one focus read after a `-p` start
     // (≈ 70 ms measured, batch-11) — never after `-n`, which names the activity and cannot raise it. The chooser named
     // is a ⚠ note under "Launched" (D56's shape on iOS: the start happened); a failed or unmatched read is `{}`.
+    // D55c: the chooser named, one dump of its tree quotes its sheet in the note (linkChooserInFront; none: D55b's note).
     if (component !== undefined) return {};
-    const chooser = await this.chooserInFront();
+    const chooser = await this.linkChooserInFront();
     return chooser === undefined ? {} : { note: launchChooserNote(packageName, chooser, NAME_THE_ACTIVITY) };
   }
 
@@ -420,8 +427,21 @@ export class AndroidAdapter implements DeviceAdapter {
     // "Open with" chooser, which am reports as `started` (android-start.ts; measured, batch-9 D55): so ONE focus read
     // after the start asks whether the chooser is in front (D55, android-chooser.ts; ADR 0041). Only a positive
     // match changes the outcome; a failed or unreadable read, or a chooser not in front yet, is today's `{}`.
-    const chooser = await this.chooserInFront();
-    return chooser === undefined ? {} : { chooser: { component: chooser } };
+    // D55c: the chooser named, one dump of its tree quotes its sheet (linkChooserInFront); none is D55's `{ component }`.
+    const chooser = await this.linkChooserInFront();
+    return chooser === undefined ? {} : { chooser };
+  }
+
+  /**
+   * The chooser after averi's own start (openDeepLink, a `-p` launch): the focus read (chooserInFront) and, only once
+   * it named the chooser, the one dump of its tree (chooserSheetInFront, D55c) — `{ component, sheet? }`, or undefined
+   * when the focus names no chooser. monkey's refusal asks chooserInFront alone.
+   */
+  private async linkChooserInFront(): Promise<LinkChooser | undefined> {
+    const component = await this.chooserInFront();
+    if (component === undefined) return undefined;
+    const sheet = await this.chooserSheetInFront();
+    return { component, ...(sheet !== undefined && { sheet }) };
   }
 
   /**
@@ -436,6 +456,34 @@ export class AndroidAdapter implements DeviceAdapter {
     } catch {
       return undefined;
     }
+  }
+
+  /**
+   * The chooser's sheet (android-chooser.ts#chooserSheet) from ONE `uiautomator dump`, asked only once chooserInFront
+   * named the chooser (D55c; ADR 0041's D55c amendment). Its own 5 s bound (CHOOSER_TREE_TIMEOUT_MS), and never
+   * uiTree(): its 15 s bound, its "null root node" retry and its diagnosis (an `adb get-state`) are the costs of a read
+   * the caller needs, not of an optional enrichment. ≈ 2–2.5 s on the chooser path only — the ui_snapshot today's
+   * advice sends the agent to is the same dump. Never throws: a failed, timed-out or XML-less dump, or a tree that is
+   * not the measured layout, is undefined, and the reply is D55's (or D55b's) byte for byte.
+   */
+  private async chooserSheetInFront(): Promise<ChooserSheet | undefined> {
+    try {
+      const raw = (await this.execOut(['uiautomator', 'dump', '/dev/tty'], { timeoutMs: CHOOSER_TREE_TIMEOUT_MS })).stdout.toString('utf8');
+      const tree = this.dumpedTree(raw);
+      return tree === undefined ? undefined : chooserSheet(tree);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * The tree in a `uiautomator dump /dev/tty`'s output: the XML up to its last `>`, parsed (uiautomator appends a status
+   * line after it); undefined when the output holds no XML (its status alone: `null root node`, `Killed`, nothing).
+   * Throws what the parser throws. uiTree's and chooserSheetInFront's one reading of a dump.
+   */
+  private dumpedTree(raw: string): UiNode | undefined {
+    const xmlEnd = raw.lastIndexOf('>');
+    return xmlEnd === -1 ? undefined : parseUiautomatorXml(raw.slice(0, xmlEnd + 1), this.drawnOverStrip);
   }
 
   /**
@@ -513,8 +561,8 @@ export class AndroidAdapter implements DeviceAdapter {
         }
         throw e;
       }
-      const xmlEnd = raw.lastIndexOf('>');
-      if (xmlEnd !== -1) return parseUiautomatorXml(raw.slice(0, xmlEnd + 1), this.drawnOverStrip);
+      const tree = this.dumpedTree(raw);
+      if (tree !== undefined) return tree;
       const status = raw.trim().slice(0, 200);
       // "null root node" is uiautomator saying the app has no window to dump YET
       // (cold launch, ~2-3 s; mid-animation). The one-shot MCP tools opt into a

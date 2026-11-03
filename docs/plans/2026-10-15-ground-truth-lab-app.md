@@ -490,7 +490,8 @@ truth corpus and the golden do not move: an uncaptured cell makes no golden row)
   count is read from the state's existing `strokes` list (no counter of its own); RecyclerView and PagerSnapHelper
   come in through material's dependency (compiled offline), no explicit `androidx.recyclerview` line.
 - The Android manifest: `averilab://shared` resolves to two components (MainActivity and its alias `.Twin`) — D55's
-  second handler; `averilab://cell` keeps one.
+  second handler; `averilab://cell` keeps one. `averilab://pair` (D55c) has the same two handlers, for a fresh
+  chooser: `shared`'s keeps a last-chosen entry since batch-11 (fact 5 below). Neither opens a cell.
 
 The three apps spell the two formats alike (Forms.kt, Forms.swift, the RN app's src/format.ts); the table is
 tests/truth/lab-format.test.ts. batch-9 read the cases on the device; g2 and rfe3 are filed in live-known.ts since T3,
