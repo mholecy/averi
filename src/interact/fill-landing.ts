@@ -313,10 +313,11 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
   if (hasBullet(observed)) return { kind: 'length' };
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   const tail = tailOf(observed, e);
-  if (landedSome(tail) && tail.reformatted !== undefined) {
-    return { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 };
-  }
   const held = heldText(observed, e.placeholder);
+  if (landedSome(tail) && tail.reformatted !== undefined) {
+    const dropped = { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 } as const;
+    return wholeLandingToo(held, e) ? { ...dropped, wholeToo: true } : dropped;
+  }
   // D53: every typed character there, in order, with separators the rules refused as grouping — never "a length".
   const added = overPriors(held, e, (whole) => separatedOf(held, whole));
   if (added !== undefined) return { kind: 'separated', added };

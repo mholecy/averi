@@ -343,10 +343,12 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
   'same-length': ({ positions }) =>
     ` — as many characters as were typed, ${positions} differing: ` +
     'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
-  'dropped-tail': ({ landed, dropped, grouped }) =>
+  'dropped-tail': ({ landed, dropped, grouped, wholeToo }) =>
     ` — the first ${landed === 1 ? '1 typed character is' : `${landed} typed characters are`} there, ` +
     (grouped ? 'grouped by the field (separators of its own added)' : 'its spaces shown as another kind of space') +
     `, the last ${dropped} did not land: dropped, or refused by the field (a length cap, a character it does not take) — ` +
+    // D64 review round 2: the reading is a whole landing too (fill-landing.ts#wholeLandingToo), nothing typed again
+    (wholeToo ? 'or the field replaced its text (select-all): fill with `clear: true` — ' : '') +
     'not a transformed input; content withheld from this error',
   // D53: the marks as fill-reformat.ts#SEPARATORS holds them (a test pins the two agree); the check before the remedy —
   // typing `12.34` into a cents mask passes and means 12.34.
