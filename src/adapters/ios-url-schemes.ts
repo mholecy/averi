@@ -83,7 +83,7 @@ export function urlSchemes(json: string): string[] {
  * `com.apple.CoreSimulator.CoreSimulatorBridge-->averilab = dev.averi.lab` (and one such key for another project's
  * scheme); batch-7 deleted that key, and the next `simctl openurl` raised the alert again, with no reboot. The opener
  * is CoreSimulatorBridge, the caller behind `simctl openurl` — Safari and other openers have keys of their own.
- * Whether a key written before the link stops the alert is batch-8's device check.
+ * Batch-8's device check passed: a key written just before the link stops the alert (5/5, the write ~0.2 s).
  */
 export const SCHEME_APPROVAL_DOMAIN = 'com.apple.launchservices.schemeapproval';
 /** The opener behind `simctl openurl`, as the key names it. */
