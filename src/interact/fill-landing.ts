@@ -118,12 +118,11 @@ export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInp
  * `priorsOf`'s, as for a reformat (review round 1, M-1): a reading whose letters and digits are exactly the value's and
  * no start of the earlier text's plus the value's is judged as the value alone too (D61) — a field that adds a leading
  * `+` under idb's unnamed `+421` (`+421903123456`), a select-all field that adds a mark (`SK31 ` after `SK3`, `50%`
- * after `5`). D63 at its limit: a reading still
- * the earlier text holds nothing past it (`unchanged`, a field that refused the keys or never got them). The value
- * itself is excepted: a reading that is both the earlier text and the value cannot be told from a select-all field
- * that retyped it, or a placeholder equal to it — it still lands (ADR 0034's D63 amendment, residual 7). The limit, on
- * the safe side: the caret at the start, with a typing that re-forms the earlier text (`aba` for `ab` after `a`), is
- * refused (ADR 0034's D64 amendment).
+ * after `5`). D63's rule is this one at its limit (`landingOf`). The value itself is excepted: a reading that is both
+ * the earlier text and the value cannot be told from a select-all field that retyped it, or a placeholder equal to it
+ * — it still lands (ADR 0034's D63 amendment, residual 7). The limit, on the safe side: a caret not at the end whose
+ * typing leaves the reading starting with the earlier text (`aba` for `ab` after `a`) is refused (ADR 0034's D64
+ * amendment, residual 9).
  */
 function showsExactly(observed: string, e: Expectation): boolean {
   const { value, clear } = e;
