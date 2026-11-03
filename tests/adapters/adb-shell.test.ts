@@ -118,7 +118,12 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     const { fn, commands } = deviceShExec();
     const url = "app://login?a=1&b=2;echo x $HOME 'q'";
     await new AndroidAdapter({ drawnOverStrip, serial: 'e', exec: fn }).openDeepLink(url);
-    expect(commands).toEqual([['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url]]);
+    // Then D55's focus read (android-chooser.ts), every word a constant: the url is in none of it. Its pipe runs on
+    // the device, so only grep's record reaches stdout (dumpsys's went into the pipe), as for the keyboard witness.
+    expect(commands).toEqual([
+      ['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url],
+      ['grep', '-E', 'mCurrentFocus=|mFocusedApp='],
+    ]);
   });
 
   it('launch: intent data and extras (keys and values) arrive whole', async () => {
