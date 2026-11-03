@@ -92,16 +92,27 @@ export type FetchFn = (
 
 const defaultFetch: FetchFn = (url, init) => fetch(url, init);
 
+/** A W3C error body's `value.error` and `value.message`, where they are strings — parsed once, here. */
+interface WdaError {
+  readonly error?: string;
+  readonly message?: string;
+}
+
+function wdaErrorOf(body: unknown): WdaError {
+  const value = (body as { value?: { error?: unknown; message?: unknown } } | null | undefined)?.value;
+  return {
+    ...(typeof value?.error === 'string' && { error: value.error }),
+    ...(typeof value?.message === 'string' && { message: value.message }),
+  };
+}
+
 /**
- * WDA's error answer as a reply says it: the status, and the W3C body's `value.error`; its `value.message` (cut to 200
- * characters) only `withMessage` — never for `/wda/keys`, whose message is NSError's description and may hold the typed
- * value, escaped (`\U0161`) or in part, where no cut of the text can find it (review round 1).
+ * An error answer as a reply says it: the status, WDA's `error`, and its `message` (cut to 200 characters) when given.
+ * `/wda/keys` never passes the message: it is NSError's description and may hold the typed value, escaped (`\U0161`) or
+ * in part, where no cut of the text can find it (review round 1).
  */
-function wdaAnswer(status: number, body: unknown, withMessage: boolean): string {
-  const value = (body as { value?: { error?: unknown; message?: unknown } } | undefined)?.value;
-  const error = typeof value?.error === 'string' ? ` ${value.error}` : '';
-  const message = withMessage && typeof value?.message === 'string' ? value.message : '';
-  return `HTTP ${status}${error}${message === '' ? '' : `: ${message.slice(0, 200)}`}`;
+function describeWdaError(status: number, { error, message }: WdaError): string {
+  return `HTTP ${status}${error === undefined ? '' : ` ${error}`}${message === undefined || message === '' ? '' : `: ${message.slice(0, 200)}`}`;
 }
 
 /** Structural subset of node's ChildProcess — injectable for tests. */
@@ -338,7 +349,7 @@ export class WdaServer {
       answer = await this.postKeys(await this.sessionId(), text);
     }
     if (answer.kind === 'typed') return;
-    throw new Error(`WDA /wda/keys failed: ${wdaAnswer(answer.status, answer.body, false)} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`);
+    throw new Error(`WDA /wda/keys failed: ${describeWdaError(answer.status, { error: answer.error })} ${this.where()}`);
   }
 
   /** This WDA start's session for keys(): the one made on it, or a new one (KEYS_SESSION), single-flight. */
@@ -363,7 +374,7 @@ export class WdaServer {
     }
     const body = (await res.json().catch(() => undefined)) as { sessionId?: unknown; value?: { sessionId?: unknown } } | undefined;
     const id = body?.sessionId ?? body?.value?.sessionId;
-    if (!res.ok || typeof id !== 'string' || id === '') throw new Error(`WDA POST /session failed: ${wdaAnswer(res.status, body, true)} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`);
+    if (!res.ok || typeof id !== 'string' || id === '') throw new Error(`WDA POST /session failed: ${describeWdaError(res.status, wdaErrorOf(body))} ${this.where()}`);
     return id;
   }
 
@@ -371,7 +382,7 @@ export class WdaServer {
    * One `/wda/keys` on `session`, never sent again here: `typed`; `lost` — the session is gone (HTTP 404 or "invalid
    * session id"), nothing typed; `refused` — any other error answer. A request that did not complete throws.
    */
-  private async postKeys(session: string, text: string): Promise<{ kind: 'typed' } | { kind: 'lost' | 'refused'; status: number; body: unknown }> {
+  private async postKeys(session: string, text: string): Promise<{ kind: 'typed' } | { kind: 'lost' | 'refused'; status: number; error?: string }> {
     let res: Awaited<ReturnType<FetchFn>>;
     try {
       res = await this.post(`/session/${session}/wda/keys`, { value: [...text] }, keysTimeoutMs([...text].length));
@@ -385,8 +396,8 @@ export class WdaServer {
     }
     const body = await res.json().catch(() => undefined); // read on success too: an unread body holds the connection
     if (res.ok) return { kind: 'typed' };
-    const error = (body as { value?: { error?: unknown } } | undefined)?.value?.error;
-    return { kind: res.status === 404 || error === 'invalid session id' ? 'lost' : 'refused', status: res.status, body };
+    const { error } = wdaErrorOf(body);
+    return { kind: res.status === 404 || error === 'invalid session id' ? 'lost' : 'refused', status: res.status, ...(error !== undefined && { error }) };
   }
 
   /** A JSON POST of `route` under `timeoutMs`; a request that did not complete throws as fetch threw it. */
@@ -423,7 +434,7 @@ export class WdaServer {
   private body(route: string, res: Awaited<ReturnType<FetchFn>>): Promise<unknown> {
     if (!res.ok) {
       throw new Error(
-        `WDA ${route} failed: HTTP ${res.status} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`,
+        `WDA ${route} failed: HTTP ${res.status} ${this.where()}`,
       );
     }
     return res.json();
@@ -587,6 +598,11 @@ export class WdaServer {
     }
     this.inflight = undefined;
     this.killChild();
+  }
+
+  /** The tail of a failure that names where: `on port … (udid …) — xcodebuild log: …`. */
+  private where(): string {
+    return `on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`;
   }
 
   private baseUrl(): string {
