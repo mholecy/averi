@@ -22,8 +22,9 @@ import { errorMessage } from '../util/error-message.js';
  * - readiness = `GET /status` 200 with
  *   value.build.productBundleIdentifier === com.facebook.WebDriverAgentRunner.
  *
- * Only the tree read lives here; taps/typing/install stay on idb/simctl
- * (WDA input would drag in session management — plan, decision 4).
+ * The tree read lives here, and since D43 the typing of what idb cannot type (keys(): one WebDriver session per WDA
+ * start, the one session averi holds — docs/adr/0037-a-value-the-adapter-cannot-type-is-refused-before-any-device-
+ * call.md, the D43 amendment); taps, every other typing and install stay on idb/simctl (plan, decision 4).
  */
 
 const WDA_BUNDLE_ID = 'com.facebook.WebDriverAgentRunner';
@@ -47,6 +48,23 @@ const SOURCE_TIMEOUT_MS = 30_000;
  * 30 s would let a wedged runner hold it. A read past it is no alert: the reply falls back to its note.
  */
 export const SYSTEM_ALERT_SOURCE_TIMEOUT_MS = 2_000;
+/**
+ * `POST /session`'s budget (D43): no app is launched (no bundleId), so WDA only resets its settings — 2–3 ms measured
+ * (batch-10's G3 and G4); 10 s is a wedged runner, not a slow one.
+ */
+const SESSION_TIMEOUT_MS = 10_000;
+/**
+ * `/wda/keys`' budget (D43), by the text's length in characters: batch-10's G3 measured ~300 ms + ~16 ms a character
+ * (XCTest's 60 characters a second), 967 ms at 40; this gives each part about three times that — 2 s + 50 ms a
+ * character, 4 s at 40.
+ */
+export const keysTimeoutMs = (characters: number): number => 2_000 + 50 * characters;
+/**
+ * The session a typing is sent on (D43): no software keyboard forced into view, so averi's keyboard readings (the WDA
+ * keyboard band, `keyboardDismiss`) are not changed by the first non-ASCII fill — batch-10's G4: the keyboard prefs,
+ * the three simulator domains and the sessionless /source unchanged, and `/wda/keys` types with no keyboard shown.
+ */
+export const KEYS_SESSION = { capabilities: { alwaysMatch: { forceSimulatorSoftwareKeyboardPresence: false }, firstMatch: [{}] } };
 /** Post-build: the first app-install on the simulator dominates this. */
 const READY_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 500;
@@ -66,13 +84,25 @@ const SHUTDOWN_LSOF_MS = 300;
 const FIRST_BUILD_NOTE =
   'Note: the first WDA build per Xcode version takes minutes (cached in DerivedData afterwards).';
 
-/** Structural subset of global fetch — injectable for tests. */
+/** Structural subset of global fetch — injectable for tests. A GET passes `signal` alone; keys()' POSTs add the rest. */
 export type FetchFn = (
   url: string,
-  init?: { signal?: AbortSignal },
+  init?: { signal?: AbortSignal; method?: 'GET' | 'POST'; headers?: Record<string, string>; body?: string },
 ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 
 const defaultFetch: FetchFn = (url, init) => fetch(url, init);
+
+/**
+ * WDA's error answer as a reply says it: the status, and the W3C body's `value.error` and `value.message` (cut to 200
+ * characters) when it has them — with every occurrence of `text`, the typed value, replaced by `…`.
+ */
+function wdaAnswer(status: number, body: unknown, text?: string): string {
+  const value = (body as { value?: { error?: unknown; message?: unknown } } | undefined)?.value;
+  const error = typeof value?.error === 'string' ? ` ${value.error}` : '';
+  let message = typeof value?.message === 'string' ? value.message : '';
+  if (text !== undefined && text !== '') message = message.split(text).join('…');
+  return `HTTP ${status}${error}${message === '' ? '' : `: ${message.slice(0, 200)}`}`;
+}
 
 /** Structural subset of node's ChildProcess — injectable for tests. */
 export interface WdaChild {
@@ -193,6 +223,11 @@ export class WdaServer {
    * the NEW value, so a stopped server can be legitimately restarted.
    */
   private stopEpoch = 0;
+  /**
+   * keys()' WebDriver session and the WDA start (upGeneration) it was made on — or the making of it, in flight. It dies
+   * with that runner, so a start under another number makes a new one; stop() and shutdown() forget it.
+   */
+  private session: { generation: number; id: Promise<string> } | undefined;
 
   constructor(opts: WdaServerOptions) {
     this.udid = opts.udid;
@@ -279,6 +314,87 @@ export class WdaServer {
   async quickSourceIfUp(): Promise<unknown> {
     if (this.upGeneration() === undefined) return undefined;
     return this.askOnce('/source?format=json', SYSTEM_ALERT_SOURCE_TIMEOUT_MS, '/source');
+  }
+
+  /**
+   * Types `text` into whatever holds keyboard focus: `POST /session/:id/wda/keys` (D43, WDA 16.1.7's FBTypeText — no
+   * element, no focus check, like `idb ui text`; it returns once the events are delivered, batch-10's G1: 20/20 whole on
+   * the read right after). Starts WDA when it is not up (ensureRunning), then sends on this start's session, made once
+   * (KEYS_SESSION).
+   * - A lost session — HTTP 404 or "invalid session id", what a restarted runner answers with nothing typed (G4) — is
+   *   made again once and the text sent once more; a second loss fails.
+   * - A request that did not complete (its budget, keysTimeoutMs, ran out, or the connection went) is NEVER sent again:
+   *   it may have typed part of the text, and a retry could type it twice. It fails saying so.
+   * - Any other error answer fails quoting WDA's error and message — with the text cut out of it: a value may be a
+   *   credential — naming the port and the log, as askOnce does.
+   */
+  async keys(text: string): Promise<void> {
+    await this.ensureRunning();
+    let answer = await this.postKeys(await this.sessionId(), text);
+    if (answer.kind === 'lost') {
+      this.session = undefined;
+      answer = await this.postKeys(await this.sessionId(), text);
+    }
+    if (answer.kind === 'typed') return;
+    throw new Error(`WDA /wda/keys failed: ${wdaAnswer(answer.status, answer.body, text)} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`);
+  }
+
+  /** This WDA start's session for keys(): the one made on it, or a new one (KEYS_SESSION), single-flight. */
+  private sessionId(): Promise<string> {
+    const generation = this.upGeneration() ?? -1;
+    if (this.session?.generation !== generation) {
+      const id = this.newSession();
+      this.session = { generation, id };
+      id.catch(() => {
+        if (this.session?.id === id) this.session = undefined;
+      });
+    }
+    return this.session.id;
+  }
+
+  private async newSession(): Promise<string> {
+    let res: Awaited<ReturnType<FetchFn>>;
+    try {
+      res = await this.post('/session', KEYS_SESSION, SESSION_TIMEOUT_MS);
+    } catch (err) {
+      throw new Error(`WDA POST /session request failed on port ${this.port} (udid ${this.udid}): ${errorMessage(err)} — xcodebuild log: ${this.logPath}`, { cause: err });
+    }
+    const body = (await res.json().catch(() => undefined)) as { sessionId?: unknown; value?: { sessionId?: unknown } } | undefined;
+    const id = body?.sessionId ?? body?.value?.sessionId;
+    if (!res.ok || typeof id !== 'string' || id === '') throw new Error(`WDA POST /session failed: ${wdaAnswer(res.status, body)} on port ${this.port} (udid ${this.udid}) — xcodebuild log: ${this.logPath}`);
+    return id;
+  }
+
+  /**
+   * One `/wda/keys` on `session`, never sent again here: `typed`; `lost` — the session is gone (HTTP 404 or "invalid
+   * session id"), nothing typed; `refused` — any other error answer. A request that did not complete throws.
+   */
+  private async postKeys(session: string, text: string): Promise<{ kind: 'typed' } | { kind: 'lost' | 'refused'; status: number; body: unknown }> {
+    let res: Awaited<ReturnType<FetchFn>>;
+    try {
+      res = await this.post(`/session/${session}/wda/keys`, { value: [...text] }, keysTimeoutMs([...text].length));
+    } catch (err) {
+      throw new Error(
+        `WDA /wda/keys did not complete on port ${this.port} (udid ${this.udid}): ${errorMessage(err)} — it may have typed ` +
+          `part of the text, so it is not sent again (a retry could type it twice); read the field before typing more. ` +
+          `xcodebuild log: ${this.logPath}`,
+        { cause: err },
+      );
+    }
+    const body = await res.json().catch(() => undefined); // read on success too: an unread body holds the connection
+    if (res.ok) return { kind: 'typed' };
+    const error = (body as { value?: { error?: unknown } } | undefined)?.value?.error;
+    return { kind: res.status === 404 || error === 'invalid session id' ? 'lost' : 'refused', status: res.status, body };
+  }
+
+  /** A JSON POST of `route` under `timeoutMs`; a request that did not complete throws as fetch threw it. */
+  private post(route: string, body: unknown, timeoutMs: number): ReturnType<FetchFn> {
+    return this.fetchFn(`${this.baseUrl()}${route}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   }
 
   /** One GET of a running WDA under `timeoutMs`, no start and no retry; fails naming `name` (the route), the port and the log. */
@@ -462,6 +578,7 @@ export class WdaServer {
    */
   stop(): void {
     this.stopEpoch++;
+    this.session = undefined; // it dies with the runner
     if (this.exitHook) {
       process.removeListener('exit', this.exitHook);
       this.exitHook = undefined;

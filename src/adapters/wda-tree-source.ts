@@ -147,6 +147,22 @@ export class WdaTreeSource implements IosTreeSource {
     return payload === undefined ? undefined : alertInWda(parseWdaSourceValue(payload));
   }
 
+  /**
+   * Types `text` into whatever holds keyboard focus through WebDriverAgent (D43, ADR 0037's D43 amendment):
+   * WdaServer.keys — a session per WDA start, one retry on a lost session, none after a request that did not complete.
+   * IosAdapter sends only what idb cannot type (ios-typing.ts#typingPathOf). Starts WDA when it is not up, as read()
+   * does. Released → the released error, nothing sent; a failure after dispose is the release, as read()'s.
+   */
+  async typeText(text: string): Promise<void> {
+    if (this.disposed) throw this.released();
+    try {
+      await this.server.keys(text);
+    } catch (err) {
+      if (this.disposed) throw this.released(err);
+      throw err;
+    }
+  }
+
   private released(cause?: unknown): Error {
     return new Error(
       `The WebDriverAgent tree source for simulator ${this.udid} has been released — ` +
