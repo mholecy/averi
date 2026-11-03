@@ -274,8 +274,12 @@ export function droppedTail(observed: string, e: TextExpectation): string | unde
  * alphabets: no reading that a select-all field, a caret anywhere in the earlier text, or a leading or trailing mark
  * makes of a whole landing is typed into again.
  */
-const wholeLandingToo = (held: string, e: TextExpectation): boolean =>
-  held.indexOf(e.value, priorText(e).length - e.value.length + 1) !== -1 || (held.includes(e.value) && skeleton(held) === skeleton(e.value));
+function wholeLandingToo(held: string, e: TextExpectation): boolean {
+  // The first index an occurrence of the value can start at and still end past the earlier text; a negative start is
+  // read from 0 by indexOf.
+  const firstEndPastPrior = priorText(e).length - e.value.length + 1;
+  return held.indexOf(e.value, firstEndPastPrior) !== -1 || (held.includes(e.value) && skeleton(held) === skeleton(e.value));
+}
 
 /**
  * What can be said of a reading that missed the value — ONE classification of the kinds (fill-facts.ts#Difference),
