@@ -136,8 +136,9 @@ describe('chooserInFocus — one focus pair per display: the default display\'s 
     expect(chooserInFocus(display(1, CHOOSER_WINDOW, CHOOSER_APP) + display(0, LAB_WINDOW, LAB_APP))).toBeUndefined();
   });
 
-  it('headers but no display 0: undefined', () => {
-    expect(chooserInFocus(display(1, CHOOSER_WINDOW, CHOOSER_APP))).toBeUndefined();
+  it('no display 0 among the headers: the first display\'s pair', () => {
+    expect(chooserInFocus(display(1, CHOOSER_WINDOW, CHOOSER_APP) + display(2, LAB_WINDOW, LAB_APP))).toBe(RESOLVER);
+    expect(chooserInFocus(display(10, LAB_WINDOW, LAB_APP) + display(1, CHOOSER_WINDOW, CHOOSER_APP))).toBeUndefined();
   });
 });
 
