@@ -3,7 +3,8 @@
  * Until then that was judged in four modules by three rules of the earlier text, and D28 and D29 were both bugs of
  * the typing and the verdict judging the same reading differently. Three questions, one answer each:
  * - `landingOf`: did this reading land — exactly, reformatted, or only as the field's placeholder — or is it a masked
- *   reading that proves the field was wrongly said plain?
+ *   reading that proves the field was wrongly said plain? Without clear, a reading unchanged since typing began has not
+ *   landed unless it is the value itself (D63).
  * - `tailOf` (and `droppedTail`): is it a strict prefix of what the field should hold — the tail a field dropped?
  * - `differenceOf`: what can be said of a reading that missed, without content?
  * interact/fill-type.ts asks the first two as it types, polls and retypes; it asks the third once, for a typing that
@@ -60,6 +61,8 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
 /**
  * Whether a reading landed, and how; undefined when it did not. The rules:
  * - a non-input proves it took the text only by CHANGING to show it (`tookText`);
+ * - without clear, a reading still exactly what the field showed when typing began has not landed, unless it is the
+ *   value itself (`unchangedSinceTyping`, D63);
  * - a field that reformats as it is typed (D18) lands when it shows what it should hold — its earlier text, unless
  *   cleared, then the value — every typed character in order, separators of its own added (`landedReformat`);
  * - else the reading must show the value exactly (`showsExactly`): with clear the whole reading, without it inside what
@@ -69,6 +72,7 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
  */
 export function landingOf(observed: string, e: Expectation): Landing | undefined {
   if (!tookText(observed, e)) return undefined;
+  if (unchangedSinceTyping(observed, e)) return undefined;
   const reformatted = landedReformat(observed, e);
   if (reformatted === undefined && !showsExactly(observed, e)) return undefined;
   if (bulletsSaidPlain(observed, e) && observed.length !== e.value.length) return { kind: 'said-plain' };
@@ -86,6 +90,18 @@ export function landingOf(observed: string, e: Expectation): Landing | undefined
  */
 export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInput' | 'resolvedValue'>): boolean =>
   e.isInput || (observed !== e.resolvedValue && (isMaskedValue(observed) || observed.includes(e.value)));
+
+/**
+ * D63: without clear, a reading still exactly what the field showed when typing began has not landed — unless it is the
+ * value itself. `tookText`'s rule for a non-input, extended to an input typed without clear: the exact rule asks only
+ * that the reading CONTAIN the value, and an earlier text that already held it passed with nothing typed into the field
+ * — a field that refused the keys (a length cap: the lab's date `31.12.2026` typed `2026`), keys that went into another
+ * input, idb's unnamed placeholder holding the value (`+421` typed `421`). The poll then reads on, and a typing that
+ * never reached the field ends on `differenceOf`'s `unchanged`. The value itself is excepted: a reading that is both
+ * the earlier text and the value cannot be told from a select-all field that retyped it, or a placeholder equal to it —
+ * it still lands (ADR 0034's D63 amendment, residual 7).
+ */
+const unchangedSinceTyping = (observed: string, e: Pick<Expectation, 'value' | 'clear' | 'before'>): boolean => !e.clear && observed === e.before && observed !== e.value;
 
 /**
  * The reading shows the value as typed.

@@ -17,6 +17,9 @@ Amended 2026-11-03 (batch-9: D60's live proof on iOS React Native — the D60 am
 Amended 2026-11-03 (D61: an unnamed placeholder whose letters and digits start the value's — idb's `+421` — no longer
 turns a correct grouped fill into `length`; D29's pinned `1234 5678` after `1` lands; residual 6 accepted; implemented
 on `fix/d61-placeholder-prior`).
+Amended 2026-11-03 (D63: without clear, a reading still exactly what the field showed when typing began has not
+landed, unless it is the value itself — the exact rule's `includes` no longer passes a reading byte for byte what the
+field showed when typing began; residuals 7 and 8 accepted; implemented on `fix/d63-unchanged-reading`).
 
 ## Context
 
@@ -569,7 +572,7 @@ placeholder from a filled one: the type, label, traits and role are the same, on
   really holds the value, as D29 already accepts.
 - Out of scope: a fill without clear whose reading is unchanged from `before` but already contains the value
   (`Hello world` typed `world`, `+421` typed `421`) passes by the exact rule's `includes` — not this rule; a backlog row
-  of its own (D63).
+  of its own (D63). Closed by the D63 amendment below.
 
 **Mutation-checked**: hand mutants, each killed — the new disjunct removed (5 tests fail); the second conjunct removed
 (5: MAJOR-1, an earlier text alone regrouped, MINOR-A's dash); `===` as `skeleton(value).startsWith(…)`, the prefix
@@ -586,6 +589,81 @@ should move from MISMATCH failed-holds to ok (it is not in live-known.ts); f13 p
 clear, g5 is exact, and wda and uiautomator dump no `+421` as `before`, so nothing else moves. Not checked on the
 device: `live.ts --groups forms --cases g3,g4,g5,f13` on idb and wda, a later batch's (g3 should read `Filled … (12
 characters, the field shows them reformatted: 3 separators added)`).
+
+## Amendment: a reading unchanged since typing began has not landed (2026-11-03, D63)
+
+**Context.** Found in D61's analysis (2026-11-03); no live record shows it. Without clear, the exact rule
+(`fill-landing.ts#showsExactly`) asks only that the reading CONTAIN the value — `observed === value ||
+heldText(observed).includes(value)` — and never compares it with `before`. For an input, `tookText` is simply true: its
+rule that a reading must change applies to non-inputs alone. So a reading byte for byte what the field showed when
+typing began passed as `landed` whenever that earlier text held the value, and `pollValue`, which does not wait
+before its first read, stopped there and fill replied Filled, verified:
+- a field that refuses the keys while its text holds the value — a length cap, a digits-only filter, a controlled
+  input that reverts: the lab's form-format `date` keeps 8 digits (Forms.swift, Forms.kt), so `2026` typed without
+  clear after a full `31.12.2026` leaves `31.12.2026`, on both platforms;
+- keys that went into another input (an auto-advance, a stolen focus): a landed reading skipped `whereTyped`, so its
+  `elsewhere` proof was never asked;
+- a source that names no placeholder (idb, the API 33 dump: D29) whose empty field's placeholder holds the value —
+  `+421` typed `421`, `SK00 0000 0000 …` typed `0000`, `Search` typed `ear`: the unnamed twin of a case fill.test.ts
+  already refused with a named placeholder;
+- keys that arrive after the first read (`may-arrive-late`, uiautomator): plausible, unmeasured since the paced typing.
+
+`differenceOf` already had the honest answer for such a reading, its first rule `unchanged` ("the field did not
+change: the typing did not reach it, or the field refused it"), never reached because the reading landed first. D61's
+`landingOf('+421', … '421' after '+421')` guard was red for this reason and was left to D63.
+
+**Decision.**
+- `fill-landing.ts#landingOf` alone changes: right after `tookText`, a reading for which `unchangedSinceTyping` holds
+  has not landed — `!clear && observed === before && observed !== value`. It extends `tookText`'s "a non-input proves
+  it took the text only by changing" to an input typed without clear, and covers the reformat route and the exact rule
+  alike, stated once. Raw equality, as `before` is the raw reading when typing began (for an empty or masked field,
+  the post-focus re-read, unless skipped: residual 8 B).
+- **The value itself is excepted.** A reading that is both the earlier text and the value cannot be told from a
+  select-all field that replaced its text with the typing (the D29 amendment), an unnamed placeholder equal to the value,
+  or a named one (`placeholder`, not verified, pinned end to end). It lands as before: residual 7.
+- **The poll needs no change.** A reading that has not landed keeps `pollValue` reading (fill-type.ts): keys that arrive
+  late land on the first changed reading; a typing that never reaches the field takes the whole poll (5 reads) and ends
+  `missed`, `differenceOf` → `unchanged`. `tailOf` finds none of the typing in it, so nothing is typed again; without
+  clear nothing is wiped. A typing that went into another input now reaches `whereTyped`, and the miss names that input.
+- Not changed: `priorsOf` and D61's condition in it, `showsExactly`, `tailOf`, `differenceOf`, the clear path (a reading
+  with clear must equal the value), the masked rule (a masked reading unchanged since typing began already failed by its
+  length). No new Difference kind, wording, verdict reason or module.
+
+**Consequences.**
+- A fill without clear whose typing changed nothing replies "ERROR fill: typed N characters but the field shows M — the
+  field did not change: the typing did not reach it, or the field refused it" instead of a false Filled; f15's date
+  should reply so on every source (not yet run on a device). The agent's flow no longer continues on a field it
+  believes holds an append it does not hold. skill/references/troubleshooting.md says it.
+- No cost on a correct fill whose first reading has changed — every live case's reading differs from its `before`
+  (b-, p-, f-, g- and rf-cases fill empty fields or replace idb's placeholder; p1 appends; p5 is masked; p7 is refused
+  before the tap). A late-key source loses its premature return: one more `pollMs` and read where the first read predates
+  the keys. A typing that changed nothing pays the whole poll (about 4 s on idb, 5 dumps on Android) for an honest error.
+- A value typed again into a field that holds it among more text, without clear: a field that takes the keys reads
+  `Jan ŠťastnýJan` and still lands by containment; one that refuses them is refused, which is true.
+
+**Mutation-checked**: hand mutants on `unchangedSinceTyping`, each killed but one — the guard line removed (10 tests
+fail); the value exception dropped, the strict form (2: D63's value-itself test and fill.test.ts's named `Search` typed
+`Search`); `!clear` dropped (1: with clear `1 234` after `1 234`, typed `1234`, still lands reformatted); `observed ===
+before` as the reading containing `before` (25); `before` as `resolvedValue` (8); `observed !== value` as `===` (12);
+the first `&&` as `||` (72). Equivalent: raw equality as `heldText(observed) === heldText(before)` — the two differ only
+where a named placeholder is held as empty against an empty side, and an empty held text contains no non-empty value,
+while a reading equal to the value is excepted anyway. `npm run mutate` (cold): fill-landing 95.52 → 95.73 % (floor 93;
+281 mutants, 12 survived, 4 timeouts — none in the new guard); every other module's score unchanged; floors unchanged.
+
+**Golden and live.** The golden replays tree reads and never types: Changed 0, which is no evidence either way; the
+unit tests are (fill-landing.test.ts's D63 group, fill-type.test.ts's late, lost and elsewhere keys, and fill.test.ts's
+prefilled field and idb-like unnamed `Search` placeholder that drop every key). Live: a new case f15 (form-format's
+`date`: `31122026` with clear, then `2026` without; judge `refusedUnchanged`, ok only when the last reply says the field
+did not change and the app still holds `31.12.2026`) runs after f14 on idb, wda and uiautomator. Before D63 it would
+read MISMATCH `fill-claim`; with D63 ok. No existing case's verdict moves; g1 now runs after f15. Not checked on the
+device: `live.ts --groups forms --cases f15` on idb, wda and uiautomator, and a regression pass of p1, f13, g3–g5, a
+later batch's.
+
+Residuals, stated: residuals 7 and 8 below — the guard is byte equality with `before`, so a reading that moved
+without any of the typing, or whose `before` was not what the field showed when typing began, still passes by
+containment (residual 8, follow-up D64); the late-key race is unmeasured since the paced typing, so how often a first read
+predated the keys, and what D63 now costs there, is not known; a field that commits its accessibility value only on
+blur is refused, as it already was when `before` was empty.
 
 ## Residuals accepted
 
@@ -609,3 +687,15 @@ characters, the field shows them reformatted: 3 separators added)`).
    (D61's amendment, the equality form): on idb, `421 903 123` for a typed `421903123456` after the empty field's
    `+421` is judged after the placeholder alone — no prefix of `+421421903123456` — and fails `length`, no tail typed
    again. Remedy: fill with `clear: true`, so the earlier text is none and the tail is typed again.
+7. **A value typed again into a field that already shows exactly it, without clear, still lands** (D63's amendment, the
+   value exception): `421` typed into a field reading `421`, its typing refused or lost, replies Filled — the reading
+   cannot be told from a select-all field that retyped it or a placeholder equal to the value. The field does hold the
+   value. Remedy, where it matters: fill with `clear: true`.
+8. **A reading that holds the value but none of the typing still lands by containment** (D63's amendment, review round
+   1, MINOR-1): D63's guard refuses only a reading byte for byte equal to `before`. (A) A reading that moved but holds
+   no new typing lands by the value inside the earlier text: `Hello worldw` for a typed `world` after `Hello world`
+   (one key landed, the rest went elsewhere) replies Filled — the analysis's option D, the earlier text then the value,
+   would close it. (B) On Android, fill.ts skips the post-focus re-read for a sole-id selector on an empty plain field
+   and takes `before` as empty; a field that inserts `+421 ` on focus and takes no key reads `+421 `, which contains a
+   typed `421`, and replies Filled. Both are pinned as today's behaviour in fill-landing.test.ts. Follow-up: backlog
+   row D64.

@@ -1395,6 +1395,32 @@ describe('fillField — a field that shows its hint or placeholder as its value 
     });
   });
 
+  // D63: without clear, a reading still what the field showed when typing began passed whenever that text held the
+  // value. The unnamed twin of the named `Search` above, as idb and the API 33 dump give it, and a prefilled field.
+  describe('without clear, a field that never changed is no fill, though its earlier text holds the value (D63)', () => {
+    const dropsEveryKey = (fake: FakeAdapter) => {
+      fake.typeText = async (t: string) => {
+        fake.typed.push(t); // the typing never lands: the field shows what it showed before
+      };
+    };
+
+    it('a prefilled field that drops every key: did not change', async () => {
+      const { fake, real } = hintedField('Hello world');
+      dropsEveryKey(fake);
+      await expect(fillField(fake, { id: 'last_name' }, 'world', FAST)).rejects.toThrow(/^fill: typed 5 characters but the field shows 11 — the field did not change/);
+      expect(fake.typed).toEqual(['world']); // nothing typed again
+      expect(fake.deletes).toEqual([]);
+      expect(real()).toBe('Hello world');
+    });
+
+    it('an empty field whose UNNAMED placeholder holds the value: did not change', async () => {
+      const { fake } = hintedField('', { hint: 'Search' });
+      dropsEveryKey(fake);
+      await expect(fillField(fake, { id: 'last_name' }, 'ear', FAST)).rejects.toThrow(/^fill: typed 3 characters but the field shows 6 — the field did not change/);
+      expect(fake.typed).toEqual(['ear']);
+    });
+  });
+
   describe('a masked field whose hint read as text before typing (inferred from the plain EditText, not seen on a device)', () => {
     const hintedPassword = (drop = 0) => {
       resetLayout();

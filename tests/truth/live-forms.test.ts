@@ -347,6 +347,50 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
 });
 
 /**
+ * f15 (D63): form-format's `date` keeps 8 digits, so `2026` typed without clear after a full `31.12.2026` changes
+ * nothing, though the field's text holds it — the reading is unchanged since typing began, and averi must say the field
+ * did not change (live-forms.ts#refusedUnchanged). Not yet run on a device; judged over D40's f1 record (iOS WDA), its
+ * final state set to what the fills would leave.
+ */
+describe('f15 (D63): digits the full date field refuses, though its text holds them', () => {
+  const f1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'f1');
+  const left = (value: string) => withFieldValue(f1, 'date', value).state;
+  const FIRST = 'Filled id:"lab.form-format.date" (8 characters, cleared 0 characters first, the field shows them reformatted: 2 separators added)';
+  const UNCHANGED = 'ERROR fill: typed 4 characters but the field shows 10 — the field did not change: the typing did not reach it, or the field refused it';
+  const casesOn = async (platform: 'ios' | 'android') => selectCases({ platform, app: 'native', groups: ['forms'], only: ['f15'] });
+
+  it.each(['ios', 'android'] as const)('%s runs it right after f14: a fill with clear, then a fill without', async (platform) => {
+    const [f15] = await casesOn(platform);
+    expect(f15.cell).toBe('form-format');
+    expect(f15.calls).toEqual([
+      { tool: 'type_text', args: { selector: 'id:"lab.form-format.date"', text: '31122026', clear: true } },
+      { tool: 'type_text', args: { selector: 'id:"lab.form-format.date"', text: '2026' } },
+    ]);
+    const all = (await selectCases({ platform, app: 'native', groups: ['forms'] })).map((c) => c.id);
+    expect(all.indexOf('f15')).toBe(all.indexOf('f14') + 1);
+  });
+
+  it('the reading is what landingOf refuses since D63: unchanged since typing began, its text holding the value', () => {
+    const second = { value: '2026', clear: false, before: '31.12.2026', placeholder: undefined, isInput: true, resolvedValue: '31.12.2026', held: 0 as const };
+    expect(landingOf('31.12.2026', second)).toBeUndefined();
+    expect(differenceOf('31.12.2026', second)).toEqual({ kind: 'unchanged' });
+  });
+
+  it('refused as unchanged, the date kept: ok; Filled over it (the src before D63): MISMATCH fill-claim', async () => {
+    const [f15] = await casesOn('ios');
+    expect(f15.judge(left('31.12.2026'), [FIRST, UNCHANGED], 'wda', f1.launched, [])).toMatchObject({ outcome: 'ok', kind: 'refused' });
+    expect(f15.judge(left('31.12.2026'), [FIRST, 'Filled id:"lab.form-format.date" (4 characters)'], 'idb', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+  });
+
+  it('another error with the date kept: LOUD loud-untouched; the date changed: LOUD loud-changed; the first fill failed over it: MISMATCH failed-holds', async () => {
+    const [f15] = await casesOn('android');
+    expect(f15.judge(left('31.12.2026'), [FIRST, 'ERROR fill: typed 4 characters but the field shows 10'], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
+    expect(f15.judge(left('20.26.2026'), [FIRST, UNCHANGED], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed' });
+    expect(f15.judge(left('31.12.2026'), ['ERROR fill: typed 8 characters but the field shows 10', UNCHANGED], 'uiautomator', f1.launched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds', kind: 'refused' });
+  });
+});
+
+/**
  * g1–g5 and rfe1–rfe3 (L7): form-grouped's ibanEager (group4eager: a space as soon as a group of four is complete,
  * none at 24) and phoneGrouped (phone3: a leading `+`, the digits in threes, under a `+421` placeholder), and
  * rn-format-eager's E (group4eager on React Native) — D60's eager trailing mark and D37's `+421` grouping field. No device has run them
@@ -366,7 +410,7 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
   const rn = async (platform: 'ios' | 'android') => selectCases({ platform, app: 'react-native', groups: ['forms'], only: RFE_IDS });
   const SHOWN = 'All 1 asserts passed\nPASS  element id:"lab.form-grouped.ibanEager" with text "SK31 1200 0000 123" exists\nappAlive: true';
 
-  it.each(['ios', 'android'] as const)('%s runs g1–g5 after f14, one fill each of form-grouped, clear on g1 and g4; g1 then asserts what the tree shows', async (platform) => {
+  it.each(['ios', 'android'] as const)('%s runs g1–g5 after f15, form-format\'s last, one fill each of form-grouped, clear on g1 and g4; g1 then asserts what the tree shows', async (platform) => {
     const cases = await native(platform);
     expect(cases.map((c) => c.id)).toEqual(G_IDS);
     expect(cases.every((c) => c.cell === 'form-grouped' && c.group === 'forms')).toBe(true);
@@ -380,7 +424,7 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
     expect(cases.map((c) => c.calls.length)).toEqual([2, 1, 1, 1, 1]);
     expect(cases[0].calls[1]).toEqual({ tool: 'assert', args: { asserts: [{ element: { id: 'lab.form-grouped.ibanEager' }, text: 'SK31 1200 0000 123', timeout: 2_000 }] } });
     const all = (await selectCases({ platform, app: 'native', groups: ['forms'] })).map((c) => c.id);
-    expect(all.indexOf('g1')).toBe(all.indexOf('f14') + 1);
+    expect(all.indexOf('g1')).toBe(all.indexOf('f15') + 1);
     // Native cases only: rfe1–rfe3 are the React Native app's.
     expect(all.filter((id) => RFE_IDS.includes(id))).toEqual([]);
   });
