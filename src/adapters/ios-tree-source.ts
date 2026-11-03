@@ -38,6 +38,8 @@ import { countOf } from '../util/count.js';
  * Only the tree read lives behind this seam. Taps, typing, install and launch
  * stay on idb/simctl whichever source is configured (plan, decision 4): WDA
  * frames are points, the same units idb rects use, so the coordinates agree.
+ * One exception since D43: WDA's source types what idb cannot (`typeText`,
+ * optional, as `systemAlert`), on the WebDriverAgent it already owns.
  */
 export interface IosTreeSource {
   /**

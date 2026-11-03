@@ -36,8 +36,9 @@ import type { DeviceAdapter } from '../adapters/types.js';
  *
  * Then what the adapter can type (D43a, docs/adr/0037-a-value-the-adapter-
  * cannot-type-is-refused-before-any-device-call.md): a character outside its
- * `typeable` set (DeviceAdapter.typeable — printable ASCII on both platforms
- * today) is refused here too, by the same callers, before the same nothing.
+ * `typeable` set (DeviceAdapter.typeable — printable ASCII on Android and on
+ * iOS's idb; on iOS over WDA's tree source also the letters, punctuation and
+ * symbols `/wda/keys` types, D43) is refused here too, by the same callers, before the same nothing.
  * Before it, iOS's `idb ui text` failed the whole call with a Python trace
  * AFTER the fill's tap and clear, and Android's `input text` typed every
  * character before it and then crashed, the field half-typed. The control
