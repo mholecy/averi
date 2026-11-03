@@ -106,10 +106,11 @@ describe('chooserInFocus — an app, the launcher or no focus in front is no cho
     expect(chooserInFocus('  mCurrentFocus=Window{f61dea2 u0 NotificationShade}\n')).toBeUndefined();
   });
 
-  it('an answer cut inside a record (no `}` or space after the component): that line names nothing', () => {
+  it('a record cut right after the component (no `}` or space after it, at the end or before a newline): that line names nothing', () => {
     expect(chooserInFocus(`  mCurrentFocus=Window{56b9ca0 u0 ${RESOLVER}`)).toBeUndefined();
     const cut = `  mCurrentFocus=null\n  mFocusedApp=ActivityRecord{6dd03d6 u0 ${RESOLVER}`;
     expect(chooserInFocus(cut)).toBeUndefined();
+    expect(chooserInFocus(`${cut}\n`)).toBeUndefined();
     expect(chooserInFocus(`  mCurrentFocus=Window{56b9ca0 u0 ${RESOLVER}}\n  mFocusedApp=ActivityRecord{10e4bcf u0 ${LAB}`)).toBe(RESOLVER);
   });
 });
