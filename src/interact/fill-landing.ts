@@ -268,8 +268,9 @@ export function droppedTail(observed: string, e: TextExpectation): string | unde
  *   value typed again over itself (residual 7's shape) into a select-all field that adds a mark (`-5-` for `-5` after
  *   `-5`).
  * A value found only inside the earlier text among more of it (`Note: hellohe` for `hello` after `Note: hello`, f16's
- * `31.12.2021`) is no whole landing, and its tail is typed again. `differenceOf` marks such a dropped tail `wholeToo`,
- * and its reply names the select-all reading and `clear: true`. Brute-forced (D64 review round 1) over small
+ * `31.12.2021`) is no whole landing, and its tail is typed again. `differenceOf` marks every such miss `wholeToo` — a
+ * `dropped-tail` where the field grouped the prefix (`11 `, `a1 1`), a `length` where it is exact (`-5-`, `55` after
+ * `5`) — and its reply names the select-all reading and `clear: true`. Brute-forced (D64 review round 1) over small
  * alphabets: no reading that a select-all field, a caret anywhere in the earlier text, or a leading or trailing mark
  * makes of a whole landing is typed into again.
  */
@@ -314,9 +315,11 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   const tail = tailOf(observed, e);
   const held = heldText(observed, e.placeholder);
+  // D64: a tail `droppedTail` would not type again, the reading a whole landing too — said in the reply's wording.
+  const wholeToo = landedSome(tail) && wholeLandingToo(held, e);
   if (landedSome(tail) && tail.reformatted !== undefined) {
     const dropped = { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 } as const;
-    return wholeLandingToo(held, e) ? { ...dropped, wholeToo: true } : dropped;
+    return wholeToo ? { ...dropped, wholeToo } : dropped;
   }
   // D53: every typed character there, in order, with separators the rules refused as grouping — never "a length".
   const added = overPriors(held, e, (whole) => separatedOf(held, whole));
@@ -337,7 +340,8 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
     if (caseAlone && differ > 0 && (caseOnly === undefined || differ < caseOnly)) caseOnly = differ;
   }
   if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
-  if (typed.length !== value.length) return { kind: 'length' };
+  // an exact strict prefix ends here: its typed part is shorter than the value, so no run is compared
+  if (typed.length !== value.length) return wholeToo ? { kind: 'length', wholeToo } : { kind: 'length' };
   let differ = 0;
   for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;
   return { kind: 'same-length', positions: differ };

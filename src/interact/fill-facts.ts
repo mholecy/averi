@@ -354,7 +354,9 @@ export interface OtherInput {
  *   round 2): the reading is a whole landing as well — a select-all field's
  *   value with a mark of its own, a caret inside the text
  *   (interact/fill-landing.ts#wholeLandingToo) — so nothing was typed again,
- *   and the reply names that reading and its remedy.
+ *   and the reply names that reading and its remedy. A `length` carries it
+ *   too: an exact strict prefix that is a whole landing as well (`-5-` for
+ *   `-5` after `-5`, `55` after `5`).
  * - `separated` (D53): every typed character is there, in order, with
  *   `added` separators (interact/fill-reformat.ts#SEPARATORS) and nothing
  *   else — separators ADR 0034's rules refuse as the field's grouping (a
@@ -375,4 +377,4 @@ export type Difference =
   | { kind: 'unchanged' }
   | { kind: 'dropped-tail'; landed: number; dropped: number; grouped: boolean; wholeToo?: true }
   | { kind: 'separated'; added: number }
-  | { kind: 'length' };
+  | { kind: 'length'; wholeToo?: true };

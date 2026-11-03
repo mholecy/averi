@@ -358,5 +358,6 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
     'check the field holds the value you meant — a cents mask shows a typed 1234 as 12.34 — and if it does, type the value as the field shows it; ' +
     'content withheld from this error',
   unchanged: () => ' — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
-  length: () => ' (content withheld from this error)',
+  // D64 code review: a length that is a whole landing too (fill-landing.ts#wholeLandingToo), nothing typed again
+  length: ({ wholeToo }) => `${wholeToo ? ' — the field may have replaced its text (select-all): fill with `clear: true`' : ''} (content withheld from this error)`,
 };
