@@ -1,8 +1,9 @@
 # 42. A node its source marks not enabled is said disabled; a tap on it is sent and warned
 
 Status: accepted 2026-11-03 (performance backlog row D66, docs/plans/2026-10-30-performance-backlog.md). One reply
-changes on purpose: `tap` by selector on a node marked disabled gains a second, ⚠ line. `ui_snapshot` prints the new
-mark with the tree's JSON. Every other reply is byte-identical, and so is `tap`'s on an unmarked node. `UiNode` gains
+changes on purpose: `tap` by selector on a node marked disabled gains a second, ⚠ line, and a flow's `tap:` step on
+one gains the same words as a `⚠ tap` trace line. `ui_snapshot` prints the new mark with the tree's JSON. Every other
+reply is byte-identical, and so is `tap`'s on an unmarked node or by coordinates. `UiNode` gains
 one optional field, `disabled?: true`. No tool description changes.
 
 ## Context
@@ -44,7 +45,7 @@ after `children` in key order. A filtered view keeps it (`stripChildren`).
 
 **`tap` warns, never refuses.** When the node the tap went to (`ResolvedClear.node`, after any keyboard guard's
 re-resolve) carries the mark, `tapElement` returns `disabled` and `tool-text.ts#tapText` adds one line, as swipe's and
-launch's ⚠ lines are laid out:
+launch's ⚠ lines are laid out (the words are `interact/tap.ts#DISABLED_TAP`):
 
 ```
 Tapped id:button_once
@@ -59,9 +60,11 @@ The tap is sent all the same. Reasons:
 - averi's refusals are for taps that would land wrongly (covered, off screen, a sliver). A tap on a disabled control
   harms nothing; the dishonesty was the bare "Tapped", and the ⚠ line removes it.
 
-Only `tap`'s MCP reply reads the mark. `fill`, `scroll_until`, the flow's `⚠ tap` trace, selectors, asserts, draw
-order and the tap's judgement (`tap-judgement.ts`: a disabled bar still covers) are unchanged. There is no
-`enabled:` selector field.
+A flow's `tap:` step (`flow/engine.ts#tapSpec`, the same `tapElement`, no extra read) logs the same words as a
+`⚠ tap` line, after the keyboard's and the moved tap's lines and before the `tap` line; the flow goes on. A tap by
+coordinates resolves no node and never warns. Only those two read the mark: `fill`, `scroll_until`, selectors,
+asserts, draw order and the tap's judgement (`tap-judgement.ts`: a disabled bar still covers) are unchanged. There is
+no `enabled:` selector field.
 
 ## Consequences
 
@@ -85,5 +88,7 @@ order and the tap's judgement (`tap-judgement.ts`: a disabled bar still covers) 
 - WDA's `NotEnabled` trait is unread: a payload where `isEnabled` and the trait disagree is judged by `isEnabled`.
 - uiautomator's `enabled` is View.isEnabled. An app that ignores taps without disabling the view, or that handles
   taps on a disabled one, is not seen.
+- The mark is per node: a not-enabled label inside an enabled clickable row, resolved as the target, would draw a
+  wrong (hedged) warning on a tap that works. Not seen in any fixture.
 - No wait for enabled: a control that becomes enabled just after the read is warned about and tapped, and the
   warning is then stale. The ⚠ line says to read again rather than to trust it.

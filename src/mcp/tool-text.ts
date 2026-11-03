@@ -28,9 +28,7 @@ import type { Direction } from '../interact/swipe.js';
 import { launchedLine, WIPE_LABEL, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
-
-/** tap's warning on a node the tree marks disabled — warned, never refused (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md). */
-const DISABLED_TAP = 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
+import { DISABLED_TAP } from '../interact/tap.js';
 
 /**
  * `Tapped <selector>`, then — when the tap went elsewhere than the centre

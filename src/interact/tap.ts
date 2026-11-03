@@ -11,6 +11,13 @@ import type { Target } from './resolve.js';
 export type TapAdapter = KeyboardAdapter;
 
 /**
+ * The warning on a tap whose node the tree marks disabled (adapters/types.ts#UiNode.disabled) — warned, never refused:
+ * the MCP reply's ⚠ line (mcp/tool-text.ts#tapText) and the flow's `⚠ tap` line (flow/engine.ts#tapSpec), in the same
+ * words. docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
+ */
+export const DISABLED_TAP = 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
+
+/**
  * Wait for the target to appear and settle (resolveSettled: one policy for
  * the flow engine's `tap:` step and the MCP `tap` tool), then tap the chosen
  * node at the guard's point. Returns the resolution note, if any, for the caller to
@@ -50,7 +57,7 @@ export type TapAdapter = KeyboardAdapter;
  *
  * `disabled` is the tapped node's own mark (adapters/types.ts#UiNode.disabled,
  * D66) — the node the guard handed back, after any re-resolve: the tap is sent
- * all the same, and the MCP reply warns (mcp/tool-text.ts#tapText).
+ * all the same, and the MCP reply and the flow's trace warn (DISABLED_TAP).
  * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
  */
 export async function tapElement(

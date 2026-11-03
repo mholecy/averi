@@ -8,7 +8,7 @@ import { describeScrollResult, scrollUntilVisible } from '../interact/scroll.js'
 import { eyesOn } from '../verify/eyes.js';
 import { swipeScreen } from '../interact/swipe.js';
 import { dismissKeyboard, KeyboardGuardError, type DismissResult, type GuardOptions } from '../interact/keyboard.js';
-import { tapElement } from '../interact/tap.js';
+import { DISABLED_TAP, tapElement } from '../interact/tap.js';
 import { describeElementSpec, selectorOnly, type ElementSpec } from '../ui-tree/element-spec.js';
 import {
   pollOnVerdict,
@@ -1601,11 +1601,16 @@ export class FlowEngine {
    * flow pressed `back` and the screen re-laid-out, and an author debugging
    * the next step needs to see it. A tap that met no keyboard traces exactly
    * what it did before.
+   *
+   * Likewise, D66: a tapped node the tree marks disabled gets a `⚠ tap` line
+   * in the MCP reply's words (interact/tap.ts#DISABLED_TAP), after the
+   * keyboard's and the moved tap's; the tap was sent and the flow goes on.
    */
   private async tapSpec(spec: ElementSpec, timeoutMs: number, quiet = false): Promise<void> {
-    await this.tracingDismissal('⚠ tap', describeElementSpec(spec), () =>
+    const { disabled } = await this.tracingDismissal('⚠ tap', describeElementSpec(spec), () =>
       tapElement(this.adapter, spec, { ...this.acting, timeoutMs, first: this.handOff }),
     );
+    if (disabled === true) this.log('⚠ tap', DISABLED_TAP);
     if (!quiet) this.log('tap', describeElementSpec(spec));
   }
 
