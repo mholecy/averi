@@ -271,3 +271,31 @@ describe('alertButtonsText and ALERT_ADVICE — the words both replies quote an 
     );
   });
 });
+
+// T4: the trees once Cancel answered the alert (batch-6 A, WDA's /source about 1 s after the tap: the
+// wda-capture-*-after-open-in-cancel.json fixtures' `_comment`). Cancel opens nothing, so the tree is the app that was
+// in front before the link: SpringBoard's home screen, or Contacts — never the alert, and never the lab. That the
+// tree right after the tap is SpringBoard's and the lab's ~1 s after Open (batch-7 A, L3/L4) was summarised by the
+// probe, its trees not kept.
+describe('alertInWda — WDA\'s tree after Cancel answered "Open in “AveriLab”?" (batch-6 A, real captures)', () => {
+  const after = async (name: string): Promise<UiNode> => parseWdaSourceValue(((await json(`wda-capture-${name}-after-open-in-cancel.json`)) as { value: unknown }).value);
+  const labels = (tree: UiNode): (string | null)[] => {
+    const out: (string | null)[] = [];
+    const walk = (n: UiNode): void => {
+      out.push(n.label, n.identifier);
+      n.children.forEach(walk);
+    };
+    walk(tree);
+    return out;
+  };
+
+  it.each([
+    ['springboard', ' '],
+    ['contacts', 'Contacts'],
+  ])('%s beneath: no alert, the root the previous app (%j), no node naming the alert or the lab', async (name, root) => {
+    const tree = await after(name);
+    expect(tree.label).toBe(root);
+    expect(alertInWda(tree)).toBeUndefined();
+    expect(labels(tree).filter((l) => l !== null && /Open in|^lab\./.test(l))).toEqual([]);
+  });
+});

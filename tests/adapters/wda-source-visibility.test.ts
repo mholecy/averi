@@ -307,8 +307,9 @@ describe('PARKED cell content of a SCROLLED table — the parked frame lies abov
     });
     // Swept, moving nothing: the lab's form-picker (cells on screen), carousel and bounded scroll views and
     // form-keyboard, Account Detail, the SWIFT form, the MyPort and skeleton logins, the filter sheet, the synthetic
-    // alert, the RN lab app's rn-field, iOS's "Open in “AveriLab”?" over SpringBoard and with Contacts in front (D54).
-    expect(Object.keys(counts).length).toBe(23);
+    // alert, the RN lab app's rn-field, iOS's "Open in “AveriLab”?" over SpringBoard and with Contacts in front (D54),
+    // and both after its Cancel (T4: SpringBoard's home screen, Contacts).
+    expect(Object.keys(counts).length).toBe(25);
     expect(counts['wda-capture-lab-form-picker']).toBe(0);
   });
 });

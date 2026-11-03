@@ -12,6 +12,7 @@ import {
   PLUTIL, SPRINGBOARD, WDA_ALERT, WRITES,
 } from '../helpers/ios-lab.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
+import { deepLinkText } from '../../src/mcp/tool-text.js';
 
 // The one sleep owner, recorded and not waited on; under a Date-only fake clock each recorded sleep moves the clock
 // by its length, so the wait's deadline plays out in virtual time.
@@ -203,6 +204,24 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
         "reads that app's tree, on which an absent check passes. Read again; if it repeats, take a screenshot",
     );
     expect(d.asks()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
+  });
+
+  // T4: batch-5's D49A E2 reply (main 28c1d37d, WDA, the "Open in “AveriLab”?" alert up, its activeAppInfo naming
+  // SpringBoard: wda-activeappinfo-springboard-b5.json, read in wda-tree-source.test.ts), before D54 read the alert.
+  // Today the same wording is the reply only when the alert read at the bound finds none (or fails); with the alert
+  // found the link's outcome is the alert instead.
+  it('SpringBoard to the bound and no alert read: batch-5 E2\'s reply, byte for byte', async () => {
+    const d = lab([SPRINGBOARD], { tree: new Error('no alert read') });
+    const outcome = await d.adapter.openDeepLink('averilab://cell/open', { appId: LAB });
+    expect(deepLinkText('ios', 'averilab://cell/open', outcome)).toBe(
+      'Opened averilab://cell/open on ios\n⚠ averi did not see dev.averi.lab come forward after the link: iOS may be ' +
+        'asking to confirm it ("Open in “…”?") or another app may be in front — take a screenshot, and if it shows a ' +
+        'system alert, answer it (every launch stays behind it until then). 3 s after opening averilab://cell/open in ' +
+        'dev.averi.lab, WebDriverAgent still read SpringBoard (the home screen, the launch animation or a system alert) ' +
+        "as the active app — a ui_snapshot now reads that app's tree, on which an absent check passes. Read again; if it " +
+        'repeats, take a screenshot',
+    );
+    expect(d.reads()).toBe(1);
   });
 
   it("idb reads another app's label to the bound: the same lead, then launch's note worded for the link", async () => {

@@ -12,8 +12,9 @@ export async function iosTrees(): Promise<[string, UiNode][]> {
   const trees: [string, UiNode][] = [];
   const dirs = [new URL('../fixtures/', import.meta.url), new URL('../fixtures/truth/ios-iphone17-ios27/', import.meta.url), new URL('../fixtures/truth/ios-rn-iphone17-ios27/', import.meta.url)];
   for (const dir of dirs) {
-    // `*-ui-snapshot-*`: averi's own snapshot (UiNode), no source's tree — nothing of it to parse
-    for (const file of (await readdir(dir)).filter((f) => f.endsWith('.json') && !f.includes('-ui-snapshot-'))) {
+    // `*-ui-snapshot-*`: averi's own snapshot (UiNode), no source's tree — nothing of it to parse; `wda-activeappinfo-*`
+    // and `wda-keys-*`: WDA's other answers (an activeAppInfo envelope, a `/wda/keys` body, the D43 gate's corpus)
+    for (const file of (await readdir(dir)).filter((f) => f.endsWith('.json') && !f.includes('-ui-snapshot-') && !/^wda-(?:activeappinfo|keys)-/.test(f))) {
       const text = await readFile(new URL(file, dir), 'utf8');
       if (file.startsWith('idb-') || file.endsWith('.idb.json')) {
         const json = JSON.parse(text) as unknown;

@@ -66,6 +66,19 @@ describe("tap text:\"<label>\" over iOS's system alert — the alert's own Butto
     });
   }
 
+  // T4: idb over Contacts (D57ct, batch-7 B, main a6410f64): idb-ui-snapshot-contacts-open-in-alert.json is averi's own
+  // ui_snapshot reply with the alert raised over Contacts, read just before the tap. idb lists the alert alone whatever
+  // is beneath: the reply is the parse of the SpringBoard capture's elements (IDB_ALERT, batch-5 E2), byte for byte
+  // (batch-6 A E3's raw list over Contacts holds the same kept fields too). The tap replied `Tapped text:"Cancel"` at
+  // (127, 474), and two clean reads (Contacts, 18 elements) by 1.2 s.
+  it('idb over Contacts (batch-7 B D57ct\'s real snapshot): the SpringBoard capture\'s parse; text:"Cancel" taps (127, 474) once', async () => {
+    const reply = await readFile(new URL('../fixtures/idb-ui-snapshot-contacts-open-in-alert.json', import.meta.url), 'utf8');
+    expect(JSON.stringify(parseIdbDescribeAll(IDB_ALERT), null, 2)).toBe(reply);
+    const { adapter, taps } = alertDevice(() => JSON.parse(reply) as UiNode);
+    expect(await tapElement(adapter, 'text:"Cancel"', OPTS)).toEqual({});
+    expect(taps).toEqual(['127,474']);
+  });
+
   it('WDA over Contacts: the hidden breadcrumb "Return to AveriLab" is refused, the alert named', async () => {
     const { adapter, taps } = alertDevice(TREES['WDA over Contacts']);
     const refused = tapElement(adapter, 'text:"Return to AveriLab"', OPTS);

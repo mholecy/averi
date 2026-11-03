@@ -160,6 +160,22 @@ describe('WdaTreeSource.applicationLabel — which app WebDriverAgent reads, ask
     expect(spawner.spawns).toHaveLength(1);
   });
 
+  // T4: real envelopes, as WDA 16.1.7 answered them on the averi-lab iPhone 17 simulator (iOS 27.0): batch-4's D49
+  // (main 7e6d2d47) after averilab://cell/open from SpringBoard (the lab) and after https://example.com (Safari), and
+  // batch-5's D49A E2 (main 28c1d37d) with the "Open in “AveriLab”?" alert up (SpringBoard). Each has `name: ""`,
+  // `sessionId: null` and `processArguments` with empty `env` and `args` — what the hand-written ACTIVE_LAB abbreviates.
+  it.each([
+    ['wda-activeappinfo-lab-b4.json', 'dev.averi.lab'],
+    ['wda-activeappinfo-mobilesafari-b4.json', 'com.apple.mobilesafari'],
+    ['wda-activeappinfo-springboard-b5.json', 'com.apple.springboard'],
+  ])('a real envelope (%s): the bundle it names', async (name, bundleId) => {
+    const body = JSON.parse(readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8')) as { value: Record<string, unknown>; sessionId: unknown };
+    expect(body).toMatchObject({ value: { name: '', processArguments: { env: {}, args: [] }, bundleId }, sessionId: null });
+    const { source } = await setup(() => ({ status: 200, body }));
+    await source.read();
+    expect(await source.applicationLabel()).toEqual({ kind: 'bundle', bundleId });
+  });
+
   it.each([
     ['no bundleId', { value: { pid: 1 } }],
     ['an empty bundleId', { value: { bundleId: '' } }],
