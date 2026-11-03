@@ -1208,7 +1208,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     expect(strokes(played).map((st) => st.box)).toEqual([PAGE, PAGE]);
     // The parsed dump lists the active window only, whose note follows (ui-tree/miss.ts): the bound's words are what is pinned.
     expect(failureOf(played, 'id:lab.carousel-lazy-free.C').message).toMatch(
-      `scroll_until id:lab.carousel-lazy-free.C failed after 2 swipes (the last 2, swiping right, did not change the screen: ${ACROSS}; else: content exhausted, still loading) — element never appeared in the tree`,
+      `scroll_until id:lab.carousel-lazy-free.C failed after 2 swipes (the last 2, swiping right, did not change the screen: ${ACROSS}; else: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree`,
     );
   });
 
@@ -1231,7 +1231,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     const played = play(RIGHT, [{ tree }, { tree }, { tree }]);
     expect(strokes(played).map((st) => st.box)).toEqual([PAGE, PAGE]);
     expect(failureOf(played, 'id:t').message).toBe(
-      'scroll_until id:t failed after 2 swipes (the last 2, swiping right, did not change the screen: each went across the scroll view it was drawn over, 0,0 1080x2220, which scrolls vertically, and the tree shows scrollable id:feed.chips (0,2000 1080x150), which scrolls horizontally, and which the swipes did not go over — swipe inside it (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading) — element never appeared in the tree',
+      'scroll_until id:t failed after 2 swipes (the last 2, swiping right, did not change the screen: each went across the scroll view it was drawn over, 0,0 1080x2220, which scrolls vertically, and the tree shows scrollable id:feed.chips (0,2000 1080x150), which scrolls horizontally, and which the swipes did not go over — swipe inside it (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree',
     );
   });
 
@@ -1253,7 +1253,7 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     const strip = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 1200, width: 60, height: 200 } });
     const tree = node({ role: 'container', rect: { ...PAGE }, children: [node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE }, children: [row, strip] })] });
     expect(failureOf(play(RIGHT, [{ tree }, { tree }, { tree }]), 'id:t').message).toContain(
-      'which scrolls vertically, and the tree shows scrollable (0,1200 60x200), which scrolls horizontally, but which had no room for a swipe — swipe inside it (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading)',
+      'which scrolls vertically, and the tree shows scrollable (0,1200 60x200), which scrolls horizontally, but which had no room for a swipe — swipe inside it (swipe, its coordinates), then scroll_until it; else: content exhausted, still loading, or the swipes were not taken)',
     );
   });
 
@@ -1270,7 +1270,11 @@ describe('round — strokes drawn across the scroll view they went over (D59b)',
     expect(boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'tree', touched, across }, 2)).toBe(
       'after 2 swipes (the last 2, swiping right, did not change the screen: they touched down at 864,1110 on text "Banner" at 0,1000 1080x200, drawn over the list 0,0 1080x2220, which may have taken them (else: content exhausted, still loading))',
     );
-    expect(boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'matches', across }, 3)).toBe(`after 3 swipes (the last 2, swiping right, did not move it: ${ACROSS}; else: content exhausted)`);
+    expect(boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'matches', across }, 3)).toBe(`after 3 swipes (the last 2, swiping right, did not move it: ${ACROSS}; else: content exhausted, or the swipes were not taken)`);
+    // idb's top-layer hint stays after the else, as on the generic stop (code review).
+    expect(boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'tree', across, unlisted: 'idb' }, 2)).toBe(
+      `after 2 swipes (the last 2, swiping right, did not change the screen: ${ACROSS}; else: content exhausted, still loading, or the swipes were not taken — idb lists only what a presented sheet, alert or cover leaves to accessibility: if the element lies beneath one, close it first)`,
+    );
     expect(boundText({ of: 'exhausted', lastStroke: 'down', unchanged: 'tree', across: { rect: PAGE, axis: 'horizontal' } }, 2)).toContain(
       'which scrolls horizontally, and the tree shows no scroll view that may scroll vertically — if the element lies in a vertical list the tree does not show as one',
     );

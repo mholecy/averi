@@ -1,5 +1,5 @@
 import { type DeviceScreen, type Point, type Rect, type Stroke, type UiNode } from '../adapters/types.js';
-import { aboveNavigationBand, belowStatusBand, quoted, toldFrame, type Edge, type ListedContent } from '../ui-tree/geometry.js';
+import { belowStatusBand, clearOfSystemBands, quoted, toldFrame, type Edge, type ListedContent } from '../ui-tree/geometry.js';
 import type { MarkedLayer } from '../ui-tree/presentation.js';
 import { screenChangedUnder, screenIdentity, type IdentifiedRead, type ScreenChange, type SheetDetent } from '../ui-tree/read-tree.js';
 import { drawOrderFound, type Cover } from '../ui-tree/cover.js';
@@ -1163,7 +1163,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     }
     const touched = exhausted === undefined || now === undefined ? undefined : touchedOn(s.strokes, now.facts, lastDrawn(s.motion));
     const course = courseFacts(s.course);
-    const across = exhausted === undefined || now === undefined ? undefined : strokedAcross(s.strokes, now.facts, course.lastStroke, aboveNavigationBand(belowStatusBand(s.frame.box, s.frame), s.frame, s.frame.box));
+    const across = exhausted === undefined || now === undefined ? undefined : strokedAcross(s.strokes, now.facts, course.lastStroke, clearOfSystemBands(s.frame.box, s.frame));
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
     // since the reader's next step would otherwise be another scroll that lands there (the plan's `presented`).
     // Quoted only on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe

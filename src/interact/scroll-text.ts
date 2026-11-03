@@ -878,12 +878,13 @@ export function boundText(by: BoundBy, swipes: number): string {
       const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
       // `across` (D59b): the strokes went across the scroll view they were drawn over, for want of one along them —
       // said first, with the way out, after a node named under the touch-down.
+      const untaken = `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
       const why =
         by.touched !== undefined
           ? `${touchedText(by.touched)} (else: ${others})`
           : by.across !== undefined
-            ? `${acrossText(by.across)}; else: ${others}`
-            : `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
+            ? `${acrossText(by.across)}; else: ${untaken}`
+            : untaken;
       return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${verb}: ${why})`;
     }
     case 'movesWith':
@@ -913,13 +914,14 @@ export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: num
 /**
  * The strokes went across the scroll view they were drawn over (scroll-rounds.ts#BoundBy's `across`): `each went
  * across the scroll view it was drawn over, <rect>, which scrolls vertically, and` then what the whole tree shows the
- * other way — a scroll view told to scroll horizontally named (`<node>, which scrolls horizontally, and which the
- * swipes did not go over`, or `…, but which had no room for a swipe` when the plan judged it), with `swipe inside it (swipe, its
- * coordinates), then scroll_until it`; else `the tree shows no scroll view that may scroll horizontally — if the element
- * lies in a horizontal list the tree does not show as one, swipe inside that list (swipe, its coordinates), then
- * scroll_until it`. Exported for the troubleshooting reference.
+ * other way. A scroll view told to scroll horizontally is named (`<node>, which scrolls horizontally, and which the
+ * swipes did not go over`, or `…, but which had no room for a swipe` when the plan judged it without room), with
+ * `swipe inside it (swipe, its coordinates), then scroll_until it`. Else `the tree shows no scroll view that may
+ * scroll horizontally — if the element lies in a horizontal list the tree does not show as one, swipe inside that
+ * list (swipe, its coordinates), then scroll_until it`. `boundText`'s; the troubleshooting reference pins it through
+ * `boundText` (tests/mcp/tool-descriptions.test.ts).
  */
-export function acrossText({ rect, axis, along }: StrokedAcross): string {
+function acrossText({ rect, axis, along }: StrokedAcross): string {
   const way = axis === 'vertical' ? 'horizontal' : 'vertical';
   const drawn = `each went across the scroll view it was drawn over, ${rectText(rect)}, which scrolls ${axis}ly, and the tree shows`;
   if (along !== undefined) {

@@ -142,6 +142,8 @@ interface Memory {
   readonly within: Rect | undefined;
   /** The scroll view the last plan chose (undefined: the gesture box whole), which `strokeSent` makes `within`. */
   readonly chosen: Rect | undefined;
+  /** The candidates along the stroke (or of unknown axis) the last plan judged WITHOUT room before its fallback took one across it (`StrokeRoom.roomless`) — for `strokedAcross`'s `noRoom`; empty when it took none across. */
+  readonly roomless: readonly Rect[];
   /** The carry model's measure (`carried`): the most a stroke of this scroll over the scroll view `within` (undefined: the gesture box whole) carried its target per point of finger travel; undefined until one did (UNMEASURED_CARRY stands in, `carryOver`). */
   readonly carry: { readonly within: Rect | undefined; readonly perPoint: number } | undefined;
 }
@@ -151,7 +153,7 @@ const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
 /** The memory before any read: no scroll view known, no keyboard line, no stroke sent. */
 export function startStrokes(): StrokeMemory {
-  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, carry: undefined });
+  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, roomless: [], carry: undefined });
 }
 
 /** One read that read, as the plan keeps it (`seeRead`): its facts, the line its strokes stay above (scroll-read.ts#ReadJudgement.strokeLine), the target's node when it judged one, and the region the target's motion showed, read only on a tree that tells no scroll view of it (`ScrollRegion`). */
@@ -339,7 +341,7 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   const presented = press === undefined || points === undefined ? undefined : { ...press, touchDown: points.from };
   // The latest cut read for the target's scroll views is the one a later read that has lost a rect falls back to — not the oldest.
   const planned: Memory = { ...m, last: candidates, ...(m.target !== undefined && read !== undefined && { target: candidates }) };
-  return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.within } }) };
+  return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.within }, roomless: room?.roomless ?? [] }) };
 }
 
 /**
@@ -440,8 +442,8 @@ export function touchedOn(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>,
 /**
  * The scroll view a sent stroke went across (`strokedAcross`): its rect and the axis its tree tells; and `along`, the
  * largest scroll view anywhere in the tree told to scroll the stroke's way, when there is one — `noRoom` when it was
- * among the candidates the plan judged (so the stroke box had no room in it: under MIN_STROKE_BOX, off the gesture box,
- * or cut to nothing), else the strokes were never for it (a sibling of the page, a target's stranger).
+ * among the candidates the plan judged without room (`Memory.roomless`: under MIN_STROKE_BOX, off the gesture box, or
+ * cut to nothing), else it was never a candidate (a sibling of the page; one outside the target's scroll views).
  */
 export interface StrokedAcross {
   readonly rect: Rect;
@@ -462,14 +464,15 @@ export interface StrokedAcross {
  * One walk of the tree, at the stop only.
  */
 export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect): StrokedAcross | undefined {
-  const { within } = open(memory);
+  const { within, roomless } = open(memory);
   if (within === undefined) return undefined;
   const { clips } = facts.scene;
+  const way = axisOf(toward);
   const axis = clips.axesOf(within)?.axis;
-  if (axis === undefined || axis === axisOf(toward)) return undefined;
-  const [view] = [...clips.toldOn(axisOf(toward), screen, facts.reading.ofKeyboard)].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
+  if (axis === undefined || axis === way) return undefined;
+  const [view] = [...clips.toldOn(way, screen, facts.reading.ofKeyboard)].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
   if (view === undefined) return { rect: within, axis };
-  const judged = open(memory).last.some((c) => sameRect(c.rect, view.rect));
+  const judged = roomless.some((r) => sameRect(r, view.rect));
   return { rect: within, axis, along: { view: quoted(view), ...(judged && { noRoom: true as const }) } };
 }
 
@@ -642,8 +645,9 @@ function candidatesOf(m: Memory, facts: Pick<TreeFacts, 'scene' | 'mainScroller'
   const main = facts.mainScroller;
   if (main === undefined) return [];
   const axes = facts.scene.clips.axesOf(main);
+  const way = axisOf(toward);
   const nested = [...(axes?.nested ?? [])]
-    .sort((a, b) => Number(b.axis === axisOf(toward)) - Number(a.axis === axisOf(toward)) || rectArea(b.rect) - rectArea(a.rect))
+    .sort((a, b) => Number(b.axis === way) - Number(a.axis === way) || rectArea(b.rect) - rectArea(a.rect))
     .map(({ rect }) => ({ rect, over: overIn(facts, rect) ?? [], axes: facts.scene.clips.axesOf(rect) }));
   return [{ rect: main, over: overIn(facts, main) ?? [], axes }, ...nested];
 }
@@ -706,11 +710,17 @@ function roomIn(met: Rect, toward: Direction, coverTop?: number): Rect | undefin
  */
 export const TOUCH_DOWN_CUT_FLOOR = 1 / 3;
 
-/** What `strokeRoom` decides: the candidate scroll view (`within`, as the tree gives it), the box the stroke is drawn in, and the top edge of what covers that box's lower part, when something does. */
+/**
+ * What `strokeRoom` decides: the candidate scroll view (`within`, as the tree gives it), the box the stroke is drawn in,
+ * and the top edge of what covers that box's lower part, when something does. `roomless`: when the fallback took a
+ * candidate that scrolls only across the stroke, the candidates along it (or of unknown axis) it had judged first and
+ * found no room in — what the across clause says "had no room for a swipe" of (D59b).
+ */
 interface StrokeRoom {
   within: Rect;
   box: Rect;
   coverTop?: number;
+  roomless?: readonly Rect[];
 }
 
 /**
@@ -739,7 +749,10 @@ interface StrokeRoom {
 function strokeRoom(box: Rect | undefined, candidates: readonly ScrollView[], toward: Direction, coverTop: number | undefined, otherwise: 'any axis' | 'none'): StrokeRoom | undefined {
   if (box === undefined) return undefined;
   const along = candidates.filter((c) => !acrossOnly(c, toward));
-  return roomAmong(box, along, toward, coverTop) ?? (otherwise === 'any axis' && along.length < candidates.length ? roomAmong(box, candidates, toward, coverTop) : undefined);
+  const room = roomAmong(box, along, toward, coverTop);
+  if (room !== undefined || otherwise !== 'any axis' || along.length === candidates.length) return room;
+  const across = roomAmong(box, candidates, toward, coverTop);
+  return across === undefined ? undefined : { ...across, roomless: along.map(({ rect }) => rect) };
 }
 
 /**
