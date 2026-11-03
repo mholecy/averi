@@ -292,7 +292,8 @@ const FAILURE_SENTENCE: SentenceTable<FillFailure> = {
   'clear-twice': ({ left, rounds }) => `fill: field still shows ${charactersText(left)} after clearing ${rounds === 2 ? 'twice' : `${rounds} times`}`,
   mismatch: ({ typed, shows, differs, notInput, again, elsewhere }) =>
     `fill: typed ${charactersText(typed)}${again === undefined ? '' : ` (${againText(again)})`} but the field shows ${shows}` +
-    DIFFERENCE_TEXT[differs.kind](differs as never) +
+    // D64: keys proven typed elsewhere are no select-all, so a whole landing's hedge is not said beside that clause
+    DIFFERENCE_TEXT[differs.kind]((elsewhere === undefined ? differs : { ...differs, wholeToo: undefined }) as never) +
     (elsewhere === undefined
       ? ''
       : `; the typing left the field: ${elsewhere.role}${elsewhere.identifier === null ? '' : ` id:"${elsewhere.identifier}"`} ` +
@@ -343,10 +344,12 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
   'same-length': ({ positions }) =>
     ` — as many characters as were typed, ${positions} differing: ` +
     'the app transformed the input (autocorrect, smart punctuation, a mask?); content withheld from this error',
-  'dropped-tail': ({ landed, dropped, grouped }) =>
+  'dropped-tail': ({ landed, dropped, grouped, wholeToo }) =>
     ` — the first ${landed === 1 ? '1 typed character is' : `${landed} typed characters are`} there, ` +
     (grouped ? 'grouped by the field (separators of its own added)' : 'its spaces shown as another kind of space') +
     `, the last ${dropped} did not land: dropped, or refused by the field (a length cap, a character it does not take) — ` +
+    // D64 review round 2: the reading is a whole landing too (fill-landing.ts#wholeLandingToo), nothing typed again
+    (wholeToo ? 'or the field replaced its text (select-all): fill with `clear: true` — ' : '') +
     'not a transformed input; content withheld from this error',
   // D53: the marks as fill-reformat.ts#SEPARATORS holds them (a test pins the two agree); the check before the remedy —
   // typing `12.34` into a cents mask passes and means 12.34.
@@ -356,5 +359,6 @@ const DIFFERENCE_TEXT: { [K in Difference['kind']]: (d: Extract<Difference, { ki
     'check the field holds the value you meant — a cents mask shows a typed 1234 as 12.34 — and if it does, type the value as the field shows it; ' +
     'content withheld from this error',
   unchanged: () => ' — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)',
-  length: () => ' (content withheld from this error)',
+  // D64 code review: a length that is a whole landing too (fill-landing.ts#wholeLandingToo), nothing typed again
+  length: ({ wholeToo }) => `${wholeToo ? ' — the field may have replaced its text (select-all): fill with `clear: true`' : ''} (content withheld from this error)`,
 };

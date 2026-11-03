@@ -20,6 +20,9 @@ on `fix/d61-placeholder-prior`).
 Amended 2026-11-03 (D63: without clear, a reading still exactly what the field showed when typing began has not
 landed, unless it is the value itself — the exact rule's `includes` no longer passes a reading byte for byte what the
 field showed when typing began; residuals 7 and 8 accepted; implemented on `fix/d63-unchanged-reading`).
+Amended 2026-11-03 (D64: without clear, the value must be in what was typed past the earlier text, not anywhere in the
+reading — a capped, dropped or misdirected typing whose earlier text holds the value no longer passes; D63's guard
+folded into the rule; residual 8 (A) closed, residual 9 accepted; implemented on `fix/d64-typed-past-prior`).
 
 ## Context
 
@@ -627,7 +630,8 @@ change: the typing did not reach it, or the field refused it"), never reached be
   clear nothing is wiped. A typing that went into another input now reaches `whereTyped`, and the miss names that input.
 - Not changed: `priorsOf` and D61's condition in it, `showsExactly`, `tailOf`, `differenceOf`, the clear path (a reading
   with clear must equal the value), the masked rule (a masked reading unchanged since typing began already failed by its
-  length). No new Difference kind, wording, verdict reason or module.
+  length). No new Difference kind, wording, verdict reason or module. Superseded in form by D64: see the D64
+  amendment below.
 
 **Consequences.**
 - A fill without clear whose typing changed nothing replies "ERROR fill: typed N characters but the field shows M — the
@@ -665,6 +669,131 @@ containment (residual 8, follow-up D64); the late-key race is unmeasured since t
 predated the keys, and what D63 now costs there, is not known; a field that commits its accessibility value only on
 blur is refused, as it already was when `before` was empty.
 
+## Amendment: without clear, the value must be in the typing past the earlier text (2026-11-03, D64)
+
+**Context.** D63's residual 8 (A), from its review. Without clear, the exact rule (`fill-landing.ts#showsExactly`)
+searched the WHOLE reading, earlier text included, for the value — `observed === value ||
+heldText(observed).includes(value)`. D63's guard refused only a reading byte for byte equal to `before`, so a reading
+that moved but held none of the typing passed whenever the earlier text held the value, and fill-type.ts returned at
+once: no `whereTyped`, no tail typed again. The shapes (D64's analysis, pure readings and scripted typings):
+- a length cap, deterministic on every source: the lab's form-format `date` keeps 8 digits, so `12` typed without clear
+  after `31.12.202` keeps the `1` — `31.12.2021`, which holds `12` only inside `31.12`; `Hello worldwor` for `world`
+  after `Hello world` under a 14-character cap;
+- an iOS React Native burst that kept a prefix (ADR 0023's drop; D24's first key alone makes the head land):
+  `Note: hellohe` for `hello` after `Note: hello` — Filled, and the tail never typed again;
+- keys that went into another input: `Hello worldw`, `w` landed and `orld` elsewhere — Filled, the other input never
+  named;
+- the value found across the seam: `Hello world` for `world` after `Hello wor`, only `ld` landed.
+No live or truth record shows it: no live case typed, without clear, a value its field's earlier text holds with only
+part of it landing (p1 appends ` Jr.`, which `Jan Šťastný` does not hold; f15 is D63's unchanged reading).
+
+**Decision.**
+- `fill-landing.ts#showsExactly` changes: without clear, `observed === value || priorsOf(held, e).some((prior) =>
+  typedPartOf(held, prior).includes(value))`, `held` the reading less a named placeholder. `typedPartOf` is
+  `differenceOf`'s own notion of the typing: what follows the earlier text when the reading still starts with it
+  LITERALLY, else the whole reading. So a reading that starts with the earlier text must hold the value after it; one
+  that does not is judged whole, as before — an earlier text that vanished (D29), was replaced (select-all), regrouped
+  or autocorrected, or a caret not at the end. The pass rule and the miss's wording now judge one typing.
+- **Over `priorsOf`'s earlier texts** (review round 1, M-1), as the reformat route is judged: a reading whose letters
+  and digits are exactly the value's and no start of the earlier text's plus the value's is judged as the value alone
+  too (D61's `valueAlone`). Judged after the earlier text alone, a field that adds a leading `+` under idb's unnamed
+  `+421` (`+421903123456` for `421903123456`) and a select-all field that adds a decoration (`SK31 ` after `SK3`, `abc `
+  after `ab`, `50%` after `5`) were refused, where main passed them over the right content.
+- **No tail typed again where the reading is a whole landing too** (review round 1, m-2): `droppedTail` returns none
+  when the reading holds the value at an occurrence that ends past the earlier text, or holds the value decorated with
+  no other letter or digit (`fill-landing.ts#wholeLandingToo`). `11 ` for `11` after `1` is a select-all field's `11`
+  with an eager trailing mark as much as a `1` landed with its mark and a `1` dropped; typed again, the field could
+  hold `111` and the fill end Filled over it. So nothing is typed again, and the fill fails. Main passed it, over the
+  right content; a Filled over content averi changed wrongly is the one outcome not allowed. The same for `a1 1` for `1
+  ` after `a1` (a caret inside the text) and `-5-` for `-5` after `-5` (the value typed again over itself into a
+  select-all field that adds a mark). A value found only inside the earlier text among more of it (`Note: hellohe`,
+  f16's `31.12.2021`) is no whole landing, and its tail is typed again. Brute-forced over small alphabets: no reading a
+  whole landing makes — through a select-all field, a caret anywhere in the earlier text, a leading or trailing mark —
+  is typed into again.
+- **D63's guard is folded into it.** A reading unchanged since typing began starts with the earlier text and holds
+  nothing past it, so it holds no non-empty value; the `observed === value` disjunct keeps residual 7's exception,
+  and a named placeholder equal to the value stays `placeholder`. No input tells the two apart, through the reformat
+  route either (it needs the whole of the earlier text plus the value; separator-only values, mask templates, `1,000`
+  and `+421` were tried): with D64's rule, the guard was an equivalent mutant. `unchangedSinceTyping` is removed and
+  `landingOf`'s doc says D63's rule is D64's at its limit. Every D63 test stays green, unchanged. D63's Decision is
+  superseded in form only: the behaviour it states is unchanged.
+- **Residual 8 (A)'s pin flips on purpose** (fill-landing.test.ts, renamed): `Hello worldw` for `world` after `Hello
+  world` has not landed, its dropped tail `orld`.
+- Not changed: the reformat route (`landedReformat`, `priorsOf` itself, D29's and D61's fallbacks, D51's mask
+  template), `tailOf` (eager trailing marks included), `differenceOf` (D53's `separated` among them), the clear path,
+  the masked rule, fill-type.ts's poll and retype, fill.ts. No new Difference kind, verdict reason or module; two
+  wordings gain a hedge where the reading is a whole landing too and its tail is not typed again (`wholeToo`, from
+  `wholeLandingToo`, set by `differenceOf` on every such miss): a `dropped-tail` (a grouped prefix: `11 ` after `1`)
+  adds "or the field replaced its text (select-all): fill with `clear: true`" (review round 2), a `length` (an exact
+  prefix: `-5-` after `-5`, `55` after `5`) adds "the field may have replaced its text (select-all): fill with `clear:
+  true`" (the code review). Neither is said when the typing is proven to have left the field (`elsewhere`): the reply
+  names that input instead (round 3). Every other reply byte for byte as before.
+
+**Consequences.**
+- Under the append premise (the caret at the end), each newly refused reading is a strict prefix of the earlier text
+  plus the value — a dropped tail, never `separated`; a caret elsewhere can make other shapes, which fail with the
+  wording `differenceOf` gives them. On iOS (`on-return`)
+  the retype ADR 0023 already makes runs where a false landing used to cut it off: `Note: hellohe` → `llo` typed again →
+  `Note: hellohello`, landed — a false Filled turned into a repaired fill. A capped field's one retype moves nothing and
+  the fill fails by length; keys that went into another input reach `whereTyped`, and the miss names that input. On
+  Android (`may-arrive-late`) the poll runs out and the fill fails by length. ADR 0023's "only provably missing
+  characters" holds: the tail is a strict prefix's remainder, and none is typed where the reading is a whole landing
+  too.
+- The cost is paid on failures only: the whole poll (5 reads, about 4 s on idb; 5 dumps, about 11.5 s on Android), plus
+  the iOS tail retype's own polls, where the reply was an instant false Filled. No cost on any reading that holds the
+  typing past the earlier text — every live case: b-, p-, f-, g-, rf- and rfe-cases fill empty fields or replace idb's
+  placeholder; p1 appends what its prefill does not hold; p5 is masked; p7 is refused before the tap.
+- Still landing, as before: `Hello worldworld`, `Hello world` after `Hello`, `Jan ŠťastnýJan`, a select-all `world`
+  after `Hello world`, f13's `421903123456` and `+421421903123456` after idb's `+421`, a caret mid-text (`Hello
+  woworldrld`), an autocorrected earlier text (`Hello world` after `hello `), an eager trailing mark (`SK31 1200 ` after
+  nothing or after `Note `), idb's `Search` vanished (`ear`) or kept (`Searchear`), a named `Search` placeholder, the
+  caret at the start (`Hello ` typed before `world`, `-` before `5`), and the value alone over `priorsOf`
+  (`+421903123456` after `+421`, `SK31 ` after `SK3`, `abc ` after `ab`, `50%` after `5`).
+- Refused, on the safe side: a caret not at the end whose typing leaves the reading starting with the earlier text —
+  `aba` for `ab` after `a`, `aaba` for `ab` after `aa`, `abab` for `ba` after `ab` (residual 9); and, with nothing typed
+  again, a reading that is a whole landing as well as a dropped tail (`11 ` after `1`, `a1 1` after `a1`, `-5-` after
+  `-5`).
+
+**Mutation-checked**: hand mutants, run from a copy of the file over fill-landing, fill-type, fill, fill-verdict,
+fill-text and live-forms tests (497), each killed but two. On the rule: back to the whole-reading containment (33
+tests fail); the raw reading, not `heldText` (2); `.includes` as `.startsWith` (12) and as `.endsWith` (10);
+`typedPartOf`'s fallback as `''` (34); its `startsWith` as `includes` (1: the caret at the start, `-5`); the slice one
+character back, the overlap form (13); the `observed === value` disjunct dropped (3). On `priorsOf` (M-1): the earlier
+text alone (4); `.some` as `.every` (4); the earlier text itself skipped (26). On `wholeLandingToo` (m-2): never (9);
+the across-the-seam clause dropped (2); the decorated-value clause dropped (4); an occurrence ending AT the seam
+counted (11); one character less of overlap (2); the decorated clause's `includes` dropped (1: a dropped trailing mark,
+`12/` kept `12`); its skeleton equality dropped (14); `||` as `&&` (6). On `wholeToo`: never marked on a
+`dropped-tail` (2), always marked there (13); never marked on a `length` (3), always marked there (32); marked without
+some of the typing landed (3). Equivalent: D63's guard put back (none fail: the fold); `typedPartOf`'s `prior !== ''`
+dropped (`startsWith('')` and `slice(0)` give the whole reading); before review round 1, `priorText(e)` as
+`heldText(before)` (the clear branch never reached it). `npm run mutate` (cold): fill-landing 95.73 → 95.83 % (floor
+93; 288 mutants, 12 survived, 4 timeouts — the same survivors as D63's run, none in the new code); every other
+module's score unchanged, fill-verdict's 99.33 % (floor 97) among them; floors unchanged.
+
+**Golden and live.** The golden replays tree reads and never types: Changed 0, which is no evidence either way; the
+unit tests are (fill-landing.test.ts's D64 group and the flipped pin, fill-type.test.ts's burst, cap and elsewhere
+typings on both deliveries and a whole landing not typed into again, fill.test.ts's prefilled `Hello world` on iOS
+and Android fakes). Live: a new case f16
+(form-format's `date`: `3112202` with clear, which shows `31.12.202`, then `12` without; judge `refusedCapped`, ok only
+when the app holds `31.12.2021`, the first fill passed and the last reply is an error) runs after f15 on idb, wda and
+uiautomator. Before D64 it would read MISMATCH `fill-claim`; with D64 ok — on iOS after one tail retype of `2` that moves
+nothing. A `loud-changed` there points to the caret landing inside the text, as for f15. f15 stays ok (its unchanged
+reading is refused by the folded rule, the same `unchanged` reply); no existing case's verdict moves; g1 now runs after
+f16. Not checked on the device: `live.ts --groups forms --cases f15,f16` and a regression pass of p1, f13, g1–g5 on
+idb, wda and uiautomator, a later batch's.
+
+Residuals, stated: residual 9 below; residual 8 (A) is closed; residual 8 (B) stays, moved where the skip lives (ADR 0028's D64 amendment,
+residual 3; follow-up D64b). Pre-existing, not D64's: a plain dropped tail on Android, and a capped field's on both
+platforms, is worded `length` with content withheld and no remedy named — the dropped-tail wording is D28's, for a
+grouped prefix only; a candidate follow-up (wording only). The newly refused readings' poll cost is unmeasured on a
+device. `wholeLandingToo` (m-2) costs a repair: a real dropped tail whose reading holds the value across the seam is
+not typed again and fails — `11 ` for a typed `11` after `1`, or `aaa` for `aa` after `aa`, where one key landed and
+one dropped; on small alphabets about 1 % of the dropped-tail readings, the value's head repeating the earlier text's
+end. The real-world shape (review round 2): a fill without clear whose digits repeat the field's last ones (`55` typed
+after `5`), on iOS only, where a dropped tail is typed again: it fails loudly, by length, and never ends in a wrong
+Filled. Remedy: fill with `clear: true`. Every such reply says so, since the typing may all have landed (`wholeToo`:
+the `dropped-tail` and `length` hedges above).
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
@@ -698,4 +827,10 @@ blur is refused, as it already was when `before` was empty.
    would close it. (B) On Android, fill.ts skips the post-focus re-read for a sole-id selector on an empty plain field
    and takes `before` as empty; a field that inserts `+421 ` on focus and takes no key reads `+421 `, which contains a
    typed `421`, and replies Filled. Both are pinned as today's behaviour in fill-landing.test.ts. Follow-up: backlog
-   row D64.
+   row D64. See the D64 amendment below, and ADR 0028's D64 amendment.
+9. **A caret not at the end, whose typing leaves the reading starting with the earlier text, is refused** (D64's
+   amendment, restated in review round 1): without clear, `ab` typed before an earlier `a` reads `aba`, `ab` typed
+   inside `aa` reads `aaba`, `ba` typed inside `ab` reads `abab` — each starts with the earlier text and holds no value
+   past it, though the field holds the value. The focus tap leaves the caret at the end (the premise of ADR 0023's
+   retype); a caret inside the text that breaks the literal start is judged whole, as before. Remedy: fill with
+   `clear: true`.

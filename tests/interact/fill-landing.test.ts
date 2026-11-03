@@ -414,12 +414,16 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
     expect(landingOf('Hello world ', expecting(e(' ', 'Hello world')))).toEqual({ kind: 'landed' });
   });
 
-  // ADR 0034 residual 8 (follow-up D64): what D63 does not refuse — pinned as today's behaviour, not as wanted
-  it('residual 8 (A): a reading that moved but holds no new typing still lands by containment in the earlier text', () => {
-    // `w` landed, `orld` went elsewhere: the value is found inside the earlier text `Hello world`
-    expect(landingOf('Hello worldw', expecting(e('world', 'Hello world')))).toEqual({ kind: 'landed' });
+  // ADR 0034 residual 8 (A), pinned here as D63 left it (landed: the value found inside the earlier text), flipped on
+  // purpose by D64: without clear the value must be in what was typed past the earlier text, and `w` is all of it here
+  it('D64 (A): a reading that moved but holds none of the typing past the earlier text has not landed; its tail is dropped', () => {
+    // `w` landed, `orld` went elsewhere: the value is only inside the earlier text `Hello world`
+    expect(landingOf('Hello worldw', expecting(e('world', 'Hello world')))).toBeUndefined();
+    expect(droppedTail('Hello worldw', e('world', 'Hello world'))).toBe('orld');
   });
 
+  // a `before` of `''` is taken at its word (an eager formatter can turn a typed `421` into `+421 ` from a truly empty
+  // field): the focus-inserted case is fill.ts's skipped re-read, ADR 0028's residual 3 since D64 (follow-up D64b)
   it('residual 8 (B): Android\'s skipped post-focus re-read takes `before` as empty; a `+421 ` inserted on focus, no key landed, lands', () => {
     expect(landingOf('+421 ', expecting(e('421', '')))).toEqual({ kind: 'landed' });
   });
@@ -441,6 +445,146 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
  * for; `before` defaults to null (nothing shown when typing began), `clear`
  * to false.
  */
+/**
+ * D64 (A): without clear, the exact rule searched the WHOLE reading, earlier text included, for the value — so a reading
+ * that moved but held none of the typing passed whenever the earlier text held the value: a length cap (the lab's date
+ * `31.12.202` typed `12` keeps `31.12.2021`), an iOS React Native burst that kept a prefix (`Note: hellohe`), keys that
+ * went into another input. The value must now be in what was typed past the earlier text — `differenceOf`'s own notion
+ * of the typing (`typedPartOf`): what follows the earlier text when the reading still starts with it literally, else the
+ * whole reading. Such a reading is a dropped tail, which iOS types again.
+ */
+describe('without clear, the value must be in the typing past the earlier text (D64)', () => {
+  const e = (value: string, before: string | null, f: Partial<Expectation> = {}) => expecting({ value, before, ...f });
+
+  it.each([
+    ['Hello worldwor', 'world', 'Hello world', 'ld', 'a 14-character cap'],
+    ['31.12.2021', '12', '31.12.202', '2', "the lab's date at its 8-digit cap (f16)"],
+    ['Note: hellohe', 'hello', 'Note: hello', 'llo', 'an iOS React Native burst that kept a prefix'],
+  ])('`%s` typed `%s` after `%s`: no landing, the tail `%s` dropped, the difference a length (%s)', (shown, value, before, tail) => {
+    expect(landingOf(shown, e(value, before))).toBeUndefined();
+    expect(droppedTail(shown, e(value, before))).toBe(tail);
+    expect(differenceOf(shown, e(value, before))).toEqual({ kind: 'length' });
+  });
+
+  // the overlap form (an occurrence that only ENDS past the earlier text) would pass this: only `ld` landed
+  it('a typing whose value is found only across the seam is no landing (`Hello wor` typed `world` reads `Hello world`)', () => {
+    expect(landingOf('Hello world', e('world', 'Hello wor'))).toBeUndefined();
+  });
+
+  it.each([
+    ['Hello worldworld', 'world', 'Hello world', 'the whole typing after the earlier text'],
+    ['Hello world', 'world', 'Hello', 'an earlier text that does not hold the value'],
+    ['Jan ŠťastnýJan', 'Jan', 'Jan Šťastný', 'a prefilled name that holds the value'],
+    ['world', 'world', 'Hello world', 'a select-all field that replaced its text with the value'],
+    ['421903123456', '421903123456', '+421', "idb's unnamed placeholder replaced (f13)"],
+    ['+421421903123456', '421903123456', '+421', "idb's unnamed placeholder kept"],
+    ['Hello woworldrld', 'world', 'Hello world', 'the caret inside the text: the reading no longer starts with it, judged whole'],
+    ['Hello world', 'world', 'hello ', 'an earlier text autocorrected: judged whole'],
+    ['SK31 1200 ', 'SK31 1200', '', 'an eager trailing mark, nothing before'],
+    ['Note SK31 1200 ', 'SK31 1200', 'Note ', 'an eager trailing mark after an earlier text'],
+    ['ear', 'ear', 'Search', "idb's unnamed placeholder vanished"],
+    ['Searchear', 'ear', 'Search', "idb's unnamed placeholder kept"],
+    ['+421 421', '421', '+421 ', 'an earlier text that holds the value, the typing after it'],
+  ])('`%s` typed `%s` after `%s` lands as before (%s)', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toEqual({ kind: 'landed' });
+  });
+
+  it('a named placeholder is no earlier text: `Searchear` and `Search ear` for `ear` land', () => {
+    expect(landingOf('Searchear', e('ear', 'Search', { placeholder: 'Search' }))).toEqual({ kind: 'landed' });
+    expect(landingOf('Search ear', e('ear', null, { placeholder: 'Search' }))).toEqual({ kind: 'landed' });
+  });
+
+  // the earlier text must START the reading to be cut off: one found later is part of the typing
+  it('the caret at the start: `Hello ` typed before `world` reads `Hello world`, which lands', () => {
+    expect(landingOf('Hello world', e('Hello ', 'world'))).toEqual({ kind: 'landed' });
+  });
+
+  // the same where the reading's letters and digits still start with the earlier text's, so no prior but it is tried
+  // (`priorsOf`): a sign typed at the caret before the number
+  it('the caret at the start: `-` typed before `5` reads `-5`, which lands', () => {
+    expect(landingOf('-5', e('-', '5'))).toEqual({ kind: 'landed' });
+  });
+
+  it('with clear the rule is equality, untouched', () => {
+    expect(landingOf('Hello worldw', e('Hello worldw', 'Hello world', { clear: true }))).toEqual({ kind: 'landed' });
+  });
+
+  // review round 1, M-1: the earlier text is judged over D61's priors — a reading whose letters and digits are exactly
+  // the value's, and no start of the earlier text's plus the value's, is judged as the value alone too (`valueAlone`)
+  it.each([
+    ['+421903123456', '421903123456', '+421', "a leading `+` the field adds, under idb's unnamed `+421`"],
+    ['SK31 ', 'SK31', 'SK3', 'a select-all field and an eager trailing mark'],
+    ['abc ', 'abc', 'ab', 'a select-all field and a trailing space'],
+    ['50%', '50', '5', 'a select-all field and a decoration'],
+  ])('`%s` typed `%s` after `%s` lands (%s): the value alone (D61)', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toEqual({ kind: 'landed' });
+  });
+
+  // review round 1, m-2: a reading that holds the value across the seam (an occurrence that ends past the earlier
+  // text) is also explained as a full landing — a select-all field with an eager mark, a caret not at the end — so its
+  // "tail" is not typed again: retyped, the field could end Filled over content the retype made wrong
+  it.each([
+    ['11 ', '11', '1', 'a select-all field and an eager trailing mark, or `1` landed with a mark'],
+    ['a1 1', '1 ', 'a1', 'the caret inside the text'],
+    ['Hello world', 'world', 'Hello wor', 'only `ld` landed, the value across the seam'],
+  ])('`%s` typed `%s` after `%s` (%s): no landing, and no tail to type again', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toBeUndefined();
+    expect(droppedTail(shown, e(value, before))).toBeUndefined();
+  });
+
+  // the value typed again over itself (residual 7's shape) into a select-all field that adds a mark: the reading is the
+  // value, decorated, wholly inside the earlier text's span — a whole landing as much as a dropped tail
+  it.each([
+    ['-5-', '-5', '-5'],
+    [' 42 ', ' 42', ' 42'],
+  ])('`%s` typed `%s` after `%s`: the value alone, decorated — no tail to type again', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toBeUndefined();
+    expect(droppedTail(shown, e(value, before))).toBeUndefined();
+  });
+
+  // the decorated-value clause asks that the reading hold the value: a dropped trailing mark has the value's letters
+  // and digits but not the value, and is typed again
+  it('a typed `12/` that kept `12` (with or without an earlier text) still has its `/` typed again', () => {
+    expect(droppedTail('12', e('12/', null))).toBe('/');
+    expect(droppedTail('Note: 12', e('12/', 'Note: '))).toBe('/');
+  });
+
+  // review round 2, NIT-2: the miss keeps its kind, and says it is a whole landing too, for the wording
+  it('differenceOf: `11 ` after `1` and `a1 1` after `a1` are dropped tails that are whole landings too', () => {
+    expect(differenceOf('11 ', e('11', '1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
+    expect(differenceOf('a1 1', e('1 ', 'a1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
+  });
+
+  // D64 code review: every shape whose tail is not typed again is marked, whatever its kind — an exact prefix reads
+  // `length`
+  it.each([
+    ['-5-', '-5', '-5'],
+    [' 42 ', ' 42', ' 42'],
+    ['55', '55', '5'],
+  ])('differenceOf: `%s` for `%s` after `%s`, no tail typed again, is a length that is a whole landing too', (shown, value, before) => {
+    expect(differenceOf(shown, e(value, before))).toEqual({ kind: 'length', wholeToo: true });
+  });
+
+  it('differenceOf: a length whose tail is typed again is not marked (`Hello worldwor`, the seam `Hello world`)', () => {
+    expect(differenceOf('Hello worldwor', e('world', 'Hello world'))).toEqual({ kind: 'length' });
+    expect(differenceOf('Hello world', e('world', 'Hello wor'))).toEqual({ kind: 'length' });
+  });
+
+  it('a value only inside the earlier text is no full landing: the tail is still typed again (`Note: hellohe`, f16)', () => {
+    expect(droppedTail('Note: hellohe', e('hello', 'Note: hello'))).toBe('llo');
+    expect(droppedTail('31.12.2021', e('12', '31.12.202'))).toBe('2');
+  });
+
+  // ADR 0034's D64 amendment, residual R-a: on the safe side
+  it.each([
+    ['aba', 'ab', 'a', 'the caret at the start'],
+    ['aaba', 'ab', 'aa', 'the caret inside the text'],
+    ['abab', 'ba', 'ab', 'the caret inside the text'],
+  ])('residual 9: `%s` for `%s` after `%s` (%s), the reading still starting with the earlier text, is refused', (shown, value, before) => {
+    expect(landingOf(shown, e(value, before))).toBeUndefined();
+  });
+});
+
 describe('differenceOf — what a missed read-back differs by, without content', () => {
   /** A row: the reading, and what it is judged against. */
   type Row = { observed: string } & Partial<Expectation> & Pick<Expectation, 'value'>;

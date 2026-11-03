@@ -68,26 +68,41 @@ export const refusedKept =
   };
 
 /**
- * f15 (D63): a field that refuses the keys while its text already holds the value — form-format's `date` at its 8-digit
- * cap, `31.12.2026` after a first fill, typed `2026` without clear. Before D63 averi passed that unchanged reading by
- * containment, and `holds` cannot catch it: the app does hold `kept`. Ok only when the app still holds `kept`, the first
- * fill did not fail, and the last reply is an error that says the field did not change. A claim of done is a MISMATCH
- * `fill-claim`; the field changed is LOUD `loud-changed`; the first fill failed over `kept` is a MISMATCH `failed-holds`
- * (its kind); kept but not refused as unchanged — another error — is LOUD `loud-untouched`.
+ * A second fill without clear that the field refuses, though its text already holds the value — so `holds` cannot catch
+ * a false Filled: the app does hold `kept`. Ok only when the app holds `kept`, the first fill did not fail, and the last
+ * reply is an error (saying `phrase`, when given). A claim of done is a MISMATCH `fill-claim`; the field other than
+ * `kept` is LOUD `loud-changed`; the first fill failed over `kept` is a MISMATCH `failed-holds` (its kind); kept, but
+ * no error saying `phrase` and no claim either, is LOUD `loud-untouched`. f15's and f16's judge (below).
  */
-export const refusedUnchanged =
-  (tag: string, kept: string) =>
+export const refusedHolding =
+  (tag: string, kept: string, phrase?: string) =>
   (s: LabState, replies: string[], _source: Source, _launched: LabState): LiveVerdict => {
     const got = valueOf(s, tag);
     const [first] = replies;
     const last = replies[replies.length - 1];
     const kind = replyKind(last);
+    const refused = phrase === undefined ? 'refused' : `refused as "${phrase}"`;
     if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the field refused the typing; the app holds ${JSON.stringify(got)}` };
     if (got !== kept) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(kept)}; averi: ${short(last)}` };
     if (isError(first)) return { outcome: 'MISMATCH', cls: 'failed-holds', kind: replyKind(first), why: `the app holds ${JSON.stringify(kept)}, but averi failed the first fill: ${short(first)}` };
-    if (!isError(last) || !last.includes('did not change')) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the field kept ${JSON.stringify(kept)}, but not refused as unchanged: ${short(last)}` };
-    return { outcome: 'ok', kind, why: `refused as unchanged, the field kept ${JSON.stringify(kept)}: ${short(last)}` };
+    if (!isError(last) || (phrase !== undefined && !last.includes(phrase))) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the field kept ${JSON.stringify(kept)}, but not ${refused}: ${short(last)}` };
+    return { outcome: 'ok', kind, why: `${refused}, the field kept ${JSON.stringify(kept)}: ${short(last)}` };
   };
+
+/**
+ * f15 (D63): a field that refuses the keys while its text already holds the value — form-format's `date` at its 8-digit
+ * cap, `31.12.2026` after a first fill, typed `2026` without clear. Before D63 averi passed that unchanged reading by
+ * containment. The error must say the field did not change (`refusedHolding`).
+ */
+export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(tag, kept, 'did not change');
+
+/**
+ * f16 (D64): a field at its length cap that keeps only the head of the typing while its earlier text holds the value —
+ * form-format's `date` holding `31.12.202` after a first fill, typed `12` without clear, keeps the `1`: `31.12.2021`.
+ * Before D64 averi passed that reading by containment (the `12` inside `31.12`). The error's wording is not judged: a
+ * tail typed again on iOS and the poll on Android word it alike, by length (`refusedHolding`).
+ */
+export const refusedCapped = (tag: string, kept: string) => refusedHolding(tag, kept);
 
 /**
  * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds, over the fill's reply), AND the tree shows

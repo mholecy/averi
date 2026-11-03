@@ -3,8 +3,8 @@
  * Until then that was judged in four modules by three rules of the earlier text, and D28 and D29 were both bugs of
  * the typing and the verdict judging the same reading differently. Three questions, one answer each:
  * - `landingOf`: did this reading land — exactly, reformatted, or only as the field's placeholder — or is it a masked
- *   reading that proves the field was wrongly said plain? Without clear, a reading unchanged since typing began has not
- *   landed unless it is the value itself (D63).
+ *   reading that proves the field was wrongly said plain? Without clear, the value must be in what was typed past the
+ *   earlier text, unless the reading is the value itself (D64; a reading unchanged since typing began holds none, D63).
  * - `tailOf` (and `droppedTail`): is it a strict prefix of what the field should hold — the tail a field dropped?
  * - `differenceOf`: what can be said of a reading that missed, without content?
  * interact/fill-type.ts asks the first two as it types, polls and retypes; it asks the third once, for a typing that
@@ -61,18 +61,19 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
 /**
  * Whether a reading landed, and how; undefined when it did not. The rules:
  * - a non-input proves it took the text only by CHANGING to show it (`tookText`);
- * - without clear, a reading still exactly what the field showed when typing began has not landed, unless it is the
- *   value itself (`unchangedSinceTyping`, D63);
  * - a field that reformats as it is typed (D18) lands when it shows what it should hold — its earlier text, unless
  *   cleared, then the value — every typed character in order, separators of its own added (`landedReformat`);
  * - else the reading must show the value exactly (`showsExactly`): with clear the whole reading, without it inside what
- *   the field holds; a masked reading by length.
+ *   was typed past the earlier text (D64); a masked reading by length.
+ * D63's rule — without clear, a reading still exactly what the field showed when typing began has not landed, unless it
+ * is the value itself — is D64's at its limit: such a reading starts with the earlier text and holds nothing past it.
+ * No reading tells the two apart for any Expectation fill.ts builds, through the reformat route either (a reformat
+ * needs the whole of the earlier text plus the value), so it is no separate guard.
  * A landed reading is `said-plain` when it shows bullets said plain (`bulletsSaidPlain`) and is longer than typed (a
  * shorter one has not landed), else `placeholder` when it is exactly the named placeholder. Pure.
  */
 export function landingOf(observed: string, e: Expectation): Landing | undefined {
   if (!tookText(observed, e)) return undefined;
-  if (unchangedSinceTyping(observed, e)) return undefined;
   const reformatted = landedReformat(observed, e);
   if (reformatted === undefined && !showsExactly(observed, e)) return undefined;
   if (bulletsSaidPlain(observed, e) && observed.length !== e.value.length) return { kind: 'said-plain' };
@@ -92,18 +93,6 @@ export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInp
   e.isInput || (observed !== e.resolvedValue && (isMaskedValue(observed) || observed.includes(e.value)));
 
 /**
- * D63: without clear, a reading still exactly what the field showed when typing began has not landed — unless it is the
- * value itself. `tookText`'s rule for a non-input, extended to an input typed without clear: the exact rule asks only
- * that the reading CONTAIN the value, and an earlier text that already held it passed with nothing typed into the field
- * — a field that refused the keys (a length cap: the lab's date `31.12.2026` typed `2026`), keys that went into another
- * input, idb's unnamed placeholder holding the value (`+421` typed `421`). The poll then reads on, and a typing that
- * never reached the field ends on `differenceOf`'s `unchanged`. The value itself is excepted: a reading that is both
- * the earlier text and the value cannot be told from a select-all field that retyped it, or a placeholder equal to it —
- * it still lands (ADR 0034's D63 amendment, residual 7).
- */
-const unchangedSinceTyping = (observed: string, e: Pick<Expectation, 'value' | 'clear' | 'before'>): boolean => !e.clear && observed === e.before && observed !== e.value;
-
-/**
  * The reading shows the value as typed.
  *
  * A masked (secure) field shows one bullet per character to uiautomator and WDA alike, so its content can never EQUAL
@@ -118,11 +107,29 @@ const unchangedSinceTyping = (observed: string, e: Pick<Expectation, 'value' | '
  * A placeholder is not content: on an empty field showing `Search`, nothing typed must not pass for a typed `ear`. Raw
  * equality first: a value equal to the placeholder is the one reading that cannot be told from it (`landingOf`'s
  * `placeholder`; fill-facts.ts#heldText).
+ *
+ * D64: without clear, the value must be in what was typed past the earlier text (`typedPartOf`, `differenceOf`'s own
+ * notion of the typing), not anywhere in the reading. The whole reading was searched until then, so one that moved but
+ * held none of the typing passed whenever the earlier text held the value: a length cap (the lab's date `31.12.202`
+ * typed `12` keeps `31.12.2021`), an iOS React Native burst that kept a prefix (`Note: hellohe`), keys that went into
+ * another input. Such a reading is now a dropped tail — typed again on iOS — or a miss that names where the keys went.
+ * A reading that no longer starts with the earlier text literally is judged whole, as before: an earlier text that
+ * vanished (D29), was replaced (select-all), autocorrected, or a caret not at the end. The earlier texts are
+ * `priorsOf`'s, as for a reformat (review round 1, M-1): a reading whose letters and digits are exactly the value's and
+ * no start of the earlier text's plus the value's is judged as the value alone too (D61) — a field that adds a leading
+ * `+` under idb's unnamed `+421` (`+421903123456`), a select-all field that adds a mark (`SK31 ` after `SK3`, `50%`
+ * after `5`). D63's rule is this one at its limit (`landingOf`). The value itself is excepted: a reading that is both
+ * the earlier text and the value cannot be told from a select-all field that retyped it, or a placeholder equal to it
+ * — it still lands (ADR 0034's D63 amendment, residual 7). The limit, on the safe side: a caret not at the end whose
+ * typing leaves the reading starting with the earlier text (`aba` for `ab` after `a`) is refused (ADR 0034's D64
+ * amendment, residual 9).
  */
 function showsExactly(observed: string, e: Expectation): boolean {
   const { value, clear } = e;
   if (isMaskedValue(observed)) return clear ? observed.length === value.length : observed.length >= heldCount(e) + value.length;
-  return clear ? observed === value : observed === value || heldText(observed, e.placeholder).includes(value);
+  if (clear) return observed === value;
+  const held = heldText(observed, e.placeholder);
+  return observed === value || priorsOf(held, e).some((prior) => typedPartOf(held, prior).includes(value));
 }
 
 /** The bullets the field held after focus, an unread count as none. */
@@ -240,11 +247,37 @@ export function tailOf(observed: string, e: TextExpectation): Tail | undefined {
 
 /**
  * The characters the field dropped from the END of the typing (`tailOf`, with some of the typing landed: `landedSome`),
- * or undefined when its reading does not prove that. What fill-type.ts types again (ADR 0023). Pure.
+ * or undefined when its reading does not prove that — also when it is explained as a whole landing as well
+ * (`wholeLandingToo`). What fill-type.ts types again (ADR 0023). Pure.
  */
 export function droppedTail(observed: string, e: TextExpectation): string | undefined {
   const tail = tailOf(observed, e);
-  return landedSome(tail) ? tail.missing : undefined;
+  return landedSome(tail) && !wholeLandingToo(heldText(observed, e.placeholder), e) ? tail.missing : undefined;
+}
+
+/**
+ * D64 review round 1, m-2: a held reading that has not landed but is explained as a whole landing as well as a dropped
+ * tail — its "tail" is not typed again. Typed again, it could leave the field holding content the retype made wrong
+ * and the fill end Filled over it (until D64 such readings passed by containment, over the right content). So nothing
+ * is typed again and the fill fails — the safe side. Two shapes:
+ * - the value at an occurrence that ends past the earlier text, not wholly inside it: `11 ` for `11` after `1` (a
+ *   select-all field's `11` with an eager trailing mark, or `1` landed with the mark and `1` dropped — typed again,
+ *   `111`); `a1 1` for `1 ` after `a1` (the typing at a caret inside the text);
+ * - the value, decorated, and no other letter or digit — `skeleton` equal — though inside the earlier text's span: the
+ *   value typed again over itself (residual 7's shape) into a select-all field that adds a mark (`-5-` for `-5` after
+ *   `-5`).
+ * A value found only inside the earlier text among more of it (`Note: hellohe` for `hello` after `Note: hello`, f16's
+ * `31.12.2021`) is no whole landing, and its tail is typed again. `differenceOf` marks every such miss `wholeToo` — a
+ * `dropped-tail` where the field grouped the prefix (`11 `, `a1 1`), a `length` where it is exact (`-5-`, `55` after
+ * `5`) — and its reply names the select-all reading and `clear: true`. Brute-forced (D64 review round 1) over small
+ * alphabets: no reading that a select-all field, a caret anywhere in the earlier text, or a leading or trailing mark
+ * makes of a whole landing is typed into again.
+ */
+function wholeLandingToo(held: string, e: TextExpectation): boolean {
+  // The first index an occurrence of the value can start at and still end past the earlier text; a negative start is
+  // read from 0 by indexOf.
+  const firstEndPastPrior = priorText(e).length - e.value.length + 1;
+  return held.indexOf(e.value, firstEndPastPrior) !== -1 || (held.includes(e.value) && skeleton(held) === skeleton(e.value));
 }
 
 /**
@@ -284,10 +317,13 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
   if (hasBullet(observed)) return { kind: 'length' };
   // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   const tail = tailOf(observed, e);
-  if (landedSome(tail) && tail.reformatted !== undefined) {
-    return { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 };
-  }
   const held = heldText(observed, e.placeholder);
+  // D64: a tail `droppedTail` would not type again, the reading a whole landing too — said in the reply's wording.
+  const wholeToo = landedSome(tail) && wholeLandingToo(held, e);
+  if (landedSome(tail) && tail.reformatted !== undefined) {
+    const dropped = { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 } as const;
+    return wholeToo ? { ...dropped, wholeToo } : dropped;
+  }
   // D53: every typed character there, in order, with separators the rules refused as grouping — never "a length".
   const added = overPriors(held, e, (whole) => separatedOf(held, whole));
   if (added !== undefined) return { kind: 'separated', added };
@@ -307,22 +343,25 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
     if (caseAlone && differ > 0 && (caseOnly === undefined || differ < caseOnly)) caseOnly = differ;
   }
   if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
-  if (typed.length !== value.length) return { kind: 'length' };
+  // an exact strict prefix ends here: its typed part is shorter than the value, so no run is compared
+  if (typed.length !== value.length) return wholeToo ? { kind: 'length', wholeToo } : { kind: 'length' };
   let differ = 0;
   for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;
   return { kind: 'same-length', positions: differ };
 }
 
 /**
- * What `differenceOf` compares of a held reading: what came AFTER the earlier text (`prior`), when the reading still
- * starts with it LITERALLY (typing appends at the cursor, which the focus tap leaves at the end), else the whole
- * reading — the limit: a run of the old text can then be named as the "transformed" typing.
+ * The typing in a held reading — what `differenceOf` compares, and where `showsExactly` looks for the value without
+ * clear (D64): what came AFTER the earlier text (`prior`), when the reading still starts with it LITERALLY (typing
+ * appends at the cursor, which the focus tap leaves at the end), else the whole reading — the limit: a run of the old
+ * text can then be named as the "transformed" typing.
  *
  * Deliberately not `priorsOf`'s letters-and-digits rule: a skeleton match cannot be sliced back to reading positions
  * (an earlier `1,000` that a regrouping field shows, with `5678` typed, as `10,005,678` starts with `1000` by its
  * letters and digits, but no slice of the reading is the typing), and an earlier text that vanished (D29) is compared
  * whole here as it is there. No input was found where the two rules give another Difference, and a Difference never
- * changes pass or fail — it words the failure.
+ * changes pass or fail — it words the failure. The landing and the wording judge one typing: a reading passes only on
+ * the part of it that a miss would name.
  */
 function typedPartOf(shown: string, prior: string): string {
   return prior !== '' && shown.startsWith(prior) ? shown.slice(prior.length) : shown;
