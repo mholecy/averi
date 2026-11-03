@@ -109,6 +109,11 @@ describe('chooserInFocus — API 29\'s `mFocusedApp`, an ActivityRecord inside a
     expect(chooserInFocus(api29('null', RESOLVER))).toBe(RESOLVER);
   });
 
+  it('`mFocusedApp=null`: an ActivityRecord on a later line is not the focused activity — the window decides', () => {
+    const dump = `  mCurrentFocus=null\n  mFocusedApp=null\n  mResumedActivity: ActivityRecord{6909a9c u0 ${RESOLVER} t2590}\n`;
+    expect(chooserInFocus(dump)).toBeUndefined();
+  });
+
   it('the chooser the focus window, an app the focused activity (a chooser on its way out): undefined — "Opened"', () => {
     expect(chooserInFocus(api29(`Window{56b9ca0 u0 ${RESOLVER}}`, 'dev.averi.lab/.MainActivity'))).toBeUndefined();
   });
