@@ -416,7 +416,10 @@ describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', (
   it('batch-10\'s fresh chooser: the title, both rows at their ROW\'s centre (not the label\'s), both buttons disabled; 2057.5 rounds to 2058', async () => {
     const tree = await fresh();
     expect(one(tree, 'button_once').rect).toEqual({ x: 604, y: 1983, width: 238, height: 149 });
-    expect(chooserSheet(tree)).toEqual(SHEET);
+    const sheet = chooserSheet(tree);
+    expect(sheet).toEqual(SHEET);
+    // A row with no `text2` has no `detail` key at all (toEqual alone would take `detail: undefined` for it).
+    expect(Object.keys(sheet?.apps[0] ?? {})).toEqual(['label', 'centre']);
   });
 
   it('batch-11\'s selected chooser (one row tapped): the same sheet, neither button disabled', async () => {
@@ -453,6 +456,7 @@ describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', (
     const tree = await fresh();
     one(tree, 'text2').label = '';
     expect(chooserSheet(tree)?.apps[1]).toEqual({ label: 'AveriLab', centre: { x: 540, y: 1881 } });
+    expect(Object.keys(chooserSheet(tree)?.apps[1] ?? {})).toEqual(['label', 'centre']);
   });
 
   /** Each shape the guard refuses: anything but the measured layout fails open (undefined, today's reply). */
