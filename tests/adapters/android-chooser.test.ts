@@ -42,7 +42,7 @@ describe('chooserInFocus — an app, the launcher or no focus in front is no cho
   });
 });
 
-describe('chooserInFocus — either line names it (synthetic lines)', () => {
+describe('chooserInFocus — the focused activity decides; the focused window only when no activity is named (synthetic lines)', () => {
   it('no focus window yet, the chooser already the focused activity (the start resumed it, its window not drawn): the chooser', () => {
     expect(chooserInFocus(focus('null', RESOLVER))).toBe(RESOLVER);
   });
@@ -51,13 +51,17 @@ describe('chooserInFocus — either line names it (synthetic lines)', () => {
     expect(chooserInFocus(focus('Window{9d5e433 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}', RESOLVER))).toBe(RESOLVER);
   });
 
-  it('the chooser the focus window, an app the focused activity: the chooser', () => {
-    expect(chooserInFocus(focus(`Window{56b9ca0 u0 ${RESOLVER}}`, 'dev.averi.lab/.MainActivity'))).toBe(RESOLVER);
+  it('the chooser the focus window, an app the focused activity (a chooser on its way out, the link\'s app resumed): undefined', () => {
+    expect(chooserInFocus(focus(`Window{56b9ca0 u0 ${RESOLVER}}`, 'dev.averi.lab/.MainActivity'))).toBeUndefined();
   });
 
-  it('the focus window\'s component first, when the two lines name two choosers', () => {
+  it('the chooser the focus window and no focused activity line: the chooser', () => {
+    expect(chooserInFocus(`  mCurrentFocus=Window{56b9ca0 u0 ${RESOLVER}}\n`)).toBe(RESOLVER);
+  });
+
+  it('the focused activity\'s component, when the two lines name two choosers', () => {
     const chooser = 'android/com.android.internal.app.ChooserActivity';
-    expect(chooserInFocus(focus(`Window{56b9ca0 u0 ${chooser}}`, RESOLVER))).toBe(chooser);
+    expect(chooserInFocus(focus(`Window{56b9ca0 u0 ${chooser}}`, RESOLVER))).toBe(RESOLVER);
   });
 });
 
@@ -105,8 +109,8 @@ describe('CHOOSER_FOCUS_COMMAND — the two focus lines of `dumpsys window displ
 describe('CHOOSER_ADVICE — what the reply advises, and that averi taps nothing', () => {
   it('is the one wording: pick the app, "Just once", never "Always"; BACK drops the link; averi taps nothing', () => {
     expect(CHOOSER_ADVICE).toBe(
-      'Take a ui_snapshot, tap the app you mean, then its "Just once" button (never "Always": it changes the ' +
-        "device's default for such links); press_key back drops the link. averi taps nothing itself.",
+      'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
+        "changes the device's default for such links); press_key back drops the link. averi taps nothing itself.",
     );
   });
 });

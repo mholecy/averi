@@ -155,8 +155,8 @@ describe('deepLinkText', () => {
     expect(deepLinkText('android', 'averilab://shared/open', { chooser: { component: RESOLVER } })).toBe(
       'Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
         'is in front, asking which app opens it. Take a ui_snapshot, tap the app you mean, then its "Just once" button ' +
-        '(never "Always": it changes the device\'s default for such links); press_key back drops the link. averi taps ' +
-        'nothing itself.',
+        'if it shows one (never "Always": it changes the device\'s default for such links); press_key back drops the ' +
+        'link. averi taps nothing itself.',
     );
   });
 
