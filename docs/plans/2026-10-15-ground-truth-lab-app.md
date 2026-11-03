@@ -505,6 +505,23 @@ through D60's retype from the eager mark; rfe3 the expected MISMATCH ×10. The s
 kept the batch's from-launch D59 leg from running: its probe wanted a `lab.<cell>.*` id on screen, and none is there at
 launch.
 
+Read on the device (batch-10, 2026-11-03, main 139256a2, the iOS simulator 27.0 and averi_lab API 33; the outcomes are
+in the performance backlog's rows). The forms group, two runs of the new cases and one whole-group run on each of
+uiautomator, idb and wda: g3, f15 and f16 ok 3/3 on every source (D61, D63, D64), g4, g5 and f13 too. The regression:
+idb and wda PASS, 46 cases, 42 ok, nothing unexpected (known: b1d, b7 and p5; g2 the expected D53 MISMATCH);
+uiautomator 54 cases, 49 ok, b1d and b7 known, g2 ok as in batch-9, nothing unexpected — INCONCLUSIVE only because
+kf1–kf3 were SKIPPED, each "keyboard docked (the app hears an IME 822 px tall, not the floating strip)". That is the
+environment, not averi: form-keyboard-floating needs Gboard switched to Floating by hand on averi_lab (no adb command
+or setting switches it, above), the batch left it docked, and each case's own precondition skipped it; a later batch
+with Gboard floated runs them. (The batch's first forms block never ran: its precheck grepped for D63's
+`unchangedSinceTyping`, which D64 folded away; it was re-run on the same main, proving D61 and D63 by ancestry.)
+`averilab://shared`'s chooser tree was captured (D55, D55c): both rows' `android:id/text1` say "AveriLab", the
+alias's `android:id/text2` "AveriLab twin"; the rows, children of `resolver_list`, are not clickable in the dump (the
+ListView takes the click), and `button_once` and `button_always` are disabled until a row is selected. The free
+carousels from a fresh launch (D59): 12/12 `stuck`, the lab counting 0 carousel strokes — the swipes went over the
+vertical page (D59b). carousel-recycler-free's false "fully visible" (D62) did not recur in 13 runs, every stroke
+taken at rest.
+
 ## Workflow per bug, once phase 3 is in
 
 1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,
