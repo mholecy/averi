@@ -493,8 +493,8 @@ truth corpus and the golden do not move: an uncaptured cell makes no golden row)
   second handler; `averilab://cell` keeps one.
 
 The three apps spell the two formats alike (Forms.kt, Forms.swift, the RN app's src/format.ts); the table is
-tests/truth/lab-format.test.ts. No LIVE_KNOWN entry: the cases' device outcomes are batch-9's to read.
-See ADR 0034 residual 10.
+tests/truth/lab-format.test.ts. batch-9 read the cases on the device; g2 and rfe3 are filed in live-known.ts since T3,
+under ADR 0034 residual 10, and g2 is ok on Android.
 
 Read on the device (batch-9, 2026-11-03, main e734fedf, the iOS simulator 27.0 and averi_lab API 33; the outcomes are in
 the performance backlog's rows): g1, g4 and g5 ok on every source; g2 the expected `separated` MISMATCH on idb and WDA

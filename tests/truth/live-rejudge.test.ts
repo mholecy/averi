@@ -11,21 +11,13 @@ import type { LabState } from '../../scripts/truth/schema.js';
 import { readLiveRecord, type LiveRecord, type RecordedCase, withFieldValue } from '../helpers/live-records.js';
 
 /**
- * The live golden's committed visibility records (docs/truth/live-records: android-vis.json, round 6's device check;
- * android-vis-hint-ea070d2.json, its closing review's run of the active-window hint; android-vis-sheet-dialog-run1…3.json
- * and android-hint-everywhere-*-c2c4.json, round 7's A7 and A3; ios-vis.json and
- * ios-wda-bounded-long-list-11683c3-1…3.json, round 6's iOS device check; ios-wda-long-list-parked-1…3.json and
- * ios-wda-vis-parked.json, round 7's A2; ios-wda-stop-carousel-r23-*.json, ios-vis-r23-ios-stop-e687fe83.json,
- * ios-wda-forms-r23*.json and ios-wda-cut-cells-r23*.json, round 7's A1; ios-keyboard-fallbacks-*.json, A4's;
- * ios-rn-forms-a9-*.json and ios-forms-a9.json, A9's; ios-idb-sheet-a5-*.json and ios-idb-vis-a5.json, A5's;
- * android-k7-eyes-{1,2,3,r1}.json and android-forms-eyes.json, A6's; the *-r7final*.json, round 7's final device check;
- * ios-scroll-bounded-wda-2725e76-*.json, round 5's; ios-forms-r8-l2-*.json, round 8's L2 fix and the src before it; ios-vis-r8-l4-*.json, its L4 fix and the src before it; ios-vis-r9-l4w-*.json, round 9's fix of L4's remaining half; android-vis-r9-b4l1*.json, round 9's B4-L1 fix and its first src; *-r9-final*.json, round 9's final device check; android-vis-r14-le1.json, round 14's LE1 fix; android-vis-r14-va1*.json, its VA1 fix; android-vis-r14-lv1*.json, its LV1 fix; ios-idb-vis-r14-le2-*.json, its LE2 fix; ios-vis-r14-le3-*.json, its LE3 fix; ios-vis-r16-le2-*.json, round 16's LE2 rest; ios-vis-r14-lv3*.json, its LV3 fix; ios-vis-r16-blur-*.json, round 16's in-window backdrop; ios-vis-r16-merge-*.json, round 16's merge; android-forms-r1023-phone-*.json, round 1023's phone after back; android-vis-r1023-lv2-*.json, its LV2 fix; android-forms-r1023b-fu1-*.json, round 1023b's FU1 fix; android-vis-r1023b-r19-*.json and android-forms-r1023b-r19-*.json, its residual 19 fix and its review fixes; android-forms-r1023b-row19-1.json, its row 19 fix; ios-vis-r9-absent-*.json, round 9's rebound fix and its src before; ios-rn-*-lr3*.json, round 9's LR3 fix; ios-forms-d40-1.json, ios-rn-forms-d40-1.json and android-forms-d40-1.json, D40's device run at 40ba3dd1, whose forms LOUDs D31 filed; ios-idb-forms-d43a-1.json, ios-wda-forms-d43a-1.json and android-forms-d43a-1.json, D43a's device run at 0262c69d; *-ensure-d30-1.json and *-forms-d37-1.json, batch-3's device run at 6b4a44df — ios-idb-ensure-d30-1.json the src before D50's fix, every *-forms-d37-1.json the src before D51's fix); ios-idb-ensure-d50-1.json and *-forms-d51-1.json, batch-4's device run at 7e6d2d47 (D50's and D51's fixes, every case ok); android-forms-d37-uptime-1.json, batch-2's uptime block at 39c1fcda (D37); *-forms-l7-1.json, ios-rn-*-forms-l7-*.json and *-ensure-d30-{2,3}.json, batch-9's device run at e734fedf (L7's first read, D60's live proof, D30's repeat) — ios-idb-forms-l7-1.json the src before D61's fix; *-forms-d61-*.json, batch-10's at 139256a2 (D61, D63 and D64 proven) judged again
- * by this checkout's judges — `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry
- * that changes what the records read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that
- * live-known.ts does not explain, no known case not intermittent ok), no case not known, and the counts of the
- * summary's header. Not pinned: ad-hoc probes run from a scratch copy of the harness (ios-wda-kbscroll-r23*.json, A1's
- * five keyboard scroll probes — no live.ts case asks them), A9's raw typing diagnosis (a9-fill-tail-diag/) and batch-3's raw idb
- * read of the held-no-spinner's spinner (ios-idb-held-no-spinner-describe-all-*d30-1.json, no run record).
+ * The live golden's committed records (docs/truth/live-records) judged again by this checkout's judges —
+ * `live.ts --rejudge`, the very code path, no device: a judge or a live-known.ts entry that changes what the records
+ * read fails here, not first on a device. Pinned: the exit code (0: no MISMATCH that live-known.ts does not explain,
+ * no known case not intermittent ok), no case not known, and the counts of the summary's header. Which records are
+ * replayed is the rows below, each with the run it comes from; tests/truth/live-records-replayed.test.ts holds every
+ * committed record to one of them or to its `EXEMPT` list (the records no rejudge can judge, each with its reason) —
+ * that guard, not a list here, is the source of truth.
  */
 
 const run = promisify(execFile);
@@ -602,8 +594,7 @@ describe('live.ts --rejudge over the committed record of the src before D61\'s f
   it('ios-idb-forms-l7-1.json: g3 not known, g2 known, the rest ok', { timeout: 60_000 }, async () => {
     const { code, out } = await rejudgeInProcess('ios-idb-forms-l7-1.json', 'forms');
     expect(out).toMatch(/^# Live golden: 18 cases, 16 ok, 0 loud, 2 mismatches \(1 not known\), 0 skipped$/m);
-    const unknown = [...out.matchAll(/^- MISMATCH (?:\([A-Za-z-]+\) )?(\S+) (?!.*\[known).*$/gm)].map((m) => m[1]);
-    expect(unknown).toEqual(['g3']);
+    expect(notKnown(out)).toEqual(['g3']);
     expect(out).toMatch(/^- MISMATCH \(failed-holds\) g2 .*\[known: residual:ADR 0034 residual 10 — /m);
     expect(code).toBe(1);
   });
@@ -965,8 +956,8 @@ describe('live.ts --rejudge over the first committed records of FU1\'s fix, befo
   });
 });
 
-describe('live.ts --rejudge over a committed calibration record of the src before the flush probe', () => {
-  // cal12-d043e65-1.json (#12's live calibration, a --side run of d043e65, before the flush probe existed) reads
+describe('live.ts --rejudge over the committed calibration records of the src before the flush probe', () => {
+  // cal12-d043e65-1.json and -2.json (#12's live calibration, two --side runs of d043e65, before the flush probe existed) read
   // scroll-bounded-flush's S, P.fully and S.fully as a stop claimed on `visible` ("fully visible after 0 swipes"): #12's
   // own defect at that commit. P.fully and S.fully were known by LV2's intermittent entries until round 1023 fixed LV2
   // and struck them off; they never were LV2's at that src (no probe was sent), so all three read not known now — a
