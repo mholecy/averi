@@ -16,6 +16,17 @@ describe('tap and type_text response lines', () => {
     expect(tapText('id:p', 'a note', moved)).toBe(`Tapped id:p ${moved} (a note)`);
   });
 
+  // D66 (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): a tap on a node the tree marks
+  // disabled was sent, and says so on its own line below; unmarked, the reply is as before, byte for byte.
+  it('tapText warns on its own line when the tapped node is marked disabled, after the moved part and the note', () => {
+    const warn = '\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
+    expect(tapText('id:go', undefined, undefined, true)).toBe(`Tapped id:go${warn}`);
+    expect(tapText('id:go', 'a note', undefined, true)).toBe(`Tapped id:go (a note)${warn}`);
+    expect(tapText('id:p', undefined, 'at (1,2)', true)).toBe(`Tapped id:p at (1,2)${warn}`);
+    expect(tapText('id:p', 'a note', 'at (1,2)', true)).toBe(`Tapped id:p at (1,2) (a note)${warn}`);
+    expect(tapText('id:p', 'a note', 'at (1,2)', undefined)).toBe('Tapped id:p at (1,2) (a note)');
+  });
+
   // The type_text reply WITH a selector is interact/fill-text.ts's since
   // 2026-10-09, pinned beside the flow line in tests/interact/fill-text.test.ts.
   it('typedText (no selector: nothing read back) counts characters, singular for one', () => {

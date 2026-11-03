@@ -47,13 +47,18 @@ export type TapAdapter = KeyboardAdapter;
  * DeviceAdapter method: nothing in it is platform-specific, and as a method
  * both adapters implemented it identically, which forced the platform layer
  * to import the selector layer above it (ARCHITECTURE.md §3).
+ *
+ * `disabled` is the tapped node's own mark (adapters/types.ts#UiNode.disabled,
+ * D66) — the node the guard handed back, after any re-resolve: the tap is sent
+ * all the same, and the MCP reply warns (mcp/tool-text.ts#tapText).
+ * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
  */
 export async function tapElement(
   adapter: TapAdapter,
   target: Target,
   opts: GuardOptions,
-): Promise<{ note?: string; keyboardHidden?: string; moved?: string }> {
-  const { note, keyboardHidden, point, moved } = await resolveClearOfKeyboard(adapter, target, opts);
+): Promise<{ note?: string; keyboardHidden?: string; moved?: string; disabled?: true }> {
+  const { note, keyboardHidden, point, moved, node } = await resolveClearOfKeyboard(adapter, target, opts);
   await adapter.tap(point.x, point.y);
-  return { note, keyboardHidden, moved };
+  return { note, keyboardHidden, moved, disabled: node.disabled };
 }

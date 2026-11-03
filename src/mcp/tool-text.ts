@@ -29,13 +29,19 @@ import { launchedLine, WIPE_LABEL, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
 import { formatSeconds } from '../util/duration.js';
 
+/** tap's warning on a node the tree marks disabled — warned, never refused (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md). */
+const DISABLED_TAP = 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
+
 /**
  * `Tapped <selector>`, then — when the tap went elsewhere than the centre
  * (interact/tap-judgement.ts#TapJudge.aim, 2026-10-09) — where and why, then
- * the resolution note in parentheses when there was one.
+ * the resolution note in parentheses when there was one. And on its own line
+ * below, as swipeText lays out its note, `⚠ <DISABLED_TAP>` when the tapped node
+ * is marked disabled (adapters/types.ts#UiNode.disabled, D66): the tap was sent
+ * all the same. Unmarked, the reply is one line.
  */
-export const tapText = (selector: string, note: string | undefined, moved?: string): string =>
-  `Tapped ${selector}${moved ? ` ${moved}` : ''}${note ? ` (${note})` : ''}`;
+export const tapText = (selector: string, note: string | undefined, moved?: string, disabled?: true): string =>
+  `Tapped ${selector}${moved ? ` ${moved}` : ''}${note ? ` (${note})` : ''}` + (disabled === true ? `\n⚠ ${DISABLED_TAP}` : '');
 
 /**
  * `Typed N characters` — type_text without a selector: the focused field

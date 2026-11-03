@@ -431,8 +431,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const settings = iosToolSettings((await loadForCall(TOOL_CONFIG.tap(p), cp)).cfg, p);
       const adapter = await deviceFor(p, settings);
       if (selector !== undefined) {
-        const { note, moved } = await tapElement(adapter, selector, guardOpts(settings, adapter));
-        return text(tapText(selector, note, moved));
+        const { note, moved, disabled } = await tapElement(adapter, selector, guardOpts(settings, adapter));
+        return text(tapText(selector, note, moved, disabled));
       }
       if (x === undefined || y === undefined) {
         throw new Error('Provide either selector or both x and y');
