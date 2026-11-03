@@ -913,8 +913,8 @@ export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: num
 /**
  * The strokes went across the scroll view they were drawn over (scroll-rounds.ts#BoundBy's `across`): `each went
  * across the scroll view it was drawn over, <rect>, which scrolls vertically, and` then what the whole tree shows the
- * other way — a scroll view told to scroll horizontally named (`<node>, which scrolls horizontally and the swipes did
- * not go over`, or `… but had no room for a swipe` when the plan judged it), with `swipe inside it (swipe, its
+ * other way — a scroll view told to scroll horizontally named (`<node>, which scrolls horizontally, and which the
+ * swipes did not go over`, or `…, but which had no room for a swipe` when the plan judged it), with `swipe inside it (swipe, its
  * coordinates), then scroll_until it`; else `the tree shows no scroll view that may scroll horizontally — if the element
  * lies in a horizontal list the tree does not show as one, swipe inside that list (swipe, its coordinates), then
  * scroll_until it`. Exported for the troubleshooting reference.
@@ -923,8 +923,8 @@ export function acrossText({ rect, axis, along }: StrokedAcross): string {
   const way = axis === 'vertical' ? 'horizontal' : 'vertical';
   const drawn = `each went across the scroll view it was drawn over, ${rectText(rect)}, which scrolls ${axis}ly, and the tree shows`;
   if (along !== undefined) {
-    const why = along.noRoom === true ? 'but had no room for a swipe' : 'and the swipes did not go over';
-    return `${drawn} ${nodeText(along.view)}, which scrolls ${way}ly ${why} — swipe inside it (swipe, its coordinates), then scroll_until it`;
+    const why = along.noRoom === true ? 'but which had no room for a swipe' : 'and which the swipes did not go over';
+    return `${drawn} ${nodeText(along.view)}, which scrolls ${way}ly, ${why} — swipe inside it (swipe, its coordinates), then scroll_until it`;
   }
   return `${drawn} no scroll view that may scroll ${way}ly — if the element lies in a ${way} list the tree does not show as one, swipe inside that list (swipe, its coordinates), then scroll_until it`;
 }

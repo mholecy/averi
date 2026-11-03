@@ -454,19 +454,20 @@ export interface StrokedAcross {
  * one than `toward`'s — the stroke went across it, which `strokeRoom` does only when no candidate along the stroke (or
  * of unknown axis) had room — with the largest scroll view of the WHOLE tree told to scroll that way, when there is
  * one (ui-tree/geometry.ts#Clips.toldOn; review round 1: a chips row beside the page is no candidate, and "the tree
- * shows none" would be false of it). For the exhausted stop's sentence
+ * shows none" would be false of it) — of those meeting `screen`, the usable screen less its system bands, and none of
+ * the keyboard's own (review round 2). For the exhausted stop's sentence
  * (scroll-text.ts#boundText): what the strokes did is said, not only "content exhausted" — batch-11's carousel the
  * dump marked as nothing that scrolls would read so. Undefined when the stroke went over the gesture box whole, over a
  * scroll view of unknown axis or along it, or when this tree holds no scroll view of that rect (idb's region is none).
  * One walk of the tree, at the stop only.
  */
-export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene'>, toward: Direction): StrokedAcross | undefined {
+export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect): StrokedAcross | undefined {
   const { within } = open(memory);
   if (within === undefined) return undefined;
   const { clips } = facts.scene;
   const axis = clips.axesOf(within)?.axis;
   if (axis === undefined || axis === axisOf(toward)) return undefined;
-  const [view] = [...clips.toldOn(axisOf(toward))].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
+  const [view] = [...clips.toldOn(axisOf(toward), screen, facts.reading.ofKeyboard)].sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
   if (view === undefined) return { rect: within, axis };
   const judged = open(memory).last.some((c) => sameRect(c.rect, view.rect));
   return { rect: within, axis, along: { view: quoted(view), ...(judged && { noRoom: true as const }) } };

@@ -6,6 +6,7 @@ import { parseWdaSource } from '../../src/adapters/wda-source.js';
 import { MIN_STROKE_BOX, planProbe, planStroke, seeRead, startStrokes, strokedAcross, strokeSent, touchedOn, TOUCH_DOWN_CUT_FLOOR, type StrokeMemory } from '../../src/interact/stroke-plan.js';
 import { shortenStroke, swipeVector, swipeVectorAbove, type Direction } from '../../src/interact/swipe.js';
 import { containsPoint, largestScroller } from '../../src/ui-tree/geometry.js';
+import { keyboardSideNodes } from '../../src/ui-tree/soft-keyboard.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { node } from '../helpers/fake.js';
@@ -37,7 +38,7 @@ const cover = (rect: Rect, label = 'cover'): UiNode => node({ role: 'other', lab
 /** A screen of `children` in draw order. */
 const screenOf = (children: UiNode[], extra: Partial<UiNode> = {}): UiNode => node({ role: 'container', rect: { ...BOX }, ...extra, children });
 /** A tree's facts as the round derives them (scroll-read.ts#TreeFacts): its scene and its largest scroller. */
-const factsOf = (tree: UiNode) => ({ tree, scene: sceneOf(tree), mainScroller: largestScroller(tree) });
+const factsOf = (tree: UiNode) => ({ tree, scene: sceneOf(tree), mainScroller: largestScroller(tree), reading: { ofKeyboard: (n: UiNode) => keyboardSideNodes(tree).has(n) } });
 
 /** The memory after one read of `tree`: its keyboard line at `keyboardTop`, and the target when it found one. */
 const after = (tree: UiNode, { target, keyboardTop }: { target?: UiNode; keyboardTop?: number } = {}): StrokeMemory =>
@@ -466,12 +467,12 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
   it('strokedAcross: the page a SENT stroke went over when its told axis is across the stroke; nothing along it, of unknown axis, over the screen box, or not sent', () => {
     const bare = page();
     const sent = strokeSent(planOn(bare, 'right').memory);
-    expect(strokedAcross(sent, factsOf(bare), 'right')).toEqual({ rect: PAGE, axis: 'vertical' });
-    expect(strokedAcross(sent, factsOf(bare), 'down')).toBeUndefined();
-    expect(strokedAcross(planOn(bare, 'right').memory, factsOf(bare), 'right')).toBeUndefined();
-    expect(strokedAcross(strokeSent(planOn(lazy, 'right').memory), factsOf(lazy), 'right')).toBeUndefined();
+    expect(strokedAcross(sent, factsOf(bare), 'right', BOX)).toEqual({ rect: PAGE, axis: 'vertical' });
+    expect(strokedAcross(sent, factsOf(bare), 'down', BOX)).toBeUndefined();
+    expect(strokedAcross(planOn(bare, 'right').memory, factsOf(bare), 'right', BOX)).toBeUndefined();
+    expect(strokedAcross(strokeSent(planOn(lazy, 'right').memory), factsOf(lazy), 'right', BOX)).toBeUndefined();
     const none = screenOf([]);
-    expect(strokedAcross(strokeSent(planOn(none, 'right').memory), factsOf(none), 'right')).toBeUndefined();
+    expect(strokedAcross(strokeSent(planOn(none, 'right').memory), factsOf(none), 'right', BOX)).toBeUndefined();
   });
 
   it('strokedAcross asks the WHOLE tree for a scroll view told along the stroke (review round 1): a chips row beside the page, never a candidate, is named — the swipes did not go over it', () => {
@@ -479,14 +480,36 @@ describe('before a read finds the target, a sideways stroke goes inside a nested
     const small = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2160, width: 500, height: 60 } });
     const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE } }), small, chips]);
     const sent = strokeSent(planOn(tree, 'right').memory);
-    expect(strokedAcross(sent, factsOf(tree), 'right')).toEqual({ rect: PAGE, axis: 'vertical', along: { view: { role: 'scrollable', label: null, identifier: 'feed.chips', rect: chips.rect } } });
+    expect(strokedAcross(sent, factsOf(tree), 'right', BOX)).toEqual({ rect: PAGE, axis: 'vertical', along: { view: { role: 'scrollable', label: null, identifier: 'feed.chips', rect: chips.rect } } });
+  });
+
+  it('…but only one that meets the usable screen (review round 2): a chips row below the screen is not named; on a screen tall enough to show it, it is', () => {
+    const below = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 2300, width: 1080, height: 150 } });
+    const tree = screenOf([node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'vertical', rect: { ...PAGE } }), below]);
+    const sent = strokeSent(planOn(tree, 'right').memory);
+    expect(strokedAcross(sent, factsOf(tree), 'right', BOX)).toEqual({ rect: PAGE, axis: 'vertical' });
+    expect(strokedAcross(sent, factsOf(tree), 'right', { ...BOX, height: 2400 })?.along?.view.rect).toEqual(below.rect);
+  });
+
+  it('…nor the keyboard\'s own scroll view (WDA: its suggestion strip under the keyboard\'s band), as the reading marks the keyboard\'s own (UiNode.ofKeyboard, soft-keyboard.ts#keyboardSideNodes)', () => {
+    const row = node({ role: 'button', identifier: 'row', rect: { x: 24, y: 300, width: 354, height: 52 } });
+    const page = wdaScroll({ x: 0, y: 100, width: 402, height: 400 }, [row, node({ role: 'other', rect: { x: 24, y: 450, width: 354, height: 400 } })]);
+    const strip: Rect = { x: 0, y: 560, width: 402, height: 44 };
+    const suggestions = wdaScroll(strip, cards({ x: 0, y: 560, width: 300, height: 44 }));
+    const keyboard = node({ role: 'keyboard', ofKeyboard: true, rect: { x: 0, y: 560, width: 402, height: 314 }, children: [suggestions] });
+    const tree = wdaScreen([page, keyboard]);
+    const sent = strokeSent(planOn(tree, 'right', { target: row, gesture: PHONE }).memory);
+    expect(strokedAcross(sent, factsOf(tree), 'right', PHONE)).toEqual({ rect: page.rect, axis: 'vertical' });
+    // The same strip outside the keyboard is named.
+    const loose = wdaScreen([page, wdaScroll(strip, cards({ x: 0, y: 560, width: 300, height: 44 }))]);
+    expect(strokedAcross(strokeSent(planOn(loose, 'right', { target: row, gesture: PHONE }).memory), factsOf(loose), 'right', PHONE)?.along?.view.rect).toEqual(strip);
   });
 
   it('…and one that WAS a candidate along the stroke but had no room (a 60-px-wide strip nested in the page) is named with that', () => {
     const strip = node({ role: 'scrollable', clipsDescendants: true, scrollAxis: 'horizontal', rect: { x: 0, y: 900, width: 60, height: 200 } });
     const tree = page(strip);
     const sent = strokeSent(planOn(tree, 'right').memory);
-    expect(strokedAcross(sent, factsOf(tree), 'right')).toEqual({ rect: PAGE, axis: 'vertical', along: { view: { role: 'scrollable', label: null, identifier: null, rect: strip.rect }, noRoom: true } });
+    expect(strokedAcross(sent, factsOf(tree), 'right', BOX)).toEqual({ rect: PAGE, axis: 'vertical', along: { view: { role: 'scrollable', label: null, identifier: null, rect: strip.rect }, noRoom: true } });
   });
 });
 
