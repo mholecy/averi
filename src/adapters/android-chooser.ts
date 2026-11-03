@@ -36,8 +36,11 @@ export const CHOOSER_FOCUS_COMMAND = "dumpsys window displays | grep -E 'mCurren
 /** The packages the platform's chooser runs in: the framework's, and the IntentResolver module's (later APIs). */
 const CHOOSER_PACKAGES: ReadonlySet<string> = new Set(['android', 'com.android.intentresolver']);
 
-/** The chooser's class: ResolverActivity or ChooserActivity, fully named or short (`.ResolverActivity`). */
-const CHOOSER_CLASS = /(?:^|\.)(?:Resolver|Chooser)Activity$/;
+/**
+ * The chooser's class: ResolverActivity or ChooserActivity, fully named or short (`.ResolverActivity`) — the window
+ * manager prints a class with its package or its leading dot, so a dot always comes before the name.
+ */
+const CHOOSER_CLASS = /\.(?:Resolver|Chooser)Activity$/;
 
 /** The focused window's component; a window named by a title (`Window{… u0 NotificationShade}`) has none. */
 const FOCUS_WINDOW_RE = /mCurrentFocus=Window\{[0-9a-f]+ u\d+ ([^\s/}]+\/[^\s}]+)\}/;

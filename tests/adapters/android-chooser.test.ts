@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { CHOOSER_FOCUS_COMMAND, chooserInFocus } from '../../src/adapters/android-chooser.js';
+import { CHOOSER_ADVICE, CHOOSER_FOCUS_COMMAND, chooserInFocus } from '../../src/adapters/android-chooser.js';
 
 // D55 (ADR 0041): Android's "Open with" chooser in front after a deep link, judged by the focused component alone.
 // dumpsys-window-focus-api33-resolver.txt is the two focus lines batch-9's D55 probe recorded (averi_lab, API 33,
@@ -84,6 +84,13 @@ describe('chooserInFocus — the components that are the chooser, and no others 
     expect(chooserInFocus(focus(`Window{56b9ca0 u0 ${component}}`, component))).toBeUndefined();
   });
 
+  it('a user other than the first (`u10`, a work profile): the same chooser', () => {
+    const window = `  mCurrentFocus=Window{56b9ca0 u10 ${RESOLVER}}\n`;
+    const app = `  mFocusedApp=ActivityRecord{6909a9c u10 ${RESOLVER} t2590}\n`;
+    expect(chooserInFocus(window)).toBe(RESOLVER);
+    expect(chooserInFocus(app)).toBe(RESOLVER);
+  });
+
   it('a window named by its title, not a component (`Window{… u0 NotificationShade}`): undefined', () => {
     expect(chooserInFocus('  mCurrentFocus=Window{f61dea2 u0 NotificationShade}\n')).toBeUndefined();
   });
@@ -92,5 +99,14 @@ describe('chooserInFocus — the components that are the chooser, and no others 
 describe('CHOOSER_FOCUS_COMMAND — the two focus lines of `dumpsys window displays`, every word a constant', () => {
   it('is the one line averi asks', () => {
     expect(CHOOSER_FOCUS_COMMAND).toBe("dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='");
+  });
+});
+
+describe('CHOOSER_ADVICE — what the reply advises, and that averi taps nothing', () => {
+  it('is the one wording: pick the app, "Just once", never "Always"; BACK drops the link; averi taps nothing', () => {
+    expect(CHOOSER_ADVICE).toBe(
+      'Take a ui_snapshot, tap the app you mean, then its "Just once" button (never "Always": it changes the ' +
+        "device's default for such links); press_key back drops the link. averi taps nothing itself.",
+    );
   });
 });
