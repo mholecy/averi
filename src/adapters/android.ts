@@ -3,8 +3,8 @@ import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
-import { causeOf, runStart, type StartRefused } from './android-start.js';
-import { CHOOSER_FOCUS_COMMAND, chooserInFocus } from './android-chooser.js';
+import { causeOf, refusalReasons, runStart, startSaid, type StartRefused } from './android-start.js';
+import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, launchChooserNote, monkeyChooserRefusal } from './android-chooser.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -47,7 +47,10 @@ const KEYBOARD_WITNESS_TIMEOUT_MS = 2_000;
 const STATUS_BAND_QUERY_TIMEOUT_MS = 2_000;
 /** The same reasoning for the window manager's word on a miss (focusedWindow): past it, `unknown` — the active-window hint. */
 const FOCUSED_WINDOW_TIMEOUT_MS = 2_000;
-/** The focus read after a deep link's start (D55, android-chooser.ts): its bound, as the other focus reads'. */
+/**
+ * The focus read after a deep link's or a `-p` launch's start, or monkey's refusal (D55, D55b, android-chooser.ts): its
+ * bound, as the other focus reads'.
+ */
 const CHOOSER_FOCUS_TIMEOUT_MS = 2_000;
 
 /**
@@ -69,11 +72,6 @@ const CHOOSER_FOCUS_TIMEOUT_MS = 2_000;
 const TYPING_PACE_MS = 100;
 /** typeText's wait after the DPAD left/right nudge that commits Gboard's composing character (see typeText). */
 const COMMIT_SETTLE_MS = 150;
-
-/** A refusal's lines as the messages below quote them: `<command> said: a / b`. */
-function startSaid(refused: StartRefused): string {
-  return `${refused.command} said: ${refused.lines.join(' / ')}`;
-}
 
 // The advice the start refusals below share, written once (launchRefused
 // says why an adapter message may name config keys and tools).
@@ -292,8 +290,9 @@ export class AndroidAdapter implements DeviceAdapter {
    * tree to be the app's, unlike iOS (ios-foreground.ts). Whether
    * uiautomator hands out the previous app's tree for a moment after a
    * switch, as idb does, has not been measured on Android (it dumps the
-   * focused window, which may close the gap or not), so nothing waits here
-   * and LaunchOutcome carries no note.
+   * focused window, which may close the gap or not), so nothing waits here.
+   * LaunchOutcome carries a note in one case: Android's chooser in front
+   * after a `-p` start (D55b, launchApp below).
    */
   async launch(packageName: string, opts: LaunchOptions = {}): Promise<LaunchOutcome> {
     // The foreground app changes here, and with it whether the status bar shows: the band is read again
@@ -324,15 +323,27 @@ export class AndroidAdapter implements DeviceAdapter {
         (argv) => this.shell(argv),
       );
       if (outcome.kind === 'refused') {
+        // D55b: with Android's chooser in front monkey starts nothing (exit 251 on API 33, batch-11) and its one `** `
+        // line is the emulator's SYS_KEYS warning, not a reason. So one focus read, on the refusal only (a monkey that
+        // started something pays nothing). The chooser named and no reason of monkey's own: the chooser is the cause.
+        // The chooser named beside a real reason: that reason leads, the chooser is also in front. No chooser named
+        // (a failed or unmatched read): today's error byte for byte, the warning quoted as before.
+        const chooser = await this.chooserInFront();
+        const reasons = refusalReasons(outcome);
+        if (chooser !== undefined && reasons.length === 0) {
+          throw new Error(monkeyChooserRefusal(packageName, chooser, outcome), causeOf(outcome));
+        }
         // monkey's reason may be on its stdout, which the ExecError's
         // message drops — read here, or this would fail with no reason at
         // all. Not every reason is the package's: monkey itself may have
         // failed to run (android-start.ts lists its lines), and its line says.
-        throw new Error(
+        const monkeyRefusal =
           `monkey started nothing in ${packageName} — check that ${packageName} is installed and has a launcher ` +
-            `activity, or name the activity to start: ${NAME_THE_ACTIVITY}, or ` +
-            `${ACTIVITY_IN_CONFIG} — or monkey itself could not run; its line says which. ` +
-            startSaid(outcome),
+          `activity, or name the activity to start: ${NAME_THE_ACTIVITY}, or ` +
+          `${ACTIVITY_IN_CONFIG} — or monkey itself could not run; its line says which. ` +
+          startSaid(outcome, chooser === undefined ? outcome.lines : reasons);
+        throw new Error(
+          chooser === undefined ? monkeyRefusal : `${monkeyRefusal} ${chooserAlsoInFront(chooser)}`,
           causeOf(outcome),
         );
       }
@@ -372,7 +383,13 @@ export class AndroidAdapter implements DeviceAdapter {
     for (const [key, value] of Object.entries(intent.extras ?? {})) argv.push('--es', key, value);
     const outcome = await runStart(argv, (start) => this.shell(start));
     if (outcome.kind === 'refused') throw launchRefused(outcome, { packageName, component, intent: opts.intent });
-    return {};
+    // D55b (ADR 0041's D55b amendment): a `-p` intent two of the package's activities handle, none preferred, starts
+    // Android's chooser, and am reports it `started` (batch-11: 10 of 10). So D55's one focus read after a `-p` start
+    // (≈ 70 ms measured, batch-11) — never after `-n`, which names the activity and cannot raise it. The chooser named
+    // is a ⚠ note under "Launched" (D56's shape on iOS: the start happened); a failed or unmatched read is `{}`.
+    if (component !== undefined) return {};
+    const chooser = await this.chooserInFront();
+    return chooser === undefined ? {} : { note: launchChooserNote(packageName, chooser, NAME_THE_ACTIVITY) };
   }
 
   async terminate(packageName: string): Promise<void> {
@@ -409,9 +426,9 @@ export class AndroidAdapter implements DeviceAdapter {
 
   /**
    * The chooser's component when the window manager's focus names it (android-chooser.ts#chooserInFocus), else
-   * undefined. One `dumpsys window displays | grep` (≈ 20–26 ms, estimated from FOCUSED_WINDOW_COMMAND's measured
-   * 25–26 ms; ADR 0041). Never throws: a failed or timed-out call is undefined, so the link's reply falls back to
-   * "Opened" as before D55.
+   * undefined. One `dumpsys window displays | grep` (ADR 0041 estimated ≈ 20–26 ms from FOCUSED_WINDOW_COMMAND's
+   * 25–26 ms; batch-11 measured it at a median 70 ms, 58–99, n=10 — ADR 0041's D55b amendment). Never throws: a failed
+   * or timed-out call is undefined, so the reply falls back to today's ("Opened", "Launched", monkey's error).
    */
   private async chooserInFront(): Promise<string | undefined> {
     try {

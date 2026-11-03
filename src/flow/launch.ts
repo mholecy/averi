@@ -66,10 +66,12 @@ export interface Launched {
    */
   app: string;
   /**
-   * The launch's caveat (LaunchOutcome.note — today iOS's foreground wait
+   * The launch's caveat (LaunchOutcome.note — iOS's foreground wait
    * giving up: the tree may still be the app this launch covered,
-   * adapters/ios-foreground.ts). A `⚠` line, not a failure: the app was
-   * launched, and what reads the wrong app's tree next is what it warns about.
+   * adapters/ios-foreground.ts; or Android's chooser in front after a `-p`
+   * start, D55b, adapters/android-chooser.ts). A `⚠` line, not a failure: the
+   * app was launched, and what reads the wrong app's tree next is what it
+   * warns about.
    */
   note?: string;
   /** The `⚠ clearState` sentence, with the session's count — set exactly when the launch wiped. */

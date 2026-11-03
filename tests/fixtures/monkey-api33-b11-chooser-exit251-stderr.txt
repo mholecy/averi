@@ -1,0 +1,9 @@
+args: [-p, dev.averi.lab, -c, android.intent.category.LAUNCHER, 1]
+ arg: "-p"
+ arg: "dev.averi.lab"
+ arg: "-c"
+ arg: "android.intent.category.LAUNCHER"
+ arg: "1"
+data="dev.averi.lab"
+data="android.intent.category.LAUNCHER"
+** SYS_KEYS has no physical keys but with factor 2.0%.

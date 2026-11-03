@@ -1,3 +1,5 @@
+import type { StartRefused } from './android-start.js';
+
 /**
  * Android's "Open with" chooser in front after a deep link (D55; docs/adr/0041-an-android-link-names-the-chooser-in-front.md),
  * judged from the focused component alone, with no device call here: Android's counterpart of ios-system-alert.ts.
@@ -5,7 +7,9 @@
  * `am start -a VIEW -d <url>` with no package is an implicit intent. When two activities handle the url and none is
  * the preferred one, Android starts its resolver instead of either app, and `am start` reports an activity started
  * (android-start.ts): the start was right, but which activity it started was never asked. So openDeepLink reads the
- * focus once after the start (CHOOSER_FOCUS_COMMAND) and asks chooserInFocus.
+ * focus once after the start (CHOOSER_FOCUS_COMMAND) and asks chooserInFocus. Since D55b launch_app does the same
+ * after its `-p` start (an intent scoped to the package, which two of its activities may handle), and after monkey's
+ * refusal (monkey starts nothing over the chooser): ADR 0041's D55b amendment.
  *
  * The device facts (batch-9 D55, 2026-11-03, averi_lab emulator, Android 13 / API 33, main e734fedf;
  * `averilab://shared/open`, which the lab's `.MainActivity` and its alias `.Twin` both handle): a raw `am start` and
@@ -102,10 +106,63 @@ export function chooserInFocus(dump: string): string | undefined {
  * What the reply advises once the chooser is named (mcp/tool-text.ts#deepLinkText): the agent picks the app, "Just
  * once" (never "Always", which writes a preferred activity: a device change every later run would inherit), or BACK
  * (measured: one BACK dismissed it, batch-9). averi taps nothing: which handler is meant is the test's business. The
- * labels are AOSP's English ones, and the reply does not claim what a launch_app does with the chooser up (unmeasured).
+ * labels are AOSP's English ones; what a launch does under the chooser is launch_app's own wording below (D55b).
  * "if it shows one": ResolverActivity asks for an app and then "Just once" or "Always" (batch-9); ChooserActivity, a
  * share sheet's chooser, opens the app tapped and has neither button (AOSP, not measured).
  */
-export const CHOOSER_ADVICE =
-  'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
-  "changes the device's default for such links); press_key back drops the link. averi taps nothing itself.";
+export const CHOOSER_ADVICE = chooserAdvice('such links', 'the link');
+
+/**
+ * The advice, for what the chooser holds: `defaultFor` is what "Always" would change the default for (`such links`
+ * after a link, `the intent it answers` after a launch), `drops` what one BACK drops (`the link`, `the chooser`). One
+ * wording for open_deep_link (CHOOSER_ADVICE) and both launch paths (launchChooserNote, monkeyChooserRefusal): D55b.
+ */
+export function chooserAdvice(defaultFor: string, drops: string): string {
+  return (
+    'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
+    `changes the device's default for ${defaultFor}); press_key back drops ${drops}. averi taps nothing itself.`
+  );
+}
+
+/**
+ * The advice after a launch. Neutral on whose intent the chooser answers: after a `-p` start it is most likely the
+ * launch's own (two of the package's activities, none preferred; batch-11 10 of 10), but a chooser left up by another
+ * app's link reads the same.
+ */
+const LAUNCH_ADVICE = chooserAdvice('the intent it answers', 'the chooser');
+
+/**
+ * launch_app's ⚠ note when the chooser is in front after its `-p` start (D55b; ADR 0041's D55b amendment). The
+ * headline stays "Launched" — D56's shape on iOS (ADR 0032's D56 amendment), the start did happen. It says only what
+ * the read saw: the chooser in front, the package not. Naming an activity (`nameTheActivity`: where the call names
+ * it, the adapter's wording) starts it with `-n`, which a package's own chooser cannot stop.
+ */
+export function launchChooserNote(packageName: string, component: string, nameTheActivity: string): string {
+  return (
+    `Android has not brought ${packageName} forward yet: its chooser (${component}) is in front, and ${packageName} ` +
+    `is not. ${LAUNCH_ADVICE} Naming the activity (${nameTheActivity}) starts it without the chooser.`
+  );
+}
+
+/**
+ * monkey's refusal when the chooser is in front and monkey gave no reason of its own (D55b; refusalReasons empty, its
+ * only `** ` line the emulator's SYS_KEYS warning): monkey starts nothing over the chooser (exit 251 3 of 3 in
+ * batch-11, averi_lab API 33; batch-10's refusal was recorded as 252), so the message names the chooser as the cause
+ * instead of the install, with monkey's actual exit code when it had one (the refusal's ExecError; none at exit 0, and
+ * `null` on a signal). It quotes no line; the ExecError, the caller's cause, keeps the whole output.
+ */
+export function monkeyChooserRefusal(packageName: string, component: string, refused: StartRefused): string {
+  const exitCode = refused.cause?.exitCode;
+  return (
+    `monkey started nothing in ${packageName}: Android's chooser (${component}) is in front, and monkey starts ` +
+    `nothing over it${exitCode == null ? '' : ` (it exited ${exitCode})`}. ${LAUNCH_ADVICE} Then launch again.`
+  );
+}
+
+/**
+ * The chooser beside a refusal with a reason of its own (D55b: monkey's real `** ` line, e.g. `** No activities found
+ * to run`): not claimed as the cause, only named as also in front, with the advice. The caller's message leads.
+ */
+export function chooserAlsoInFront(component: string): string {
+  return `Android's chooser (${component}) is also in front. ${LAUNCH_ADVICE}`;
+}

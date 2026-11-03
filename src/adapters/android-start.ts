@@ -101,6 +101,20 @@ export interface StartRefused {
 
 export type StartOutcome = { readonly kind: 'started' } | StartRefused;
 
+/**
+ * A refusal's lines as the messages quote them: `<command> said: a / b` — all its lines, or the ones given (D55b quotes
+ * refusalReasons'). The one place a refusal's quote is built.
+ */
+export function startSaid(refused: StartRefused, lines: readonly string[] = refused.lines): string {
+  return `${refused.command} said: ${lines.join(' / ')}`;
+}
+
+/** A refusal's lines that are reasons: monkey's without its emulator warning (MONKEY_EMULATOR_WARNING_RE), am's all. */
+export function refusalReasons(refused: StartRefused): readonly string[] {
+  if (refused.command !== 'monkey') return refused.lines;
+  return refused.lines.filter((line) => !MONKEY_EMULATOR_WARNING_RE.test(line));
+}
+
 /** `{ cause }` for an Error's options only when there is one — no own `cause: undefined`. */
 export function causeOf(refused: StartRefused): ErrorOptions {
   return refused.cause ? { cause: refused.cause } : {};
@@ -137,6 +151,15 @@ const AM_ERROR_LINE_RE = /^(?:Error\b|java\.lang\.\w+(?:Exception|Error)\b).*$/g
  * the line is the reason.
  */
 const MONKEY_DIAGNOSIS_LINE_RE = /^\*\* .*$/gm;
+
+/**
+ * monkey's emulator warning, `** SYS_KEYS has no physical keys but with factor 2.0%.`: on the lab emulator monkey
+ * prints it whatever the outcome (lab fact 14), and it was the only `** ` line of batch-10's E4c refusal and of
+ * batch-11's three exit-251 refusals under the chooser (D55b) — so never a reason. Only a line that IS the warning,
+ * from its start; one that mentions SYS_KEYS otherwise is monkey's own. It still counts as a diagnosis for
+ * MONKEY_DIAGNOSIS_LINE_RE (a non-zero exit with it is `refused`, so the caller can ask why): refusalReasons drops it.
+ */
+const MONKEY_EMULATOR_WARNING_RE = /^\*\* SYS_KEYS /;
 
 /** How many of monkey's last stdout lines a thrown failure carries. */
 const STDOUT_TAIL_LINES = 3;
