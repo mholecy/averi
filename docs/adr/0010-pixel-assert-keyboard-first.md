@@ -352,13 +352,57 @@ Bug note: docs/bugs/2026-10-16-lab-android-uiautomator-bounds-past-the-scroll-co
    views alone says so, `flush.why: 'axis'` — Android only in practice: WDA's clipping chain is empty). Still
    UNMEASURED on a device: what a carousel hands the outer scroller of a cross-axis drag (~51 pt a stroke, inferred);
    the lab's `carousel-in-list` cell (harness task H2) is to show it, and a lazy-row carousel there reads of unknown
-   axis on Android.
+   axis on Android. See the D59b amendment below.
 8. **An ocr assert on a text line cut at its scroll view's edge** reads only the drawn part, so its glyphs may be cut (a
    21-pt line with 15 pt drawn is read on clipped glyphs). Android's glyph readers fail closed on a node that may be cut
    at the navigation bar (`ui-tree/standing.ts#cutAtNavigationBar`); there is no counterpart at a scroll view's edge yet.
 9. **A scroll view that draws past its frame** (SwiftUI's `.scrollClipDisabled()`, a UIKit scroll view with
    `clipsToBounds = NO`) is judged as one that clips: content it draws outside its frame is refused, never measured —
    the safe direction.
+
+## Amendment: D59b — before the target is found, the largest scroller's nested scroll views (2026-11-03)
+
+**Context.** Residual 7's rule chose among the TARGET's scroll views; before a read finds the target the only
+candidate was the screen's largest scroller (`ui-tree/geometry.ts#largestScroller`). Batch-11 (the averi_lab emulator,
+API 33, 1080x2220, `d59b-measure` on main a5fefd32): `scroll_until` right for card C of the L7 cells
+`carousel-lazy-free` and `carousel-recycler-free` from a fresh launch, where C is not laid out, so no read finds it.
+6/6 runs stroked `(864,1110)→(216,1110)`, the page's centre row, 496 px below the carousel's band (y 380–614). The
+carousel never moved, and the call failed "content exhausted, still loading, or the swipes were not taken". A raw stroke
+in the band, `(872,497)→(208,497)`, moved it 4/4. Cause: the page `0,0 1080x2220` (a ScrollView, told vertical) scrolls
+across a `right` stroke, so `strokeRoom` dropped it, found no other candidate and took it anyway through the
+`'any axis'` fallback. The carousel (a LazyRow dumped as `android.view.View` or a RecyclerView, no told axis) was never
+a candidate.
+
+**Decision.**
+1. Before a read finds the target, the candidates are the largest scroller, then the scroll views nested in it, largest
+   first (`interact/stroke-plan.ts#candidatesOf`, from the `ScrollAxes.nested` it already reads). Text inputs are left
+   out of `nested` (`Clips.axesOf`): a Compose text field dumps as a scrolling (Horizontal)ScrollView, role
+   `textfield`, and a sideways stroke must not land in one. The page stays FIRST, so residual 7's axis rule takes a
+   nested one only when the page scrolls across the stroke. Every stroke along the page, a page of unknown axis and the
+   all-across fallback are as before; so are iOS (WDA marks no node clipping, so there is no largest scroller) and idb.
+   The lab's carousel is now stroked inside, `swipeVector(66,380 948x234, right)` = `(824,497)→(256,497)`.
+2. When the strokes still went across a scroll view whose axis the tree tells (`stroke-plan.ts#strokedAcross`), the
+   exhausted stop says so first, after a node named under the touch-down and below an end the tree proves
+   (`scroll-rounds.ts#BoundBy`'s `across`, `scroll-text.ts#acrossText`): `failed after 2 swipes (the last 2, swiping
+   right, did not change the screen: each went across the scroll view it was drawn over, 0,0 1080x2220, which scrolls
+   vertically, and the tree shows no scroll view that may scroll horizontally — if the element lies in a horizontal
+   list the tree does not show as one, swipe inside that list (swipe, its coordinates), then scroll_until it; else:
+   content exhausted, still loading)`. It does not depend on whether a read found the target: it describes the strokes.
+3. No change to `swipeVector` or to the stroke's length.
+
+**Residuals.** (a) A nested scroll view of unknown axis that really scrolls vertically (a RecyclerView list inside a
+NestedScrollView) is now stroked sideways, and the reply stays the generic one. (b) On a page with two carousels the
+larger is stroked, and it may not hold the target. (c) The across clause's "no scroll view that may scroll that way" is
+the plan's view. A nested one along the stroke that had no room (under MIN_STROKE_BOX, or off the gesture box) still
+counts as none. (d) A carousel the dump marks neither scrolling nor clipping is no candidate. Only the across clause
+helps there. (e) Golden does not catch D59b: its stroke row skips the in-scroll-view check when the target is absent
+(T6), and no truth capture has an absent target with a sideways direction, so golden is Changed 0.
+
+**Tests.** tests/interact/stroke-plan.test.ts (the derived lab trees `tests/fixtures/uiautomator-lab-carousel-*-launch.xml`,
+made from the committed `carousel-in-list` capture, since the batches kept no dump, and batch-11's strokes,
+`tests/fixtures/d59b-b11-strokes.json`, trimmed), tests/interact/scroll-rounds.test.ts (the across clause and its
+order), tests/ui-tree/geometry-clips.test.ts (the text input left out). Hand mutants: 13, all killed. Device gate:
+`d59b-measure` rerun in the next batch, FAIL → PASS.
 
 ## Bug note
 

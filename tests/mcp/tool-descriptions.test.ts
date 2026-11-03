@@ -582,6 +582,14 @@ describe('troubleshooting on scroll_until\'s end proof, unchecked axis and the d
     expect(TROUBLESHOOTING).toContain(`- **\`scroll_until … failed ${elide(proven)} — …\`**`);
   });
 
+  it('the strokes drawn across the scroll view they went over (D59b): the entry quotes boundText\'s words, the way out elided', async () => {
+    const { boundText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
+    const words = boundText({ of: 'exhausted', lastStroke: 'right', unchanged: 'tree', across: { rect: { x: 0, y: 0, width: 1080, height: 2220 }, axis: 'vertical' } }, 2);
+    const cut = words.indexOf(' — if the element lies');
+    const back = words.indexOf(' then scroll_until it');
+    expect(TROUBLESHOOTING).toContain(`- **\`scroll_until … failed ${words.slice(0, cut)} — …${words.slice(back)} — …\`**`);
+  });
+
   it('the fully probe unchecked for its axis, and the swipe that would touch down on the dim outside a dialog', async () => {
     const { flushText, touchDownText } = await vi.importActual<typeof import('../../src/interact/scroll-text.js')>('../../src/interact/scroll-text.js');
     const axis = flushText({ edge: 'top', container: { x: 66, y: 380, width: 948, height: 234 }, checked: false, why: 'axis' });

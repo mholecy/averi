@@ -43,7 +43,10 @@ import { axisOf, EDGE_TOWARD, shortenStroke, strokeLength, SWIPE_REACH_FRACTION,
  * window of its own.
  *
  * WHICH SCROLL VIEW, and the axis. The candidates are the target's scroll views, nearest first (`targetScrollers`),
- * once a read has found it; before that the screen's largest scroller; none (the screen box) when the target was found
+ * once a read has found it; before that the screen's largest scroller, then the scroll views nested in it, largest
+ * first, text inputs left out (`candidatesOf`, D59b: the axis rule below takes a nested one only when the largest
+ * scrolls across the stroke — a carousel in a vertical page, stroked `right` for a card not laid out yet, is stroked
+ * inside, not across the page's centre row, ADR 0010's D59b amendment); none (the screen box) when the target was found
  * in none. Each is remembered with its AXIS and its nested scroll views' (`ScrollView.axes`, asked of the read's tree:
  * ui-tree/geometry.ts#Clips.axesOf, per source ui-tree/scroll-containers.ts#scrollAxis — Android's class, WDA's
  * `Table`, else on WDA the content's extent past the frame; unknown for a Compose lazy list, a RecyclerView and on idb,
