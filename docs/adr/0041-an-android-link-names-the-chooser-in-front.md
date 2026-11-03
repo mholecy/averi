@@ -30,12 +30,16 @@ the platform's chooser, the outcome is `{ chooser: { component } }` and the repl
 - The read is `CHOOSER_FOCUS_COMMAND`, `dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='`, with a 2 s
   bound, like the adapter's other focus reads. It is a new constant beside `FOCUSED_WINDOW_COMMAND`, whose contract
   (a window TYPE for a miss) its callers keep unchanged.
-- The judgement is pure: `adapters/android-chooser.ts#chooserInFocus`. It takes the component of either line, the
-  focused window's first, and names it a chooser when the package is exactly `android` or
-  `com.android.intentresolver` and the class is `ResolverActivity` or `ChooserActivity`, fully named or short. No app
-  can own those packages, so a match is the platform's chooser, never an app's activity of the same name. Either line
-  counts because `am start` returns without waiting for the chooser's window: the focused activity may already be
-  the chooser while the focused window is still the launcher or `null` (AOSP's reasoning, not measured).
+- The judgement is pure: `adapters/android-chooser.ts#chooserInFocus`. It takes the focused activity's component
+  (`mFocusedApp`), or the focused window's (`mCurrentFocus`) when no activity is named, and names it a chooser when
+  the package is exactly `android` or `com.android.intentresolver` and the class is `ResolverActivity` or
+  `ChooserActivity`, fully named or short. No app can own those packages, so a match is the platform's chooser, never
+  an app's activity of the same name. The activity decides because `am start` returns without waiting for a window:
+  the focused activity is set as the start resumes it, and the focused window follows once it is drawn (AOSP's
+  reasoning, not measured). So the chooser as the activity under the launcher's or a `null` window is the link's
+  chooser not drawn yet, and an app as the activity under the chooser's window is an earlier chooser on its way out,
+  which is no chooser. (The code review changed this from "either line": the analysis's rule would warn for a
+  chooser on its way out.)
 - The list's provenance is in the module: `android/com.android.internal.app.ResolverActivity` was measured (batch-9,
   API 33). `ChooserActivity` and the `com.android.intentresolver` package (the IntentResolver module of later
   releases) are AOSP's, not measured.
@@ -45,12 +49,14 @@ the platform's chooser, the outcome is `{ chooser: { component } }` and the repl
 - The reply (`mcp/tool-text.ts#deepLinkText`, checked before `alert`) replaces the headline, as D54's does:
 
   > Android has not opened <url> yet: its chooser (<component>) is in front, asking which app opens it. Take a
-  > ui_snapshot, tap the app you mean, then its "Just once" button (never "Always": it changes the device's default
-  > for such links); press_key back drops the link. averi taps nothing itself.
+  > ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it changes the
+  > device's default for such links); press_key back drops the link. averi taps nothing itself.
 
   The advice is one constant, `CHOOSER_ADVICE`, in the new module. averi taps nothing: "Always" writes a preferred
-  activity, a device change every later run would inherit, and which handler is meant is the test's business. The
-  reply does not say what `launch_app` does with the chooser up, because that is unmeasured.
+  activity, a device change every later run would inherit, and which handler is meant is the test's business. "If it
+  shows one": a ResolverActivity asks for the app and then "Just once" or "Always" (batch-9), while a ChooserActivity
+  opens the app that is tapped (AOSP, not measured). The reply does not say what `launch_app` does with the chooser
+  up, because that is unmeasured.
 - Not done here: no `am start -W` (it would make every happy-path reply wait for the app's first frame), no
   `cmd package resolve-activity` (it predicts the chooser and does not see it), and no tree read on the happy path (at
   least 1 s per link). No tap.
@@ -74,4 +80,8 @@ Residuals, stated:
 - `launch_app` with `intent:` and no `activity` (`am start -p`) can raise the same chooser when the app itself
   declares two handlers, as the lab does (inference, unmeasured). It still answers `Launched` (backlog D55b).
 - An OEM's own chooser component, outside the list, is not named. The reply is then `Opened`, as before.
+- A chooser that was already up before the link (an unanswered earlier one) can still be the focused activity at the
+  one read when the link's own start has not resumed yet. The reply then names it, although a one-handler link may
+  open a moment later. averi does not read the focus before the start, because that would be a third call on every
+  link. The chooser IS in front at the read, and the advice's `ui_snapshot` shows which.
 - `adapters/android-chooser.ts` joins the mutation run (ADR 0038) with its direct tests.
