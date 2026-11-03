@@ -618,3 +618,35 @@ describe('createIosTreeSource — which backend a kind gets, pinned by what the 
     expect(exec.calls.filter((c) => c.full.startsWith('idb'))).toEqual([]);
   });
 });
+
+// D66: idb's `enabled` (a JSON boolean on every element of a full capture) — `false` marks the node `disabled`
+// (types.ts#UiNode.disabled, docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md). No committed idb
+// capture holds a `false` (the lab apps have no disabled control): the positive case below is SYNTHETIC, a real capture
+// with one element flipped.
+describe('idb `enabled` → `disabled: true` (D66)', () => {
+  const truth = (name: string) => readFile(new URL(`../fixtures/truth/ios-iphone17-ios27/${name}`, import.meta.url), 'utf8');
+  const marked = (tree: UiNode) => tree.children.filter((n) => n.disabled !== undefined).map((n) => n.identifier);
+
+  it('a real capture, every element `enabled: true`: no node is marked', async () => {
+    const raw = await truth('form-basic.idb.json');
+    expect(raw.match(/"enabled":true/g)).toHaveLength(13);
+    expect(marked(parseIdbDescribeAll(raw))).toEqual([]);
+  });
+
+  it('a trimmed capture without the key: unknown, no node is marked (fail open)', async () => {
+    const raw = await readFile(new URL('../fixtures/idb-swift-form-continue.json', import.meta.url), 'utf8');
+    expect(raw).not.toContain('"enabled"');
+    expect(marked(parseIdbDescribeAll(raw))).toEqual([]);
+  });
+
+  it('SYNTHETIC — form-basic with its submit flipped to `enabled: false`: that node alone is marked', async () => {
+    const elements = JSON.parse(await truth('form-basic.idb.json')) as Record<string, unknown>[];
+    const flipped = elements.map((el) => (el.AXUniqueId === 'lab.form-basic.submit' ? { ...el, enabled: false } : el));
+    expect(marked(parseIdbDescribeAll(JSON.stringify(flipped)))).toEqual(['lab.form-basic.submit']);
+  });
+
+  it.each([['null', null], ['0', 0], ['"false"', 'false']])('SYNTHETIC — `enabled: %s` is no `false`: unmarked', async (_name, value) => {
+    const elements = JSON.parse(await truth('form-basic.idb.json')) as Record<string, unknown>[];
+    expect(marked(parseIdbDescribeAll(JSON.stringify(elements.map((el) => ({ ...el, enabled: value })))))).toEqual([]);
+  });
+});

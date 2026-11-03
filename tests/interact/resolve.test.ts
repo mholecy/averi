@@ -654,7 +654,7 @@ describe('a tap target under the app\'s chrome (2026-10-09)', () => {
     const result = await tapElement(fake, PRIORITY, OPTS);
     expect(fake.tapPoints).toEqual([{ x: 201, y: 767 }]);
     expect(result.moved).toBe(`at (201,767) — its centre (201,780) is under ${CONTINUE}, drawn over it; tapped the uncovered part 354x26`);
-    expect(tapText(PRIORITY, result.note, result.moved)).toBe(
+    expect(tapText(PRIORITY, result)).toBe(
       `Tapped ${PRIORITY} at (201,767) — its centre (201,780) is under ${CONTINUE}, drawn over it; tapped the uncovered part 354x26`,
     );
   });

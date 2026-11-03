@@ -5,7 +5,8 @@ import type { ExecFn } from '../../src/adapters/exec.js';
 import { FlowEngine } from '../../src/flow/engine.js';
 import { parseConfig } from '../../src/flow/config.js';
 import { EngineSession, launchApp } from '../../src/flow/launch.js';
-import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
+import { deepLinkText, launchText, tapText } from '../../src/mcp/tool-text.js';
+import { tapElement } from '../../src/interact/tap.js';
 import { drawnOverStrip } from '../helpers/android-dumps.js';
 import { resetSleeps } from '../helpers/sleep-recorder.js';
 
@@ -81,5 +82,43 @@ flows:
         'if it shows one (never "Always": it changes the device\'s default for such links); press_key back drops the ' +
         'link. averi taps nothing itself.',
     );
+  });
+});
+
+/**
+ * A real AndroidAdapter whose `uiautomator dump` answers the committed chooser capture (uiautomator-lab-resolver.xml,
+ * batch-10 E2); every other command answers nothing. `taps` records the `input tap` calls the adapter sent.
+ */
+async function chooserTree(): Promise<{ adapter: AndroidAdapter; taps: string[] }> {
+  const xml = await fixture('uiautomator-lab-resolver.xml');
+  const taps: string[] = [];
+  const exec: ExecFn = async (_cmd, args) => {
+    const line = args.join(' ');
+    if (line.includes('input tap')) taps.push(line.slice(line.indexOf('input tap')));
+    return { stdout: Buffer.from(line.includes('uiautomator') ? xml : ''), stderr: '' };
+  };
+  return { adapter: new AndroidAdapter({ drawnOverStrip, serial: 'e', exec }), taps };
+}
+
+// D66 (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): the chooser's fresh layout dumps "Just
+// once" and "Always" enabled="false" — a tap on either is sent, and the reply says the tree marks it disabled.
+describe("tap's reply on Android's chooser (D66): warned on a disabled button, never refused", () => {
+  const WARN = '⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
+
+  it.each([
+    ['id:button_once', 'input tap 723 2058'],
+    ['text:"Always"', 'input tap 936 2058'],
+  ])('%s: tapped at its centre, and the ⚠ line follows the Tapped line', async (selector, sent) => {
+    const { adapter, taps } = await chooserTree();
+    const tapped = await tapElement(adapter, selector, { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    expect(taps).toEqual([sent]);
+    expect(tapText(selector, tapped)).toBe(`Tapped ${selector}\n${WARN}`);
+  });
+
+  it('a row\'s app name (enabled): the reply is the one Tapped line, byte for byte as before D66', async () => {
+    const { adapter, taps } = await chooserTree();
+    const tapped = await tapElement(adapter, 'text:"AveriLab twin"', { ambiguous: 'refuse', timeoutMs: 200, pollMs: 2 });
+    expect(taps).toHaveLength(1);
+    expect(tapText('text:"AveriLab twin"', tapped)).toBe('Tapped text:"AveriLab twin"');
   });
 });

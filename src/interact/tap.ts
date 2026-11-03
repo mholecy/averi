@@ -11,6 +11,26 @@ import type { Target } from './resolve.js';
 export type TapAdapter = KeyboardAdapter;
 
 /**
+ * The warning on a tap whose node the tree marks disabled (adapters/types.ts#UiNode.disabled) — warned, never refused:
+ * the MCP reply's ⚠ line (mcp/tool-text.ts#tapText) and the flow's `⚠ tap` line (flow/engine.ts#tapSpec), in the same
+ * words. docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
+ */
+export const DISABLED_TAP = 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
+
+/** What a tap by selector says of itself (tapElement): the resolution note, the keyboard's sentence, where it went, the mark. */
+export interface Tapped {
+  note?: string;
+  /** The keyboard guard's sentence alone, for the one caller that prints no notes (the flow trace's `⚠ tap`). */
+  keyboardHidden?: string;
+  moved?: string;
+  /** The tapped node's own mark (adapters/types.ts#UiNode.disabled). */
+  disabled?: true;
+}
+
+/** What the MCP reply prints of a tap (mcp/tool-text.ts#tapText). */
+export type TapMarks = Pick<Tapped, 'note' | 'moved' | 'disabled'>;
+
+/**
  * Wait for the target to appear and settle (resolveSettled: one policy for
  * the flow engine's `tap:` step and the MCP `tap` tool), then tap the chosen
  * node at the guard's point. Returns the resolution note, if any, for the caller to
@@ -47,13 +67,14 @@ export type TapAdapter = KeyboardAdapter;
  * DeviceAdapter method: nothing in it is platform-specific, and as a method
  * both adapters implemented it identically, which forced the platform layer
  * to import the selector layer above it (ARCHITECTURE.md §3).
+ *
+ * `disabled` is the tapped node's own mark (adapters/types.ts#UiNode.disabled,
+ * D66) — the node the guard handed back, after any re-resolve: the tap is sent
+ * all the same, and the MCP reply and the flow's trace warn (DISABLED_TAP).
+ * docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md
  */
-export async function tapElement(
-  adapter: TapAdapter,
-  target: Target,
-  opts: GuardOptions,
-): Promise<{ note?: string; keyboardHidden?: string; moved?: string }> {
-  const { note, keyboardHidden, point, moved } = await resolveClearOfKeyboard(adapter, target, opts);
+export async function tapElement(adapter: TapAdapter, target: Target, opts: GuardOptions): Promise<Tapped> {
+  const { note, keyboardHidden, point, moved, node } = await resolveClearOfKeyboard(adapter, target, opts);
   await adapter.tap(point.x, point.y);
-  return { note, keyboardHidden, moved };
+  return { note, keyboardHidden, moved, disabled: node.disabled };
 }

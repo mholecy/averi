@@ -4,16 +4,27 @@ import { el, node, screen } from '../helpers/fake.js';
 
 describe('tap and type_text response lines', () => {
   it('tapText names the selector, and the resolution note when there was one', () => {
-    expect(tapText('id:go', undefined)).toBe('Tapped id:go');
-    expect(tapText('id:go', '2 matches; picked the only interactive one (button)')).toBe(
+    expect(tapText('id:go', {})).toBe('Tapped id:go');
+    expect(tapText('id:go', { note: '2 matches; picked the only interactive one (button)' })).toBe(
       'Tapped id:go (2 matches; picked the only interactive one (button))',
     );
   });
 
   it('tapText says where the tap went when it was moved off a covered centre (2026-10-09), before the note', () => {
     const moved = 'at (201,767) — its centre (201,780) is under button "Continue to summary" (24,780 354x44), drawn over it; tapped the uncovered part 354x26';
-    expect(tapText('id:p', undefined, moved)).toBe(`Tapped id:p ${moved}`);
-    expect(tapText('id:p', 'a note', moved)).toBe(`Tapped id:p ${moved} (a note)`);
+    expect(tapText('id:p', { moved })).toBe(`Tapped id:p ${moved}`);
+    expect(tapText('id:p', { note: 'a note', moved })).toBe(`Tapped id:p ${moved} (a note)`);
+  });
+
+  // D66 (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): a tap on a node the tree marks
+  // disabled was sent, and says so on its own line below; unmarked, the reply is as before, byte for byte.
+  it('tapText warns on its own line when the tapped node is marked disabled, after the moved part and the note', () => {
+    const warn = '\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.';
+    expect(tapText('id:go', { disabled: true })).toBe(`Tapped id:go${warn}`);
+    expect(tapText('id:go', { note: 'a note', disabled: true })).toBe(`Tapped id:go (a note)${warn}`);
+    expect(tapText('id:p', { moved: 'at (1,2)', disabled: true })).toBe(`Tapped id:p at (1,2)${warn}`);
+    expect(tapText('id:p', { note: 'a note', moved: 'at (1,2)', disabled: true })).toBe(`Tapped id:p at (1,2) (a note)${warn}`);
+    expect(tapText('id:p', { note: 'a note', moved: 'at (1,2)' })).toBe('Tapped id:p at (1,2) (a note)');
   });
 
   // The type_text reply WITH a selector is interact/fill-text.ts's since

@@ -159,6 +159,8 @@ interface IdbElement {
   traits?: string[] | null;
   /** idb's AX subrole — `AXSecureTextField` on a secure field (UiNode.secure), null elsewhere in the lab's captures. */
   subrole?: string | null;
+  /** idb's enabled state, a JSON boolean on every element of a full capture (`true` in every committed one) — UiNode.disabled. */
+  enabled?: boolean | null;
 }
 
 /**
@@ -201,6 +203,8 @@ function idbTree(elements: IdbElement[]): UiNode {
     );
     if (idbSpinner(el)) node.role = 'progress';
     if (el.traits?.includes('Header') === true) node.heading = true;
+    // Strictly `false` (types.ts#UiNode.disabled): a trimmed or older payload without the key stays unknown.
+    if (el.enabled === false) node.disabled = true;
     const secure = idbSecure(el);
     if (secure !== undefined) node.secure = secure;
     return node;

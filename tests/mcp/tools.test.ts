@@ -1583,6 +1583,57 @@ describe('tap and type_text under the Android soft keyboard', () => {
     expect(fake.tapPoints).toEqual([{ x: 249, y: 1766 }]);
   });
 
+  // D66 review: the mark read is the node the guard hands back after hiding the keyboard, not the first look's.
+  it('tap under the keyboard: the node found again after back carries the mark → the ⚠ line, tapped at the re-resolved point', async () => {
+    const fake = loginFake();
+    fake.onKey = (key, self) => {
+      if (key !== 'back') return;
+      for (const n of self.live().children) n.rect.y += 300;
+      self.live().children[0].disabled = true;
+    };
+    const { call } = await connect({ android: fake });
+    const result = await call('tap', { platform: 'android', selector: 'id:login_submit', configPath: missing() });
+    expect(result.text).toBe('Tapped id:login_submit (the soft keyboard covered id:login_submit; hidden before tapping)\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.');
+    expect(fake.tapPoints).toEqual([{ x: 249, y: 1766 }]);
+  });
+
+  it('tap under the keyboard: marked on the first look, unmarked once found again after back → no ⚠ line', async () => {
+    const fake = loginFake();
+    fake.live().children[0].disabled = true;
+    fake.onKey = (key, self) => {
+      if (key !== 'back') return;
+      for (const n of self.live().children) n.rect.y += 300;
+      delete self.live().children[0].disabled;
+    };
+    const { call } = await connect({ android: fake });
+    const result = await call('tap', { platform: 'android', selector: 'id:login_submit', configPath: missing() });
+    expect(result.text).toBe('Tapped id:login_submit (the soft keyboard covered id:login_submit; hidden before tapping)');
+  });
+
+  // D66: the handler hands the tapped node's mark to the reply (tool-text.ts#tapText); the tap is sent either way.
+  it('tap by selector on a node marked disabled: tapped all the same, the reply\'s ⚠ line says the tree marks it so', async () => {
+    const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
+    const { call } = await connect({ android: fake });
+    const result = await call('tap', { platform: 'android', selector: 'id:go', configPath: missing() });
+    expect(result.isError).toBe(false);
+    expect(result.text).toBe('Tapped id:go\n⚠ The tree marks the target disabled, the tap may do nothing; read again before relying on it.');
+    expect(fake.tapPoints).toEqual([{ x: 120, y: 210 }]);
+  });
+
+  it('tap by COORDINATES on a node marked disabled: no ⚠ line — the caller chose the point, no node was resolved', async () => {
+    const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
+    const { call } = await connect({ android: fake });
+    expect((await call('tap', { platform: 'android', x: 120, y: 210 })).text).toBe('Tapped (120, 210)');
+    expect(fake.tapPoints).toEqual([{ x: 120, y: 210 }]);
+  });
+
+  it('tap by selector on an unmarked node: the one-line reply, as before', async () => {
+    const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 } })) }, 's');
+    const { call } = await connect({ android: fake });
+    expect((await call('tap', { platform: 'android', selector: 'id:go', configPath: missing() })).text).toBe('Tapped id:go');
+    expect(fake.tapPoints).toEqual([{ x: 120, y: 210 }]);
+  });
+
   it('tap by COORDINATES is not guarded: no keyboard query, no key — the caller chose the point', async () => {
     const fake = loginFake();
     const { call } = await connect({ android: fake });

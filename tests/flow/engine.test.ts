@@ -3297,6 +3297,46 @@ flows:
       - ${step}
 `);
 
+  // D66 review (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md): the flow's `tap:` step says
+  // what the MCP tap's reply says, as a `⚠ tap` line before the tap line; the tap is sent and the flow goes on.
+  it('a tap on a node marked disabled: one ⚠ tap line with the tap reply\'s words, the tap sent, the flow done', async () => {
+    const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
+    const trace = await FlowEngine.run(flow('tap: { id: go }'), fake, FAST, { flow: 'f' });
+    expect(trace).toEqual([
+      { action: 'flow f', detail: 'start' },
+      { action: '⚠ tap', detail: 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.' },
+      { action: 'tap', detail: 'id:"go"' },
+      { action: 'flow f', detail: 'done' },
+    ]);
+    expect(fake.tapPoints).toEqual([{ x: 120, y: 210 }]);
+  });
+
+  // D66 review round 2, decided: quiet suppresses the tap line, not the warning — as the keyboard's ⚠ tap line.
+  it('an optional tap: on a present node marked disabled, the ⚠ tap line too, the tap sent', async () => {
+    const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'promo_close', rect: { x: 100, y: 200, width: 40, height: 20 }, disabled: true })) }, 's');
+    const trace = await FlowEngine.run(flow('optional:\n          - tap: { id: promo_close }'), fake, FAST, { flow: 'f' });
+    expect(trace.filter((t) => t.action.startsWith('⚠') || t.action === 'tap')).toEqual([
+      { action: '⚠ tap', detail: 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.' },
+      { action: 'tap', detail: 'id:"promo_close"' },
+    ]);
+    expect(fake.taps).toEqual(['promo_close']);
+  });
+
+  it('type_pin\'s keypad: a digit key marked disabled gets the ⚠ tap line though its tap line is quiet; an unmarked one none', async () => {
+    const key = (d: string, disabled: boolean) =>
+      node({ role: 'button', identifier: `k${d}`, label: d, rect: { x: 100 * Number(d), y: 200, width: 40, height: 20 }, ...(disabled && { disabled: true as const }) });
+    const fake = new FakeAdapter({ s: screen(key('1', false), key('2', true)) }, 's');
+    const trace = await FlowEngine.run(flow('type_pin: { value: "12", keypad: { id_pattern: "k{digit}" } }'), fake, FAST, { flow: 'f' });
+    expect(trace.filter((t) => t.action.startsWith('⚠') || t.action === 'tap')).toEqual([{ action: '⚠ tap', detail: 'The tree marks the target disabled, the tap may do nothing; read again before relying on it.' }]);
+    expect(fake.taps).toEqual(['k1', 'k2']);
+  });
+
+  it('a tap on an unmarked node: the trace as before, no ⚠ line', async () => {
+    const fake = new FakeAdapter({ s: screen(node({ role: 'button', identifier: 'go', rect: { x: 100, y: 200, width: 40, height: 20 } })) }, 's');
+    const trace = await FlowEngine.run(flow('tap: { id: go }'), fake, FAST, { flow: 'f' });
+    expect(trace.map((t) => t.action)).toEqual(['flow f', 'tap', 'flow f']);
+  });
+
   it('a tap: under the keyboard logs ONE ⚠ tap line before the tap line, and taps the re-resolved point', async () => {
     const fake = loginFake();
     fake.attachedKeyboard.windowAnswers.current = { state: 'shown', frame: KEYBOARD };
