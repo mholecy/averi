@@ -1523,6 +1523,8 @@ interface RawNode {
   scrollable?: string;
   /** "true"/"false" on every node of the API 33 dump (measured: the lab's form PIN "true") — read on text inputs only (types.ts#UiNode.secure). */
   password?: string;
+  /** "true"/"false" on every node of the API 33 dump (measured: the chooser's "Just once" "false") — UiNode.disabled. */
+  enabled?: string;
   bounds?: string;
   node?: RawNode | RawNode[];
 }
@@ -1733,6 +1735,8 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
     ...(clippedOut !== undefined && { clippedOut }),
     // The axis its class fixes (AXIS_BY_CLASS) — never a text input's, whose class is a scroll view's too.
     ...(!isTextInput && AXIS_BY_CLASS[className] !== undefined && { scrollAxis: AXIS_BY_CLASS[className] }),
+    // Not enabled, as the dump says it (types.ts#UiNode.disabled): a missing attribute stays unknown.
+    ...(raw.enabled === 'false' && { disabled: true as const }),
   };
   // An EMPTY classic EditText dumps its HINT as `text` — AccessibilityNodeInfo
   // .getText() returns the hint while isShowingHintText() — and the API 33

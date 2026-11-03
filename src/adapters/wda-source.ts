@@ -105,7 +105,9 @@ const PRESENTATIONS: readonly (readonly [string, TypedPresentationKind])[] = [
  * HIDDEN (`hiddenRoots`, `UiNode.hidden`); whether a cell's content is
  * PARKED (`parkedIn`); and which layers and in-window backdrops are
  * PRESENTED (`presentedScreen`; `inWindowBackdrops`, with `isAccessible`
- * too). The normalized node carries neither flag itself.
+ * too). The normalized node carries neither flag itself, but for `isEnabled`
+ * "0" (or 0): it is marked `disabled` (UiNode.disabled, D66; the `NotEnabled`
+ * trait, which agrees in both captures, is not read).
  * `placeholderValue` (since 2026-10-09) is the text XCUITest says the field
  * shows while empty; WDA's `value` of an EMPTY field is that same text
  * (measured 2026-10-09, iPhone 17 / iOS 27.0, Contacts "New Contact":
@@ -122,6 +124,7 @@ interface WdaElement {
   rect?: Rect;
   isVisible?: string | number | null;
   isAccessible?: string | number | null;
+  isEnabled?: string | number | null;
   /** WDA's accessibility traits, one comma-separated string (`"Header, StaticText"`): read for `Header` alone (UiNode.heading). */
   traits?: string | null;
   children?: WdaElement[] | null;
@@ -241,6 +244,7 @@ function toUiNode(el: WdaElement, marks: SourceMarks, inherited: Inherited): UiN
   );
   if (hidden) node.hidden = true;
   if (/\bHeader\b/.test(el.traits ?? '')) node.heading = true;
+  if (isZero(el.isEnabled)) node.disabled = true;
   // WDA names a secure field by its type (types.ts#UiNode.secure): the lab's PIN is a `SecureTextField`.
   const secure = el.type === undefined ? undefined : SECURE_BY_TYPE.get(el.type);
   if (secure !== undefined) node.secure = secure;
@@ -408,7 +412,7 @@ function atParkedFrame(own: Rect, view: Rect): boolean {
 
 /**
  * WDA's "0" and "1" — strings in the JSON format, a number in older payloads, compared as strings; a missing or null
- * flag is neither. The one reading of a visibility flag's value in this file (`onScreen` reads `isOne` too).
+ * flag is neither. The one reading of a visibility or enabled flag's value in this file (`onScreen` reads `isOne` too).
  */
 const flagIs = (flag: string | number | null | undefined, value: '0' | '1'): boolean =>
   flag !== undefined && flag !== null && String(flag) === value;
