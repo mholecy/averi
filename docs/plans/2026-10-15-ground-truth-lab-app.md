@@ -504,6 +504,9 @@ through D60's retype from the eager mark; rfe3 the expected MISMATCH ×10. The s
 (D62), and `averilab://shared` raised the chooser, which lists the alias as "AveriLab twin" (D55). C's absence at launch
 kept the batch's from-launch D59 leg from running: its probe wanted a `lab.<cell>.*` id on screen, and none is there at
 launch.
+Records: docs/truth/live-records/{android,ios-idb,ios-wda}-forms-l7-1.json, ios-rn-{idb,wda}-forms-l7-1…5.json and
+{android,ios-idb,ios-wda}-ensure-d30-2.json, -3.json (D30's repeat); g2 and rfe3 filed in live-known.ts since (T3,
+ADR 0034 residual 10).
 
 Read on the device (batch-10, 2026-11-03, main 139256a2, the iOS simulator 27.0 and averi_lab API 33; the outcomes are
 in the performance backlog's rows). The forms group, two runs of the new cases and one whole-group run on each of
@@ -521,6 +524,8 @@ ListView takes the click), and `button_once` and `button_always` are disabled un
 carousels from a fresh launch (D59): 12/12 `stuck`, the lab counting 0 carousel strokes — the swipes went over the
 vertical page (D59b). carousel-recycler-free's false "fully visible" (D62) did not recur in 13 runs, every stroke
 taken at rest.
+Records: docs/truth/live-records/{android,ios-idb,ios-wda}-forms-d61-1.json, -2.json (the new cases) and
+-whole.json (the whole group).
 
 ### Device facts (batches 1–10)
 
