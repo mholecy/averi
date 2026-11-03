@@ -721,10 +721,12 @@ part of it landing (p1 appends ` Jr.`, which `Jan Šťastný` does not hold; f15
   world` has not landed, its dropped tail `orld`.
 - Not changed: the reformat route (`landedReformat`, `priorsOf` itself, D29's and D61's fallbacks, D51's mask
   template), `tailOf` (eager trailing marks included), `differenceOf` (D53's `separated` among them), the clear path,
-  the masked rule, fill-type.ts's poll and retype, fill.ts. No new Difference kind, verdict reason or module; one
-  wording gains a hedge — a `dropped-tail` that is a whole landing too (`wholeToo`, from `wholeLandingToo`; review round
-  2) adds "or the field replaced its text (select-all): fill with `clear: true`", every other reply byte for byte as
-  before.
+  the masked rule, fill-type.ts's poll and retype, fill.ts. No new Difference kind, verdict reason or module; two
+  wordings gain a hedge where the reading is a whole landing too and its tail is not typed again (`wholeToo`, from
+  `wholeLandingToo`, set by `differenceOf` on every such miss): a `dropped-tail` (a grouped prefix: `11 ` after `1`)
+  adds "or the field replaced its text (select-all): fill with `clear: true`" (review round 2), a `length` (an exact
+  prefix: `-5-` after `-5`, `55` after `5`) adds "the field may have replaced its text (select-all): fill with `clear:
+  true`" (the code review); every other reply byte for byte as before.
 
 **Consequences.**
 - Under the append premise (the caret at the end), each newly refused reading is a strict prefix of the earlier text
@@ -752,19 +754,20 @@ part of it landing (p1 appends ` Jr.`, which `Jan Šťastný` does not hold; f15
   `-5`).
 
 **Mutation-checked**: hand mutants, run from a copy of the file over fill-landing, fill-type, fill, fill-verdict,
-fill-text and live-forms tests (492), each killed but two. On the rule: back to the whole-reading containment (33
+fill-text and live-forms tests (497), each killed but two. On the rule: back to the whole-reading containment (33
 tests fail); the raw reading, not `heldText` (2); `.includes` as `.startsWith` (12) and as `.endsWith` (10);
 `typedPartOf`'s fallback as `''` (34); its `startsWith` as `includes` (1: the caret at the start, `-5`); the slice one
-character back, the overlap form (11); the `observed === value` disjunct dropped (3). On `priorsOf` (M-1): the earlier
-text alone (4); `.some` as `.every` (4); the earlier text itself skipped (26). On `wholeLandingToo` (m-2): never (6);
-the across-the-seam clause dropped (2); the decorated-value clause dropped (2); an occurrence ending AT the seam
-counted (7); one character less of overlap (2); the decorated clause's `includes` dropped (1: a dropped trailing mark,
-`12/` kept `12`); its skeleton equality dropped (8); `||` as `&&` (4). On `wholeToo` (round 2): never marked (2),
-always marked (13). Equivalent: D63's guard put back (none fail: the fold); `typedPartOf`'s `prior !== ''` dropped
-(`startsWith('')` and `slice(0)` give the whole reading); before review round 1, `priorText(e)` as `heldText(before)`
-(the clear branch never reached it). `npm run mutate` (cold): fill-landing 95.73 → 95.77 % (floor 93; 284 mutants, 12
-survived, 4 timeouts — the same survivors as D63's run, none in the new code); every other module's score unchanged,
-fill-verdict's 99.33 % (floor 97) among them; floors unchanged.
+character back, the overlap form (13); the `observed === value` disjunct dropped (3). On `priorsOf` (M-1): the earlier
+text alone (4); `.some` as `.every` (4); the earlier text itself skipped (26). On `wholeLandingToo` (m-2): never (9);
+the across-the-seam clause dropped (2); the decorated-value clause dropped (4); an occurrence ending AT the seam
+counted (11); one character less of overlap (2); the decorated clause's `includes` dropped (1: a dropped trailing mark,
+`12/` kept `12`); its skeleton equality dropped (14); `||` as `&&` (6). On `wholeToo`: never marked on a
+`dropped-tail` (2), always marked there (13); never marked on a `length` (3), always marked there (32); marked without
+some of the typing landed (3). Equivalent: D63's guard put back (none fail: the fold); `typedPartOf`'s `prior !== ''`
+dropped (`startsWith('')` and `slice(0)` give the whole reading); before review round 1, `priorText(e)` as
+`heldText(before)` (the clear branch never reached it). `npm run mutate` (cold): fill-landing 95.73 → 95.83 % (floor
+93; 288 mutants, 12 survived, 4 timeouts — the same survivors as D63's run, none in the new code); every other
+module's score unchanged, fill-verdict's 99.33 % (floor 97) among them; floors unchanged.
 
 **Golden and live.** The golden replays tree reads and never types: Changed 0, which is no evidence either way; the
 unit tests are (fill-landing.test.ts's D64 group and the flipped pin, fill-type.test.ts's burst, cap and elsewhere
@@ -787,8 +790,8 @@ not typed again and fails — `11 ` for a typed `11` after `1`, or `aaa` for `aa
 one dropped; on small alphabets about 1 % of the dropped-tail readings, the value's head repeating the earlier text's
 end. The real-world shape (review round 2): a fill without clear whose digits repeat the field's last ones (`55` typed
 after `5`), on iOS only, where a dropped tail is typed again: it fails loudly, by length, and never ends in a wrong
-Filled. Remedy: fill with `clear: true`. Where such a reading is worded `dropped-tail`, its reply adds "or the field
-replaced its text (select-all): fill with `clear: true`" (`wholeToo`, review round 2), since it may all have landed.
+Filled. Remedy: fill with `clear: true`. Every such reply says so, since the typing may all have landed (`wholeToo`:
+the `dropped-tail` and `length` hedges above).
 
 ## Residuals accepted
 
