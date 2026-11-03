@@ -18,8 +18,8 @@ Amended 2026-11-03 (D61: an unnamed placeholder whose letters and digits start t
 turns a correct grouped fill into `length`; D29's pinned `1234 5678` after `1` lands; residual 6 accepted; implemented
 on `fix/d61-placeholder-prior`).
 Amended 2026-11-03 (D63: without clear, a reading still exactly what the field showed when typing began has not
-landed, unless it is the value itself — the exact rule's `includes` no longer passes a typing that changed nothing;
-residual 7 accepted; implemented on `fix/d63-unchanged-reading`).
+landed, unless it is the value itself — the exact rule's `includes` no longer passes a reading byte for byte what the
+field showed when typing began; residuals 7 and 8 accepted; implemented on `fix/d63-unchanged-reading`).
 
 ## Context
 
@@ -616,7 +616,8 @@ change: the typing did not reach it, or the field refused it"), never reached be
 - `fill-landing.ts#landingOf` alone changes: right after `tookText`, a reading for which `unmoved` holds has not landed
   — `!clear && observed === before && observed !== value`. It extends `tookText`'s "a non-input proves it took the text
   only by changing" to an input typed without clear, and covers the reformat route and the exact rule alike, stated
-  once. Raw equality, as `before` is the raw pre-tap reading.
+  once. Raw equality, as `before` is the raw reading when typing began (for an empty or masked field, the post-focus
+  re-read).
 - **The value itself is excepted.** A reading that is both the earlier text and the value cannot be told from a
   select-all field that replaced its text with the typing (the D29 amendment), an unnamed placeholder equal to the value,
   or a named one (`placeholder`, not verified, pinned end to end). It lands as before: residual 7.
@@ -658,7 +659,9 @@ read MISMATCH `fill-claim`; with D63 ok. No existing case's verdict moves; g1 no
 device: `live.ts --groups forms --cases f15` on idb, wda and uiautomator, and a regression pass of p1, f13, g3–g5, a
 later batch's.
 
-Residuals, stated: residual 7 below; the late-key race is unmeasured since the paced typing, so how often a first read
+Residuals, stated: residuals 7 and 8 below — the guard is byte equality with `before`, so a reading that moved
+without any of the typing, or whose `before` was not what the field showed when typing began, still passes by
+containment (residual 8, follow-up D64); the late-key race is unmeasured since the paced typing, so how often a first read
 predated the keys, and what D63 now costs there, is not known; a field that commits its accessibility value only on
 blur is refused, as it already was when `before` was empty.
 
@@ -688,3 +691,11 @@ blur is refused, as it already was when `before` was empty.
    value exception): `421` typed into a field reading `421`, its typing refused or lost, replies Filled — the reading
    cannot be told from a select-all field that retyped it or a placeholder equal to the value. The field does hold the
    value. Remedy, where it matters: fill with `clear: true`.
+8. **A reading that holds the value but none of the typing still lands by containment** (D63's amendment, review round
+   1, MINOR-1): D63's guard refuses only a reading byte for byte equal to `before`. (A) A reading that moved but holds
+   no new typing lands by the value inside the earlier text: `Hello worldw` for a typed `world` after `Hello world`
+   (one key landed, the rest went elsewhere) replies Filled — the analysis's option D, the earlier text then the value,
+   would close it. (B) On Android, fill.ts skips the post-focus re-read for a sole-id selector on an empty plain field
+   and takes `before` as empty; a field that inserts `+421 ` on focus and takes no key reads `+421 `, which contains a
+   typed `421`, and replies Filled. Both are pinned as today's behaviour in fill-landing.test.ts. Follow-up: backlog
+   row D64.
