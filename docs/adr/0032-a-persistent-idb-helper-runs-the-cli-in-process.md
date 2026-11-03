@@ -24,6 +24,8 @@ amendment below).
 Amended 2026-11-02 (D58: before a link to the project's own scheme, averi records the answer an Open tap records, so iOS
 should not ask "Open in …?" — see the amendment below).
 Amended 2026-11-03 (batch-8: D58's gate device-checked — the D58 amendment's last paragraph).
+Amended 2026-11-03 (batch-9: D58 checked end to end through averi — the D58 amendment's last paragraph, after
+batch-8's).
 
 ## Context
 
@@ -730,3 +732,17 @@ The same batch read D57's reply on the device: open_deep_link's alert reply was 
 WDA (3916 ms), and `tap text:"Cancel"` dismissed it 2/2. The remembered answer was restored and verified. Still open, a
 later batch's: the end-to-end check through averi (a bare `Opened` with the key deleted, no write for https and tel
 links, the happy path's Δ, a second link with the key present).
+Since then batch-9 ran it and it passed: see the next paragraph.
+
+Checked end to end through averi (batch-9, 2026-11-03, lab simulator iOS 27.0, main e734fedf; the alert raised as
+before, causally: with the key deleted and no write, four controls — over SpringBoard, over Contacts, on a cold start
+and at the end — each raised it from the first read, 29–30 of 29–30 reads): PASS on P1–P5. P1 6/6: with the key deleted,
+`open_deep_link averilab://cell/open` replied a bare `Opened` over SpringBoard, over Contacts and on a cold start, on
+idb and WDA (511–2121 ms); 0 of 28–29 reads listed the alert, the lab's open cell was in front at 0–1 ms, the key read
+back `dev.averi.lab`, with one write and one D58 stderr line (the write's announcement). P2 2/2: on 0133247c, the tree
+before this change, the same link drew D54's alert reply verbatim, idb and WDA. P3 2/2: an https and a `tel:` link made
+no write and no D58 line, and the key stayed absent. P4: the happy path's Δ, median idb +14 ms (437 against 423 ms) and
+WDA +17 ms (441 against 424 ms), within 50 ms. P5 2/2: with the key present every reply was bare, the key unchanged, one
+D58 stderr line an adapter. So the end-to-end check stated open above is done. The remembered answer was restored and
+read back after a reboot. Not D58's: on the simulator the `tel:` link's reply is simctl's raw exit-115 trace (no app
+handles `tel:` there), which averi does not name.

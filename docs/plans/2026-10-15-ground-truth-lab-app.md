@@ -495,6 +495,16 @@ truth corpus and the golden do not move: an uncaptured cell makes no golden row)
 The three apps spell the two formats alike (Forms.kt, Forms.swift, the RN app's src/format.ts); the table is
 tests/truth/lab-format.test.ts. No LIVE_KNOWN entry: the cases' device outcomes are batch-9's to read.
 
+Read on the device (batch-9, 2026-11-03, main e734fedf, the iOS simulator 27.0 and averi_lab API 33; the outcomes are in
+the performance backlog's rows): g1, g4 and g5 ok on every source; g2 the expected `separated` MISMATCH on idb and WDA
+and, first read on Android, ok (`Filled … 2 separators added`: the reading there had no trailing space); g3 a MISMATCH
+on idb only, the unnamed `+421` placeholder taken for earlier text (backlog D61); rfe1 and rfe2 20/20 ok, 5 of them
+through D60's retype from the eager mark; rfe3 the expected MISMATCH ×10. The snapping twins held D10's settled read
+40/40 (D37), the free twins met D59's three preconditions, with one false "fully visible" on carousel-recycler-free
+(D62), and `averilab://shared` raised the chooser, which lists the alias as "AveriLab twin" (D55). C's absence at launch
+kept the batch's from-launch D59 leg from running: its probe wanted a `lab.<cell>.*` id on screen, and none is there at
+launch.
+
 ## Workflow per bug, once phase 3 is in
 
 1. A device or exploratory finding becomes a cell plus its neighbours (other layer kind, other edge, other verbs,

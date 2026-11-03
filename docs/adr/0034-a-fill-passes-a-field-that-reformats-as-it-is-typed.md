@@ -13,6 +13,7 @@ Amended 2026-11-02 (D53: a reading that shows every typed character in order wit
 fails `separated`, naming the check and the remedy; implemented on `fix/d53-separated`).
 Amended 2026-11-02 (D60: a dropped tail that ends in an eager trailing mark is typed again; implemented on
 `fix/d60-eager-trailing-tail`).
+Amended 2026-11-03 (batch-9: D60's live proof on iOS React Native — the D60 amendment's last paragraph).
 
 ## Context
 
@@ -500,6 +501,17 @@ Forms.kt, Forms.swift and rn/src/format.ts joins its groups, no trailing mark), 
 re-judges the recorded replies by class and kind, unchanged; the forms groups (f1–f14, rf1–rf5) take only the
 earlier branches. No device check before merge; a lab format that marks a complete group eagerly, for a live proof on
 iOS React Native, is a later batch's.
+Since then batch-9 made that live proof: see the next paragraph.
+
+**Proven live** (batch-9, 2026-11-03, main e734fedf, the lab simulator iOS 27.0; L7's `group4eager` in
+`react-native/rn-format-eager` and `forms/form-grouped`, live cases rfe1–rfe3, g1 and g2): of the 18 drops React Native
+showed on rfe1 and rfe2, 5 kept a part ending on the eager mark, were typed again from it and landed, the app holding
+the full value each time — rfe1 on idb ×2 (`SK31 1200 0000 1987 ` kept, the last 8 of 24 characters typed again) and
+rfe2 on WDA ×3 (`SK31 1200 ` kept, the last 2 of 10). All 20 rfe1/rfe2 runs were ok. rfe3 (×10) and native g2 (idb,
+WDA), a full reading ending in the mark, failed `separated` as this amendment says ("… with 3 separators added …": the
+two inner spaces and the eager one); g1 was ok on idb, WDA and uiautomator. On Android g2 passed (`Filled … 2 separators
+added`) while the app held `SK31 1200 0000 `: the reading judged there had no trailing space, and whether the dump or
+averi drops it is unread.
 
 ## Residuals accepted
 
