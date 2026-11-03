@@ -357,7 +357,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
       return { status: 200, body: WDA_ENVELOPE };
     });
     const source = new WdaTreeSource({ udid: 'AAAA-1111', exec: fakeExec().fn, fetchFn: fetcher.fn, spawnFn: spawner.fn, derivedDataPath: dd, pollIntervalMs: 5 });
-    const keyBodies = () => fetcher.requests.filter((r) => r.url.endsWith('/wda/keys')).map((r) => r.body);
+    const keyBodies = () => fetcher.requests.filter((r) => r.url.endsWith('/wda/keys')).map((r) => (r.body as { value: string[] }).value.join(''));
     return { source, spawner, fetcher, keyBodies };
   }
 
@@ -365,7 +365,7 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
     const { source, spawner, keyBodies } = await typingSetup();
     await source.read();
     await source.typeText('Jan Šťastný');
-    expect(keyBodies()).toEqual([{ value: [...'Jan Šťastný'] }]);
+    expect(keyBodies()).toEqual(['Jan Šťastný']);
     expect(spawner.spawns).toHaveLength(1);
     await source.dispose();
   });
@@ -381,7 +381,9 @@ describe('WdaTreeSource.typeText — WdaServer.keys on the source\'s own server 
     await source.read();
     await source.dispose();
     const before = fetcher.urls.length;
-    await expect(source.typeText('Šťastný')).rejects.toThrow(/deselected or averi is shutting down/);
+    const err = (await source.typeText('Šťastný').catch((e: unknown) => e)) as Error;
+    expect(err.message).toMatch(/deselected or averi is shutting down/);
+    expect(err.cause).toBeUndefined(); // released before the server is asked: no WdaServer error behind it
     expect(fetcher.urls.slice(before)).toEqual([]);
   });
 

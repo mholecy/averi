@@ -48,6 +48,8 @@ describe('WDA_TYPEABLE: idb\'s set and what the gate measured exact through /wda
   it.each([
     ['an emoji outside the BMP, whole (never half a pair)', 'a😀b', 'U+1F600'],
     ['an emoji in the BMP (Extended_Pictographic)', 'a☺b', 'U+263A'],
+    ['a Han ideograph outside the BMP (CJK Extension B)', 'a\u{20000}b', 'U+20000'],
+    ['a Common digit outside the BMP (mathematical bold zero)', 'a\u{1D7CE}b', 'U+1D7CE'],
     ['a combining mark (NFD)', 'Š', 'U+030C'],
     ['an acute combining mark', 'é', 'U+0301'],
     ['a zero-width joiner (Cf)', 'a‍b', 'U+200D'],

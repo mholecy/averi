@@ -651,7 +651,8 @@ describe('WdaServer.keys — one session per WDA start, one retry on a lost sess
     expect(posts()).toEqual(['/session', '/session/S1/wda/keys']);
     const [session, keys] = fetcher.requests.filter((r) => r.method === 'POST');
     expect(session.body).toEqual({ capabilities: { alwaysMatch: { forceSimulatorSoftwareKeyboardPresence: false }, firstMatch: [{}] } });
-    expect(keys.body).toEqual({ value: [...'Jan Šťastný'] });
+    // `value` is joined by WDA (FBElementCommands.m: componentsJoinedByString), so `[text]` and `[...text]` are one typing.
+    expect((keys.body as { value: string[] }).value.join('')).toBe('Jan Šťastný');
     for (const r of [session, keys]) expect(r.headers).toEqual({ 'content-type': 'application/json' });
     server.stop();
   });
