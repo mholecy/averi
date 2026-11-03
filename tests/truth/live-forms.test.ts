@@ -3,7 +3,7 @@ import { selectCases } from '../../scripts/truth/live-cases.js';
 import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedKept } from '../../scripts/truth/live-forms.js';
 import { knownEntry } from '../../scripts/truth/live-known.js';
 import type { LabState } from '../../scripts/truth/schema.js';
-import { landingOf } from '../../src/interact/fill-landing.js';
+import { differenceOf, landingOf } from '../../src/interact/fill-landing.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import { readLiveRecord, recordedCase, withFieldValue } from '../helpers/live-records.js';
 
@@ -347,15 +347,15 @@ describe('f11–f14 (D37): a dotted date and a `+421` phone in form-format', () 
 });
 
 /**
- * g1–g5 and rfe1–rfe2 (L7): form-grouped's ibanEager (group4eager: a space as soon as a group of four is complete, none
+ * g1–g5 and rfe1–rfe3 (L7): form-grouped's ibanEager (group4eager: a space as soon as a group of four is complete, none
  * at 24) and phoneGrouped (phone3: a leading `+`, the digits in threes, under a `+421` placeholder), and rn-format-eager's
  * E (group4eager on React Native) — D60's eager trailing mark and D37's `+421` grouping field. No device has run them
  * yet: judged over D40's records (form-format's f1 under WDA, rn-format's rf1 under idb), their final state set to what
  * each fill would leave; what each source answers is batch-9's to read.
  */
-describe('g1–g5 and rfe1–rfe2 (L7): an eager-spaced IBAN and a grouped `+421` phone, native and React Native', () => {
+describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421` phone, native and React Native', () => {
   const G_IDS = ['g1', 'g2', 'g3', 'g4', 'g5'];
-  const RFE_IDS = ['rfe1', 'rfe2'];
+  const RFE_IDS = ['rfe1', 'rfe2', 'rfe3'];
   const f1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'f1');
   const left = (tag: string, value: string) => withFieldValue(f1, tag, value).state;
   const rf1 = recordedCase(readLiveRecord('ios-rn-forms-d40-1.json'), 'idb', 'rf1');
@@ -385,12 +385,13 @@ describe('g1–g5 and rfe1–rfe2 (L7): an eager-spaced IBAN and a grouped `+421
     expect(all.filter((id) => RFE_IDS.includes(id))).toEqual([]);
   });
 
-  it.each(['ios', 'android'] as const)('%s runs rfe1–rfe2 on the React Native app after rf5: clear on rfe1 alone, into E\'s field', async (platform) => {
+  it.each(['ios', 'android'] as const)('%s runs rfe1–rfe3 on the React Native app after rf5: clear on rfe1 alone, into E\'s field', async (platform) => {
     const cases = await rn(platform);
     expect(cases.map((c) => c.id)).toEqual(RFE_IDS);
     expect(cases.every((c) => c.cell === 'rn-format-eager' && c.group === 'forms')).toBe(true);
     expect(cases.map((c) => c.calls)).toEqual([
-      [{ tool: 'type_text', args: { selector: 'id:"lab.rn-format-eager.E.field"', text: 'SK3112000000123', clear: true } }],
+      [{ tool: 'type_text', args: { selector: 'id:"lab.rn-format-eager.E.field"', text: 'SK3112000000198742637541', clear: true } }],
+      [{ tool: 'type_text', args: { selector: 'id:"lab.rn-format-eager.E.field"', text: 'SK31120000' } }],
       [{ tool: 'type_text', args: { selector: 'id:"lab.rn-format-eager.E.field"', text: 'SK3112000000' } }],
     ]);
     const all = (await selectCases({ platform, app: 'react-native', groups: ['forms'] })).map((c) => c.id);
@@ -423,14 +424,33 @@ describe('g1–g5 and rfe1–rfe2 (L7): an eager-spaced IBAN and a grouped `+421
     expect(g3.judge(left('phoneGrouped', '+421 421 903 123 456'), [refused], 'idb', f1.launched, [])).toMatchObject({ outcome: 'LOUD' });
   });
 
-  it('rfe1/rfe2: E held as the eager field spaces it — ok, a dropped tail typed again included (D60\'s live reply); a tail left dropped, claimed done — MISMATCH', async () => {
-    const [rfe1, rfe2] = await rn('ios');
-    const retyped = 'Filled id:"lab.rn-format-eager.E.field" (15 characters, the last 3 characters typed again after the field dropped them, the field shows them reformatted: 3 separators added)';
-    expect(rfe1.judge(rnLeft('SK31 1200 0000 123'), [retyped], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'ok' });
-    expect(rfe1.judge(rnLeft('SK31 1200 0000 '), [retyped], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
-    const twelve = 'Filled id:"lab.rn-format-eager.E.field" (12 characters, the field shows them reformatted: 3 separators added)';
-    expect(rfe2.judge(rnLeft('SK31 1200 0000 '), [twelve], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'ok' });
-    expect(rfe2.judge(rnLeft('SK31 1200 00'), ['ERROR the field shows "SK31 1200 00", not the 12 characters typed'], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed' });
+  it('rfe1/rfe2 (D60): the drops D40 saw on iOS RN (4 under idb, 2 under wda) end on a group, in the eager mark — a dropped tail by the fill\'s rules; the full value lands', () => {
+    const rule = (value: string, clear = false) => ({ value, clear, before: '', placeholder: undefined, isInput: true, resolvedValue: '', held: 0 as const });
+    expect(landingOf('SK31 1200 0000 1987 4263 ', rule('SK3112000000198742637541', true))).toBeUndefined();
+    expect(differenceOf('SK31 1200 0000 1987 4263 ', rule('SK3112000000198742637541', true))).toEqual({ kind: 'dropped-tail', landed: 20, dropped: 4, grouped: true });
+    expect(landingOf('SK31 1200 0000 1987 4263 7541', rule('SK3112000000198742637541', true))).toMatchObject({ kind: 'landed' });
+    expect(differenceOf('SK31 1200 ', rule('SK31120000'))).toEqual({ kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true });
+    expect(landingOf('SK31 1200 00', rule('SK31120000'))).toMatchObject({ kind: 'landed' });
+    // rfe3 (and g2): the full 12 end on a group — the eager mark after them is D53's `separated`, refused by design.
+    expect(differenceOf('SK31 1200 0000 ', rule('SK3112000000'))).toEqual({ kind: 'separated', added: 3 });
+  });
+
+  it('rfe1–rfe3: E held as the eager field spaces it — ok, a dropped tail typed again included (D60\'s live reply); a tail left dropped, claimed done — MISMATCH; rfe3 refused while the app holds it — MISMATCH failed-holds, as its `says` expects', async () => {
+    const [rfe1, rfe2, rfe3] = await rn('ios');
+    const retyped = 'Filled id:"lab.rn-format-eager.E.field" (24 characters, the last 4 characters typed again after the field dropped them, the field shows them reformatted: 5 separators added)';
+    expect(rfe1.judge(rnLeft('SK31 1200 0000 1987 4263 7541'), [retyped], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'ok' });
+    expect(rfe1.judge(rnLeft('SK31 1200 0000 1987 4263 '), [retyped], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    const ten = 'Filled id:"lab.rn-format-eager.E.field" (10 characters, the last 2 characters typed again after the field dropped them, the field shows them reformatted: 2 separators added)';
+    expect(rfe2.judge(rnLeft('SK31 1200 00'), [ten], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'ok' });
+    expect(rfe2.judge(rnLeft('SK31 1200 '), ['ERROR the field shows "SK31 1200 ", not the 10 characters typed'], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed' });
+    expect(rfe3.says).toMatch(/expected MISMATCH failed-holds by design \(D53 `separated`/);
+    const separated = 'ERROR typed 12 characters but the field shows 15 — every typed character is there, in order, with 3 separators added';
+    expect(rfe3.judge(rnLeft('SK31 1200 0000 '), [separated], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
+  });
+
+  it('g2 says its expected MISMATCH by design, as rfe3 does; no other g or rfe case does', async () => {
+    const all = [...(await native('ios')), ...(await rn('ios'))];
+    expect(all.filter((c) => /expected MISMATCH/.test(c.says)).map((c) => c.id)).toEqual(['g2', 'rfe3']);
   });
 
   it('no outcome guessed: none of g1–g5 or rfe1–rfe2 is known under any source until a device run reads it', () => {
