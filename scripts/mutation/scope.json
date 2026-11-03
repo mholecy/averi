@@ -42,11 +42,11 @@
   "src/adapters/typeable.ts": {
     "tests": ["tests/adapters/typeable.test.ts", "tests/adapters/ios-typing.test.ts", "tests/interact/type-text.test.ts"],
     "floor": 86,
-    "baseline": "88.89 % on 2026-11-03 (D43, Typeable.otherPath and widerPath; cold): 36 mutants, 4 survived, 0 without coverage — all four in named()'s two class tests, whose ^ or $ anchor dropped is equivalent (a refusal's character is one code point)"
+    "baseline": "88.89 % on 2026-11-03 (D43 review round 1, widerPath judged by the whole value; cold): the same 36 mutants and 4 survivors; 88.89 % on 2026-11-03 (D43, Typeable.otherPath and widerPath; cold): 36 mutants, 4 survived, 0 without coverage — all four in named()'s two class tests, whose ^ or $ anchor dropped is equivalent (a refusal's character is one code point)"
   },
   "src/adapters/ios-typing.ts": {
     "tests": ["tests/adapters/ios-typing.test.ts", "tests/adapters/typeable.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-03 (D43, IDB_TYPEABLE, WDA_TYPEABLE and typingPathOf; cold, after a test pinned WDA's whole says clause, whose middle string survived the first run at 95.65 %): 25 mutants, 23 valid, 0 survived, 2 runtime errors (a class fragment emptied: an invalid RegExp) — Stryker's regex mutator does not reach the two sets, built with new RegExp: the hand mutants do (ADR 0037's D43 amendment, residual 9)"
+    "baseline": "100 % on 2026-11-03 (D43 review round 1, the Specials refused, \"any other character\" in the refusal; cold): 25 mutants, 23 valid, 0 survived, 2 runtime errors; 100 % on 2026-11-03 (D43, IDB_TYPEABLE, WDA_TYPEABLE and typingPathOf; cold, after a test pinned WDA's whole says clause, whose middle string survived the first run at 95.65 %): 25 mutants, 23 valid, 0 survived, 2 runtime errors (a class fragment emptied: an invalid RegExp) — Stryker's regex mutator does not reach the two sets, built with new RegExp: the hand mutants do (ADR 0037's D43 amendment, residual 9)"
   }
 }
