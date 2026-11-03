@@ -65,7 +65,8 @@ flows:
   with separators the rule refuses (a cents mask's `12.34` for `1234`) fails saying so, the check
   and the remedy named (ADR 0034's D53 amendment). Without clear, an earlier text that
   vanished (a placeholder the source does not name, read as the empty field's value) no longer
-  fails the fill: the reading is judged as the value alone too (ADR 0034's D29 amendment).
+  fails the fill: the reading is judged as the value alone too (ADR 0034's D29 amendment;
+  widened by D61: an unnamed placeholder whose letters and digits start the value's).
   Android types one character per `input text` call: bulk injection races Compose's async state
   and drops most characters (measured 3 of 11 landing). Today averi types only printable ASCII
   (U+0020–U+007E) on both platforms: a value holding any other character — `Š`, `’`,
