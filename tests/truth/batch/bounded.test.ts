@@ -1,0 +1,240 @@
+import { describe, expect, it } from 'vitest';
+import { boundFor, Calls, codeOf, NOT_STARTED, TIMED_OUT } from '../../../scripts/truth/batch/bounded.js';
+import type { Ended, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
+
+// scripts/truth/batch/bounded.ts over a fake process seam: which bound a device call gets, what its exit code says,
+// and when a call's process group is sent SIGTERM and SIGKILL. No process is started here; the real groups (a
+// grandchild gone after a timeout) are tests/truth/batch/bounded-proc.test.ts.
+
+/** One fake call: it ends when `end` is called, or — unless stubborn — when its group gets SIGTERM or SIGKILL. */
+interface FakeCall {
+  cmd: string;
+  args: readonly string[];
+  pid: number;
+  end(e: Ended): void;
+  stubbornToTerm: boolean;
+}
+
+class FakeSeam implements ProcessSeam {
+  readonly calls: FakeCall[] = [];
+  readonly options: StartOptions[] = [];
+  readonly kills: string[] = [];
+  /** Calls started from now on ignore SIGTERM (a grandchild that traps it); SIGKILL ends them. */
+  stubborn = false;
+  /** The next start fails as an unknown command does. */
+  failNext = false;
+  private nextPid = 100;
+
+  start(cmd: string, args: readonly string[], options: StartOptions): Started {
+    this.options.push(options);
+    if (this.failNext) {
+      this.failNext = false;
+      return { pid: undefined, done: Promise.resolve({ code: null, signal: null, error: `spawn ${cmd} ENOENT` }), out: () => '', err: () => '' };
+    }
+    let end!: (e: Ended) => void;
+    const done = new Promise<Ended>((resolve) => (end = resolve));
+    const call: FakeCall = { cmd, args, pid: this.nextPid++, end, stubbornToTerm: this.stubborn };
+    this.calls.push(call);
+    return { pid: call.pid, done, out: () => `out of ${cmd}`, err: () => `err of ${cmd}` };
+  }
+
+  killGroup(pid: number, signal: NodeJS.Signals): void {
+    this.kills.push(`${signal} -${pid}`);
+    const call = this.calls.find((c) => c.pid === pid);
+    if (call === undefined || (signal === 'SIGTERM' && call.stubbornToTerm)) return;
+    call.end({ code: null, signal });
+  }
+
+  install(): void {}
+  exit(): void {}
+}
+
+const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+
+describe('boundFor — every device call bounded, by tool (batch-7\'s `bounded`, batch-11\'s per-tool wrappers)', () => {
+  it('xcrun: simctl boot and bootstatus 300 s, simctl install the install bound, anything else 120 s (batch-11.sh:224)', () => {
+    expect(boundFor('xcrun', ['simctl', 'boot', 'U'])).toBe(300);
+    expect(boundFor('xcrun', ['simctl', 'bootstatus', 'U', '-b'])).toBe(300);
+    expect(boundFor('xcrun', ['simctl', 'install', 'U', 'a.app'])).toBe(600);
+    expect(boundFor('xcrun', ['simctl', 'install', 'U', 'a.app'], 900)).toBe(900);
+    expect(boundFor('xcrun', ['simctl', 'spawn', 'U', 'defaults', 'read', 'd'])).toBe(120);
+    expect(boundFor('xcrun', ['boot'])).toBe(120);
+    expect(boundFor('xcrun', ['devicectl', 'boot'])).toBe(120);
+    expect(boundFor('xcrun', [])).toBe(120);
+  });
+
+  it('idb 60 s (batch-11.sh:225)', () => {
+    expect(boundFor('idb', ['ui', 'describe-all'])).toBe(60);
+  });
+
+  it('adb: install or uninstall anywhere in its words the install bound (batch-12\'s B_INSTALL), anything else 120 s (batch-11.sh:226)', () => {
+    expect(boundFor('adb', ['-s', 'emulator-5554', 'install', '-r', 'a.apk'])).toBe(600);
+    expect(boundFor('adb', ['-s', 'emulator-5554', 'uninstall', 'dev.averi.lab'], 450)).toBe(450);
+    expect(boundFor('adb', ['-s', 'emulator-5554', 'shell', 'pm', 'path', 'dev.averi.lab'])).toBe(120);
+    expect(boundFor('adb', ['shell', 'cmd', 'package', 'install-existing', 'x'])).toBe(120);
+  });
+
+  it('by the command\'s base name: a full path to the tool is the tool', () => {
+    expect(boundFor('/usr/bin/xcrun', ['simctl', 'boot', 'U'])).toBe(300);
+    expect(boundFor('/opt/sdk/platform-tools/adb', ['devices'])).toBe(120);
+  });
+
+  it('any other command has no bound of its own: its caller names one', () => {
+    expect(boundFor('node', ['live.ts'])).toBeUndefined();
+    expect(boundFor('xcrun-like', [])).toBeUndefined();
+    expect(boundFor('node', ['install'])).toBeUndefined();
+  });
+});
+
+describe('codeOf — a call\'s exit code as the shell gave it (batch-7: exit 142 is "a failed call like any other")', () => {
+  it('its own code; 128 + the signal\'s number when a signal ended it', () => {
+    expect([codeOf({ code: 0, signal: null }, false), codeOf({ code: 3, signal: null }, false)]).toEqual([0, 3]);
+    expect([codeOf({ code: null, signal: 'SIGKILL' }, false), codeOf({ code: null, signal: 'SIGTERM' }, false), codeOf({ code: null, signal: 'SIGINT' }, false)]).toEqual([137, 143, 130]);
+  });
+
+  it('past its bound 142 (128 + SIGALRM, perl alarm\'s code), whatever signal the group was ended with', () => {
+    expect(TIMED_OUT).toBe(142);
+    expect([codeOf({ code: null, signal: 'SIGKILL' }, true), codeOf({ code: 0, signal: null }, true)]).toEqual([142, 142]);
+  });
+
+  it('not started (no such command) 127, as `exec … or exit 127`', () => {
+    expect(NOT_STARTED).toBe(127);
+    expect(codeOf({ code: null, signal: null, error: 'spawn x ENOENT' }, false)).toBe(127);
+  });
+
+  it('neither a code nor a signal: 1, a failure, never 0', () => {
+    expect(codeOf({ code: null, signal: null }, false)).toBe(1);
+  });
+});
+
+describe('Calls.bounded — a call in a process group of its own, ended whole past its bound', () => {
+  it('a call that ends in time: its code and output, no signal sent', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam);
+    const r = calls.bounded('adb', ['devices']);
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    expect(await r).toEqual({ code: 0, timedOut: false, signal: null, out: 'out of adb', err: 'err of adb' });
+    expect(seam.kills).toEqual([]);
+  });
+
+  it('past its bound: SIGTERM to its whole group (-pid), then SIGKILL to the group even when the leader died of the TERM — a grandchild may trap it (backlog T2 S2: the grandchild gone)', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 30 });
+    const r = await calls.bounded('node', ['probe.ts'], { secs: 0.02 });
+    expect(r).toMatchObject({ code: TIMED_OUT, timedOut: true, signal: 'SIGTERM' });
+    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+  });
+
+  it('a group that ignores SIGTERM: SIGKILL after the grace, and the result waits for it', async () => {
+    const seam = new FakeSeam();
+    seam.stubborn = true;
+    const calls = new Calls(seam, { graceMs: 30 });
+    const started = Date.now();
+    const r = await calls.bounded('node', ['probe.ts'], { secs: 0.02 });
+    expect(r).toMatchObject({ code: TIMED_OUT, timedOut: true, signal: 'SIGKILL' });
+    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(45);
+  });
+
+  it('the bound is in seconds: a call ended at 10 ms of a 0.2 s bound was in time', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 10 });
+    const r = calls.bounded('node', ['x'], { secs: 0.2 });
+    await tick(10);
+    seam.calls[0].end({ code: 1, signal: null });
+    expect(await r).toMatchObject({ code: 1, timedOut: false });
+    await tick(250);
+    expect(seam.kills).toEqual([]);
+  });
+
+  it('a device tool takes its own bound when none is given; another command without one is refused before it starts', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam);
+    await expect(calls.bounded('node', ['live.ts'])).rejects.toThrow(/node: no bound/);
+    await expect(calls.bounded('node', ['live.ts'], { secs: 0 })).rejects.toThrow(/node: no bound/);
+    await expect(calls.bounded('node', ['live.ts'], { secs: Number.NaN })).rejects.toThrow(/node: no bound/);
+    expect(seam.calls).toEqual([]);
+  });
+
+  it('the call\'s folder, env and log reach the seam', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam);
+    const r = calls.bounded('adb', ['devices'], { cwd: 'the-dir', env: { A: '1' }, log: 'the.log' });
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await r;
+    expect(seam.options).toEqual([{ cwd: 'the-dir', env: { A: '1' }, log: 'the.log' }]);
+  });
+
+  it('the install bound is the one Calls was given (batch-12\'s B_INSTALL)', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { installSecs: 0.02, graceMs: 5 });
+    expect(await calls.bounded('adb', ['install', 'a.apk'])).toMatchObject({ code: TIMED_OUT });
+  });
+
+  it('a command that cannot start: 127 and why, as `exec … or exit 127`; nothing to kill', async () => {
+    const seam = new FakeSeam();
+    seam.failNext = true;
+    const calls = new Calls(seam);
+    expect(await calls.bounded('no-such-tool', [], { secs: 1 })).toEqual({ code: NOT_STARTED, timedOut: false, signal: null, out: '', err: 'spawn no-such-tool ENOENT' });
+    expect(seam.kills).toEqual([]);
+  });
+});
+
+describe('Calls.stopAll — the abort stops every running probe, its whole group, but never a detached restore (batch-11: the second Ctrl-C killed the restore)', () => {
+  it('bounded calls running: SIGTERM then SIGKILL to each group; detached ones untouched', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 10 });
+    const probe = calls.bounded('node', ['probe.ts'], { secs: 60 });
+    const restore = calls.detached('node', ['restore.ts'], { secs: 60 });
+    await tick();
+    expect(await calls.stopAll()).toBe(1);
+    expect(await probe).toMatchObject({ signal: 'SIGTERM', timedOut: false });
+    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+    seam.calls[1].end({ code: 0, signal: null });
+    expect(await restore).toMatchObject({ code: 0 });
+  });
+
+  it('a probe that ignores SIGTERM is killed after the grace', async () => {
+    const seam = new FakeSeam();
+    seam.stubborn = true;
+    const calls = new Calls(seam, { graceMs: 20 });
+    const probe = calls.bounded('node', ['probe.ts'], { secs: 60 });
+    await tick();
+    await calls.stopAll();
+    expect(await probe).toMatchObject({ signal: 'SIGKILL' });
+  });
+
+  it('a call that ended before the abort is not signalled', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    const probe = calls.bounded('node', ['probe.ts'], { secs: 60 });
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await probe;
+    expect(await calls.stopAll()).toBe(0);
+    expect(seam.kills).toEqual([]);
+  });
+
+  it('once stopping, no new bounded call starts (the run\'s body must not go on to its next probe); a detached one still does', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    await calls.stopAll();
+    await expect(calls.bounded('adb', ['devices'])).rejects.toThrow(/adb not started: the run is being stopped/);
+    const restore = calls.detached('adb', ['shell', 'input', 'keyevent', 'KEYCODE_HOME']);
+    await tick();
+    expect(seam.calls.map((c) => c.cmd)).toEqual(['adb']);
+    seam.calls[0].end({ code: 0, signal: null });
+    expect(await restore).toMatchObject({ code: 0 });
+  });
+
+  it('a timed-out call that ended is no longer running for stopAll', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    await calls.bounded('node', ['x'], { secs: 0.01 });
+    seam.kills.length = 0;
+    expect(await calls.stopAll()).toBe(0);
+    expect(seam.kills).toEqual([]);
+  });
+});
