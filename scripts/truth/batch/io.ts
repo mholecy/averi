@@ -4,8 +4,9 @@ import { basename, dirname, join, resolve } from 'node:path';
 /**
  * The batch module's one filesystem seam: every file the module reads or writes goes through a `BatchFs`. Nothing here
  * removes, empties or truncates a file or a folder — a run's evidence is never deleted (batch-3's B2 lost its raw
- * data to a second run that emptied its folder). The only thing ever replaced is the latest-out symlink, and only
- * when it is a symlink. Synchronous on purpose: a step line is on disk before the next step starts, so a run killed
+ * data to a second run that emptied its folder). Two things are ever replaced, each by one rename, never emptied
+ * first: the latest-out symlink, and only when it is a symlink; and a probe's state file (abort.ts#markDirty).
+ * Synchronous on purpose: a step line is on disk before the next step starts, so a run killed
  * mid-step keeps what it wrote.
  */
 export interface BatchFs {
@@ -26,6 +27,11 @@ export interface BatchFs {
    * else there is kept.
    */
   linkLatest(link: string, target: string): string | undefined;
+  /**
+   * Replace a file's text whole: written beside it, then renamed over it, so a reader sees the old text or the new,
+   * never a part. Only for a probe's state file (abort.ts#markDirty); throws when it cannot (a folder there).
+   */
+  replace(path: string, text: string): void;
   /** The path with its symlinks resolved, as far as it exists (a missing tail is kept as written). */
   real(path: string): string;
 }
@@ -85,6 +91,13 @@ export const nodeFs: BatchFs = {
       return `the link could not be made (${(e as Error).message})`;
     }
     return undefined;
+  },
+  replace(path, text) {
+    // Checked first, so nothing is written beside a folder that the rename would refuse to replace.
+    if (this.exists(path) && !lstatSync(path).isFile()) throw new Error(`${path} is no file: not replaced`);
+    const fresh = `${path}.${process.pid}.new`;
+    writeFileSync(fresh, text, { flag: 'wx' });
+    renameSync(fresh, path);
   },
   real(path) {
     const abs = resolve(path);

@@ -76,3 +76,27 @@ describe('nodeFs: writes never remove or overwrite', () => {
     expect(nodeFs.linkLatest(join(dir, 'file', 'latest'), join(dir, 'two'))).toMatch(/^the link could not be checked \(ENOTDIR/);
   });
 });
+
+describe('nodeFs.replace: a state file\'s text replaced in one step (abort.ts#markDirty)', () => {
+  it('the new text whole, by a rename over the old file: no temp file left beside it', () => {
+    writeFileSync(join(dir, 'state.json'), '{"dirty":false}');
+    nodeFs.replace(join(dir, 'state.json'), '{"dirty":true}');
+    expect(readFileSync(join(dir, 'state.json'), 'utf8')).toBe('{"dirty":true}');
+    expect(nodeFs.list(dir)).toEqual(['state.json']);
+  });
+
+  it('a file already at its temp name is never overwritten: throws, both files kept', () => {
+    writeFileSync(join(dir, 'state.json'), 'old');
+    writeFileSync(join(dir, `state.json.${process.pid}.new`), 'someone else\'s');
+    expect(() => nodeFs.replace(join(dir, 'state.json'), 'new')).toThrow(/EEXIST/);
+    expect([readFileSync(join(dir, 'state.json'), 'utf8'), readFileSync(join(dir, `state.json.${process.pid}.new`), 'utf8')]).toEqual(['old', "someone else's"]);
+  });
+
+  it('a folder in its place: throws, the folder kept, nothing written beside it', () => {
+    mkdirSync(join(dir, 'state.json'));
+    writeFileSync(join(dir, 'state.json', 'inner'), 'x');
+    expect(() => nodeFs.replace(join(dir, 'state.json'), '{}')).toThrow(/is no file: not replaced/);
+    expect(readFileSync(join(dir, 'state.json', 'inner'), 'utf8')).toBe('x');
+    expect(nodeFs.list(dir)).toEqual(['state.json']);
+  });
+});
