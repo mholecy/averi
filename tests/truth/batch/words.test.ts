@@ -3,8 +3,10 @@ import {
   EXIT,
   exitCodeOf,
   failsIn,
+  firstLineOf,
   interruptedBlock,
   messageOf,
+  nameInLine,
   timeOf,
   parseVerdictLine,
   stepLine,
@@ -222,5 +224,17 @@ describe('messageOf and timeOf — said once, here, for every module of the batc
 
   it('timeOf: HH:MM:SS, local, zero-padded', () => {
     expect([timeOf(new Date(2026, 10, 4, 9, 4, 6)), timeOf(new Date(2026, 10, 4, 23, 59, 59))]).toEqual(['09:04:06', '23:59:59']);
+  });
+});
+
+describe('nameInLine and firstLineOf — a name or a tool\'s words inside a why never break its line (T2 S3 review round 1)', () => {
+  it('nameInLine: a name as given; one holding a line break, or empty (else unseen), JSON-quoted, as words.ts\'s own errors quote a value', () => {
+    expect([nameInLine('a b/Šť.ts'), nameInLine('a\nb'), nameInLine('a\rb')]).toEqual(['a b/Šť.ts', '"a\\nb"', '"a\\rb"']);
+    expect(nameInLine('')).toBe('""');
+    expect(() => verdictLine('x', 'INCONCLUSIVE', nameInLine('a\nb'))).not.toThrow();
+  });
+
+  it('firstLineOf: up to the first \\n or \\r, trimmed; blanks only are nothing', () => {
+    expect([firstLineOf(' fatal: x \r\nmore'), firstLineOf('a\rb'), firstLineOf('  \n'), firstLineOf(''), firstLineOf('one')]).toEqual(['fatal: x', 'a', '', '', 'one']);
   });
 });

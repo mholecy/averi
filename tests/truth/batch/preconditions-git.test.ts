@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Calls } from '../../../scripts/truth/batch/bounded.js';
-import { ancestor, checkout, shortSha } from '../../../scripts/truth/batch/preconditions.js';
+import { nodeFs } from '../../../scripts/truth/batch/io.js';
+import { ancestor, checkout, preconditionLine, shortSha } from '../../../scripts/truth/batch/preconditions.js';
 import { nodeProcess } from '../../../scripts/truth/batch/proc.js';
 
 vi.setConfig({ testTimeout: 10_000, hookTimeout: 10_000 });
@@ -108,7 +109,7 @@ describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–21
 
   it('no repo there: git failed, its own first line said', async () => {
     const r = await checkout({ ...g(), env: { ...env, GIT_CEILING_DIRECTORIES: tmp } });
-    expect(r.ok === false && r.why).toMatch(/^git rev-parse HEAD failed \(exit 128: fatal: not a git repository/);
+    expect(r.ok === false && r.why).toMatch(/^git rev-parse --show-toplevel failed \(exit 128: fatal: not a git repository/);
   });
 
   it('GIT_DIR inherited from a hook\'s context does not leak in: the repo named is the repo read', async () => {
@@ -119,13 +120,43 @@ describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–21
     expect(await checkout({ ...g(), env: { ...env, GIT_DIR: join(other, '.git'), GIT_INDEX_FILE: join(other, '.git', 'index') } })).toEqual({ ok: true, head });
   });
 
+  it('a folder inside the checkout named as the repo: not its top, the top named; ancestor says the same (review round 1)', async () => {
+    const { first } = await mainRepo();
+    const sub = join(repo, 'sub');
+    mkdirSync(sub);
+    const why = `${sub} is not the top of a git checkout (top is ${nodeFs.real(repo)})`;
+    expect(await checkout({ ...g(), repo: sub })).toEqual({ ok: false, why });
+    expect(await ancestor({ ...g(), repo: sub, sha: first })).toEqual({ ok: false, why });
+  });
+
+  it('config given through the env (git -c\'s GIT_CONFIG_PARAMETERS, GIT_CONFIG_COUNT/KEY/VALUE) cannot hide a modified file (review round 1)', async () => {
+    await mainRepo();
+    chmodSync(join(repo, 'a.txt'), 0o755);
+    const dirty = { ok: false, why: 'the checkout has 1 modified tracked file(s) (a.txt) — the batch runs main as committed' };
+    const viaParameters = { ...env, GIT_CONFIG_PARAMETERS: "'core.filemode'='false'" };
+    const viaCount = { ...env, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.fileMode', GIT_CONFIG_VALUE_0: 'false' };
+    // Handed to git, either hides the mode change: the status reads clean.
+    for (const e of [viaParameters, viaCount]) expect((await run('git', ['-C', repo, 'status', '--porcelain'], { env: e, secs: 10 })).out).toBe('');
+    expect(await checkout({ ...g(), env: viaParameters })).toEqual(dirty);
+    expect(await checkout({ ...g(), env: viaCount })).toEqual(dirty);
+  });
+
+  it('a tracked file named with a line break, modified: named JSON-quoted, and the block\'s line made without a throw (review round 1)', async () => {
+    await mainRepo();
+    await commit('a\nb', '1');
+    writeFileSync(join(repo, 'a\nb'), '2');
+    const r = await checkout(g());
+    expect(r).toEqual({ ok: false, why: 'the checkout has 1 modified tracked file(s) ("a\\nb") — the batch runs main as committed' });
+    expect(preconditionLine('kf live verdict', [r])).toBe('kf live verdict: INCONCLUSIVE — precondition: the checkout has 1 modified tracked file(s) ("a\\nb") — the batch runs main as committed');
+  });
+
   it('git past an injected bound (a git that hangs): "git timed out", the call and the bound named, back in under 3 s', async () => {
     const bin = join(tmp, 'bin');
     mkdirSync(bin);
     writeFileSync(join(bin, 'git'), '#!/bin/sh\nexec sleep 5\n');
     chmodSync(join(bin, 'git'), 0o755);
     const t0 = Date.now();
-    expect(await checkout({ repo, run, env: { ...env, PATH: `${bin}:${env.PATH ?? ''}` }, secs: 0.3 })).toEqual({ ok: false, why: 'git timed out (rev-parse HEAD, past its 0.3 s bound)' });
+    expect(await checkout({ repo, run, env: { ...env, PATH: `${bin}:${env.PATH ?? ''}` }, secs: 0.3 })).toEqual({ ok: false, why: 'git timed out (rev-parse --show-toplevel, past its 0.3 s bound)' });
     expect(Date.now() - t0).toBeLessThan(3000);
   });
 });

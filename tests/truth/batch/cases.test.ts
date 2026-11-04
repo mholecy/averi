@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NOT_STARTED, TIMED_OUT } from '../../../scripts/truth/batch/bounded.js';
-import { completeness, incompleteLine, runFiles, runsIn, selectorOf, stepOutcome, writeCases, type Asked, type LiveCases, type Selector } from '../../../scripts/truth/batch/cases.js';
+import { completeness, incompleteLine, runFiles, runsIn, selectorOf, stepOutcome, writeCases, type Asked, type Selector } from '../../../scripts/truth/batch/cases.js';
+import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import { exitCodeOf, parseVerdictLine, type Summary } from '../../../scripts/truth/batch/words.js';
@@ -23,11 +24,11 @@ afterEach(() => {
 });
 
 const KF: Asked = { platform: 'android', app: 'native', kind: 'new', sources: ['uiautomator'], cases: ['kf1', 'kf2', 'kf3'] };
-/** A fake selector: the ids main's selectCases would pick for each source. */
+/** A fake selector: the ids main's selectCases would pick for each source, only those asked when any were (as main's). */
 const picks =
   (bySource: Record<string, string[]>): Selector =>
-  async (_asked, source) =>
-    bySource[source] ?? [];
+  async (asked, source) =>
+    (bySource[source] ?? []).filter((id) => asked.cases.length === 0 || asked.cases.includes(id));
 const select = picks({ uiautomator: ['kf1', 'kf2', 'kf3'], wda: ['p7w', 'b1d'], idb: ['p7'] });
 
 /** live.ts's log and rejudge summary of a run, as summarize writes them: the header, `## <source>`, one line per case. */
@@ -187,7 +188,7 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     expect(await judge('c')).toEqual({ ok: false, why: 'c.log is unreadable' });
   });
 
-  it('the summary: missing, unreadable, or without the header — named as the summary; its cases then not counted', async () => {
+  it('the summary: missing, unreadable, or without the header — named as the summary', async () => {
     putRun('a', { summary: null });
     putRun('b', { summary: summaryOf({ uiautomator: ['kf1', 'kf2', 'kf3'] }, false) });
     putRun('c', { summary: null });
@@ -195,6 +196,30 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     expect(await judge('a')).toEqual({ ok: false, why: 'no rejudge summary (a.rejudge.txt)' });
     expect(await judge('b')).toEqual({ ok: false, why: 'b.rejudge.txt has no `# Live golden:` line (the rejudge did not finish)' });
     expect(await judge('c')).toEqual({ ok: false, why: 'c.rejudge.txt is unreadable' });
+  });
+
+  it('a summary without its header still has its cases counted: every gap at once (review round 1)', async () => {
+    putRun('kf-1', { summary: summaryOf({ uiautomator: ['kf1'] }, false) });
+    expect(await judge('kf-1')).toEqual({ ok: false, why: 'kf-1.rejudge.txt has no `# Live golden:` line (the rejudge did not finish); uiautomator: kf2, kf3 missing from the summary' });
+  });
+
+  it('a run that proves nothing is never complete: an asked id main runs under none of the sources asked, named with the platform and sources; a selection of no case at all (review round 1)', async () => {
+    const nope: Asked = { platform: 'android', app: 'native', sources: ['uiautomator'], cases: ['zz-nope'] };
+    const empty = [`${LIVE_GOLDEN_HEADER} 0 cases, 0 ok, 0 loud, 0 mismatches (0 not known), 0 skipped`, ''].join('\n');
+    putRun('a', { cases: JSON.stringify(nope), record: '{}', log: empty, summary: empty });
+    expect(await judge('a')).toEqual({ ok: false, why: 'zz-nope: no case main runs on android under uiautomator; main picks no case for what was asked (android, native app, under uiautomator): the run proves nothing' });
+    const some: Asked = { platform: 'ios', app: 'native', sources: ['idb', 'wda'], cases: ['p7', 'zz', 'p7w', 'zz'] };
+    putRun('b', { cases: JSON.stringify(some), summary: summaryOf({ idb: ['p7'], wda: ['p7w'] }) });
+    expect(await judge('b')).toEqual({ ok: false, why: 'zz: no case main runs on ios under idb or wda' });
+    putRun('c', { cases: JSON.stringify({ ...KF, cases: [] }), summary: summaryOf({ uiautomator: [] }) });
+    expect(await judge('c', picks({}))).toEqual({ ok: false, why: 'main picks no case for what was asked (android, native app, under uiautomator): the run proves nothing' });
+  });
+
+  it('a source or an id holding a line break is named JSON-quoted: the block\'s line is still made (review round 1)', async () => {
+    putRun('kf-1', { cases: JSON.stringify({ ...KF, sources: ['ui\nx'], cases: ['k\nf'] }) });
+    const r = await judge('kf-1', async () => ['k\nf']);
+    expect(r).toEqual({ ok: false, why: '"ui\\nx": "k\\nf" missing from the summary' });
+    expect(incompleteLine('kf live verdict', [{ name: 'kf-1', result: r }])).toBe('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: kf-1 — "ui\\nx": "k\\nf" missing from the summary');
   });
 
   it('a case main picks missing from the summary, per source: every id named, under its source; an ok, a MISMATCH, a SKIP and a LOUD all count as there', async () => {
@@ -228,7 +253,9 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
 
   it('a selector that throws (main\'s table unreadable) is a gap, named; never thrown', async () => {
     putRun('kf-1');
-    expect(await judge('kf-1', () => Promise.reject(new Error('import failed\nstack')))).toEqual({ ok: false, why: 'the cases main picks could not be read (import failed)' });
+    expect(await judge('kf-1', () => Promise.reject(new Error('import failed\nstack')))).toEqual({ ok: false, why: "main's live cases could not be read: import failed" });
+    const unloadable: LiveTable = () => Promise.reject(new Error("Cannot find module 'live-cases.ts'\n  at x"));
+    expect(await judge('kf-1', selectorOf(unloadable))).toEqual({ ok: false, why: "main's live cases could not be read: Cannot find module 'live-cases.ts'" });
   });
 
   it('the selector is asked once per source, with what was asked', async () => {
@@ -238,8 +265,20 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     expect(asked.map(([a, s]) => [a.platform, s])).toEqual([['ios', 'idb'], ['ios', 'wda']]);
   });
 
-  it('a name that is no plain path segment is refused', async () => {
-    await expect(judge('../x')).rejects.toThrow(/one plain path segment/);
+  it('a name that is no plain path segment is a gap, never a throw: nothing of it is read (review round 1)', async () => {
+    expect(await judge('../x')).toEqual({ ok: false, why: "../x.cases: its name is no plain path segment (letters, digits, _ and -), not read as a run" });
+    expect(await judge('a\nb')).toEqual({ ok: false, why: '"a\\nb.cases": its name is no plain path segment (letters, digits, _ and -), not read as a run' });
+  });
+
+  it('a stray .cases (".cases", "x.y.cases") in a block\'s folder: listed as a run, judged a named gap, the others still judged (review round 1)', async () => {
+    putRun('kf-1');
+    writeFileSync(join(dir, '.cases'), '{}');
+    writeFileSync(join(dir, 'x.y.cases'), '{}');
+    const runs = await Promise.all(runsIn(nodeFs, dir).map(async (name) => ({ name, result: await judge(name) })));
+    expect(runs.map((r) => r.name)).toEqual(['', 'kf-1', 'x.y']);
+    expect(incompleteLine('kf live verdict', runs)).toBe(
+      'kf live verdict: INCONCLUSIVE — 2 of 3 run(s) incomplete: "" — .cases: its name is no plain path segment (letters, digits, _ and -), not read as a run | x.y — x.y.cases: its name is no plain path segment (letters, digits, _ and -), not read as a run',
+    );
   });
 
   it('with no fs given, the real filesystem', async () => {
@@ -250,7 +289,9 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
 
 describe('selectorOf — main\'s selectCases per source, as in b11-analyze.ts (Case.sources honoured)', () => {
   const cases = [{ id: 'p7', sources: ['idb', 'uiautomator'] }, { id: 'p7w', sources: ['wda'] }, { id: 'b1d' }];
-  const live = (seen: unknown[]): LiveCases => ({ selectCases: async (s) => (seen.push(s), cases), catalogOf: async () => ({ cells: [] }) });
+  const live =
+    (seen: unknown[]): LiveTable =>
+    async (): Promise<LiveCases> => ({ selectCases: async (s) => (seen.push(s), cases), catalogOf: async () => ({ cells: [] }) });
 
   it('the ids of the cases picked whose sources hold this one, or that name none', async () => {
     const seen: unknown[] = [];
@@ -268,6 +309,10 @@ describe('selectorOf — main\'s selectCases per source, as in b11-analyze.ts (C
 });
 
 describe('incompleteLine — the block\'s INCONCLUSIVE when a run is not complete, or none was asked', () => {
+  it('a run name holding a line break is named JSON-quoted', () => {
+    expect(incompleteLine('kf live verdict', [{ name: 'a\nb', result: { ok: false, why: 'x' } }])).toBe('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: "a\\nb" — x');
+  });
+
   it('every run complete: no line', () => {
     expect(incompleteLine('kf live verdict', [{ name: 'a', result: { ok: true, asked: KF } }])).toBeUndefined();
   });

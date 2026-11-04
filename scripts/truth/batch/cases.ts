@@ -1,10 +1,11 @@
-import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { join } from 'node:path';
 import { NOT_STARTED, TIMED_OUT } from './bounded.js';
 import { isEexist, nodeFs, type BatchFs } from './io.js';
+import type { LiveTable } from './live-table.js';
+import { unreadLive } from './preconditions.js';
 import { PLAIN_SEGMENT } from './run-dir.js';
 import { holdsGoldenHeader, LIVE_GOLDEN_HEADER, stepWordOf } from './steps.js';
-import { messageOf, verdictLine } from './words.js';
+import { nameInLine, verdictLine } from './words.js';
 
 /**
  * A live run's own record of what it was asked, and when it counts. A block that runs live.ts writes `<name>.cases`
@@ -15,23 +16,13 @@ import { messageOf, verdictLine } from './words.js';
  *
  * A run counts only when complete (b11-analyze.ts:1–23): its `.cases`, a record, live.ts's `# Live golden:` line in
  * both its log and its summary (printed only once live.ts has judged), and every case main's selectCases picks for
- * what was asked present in the summary under each source asked. What it found is the batch's analyzer's to judge;
- * this module only says whether there is a whole run to judge.
+ * what was asked present in the summary under each source asked — and something to prove: every id asked is one main
+ * runs under a source asked, and main picks one case at least. What it found is the batch's analyzer's to judge; this
+ * module only says whether there is a whole run to judge.
  *
- * Main's live-cases.ts is read through `liveCasesOf(repo)`, a dynamic import of the checkout's own file — never a grep,
- * and never a static import: the mutation run's sandbox holds scripts/truth/batch/ alone (ADR 0038's T2 amendment).
+ * Main's live-cases.ts is read through a LiveTable (live-table.ts#liveTableOf), a dynamic import of the checkout's own
+ * file — never a grep, and never a static import.
  */
-
-/** What main's live-cases.ts gives this module: selectCases (the cases a run takes) and catalogOf (the lab's cells). */
-export interface LiveCases {
-  selectCases(s: { platform: 'ios' | 'android'; app: string; groups: readonly string[]; only?: readonly string[] }): Promise<readonly { id: string; sources?: readonly string[] }[]>;
-  catalogOf(): Promise<{ cells: readonly { id: string }[] }>;
-}
-
-/** The checkout `repo`'s live-cases.ts, imported from its own file: the table main holds, read in process. */
-export async function liveCasesOf(repo: string): Promise<LiveCases> {
-  return (await import(pathToFileURL(join(resolve(repo), 'scripts/truth/live-cases.ts')).href)) as LiveCases;
-}
 
 /** What a live run was asked (batch-11's `asked`): the platform, the lab app, its sources and case ids (none: all). */
 export interface Asked {
@@ -101,12 +92,13 @@ export type Selector = (asked: Asked, source: string) => Promise<readonly string
 /**
  * main's selectCases as a Selector (b11-analyze.ts's selectorOf): the cases of the run's platform, app and groups (forms
  * when the .cases names none), only those asked when any were, and of them those whose sources hold this one or name
- * none (Case.sources).
+ * none (Case.sources). The table is loaded at the first call; a load that fails rejects the call, which completeness
+ * names.
  */
 export const selectorOf =
-  (live: LiveCases): Selector =>
+  (table: LiveTable): Selector =>
   async (asked, source) =>
-    (await live.selectCases({ platform: asked.platform, app: asked.app, groups: asked.groups ?? ['forms'], ...(asked.cases.length > 0 && { only: asked.cases }) }))
+    (await (await table()).selectCases({ platform: asked.platform, app: asked.app, groups: asked.groups ?? ['forms'], ...(asked.cases.length > 0 && { only: asked.cases }) }))
       .filter((c) => c.sources === undefined || c.sources.includes(source))
       .map((c) => c.id);
 
@@ -149,14 +141,43 @@ function readOr(fs: BatchFs, path: string, file: string, missing: string): { tex
   return { gap: fs.exists(path) ? `${file} is unreadable` : missing };
 }
 
+/** `ids` as a why lists them: each as a line may name it, `, ` between. */
+const listed = (ids: readonly string[]): string => ids.map(nameInLine).join(', ');
+
+/**
+ * What the selection says of a run: every id asked that main runs under none of the sources asked, then — when main
+ * picks no case at all for any source — that the run proves nothing (a run of zero cases is no evidence, whatever its
+ * header says); then, when the summary is there to read, every picked id it does not list under its source.
+ */
+async function selectionGaps(asked: Asked, select: Selector, summary: string | undefined): Promise<string[]> {
+  const gaps: string[] = [];
+  const picked = new Map<string, readonly string[]>();
+  for (const source of asked.sources) picked.set(source, await select(asked, source));
+  const any = new Set([...picked.values()].flat());
+  const under = `on ${asked.platform} under ${asked.sources.map(nameInLine).join(' or ')}`;
+  for (const id of new Set(asked.cases)) if (!any.has(id)) gaps.push(`${nameInLine(id)}: no case main runs ${under}`);
+  if (any.size === 0) gaps.push(`main picks no case for what was asked (${asked.platform}, ${nameInLine(asked.app)} app, under ${asked.sources.map(nameInLine).join(' or ')}): the run proves nothing`);
+  if (summary === undefined) return gaps;
+  const shown = idsBySource(summary);
+  for (const [source, ids] of picked) {
+    const have = shown.get(source) ?? new Set<string>();
+    const missing = ids.filter((id) => !have.has(id));
+    if (missing.length > 0) gaps.push(`${nameInLine(source)}: ${listed(missing)} missing from the summary`);
+  }
+  return gaps;
+}
+
 /**
  * Whether the run `name` in `dir` is complete (b11-analyze.ts's readRun's rule): its `.cases` read as what a live run is
  * asked; its record JSON; `# Live golden:` in its log and in its summary; every id `select` picks for each source asked
- * listed in the summary under that source. A `.cases` with nothing beside it was asked but never ran. Every gap is said,
- * in that order, `; ` between them: the whole why at once, so one rerun fixes it.
+ * listed in the summary under that source; and something to prove (selectionGaps). A `.cases` with nothing beside it
+ * was asked but never ran. Every gap is said, in that order, `; ` between them: the whole why at once, so one rerun
+ * fixes it — but the cases are checked only when the `.cases` was read as asked (else what to pick is unknown), and
+ * against the summary only when it could be read (with or without its header). A name that is no plain path segment
+ * (a stray `.cases` or `x.y.cases` in the folder) is a gap of its own, and nothing of it is read. Never throws.
  */
 export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: BatchFs; dir: string; name: string; select: Selector }): Promise<Completeness> {
-  checkName(name);
+  if (!PLAIN_SEGMENT.test(name)) return { ok: false, why: `${nameInLine(`${name}${CASES_EXT}`)}: its name is no plain path segment (letters, digits, _ and -), not read as a run` };
   const f = runFiles(dir, name);
   const ran = [f.record, f.log, f.summary].some((p) => fs.exists(p));
   if (!ran) return { ok: false, why: fs.exists(f.cases) ? 'asked but never ran (no record, log or summary beside its .cases)' : 'never ran (no .cases, record, log or summary)' };
@@ -189,19 +210,13 @@ export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: Ba
   if ('gap' in log) gaps.push(log.gap);
   else if (!holdsGoldenHeader(log.text)) gaps.push(`${name}.log has no \`${LIVE_GOLDEN_HEADER}\` line (live.ts did not finish)`);
   const summary = readOr(fs, f.summary, `${name}.rejudge.txt`, `no rejudge summary (${name}.rejudge.txt)`);
-  let listed: Map<string, Set<string>> | undefined;
   if ('gap' in summary) gaps.push(summary.gap);
   else if (!holdsGoldenHeader(summary.text)) gaps.push(`${name}.rejudge.txt has no \`${LIVE_GOLDEN_HEADER}\` line (the rejudge did not finish)`);
-  else listed = idsBySource(summary.text);
-  if (asked !== undefined && listed !== undefined) {
+  if (asked !== undefined) {
     try {
-      for (const source of asked.sources) {
-        const have = listed.get(source) ?? new Set<string>();
-        const missing = (await select(asked, source)).filter((id) => !have.has(id));
-        if (missing.length > 0) gaps.push(`${source}: ${missing.join(', ')} missing from the summary`);
-      }
+      gaps.push(...(await selectionGaps(asked, select, 'text' in summary ? summary.text : undefined)));
     } catch (e) {
-      gaps.push(`the cases main picks could not be read (${messageOf(e).split('\n', 1)[0]})`);
+      gaps.push(unreadLive(e));
     }
   }
   // No gap means `asked` was read: its check is for the type.
@@ -215,6 +230,6 @@ export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: Ba
  */
 export function incompleteLine(label: string, runs: readonly { name: string; result: Completeness }[]): string | undefined {
   if (runs.length === 0) return verdictLine(label, 'INCONCLUSIVE', 'not run: no .cases in its folder (nothing was asked)');
-  const bad = runs.flatMap((r) => (r.result.ok ? [] : [`${r.name} — ${r.result.why}`]));
+  const bad = runs.flatMap((r) => (r.result.ok ? [] : [`${nameInLine(r.name)} — ${r.result.why}`]));
   return bad.length === 0 ? undefined : verdictLine(label, 'INCONCLUSIVE', `${bad.length} of ${runs.length} run(s) incomplete: ${bad.join(' | ')}`);
 }

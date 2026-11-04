@@ -50,7 +50,7 @@ export const CLOSE_GRACE_MS = 1000;
 export const MAX_SECS = 86_400;
 /** How long to wait before a group kill refused with EPERM is tried once more. */
 export const EPERM_RETRY_MS = 50;
-/** git's own bound (boundFor): preconditions.ts reads the local checkout with it. */
+/** git's own bound (boundFor), for reads: preconditions.ts reads the local checkout with it; a slow git op passes its own secs. */
 export const GIT_SECS = 30;
 
 /**
@@ -72,9 +72,9 @@ export const keepsGroup = (cmd: string): boolean => KEEPS_GROUP[basename(cmd)]?.
 /**
  * A device tool's own bound, in seconds (batch-11's wrappers, :224–226): xcrun simctl boot and bootstatus 300,
  * simctl install the install bound, any other xcrun 120; idb 60; adb install or uninstall the install bound, any other
- * adb 120. The install bound is 600 s (batch-11), or batch-12's B_INSTALL. git 30 (T2 S3's preconditions: a read of
- * the local checkout, never the network; batch-11 ran its git unbounded). Any other command has none: its caller
- * names it (batch-12's B_LIVE, B_E5, …).
+ * adb 120. The install bound is 600 s (batch-11), or batch-12's B_INSTALL. git 30, for reads (T2 S3's preconditions:
+ * the local checkout, never the network; batch-11 ran its git unbounded) — a slow git operation (batch-12's `worktree
+ * add`) passes its own secs. Any other command has none: its caller names it (batch-12's B_LIVE, B_E5, …).
  */
 export function boundFor(cmd: string, args: readonly string[], installSecs = 600): number | undefined {
   switch (basename(cmd)) {

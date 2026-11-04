@@ -54,6 +54,16 @@ export const twoDigits = (n: number): string => String(n).padStart(2, '0');
 /** A time of day as the batch writes it: `HH:MM:SS`, local (the step lines, the INTERRUPTED line, RESTORE's header). */
 export const timeOf = (d: Date): string => `${twoDigits(d.getHours())}:${twoDigits(d.getMinutes())}:${twoDigits(d.getSeconds())}`;
 
+/**
+ * A name (a path, a case id, a source) as a line may hold it: as given, or JSON-quoted (`"a\nb"`, `""`) when it holds a
+ * line break or is empty — as this module's own errors quote a value — so a why naming it never breaks its line, never
+ * throws, and never names nothing unseen.
+ */
+export const nameInLine = (name: string): string => (name === '' || LINE_BREAK.test(name) ? JSON.stringify(name) : name);
+
+/** A tool's or an error's first line, trimmed: up to the first \n or \r, so what a why quotes of it is one line. */
+export const firstLineOf = (text: string): string => text.split(LINE_BREAK, 1)[0].trim();
+
 /** What a thrown value says: an Error's message, anything else as a string. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
