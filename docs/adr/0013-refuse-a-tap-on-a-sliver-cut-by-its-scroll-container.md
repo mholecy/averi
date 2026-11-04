@@ -480,6 +480,21 @@ and doubting it would cost a second probe on every checked stop (4 golden rows f
 (b) A reveal dropped after a stroke that ran short for another reason (a loaded host: a 74-px probe moved 21 or 38
 px, LV2's table) still passes. (c) Two strokes dropped in a row still pass.
 
+**Live check (batch-12, 2026-11-04).** Main f7ea6e07 against pre-D62 0eab7789 on the averi_lab AVD (API 33),
+carousel-recycler-free after the 440-px pre-drag, `left fully: true`, a wrapper dropping the call's 2nd stroke (the
+reveal after the probe; the app's own stroke count judged every run); PASS. Pre-D62 reproduced batch-9 3/3: "fully
+visible after 2 swipes … a probe swipe toward it moved nothing", while the app's frame of C lay 367–376 px past the
+clip's right edge. Main 3/3: the 142-px probe carried C, the dropped reveal (183–184 px) was doubted and sent again as
+swipe 3 at the same length, and the call went on to `maxSwipes` after 6 swipes in LV2 point 3's words ("a probe swipe
+toward it showed 27 px more of it … may still be cut there …"), C 42–44 px short; never "fully visible". The control
+(no drop) ended the same way 3/3, C 17–18 px short — the carousel's convergence below the stroke floor (backlog D68),
+not D62. The legitimate pins held, 2 runs a side: sticky R "fully visible after 2 swipes" on both (its 177-px probe
+moved R 66 px, short, and the held reveal after it was not doubted: point 4 seen live) and bounded S after 2 swipes on
+both (its 74-px probe carried S 59–62 px, but the reveal after it moved S, so nothing was doubted). The retry cost no
+time beyond the budget in the doubted case (main's drop runs and the control both 6 swipes, about 16.1 s). Not
+exercised live: the Cost case proper (a held reveal after S's carried probe, one retry), and residuals (a)–(c). No
+earlier sentence of this amendment is contradicted.
+
 ## Residuals accepted
 
 1. A node that only READS cut (whole, its own content running to the edge, `geometry.ts#evidentCut`) is refused too;

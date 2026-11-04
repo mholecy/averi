@@ -386,3 +386,26 @@ Residuals, stated:
 - Device check: none yet. Proposed for batch-12 (E5): the with_default fail-open on `shared`, then `open_deep_link
   averilab://pair/open` × 10 and `launch_app` `-p` × 5 from the launcher (the sheet quoted n/10, the latency), then a
   tap at row 1's quoted centre and `tap id:button_once`, `.MainActivity` expected.
+
+**Live check (batch-12, 2026-11-04).** Main f7ea6e07 on the averi_lab AVD (API 33), E5 as proposed above; PASS. (a)
+`averilab://shared/open` × 3, its last-chosen `.Twin` entry in place: the chooser was the `resolver_list_with_default`
+layout, 25 nodes, every node package `android` — a header LinearLayout with `icon` and `title` "Open with AveriLab",
+then `button_bar` in the same header with "Just once" at (723, 1723) and "Always" at (936, 1723), both enabled; then a
+"Use a different app" text; then `resolver_list` with one row at (540, 2074), its `text1` "AveriLab", no `text2`; no
+node selected or checked. So the AOSP reading above holds: the header with its `icon` lies above the list and holds
+the buttons, enabled; the preselected app is the header's (the tree does not say which target it is: both labels read
+"AveriLab"), not a marked row, and the list holds the other one. The guard failed open on it: averi's reply was
+byte-identical to D55's 3/3 (2012–2124 ms). (c) after the lab's reinstall, `averilab://pair/open` × 10 and
+`launch_app` `-p` × 5 from the launcher: the sheet quoted 15/15 (links median 2022 ms, launches median 2041 ms), the
+quoted centres and "(disabled)" marks equal to the probe's own dump, the fresh tree byte-identical to
+`tests/fixtures/uiautomator-lab-resolver.xml`. averi's dump, started right after `am start` (38–60 ms) and the focus
+read (24–35 ms), took about 1.94–2.05 s (19 dumps, median 1.94 s, exit 0 every time, no timeout, never the launcher's
+tree). (d) a tap at row 1's quoted centre (540, 1727) only selected (both buttons enabled, no node marking the row),
+then `tap id:button_once` brought `.MainActivity` to the front, leaving a last-chosen `pair` entry (`mAlways=false`,
+not a default). The cost is therefore about 2.0 s against the ≈ 127 ms before, at the low end of the 2–2.5 s stated in
+Consequences; the 5 s bound is about 2.4 times the slowest dump. Residuals now measured: the with_default layout
+(fails open), row 1's tap (works), the dump's timing right after `am start` (no timeout in 19). Still open: a scrolled
+list, an OEM's layout, monkey's refusal, a hung dump's bound never seen live; the with_default tree is not yet a
+committed fixture (backlog D55d). "Device check: none yet" above is superseded by this paragraph, and the lab AVD now
+has no fresh chooser left (`shared` and `pair` both keep a last-chosen entry): a later fresh-chooser check needs a new
+two-handler host.

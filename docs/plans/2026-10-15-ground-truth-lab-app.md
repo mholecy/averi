@@ -491,7 +491,8 @@ truth corpus and the golden do not move: an uncaptured cell makes no golden row)
   come in through material's dependency (compiled offline), no explicit `androidx.recyclerview` line.
 - The Android manifest: `averilab://shared` resolves to two components (MainActivity and its alias `.Twin`) — D55's
   second handler; `averilab://cell` keeps one. `averilab://pair` (D55c) has the same two handlers, for a fresh
-  chooser: `shared`'s keeps a last-chosen entry since batch-11 (fact 5 below). Neither opens a cell.
+  chooser: `shared`'s keeps a last-chosen entry since batch-11 (fact 5 below). Since batch-12 `pair`'s keeps one too
+  (fact 18), so the lab AVD has no fresh chooser left: the next one needs a new two-handler host. Neither opens a cell.
 
 The three apps spell the two formats alike (Forms.kt, Forms.swift, the RN app's src/format.ts); the table is
 tests/truth/lab-format.test.ts. batch-9 read the cases on the device; g2 and rfe3 are filed in live-known.ts since T3,
@@ -538,7 +539,16 @@ selects, and "Just once" started `.Twin`, leaving a last-chosen entry the lab AV
 stroked the page centre, 496 px below the carousel band, 6/6, while a stroke inside the band moved it 4/4. D62's
 pre-call fling never met a probe swipe (0/12 triggered). B2 re-sampled the idb settle (D35, T5's corpus).
 
-### Device facts (batches 1–11)
+Read on the device (batch-12, 2026-11-04, main f7ea6e07, the iOS simulator 27.0 and averi_lab API 33; the outcomes are
+in the performance backlog's rows). D55c (E5): `shared`'s chooser, with its last-chosen entry, was the with_default
+layout (fact 17) and averi's reply failed open byte for byte 3/3; after the lab's reinstall `pair`'s fresh sheet was
+quoted 10/10 links and 5/5 `-p` launches (about 2.0 s each, fact 19), and a tap at row 1's quoted centre then
+`tap id:button_once` started `.MainActivity` (fact 18). D62 (lv-d62): with the first reveal dropped, pre-D62 0eab7789
+said "fully visible" 3/3 with C 367–376 px cut, main ended hedged 3/3; sticky R and bounded S kept their swipe counts.
+kf1–kf3 did not run: D67's read measured the panel where batch-11 left it (fact 20). T6: no iOS lab control is
+disabled (form-shared-id: 13 elements, all enabled), so D66's idb capture is not possible in the lab.
+
+### Device facts (batches 1–12)
 
 Measured on the lab devices (the iOS 27.0 simulator, averi_lab API 33) and written nowhere else before; the batch's raw
 evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is named; it is not edited from here.
@@ -594,6 +604,26 @@ evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is na
 16. Gboard's floating panel, dragged by hand, lay at 87,1243 937×792 (the strip 132 px tall at 0,2088): a third
     position, the same size as 2026-10-16's 71,1092. At that position form-keyboard-floating's submit (55,1928
     970×132) lies 107 px under the panel (bottom 2035), only 53 px of gap above the strip (batch-11, kf; D67).
+17. The chooser of a link whose target has a last-chosen entry (`shared`, fact 5) is AOSP's `resolver_list_with_default`
+    layout, 25 nodes: a header with `android:id/icon` [22,1472][110,1560] and `title` "Open with AveriLab"
+    [132,1472][1014,1531], then `button_bar` in the same header with `button_once` "Just once" [604,1648][842,1797]
+    (centre 723,1723) and `button_always` "Always" [842,1648][1030,1797] (936,1723), both enabled; a "Use a different
+    app" TextView [0,1822][1080,1997]; `resolver_list` [0,1997][1080,2217] with one row [0,1997][1080,2151] (centre
+    540,2074), its `text1` "AveriLab", no `text2`; no `title_container`, no node selected or checked. The last-chosen
+    app is the header's, not a marked row; which target it is the tree does not say (batch-12, E5 (a), 3/3; ADR 0041's
+    D55c amendment).
+18. `pair`'s fresh chooser is byte for byte batch-10's `shared` tree (`tests/fixtures/uiautomator-lab-resolver.xml`:
+    rows at 540,1727 and 540,1881, buttons at 723,2058 and 936,2058, disabled). A tap at row 1's centre only selects
+    (the buttons enabled, the tree then equal to row 2's selected tree); "Just once" started `.MainActivity` and left
+    `dev.averi.lab/.MainActivity mMatch=0x300000 mAlways=false`, Authority `pair`, a last-chosen entry like fact 5's,
+    accepted. The lab AVD now keeps two (shared → `.Twin`, pair → `.MainActivity`), so a fresh chooser needs a new host
+    (batch-12, E5 (d)).
+19. averi's chooser dump (`uiautomator dump /dev/tty`), started right after `am start` (38–60 ms) and the focus read
+    (24–35 ms), returned the chooser's tree 19/19 in 1937–2049 ms (median 1944), exit 0, no timeout, never the
+    launcher's; the whole chooser reply took 2011–2124 ms (batch-12, E5; ADR 0041's D55c amendment).
+20. Gboard's floating panel stays where it was dragged across days: D67's read (`dumpsys window InputMethod`'s
+    `touchable region=SkRegion((87,1243,1024,2035)(0,2088,1080,2220))`) found batch-11's 87,1243 937×792 again a day
+    later (batch-12, kf).
 
 ## Workflow per bug, once phase 3 is in
 
