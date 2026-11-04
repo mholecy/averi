@@ -1,11 +1,12 @@
-import { appendFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 /**
  * The batch module's one filesystem seam: every file the module reads or writes goes through a `BatchFs`. Nothing here
  * removes, empties or truncates a file or a folder — a run's evidence is never deleted (batch-3's B2 lost its raw
- * data to a second run that emptied its folder). The only thing ever replaced is the latest-out symlink, and only
- * when it is a symlink. Synchronous on purpose: a step line is on disk before the next step starts, so a run killed
+ * data to a second run that emptied its folder). Two things are ever replaced, each by one rename, never emptied
+ * first: the latest-out symlink, and only when it is a symlink; and a probe's state file (abort.ts#markDirty).
+ * Synchronous on purpose: a step line is on disk before the next step starts, so a run killed
  * mid-step keeps what it wrote.
  */
 export interface BatchFs {
@@ -26,6 +27,16 @@ export interface BatchFs {
    * else there is kept.
    */
   linkLatest(link: string, target: string): string | undefined;
+  /**
+   * Replace a file's text whole: written beside it, then renamed over it, so a reader sees the old text or the new,
+   * never a part. Only for a probe's state file (abort.ts#markDirty); throws when it cannot (a folder there).
+   */
+  replace(path: string, text: string): void;
+  /**
+   * Open `path` for append (creating it, never truncating), hand its fd to `use`, and close it after, even when `use`
+   * throws: a child's log, which the child writes itself (bounded.ts hands the fd to proc.ts's start).
+   */
+  withAppend<T>(path: string, use: (fd: number) => T): T;
   /** The path with its symlinks resolved, as far as it exists (a missing tail is kept as written). */
   real(path: string): string;
 }
@@ -85,6 +96,23 @@ export const nodeFs: BatchFs = {
       return `the link could not be made (${(e as Error).message})`;
     }
     return undefined;
+  },
+  withAppend(path, use) {
+    const fd = openSync(path, 'a');
+    try {
+      return use(fd);
+    } finally {
+      // Should the close throw after `use` threw, the close's error hides `use`'s: accepted — a close of a just-opened
+      // append fd failing is rarer still, and either error stops the call.
+      closeSync(fd);
+    }
+  },
+  replace(path, text) {
+    // Checked first, so nothing is written beside a folder that the rename would refuse to replace.
+    if (this.exists(path) && !lstatSync(path).isFile()) throw new Error(`${path} is no file: not replaced`);
+    const fresh = `${path}.${process.pid}.new`;
+    writeFileSync(fresh, text, { flag: 'wx' });
+    renameSync(fresh, path);
   },
   real(path) {
     const abs = resolve(path);

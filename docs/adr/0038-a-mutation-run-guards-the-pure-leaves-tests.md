@@ -6,6 +6,7 @@ Amended 2026-11-02 (D45: geometry.ts joined the run — see the amendment below)
 Amended 2026-11-02 (D33: adapters/ios-liveness.ts joined the run — see the second amendment below).
 Amended 2026-11-03 (D43: adapters/typeable.ts and adapters/ios-typing.ts joined the run — see the D43 amendment below).
 Amended 2026-11-04 (T2 S1: scripts/truth/batch/ joined the run — see the T2 amendment below).
+Amended 2026-11-04 (T2 S2: bounded.ts and abort.ts joined the run — see the T2 amendment's S2 part below).
 
 ## Context
 
@@ -150,3 +151,125 @@ Where S1 departs from batch-12, on purpose:
 - the exit rule fails on a step-form FAIL line too (`FAIL …`), besides batch-12's `^[^:]+: FAIL( |$)`.
 - ONLY= takes spaces as well as commas between block names.
 - an out folder inside the checkout is refused already in S1 (analysis §5), not left to S6.
+
+### S2: bounded calls and the abort (2026-11-04, backlog T2 slice S2, the risk gate)
+
+S2 adds three files. bounded.ts bounds every call: its tool's own bound (at most a day, `MAX_SECS`), exit 142 past it,
+and the whole process group ended, SIGTERM and then SIGKILL; once a call's leader has ended, its group gets SIGKILL, so
+nothing it started outlives it, unless the call keeps its group (`keepGroup`), and then stopKept ends that group at the
+abort. Output a grandchild writes after its leader's end is dropped on purpose: the result is the leader's. A group kill
+never throws or rejects: EPERM, seen under parallel load, is tried once more 50 ms later, and a kill still not delivered
+is said at once as an ERROR line, on the normal path too, and gets a RESTORE hand line (`group N may still be running:
+kill -9 -N, then check <window>'s state`), first in the file; the abort puts the windows back all the same, and a
+restore past its bound whose kill was not delivered says it may still be running, not that it was stopped part-way.
+abort.ts holds the dirty windows and the abort: SIGINT, SIGTERM or SIGHUP, a throw out of the run's body, or an uncaught
+exception or unhandled rejection puts back every dirty window, writes RESTORE for what it cannot prove, prints the abort
+SUMMARY through words.ts and steps.ts, and exits 130. proc.ts is the one process and signal seam: spawn in a group of
+its own, kill a group, the signal and fatal handlers, exit, stderr; it only reports a child's exit and its pipes' close,
+and bounded.ts decides how long to wait for either. io.ts gains `replace`, which writes a state file's text beside it
+and renames it over the old one (`markDirty`).
+
+bounded.ts and abort.ts join the run. Each is tested over a fake seam (tests/truth/batch/bounded.test.ts,
+abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines after the final check: bounded.ts
+99.08 % (2 survivors), abort.ts 98.03 % (4 survivors, 4 mutants without coverage — three of them in a defensive catch
+that cannot run), every one equivalent and named in scope.json; floors 97 and 96. io.ts rose to 95.71 % with `replace`
+and `withAppend` and its tests (the same three equivalents), so its floor rises from 92 to 93. The cold run of all
+seventeen modules took about 2 minutes (Stryker's own 108 to 131 s), past the 90 s mark the S1 part already noted; the
+look at one Stryker run per module is still left for later. proc.ts stays out: it is only spawn, kill and process.on,
+and its tests start real children. Those are tests/truth/batch/bounded-proc.test.ts (a grandchild that traps SIGTERM is
+gone after a timeout, a leader's leftover gone after its end, a kept group ended by stopAll) and abort-proc.test.ts
+(b11-dry's int.sh scenarios as vitest tests: a group sent SIGINT, a second SIGINT, a throw, a rejection and an uncaught
+exception inside a window, stdout EPIPE, a terminal that blocks, batch-12's worktree window). Both run in the normal
+suite only, as terminal.test.ts does.
+
+Which tools keep their group by default (bounded.ts `KEEPS_GROUP`; a call's own `keepGroup` overrides it). The emulator
+is not in it: no batch starts it through bounded, so a call that did would pass `keepGroup` itself.
+- idb: kept. A local idb client may start idb_companion without a session of its own, in the call's group, where
+  the SIGKILL at the leader's end would kill it.
+- adb: not kept. The adb server it starts calls setsid(), so it leaves the call's group.
+- xcrun (simctl): not kept. The simulator runs under launchd, outside the call's group.
+
+Residuals of S2, open:
+- whether idb_companion really starts in the idb client's group is not measured; a lab check (an idb call, then the
+  companion's process group read outside the sandbox) decides whether idb may drop `keepGroup`. Not run in S2.
+- a kept group is kept only while it exists: it is asked (`kill(-id, 0)`) when its leader ends, so an idb call that
+  started no companion keeps nothing, and asked again just before stopAll signals it, so one gone since is dropped,
+  never signalled; every new call asks about the kept groups first and drops those gone. While any of its processes
+  lives its id cannot be reused. What is left is the time between the last call or check and the signal; telling
+  groups apart for certain needs a process's start time (ps, which the sandbox blocks). A refused check (EPERM) keeps
+  the group, on purpose the safe side: the abort signals it, a kill refused too gets its RESTORE hand line, and so the
+  next run refuses to start.
+
+What of batch-11's and batch-12's safety core S2 does not port, each with the slice that owns it or the reason:
+- the `B_*` bound knobs and their validation: S1's select.ts `knobs` already covers them; a batch passes the value as
+  a call's `secs`.
+- the cleanup after a build passes its bound: the group kill ends an `xcodebuild` the call started, so `pkill
+  xcodebuild` is not needed; but the Gradle daemon leaves the call's group by design, so `gradlew --stop` stays with
+  the lab build step: S6.
+- on_abort's own restores: BACK/HOME, the reinstall checked with `adb get-state` and `pm path`, and the chooser's
+  `--check` exits (S5); the D43 restore after `kill_lab_wda` and its 4 s wait (S4); `pkill` of idb_companion and the
+  lab's WebDriverAgent (lab plumbing for the runner: S6). S2 gives each of them a window: a restore, its hand lines,
+  its bound and its block. batch-12's worktree window is shown as one in abort-proc.test.ts's fixture.
+- `A_DIRTY` and `CLIP_DIRTY` as flags: no block of batch-11 or batch-12 ever set them. A batch that writes the
+  schemeapproval domain or the clipboard opens a window for it.
+- `exec >>$STEPS` after the tee died: steps.ts already writes the run's own files (S1); the abort writes only to them
+  until the SUMMARY's last write to the terminal.
+- block_complete's per-block rules (the `.cases` with their records, kf's premise verdict, T6's capture): the batch's
+  `AbortBlock.complete`. The generic `.cases` completeness is S3. The analyzer that judges a complete block stays per
+  batch, called through `judge`.
+- the abort-path hand lines of int-reinstall, int-reinstall-nolab and -noadb, and int-after-e2: S5.
+- a SIGKILL to the runner: nothing can catch it, in zsh or in Node. A state file a window marked dirty still refuses
+  the next run (S1's refusals).
+
+Where S2 departs from batch-12, on purpose:
+- a throw or an uncaught error outside every window takes the abort path too: the abort SUMMARY, exit 130. batch-12's
+  TRAPEXIT acted only inside a window. A waiter waits for `======== SUMMARY`, so a run that died without printing one
+  would leave it waiting, and the SUMMARY's ERROR line names the error.
+- a block interrupted inside its own window is never judged, even when the abort then puts the window back.
+  batch-12's block_complete read CHOOSER_DIRTY after on_abort had cleared it, although its comment says "never while
+  interrupted inside it". The comment is the rule: one of that block's legs was cut short.
+- the abort's cleanup line (`E5 cleanup: OK — … (verified by the abort)`) follows the block's INTERRUPTED line
+  unprefixed. batch-12 appended it to verdict.txt, so it was printed as "(before the interrupt)".
+- the windows are put back last opened first. batch-12 used a fixed order, which mattered only with two windows
+  open.
+- a restore is bounded as a whole by its window's `secs` (300 by default, as B_RESTORE), not only each command in it. A
+  restore past its bound is stopped there, with the detached calls it started (`Calls.scope`), and its RESTORE lines say
+  it was stopped part-way; its scope then refuses any further call, so it cannot start its next step (a judge past the
+  budget likewise). A window's `secs` is checked when it opens: more than 0, at most `MAX_SECS`. The judges of the
+  complete blocks share one budget, `judgeBudgetSecs` (120 s by default), where batch-12 gave its analyzer 300 s per
+  block; a block not judged in it, or after a restore passed its bound, is `INTERRUPTED — not judged (<why>; rerun
+  ONLY=<block>)`. The abort's worst case is then the probes' stop (2 s), each dirty window's bound and its stop (300 s +
+  2 s by default), and the budget and its stop (120 s + 2 s): about 7 minutes for one window at the defaults.
+- the windows the abort puts back are those open when it began, taken before its first await. The run's body goes on
+  meanwhile (a probe the abort stopped returns to it), so close() and finish() are only noted from then on; else a
+  body that closed its window after its probe was killed would leave the device dirty with `RESTORE: none`. A window
+  opens only inside run(), where the abort is installed, and a cleanup line only for a wanted block.
+- the abort does not rely on its log: a line it cannot write (ENOSPC, the out folder gone) is dropped, each window is
+  put back on its own, and when the RESTORE file cannot be written its lines go to stderr once.
+- a block's own restore on the normal path runs as a probe, so the abort may stop it part-way and then run the
+  window's restore again: every restore must be safe to run twice, as batch-12's were.
+- the runner stops its running probes itself, before the first restore: SIGTERM to each probe's group, then SIGKILL
+  after a 2 s grace or once the probe has ended. In a group of its own a probe no longer gets the terminal's Ctrl-C.
+  Once stopping, no probe starts and no window opens, so a body that goes on after its probe was killed cannot touch
+  a device.
+- a window with a state file: opening it marks an existing state file dirty (`markDirty`). This covers batch-11's
+  forced-dirty state after the reinstall: a window reopened over a state that a restore had cleared reads dirty
+  again. A restore that says it is done while that file is still not clean is not put back.
+- a signal that arrives during the abort is noted in steps.log, not silently ignored.
+- the normal end's RESTORE header is S1's writeRestore form: `<name> run <id> ended at <date>; state to put back by
+  hand:`.
+- once a call's leader has ended, its whole group gets SIGKILL, so nothing it started outlives it; batch-12's `bounded`
+  (perl's alarm) reached the leader alone, and only past its bound.
+- which groups outlive their leader is a per-tool table, `KEEPS_GROUP` (idb kept, adb and xcrun not), a call's own
+  `keepGroup` over it; batch-12 had no such notion and pkilled idb_companion by name.
+- the abort stops the running probes first and the kept groups only last, after the restores and the judging, which
+  may need them: batch-11's on_abort pkilled idb_companion at its end too, and S2 keeps that order. The normal end
+  (`finish()`, now async) ends them as well, after its RESTORE, appending a hand line for a kill not delivered, so a
+  companion lives across blocks but not past the run; a block can end its own earlier with `stopKept(owner)`, as
+  batch-12 did after each iOS block — the owner is the call's `owner`, recorded when its group is kept.
+- `markDirty` on open() and io.ts's `replace` port batch-11's forced-dirty state after a reinstall into S2 already, not
+  S5: a window reopened over a state file a restore had cleared must read dirty again, and S2's windows need that.
+- TRAPEXIT's `$ZSH_SUBSHELL -eq 0` guard has no Node counterpart: Node has no subshells, so nothing else's exit can
+  look like the runner's. A child process's failure is a call's result, never the runner's error ("only the run's own
+  errors abort it", abort.test.ts).
+

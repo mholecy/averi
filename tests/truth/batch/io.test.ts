@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { fstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -74,5 +74,49 @@ describe('nodeFs: writes never remove or overwrite', () => {
   it('linkLatest: a link that cannot even be looked at (its folder a file) is said, not guessed past', () => {
     writeFileSync(join(dir, 'file'), 'kept');
     expect(nodeFs.linkLatest(join(dir, 'file', 'latest'), join(dir, 'two'))).toMatch(/^the link could not be checked \(ENOTDIR/);
+  });
+});
+
+describe('nodeFs.replace: a state file\'s text replaced in one step (abort.ts#markDirty)', () => {
+  it('the new text whole, by a rename over the old file: no temp file left beside it', () => {
+    writeFileSync(join(dir, 'state.json'), '{"dirty":false}');
+    nodeFs.replace(join(dir, 'state.json'), '{"dirty":true}');
+    expect(readFileSync(join(dir, 'state.json'), 'utf8')).toBe('{"dirty":true}');
+    expect(nodeFs.list(dir)).toEqual(['state.json']);
+  });
+
+  it('a file already at its temp name is never overwritten: throws, both files kept', () => {
+    writeFileSync(join(dir, 'state.json'), 'old');
+    writeFileSync(join(dir, `state.json.${process.pid}.new`), 'someone else\'s');
+    expect(() => nodeFs.replace(join(dir, 'state.json'), 'new')).toThrow(/EEXIST/);
+    expect([readFileSync(join(dir, 'state.json'), 'utf8'), readFileSync(join(dir, `state.json.${process.pid}.new`), 'utf8')]).toEqual(['old', "someone else's"]);
+  });
+
+  it('a folder in its place: throws, the folder kept, nothing written beside it', () => {
+    mkdirSync(join(dir, 'state.json'));
+    writeFileSync(join(dir, 'state.json', 'inner'), 'x');
+    expect(() => nodeFs.replace(join(dir, 'state.json'), '{}')).toThrow(/is no file: not replaced/);
+    expect(readFileSync(join(dir, 'state.json', 'inner'), 'utf8')).toBe('x');
+    expect(nodeFs.list(dir)).toEqual(['state.json']);
+  });
+});
+
+describe('nodeFs.withAppend: a child\'s log, opened for append and handed over as an fd (bounded.ts)', () => {
+  it('the fd appends to the file, creating it or keeping what is there; it is closed after', () => {
+    writeFileSync(join(dir, 'old.log'), 'earlier\n');
+    let kept = -1;
+    expect(nodeFs.withAppend(join(dir, 'old.log'), (fd) => ((kept = fd), writeSync(fd, 'more\n'), 'used'))).toBe('used');
+    nodeFs.withAppend(join(dir, 'new.log'), (fd) => writeSync(fd, 'x'));
+    expect([readFileSync(join(dir, 'old.log'), 'utf8'), readFileSync(join(dir, 'new.log'), 'utf8')]).toEqual(['earlier\nmore\n', 'x']);
+    expect(() => fstatSync(kept)).toThrow(/EBADF/);
+  });
+
+  it('closed even when its user throws', () => {
+    let kept = -1;
+    expect(() => nodeFs.withAppend(join(dir, 'a.log'), (fd) => {
+      kept = fd;
+      throw new Error('boom');
+    })).toThrow('boom');
+    expect(() => fstatSync(kept)).toThrow(/EBADF/);
   });
 });

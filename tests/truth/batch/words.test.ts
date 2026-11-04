@@ -4,6 +4,8 @@ import {
   exitCodeOf,
   failsIn,
   interruptedBlock,
+  messageOf,
+  timeOf,
   parseVerdictLine,
   stepLine,
   SUMMARY_MARKER,
@@ -174,6 +176,15 @@ describe('interruptedBlock — an unfinished block in the abort SUMMARY', () => 
   it('keeps its lines so far, marked, then says INTERRUPTED and how to rerun it', () => {
     expect(interruptedBlock('lvd62', ['lv-d62 main drop: PASS'])).toEqual(['(before the interrupt) lv-d62 main drop: PASS', 'lvd62: INTERRUPTED — its records are not complete, not judged (rerun ONLY=lvd62)']);
   });
+
+  it('a block not judged for a reason of its own (the abort\'s judging budget spent): `not judged (<why>; rerun ONLY=…)`', () => {
+    expect(interruptedBlock('kf', [], "the abort's judging budget of 120 s was spent")).toEqual(["kf: INTERRUPTED — not judged (the abort's judging budget of 120 s was spent; rerun ONLY=kf)"]);
+  });
+
+  it('a BlockReport\'s `why` reaches the SUMMARY line', () => {
+    const lines = summaryLines({ name: 'b', runId: '1', checkout: 'OK c', labs: [], protectedLines: [], restore: { file: 'R', written: [] }, errors: [], interrupted: { at: '10:00:00' }, blocks: [{ block: 'kf', lines: [], interrupted: true, why: 'its judge failed: x' }] });
+    expect(lines).toContain('kf: INTERRUPTED — not judged (its judge failed: x; rerun ONLY=kf)');
+  });
 });
 
 describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batch-12; batch-11 exited 0 whatever its verdicts)', () => {
@@ -201,5 +212,15 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
     const interrupted = { ...base, interrupted: { at: '10:12:00' } };
     expect(exitCodeOf(interrupted)).toBe(130);
     expect(exitCodeOf({ ...interrupted, restore: { file: 'R', written: ['x'] }, blocks: [{ block: 'E5', lines: ['E5 verdict: FAIL'] }] })).toBe(130);
+  });
+});
+
+describe('messageOf and timeOf — said once, here, for every module of the batch core (code review)', () => {
+  it('messageOf: an Error\'s message; anything else as a string', () => {
+    expect([messageOf(new Error('boom')), messageOf('text'), messageOf(42), messageOf(undefined)]).toEqual(['boom', 'text', '42', 'undefined']);
+  });
+
+  it('timeOf: HH:MM:SS, local, zero-padded', () => {
+    expect([timeOf(new Date(2026, 10, 4, 9, 4, 6)), timeOf(new Date(2026, 10, 4, 23, 59, 59))]).toEqual(['09:04:06', '23:59:59']);
   });
 });
