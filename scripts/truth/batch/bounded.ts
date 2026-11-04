@@ -26,9 +26,11 @@ import type { Ended, KillResult, ProcessSeam } from './proc.js';
  *
  * A kept group is kept only if it still exists once its leader has ended (`kill(-id, 0)`: an idb call that started no
  * companion leaves none), and asked again just before stopAll signals it: one gone by then is dropped, never
- * signalled. While any process of a group lives, its id cannot be reused. Residual: between that last ask and the
- * signal the group could still end and its id be taken — a window of microseconds, not of the whole run; telling
- * groups apart needs a process's start time (ps, which the sandbox blocks).
+ * signalled; every new call asks about the kept groups first too, and drops those gone. While any process of a group
+ * lives, its id cannot be reused. Residual: between the last call or check and the signal the group could end and its
+ * id be taken; telling groups apart needs a process's start time (ps, which the sandbox blocks). A refused check
+ * (EPERM) keeps the group, on purpose the safe side: the abort signals it, and a kill refused too gets its RESTORE hand
+ * line, so the next run refuses to start.
  */
 
 /** A call past its bound exits 142, as perl's alarm did (128 + SIGALRM): steps.ts#stepWordOf reads it as FAIL. */
@@ -174,6 +176,8 @@ export class Calls {
   /** The bounded calls still running, and the groups kept past their leader. */
   private readonly running = new Tracked();
   private readonly notDelivered: Undelivered[] = [];
+  /** The groups kept past their leader (also in `running`): asked again at every new call and at stopAll. */
+  private readonly kept = new Set<number>();
   private readonly graceMs: number;
   private readonly closeGraceMs: number;
   private readonly installSecs: number | undefined;
@@ -269,6 +273,15 @@ export class Calls {
     return u;
   }
 
+  /** Drop every kept group that is gone (ESRCH): its id may be another group's by the abort. */
+  private dropGoneKept(): void {
+    for (const pid of this.kept) {
+      if (this.tryKill(pid, 0) !== 'gone') continue;
+      this.kept.delete(pid);
+      this.running.groups.delete(pid);
+    }
+  }
+
   /** The seam's kill, never thrown; signal 0 only asks whether the group still exists. */
   private tryKill(pid: number, signal: NodeJS.Signals | 0): KillResult {
     try {
@@ -283,6 +296,7 @@ export class Calls {
     if (bound === undefined || !(bound > 0)) throw new Error(`${cmd}: no bound — give its secs (only xcrun, idb and adb have one of their own)`);
     if (bound > MAX_SECS) throw new Error(`${cmd}: a bound of ${bound} s is above ${MAX_SECS} s, the longest taken`);
     if (tracked?.refused !== undefined) throw new Error(`${cmd} not started: ${tracked.refused}`);
+    this.dropGoneKept();
     const started = this.seam.start(cmd, args, { cwd, env, log });
     const { pid, exited } = started;
     const resultOf = (end: Ended, timedOut: boolean): CallResult => ({ code: codeOf(end, timedOut), timedOut, signal: end.signal, out: started.out(), err: end.error ?? started.err() });
@@ -307,7 +321,10 @@ export class Calls {
     }
     // A kept group is kept only while something of it lives: an empty one's id could be reused before the abort.
     if (!keepGroup) await this.signal(pid, 'SIGKILL', tracked?.owner);
-    else if (this.tryKill(pid, 0) !== 'gone') this.running.groups.set(pid, exited);
+    else if (this.tryKill(pid, 0) !== 'gone') {
+      this.running.groups.set(pid, exited);
+      this.kept.add(pid);
+    }
     await untilOr(started.closed, this.closeGraceMs);
     started.release();
     return resultOf(end, timedOut);

@@ -170,8 +170,8 @@ and bounded.ts decides how long to wait for either. io.ts gains `replace`, which
 and renames it over the old one (`markDirty`).
 
 bounded.ts and abort.ts join the run. Each is tested over a fake seam (tests/truth/batch/bounded.test.ts,
-abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines after review round 3: bounded.ts
-98.96 % (2 survivors), abort.ts 98.03 % (4 survivors, 4 mutants without coverage — three of them in a defensive catch
+abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines after review round 4: bounded.ts
+99.02 % (2 survivors), abort.ts 98.03 % (4 survivors, 4 mutants without coverage — three of them in a defensive catch
 that cannot run), every one equivalent and named in scope.json; floors 97 and 96. io.ts rose to 95.38 % with `replace`
 and its tests (the same three equivalents), so its floor rises from 92 to 93. The cold run of all seventeen modules took
 about 2 minutes (Stryker's own 108 to 131 s), past the 90 s mark the S1 part already noted; the look at one Stryker run
@@ -194,9 +194,11 @@ Residuals of S2, open:
   companion's process group read outside the sandbox) decides whether idb may drop `keepGroup`. Not run in S2.
 - a kept group is kept only while it exists: it is asked (`kill(-id, 0)`) when its leader ends, so an idb call that
   started no companion keeps nothing, and asked again just before stopAll signals it, so one gone since is dropped,
-  never signalled. While any of its processes lives its id cannot be reused. What is left is the moment between that
-  last ask and the signal; telling groups apart for certain needs a process's start time (ps, which the sandbox
-  blocks).
+  never signalled; every new call asks about the kept groups first and drops those gone. While any of its processes
+  lives its id cannot be reused. What is left is the time between the last call or check and the signal; telling
+  groups apart for certain needs a process's start time (ps, which the sandbox blocks). A refused check (EPERM) keeps
+  the group, on purpose the safe side: the abort signals it, a kill refused too gets its RESTORE hand line, and so the
+  next run refuses to start.
 
 What of batch-11's and batch-12's safety core S2 does not port, each with the slice that owns it or the reason:
 - the `B_*` bound knobs and their validation: S1's select.ts `knobs` already covers them; a batch passes the value as

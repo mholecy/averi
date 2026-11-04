@@ -554,6 +554,31 @@ describe('a kept group is checked before it is kept and before it is killed (rev
     expect(seam.probes).toEqual(['0 -100', '0 -100']);
   });
 
+  it('each new call first drops the kept groups gone since: an id taken again by another group before the abort is never signalled (review round 4)', async () => {
+    const seam = new FakeSeam();
+    seam.leaveGroup = true;
+    const calls = new Calls(seam, { graceMs: 5 });
+    const kept = calls.bounded('idb', ['connect', 'U']);
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await kept;
+    seam.calls[0].groupLeft = false; // the daemon died
+    const next = calls.bounded('adb', ['devices']);
+    await tick();
+    expect(seam.probes).toEqual(['0 -100', '0 -100']);
+    seam.calls[0].groupLeft = true; // another group took id 100
+    // Dropped for good: a later call does not ask about it again.
+    const third = calls.bounded('adb', ['devices']);
+    await tick();
+    expect(seam.probes).toEqual(['0 -100', '0 -100']);
+    seam.calls[2].end({ code: 0, signal: null });
+    await third;
+    await calls.stopAll();
+    expect(seam.kills.filter((k) => k.endsWith(' -100'))).toEqual([]);
+    seam.calls[1].end({ code: 0, signal: null });
+    await next;
+  });
+
   it('a group whose probe is refused (EPERM) is not taken for gone: kept, and stopped at the abort', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam, { graceMs: 5 });
