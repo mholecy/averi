@@ -117,8 +117,8 @@ const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x)
 
 /** The .cases read as what a live run is asked, or undefined when it is not. */
 function askedOf(v: unknown): Asked | undefined {
-  if (typeof v !== 'object' || v === null || Array.isArray(v)) return undefined;
-  const a = v as Record<string, unknown>;
+  // JSON's null read as no field at all; an array, a number or a string has none of the fields either.
+  const a = (v ?? {}) as Record<string, unknown>;
   const shaped = (a.platform === 'ios' || a.platform === 'android') && typeof a.app === 'string' && isStrings(a.sources) && a.sources.length > 0 && isStrings(a.cases) && (a.groups === undefined || isStrings(a.groups));
   return shaped ? (a as unknown as Asked) : undefined;
 }
@@ -134,8 +134,9 @@ function idsBySource(summary: string): Map<string, Set<string>> {
     const source = /^## (\S+)/.exec(line)?.[1];
     if (source !== undefined) by.set(source, (ids = by.get(source) ?? new Set()));
     else {
-      const id = CASE_LINE.exec(line)?.[1];
-      if (id !== undefined) ids?.add(id);
+      // A case line before any `## <source>` belongs to none.
+      const m = CASE_LINE.exec(line);
+      if (m !== null) ids?.add(m[1]);
     }
   }
   return by;
@@ -203,6 +204,7 @@ export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: Ba
       gaps.push(`the cases main picks could not be read (${messageOf(e).split('\n', 1)[0]})`);
     }
   }
+  // No gap means `asked` was read: its check is for the type.
   return gaps.length === 0 && asked !== undefined ? { ok: true, asked } : { ok: false, why: gaps.join('; ') };
 }
 

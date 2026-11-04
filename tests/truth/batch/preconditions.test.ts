@@ -54,6 +54,11 @@ describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209�
     expect(await checkout({ repo: 'r', run: g.run })).toEqual({ ok: false, why: 'the checkout has 3 modified tracked file(s) (a.ts, b.ts, new.ts) — the batch runs main as committed' });
   });
 
+  it('a modified path holding an R or a C (README, CHANGELOG) is no rename: the entry after it is counted', async () => {
+    const g = fakeGit([['status', ok(' M README.md\0 M CHANGELOG.md\0 M x.ts\0')], ...clean]);
+    expect(await checkout({ repo: 'r', run: g.run })).toEqual({ ok: false, why: 'the checkout has 3 modified tracked file(s) (README.md, CHANGELOG.md, x.ts) — the batch runs main as committed' });
+  });
+
   it(`more than ${SHOWN_PATHS} modified: the first ${SHOWN_PATHS} named, then how many more; a copy (C) skips its origin too`, async () => {
     const g = fakeGit([['status', ok('C  c2.ts\0c.ts\0 M d.ts\0 D e.ts\0AM f.ts\0 M g.ts\0')], ...clean]);
     expect(await checkout({ repo: 'r', run: g.run })).toEqual({ ok: false, why: 'the checkout has 5 modified tracked file(s) (c2.ts, d.ts, e.ts and 2 more) — the batch runs main as committed' });
@@ -79,15 +84,21 @@ describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209�
     expect(g.said()).toHaveLength(3);
   });
 
+  it('main unreadable with nothing on stderr: its exit alone; main past its bound: "git timed out", never "no branch main"', async () => {
+    expect(await checkout({ repo: 'r', run: fakeGit([['refs/heads/main', exit(128)], ...clean]).run })).toEqual({ ok: false, why: 'the repo has no branch main (git rev-parse: exit 128)' });
+    expect(await checkout({ repo: 'r', run: fakeGit([['refs/heads/main', timedOut], ...clean]).run })).toEqual({ ok: false, why: `git timed out (rev-parse main, past its ${GIT_SECS} s bound)` });
+  });
+
   it('HEAD unreadable (no repo there): git failed, its first line said, and nothing else is asked', async () => {
     const g = fakeGit([['HEAD^{commit}', exit(128, 'fatal: not a git repository (or any of the parent directories): .git\n')], ...clean]);
     expect(await checkout({ repo: 'r', run: g.run })).toEqual({ ok: false, why: 'git rev-parse HEAD failed (exit 128: fatal: not a git repository (or any of the parent directories): .git)' });
     expect(g.said()).toEqual(['rev-parse --verify HEAD^{commit}']);
   });
 
-  it('a git failure with nothing on stderr names its exit alone', async () => {
-    const g = fakeGit([['status', exit(129)], ...clean]);
-    expect(await checkout({ repo: 'r', run: g.run })).toEqual({ ok: false, why: 'git status failed (exit 129)' });
+  it('a git failure with nothing but blanks on stderr names its exit alone; git\'s line is trimmed (a \\r too)', async () => {
+    expect(await checkout({ repo: 'r', run: fakeGit([['status', exit(129)], ...clean]).run })).toEqual({ ok: false, why: 'git status failed (exit 129)' });
+    expect(await checkout({ repo: 'r', run: fakeGit([['status', exit(129, '  \r\n')], ...clean]).run })).toEqual({ ok: false, why: 'git status failed (exit 129)' });
+    expect(await checkout({ repo: 'r', run: fakeGit([['status', exit(129, ' usage: git status \r\nmore')], ...clean]).run })).toEqual({ ok: false, why: 'git status failed (exit 129: usage: git status)' });
   });
 
   it('git past its bound: "git timed out", the call and its bound named — the tool\'s own (30 s) or the one given', async () => {
@@ -222,6 +233,7 @@ describe('casesOnMain — the live cases a block runs, read from main\'s live-ca
     const { live, asked } = fakeLive([{ id: 'v1', group: 'visibility' }]);
     expect(await casesOnMain({ ids: ['v1'], platform: 'ios', app: 'react-native', groups: ['forms', 'visibility'], live })).toEqual({ ok: true });
     expect(asked).toEqual([{ platform: 'ios', app: 'react-native', groups: ['forms', 'visibility'], only: ['v1'] }]);
+    expect(await casesOnMain({ ids: ['v2'], platform: 'ios', app: 'react-native', groups: ['forms', 'visibility'], live })).toEqual({ ok: false, why: "live case(s) v2 not on main's live-cases.ts (ios, react-native app, groups forms, visibility)" });
   });
 
   it('no id given: never a pass (a block judged on no case proves nothing)', async () => {

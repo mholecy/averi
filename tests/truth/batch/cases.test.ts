@@ -149,9 +149,11 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     putRun('f', { cases: '[]' });
     putRun('g', { cases: 'null' });
     putRun('h', { cases: JSON.stringify({ ...KF, app: 3 }) });
+    putRun('i', { cases: JSON.stringify({ ...KF, groups: ['forms', 2] }) });
+    putRun('j', { cases: '"kf1"' });
     expect(await judge('a')).toEqual({ ok: false, why: 'a.cases is no JSON' });
     const shape = "is not what a live run is asked (platform ios or android, app, sources: one at least, cases: ids)";
-    for (const n of ['b', 'c', 'd', 'e', 'f', 'g', 'h']) expect(await judge(n), n).toEqual({ ok: false, why: `${n}.cases ${shape}` });
+    for (const n of ['b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']) expect(await judge(n), n).toEqual({ ok: false, why: `${n}.cases ${shape}` });
   });
 
   it('an empty cases list is valid: every case main picks for the source must be there', async () => {
@@ -204,9 +206,14 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
   });
 
   it('a case line under another source, or a line not in summarize\'s shape, does not count', async () => {
-    const text = [`${LIVE_GOLDEN_HEADER} x`, '## wda', '- ok kf1 c: s', '## uiautomator', '- ok kf2: s', '- fine kf3 c: s', '  - ok kf3 c: s', '- ok (cls kf3 c: s'].join('\n');
+    const text = [`${LIVE_GOLDEN_HEADER} x`, '- ok kf3 c: s', '## wda', '- ok kf1 c: s', '## uiautomator', '- ok kf2: s', '- fine kf3 c: s', '  - ok kf3 c: s', '- ok (cls kf3 c: s'].join('\n');
     putRun('kf-1', { summary: text });
     expect(await judge('kf-1')).toEqual({ ok: false, why: 'uiautomator: kf1, kf2, kf3 missing from the summary' });
+  });
+
+  it('a source is a `## <source>` at a line\'s start only: one inside a line switches nothing', async () => {
+    putRun('kf-1', { summary: [`${LIVE_GOLDEN_HEADER} x`, '## uiautomator', '- ok kf1 c: s', 'see ## wda', '- ok kf2 c: s', '- ok kf3 c: s'].join('\n') });
+    expect(await judge('kf-1')).toEqual({ ok: true, asked: KF });
   });
 
   it('a line with its class in parentheses counts by its id', async () => {

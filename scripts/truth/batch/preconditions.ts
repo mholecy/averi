@@ -74,8 +74,11 @@ function unanswered(g: Git, call: string, r: CallResult): string | undefined {
   return undefined;
 }
 
+/** `exit <code>`, and `: <git's first line>` when it said one. */
+const exitOf = (r: CallResult): string => `exit ${r.code}${firstLine(r.err) === '' ? '' : `: ${firstLine(r.err)}`}`;
+
 /** Why a call that git ran failed: past its bound, not started, or its exit and git's first line. */
-const failed = (g: Git, call: string, r: CallResult): string => unanswered(g, call, r) ?? `git ${call} failed (exit ${r.code}${firstLine(r.err) === '' ? '' : `: ${firstLine(r.err)}`})`;
+const failed = (g: Git, call: string, r: CallResult): string => unanswered(g, call, r) ?? `git ${call} failed (${exitOf(r)})`;
 
 /**
  * The paths `git status --porcelain -z` lists, each once: an entry is `XY <path>`, NUL-ended; a rename or a copy (R or
@@ -111,8 +114,11 @@ export async function checkout(g: Git): Promise<CheckoutPrecondition> {
   const headSha = head.out.trim();
   const whys: string[] = [];
   const main = await git(g, ['rev-parse', '--verify', 'refs/heads/main^{commit}']);
-  if (main.code !== 0) whys.push(unanswered(g, 'rev-parse main', main) ?? `the repo has no branch main (git rev-parse: exit ${main.code}${firstLine(main.err) === '' ? '' : `: ${firstLine(main.err)}`})`);
-  else if (main.out.trim() !== headSha) whys.push(`the checkout's HEAD (${shortSha(headSha)}) is not main's (${shortSha(main.out.trim())}) — git switch main, then rerun`);
+  if (main.code !== 0) whys.push(unanswered(g, 'rev-parse main', main) ?? `the repo has no branch main (git rev-parse: ${exitOf(main)})`);
+  else {
+    const mainSha = main.out.trim();
+    if (mainSha !== headSha) whys.push(`the checkout's HEAD (${shortSha(headSha)}) is not main's (${shortSha(mainSha)}) — git switch main, then rerun`);
+  }
   // --no-optional-locks: a read of the status never takes the index lock (batch-11.sh:211).
   const status = await git(g, ['--no-optional-locks', 'status', '--porcelain', '-z', '--untracked-files=no']);
   if (status.code !== 0) whys.push(failed(g, 'status', status));
