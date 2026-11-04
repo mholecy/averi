@@ -174,7 +174,7 @@ abort.test.ts), with real files in a temp dir and tiny real timers. Their baseli
 99.08 % (2 survivors), abort.ts 98.03 % (4 survivors, 4 mutants without coverage — three of them in a defensive catch
 that cannot run), every one equivalent and named in scope.json; floors 97 and 96. io.ts rose to 95.71 % with `replace`
 and `withAppend` and its tests (the same three equivalents), so its floor rises from 92 to 93. The cold run of all
-seventeen modules took about 2 minutes (Stryker's own 108 to 131 s), past the 90 s mark the S1 part already noted; the
+seventeen modules took about 2 minutes (Stryker's own 108 to 141 s), past the 90 s mark the S1 part already noted; the
 look at one Stryker run per module is still left for later. proc.ts stays out: it is only spawn, kill and process.on,
 and its tests start real children. Those are tests/truth/batch/bounded-proc.test.ts (a grandchild that traps SIGTERM is
 gone after a timeout, a leader's leftover gone after its end, a kept group ended by stopAll) and abort-proc.test.ts
