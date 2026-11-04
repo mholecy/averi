@@ -20,6 +20,10 @@ export default {
     '!/scripts/',
     '/scripts/*',
     '!/scripts/mutation/',
+    // The device batches' core (scripts/truth/batch/, backlog T2): its own folder only, never the rest of scripts/truth/.
+    '!/scripts/truth/',
+    '/scripts/truth/*',
+    '!/scripts/truth/batch/',
     '!/package.json',
     '!/tsconfig.json',
     '!/tsconfig.test.json',

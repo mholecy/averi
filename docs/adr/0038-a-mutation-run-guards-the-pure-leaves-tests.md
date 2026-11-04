@@ -5,6 +5,7 @@ behaviour changes.
 Amended 2026-11-02 (D45: geometry.ts joined the run — see the amendment below).
 Amended 2026-11-02 (D33: adapters/ios-liveness.ts joined the run — see the second amendment below).
 Amended 2026-11-03 (D43: adapters/typeable.ts and adapters/ios-typing.ts joined the run — see the D43 amendment below).
+Amended 2026-11-04 (T2 S1: the device batches' core, scripts/truth/batch/, joined the run — see the T2 amendment below).
 
 ## Context
 
@@ -103,3 +104,22 @@ since the character a refusal names is one code point. ios-typing.ts's names tes
 typeable.test.ts, with a floor of 98 under a baseline of 100 % (24 valid mutants; 2 runtime errors). Stryker does not
 mutate a RegExp built with `new RegExp`, as both iOS sets are, so their character classes are held by hand mutants and
 per-character tests instead. The cold run of all ten modules took 74 s.
+
+## Amendment: the device batches' core joins the run (2026-11-04, backlog T2 slice S1)
+
+scripts/truth/batch/ is the first scope outside src/: words.ts (the verdict vocabulary, the SUMMARY and the exit
+code), select.ts (ONLY= and the knobs), run-dir.ts (the refusals to start and the exclusive run folders), steps.ts
+(the run's own output) and io.ts (their one filesystem seam). Each is tested on its own, io.ts and the folder code on
+real files in a temp dir; a dropped guard there would let a batch start over state an earlier run left, or write
+into an earlier run's folder, and no other test would notice. Their baselines: words.ts and steps.ts 100 %, select.ts
+99.41 %, run-dir.ts 99.36 %, io.ts 94.00 %, every survivor equivalent and named in scope.json; floors 98, 98, 97, 97
+and 92.
+
+Adding a module outside src/ takes two edits, not one: its scope.json entry, and its folder in stryker.config.mjs's
+allowlist (`ignorePatterns`), which copies `scripts/truth/batch/` into the sandbox and still none of the rest of
+scripts/truth/. A test that imports a scripts/truth module outside that folder therefore stays out of the entry's
+tests: tests/truth/batch/steps-live.test.ts, which holds steps.ts's live.ts header to live-cases.ts, runs in the normal
+suite only. tests/mutation/mutate.test.ts accepts a scope key under src/ or scripts/truth/batch/. The cold run of all
+fifteen modules took 105 s, past the 90 s at which the amendment for geometry.ts said to revisit one Stryker run per
+module; that is left for a later look, since the five new modules add about 30 s of it.
+

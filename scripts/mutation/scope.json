@@ -48,5 +48,30 @@
     "tests": ["tests/adapters/ios-typing.test.ts", "tests/adapters/typeable.test.ts"],
     "floor": 98,
     "baseline": "100 % on 2026-11-03 (D43 code review, blockedBy in IDB_TYPEABLE; cold): 26 mutants, 24 valid, 0 survived, 2 runtime errors; 100 % on 2026-11-03 (D43 review round 2, cold, after main's merge): 25 mutants, 23 valid, 0 survived, 2 runtime errors; 100 % on 2026-11-03 (D43 review round 1, the Specials refused, \"any other character\" in the refusal; cold): 25 mutants, 23 valid, 0 survived, 2 runtime errors; 100 % on 2026-11-03 (D43, IDB_TYPEABLE, WDA_TYPEABLE and typingPathOf; cold, after a test pinned WDA's whole says clause, whose middle string survived the first run at 95.65 %): 25 mutants, 23 valid, 0 survived, 2 runtime errors (a class fragment emptied: an invalid RegExp) — Stryker's regex mutator does not reach the two sets, built with new RegExp: the hand mutants do (ADR 0037's D43 amendment, residual 9)"
+  },
+  "scripts/truth/batch/words.ts": {
+    "tests": ["tests/truth/batch/words.test.ts", "tests/truth/batch/steps.test.ts"],
+    "floor": 98,
+    "baseline": "100 % on 2026-11-04 (T2 S1, cold): 95 mutants, 0 survived, 0 without coverage"
+  },
+  "scripts/truth/batch/select.ts": {
+    "tests": ["tests/truth/batch/select.test.ts"],
+    "floor": 97,
+    "baseline": "99.41 % on 2026-11-04 (T2 S1, cold): 170 mutants, 1 survived, 0 without coverage — equivalent: `spec.atMost ?? []` turned into a one-string list, whose destructured `low` and `high` are undefined, so the cross check compares NaN and adds nothing"
+  },
+  "scripts/truth/batch/run-dir.ts": {
+    "tests": ["tests/truth/batch/run-dir.test.ts"],
+    "floor": 97,
+    "baseline": "99.36 % on 2026-11-04 (T2 S1, cold): 157 mutants, 1 survived, 0 without coverage — equivalent: stateOf's `?? ''` for a missing file turned into another string that is no JSON either (both read unreadable)"
+  },
+  "scripts/truth/batch/steps.ts": {
+    "tests": ["tests/truth/batch/steps.test.ts"],
+    "floor": 98,
+    "baseline": "100 % on 2026-11-04 (T2 S1, cold): 96 mutants, 0 survived, 0 without coverage — after linkLatest's lstat catch was narrowed to ENOENT; the run before, at 97.94 %, left open's `latestOut === undefined` set false surviving, since a bare catch read the missing path as nothing there"
+  },
+  "scripts/truth/batch/io.ts": {
+    "tests": ["tests/truth/batch/io.test.ts", "tests/truth/batch/run-dir.test.ts", "tests/truth/batch/steps.test.ts"],
+    "floor": 92,
+    "baseline": "94.00 % on 2026-11-04 (T2 S1, cold): 50 mutants, 3 survived, 0 without coverage — all equivalent: read's catch emptied (it returns undefined either way), list's `.sort()` dropped (APFS lists a folder sorted already, so no test on this machine tells them apart), real's root guard set false (realpath of the root never fails)"
   }
 }
