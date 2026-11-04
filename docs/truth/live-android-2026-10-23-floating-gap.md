@@ -77,3 +77,12 @@ SKIP naming the cover. kf3 checks that ks's centre lies under the panel.
 None of the records above read the region, so every one of them, the -cr runs included, now rejudges as kf1–kf3 SKIP
 "no measured panel (no IME region read at launch)". tests/truth/live-forms.test.ts judges their replies against the
 region read that day (above): kf1–kf3 are ok there.
+
+Live check (batch-12 ONLY=kf, 2026-11-04, main 1b129afa, averi_lab API 33): PASS in 1 run. The panel was placed first
+with `adb shell input swipe` on Gboard's drag handle, slowly (1500 ms per swipe), about 228 px up, then 3–4 s of waiting
+before the region was read: for 1–2 s after a drag it reads as almost the whole screen, `(0,66,1080,2220)`. The read at
+launch was `SkRegion((87,1015,1024,1807)(0,2088,1080,2220))`, the panel 87,1015 937×792, so the premise held: the
+submit (55,1928 970×132) wholly in the gap and ks's centre under the panel. kf1 and kf2 got `fully visible after 0
+swipes` (kf2 then `Tapped`, 1 submit, the IME still up); kf3 got no stop, the postcode untouched, and averi's
+`scroll_until … failed after 3 swipes … never intersected the 1080x1015 screen above the soft keyboard over
+[87,1015][1024,1807]`.
