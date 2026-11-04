@@ -353,6 +353,8 @@ export class Calls {
     if (!keepGroup) await this.signal(pid, 'SIGKILL', tracked?.owner);
     else if (this.tryKill(pid, 0) !== 'gone') {
       this.kept.groups.set(pid, exited);
+      // Always set, undefined too, so it overwrites whatever an earlier group of this id left: no delete is needed, and
+      // a stale entry for a dropped id is never read (stopKept reads owners of kept groups only).
       this.keptOwners.set(pid, owner);
     }
     await untilOr(started.closed, this.closeGraceMs);
