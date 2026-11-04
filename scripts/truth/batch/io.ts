@@ -86,7 +86,8 @@ export const nodeFs: BatchFs = {
   real(path) {
     const abs = resolve(path);
     try {
-      return realpathSync(abs);
+      // .native: the on-disk case too, so on a case-folding filesystem one folder named in two cases resolves the same.
+      return realpathSync.native(abs);
     } catch {
       const parent = dirname(abs);
       return parent === abs ? abs : join(this.real(parent), basename(abs));

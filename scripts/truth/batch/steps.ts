@@ -1,12 +1,48 @@
+import { writeSync } from 'node:fs';
 import type { BatchFs } from './io.js';
 import { oneLine, stepLine, type StepWord } from './words.js';
 
 /**
  * A run's own output. The runner writes its `<name>.out` and steps.log itself, never through `| tee`: batch-11's tee
- * died with the Ctrl-C and took the run's output with it (its on_abort had to switch to steps.log), and a Node
- * process writing into a dead pipe gets EPIPE. The terminal gets two things only — the .out's path at the start and
- * the SUMMARY at the end — and when it is gone the run goes on writing its files.
+ * died with the Ctrl-C and took the run's output with it (its on_abort had to switch to steps.log). The terminal gets
+ * two things only — the .out's path at the start and the SUMMARY at the end — and when it is gone the run goes on
+ * writing its files.
+ *
+ * The terminal is safe only if it writes synchronously: `process.stdout.write` into a pipe whose reader has gone
+ * reports EPIPE later, as an `'error'` event that kills the process unless handled — perhaps in the middle of a
+ * restore. So the default terminal (`terminalOf`) writes fd 1 with `writeSync` and says `'gone'` on EPIPE or EBADF
+ * at the call itself; StepLog then drops it and notes why.
  */
+
+/** A terminal: write `text`; `'gone'` when the reader has gone. A throw drops it too. */
+export type Terminal = (text: string) => 'gone' | undefined;
+
+const sleepMs = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/**
+ * The default terminal: `text` written whole to `fd` (1, stdout) with a synchronous write, looping over partial
+ * writes. EPIPE (the reader closed its end) and EBADF (no such fd) say `'gone'`. EAGAIN (a non-blocking pipe that is
+ * full) is waited out, `waitMs` a try, `tries` times, then `'gone'` too: never a hang. Any other failure is thrown.
+ */
+export function terminalOf(fd = 1, write: (fd: number, buf: Buffer) => number = writeSync, { waitMs = 2, tries = 2500 } = {}): Terminal {
+  return (text) => {
+    let buf = Buffer.from(text);
+    let left = tries;
+    while (buf.length > 0) {
+      try {
+        buf = buf.subarray(write(fd, buf));
+      } catch (e) {
+        const code = (e as NodeJS.ErrnoException).code;
+        if (code === 'EPIPE' || code === 'EBADF') return 'gone';
+        if (code !== 'EAGAIN') throw e;
+        left -= 1;
+        if (left <= 0) return 'gone';
+        sleepMs(waitMs);
+      }
+    }
+    return undefined;
+  };
+}
 
 /** The first words of live.ts's judged summary line (live-cases.ts#summarize): its exit 1 judged a run. */
 export const LIVE_GOLDEN_HEADER = '# Live golden:';
@@ -33,8 +69,13 @@ export interface StepLogOptions {
   stepsFile: string;
   /** A symlink to point at `outFile` (run-dir.ts#layoutOf's latestOut); none: no link. */
   latestOut?: string;
-  /** The terminal: the start line and the SUMMARY. A write that throws drops it for the rest of the run. */
-  terminal: (text: string) => void;
+  /**
+   * The terminal: the start line and the SUMMARY (`terminalOf()` for stdout). One that says `'gone'` or throws is
+   * dropped for the rest of the run.
+   */
+  terminal: Terminal | ((text: string) => void);
+  /** Where the SUMMARY is appended alone (run-dir.ts#layoutOf's summaryFile); none: only the .out and the terminal. */
+  summaryFile?: string;
   clock?: () => Date;
 }
 
@@ -79,13 +120,17 @@ export class StepLog {
 
   private toTerminal(text: string): void {
     if (!this.terminalUp) return;
+    let why: string | undefined;
     try {
-      this.o.terminal(text);
+      why = this.o.terminal(text) === 'gone' ? 'closed' : undefined;
     } catch (e) {
-      this.terminalUp = false;
-      this.note(stepLine('NOTE', `the terminal is gone (${(e as Error).message}): this run writes only to ${this.o.outFile} and ${this.o.stepsFile} now`));
+      why = (e as Error).message;
     }
+    if (why === undefined) return;
+    this.terminalUp = false;
+    this.note(stepLine('NOTE', `the terminal is gone (${why}): this run writes only to ${this.o.outFile} and ${this.o.stepsFile} now`));
   }
+
 
   /** A line to the .out only (a step's banner, a detail). */
   print(line: string): void {
@@ -115,10 +160,11 @@ export class StepLog {
     return [...this.errorLines];
   }
 
-  /** The SUMMARY (words.ts#summaryLines): to the .out, then to the terminal. */
+  /** The SUMMARY (words.ts#summaryLines, its lines checked there): to the .out, to summaryFile, then to the terminal. */
   summary(lines: readonly string[]): void {
-    const text = `${lines.map((l) => oneLine(l)).join('\n')}\n`;
+    const text = `${lines.join('\n')}\n`;
     this.fs.append(this.o.outFile, text);
+    if (this.o.summaryFile !== undefined) this.fs.append(this.o.summaryFile, text);
     this.toTerminal(text);
   }
 }

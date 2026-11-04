@@ -24,7 +24,10 @@ const filesUnder = (dir: string): string[] =>
 
 const slash = '/';
 const user = userInfo().username;
-/** Each forbidden fragment and why. A user name counts only path-shaped (`/name/`, `~name`): as a bare word it is English. */
+/**
+ * Each forbidden fragment and why. A user name counts only as `~name/` (a home directory path is
+ * caught by its own pattern): as a bare word it is English.
+ */
 const FORBIDDEN: readonly { what: string; re: RegExp }[] = [
   { what: 'a macOS temporary folder', re: new RegExp(['', 'private', 'tmp'].join(slash)) },
   { what: 'a macOS per-user temporary folder', re: new RegExp(['', 'var', 'folders', ''].join(slash)) },
@@ -35,7 +38,7 @@ const FORBIDDEN: readonly { what: string; re: RegExp }[] = [
   { what: 'a home directory', re: new RegExp(`${slash}(Users|home)${slash}`) },
   { what: 'a mounted volume', re: new RegExp(`${slash}Volumes${slash}`) },
   { what: "this machine's home directory", re: new RegExp(homedir().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) },
-  { what: 'the user name in a path', re: new RegExp(`(${slash}|~)${user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(${slash}|\\b)`) },
+  { what: "the user's home as ~user/", re: new RegExp(`~${user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${slash}`) },
 ];
 
 describe("path hygiene: the batch module's directories hold no machine- or session-bound path (T2 S1, seed of T8)", () => {
@@ -65,7 +68,8 @@ describe("path hygiene: the batch module's directories hold no machine- or sessi
     expect(caught(`${slash}Users${slash}someone`)).toContain('a home directory');
     expect(caught(`${slash}Volumes${slash}Disk`)).toContain('a mounted volume');
     expect(caught(`${homedir()}${slash}x`)).toContain("this machine's home directory");
-    expect(caught(`x${slash}${user}${slash}y`)).toContain('the user name in a path');
+    expect(caught(`~${user}${slash}y`)).toContain("the user's home as ~user/");
+    expect(caught(`an ${user} or ~${user}`)).toEqual([]);
     expect(caught('a relative path: meta/run-1/batch-n.out, or src/tmp/x')).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { LIVE_GOLDEN_HEADER, StepLog, stepWordOf } from '../../../scripts/truth/batch/steps.js';
+import { LIVE_GOLDEN_HEADER, StepLog, stepWordOf, terminalOf } from '../../../scripts/truth/batch/steps.js';
 import { summaryLines, type Summary } from '../../../scripts/truth/batch/words.js';
 
 // scripts/truth/batch/steps.ts: the run's own output. The runner writes `<name>.out` and steps.log itself — never
@@ -128,12 +128,21 @@ describe('StepLog — print, note, step, error', () => {
     log.error('E5: the lab is not installed');
     log.step('ERROR', 'kf: no record');
     log.note('OK   fine');
+    log.note('E5 cleanup: ERROR — the lab not proven installed');
+    log.note('NOTE an ERROR mid-line');
     expect(log.errors()).toEqual(['09:44:26 ERROR E5: the lab is not installed', '09:44:26 ERROR kf: no record']);
   });
 });
 
 describe('StepLog.summary — the SUMMARY to the .out, then to the terminal', () => {
-  const s: Summary = { name: 'batch-n', runId: '1', checkout: 'OK checkout', labs: [], blocks: [], protectedLines: [], restore: { file: 'R', hand: [] }, errors: [] };
+  const s: Summary = { name: 'batch-n', runId: '1', checkout: 'OK checkout', labs: [], blocks: [], protectedLines: [], restore: { file: 'R', written: [] }, errors: [] };
+
+  it('appends it to summary.txt when one is given (batch-12\'s meta/summary.txt): the end\'s and a later abort\'s both kept', () => {
+    const log = open({ summaryFile: join(meta, 'summary.txt') });
+    log.summary(['======== SUMMARY', 'one', '======== SUMMARY end (run 1)']);
+    log.summary(['======== SUMMARY', 'two', '======== SUMMARY end (run 1, INTERRUPTED)']);
+    expect(text(join(meta, 'summary.txt'))).toBe('======== SUMMARY\none\n======== SUMMARY end (run 1)\n======== SUMMARY\ntwo\n======== SUMMARY end (run 1, INTERRUPTED)\n');
+  });
 
   it('writes summaryLines to both, the marker unchanged', () => {
     const log = open();
@@ -160,6 +169,67 @@ describe('the terminal gone (the tee\'s EPIPE of batch-11) never stops the run\'
     expect(o).toContain('09:44:26 NOTE the terminal is gone (write EPIPE): this run writes only to');
     expect(o.endsWith('======== SUMMARY\n======== SUMMARY end (run 1)\n')).toBe(true);
     expect(text(join(out, 'steps.log'))).toContain('NOTE after');
+  });
+});
+
+describe('a terminal that says it is gone is dropped too, the same as one that throws', () => {
+  it("'gone' from the terminal: no further write, a NOTE, the files go on", () => {
+    let calls = 0;
+    const log = open({ terminal: () => ((calls += 1), 'gone') });
+    log.summary(['======== SUMMARY', '======== SUMMARY end (run 1)']);
+    expect(calls).toBe(1);
+    expect(text(join(meta, 'batch-n.out'))).toContain('NOTE the terminal is gone (closed): this run writes only to');
+  });
+});
+
+describe('terminalOf — the default terminal: a synchronous write to fd 1, safe when the reader is gone', () => {
+  const failing = (code: string) => () => {
+    throw Object.assign(new Error(`${code}: x`), { code });
+  };
+
+  it('writes the whole text, piece by piece when the fd takes less', () => {
+    const got: string[] = [];
+    const term = terminalOf(7, (fd, buf) => {
+      expect(fd).toBe(7);
+      got.push(buf.subarray(0, 3).toString());
+      return Math.min(3, buf.length);
+    });
+    expect(term('abcdefgh')).toBeUndefined();
+    expect(got.join('')).toBe('abcdefgh');
+  });
+
+  it('EPIPE (the reader closed its end) and EBADF (no fd 1) say gone, never throw', () => {
+    expect(terminalOf(1, failing('EPIPE'))('x')).toBe('gone');
+    expect(terminalOf(1, failing('EBADF'))('x')).toBe('gone');
+  });
+
+  it('EAGAIN (a non-blocking pipe, full) is waited out, and the text still lands whole', () => {
+    let tries = 0;
+    const got: string[] = [];
+    const term = terminalOf(1, (_fd, buf) => {
+      tries += 1;
+      if (tries <= 2) throw Object.assign(new Error('EAGAIN'), { code: 'EAGAIN' });
+      got.push(buf.toString());
+      return buf.length;
+    });
+    expect(term('abc')).toBeUndefined();
+    expect(got).toEqual(['abc']);
+  });
+
+  it('a pipe that stays full past the bound is gone, not a hang: exactly `tries` writes, a wait of `waitMs` between each', () => {
+    let calls = 0;
+    const full = () => {
+      calls += 1;
+      throw Object.assign(new Error('EAGAIN'), { code: 'EAGAIN' });
+    };
+    const started = Date.now();
+    expect(terminalOf(1, full, { waitMs: 25, tries: 3 })('x')).toBe('gone');
+    expect(calls).toBe(3);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(45);
+  });
+
+  it('any other failure is thrown, for StepLog to drop the terminal and say why', () => {
+    expect(() => terminalOf(1, failing('EIO'))('x')).toThrow(/^EIO: x$/);
   });
 });
 

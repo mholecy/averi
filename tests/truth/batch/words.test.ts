@@ -26,7 +26,7 @@ const base: Summary = {
     { block: 'E5', lines: ['E5 cleanup: OK — exit 5', 'E5 verdict: PASS — a PASS, c PASS'] },
   ],
   protectedLines: ["OK   com.apple.launchservices.schemeapproval's key unchanged"],
-  restore: { file: 'RESTORE.txt', hand: [] },
+  restore: { file: 'RESTORE.txt', written: [] },
   errors: [],
 };
 
@@ -78,7 +78,19 @@ describe('stepLine — a step word, padded as batch-1 to batch-12 pad it', () =>
   });
 });
 
-describe('failsIn — what the exit rule counts as a FAIL', () => {
+describe("failsIn — batch-12's exit rule, `^[^:]+: FAIL( |$)`, plus the step form", () => {
+  it('a FAIL verdict with a tail that is no reason still fails (review round 1: these exited 0)', () => {
+    expect(failsIn('lv-d62 verdict: FAIL 2/3 dropped')).toBe(true);
+    expect(failsIn('kf live verdict: FAIL (1 of 3 MISMATCH)')).toBe(true);
+    expect(failsIn('(before the interrupt) E5 cleanup: FAIL — x')).toBe(true);
+  });
+
+  it('a PASS with a tail, and a FAIL after a colon-free lead that is not the first colon, do not', () => {
+    expect(failsIn('E5 verdict: PASS 3/3')).toBe(false);
+    expect(failsIn('D55 note: see x: FAIL')).toBe(false);
+    expect(failsIn(': FAIL')).toBe(false);
+  });
+
   it('a FAIL verdict line, and a FAIL step line (a FAIL protected-key line would have exited 0 under batch-12\'s regex)', () => {
     expect(failsIn('E5 cleanup: FAIL — a lab default')).toBe(true);
     expect(failsIn('LAB android: FAIL — the guard refused emulator-5554')).toBe(true);
@@ -117,10 +129,12 @@ describe('summaryLines — the SUMMARY, its marker unchanged so the waiting rule
     expect(lines.filter((l) => l === '09:50:01 ERROR x')).toHaveLength(1);
   });
 
-  it('a RESTORE written by this run prints its file and every hand line', () => {
-    const lines = summaryLines({ ...base, restore: { file: 'out/RESTORE.txt', hand: ['E5 (Android): adb -s emulator-5554 shell pm path dev.averi.lab', 'lvd62: git worktree prune'] } });
-    expect(lines.slice(-4)).toEqual([
+  it('a RESTORE written by this run prints its file, then what this run wrote into it — its header line and every hand line (batch-12 cat the file)', () => {
+    const written = ['batch-n run 1 ended 2026-11-04 10:00:00; state to put back by hand:', 'E5 (Android): adb -s emulator-5554 shell pm path dev.averi.lab', 'lvd62: git worktree prune'];
+    const lines = summaryLines({ ...base, restore: { file: 'out/RESTORE.txt', written } });
+    expect(lines.slice(-5)).toEqual([
       'RESTORE: state not provably put back — out/RESTORE.txt:',
+      'batch-n run 1 ended 2026-11-04 10:00:00; state to put back by hand:',
       'E5 (Android): adb -s emulator-5554 shell pm path dev.averi.lab',
       'lvd62: git worktree prune',
       '======== SUMMARY end (run 20261104-094426-2763)',
@@ -152,7 +166,7 @@ describe('summaryLines — the SUMMARY, its marker unchanged so the waiting rule
 
   it('a SUMMARY line with a line break in it is refused (a split line would hide a FAIL from the exit rule)', () => {
     expect(() => summaryLines({ ...base, labs: ['LAB android: OK\nE5 verdict: FAIL'] })).toThrow(/a SUMMARY line holds a line break/);
-    expect(() => summaryLines({ ...base, restore: { file: 'R', hand: ['one\ntwo'] } })).toThrow(/a SUMMARY line holds a line break/);
+    expect(() => summaryLines({ ...base, restore: { file: 'R', written: ['one\ntwo'] } })).toThrow(/a SUMMARY line holds a line break/);
   });
 });
 
@@ -176,7 +190,7 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
   });
 
   it('1 when this run wrote a RESTORE, every verdict a PASS', () => {
-    expect(exitCodeOf({ ...base, restore: { file: 'R', hand: ['E5: by hand'] } })).toBe(1);
+    expect(exitCodeOf({ ...base, restore: { file: 'R', written: ['h; state to put back by hand:', 'E5: by hand'] } })).toBe(1);
   });
 
   it('an ERROR line, an INCONCLUSIVE or a SKIP alone is not a FAIL: 0', () => {
@@ -186,6 +200,6 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
   it('130 when interrupted, whatever its verdicts and RESTORE', () => {
     const interrupted = { ...base, interrupted: { at: '10:12:00' } };
     expect(exitCodeOf(interrupted)).toBe(130);
-    expect(exitCodeOf({ ...interrupted, restore: { file: 'R', hand: ['x'] }, blocks: [{ block: 'E5', lines: ['E5 verdict: FAIL'] }] })).toBe(130);
+    expect(exitCodeOf({ ...interrupted, restore: { file: 'R', written: ['x'] }, blocks: [{ block: 'E5', lines: ['E5 verdict: FAIL'] }] })).toBe(130);
   });
 });

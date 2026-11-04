@@ -42,7 +42,7 @@ describe('selectBlocks — ONLY= (batch-2 on; validated since batch-10/11: b11-d
 });
 
 /** batch-12's knobs, a sample of each kind. */
-const SPEC: KnobSpec = {
+const SPEC = {
   counts: {
     KF_RUNS: { default: 1, min: 1 },
     E5C_LAUNCH_RUNS: { default: 5, min: 0 },
@@ -56,7 +56,7 @@ const SPEC: KnobSpec = {
     M_D43: { default: '', pattern: /^[0-9a-f]{7,40}$/, what: 'a commit sha (7–40 hex digits) or empty' },
   },
   atMost: [{ low: 'E5C_MIN_LAUNCH', high: 'E5C_LAUNCH_RUNS', why: 'a PASS could never be shown' }],
-};
+} satisfies KnobSpec;
 
 describe('knobs — every knob checked before anything is done (batch-10 → batch-12)', () => {
   it('the defaults when the env names none, or names one empty (zsh `${K:-d}` reads empty as unset)', () => {
@@ -119,6 +119,31 @@ describe('knobs — every knob checked before anything is done (batch-10 → bat
   it('a text knob matches its pattern or is empty (batch-11 M_D43: a sha or nothing)', () => {
     expect(knobs(SPEC, { M_D43: 'cb011fe5' })).toMatchObject({ ok: true, values: { M_D43: 'cb011fe5' } });
     expect(knobs(SPEC, { M_D43: 'HEAD~1' })).toEqual({ ok: false, errors: ['ERROR M_D43=HEAD~1: a commit sha (7–40 hex digits) or empty — nothing was done'] });
+  });
+
+  it('a text pattern matches the whole value, anchored or not (review round 1: an unanchored sha pattern let `xxcb011fe5yy` in)', () => {
+    const spec = { texts: { SHA: { default: '', pattern: /[0-9a-f]{7,40}/, what: 'a commit sha' } } } satisfies KnobSpec;
+    expect(knobs(spec, { SHA: 'xxcb011fe5yy' })).toEqual({ ok: false, errors: ['ERROR SHA=xxcb011fe5yy: a commit sha — nothing was done'] });
+    expect(knobs(spec, { SHA: 'cb011fe5' })).toMatchObject({ ok: true, values: { SHA: 'cb011fe5' } });
+    const alt = { texts: { K: { default: '', pattern: /a|b/, what: 'a or b' } } } satisfies KnobSpec;
+    expect(knobs(alt, { K: 'ax' })).toMatchObject({ ok: false });
+    expect(knobs(alt, { K: 'b' })).toMatchObject({ ok: true });
+    expect(knobs({ texts: { K: { default: '', pattern: /^ab$/i, what: 'ab' } } }, { K: 'AB' })).toMatchObject({ ok: true });
+  });
+
+  it('a pattern with the g or y flag is refused when the spec is read: its lastIndex would make one value pass once and fail the next time', () => {
+    expect(() => knobs({ texts: { K: { default: '', pattern: /a/g, what: 'a' } } }, {})).toThrow(/K's pattern \/a\/g has the g or y flag/);
+    expect(() => knobs({ texts: { K: { default: '', pattern: /a/y, what: 'a' } } }, {})).toThrow(/K's pattern \/a\/y has the g or y flag/);
+  });
+
+  it('the values are typed from the spec: a count a number, a text a string, an unknown knob no key', () => {
+    const r = knobs(SPEC, {});
+    if (!r.ok) throw new Error('refused');
+    const runs: number = r.values.KF_RUNS;
+    const sha: string = r.values.M_D43;
+    // @ts-expect-error a knob the spec does not declare
+    void r.values.NOPE;
+    expect([runs, sha]).toEqual([1, '']);
   });
 
   it('every error at once, in the spec\'s order, so one rerun fixes them all', () => {

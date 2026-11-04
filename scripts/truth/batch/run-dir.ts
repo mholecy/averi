@@ -12,6 +12,13 @@ import { oneLine } from './words.js';
  * A run must not start over state an earlier run did not provably put back: a RESTORE file left, or an earlier run's
  * state file not clean. batch-7 to batch-9 only renamed a leftover RESTORE aside with a WARN; batch-10 refused, since
  * a new run would bury it; batch-11 read the state of every earlier run folder, not only the last.
+ *
+ * Ported differently (backlog T2):
+ * - batch-11's B2 refused a folder holding more than its own `.cases`. The exclusive mkdir replaces it, and is as
+ *   strong for what it guarded: another run's data, since this run's folder is made by this run or the run refuses.
+ *   It is weaker only against this run's own earlier step writing into a later block's folder, which no batch does.
+ * - batch-12's refusal of a pre-D62 worktree an earlier run left registered stays the batch's own check (it knows its
+ *   worktree): its lines go into `refusals` as `batchReasons` and print with the module's.
  */
 
 /** A probe's state file: `{dirty: false, …}` once a restore has been verified; anything else is not proven clean. */
@@ -60,6 +67,8 @@ export interface Layout {
   latestOut: string;
   /** This run's own output, in its meta folder. */
   outFile: string;
+  /** The SUMMARY again, alone (batch-12's meta/summary.txt), appended by steps.ts#StepLog.summary. */
+  summaryFile: string;
 }
 
 export const layoutOf = (out: string, name: string, metaDir: string): Layout => ({
@@ -67,6 +76,7 @@ export const layoutOf = (out: string, name: string, metaDir: string): Layout => 
   stepsFile: join(out, 'steps.log'),
   latestOut: join(out, `${name}.out`),
   outFile: join(metaDir, `${name}.out`),
+  summaryFile: join(metaDir, 'summary.txt'),
 });
 
 /** Whether `inner` is `outer` or lies under it, symlinks resolved on both sides. */
@@ -78,17 +88,21 @@ function within(fs: BatchFs, inner: string, outer: string): boolean {
 /**
  * Why the run must not start — none when it may. In order: an out folder inside the checkout (`repo`: it must stay
  * clean, and a status of tracked files only would not see the run's files); the RESTORE file, with its hand lines and
- * how to move it aside once done; every earlier run's state file of every stateful block that is not clean.
+ * how to move it aside once done; every earlier run's state file of every stateful block that is not clean; last, the
+ * batch's own reasons (`batchReasons`, lines it found itself).
  */
-export function refusals(fs: BatchFs, { out, repo, stateful }: { out: string; repo?: string; stateful: readonly Stateful[] }): string[] {
+export function refusals(
+  fs: BatchFs,
+  { out, repo, stateful, batchReasons = [] }: { out: string; repo?: string; stateful: readonly Stateful[]; batchReasons?: readonly string[] },
+): string[] {
   const lines: string[] = [];
-  if (repo !== undefined && within(fs, out, repo)) lines.push(`the out folder ${out} lies inside the checkout ${repo}: give an --out outside it`);
+  if (repo !== undefined && within(fs, out, repo)) lines.push(`the out folder ${out} lies inside the checkout ${repo}: pass an \`out\` outside it`);
   const restore = join(out, RESTORE_FILE);
   if (fs.exists(restore)) {
     const text = fs.read(restore) ?? '(unreadable)';
     lines.push(`${restore} exists (an earlier run left state not provably put back):`);
     lines.push(...text.split('\n').filter((l) => l !== ''));
-    lines.push(`  → run its hand commands, then: mv ${restore} ${join(out, RESTORE_DONE)}`);
+    lines.push(`  → run its hand commands, then: mv "${restore}" "${join(out, RESTORE_DONE)}"`);
   }
   for (const s of stateful) {
     for (const run of fs.list(join(out, s.block)).filter((n) => n.startsWith('run-'))) {
@@ -99,7 +113,7 @@ export function refusals(fs: BatchFs, { out, repo, stateful }: { out: string; re
       lines.push(`${file} ${state === 'dirty' ? 'is dirty' : 'is unreadable, so not provably clean'} (${s.what}):`, ...s.hand(file));
     }
   }
-  return lines;
+  return [...lines, ...batchReasons];
 }
 
 /** The refusal as the batch prints it, before it exits 2. */
@@ -150,12 +164,13 @@ export function openRun(fs: BatchFs, { out, runId, blocks, wanted }: { out: stri
 
 /**
  * Append the hand commands of state not provably put back: `<header>; state to put back by hand:`, then one line each.
- * Nothing to put back: nothing written (false). Appended, never overwritten: a second write in the same run (the end,
- * then an abort) keeps the first's lines.
+ * Returns the lines written, for the SUMMARY (words.ts#Summary's `restore.written`); nothing to put back: nothing
+ * written, none returned. Appended, never overwritten: a second write in the same run (the end, then an abort) keeps
+ * the first's lines.
  */
-export function writeRestore(fs: BatchFs, file: string, { header, hand }: { header: string; hand: readonly string[] }): boolean {
-  if (hand.length === 0) return false;
+export function writeRestore(fs: BatchFs, file: string, { header, hand }: { header: string; hand: readonly string[] }): string[] {
+  if (hand.length === 0) return [];
   const lines = [`${header}; state to put back by hand:`, ...hand].map((l) => oneLine(l, 'a RESTORE line'));
   fs.append(file, `${lines.join('\n')}\n`);
-  return true;
+  return lines;
 }

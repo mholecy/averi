@@ -52,26 +52,26 @@
   "scripts/truth/batch/words.ts": {
     "tests": ["tests/truth/batch/words.test.ts", "tests/truth/batch/steps.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-04 (T2 S1, cold): 95 mutants, 0 survived, 0 without coverage"
+    "baseline": "100 % on 2026-11-04 (T2 S1 review round 1, failsIn as batch-12's exit rule plus the step form, restore.written; cold): 91 mutants, 0 survived; 100 % on 2026-11-04 (T2 S1, cold): 95 mutants, 0 survived, 0 without coverage"
   },
   "scripts/truth/batch/select.ts": {
     "tests": ["tests/truth/batch/select.test.ts"],
     "floor": 97,
-    "baseline": "99.41 % on 2026-11-04 (T2 S1, cold): 170 mutants, 1 survived, 0 without coverage — equivalent: `spec.atMost ?? []` turned into a one-string list, whose destructured `low` and `high` are undefined, so the cross check compares NaN and adds nothing"
+    "baseline": "99.43 % on 2026-11-04 (T2 S1 review round 1, a text pattern matched whole, no g or y flag, values typed from the spec; cold): 176 mutants, 1 survived — the same equivalent; 99.41 % on 2026-11-04 (T2 S1, cold): 170 mutants, 1 survived, 0 without coverage — equivalent: `spec.atMost ?? []` turned into a one-string list, whose destructured `low` and `high` are undefined, so the cross check compares NaN and adds nothing"
   },
   "scripts/truth/batch/run-dir.ts": {
     "tests": ["tests/truth/batch/run-dir.test.ts"],
     "floor": 97,
-    "baseline": "99.36 % on 2026-11-04 (T2 S1, cold): 157 mutants, 1 survived, 0 without coverage — equivalent: stateOf's `?? ''` for a missing file turned into another string that is no JSON either (both read unreadable)"
+    "baseline": "99.37 % on 2026-11-04 (T2 S1 review round 1, batchReasons, the quoted mv, writeRestore returns its lines, summaryFile; cold): 159 mutants, 1 survived — the same equivalent; 99.36 % on 2026-11-04 (T2 S1, cold): 157 mutants, 1 survived, 0 without coverage — equivalent: stateOf's `?? ''` for a missing file turned into another string that is no JSON either (both read unreadable)"
   },
   "scripts/truth/batch/steps.ts": {
     "tests": ["tests/truth/batch/steps.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-04 (T2 S1, cold): 96 mutants, 0 survived, 0 without coverage — after linkLatest's lstat catch was narrowed to ENOENT; the run before, at 97.94 %, left open's `latestOut === undefined` set false surviving, since a bare catch read the missing path as nothing there"
+    "baseline": "100 % on 2026-11-04 (T2 S1 review round 1, terminalOf: a synchronous write to fd 1, EPIPE and EBADF gone, EAGAIN waited out within a bound; summary.txt; cold): 135 mutants, 0 survived, 7 timeouts — after a test pinned the EAGAIN bound's count and its wait, whose three mutants survived the first run at 97.78 %; 100 % on 2026-11-04 (T2 S1, cold): 96 mutants, 0 survived, 0 without coverage — after linkLatest's lstat catch was narrowed to ENOENT; the run before, at 97.94 %, left open's `latestOut === undefined` set false surviving, since a bare catch read the missing path as nothing there"
   },
   "scripts/truth/batch/io.ts": {
     "tests": ["tests/truth/batch/io.test.ts", "tests/truth/batch/run-dir.test.ts", "tests/truth/batch/steps.test.ts"],
     "floor": 92,
-    "baseline": "94.00 % on 2026-11-04 (T2 S1, cold): 50 mutants, 3 survived, 0 without coverage — all equivalent: read's catch emptied (it returns undefined either way), list's `.sort()` dropped (APFS lists a folder sorted already, so no test on this machine tells them apart), real's root guard set false (realpath of the root never fails)"
+    "baseline": "94.00 % on 2026-11-04 (T2 S1 review round 1, realpathSync.native; cold): 50 mutants, 3 survived — the same three equivalents; 94.00 % on 2026-11-04 (T2 S1, cold): 50 mutants, 3 survived, 0 without coverage — all equivalent: read's catch emptied (it returns undefined either way), list's `.sort()` dropped (APFS lists a folder sorted already, so no test on this machine tells them apart), real's root guard set false (realpath of the root never fails)"
   }
 }

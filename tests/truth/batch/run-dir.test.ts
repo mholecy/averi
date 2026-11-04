@@ -22,6 +22,17 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(out, { recursive: true, force: true }));
 
+/** Whether the temp dir's filesystem folds case (APFS's default): a file found again under another case. */
+function caseInsensitive(): boolean {
+  const probe = mkdtempSync(join(tmpdir(), 'batch-case-'));
+  try {
+    writeFileSync(join(probe, 'Aa'), '');
+    return existsSync(join(probe, 'aA'));
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+}
+
 const E5: Stateful = { block: 'E5', what: 'E5 not put back', hand: (file) => [`  → node e5.ts --restore --state ${file}`] };
 const D43: Stateful = { block: 'D43', what: 'the simulator settings not put back', hand: () => ['  → node d43-gate.ts --restore'] };
 
@@ -60,7 +71,7 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
       `${join(out, 'RESTORE.txt')} exists (an earlier run left state not provably put back):`,
       'batch-n run 1 interrupted; state to put back by hand:',
       'E5: adb install lab.apk',
-      `  → run its hand commands, then: mv ${join(out, 'RESTORE.txt')} ${join(out, 'RESTORE.done-$(date +%Y%m%d-%H%M%S).txt')}`,
+      `  → run its hand commands, then: mv "${join(out, 'RESTORE.txt')}" "${join(out, 'RESTORE.done-$(date +%Y%m%d-%H%M%S).txt')}"`,
     ]);
     expect(tree()).toEqual(['RESTORE.txt']);
   });
@@ -110,7 +121,7 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
     const repo = join(out, 'repo');
     mkdirSync(repo);
     expect(refusals(nodeFs, { out: join(repo, 'runs'), repo, stateful: [] })).toEqual([
-      `the out folder ${join(repo, 'runs')} lies inside the checkout ${repo}: give an --out outside it`,
+      `the out folder ${join(repo, 'runs')} lies inside the checkout ${repo}: pass an \`out\` outside it`,
     ]);
     expect(refusals(nodeFs, { out: repo, repo, stateful: [] })).toHaveLength(1);
     expect(refusals(nodeFs, { out: join(out, 'repo-runs'), repo, stateful: [] })).toEqual([]);
@@ -123,6 +134,21 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
     mkdirSync(join(repo, 'runs'), { recursive: true });
     symlinkSync(repo, join(out, 'link'));
     expect(refusals(nodeFs, { out: join(out, 'link', 'runs'), repo, stateful: [] })).toHaveLength(1);
+  });
+
+  it.runIf(caseInsensitive())('a checkout named in another case is the same checkout, on a case-insensitive filesystem (review round 1: realpath kept the case as typed)', () => {
+    const repo = join(out, 'Repo');
+    mkdirSync(repo);
+    expect(refusals(nodeFs, { out: join(out, 'repo', 'runs'), repo, stateful: [] })).toHaveLength(1);
+    expect(refusals(nodeFs, { out: join(out, 'REPO'), repo: join(out, 'repo'), stateful: [] })).toHaveLength(1);
+  });
+
+  it("a batch's own reasons (batch-12: a pre-D62 worktree of an earlier run still registered) come last, after the module's", () => {
+    put('RESTORE.txt', 'x\n');
+    const lines = refusals(nodeFs, { out, stateful: [], batchReasons: ['the pre-D62 worktree w of an earlier run is still registered:', '  → git worktree prune'] });
+    expect(lines.slice(-2)).toEqual(['the pre-D62 worktree w of an earlier run is still registered:', '  → git worktree prune']);
+    expect(lines[0]).toMatch(/RESTORE\.txt exists/);
+    expect(refusals(nodeFs, { out, stateful: [], batchReasons: [] })).toHaveLength(3);
   });
 
   it('refusalLines heads the reasons with the batch\'s name and "nothing was done"', () => {
@@ -201,19 +227,23 @@ describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or 
 });
 
 describe('layoutOf — the run\'s files, all under the out folder the batch was given (nothing literal)', () => {
-  it('RESTORE, steps.log and the latest-out link at the top; the run\'s own .out in meta\'s folder', () => {
-    expect(layoutOf('/o', 'batch-n', '/o/meta/run-1')).toEqual({ restoreFile: '/o/RESTORE.txt', stepsFile: '/o/steps.log', latestOut: '/o/batch-n.out', outFile: '/o/meta/run-1/batch-n.out' });
+  it('RESTORE, steps.log and the latest-out link at the top; the run\'s own .out and summary.txt in meta\'s folder', () => {
+    expect(layoutOf('/o', 'batch-n', '/o/meta/run-1')).toEqual({ restoreFile: '/o/RESTORE.txt', stepsFile: '/o/steps.log', latestOut: '/o/batch-n.out', outFile: '/o/meta/run-1/batch-n.out', summaryFile: '/o/meta/run-1/summary.txt' });
   });
 });
 
 describe('writeRestore — the hand commands of state not provably put back', () => {
-  it('nothing to put back: no file is written', () => {
-    expect(writeRestore(nodeFs, join(out, 'RESTORE.txt'), { header: 'batch-n run 1 ended', hand: [] })).toBe(false);
+  it('nothing to put back: no file is written, and nothing said written', () => {
+    expect(writeRestore(nodeFs, join(out, 'RESTORE.txt'), { header: 'batch-n run 1 ended', hand: [] })).toEqual([]);
     expect(existsSync(join(out, 'RESTORE.txt'))).toBe(false);
   });
 
   it('a header naming the run, then each hand line', () => {
-    expect(writeRestore(nodeFs, join(out, 'RESTORE.txt'), { header: 'batch-n run 1 ended 2026-11-04 10:00:00', hand: ['E5: one', 'lvd62: two'] })).toBe(true);
+    expect(writeRestore(nodeFs, join(out, 'RESTORE.txt'), { header: 'batch-n run 1 ended 2026-11-04 10:00:00', hand: ['E5: one', 'lvd62: two'] })).toEqual([
+      'batch-n run 1 ended 2026-11-04 10:00:00; state to put back by hand:',
+      'E5: one',
+      'lvd62: two',
+    ]);
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe('batch-n run 1 ended 2026-11-04 10:00:00; state to put back by hand:\nE5: one\nlvd62: two\n');
   });
 

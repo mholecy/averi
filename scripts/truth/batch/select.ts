@@ -34,7 +34,11 @@ export interface CountKnob {
   unit?: string;
 }
 
-/** A text knob: empty (its default) or matching `pattern`; `what` says what it must be. */
+/**
+ * A text knob: empty (its default) or matching `pattern` whole — anchors are added, so `/[0-9a-f]{7,40}/` takes a sha
+ * and nothing around it. No g or y flag (their lastIndex would make the same value pass once and fail the next time).
+ * `what` says what it must be.
+ */
 export interface TextKnob {
   default: string;
   pattern: RegExp;
@@ -48,11 +52,18 @@ export interface KnobSpec {
   atMost?: readonly { low: string; high: string; why: string }[];
 }
 
-export type Knobs = { ok: true; values: Record<string, number | string> } | { ok: false; errors: string[] };
+/** The values of a spec's knobs, typed from it: each count a number, each text a string. */
+export type KnobValues<S extends KnobSpec> = (S extends { counts: infer C } ? { [K in keyof C]: number } : unknown) &
+  (S extends { texts: infer T } ? { [K in keyof T]: string } : unknown);
+
+export type Knobs<S extends KnobSpec = KnobSpec> = { ok: true; values: KnobValues<S> } | { ok: false; errors: string[] };
 
 const WHOLE = /^\d+$/;
 /** An env variable's name, as a batch's knobs are named. */
 const KNOB_NAME = /^[A-Z][A-Z0-9_]*$/;
+
+/** `pattern` matching the whole value: the source wrapped in anchors, its flags kept. */
+const whole = (pattern: RegExp): RegExp => new RegExp(`^(?:${pattern.source})$`, pattern.flags);
 
 const fits = (k: CountKnob, v: number): boolean => Number.isSafeInteger(v) && v >= k.min && (k.max === undefined || v <= k.max);
 
@@ -75,7 +86,8 @@ function checkSpec(spec: KnobSpec): void {
     if (!fits(k, k.default)) throw new Error(`${name}'s default ${k.default} breaks its own rule (${ruleOf(k)})`);
   }
   for (const [name, k] of Object.entries(spec.texts ?? {})) {
-    if (k.default !== '' && !k.pattern.test(k.default)) throw new Error(`${name}'s default ${JSON.stringify(k.default)} breaks its own rule (${k.what})`);
+    if (/[gy]/.test(k.pattern.flags)) throw new Error(`${name}'s pattern ${k.pattern} has the g or y flag: a knob's pattern must hold no state`);
+    if (k.default !== '' && !whole(k.pattern).test(k.default)) throw new Error(`${name}'s default ${JSON.stringify(k.default)} breaks its own rule (${k.what})`);
   }
   for (const { low, high } of spec.atMost ?? []) {
     for (const n of [low, high]) if (spec.counts?.[n] === undefined) throw new Error(`atMost names ${n}, which is no count knob`);
@@ -87,7 +99,7 @@ function checkSpec(spec: KnobSpec): void {
  * space) within its rule; a text empty or matching its pattern. An unset or empty variable takes the default (zsh's
  * `${K:-d}`). Then the cross checks, each only when both sides passed. Every error at once, in the spec's order.
  */
-export function knobs(spec: KnobSpec, env: Readonly<Record<string, string | undefined>>): Knobs {
+export function knobs<S extends KnobSpec>(spec: S, env: Readonly<Record<string, string | undefined>>): Knobs<S> {
   checkSpec(spec);
   const values: Record<string, number | string> = {};
   const counted = new Map<string, number>();
@@ -103,7 +115,7 @@ export function knobs(spec: KnobSpec, env: Readonly<Record<string, string | unde
   }
   for (const [name, k] of Object.entries(spec.texts ?? {})) {
     const raw = given(name) ?? k.default;
-    if (raw === '' || k.pattern.test(raw)) values[name] = raw;
+    if (raw === '' || whole(k.pattern).test(raw)) values[name] = raw;
     else errors.push(`ERROR ${name}=${raw}: ${k.what} — nothing was done`);
   }
   // A side already refused has no value: NaN, which compares false, so the cross check adds no second error.
@@ -111,5 +123,6 @@ export function knobs(spec: KnobSpec, env: Readonly<Record<string, string | unde
     const [l, h] = [counted.get(low) ?? Number.NaN, counted.get(high) ?? Number.NaN];
     if (l > h) errors.push(`ERROR ${low}=${l} > ${high}=${h}: ${why} — nothing was done`);
   }
-  return errors.length === 0 ? { ok: true, values } : { ok: false, errors };
+  // The keys are exactly the spec's counts and texts, set above: KnobValues<S> by construction.
+  return errors.length === 0 ? { ok: true, values: values as KnobValues<S> } : { ok: false, errors };
 }

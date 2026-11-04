@@ -5,6 +5,11 @@
  * `OK   kf analyze`, `FAIL E5 restore (exit 3) — see restore.log`. A **verdict line** says what a block found, its label
  * first: `kf live verdict: INCONCLUSIVE — the premise does not hold`. The SUMMARY gathers the run's verdict lines in a
  * fixed order between two markers; whoever waits for a batch waits for `======== SUMMARY` (unchanged since batch-1).
+ *
+ * Not here yet (backlog T2): the ERROR lines batch-12 collected from each block's logs and analyze.txt — the runner
+ * (slice S6) knows those files and hands them in with `errors`. The RESTORE block needs no `grep "run $RUN_ID"`
+ * filter any more: a run refuses to start while a RESTORE file exists (run-dir.ts#refusals) and only appends to it,
+ * so what it prints is what this run wrote (`restore.written`, header line included, as batch-12's `cat`).
  */
 
 /** Step words: OK done; DONE ended with a judged exit 1 (steps.ts#stepWordOf); FAIL; WARN; NOTE; SKIP; ERROR. */
@@ -58,10 +63,11 @@ export function parseVerdictLine(line: string): { label: string; verdict: Verdic
 }
 
 /**
- * Whether a SUMMARY line says FAIL: a verdict line whose verdict is FAIL, or a step line whose word is. batch-12's
- * exit rule read only the first (`^[^:]+: FAIL( |$)`); a FAIL step line in the SUMMARY counts here too.
+ * Whether a SUMMARY line says FAIL: batch-12's exit rule, `^[^:]+: FAIL( |$)` — FAIL right after the first colon,
+ * whatever follows it (`lv-d62 verdict: FAIL 2/3 dropped` too, which parseVerdictLine, strict for the lines this module
+ * writes, reads as none) — or a step line whose word is FAIL.
  */
-export const failsIn = (line: string): boolean => parseVerdictLine(line)?.verdict === 'FAIL' || /^FAIL( |$)/.test(line);
+export const failsIn = (line: string): boolean => /^(?:[^:]+: )?FAIL(?: |$)/.test(line);
 
 /** One block's lines for the SUMMARY: its verdict lines, or — `interrupted` — the lines it wrote before the interrupt. */
 export interface BlockReport {
@@ -82,8 +88,8 @@ export interface Summary {
   blocks: readonly BlockReport[];
   /** The read-only keys' lines (the schemeapproval key: unchanged or not). */
   protectedLines: readonly string[];
-  /** The RESTORE file and the hand lines this run wrote into it (none: everything put back). */
-  restore: { file: string; hand: readonly string[] };
+  /** The RESTORE file and the lines this run wrote into it (run-dir.ts#writeRestore; none: everything put back). */
+  restore: { file: string; written: readonly string[] };
   /** This run's ERROR lines (steps.ts#StepLog.errors). */
   errors: readonly string[];
   /** Set when the run was interrupted: the time of the interrupt (HH:MM:SS). */
@@ -104,14 +110,14 @@ function bodyOf(s: Summary): string[] {
     ...s.labs,
     ...s.blocks.flatMap((b) => (b.interrupted === true ? interruptedBlock(b.block, b.lines) : b.lines)),
     ...s.protectedLines,
-    ...(s.restore.hand.length === 0 ? ['RESTORE: none — everything dirty was put back and verified'] : [`RESTORE: state not provably put back — ${s.restore.file}:`, ...s.restore.hand]),
+    ...(s.restore.written.length === 0 ? ['RESTORE: none — everything dirty was put back and verified'] : [`RESTORE: state not provably put back — ${s.restore.file}:`, ...s.restore.written]),
     ...s.errors,
   ].map((l) => oneLine(l, 'a SUMMARY line'));
 }
 
 /**
  * The SUMMARY: the marker; the checkout line; INTERRUPTED when it was; the lab lines; each block's verdict lines; the
- * protected-key lines; RESTORE (none, or its file and hand lines); this run's ERRORs; the end marker. Each body line
+ * protected-key lines; RESTORE (none, or its file and what this run wrote into it); this run's ERRORs; the end marker. Each body line
  * once (batch-6's deduplication: an ERROR noted twice prints once).
  */
 export function summaryLines(s: Summary): string[] {
@@ -126,7 +132,7 @@ export function summaryLines(s: Summary): string[] {
  */
 export function exitCodeOf(s: Summary): 0 | 1 | 130 {
   if (s.interrupted !== undefined) return EXIT.interrupted;
-  if (s.restore.hand.length > 0) return EXIT.failed;
+  if (s.restore.written.length > 0) return EXIT.failed;
   const judged = [s.checkout, ...s.labs, ...s.blocks.flatMap((b) => b.lines), ...s.protectedLines];
   return judged.some(failsIn) ? EXIT.failed : EXIT.ok;
 }
