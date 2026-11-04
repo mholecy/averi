@@ -82,7 +82,7 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
     expect(refusals(nodeFs, { out, stateful: [] }).slice(0, 2)).toEqual([`${join(out, 'RESTORE.txt')} exists (an earlier run left state not provably put back):`, '(unreadable)']);
   });
 
-  it("the mv hand line runs as written in a shell, on a path holding ' and $: each path single-quoted, only the date expanded (review round 2)", () => {
+  it("the mv hand line runs as written in a shell, on a path holding ' and $: each path single-quoted, only the date expanded", () => {
     const odd = join(out, "it's $HOME");
     mkdirSync(odd);
     writeFileSync(join(odd, 'RESTORE.txt'), 'x\n');
@@ -147,7 +147,7 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
     expect(refusals(nodeFs, { out: join(out, 'link', 'runs'), repo, stateful: [] })).toHaveLength(1);
   });
 
-  it.runIf(caseInsensitive())('a checkout named in another case is the same checkout, on a case-insensitive filesystem (review round 1: realpath kept the case as typed)', () => {
+  it.runIf(caseInsensitive())('a checkout named in another case is the same checkout, on a case-insensitive filesystem (realpath kept the case as typed)', () => {
     const repo = join(out, 'Repo');
     mkdirSync(repo);
     expect(refusals(nodeFs, { out: join(out, 'repo', 'runs'), repo, stateful: [] })).toHaveLength(1);
@@ -199,7 +199,7 @@ describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or 
   it('a folder of this RUN_ID that already exists refuses before anything is created — for any block of the batch, wanted or not', () => {
     put('kf/run-X/data.json', 'kept');
     const run = openRun(nodeFs, { out, runId: 'X', blocks: BLOCKS, wanted: ['lab'] });
-    expect(run).toEqual({ ok: false, error: `ERROR the run folder ${join(out, 'kf/run-X')} already exists: nothing was done` });
+    expect(run).toEqual({ ok: false, error: `ERROR the run folder ${join(out, 'kf/run-X')} already exists — nothing was done` });
     expect(tree()).toEqual(['kf/run-X/data.json']);
     expect(existsSync(join(out, 'meta'))).toBe(false);
   });
@@ -219,7 +219,7 @@ describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or 
   it('a folder made between the check and the mkdir is refused, not reused (the mkdir itself is exclusive)', () => {
     const racing = { ...nodeFs, exists: () => false };
     put('E5/run-X/data.json', 'kept');
-    expect(openRun(racing, { out, runId: 'X', blocks: BLOCKS, wanted: BLOCKS })).toEqual({ ok: false, error: `ERROR the run folder ${join(out, 'E5/run-X')} already exists: nothing was done` });
+    expect(openRun(racing, { out, runId: 'X', blocks: BLOCKS, wanted: BLOCKS })).toEqual({ ok: false, error: `ERROR the run folder ${join(out, 'E5/run-X')} already exists — nothing was done` });
     expect(readFileSync(join(out, 'E5/run-X/data.json'), 'utf8')).toBe('kept');
   });
 

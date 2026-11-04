@@ -1,6 +1,6 @@
 import { writeSync } from 'node:fs';
-import type { BatchFs } from './io.js';
-import { oneLine, stepLine, type StepWord } from './words.js';
+import { isEexist, type BatchFs } from './io.js';
+import { oneLine, stepLine, twoDigits, type StepWord } from './words.js';
 
 /**
  * A run's own output. The runner writes its `<name>.out` and steps.log itself, never through `| tee`: batch-11's tee
@@ -90,8 +90,7 @@ export interface StepLogOptions {
   clock?: () => Date;
 }
 
-const two = (n: number) => String(n).padStart(2, '0');
-const timeOf = (d: Date) => `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+const timeOf = (d: Date) => `${twoDigits(d.getHours())}:${twoDigits(d.getMinutes())}:${twoDigits(d.getSeconds())}`;
 
 /** The run's step log: its `.out` (everything), steps.log (the timed notes), and the terminal (the start and the SUMMARY). */
 export class StepLog {
@@ -100,7 +99,7 @@ export class StepLog {
 
   private constructor(
     private readonly fs: BatchFs,
-    private readonly o: StepLogOptions,
+    private readonly options: StepLogOptions,
   ) {}
 
   /**
@@ -108,51 +107,51 @@ export class StepLog {
    * link at it (a plain file there is kept, and said), append the run's header to steps.log and tell the terminal where
    * to look.
    */
-  static open(fs: BatchFs, o: StepLogOptions): StepLog {
-    const log = new StepLog(fs, o);
-    const header = `${log.time()} ---- ${o.name} run ${o.runId}, blocks ${o.blocks.join(',')}`;
+  static open(fs: BatchFs, options: StepLogOptions): StepLog {
+    const log = new StepLog(fs, options);
+    const header = `${log.time()} ---- ${options.name} run ${options.runId}, blocks ${options.blocks.join(',')}`;
     try {
-      fs.createExclusive(o.outFile, `${header}\n`);
+      fs.createExclusive(options.outFile, `${header}\n`);
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`${o.outFile} already exists: a run's output is never overwritten`);
+      if (isEexist(e)) throw new Error(`${options.outFile} already exists: a run's output is never overwritten`);
       throw e;
     }
-    fs.append(o.stepsFile, `${header}\n`);
-    const notLinked = o.latestOut === undefined ? undefined : fs.linkLatest(o.latestOut, o.outFile);
-    if (notLinked !== undefined) log.note(stepLine('WARN', `${o.latestOut} not pointed at this run: ${notLinked}`));
-    const also = o.latestOut !== undefined && notLinked === undefined ? ` (also ${o.latestOut})` : '';
-    log.toTerminal(`${o.name} run ${o.runId}: blocks ${o.blocks.join(',')} — writing ${o.outFile}${also}; tail -f it; the SUMMARY follows here at the end.\n`);
+    fs.append(options.stepsFile, `${header}\n`);
+    const notLinked = options.latestOut === undefined ? undefined : fs.linkLatest(options.latestOut, options.outFile);
+    if (notLinked !== undefined) log.note(stepLine('WARN', `${options.latestOut} not pointed at this run: ${notLinked}`));
+    const also = options.latestOut !== undefined && notLinked === undefined ? ` (also ${options.latestOut})` : '';
+    log.toTerminal(`${options.name} run ${options.runId}: blocks ${options.blocks.join(',')} — writing ${options.outFile}${also}; tail -f it; the SUMMARY follows here at the end.\n`);
     return log;
   }
 
   private time(): string {
-    return timeOf((this.o.clock ?? (() => new Date()))());
+    return timeOf((this.options.clock ?? (() => new Date()))());
   }
 
   private toTerminal(text: string): void {
     if (!this.terminalUp) return;
     let why: string | undefined;
     try {
-      why = this.o.terminal(text) === 'gone' ? 'closed' : undefined;
+      why = this.options.terminal(text) === 'gone' ? 'closed' : undefined;
     } catch (e) {
       why = (e as Error).message;
     }
     if (why === undefined) return;
     this.terminalUp = false;
-    this.note(stepLine('NOTE', `the terminal is gone (${why}): this run writes only to ${this.o.outFile} and ${this.o.stepsFile} now`));
+    this.note(stepLine('NOTE', `the terminal is gone (${why}): this run writes only to ${this.options.outFile} and ${this.options.stepsFile} now`));
   }
 
   /** A line to the .out only (a step's banner, a detail). */
   print(line: string): void {
-    this.fs.append(this.o.outFile, `${oneLine(line)}\n`);
+    this.fs.append(this.options.outFile, `${oneLine(line)}\n`);
   }
 
   /** A timed line to the .out and steps.log. An ERROR line is kept for the SUMMARY. */
   note(line: string): void {
     const timed = `${this.time()} ${oneLine(line)}`;
     if (line.startsWith('ERROR')) this.errorLines.push(timed);
-    this.fs.append(this.o.outFile, `${timed}\n`);
-    this.fs.append(this.o.stepsFile, `${timed}\n`);
+    this.fs.append(this.options.outFile, `${timed}\n`);
+    this.fs.append(this.options.stepsFile, `${timed}\n`);
   }
 
   /** A step line, timed (`09:44:26 OK   kf analyze`). */
@@ -173,8 +172,8 @@ export class StepLog {
   /** The SUMMARY (words.ts#summaryLines, its lines checked there): to the .out, to summaryFile, then to the terminal. */
   summary(lines: readonly string[]): void {
     const text = `${lines.join('\n')}\n`;
-    this.fs.append(this.o.outFile, text);
-    if (this.o.summaryFile !== undefined) this.fs.append(this.o.summaryFile, text);
+    this.fs.append(this.options.outFile, text);
+    if (this.options.summaryFile !== undefined) this.fs.append(this.options.summaryFile, text);
     this.toTerminal(text);
   }
 }

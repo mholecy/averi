@@ -5,8 +5,7 @@ behaviour changes.
 Amended 2026-11-02 (D45: geometry.ts joined the run — see the amendment below).
 Amended 2026-11-02 (D33: adapters/ios-liveness.ts joined the run — see the second amendment below).
 Amended 2026-11-03 (D43: adapters/typeable.ts and adapters/ios-typing.ts joined the run — see the D43 amendment below).
-Amended 2026-11-04 (T2 S1: the device batches' core, scripts/truth/batch/, joined the run — see the T2 amendment
-below).
+Amended 2026-11-04 (T2 S1: scripts/truth/batch/ joined the run — see the T2 amendment below).
 
 ## Context
 
@@ -112,9 +111,10 @@ scripts/truth/batch/ is the first scope outside src/: words.ts (the verdict voca
 code), select.ts (ONLY= and the knobs), run-dir.ts (the refusals to start and the exclusive run folders), steps.ts
 (the run's own output) and io.ts (their one filesystem seam). Each is tested on its own, io.ts and the folder code on
 real files in a temp dir; a dropped guard there would let a batch start over state an earlier run left, or write
-into an earlier run's folder, and no other test would notice. Their baselines: words.ts and steps.ts 100 %, select.ts
-99.41 %, run-dir.ts 99.36 %, io.ts 94.00 %, every survivor equivalent and named in scope.json; floors 98, 98, 97, 97
-and 92.
+into an earlier run's folder, and no other test would notice. Their baselines: words.ts 100 %, steps.ts 99.26 %
+(1 survivor), select.ts 99.44 %, run-dir.ts 99.36 %, io.ts 94.55 %, every survivor equivalent and named in
+scope.json; floors 98, 97, 97, 97 and 92. steps.ts's floor is 97, not 98: 98 sat a quarter point under its baseline,
+less than one mutant, where the rule above asks for about 2 points.
 
 Adding a module outside src/ takes two edits, not one: its scope.json entry, and its folder in stryker.config.mjs's
 allowlist (`ignorePatterns`), which copies `scripts/truth/batch/` into the sandbox and still none of the rest of
@@ -122,6 +122,31 @@ scripts/truth/. A test that imports a scripts/truth module outside that folder t
 tests/truth/batch/steps-live.test.ts, which holds steps.ts's live.ts header to live-cases.ts, runs in the normal suite
 only, as does tests/truth/batch/terminal.test.ts, which spawns a child whose stdout's reader has gone.
 tests/mutation/mutate.test.ts accepts a scope key under src/ or scripts/truth/batch/. The cold run of all fifteen
-modules took 86 to 105 s, past the 90 s at which the amendment for geometry.ts said to revisit one Stryker run per
+modules took 86 to 108 s, past the 90 s at which the amendment for geometry.ts said to revisit one Stryker run per
 module; that is left for a later look, since the five new modules add about 30 s of it.
 
+What of batch-11's and batch-12's safety core S1 does not port, each with the slice that owns it or the reason (spec
+T2: no row dropped silently):
+- bounded device calls, the process-group timeout and `detached()` restores: S2.
+- the dirty windows, `on_abort` on INT/TERM/HUP and TRAPEXIT's port, which also trigger the abort SUMMARY: S2.
+- marking a state file dirty (`markDirty`): S2 and S5, where it is first used.
+- the precondition reasons behind an INCONCLUSIVE, `.cases` completeness, the clean checkout and the ancestry gates
+  (`git merge-base --is-ancestor`): S3.
+- the D43 keys restored one by one, the schemeapproval key read-only, `sim-domains --compare`: S4.
+- safeTap, the preferred-activities read, the abort-safe reinstall with `pm path`: S5.
+- the missing-verdict backstop, the per-run steps and details printout, the `lab` folder made on every run, and the
+  ERROR lines batch-12 collected from each block's logs and analyze.txt: S6, the runner.
+- b11-dry's assertions go to the slices that own them; its "out.txt newer than batch-11.sh" check is dropped, an
+  artefact of its sed-copy harness.
+- ported in another shape: B2's "folder holds more than its `.cases`" check is the exclusive mkdir (as strong against
+  another run's data, weaker only against this run writing into a later block's folder, which no batch does);
+  batch-12's pre-D62 worktree refusal stays the batch's own, passed to `refusals` as `batchReasons`; the `grep "run
+  $RUN_ID"` filter on RESTORE is gone, since a run refuses to start while a RESTORE exists and only appends to it.
+
+Where S1 departs from batch-12, on purpose:
+- every SUMMARY has a RESTORE line, `RESTORE: none — …` when nothing is left, not only the abort SUMMARY.
+- an ERROR line is a step line, one that starts with ERROR; an ERROR inside a verdict line (`E5 cleanup: ERROR — …`)
+  reaches the SUMMARY as that block's verdict line, not as an ERROR.
+- the exit rule fails on a step-form FAIL line too (`FAIL …`), besides batch-12's `^[^:]+: FAIL( |$)`.
+- ONLY= takes spaces as well as commas between block names.
+- an out folder inside the checkout is refused already in S1 (analysis §5), not left to S6.

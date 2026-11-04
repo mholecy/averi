@@ -30,6 +30,9 @@ export interface BatchFs {
   real(path: string): string;
 }
 
+/** Whether `e` is the EEXIST an exclusive mkdir or create throws: something is already there. */
+export const isEexist = (e: unknown): boolean => (e as NodeJS.ErrnoException).code === 'EEXIST';
+
 /** The real filesystem. */
 export const nodeFs: BatchFs = {
   exists(path) {

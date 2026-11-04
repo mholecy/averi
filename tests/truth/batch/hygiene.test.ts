@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir, userInfo } from 'node:os';
 import { join, relative } from 'node:path';
@@ -24,9 +25,21 @@ const filesUnder = (dir: string): string[] =>
 
 const slash = '/';
 const user = userInfo().username;
+const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** A name as given (trimmed), or none when it is shorter than 3 characters: too short to mean a name. */
+const asOwner = (name: string): string | undefined => (name.trim().length >= 3 ? name.trim() : undefined);
+/** The owner's name as git knows it (`git config user.name`), read at run time so no name is ever written here. */
+function ownerName(): string | undefined {
+  try {
+    return asOwner(execFileSync('git', ['config', 'user.name'], { cwd: ROOT, encoding: 'utf8', timeout: 10_000 }));
+  } catch {
+    return undefined; // unset: git exits 1
+  }
+}
+const owner = ownerName();
 /**
- * Each forbidden fragment and why. A user name counts only as `~name/` (a home directory path is
- * caught by its own pattern): as a bare word it is English.
+ * Each forbidden fragment and why. A user name counts only as `~name/` (a home directory path is caught by its own
+ * pattern): as a bare word it is English. The owner's name counts anywhere, in any case.
  */
 const FORBIDDEN: readonly { what: string; re: RegExp }[] = [
   { what: 'a macOS temporary folder', re: new RegExp(['', 'private', 'tmp'].join(slash)) },
@@ -37,8 +50,9 @@ const FORBIDDEN: readonly { what: string; re: RegExp }[] = [
   { what: 'the evidence folder', re: new RegExp('averi-' + 'evidence') },
   { what: 'a home directory', re: new RegExp(`${slash}(Users|home)${slash}`) },
   { what: 'a mounted volume', re: new RegExp(`${slash}Volumes${slash}`) },
-  { what: "this machine's home directory", re: new RegExp(homedir().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) },
-  { what: "the user's home as ~user/", re: new RegExp(`~${user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${slash}`) },
+  { what: "this machine's home directory", re: new RegExp(escaped(homedir())) },
+  { what: "the user's home as ~user/", re: new RegExp(`~${escaped(user)}${slash}`) },
+  ...(owner === undefined ? [] : [{ what: "the owner's name (git config user.name)", re: new RegExp(escaped(owner), 'i') }]),
 ];
 
 describe("path hygiene: the batch module's directories hold no machine- or session-bound path (T2 S1, seed of T8)", () => {
@@ -71,5 +85,14 @@ describe("path hygiene: the batch module's directories hold no machine- or sessi
     expect(caught(`~${user}${slash}y`)).toContain("the user's home as ~user/");
     expect(caught(`an ${user} or ~${user}`)).toEqual([]);
     expect(caught('a relative path: meta/run-1/batch-n.out, or src/tmp/x')).toEqual([]);
+  });
+
+  it('a name from git counts from 3 characters, trimmed; an unset or shorter one is skipped (made-up names only)', () => {
+    expect([asOwner('Ada Example\n'), asOwner('Abc'), asOwner('Ab'), asOwner('  Ab \n'), asOwner('')]).toEqual(['Ada Example', 'Abc', undefined, undefined, undefined]);
+  });
+
+  it.runIf(owner !== undefined)("the owner's name, read from git at run time, is caught in any case", () => {
+    const name = owner ?? '';
+    expect(FORBIDDEN.filter((f) => f.re.test(`by ${name.toUpperCase()}`)).map((f) => f.what)).toContain("the owner's name (git config user.name)");
   });
 });

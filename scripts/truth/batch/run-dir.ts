@@ -1,6 +1,6 @@
 import { join, relative, sep } from 'node:path';
-import type { BatchFs } from './io.js';
-import { oneLine } from './words.js';
+import { isEexist, type BatchFs } from './io.js';
+import { NOTHING_DONE, oneLine, refusedLine, stepLine, twoDigits } from './words.js';
 
 /**
  * Where a run writes, and when it must not start.
@@ -119,16 +119,14 @@ export function refusals(
 }
 
 /** The refusal as the batch prints it, before it exits 2. */
-export const refusalLines = (name: string, reasons: readonly string[]): string[] => [`ERROR ${name} refuses to start — nothing was done:`, ...reasons];
+export const refusalLines = (name: string, reasons: readonly string[]): string[] => [`${stepLine('ERROR', `${name} refuses to start`)}${NOTHING_DONE}:`, ...reasons];
 
-const two = (n: number) => String(n).padStart(2, '0');
 /** A run's id: its local start time and the pid, `YYYYMMDD-HHMMSS-<pid>` (as `date +%Y%m%d-%H%M%S`-$$). */
 export const newRunId = (now: Date, pid: number): string =>
-  `${now.getFullYear()}${two(now.getMonth() + 1)}${two(now.getDate())}-${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}-${pid}`;
+  `${now.getFullYear()}${twoDigits(now.getMonth() + 1)}${twoDigits(now.getDate())}-${twoDigits(now.getHours())}${twoDigits(now.getMinutes())}${twoDigits(now.getSeconds())}-${pid}`;
 
 /** A RUN_ID or a block name: one plain path segment, so its folder cannot leave `<out>`. */
-const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
-const BLOCK = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+const PLAIN_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 /** The run's own folder (its .out, the checkout line): not a block name. */
 export const META = 'meta';
 
@@ -141,14 +139,14 @@ export type OpenedRun = { ok: true; dirs: Readonly<Record<string, string>> } | {
  * made before it stay, empty: nothing is ever removed). A RUN_ID or block name that is no plain path segment is a programming error.
  */
 export function openRun(fs: BatchFs, { out, runId, blocks, wanted }: { out: string; runId: string; blocks: readonly string[]; wanted: readonly string[] }): OpenedRun {
-  if (!RUN_ID.test(runId)) throw new Error(`RUN_ID ${JSON.stringify(runId)}: one plain path segment is needed`);
+  if (!PLAIN_SEGMENT.test(runId)) throw new Error(`RUN_ID ${JSON.stringify(runId)}: one plain path segment is needed`);
   for (const b of blocks) {
-    if (!BLOCK.test(b) || b === META) throw new Error(`block name ${JSON.stringify(b)}: one plain path segment, not "${META}", is needed`);
+    if (!PLAIN_SEGMENT.test(b) || b === META) throw new Error(`block name ${JSON.stringify(b)}: one plain path segment, not "${META}", is needed`);
     if (blocks.indexOf(b) !== blocks.lastIndexOf(b)) throw new Error(`block ${b} is named twice`);
   }
   for (const w of wanted) if (!blocks.includes(w)) throw new Error(`wanted block ${w} is not a block of the batch`);
   const dirOf = (b: string) => join(out, b, `run-${runId}`);
-  const refused = (d: string): OpenedRun => ({ ok: false, error: `ERROR the run folder ${d} already exists: nothing was done` });
+  const refused = (d: string): OpenedRun => ({ ok: false, error: refusedLine(`the run folder ${d} already exists`) });
   const taken = [META, ...blocks].map(dirOf).find((d) => fs.exists(d));
   if (taken !== undefined) return refused(taken);
   const dirs: Record<string, string> = {};
@@ -156,7 +154,7 @@ export function openRun(fs: BatchFs, { out, runId, blocks, wanted }: { out: stri
     try {
       fs.mkdirExclusive(dirOf(b));
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'EEXIST') return refused(dirOf(b));
+      if (isEexist(e)) return refused(dirOf(b));
       throw e;
     }
     dirs[b] = dirOf(b);

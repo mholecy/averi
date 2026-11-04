@@ -121,7 +121,7 @@ describe('knobs — every knob checked before anything is done (batch-10 → bat
     expect(knobs(SPEC, { M_D43: 'HEAD~1' })).toEqual({ ok: false, errors: ['ERROR M_D43=HEAD~1: a commit sha (7–40 hex digits) or empty — nothing was done'] });
   });
 
-  it('a text pattern matches the whole value, anchored or not (review round 1: an unanchored sha pattern let `xxcb011fe5yy` in)', () => {
+  it('a text pattern matches the whole value, anchored or not (an unanchored sha pattern let `xxcb011fe5yy` in)', () => {
     const spec = { texts: { SHA: { default: '', pattern: /[0-9a-f]{7,40}/, what: 'a commit sha' } } } satisfies KnobSpec;
     expect(knobs(spec, { SHA: 'xxcb011fe5yy' })).toEqual({ ok: false, errors: ['ERROR SHA=xxcb011fe5yy: a commit sha — nothing was done'] });
     expect(knobs(spec, { SHA: 'cb011fe5' })).toMatchObject({ ok: true, values: { SHA: 'cb011fe5' } });

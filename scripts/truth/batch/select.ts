@@ -1,3 +1,5 @@
+import { refusedLine, stepLine } from './words.js';
+
 /**
  * What a run does, decided before anything is done: which blocks (ONLY=) and with which knobs. Pure — the env is a
  * plain record. A refusal is a list of lines for the batch to print before it exits 2 (words.ts#EXIT.refused), with no
@@ -16,10 +18,10 @@ export function selectBlocks(blocks: readonly string[], only: string | undefined
   if (only === undefined || only === '') return { ok: true, wanted: [...blocks], warnings: [] };
   const named = only.split(/[\s,]/).filter((n) => n !== '');
   const warnings = [...new Set(named.filter((n) => !blocks.includes(n)))].map(
-    (n) => `WARN ONLY names '${n}', which is not a block of this batch (${blocks.join(', ')}): ignored`,
+    (n) => stepLine('WARN', `ONLY names '${n}', which is not a block of this batch (${blocks.join(', ')}): ignored`),
   );
   const wanted = blocks.filter((b) => named.includes(b));
-  if (wanted.length === 0) return { ok: false, errors: [...warnings, `ERROR ONLY=${only} names no block of this batch — nothing was done`] };
+  if (wanted.length === 0) return { ok: false, errors: [...warnings, refusedLine(`ONLY=${only} names no block of this batch`)] };
   return { ok: true, wanted, warnings };
 }
 
@@ -64,9 +66,10 @@ const WHOLE = /^\d+$/;
 const KNOB_NAME = /^[A-Z][A-Z0-9_]*$/;
 
 /** `pattern` matching the whole value: the source wrapped in anchors, its flags kept. */
-const whole = (pattern: RegExp): RegExp => new RegExp(`^(?:${pattern.source})$`, pattern.flags);
+const matchingWhole = (pattern: RegExp): RegExp => new RegExp(`^(?:${pattern.source})$`, pattern.flags);
 
-const fits = (k: CountKnob, v: number): boolean => Number.isSafeInteger(v) && v >= k.min && (k.max === undefined || v <= k.max);
+/** Whether `v` keeps the count knob's rule: a safe whole number within its floor and ceiling. */
+const keepsRule = (k: CountKnob, v: number): boolean => Number.isSafeInteger(v) && v >= k.min && (k.max === undefined || v <= k.max);
 
 /** The rule a count knob is held to, in words. */
 function ruleOf(k: CountKnob): string {
@@ -84,11 +87,11 @@ function checkSpec(spec: KnobSpec): void {
     if (names.indexOf(name) !== names.lastIndexOf(name)) throw new Error(`knob ${name} is declared twice`);
   }
   for (const [name, k] of Object.entries(spec.counts ?? {})) {
-    if (!fits(k, k.default)) throw new Error(`${name}'s default ${k.default} breaks its own rule (${ruleOf(k)})`);
+    if (!keepsRule(k, k.default)) throw new Error(`${name}'s default ${k.default} breaks its own rule (${ruleOf(k)})`);
   }
   for (const [name, k] of Object.entries(spec.texts ?? {})) {
     if (/[gmy]/.test(k.pattern.flags)) throw new Error(`${name}'s pattern ${k.pattern} has the g, m or y flag: a knob's pattern holds no state and matches the whole value, not a line of it`);
-    if (k.default !== '' && !whole(k.pattern).test(k.default)) throw new Error(`${name}'s default ${JSON.stringify(k.default)} breaks its own rule (${k.what})`);
+    if (k.default !== '' && !matchingWhole(k.pattern).test(k.default)) throw new Error(`${name}'s default ${JSON.stringify(k.default)} breaks its own rule (${k.what})`);
   }
   for (const { low, high } of spec.atMost ?? []) {
     for (const n of [low, high]) if (spec.counts?.[n] === undefined) throw new Error(`atMost names ${n}, which is no count knob`);
@@ -109,20 +112,20 @@ export function knobs<S extends KnobSpec>(spec: S, env: Readonly<Record<string, 
   for (const [name, k] of Object.entries(spec.counts ?? {})) {
     const raw = given(name);
     const v = raw === undefined ? k.default : WHOLE.test(raw) ? Number(raw) : Number.NaN;
-    if (fits(k, v)) {
+    if (keepsRule(k, v)) {
       values[name] = v;
       counted.set(name, v);
-    } else errors.push(`ERROR ${name}=${raw}: ${ruleOf(k)} — nothing was done`);
+    } else errors.push(refusedLine(`${name}=${raw}: ${ruleOf(k)}`));
   }
   for (const [name, k] of Object.entries(spec.texts ?? {})) {
     const raw = given(name) ?? k.default;
-    if (raw === '' || whole(k.pattern).test(raw)) values[name] = raw;
-    else errors.push(`ERROR ${name}=${raw}: ${k.what} — nothing was done`);
+    if (raw === '' || matchingWhole(k.pattern).test(raw)) values[name] = raw;
+    else errors.push(refusedLine(`${name}=${raw}: ${k.what}`));
   }
   // A side already refused has no value: NaN, which compares false, so the cross check adds no second error.
   for (const { low, high, why } of spec.atMost ?? []) {
     const [l, h] = [counted.get(low) ?? Number.NaN, counted.get(high) ?? Number.NaN];
-    if (l > h) errors.push(`ERROR ${low}=${l} > ${high}=${h}: ${why} — nothing was done`);
+    if (l > h) errors.push(refusedLine(`${low}=${l} > ${high}=${h}: ${why}`));
   }
   // The keys are exactly the spec's counts and texts, set above: KnobValues<S> by construction.
   return errors.length === 0 ? { ok: true, values: values as KnobValues<S> } : { ok: false, errors };

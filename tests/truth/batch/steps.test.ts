@@ -223,7 +223,7 @@ describe('terminalOf — the default terminal: a synchronous write to fd 1, safe
     expect(got).toEqual(['abc']);
   });
 
-  it('a slow reader taking 1 byte a call, with EAGAIN between, is never dropped: each byte starts the deadline afresh (review round 2)', () => {
+  it('a slow reader taking 1 byte a call, with EAGAIN between, is never dropped: each byte starts the deadline afresh', () => {
     let full = false;
     const got: string[] = [];
     const fd = clocked(1000, (buf) => {

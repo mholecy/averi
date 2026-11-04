@@ -79,7 +79,7 @@ describe('stepLine — a step word, padded as batch-1 to batch-12 pad it', () =>
 });
 
 describe("failsIn — batch-12's exit rule, `^[^:]+: FAIL( |$)`, plus the step form", () => {
-  it('a FAIL verdict with a tail that is no reason still fails (review round 1: these exited 0)', () => {
+  it('a FAIL verdict with a tail that is no reason still fails, as under batch-12\'s rule', () => {
     expect(failsIn('lv-d62 verdict: FAIL 2/3 dropped')).toBe(true);
     expect(failsIn('kf live verdict: FAIL (1 of 3 MISMATCH)')).toBe(true);
     expect(failsIn('(before the interrupt) E5 cleanup: FAIL — x')).toBe(true);
@@ -123,7 +123,7 @@ describe('summaryLines — the SUMMARY, its marker unchanged so the waiting rule
     expect(SUMMARY_MARKER).toBe('======== SUMMARY');
   });
 
-  it('each line once: an ERROR noted twice and a verdict repeated print once (batch-6\'s deduplicated ERRORs)', () => {
+  it('each line once: identical lines — the same ERROR line twice, a verdict line twice — print once (batch-6\'s `awk \'!seen[$0]++\'`)', () => {
     const lines = summaryLines({ ...base, blocks: [{ block: 'kf', lines: ['kf live verdict: PASS', 'kf live verdict: PASS'] }], errors: ['09:50:01 ERROR x', '09:50:01 ERROR x'] });
     expect(lines.filter((l) => l === 'kf live verdict: PASS')).toHaveLength(1);
     expect(lines.filter((l) => l === '09:50:01 ERROR x')).toHaveLength(1);

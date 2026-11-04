@@ -42,6 +42,15 @@ export function oneLine(line: string, what = 'a line'): string {
 /** A step line: the word padded to four, then the text (`OK   x`, `DONE x`, `ERROR x`). */
 export const stepLine = (word: StepWord, text: string): string => `${word.padEnd(4)} ${text}`;
 
+/** What every refusal line ends with: the batch exits 2 (EXIT.refused) and has done nothing. */
+export const NOTHING_DONE = ' — nothing was done';
+
+/** A refusal: `ERROR <text> — nothing was done`. */
+export const refusedLine = (text: string): string => `${stepLine('ERROR', text)}${NOTHING_DONE}`;
+
+/** A number as two digits (`09`): the step times and the RUN_ID. */
+export const twoDigits = (n: number): string => String(n).padStart(2, '0');
+
 /**
  * A verdict line, `<label>: <VERDICT>` and ` — <why>` when a reason is given. The label must not hold a colon: the
  * exit rule and parseVerdictLine read the label up to the first one.
