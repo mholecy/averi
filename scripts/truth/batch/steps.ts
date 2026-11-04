@@ -27,6 +27,8 @@ const GONE = new Set(['EPIPE', 'EBADF', 'EIO']);
  * writes. EPIPE, EBADF and EIO say `'gone'`. A write that takes nothing — EAGAIN (a non-blocking pipe that is full) or
  * 0 bytes — is tried again `waitMs` later, until `deadlineMs` pass with no byte taken: then `'gone'` too, never a
  * hang. Any byte taken starts the deadline afresh, so a slow reader is never dropped. Any other failure is thrown.
+ * The deadline covers a non-blocking fd only: a tty paused with Ctrl-S, or a blocking pipe whose reader has stopped
+ * reading, blocks inside writeSync itself, which no deadline here can end — S2's abort path must allow for that.
  */
 export function terminalOf(
   fd = 1,
