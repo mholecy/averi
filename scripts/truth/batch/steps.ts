@@ -60,6 +60,9 @@ export function terminalOf(
 /** The first words of live.ts's judged summary line (live-cases.ts#summarize): its exit 1 judged a run. */
 export const LIVE_GOLDEN_HEADER = '# Live golden:';
 
+/** Whether `text` holds live.ts's `# Live golden:` line at a line's start: printed only once live.ts has judged. */
+export const holdsGoldenHeader = (text: string): boolean => text.split('\n').some((l) => l.startsWith(LIVE_GOLDEN_HEADER));
+
 /**
  * A step's word by its exit code. 0 is OK. 1 is DONE only for a judged step (a live.ts run: exit 1 means a MISMATCH or
  * a known case off, which the batch's analyzer judges) whose log holds live.ts's `# Live golden:` line at a line's
@@ -68,7 +71,7 @@ export const LIVE_GOLDEN_HEADER = '# Live golden:';
 export function stepWordOf(code: number, judged?: { judged: boolean; log: string }): 'OK' | 'DONE' | 'FAIL' {
   if (code === 0) return 'OK';
   if (code !== 1 || judged?.judged !== true) return 'FAIL';
-  return judged.log.split('\n').some((l) => l.startsWith(LIVE_GOLDEN_HEADER)) ? 'DONE' : 'FAIL';
+  return holdsGoldenHeader(judged.log) ? 'DONE' : 'FAIL';
 }
 
 export interface StepLogOptions {

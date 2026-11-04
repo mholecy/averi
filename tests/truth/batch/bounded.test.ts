@@ -122,6 +122,12 @@ describe('boundFor — every device call bounded, by tool (batch-7\'s `bounded`,
     expect(boundFor('adb', ['shell', 'cmd', 'package', 'install-existing', 'x'])).toBe(120);
   });
 
+  it('git 30 s, whatever it is asked (T2 S3: the preconditions read a local repo, never the network)', () => {
+    expect(boundFor('git', ['-C', 'repo', 'merge-base', '--is-ancestor', 'abc1234', 'HEAD'])).toBe(30);
+    expect(boundFor('git', ['install'], 900)).toBe(30);
+    expect(boundFor('/usr/bin/git', [])).toBe(30);
+  });
+
   it('by the command\'s base name: a full path to the tool is the tool', () => {
     expect(boundFor('/usr/bin/xcrun', ['simctl', 'boot', 'U'])).toBe(300);
     expect(boundFor('/opt/sdk/platform-tools/adb', ['devices'])).toBe(120);
