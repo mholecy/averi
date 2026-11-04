@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { fstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -98,5 +98,25 @@ describe('nodeFs.replace: a state file\'s text replaced in one step (abort.ts#ma
     expect(() => nodeFs.replace(join(dir, 'state.json'), '{}')).toThrow(/is no file: not replaced/);
     expect(readFileSync(join(dir, 'state.json', 'inner'), 'utf8')).toBe('x');
     expect(nodeFs.list(dir)).toEqual(['state.json']);
+  });
+});
+
+describe('nodeFs.withAppend: a child\'s log, opened for append and handed over as an fd (bounded.ts)', () => {
+  it('the fd appends to the file, creating it or keeping what is there; it is closed after', () => {
+    writeFileSync(join(dir, 'old.log'), 'earlier\n');
+    let kept = -1;
+    expect(nodeFs.withAppend(join(dir, 'old.log'), (fd) => ((kept = fd), writeSync(fd, 'more\n'), 'used'))).toBe('used');
+    nodeFs.withAppend(join(dir, 'new.log'), (fd) => writeSync(fd, 'x'));
+    expect([readFileSync(join(dir, 'old.log'), 'utf8'), readFileSync(join(dir, 'new.log'), 'utf8')]).toEqual(['earlier\nmore\n', 'x']);
+    expect(() => fstatSync(kept)).toThrow(/EBADF/);
+  });
+
+  it('closed even when its user throws', () => {
+    let kept = -1;
+    expect(() => nodeFs.withAppend(join(dir, 'a.log'), (fd) => {
+      kept = fd;
+      throw new Error('boom');
+    })).toThrow('boom');
+    expect(() => fstatSync(kept)).toThrow(/EBADF/);
   });
 });

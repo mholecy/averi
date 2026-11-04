@@ -1,4 +1,4 @@
-import { appendFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 /**
@@ -32,6 +32,11 @@ export interface BatchFs {
    * never a part. Only for a probe's state file (abort.ts#markDirty); throws when it cannot (a folder there).
    */
   replace(path: string, text: string): void;
+  /**
+   * Open `path` for append (creating it, never truncating), hand its fd to `use`, and close it after, even when `use`
+   * throws: a child's log, which the child writes itself (bounded.ts hands the fd to proc.ts's start).
+   */
+  withAppend<T>(path: string, use: (fd: number) => T): T;
   /** The path with its symlinks resolved, as far as it exists (a missing tail is kept as written). */
   real(path: string): string;
 }
@@ -91,6 +96,14 @@ export const nodeFs: BatchFs = {
       return `the link could not be made (${(e as Error).message})`;
     }
     return undefined;
+  },
+  withAppend(path, use) {
+    const fd = openSync(path, 'a');
+    try {
+      return use(fd);
+    } finally {
+      closeSync(fd);
+    }
   },
   replace(path, text) {
     // Checked first, so nothing is written beside a folder that the rename would refuse to replace.

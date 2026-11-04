@@ -51,6 +51,12 @@ export const refusedLine = (text: string): string => `${stepLine('ERROR', text)}
 /** A number as two digits (`09`): the step times and the RUN_ID. */
 export const twoDigits = (n: number): string => String(n).padStart(2, '0');
 
+/** A time of day as the batch writes it: `HH:MM:SS`, local (the step lines, the INTERRUPTED line, RESTORE's header). */
+export const timeOf = (d: Date): string => `${twoDigits(d.getHours())}:${twoDigits(d.getMinutes())}:${twoDigits(d.getSeconds())}`;
+
+/** What a thrown value says: an Error's message, anything else as a string. */
+export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
 /**
  * A verdict line, `<label>: <VERDICT>` and ` — <why>` when a reason is given. The label must not hold a colon: the
  * exit rule and parseVerdictLine read the label up to the first one.

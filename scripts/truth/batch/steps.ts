@@ -1,6 +1,6 @@
 import { writeSync } from 'node:fs';
 import { isEexist, type BatchFs } from './io.js';
-import { oneLine, stepLine, twoDigits, type StepWord } from './words.js';
+import { oneLine, stepLine, timeOf, type StepWord } from './words.js';
 
 /**
  * A run's own output. The runner writes its `<name>.out` and steps.log itself, never through `| tee`: batch-11's tee
@@ -92,7 +92,6 @@ export interface StepLogOptions {
   clock?: () => Date;
 }
 
-const timeOf = (d: Date) => `${twoDigits(d.getHours())}:${twoDigits(d.getMinutes())}:${twoDigits(d.getSeconds())}`;
 
 /** The run's step log: its `.out` (everything), steps.log (the timed notes), and the terminal (the start and the SUMMARY). */
 export class StepLog {

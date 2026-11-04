@@ -1,6 +1,8 @@
 import { constants } from 'node:os';
 import { basename } from 'node:path';
-import type { Ended, KillResult, ProcessSeam } from './proc.js';
+import { nodeFs, type BatchFs } from './io.js';
+import type { Ended, KillResult, ProcessSeam, Started } from './proc.js';
+import { messageOf } from './words.js';
 
 /**
  * Every call a batch makes is bounded: a wedged device call cannot hold the batch longer than its bound (batch-7's
@@ -14,18 +16,19 @@ import type { Ended, KillResult, ProcessSeam } from './proc.js';
  * its `scope`'s stop, when the restore that started it passed its own bound.
  *
  * Once a call's leader has ended, its group gets SIGKILL: nothing it started outlives it, unless the call keeps its
- * group (`keepGroup`, by default per tool: `KEEPS_GROUP`), and then stopAll ends that group at the abort. Its result
- * comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in another group holds
- * them; what a grandchild writes after that is dropped on purpose — the result is the leader's, and a daemon's output
- * is no part of it. Its code is its leader's: a leader that ended before the bound is never 142, however long its
- * pipes took.
+ * group (`keepGroup`, by default per tool: `KEEPS_GROUP`): stopAll leaves it, and stopKept ends it — at the abort,
+ * after the restores and the judging, which may need it (batch-11 pkilled idb_companion only at the end of on_abort).
+ * Its result comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in another
+ * group holds them; what a grandchild writes after that is dropped on purpose — the result is the leader's, and a
+ * daemon's output is no part of it. Its code is its leader's: a leader that ended before the bound is never 142,
+ * however long its pipes took.
  *
  * A group kill never rejects a call or a stop. A kill the system refuses with EPERM (seen under load: delivery not
  * proven) is tried once more `EPERM_RETRY_MS` later; one still not delivered is kept in `unproven()`, and stopAll and
  * a scope's stop name theirs, for the abort to say. A group already gone (ESRCH) is ended.
  *
  * A kept group is kept only if it still exists once its leader has ended (`kill(-id, 0)`: an idb call that started no
- * companion leaves none), and asked again just before stopAll signals it: one gone by then is dropped, never
+ * companion leaves none), and asked again just before stopKept signals it: one gone by then is dropped, never
  * signalled; every new call asks about the kept groups first too, and drops those gone. While any process of a group
  * lives, its id cannot be reused. Residual: between the last call or check and the signal the group could end and its
  * id be taken; telling groups apart needs a process's start time (ps, which the sandbox blocks). A refused check
@@ -55,7 +58,6 @@ export const KEEPS_GROUP: Readonly<Record<string, { keep: boolean; why: string }
     keep: true,
     why: 'a local idb client may start idb_companion without a session of its own, in the call\'s group; until a lab check shows it leaves the group, the companion is kept (residual: that check)',
   },
-  emulator: { keep: true, why: 'the emulator binary is the Android device itself: a call starts it to keep it running' },
   adb: { keep: false, why: 'the adb server it starts calls setsid(), so it leaves the call\'s group and outlives the SIGKILL' },
   xcrun: { keep: false, why: 'simctl hands the simulator to launchd: nothing of the device is in the call\'s group' },
 };
@@ -100,7 +102,7 @@ export interface Call {
   /** Its stdout and stderr appended to this file as it runs; then `out` and `err` are empty. */
   log?: string;
   /**
-   * Its group outlives its leader (a daemon it starts on purpose): no SIGKILL at its end. stopAll ends it with SIGTERM
+   * Its group outlives its leader (a daemon it starts on purpose): no SIGKILL at its end. stopKept ends it with SIGTERM
    * and SIGKILL straight after — its leader is gone, so nothing tells when the daemon has finished.
    */
   keepGroup?: boolean;
@@ -132,7 +134,7 @@ async function untilOr(p: Promise<unknown>, ms: number): Promise<void> {
 /** A thrown error's code (or text), whatever was thrown: reading it must not throw in turn. */
 function whyOf(e: unknown): string {
   try {
-    return (e as NodeJS.ErrnoException).code ?? String(e);
+    return (e as NodeJS.ErrnoException).code ?? messageOf(e);
   } catch {
     return 'an error that cannot be read';
   }
@@ -158,6 +160,9 @@ export interface Stopped {
   notSent: Undelivered[];
 }
 
+/** Why a probe is refused once stopAll began. */
+const STOPPING = 'the run is being stopped';
+
 /** A restore's own calls: `run` is detached, and `stop` ends the groups of those still running and refuses new ones. */
 export interface Scope {
   run: Run;
@@ -173,11 +178,12 @@ class Tracked {
 
 /** A run's calls: each bounded in a group of its own; the probes among them stopped together by `stopAll`. */
 export class Calls {
-  /** The bounded calls still running, and the groups kept past their leader. */
+  /** The bounded calls still running. */
   private readonly running = new Tracked();
   private readonly notDelivered: Undelivered[] = [];
-  /** The groups kept past their leader (also in `running`): asked again at every new call and at stopAll. */
-  private readonly kept = new Set<number>();
+  /** The groups kept past their leader: asked again at every new call and at stopKept. */
+  private readonly kept = new Tracked();
+  private readonly fs: BatchFs;
   private readonly graceMs: number;
   private readonly closeGraceMs: number;
   private readonly installSecs: number | undefined;
@@ -190,8 +196,10 @@ export class Calls {
       closeGraceMs = CLOSE_GRACE_MS,
       installSecs,
       onUndelivered = () => {},
-    }: { graceMs?: number; closeGraceMs?: number; installSecs?: number; onUndelivered?: (u: Undelivered) => void } = {},
+      fs = nodeFs,
+    }: { graceMs?: number; closeGraceMs?: number; installSecs?: number; onUndelivered?: (u: Undelivered) => void; fs?: BatchFs } = {},
   ) {
+    this.fs = fs;
     this.graceMs = graceMs;
     this.closeGraceMs = closeGraceMs;
     this.installSecs = installSecs;
@@ -217,11 +225,19 @@ export class Calls {
   }
 
   /**
-   * Stop every bounded call still running and every group kept, each whole (SIGTERM, then SIGKILL after the grace or
-   * once its leader ended), and refuse any new probe: the run is being stopped. Detached calls go on. Never rejects.
+   * Stop every bounded call still running, each whole (SIGTERM, then SIGKILL after the grace or once its leader
+   * ended), and refuse any new probe: the run is being stopped. Detached calls and kept groups go on. Never rejects.
    */
   stopAll(): Promise<Stopped> {
-    return this.endAll(this.running, 'the run is being stopped');
+    return this.endAll(this.running, STOPPING);
+  }
+
+  /**
+   * End every kept group still there, as stopAll ends a probe: the abort's last step, after the restores and the
+   * judging, which may need the daemon. Never rejects.
+   */
+  stopKept(): Promise<Stopped> {
+    return this.endAll(this.kept, STOPPING);
   }
 
   /** Every signal not proven delivered so far — stopAll's, the scopes' and those after a leader's end — in order. */
@@ -275,10 +291,9 @@ export class Calls {
 
   /** Drop every kept group that is gone (ESRCH): its id may be another group's by the abort. */
   private dropGoneKept(): void {
-    for (const pid of this.kept) {
+    for (const pid of this.kept.groups.keys()) {
       if (this.tryKill(pid, 0) !== 'gone') continue;
-      this.kept.delete(pid);
-      this.running.groups.delete(pid);
+      this.kept.groups.delete(pid);
     }
   }
 
@@ -297,7 +312,13 @@ export class Calls {
     if (bound > MAX_SECS) throw new Error(`${cmd}: a bound of ${bound} s is above ${MAX_SECS} s, the longest taken`);
     if (tracked?.refused !== undefined) throw new Error(`${cmd} not started: ${tracked.refused}`);
     this.dropGoneKept();
-    const started = this.seam.start(cmd, args, { cwd, env, log });
+    let started: Started;
+    try {
+      // The log through io.ts, the one fs seam: opened for append, its fd handed to the child, closed after the start.
+      started = log === undefined ? this.seam.start(cmd, args, { cwd, env }) : this.fs.withAppend(log, (logFd) => this.seam.start(cmd, args, { cwd, env, logFd }));
+    } catch (e) {
+      return { code: NOT_STARTED, timedOut: false, signal: null, out: '', err: messageOf(e) };
+    }
     const { pid, exited } = started;
     const resultOf = (end: Ended, timedOut: boolean): CallResult => ({ code: codeOf(end, timedOut), timedOut, signal: end.signal, out: started.out(), err: end.error ?? started.err() });
     // Not started (no such command): no group to bound or stop.
@@ -321,10 +342,7 @@ export class Calls {
     }
     // A kept group is kept only while something of it lives: an empty one's id could be reused before the abort.
     if (!keepGroup) await this.signal(pid, 'SIGKILL', tracked?.owner);
-    else if (this.tryKill(pid, 0) !== 'gone') {
-      this.running.groups.set(pid, exited);
-      this.kept.add(pid);
-    }
+    else if (this.tryKill(pid, 0) !== 'gone') this.kept.groups.set(pid, exited);
     await untilOr(started.closed, this.closeGraceMs);
     started.release();
     return resultOf(end, timedOut);

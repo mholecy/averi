@@ -40,13 +40,16 @@ class FakeSeam implements ProcessSeam {
   /** The groups whose kills (and probes) throw `kill EPERM`. */
   readonly refusePids = new Set<number>();
   readonly ended = new Set<number>();
+  /** Groups something outlives the leader of (a daemon): alive to a signal-0 probe until signalled. */
+  readonly leftGroups = new Set<number>();
   killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult {
     if (this.killThrows || this.refusePids.has(pid)) {
       if (signal !== 0) this.events.push(`${signal} -${pid}`);
       throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
     }
-    if (signal === 0) return this.ended.has(pid) ? 'gone' : 'sent';
+    if (signal === 0) return this.ended.has(pid) && !this.leftGroups.has(pid) ? 'gone' : 'sent';
     this.events.push(`${signal} -${pid}`);
+    if (!(signal === 'SIGTERM' && this.stubborn)) this.leftGroups.delete(pid);
     if (signal === 'SIGTERM' && this.stubborn) return 'sent';
     this.started[pid - 100]?.end({ code: null, signal });
     return 'sent';
@@ -442,6 +445,45 @@ describe('a group kill that throws EPERM stops no restore (review round 2, BLOCK
     seam.handlers?.signal('SIGINT');
     expect(await seam.exit$).toBe(130);
     expect(text(restoreFile())).toBe("batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\ngroup 100 may still be running: kill -9 -100, then check E5's state\n");
+  });
+});
+
+describe('kept groups live through the abort\'s restores and judging, and are ended last (code review: batch-11 pkilled the companion at the end of on_abort)', () => {
+  /** A run whose idb call leaves its group (idb_companion), then opens E5; resolves once E5 is open. */
+  async function keptThenWindow(guard: AbortGuard, restore: WindowSpec['restore']) {
+    seam.leftGroups.add(100);
+    let opened = false;
+    const ran = guard.run(async () => {
+      const r = guard.bounded('idb', ['connect', 'U']);
+      await tick();
+      seam.started[0].end({ code: 0, signal: null });
+      await r;
+      guard.open('E5', window({ restore }));
+      opened = true;
+      await new Promise(() => {});
+    });
+    ran.catch(() => {});
+    for (let i = 0; i < 100 && !opened; i++) await tick(5);
+  }
+
+  it('the order: the restore (the kept group alive), the judge, then SIGTERM and SIGKILL to the kept group; exit 130', async () => {
+    const guard = guardOf([block('kf', { complete: () => true, judge: async () => (seam.events.push('judge kf'), ['kf: PASS']) })]);
+    await keptThenWindow(guard, async () => (seam.events.push(`restore E5, group 100 ${seam.leftGroups.has(100) ? 'alive' : 'gone'}`), { ok: true, how: 'x' }));
+    seam.handlers?.signal('SIGINT');
+    expect(await seam.exit$).toBe(130);
+    expect(seam.events).toEqual(['start idb connect U', 'restore E5, group 100 alive', 'judge kf', 'SIGTERM -100', 'SIGKILL -100']);
+    expect(seam.leftGroups.has(100)).toBe(false);
+    expect(existsSync(restoreFile())).toBe(false);
+  });
+
+  it('a kept group whose kills are refused: its hand line appended to RESTORE after the judging, and the SUMMARY shows it', async () => {
+    const guard = guardOf([block('kf')]);
+    await keptThenWindow(guard, async () => ({ ok: true, how: 'x' }));
+    seam.refusePids.add(100);
+    seam.handlers?.signal('SIGINT');
+    expect(await seam.exit$).toBe(130);
+    expect(text(restoreFile())).toBe("batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\ngroup 100 may still be running: kill -9 -100, then check E5's state\n");
+    expect(summaryText()).toContain("group 100 may still be running: kill -9 -100, then check E5's state");
   });
 });
 

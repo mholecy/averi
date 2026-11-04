@@ -156,7 +156,7 @@ Where S1 departs from batch-12, on purpose:
 
 S2 adds three files. bounded.ts bounds every call: its tool's own bound (at most a day, `MAX_SECS`), exit 142 past it,
 and the whole process group ended, SIGTERM and then SIGKILL; once a call's leader has ended, its group gets SIGKILL, so
-nothing it started outlives it, unless the call keeps its group (`keepGroup`), and then stopAll ends that group at the
+nothing it started outlives it, unless the call keeps its group (`keepGroup`), and then stopKept ends that group at the
 abort. Output a grandchild writes after its leader's end is dropped on purpose: the result is the leader's. A group kill
 never throws or rejects: EPERM, seen under parallel load, is tried once more 50 ms later, and a kill still not delivered
 is said at once as an ERROR line, on the normal path too, and gets a RESTORE hand line (`group N may still be running:
@@ -170,8 +170,8 @@ and bounded.ts decides how long to wait for either. io.ts gains `replace`, which
 and renames it over the old one (`markDirty`).
 
 bounded.ts and abort.ts join the run. Each is tested over a fake seam (tests/truth/batch/bounded.test.ts,
-abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines after review round 4: bounded.ts
-99.02 % (2 survivors), abort.ts 98.03 % (4 survivors, 4 mutants without coverage — three of them in a defensive catch
+abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines after the code review: bounded.ts
+99.04 % (2 survivors), abort.ts 98.02 % (4 survivors, 4 mutants without coverage — three of them in a defensive catch
 that cannot run), every one equivalent and named in scope.json; floors 97 and 96. io.ts rose to 95.38 % with `replace`
 and its tests (the same three equivalents), so its floor rises from 92 to 93. The cold run of all seventeen modules took
 about 2 minutes (Stryker's own 108 to 131 s), past the 90 s mark the S1 part already noted; the look at one Stryker run
@@ -182,10 +182,10 @@ as vitest tests: a group sent SIGINT, a second SIGINT, a throw, a rejection and 
 stdout EPIPE, a terminal that blocks, batch-12's worktree window). Both run in the normal suite only, as
 terminal.test.ts does.
 
-Which tools keep their group by default (bounded.ts `KEEPS_GROUP`; a call's own `keepGroup` overrides it):
+Which tools keep their group by default (bounded.ts `KEEPS_GROUP`; a call's own `keepGroup` overrides it). The emulator
+is not in it: no batch starts it through bounded, so a call that did would pass `keepGroup` itself.
 - idb: kept. A local idb client may start idb_companion without a session of its own, in the call's group, where
   the SIGKILL at the leader's end would kill it.
-- emulator: kept. The emulator binary is the Android device itself; a call starts it to keep it running.
 - adb: not kept. The adb server it starts calls setsid(), so it leaves the call's group.
 - xcrun (simctl): not kept. The simulator runs under launchd, outside the call's group.
 
@@ -258,4 +258,15 @@ Where S2 departs from batch-12, on purpose:
 - a signal that arrives during the abort is noted in steps.log, not silently ignored.
 - the normal end's RESTORE header is S1's writeRestore form: `<name> run <id> ended at <date>; state to put back by
   hand:`.
+- once a call's leader has ended, its whole group gets SIGKILL, so nothing it started outlives it; batch-12's `bounded`
+  (perl's alarm) reached the leader alone, and only past its bound.
+- which groups outlive their leader is a per-tool table, `KEEPS_GROUP` (idb kept, adb and xcrun not), a call's own
+  `keepGroup` over it; batch-12 had no such notion and pkilled idb_companion by name.
+- the abort stops the running probes first and the kept groups only last, after the restores and the judging, which
+  may need them: batch-11's on_abort pkilled idb_companion at its end too, and S2 keeps that order.
+- `markDirty` on open() and io.ts's `replace` port batch-11's forced-dirty state after a reinstall into S2 already, not
+  S5: a window reopened over a state file a restore had cleared must read dirty again, and S2's windows need that.
+- TRAPEXIT's `$ZSH_SUBSHELL -eq 0` guard has no Node counterpart: Node has no subshells, so nothing else's exit can
+  look like the runner's. A child process's failure is a call's result, never the runner's error ("only the run's own
+  errors abort it", abort.test.ts).
 

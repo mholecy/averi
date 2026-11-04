@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { boundFor, Calls, codeOf, EPERM_RETRY_MS, KEEPS_GROUP, keepsGroup, MAX_SECS, NOT_STARTED, TIMED_OUT, undeliveredText, type Undelivered } from '../../../scripts/truth/batch/bounded.js';
+import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 
 // scripts/truth/batch/bounded.ts over a fake process seam: which bound a device call gets, what its exit code says,
@@ -231,7 +232,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     expect(Date.now() - started).toBeLessThan(500);
   });
 
-  it('keepGroup (idb_companion, a daemon the call starts on purpose): no SIGKILL once the leader ended; stopAll ends the group later', async () => {
+  it('keepGroup (idb_companion, a daemon the call starts on purpose): no SIGKILL once the leader ended; stopAll leaves it, stopKept ends it (code review: the companion lives through the restores)', async () => {
     const seam = new FakeSeam();
     seam.leaveGroup = true;
     const calls = new Calls(seam, { graceMs: 5 });
@@ -240,7 +241,9 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     seam.calls[0].end({ code: 0, signal: null });
     expect(await r).toMatchObject({ code: 0 });
     expect(seam.kills).toEqual([]);
-    expect(await calls.stopAll()).toEqual({ stopped: 1, notSent: [] });
+    expect(await calls.stopAll()).toEqual({ stopped: 0, notSent: [] });
+    expect(seam.kills).toEqual([]);
+    expect(await calls.stopKept()).toEqual({ stopped: 1, notSent: [] });
     expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
   });
 
@@ -266,14 +269,35 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     expect(await r).toMatchObject({ code: 0, timedOut: false });
   });
 
-  it('the call\'s folder, env and log reach the seam', async () => {
+  it('the call\'s folder and env reach the seam; its log is opened through the fs seam (io.ts) and handed over as an fd (code review: io.ts the only fs seam)', async () => {
     const seam = new FakeSeam();
-    const calls = new Calls(seam);
+    const opened: string[] = [];
+    const calls = new Calls(seam, { fs: { ...nodeFs, withAppend: (path, use) => (opened.push(path), use(7)) } });
     const r = calls.bounded('adb', ['devices'], { cwd: 'the-dir', env: { A: '1' }, log: 'the.log' });
     await tick();
     seam.calls[0].end({ code: 0, signal: null });
     await r;
-    expect(seam.options).toEqual([{ cwd: 'the-dir', env: { A: '1' }, log: 'the.log' }]);
+    expect(opened).toEqual(['the.log']);
+    expect(seam.options).toEqual([{ cwd: 'the-dir', env: { A: '1' }, logFd: 7 }]);
+  });
+
+  it('with no log: the folder and env reach the seam, and no fd', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam);
+    const r = calls.bounded('adb', ['devices'], { cwd: 'the-dir', env: { A: '1' } });
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await r;
+    expect(seam.options).toStrictEqual([{ cwd: 'the-dir', env: { A: '1' } }]);
+  });
+
+  it('a log that cannot be opened: 127 and why, as a command that cannot start; nothing started', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { fs: { ...nodeFs, withAppend: () => {
+      throw new Error('ENOENT: no such folder');
+    } } });
+    expect(await calls.bounded('adb', ['devices'], { log: 'x/the.log' })).toEqual({ code: NOT_STARTED, timedOut: false, signal: null, out: '', err: 'ENOENT: no such folder' });
+    expect(seam.calls).toEqual([]);
   });
 
   it('a detached call past its bound is ended too: 142, its group SIGTERMed and SIGKILLed', async () => {
@@ -505,9 +529,10 @@ describe('a stopped scope starts nothing more (review round 2): its restore, sto
 });
 
 describe('keepsGroup — which tools start a daemon in their own group (review round 2)', () => {
-  it('idb and the emulator keep their group; adb and xcrun do not; anything else does not', () => {
-    expect([keepsGroup('idb'), keepsGroup('/opt/sdk/emulator/emulator'), keepsGroup('adb'), keepsGroup('xcrun'), keepsGroup('node')]).toEqual([true, true, false, false, false]);
-    for (const tool of ['idb', 'emulator', 'adb', 'xcrun']) expect(KEEPS_GROUP[tool].why.length).toBeGreaterThan(20);
+  it('idb keeps its group; adb, xcrun, the emulator (no batch starts it through bounded) and anything else do not', () => {
+    expect([keepsGroup('idb'), keepsGroup('/opt/sdk/emulator/emulator'), keepsGroup('adb'), keepsGroup('xcrun'), keepsGroup('node')]).toEqual([true, false, false, false, false]);
+    expect(Object.keys(KEEPS_GROUP).sort()).toEqual(['adb', 'idb', 'xcrun']);
+    for (const tool of ['idb', 'adb', 'xcrun']) expect(KEEPS_GROUP[tool].why.length).toBeGreaterThan(20);
   });
 
   it('an idb call keeps its group unless it says otherwise; an adb call does not', async () => {
@@ -524,7 +549,7 @@ describe('keepsGroup — which tools start a daemon in their own group (review r
 });
 
 describe('a kept group is checked before it is kept and before it is killed (review round 3, MAJOR: a reused id SIGKILLed)', () => {
-  it('a kept call whose group is empty once its leader ended (an idb call that started no companion) is not kept: stopAll signals nothing', async () => {
+  it('a kept call whose group is empty once its leader ended (an idb call that started no companion) is not kept: stopKept signals nothing', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam, { graceMs: 5 });
     const r = calls.bounded('idb', ['ui', 'describe-all']);
@@ -532,12 +557,12 @@ describe('a kept group is checked before it is kept and before it is killed (rev
     seam.calls[0].end({ code: 0, signal: null });
     await r;
     expect(seam.probes).toEqual(['0 -100']);
-    expect(await calls.stopAll()).toEqual({ stopped: 0, notSent: [] });
+    expect(await calls.stopKept()).toEqual({ stopped: 0, notSent: [] });
     expect(seam.kills).toEqual([]);
     expect(seam.probes).toEqual(['0 -100']);
   });
 
-  it('a kept group that ended before the abort (its daemon gone since) is dropped at stopAll, never signalled', async () => {
+  it('a kept group that ended before the abort (its daemon gone since) is dropped at stopKept, never signalled', async () => {
     const seam = new FakeSeam();
     seam.leaveGroup = true;
     const calls = new Calls(seam, { graceMs: 5 });
@@ -546,11 +571,11 @@ describe('a kept group is checked before it is kept and before it is killed (rev
     seam.calls[0].end({ code: 0, signal: null });
     await r;
     seam.calls[0].groupLeft = false;
-    expect(await calls.stopAll()).toEqual({ stopped: 0, notSent: [] });
+    expect(await calls.stopKept()).toEqual({ stopped: 0, notSent: [] });
     expect(seam.kills).toEqual([]);
     expect(seam.probes).toEqual(['0 -100', '0 -100']);
     // Dropped: a second stop does not ask about it again.
-    await calls.stopAll();
+    await calls.stopKept();
     expect(seam.probes).toEqual(['0 -100', '0 -100']);
   });
 
@@ -574,6 +599,7 @@ describe('a kept group is checked before it is kept and before it is killed (rev
     seam.calls[2].end({ code: 0, signal: null });
     await third;
     await calls.stopAll();
+    await calls.stopKept();
     expect(seam.kills.filter((k) => k.endsWith(' -100'))).toEqual([]);
     seam.calls[1].end({ code: 0, signal: null });
     await next;
@@ -587,7 +613,7 @@ describe('a kept group is checked before it is kept and before it is killed (rev
     await tick();
     seam.calls[0].end({ code: 0, signal: null });
     await r;
-    expect((await calls.stopAll()).stopped).toBe(1);
+    expect((await calls.stopKept()).stopped).toBe(1);
     expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
   });
 });

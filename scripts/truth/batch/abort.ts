@@ -3,7 +3,7 @@ import type { BatchFs } from './io.js';
 import type { ProcessSeam } from './proc.js';
 import { stateOf, writeRestore } from './run-dir.js';
 import type { StepLog } from './steps.js';
-import { EXIT, stepLine, summaryLines, twoDigits, verdictLine, type BlockReport } from './words.js';
+import { EXIT, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine, type BlockReport } from './words.js';
 
 /**
  * The dirty windows, and what stops a run inside one: batch-6's `on_abort`, batch-7's TRAPEXIT, batch-11's detached
@@ -36,10 +36,16 @@ import { EXIT, stepLine, summaryLines, twoDigits, verdictLine, type BlockReport 
  *   next step; a judge past the budget likewise.
  * - A group kill the system refuses (EPERM under load) is said, never thrown: the windows are put back whatever
  *   stopping the probes did.
+ * - The running probes are stopped first; the kept groups (a daemon such as idb_companion) only last, after the
+ *   restores and the judging, which may need them — as batch-11 pkilled the companion at the end of on_abort.
  *
  * How long it can take, at worst: the probes' stop (`graceMs`, 2 s), then each dirty window's restore bound (`secs`,
- * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s) —
- * one window at the defaults, about 7 minutes. No block is judged once a restore has passed its bound.
+ * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s),
+ * then the kept groups' stop (2 s) — one window at the defaults, about 7 minutes. No block is judged once a restore has
+ * passed its bound.
+ *
+ * Should this file grow further, the judging (reports, judged, the budget) and the RESTORE writing (writeRestore,
+ * undeliveredHand) are the parts to move into files of their own, each behind the guard.
  */
 
 /** A restore's outcome: put back and verified (`how`, for the step line), or not (`why`, its hand lines, its word). */
@@ -103,7 +109,6 @@ export const RESTORE_SECS = 300;
  */
 export const JUDGE_BUDGET_SECS = 120;
 
-const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** What `p` settled to, or `late` once `secs` have passed with it unsettled. */
 async function within<T>(secs: number, p: Promise<T>): Promise<{ late: false; value: T } | { late: true }> {
@@ -135,7 +140,6 @@ export function markDirty(fs: BatchFs, file: string): 'marked' | 'missing' | 'un
 }
 
 const dateOf = (d: Date) => `${d.getFullYear()}-${twoDigits(d.getMonth() + 1)}-${twoDigits(d.getDate())}`;
-const timeOf = (d: Date) => `${twoDigits(d.getHours())}:${twoDigits(d.getMinutes())}:${twoDigits(d.getSeconds())}`;
 
 /** One window's put-back: its outcome, and whether its restore was stopped at its bound. */
 interface PutBack {
@@ -320,7 +324,10 @@ export class AbortGuard {
       // The groups that may still be running first: they are killed by hand before anything is put back by hand.
       if (this.writeRestore('interrupted', [...this.undeliveredHand(names), ...hand]).length > 0) this.say('ERROR', `state not provably put back — ${this.options.restoreFile}`);
       const blocks = await this.reports(cut, cleanups, late);
-      // A judge's kill not delivered comes after that RESTORE: its line is appended.
+      // Last, the kept groups (idb_companion): a restore or a judge may have needed them (batch-11 pkilled the
+      // companion only at the end of on_abort). A judge's or a kept group's kill not delivered comes after that
+      // RESTORE: its line is appended. stopKept never rejects (bounded.ts turns every kill failure into a result).
+      await this.calls.stopKept();
       this.writeRestore('interrupted', this.undeliveredHand(names));
       log.summary(summaryLines({ ...this.headOf(), name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors: log.errors(), interrupted: { at: timeOf(at) } }));
     } catch (e) {

@@ -4,6 +4,8 @@ import {
   exitCodeOf,
   failsIn,
   interruptedBlock,
+  messageOf,
+  timeOf,
   parseVerdictLine,
   stepLine,
   SUMMARY_MARKER,
@@ -210,5 +212,15 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
     const interrupted = { ...base, interrupted: { at: '10:12:00' } };
     expect(exitCodeOf(interrupted)).toBe(130);
     expect(exitCodeOf({ ...interrupted, restore: { file: 'R', written: ['x'] }, blocks: [{ block: 'E5', lines: ['E5 verdict: FAIL'] }] })).toBe(130);
+  });
+});
+
+describe('messageOf and timeOf — said once, here, for every module of the batch core (code review)', () => {
+  it('messageOf: an Error\'s message; anything else as a string', () => {
+    expect([messageOf(new Error('boom')), messageOf('text'), messageOf(42), messageOf(undefined)]).toEqual(['boom', 'text', '42', 'undefined']);
+  });
+
+  it('timeOf: HH:MM:SS, local, zero-padded', () => {
+    expect([timeOf(new Date(2026, 10, 4, 9, 4, 6)), timeOf(new Date(2026, 10, 4, 23, 59, 59))]).toEqual(['09:04:06', '23:59:59']);
   });
 });

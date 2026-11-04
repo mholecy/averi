@@ -93,10 +93,10 @@ describe('bounded over real processes: a call past its bound is gone with its gr
     expect((await calls.detached(node, [HELPER, 'stdin'], { secs: 5 })).out).toBe('stdin 0');
   }, 10_000);
 
-  it('a kept call whose group is empty once its leader ended is not kept: stopAll has nothing to stop (review round 3)', async () => {
+  it('a kept call whose group is empty once its leader ended is not kept: stopKept has nothing to stop (review round 3)', async () => {
     const calls = new Calls(nodeProcess, { graceMs: 200 });
     expect(await calls.bounded(node, [HELPER, 'echo', 'x'], { secs: 5, keepGroup: true })).toMatchObject({ code: 0 });
-    expect(await calls.stopAll()).toEqual({ stopped: 0, notSent: [] });
+    expect(await calls.stopKept()).toEqual({ stopped: 0, notSent: [] });
   }, 10_000);
 
   it('a call that exits leaving a grandchild: the grandchild is killed with its group, and the result comes at once (review round 1)', async () => {
@@ -109,14 +109,16 @@ describe('bounded over real processes: a call past its bound is gone with its gr
     expect(await until(() => !alive(grandchild))).toBe(true);
   }, 10_000);
 
-  it('keepGroup: the grandchild (a daemon such as idb_companion) outlives the call, its result after the close grace; stopAll ends it', async () => {
+  it('keepGroup: the grandchild (a daemon such as idb_companion) outlives the call, its result after the close grace; stopAll leaves it, stopKept ends it', async () => {
     const calls = new Calls(nodeProcess, { graceMs: 200, closeGraceMs: 300 });
     const pidfile = join(dir, 'kept.pid');
     expect(await calls.bounded(node, [HELPER, 'leave', pidfile], { secs: 20, keepGroup: true })).toMatchObject({ code: 0, timedOut: false });
     const [grandchild] = await pidsIn(pidfile);
     await sleep(100);
     expect(alive(grandchild)).toBe(true);
-    expect(await calls.stopAll()).toEqual({ stopped: 1, notSent: [] });
+    expect(await calls.stopAll()).toEqual({ stopped: 0, notSent: [] });
+    expect(alive(grandchild)).toBe(true);
+    expect(await calls.stopKept()).toEqual({ stopped: 1, notSent: [] });
     expect(await until(() => !alive(grandchild))).toBe(true);
   }, 10_000);
 

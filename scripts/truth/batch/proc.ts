@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { closeSync, openSync, writeSync } from 'node:fs';
+import { writeSync } from 'node:fs';
+import { messageOf } from './words.js';
 
 /**
  * The batch module's one process seam: every process it starts, every signal it sends or takes, and its exit go
@@ -9,7 +10,8 @@ import { closeSync, openSync, writeSync } from 'node:fs';
  * (tests/truth/batch/bounded-proc.test.ts, abort-proc.test.ts).
  *
  * Every child starts in a process group of its own (`detached`, setsid: batch-11's `perl -e 'setpgrp(0, 0)'`), stdin
- * from /dev/null, its output to pipes or to its log file, never to the terminal. So the terminal's Ctrl-C reaches the
+ * from /dev/null, its output to pipes or to the fd of its log (opened through io.ts, the one fs seam: nothing here
+ * opens a file), never to the terminal. So the terminal's Ctrl-C reaches the
  * runner alone: a probe is stopped by the runner (abort.ts), a restore is not stopped at all — a second Ctrl-C cannot
  * kill it (batch-11's restore child ran in the batch's foreground group and died of one). And a group can be ended
  * whole, grandchildren too: src/adapters/exec.ts kills only the direct child.
@@ -18,8 +20,11 @@ import { closeSync, openSync, writeSync } from 'node:fs';
 export interface StartOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
-  /** A log file the child's stdout and stderr are appended to as it runs (opened for append: never truncated). */
-  log?: string;
+  /**
+   * An fd the child's stdout and stderr go to as it runs: a log opened for append through io.ts (bounded.ts), which
+   * the caller closes after start — the child holds its own copy.
+   */
+  logFd?: number;
 }
 
 /** How a child ended: its code or its signal; `error` when it never started (no such command). */
@@ -76,7 +81,6 @@ export interface ProcessSeam {
 /** The signals that abort a run: a Ctrl-C, a kill, a closed terminal (`trap on_abort INT TERM HUP`). */
 export const ABORT_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 
-const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 function notStarted(error: unknown): Started {
   const exited = Promise.resolve({ code: null, signal: null, error: messageOf(error) });
@@ -104,18 +108,13 @@ function startedOf(child: ChildProcess): Started {
 
 /** The real seam. */
 export const nodeProcess: ProcessSeam = {
-  start(cmd, args, { cwd, env, log }) {
-    let fd: number | undefined;
+  start(cmd, args, { cwd, env, logFd }) {
     try {
-      fd = log === undefined ? undefined : openSync(log, 'a');
-      const child = spawn(cmd, args, { cwd, env, detached: true, stdio: ['ignore', fd ?? 'pipe', fd ?? 'pipe'] });
-      // No such command: no pid, and its 'error' settles `done`.
+      const child = spawn(cmd, args, { cwd, env, detached: true, stdio: ['ignore', logFd ?? 'pipe', logFd ?? 'pipe'] });
+      // No such command: no pid, and its 'error' settles `exited`.
       return startedOf(child);
     } catch (e) {
       return notStarted(e);
-    } finally {
-      // The child holds its own copy of the log's fd.
-      if (fd !== undefined) closeSync(fd);
     }
   },
   killGroup(pid, signal) {
