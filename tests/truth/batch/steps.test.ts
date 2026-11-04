@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { LIVE_GOLDEN_HEADER, StepLog, stepWordOf, terminalOf } from '../../../scripts/truth/batch/steps.js';
+import { holdsGoldenHeader, LIVE_GOLDEN_HEADER, StepLog, stepWordOf, terminalOf } from '../../../scripts/truth/batch/steps.js';
 import { summaryLines, type Summary } from '../../../scripts/truth/batch/words.js';
 
 // scripts/truth/batch/steps.ts: the run's own output. The runner writes `<name>.out` and steps.log itself — never
@@ -287,6 +287,11 @@ describe('stepWordOf — the judged exit-1 rule (batch-11): live.ts exit 1 is DO
     expect(stepWordOf(1, { judged: true, log: 'x # Live golden: 3 cases\n' })).toBe('FAIL');
     expect(stepWordOf(1, { judged: false, log: '# Live golden: 3 cases\n' })).toBe('FAIL');
     expect(stepWordOf(1)).toBe('FAIL');
+  });
+
+  it('holdsGoldenHeader: the header at a line\'s start, anywhere in the text; never inside a line (T2 S3: the log and the summary read alike)', () => {
+    expect([holdsGoldenHeader(`${LIVE_GOLDEN_HEADER} 3 cases`), holdsGoldenHeader(`<!-- averi -->\n${LIVE_GOLDEN_HEADER} 3 cases\n`)]).toEqual([true, true]);
+    expect([holdsGoldenHeader(''), holdsGoldenHeader('x # Live golden: 3'), holdsGoldenHeader('# Live golden 3'), holdsGoldenHeader('#  Live golden: 3')]).toEqual([false, false, false, false]);
   });
 
   it('any other exit is FAIL, the header or not (142: the bound\'s alarm)', () => {

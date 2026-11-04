@@ -125,8 +125,17 @@ export const refusalLines = (name: string, reasons: readonly string[]): string[]
 export const newRunId = (now: Date, pid: number): string =>
   `${now.getFullYear()}${twoDigits(now.getMonth() + 1)}${twoDigits(now.getDate())}-${twoDigits(now.getHours())}${twoDigits(now.getMinutes())}${twoDigits(now.getSeconds())}-${pid}`;
 
-/** A RUN_ID or a block name: one plain path segment, so its folder cannot leave `<out>`. */
-const PLAIN_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+/**
+ * A RUN_ID, a block name or a run's name (cases.ts): one plain path segment, so its files cannot leave their folder.
+ */
+export const PLAIN_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
+/** `name`, or a throw naming `what` it is when it is no plain path segment: a programming error. */
+export function plainSegment(what: string, name: string): string {
+  if (!PLAIN_SEGMENT.test(name)) throw new Error(`${what} ${JSON.stringify(name)}: one plain path segment is needed`);
+  return name;
+}
+
 /** The run's own folder (its .out, the checkout line): not a block name. */
 export const META = 'meta';
 
@@ -136,10 +145,11 @@ export type OpenedRun = { ok: true; dirs: Readonly<Record<string, string>> } | {
  * Make this run's folders: `<out>/meta/run-<id>/` and one per wanted block — none for a block not wanted. First every
  * block's folder of this id, wanted or not, and meta's, must not exist: any one that does refuses, and nothing is
  * made. Each mkdir is exclusive too, so a folder made between the check and the mkdir refuses as well (the folders
- * made before it stay, empty: nothing is ever removed). A RUN_ID or block name that is no plain path segment is a programming error.
+ * made before it stay, empty: nothing is ever removed). A RUN_ID or block name that is no plain path segment is a
+ * programming error.
  */
 export function openRun(fs: BatchFs, { out, runId, blocks, wanted }: { out: string; runId: string; blocks: readonly string[]; wanted: readonly string[] }): OpenedRun {
-  if (!PLAIN_SEGMENT.test(runId)) throw new Error(`RUN_ID ${JSON.stringify(runId)}: one plain path segment is needed`);
+  plainSegment('RUN_ID', runId);
   for (const b of blocks) {
     if (!PLAIN_SEGMENT.test(b) || b === META) throw new Error(`block name ${JSON.stringify(b)}: one plain path segment, not "${META}", is needed`);
     if (blocks.indexOf(b) !== blocks.lastIndexOf(b)) throw new Error(`block ${b} is named twice`);

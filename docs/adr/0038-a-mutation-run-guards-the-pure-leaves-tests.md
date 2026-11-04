@@ -7,6 +7,7 @@ Amended 2026-11-02 (D33: adapters/ios-liveness.ts joined the run — see the sec
 Amended 2026-11-03 (D43: adapters/typeable.ts and adapters/ios-typing.ts joined the run — see the D43 amendment below).
 Amended 2026-11-04 (T2 S1: scripts/truth/batch/ joined the run — see the T2 amendment below).
 Amended 2026-11-04 (T2 S2: bounded.ts and abort.ts joined the run — see the T2 amendment's S2 part below).
+Amended 2026-11-04 (T2 S3: preconditions.ts and cases.ts joined the run — see the T2 amendment's S3 part below).
 
 ## Context
 
@@ -273,3 +274,124 @@ Where S2 departs from batch-12, on purpose:
   look like the runner's. A child process's failure is a call's result, never the runner's error ("only the run's own
   errors abort it", abort.test.ts).
 
+### S3: preconditions and the cases (2026-11-04, backlog T2 slice S3)
+
+S3 adds three files. preconditions.ts shows a block's preconditions or says why not, each answer git's, read through a
+bounded call: `checkout` (HEAD is the commit refs/heads/main is, no modified tracked file), `ancestor` (a required
+commit's sha format, then `git cat-file -e <sha>^{commit}`, then `git merge-base --is-ancestor <sha> HEAD`),
+`casesOnMain` and `cellsOnMain` (the live cases and lab cells from main's own live-cases.ts and catalog, never grepped),
+and `preconditionLine`, which turns the failed ones into the block's `<label>: INCONCLUSIVE — precondition: <why>; …`.
+cases.ts holds a live run's `.cases`: `writeCases` (written before anything of the run, never overwritten),
+`stepOutcome` (the judged exit-1 rule with its why, over steps.ts's stepWordOf), `completeness` (b11-analyze.ts's rule:
+the `.cases`, a record, `# Live golden:` in the log and in the summary, every case main picks there; and, since review
+round 1, something to prove) and `incompleteLine` (`<label>: INCONCLUSIVE — <k> of <n> run(s) incomplete: <name> —
+<why> | …`, or `not run` when the folder holds no `.cases`). live-table.ts holds what both read of main's table: the
+`LiveCases` and `LiveSelection` types, `DEFAULT_GROUPS` (forms), `liveTableOf(repo)` (the loader), `loadTable` and
+`unreadLive` (a load that fails, named). bounded.ts gains git's own bound, 30 s (`GIT_SECS`), for reads — a slow git
+operation passes its own secs; steps.ts shares `holdsGoldenHeader`; run-dir.ts exports `PLAIN_SEGMENT` and
+`plainSegment(what, name)`, which openRun and writeCases both use; words.ts gains `nameInLine` and `firstLineOf`.
+
+preconditions.ts, cases.ts and live-table.ts join the run. Each is tested over fakes: a fake `Run` that answers git as
+git does, a fake live-cases table, and real files in a temp dir (tests/truth/batch/preconditions.test.ts,
+cases.test.ts). The same code over real temporary git repos (`git init -b main` in a mkdtemp with its own HOME and git
+config, no inherited GIT_DIR, GIT_WORK_TREE or GIT_INDEX_FILE; git started through bounded.ts) is
+preconditions-git.test.ts, and over this checkout's own live-cases table cases-live.test.ts; both run in the normal
+suite only — the first starts processes, the second imports live-cases.ts, which the sandbox does not hold. Main's table
+is read by a dynamic import of the checkout's own file (live-table.ts's `liveTableOf(repo)`, as b11-analyze.ts did),
+never a static one, so the sandbox needs no new entry; the sandbox tests reach `liveTableOf` through a temp folder that
+holds no live-cases.ts, whose load rejects. Baselines after the code review: preconditions.ts 100 % (279 mutants, 1
+timeout), cases.ts 99.64 % (275 mutants, 1 equivalent survivor: `asked !== undefined` beside no gap, there for the
+type), live-table.ts 100 % (11 mutants); floors 98, 97 and 98. words.ts stays at 100 % with its two new helpers (113
+mutants). The cold run of all twenty modules took 2 min 15 s.
+
+Decisions S3 pins:
+- a detached HEAD, or another branch, at main's very commit passes: what runs is main's code as committed. batch-11 and
+  batch-12 compared the two shas too; S3 tests it.
+- HEAD ≠ main and modified tracked files are both said, in one why, when both hold: one rerun fixes both. An untracked
+  file is allowed (`--untracked-files=no`, as both batches); a staged change counts; a rename or copy counts once, by
+  its new path (`status --porcelain -z`); the first three paths are named, then how many more.
+- the preconditions take a `Run` (a Calls' `bounded`, or a scope's `run`), not a Calls object: any Run can be faked, and
+  a restore's scope can use the same checks. The top check reads real paths through the `BatchFs` given (`Git.fs`),
+  the real one by default.
+- every git call runs `git -C <repo>` with GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_COMMON_DIR,
+  GIT_OBJECT_DIRECTORY and GIT_ALTERNATE_OBJECT_DIRECTORIES dropped from its env: a batch started inside a hook's
+  context would otherwise read another repo. Config given through the env is dropped too (GIT_CONFIG_PARAMETERS, which
+  `git -c` passes down, GIT_CONFIG_COUNT and every GIT_CONFIG_KEY_n/VALUE_n): a `core.fileMode=false` there hides a
+  modified file (preconditions-git.test.ts). The config files' own variables (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM)
+  are kept.
+- `checkout` and `ancestor` first ask `git rev-parse --show-toplevel`, and the top must be the repo named, both by
+  real path: a folder inside another checkout would have git read that one. Not shown, it ends the check: `<repo> is
+  not the top of a git checkout (top is …)`.
+- a name inside a why (a path, a case id, a source, a run's name) that holds a line break, or is empty, is JSON-quoted
+  (words.ts `nameInLine`, as words.ts's own errors quote a value; summarize's ` ⏎ ` is for replies, not names), and
+  git's or an error's words are cut at their first `\n` or `\r` (`firstLineOf`): preconditionLine and incompleteLine
+  never throw on what the device, git or a file says.
+- a LiveTable is loaded inside each check: a load that fails (a missing file, a syntax error) or a read that fails is
+  `main's live cases could not be read: <first line>`, never thrown; a catalog read that fails, `main's catalog could
+  not be read: <first line>`.
+- a sha's format is batch-11's knob rule exactly (`^[0-9a-f]{7,40}$`), checked before any git call; an empty one is
+  `<what> is not set`. cat-file exits 128 both for an unknown commit and for no repo, so its why carries git's own first
+  line. `merge-base --is-ancestor` exit 1 is "not an ancestor"; any other failure is git failing. Past its bound, or not
+  started, at any call, is said as such, never as a precondition's answer.
+- `casesOnMain` asks selectCases for the platform, the lab app (native) and the groups (forms, as batch-11's live_run
+  ran), so a case main holds for the other platform only is missing (p7w on Android): batch-11's grep would have passed
+  it. No id at all is never a pass, for cases or cells.
+- `writeCases` takes what a live run is asked (`Asked`) and nothing else, by its type and at run time: runsIn and
+  completeness read every `.cases` as a live run's, so a non-live block keeps its own record elsewhere (batch-12's E5
+  wrote `{"runs":3}` as a `.cases`; such a record is the runner's, S6). batch-11's `"kind": "new"` is not asked for:
+  nothing read it, and a `.cases` holding it still reads. `completeness` reads the live shape and refuses a
+  `.cases` that is not it (platform ios or android, an app, one source at least, case ids, optional groups), where
+  b11-analyze.ts trusted it. Every gap is said at once, in order: the `.cases`, the record, the log, the summary, the
+  cases. The one exception: the cases are checked only when the `.cases` was read as asked (else what to pick is
+  unknown), and against the summary only when it can be read — with its header or without. A file that is there but
+  cannot be read is "unreadable", never "missing". A case line counts only under its own `## <source>` at a line's
+  start. A name that is no plain path segment (a stray `.cases` or `x.y.cases` in a block's folder) is a gap of its own,
+  `<name>.cases: its name is no plain path segment …, not read as a run`, and the other runs are still judged.
+
+§1a and §1b rows S3 ports, each to its tests:
+- "INCONCLUSIVE when a precondition is unshown": preconditionLine (preconditions.test.ts, its describe block), every
+  why branch of checkout and ancestor over the fake and over real repos, casesOnMain and cellsOnMain over the fake and
+  the real table.
+- "Preconditions via `merge-base --is-ancestor`, clean checkout": checkout (HEAD = main; a branch ≠ main; detached at
+  main; a modified, an untracked and a staged file; a rename; a path with a line break; no main; no repo; a folder
+  inside the checkout; a hook's GIT_DIR; config given through the env; a git that hangs past an injected bound) and
+  ancestor (the format; unknown; a tree; a side branch; HEAD itself; a short sha; merged later; not the top).
+- "`.cases` completeness": writeCases, runsIn, completeness (asked but never ran; never ran; each file missing,
+  unreadable, no JSON or without its header; the cases main picks per source; a run that proves nothing; a stray
+  `.cases`; a table that does not load), incompleteLine, over temp folders and over the real selector.
+- §1b "`step` with the judged exit-1 rule": stepOutcome (cases.test.ts), over steps.ts's stepWordOf and its
+  steps-live.test.ts.
+
+What of batch-11's and batch-12's preconditions and cases S3 does not port, each with the slice that owns it or the
+reason:
+- the lab install verification (the installed cells.json byte-equal to main's catalog, the handler count) and the lab
+  guards: S4 and S5, which read the devices.
+- the catalog's `--check` precheck before the lab build: S6, with the lab build step.
+- `live_run` itself (live.ts with its record, then its rejudge, each a bounded step) and the missing-verdict backstop
+  "not run (see the ERROR lines)": S6, the runner, which owns the steps; incompleteLine gives it the lines.
+- b11-analyze.ts's judgement (per-source PASS/FAIL/INCONCLUSIVE, tallies, the KNOWN marks): stays per batch, the
+  analyzer's; completeness only says whether there is a whole run to judge.
+- batch-12's `PRE_D62 = M_D62^1` first-parent check: one batch's own worktree setup, not a general precondition; a batch
+  that needs one runs it through the same bounded git.
+- the D64B_CASES id-list format: S1's select.ts text knobs.
+
+Where S3 departs from batch-11 and batch-12, on purpose:
+- git is bounded, 30 s a call; both batches ran it unbounded.
+- a failed checkout or ancestry gives a result, not a refusal: batch-12 refused to start, batch-11 skipped the blocks
+  with INCONCLUSIVE. Which of the two a batch does is the runner's (S6); the why is the same.
+- the modified paths are named, not only counted; both failures of the checkout are said, not only the first.
+- the live cases are main's table read in process, per platform, never `grep "id: '$1'"`.
+- a `.cases` is never overwritten, where both batches removed a run's files and wrote it again: run folders are
+  exclusive since S1, so a second one of a name is the batch's mistake, thrown.
+- a block folder that holds no `.cases` at all gives an INCONCLUSIVE `not run: no .cases in its folder (nothing was
+  asked)` from incompleteLine, not only from the backstop.
+- a run that proves nothing is not complete, where b11-analyze.ts counted it (review round 1): every id asked that main
+  runs under none of the sources asked is a gap (`zz-nope: no case main runs on android under uiautomator`), and a
+  selection of no case at all for any source is one too (`main picks no case for what was asked (…): the run proves
+  nothing`). b11-analyze.ts only checked that what main picks is in the summary, so a `.cases` asking for an unknown
+  id, beside a summary of 0 cases, passed.
+- a case line before any `## <source>` counts under none; b11-analyze.ts filed it under a source named `?`, which no
+  run asks.
+- the checkout's repo must be the top of its checkout, and config given through the env is dropped: both batches ran
+  git in the shell's env, from `cd $MAIN`.
+- a `.cases` is a live run's only: batch-12 also wrote one for its E5 and T6 blocks, in shapes of their own.
