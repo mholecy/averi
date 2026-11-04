@@ -1,0 +1,67 @@
+{
+  "WebDatabaseDirectory": {
+    "c": "\"~/Library/Developer/CoreSimulator/Devices/LAB-SIMULATOR-UDID/data/Library/WebKit/Databases\"",
+    "t": "string",
+    "v": "~/Library/Developer/CoreSimulator/Devices/LAB-SIMULATOR-UDID/data/Library/WebKit/Databases"
+  },
+  "WebKitLocalStorageDatabasePathPreferenceKey": {
+    "c": "\"~/Library/Developer/CoreSimulator/Devices/LAB-SIMULATOR-UDID/data/Library/WebKit/LocalStorage\"",
+    "t": "string",
+    "v": "~/Library/Developer/CoreSimulator/Devices/LAB-SIMULATOR-UDID/data/Library/WebKit/LocalStorage"
+  },
+  "isAppAndAccessoryAnalyticsAllowedRemoval": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "lastIndexed_OpenGameCenterSettingsDeepLinks.GameCenterSettingsDeepLinks": {
+    "c": "\"24A434:en_US@rg=skzzzz:AN-INDEX-UUID:9\"",
+    "t": "string",
+    "v": "24A434:en_US@rg=skzzzz:AN-INDEX-UUID:9"
+  },
+  "lastIndexed_OpenSettingsCalendarStaticDeepLinks.SettingsCalendarStaticDeepLinks": {
+    "c": "\"24A434:en_US@rg=skzzzz:AN-INDEX-UUID:17\"",
+    "t": "string",
+    "v": "24A434:en_US@rg=skzzzz:AN-INDEX-UUID:17"
+  },
+  "locationBasedAlertsMigrationVersionHash": {
+    "c": "5489259180350329020",
+    "t": "int",
+    "v": "5489259180350329020"
+  },
+  "locationHomeKitMigrationVersionHash": {
+    "c": "-6631042078203184308",
+    "t": "int",
+    "v": "-6631042078203184308"
+  },
+  "locationSystemCustomizationMigrationVersionHash": {
+    "c": "7221500314431908556",
+    "t": "int",
+    "v": "7221500314431908556"
+  },
+  "locationWifiBluetoothUWBMigrationVersionHash": {
+    "c": "7511997438320812976",
+    "t": "int",
+    "v": "7511997438320812976"
+  },
+  "ranHTTP3DeveloperOptInMigrator16.0": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "ranRestrictionsPINMigrator12.0": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "ranSoundMigrator13.0": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "ranTigrisAutoBrightnessMigrator11.0": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  }
+}

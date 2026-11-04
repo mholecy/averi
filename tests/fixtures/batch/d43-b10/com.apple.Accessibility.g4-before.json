@@ -1,0 +1,67 @@
+{
+  "AXSDidResetD22Preferences": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "AXSScrollActionDomainMigrationCompleted": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "AXSSystemUIProcessAppSmartInvertEnabledPreference": {
+    "c": "false",
+    "t": "bool",
+    "v": "false"
+  },
+  "AccessibilityEnabled": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "ApplicationAccessibilityEnabled": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "AutomationEnabled": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "GrayscaleDisplay": {
+    "c": "0",
+    "t": "int",
+    "v": "0"
+  },
+  "HearingAidCompliance": {
+    "c": "0",
+    "t": "int",
+    "v": "0"
+  },
+  "InvertColorsEnabled": {
+    "c": "0",
+    "t": "int",
+    "v": "0"
+  },
+  "LocalizedStringLookupInfoEnabled": {
+    "c": "0",
+    "t": "int",
+    "v": "0"
+  },
+  "PointerAllowAppCustomizationEnabled": {
+    "c": "1",
+    "t": "int",
+    "v": "1"
+  },
+  "PointerEffectScalingEnabled": {
+    "c": "1",
+    "t": "int",
+    "v": "1"
+  },
+  "ReduceMotionEnabled": {
+    "c": "0",
+    "t": "int",
+    "v": "0"
+  }
+}
