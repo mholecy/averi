@@ -15,6 +15,8 @@ import {
   protectedLine,
   restoreDomain,
   stateIn,
+  TYPED_PY,
+  backupPathOf,
   typedMapOf,
   type DomainMap,
   type KeyVal,
@@ -80,8 +82,7 @@ describe("decideRestore over batch-10's real exports (d43-gate.ts:296–338; bat
 
   it("the runner exit's flip: Accessibility's bool true read int 0 written back typed, -bool true, key by key, never the domain", () => {
     const plan = decideRestore(input({ backup: exported(A11Y, 'backup'), now: exported(A11Y, 'after') }));
-    expect(plan.verdict).toBe('act');
-    expect(plan.stage).toBe('per-key');
+    expect(plan).toMatchObject({ verdict: 'act', stage: 'per-key' });
     expect(plan.differ).toEqual([
       { key: 'AccessibilityEnabled', kind: 'changed' },
       { key: 'ApplicationAccessibilityEnabled', kind: 'changed' },
@@ -143,7 +144,7 @@ describe('decideRestore — the rule, stage by stage (d43-gate.ts, batch-10 revi
   });
 
   it('a scalar with no write text (none recorded) goes to the import too', () => {
-    expect(decideRestore(input({ backup: { k: { t: 'int', c: '1' } }, now: { k: int(2) } })).stage).toBe('import');
+    expect(decideRestore(input({ backup: { k: { t: 'int', c: '1' } }, now: { k: int(2) } }))).toMatchObject({ stage: 'import' });
   });
 
   it('still differing after the per-key writes (a write refused): the whole backup imported', () => {
@@ -162,11 +163,12 @@ describe('decideRestore — the rule, stage by stage (d43-gate.ts, batch-10 revi
       actions: [],
       why: 'the import did not bring back a: it did not merge, so the domain not cleared',
     });
+    expect(decideRestore(input({ backup: { a: int(1), b: int(2) }, now: {}, done: 'import', importExit: 0 }))).toMatchObject({ why: 'the import did not bring back a, b: it did not merge, so the domain not cleared' });
   });
 
   it('NOT VERIFIED when the import exited non-zero, extras or not; an unknown exit said as ?', () => {
-    expect(decideRestore(input({ backup: { a: int(1) }, now: { a: int(1), x: int(9) }, done: 'import', importExit: 1 })).why).toBe('defaults import exited 1: the domain not cleared');
-    expect(decideRestore(input({ backup: { a: int(1) }, now: { a: int(2) }, done: 'import' })).why).toBe('defaults import exited ?: the domain not cleared');
+    expect(decideRestore(input({ backup: { a: int(1) }, now: { a: int(1), x: int(9) }, done: 'import', importExit: 1 }))).toMatchObject({ why: 'defaults import exited 1: the domain not cleared' });
+    expect(decideRestore(input({ backup: { a: int(1) }, now: { a: int(2) }, done: 'import' }))).toMatchObject({ why: 'defaults import exited ?: the domain not cleared' });
   });
 
   it('NOT VERIFIED when it still differs after the fallback: nothing more is tried', () => {
@@ -225,6 +227,7 @@ describe('restoreDomain — decideRestore driven to its end (d43-gate.ts:722)', 
 
   it('performedText names each kind, in order, each with its domain; nothing done is empty', () => {
     expect(performedText('d', noPerformed())).toBe('');
+    expect(performedText('d', { ...noPerformed(), deleted: ['x', 'y'] })).toBe('deleted x, y in d');
     expect(performedText('d', { deleted: ['x'], wroteBack: ['a', 'b'], refused: ['write c (exit 1)'], import: 0, fallback: { delete: 0, import: 1 } })).toBe(
       'wrote back a, b in d; deleted x in d; refused in d: write c (exit 1); imported the whole backup into d (exit 0); fell back to defaults delete d (exit 0) + defaults import (exit 1)',
     );
@@ -309,9 +312,27 @@ describe('protectedLine — the finportal key, unchanged | CHANGED | unread (bat
   });
 });
 
+describe('TYPED_PY and the file names, as d43-gate.ts read and named them', () => {
+  it("plistlib's bool is asked before its int (a Python bool is an int): bool true is never int 1; the top level must be a dictionary", () => {
+    expect(TYPED_PY.indexOf('if isinstance(v,bool): return "bool"')).toBeGreaterThan(0);
+    expect(TYPED_PY.indexOf('if isinstance(v,bool): return "bool"')).toBeLessThan(TYPED_PY.indexOf('if isinstance(v,int): return "int"'));
+    expect(TYPED_PY).toContain('d=plistlib.load(f)');
+    expect(TYPED_PY).toContain('if not isinstance(d,dict): sys.exit(');
+    expect(TYPED_PY).toContain('print(json.dumps(out,sort_keys=True))');
+  });
+
+  it("a backup lies beside its state file as d43-gate.ts names it, the state's .json dropped from its end only", () => {
+    expect(backupPathOf('/o/D43/state.json', A11Y)).toBe(`/o/D43/state.${A11Y}.backup.plist`);
+    expect(backupPathOf('/o/a.json.x.json', A11Y)).toBe(`/o/a.json.x.${A11Y}.backup.plist`);
+    expect(backupPathOf('/o/a.jsonl', A11Y)).toBe(`/o/a.jsonl.${A11Y}.backup.plist`);
+  });
+});
+
 describe('the typed read and the state file, read strictly (sim-domains.ts review round 2: unreadable is no empty map)', () => {
   it('typedMapOf: a map of typed values, or why it is none', () => {
     expect(typedMapOf('{"a": {"t": "int", "c": "1", "v": "1"}, "d": {"t": "dict", "c": "{}"}}')).toEqual({ a: int(1), d: dict('{}') });
+    const every = ['bool', 'int', 'float', 'string', 'data', 'date', 'dict', 'array'].map((t) => [t, { t, c: '0' }]);
+    expect(typedMapOf(JSON.stringify(Object.fromEntries(every)))).toEqual(Object.fromEntries(every));
     expect(typedMapOf('{}')).toEqual({});
     expect(typedMapOf('not json')).toBe('its typed read is no JSON');
     for (const t of ['null', '[]', '1']) expect(typedMapOf(t)).toBe('its typed read is no map');

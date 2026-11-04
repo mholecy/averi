@@ -213,6 +213,7 @@ describe("backup — the state file written dirty before the window's first chan
       [(_, a) => (a[4] === 'export' ? timedOut : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) — no state written'],
       [(_, a) => (a[4] === 'export' ? { ...timedOut, err: 'Domain x does not exist' } : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) Domain x does not exist — no state written'],
       [(_, a) => (a[4] === 'export' ? ok('Domain x does not exist') : undefined), 'defaults export com.apple.keyboard.preferences: exit 0 but no file written — no state written'],
+      [(_, a) => (a[4] === 'export' ? (writeFileSync(a[6], '{}'), timedOut) : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) — no state written'],
     ];
     for (const [rule, why] of cases) {
       const file = join(mkdtempSync(join(dir, 'c-')), 'state.json');
@@ -293,7 +294,7 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
     const sim = await labOf(fake);
     writeFileSync(stateFile(), JSON.stringify({ dirty: true, udid: 'OTHER', port: 8120, domains: [] }));
     const other = await restore(sim, stateFile());
-    expect(other).toMatchObject({ ok: false, line: `D43 WDA-window restore: ERROR — NOT VERIFIED — the state file is for OTHER, not ${LAB}` });
+    expect(other).toMatchObject({ ok: false, line: `D43 WDA-window restore: ERROR — NOT VERIFIED — the state file is for OTHER, not ${LAB}`, domains: [], why: `the state file is for OTHER, not ${LAB}` });
     expect(!other.ok && other.hand).toEqual([`D43 (iOS): compare the simulator's ${DOMAINS.join(', ')} with the .backup.plist files beside ${stateFile()}`]);
     writeFileSync(stateFile(), '{"dirty": tru');
     expect((await restore(sim, stateFile())).line).toBe(`D43 WDA-window restore: ERROR — NOT VERIFIED — the state file ${stateFile()}: it is no JSON`);
@@ -365,6 +366,17 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
     expect(readState().dirty).toBe(false);
   });
 
+  it('a domain absent before whose export then fails: NOT VERIFIED, its hand line a read and key deletes, never the whole domain', async () => {
+    const domains = before();
+    delete domains['com.apple.Preferences'];
+    const fake = fakeSim({ domains });
+    const sim = await labOf(fake);
+    await backup(sim, stateFile());
+    const r = await restore(sim.using(async (cmd, args, call) => (args[4] === 'export' && args[5] === 'com.apple.Preferences' ? exit(9, 'busy') : fake.run(cmd, args, call))), stateFile());
+    expect(r.line).toContain('com.apple.Preferences NOT equal to its backup (defaults export com.apple.Preferences: exit 9 busy)');
+    expect(!r.ok && r.hand).toEqual([`D43 (iOS): xcrun simctl spawn ${LAB} defaults read com.apple.Preferences (then defaults delete com.apple.Preferences <key> for each key it holds; never the whole domain)`]);
+  });
+
   it('a domain absent before that still holds a key it cannot delete: NOT VERIFIED, its hand line a key delete, never the domain', async () => {
     const domains = before();
     delete domains['com.apple.Preferences'];
@@ -393,7 +405,8 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
     expect(sim.fs).toBe(nodeFs);
     const opened = await LabSim.open(LAB, fake.run, { ...nodeFs, replace: () => { throw new Error('EISDIR: no\nmore'); } });
     const r = await restore(opened.ok ? opened.sim : sim, stateFile());
-    expect(r.line).toBe(`D43 WDA-window restore: ERROR — NOT VERIFIED — every domain equals its backup, but ${stateFile()} could not be cleared (EISDIR: no)`);
+    expect(r).toMatchObject({ ok: false, line: `D43 WDA-window restore: ERROR — NOT VERIFIED — every domain equals its backup, but ${stateFile()} could not be cleared (EISDIR: no)` });
+    expect(!r.ok && r.hand).toEqual([`D43 (iOS): compare the simulator's ${DOMAINS.join(', ')} with the .backup.plist files beside ${stateFile()}`]);
     expect(readState().dirty).toBe(true);
   });
 });
@@ -442,7 +455,9 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     rmSync(backupPathOf(stateFile(), 'com.apple.keyboard.preferences'));
     const c = await compare(sim.using(async (cmd, args, call) => (args[4] === 'export' && args[5] === A11Y ? timedOut : fake.run(cmd, args, call))), stateFile());
     expect(c.domains.map((d) => d.outcome)).toEqual(['unread', 'unchanged', 'unread']);
+    expect(c.domains[0]).toEqual({ name: 'com.apple.keyboard.preferences', outcome: 'unread', why: 'its backup: plistlib could not read state.com.apple.keyboard.preferences.backup.plist: exit 1 plistlib.InvalidFileException: Invalid file' });
     expect(c.domains[2]).toEqual({ name: A11Y, outcome: 'unread', why: `defaults export ${A11Y}: past its bound (exit 142)` });
+    expect(c.line).toBe(`WARN D43 compare: com.apple.keyboard.preferences unread (${(c.domains[0] as { why: string }).why}); ${A11Y} unread (defaults export ${A11Y}: past its bound (exit 142)) — the state file marked dirty again; the hand lines are in RESTORE`);
   });
 
   it('no state file, or one that is no state: every domain unread, the line a WARN, nothing marked (there is nothing to mark)', async () => {
@@ -465,6 +480,7 @@ describe("readProtected — the finportal key, read only: a value, absent or unr
   it('read with `defaults read <schemeapproval> <finportal key>` and nothing else; its value, the trailing line break dropped', async () => {
     const fake = reading(ok('dev.finportal.app\n'));
     expect(await readProtected(await labOf(fake))).toEqual({ state: 'value', value: 'dev.finportal.app' });
+    expect(await readProtected(await labOf(reading(ok('a\nb\n\n'))))).toEqual({ state: 'value', value: 'a\nb' });
     expect(fake.defaults()).toEqual([`read ${PROTECTED.domain} ${PROTECTED.key}`]);
     expect(PROTECTED).toEqual({ domain: 'com.apple.launchservices.schemeapproval', key: 'com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport' });
   });

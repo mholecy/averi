@@ -107,8 +107,8 @@ const PROTECTED_LOWER = PROTECTED.domain.toLowerCase();
  * all; a future need for it is a new decision, not a new call.
  */
 export function defaultsArgv(udid: string, args: readonly string[]): string[] {
-  const verb = args[0];
-  if (verb === undefined || !VERBS.has(verb)) throw new Error(`defaults ${JSON.stringify(verb ?? '')}: not a verb this module runs (${[...VERBS].join(', ')})`);
+  const verb = args[0] ?? '';
+  if (!VERBS.has(verb)) throw new Error(`defaults ${JSON.stringify(verb)}: not a verb this module runs (${[...VERBS].join(', ')})`);
   if (!PROTECTED_VERBS.has(verb) && args.some((a) => a.toLowerCase().includes(PROTECTED_LOWER))) {
     throw new Error(`defaults ${verb} on ${PROTECTED.domain}: refused — no batch writes that domain (read only)`);
   }
@@ -145,15 +145,14 @@ export interface RestoreInput {
   done?: 'per-key' | 'import' | 'fallback';
   importExit?: number;
 }
-export interface RestorePlan {
-  verdict: 'equal' | 'act' | 'NOT VERIFIED';
-  stage?: 'per-key' | 'import' | 'fallback';
+interface PlanParts {
   actions: RestoreAction[];
   differ: KeyDiff[];
-  why?: string;
   /** The `defaults …` commands that would put it back by hand (no `xcrun simctl spawn <udid>` yet). */
   hand: string[];
 }
+/** Equal; or a stage to act on; or NOT VERIFIED, and why. */
+export type RestorePlan = (PlanParts & { verdict: 'equal' }) | (PlanParts & { verdict: 'act'; stage: 'per-key' | 'import' | 'fallback' }) | (PlanParts & { verdict: 'NOT VERIFIED'; why: string });
 
 /**
  * The restore rule (pure; d43-gate.ts's, unchanged). Equal → done. Else, in order:
@@ -167,12 +166,14 @@ export interface RestorePlan {
 export function decideRestore(i: RestoreInput): RestorePlan {
   const differ = diffMaps(i.backup, i.now);
   if (differ.length === 0) return { verdict: 'equal', actions: [], differ, hand: [] };
+  // A changed or missing key is one the backup holds, so the domain had a backup: `backup` and `backupPath` are set.
+  const backed = (d: KeyDiff): KeyVal => i.backup![d.key];
   const hand: string[] = [];
   for (const d of differ) {
-    const kv = i.backup !== null && has(i.backup, d.key) ? i.backup[d.key] : undefined;
+    const flag = d.kind === 'extra' ? undefined : flagOf(backed(d));
     if (d.kind === 'extra') hand.push(`defaults delete ${i.domain} ${shq(d.key)}`);
-    else if (kv !== undefined && flagOf(kv) !== undefined) hand.push(`defaults write ${i.domain} ${shq(d.key)} ${flagOf(kv)} ${shq(kv.v!)}`);
-    else if (i.backupPath !== null && !hand.some((h) => h.startsWith('defaults import '))) hand.push(`defaults import ${i.domain} ${shq(i.backupPath)}`);
+    else if (flag !== undefined) hand.push(`defaults write ${i.domain} ${shq(d.key)} ${flag} ${shq(backed(d).v!)}`);
+    else if (!hand.some((h) => h.startsWith('defaults import '))) hand.push(`defaults import ${i.domain} ${shq(i.backupPath!)}`);
   }
   const stop = (why: string): RestorePlan => ({ verdict: 'NOT VERIFIED', actions: [], differ, why, hand });
   const absentBefore = i.backupPath === null;
@@ -181,9 +182,8 @@ export function decideRestore(i: RestoreInput): RestorePlan {
     for (const d of differ) {
       if (d.kind === 'extra') actions.push({ op: 'delete-key', key: d.key });
       else {
-        const kv = has(i.backup, d.key) ? i.backup![d.key] : undefined;
-        const flag = kv !== undefined ? flagOf(kv) : undefined;
-        if (flag !== undefined) actions.push({ op: 'write', key: d.key, flag, value: kv!.v! });
+        const flag = flagOf(backed(d));
+        if (flag !== undefined) actions.push({ op: 'write', key: d.key, flag, value: backed(d).v! });
       }
     }
     if (actions.length) return { verdict: 'act', stage: 'per-key', actions, differ, hand };
@@ -239,21 +239,17 @@ export async function restoreDomain(
   for (;;) {
     const plan = decideRestore(input);
     if (plan.verdict !== 'act') return { equal: plan.verdict === 'equal', plan, performed };
-    let importExit: number | undefined;
     for (const a of plan.actions) {
       const codes: number[] = [];
-      for (const args of actionArgs(a, input.domain, input.backupPath)) {
-        const code = await io.run(args);
-        codes.push(code);
-        if (args[0] === 'import') importExit = code;
-      }
+      for (const args of actionArgs(a, input.domain, input.backupPath)) codes.push(await io.run(args));
       if (a.op === 'write' || a.op === 'delete-key') {
         if (codes[0] === 0) (a.op === 'write' ? performed.wroteBack : performed.deleted).push(a.key);
         else performed.refused.push(`${a.op === 'write' ? 'write' : 'delete'} ${a.key} (exit ${codes[0]})`);
       } else if (a.op === 'import') performed.import = codes[0];
       else performed.fallback = { delete: codes[0], import: codes[1] };
     }
-    input = { ...input, now: await io.read(), done: plan.stage, ...(importExit !== undefined && { importExit }) };
+    // decideRestore reads the import's exit only after the import stage: the whole import's, recorded as performed.
+    input = { ...input, now: await io.read(), done: plan.stage, importExit: performed.import };
   }
 }
 
@@ -357,7 +353,8 @@ export function typedMapOf(out: string): Record<string, KeyVal> | string {
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return 'its typed read is no map';
   for (const [k, kv] of Object.entries(parsed)) {
     const v = kv as Partial<KeyVal> | null;
-    if (typeof v !== 'object' || v === null || !KEY_TYPES.has(v.t as string) || typeof v.c !== 'string' || (v.v !== undefined && typeof v.v !== 'string')) return `its typed read holds no typed value for ${nameInLine(k)}`;
+    // Anything but an object holds no `t` from KEY_TYPES: refused by the same check.
+    if (v === null || !KEY_TYPES.has(v.t as string) || typeof v.c !== 'string' || (v.v !== undefined && typeof v.v !== 'string')) return `its typed read holds no typed value for ${nameInLine(k)}`;
   }
   return parsed as Record<string, KeyVal>;
 }
@@ -368,6 +365,13 @@ async function typedOf(sim: LabSim, path: string): Promise<{ map: Record<string,
   if (r.code !== 0) return { why: `plistlib could not read ${nameInLine(basename(path))}: ${exitText(r)}` };
   const map = typedMapOf(r.out);
   return typeof map === 'string' ? { why: `${nameInLine(basename(path))}: ${map}` } : { map };
+}
+
+/** A domain's backup read typed: null when it was absent before the window (no backup), else plistlib's map or why not. */
+async function backupOf(sim: LabSim, d: DomainsState['domains'][number]): Promise<{ map: DomainMap } | { why: string }> {
+  if (d.backup === null) return { map: null };
+  const read = await typedOf(sim, d.backup);
+  return 'why' in read ? { why: `its backup: ${read.why}` } : read;
 }
 
 /** Export a domain to `path` and read it typed: its map (null: the domain does not exist), or why not. */
@@ -388,7 +392,7 @@ export interface DomainsState {
   domains: { name: string; backup: string | null }[];
 }
 
-/** `<state dir>/<state stem>.<domain>` — d43-gate.ts#pathsOf's base, so its --restore reads the same files. */
+/** `<state dir>/<state stem>.<domain>` — the base of d43-gate.ts's pathsOf, so its --restore reads the same files. */
 const baseOf = (stateFile: string, domain: string) => join(dirname(stateFile), `${basename(stateFile).replace(/\.json$/, '')}.${domain}`);
 
 /** The backup's path beside the state file (d43-gate.ts's, sim-domains.ts's). */
@@ -416,10 +420,11 @@ export function stateIn(text: string | undefined): DomainsState | string {
     return 'it is no JSON';
   }
   const st = s as Partial<DomainsState> | null;
-  if (typeof st !== 'object' || st === null || typeof st.dirty !== 'boolean' || typeof st.udid !== 'string' || !Array.isArray(st.domains)) return 'it is no state of the simulator domains';
+  // A primitive or an array has no boolean `dirty`: refused by the same check.
+  if (st === null || typeof st.dirty !== 'boolean' || typeof st.udid !== 'string' || !Array.isArray(st.domains)) return 'it is no state of the simulator domains';
   for (const d of st.domains as unknown[]) {
     const x = d as { name?: unknown; backup?: unknown } | null;
-    if (typeof x !== 'object' || x === null || typeof x.name !== 'string' || (x.backup !== null && typeof x.backup !== 'string')) return 'a domain in it has no name or backup';
+    if (x === null || typeof x.name !== 'string' || (x.backup !== null && typeof x.backup !== 'string')) return 'a domain in it has no name or backup';
     // Only the window's own domains are ever put back: a state naming another (the schemeapproval one) is refused whole.
     if (!(DOMAINS as readonly string[]).includes(x.name)) return `it names ${nameInLine(x.name)}, not one of ${DOMAINS.join(', ')}`;
   }
@@ -454,20 +459,15 @@ export async function backup(sim: LabSim, stateFile: string): Promise<Backup> {
 
 // ------------------------------------------------------------------------------------------------- restore
 
-/** One domain's restore, as the lines say it. */
-export interface DomainRestore {
-  name: string;
-  backup: string | null;
-  /** Equal right after the run, before anything was put back. */
-  equalAfterRun?: boolean;
-  performed: Performed;
-  /** Its final read-back equals its backup. */
-  readBackEqual: boolean;
-  /** NOT VERIFIED: the keys still differing, why the restore stopped, the `defaults …` hand commands. */
-  differ?: KeyDiff[];
-  why?: string;
-  hand?: string[];
-}
+/**
+ * One domain's restore, as the lines say it: its read-back equal to its backup — and whether it was equal right after
+ * the run already — or not, with the keys still differing (none known when a read failed), why it stopped and the
+ * `defaults …` commands to finish it by hand (none planned when a read failed).
+ */
+export type DomainRestore = { name: string; backup: string | null; performed: Performed } & (
+  | { readBackEqual: true; equalAfterRun: boolean }
+  | { readBackEqual: false; differ: KeyDiff[]; why: string; hand: string[] }
+);
 
 export type Restored =
   | { ok: true; line: string; domains: DomainRestore[] }
@@ -476,19 +476,20 @@ export type Restored =
 /** The commands as RESTORE lines: `D43 (iOS): xcrun simctl spawn <udid> <cmd>`. */
 const handLines = (prefix: string, udid: string, cmds: readonly string[]): string[] => cmds.map((c) => `${prefix}xcrun simctl spawn ${shq(udid)} ${c}`);
 
-/** The hand commands for a domain not put back: its plan's, or by its backup (d43-gate.ts#restoreLine's rule). */
-function domainHand(name: string, backupPath: string | null, planned: readonly string[] | undefined): string[] {
-  if (planned !== undefined && planned.length > 0) return [...planned];
+/** The hand commands for a domain not put back: its plan's, or by its backup (the rule of d43-gate.ts's restoreLine). */
+function domainHand(name: string, backupPath: string | null, planned: readonly string[]): string[] {
+  if (planned.length > 0) return [...planned];
   if (backupPath === null) return [`defaults read ${name} (then defaults delete ${name} <key> for each key it holds; never the whole domain)`];
   return [`defaults import ${name} ${shq(backupPath)}`];
 }
 
-/** One domain in the restore line (d43-gate.ts#restoreLine's part, without the port: S6 owns the WDA). */
+/** One domain in the restore line (a part of d43-gate.ts's restoreLine, without the port: S6 owns the WDA). */
 function domainPart(d: DomainRestore): string {
   const did = performedText(d.name, d.performed);
-  if (d.readBackEqual) return d.equalAfterRun === true ? `${d.name} equal` : `${d.name} put back${did === '' ? '' : ` (${did})`}`;
-  const keys = d.differ !== undefined && d.differ.length > 0 ? ` — keys differ: ${differText(d.differ)}` : '';
-  return `${d.name} NOT equal to its backup${did === '' ? '' : ` after ${did}`}${keys}${d.why === undefined ? '' : ` (${d.why})`}`;
+  // Put back means something was done: a domain that differed after the run got at least one action.
+  if (d.readBackEqual) return d.equalAfterRun ? `${d.name} equal` : `${d.name} put back (${did})`;
+  const keys = d.differ.length > 0 ? ` — keys differ: ${differText(d.differ)}` : '';
+  return `${d.name} NOT equal to its backup${did === '' ? '' : ` after ${did}`}${keys} (${d.why})`;
 }
 
 /** A restore that did nothing, and needed nothing: `<label>: OK — <why>`. */
@@ -524,7 +525,7 @@ export async function restore(sim: LabSim, stateFile: string): Promise<Restored>
       const why = `every domain equals its backup, but ${nameInLine(stateFile)} could not be cleared (${firstLineOf(messageOf(e))})`;
       return { ok: false, line: verdictLine(RESTORE_LABEL, 'ERROR', `NOT VERIFIED — ${why}`), domains, why, hand: byHand };
     }
-    const allEqual = domains.every((d) => d.equalAfterRun === true);
+    const allEqual = domains.every((d) => d.readBackEqual && d.equalAfterRun);
     return { ok: true, line: verdictLine(RESTORE_LABEL, 'OK', allEqual ? 'every domain equals its backup (nothing put back)' : parts.join(', ')), domains };
   }
   const why = parts.join(', ');
@@ -534,9 +535,9 @@ export async function restore(sim: LabSim, stateFile: string): Promise<Restored>
 /** One domain: its backup and its state now read typed, then restoreDomain; any read or call that fails stops it. */
 async function restoreOne(sim: LabSim, stateFile: string, d: DomainsState['domains'][number]): Promise<DomainRestore> {
   const performed = noPerformed();
-  const failed = (why: string): DomainRestore => ({ name: d.name, backup: d.backup, performed, readBackEqual: false, why });
-  const before = d.backup === null ? { map: null } : await typedOf(sim, d.backup);
-  if ('why' in before) return failed(`its backup: ${before.why}`);
+  const failed = (why: string): DomainRestore => ({ name: d.name, backup: d.backup, performed, readBackEqual: false, differ: [], why, hand: [] });
+  const before = await backupOf(sim, d);
+  if ('why' in before) return failed(before.why);
   const after = await readDomain(sim, d.name, freshPathOf(sim.fs, stateFile, d.name, 'after'));
   if ('why' in after) return failed(after.why);
   const equalAfterRun = diffMaps(before.map, after.map).length === 0;
@@ -553,10 +554,10 @@ async function restoreOne(sim: LabSim, stateFile: string, d: DomainsState['domai
       },
       performed,
     );
-    if (r.equal) return { name: d.name, backup: d.backup, equalAfterRun, performed, readBackEqual: true };
-    return { name: d.name, backup: d.backup, equalAfterRun, performed, readBackEqual: false, differ: r.plan.differ, ...(r.plan.why !== undefined && { why: r.plan.why }), hand: r.plan.hand };
+    if (r.plan.verdict !== 'NOT VERIFIED') return { name: d.name, backup: d.backup, equalAfterRun, performed, readBackEqual: true };
+    return { name: d.name, backup: d.backup, performed, readBackEqual: false, differ: r.plan.differ, why: r.plan.why, hand: r.plan.hand };
   } catch (e) {
-    return { ...failed(firstLineOf(messageOf(e))), equalAfterRun };
+    return failed(firstLineOf(messageOf(e)));
   }
 }
 
@@ -590,8 +591,8 @@ export async function compare(sim: LabSim, stateFile: string): Promise<Compariso
 }
 
 async function compareOne(sim: LabSim, stateFile: string, d: DomainsState['domains'][number]): Promise<Compared> {
-  const before = d.backup === null ? { map: null } : await typedOf(sim, d.backup);
-  if ('why' in before) return { name: d.name, outcome: 'unread', why: `its backup: ${before.why}` };
+  const before = await backupOf(sim, d);
+  if ('why' in before) return { name: d.name, outcome: 'unread', why: before.why };
   const now = await readDomain(sim, d.name, freshPathOf(sim.fs, stateFile, d.name, 'compare'));
   if ('why' in now) return { name: d.name, outcome: 'unread', why: now.why };
   const plan = decideRestore({ domain: d.name, backupPath: d.backup, backup: before.map, now: now.map });
@@ -635,8 +636,8 @@ export async function readProtected(sim: LabSim): Promise<ProtectedRead> {
   return { state: 'unreadable', why: exitText(r) };
 }
 
-/** Two reads the same: both absent, or both the same value (a value that reads "absent" is no absent key). */
-const sameRead = (a: ProtectedRead, b: ProtectedRead): boolean => (a.state === 'value' && b.state === 'value' ? a.value === b.value : a.state === b.state);
+/** A read's value; none when absent (so a value that reads "absent" is still no absent key). */
+const valueOf = (p: ProtectedRead): string | undefined => (p as { value?: string }).value;
 
 const shown = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine(p.value) : p.state === 'absent' ? 'absent' : `unreadable (${p.why})`);
 
@@ -648,7 +649,7 @@ const shown = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine(p.
 export function protectedLine(start: ProtectedRead, end: ProtectedRead): string {
   const what = `${PROTECTED.domain}'s ${PROTECTED_SHORT}`;
   const bothRead = start.state !== 'unreadable' && end.state !== 'unreadable';
-  if (bothRead && sameRead(start, end)) return stepLine('OK', `${what} unchanged (${shown(start)}; read only)`);
+  if (bothRead && valueOf(start) === valueOf(end)) return stepLine('OK', `${what} unchanged (${shown(start)}; read only)`);
   const how = bothRead ? 'CHANGED' : 'unread';
   return stepLine('ERROR', `${what} ${how}: ${shown(start)} at the start, ${shown(end)} at the end — no batch writes it: read it by hand (batch-5's backup stays read only)`);
 }
