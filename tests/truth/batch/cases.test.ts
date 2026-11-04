@@ -85,7 +85,7 @@ describe('writeCases — what a run was asked, written before anything of it run
   });
 
   it('a name that is no plain path segment is refused: its files cannot leave the block\'s folder', () => {
-    for (const bad of ['', '../x', 'a/b', '.hidden', 'a b', 'a.b']) expect(() => writeCases(nodeFs, dir, bad, KF), bad).toThrow(/one plain path segment/);
+    for (const bad of ['', '../x', 'a/b', '.hidden', 'a b', 'a.b']) expect(() => writeCases(nodeFs, dir, bad, KF), bad).toThrow(`run name ${JSON.stringify(bad)}: one plain path segment is needed`);
     expect(readdirSync(dir)).toEqual([]);
   });
 

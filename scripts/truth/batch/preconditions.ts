@@ -167,11 +167,12 @@ export async function checkout(g: Git): Promise<CheckoutPrecondition> {
  * batch does (`M_D43`): `M_D43=<sha> …`, `M_D43 is not set`.
  */
 export async function ancestor(g: Git & { sha: string; what?: string }): Promise<Precondition> {
-  const sha = g.sha;
-  const what = g.what === undefined ? undefined : nameInLine(g.what);
-  if (sha === '') return { ok: false, why: `${what ?? 'the commit'} is not set` };
-  if (!SHA_FORMAT.test(sha)) return { ok: false, why: `${what === undefined ? '' : `${what}=`}${JSON.stringify(sha)} is not a commit sha (7–40 hex digits)` };
-  const it = what === undefined ? sha : `${what}=${sha}`;
+  const { sha, what } = g;
+  /** `value` as the batch names it: `M_D43=<value>` when `what` is given. */
+  const as = (value: string): string => (what === undefined ? value : `${nameInLine(what)}=${value}`);
+  if (sha === '') return { ok: false, why: `${what === undefined ? 'the commit' : nameInLine(what)} is not set` };
+  if (!SHA_FORMAT.test(sha)) return { ok: false, why: `${as(JSON.stringify(sha))} is not a commit sha (7–40 hex digits)` };
+  const it = as(sha);
   const outside = await topRefusal(g);
   if (outside !== undefined) return { ok: false, why: outside };
   const known = await git(g, ['cat-file', '-e', `${sha}^{commit}`]);

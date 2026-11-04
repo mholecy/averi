@@ -284,24 +284,25 @@ and `preconditionLine`, which turns the failed ones into the block's `<label>: I
 cases.ts holds a live run's `.cases`: `writeCases` (written before anything of the run, never overwritten),
 `stepOutcome` (the judged exit-1 rule with its why, over steps.ts's stepWordOf), `completeness` (b11-analyze.ts's rule:
 the `.cases`, a record, `# Live golden:` in the log and in the summary, every case main picks there; and, since review
-round 1, something to prove) and
-`incompleteLine` (`<label>: INCONCLUSIVE — <k> of <n> run(s) incomplete: <name> — <why> | …`, or `not run` when the
-folder holds no `.cases`). live-table.ts holds the `LiveCases` type both read and `liveTableOf(repo)`, the loader of
-main's table. bounded.ts gains git's own bound, 30 s (`GIT_SECS`), for reads — a slow git operation passes its own
-secs; steps.ts shares `holdsGoldenHeader`; run-dir.ts exports `PLAIN_SEGMENT`, which a run's name must be too; words.ts
-gains `nameInLine` and `firstLineOf`.
+round 1, something to prove) and `incompleteLine` (`<label>: INCONCLUSIVE — <k> of <n> run(s) incomplete: <name> —
+<why> | …`, or `not run` when the folder holds no `.cases`). live-table.ts holds what both read of main's table: the
+`LiveCases` and `LiveSelection` types, `DEFAULT_GROUPS` (forms), `liveTableOf(repo)` (the loader), `loadTable` and
+`unreadLive` (a load that fails, named). bounded.ts gains git's own bound, 30 s (`GIT_SECS`), for reads — a slow git
+operation passes its own secs; steps.ts shares `holdsGoldenHeader`; run-dir.ts exports `PLAIN_SEGMENT` and
+`plainSegment(what, name)`, which openRun and writeCases both use; words.ts gains `nameInLine` and `firstLineOf`.
 
-preconditions.ts and cases.ts join the run. Each is tested over fakes: a fake `Run` that answers git as git does, a fake
-live-cases table, and real files in a temp dir (tests/truth/batch/preconditions.test.ts, cases.test.ts). The same code
-over real temporary git repos (`git init -b main` in a mkdtemp with its own HOME and git config, no inherited GIT_DIR,
-GIT_WORK_TREE or GIT_INDEX_FILE; git started through bounded.ts) is preconditions-git.test.ts, and over this checkout's
-own live-cases table cases-live.test.ts; both run in the normal suite only — the first starts processes, the second
-imports live-cases.ts, which the sandbox does not hold. Main's table is read by a dynamic import of the checkout's own
-file (live-table.ts's `liveTableOf(repo)`, as b11-analyze.ts did), never a static one, so the sandbox needs no new
-entry; live-table.ts stays out of the run, as proc.ts does: its one statement is that import, which only
-cases-live.test.ts makes. Baselines after review round 1: preconditions.ts 100 % (285 mutants, 1 timeout), cases.ts
-99.64 % (277 mutants, 1 equivalent survivor: `asked !== undefined` beside no gap, there for the type); floors 98 and 97.
-words.ts stays at 100 % with its two new helpers (113 mutants). The cold run of all nineteen modules took 2 min 15 s.
+preconditions.ts, cases.ts and live-table.ts join the run. Each is tested over fakes: a fake `Run` that answers git as
+git does, a fake live-cases table, and real files in a temp dir (tests/truth/batch/preconditions.test.ts,
+cases.test.ts). The same code over real temporary git repos (`git init -b main` in a mkdtemp with its own HOME and git
+config, no inherited GIT_DIR, GIT_WORK_TREE or GIT_INDEX_FILE; git started through bounded.ts) is
+preconditions-git.test.ts, and over this checkout's own live-cases table cases-live.test.ts; both run in the normal
+suite only — the first starts processes, the second imports live-cases.ts, which the sandbox does not hold. Main's table
+is read by a dynamic import of the checkout's own file (live-table.ts's `liveTableOf(repo)`, as b11-analyze.ts did),
+never a static one, so the sandbox needs no new entry; the sandbox tests reach `liveTableOf` through a temp folder that
+holds no live-cases.ts, whose load rejects. Baselines after the code review: preconditions.ts 100 % (279 mutants, 1
+timeout), cases.ts 99.64 % (275 mutants, 1 equivalent survivor: `asked !== undefined` beside no gap, there for the
+type), live-table.ts 100 % (11 mutants); floors 98, 97 and 98. words.ts stays at 100 % with its two new helpers (113
+mutants). The cold run of all twenty modules took 2 min 15 s.
 
 Decisions S3 pins:
 - a detached HEAD, or another branch, at main's very commit passes: what runs is main's code as committed. batch-11 and
@@ -310,7 +311,8 @@ Decisions S3 pins:
   file is allowed (`--untracked-files=no`, as both batches); a staged change counts; a rename or copy counts once, by
   its new path (`status --porcelain -z`); the first three paths are named, then how many more.
 - the preconditions take a `Run` (a Calls' `bounded`, or a scope's `run`), not a Calls object: any Run can be faked, and
-  a restore's scope can use the same checks.
+  a restore's scope can use the same checks. The top check reads real paths through the `BatchFs` given (`Git.fs`),
+  the real one by default.
 - every git call runs `git -C <repo>` with GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_COMMON_DIR,
   GIT_OBJECT_DIRECTORY and GIT_ALTERNATE_OBJECT_DIRECTORIES dropped from its env: a batch started inside a hook's
   context would otherwise read another repo. Config given through the env is dropped too (GIT_CONFIG_PARAMETERS, which
@@ -334,7 +336,10 @@ Decisions S3 pins:
 - `casesOnMain` asks selectCases for the platform, the lab app (native) and the groups (forms, as batch-11's live_run
   ran), so a case main holds for the other platform only is missing (p7w on Android): batch-11's grep would have passed
   it. No id at all is never a pass, for cases or cells.
-- `writeCases` takes any object (batch-12's E5 wrote `{"runs":3}`); `completeness` reads the live shape and refuses a
+- `writeCases` takes what a live run is asked (`Asked`) and nothing else, by its type and at run time: runsIn and
+  completeness read every `.cases` as a live run's, so a non-live block keeps its own record elsewhere (batch-12's E5
+  wrote `{"runs":3}` as a `.cases`; such a record is the runner's, S6). batch-11's `"kind": "new"` is not asked for:
+  nothing read it, and a `.cases` holding it still reads. `completeness` reads the live shape and refuses a
   `.cases` that is not it (platform ios or android, an app, one source at least, case ids, optional groups), where
   b11-analyze.ts trusted it. Every gap is said at once, in order: the `.cases`, the record, the log, the summary, the
   cases. The one exception: the cases are checked only when the `.cases` was read as asked (else what to pick is
@@ -389,3 +394,4 @@ Where S3 departs from batch-11 and batch-12, on purpose:
   run asks.
 - the checkout's repo must be the top of its checkout, and config given through the env is dropped: both batches ran
   git in the shell's env, from `cd $MAIN`.
+- a `.cases` is a live run's only: batch-12 also wrote one for its E5 and T6 blocks, in shapes of their own.
