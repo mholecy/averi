@@ -623,7 +623,10 @@ evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is na
     launcher's; the whole chooser reply took 2011–2124 ms (batch-12, E5; ADR 0041's D55c amendment).
 20. Gboard's floating panel stays where it was dragged across days: D67's read (`dumpsys window InputMethod`'s
     `touchable region=SkRegion((87,1243,1024,2035)(0,2088,1080,2220))`) found batch-11's 87,1243 937×792 again a day
-    later (batch-12, kf).
+    later (batch-12, kf). It can be moved without a hand: `adb shell input swipe` on its drag handle, slow (1500 ms
+    per swipe), moved it about 228 px up to 87,1015 937×792 (bottom 1807), and that place survived BACK and a cold
+    `am start`. For 1–2 s after a drag the touchable region reads as almost the whole screen, `(0,66,1080,2220)`, so
+    the region is read 3–4 s later (batch-12 ONLY=kf, D67's PASS).
 
 ## Workflow per bug, once phase 3 is in
 
