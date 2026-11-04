@@ -43,6 +43,9 @@ export interface Started {
   release(): void;
 }
 
+/** What a group kill did: delivered; no group left to deliver to; or not delivered, and the error's code. */
+export type KillResult = 'sent' | 'gone' | { notSent: string };
+
 /** What the runner takes instead of the default exits: SIGINT, SIGTERM, SIGHUP; an uncaught exception or rejection. */
 export interface Handlers {
   signal(name: NodeJS.Signals): void;
@@ -52,8 +55,11 @@ export interface Handlers {
 export interface ProcessSeam {
   /** Start `cmd` in a process group of its own, stdin /dev/null. */
   start(cmd: string, args: readonly string[], options: StartOptions): Started;
-  /** Send `signal` to the whole group `pid` leads; a group already gone is no error. */
-  killGroup(pid: number, signal: NodeJS.Signals): void;
+  /**
+   * Send `signal` to the whole group `pid` leads. Never throws: `'sent'`; `'gone'` when no such group is left
+   * (ESRCH); else not sent and why (EPERM: delivery not proven — bounded.ts tries once more).
+   */
+  killGroup(pid: number, signal: NodeJS.Signals): KillResult;
   /**
    * Route the abort signals and the fatal errors to `handlers`, replacing their default exits — a listener on SIGINT
    * is what ignoring it means in Node (zsh's `trap '' INT` once the handler ignores it). And drop errors on stdout and
@@ -114,8 +120,10 @@ export const nodeProcess: ProcessSeam = {
   killGroup(pid, signal) {
     try {
       process.kill(-pid, signal);
+      return 'sent';
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'ESRCH') throw e;
+      const code = (e as NodeJS.ErrnoException).code;
+      return code === 'ESRCH' ? 'gone' : { notSent: code ?? messageOf(e) };
     }
   },
   install(handlers) {

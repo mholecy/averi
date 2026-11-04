@@ -1,4 +1,4 @@
-import { Calls, type Run } from './bounded.js';
+import { Calls, MAX_SECS, type Run } from './bounded.js';
 import type { BatchFs } from './io.js';
 import type { ProcessSeam } from './proc.js';
 import { stateOf, writeRestore } from './run-dir.js';
@@ -32,7 +32,10 @@ import { EXIT, stepLine, summaryLines, twoDigits, verdictLine, type BlockReport 
  * - A block's own restore, on the normal path, runs as a probe (`bounded`), so the abort may stop it part-way and then
  *   run the window's restore again: every restore must be safe to run twice (batch-12's were).
  * - A restore that passes its bound is stopped there with the detached calls it started, and its RESTORE lines say
- *   so: the state it left is part-way.
+ *   so: the state it left is part-way. Its scope then refuses any further call, so the restore cannot go on to its
+ *   next step; a judge past the budget likewise.
+ * - A group kill the system refuses (EPERM under load) is said, never thrown: the windows are put back whatever
+ *   stopping the probes did.
  *
  * How long it can take, at worst: the probes' stop (`graceMs`, 2 s), then each dirty window's restore bound (`secs`,
  * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s) —
@@ -166,6 +169,7 @@ export class AbortGuard {
     if (this.aborting !== undefined) throw new Error(`${name}: no window opens while the run is being stopped`);
     if (this.windows.has(name)) throw new Error(`${name} is open already`);
     if (spec.hand.length === 0) throw new Error(`${name}: a window needs its hand lines, for a RESTORE when it is not put back`);
+    if (spec.secs !== undefined && !(spec.secs > 0 && spec.secs <= MAX_SECS)) throw new Error(`${name}: a restore bound of ${spec.secs} s: more than 0 and at most ${MAX_SECS} s is needed`);
     const wanted = this.options.blocks.map((b) => b.block);
     if (spec.cleanup !== undefined && !wanted.some((b) => b === spec.block)) {
       throw new Error(`${name}: a cleanup line needs a wanted block (${spec.block ?? 'none given'}; wanted: ${wanted.join(', ')})`);
@@ -252,7 +256,7 @@ export class AbortGuard {
       if (how === 'ended') throw e;
       // The last place left: the hand lines once on stderr, so a person can still put the state back.
       const lines = [`${header}; state to put back by hand:`, ...hand];
-      this.options.seam.stderr(`${name}: ${restoreFile} could not be written (${messageOf(e)}); state to put back by hand:\n${lines.join('\n')}\n`);
+      this.options.seam.stderr(`${name}: ${restoreFile} could not be written (${messageOf(e)}):\n${lines.join('\n')}\n`);
       this.restoreLines.push(...lines);
       return lines;
     }
@@ -276,8 +280,14 @@ export class AbortGuard {
     try {
       this.say('ERROR', `${this.options.name} interrupted (run ${this.options.runId}) ${why}`);
       const cut = new Set(windows.map(([, w]) => w.block));
-      const stopped = await this.calls.stopAll();
-      if (stopped > 0) this.say('NOTE', `${stopped} running call(s) stopped, each its whole process group`);
+      // Its own try: whatever stopping the probes does, the windows are put back next.
+      try {
+        const { stopped, notSent } = await this.calls.stopAll();
+        if (stopped > 0) this.say('NOTE', `${stopped} running call(s) stopped, each its whole process group`);
+        for (const line of notSent) this.say('ERROR', `a running call not proven stopped: ${line}`);
+      } catch (e) {
+        this.say('ERROR', `the running calls could not be stopped: ${messageOf(e)}`);
+      }
       const { hand, cleanups, late } = await this.putBackAll(windows);
       if (this.writeRestore('interrupted', hand).length > 0) this.say('ERROR', `state not provably put back — ${this.options.restoreFile}`);
       const blocks = await this.reports(cut, cleanups, late);

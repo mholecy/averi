@@ -61,6 +61,16 @@ describe('bounded over real processes: a call past its bound is gone with its gr
     expect(await until(() => !alive(child) && !alive(grandchild))).toBe(true);
   }, 10_000);
 
+  it('killGroup never throws: a live group "sent", a group gone "gone" (review round 2)', async () => {
+    const pidfile = join(dir, 'tree.pids');
+    const calls = new Calls(nodeProcess, { graceMs: 200 });
+    const r = calls.bounded(node, [HELPER, 'tree', pidfile], { secs: 20 });
+    const [child] = await pidsIn(pidfile);
+    expect(nodeProcess.killGroup(child, 'SIGKILL')).toBe('sent');
+    await r;
+    expect(await until(() => nodeProcess.killGroup(child, 0 as unknown as NodeJS.Signals) === 'gone')).toBe(true);
+  }, 10_000);
+
   it('a call in time: its code, its stdout and stderr', async () => {
     const calls = new Calls(nodeProcess);
     expect(await calls.bounded(node, [HELPER, 'echo', 'the out', 'the err', '3'], { secs: 5 })).toEqual({ code: 3, timedOut: false, signal: null, out: 'the out', err: 'the err' });
@@ -103,7 +113,7 @@ describe('bounded over real processes: a call past its bound is gone with its gr
     const [grandchild] = await pidsIn(pidfile);
     await sleep(100);
     expect(alive(grandchild)).toBe(true);
-    expect(await calls.stopAll()).toBe(1);
+    expect(await calls.stopAll()).toEqual({ stopped: 1, notSent: [] });
     expect(await until(() => !alive(grandchild))).toBe(true);
   }, 10_000);
 
@@ -116,7 +126,7 @@ describe('bounded over real processes: a call past its bound is gone with its gr
     const restore = calls.detached(node, [HELPER, 'slow', started, done, '600'], { secs: 20 });
     const [child, grandchild] = await pidsIn(probe);
     await pidsIn(started);
-    expect(await calls.stopAll()).toBe(1);
+    expect(await calls.stopAll()).toEqual({ stopped: 1, notSent: [] });
     expect(await p).toMatchObject({ timedOut: false });
     expect(await until(() => !alive(child) && !alive(grandchild))).toBe(true);
     expect(await restore).toMatchObject({ code: 0 });

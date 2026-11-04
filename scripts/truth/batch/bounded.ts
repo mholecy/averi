@@ -1,6 +1,6 @@
 import { constants } from 'node:os';
 import { basename } from 'node:path';
-import type { Ended, ProcessSeam } from './proc.js';
+import type { Ended, KillResult, ProcessSeam } from './proc.js';
 
 /**
  * Every call a batch makes is bounded: a wedged device call cannot hold the batch longer than its bound (batch-7's
@@ -13,11 +13,21 @@ import type { Ended, ProcessSeam } from './proc.js';
  * or a check, which nothing but its own bound stops (batch-11's `detached`: a second Ctrl-C killed the restore) — or
  * its `scope`'s stop, when the restore that started it passed its own bound.
  *
- * Once a call's leader has ended, its group gets SIGKILL: nothing it started outlives it, unless the call says
- * `keepGroup` (a daemon it starts on purpose, such as idb_companion), and then stopAll ends that group at the abort.
- * Its result comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in another
- * group holds them. Its code is its leader's: a leader that ended before the bound is never 142, however long its
+ * Once a call's leader has ended, its group gets SIGKILL: nothing it started outlives it, unless the call keeps its
+ * group (`keepGroup`, by default per tool: `KEEPS_GROUP`), and then stopAll ends that group at the abort. Its result
+ * comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in another group holds
+ * them; what a grandchild writes after that is dropped on purpose — the result is the leader's, and a daemon's output
+ * is no part of it. Its code is its leader's: a leader that ended before the bound is never 142, however long its
  * pipes took.
+ *
+ * A group kill never rejects a call or a stop. A kill the system refuses with EPERM (seen under load: delivery not
+ * proven) is tried once more `EPERM_RETRY_MS` later; one still not delivered is kept in `unproven()`, and stopAll and
+ * a scope's stop name theirs, for the abort to say. A group already gone (ESRCH) is ended.
+ *
+ * Residual: a kept group is signalled by its id alone. While any process of it lives, the id cannot be reused; if all
+ * of it died and a new group took the same id before the abort, that group would be signalled. Telling them apart
+ * needs a process's start time (ps, which the sandbox blocks), so it is not checked; a kept group is a daemon that
+ * runs to the abort, which keeps the window small.
  */
 
 /** A call past its bound exits 142, as perl's alarm did (128 + SIGALRM): steps.ts#stepWordOf reads it as FAIL. */
@@ -30,6 +40,25 @@ export const GRACE_MS = 2000;
 export const CLOSE_GRACE_MS = 1000;
 /** The longest bound taken, a day: setTimeout's delay overflows past 2^31 - 1 ms (24.8 days) and fires at once. */
 export const MAX_SECS = 86_400;
+/** How long to wait before a group kill refused with EPERM is tried once more. */
+export const EPERM_RETRY_MS = 50;
+
+/**
+ * Whether a tool's calls keep their group past their leader, and why: a tool whose leader may leave a daemon in its
+ * group, which the SIGKILL at the leader's end would kill. A call's own `keepGroup` overrides it.
+ */
+export const KEEPS_GROUP: Readonly<Record<string, { keep: boolean; why: string }>> = {
+  idb: {
+    keep: true,
+    why: 'a local idb client may start idb_companion without a session of its own, in the call\'s group; until a lab check shows it leaves the group, the companion is kept (residual: that check)',
+  },
+  emulator: { keep: true, why: 'the emulator binary is the Android device itself: a call starts it to keep it running' },
+  adb: { keep: false, why: 'the adb server it starts calls setsid(), so it leaves the call\'s group and outlives the SIGKILL' },
+  xcrun: { keep: false, why: 'simctl hands the simulator to launchd: nothing of the device is in the call\'s group' },
+};
+
+/** Whether `cmd`'s calls keep their group by default (`KEEPS_GROUP`, by the command's base name; others do not). */
+export const keepsGroup = (cmd: string): boolean => KEEPS_GROUP[basename(cmd)]?.keep === true;
 
 /**
  * A device tool's own bound, in seconds (batch-11's wrappers, :224–226): xcrun simctl boot and bootstatus 300,
@@ -97,17 +126,38 @@ async function untilOr(p: Promise<unknown>, ms: number): Promise<void> {
   }
 }
 
-/** A restore's own calls: `run` is detached, and `stop` ends the groups of those still running. */
+/** A thrown error's code (or text), whatever was thrown: reading it must not throw in turn. */
+function whyOf(e: unknown): string {
+  try {
+    return (e as NodeJS.ErrnoException).code ?? String(e);
+  } catch {
+    return 'an error that cannot be read';
+  }
+}
+
+/** What a stop did: how many groups it ended, and each signal not proven delivered. */
+export interface Stopped {
+  stopped: number;
+  notSent: string[];
+}
+
+/** A restore's own calls: `run` is detached, and `stop` ends the groups of those still running and refuses new ones. */
 export interface Scope {
   run: Run;
-  stop(): Promise<number>;
+  stop(): Promise<Stopped>;
+}
+
+/** Calls tracked together: their groups by id (→ their leader's end), and whether new ones are refused, and why. */
+class Tracked {
+  readonly groups = new Map<number, Promise<Ended>>();
+  refused: string | undefined;
 }
 
 /** A run's calls: each bounded in a group of its own; the probes among them stopped together by `stopAll`. */
 export class Calls {
-  /** The bounded calls still running, and the groups kept past their leader: their group's id → their leader's end. */
-  private readonly running = new Map<number, Promise<Ended>>();
-  private stopping = false;
+  /** The bounded calls still running, and the groups kept past their leader. */
+  private readonly running = new Tracked();
+  private readonly notDelivered: string[] = [];
   private readonly graceMs: number;
   private readonly closeGraceMs: number;
   private readonly installSecs: number | undefined;
@@ -129,52 +179,82 @@ export class Calls {
 
   /** Detached calls tracked together, so that a restore past its bound can be stopped with what it started. */
   scope(): Scope {
-    const mine = new Map<number, Promise<Ended>>();
+    const mine = new Tracked();
     return {
       run: (cmd, args, call = {}) => this.call(cmd, args, call, mine),
-      stop: () => this.endAll(mine),
+      stop: () => this.endAll(mine, 'its restore or judge was stopped at its bound'),
     };
   }
 
   /**
    * Stop every bounded call still running and every group kept, each whole (SIGTERM, then SIGKILL after the grace or
-   * once its leader ended), and refuse any new probe: the run is being stopped. Detached calls go on. How many.
+   * once its leader ended), and refuse any new probe: the run is being stopped. Detached calls go on. Never rejects.
    */
-  stopAll(): Promise<number> {
-    this.stopping = true;
-    return this.endAll(this.running);
+  stopAll(): Promise<Stopped> {
+    return this.endAll(this.running, 'the run is being stopped');
   }
 
-  private async endAll(groups: Map<number, Promise<Ended>>): Promise<number> {
-    const ending = [...groups];
-    await Promise.all(ending.map(([pid, exited]) => this.endGroup(pid, exited)));
-    return ending.length;
+  /** Every signal not proven delivered so far (stopAll's and the scopes' too), as `<signal> to group <id>: <why>`. */
+  unproven(): string[] {
+    return [...this.notDelivered];
   }
 
-  /** SIGTERM to the group; SIGKILL once its leader ended or the grace passed, whichever first: a grandchild may trap TERM. */
-  private async endGroup(pid: number, exited: Promise<Ended>): Promise<void> {
-    this.seam.killGroup(pid, 'SIGTERM');
+  private async endAll(tracked: Tracked, why: string): Promise<Stopped> {
+    tracked.refused = why;
+    const ending = [...tracked.groups];
+    const notSent = (await Promise.all(ending.map(([pid, exited]) => this.endGroup(pid, exited)))).flat();
+    return { stopped: ending.length, notSent };
+  }
+
+  /**
+   * SIGTERM to the group; SIGKILL once its leader ended or the grace passed, whichever first: a grandchild may trap
+   * TERM. A group gone at the TERM is ended. Returns the signals not proven delivered.
+   */
+  private async endGroup(pid: number, exited: Promise<Ended>): Promise<string[]> {
+    const term = await this.signal(pid, 'SIGTERM');
+    if (term === 'gone') return [];
     await untilOr(exited, this.graceMs);
-    this.seam.killGroup(pid, 'SIGKILL');
+    const kill = await this.signal(pid, 'SIGKILL');
+    return [term, kill].flatMap((r) => (typeof r === 'object' ? [`${r.signal} to group ${pid}: ${r.notSent}`] : []));
   }
 
-  private async call(cmd: string, args: readonly string[], { secs, cwd, env, log, keepGroup = false }: Call, tracked: Map<number, Promise<Ended>> | undefined): Promise<CallResult> {
+  /** A group kill that never throws: EPERM tried once more after EPERM_RETRY_MS; one not delivered kept as unproven. */
+  private async signal(pid: number, signal: NodeJS.Signals): Promise<'sent' | 'gone' | { notSent: string; signal: NodeJS.Signals }> {
+    let r = this.tryKill(pid, signal);
+    if (typeof r === 'object' && r.notSent === 'EPERM') {
+      await untilOr(new Promise(() => {}), EPERM_RETRY_MS);
+      r = this.tryKill(pid, signal);
+    }
+    if (typeof r !== 'object') return r;
+    this.notDelivered.push(`${signal} to group ${pid}: ${r.notSent}`);
+    return { notSent: r.notSent, signal };
+  }
+
+  private tryKill(pid: number, signal: NodeJS.Signals): KillResult {
+    try {
+      return this.seam.killGroup(pid, signal);
+    } catch (e) {
+      return { notSent: whyOf(e) };
+    }
+  }
+
+  private async call(cmd: string, args: readonly string[], { secs, cwd, env, log, keepGroup = keepsGroup(cmd) }: Call, tracked: Tracked | undefined): Promise<CallResult> {
     const bound = secs ?? boundFor(cmd, args, this.installSecs);
     if (bound === undefined || !(bound > 0)) throw new Error(`${cmd}: no bound — give its secs (only xcrun, idb and adb have one of their own)`);
     if (bound > MAX_SECS) throw new Error(`${cmd}: a bound of ${bound} s is above ${MAX_SECS} s, the longest taken`);
-    if (tracked === this.running && this.stopping) throw new Error(`${cmd} not started: the run is being stopped`);
+    if (tracked?.refused !== undefined) throw new Error(`${cmd} not started: ${tracked.refused}`);
     const started = this.seam.start(cmd, args, { cwd, env, log });
     const { pid, exited } = started;
     const resultOf = (end: Ended, timedOut: boolean): CallResult => ({ code: codeOf(end, timedOut), timedOut, signal: end.signal, out: started.out(), err: end.error ?? started.err() });
     // Not started (no such command): no group to bound or stop.
     if (pid === undefined) return resultOf(await exited, false);
     let timedOut = false;
-    let ending: Promise<void> = Promise.resolve();
+    let ending: Promise<unknown> = Promise.resolve();
     const timer = setTimeout(() => {
       timedOut = true;
       ending = this.endGroup(pid, exited);
     }, bound * 1000);
-    tracked?.set(pid, exited);
+    tracked?.groups.set(pid, exited);
     let end: Ended;
     try {
       // The leader's end, not its pipes': past this the bound no longer runs (no 142 for a call that ended in time).
@@ -183,10 +263,10 @@ export class Calls {
       // Past its bound, the result waits for the SIGKILL to have been sent: the grandchildren are gone with it.
       await ending;
     } finally {
-      tracked?.delete(pid);
+      tracked?.groups.delete(pid);
     }
-    if (keepGroup) this.running.set(pid, exited);
-    else this.seam.killGroup(pid, 'SIGKILL');
+    if (keepGroup) this.running.groups.set(pid, exited);
+    else await this.signal(pid, 'SIGKILL');
     await untilOr(started.closed, this.closeGraceMs);
     started.release();
     return resultOf(end, timedOut);

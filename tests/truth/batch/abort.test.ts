@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AbortGuard, JUDGE_BUDGET_SECS, markDirty, type AbortBlock, type WindowSpec } from '../../../scripts/truth/batch/abort.js';
+import { MAX_SECS } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs, type BatchFs } from '../../../scripts/truth/batch/io.js';
-import type { Ended, ProcessSeam, Started } from '../../../scripts/truth/batch/proc.js';
+import type { Ended, KillResult, ProcessSeam, Started } from '../../../scripts/truth/batch/proc.js';
 import { RESTORE_FILE } from '../../../scripts/truth/batch/run-dir.js';
 import { StepLog } from '../../../scripts/truth/batch/steps.js';
 
@@ -34,10 +35,14 @@ class FakeSeam implements ProcessSeam {
     this.events.push(`start ${cmd} ${args.join(' ')}`);
     return { pid, exited, closed: exited.then(() => {}), out: () => (args[0] === 'judge' ? `${args[1]}\n` : ''), err: () => '', release: () => {} };
   }
-  killGroup(pid: number, signal: NodeJS.Signals): void {
+  /** Every kill throws `kill EPERM`, as one did under load (review round 2). */
+  killThrows = false;
+  killGroup(pid: number, signal: NodeJS.Signals): KillResult {
     this.events.push(`${signal} -${pid}`);
-    if (signal === 'SIGTERM' && this.stubborn) return;
+    if (this.killThrows) throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
+    if (signal === 'SIGTERM' && this.stubborn) return 'sent';
     this.started[pid - 100]?.end({ code: null, signal });
+    return 'sent';
   }
   install(handlers: { signal(name: NodeJS.Signals): void; fatal(error: unknown): void }): void {
     this.handlers = handlers;
@@ -219,6 +224,20 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     expect(seam.exits).toEqual([130]);
   });
 
+  it('a restore stopped at its bound cannot start its next step (review round 2)', async () => {
+    const guard = guardOf();
+    await interrupt(guard, () =>
+      guard.open('E5', window({ secs: 0.03, restore: async (run) => {
+        await run('node', ['slow-step.ts'], { secs: 60 });
+        await run('node', ['second-step.ts'], { secs: 60 });
+        return { ok: true, how: 'both steps' };
+      } })),
+    );
+    await tick(20);
+    expect(seam.events.filter((e) => e.startsWith('start'))).toEqual(['start node slow-step.ts']);
+    expect(summaryText()).toContain('ERROR E5 not provably put back: its restore passed its bound (0.03 s) and was stopped there');
+  });
+
   it('a restore stopped at its bound: the detached calls it started are ended, each its group; the RESTORE says it was stopped part-way (review round 1)', async () => {
     const guard = guardOf();
     await interrupt(guard, () =>
@@ -327,6 +346,25 @@ describe('the abort leaves no timer behind: the runner can end on its own (revie
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('a group kill that throws EPERM stops no restore (review round 2, BLOCKER)', () => {
+  it('every kill throws: the probe not proven stopped, said; every window still put back; exit 130; nothing unhandled', async () => {
+    seam.killThrows = true;
+    const restored: string[] = [];
+    const guard = guardOf();
+    expect(await interrupt(guard, () => {
+      guard.open('A', window({ restore: async () => (restored.push('A'), { ok: true, how: 'a' }) }));
+      guard.open('B', window({ restore: async () => (restored.push('B'), { ok: true, how: 'b' }) }));
+      void guard.bounded('node', ['probe.ts'], { secs: 60 });
+    })).toBe(130);
+    expect(restored).toEqual(['B', 'A']);
+    expect(existsSync(restoreFile())).toBe(false);
+    const steps = text(join(out, 'steps.log'));
+    expect(steps).toContain('ERROR a running call not proven stopped: SIGTERM to group 100: EPERM');
+    expect(steps).toContain('ERROR a running call not proven stopped: SIGKILL to group 100: EPERM');
+    expect(seam.said).toEqual([]);
   });
 });
 
@@ -651,7 +689,8 @@ describe('an abort that fails itself still exits 130', () => {
       broken = true;
     });
     const said = seam.said.join('');
-    expect(said).toContain(`batch-n: ${restoreFile()} could not be written (EROFS); state to put back by hand:\nbatch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nA: by hand\n`);
+    expect(said).toContain(`batch-n: ${restoreFile()} could not be written (EROFS):\nbatch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nA: by hand\n`);
+    expect(said.match(/state to put back by hand:/g)).toHaveLength(1);
     expect(said.match(/A: by hand/g)).toHaveLength(1);
     expect(seam.exits).toEqual([130]);
   });
@@ -756,6 +795,8 @@ describe('open and close — a dirty window from before its first change until a
       expect(() => guard.close('W')).toThrow(/W is not open/);
       expect(() => guard.open('X', window({ cleanup: 'X cleanup' }))).toThrow(/X: a cleanup line needs a wanted block \(none given; wanted: kf, E5\)/);
       expect(() => guard.open('Y', window({ cleanup: 'Y cleanup', block: 'lvd62' }))).toThrow(/Y: a cleanup line needs a wanted block \(lvd62; wanted: kf, E5\)/);
+      for (const secs of [0, -1, Number.NaN, MAX_SECS + 1]) expect(() => guard.open('S', window({ secs }))).toThrow(new RegExp(`S: a restore bound of ${secs} s: more than 0 and at most ${MAX_SECS} s is needed`));
+      guard.open('M', window({ secs: MAX_SECS }));
     });
   });
 
