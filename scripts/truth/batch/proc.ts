@@ -1,10 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { closeSync, openSync } from 'node:fs';
+import { closeSync, openSync, writeSync } from 'node:fs';
 
 /**
  * The batch module's one process seam: every process it starts, every signal it sends or takes, and its exit go
- * through a `ProcessSeam`. Thin on purpose — the decisions (which bound, when to send which signal, what an interrupt
- * puts back) are bounded.ts's and abort.ts's, tested over a fake seam; this file is tested with real children
+ * through a `ProcessSeam`. Thin on purpose — the decisions (which bound, when to send which signal, how long to read a
+ * child's pipes, what an interrupt puts back) are bounded.ts's and abort.ts's, tested over a fake seam; this file only
+ * reports what happened, and is tested with real children
  * (tests/truth/batch/bounded-proc.test.ts, abort-proc.test.ts).
  *
  * Every child starts in a process group of its own (`detached`, setsid: batch-11's `perl -e 'setpgrp(0, 0)'`), stdin
@@ -31,11 +32,15 @@ export interface Ended {
 export interface Started {
   /** Its pid, which is also its group's id; undefined when it never started. */
   pid: number | undefined;
-  /** Settles once it has ended and its pipes are read (or `CLOSE_GRACE_MS` after its end: see below). Never rejects. */
-  done: Promise<Ended>;
-  /** What it wrote to stdout and stderr, when not to a log. */
+  /** Settles when its leader has ended, or when it never started. Never rejects. */
+  exited: Promise<Ended>;
+  /** Settles when its stdout and stderr have closed — never while a grandchild still holds them. */
+  closed: Promise<void>;
+  /** What it wrote to stdout and stderr so far, when not to a log. */
   out(): string;
   err(): string;
+  /** Stop reading its pipes (a grandchild holds them open); `closed` then settles. */
+  release(): void;
 }
 
 /** What the runner takes instead of the default exits: SIGINT, SIGTERM, SIGHUP; an uncaught exception or rejection. */
@@ -57,42 +62,37 @@ export interface ProcessSeam {
   install(handlers: Handlers): void;
   /** End the runner with `code`. Called once, after the abort has put back what it could. */
   exit(code: number): void;
+  /** The last place to say something when the run's own files cannot be written. Never throws. */
+  stderr(text: string): void;
 }
 
 /** The signals that abort a run: a Ctrl-C, a kill, a closed terminal (`trap on_abort INT TERM HUP`). */
 export const ABORT_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 
-/**
- * How long a child's pipes are read after it has ended. A grandchild that outlives it holds them open, which would
- * hold its result for ever; after this the pipes are let go and the result is what was read.
- */
-export const CLOSE_GRACE_MS = 1000;
-
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 function notStarted(error: unknown): Started {
-  return { pid: undefined, done: Promise.resolve({ code: null, signal: null, error: messageOf(error) }), out: () => '', err: () => '' };
+  const exited = Promise.resolve({ code: null, signal: null, error: messageOf(error) });
+  return { pid: undefined, exited, closed: Promise.resolve(), out: () => '', err: () => '', release: () => {} };
 }
 
 function startedOf(child: ChildProcess): Started {
   let [out, err] = ['', ''];
   child.stdout?.on('data', (d: Buffer) => (out += d.toString()));
   child.stderr?.on('data', (d: Buffer) => (err += d.toString()));
-  const done = new Promise<Ended>((resolve) => {
-    let ended: Ended | undefined;
+  const exited = new Promise<Ended>((resolve) => {
     child.once('error', (e) => resolve({ code: null, signal: null, error: e.message }));
-    child.once('close', (code, signal) => resolve(ended ?? { code, signal }));
-    child.once('exit', (code, signal) => {
-      ended = { code, signal };
-      const letGo = setTimeout(() => {
-        child.stdout?.destroy();
-        child.stderr?.destroy();
-        resolve({ code, signal });
-      }, CLOSE_GRACE_MS);
-      letGo.unref();
-    });
+    child.once('exit', (code, signal) => resolve({ code, signal }));
   });
-  return { pid: child.pid, done, out: () => out, err: () => err };
+  const closed = new Promise<void>((resolve) => {
+    child.once('error', () => resolve());
+    child.once('close', () => resolve());
+  });
+  const release = () => {
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+  };
+  return { pid: child.pid, exited, closed, out: () => out, err: () => err, release };
 }
 
 /** The real seam. */
@@ -126,5 +126,12 @@ export const nodeProcess: ProcessSeam = {
   },
   exit(code) {
     process.exit(code);
+  },
+  stderr(text) {
+    try {
+      writeSync(2, text);
+    } catch {
+      // stderr gone too: nothing is left to say it with
+    }
   },
 };

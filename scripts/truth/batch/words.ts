@@ -83,6 +83,8 @@ export interface BlockReport {
   block: string;
   lines: readonly string[];
   interrupted?: boolean;
+  /** Why an interrupted block was not judged, when not for its records (abort.ts: the judging budget spent). */
+  why?: string;
 }
 
 /** Everything the SUMMARY says, in the order it says it. */
@@ -105,10 +107,13 @@ export interface Summary {
   interrupted?: { at: string };
 }
 
-/** An unfinished block in the abort SUMMARY: its lines so far, marked, then INTERRUPTED and how to rerun it. */
-export const interruptedBlock = (block: string, linesSoFar: readonly string[]): string[] => [
+/**
+ * A block the abort SUMMARY did not judge: its lines so far, marked, then INTERRUPTED and how to rerun it. Its
+ * records not complete, or — `why` — not judged for another reason (the abort's judging budget spent).
+ */
+export const interruptedBlock = (block: string, linesSoFar: readonly string[], why?: string): string[] => [
   ...linesSoFar.map((l) => `(before the interrupt) ${l}`),
-  verdictLine(block, 'INTERRUPTED', `its records are not complete, not judged (rerun ONLY=${block})`),
+  verdictLine(block, 'INTERRUPTED', why === undefined ? `its records are not complete, not judged (rerun ONLY=${block})` : `not judged (${why}; rerun ONLY=${block})`),
 ];
 
 /** The SUMMARY's body, before deduplication. */
@@ -117,7 +122,7 @@ function bodyOf(s: Summary): string[] {
     s.checkout,
     ...(s.interrupted === undefined ? [] : [`INTERRUPTED: ${s.name} run ${s.runId} was interrupted at ${s.interrupted.at}`]),
     ...s.labs,
-    ...s.blocks.flatMap((b) => (b.interrupted === true ? interruptedBlock(b.block, b.lines) : b.lines)),
+    ...s.blocks.flatMap((b) => (b.interrupted === true ? interruptedBlock(b.block, b.lines, b.why) : b.lines)),
     ...s.protectedLines,
     ...(s.restore.written.length === 0 ? ['RESTORE: none — everything dirty was put back and verified'] : [`RESTORE: state not provably put back — ${s.restore.file}:`, ...s.restore.written]),
     ...s.errors,

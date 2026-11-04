@@ -174,6 +174,15 @@ describe('interruptedBlock — an unfinished block in the abort SUMMARY', () => 
   it('keeps its lines so far, marked, then says INTERRUPTED and how to rerun it', () => {
     expect(interruptedBlock('lvd62', ['lv-d62 main drop: PASS'])).toEqual(['(before the interrupt) lv-d62 main drop: PASS', 'lvd62: INTERRUPTED — its records are not complete, not judged (rerun ONLY=lvd62)']);
   });
+
+  it('a block not judged for a reason of its own (the abort\'s judging budget spent): `not judged (<why>; rerun ONLY=…)`', () => {
+    expect(interruptedBlock('kf', [], "the abort's judging budget of 120 s was spent")).toEqual(["kf: INTERRUPTED — not judged (the abort's judging budget of 120 s was spent; rerun ONLY=kf)"]);
+  });
+
+  it('a BlockReport\'s `why` reaches the SUMMARY line', () => {
+    const lines = summaryLines({ name: 'b', runId: '1', checkout: 'OK c', labs: [], protectedLines: [], restore: { file: 'R', written: [] }, errors: [], interrupted: { at: '10:00:00' }, blocks: [{ block: 'kf', lines: [], interrupted: true, why: 'its judge failed: x' }] });
+    expect(lines).toContain('kf: INTERRUPTED — not judged (its judge failed: x; rerun ONLY=kf)');
+  });
 });
 
 describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batch-12; batch-11 exited 0 whatever its verdicts)', () => {

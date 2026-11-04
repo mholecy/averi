@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AbortGuard, markDirty, type AbortBlock, type WindowSpec } from '../../../scripts/truth/batch/abort.js';
-import { nodeFs } from '../../../scripts/truth/batch/io.js';
+import { AbortGuard, JUDGE_BUDGET_SECS, markDirty, type AbortBlock, type WindowSpec } from '../../../scripts/truth/batch/abort.js';
+import { nodeFs, type BatchFs } from '../../../scripts/truth/batch/io.js';
 import type { Ended, ProcessSeam, Started } from '../../../scripts/truth/batch/proc.js';
 import { RESTORE_FILE } from '../../../scripts/truth/batch/run-dir.js';
 import { StepLog } from '../../../scripts/truth/batch/steps.js';
@@ -28,11 +28,11 @@ class FakeSeam implements ProcessSeam {
 
   start(cmd: string, args: readonly string[]): Started {
     let end!: (e: Ended) => void;
-    const done = new Promise<Ended>((r) => (end = r));
+    const exited = new Promise<Ended>((r) => (end = r));
     const pid = this.nextPid++;
     this.started.push({ cmd, args, end });
     this.events.push(`start ${cmd} ${args.join(' ')}`);
-    return { pid, done, out: () => (args[0] === 'judge' ? `${args[1]}\n` : ''), err: () => '' };
+    return { pid, exited, closed: exited.then(() => {}), out: () => (args[0] === 'judge' ? `${args[1]}\n` : ''), err: () => '', release: () => {} };
   }
   killGroup(pid: number, signal: NodeJS.Signals): void {
     this.events.push(`${signal} -${pid}`);
@@ -46,6 +46,10 @@ class FakeSeam implements ProcessSeam {
   exit(code: number): void {
     this.exits.push(code);
     this.exited(code);
+  }
+  readonly said: string[] = [];
+  stderr(text: string): void {
+    this.said.push(text);
   }
 }
 
@@ -90,15 +94,16 @@ const block = (name: string, over: Partial<AbortBlock> = {}): AbortBlock => ({
 
 function guardOf(
   blocks: AbortBlock[] = [block('kf'), block('E5')],
-  over: { head?: () => { checkout: string; labs: string[]; protectedLines: string[] }; graceMs?: number; installSecs?: number; clock?: () => Date } = {},
+  over: { head?: () => { checkout: string; labs: string[]; protectedLines: string[] }; graceMs?: number; installSecs?: number; clock?: () => Date; judgeBudgetSecs?: number; fs?: BatchFs } = {},
 ) {
   return new AbortGuard({
     name: 'batch-n',
     runId: '1',
-    fs: nodeFs,
+    fs: over.fs ?? nodeFs,
     log,
     seam,
     restoreFile: restoreFile(),
+    judgeBudgetSecs: over.judgeBudgetSecs,
     head: over.head ?? (() => ({ checkout: CHECKOUT, labs: ['LAB android: OK — emulator-5554'], protectedLines: [] })),
     blocks,
     clock: 'clock' in over ? over.clock : clock,
@@ -157,7 +162,7 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
     });
     await ran;
     expect(Date.now() - started).toBeLessThan(1000);
-    expect(seam.events).toEqual(['start adb install a.apk', 'SIGTERM -100', 'SIGKILL -100']);
+    expect(seam.events).toEqual(['start adb install a.apk', 'SIGTERM -100', 'SIGKILL -100', 'SIGKILL -100']);
   });
 
   it('with no clock given, the time is now\'s', async () => {
@@ -204,14 +209,29 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
       } })),
     );
     expect(summaryText()).toContain('ERROR E5 not provably put back: its restore threw: no state.json');
-    expect(text(restoreFile())).toContain('E5 (Android): node e5.ts --restore');
+    expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): node e5.ts --restore\n');
   });
 
   it('a restore that never settles is bounded by the window\'s secs: not put back, and the abort goes on', async () => {
     const guard = guardOf();
     await interrupt(guard, () => guard.open('E5', window({ secs: 0.02, restore: () => new Promise(() => {}) })));
-    expect(summaryText()).toContain('ERROR E5 not provably put back: its restore passed its bound (0.02 s)');
+    expect(summaryText()).toContain('ERROR E5 not provably put back: its restore passed its bound (0.02 s) and was stopped there');
     expect(seam.exits).toEqual([130]);
+  });
+
+  it('a restore stopped at its bound: the detached calls it started are ended, each its group; the RESTORE says it was stopped part-way (review round 1)', async () => {
+    const guard = guardOf();
+    await interrupt(guard, () =>
+      guard.open('E5', window({ secs: 0.03, restore: async (run) => {
+        await run('adb', ['install', '-r', 'a.apk']);
+        return { ok: true, how: 'never' };
+      } })),
+    );
+    expect(seam.events.slice(0, 3)).toEqual(['start adb install -r a.apk', 'SIGTERM -100', 'SIGKILL -100']);
+    expect(text(restoreFile()).split('\n').slice(1, 3)).toEqual([
+      "E5: its restore was stopped at its bound (0.03 s), part-way — check the state it left before the hand commands below",
+      'E5 (Android): node e5.ts --restore',
+    ]);
   });
 
   it('a restore that says done while its state file is still dirty is not put back (batch-12: state_of after the restore)', async () => {
@@ -222,6 +242,7 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
       writeFileSync(state, '{"dirty":true,"before":"x"}');
     });
     expect(summaryText()).toContain(`ERROR E5 not provably put back: its restore said done, but ${state} is dirty`);
+    expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): node e5.ts --restore\n');
   });
 
   it('a restore that fails with its state file dirty says its own why', async () => {
@@ -283,8 +304,29 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
       guard.open('E5', window({ restore: async () => (seam.events.push('restore E5'), { ok: true, how: 'x' }) }));
       void guard.bounded('node', ['probe.ts'], { secs: 60 });
     });
-    expect(seam.events).toEqual(['start node probe.ts', 'SIGTERM -100', 'SIGKILL -100', 'restore E5']);
+    expect(seam.events.slice(0, 3)).toEqual(['start node probe.ts', 'SIGTERM -100', 'SIGKILL -100']);
+    expect(seam.events.indexOf('restore E5')).toBeGreaterThan(2);
     expect(text(join(out, 'steps.log'))).toContain('NOTE 1 running call(s) stopped, each its whole process group');
+  });
+});
+
+describe('the abort leaves no timer behind: the runner can end on its own (review round 1)', () => {
+  it('a restore and a judge settled in time: every bound\'s timer cleared', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const guard = guardOf([block('kf', { complete: () => true })]);
+      void guard.run(async () => {
+        guard.open('E5', window());
+        await new Promise(() => {});
+      }).catch(() => {});
+      await vi.advanceTimersByTimeAsync(0);
+      seam.handlers?.signal('SIGINT');
+      for (let i = 0; i < 20 && seam.exits.length === 0; i++) await vi.advanceTimersByTimeAsync(1);
+      expect(seam.exits).toEqual([130]);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -478,19 +520,38 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     ]);
     await interrupt(guard);
     const s = summaryText();
-    expect(s).toContain('kf: INTERRUPTED — its records are not complete, not judged (rerun ONLY=kf)');
+    expect(s).toContain('kf: INTERRUPTED — not judged (its judge failed: analyze.txt missing; rerun ONLY=kf)');
     expect(s).toContain('ERROR kf not judged by the abort: analyze.txt missing');
     expect(s).toContain('T6: INTERRUPTED');
   });
 
-  it('a judge that never settles is bounded (judgeSecs)', async () => {
-    const guard = new AbortGuard({
-      name: 'batch-n', runId: '1', fs: nodeFs, log, seam, restoreFile: restoreFile(), clock, graceMs: 5, judgeSecs: 0.02,
-      head: () => ({ checkout: CHECKOUT, labs: [], protectedLines: [] }),
-      blocks: [block('kf', { complete: () => true, judge: () => new Promise(() => {}) })],
-    });
+  it('the judges share one budget (review round 1): a judge that never settles spends it, its calls are stopped, and the blocks after it are not judged', async () => {
+    let judged = 0;
+    const guard = guardOf(
+      [
+        block('kf', { complete: () => true, judge: (run) => (judged++, run('node', ['analyze.ts'], { secs: 60 }).then(() => ['kf: PASS'])) }),
+        block('T6', { complete: () => true, judge: async () => (judged++, ['T6 verdict: PASS']) }),
+      ],
+      { judgeBudgetSecs: 0.05 },
+    );
     await interrupt(guard);
-    expect(summaryText()).toContain('ERROR kf not judged by the abort: its judge passed its bound (0.02 s)');
+    const s = summaryText();
+    expect(s).toContain("kf: INTERRUPTED — not judged (the abort's judging budget of 0.05 s was spent; rerun ONLY=kf)");
+    expect(s).toContain("T6: INTERRUPTED — not judged (the abort's judging budget of 0.05 s was spent; rerun ONLY=T6)");
+    expect(judged).toBe(1);
+    expect(seam.events).toEqual(['start node analyze.ts', 'SIGTERM -100', 'SIGKILL -100', 'SIGKILL -100']);
+  });
+
+  it('the judging budget is 120 s unless given', () => {
+    expect(JUDGE_BUDGET_SECS).toBe(120);
+  });
+
+  it('once a restore passed its bound, no block is judged: the abort has taken long already', async () => {
+    let judged = 0;
+    const guard = guardOf([block('kf', { complete: () => true, judge: async () => (judged++, ['kf: PASS']) })]);
+    await interrupt(guard, () => guard.open('E5', window({ secs: 0.02, restore: () => new Promise(() => {}) })));
+    expect(judged).toBe(0);
+    expect(summaryText()).toContain('kf: INTERRUPTED — not judged (a restore passed its bound, so the abort judges nothing more; rerun ONLY=kf)');
   });
 
   it('the protected-key lines are kept, after the blocks', async () => {
@@ -533,14 +594,120 @@ describe('an abort that fails itself still exits 130', () => {
   it('its SUMMARY cannot be written (summary.txt a folder): the failure said on stderr, exit 130', async () => {
     mkdirSync(join(out, 'meta', 'blocked'));
     log = StepLog.open(nodeFs, { name: 'batch-n', runId: '3', blocks: ['E5'], outFile: join(out, 'meta', 'c.out'), stepsFile: join(out, 'steps.log'), summaryFile: join(out, 'meta', 'blocked'), clock, terminal: () => {} });
-    const said: string[] = [];
-    const write = vi.spyOn(process.stderr, 'write').mockImplementation((t) => (said.push(String(t)), true));
-    try {
-      expect(await interrupt(guardOf([block('E5')]))).toBe(130);
-    } finally {
-      write.mockRestore();
-    }
-    expect(said.join('')).toMatch(/^batch-n: the abort failed: EISDIR/);
+    expect(await interrupt(guardOf([block('E5')]))).toBe(130);
+    expect(seam.said.join('')).toMatch(/^batch-n: the abort failed: EISDIR/);
+  });
+
+  it('the log failing (ENOSPC, the out folder gone) stops no restore: every window put back, RESTORE written, exit 130 (review round 1)', async () => {
+    let broken = false;
+    const flaky: BatchFs = { ...nodeFs, append: (p, t) => {
+      if (broken && p !== restoreFile()) throw new Error('ENOSPC: no space left on device');
+      nodeFs.append(p, t);
+    } };
+    log = StepLog.open(flaky, { name: 'batch-n', runId: '4', blocks: ['E5'], outFile: join(out, 'meta', 'd.out'), stepsFile: join(out, 'steps.log'), summaryFile: join(out, 'meta', 'summary.txt'), clock, terminal: () => {} });
+    const restored: string[] = [];
+    const guard = guardOf([block('E5')], { fs: flaky });
+    expect(await interrupt(guard, () => {
+      guard.open('A', window({ restore: async () => (restored.push('A'), { ok: false, why: 'x', hand: ['A: by hand'] }) }));
+      guard.open('B', window({ restore: async () => (restored.push('B'), { ok: true, how: 'y' }) }));
+      broken = true;
+    })).toBe(130);
+    expect(restored).toEqual(['B', 'A']);
+    expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nA: by hand\n');
+  });
+
+  it('only RESTORE cannot be written: stderr carries its lines, and the SUMMARY still lists them', async () => {
+    const flaky: BatchFs = { ...nodeFs, append: (p, t) => {
+      if (p === restoreFile()) throw new Error('EACCES');
+      nodeFs.append(p, t);
+    } };
+    const guard = guardOf([block('E5')], { fs: flaky });
+    await interrupt(guard, () => guard.open('A', window({ restore: async () => ({ ok: false, why: 'x', hand: ['A: by hand'] }) })));
+    expect(seam.said.join('')).toContain('A: by hand');
+    expect(summaryText()).toContain(`RESTORE: state not provably put back — ${restoreFile()}:\nbatch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nA: by hand\n`);
+  });
+
+  it('the normal end\'s RESTORE that cannot be written throws to the runner: no abort is running to say it', async () => {
+    const flaky: BatchFs = { ...nodeFs, append: (p, t) => {
+      if (p === restoreFile()) throw new Error('EACCES');
+      nodeFs.append(p, t);
+    } };
+    const guard = guardOf([block('E5')], { fs: flaky });
+    await guard.run(async () => guard.open('A', window()));
+    expect(() => guard.finish()).toThrow(/EACCES/);
+    expect(seam.said).toEqual([]);
+  });
+
+  it('RESTORE itself cannot be written: its hand lines go to stderr once, the last place left', async () => {
+    let broken = false;
+    const flaky: BatchFs = { ...nodeFs, append: (p, t) => {
+      if (broken) throw new Error('EROFS');
+      nodeFs.append(p, t);
+    } };
+    log = StepLog.open(flaky, { name: 'batch-n', runId: '5', blocks: ['E5'], outFile: join(out, 'meta', 'e.out'), stepsFile: join(out, 'steps.log'), clock, terminal: () => {} });
+    const guard = guardOf([block('E5')], { fs: flaky });
+    await interrupt(guard, () => {
+      guard.open('A', window({ restore: async () => ({ ok: false, why: 'x', hand: ['A: by hand'] }) }));
+      broken = true;
+    });
+    const said = seam.said.join('');
+    expect(said).toContain(`batch-n: ${restoreFile()} could not be written (EROFS); state to put back by hand:\nbatch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nA: by hand\n`);
+    expect(said.match(/A: by hand/g)).toHaveLength(1);
+    expect(seam.exits).toEqual([130]);
+  });
+
+  it('a window whose put-back throws past its restore (its state file cannot be read) does not stop the next window', async () => {
+    const restored: string[] = [];
+    let boom = false;
+    const guard = guardOf([block('E5')], { fs: { ...nodeFs, exists: (p) => {
+      if (boom && p.endsWith('boom.json')) throw new Error('EACCES');
+      return nodeFs.exists(p);
+    } } });
+    await interrupt(guard, () => {
+      guard.open('A', window({ restore: async () => (restored.push('A'), { ok: true, how: 'a' }) }));
+      guard.open('B', window({ stateFile: join(out, 'boom.json'), restore: async () => (restored.push('B'), { ok: true, how: 'b' }) }));
+      boom = true;
+    });
+    expect(restored).toEqual(['B', 'A']);
+    expect(summaryText()).toContain('ERROR B not provably put back: its put-back failed: EACCES');
+    expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): node e5.ts --restore\n');
+  });
+});
+
+describe('the body keeps running during the abort: its close() and finish() empty no window (review round 1, MAJOR)', () => {
+  const bodyThen = (guard: AbortGuard, after: () => void) => async () => {
+    guard.open('E5', window({ restore: async () => ({ ok: false, why: 'check exit 3' }) }));
+    await guard.bounded('node', ['probe.ts'], { secs: 60 });
+    after();
+  };
+
+  it('close() in the body after its probe was stopped: a NOTE, no throw; the window still put back by the abort, RESTORE under the interrupted header', async () => {
+    const guard = guardOf();
+    let threw: unknown;
+    await interrupt(guard, bodyThen(guard, () => {
+      try {
+        guard.close('E5');
+      } catch (e) {
+        threw = e;
+      }
+    }));
+    expect(threw).toBeUndefined();
+    expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): node e5.ts --restore\n');
+    expect(text(join(out, 'steps.log'))).toContain('NOTE close(E5) ignored: the abort is putting the windows back');
+  });
+
+  it('finish() in the body after its probe was stopped: a NOTE, nothing more written as "ended", the lines so far returned; the abort writes the window', async () => {
+    const guard = guardOf();
+    let returned: string[] = [];
+    const ended = ['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', 'W: by hand'];
+    await interrupt(guard, async () => {
+      guard.open('W', window({ hand: ['W: by hand'] }));
+      expect(guard.finish()).toEqual(ended);
+      await bodyThen(guard, () => (returned = guard.finish()))();
+    });
+    expect(returned).toEqual(ended);
+    expect(text(restoreFile())).toBe(`${ended.join('\n')}\nbatch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): node e5.ts --restore\n`);
+    expect(text(join(out, 'steps.log'))).toContain('NOTE finish() ignored: the abort is putting the windows back');
   });
 });
 
@@ -580,19 +747,27 @@ describe('finish — the normal end writes RESTORE for any window still dirty (b
 });
 
 describe('open and close — a dirty window from before its first change until a verified restore', () => {
-  it('a window opened twice, one with no hand lines, or closing one not open: a programming error', () => {
+  it('a window opened twice, one with no hand lines, closing one not open, a cleanup line with no wanted block: a programming error', async () => {
     const guard = guardOf();
-    guard.open('E5', window());
-    expect(() => guard.open('E5', window())).toThrow(/E5 is open already/);
-    expect(() => guard.open('W', window({ hand: [] }))).toThrow(/W: a window needs its hand lines/);
-    expect(() => guard.close('W')).toThrow(/W is not open/);
-    expect(() => guard.open('X', window({ cleanup: 'X cleanup' }))).toThrow(/X: a cleanup line needs the block it belongs to/);
+    await guard.run(async () => {
+      guard.open('E5', window());
+      expect(() => guard.open('E5', window())).toThrow(/E5 is open already/);
+      expect(() => guard.open('W', window({ hand: [] }))).toThrow(/W: a window needs its hand lines/);
+      expect(() => guard.close('W')).toThrow(/W is not open/);
+      expect(() => guard.open('X', window({ cleanup: 'X cleanup' }))).toThrow(/X: a cleanup line needs a wanted block \(none given; wanted: kf, E5\)/);
+      expect(() => guard.open('Y', window({ cleanup: 'Y cleanup', block: 'lvd62' }))).toThrow(/Y: a cleanup line needs a wanted block \(lvd62; wanted: kf, E5\)/);
+    });
   });
 
-  it('opened over an existing state file: marked dirty, its other fields kept — a window reopened over a restore that had cleared it (batch-11\'s reinstall after the restore) reads dirty again', () => {
+  it('a window opened before run() installed the abort: refused — nothing would put it back (review round 1)', () => {
+    expect(() => guardOf().open('E5', window())).toThrow(/E5: the abort is not installed yet — open windows inside run\(\)/);
+  });
+
+  it('opened over an existing state file: marked dirty, its other fields kept — a window reopened over a restore that had cleared it (batch-11\'s reinstall after the restore) reads dirty again', async () => {
     const state = join(out, 'state.json');
     writeFileSync(state, '{"dirty":false,"before":{"k":1}}');
-    guardOf().open('E5', window({ stateFile: state }));
+    const guard = guardOf();
+    await guard.run(async () => guard.open('E5', window({ stateFile: state })));
     expect(JSON.parse(text(state))).toEqual({ dirty: true, before: { k: 1 } });
   });
 });

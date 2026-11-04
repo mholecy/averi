@@ -10,7 +10,14 @@ import type { Ended, ProcessSeam } from './proc.js';
  *
  * Two kinds of call, both in a group of their own (proc.ts): `bounded`, a probe, which the abort stops before it puts
  * anything back (a probe no longer gets the terminal's Ctrl-C, so the runner must stop it); and `detached`, a restore
- * or a check, which nothing but its own bound stops (batch-11's `detached`: a second Ctrl-C killed the restore).
+ * or a check, which nothing but its own bound stops (batch-11's `detached`: a second Ctrl-C killed the restore) — or
+ * its `scope`'s stop, when the restore that started it passed its own bound.
+ *
+ * Once a call's leader has ended, its group gets SIGKILL: nothing it started outlives it, unless the call says
+ * `keepGroup` (a daemon it starts on purpose, such as idb_companion), and then stopAll ends that group at the abort.
+ * Its result comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in another
+ * group holds them. Its code is its leader's: a leader that ended before the bound is never 142, however long its
+ * pipes took.
  */
 
 /** A call past its bound exits 142, as perl's alarm did (128 + SIGALRM): steps.ts#stepWordOf reads it as FAIL. */
@@ -19,6 +26,10 @@ export const TIMED_OUT = 142;
 export const NOT_STARTED = 127;
 /** How long a group is given after SIGTERM before SIGKILL. */
 export const GRACE_MS = 2000;
+/** How long a call's pipes are read after its leader has ended, when something outside its group holds them. */
+export const CLOSE_GRACE_MS = 1000;
+/** The longest bound taken, a day: setTimeout's delay overflows past 2^31 - 1 ms (24.8 days) and fires at once. */
+export const MAX_SECS = 86_400;
 
 /**
  * A device tool's own bound, in seconds (batch-11's wrappers, :224–226): xcrun simctl boot and bootstatus 300,
@@ -56,6 +67,11 @@ export interface Call {
   env?: NodeJS.ProcessEnv;
   /** Its stdout and stderr appended to this file as it runs; then `out` and `err` are empty. */
   log?: string;
+  /**
+   * Its group outlives its leader (a daemon it starts on purpose): no SIGKILL at its end. stopAll ends it with SIGTERM
+   * and SIGKILL straight after — its leader is gone, so nothing tells when the daemon has finished.
+   */
+  keepGroup?: boolean;
 }
 
 export interface CallResult {
@@ -71,72 +87,108 @@ export interface CallResult {
 /** Run a command, bounded. */
 export type Run = (cmd: string, args: readonly string[], call?: Call) => Promise<CallResult>;
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** `p`'s settling or `ms` passing, whichever first; the timer cleared, so none is left to hold the run open. */
+async function untilOr(p: Promise<unknown>, ms: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([p, new Promise<void>((resolve) => (timer = setTimeout(resolve, ms)))]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** A restore's own calls: `run` is detached, and `stop` ends the groups of those still running. */
+export interface Scope {
+  run: Run;
+  stop(): Promise<number>;
+}
 
 /** A run's calls: each bounded in a group of its own; the probes among them stopped together by `stopAll`. */
 export class Calls {
-  /** The bounded calls still running: their group's id → their end. */
+  /** The bounded calls still running, and the groups kept past their leader: their group's id → their leader's end. */
   private readonly running = new Map<number, Promise<Ended>>();
   private stopping = false;
   private readonly graceMs: number;
+  private readonly closeGraceMs: number;
   private readonly installSecs: number | undefined;
 
   constructor(
     private readonly seam: ProcessSeam,
-    { graceMs = GRACE_MS, installSecs }: { graceMs?: number; installSecs?: number } = {},
+    { graceMs = GRACE_MS, closeGraceMs = CLOSE_GRACE_MS, installSecs }: { graceMs?: number; closeGraceMs?: number; installSecs?: number } = {},
   ) {
     this.graceMs = graceMs;
+    this.closeGraceMs = closeGraceMs;
     this.installSecs = installSecs;
   }
 
   /** A probe: past its bound its group gets SIGTERM, then SIGKILL; `stopAll` stops it; none starts once stopping. */
-  readonly bounded: Run = (cmd, args, call = {}) => this.call(cmd, args, call, true);
+  readonly bounded: Run = (cmd, args, call = {}) => this.call(cmd, args, call, this.running);
 
   /** A restore or a check: the same bound, but `stopAll` leaves it running, and it starts while stopping too. */
-  readonly detached: Run = (cmd, args, call = {}) => this.call(cmd, args, call, false);
+  readonly detached: Run = (cmd, args, call = {}) => this.call(cmd, args, call, undefined);
+
+  /** Detached calls tracked together, so that a restore past its bound can be stopped with what it started. */
+  scope(): Scope {
+    const mine = new Map<number, Promise<Ended>>();
+    return {
+      run: (cmd, args, call = {}) => this.call(cmd, args, call, mine),
+      stop: () => this.endAll(mine),
+    };
+  }
 
   /**
-   * Stop every bounded call still running, each its whole group (SIGTERM, then SIGKILL after the grace or once it
-   * ended), and refuse any new one: the run is being stopped. Detached calls go on. Returns how many were stopped.
+   * Stop every bounded call still running and every group kept, each whole (SIGTERM, then SIGKILL after the grace or
+   * once its leader ended), and refuse any new probe: the run is being stopped. Detached calls go on. How many.
    */
-  async stopAll(): Promise<number> {
+  stopAll(): Promise<number> {
     this.stopping = true;
-    const stopped = [...this.running];
-    await Promise.all(stopped.map(([pid, done]) => this.endGroup(pid, done)));
-    return stopped.length;
+    return this.endAll(this.running);
+  }
+
+  private async endAll(groups: Map<number, Promise<Ended>>): Promise<number> {
+    const ending = [...groups];
+    await Promise.all(ending.map(([pid, exited]) => this.endGroup(pid, exited)));
+    return ending.length;
   }
 
   /** SIGTERM to the group; SIGKILL once its leader ended or the grace passed, whichever first: a grandchild may trap TERM. */
-  private async endGroup(pid: number, done: Promise<Ended>): Promise<void> {
+  private async endGroup(pid: number, exited: Promise<Ended>): Promise<void> {
     this.seam.killGroup(pid, 'SIGTERM');
-    await Promise.race([done, sleep(this.graceMs)]);
+    await untilOr(exited, this.graceMs);
     this.seam.killGroup(pid, 'SIGKILL');
   }
 
-  private async call(cmd: string, args: readonly string[], { secs, cwd, env, log }: Call, probe: boolean): Promise<CallResult> {
+  private async call(cmd: string, args: readonly string[], { secs, cwd, env, log, keepGroup = false }: Call, tracked: Map<number, Promise<Ended>> | undefined): Promise<CallResult> {
     const bound = secs ?? boundFor(cmd, args, this.installSecs);
     if (bound === undefined || !(bound > 0)) throw new Error(`${cmd}: no bound — give its secs (only xcrun, idb and adb have one of their own)`);
-    if (probe && this.stopping) throw new Error(`${cmd} not started: the run is being stopped`);
+    if (bound > MAX_SECS) throw new Error(`${cmd}: a bound of ${bound} s is above ${MAX_SECS} s, the longest taken`);
+    if (tracked === this.running && this.stopping) throw new Error(`${cmd} not started: the run is being stopped`);
     const started = this.seam.start(cmd, args, { cwd, env, log });
-    const { pid, done } = started;
+    const { pid, exited } = started;
     const resultOf = (end: Ended, timedOut: boolean): CallResult => ({ code: codeOf(end, timedOut), timedOut, signal: end.signal, out: started.out(), err: end.error ?? started.err() });
     // Not started (no such command): no group to bound or stop.
-    if (pid === undefined) return resultOf(await done, false);
+    if (pid === undefined) return resultOf(await exited, false);
     let timedOut = false;
-    let ended: Promise<void> = Promise.resolve();
+    let ending: Promise<void> = Promise.resolve();
     const timer = setTimeout(() => {
       timedOut = true;
-      ended = this.endGroup(pid, done);
+      ending = this.endGroup(pid, exited);
     }, bound * 1000);
-    if (probe) this.running.set(pid, done);
+    tracked?.set(pid, exited);
+    let end: Ended;
     try {
-      const end = await done;
+      // The leader's end, not its pipes': past this the bound no longer runs (no 142 for a call that ended in time).
+      end = await exited;
       clearTimeout(timer);
       // Past its bound, the result waits for the SIGKILL to have been sent: the grandchildren are gone with it.
-      await ended;
-      return resultOf(end, timedOut);
+      await ending;
     } finally {
-      this.running.delete(pid);
+      tracked?.delete(pid);
     }
+    if (keepGroup) this.running.set(pid, exited);
+    else this.seam.killGroup(pid, 'SIGKILL');
+    await untilOr(started.closed, this.closeGraceMs);
+    started.release();
+    return resultOf(end, timedOut);
   }
 }

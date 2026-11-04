@@ -86,13 +86,25 @@ describe('bounded over real processes: a call past its bound is gone with its gr
     expect((await calls.detached(node, [HELPER, 'stdin'], { secs: 5 })).out).toBe('stdin 0');
   }, 10_000);
 
-  it('a call that exits leaving a grandchild on its pipes does not hold the batch: its result comes within the close grace', async () => {
+  it('a call that exits leaving a grandchild: the grandchild is killed with its group, and the result comes at once (review round 1)', async () => {
     const calls = new Calls(nodeProcess);
     const pidfile = join(dir, 'left.pid');
     const started = Date.now();
     expect(await calls.bounded(node, [HELPER, 'leave', pidfile], { secs: 20 })).toMatchObject({ code: 0, timedOut: false });
-    expect(Date.now() - started).toBeLessThan(5000);
-    await pidsIn(pidfile);
+    expect(Date.now() - started).toBeLessThan(800);
+    const [grandchild] = await pidsIn(pidfile);
+    expect(await until(() => !alive(grandchild))).toBe(true);
+  }, 10_000);
+
+  it('keepGroup: the grandchild (a daemon such as idb_companion) outlives the call, its result after the close grace; stopAll ends it', async () => {
+    const calls = new Calls(nodeProcess, { graceMs: 200, closeGraceMs: 300 });
+    const pidfile = join(dir, 'kept.pid');
+    expect(await calls.bounded(node, [HELPER, 'leave', pidfile], { secs: 20, keepGroup: true })).toMatchObject({ code: 0, timedOut: false });
+    const [grandchild] = await pidsIn(pidfile);
+    await sleep(100);
+    expect(alive(grandchild)).toBe(true);
+    expect(await calls.stopAll()).toBe(1);
+    expect(await until(() => !alive(grandchild))).toBe(true);
   }, 10_000);
 
   it('stopAll ends a running bounded call\'s whole group and leaves a detached one running (batch-11\'s restores)', async () => {

@@ -1,26 +1,33 @@
-import { describe, expect, it } from 'vitest';
-import { boundFor, Calls, codeOf, NOT_STARTED, TIMED_OUT } from '../../../scripts/truth/batch/bounded.js';
+import { describe, expect, it, vi } from 'vitest';
+import { boundFor, Calls, codeOf, MAX_SECS, NOT_STARTED, TIMED_OUT } from '../../../scripts/truth/batch/bounded.js';
 import type { Ended, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 
 // scripts/truth/batch/bounded.ts over a fake process seam: which bound a device call gets, what its exit code says,
-// and when a call's process group is sent SIGTERM and SIGKILL. No process is started here; the real groups (a
-// grandchild gone after a timeout) are tests/truth/batch/bounded-proc.test.ts.
+// when a call's process group is sent SIGTERM and SIGKILL, and when its result comes. No process is started here; the
+// real groups (a grandchild gone after a timeout, or after its leader exited) are tests/truth/batch/bounded-proc.test.ts.
 
-/** One fake call: it ends when `end` is called, or — unless stubborn — when its group gets SIGTERM or SIGKILL. */
+/** One fake call: its leader ends when `end` is called, or — unless stubborn — when its group gets SIGTERM or SIGKILL. */
 interface FakeCall {
   cmd: string;
   args: readonly string[];
   pid: number;
   end(e: Ended): void;
+  /** Its pipes close: with the leader's end, unless the seam holds them (a grandchild keeps them open). */
+  close(): void;
   stubbornToTerm: boolean;
+  released: boolean;
 }
 
 class FakeSeam implements ProcessSeam {
   readonly calls: FakeCall[] = [];
-  readonly options: StartOptions[] = [];
   readonly kills: string[] = [];
+  readonly options: StartOptions[] = [];
   /** Calls started from now on ignore SIGTERM (a grandchild that traps it); SIGKILL ends them. */
   stubborn = false;
+  /** Calls started from now on keep their pipes open after their leader ends, until their group gets SIGKILL. */
+  holdPipes = false;
+  /** Calls started from now on keep their pipes open whatever happens (a grandchild in another group holds them). */
+  holdPipesForEver = false;
   /** The next start fails as an unknown command does. */
   failNext = false;
   private nextPid = 100;
@@ -29,24 +36,43 @@ class FakeSeam implements ProcessSeam {
     this.options.push(options);
     if (this.failNext) {
       this.failNext = false;
-      return { pid: undefined, done: Promise.resolve({ code: null, signal: null, error: `spawn ${cmd} ENOENT` }), out: () => '', err: () => '' };
+      return { pid: undefined, exited: Promise.resolve({ code: null, signal: null, error: `spawn ${cmd} ENOENT` }), closed: Promise.resolve(), out: () => '', err: () => '', release: () => {} };
     }
     let end!: (e: Ended) => void;
-    const done = new Promise<Ended>((resolve) => (end = resolve));
-    const call: FakeCall = { cmd, args, pid: this.nextPid++, end, stubbornToTerm: this.stubborn };
+    let close!: () => void;
+    const exited = new Promise<Ended>((resolve) => (end = resolve));
+    const closed = new Promise<void>((resolve) => (close = resolve));
+    const [hold, forEver] = [this.holdPipes, this.holdPipesForEver];
+    const call: FakeCall = {
+      cmd,
+      args,
+      pid: this.nextPid++,
+      end: (e) => {
+        end(e);
+        if (!hold && !forEver) close();
+      },
+      close: () => {
+        if (!forEver) close();
+      },
+      stubbornToTerm: this.stubborn,
+      released: false,
+    };
     this.calls.push(call);
-    return { pid: call.pid, done, out: () => `out of ${cmd}`, err: () => `err of ${cmd}` };
+    return { pid: call.pid, exited, closed, out: () => `out of ${cmd}`, err: () => `err of ${cmd}`, release: () => (call.released = true) };
   }
 
   killGroup(pid: number, signal: NodeJS.Signals): void {
     this.kills.push(`${signal} -${pid}`);
     const call = this.calls.find((c) => c.pid === pid);
-    if (call === undefined || (signal === 'SIGTERM' && call.stubbornToTerm)) return;
+    if (call === undefined) return;
+    if (signal === 'SIGKILL') call.close();
+    if (signal === 'SIGTERM' && call.stubbornToTerm) return;
     call.end({ code: null, signal });
   }
 
   install(): void {}
   exit(): void {}
+  stderr(): void {}
 }
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
@@ -108,14 +134,14 @@ describe('codeOf — a call\'s exit code as the shell gave it (batch-7: exit 142
 });
 
 describe('Calls.bounded — a call in a process group of its own, ended whole past its bound', () => {
-  it('a call that ends in time: its code and output, no signal sent', async () => {
+  it('a call that ends in time: its code and output; then SIGKILL to its group, so nothing it started outlives it (review round 1)', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam);
     const r = calls.bounded('adb', ['devices']);
     await tick();
     seam.calls[0].end({ code: 0, signal: null });
     expect(await r).toEqual({ code: 0, timedOut: false, signal: null, out: 'out of adb', err: 'err of adb' });
-    expect(seam.kills).toEqual([]);
+    expect(seam.kills).toEqual(['SIGKILL -100']);
   });
 
   it('past its bound: SIGTERM to its whole group (-pid), then SIGKILL to the group even when the leader died of the TERM — a grandchild may trap it (backlog T2 S2: the grandchild gone)', async () => {
@@ -123,7 +149,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     const calls = new Calls(seam, { graceMs: 30 });
     const r = await calls.bounded('node', ['probe.ts'], { secs: 0.02 });
     expect(r).toMatchObject({ code: TIMED_OUT, timedOut: true, signal: 'SIGTERM' });
-    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+    expect(seam.kills.slice(0, 2)).toEqual(['SIGTERM -100', 'SIGKILL -100']);
   });
 
   it('a group that ignores SIGTERM: SIGKILL after the grace, and the result waits for it', async () => {
@@ -133,11 +159,11 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     const started = Date.now();
     const r = await calls.bounded('node', ['probe.ts'], { secs: 0.02 });
     expect(r).toMatchObject({ code: TIMED_OUT, timedOut: true, signal: 'SIGKILL' });
-    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+    expect(seam.kills.slice(0, 2)).toEqual(['SIGTERM -100', 'SIGKILL -100']);
     expect(Date.now() - started).toBeGreaterThanOrEqual(45);
   });
 
-  it('the bound is in seconds: a call ended at 10 ms of a 0.2 s bound was in time', async () => {
+  it('the bound is in seconds: a call ended at 10 ms of a 0.2 s bound was in time, and no SIGTERM ever follows', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam, { graceMs: 10 });
     const r = calls.bounded('node', ['x'], { secs: 0.2 });
@@ -145,7 +171,55 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     seam.calls[0].end({ code: 1, signal: null });
     expect(await r).toMatchObject({ code: 1, timedOut: false });
     await tick(250);
+    expect(seam.kills).toEqual(['SIGKILL -100']);
+  });
+
+  it('a leader that ended before its bound, its pipes held past the bound: its own code, never 142 (review round 1: the race)', async () => {
+    const seam = new FakeSeam();
+    seam.holdPipesForEver = true;
+    const calls = new Calls(seam, { graceMs: 5, closeGraceMs: 60 });
+    const r = calls.bounded('node', ['x'], { secs: 0.02, keepGroup: true });
+    await tick();
+    seam.calls[0].end({ code: 4, signal: null });
+    expect(await r).toMatchObject({ code: 4, timedOut: false });
     expect(seam.kills).toEqual([]);
+  });
+
+  it('pipes a grandchild holds open: let go after the close grace, the result what was read (backlog T2 S2)', async () => {
+    const seam = new FakeSeam();
+    seam.holdPipesForEver = true;
+    const calls = new Calls(seam, { closeGraceMs: 30 });
+    const started = Date.now();
+    const r = calls.bounded('node', ['x'], { secs: 5 });
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    expect(await r).toMatchObject({ code: 0, out: 'out of node' });
+    expect(Date.now() - started).toBeGreaterThanOrEqual(25);
+    expect(seam.calls[0].released).toBe(true);
+  });
+
+  it('pipes held by a grandchild in its group close with the SIGKILL: no close grace waited', async () => {
+    const seam = new FakeSeam();
+    seam.holdPipes = true;
+    const calls = new Calls(seam, { closeGraceMs: 2000 });
+    const started = Date.now();
+    const r = calls.bounded('node', ['x'], { secs: 5 });
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await r;
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it('keepGroup (idb_companion, a daemon the call starts on purpose): no SIGKILL once the leader ended; stopAll ends the group later', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    const r = calls.bounded('idb', ['connect', 'U'], { keepGroup: true });
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    expect(await r).toMatchObject({ code: 0 });
+    expect(seam.kills).toEqual([]);
+    expect(await calls.stopAll()).toBe(1);
+    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
   });
 
   it('a device tool takes its own bound when none is given; another command without one is refused before it starts', async () => {
@@ -155,6 +229,19 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     await expect(calls.bounded('node', ['live.ts'], { secs: 0 })).rejects.toThrow(/node: no bound/);
     await expect(calls.bounded('node', ['live.ts'], { secs: Number.NaN })).rejects.toThrow(/node: no bound/);
     expect(seam.calls).toEqual([]);
+  });
+
+  it(`a bound above MAX_SECS is refused: setTimeout would overflow and fire at once (review round 1); MAX_SECS itself is taken`, async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam);
+    expect(MAX_SECS * 1000).toBeLessThan(2 ** 31);
+    await expect(calls.bounded('node', ['x'], { secs: MAX_SECS + 1 })).rejects.toThrow(new RegExp(`node: a bound of ${MAX_SECS + 1} s is above ${MAX_SECS} s`));
+    expect(seam.calls).toEqual([]);
+    const r = calls.bounded('node', ['x'], { secs: MAX_SECS });
+    await tick(20);
+    expect(seam.kills).toEqual([]);
+    seam.calls[0].end({ code: 0, signal: null });
+    expect(await r).toMatchObject({ code: 0, timedOut: false });
   });
 
   it('the call\'s folder, env and log reach the seam', async () => {
@@ -182,6 +269,28 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
   });
 });
 
+describe('a call leaves no timer behind: the runner can end on its own (review round 1)', () => {
+  it('a call in time, one past its bound, one whose pipes closed with its end: every timer cleared', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const seam = new FakeSeam();
+      const calls = new Calls(seam, { graceMs: 50, closeGraceMs: 50 });
+      const inTime = calls.bounded('adb', ['devices']);
+      await vi.advanceTimersByTimeAsync(0);
+      seam.calls[0].end({ code: 0, signal: null });
+      await vi.advanceTimersByTimeAsync(0);
+      await inTime;
+      expect(vi.getTimerCount()).toBe(0);
+      const late = calls.bounded('node', ['x'], { secs: 0.01 });
+      await vi.advanceTimersByTimeAsync(20);
+      await late;
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('Calls.stopAll — the abort stops every running probe, its whole group, but never a detached restore (batch-11: the second Ctrl-C killed the restore)', () => {
   it('bounded calls running: SIGTERM then SIGKILL to each group; detached ones untouched', async () => {
     const seam = new FakeSeam();
@@ -191,7 +300,8 @@ describe('Calls.stopAll — the abort stops every running probe, its whole group
     await tick();
     expect(await calls.stopAll()).toBe(1);
     expect(await probe).toMatchObject({ signal: 'SIGTERM', timedOut: false });
-    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+    expect(seam.kills.filter((k) => k.endsWith('-101'))).toEqual([]);
+    expect(seam.kills.slice(0, 2)).toEqual(['SIGTERM -100', 'SIGKILL -100']);
     seam.calls[1].end({ code: 0, signal: null });
     expect(await restore).toMatchObject({ code: 0 });
   });
@@ -206,15 +316,16 @@ describe('Calls.stopAll — the abort stops every running probe, its whole group
     expect(await probe).toMatchObject({ signal: 'SIGKILL' });
   });
 
-  it('a call that ended before the abort is not signalled', async () => {
+  it('a call that ended before the abort is not stopped again', async () => {
     const seam = new FakeSeam();
     const calls = new Calls(seam, { graceMs: 5 });
     const probe = calls.bounded('node', ['probe.ts'], { secs: 60 });
     await tick();
     seam.calls[0].end({ code: 0, signal: null });
     await probe;
+    const before = [...seam.kills];
     expect(await calls.stopAll()).toBe(0);
-    expect(seam.kills).toEqual([]);
+    expect(seam.kills).toEqual(before);
   });
 
   it('once stopping, no new bounded call starts (the run\'s body must not go on to its next probe); a detached one still does', async () => {
@@ -236,5 +347,34 @@ describe('Calls.stopAll — the abort stops every running probe, its whole group
     seam.kills.length = 0;
     expect(await calls.stopAll()).toBe(0);
     expect(seam.kills).toEqual([]);
+  });
+});
+
+describe('Calls.scope — the detached calls of one restore, stopped together when the restore passes its bound (review round 1)', () => {
+  it('stop ends the groups of the scope\'s calls still running; another scope\'s, and stopAll, leave them', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    const [a, b] = [calls.scope(), calls.scope()];
+    const ra = a.run('node', ['restore-a.ts'], { secs: 60 });
+    const rb = b.run('node', ['restore-b.ts'], { secs: 60 });
+    await tick();
+    expect(await calls.stopAll()).toBe(0);
+    expect(await a.stop()).toBe(1);
+    expect(await ra).toMatchObject({ signal: 'SIGTERM' });
+    expect(seam.kills.filter((k) => k.endsWith('-101'))).toEqual([]);
+    seam.calls[1].end({ code: 0, signal: null });
+    expect(await rb).toMatchObject({ code: 0 });
+    expect(await b.stop()).toBe(0);
+  });
+
+  it('a scope\'s call starts while the run is being stopped: it is a restore\'s', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    await calls.stopAll();
+    const s = calls.scope();
+    const r = s.run('adb', ['devices']);
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    expect(await r).toMatchObject({ code: 0 });
   });
 });

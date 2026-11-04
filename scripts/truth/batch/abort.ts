@@ -22,6 +22,21 @@ import { EXIT, stepLine, summaryLines, twoDigits, verdictLine, type BlockReport 
  * RESTORE file as hand lines; then the SUMMARY — INTERRUPTED, each block whose records are complete judged now,
  * device-free, the others INTERRUPTED — and exit 130. Everything durable is written before the terminal gets the
  * SUMMARY: a tty paused with Ctrl-S blocks inside that last write (steps.ts#terminalOf), and so holds only the exit.
+ *
+ * What the abort relies on, and what it does not:
+ * - The windows it puts back are those open when it began, taken before its first await. The run's body goes on
+ *   meanwhile — a probe the abort stopped returns to it — so its close() and finish() are only noted from then on: a
+ *   body that closes its window after its probe was killed must not leave the device dirty with `RESTORE: none`.
+ * - The log is not relied on: a line it cannot write (ENOSPC, the out folder gone) is dropped, and each window is
+ *   put back on its own. When the RESTORE file itself cannot be written, its lines go to stderr once.
+ * - A block's own restore, on the normal path, runs as a probe (`bounded`), so the abort may stop it part-way and then
+ *   run the window's restore again: every restore must be safe to run twice (batch-12's were).
+ * - A restore that passes its bound is stopped there with the detached calls it started, and its RESTORE lines say
+ *   so: the state it left is part-way.
+ *
+ * How long it can take, at worst: the probes' stop (`graceMs`, 2 s), then each dirty window's restore bound (`secs`,
+ * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s) —
+ * one window at the defaults, about 7 minutes. No block is judged once a restore has passed its bound.
  */
 
 /** A restore's outcome: put back and verified (`how`, for the step line), or not (`why`, its hand lines, its word). */
@@ -73,14 +88,17 @@ export interface AbortGuardOptions {
   graceMs?: number;
   /** bounded.ts#boundFor's install bound (batch-12's B_INSTALL). */
   installSecs?: number;
-  /** A judge's bound in seconds (300 by default, as batch-12's analyzer). */
-  judgeSecs?: number;
+  /** The judges' one budget in seconds, for all blocks together (120 by default). */
+  judgeBudgetSecs?: number;
 }
 
 /** A restore's bound when its window names none (batch-12's B_RESTORE). */
 export const RESTORE_SECS = 300;
-/** A judge's bound when none is given (batch-12's `detached 300` analyzer). */
-export const JUDGE_SECS = 300;
+/**
+ * The judges' budget when none is given: all complete blocks together. batch-12 gave its analyzer 300 s per block;
+ * one budget for all keeps the abort's worst case short, and a block not judged in it is INTERRUPTED and rerun.
+ */
+export const JUDGE_BUDGET_SECS = 120;
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -116,6 +134,12 @@ export function markDirty(fs: BatchFs, file: string): 'marked' | 'missing' | 'un
 const dateOf = (d: Date) => `${d.getFullYear()}-${twoDigits(d.getMonth() + 1)}-${twoDigits(d.getDate())}`;
 const timeOf = (d: Date) => `${twoDigits(d.getHours())}:${twoDigits(d.getMinutes())}:${twoDigits(d.getSeconds())}`;
 
+/** One window's put-back: its outcome, and whether its restore was stopped at its bound. */
+interface PutBack {
+  p: Putback;
+  late?: true;
+}
+
 /** A run's guard: its bounded calls, its dirty windows, and the abort that puts them back. */
 export class AbortGuard {
   private readonly calls: Calls;
@@ -133,18 +157,26 @@ export class AbortGuard {
     return this.calls.bounded;
   }
 
-  /** Open a dirty window, before the first change it covers. Its state file, when one is there, is marked dirty. */
+  /**
+   * Open a dirty window, before the first change it covers — inside run(), where the abort is installed. Its state
+   * file, when one is there, is marked dirty.
+   */
   open(name: string, spec: WindowSpec): void {
+    if (!this.installed) throw new Error(`${name}: the abort is not installed yet — open windows inside run()`);
     if (this.aborting !== undefined) throw new Error(`${name}: no window opens while the run is being stopped`);
     if (this.windows.has(name)) throw new Error(`${name} is open already`);
     if (spec.hand.length === 0) throw new Error(`${name}: a window needs its hand lines, for a RESTORE when it is not put back`);
-    if (spec.cleanup !== undefined && spec.block === undefined) throw new Error(`${name}: a cleanup line needs the block it belongs to`);
+    const wanted = this.options.blocks.map((b) => b.block);
+    if (spec.cleanup !== undefined && !wanted.some((b) => b === spec.block)) {
+      throw new Error(`${name}: a cleanup line needs a wanted block (${spec.block ?? 'none given'}; wanted: ${wanted.join(', ')})`);
+    }
     if (spec.stateFile !== undefined) markDirty(this.options.fs, spec.stateFile);
     this.windows.set(name, spec);
   }
 
-  /** Close a window: its restore was verified. */
+  /** Close a window: its restore was verified. While the abort runs, only noted: the abort puts it back. */
   close(name: string): void {
+    if (this.aborting !== undefined) return this.say('NOTE', `close(${name}) ignored: the abort is putting the windows back`);
     if (!this.windows.delete(name)) throw new Error(`${name} is not open`);
   }
 
@@ -169,9 +201,14 @@ export class AbortGuard {
 
   /**
    * The normal end: every window still open goes to the RESTORE file with its hand lines (the block's own restore
-   * did not prove it put back), and is closed. Returns every RESTORE line this run wrote, for the SUMMARY.
+   * did not prove it put back), and is closed. Returns every RESTORE line this run wrote, for the SUMMARY. While the
+   * abort runs, only noted: the abort writes the RESTORE.
    */
   finish(): string[] {
+    if (this.aborting !== undefined) {
+      this.say('NOTE', 'finish() ignored: the abort is putting the windows back');
+      return [...this.restoreLines];
+    }
     const hand = [...this.windows.values()].flatMap((w) => w.hand);
     this.windows.clear();
     const written = this.writeRestore('ended', hand);
@@ -184,23 +221,41 @@ export class AbortGuard {
     this.installed = true;
     this.options.seam.install({
       signal: (name) => {
-        if (this.aborting !== undefined) this.options.log.step('NOTE', `${name} ignored: the abort is putting state back`);
+        if (this.aborting !== undefined) this.say('NOTE', `${name} ignored: the abort is putting state back`);
         else void this.abort(`by ${name}`);
       },
       fatal: (e) => {
-        if (this.aborting !== undefined) this.options.log.error(`an uncaught error while aborting: ${messageOf(e)}`);
+        if (this.aborting !== undefined) this.say('ERROR', `an uncaught error while aborting: ${messageOf(e)}`);
         else void this.abort(`by an uncaught error: ${messageOf(e)}`);
       },
     });
+  }
+
+  /** A step line the abort cannot be stopped by: one the log fails to write is dropped. */
+  private say(word: 'OK' | 'NOTE' | 'ERROR', text: string): void {
+    try {
+      this.options.log.step(word, text);
+    } catch {
+      // The log cannot be written (ENOSPC, the out folder gone): the restores matter more than the line.
+    }
   }
 
   private writeRestore(how: 'ended' | 'interrupted', hand: readonly string[]): string[] {
     const { name, runId, restoreFile, fs } = this.options;
     const now = this.now();
     const header = `${name} run ${runId} ${how} at ${dateOf(now)} ${timeOf(now)}`;
-    const written = writeRestore(fs, restoreFile, { header, hand });
-    this.restoreLines.push(...written);
-    return written;
+    try {
+      const written = writeRestore(fs, restoreFile, { header, hand });
+      this.restoreLines.push(...written);
+      return written;
+    } catch (e) {
+      if (how === 'ended') throw e;
+      // The last place left: the hand lines once on stderr, so a person can still put the state back.
+      const lines = [`${header}; state to put back by hand:`, ...hand];
+      this.options.seam.stderr(`${name}: ${restoreFile} could not be written (${messageOf(e)}); state to put back by hand:\n${lines.join('\n')}\n`);
+      this.restoreLines.push(...lines);
+      return lines;
+    }
   }
 
   private now(): Date {
@@ -213,69 +268,105 @@ export class AbortGuard {
   }
 
   private async abortOnce(why: string): Promise<void> {
+    // Before any await: the windows open now are the ones to put back, whatever the body does from here. (close()
+    // and finish() are only noted once aborting, so nothing changes them now; the snapshot holds even if one did.)
+    const windows = [...this.windows];
+    const at = this.now();
     const { log, seam } = this.options;
     try {
-      const at = this.now();
-      log.error(`${this.options.name} interrupted (run ${this.options.runId}) ${why}`);
-      const cut = new Set([...this.windows.values()].map((w) => w.block));
+      this.say('ERROR', `${this.options.name} interrupted (run ${this.options.runId}) ${why}`);
+      const cut = new Set(windows.map(([, w]) => w.block));
       const stopped = await this.calls.stopAll();
-      if (stopped > 0) log.step('NOTE', `${stopped} running call(s) stopped, each its whole process group`);
-      const { hand, cleanups } = await this.putBackAll();
-      if (this.writeRestore('interrupted', hand).length > 0) log.error(`state not provably put back — ${this.options.restoreFile}`);
-      const blocks = await this.reports(cut, cleanups);
+      if (stopped > 0) this.say('NOTE', `${stopped} running call(s) stopped, each its whole process group`);
+      const { hand, cleanups, late } = await this.putBackAll(windows);
+      if (this.writeRestore('interrupted', hand).length > 0) this.say('ERROR', `state not provably put back — ${this.options.restoreFile}`);
+      const blocks = await this.reports(cut, cleanups, late);
       log.summary(summaryLines({ ...this.headOf(), name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors: log.errors(), interrupted: { at: timeOf(at) } }));
     } catch (e) {
-      // The abort's own failure (a file it could not write): said on stderr, and the exit is 130 still.
-      process.stderr.write(`${this.options.name}: the abort failed: ${messageOf(e)}\n`);
+      // The abort's own failure (its SUMMARY could not be written): said on stderr, and the exit is 130 still.
+      seam.stderr(`${this.options.name}: the abort failed: ${messageOf(e)}\n`);
     } finally {
       seam.exit(EXIT.interrupted);
     }
   }
 
-  /** Every dirty window, the last opened first: put back, or its hand lines kept. And its cleanup line. */
-  private async putBackAll(): Promise<{ hand: string[]; cleanups: Map<string | undefined, string[]> }> {
+  /**
+   * Every window open at the interrupt, the last opened first, each on its own: put back, or its hand lines kept. And
+   * its cleanup line. `late`: a restore passed its bound.
+   */
+  private async putBackAll(windows: readonly [string, WindowSpec][]): Promise<{ hand: string[]; cleanups: Map<string | undefined, string[]>; late: boolean }> {
     const hand: string[] = [];
     const cleanups = new Map<string | undefined, string[]>();
-    for (const [name, spec] of [...this.windows].reverse()) {
-      const p = await this.putBack(spec);
-      if (p.ok) {
-        this.options.log.step('OK', `${name} put back (verified by the abort): ${p.how}`);
-      } else {
-        hand.push(...(p.hand !== undefined && p.hand.length > 0 ? p.hand : spec.hand));
-        this.options.log.error(`${name} not provably put back: ${p.why}`);
+    let late = false;
+    for (const [name, spec] of [...windows].reverse()) {
+      let b: PutBack;
+      try {
+        b = await this.putBack(spec);
+      } catch (e) {
+        b = { p: { ok: false, why: `its put-back failed: ${messageOf(e)}` } };
       }
-      // A cleanup label has its block: open() refuses one without.
+      const { p } = b;
+      late ||= b.late === true;
+      if (p.ok) this.say('OK', `${name} put back (verified by the abort): ${p.how}`);
+      else {
+        const own = p.hand !== undefined && p.hand.length > 0 ? p.hand : spec.hand;
+        hand.push(...(b.late === true ? [`${name}: its restore was stopped at its bound (${spec.secs ?? RESTORE_SECS} s), part-way — check the state it left before the hand commands below`] : []), ...own);
+        this.say('ERROR', `${name} not provably put back: ${p.why}`);
+      }
+      // A cleanup label has a wanted block: open() refuses one without.
       if (spec.cleanup !== undefined) {
         const line = p.ok ? verdictLine(spec.cleanup, 'OK', `${p.how} (verified by the abort)`) : verdictLine(spec.cleanup, p.verdict ?? 'ERROR', `${p.why} (the abort)`);
         cleanups.set(spec.block, [...(cleanups.get(spec.block) ?? []), line]);
       }
     }
-    return { hand, cleanups };
+    return { hand, cleanups, late };
   }
 
-  private async putBack(spec: WindowSpec): Promise<Putback> {
+  private async putBack(spec: WindowSpec): Promise<PutBack> {
     const secs = spec.secs ?? RESTORE_SECS;
-    let p: Putback;
+    // The restore's own calls, so that a restore stopped at its bound is stopped with what it started.
+    const scope = this.calls.scope();
+    let r: Awaited<ReturnType<typeof within<Putback>>>;
     try {
-      const r = await within(secs, spec.restore(this.calls.detached));
-      p = r.late ? { ok: false, why: `its restore passed its bound (${secs} s)` } : r.value;
+      r = await within(secs, spec.restore(scope.run));
     } catch (e) {
-      p = { ok: false, why: `its restore threw: ${messageOf(e)}` };
+      return { p: { ok: false, why: `its restore threw: ${messageOf(e)}` } };
+    }
+    if (r.late) {
+      await scope.stop();
+      return { p: { ok: false, why: `its restore passed its bound (${secs} s) and was stopped there` }, late: true };
     }
     const file = spec.stateFile;
-    if (p.ok && file !== undefined && this.options.fs.exists(file)) {
+    if (r.value.ok && file !== undefined && this.options.fs.exists(file)) {
       const state = stateOf(this.options.fs, file);
-      if (state !== 'clean') return { ok: false, why: `its restore said done, but ${file} is ${state}` };
+      if (state !== 'clean') return { p: { ok: false, why: `its restore said done, but ${file} is ${state}` } };
     }
-    return p;
+    return { p: r.value };
   }
 
-  /** Each wanted block: judged when complete and not cut inside a window, else INTERRUPTED; then its cleanup lines. */
-  private async reports(cut: ReadonlySet<string | undefined>, cleanups: ReadonlyMap<string | undefined, readonly string[]>): Promise<BlockReport[]> {
+  /**
+   * Each wanted block: judged when complete, not cut inside a window, and the judges' budget not spent — else
+   * INTERRUPTED, with why when its records were complete; then its cleanup lines. Nothing is judged once a restore
+   * has passed its bound.
+   */
+  private async reports(cut: ReadonlySet<string | undefined>, cleanups: ReadonlyMap<string | undefined, readonly string[]>, lateRestore: boolean): Promise<BlockReport[]> {
+    const budget = this.options.judgeBudgetSecs ?? JUDGE_BUDGET_SECS;
+    const until = Date.now() + budget * 1000;
+    const spent = `the abort's judging budget of ${budget} s was spent`;
+    let skip = lateRestore ? 'a restore passed its bound, so the abort judges nothing more' : undefined;
     const reports: BlockReport[] = [];
     for (const b of this.options.blocks) {
-      const lines = cut.has(b.block) || !this.completeOf(b) ? undefined : await this.judged(b);
-      reports.push(lines === undefined ? { block: b.block, lines: b.linesSoFar(), interrupted: true } : { block: b.block, lines });
+      let report: BlockReport;
+      if (cut.has(b.block) || !this.completeOf(b)) report = { block: b.block, lines: b.linesSoFar(), interrupted: true };
+      else {
+        const left = (until - Date.now()) / 1000;
+        if (skip === undefined && left <= 0) skip = spent;
+        // A judge past what was left spent the budget: the next block finds none left.
+        const judged = skip === undefined ? await this.judged(b, left) : { why: skip };
+        if (judged === 'late') report = { block: b.block, lines: b.linesSoFar(), interrupted: true, why: spent };
+        else report = 'lines' in judged ? { block: b.block, lines: judged.lines } : { block: b.block, lines: b.linesSoFar(), interrupted: true, why: judged.why };
+      }
+      reports.push(report);
       const cleanup = cleanups.get(b.block);
       if (cleanup !== undefined) reports.push({ block: b.block, lines: cleanup });
     }
@@ -290,16 +381,17 @@ export class AbortGuard {
     }
   }
 
-  private async judged(b: AbortBlock): Promise<readonly string[] | undefined> {
-    const secs = this.options.judgeSecs ?? JUDGE_SECS;
+  /** A block judged within what is left of the budget: its lines; or why not; or `late`, its calls stopped. */
+  private async judged(b: AbortBlock, secs: number): Promise<{ lines: readonly string[] } | { why: string } | 'late'> {
+    const scope = this.calls.scope();
     try {
-      const r = await within(secs, b.judge(this.calls.detached));
-      if (!r.late) return r.value;
-      this.options.log.error(`${b.block} not judged by the abort: its judge passed its bound (${secs} s)`);
-      return undefined;
+      const r = await within(secs, b.judge(scope.run));
+      if (!r.late) return { lines: r.value };
+      await scope.stop();
+      return 'late';
     } catch (e) {
-      this.options.log.error(`${b.block} not judged by the abort: ${messageOf(e)}`);
-      return undefined;
+      this.say('ERROR', `${b.block} not judged by the abort: ${messageOf(e)}`);
+      return { why: `its judge failed: ${messageOf(e)}` };
     }
   }
 

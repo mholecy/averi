@@ -154,23 +154,28 @@ Where S1 departs from batch-12, on purpose:
 
 ### S2: bounded calls and the abort (2026-11-04, backlog T2 slice S2, the risk gate)
 
-S2 adds three files. bounded.ts bounds every call: its tool's own bound, exit 142 past it, and the whole process group
-ended, SIGTERM and then SIGKILL. abort.ts holds the dirty windows and the abort: SIGINT, SIGTERM or SIGHUP, a throw out
+S2 adds three files. bounded.ts bounds every call: its tool's own bound (at most a day, `MAX_SECS`), exit 142 past
+it, and the whole process group ended, SIGTERM and then SIGKILL; once a call's leader has ended, its group gets
+SIGKILL, so nothing it started outlives it, unless the call says `keepGroup` (a daemon such as idb_companion, whose
+group stopAll then ends). abort.ts holds the dirty windows and the abort: SIGINT, SIGTERM or SIGHUP, a throw out
 of the run's body, or an uncaught exception or unhandled rejection puts back every dirty window, writes RESTORE for
 what it cannot prove, prints the abort SUMMARY through words.ts and steps.ts, and exits 130. proc.ts is the one
-process and signal seam: spawn in a group of its own, kill a group, the signal and fatal handlers, exit. io.ts gains
+process and signal seam: spawn in a group of its own, kill a group, the signal and fatal handlers, exit, stderr; it
+only reports a child's exit and its pipes' close, and bounded.ts decides how long to wait for either. io.ts gains
 `replace`, which writes a state file's text beside it and renames it over the old one (`markDirty`).
 
 bounded.ts and abort.ts join the run. Each is tested over a fake seam (tests/truth/batch/bounded.test.ts,
-abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines: bounded.ts 97.87 %
-(2 survivors), abort.ts 97.53 % (5 survivors, 1 mutant without coverage), every one equivalent and named in
-scope.json; floors 96 and 95. io.ts rose to 95.38 % with `replace` and its tests (the same three equivalents), so its
-floor rises from 92 to 93. The cold run of all seventeen modules took about 2 minutes (Stryker's own 125 to 131 s),
-past the 90 s mark the S1 part already noted; the look at one Stryker run per module is still left for later. proc.ts stays out: it is only spawn, kill and process.on, and its tests start real
-children. Those are tests/truth/batch/bounded-proc.test.ts (a grandchild that traps SIGTERM is gone after a timeout)
-and abort-proc.test.ts (b11-dry's int.sh scenarios as vitest tests: a group sent SIGINT, a second SIGINT, a throw, a
-rejection and an uncaught exception inside a window, stdout EPIPE, a terminal that blocks, batch-12's worktree
-window). Both run in the normal suite only, as terminal.test.ts does.
+abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines after review round 1: bounded.ts
+99.10 % (1 survivor), abort.ts 98.54 % (4 survivors, 1 mutant without coverage), every one equivalent and named in
+scope.json; floors 97 and 96. io.ts rose to 95.38 % with `replace` and its tests (the same three equivalents), so its
+floor rises from 92 to 93. The cold run of all seventeen modules took about 2 minutes (Stryker's own 108 to 131 s),
+past the 90 s mark the S1 part already noted; the look at one Stryker run per module is still left for later.
+proc.ts stays out: it is only spawn, kill and process.on, and its tests start real children. Those are
+tests/truth/batch/bounded-proc.test.ts (a grandchild that traps SIGTERM is gone after a timeout, a leader's leftover
+gone after its end, a kept group ended by stopAll) and abort-proc.test.ts (b11-dry's int.sh scenarios as vitest
+tests: a group sent SIGINT, a second SIGINT, a throw, a rejection and an uncaught exception inside a window, stdout
+EPIPE, a terminal that blocks, batch-12's worktree window). Both run in the normal suite only, as terminal.test.ts
+does.
 
 What of batch-11's and batch-12's safety core S2 does not port, each with the slice that owns it or the reason:
 - the `B_*` bound knobs and their validation: S1's select.ts `knobs` already covers them; a batch passes the value as
@@ -205,7 +210,20 @@ Where S2 departs from batch-12, on purpose:
 - the windows are put back last opened first. batch-12 used a fixed order, which mattered only with two windows
   open.
 - a restore is bounded as a whole by its window's `secs` (300 by default, as B_RESTORE), not only each command in it.
-  A complete block's judge is bounded too (300 s, as batch-12's `detached 300` analyzer).
+  A restore past its bound is stopped there, with the detached calls it started (`Calls.scope`), and its RESTORE
+  lines say it was stopped part-way. The judges of the complete blocks share one budget, `judgeBudgetSecs` (120 s by
+  default), where batch-12 gave its analyzer 300 s per block; a block not judged in it, or after a restore passed its
+  bound, is `INTERRUPTED — not judged (<why>; rerun ONLY=<block>)`. The abort's worst case is then the probes' stop
+  (2 s), each dirty window's bound and its stop (300 s + 2 s by default), and the budget and its stop (120 s + 2 s):
+  about 7 minutes for one window at the defaults.
+- the windows the abort puts back are those open when it began, taken before its first await. The run's body goes on
+  meanwhile (a probe the abort stopped returns to it), so close() and finish() are only noted from then on; else a
+  body that closed its window after its probe was killed would leave the device dirty with `RESTORE: none`. A window
+  opens only inside run(), where the abort is installed, and a cleanup line only for a wanted block.
+- the abort does not rely on its log: a line it cannot write (ENOSPC, the out folder gone) is dropped, each window is
+  put back on its own, and when the RESTORE file cannot be written its lines go to stderr once.
+- a block's own restore on the normal path runs as a probe, so the abort may stop it part-way and then run the
+  window's restore again: every restore must be safe to run twice, as batch-12's were.
 - the runner stops its running probes itself, before the first restore: SIGTERM to each probe's group, then SIGKILL
   after a 2 s grace or once the probe has ended. In a group of its own a probe no longer gets the terminal's Ctrl-C.
   Once stopping, no probe starts and no window opens, so a body that goes on after its probe was killed cannot touch
