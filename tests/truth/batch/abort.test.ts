@@ -8,6 +8,7 @@ import { nodeFs, type BatchFs } from '../../../scripts/truth/batch/io.js';
 import type { Ended, KillResult, ProcessSeam, Started } from '../../../scripts/truth/batch/proc.js';
 import { RESTORE_FILE } from '../../../scripts/truth/batch/run-dir.js';
 import { StepLog } from '../../../scripts/truth/batch/steps.js';
+import { exitCodeOf } from '../../../scripts/truth/batch/words.js';
 
 // scripts/truth/batch/abort.ts over a fake process seam: the dirty windows, and what an interrupt, a throw or an
 // unhandled rejection does with them — batch-6's on_abort, batch-7's TRAPEXIT, batch-11's detached restores, batch-12's
@@ -411,7 +412,7 @@ describe('a group kill that throws EPERM stops no restore (review round 2, BLOCK
       expect(await r).toMatchObject({ code: 0 });
     });
     expect(text(join(out, 'steps.log'))).toContain('ERROR a kill not delivered: SIGKILL to group 100: EPERM — group 100 may still be running');
-    expect(guard.finish()).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 100 may still be running: kill -9 -100, then check the device's state"]);
+    expect(await guard.finish()).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 100 may still be running: kill -9 -100, then check the device's state"]);
   });
 
   it('…with a window still open at the end, its group line names that window', async () => {
@@ -424,7 +425,7 @@ describe('a group kill that throws EPERM stops no restore (review round 2, BLOCK
       await r;
       guard.open('E5', window());
     });
-    expect(guard.finish()).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 100 may still be running: kill -9 -100, then check E5's state", 'E5 (Android): node e5.ts --restore']);
+    expect(await guard.finish()).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 100 may still be running: kill -9 -100, then check E5's state", 'E5 (Android): node e5.ts --restore']);
   });
 
   it('…and when the run is interrupted instead, the abort\'s RESTORE has it, naming the window open then', async () => {
@@ -484,6 +485,52 @@ describe('kept groups live through the abort\'s restores and judging, and are en
     expect(await seam.exit$).toBe(130);
     expect(text(restoreFile())).toBe("batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\ngroup 100 may still be running: kill -9 -100, then check E5's state\n");
     expect(summaryText()).toContain("group 100 may still be running: kill -9 -100, then check E5's state");
+  });
+});
+
+describe('the normal end ends the kept groups too: a companion lives across blocks, not past the run (final check)', () => {
+  /** A run whose idb call (owner `owner`) leaves its group alive (idb_companion). */
+  async function keptRun(guard: AbortGuard, owners: (string | undefined)[]) {
+    for (const [i, owner] of owners.entries()) seam.leftGroups.add(100 + i);
+    await guard.run(async () => {
+      for (const [i, owner] of owners.entries()) {
+        const r = guard.bounded('idb', ['connect', 'U'], { owner });
+        await tick();
+        seam.started[i].end({ code: 0, signal: null });
+        await r;
+      }
+    });
+  }
+
+  it('finish(): RESTORE first (none here), then the kept group ended; nothing left after the run', async () => {
+    const guard = guardOf();
+    await keptRun(guard, [undefined]);
+    expect(seam.leftGroups.has(100)).toBe(true);
+    expect(await guard.finish()).toEqual([]);
+    expect(seam.events).toEqual(['start idb connect U', 'SIGTERM -100', 'SIGKILL -100']);
+    expect(seam.leftGroups.has(100)).toBe(false);
+    expect(existsSync(restoreFile())).toBe(false);
+  });
+
+  it('a kept group whose kills are refused at the end: its hand line in RESTORE, and the run exits 1', async () => {
+    const guard = guardOf();
+    await keptRun(guard, [undefined]);
+    seam.refusePids.add(100);
+    const written = await guard.finish();
+    expect(written).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 100 may still be running: kill -9 -100, then check the device's state"]);
+    expect(text(restoreFile())).toBe(`${written.join('\n')}\n`);
+    expect(text(join(out, 'steps.log'))).toContain(`ERROR state not provably put back — the hand commands are in ${restoreFile()}`);
+    expect(exitCodeOf({ name: 'batch-n', runId: '1', checkout: CHECKOUT, labs: [], blocks: [], protectedLines: [], restore: { file: restoreFile(), written }, errors: [] })).toBe(1);
+  });
+
+  it('stopKept(owner): a block ends its own companion when done with it, the others\' left running', async () => {
+    const guard = guardOf();
+    await keptRun(guard, ['kf', 'T6']);
+    await guard.stopKept('kf');
+    expect(seam.events.filter((e) => e.startsWith('SIG'))).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+    expect([seam.leftGroups.has(100), seam.leftGroups.has(101)]).toEqual([false, true]);
+    await guard.stopKept();
+    expect(seam.leftGroups.has(101)).toBe(false);
   });
 });
 
@@ -791,7 +838,7 @@ describe('an abort that fails itself still exits 130', () => {
     } };
     const guard = guardOf([block('E5')], { fs: flaky });
     await guard.run(async () => guard.open('A', window()));
-    expect(() => guard.finish()).toThrow(/EACCES/);
+    await expect(guard.finish()).rejects.toThrow(/EACCES/);
     expect(seam.said).toEqual([]);
   });
 
@@ -860,8 +907,8 @@ describe('the body keeps running during the abort: its close() and finish() empt
     const ended = ['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', 'W: by hand'];
     await interrupt(guard, async () => {
       guard.open('W', window({ hand: ['W: by hand'] }));
-      expect(guard.finish()).toEqual(ended);
-      await bodyThen(guard, () => (returned = guard.finish()))();
+      expect(await guard.finish()).toEqual(ended);
+      await bodyThen(guard, () => void guard.finish().then((lines) => (returned = lines)))();
     });
     expect(returned).toEqual(ended);
     expect(text(restoreFile())).toBe(`${ended.join('\n')}\nbatch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): node e5.ts --restore\n`);
@@ -876,11 +923,11 @@ describe('finish — the normal end writes RESTORE for any window still dirty (b
       guard.open('E5', window());
       guard.open('WT', window({ hand: ['lvd62: git worktree remove --force wt'] }));
     });
-    const written = guard.finish();
+    const written = await guard.finish();
     expect(written).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', 'E5 (Android): node e5.ts --restore', 'lvd62: git worktree remove --force wt']);
     expect(text(restoreFile())).toBe(`${written.join('\n')}\n`);
     expect(text(join(out, 'steps.log'))).toContain(`ERROR state not provably put back — the hand commands are in ${restoreFile()}`);
-    expect(guard.finish()).toEqual(written);
+    expect(await guard.finish()).toEqual(written);
     expect(text(restoreFile())).toBe(`${written.join('\n')}\n`);
   });
 
@@ -890,7 +937,7 @@ describe('finish — the normal end writes RESTORE for any window still dirty (b
       guard.open('E5', window());
       guard.close('E5');
     });
-    expect(guard.finish()).toEqual([]);
+    expect(await guard.finish()).toEqual([]);
     expect(existsSync(restoreFile())).toBe(false);
     expect(text(join(out, 'steps.log'))).not.toContain('ERROR');
   });
@@ -898,7 +945,7 @@ describe('finish — the normal end writes RESTORE for any window still dirty (b
   it('an interrupt after the end\'s RESTORE: the abort SUMMARY shows the end\'s lines too (RESTORE is appended, never overwritten)', async () => {
     const guard = guardOf();
     await guard.run(async () => guard.open('E5', window()));
-    guard.finish();
+    await guard.finish();
     await interrupt(guard);
     expect(summaryText()).toContain(`RESTORE: state not provably put back — ${restoreFile()}:\nbatch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:\nE5 (Android): node e5.ts --restore\n`);
   });

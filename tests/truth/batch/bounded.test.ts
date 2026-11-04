@@ -618,6 +618,25 @@ describe('a kept group is checked before it is kept and before it is killed (rev
   });
 });
 
+describe('stopKept(owner) — a block ends its own kept groups (final check)', () => {
+  it('only the groups its calls were kept with; stopKept() all the others; a group stopped is not stopped again', async () => {
+    const seam = new FakeSeam();
+    seam.leaveGroup = true;
+    const calls = new Calls(seam, { graceMs: 5 });
+    for (const owner of ['kf', 'T6', undefined]) {
+      const r = calls.bounded('idb', ['connect', 'U'], { owner });
+      await tick();
+      seam.calls.at(-1)?.end({ code: 0, signal: null });
+      await r;
+    }
+    expect(await calls.stopKept('kf')).toEqual({ stopped: 1, notSent: [] });
+    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+    expect(await calls.stopKept('kf')).toEqual({ stopped: 0, notSent: [] });
+    expect(await calls.stopKept()).toEqual({ stopped: 2, notSent: [] });
+    expect(seam.kills.slice(2).sort()).toEqual(['SIGKILL -101', 'SIGKILL -102', 'SIGTERM -101', 'SIGTERM -102']);
+  });
+});
+
 describe('undelivered kills are reported where they happen (review round 3)', () => {
   it('each one, as it happens, to onUndelivered — with the scope\'s owner when a scope\'s', async () => {
     const seen: Undelivered[] = [];

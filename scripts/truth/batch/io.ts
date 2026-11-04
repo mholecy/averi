@@ -102,6 +102,8 @@ export const nodeFs: BatchFs = {
     try {
       return use(fd);
     } finally {
+      // Should the close throw after `use` threw, the close's error hides `use`'s: accepted — a close of a just-opened
+      // append fd failing is rarer still, and either error stops the call.
       closeSync(fd);
     }
   },

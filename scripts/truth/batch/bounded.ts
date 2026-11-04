@@ -17,7 +17,9 @@ import { messageOf } from './words.js';
  *
  * Once a call's leader has ended, its group gets SIGKILL: nothing it started outlives it, unless the call keeps its
  * group (`keepGroup`, by default per tool: `KEEPS_GROUP`): stopAll leaves it, and stopKept ends it — at the abort,
- * after the restores and the judging, which may need it (batch-11 pkilled idb_companion only at the end of on_abort).
+ * after the restores and the judging, which may need it (batch-11 pkilled idb_companion only at the end of on_abort),
+ * and at the normal end; a block done with its companion ends its own with stopKept(owner), the owner recorded when the
+ * group is kept (Call.owner) — no seam query tells owners apart.
  * Its result comes once its pipes have closed, or `CLOSE_GRACE_MS` after its leader's end if a grandchild in another
  * group holds them; what a grandchild writes after that is dropped on purpose — the result is the leader's, and a
  * daemon's output is no part of it. Its code is its leader's: a leader that ended before the bound is never 142,
@@ -106,6 +108,8 @@ export interface Call {
    * and SIGKILL straight after — its leader is gone, so nothing tells when the daemon has finished.
    */
   keepGroup?: boolean;
+  /** The block it is for: a kept group remembers it, so the block can end its own (stopKept(owner)). */
+  owner?: string;
 }
 
 export interface CallResult {
@@ -183,6 +187,8 @@ export class Calls {
   private readonly notDelivered: Undelivered[] = [];
   /** The groups kept past their leader: asked again at every new call and at stopKept. */
   private readonly kept = new Tracked();
+  /** Each kept group's owner (Call.owner), recorded when it is kept: no seam query is needed to tell owners apart. */
+  private readonly keptOwners = new Map<number, string | undefined>();
   private readonly fs: BatchFs;
   private readonly graceMs: number;
   private readonly closeGraceMs: number;
@@ -233,11 +239,18 @@ export class Calls {
   }
 
   /**
-   * End every kept group still there, as stopAll ends a probe: the abort's last step, after the restores and the
-   * judging, which may need the daemon. Never rejects.
+   * End the kept groups still there, as stopAll ends a probe — those of `owner` only, when one is given (a block done
+   * with its companion), else all: the abort's and the normal end's last step, after the restores and the judging,
+   * which may need the daemon. A group ended or found gone is no longer kept. Never rejects.
    */
-  stopKept(): Promise<Stopped> {
-    return this.endAll(this.kept, STOPPING);
+  async stopKept(owner?: string): Promise<Stopped> {
+    const mine = new Tracked();
+    for (const [pid, exited] of this.kept.groups) {
+      if (owner !== undefined && this.keptOwners.get(pid) !== owner) continue;
+      mine.groups.set(pid, exited);
+      this.kept.groups.delete(pid);
+    }
+    return this.endAll(mine, STOPPING);
   }
 
   /** Every signal not proven delivered so far — stopAll's, the scopes' and those after a leader's end — in order. */
@@ -251,11 +264,7 @@ export class Calls {
    */
   private async endAll(tracked: Tracked, why: string): Promise<Stopped> {
     tracked.refused = why;
-    const ending = [...tracked.groups].filter(([pid]) => {
-      if (this.tryKill(pid, 0) !== 'gone') return true;
-      tracked.groups.delete(pid);
-      return false;
-    });
+    const ending = [...tracked.groups].filter(([pid]) => this.tryKill(pid, 0) !== 'gone');
     const notSent = (await Promise.all(ending.map(([pid, exited]) => this.endGroup(pid, exited, tracked.owner)))).flat();
     return { stopped: ending.length, notSent };
   }
@@ -306,7 +315,7 @@ export class Calls {
     }
   }
 
-  private async call(cmd: string, args: readonly string[], { secs, cwd, env, log, keepGroup = keepsGroup(cmd) }: Call, tracked: Tracked | undefined): Promise<CallResult> {
+  private async call(cmd: string, args: readonly string[], { secs, cwd, env, log, keepGroup = keepsGroup(cmd), owner }: Call, tracked: Tracked | undefined): Promise<CallResult> {
     const bound = secs ?? boundFor(cmd, args, this.installSecs);
     if (bound === undefined || !(bound > 0)) throw new Error(`${cmd}: no bound — give its secs (only xcrun, idb and adb have one of their own)`);
     if (bound > MAX_SECS) throw new Error(`${cmd}: a bound of ${bound} s is above ${MAX_SECS} s, the longest taken`);
@@ -342,7 +351,10 @@ export class Calls {
     }
     // A kept group is kept only while something of it lives: an empty one's id could be reused before the abort.
     if (!keepGroup) await this.signal(pid, 'SIGKILL', tracked?.owner);
-    else if (this.tryKill(pid, 0) !== 'gone') this.kept.groups.set(pid, exited);
+    else if (this.tryKill(pid, 0) !== 'gone') {
+      this.kept.groups.set(pid, exited);
+      this.keptOwners.set(pid, owner);
+    }
     await untilOr(started.closed, this.closeGraceMs);
     started.release();
     return resultOf(end, timedOut);

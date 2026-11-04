@@ -37,7 +37,9 @@ import { EXIT, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine
  * - A group kill the system refuses (EPERM under load) is said, never thrown: the windows are put back whatever
  *   stopping the probes did.
  * - The running probes are stopped first; the kept groups (a daemon such as idb_companion) only last, after the
- *   restores and the judging, which may need them — as batch-11 pkilled the companion at the end of on_abort.
+ *   restores and the judging, which may need them — as batch-11 pkilled the companion at the end of on_abort. The
+ *   normal end (finish) ends them too: a companion lives across blocks, not past the run; a block may end its own
+ *   earlier with stopKept(owner), as batch-12 did after each iOS block.
  *
  * How long it can take, at worst: the probes' stop (`graceMs`, 2 s), then each dirty window's restore bound (`secs`,
  * 300 s by default) and its stop (2 s), then the judges' one budget (`judgeBudgetSecs`, 120 s) and its stop (2 s),
@@ -224,19 +226,32 @@ export class AbortGuard {
 
   /**
    * The normal end: every window still open goes to the RESTORE file with its hand lines (the block's own restore
-   * did not prove it put back), and is closed. Returns every RESTORE line this run wrote, for the SUMMARY. While the
-   * abort runs, only noted: the abort writes the RESTORE.
+   * did not prove it put back), and is closed; then the kept groups are ended — a companion lives across blocks, not
+   * past the run — and a kill of them not delivered is appended. Returns every RESTORE line this run wrote, for the
+   * SUMMARY (and its exit code: 1 with any). While the abort runs, only noted: the abort writes the RESTORE.
    */
-  finish(): string[] {
+  async finish(): Promise<string[]> {
     if (this.aborting !== undefined) {
       this.say('NOTE', 'finish() ignored: the abort is putting the windows back');
       return [...this.restoreLines];
     }
-    const hand = [...this.undeliveredHand([...this.windows.keys()]), ...[...this.windows.values()].flatMap((w) => w.hand)];
+    const names = [...this.windows.keys()];
+    const hand = [...this.undeliveredHand(names), ...[...this.windows.values()].flatMap((w) => w.hand)];
     this.windows.clear();
     const written = this.writeRestore('ended', hand);
-    if (written.length > 0) this.options.log.error(`state not provably put back — the hand commands are in ${this.options.restoreFile}`);
+    await this.calls.stopKept();
+    const late = this.writeRestore('ended', this.undeliveredHand(names));
+    if (written.length + late.length > 0) this.options.log.error(`state not provably put back — the hand commands are in ${this.options.restoreFile}`);
     return [...this.restoreLines];
+  }
+
+  /**
+   * End the kept groups (idb_companion) of `owner`'s calls (Call.owner), or all when none is given: a block done with
+   * its companion ends it, as batch-12 did after each iOS block. A kill not delivered is said at once and gets its
+   * RESTORE line at the next write (finish or the abort).
+   */
+  async stopKept(owner?: string): Promise<void> {
+    await this.calls.stopKept(owner);
   }
 
   private install(): void {

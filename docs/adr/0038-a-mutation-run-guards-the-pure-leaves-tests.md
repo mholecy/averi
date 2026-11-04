@@ -170,17 +170,17 @@ and bounded.ts decides how long to wait for either. io.ts gains `replace`, which
 and renames it over the old one (`markDirty`).
 
 bounded.ts and abort.ts join the run. Each is tested over a fake seam (tests/truth/batch/bounded.test.ts,
-abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines after the code review: bounded.ts
-99.04 % (2 survivors), abort.ts 98.02 % (4 survivors, 4 mutants without coverage — three of them in a defensive catch
-that cannot run), every one equivalent and named in scope.json; floors 97 and 96. io.ts rose to 95.38 % with `replace`
-and its tests (the same three equivalents), so its floor rises from 92 to 93. The cold run of all seventeen modules took
-about 2 minutes (Stryker's own 108 to 131 s), past the 90 s mark the S1 part already noted; the look at one Stryker run
-per module is still left for later. proc.ts stays out: it is only spawn, kill and process.on, and its tests start real
-children. Those are tests/truth/batch/bounded-proc.test.ts (a grandchild that traps SIGTERM is gone after a timeout, a
-leader's leftover gone after its end, a kept group ended by stopAll) and abort-proc.test.ts (b11-dry's int.sh scenarios
-as vitest tests: a group sent SIGINT, a second SIGINT, a throw, a rejection and an uncaught exception inside a window,
-stdout EPIPE, a terminal that blocks, batch-12's worktree window). Both run in the normal suite only, as
-terminal.test.ts does.
+abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines after the final check: bounded.ts
+99.08 % (2 survivors), abort.ts 98.03 % (4 survivors, 4 mutants without coverage — three of them in a defensive catch
+that cannot run), every one equivalent and named in scope.json; floors 97 and 96. io.ts rose to 95.71 % with `replace`
+and `withAppend` and its tests (the same three equivalents), so its floor rises from 92 to 93. The cold run of all
+seventeen modules took about 2 minutes (Stryker's own 108 to 131 s), past the 90 s mark the S1 part already noted; the
+look at one Stryker run per module is still left for later. proc.ts stays out: it is only spawn, kill and process.on,
+and its tests start real children. Those are tests/truth/batch/bounded-proc.test.ts (a grandchild that traps SIGTERM is
+gone after a timeout, a leader's leftover gone after its end, a kept group ended by stopAll) and abort-proc.test.ts
+(b11-dry's int.sh scenarios as vitest tests: a group sent SIGINT, a second SIGINT, a throw, a rejection and an uncaught
+exception inside a window, stdout EPIPE, a terminal that blocks, batch-12's worktree window). Both run in the normal
+suite only, as terminal.test.ts does.
 
 Which tools keep their group by default (bounded.ts `KEEPS_GROUP`; a call's own `keepGroup` overrides it). The emulator
 is not in it: no batch starts it through bounded, so a call that did would pass `keepGroup` itself.
@@ -263,7 +263,10 @@ Where S2 departs from batch-12, on purpose:
 - which groups outlive their leader is a per-tool table, `KEEPS_GROUP` (idb kept, adb and xcrun not), a call's own
   `keepGroup` over it; batch-12 had no such notion and pkilled idb_companion by name.
 - the abort stops the running probes first and the kept groups only last, after the restores and the judging, which
-  may need them: batch-11's on_abort pkilled idb_companion at its end too, and S2 keeps that order.
+  may need them: batch-11's on_abort pkilled idb_companion at its end too, and S2 keeps that order. The normal end
+  (`finish()`, now async) ends them as well, after its RESTORE, appending a hand line for a kill not delivered, so a
+  companion lives across blocks but not past the run; a block can end its own earlier with `stopKept(owner)`, as
+  batch-12 did after each iOS block — the owner is the call's `owner`, recorded when its group is kept.
 - `markDirty` on open() and io.ts's `replace` port batch-11's forced-dirty state after a reinstall into S2 already, not
   S5: a window reopened over a state file a restore had cleared must read dirty again, and S2's windows need that.
 - TRAPEXIT's `$ZSH_SUBSHELL -eq 0` guard has no Node counterpart: Node has no subshells, so nothing else's exit can

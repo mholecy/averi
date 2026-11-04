@@ -129,4 +129,4 @@ await guard.run(async () => {
   ready();
   await waiting;
 });
-guard.finish();
+await guard.finish();
