@@ -125,8 +125,8 @@ export const refusalLines = (name: string, reasons: readonly string[]): string[]
 export const newRunId = (now: Date, pid: number): string =>
   `${now.getFullYear()}${twoDigits(now.getMonth() + 1)}${twoDigits(now.getDate())}-${twoDigits(now.getHours())}${twoDigits(now.getMinutes())}${twoDigits(now.getSeconds())}-${pid}`;
 
-/** A RUN_ID or a block name: one plain path segment, so its folder cannot leave `<out>`. */
-const PLAIN_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+/** A RUN_ID, a block name or a run's name (cases.ts): one plain path segment, so its files cannot leave their folder. */
+export const PLAIN_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 /** The run's own folder (its .out, the checkout line): not a block name. */
 export const META = 'meta';
 
