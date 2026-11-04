@@ -99,7 +99,7 @@ export function stepOutcome(code: number, log: string): { word: 'OK' | 'DONE' | 
 export type Selector = (asked: Asked, source: string) => Promise<readonly string[]>;
 
 /**
- * main's selectCases as a Selector (b11-analyze.ts#selectorOf): the cases of the run's platform, app and groups (forms
+ * main's selectCases as a Selector (b11-analyze.ts's selectorOf): the cases of the run's platform, app and groups (forms
  * when the .cases names none), only those asked when any were, and of them those whose sources hold this one or name
  * none (Case.sources).
  */
@@ -150,7 +150,7 @@ function readOr(fs: BatchFs, path: string, file: string, missing: string): { tex
 }
 
 /**
- * Whether the run `name` in `dir` is complete (b11-analyze.ts#readRun's rule): its `.cases` read as what a live run is
+ * Whether the run `name` in `dir` is complete (b11-analyze.ts's readRun's rule): its `.cases` read as what a live run is
  * asked; its record JSON; `# Live golden:` in its log and in its summary; every id `select` picks for each source asked
  * listed in the summary under that source. A `.cases` with nothing beside it was asked but never ran. Every gap is said,
  * in that order, `; ` between them: the whole why at once, so one rerun fixes it.

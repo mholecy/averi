@@ -248,7 +248,7 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
   });
 });
 
-describe('selectorOf — main\'s selectCases per source, as b11-analyze.ts#selectorOf (Case.sources honoured)', () => {
+describe('selectorOf — main\'s selectCases per source, as in b11-analyze.ts (Case.sources honoured)', () => {
   const cases = [{ id: 'p7', sources: ['idb', 'uiautomator'] }, { id: 'p7w', sources: ['wda'] }, { id: 'b1d' }];
   const live = (seen: unknown[]): LiveCases => ({ selectCases: async (s) => (seen.push(s), cases), catalogOf: async () => ({ cells: [] }) });
 
