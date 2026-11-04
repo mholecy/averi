@@ -98,5 +98,10 @@
     "tests": ["tests/truth/batch/preconditions.test.ts", "tests/truth/batch/cases.test.ts"],
     "floor": 98,
     "baseline": "100 % on 2026-11-05 (T2 S3 code review: LiveSelection, DEFAULT_GROUPS, unreadLive and loadTable moved here; cold): 11 mutants, 0 survived — liveTableOf reached in the sandbox through a temp folder with no live-cases.ts, whose load rejects"
+  },
+  "scripts/truth/batch/ios-domains.ts": {
+    "tests": ["tests/truth/batch/ios-domains.test.ts", "tests/truth/batch/ios-domains-sim.test.ts"],
+    "floor": 98,
+    "baseline": "100 % on 2026-11-05 (T2 S4, cold): 823 mutants, 0 survived, 2 timeouts (counted killed) — after the first run's 38 survivors and 4 without coverage were killed by tests (two keys in a join, a typed read of every type, an export past its bound that wrote its file, a value with two trailing line breaks, an absent-before domain whose export fails, the restore's and compare's whys) or designed away as equivalents (guards the type already gave: decideRestore's backup and kv checks, `verb === undefined`, `typeof … !== 'object'` before a field check that refuses the same, the import exit tracked twice, a put back with nothing done, a domain's why and hand made always present, the protected read compared by value alone); tests/truth/batch/ios-domains-plist.test.ts, which starts python3, runs in the normal suite only"
   }
 }
