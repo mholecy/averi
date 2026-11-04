@@ -40,7 +40,7 @@ describe('checkFloors — the failure lines of a run', () => {
 
   it('scope.json: every module names its tests and a floor between 0 and 100', () => {
     for (const [file, m] of Object.entries(readScope())) {
-      expect(file).toMatch(/^src\/.*\.ts$/);
+      expect(file).toMatch(/^(src|scripts\/truth\/batch)\/[^/]+(\/[^/]+)*\.ts$/);
       expect(m.tests.length).toBeGreaterThan(0);
       expect(m.floor).toBeGreaterThan(0);
       expect(m.floor).toBeLessThanOrEqual(100);
