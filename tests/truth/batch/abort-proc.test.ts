@@ -3,7 +3,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { endChildren } from './proc-cleanup.js';
+
+// Each test carries its own timeout too; the hooks get theirs here (teardownTimeout is vitest's global default).
+vi.setConfig({ testTimeout: 15_000, hookTimeout: 10_000 });
 
 // scripts/truth/batch/abort.ts on the real process seam, with real signals: b11-dry's int.sh scenarios (a process
 // group sent SIGINT, a second SIGINT, a fatal error inside a window) as vitest tests. The child is
@@ -21,16 +25,10 @@ beforeEach(() => {
   child = undefined;
   pids = [];
 });
-afterEach(() => {
-  for (const pid of [...(child?.pid === undefined ? [] : [-child.pid]), ...pids]) {
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // gone already
-    }
-  }
+afterEach(async () => {
+  await endChildren(child === undefined ? [] : [child], pids);
   rmSync(dir, { recursive: true, force: true });
-});
+}, 10_000);
 
 const at = (name: string) => join(dir, name);
 const text = (name: string) => readFileSync(at(name), 'utf8');

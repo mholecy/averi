@@ -1,4 +1,4 @@
-import { Calls, MAX_SECS, type Run } from './bounded.js';
+import { Calls, MAX_SECS, undeliveredText, type Run, type Undelivered } from './bounded.js';
 import type { BatchFs } from './io.js';
 import type { ProcessSeam } from './proc.js';
 import { stateOf, writeRestore } from './run-dir.js';
@@ -140,7 +140,16 @@ const timeOf = (d: Date) => `${twoDigits(d.getHours())}:${twoDigits(d.getMinutes
 /** One window's put-back: its outcome, and whether its restore was stopped at its bound. */
 interface PutBack {
   p: Putback;
+  /** Its restore passed its bound. */
   late?: true;
+  /** …and a kill of what it started was not delivered: it may still be running, not stopped part-way. */
+  running?: true;
+}
+
+/** Whose state to check after killing a group by hand: the windows open then, or the device's. */
+function whoseState(names: readonly string[]): string {
+  if (names.length === 0) return "the device's state";
+  return names.length === 1 ? `${names[0]}'s state` : `the state of ${names.join(', ')}`;
 }
 
 /** A run's guard: its bounded calls, its dirty windows, and the abort that puts them back. */
@@ -148,11 +157,17 @@ export class AbortGuard {
   private readonly calls: Calls;
   private readonly windows = new Map<string, WindowSpec>();
   private readonly restoreLines: string[] = [];
+  /** How many of the calls' undelivered kills a RESTORE has already given its hand line. */
+  private undeliveredWritten = 0;
   private aborting: Promise<void> | undefined;
   private installed = false;
 
   constructor(private readonly options: AbortGuardOptions) {
-    this.calls = new Calls(options.seam, { graceMs: options.graceMs, installSecs: options.installSecs });
+    this.calls = new Calls(options.seam, {
+      graceMs: options.graceMs,
+      installSecs: options.installSecs,
+      onUndelivered: (u) => this.say('ERROR', `a kill not delivered: ${undeliveredText(u)} — group ${u.pid} may still be running`),
+    });
   }
 
   /** A probe, bounded in a group of its own; the abort stops it. */
@@ -213,7 +228,7 @@ export class AbortGuard {
       this.say('NOTE', 'finish() ignored: the abort is putting the windows back');
       return [...this.restoreLines];
     }
-    const hand = [...this.windows.values()].flatMap((w) => w.hand);
+    const hand = [...this.undeliveredHand([...this.windows.keys()]), ...[...this.windows.values()].flatMap((w) => w.hand)];
     this.windows.clear();
     const written = this.writeRestore('ended', hand);
     if (written.length > 0) this.options.log.error(`state not provably put back — the hand commands are in ${this.options.restoreFile}`);
@@ -242,6 +257,18 @@ export class AbortGuard {
     } catch {
       // The log cannot be written (ENOSPC, the out folder gone): the restores matter more than the line.
     }
+  }
+
+  /**
+   * A hand line for each group whose kill was not delivered since the last RESTORE write, one per group: it may still
+   * be running. `names`: the windows to check after killing it, when no scope's owner says what.
+   */
+  private undeliveredHand(names: readonly string[]): string[] {
+    const fresh = this.calls.unproven().slice(this.undeliveredWritten);
+    this.undeliveredWritten += fresh.length;
+    const byGroup = new Map<number, Undelivered>();
+    for (const u of fresh) byGroup.set(u.pid, u);
+    return [...byGroup.values()].map((u) => `group ${u.pid} may still be running: kill -9 -${u.pid}, then check ${u.owner ?? whoseState(names)}`);
   }
 
   private writeRestore(how: 'ended' | 'interrupted', hand: readonly string[]): string[] {
@@ -282,15 +309,19 @@ export class AbortGuard {
       const cut = new Set(windows.map(([, w]) => w.block));
       // Its own try: whatever stopping the probes does, the windows are put back next.
       try {
-        const { stopped, notSent } = await this.calls.stopAll();
+        // A kill not delivered is said as it happens (onUndelivered), and gets its RESTORE line below.
+        const { stopped } = await this.calls.stopAll();
         if (stopped > 0) this.say('NOTE', `${stopped} running call(s) stopped, each its whole process group`);
-        for (const line of notSent) this.say('ERROR', `a running call not proven stopped: ${line}`);
       } catch (e) {
         this.say('ERROR', `the running calls could not be stopped: ${messageOf(e)}`);
       }
       const { hand, cleanups, late } = await this.putBackAll(windows);
-      if (this.writeRestore('interrupted', hand).length > 0) this.say('ERROR', `state not provably put back — ${this.options.restoreFile}`);
+      const names = windows.map(([name]) => name);
+      // The groups that may still be running first: they are killed by hand before anything is put back by hand.
+      if (this.writeRestore('interrupted', [...this.undeliveredHand(names), ...hand]).length > 0) this.say('ERROR', `state not provably put back — ${this.options.restoreFile}`);
       const blocks = await this.reports(cut, cleanups, late);
+      // A judge's kill not delivered comes after that RESTORE: its line is appended.
+      this.writeRestore('interrupted', this.undeliveredHand(names));
       log.summary(summaryLines({ ...this.headOf(), name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors: log.errors(), interrupted: { at: timeOf(at) } }));
     } catch (e) {
       // The abort's own failure (its SUMMARY could not be written): said on stderr, and the exit is 130 still.
@@ -311,7 +342,7 @@ export class AbortGuard {
     for (const [name, spec] of [...windows].reverse()) {
       let b: PutBack;
       try {
-        b = await this.putBack(spec);
+        b = await this.putBack(name, spec);
       } catch (e) {
         b = { p: { ok: false, why: `its put-back failed: ${messageOf(e)}` } };
       }
@@ -320,7 +351,7 @@ export class AbortGuard {
       if (p.ok) this.say('OK', `${name} put back (verified by the abort): ${p.how}`);
       else {
         const own = p.hand !== undefined && p.hand.length > 0 ? p.hand : spec.hand;
-        hand.push(...(b.late === true ? [`${name}: its restore was stopped at its bound (${spec.secs ?? RESTORE_SECS} s), part-way — check the state it left before the hand commands below`] : []), ...own);
+        hand.push(...(b.late === true && b.running !== true ? [`${name}: its restore was stopped at its bound (${spec.secs ?? RESTORE_SECS} s), part-way — check the state it left before the hand commands below`] : []), ...own);
         this.say('ERROR', `${name} not provably put back: ${p.why}`);
       }
       // A cleanup label has a wanted block: open() refuses one without.
@@ -332,10 +363,10 @@ export class AbortGuard {
     return { hand, cleanups, late };
   }
 
-  private async putBack(spec: WindowSpec): Promise<PutBack> {
+  private async putBack(name: string, spec: WindowSpec): Promise<PutBack> {
     const secs = spec.secs ?? RESTORE_SECS;
     // The restore's own calls, so that a restore stopped at its bound is stopped with what it started.
-    const scope = this.calls.scope();
+    const scope = this.calls.scope(`${name}'s state`);
     let r: Awaited<ReturnType<typeof within<Putback>>>;
     try {
       r = await within(secs, spec.restore(scope.run));
@@ -343,7 +374,7 @@ export class AbortGuard {
       return { p: { ok: false, why: `its restore threw: ${messageOf(e)}` } };
     }
     if (r.late) {
-      await scope.stop();
+      if ((await scope.stop()).notSent.length > 0) return { p: { ok: false, why: `its restore passed its bound (${secs} s) and may still be running` }, late: true, running: true };
       return { p: { ok: false, why: `its restore passed its bound (${secs} s) and was stopped there` }, late: true };
     }
     const file = spec.stateFile;
@@ -393,10 +424,11 @@ export class AbortGuard {
 
   /** A block judged within what is left of the budget: its lines; or why not; or `late`, its calls stopped. */
   private async judged(b: AbortBlock, secs: number): Promise<{ lines: readonly string[] } | { why: string } | 'late'> {
-    const scope = this.calls.scope();
+    const scope = this.calls.scope(`the judge of ${b.block} (device-free)`);
     try {
       const r = await within(secs, b.judge(scope.run));
       if (!r.late) return { lines: r.value };
+      // A kill of it not delivered is said and gets its RESTORE line (abortOnce), as every undelivered kill does.
       await scope.stop();
       return 'late';
     } catch (e) {

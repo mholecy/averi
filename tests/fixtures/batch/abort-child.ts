@@ -19,9 +19,12 @@ const HELPER = join(import.meta.dirname, 'proc-child.mjs');
 const node = process.execPath;
 const at = (name: string) => join(dir, name);
 
-/** A terminal paused with Ctrl-S: writeSync into it blocks, for ever. The start line passes; the SUMMARY blocks. */
+/**
+ * A terminal paused with Ctrl-S: writeSync into it blocks. The start line passes; the SUMMARY blocks — for 20 s here,
+ * not for ever, so a child no kill reached still ends (review round 3: one hung a loaded run).
+ */
 const paused: Terminal = (text) => {
-  if (text.startsWith(SUMMARY_MARKER)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+  if (text.startsWith(SUMMARY_MARKER)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20_000);
   return undefined;
 };
 

@@ -1,7 +1,10 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { endChildren } from './proc-cleanup.js';
+
+vi.setConfig({ testTimeout: 10_000, hookTimeout: 10_000 });
 import { Calls, NOT_STARTED, TIMED_OUT } from '../../../scripts/truth/batch/bounded.js';
 import { nodeProcess } from '../../../scripts/truth/batch/proc.js';
 
@@ -18,16 +21,10 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'batch-bounded-'));
   pids = [];
 });
-afterEach(() => {
-  for (const pid of pids) {
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // gone already: what the tests want
-    }
-  }
+afterEach(async () => {
+  await endChildren([], [...pids.map((p) => -p), ...pids]);
   rmSync(dir, { recursive: true, force: true });
-});
+}, 10_000);
 
 const alive = (pid: number): boolean => {
   try {
@@ -94,6 +91,12 @@ describe('bounded over real processes: a call past its bound is gone with its gr
   it('stdin is /dev/null, as batch-11\'s `detached … < /dev/null`: a child that reads it sees it end at once', async () => {
     const calls = new Calls(nodeProcess);
     expect((await calls.detached(node, [HELPER, 'stdin'], { secs: 5 })).out).toBe('stdin 0');
+  }, 10_000);
+
+  it('a kept call whose group is empty once its leader ended is not kept: stopAll has nothing to stop (review round 3)', async () => {
+    const calls = new Calls(nodeProcess, { graceMs: 200 });
+    expect(await calls.bounded(node, [HELPER, 'echo', 'x'], { secs: 5, keepGroup: true })).toMatchObject({ code: 0 });
+    expect(await calls.stopAll()).toEqual({ stopped: 0, notSent: [] });
   }, 10_000);
 
   it('a call that exits leaving a grandchild: the grandchild is killed with its group, and the result comes at once (review round 1)', async () => {

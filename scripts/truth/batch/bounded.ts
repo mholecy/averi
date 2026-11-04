@@ -24,10 +24,11 @@ import type { Ended, KillResult, ProcessSeam } from './proc.js';
  * proven) is tried once more `EPERM_RETRY_MS` later; one still not delivered is kept in `unproven()`, and stopAll and
  * a scope's stop name theirs, for the abort to say. A group already gone (ESRCH) is ended.
  *
- * Residual: a kept group is signalled by its id alone. While any process of it lives, the id cannot be reused; if all
- * of it died and a new group took the same id before the abort, that group would be signalled. Telling them apart
- * needs a process's start time (ps, which the sandbox blocks), so it is not checked; a kept group is a daemon that
- * runs to the abort, which keeps the window small.
+ * A kept group is kept only if it still exists once its leader has ended (`kill(-id, 0)`: an idb call that started no
+ * companion leaves none), and asked again just before stopAll signals it: one gone by then is dropped, never
+ * signalled. While any process of a group lives, its id cannot be reused. Residual: between that last ask and the
+ * signal the group could still end and its id be taken — a window of microseconds, not of the whole run; telling
+ * groups apart needs a process's start time (ps, which the sandbox blocks).
  */
 
 /** A call past its bound exits 142, as perl's alarm did (128 + SIGALRM): steps.ts#stepWordOf reads it as FAIL. */
@@ -135,10 +136,24 @@ function whyOf(e: unknown): string {
   }
 }
 
+/**
+ * A signal not proven delivered: its group may still be running. `owner` says what to check after killing it by hand
+ * (`E5's state`), when a scope's call sent it.
+ */
+export interface Undelivered {
+  pid: number;
+  signal: NodeJS.Signals;
+  why: string;
+  owner?: string;
+}
+
+/** `<signal> to group <id>: <why>`. */
+export const undeliveredText = (u: Undelivered): string => `${u.signal} to group ${u.pid}: ${u.why}`;
+
 /** What a stop did: how many groups it ended, and each signal not proven delivered. */
 export interface Stopped {
   stopped: number;
-  notSent: string[];
+  notSent: Undelivered[];
 }
 
 /** A restore's own calls: `run` is detached, and `stop` ends the groups of those still running and refuses new ones. */
@@ -151,24 +166,32 @@ export interface Scope {
 class Tracked {
   readonly groups = new Map<number, Promise<Ended>>();
   refused: string | undefined;
+  constructor(readonly owner?: string) {}
 }
 
 /** A run's calls: each bounded in a group of its own; the probes among them stopped together by `stopAll`. */
 export class Calls {
   /** The bounded calls still running, and the groups kept past their leader. */
   private readonly running = new Tracked();
-  private readonly notDelivered: string[] = [];
+  private readonly notDelivered: Undelivered[] = [];
   private readonly graceMs: number;
   private readonly closeGraceMs: number;
   private readonly installSecs: number | undefined;
+  private readonly onUndelivered: (u: Undelivered) => void;
 
   constructor(
     private readonly seam: ProcessSeam,
-    { graceMs = GRACE_MS, closeGraceMs = CLOSE_GRACE_MS, installSecs }: { graceMs?: number; closeGraceMs?: number; installSecs?: number } = {},
+    {
+      graceMs = GRACE_MS,
+      closeGraceMs = CLOSE_GRACE_MS,
+      installSecs,
+      onUndelivered = () => {},
+    }: { graceMs?: number; closeGraceMs?: number; installSecs?: number; onUndelivered?: (u: Undelivered) => void } = {},
   ) {
     this.graceMs = graceMs;
     this.closeGraceMs = closeGraceMs;
     this.installSecs = installSecs;
+    this.onUndelivered = onUndelivered;
   }
 
   /** A probe: past its bound its group gets SIGTERM, then SIGKILL; `stopAll` stops it; none starts once stopping. */
@@ -177,9 +200,12 @@ export class Calls {
   /** A restore or a check: the same bound, but `stopAll` leaves it running, and it starts while stopping too. */
   readonly detached: Run = (cmd, args, call = {}) => this.call(cmd, args, call, undefined);
 
-  /** Detached calls tracked together, so that a restore past its bound can be stopped with what it started. */
-  scope(): Scope {
-    const mine = new Tracked();
+  /**
+   * Detached calls tracked together, so that a restore past its bound can be stopped with what it started. `owner`:
+   * what to check when one of its kills is not delivered (`E5's state`).
+   */
+  scope(owner?: string): Scope {
+    const mine = new Tracked(owner);
     return {
       run: (cmd, args, call = {}) => this.call(cmd, args, call, mine),
       stop: () => this.endAll(mine, 'its restore or judge was stopped at its bound'),
@@ -194,15 +220,23 @@ export class Calls {
     return this.endAll(this.running, 'the run is being stopped');
   }
 
-  /** Every signal not proven delivered so far (stopAll's and the scopes' too), as `<signal> to group <id>: <why>`. */
-  unproven(): string[] {
+  /** Every signal not proven delivered so far — stopAll's, the scopes' and those after a leader's end — in order. */
+  unproven(): Undelivered[] {
     return [...this.notDelivered];
   }
 
+  /**
+   * Refuse new calls, then end every group: first each is asked whether it still exists (`kill(-id, 0)`); one gone
+   * (ESRCH) is dropped and never signalled — its id may since belong to another group.
+   */
   private async endAll(tracked: Tracked, why: string): Promise<Stopped> {
     tracked.refused = why;
-    const ending = [...tracked.groups];
-    const notSent = (await Promise.all(ending.map(([pid, exited]) => this.endGroup(pid, exited)))).flat();
+    const ending = [...tracked.groups].filter(([pid]) => {
+      if (this.tryKill(pid, 0) !== 'gone') return true;
+      tracked.groups.delete(pid);
+      return false;
+    });
+    const notSent = (await Promise.all(ending.map(([pid, exited]) => this.endGroup(pid, exited, tracked.owner)))).flat();
     return { stopped: ending.length, notSent };
   }
 
@@ -210,27 +244,33 @@ export class Calls {
    * SIGTERM to the group; SIGKILL once its leader ended or the grace passed, whichever first: a grandchild may trap
    * TERM. A group gone at the TERM is ended. Returns the signals not proven delivered.
    */
-  private async endGroup(pid: number, exited: Promise<Ended>): Promise<string[]> {
-    const term = await this.signal(pid, 'SIGTERM');
+  private async endGroup(pid: number, exited: Promise<Ended>, owner: string | undefined): Promise<Undelivered[]> {
+    const term = await this.signal(pid, 'SIGTERM', owner);
     if (term === 'gone') return [];
     await untilOr(exited, this.graceMs);
-    const kill = await this.signal(pid, 'SIGKILL');
-    return [term, kill].flatMap((r) => (typeof r === 'object' ? [`${r.signal} to group ${pid}: ${r.notSent}`] : []));
+    const kill = await this.signal(pid, 'SIGKILL', owner);
+    return [term, kill].filter((r): r is Undelivered => typeof r === 'object');
   }
 
-  /** A group kill that never throws: EPERM tried once more after EPERM_RETRY_MS; one not delivered kept as unproven. */
-  private async signal(pid: number, signal: NodeJS.Signals): Promise<'sent' | 'gone' | { notSent: string; signal: NodeJS.Signals }> {
+  /**
+   * A group kill that never throws: EPERM tried once more after EPERM_RETRY_MS; one not delivered kept as unproven and
+   * reported (onUndelivered) at once.
+   */
+  private async signal(pid: number, signal: NodeJS.Signals, owner: string | undefined): Promise<'sent' | 'gone' | Undelivered> {
     let r = this.tryKill(pid, signal);
     if (typeof r === 'object' && r.notSent === 'EPERM') {
       await untilOr(new Promise(() => {}), EPERM_RETRY_MS);
       r = this.tryKill(pid, signal);
     }
     if (typeof r !== 'object') return r;
-    this.notDelivered.push(`${signal} to group ${pid}: ${r.notSent}`);
-    return { notSent: r.notSent, signal };
+    const u: Undelivered = { pid, signal, why: r.notSent, ...(owner === undefined ? {} : { owner }) };
+    this.notDelivered.push(u);
+    this.onUndelivered(u);
+    return u;
   }
 
-  private tryKill(pid: number, signal: NodeJS.Signals): KillResult {
+  /** The seam's kill, never thrown; signal 0 only asks whether the group still exists. */
+  private tryKill(pid: number, signal: NodeJS.Signals | 0): KillResult {
     try {
       return this.seam.killGroup(pid, signal);
     } catch (e) {
@@ -252,7 +292,7 @@ export class Calls {
     let ending: Promise<unknown> = Promise.resolve();
     const timer = setTimeout(() => {
       timedOut = true;
-      ending = this.endGroup(pid, exited);
+      ending = this.endGroup(pid, exited, tracked?.owner);
     }, bound * 1000);
     tracked?.groups.set(pid, exited);
     let end: Ended;
@@ -265,8 +305,9 @@ export class Calls {
     } finally {
       tracked?.groups.delete(pid);
     }
-    if (keepGroup) this.running.groups.set(pid, exited);
-    else await this.signal(pid, 'SIGKILL');
+    // A kept group is kept only while something of it lives: an empty one's id could be reused before the abort.
+    if (!keepGroup) await this.signal(pid, 'SIGKILL', tracked?.owner);
+    else if (this.tryKill(pid, 0) !== 'gone') this.running.groups.set(pid, exited);
     await untilOr(started.closed, this.closeGraceMs);
     started.release();
     return resultOf(end, timedOut);

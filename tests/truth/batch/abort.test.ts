@@ -31,15 +31,22 @@ class FakeSeam implements ProcessSeam {
     let end!: (e: Ended) => void;
     const exited = new Promise<Ended>((r) => (end = r));
     const pid = this.nextPid++;
-    this.started.push({ cmd, args, end });
+    this.started.push({ cmd, args, end: (e) => (this.ended.add(pid), end(e)) });
     this.events.push(`start ${cmd} ${args.join(' ')}`);
     return { pid, exited, closed: exited.then(() => {}), out: () => (args[0] === 'judge' ? `${args[1]}\n` : ''), err: () => '', release: () => {} };
   }
   /** Every kill throws `kill EPERM`, as one did under load (review round 2). */
   killThrows = false;
-  killGroup(pid: number, signal: NodeJS.Signals): KillResult {
+  /** The groups whose kills (and probes) throw `kill EPERM`. */
+  readonly refusePids = new Set<number>();
+  readonly ended = new Set<number>();
+  killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult {
+    if (this.killThrows || this.refusePids.has(pid)) {
+      if (signal !== 0) this.events.push(`${signal} -${pid}`);
+      throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
+    }
+    if (signal === 0) return this.ended.has(pid) ? 'gone' : 'sent';
     this.events.push(`${signal} -${pid}`);
-    if (this.killThrows) throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
     if (signal === 'SIGTERM' && this.stubborn) return 'sent';
     this.started[pid - 100]?.end({ code: null, signal });
     return 'sent';
@@ -360,11 +367,81 @@ describe('a group kill that throws EPERM stops no restore (review round 2, BLOCK
       void guard.bounded('node', ['probe.ts'], { secs: 60 });
     })).toBe(130);
     expect(restored).toEqual(['B', 'A']);
-    expect(existsSync(restoreFile())).toBe(false);
+    expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\ngroup 100 may still be running: kill -9 -100, then check the state of A, B\n');
+    expect(summaryText()).not.toContain('RESTORE: none');
     const steps = text(join(out, 'steps.log'));
-    expect(steps).toContain('ERROR a running call not proven stopped: SIGTERM to group 100: EPERM');
-    expect(steps).toContain('ERROR a running call not proven stopped: SIGKILL to group 100: EPERM');
+    expect(steps).toContain('ERROR a kill not delivered: SIGTERM to group 100: EPERM — group 100 may still be running');
+    expect(steps).toContain('ERROR a kill not delivered: SIGKILL to group 100: EPERM — group 100 may still be running');
     expect(seam.said).toEqual([]);
+  });
+
+  it('a restore past its bound whose kill was not delivered: "may still be running", its group line first, no "stopped part-way" (review round 3)', async () => {
+    seam.refusePids.add(100);
+    let judged = 0;
+    const guard = guardOf([block('kf', { complete: () => true, judge: async () => (judged++, ['kf: PASS']) })]);
+    await interrupt(guard, () =>
+      guard.open('E5', window({ secs: 0.03, restore: async (run) => {
+        await run('adb', ['install', '-r', 'a.apk']);
+        return { ok: true, how: 'never' };
+      } })),
+    );
+    expect(judged).toBe(0);
+    expect(text(restoreFile())).toBe("batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\ngroup 100 may still be running: kill -9 -100, then check E5's state\nE5 (Android): node e5.ts --restore\n");
+    expect(summaryText()).toContain('ERROR E5 not provably put back: its restore passed its bound (0.03 s) and may still be running');
+  });
+
+  it('a judge past the budget whose kill was not delivered: its group line in RESTORE too, after the judging', async () => {
+    seam.refusePids.add(100);
+    const guard = guardOf([block('kf', { complete: () => true, judge: (run) => run('node', ['analyze.ts'], { secs: 60 }).then(() => ['kf: PASS']) })], { judgeBudgetSecs: 0.03 });
+    await interrupt(guard);
+    expect(text(restoreFile())).toBe('batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\ngroup 100 may still be running: kill -9 -100, then check the judge of kf (device-free)\n');
+    expect(summaryText()).toContain(`RESTORE: state not provably put back — ${restoreFile()}:`);
+  });
+
+  it('the normal path: a SIGKILL after a leader\'s end not delivered is an ERROR line at once, and the end\'s RESTORE has its group line (review round 3)', async () => {
+    seam.refusePids.add(100);
+    const guard = guardOf();
+    await guard.run(async () => {
+      const r = guard.bounded('adb', ['devices']);
+      await tick();
+      seam.started[0].end({ code: 0, signal: null });
+      expect(await r).toMatchObject({ code: 0 });
+    });
+    expect(text(join(out, 'steps.log'))).toContain('ERROR a kill not delivered: SIGKILL to group 100: EPERM — group 100 may still be running');
+    expect(guard.finish()).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 100 may still be running: kill -9 -100, then check the device's state"]);
+  });
+
+  it('…with a window still open at the end, its group line names that window', async () => {
+    seam.refusePids.add(100);
+    const guard = guardOf();
+    await guard.run(async () => {
+      const r = guard.bounded('adb', ['devices']);
+      await tick();
+      seam.started[0].end({ code: 0, signal: null });
+      await r;
+      guard.open('E5', window());
+    });
+    expect(guard.finish()).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 100 may still be running: kill -9 -100, then check E5's state", 'E5 (Android): node e5.ts --restore']);
+  });
+
+  it('…and when the run is interrupted instead, the abort\'s RESTORE has it, naming the window open then', async () => {
+    seam.refusePids.add(100);
+    const guard = guardOf();
+    let opened = false;
+    const ran = guard.run(async () => {
+      const r = guard.bounded('adb', ['devices']);
+      await tick();
+      seam.started[0].end({ code: 0, signal: null });
+      await r;
+      guard.open('E5', window());
+      opened = true;
+      await new Promise(() => {});
+    });
+    ran.catch(() => {});
+    for (let i = 0; i < 100 && !opened; i++) await tick(5);
+    seam.handlers?.signal('SIGINT');
+    expect(await seam.exit$).toBe(130);
+    expect(text(restoreFile())).toBe("batch-n run 1 interrupted at 2026-11-04 09:44:26; state to put back by hand:\ngroup 100 may still be running: kill -9 -100, then check E5's state\n");
   });
 });
 

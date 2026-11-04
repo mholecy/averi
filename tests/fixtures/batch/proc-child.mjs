@@ -6,7 +6,8 @@ import { writeFileSync } from 'node:fs';
 // argv[2]; pids and markers go through files the test names, never through ps or pgrep (the sandbox blocks them).
 
 const [mode, ...rest] = process.argv.slice(2);
-const forever = () => setInterval(() => {}, 1 << 30);
+/** Wait "for ever" — 60 s at most, so a child no test cleanup reached still ends of itself. */
+const forever = () => setTimeout(() => process.exit(0), 60_000);
 /** A grandchild in this process's group (not detached) that ignores SIGTERM and waits for ever. */
 const stubborn = () => spawn(process.execPath, [import.meta.filename, 'stubborn'], { stdio: 'inherit' });
 

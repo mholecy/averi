@@ -57,9 +57,10 @@ export interface ProcessSeam {
   start(cmd: string, args: readonly string[], options: StartOptions): Started;
   /**
    * Send `signal` to the whole group `pid` leads. Never throws: `'sent'`; `'gone'` when no such group is left
-   * (ESRCH); else not sent and why (EPERM: delivery not proven — bounded.ts tries once more).
+   * (ESRCH); else not sent and why (EPERM: delivery not proven — bounded.ts tries once more). Signal 0 sends nothing:
+   * it only asks whether the group still exists.
    */
-  killGroup(pid: number, signal: NodeJS.Signals): KillResult;
+  killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult;
   /**
    * Route the abort signals and the fatal errors to `handlers`, replacing their default exits — a listener on SIGINT
    * is what ignoring it means in Node (zsh's `trap '' INT` once the handler ignores it). And drop errors on stdout and

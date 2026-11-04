@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { boundFor, Calls, codeOf, EPERM_RETRY_MS, KEEPS_GROUP, keepsGroup, MAX_SECS, NOT_STARTED, TIMED_OUT } from '../../../scripts/truth/batch/bounded.js';
+import { boundFor, Calls, codeOf, EPERM_RETRY_MS, KEEPS_GROUP, keepsGroup, MAX_SECS, NOT_STARTED, TIMED_OUT, undeliveredText, type Undelivered } from '../../../scripts/truth/batch/bounded.js';
 import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 
 // scripts/truth/batch/bounded.ts over a fake process seam: which bound a device call gets, what its exit code says,
@@ -16,6 +16,9 @@ interface FakeCall {
   close(): void;
   stubbornToTerm: boolean;
   released: boolean;
+  ended: boolean;
+  /** Something of its group outlives its leader (a daemon): a signal-0 probe then answers 'sent', else 'gone'. */
+  groupLeft: boolean;
 }
 
 class FakeSeam implements ProcessSeam {
@@ -30,6 +33,10 @@ class FakeSeam implements ProcessSeam {
   holdPipesForEver = false;
   /** The next start fails as an unknown command does. */
   failNext = false;
+  /** Calls started from now on leave something running in their group after their leader ends. */
+  leaveGroup = false;
+  /** The signal-0 probes asked (`kill(-pid, 0)`: does the group still exist?). */
+  readonly probes: string[] = [];
   /** How killGroup fails, when it does: per signal, the answers to give in turn (then 'sent'); 'throw' throws EPERM. */
   refuse: Partial<Record<NodeJS.Signals, ('throw' | KillResult)[]>> = {};
   private nextPid = 100;
@@ -50,6 +57,7 @@ class FakeSeam implements ProcessSeam {
       args,
       pid: this.nextPid++,
       end: (e) => {
+        call.ended = true;
         end(e);
         if (!hold && !forEver) close();
       },
@@ -58,12 +66,19 @@ class FakeSeam implements ProcessSeam {
       },
       stubbornToTerm: this.stubborn,
       released: false,
+      ended: false,
+      groupLeft: this.leaveGroup,
     };
     this.calls.push(call);
     return { pid: call.pid, exited, closed, out: () => `out of ${cmd}`, err: () => `err of ${cmd}`, release: () => (call.released = true) };
   }
 
-  killGroup(pid: number, signal: NodeJS.Signals): KillResult {
+  killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult {
+    if (signal === 0) {
+      this.probes.push(`0 -${pid}`);
+      const c = this.calls.find((x) => x.pid === pid);
+      return c !== undefined && c.ended && !c.groupLeft ? 'gone' : 'sent';
+    }
     this.kills.push(`${signal} -${pid}`);
     const answer = this.refuse[signal]?.shift();
     if (answer === 'throw') throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
@@ -218,6 +233,7 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
 
   it('keepGroup (idb_companion, a daemon the call starts on purpose): no SIGKILL once the leader ended; stopAll ends the group later', async () => {
     const seam = new FakeSeam();
+    seam.leaveGroup = true;
     const calls = new Calls(seam, { graceMs: 5 });
     const r = calls.bounded('node', ['companion.js'], { secs: 5, keepGroup: true });
     await tick();
@@ -258,6 +274,13 @@ describe('Calls.bounded — a call in a process group of its own, ended whole pa
     seam.calls[0].end({ code: 0, signal: null });
     await r;
     expect(seam.options).toEqual([{ cwd: 'the-dir', env: { A: '1' }, log: 'the.log' }]);
+  });
+
+  it('a detached call past its bound is ended too: 142, its group SIGTERMed and SIGKILLed', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    expect(await calls.detached('node', ['restore.ts'], { secs: 0.01 })).toMatchObject({ code: TIMED_OUT, timedOut: true });
+    expect(seam.kills.slice(0, 2)).toEqual(['SIGTERM -100', 'SIGKILL -100']);
   });
 
   it('the install bound is the one Calls was given (batch-12\'s B_INSTALL)', async () => {
@@ -332,6 +355,7 @@ describe('Calls.stopAll — the abort stops every running probe, its whole group
     const before = [...seam.kills];
     expect((await calls.stopAll()).stopped).toBe(0);
     expect(seam.kills).toEqual(before);
+    expect(seam.probes).toEqual([]);
   });
 
   it('once stopping, no new bounded call starts (the run\'s body must not go on to its next probe); a detached one still does', async () => {
@@ -397,7 +421,7 @@ describe('a group kill that is not delivered never rejects (review round 2, BLOC
     expect(await r).toMatchObject({ code: 0 });
     expect(Date.now() - started).toBeGreaterThanOrEqual(EPERM_RETRY_MS - 5);
     expect(seam.kills).toEqual(['SIGKILL -100', 'SIGKILL -100']);
-    expect(calls.unproven()).toEqual([]);
+    expect(calls.unproven().map(undeliveredText)).toEqual([]);
   });
 
   it('the SIGKILL after the leader\'s end refused twice, or thrown: the probe\'s result as ever, the refusal kept as unproven', async () => {
@@ -409,7 +433,7 @@ describe('a group kill that is not delivered never rejects (review round 2, BLOC
       await tick();
       seam.calls[0].end({ code: 3, signal: null });
       expect(await r).toMatchObject({ code: 3, timedOut: false });
-      expect(calls.unproven()).toEqual(['SIGKILL to group 100: EPERM']);
+      expect(calls.unproven().map(undeliveredText)).toEqual(['SIGKILL to group 100: EPERM']);
     }
   });
 
@@ -423,7 +447,7 @@ describe('a group kill that is not delivered never rejects (review round 2, BLOC
     await tick();
     seam.calls[0].end({ code: 0, signal: null });
     expect(await r).toMatchObject({ code: 0 });
-    expect(calls.unproven()).toEqual(['SIGKILL to group 100: an error that cannot be read']);
+    expect(calls.unproven().map(undeliveredText)).toEqual(['SIGKILL to group 100: an error that cannot be read']);
   });
 
   it('any other refusal is not retried, and kept', async () => {
@@ -435,7 +459,7 @@ describe('a group kill that is not delivered never rejects (review round 2, BLOC
     seam.calls[0].end({ code: 0, signal: null });
     await r;
     expect(seam.kills).toEqual(['SIGKILL -100']);
-    expect(calls.unproven()).toEqual(['SIGKILL to group 100: EINVAL']);
+    expect(calls.unproven().map(undeliveredText)).toEqual(['SIGKILL to group 100: EINVAL']);
   });
 
   it('stopAll with every kill thrown or refused: it resolves, naming what was not sent', async () => {
@@ -444,7 +468,8 @@ describe('a group kill that is not delivered never rejects (review round 2, BLOC
     const calls = new Calls(seam, { graceMs: 5 });
     void calls.bounded('node', ['probe.ts'], { secs: 60 });
     await tick();
-    expect(await calls.stopAll()).toEqual({ stopped: 1, notSent: ['SIGTERM to group 100: EPERM', 'SIGKILL to group 100: EPERM'] });
+    const { stopped, notSent } = await calls.stopAll();
+    expect([stopped, notSent.map(undeliveredText)]).toEqual([1, ['SIGTERM to group 100: EPERM', 'SIGKILL to group 100: EPERM']]);
   });
 
   it('scope.stop with its kills refused: it resolves too', async () => {
@@ -495,5 +520,68 @@ describe('keepsGroup — which tools start a daemon in their own group (review r
       await r;
     }
     expect(seam.kills).toEqual(['SIGKILL -101', 'SIGKILL -102']);
+  });
+});
+
+describe('a kept group is checked before it is kept and before it is killed (review round 3, MAJOR: a reused id SIGKILLed)', () => {
+  it('a kept call whose group is empty once its leader ended (an idb call that started no companion) is not kept: stopAll signals nothing', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    const r = calls.bounded('idb', ['ui', 'describe-all']);
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await r;
+    expect(seam.probes).toEqual(['0 -100']);
+    expect(await calls.stopAll()).toEqual({ stopped: 0, notSent: [] });
+    expect(seam.kills).toEqual([]);
+    expect(seam.probes).toEqual(['0 -100']);
+  });
+
+  it('a kept group that ended before the abort (its daemon gone since) is dropped at stopAll, never signalled', async () => {
+    const seam = new FakeSeam();
+    seam.leaveGroup = true;
+    const calls = new Calls(seam, { graceMs: 5 });
+    const r = calls.bounded('idb', ['connect', 'U']);
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await r;
+    seam.calls[0].groupLeft = false;
+    expect(await calls.stopAll()).toEqual({ stopped: 0, notSent: [] });
+    expect(seam.kills).toEqual([]);
+    expect(seam.probes).toEqual(['0 -100', '0 -100']);
+    // Dropped: a second stop does not ask about it again.
+    await calls.stopAll();
+    expect(seam.probes).toEqual(['0 -100', '0 -100']);
+  });
+
+  it('a group whose probe is refused (EPERM) is not taken for gone: kept, and stopped at the abort', async () => {
+    const seam = new FakeSeam();
+    const calls = new Calls(seam, { graceMs: 5 });
+    seam.killGroup = ((orig) => (pid: number, signal: NodeJS.Signals | 0) => (signal === 0 ? { notSent: 'EPERM' } : orig(pid, signal)))(seam.killGroup.bind(seam));
+    const r = calls.bounded('idb', ['connect', 'U']);
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await r;
+    expect((await calls.stopAll()).stopped).toBe(1);
+    expect(seam.kills).toEqual(['SIGTERM -100', 'SIGKILL -100']);
+  });
+});
+
+describe('undelivered kills are reported where they happen (review round 3)', () => {
+  it('each one, as it happens, to onUndelivered — with the scope\'s owner when a scope\'s', async () => {
+    const seen: Undelivered[] = [];
+    const seam = new FakeSeam();
+    seam.refuse = { SIGKILL: [{ notSent: 'EINVAL' }, { notSent: 'EINVAL' }] };
+    const calls = new Calls(seam, { graceMs: 5, onUndelivered: (u) => seen.push(u) });
+    const r = calls.bounded('adb', ['devices']);
+    await tick();
+    seam.calls[0].end({ code: 0, signal: null });
+    await r;
+    const s = calls.scope("E5's state");
+    void s.run('node', ['restore.ts'], { secs: 60 });
+    await tick();
+    await s.stop();
+    expect(seen).toStrictEqual([{ pid: 100, signal: 'SIGKILL', why: 'EINVAL' }, { pid: 101, signal: 'SIGKILL', why: 'EINVAL', owner: "E5's state" }]);
+    expect(calls.unproven()).toEqual(seen);
   });
 });
