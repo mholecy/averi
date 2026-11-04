@@ -171,8 +171,8 @@ describe('gitEnv — the repo-locating variables dropped, everything else kept, 
   });
 
   it('drops config given through the env too: GIT_CONFIG_PARAMETERS, GIT_CONFIG_COUNT and every GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n; the config files\' own variables kept (review round 1)', () => {
-    const env = { GIT_CONFIG_PARAMETERS: 'x', GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'a', GIT_CONFIG_VALUE_0: 'b', GIT_CONFIG_KEY_12: 'c', GIT_CONFIG_VALUE_12: 'd', GIT_CONFIG_GLOBAL: 'g', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_KEYS: 'k', XGIT_CONFIG_KEY_0: 'y' };
-    expect(gitEnv(env)).toEqual({ GIT_CONFIG_GLOBAL: 'g', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_KEYS: 'k', XGIT_CONFIG_KEY_0: 'y' });
+    const env = { GIT_CONFIG_PARAMETERS: 'x', GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'a', GIT_CONFIG_VALUE_0: 'b', GIT_CONFIG_KEY_12: 'c', GIT_CONFIG_VALUE_12: 'd', GIT_CONFIG_GLOBAL: 'g', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_KEYS: 'k', XGIT_CONFIG_KEY_0: 'y', GIT_CONFIG_PARAMETERSX: 'z', GIT_CONFIG_KEY_0X: 'w' };
+    expect(gitEnv(env)).toEqual({ GIT_CONFIG_GLOBAL: 'g', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_KEYS: 'k', XGIT_CONFIG_KEY_0: 'y', GIT_CONFIG_PARAMETERSX: 'z', GIT_CONFIG_KEY_0X: 'w' });
   });
 
   it('none given: process.env\'s, without them', () => {

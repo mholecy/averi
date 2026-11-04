@@ -154,9 +154,9 @@ async function selectionGaps(asked: Asked, select: Selector, summary: string | u
   const picked = new Map<string, readonly string[]>();
   for (const source of asked.sources) picked.set(source, await select(asked, source));
   const any = new Set([...picked.values()].flat());
-  const under = `on ${asked.platform} under ${asked.sources.map(nameInLine).join(' or ')}`;
-  for (const id of new Set(asked.cases)) if (!any.has(id)) gaps.push(`${nameInLine(id)}: no case main runs ${under}`);
-  if (any.size === 0) gaps.push(`main picks no case for what was asked (${asked.platform}, ${nameInLine(asked.app)} app, under ${asked.sources.map(nameInLine).join(' or ')}): the run proves nothing`);
+  const sources = asked.sources.map(nameInLine).join(' or ');
+  for (const id of new Set(asked.cases)) if (!any.has(id)) gaps.push(`${nameInLine(id)}: no case main runs on ${asked.platform} under ${sources}`);
+  if (any.size === 0) gaps.push(`main picks no case for what was asked (${asked.platform}, ${nameInLine(asked.app)} app, under ${sources}): the run proves nothing`);
   if (summary === undefined) return gaps;
   const shown = idsBySource(summary);
   for (const [source, ids] of picked) {

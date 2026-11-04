@@ -213,6 +213,8 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
     expect(await judge('b')).toEqual({ ok: false, why: 'zz: no case main runs on ios under idb or wda' });
     putRun('c', { cases: JSON.stringify({ ...KF, cases: [] }), summary: summaryOf({ uiautomator: [] }) });
     expect(await judge('c', picks({}))).toEqual({ ok: false, why: 'main picks no case for what was asked (android, native app, under uiautomator): the run proves nothing' });
+    putRun('d', { cases: JSON.stringify({ ...some, cases: [] }), summary: summaryOf({ idb: [], wda: [] }) });
+    expect(await judge('d', picks({}))).toEqual({ ok: false, why: 'main picks no case for what was asked (ios, native app, under idb or wda): the run proves nothing' });
   });
 
   it('a source or an id holding a line break is named JSON-quoted: the block\'s line is still made (review round 1)', async () => {
