@@ -291,24 +291,24 @@ main's table. bounded.ts gains git's own bound, 30 s (`GIT_SECS`), for reads —
 secs; steps.ts shares `holdsGoldenHeader`; run-dir.ts exports `PLAIN_SEGMENT`, which a run's name must be too; words.ts
 gains `nameInLine` and `firstLineOf`.
 
-preconditions.ts and cases.ts join the run. Each is tested over fakes: a fake `Run` that answers git as git does, a fake live-cases table, and
-real files in a temp dir (tests/truth/batch/preconditions.test.ts, cases.test.ts). The same code over real temporary
-git repos (`git init -b main` in a mkdtemp with its own HOME and git config, no inherited GIT_DIR, GIT_WORK_TREE or
-GIT_INDEX_FILE; git started through bounded.ts) is preconditions-git.test.ts, and over this checkout's own live-cases
-table cases-live.test.ts; both run in the normal suite only — the first starts processes, the second imports
-live-cases.ts, which the sandbox does not hold. Main's table is read by a dynamic import of the checkout's own file
-(live-table.ts's `liveTableOf(repo)`, as b11-analyze.ts did), never a static one, so the sandbox needs no new entry;
-live-table.ts stays out of the run, as proc.ts does: its one statement is that import, which only cases-live.test.ts
-makes. Baselines after review round 1: preconditions.ts 100 % (285 mutants, 1 timeout), cases.ts 99.64 % (277 mutants,
-1 equivalent survivor: `asked !== undefined` beside no gap, there for the type); floors 98 and 97. words.ts stays at
-100 % with its two new helpers (113 mutants). The cold run of all nineteen modules took 2 min 15 s.
+preconditions.ts and cases.ts join the run. Each is tested over fakes: a fake `Run` that answers git as git does, a fake
+live-cases table, and real files in a temp dir (tests/truth/batch/preconditions.test.ts, cases.test.ts). The same code
+over real temporary git repos (`git init -b main` in a mkdtemp with its own HOME and git config, no inherited GIT_DIR,
+GIT_WORK_TREE or GIT_INDEX_FILE; git started through bounded.ts) is preconditions-git.test.ts, and over this checkout's
+own live-cases table cases-live.test.ts; both run in the normal suite only — the first starts processes, the second
+imports live-cases.ts, which the sandbox does not hold. Main's table is read by a dynamic import of the checkout's own
+file (live-table.ts's `liveTableOf(repo)`, as b11-analyze.ts did), never a static one, so the sandbox needs no new
+entry; live-table.ts stays out of the run, as proc.ts does: its one statement is that import, which only
+cases-live.test.ts makes. Baselines after review round 1: preconditions.ts 100 % (285 mutants, 1 timeout), cases.ts
+99.64 % (277 mutants, 1 equivalent survivor: `asked !== undefined` beside no gap, there for the type); floors 98 and 97.
+words.ts stays at 100 % with its two new helpers (113 mutants). The cold run of all nineteen modules took 2 min 15 s.
 
 Decisions S3 pins:
 - a detached HEAD, or another branch, at main's very commit passes: what runs is main's code as committed. batch-11 and
   batch-12 compared the two shas too; S3 tests it.
 - HEAD ≠ main and modified tracked files are both said, in one why, when both hold: one rerun fixes both. An untracked
-  file is allowed (`--untracked-files=no`, as both batches); a staged change counts; a rename or copy counts once, by its
-  new path (`status --porcelain -z`); the first three paths are named, then how many more.
+  file is allowed (`--untracked-files=no`, as both batches); a staged change counts; a rename or copy counts once, by
+  its new path (`status --porcelain -z`); the first three paths are named, then how many more.
 - the preconditions take a `Run` (a Calls' `bounded`, or a scope's `run`), not a Calls object: any Run can be faked, and
   a restore's scope can use the same checks.
 - every git call runs `git -C <repo>` with GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_COMMON_DIR,

@@ -6,9 +6,9 @@ import { ancestor, casesOnMain, cellsOnMain, checkout, gitEnv, preconditionLine,
 import { exitCodeOf, parseVerdictLine, type Summary } from '../../../scripts/truth/batch/words.js';
 
 // scripts/truth/batch/preconditions.ts over a fake Run: which git calls a precondition makes, in which order, and what
-// each answer of git becomes — a pass, or one short why an agent can act on. The same preconditions over real
-// temporary git repos are tests/truth/batch/preconditions-git.test.ts (kept apart: it starts git, which the mutation run
-// does not), and over the real live-cases table tests/truth/batch/cases-live.test.ts.
+// each answer of git becomes — a pass, or one short why an agent can act on. The same preconditions over real temporary
+// git repos are tests/truth/batch/preconditions-git.test.ts (kept apart: it starts git, which the mutation run does
+// not), and over the real live-cases table tests/truth/batch/cases-live.test.ts.
 
 const HEAD = 'a'.repeat(40);
 const MAIN = 'b'.repeat(40);
@@ -114,6 +114,12 @@ describe('checkout — main\'s HEAD, no modified tracked file (batch-11.sh:209�
     expect(g.said()).toEqual([TOP]);
     const odd = fakeGit([[TOP, ok('/else/a\nb\n')], ...clean]);
     expect(await checkout({ repo: 'r\nx', run: odd.run })).toEqual({ ok: false, why: '"r\\nx" is not the top of a git checkout (top is /else/a)' });
+  });
+
+  it('the top compared through the fs given (BatchFs.real), never the real one behind its back (T2 S3 code review)', async () => {
+    const fs = { ...nodeFs, real: (p: string) => (p === 'r' ? '/repo/r' : p) };
+    expect(await checkout({ repo: 'r', run: fakeGit([[TOP, ok('/repo/r\n')], ...clean]).run, fs })).toEqual({ ok: true, head: HEAD });
+    expect(await checkout({ repo: 'r', run: fakeGit([[TOP, ok(`${nodeFs.real('r')}\n`)], ...clean]).run, fs })).toEqual({ ok: false, why: `r is not the top of a git checkout (top is ${nodeFs.real('r')})` });
   });
 
   it('the top compared by real path: the repo named with a trailing slash is the same top', async () => {
@@ -224,6 +230,18 @@ describe('ancestor — a required commit by ancestry, never by a symbol (batch-4
     expect(g.said()).toEqual([TOP]);
   });
 
+  it('`what` holding a line break is named JSON-quoted in every why, and the block\'s line is made (T2 S3 code review)', async () => {
+    const what = 'M\nD43';
+    const whys = [
+      await ancestor({ repo: 'r', run: fakeGit(known).run, sha: '', what }),
+      await ancestor({ repo: 'r', run: fakeGit(known).run, sha: 'xyz', what }),
+      await ancestor({ repo: 'r', run: fakeGit([['cat-file', exit(128)], ...known]).run, sha: SHA, what }),
+      await ancestor({ repo: 'r', run: fakeGit([['merge-base', exit(1)], ...known]).run, sha: SHA, what }),
+    ];
+    expect(whys.map((r) => (r.ok ? '' : r.why))).toEqual(['"M\\nD43" is not set', '"M\\nD43"="xyz" is not a commit sha (7–40 hex digits)', `"M\\nD43"=${SHA} names no commit of this repo`, `"M\\nD43"=${SHA} is not an ancestor of HEAD (not merged into main yet)`]);
+    expect(() => preconditionLine('D43 live verdict', whys)).not.toThrow();
+  });
+
   it('not an ancestor of HEAD (exit 1): batch-11\'s words', async () => {
     const g = fakeGit([['merge-base', exit(1)], ...known]);
     expect(await ancestor({ repo: 'r', run: g.run, sha: SHA })).toEqual({ ok: false, why: `${SHA} is not an ancestor of HEAD (not merged into main yet)` });
@@ -247,7 +265,9 @@ describe('ancestor — a required commit by ancestry, never by a symbol (batch-4
   });
 });
 
-/** A fake live-cases table: the cases selectCases picks (platform, groups and only honoured), and the catalog's cells. */
+/**
+ * A fake live-cases table: the cases selectCases picks (platform, groups and only honoured), and the catalog's cells.
+ */
 function fakeLive(cases: { id: string; platforms?: string[]; group?: string }[], cells: string[] = []) {
   const asked: unknown[] = [];
   const live: LiveCases = {
@@ -292,6 +312,13 @@ describe('casesOnMain — the live cases a block runs, read from main\'s live-ca
     const unloadable: LiveTable = () => Promise.reject(new SyntaxError("Unexpected token ')'\n    at live-cases.ts:3"));
     expect(await casesOnMain({ ids: ['kf1'], platform: 'android', table: unloadable })).toEqual({ ok: false, why: "main's live cases could not be read: Unexpected token ')'" });
     expect(await casesOnMain({ ids: ['kf1'], platform: 'android', table: () => Promise.reject('ENOENT') })).toEqual({ ok: false, why: "main's live cases could not be read: ENOENT" });
+  });
+
+  it('an app or a group holding a line break is named JSON-quoted too, and the block\'s line is made (T2 S3 code review)', async () => {
+    const { table } = fakeLive([]);
+    const r = await casesOnMain({ ids: ['kf1'], platform: 'android', app: 'na\ntive', groups: ['fo\nrms', 'ensure'], table });
+    expect(r).toEqual({ ok: false, why: "live case(s) kf1 not on main's live-cases.ts (android, \"na\\ntive\" app, groups \"fo\\nrms\", ensure)" });
+    expect(() => preconditionLine('kf live verdict', [r])).not.toThrow();
   });
 
   it('an id holding a line break is named JSON-quoted: the line never breaks', async () => {

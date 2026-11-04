@@ -53,12 +53,12 @@ async function mainRepo(): Promise<{ first: string; head: string }> {
 const g = () => ({ repo, run, env });
 
 describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–219)', () => {
-  it('HEAD = main, clean: ok, with its sha', async () => {
+  it('HEAD = main, clean: ok, with its sha (batch-11\'s checkout gate)', async () => {
     const { head } = await mainRepo();
     expect(await checkout(g())).toEqual({ ok: true, head });
   });
 
-  it('HEAD on a branch whose commit is not main\'s: both named', async () => {
+  it('HEAD on a branch whose commit is not main\'s: both named (batch-11\'s "git switch main, then rerun")', async () => {
     const { head } = await mainRepo();
     await git('switch', '-q', '-c', 'side');
     const side = await commit('c.txt', '3');
@@ -73,13 +73,13 @@ describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–21
     expect(await checkout(g())).toEqual({ ok: true, head });
   });
 
-  it('a detached HEAD at another commit: not main\'s', async () => {
+  it('a detached HEAD at another commit: not main\'s (batch-11 compared the shas; T2 S3 decision)', async () => {
     const { first, head } = await mainRepo();
     await git('switch', '-q', '--detach', first);
     expect(await checkout(g())).toEqual({ ok: false, why: `the checkout's HEAD (${shortSha(first)}) is not main's (${shortSha(head)}) — git switch main, then rerun` });
   });
 
-  it('a modified tracked file: named, counted', async () => {
+  it('a modified tracked file: named, counted (batch-11: the batch runs main as committed)', async () => {
     await mainRepo();
     writeFileSync(join(repo, 'a.txt'), 'changed');
     expect(await checkout(g())).toEqual({ ok: false, why: 'the checkout has 1 modified tracked file(s) (a.txt) — the batch runs main as committed' });
@@ -91,7 +91,7 @@ describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–21
     expect(await checkout(g())).toEqual({ ok: true, head });
   });
 
-  it('a staged change counts as modified, a new file staged too; a staged rename once, by its new name', async () => {
+  it('a staged change counts as modified, a new file staged too; a staged rename once, by its new name (T2 S3 decision: status -z)', async () => {
     await mainRepo();
     writeFileSync(join(repo, 'n.txt'), 'x');
     await git('add', 'n.txt');
@@ -99,7 +99,7 @@ describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–21
     expect(await checkout(g())).toEqual({ ok: false, why: 'the checkout has 2 modified tracked file(s) (c d.txt, n.txt) — the batch runs main as committed' });
   });
 
-  it('no branch main (init -b trunk): said, never a pass', async () => {
+  it('no branch main (init -b trunk): said, never a pass (T2 S3 decision)', async () => {
     await git('init', '-q', '-b', 'trunk');
     await commit('a.txt', '1');
     const r = await checkout(g());
@@ -107,12 +107,12 @@ describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–21
     expect(r.ok === false && r.why).toMatch(/^the repo has no branch main \(git rev-parse: exit 128: fatal: /);
   });
 
-  it('no repo there: git failed, its own first line said', async () => {
+  it('no repo there: git failed, its own first line said (T2 S3: git failing is never a precondition\'s answer)', async () => {
     const r = await checkout({ ...g(), env: { ...env, GIT_CEILING_DIRECTORIES: tmp } });
     expect(r.ok === false && r.why).toMatch(/^git rev-parse --show-toplevel failed \(exit 128: fatal: not a git repository/);
   });
 
-  it('GIT_DIR inherited from a hook\'s context does not leak in: the repo named is the repo read', async () => {
+  it('GIT_DIR inherited from a hook\'s context does not leak in: the repo named is the repo read (T2 S3 decision)', async () => {
     const { head } = await mainRepo();
     const other = join(tmp, 'other');
     mkdirSync(other);
@@ -150,7 +150,7 @@ describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–21
     expect(preconditionLine('kf live verdict', [r])).toBe('kf live verdict: INCONCLUSIVE — precondition: the checkout has 1 modified tracked file(s) ("a\\nb") — the batch runs main as committed');
   });
 
-  it('git past an injected bound (a git that hangs): "git timed out", the call and the bound named, back in under 3 s', async () => {
+  it('git past an injected bound (a git that hangs): "git timed out", the call and the bound named, back in under 3 s (batch-7\'s bounded calls; T2 S3: batch-11 ran git unbounded)', async () => {
     const bin = join(tmp, 'bin');
     mkdirSync(bin);
     writeFileSync(join(bin, 'git'), '#!/bin/sh\nexec sleep 5\n');
@@ -162,31 +162,31 @@ describe('checkout over a real repo — main\'s clean HEAD (batch-11.sh:209–21
 });
 
 describe('ancestor over a real repo — a required commit by ancestry (batch-11.sh:238–242)', () => {
-  it('the first commit, an ancestor of HEAD: ok; HEAD itself: ok; by a 7-digit short sha too', async () => {
+  it('the first commit, an ancestor of HEAD: ok; HEAD itself: ok; by a 7-digit short sha too (batch-4\'s ancestry gate)', async () => {
     const { first, head } = await mainRepo();
     expect(await ancestor({ ...g(), sha: first })).toEqual({ ok: true });
     expect(await ancestor({ ...g(), sha: head })).toEqual({ ok: true });
     expect(await ancestor({ ...g(), sha: first.slice(0, 7) })).toEqual({ ok: true });
   });
 
-  it('a sha of a bad format: refused before git is asked', async () => {
+  it('a sha of a bad format: refused before git is asked (batch-11.sh:80\'s knob rule)', async () => {
     await mainRepo();
     expect(await ancestor({ ...g(), sha: 'HEAD~1', what: 'M_D43' })).toEqual({ ok: false, why: 'M_D43="HEAD~1" is not a commit sha (7–40 hex digits)' });
   });
 
-  it('an unknown sha: no commit of this repo, git\'s own line said', async () => {
+  it('an unknown sha: no commit of this repo, git\'s own line said (batch-11\'s "no commit of this repo"; T2 S3: cat-file exits 128 for no repo too)', async () => {
     await mainRepo();
     expect(await ancestor({ ...g(), sha: 'deadbeef', what: 'M_D43' })).toEqual({ ok: false, why: 'M_D43=deadbeef names no commit of this repo (git: fatal: Not a valid object name deadbeef^{commit})' });
   });
 
-  it('a tree\'s sha (an object, but no commit): no commit of this repo', async () => {
+  it('a tree\'s sha (an object, but no commit): no commit of this repo (T2 S3 decision: ^{commit})', async () => {
     await mainRepo();
     const tree = await git('rev-parse', 'HEAD^{tree}');
     const r = await ancestor({ ...g(), sha: tree });
     expect(r.ok === false && r.why).toMatch(new RegExp(`^${tree} names no commit of this repo \\(git: `));
   });
 
-  it('a commit on a side branch, not merged: not an ancestor of HEAD', async () => {
+  it('a commit on a side branch, not merged: not an ancestor of HEAD (batch-11\'s D43 gate: "not merged into main yet")', async () => {
     await mainRepo();
     await git('switch', '-q', '-c', 'side');
     const side = await commit('s.txt', 'x');

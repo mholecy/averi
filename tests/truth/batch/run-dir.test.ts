@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { layoutOf, newRunId, openRun, refusals, refusalLines, stateOf, writeRestore, type Stateful } from '../../../scripts/truth/batch/run-dir.js';
+import { layoutOf, newRunId, openRun, plainSegment, refusals, refusalLines, stateOf, writeRestore, type Stateful } from '../../../scripts/truth/batch/run-dir.js';
 
 // scripts/truth/batch/run-dir.ts: where a run writes (one fresh `run-<RUN_ID>` folder per block, never emptied or
 // reused) and when it must not start at all (a RESTORE file left, an earlier run's state not clean). Real files in a
@@ -267,5 +267,12 @@ describe('writeRestore — the hand commands of state not provably put back', ()
   it('a hand line with a line break is refused: one command per line', () => {
     expect(() => writeRestore(nodeFs, join(out, 'RESTORE.txt'), { header: 'h', hand: ['a\nb'] })).toThrow(/a RESTORE line holds a line break/);
     expect(existsSync(join(out, 'RESTORE.txt'))).toBe(false);
+  });
+});
+
+describe('plainSegment — one plain path segment or a throw naming what it is (shared with cases.ts, T2 S3 code review)', () => {
+  it('a plain name comes back; anything else throws, the name JSON-quoted', () => {
+    expect(plainSegment('run name', 'android-kf_1')).toBe('android-kf_1');
+    for (const bad of ['', '.x', 'a/b', '../a', 'a.b', 'a b', '-a', 'a\nb']) expect(() => plainSegment('run name', bad), bad).toThrow(`run name ${JSON.stringify(bad)}: one plain path segment is needed`);
   });
 });

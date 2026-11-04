@@ -50,7 +50,10 @@ export const CLOSE_GRACE_MS = 1000;
 export const MAX_SECS = 86_400;
 /** How long to wait before a group kill refused with EPERM is tried once more. */
 export const EPERM_RETRY_MS = 50;
-/** git's own bound (boundFor), for reads: preconditions.ts reads the local checkout with it; a slow git op passes its own secs. */
+/**
+ * git's own bound (boundFor), for reads: preconditions.ts reads the local checkout with it; a slow git op passes its
+ * own secs.
+ */
 export const GIT_SECS = 30;
 
 /**

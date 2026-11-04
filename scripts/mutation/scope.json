@@ -93,5 +93,10 @@
     "tests": ["tests/truth/batch/cases.test.ts"],
     "floor": 97,
     "baseline": "99.64 % on 2026-11-04 (T2 S3 review round 1: a run that proves nothing is incomplete, a stray .cases a gap, names quoted, the cases checked against a summary without its header; cold): 277 mutants, 1 survived — the same equivalent; liveCasesOf moved out to live-table.ts, so none is without coverage; the sources text of the selection's whys made once, after its ' or ' survived in the zero-pick why alone; 99.23 % on 2026-11-04 (T2 S3, cold): 259 mutants, 1 survived, 1 without coverage — equivalent: completeness's `asked !== undefined` set true (no gap means the .cases was read as asked; the check is for the type); without coverage liveCasesOf, the dynamic import of main's live-cases.ts, which cases-live.test.ts runs in the normal suite only (the sandbox holds scripts/truth/batch/ alone); the first run's other survivors killed by tests (an invalid groups, a case line before any `## <source>`, a source header inside a line) or designed away (askedOf's object check, JSON's null read as no field)"
+  },
+  "scripts/truth/batch/live-table.ts": {
+    "tests": ["tests/truth/batch/preconditions.test.ts", "tests/truth/batch/cases.test.ts"],
+    "floor": 1,
+    "baseline": "TBD"
   }
 }

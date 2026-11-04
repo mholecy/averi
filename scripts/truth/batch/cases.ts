@@ -1,9 +1,8 @@
 import { join } from 'node:path';
 import { NOT_STARTED, TIMED_OUT } from './bounded.js';
 import { isEexist, nodeFs, type BatchFs } from './io.js';
-import type { LiveTable } from './live-table.js';
-import { unreadLive } from './preconditions.js';
-import { PLAIN_SEGMENT } from './run-dir.js';
+import { DEFAULT_GROUPS, unreadLive, type LiveSelection, type LiveTable } from './live-table.js';
+import { PLAIN_SEGMENT, plainSegment } from './run-dir.js';
 import { holdsGoldenHeader, LIVE_GOLDEN_HEADER, stepWordOf } from './steps.js';
 import { nameInLine, verdictLine } from './words.js';
 
@@ -24,12 +23,13 @@ import { nameInLine, verdictLine } from './words.js';
  * file — never a grep, and never a static import.
  */
 
-/** What a live run was asked (batch-11's `asked`): the platform, the lab app, its sources and case ids (none: all). */
+/**
+ * What a live run was asked (batch-11's `asked`): the platform, the lab app, its sources and case ids (none: all).
+ * batch-11 also wrote `"kind": "new"`, which nothing read: it is not asked for, and a `.cases` holding it still reads.
+ */
 export interface Asked {
-  platform: 'ios' | 'android';
+  platform: LiveSelection['platform'];
   app: string;
-  /** batch-11's `"kind": "new"`; not read here. */
-  kind?: string;
   /** The tree sources it runs under (`--sources`; uiautomator on Android): one at least. */
   sources: readonly string[];
   /** `--cases`: these ids only; empty: every case of its groups. */
@@ -48,17 +48,19 @@ export const runFiles = (dir: string, name: string) => ({
 
 const CASES_EXT = '.cases';
 
-function checkName(name: string): void {
-  if (!PLAIN_SEGMENT.test(name)) throw new Error(`run name ${JSON.stringify(name)}: one plain path segment is needed`);
-}
+/** What a `.cases` must hold to be a live run's, as its whys say it. */
+const LIVE_SHAPE = 'is not what a live run is asked (platform ios or android, app, sources: one at least, cases: ids)';
 
 /**
- * Write `<dir>/<name>.cases`: what the run is asked, as JSON — `Asked` for a live run, any object for another block's
- * (batch-12's E5 wrote `{"runs":3}`). Called before anything of the run is done. Never overwritten (io.ts's exclusive
- * create): a run folder is never reused, so a second .cases of one name is the batch's mistake. Returns its path.
+ * Write `<dir>/<name>.cases`: what the live run is asked, as JSON. Called before anything of the run is done. Only a
+ * live run's (`Asked`, checked at run time too: nothing is written for anything else): runsIn and completeness read
+ * every `.cases` as one, so a non-live block keeps its own record elsewhere (batch-12's E5 wrote `{"runs":3}`; the
+ * runner's, S6). Never overwritten (io.ts's exclusive create): a run folder is never reused, so a second .cases of one
+ * name is the batch's mistake. Returns its path.
  */
-export function writeCases(fs: BatchFs, dir: string, name: string, asked: object): string {
-  checkName(name);
+export function writeCases(fs: BatchFs, dir: string, name: string, asked: Asked): string {
+  plainSegment('run name', name);
+  if (askedOf(asked) === undefined) throw new Error(`${name}${CASES_EXT}: ${JSON.stringify(asked)} ${LIVE_SHAPE}`);
   const path = runFiles(dir, name).cases;
   try {
     fs.createExclusive(path, `${JSON.stringify(asked)}\n`);
@@ -69,7 +71,9 @@ export function writeCases(fs: BatchFs, dir: string, name: string, asked: object
   return path;
 }
 
-/** The runs a block's folder asked: the name of every `.cases` in it, sorted. A record with none (ime.json) is no run. */
+/**
+ * The runs a block's folder asked: the name of every `.cases` in it, sorted. A record with none (ime.json) is no run.
+ */
 export const runsIn = (fs: BatchFs, dir: string): string[] => fs.list(dir).filter((n) => n.endsWith(CASES_EXT)).map((n) => n.slice(0, -CASES_EXT.length));
 
 /**
@@ -90,15 +94,15 @@ export function stepOutcome(code: number, log: string): { word: 'OK' | 'DONE' | 
 export type Selector = (asked: Asked, source: string) => Promise<readonly string[]>;
 
 /**
- * main's selectCases as a Selector (b11-analyze.ts's selectorOf): the cases of the run's platform, app and groups (forms
- * when the .cases names none), only those asked when any were, and of them those whose sources hold this one or name
- * none (Case.sources). The table is loaded at the first call; a load that fails rejects the call, which completeness
- * names.
+ * main's selectCases as a Selector (b11-analyze.ts's selectorOf): the cases of the run's platform, app and groups
+ * (forms when the .cases names none), only those asked when any were, and of them those whose sources hold this one or
+ * name none (Case.sources). The table is loaded at each call (Node caches the module); a load or a read that fails
+ * rejects the call, and completeness names either with live-table.ts's unreadLive, the same words casesOnMain says.
  */
 export const selectorOf =
   (table: LiveTable): Selector =>
   async (asked, source) =>
-    (await (await table()).selectCases({ platform: asked.platform, app: asked.app, groups: asked.groups ?? ['forms'], ...(asked.cases.length > 0 && { only: asked.cases }) }))
+    (await (await table()).selectCases({ platform: asked.platform, app: asked.app, groups: asked.groups ?? DEFAULT_GROUPS, ...(asked.cases.length > 0 && { only: asked.cases }) }))
       .filter((c) => c.sources === undefined || c.sources.includes(source))
       .map((c) => c.id);
 
@@ -168,13 +172,13 @@ async function selectionGaps(asked: Asked, select: Selector, summary: string | u
 }
 
 /**
- * Whether the run `name` in `dir` is complete (b11-analyze.ts's readRun's rule): its `.cases` read as what a live run is
- * asked; its record JSON; `# Live golden:` in its log and in its summary; every id `select` picks for each source asked
- * listed in the summary under that source; and something to prove (selectionGaps). A `.cases` with nothing beside it
- * was asked but never ran. Every gap is said, in that order, `; ` between them: the whole why at once, so one rerun
+ * Whether the run `name` in `dir` is complete (b11-analyze.ts's readRun's rule): its `.cases` read as what a live run
+ * is asked; its record JSON; `# Live golden:` in its log and in its summary; every id `select` picks for each source
+ * asked listed in the summary under that source; and something to prove (selectionGaps). A `.cases` with nothing beside
+ * it was asked but never ran. Every gap is said, in that order, `; ` between them: the whole why at once, so one rerun
  * fixes it — but the cases are checked only when the `.cases` was read as asked (else what to pick is unknown), and
- * against the summary only when it could be read (with or without its header). A name that is no plain path segment
- * (a stray `.cases` or `x.y.cases` in the folder) is a gap of its own, and nothing of it is read. Never throws.
+ * against the summary only when it could be read (with or without its header). A name that is no plain path segment (a
+ * stray `.cases` or `x.y.cases` in the folder) is a gap of its own, and nothing of it is read. Never throws.
  */
 export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: BatchFs; dir: string; name: string; select: Selector }): Promise<Completeness> {
   if (!PLAIN_SEGMENT.test(name)) return { ok: false, why: `${nameInLine(`${name}${CASES_EXT}`)}: its name is no plain path segment (letters, digits, _ and -), not read as a run` };
@@ -194,7 +198,7 @@ export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: Ba
     }
     if (parsed !== undefined) {
       asked = askedOf(parsed);
-      if (asked === undefined) gaps.push(`${name}.cases is not what a live run is asked (platform ios or android, app, sources: one at least, cases: ids)`);
+      if (asked === undefined) gaps.push(`${name}.cases ${LIVE_SHAPE}`);
     }
   }
   const record = readOr(fs, f.record, `its record (${name}.json)`, `no record (${name}.json)`);

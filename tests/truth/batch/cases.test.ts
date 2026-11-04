@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { NOT_STARTED, TIMED_OUT } from '../../../scripts/truth/batch/bounded.js';
 import { completeness, incompleteLine, runFiles, runsIn, selectorOf, stepOutcome, writeCases, type Asked, type Selector } from '../../../scripts/truth/batch/cases.js';
-import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
+import { DEFAULT_GROUPS, liveTableOf, type LiveCases, type LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import { exitCodeOf, parseVerdictLine, type Summary } from '../../../scripts/truth/batch/words.js';
@@ -23,15 +23,19 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-const KF: Asked = { platform: 'android', app: 'native', kind: 'new', sources: ['uiautomator'], cases: ['kf1', 'kf2', 'kf3'] };
-/** A fake selector: the ids main's selectCases would pick for each source, only those asked when any were (as main's). */
+const KF: Asked = { platform: 'android', app: 'native', sources: ['uiautomator'], cases: ['kf1', 'kf2', 'kf3'] };
+/**
+ * A fake selector: the ids main's selectCases would pick for each source, only those asked when any were (as main's).
+ */
 const picks =
   (bySource: Record<string, string[]>): Selector =>
   async (asked, source) =>
     (bySource[source] ?? []).filter((id) => asked.cases.length === 0 || asked.cases.includes(id));
 const select = picks({ uiautomator: ['kf1', 'kf2', 'kf3'], wda: ['p7w', 'b1d'], idb: ['p7'] });
 
-/** live.ts's log and rejudge summary of a run, as summarize writes them: the header, `## <source>`, one line per case. */
+/**
+ * live.ts's log and rejudge summary of a run, as summarize writes them: the header, `## <source>`, one line per case.
+ */
 const summaryOf = (bySource: Record<string, string[]>, header = true): string =>
   [
     '<!-- averi: this checkout -->',
@@ -62,14 +66,21 @@ describe('writeCases — what a run was asked, written before anything of it run
     expect(readdirSync(dir)).toEqual(['android-kf-1.cases']);
   });
 
-  it('any JSON object a block asks (batch-12\'s E5 wrote `{"runs":3}`)', () => {
-    writeCases(nodeFs, dir, 'a', { runs: 3 });
-    expect(readFileSync(join(dir, 'a.cases'), 'utf8')).toBe('{"runs":3}\n');
+  it('only what a live run is asked: a non-live block\'s record (batch-12\'s E5 `{"runs":3}`) is refused, by the type and at run time, nothing written — runsIn reads every .cases as a live run (T2 S3 code review)', () => {
+    // @ts-expect-error writeCases takes an Asked only
+    expect(() => writeCases(nodeFs, dir, 'a', { runs: 3 })).toThrow('a.cases: {"runs":3} is not what a live run is asked (platform ios or android, app, sources: one at least, cases: ids)');
+    expect(() => writeCases(nodeFs, dir, 'b', { ...KF, sources: [] })).toThrow(/b\.cases: .* is not what a live run is asked/);
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it('batch-11\'s `kind` is not asked for and not read: a .cases holding it is still a live run', async () => {
+    putRun('kf-1', { cases: JSON.stringify({ ...KF, kind: 'new' }) });
+    expect(await judge('kf-1')).toEqual({ ok: true, asked: { ...KF, kind: 'new' } });
   });
 
   it('never overwritten: a second .cases of the same name throws, the first kept (a run folder is never reused)', () => {
     writeCases(nodeFs, dir, 'kf-1', KF);
-    expect(() => writeCases(nodeFs, dir, 'kf-1', { runs: 1 })).toThrow(/kf-1\.cases already exists: what a run was asked is never overwritten/);
+    expect(() => writeCases(nodeFs, dir, 'kf-1', { ...KF, cases: [] })).toThrow(/kf-1\.cases already exists: what a run was asked is never overwritten/);
     expect(JSON.parse(readFileSync(join(dir, 'kf-1.cases'), 'utf8'))).toEqual(KF);
   });
 
@@ -251,6 +262,14 @@ describe('completeness — a run counts only when complete (b11-analyze.ts:1–2
   it('every gap at once, in order: the .cases, the record, the log, the summary, the missing cases', async () => {
     putRun('kf-1', { record: 'x', log: 'died\n', summary: [`${LIVE_GOLDEN_HEADER} x`, '## uiautomator', '- ok kf1 c: s'].join('\n') });
     expect(await judge('kf-1')).toEqual({ ok: false, why: 'its record (kf-1.json) is no JSON; kf-1.log has no `# Live golden:` line (live.ts did not finish); uiautomator: kf2, kf3 missing from the summary' });
+  });
+
+  it('liveTableOf a checkout with no scripts/truth/live-cases.ts: its load rejects, and completeness names it (T2 S3 review round 1)', async () => {
+    putRun('kf-1');
+    await expect(liveTableOf(dir)()).rejects.toThrow();
+    const r = await judge('kf-1', selectorOf(liveTableOf(dir)));
+    expect(r.ok === false && r.why).toMatch(/^main's live cases could not be read: \S/);
+    expect(DEFAULT_GROUPS).toEqual(['forms']);
   });
 
   it('a selector that throws (main\'s table unreadable) is a gap, named; never thrown', async () => {

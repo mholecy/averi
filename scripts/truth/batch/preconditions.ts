@@ -1,6 +1,6 @@
 import { GIT_SECS, NOT_STARTED, TIMED_OUT, type CallResult, type Run } from './bounded.js';
-import { nodeFs } from './io.js';
-import type { LiveCases, LiveTable } from './live-table.js';
+import { nodeFs, type BatchFs } from './io.js';
+import { DEFAULT_GROUPS, loadTable, unreadLive, type LiveSelection, type LiveTable } from './live-table.js';
 import { firstLineOf, messageOf, nameInLine, verdictLine } from './words.js';
 
 /**
@@ -47,7 +47,10 @@ const REPO_LOCATING = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON
  */
 const ENV_CONFIG = /^GIT_CONFIG_(?:PARAMETERS|COUNT|KEY_\d+|VALUE_\d+)$/;
 
-/** `env` (process.env by default) without the repo-locating variables and the env's config: a copy, the one given unchanged. */
+/**
+ * `env` (process.env by default) without the repo-locating variables and the env's config: a copy, the one given
+ * unchanged.
+ */
 export function gitEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const copy = { ...env };
   for (const name of REPO_LOCATING) delete copy[name];
@@ -63,10 +66,15 @@ export interface Git {
   env?: NodeJS.ProcessEnv;
   /** Each call's bound in seconds; none: git's own (bounded.ts#boundFor, GIT_SECS). */
   secs?: number;
+  /** Where the repo's real path is read (topRefusal); none: the real filesystem. */
+  fs?: BatchFs;
 }
 
-/** `(<prefix><first line>)` after a why, or nothing when git said nothing. */
-const said = (err: string, prefix = ''): string => (firstLineOf(err) === '' ? '' : ` (${prefix}${firstLineOf(err)})`);
+/** `told(line)` of git's first line of stderr, or nothing when git said nothing. */
+const ofStderr = (err: string, told: (line: string) => string): string => (firstLineOf(err) === '' ? '' : told(firstLineOf(err)));
+
+/** ` (<prefix><git's first line>)` after a why, or nothing when git said nothing. */
+const said = (err: string, prefix = ''): string => ofStderr(err, (line) => ` (${prefix}${line})`);
 
 /** git `-C <repo> …args`, bounded, in the cleaned env. */
 const git = (g: Git, args: readonly string[]): Promise<CallResult> => g.run('git', ['-C', g.repo, ...args], { env: gitEnv(g.env), secs: g.secs });
@@ -82,17 +90,18 @@ function unanswered(g: Git, call: string, r: CallResult): string | undefined {
 }
 
 /** `exit <code>`, and `: <git's first line>` when it said one. */
-const exitOf = (r: CallResult): string => `exit ${r.code}${firstLineOf(r.err) === '' ? '' : `: ${firstLineOf(r.err)}`}`;
+const exitOf = (r: CallResult): string => `exit ${r.code}${ofStderr(r.err, (line) => `: ${line}`)}`;
 
 /**
- * The repo named is the top of its checkout (`git rev-parse --show-toplevel`, both sides by real path): a folder inside
- * another checkout would have git read that one. Undefined when it is, else why not.
+ * Why the repo named is not the top of its checkout (`git rev-parse --show-toplevel`, both sides by real path through
+ * the fs given), or undefined when it is: a folder inside another checkout would have git read that one.
  */
-async function notTop(g: Git): Promise<string | undefined> {
+async function topRefusal(g: Git): Promise<string | undefined> {
   const top = await git(g, ['rev-parse', '--show-toplevel']);
   if (top.code !== 0) return failed(g, 'rev-parse --show-toplevel', top);
   const at = firstLineOf(top.out);
-  return nodeFs.real(at) === nodeFs.real(g.repo) ? undefined : `${nameInLine(g.repo)} is not the top of a git checkout (top is ${at})`;
+  const fs = g.fs ?? nodeFs;
+  return fs.real(at) === fs.real(g.repo) ? undefined : `${nameInLine(g.repo)} is not the top of a git checkout (top is ${at})`;
 }
 
 /** Why a call that git ran failed: past its bound, not started, or its exit and git's first line. */
@@ -114,21 +123,21 @@ function changedPaths(porcelainZ: string): string[] {
   return paths;
 }
 
-/** The modified paths as a why names them: the first SHOWN_PATHS, then how many more. */
-function named(paths: readonly string[]): string {
+/** The modified paths as a why shows them: the first SHOWN_PATHS, then how many more. */
+function shownPaths(paths: readonly string[]): string {
   const shown = paths.slice(0, SHOWN_PATHS).join(', ');
   return paths.length > SHOWN_PATHS ? `${shown} and ${paths.length - SHOWN_PATHS} more` : shown;
 }
 
 /**
- * The checkout runs main as committed: HEAD is the commit refs/heads/main is — a detached HEAD on that commit too, since
- * the code is the same — and no tracked file is modified, staged or not (`git status --porcelain
- * --untracked-files=no`: an untracked file is allowed, as in batch-11 and batch-12). HEAD ≠ main and modified files
- * are both said when both hold (one rerun fixes both). First the repo named must be the top of its checkout; that not
+ * The checkout runs main as committed: HEAD is the commit refs/heads/main is — a detached HEAD on that commit too,
+ * since the code is the same — and no tracked file is modified, staged or not (`git status --porcelain
+ * --untracked-files=no`: an untracked file is allowed, as in batch-11 and batch-12). HEAD ≠ main and modified files are
+ * both said when both hold (one rerun fixes both). First the repo named must be the top of its checkout; that not
  * shown, or HEAD unreadable, ends it: nothing else is asked.
  */
 export async function checkout(g: Git): Promise<CheckoutPrecondition> {
-  const outside = await notTop(g);
+  const outside = await topRefusal(g);
   if (outside !== undefined) return { ok: false, why: outside };
   const head = await git(g, ['rev-parse', '--verify', 'HEAD^{commit}']);
   if (head.code !== 0) return { ok: false, why: failed(g, 'rev-parse HEAD', head) };
@@ -145,23 +154,25 @@ export async function checkout(g: Git): Promise<CheckoutPrecondition> {
   if (status.code !== 0) whys.push(failed(g, 'status', status));
   else {
     const paths = changedPaths(status.out);
-    if (paths.length > 0) whys.push(`the checkout has ${paths.length} modified tracked file(s) (${named(paths)}) — the batch runs main as committed`);
+    if (paths.length > 0) whys.push(`the checkout has ${paths.length} modified tracked file(s) (${shownPaths(paths)}) — the batch runs main as committed`);
   }
   return whys.length === 0 ? { ok: true, head: headSha } : { ok: false, why: whys.join('; ') };
 }
 
 /**
  * A commit the block needs is an ancestor of HEAD (batch-4's first ancestry gate, batch-11's D43 one): its sha's format
- * first, by batch-11's knob rule — no git call for one that breaks it — then `git cat-file -e <sha>^{commit}` (it names
- * one commit of this repo; after the repo is shown to be the top of its checkout), then `git merge-base --is-ancestor <sha> HEAD` (exit 1: not an ancestor; any other failure is
- * git's, never "not an ancestor"). `what` names it as the batch does (`M_D43`): `M_D43=<sha> …`, `M_D43 is not set`.
+ * first, by batch-11's knob rule — no git call for one that breaks it — then, the repo shown to be the top of its
+ * checkout, `git cat-file -e <sha>^{commit}` (it names one commit of this repo), then `git merge-base --is-ancestor
+ * <sha> HEAD` (exit 1: not an ancestor; any other failure is git's, never "not an ancestor"). `what` names it as the
+ * batch does (`M_D43`): `M_D43=<sha> …`, `M_D43 is not set`.
  */
 export async function ancestor(g: Git & { sha: string; what?: string }): Promise<Precondition> {
-  const { sha, what } = g;
+  const sha = g.sha;
+  const what = g.what === undefined ? undefined : nameInLine(g.what);
   if (sha === '') return { ok: false, why: `${what ?? 'the commit'} is not set` };
   if (!SHA_FORMAT.test(sha)) return { ok: false, why: `${what === undefined ? '' : `${what}=`}${JSON.stringify(sha)} is not a commit sha (7–40 hex digits)` };
   const it = what === undefined ? sha : `${what}=${sha}`;
-  const outside = await notTop(g);
+  const outside = await topRefusal(g);
   if (outside !== undefined) return { ok: false, why: outside };
   const known = await git(g, ['cat-file', '-e', `${sha}^{commit}`]);
   if (known.code !== 0) return { ok: false, why: unanswered(g, 'cat-file', known) ?? `${it} names no commit of this repo${said(known.err, 'git: ')}` };
@@ -174,40 +185,37 @@ export async function ancestor(g: Git & { sha: string; what?: string }): Promise
 /** `ids` each once, in the order given, that `have` lacks, each as a line may name it. */
 const missingOf = (ids: readonly string[], have: ReadonlySet<string>): string[] => [...new Set(ids)].filter((id) => !have.has(id)).map(nameInLine);
 
-/** Why main's table was not had: its load (a missing file, a syntax error) or its own read failed. */
-export const unreadLive = (e: unknown): string => `main's live cases could not be read: ${firstLineOf(messageOf(e))}`;
-
-/** The table loaded, or why not. */
-async function load(table: LiveTable): Promise<{ live: LiveCases } | { why: string }> {
-  try {
-    return { live: await table() };
-  } catch (e) {
-    return { why: unreadLive(e) };
-  }
-}
-
 /**
  * The live cases a block runs are main's: selectCases (live-cases.ts) picks each id for the platform, the lab app
  * (native by default) and the groups (forms by default: batch-11's live_run runs `--groups forms`) — the table, never
  * a grep. Every id it does not pick is named. No id is never a pass: a block judged on no case proves nothing. A table
  * that does not load or read is said, never thrown.
  */
-export async function casesOnMain({ ids, platform, app = 'native', groups = ['forms'], table }: { ids: readonly string[]; platform: 'ios' | 'android'; app?: string; groups?: readonly string[]; table: LiveTable }): Promise<Precondition> {
+export async function casesOnMain({
+  ids,
+  platform,
+  app = 'native',
+  groups = DEFAULT_GROUPS,
+  table,
+}: { ids: readonly string[]; table: LiveTable } & Pick<LiveSelection, 'platform'> & Partial<Pick<LiveSelection, 'app' | 'groups'>>): Promise<Precondition> {
   if (ids.length === 0) return { ok: false, why: 'no live case id given' };
+  const loaded = await loadTable(table);
+  if ('why' in loaded) return { ok: false, why: loaded.why };
   let picked: readonly { id: string }[];
   try {
-    picked = await (await table()).selectCases({ platform, app, groups, only: ids });
+    picked = await loaded.live.selectCases({ platform, app, groups, only: ids });
   } catch (e) {
     return { ok: false, why: unreadLive(e) };
   }
   const missing = missingOf(ids, new Set(picked.map((c) => c.id)));
-  return missing.length === 0 ? { ok: true } : { ok: false, why: `live case(s) ${missing.join(', ')} not on main's live-cases.ts (${platform}, ${app} app, groups ${groups.join(', ')})` };
+  const where = `${platform}, ${nameInLine(app)} app, groups ${groups.map(nameInLine).join(', ')}`;
+  return missing.length === 0 ? { ok: true } : { ok: false, why: `live case(s) ${missing.join(', ')} not on main's live-cases.ts (${where})` };
 }
 
 /** The lab cells a block uses are in main's catalog (batch-11's and batch-12's cells_have): every one missing named. */
 export async function cellsOnMain({ ids, table }: { ids: readonly string[]; table: LiveTable }): Promise<Precondition> {
   if (ids.length === 0) return { ok: false, why: 'no cell id given' };
-  const loaded = await load(table);
+  const loaded = await loadTable(table);
   if ('why' in loaded) return { ok: false, why: loaded.why };
   let cells: readonly { id: string }[];
   try {

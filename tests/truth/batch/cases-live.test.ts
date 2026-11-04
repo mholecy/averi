@@ -21,20 +21,20 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe('casesOnMain over the real live-cases table (batch-11.sh:235–242: kf1–kf3, p7w/p7/b1d/b7 — grepped there)', () => {
-  it('kf1–kf3 on Android, p7w, p7, b1d and b7 on iOS: ok', async () => {
+  it('kf1–kf3 on Android, p7w, p7, b1d and b7 on iOS: ok (batch-11\'s prechecks)', async () => {
     const table = liveTableOf(ROOT);
     expect(await casesOnMain({ ids: ['kf1', 'kf2', 'kf3'], platform: 'android', table })).toEqual({ ok: true });
     expect(await casesOnMain({ ids: ['p7w', 'p7', 'b1d', 'b7'], platform: 'ios', table })).toEqual({ ok: true });
   });
 
-  it('an id the table lacks, and one it holds for the other platform only (p7w is iOS\'s): both named — a grep would have passed p7w', async () => {
+  it('an id the table lacks, and one it holds for the other platform only (p7w is iOS\'s): both named — a grep would have passed p7w (T2 S3 decision)', async () => {
     const table = liveTableOf(ROOT);
     expect(await casesOnMain({ ids: ['kf1', 'no-such-case', 'p7w'], platform: 'android', table })).toEqual({ ok: false, why: "live case(s) no-such-case, p7w not on main's live-cases.ts (android, native app, groups forms)" });
   });
 });
 
 describe('cellsOnMain over the real catalog (batch-11.sh:233, batch-12.sh:343)', () => {
-  it('batch-11\'s cells are main\'s; a made-up one is named', async () => {
+  it('batch-11\'s cells are main\'s; a made-up one is named (batch-11\'s and batch-12\'s cells_have)', async () => {
     const table = liveTableOf(ROOT);
     expect(await cellsOnMain({ ids: ['open', 'form-basic', 'form-prefilled', 'form-keyboard-floating', 'carousel-lazy-free', 'carousel-recycler-free'], table })).toEqual({ ok: true });
     expect(await cellsOnMain({ ids: ['open', 'no-such-cell'], table })).toEqual({ ok: false, why: "cell(s) no-such-cell not in main's catalog (fixtures/apps/cells.json)" });
@@ -42,7 +42,7 @@ describe('cellsOnMain over the real catalog (batch-11.sh:233, batch-12.sh:343)',
 });
 
 describe('completeness over the real selector and summarize\'s own header (b11-analyze.ts:1–23)', () => {
-  const KF: Asked = { platform: 'android', app: 'native', kind: 'new', sources: ['uiautomator'], cases: ['kf1', 'kf2', 'kf3'] };
+  const KF: Asked = { platform: 'android', app: 'native', sources: ['uiautomator'], cases: ['kf1', 'kf2', 'kf3'] };
   /** A summary in summarize's shape: its real header line, then one line per case under its source. */
   const summary = (ids: string[]) => {
     const header = summarize({ platform: 'android', sources: [], results: [], side: THIS_CHECKOUT }).lines.slice(0, 2);
@@ -56,7 +56,7 @@ describe('completeness over the real selector and summarize\'s own header (b11-a
     writeFileSync(f.summary, summary(ids));
   };
 
-  it('kf1–kf3 all in the summary: complete; kf3 missing: named; a .cases that never ran: INCONCLUSIVE in the block\'s line', async () => {
+  it('kf1–kf3 all in the summary: complete; kf3 missing: named; a .cases that never ran: INCONCLUSIVE in the block\'s line (batch-9: never an invisible gap)', async () => {
     const select = selectorOf(liveTableOf(ROOT));
     put('android-kf-1', ['kf1', 'kf2', 'kf3']);
     put('android-kf-2', ['kf1', 'kf2']);
@@ -77,7 +77,7 @@ describe('completeness over the real selector and summarize\'s own header (b11-a
     expect(r.ok === false && r.why).toMatch(/^main's live cases could not be read: /);
   });
 
-  it('no case asked: every forms case main runs on Android under uiautomator must be there', async () => {
+  it('no case asked: every forms case main runs on Android under uiautomator must be there (batch-11\'s live_run, --groups forms)', async () => {
     const select = selectorOf(liveTableOf(ROOT));
     const all = await select({ ...KF, cases: [] }, 'uiautomator');
     expect(all).toEqual(expect.arrayContaining(['kf1', 'kf2', 'kf3', 'p7']));
