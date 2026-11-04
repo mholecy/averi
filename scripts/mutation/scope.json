@@ -71,7 +71,17 @@
   },
   "scripts/truth/batch/io.ts": {
     "tests": ["tests/truth/batch/io.test.ts", "tests/truth/batch/run-dir.test.ts", "tests/truth/batch/steps.test.ts"],
-    "floor": 92,
-    "baseline": "94.55 % on 2026-11-04 (T2 S1 code review, isEexist shared from here; cold): 55 mutants, 3 survived — the same three equivalents; 94.00 % on 2026-11-04 (T2 S1 review round 1, realpathSync.native; cold): 50 mutants, 3 survived — the same three equivalents; 94.00 % on 2026-11-04 (T2 S1, cold): 50 mutants, 3 survived, 0 without coverage — all equivalent: read's catch emptied (it returns undefined either way), list's `.sort()` dropped (APFS lists a folder sorted already, so no test on this machine tells them apart), real's root guard set false (realpath of the root never fails)"
+    "floor": 93,
+    "baseline": "95.38 % on 2026-11-04 (T2 S2, replace for markDirty, its folder and temp-name refusals tested; cold): 65 mutants, 3 survived — the same three equivalents; floor 92 → 93 as the baseline rose; 94.55 % on 2026-11-04 (T2 S1 code review, isEexist shared from here; cold): 55 mutants, 3 survived — the same three equivalents; 94.00 % on 2026-11-04 (T2 S1 review round 1, realpathSync.native; cold): 50 mutants, 3 survived — the same three equivalents; 94.00 % on 2026-11-04 (T2 S1, cold): 50 mutants, 3 survived, 0 without coverage — all equivalent: read's catch emptied (it returns undefined either way), list's `.sort()` dropped (APFS lists a folder sorted already, so no test on this machine tells them apart), real's root guard set false (realpath of the root never fails)"
+  },
+  "scripts/truth/batch/bounded.ts": {
+    "tests": ["tests/truth/batch/bounded.test.ts"],
+    "floor": 96,
+    "baseline": "97.87 % on 2026-11-04 (T2 S2, cold): 94 mutants, 2 survived, 0 without coverage — both equivalent: the bound's `bound === undefined` set false (`!(undefined > 0)` refuses it as well; the test is there for the type), and the not-started `pid === undefined` set false (its `done` has settled already, so the timer is cleared before it can fire and the call is never in the running map past its end)"
+  },
+  "scripts/truth/batch/abort.ts": {
+    "tests": ["tests/truth/batch/abort.test.ts"],
+    "floor": 95,
+    "baseline": "97.53 % on 2026-11-04 (T2 S2, cold): 243 mutants, 5 survived, 1 without coverage — all equivalent: within's `finally { clearTimeout }` emptied or its call dropped (a timer left armed resolves a race already settled, and the abort exits next); open's and putBack's `stateFile !== undefined` set true (nodeFs.exists of no path is false, so markDirty says missing and the state check is skipped either way); completeOf's catch emptied (it returns undefined, falsy as false); and, without coverage, markDirty's `?? ''` for a file that exists but cannot be read (a folder) turned into another string that is no JSON either"
   }
 }

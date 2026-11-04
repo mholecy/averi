@@ -6,6 +6,7 @@ Amended 2026-11-02 (D45: geometry.ts joined the run — see the amendment below)
 Amended 2026-11-02 (D33: adapters/ios-liveness.ts joined the run — see the second amendment below).
 Amended 2026-11-03 (D43: adapters/typeable.ts and adapters/ios-typing.ts joined the run — see the D43 amendment below).
 Amended 2026-11-04 (T2 S1: scripts/truth/batch/ joined the run — see the T2 amendment below).
+Amended 2026-11-04 (T2 S2: bounded.ts and abort.ts joined the run — see the T2 amendment's S2 part below).
 
 ## Context
 
@@ -150,3 +151,69 @@ Where S1 departs from batch-12, on purpose:
 - the exit rule fails on a step-form FAIL line too (`FAIL …`), besides batch-12's `^[^:]+: FAIL( |$)`.
 - ONLY= takes spaces as well as commas between block names.
 - an out folder inside the checkout is refused already in S1 (analysis §5), not left to S6.
+
+### S2: bounded calls and the abort (2026-11-04, backlog T2 slice S2, the risk gate)
+
+S2 adds three files. bounded.ts bounds every call: its tool's own bound, exit 142 past it, and the whole process group
+ended, SIGTERM and then SIGKILL. abort.ts holds the dirty windows and the abort: SIGINT, SIGTERM or SIGHUP, a throw out
+of the run's body, or an uncaught exception or unhandled rejection puts back every dirty window, writes RESTORE for
+what it cannot prove, prints the abort SUMMARY through words.ts and steps.ts, and exits 130. proc.ts is the one
+process and signal seam: spawn in a group of its own, kill a group, the signal and fatal handlers, exit. io.ts gains
+`replace`, which writes a state file's text beside it and renames it over the old one (`markDirty`).
+
+bounded.ts and abort.ts join the run. Each is tested over a fake seam (tests/truth/batch/bounded.test.ts,
+abort.test.ts), with real files in a temp dir and tiny real timers. Their baselines: bounded.ts 97.87 %
+(2 survivors), abort.ts 97.53 % (5 survivors, 1 mutant without coverage), every one equivalent and named in
+scope.json; floors 96 and 95. io.ts rose to 95.38 % with `replace` and its tests (the same three equivalents), so its
+floor rises from 92 to 93. The cold run of all seventeen modules took about 2 minutes (Stryker's own 125 to 131 s),
+past the 90 s mark the S1 part already noted; the look at one Stryker run per module is still left for later. proc.ts stays out: it is only spawn, kill and process.on, and its tests start real
+children. Those are tests/truth/batch/bounded-proc.test.ts (a grandchild that traps SIGTERM is gone after a timeout)
+and abort-proc.test.ts (b11-dry's int.sh scenarios as vitest tests: a group sent SIGINT, a second SIGINT, a throw, a
+rejection and an uncaught exception inside a window, stdout EPIPE, a terminal that blocks, batch-12's worktree
+window). Both run in the normal suite only, as terminal.test.ts does.
+
+What of batch-11's and batch-12's safety core S2 does not port, each with the slice that owns it or the reason:
+- the `B_*` bound knobs and their validation: S1's select.ts `knobs` already covers them; a batch passes the value as
+  a call's `secs`.
+- the cleanup after a build passes its bound: the group kill ends an `xcodebuild` the call started, so `pkill
+  xcodebuild` is not needed; but the Gradle daemon leaves the call's group by design, so `gradlew --stop` stays with
+  the lab build step: S6.
+- on_abort's own restores: BACK/HOME, the reinstall checked with `adb get-state` and `pm path`, and the chooser's
+  `--check` exits (S5); the D43 restore after `kill_lab_wda` and its 4 s wait (S4); `pkill` of idb_companion and the
+  lab's WebDriverAgent (lab plumbing for the runner: S6). S2 gives each of them a window: a restore, its hand lines,
+  its bound and its block. batch-12's worktree window is shown as one in abort-proc.test.ts's fixture.
+- `A_DIRTY` and `CLIP_DIRTY` as flags: no block of batch-11 or batch-12 ever set them. A batch that writes the
+  schemeapproval domain or the clipboard opens a window for it.
+- `exec >>$STEPS` after the tee died: steps.ts already writes the run's own files (S1); the abort writes only to them
+  until the SUMMARY's last write to the terminal.
+- block_complete's per-block rules (the `.cases` with their records, kf's premise verdict, T6's capture): the batch's
+  `AbortBlock.complete`. The generic `.cases` completeness is S3. The analyzer that judges a complete block stays per
+  batch, called through `judge`.
+- the abort-path hand lines of int-reinstall, int-reinstall-nolab and -noadb, and int-after-e2: S5.
+- a SIGKILL to the runner: nothing can catch it, in zsh or in Node. A state file a window marked dirty still refuses
+  the next run (S1's refusals).
+
+Where S2 departs from batch-12, on purpose:
+- a throw or an uncaught error outside every window takes the abort path too: the abort SUMMARY, exit 130. batch-12's
+  TRAPEXIT acted only inside a window. A waiter waits for `======== SUMMARY`, so a run that died without printing one
+  would leave it waiting, and the SUMMARY's ERROR line names the error.
+- a block interrupted inside its own window is never judged, even when the abort then puts the window back.
+  batch-12's block_complete read CHOOSER_DIRTY after on_abort had cleared it, although its comment says "never while
+  interrupted inside it". The comment is the rule: one of that block's legs was cut short.
+- the abort's cleanup line (`E5 cleanup: OK — … (verified by the abort)`) follows the block's INTERRUPTED line
+  unprefixed. batch-12 appended it to verdict.txt, so it was printed as "(before the interrupt)".
+- the windows are put back last opened first. batch-12 used a fixed order, which mattered only with two windows
+  open.
+- a restore is bounded as a whole by its window's `secs` (300 by default, as B_RESTORE), not only each command in it.
+  A complete block's judge is bounded too (300 s, as batch-12's `detached 300` analyzer).
+- the runner stops its running probes itself, before the first restore: SIGTERM to each probe's group, then SIGKILL
+  after a 2 s grace or once the probe has ended. In a group of its own a probe no longer gets the terminal's Ctrl-C.
+  Once stopping, no probe starts and no window opens, so a body that goes on after its probe was killed cannot touch
+  a device.
+- a window with a state file: opening it marks an existing state file dirty (`markDirty`). This covers batch-11's
+  forced-dirty state after the reinstall: a window reopened over a state that a restore had cleared reads dirty
+  again. A restore that says it is done while that file is still not clean is not put back.
+- a signal that arrives during the abort is noted in steps.log, not silently ignored.
+- the normal end's RESTORE header is S1's writeRestore form: `<name> run <id> ended at <date>; state to put back by
+  hand:`.
+
