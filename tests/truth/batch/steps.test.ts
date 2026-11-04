@@ -198,10 +198,17 @@ describe('terminalOf — the default terminal: a synchronous write to fd 1, safe
     expect(got.join('')).toBe('abcdefgh');
   });
 
-  it('EPIPE (the reader closed its end) and EBADF (no fd 1) say gone, never throw', () => {
+  it('EPIPE (the reader closed its end), EBADF (no fd 1) and EIO (its tty hung up) say gone, never throw', () => {
     expect(terminalOf(1, failing('EPIPE'))('x')).toBe('gone');
     expect(terminalOf(1, failing('EBADF'))('x')).toBe('gone');
+    expect(terminalOf(1, failing('EIO'))('x')).toBe('gone');
   });
+
+  /** A clock the fake fd moves: each write call takes `step` ms. */
+  const clocked = (step: number, write: (buf: Buffer) => number) => {
+    let t = 0;
+    return { now: () => t, write: (_fd: number, buf: Buffer) => ((t += step), write(buf)) };
+  };
 
   it('EAGAIN (a non-blocking pipe, full) is waited out, and the text still lands whole', () => {
     let tries = 0;
@@ -216,20 +223,51 @@ describe('terminalOf — the default terminal: a synchronous write to fd 1, safe
     expect(got).toEqual(['abc']);
   });
 
-  it('a pipe that stays full past the bound is gone, not a hang: exactly `tries` writes, a wait of `waitMs` between each', () => {
+  it('a slow reader taking 1 byte a call, with EAGAIN between, is never dropped: each byte starts the deadline afresh (review round 2)', () => {
+    let full = false;
+    const got: string[] = [];
+    const fd = clocked(1000, (buf) => {
+      full = !full;
+      if (full) throw Object.assign(new Error('EAGAIN'), { code: 'EAGAIN' });
+      got.push(buf.subarray(0, 1).toString());
+      return 1;
+    });
+    expect(terminalOf(1, fd.write, { waitMs: 0, deadlineMs: 1500, now: fd.now })('a slow reader')).toBeUndefined();
+    expect(got.join('')).toBe('a slow reader');
+  });
+
+  it('a reader that stays at EAGAIN is gone once the deadline passes with no byte taken, not before', () => {
     let calls = 0;
-    const full = () => {
+    const fd = clocked(100, () => {
       calls += 1;
       throw Object.assign(new Error('EAGAIN'), { code: 'EAGAIN' });
-    };
+    });
+    expect(terminalOf(1, fd.write, { waitMs: 0, deadlineMs: 1500, now: fd.now })('x')).toBe('gone');
+    expect(calls).toBe(15);
+  });
+
+  it('a write that takes 0 bytes forever counts as no progress, and ends at the deadline', () => {
+    let calls = 0;
+    const fd = clocked(100, () => ((calls += 1), 0));
+    expect(terminalOf(1, fd.write, { waitMs: 0, deadlineMs: 1500, now: fd.now })('x')).toBe('gone');
+    expect(calls).toBe(15);
+  });
+
+  it('with the real clock and sleep: waits `waitMs` between tries, never a busy loop, and gives up at the deadline', () => {
+    let calls = 0;
     const started = Date.now();
-    expect(terminalOf(1, full, { waitMs: 25, tries: 3 })('x')).toBe('gone');
-    expect(calls).toBe(3);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(45);
+    expect(terminalOf(1, () => ((calls += 1), 0), { waitMs: 25, deadlineMs: 60 })('x')).toBe('gone');
+    expect(Date.now() - started).toBeGreaterThanOrEqual(60);
+    expect(calls).toBeLessThanOrEqual(5);
   });
 
   it('any other failure is thrown, for StepLog to drop the terminal and say why', () => {
-    expect(() => terminalOf(1, failing('EIO'))('x')).toThrow(/^EIO: x$/);
+    expect(() => terminalOf(1, failing('EINVAL'))('x')).toThrow(/^EINVAL: x$/);
+    expect(() =>
+      terminalOf(1, () => {
+        throw new Error('no code at all');
+      })('x'),
+    ).toThrow(/^no code at all$/);
   });
 });
 

@@ -36,7 +36,8 @@ export interface CountKnob {
 
 /**
  * A text knob: empty (its default) or matching `pattern` whole — anchors are added, so `/[0-9a-f]{7,40}/` takes a sha
- * and nothing around it. No g or y flag (their lastIndex would make the same value pass once and fail the next time).
+ * and nothing around it. No g or y flag (their lastIndex would make the same value pass once and fail the next time),
+ * and no m flag (its anchors would match one line of a value that holds several).
  * `what` says what it must be.
  */
 export interface TextKnob {
@@ -86,7 +87,7 @@ function checkSpec(spec: KnobSpec): void {
     if (!fits(k, k.default)) throw new Error(`${name}'s default ${k.default} breaks its own rule (${ruleOf(k)})`);
   }
   for (const [name, k] of Object.entries(spec.texts ?? {})) {
-    if (/[gy]/.test(k.pattern.flags)) throw new Error(`${name}'s pattern ${k.pattern} has the g or y flag: a knob's pattern must hold no state`);
+    if (/[gmy]/.test(k.pattern.flags)) throw new Error(`${name}'s pattern ${k.pattern} has the g, m or y flag: a knob's pattern holds no state and matches the whole value, not a line of it`);
     if (k.default !== '' && !whole(k.pattern).test(k.default)) throw new Error(`${name}'s default ${JSON.stringify(k.default)} breaks its own rule (${k.what})`);
   }
   for (const { low, high } of spec.atMost ?? []) {

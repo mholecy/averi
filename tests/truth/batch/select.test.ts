@@ -131,9 +131,10 @@ describe('knobs — every knob checked before anything is done (batch-10 → bat
     expect(knobs({ texts: { K: { default: '', pattern: /^ab$/i, what: 'ab' } } }, { K: 'AB' })).toMatchObject({ ok: true });
   });
 
-  it('a pattern with the g or y flag is refused when the spec is read: its lastIndex would make one value pass once and fail the next time', () => {
-    expect(() => knobs({ texts: { K: { default: '', pattern: /a/g, what: 'a' } } }, {})).toThrow(/K's pattern \/a\/g has the g or y flag/);
-    expect(() => knobs({ texts: { K: { default: '', pattern: /a/y, what: 'a' } } }, {})).toThrow(/K's pattern \/a\/y has the g or y flag/);
+  it('a pattern with the g, m or y flag is refused when the spec is read: lastIndex would make one value pass once and fail the next time; m would match one line of a value', () => {
+    for (const pattern of [/a/g, /a/y, /a/m, /a/im]) {
+      expect(() => knobs({ texts: { K: { default: '', pattern, what: 'a' } } }, {}), String(pattern)).toThrow(`K's pattern ${pattern} has the g, m or y flag`);
+    }
   });
 
   it('the values are typed from the spec: a count a number, a text a string, an unknown knob no key', () => {

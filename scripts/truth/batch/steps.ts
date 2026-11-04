@@ -10,8 +10,8 @@ import { oneLine, stepLine, type StepWord } from './words.js';
  *
  * The terminal is safe only if it writes synchronously: `process.stdout.write` into a pipe whose reader has gone
  * reports EPIPE later, as an `'error'` event that kills the process unless handled — perhaps in the middle of a
- * restore. So the default terminal (`terminalOf`) writes fd 1 with `writeSync` and says `'gone'` on EPIPE or EBADF
- * at the call itself; StepLog then drops it and notes why.
+ * restore. So the default terminal (`terminalOf`) writes fd 1 with `writeSync` and says `'gone'` on EPIPE, EBADF
+ * or EIO at the call itself; StepLog then drops it and notes why.
  */
 
 /** A terminal: write `text`; `'gone'` when the reader has gone. A throw drops it too. */
@@ -19,26 +19,37 @@ export type Terminal = (text: string) => 'gone' | undefined;
 
 const sleepMs = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
+/** The errors that mean the terminal's reader is gone: its end closed (EPIPE), no such fd (EBADF), its tty hung up (EIO). */
+const GONE = new Set(['EPIPE', 'EBADF', 'EIO']);
+
 /**
  * The default terminal: `text` written whole to `fd` (1, stdout) with a synchronous write, looping over partial
- * writes. EPIPE (the reader closed its end) and EBADF (no such fd) say `'gone'`. EAGAIN (a non-blocking pipe that is
- * full) is waited out, `waitMs` a try, `tries` times, then `'gone'` too: never a hang. Any other failure is thrown.
+ * writes. EPIPE, EBADF and EIO say `'gone'`. A write that takes nothing — EAGAIN (a non-blocking pipe that is full) or
+ * 0 bytes — is tried again `waitMs` later, until `deadlineMs` pass with no byte taken: then `'gone'` too, never a
+ * hang. Any byte taken starts the deadline afresh, so a slow reader is never dropped. Any other failure is thrown.
  */
-export function terminalOf(fd = 1, write: (fd: number, buf: Buffer) => number = writeSync, { waitMs = 2, tries = 2500 } = {}): Terminal {
+export function terminalOf(
+  fd = 1,
+  write: (fd: number, buf: Buffer) => number = writeSync,
+  { waitMs = 2, deadlineMs = 1500, now = Date.now }: { waitMs?: number; deadlineMs?: number; now?: () => number } = {},
+): Terminal {
   return (text) => {
     let buf = Buffer.from(text);
-    let left = tries;
+    let since = now();
     while (buf.length > 0) {
+      let taken = 0;
       try {
-        buf = buf.subarray(write(fd, buf));
+        taken = write(fd, buf);
       } catch (e) {
-        const code = (e as NodeJS.ErrnoException).code;
-        if (code === 'EPIPE' || code === 'EBADF') return 'gone';
+        const code = (e as NodeJS.ErrnoException).code ?? '';
+        if (GONE.has(code)) return 'gone';
         if (code !== 'EAGAIN') throw e;
-        left -= 1;
-        if (left <= 0) return 'gone';
-        sleepMs(waitMs);
       }
+      if (taken > 0) {
+        buf = buf.subarray(taken);
+        since = now();
+      } else if (now() - since >= deadlineMs) return 'gone';
+      else sleepMs(waitMs);
     }
     return undefined;
   };
@@ -130,7 +141,6 @@ export class StepLog {
     this.terminalUp = false;
     this.note(stepLine('NOTE', `the terminal is gone (${why}): this run writes only to ${this.o.outFile} and ${this.o.stepsFile} now`));
   }
-
 
   /** A line to the .out only (a step's banner, a detail). */
   print(line: string): void {

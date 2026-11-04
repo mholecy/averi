@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
@@ -71,7 +72,7 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
       `${join(out, 'RESTORE.txt')} exists (an earlier run left state not provably put back):`,
       'batch-n run 1 interrupted; state to put back by hand:',
       'E5: adb install lab.apk',
-      `  → run its hand commands, then: mv "${join(out, 'RESTORE.txt')}" "${join(out, 'RESTORE.done-$(date +%Y%m%d-%H%M%S).txt')}"`,
+      `  → run its hand commands, then: mv '${join(out, 'RESTORE.txt')}' '${join(out, 'RESTORE.done-')}'"$(date +%Y%m%d-%H%M%S)"'.txt'`,
     ]);
     expect(tree()).toEqual(['RESTORE.txt']);
   });
@@ -79,6 +80,16 @@ describe('refusals — the batch refuses to start, nothing done, while state is 
   it('a RESTORE that cannot be read (a folder in its place) still refuses, saying so', () => {
     mkdirSync(join(out, 'RESTORE.txt'));
     expect(refusals(nodeFs, { out, stateful: [] }).slice(0, 2)).toEqual([`${join(out, 'RESTORE.txt')} exists (an earlier run left state not provably put back):`, '(unreadable)']);
+  });
+
+  it("the mv hand line runs as written in a shell, on a path holding ' and $: each path single-quoted, only the date expanded (review round 2)", () => {
+    const odd = join(out, "it's $HOME");
+    mkdirSync(odd);
+    writeFileSync(join(odd, 'RESTORE.txt'), 'x\n');
+    const mv = refusals(nodeFs, { out: odd, stateful: [] }).at(-1)!.replace(/^ {2}→ run its hand commands, then: /, '');
+    const ran = spawnSync('/bin/sh', ['-c', mv], { encoding: 'utf8', timeout: 10_000 });
+    expect(ran.status, ran.stderr).toBe(0);
+    expect(readdirSync(odd)).toEqual([expect.stringMatching(/^RESTORE\.done-\d{8}-\d{6}\.txt$/)]);
   });
 
   it('an empty RESTORE file refuses too: its presence is the marker', () => {
