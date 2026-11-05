@@ -126,10 +126,11 @@ describe('a group\'s tests: every scoped test that imports a module of a group i
     .map((f) => `tests/${f.split('\\').join('/')}`);
 
   it('a scoped test importing a module of another group is lab\'s, importing core: the lab builds on core', () => {
-    // Narrowing a group's include can only lower a score (fewer tests to kill a mutant), so the guard is that a scoped
-    // test that imports a module of a group runs in that group. The one known exception: lab's tests import core's
-    // modules as what the lab is built on (runner, bounded, io …), never to check them — core's own tests do that, and
-    // T2b-2's per-mutant compare with the single run found every status unchanged (ADR 0038, T2b-2).
+    // Narrowing a group's include can only lower a score (fewer tests to kill a mutant): a loud floor failure, never a
+    // false pass. So a scoped test that imports a module of a group runs in that group. The one known exception: lab's
+    // tests import core's modules, what the lab is built on (runner, bounded, io …), and may kill core mutants too (in
+    // main's single run lab-batch.test.ts was the first killer of some); core's own tests must suffice for core's
+    // floors, and T2b-2's per-mutant compare with the single run found every status unchanged (ADR 0038, T2b-2).
     const misplaced: string[] = [];
     for (const test of testFiles.filter((t) => inGroup(t))) {
       const source = readFileSync(join(root, test), 'utf8');

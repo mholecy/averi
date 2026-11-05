@@ -108,13 +108,17 @@ describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)
     expect(planRuns(['--mutate=src/a.ts:1:2-3:4'], two)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts:1:2-3:4'] }] });
   });
 
-  it('--mutate without --group: a glob goes to the group of each module it matches', () => {
-    expect(planRuns(['--mutate', 'src/*.ts', '--force'], two)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/*.ts', '--force'] }] });
+  it('--mutate without --group: a glob gives each group the modules it matches there, never the glob itself', () => {
+    expect(planRuns(['--mutate', 'src/*.ts', '--force'], two)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts', '--force'] }] });
     expect(planRuns(['--mutate', 'scripts/truth/batch/lab-*.ts'], two)).toEqual({
-      runs: [{ group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-*.ts'] }],
+      runs: [{ group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts'] }],
     });
-    expect(planRuns(['--mutate', '**/*.ts'], two)).toEqual({
-      runs: [{ group: 'core', args: ['--mutate', '**/*.ts'] }, { group: 'lab', args: ['--mutate', '**/*.ts'] }],
+    const three: Scope = { ...two, 'src/b.ts': { tests: ['tests/b.test.ts'], floor: 90, baseline: '', group: 'core' } };
+    expect(planRuns(['--mutate', '**/*.ts,src/a.ts:2-5'], three)).toEqual({
+      runs: [
+        { group: 'core', args: ['--mutate', 'src/a.ts,src/b.ts,src/a.ts:2-5'] },
+        { group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts'] },
+      ],
     });
   });
 

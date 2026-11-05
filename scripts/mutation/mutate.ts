@@ -87,8 +87,8 @@ const isOption = (arg: string): arg is Option => Object.hasOwn(OPTIONS, arg);
  * The groups a run starts, in order, each with its Stryker arguments; or a refusal. `--group <name>` picks one group
  * (none: all, in GROUPS' order) and is not passed on. `--tempDirName <name>` becomes `<name>-<group>`, each group its
  * own sandbox. Without `--group`, each `--mutate` pattern (a path or a glob, a Stryker range after a path kept) is
- * matched against scope.json's modules and goes to the group of each it matches; only the groups matched run, and a
- * pattern matching none is a refusal. With `--group`, `--mutate` is passed on as given. Pure.
+ * matched against scope.json's modules, and each group gets the modules it matched there (a glob as their paths); only
+ * the groups matched run, and a pattern matching none is a refusal. With `--group`, `--mutate` is passed on as given. Pure.
  */
 export function planRuns(args: readonly string[], scope: Scope): { runs: GroupRun[] } | { refusal: string } {
   const refuse = (why: string) => ({ refusal: `npm run mutate: ${why}` });
@@ -118,9 +118,11 @@ export function planRuns(args: readonly string[], scope: Scope): { runs: GroupRu
   const byGroup = new Map<Group, string[]>();
   for (const pattern of mutate.split(',')) {
     const path = pattern.replace(/:\d.*$/s, '');
-    const owners = new Set(Object.entries(scope).filter(([file]) => matchesGlob(file, path)).map(([, m]) => m.group));
-    if (owners.size === 0) return refuse(`--mutate ${pattern}: matches no scripts/mutation/scope.json module (give --group to mutate it)`);
-    for (const owner of owners) byGroup.set(owner, [...(byGroup.get(owner) ?? []), pattern]);
+    const matched = Object.entries(scope).filter(([file]) => matchesGlob(file, path));
+    if (matched.length === 0) return refuse(`--mutate ${pattern}: matches no scripts/mutation/scope.json module (give --group to mutate it)`);
+    // A path keeps its range; a glob becomes the modules it matched, each to its own group (never the glob: in the other
+    // group it would mutate modules whose tests that group does not run).
+    for (const [file, m] of matched) byGroup.set(m.group, [...(byGroup.get(m.group) ?? []), file === path ? pattern : file]);
   }
   return { runs: GROUPS.filter((g) => byGroup.has(g)).map((g) => ({ group: g, args: argsOf(g, byGroup.get(g)?.join(',')) })) };
 }
