@@ -398,6 +398,37 @@ both visibility records in vitest (no device; 73/62/3/8 and 222/178/5/39, 0 not 
 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md); #7's second fix rerun live at d928789, the
 static pair's before (`pair: 2`).
 
+The live groups (`live.ts --groups …`): `forms` (the default), `visibility`, `dismissal` (iOS), `ensure` (D30) and,
+since T7a (2026-11-05), `carousel` (Android, the native app; scripts/truth/live-carousel.ts) — the carousel probes the
+device batches copied from batch to batch, as cases: `lv-d62-control` and `lv-d62-drop` (carousel-recycler-free after
+the 440-px, 1-s pre-drag, `left fully: true`; the drop leg with the call's second stroke dropped and resolved as
+drawn), `lv-d68-launch` (the same card from a fresh launch, `right`), `lv-d59b-lazy` and `lv-d59b-recycler` (from a
+fresh launch, `right fully: true`, every stroke inside the carousel's band), `d52-e2` (carousel-in-list after the
+pre-drag, `unfit` within 3 swipes) and `d37-snap-lazy`/`-recycler` (one stroke through `swipe`, then `ui_snapshot`: the
+first read lists C where the snapping pager comes to rest). The oracle is the app's: C's frame against the clip, the
+offsets, `carousel.index` and the strokes. The hard verdict on every `fully: true` case: never "fully visible" while C
+is cut (MISMATCH `fully-cut`); the expected reply kind (replies.ts#carouselReply: `unaimable`, `unfit` with or
+without the inferred-axis clause, `maxSwipes-hedged`) is ok, ADR 0021's D68 residual (the hedged bound where
+`unaimable` is expected) ok and counted in the summary, any other kind LOUD. Harness additions: `Case.preDrag` (a raw
+`input swipe`, lab-device.ts#AndroidLab.swipe), `Case.dropSwipe` (one SwipeHook on the Android adapter the registry
+builds, armed around a case's calls, logging every stroke averi draws into the record's `swipes`). Its judges are
+pinned offline on tests/fixtures/live-android-carousel-d68-d59-synthetic.json — partly synthesized (the D68 and D59 live
+checks' replies and app states, with the stroke log, some stroke offsets, the drop leg and both D37 cases made up; its
+`note` says which), so it pins the judges only and is no device evidence (tests/truth/live-carousel.test.ts); the
+group's first clean live record (lab only) replaces it as evidence, rejudged by tests/truth/live-rejudge.test.ts. Review
+round 1: a ceiling on the hedged acceptance — a run of this checkout whose every judged unaimable leg (lv-d62-control,
+lv-d68-launch, lv-d59b-recycler; 3 or more judged) ends hedged fails, MISMATCH-class (ADR 0021's D68 amendment
+measured the hedged bound on ~3 in 10, batch-10 runs 0, 5, 6: all three by chance is about 2.7 %, and the 3 planned
+runs, 9 legs, make chance negligible — D68 reverted), fewer judged (any leg selected, even every one SKIPped) is LOUD
+and counted in the summary's LOUD tally, "hedged N of M" printed whenever a leg ran; lv-d62's legs fail the run on a
+SKIP (skipFails: their premises are the harness's); a pre-drag that fails is the case's SKIP; no carousel clip reported
+is a SKIP, never a MISMATCH. The drop leg also checks D62's retry in its stroke log: the stroke after the dropped one
+must be the same reveal sent again (± 2 px a point; flush-check.ts: "the same reveal is sent again"), else LOUD
+`no-retry`. The carousel group takes no `late` re-read (as the visibility group): a read 3 s on would let a fling or a
+snap finish behind the reply's back, and the stop is judged on the app as scroll_until left it. Not part of T7a, filed
+as a follow-up: a `--side` pre-D62 (0eab7789) calibration run of lv-d62-drop, expecting the false "fully visible", and
+its live-known calibration entry.
+
 ### Alongside
 
 - P5 (text inventory) is independent and small — any time.

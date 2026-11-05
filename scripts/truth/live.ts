@@ -10,9 +10,9 @@ import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause, withMeasuredPanel } from './lab-device.js';
+import { hookSwipes, preDragOrSkip, SwipeHook, type PreDragged, type SwipeEntry } from './live-carousel.js';
 import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, sideLabel, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
-import type { LiveVerdict } from './live-visibility.js';
 import { callReply, isError } from './replies.js';
 import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.js';
 
@@ -77,6 +77,12 @@ import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.j
  * device: h1 and h2 (through a spinner phase) with no wipe ahead, the hold ending the second look heldS after Welcome;
  * h3 with a destructive rung ahead, the full window — each after an entry probe the reply says was bare
  * (live-ensure.ts). The app's phase events and Continue's tap are the oracle; a SKIP among them exits 1.
+ *
+ * `carousel` (T7a, Android, not in the default groups): the probes the device batches copied from batch to batch, as
+ * cases (live-carousel.ts) — lv-d62's drop and control, D68 from a fresh launch, D59b's strokes in the band, D52's E2,
+ * D37's settled read on the snapping pagers. A case may drag the carousel raw first (Case.preDrag, AndroidLab.swipe),
+ * and drop its Nth stroke (Case.dropSwipe): the Android adapter the registry builds has its `swipe` routed through one
+ * SwipeHook, armed around each case's calls, which logs every stroke averi draws into the record (`swipes`).
  */
 
 const { values } = parseArgs({
@@ -98,7 +104,7 @@ const { values } = parseArgs({
 // `--rejudge`'s record (live-cases.ts#RunRecord): read here, judged by live-cases.ts#rejudge.
 const rejudging = values.rejudge === undefined ? undefined : (JSON.parse(await readFile(values.rejudge, 'utf8')) as RunRecord);
 if (rejudging === undefined && (values.udid === undefined) === (values.serial === undefined)) {
-  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
+  throw new Error('usage: live.ts --udid <lab simulator> [--wda-port 8120] [--sources idb,wda] [--groups forms,visibility,dismissal,ensure,carousel] [--cells …] [--cases …] [--side <checkout>] [--record <file>] | --serial <lab emulator> […] | --rejudge <record>');
 }
 const platform: Platform = rejudging?.platform ?? (values.serial !== undefined ? 'android' : 'ios');
 const app: LabApp = rejudging?.app ?? parseLabApp(values.app);
@@ -135,9 +141,12 @@ function iosAdapter(udid: string, source: IosTreeSourceKind): DeviceAdapter {
   return new side.IosAdapter({ udid, treeSource: create(source, udid, { port, derivedDataPath: LAB_WDA_DERIVED_DATA }) as ConstructorParameters<typeof side.IosAdapter>[0]['treeSource'] });
 }
 
+/** The carousel group's hook on the Android adapter's strokes (live-carousel.ts#SwipeHook): armed around a case's calls. */
+const swipeHook = new SwipeHook();
+
 async function connect(): Promise<{ client: Client; close(): Promise<void> }> {
   const registry = averi!.registry({
-    factory: (p, deviceId, opts) => (p === 'android' ? averi!.defaultFactory(p, deviceId, opts) : iosAdapter(deviceId, opts?.treeSource ?? 'idb')),
+    factory: (p, deviceId, opts) => (p === 'android' ? hookSwipes(averi!.defaultFactory(p, deviceId, opts), swipeHook) : iosAdapter(deviceId, opts?.treeSource ?? 'idb')),
     // The lab device alone. Android: listed without asking adb (its listing runs getprop on every attached device).
     discovery: async (p) =>
       p !== platform ? []
@@ -199,11 +208,25 @@ if (rejudging !== undefined) {
         const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
         if (warmUpError !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
         let launched = await lab.launch(c.cell);
+        /** The case SKIPped before its calls, `why`: its result and its record (no replies, no state; the launch as read). */
+        const skip = (why: string) => {
+          results.push({ source, c, verdict: { outcome: 'SKIP', why }, replies: [] });
+          record.results.push({ source, id: c.id, skip: why, replies: [], launched, after: [], state: undefined, ...(warmUpError !== undefined && { warmUpError }) });
+          console.error(`${source} ${c.id} SKIP: ${why}`);
+        };
+        // The carousel group's raw pre-drag (Case.preDrag): the calls start from the state it left. One that failed is
+        // the case's SKIP (lv-d62's skipFails then fails the run), never the whole run thrown out.
+        let preDragged: PreDragged | undefined;
+        if (c.preDrag !== undefined) {
+          const preDragRun = android === undefined ? { skip: 'a pre-drag is the Android lab\'s only' } : await preDragOrSkip(android, launched, c.preDrag);
+          if ('skip' in preDragRun) {
+            skip(preDragRun.skip);
+            continue;
+          }
+          ({ preDrag: preDragged, launched } = preDragRun);
+        }
         if (c.keyboard && launched.keyboard?.visible !== true) {
-          const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
-          results.push({ source, c, verdict, replies: [] });
-          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined, ...(warmUpError !== undefined && { warmUpError }) });
-          console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
+          skip(platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch');
           continue;
         }
         // The first of the two device reads the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel).
@@ -213,10 +236,17 @@ if (rejudging !== undefined) {
         const config = await configFor(source, c);
         const replies: string[] = [];
         const after: (LabState | undefined)[] = [];
-        for (const [i, call] of c.calls.entries()) {
-          replies.push(await callTool(client, call, config));
-          // A visibility case reads the app between its calls: its stop is judged as scroll_until left it.
-          if (c.group === 'visibility' && i < c.calls.length - 1) after.push(await lab.state());
+        let swipes: SwipeEntry[] | undefined;
+        const logsSwipes = c.group === 'carousel';
+        if (logsSwipes) swipeHook.arm(c.dropSwipe);
+        try {
+          for (const [i, call] of c.calls.entries()) {
+            replies.push(await callTool(client, call, config));
+            // A visibility case reads the app between its calls: its stop is judged as scroll_until left it.
+            if (c.group === 'visibility' && i < c.calls.length - 1) after.push(await lab.state());
+          }
+        } finally {
+          swipes = logsSwipes ? swipeHook.disarm() : undefined;
         }
         await pause(800);
         // Stamped with when it was read (LabState.readAt): the ensure judges ask it.
@@ -226,14 +256,15 @@ if (rejudging !== undefined) {
         // reads to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged).
         const state = panelLab !== undefined ? await withMeasuredPanel(read, panelLab) : read;
         let late: LabState | undefined;
-        if (c.group !== 'visibility' && c.judge(state, replies, source, launched, after).outcome !== 'ok') {
+        // Not a visibility or carousel case: a later read would let a fling finish behind the reply's back.
+        if (c.group !== 'visibility' && c.group !== 'carousel' && c.judge(state, replies, source, launched, after).outcome !== 'ok') {
           await pause(3_000);
           late = stamped(await lab.state());
         }
-        const verdict = judged(c, source, replies, launched, after, state, late);
+        const verdict = judged(c, source, replies, launched, after, state, late, swipes);
         if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
         results.push({ source, c, verdict, replies });
-        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUpError !== undefined && { warmUpError }) });
+        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUpError !== undefined && { warmUpError }), ...(preDragged !== undefined && { preDrag: preDragged }), ...(swipes !== undefined && { swipes }) });
         console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
       }
     }

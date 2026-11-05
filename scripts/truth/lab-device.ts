@@ -4,6 +4,7 @@ import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
+import type { Point } from '../../src/adapters/types.js';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
 import { appOf, type CatalogCell, type ImeCapture, type ImeWitness, type LabApp, type LabState, type NavigationMode, WINDOW_MANAGER_WORD } from './schema.js';
@@ -400,6 +401,15 @@ export class AndroidLab implements LabDevice {
 
   async tap(x: number, y: number): Promise<void> {
     await this.adb('shell', 'input', 'tap', String(Math.round(x)), String(Math.round(y)));
+  }
+
+  /**
+   * A raw stroke, in px: one `input swipe x1 y1 x2 y2 ms`, after the guard — the carousel group's pre-drag
+   * (live-carousel.ts#preDrag), drawn without averi.
+   */
+  async swipe(from: Point, to: Point, durationMs: number): Promise<void> {
+    await this.guard();
+    await this.adb('shell', 'input', 'swipe', ...[from.x, from.y, to.x, to.y, durationMs].map((n) => String(Math.round(n))));
   }
 
   /** `settings get secure navigation_mode`: 0 three buttons, 1 two buttons, 2 gestures; anything else undefined. */

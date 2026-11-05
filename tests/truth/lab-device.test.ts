@@ -171,6 +171,16 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).navigation()).rejects.toThrow(/refused/);
   });
 
+  it('swipe(): one raw `input swipe x1 y1 x2 y2 ms`, rounded, only of the lab AVD (T7a, the carousel pre-drag)', async () => {
+    const { exec, calls } = fakeExec();
+    const answering: Exec = async (file, args) => (args.join(' ').includes('input swipe') ? (calls.push(`${file} ${args.join(' ')}`), { stdout: '' }) : exec(file, args));
+    await new AndroidLab('emulator-5556', { exec: answering }).swipe({ x: 871.6, y: 497 }, { x: 431.6, y: 497.4 }, 1000);
+    expect(calls).toEqual(['adb -s emulator-5556 emu avd name', 'adb -s emulator-5556 shell input swipe 872 497 432 497 1000']);
+    const refused = fakeExec('Pixel_7_API_34\r\nOK');
+    await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).swipe({ x: 1, y: 2 }, { x: 3, y: 4 }, 1000)).rejects.toThrow(/refused/);
+    expect(refused.calls.filter((c) => c.includes('input swipe'))).toEqual([]);
+  });
+
   it('imeTouchable(): averi\'s own TOUCHABLE_COMMAND, its output raw, only of the lab AVD (D67, the kf launch read)', async () => {
     const { exec, calls } = fakeExec();
     const answering: Exec = async (file, args) => (args.includes(TOUCHABLE_COMMAND) ? (calls.push(`${file} ${args.join(' ')}`), { stdout: B11_DUMP }) : exec(file, args));

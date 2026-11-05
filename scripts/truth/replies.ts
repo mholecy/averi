@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { boundText } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 
 /**
@@ -224,6 +225,54 @@ export const dismissalCover = (reply: string): string | undefined => /none of th
  * the keyboard is gone (live-visibility.ts#judgeDismissal).
  */
 export const refusedAfterDismissal = (reply: string) => /was not tapped: after .* was tapped .* to hide the soft keyboard/.test(reply);
+
+// --- a carousel's `fully: true` reply (T7a, the carousel group: live-carousel.ts) ---
+
+/**
+ * The bound's own words, derived from src's exported builder (src/interact/scroll-text.ts#boundText: `after N swipes
+ * (maxSwipes)`): its parenthesis.
+ */
+const bound = boundText({ of: 'maxSwipes' }, 1);
+export const MAX_SWIPES = bound.slice(bound.indexOf('('));
+
+/**
+ * The other words carouselReply keys on, pinned, each as src/interact/scroll-text.ts writes it: no export there
+ * produces them alone — they are inline in unexported builders (#unaimableText, #unfitText, #flushCutText) reached only
+ * through a whole ScrollOutcome, or (the unchecked flush clause) inside #flushText's sentence around a container's rect
+ * — so tests/truth/replies.test.ts holds each one to that file and drives the builders that write them. The unaimable
+ * stop's end (D68), the unfit stop's remedy (D52), the flush cut a probe proved (the hedge D62 keeps), the unchecked
+ * flush clause of a stop, and the inferred axis (D59).
+ */
+export const CAROUSEL_REPLY_WORDS = [
+  'more swipes are unlikely to help',
+  '— drop fully: true, or accept what it shows',
+  'so it may still be cut there',
+  'it may be cut there',
+  '(the tree does not say which way it scrolls: ',
+] as const;
+const [UNAIMABLE, UNFIT, PROVEN_CUT, UNCHECKED_CUT, INFERRED_AXIS] = CAROUSEL_REPLY_WORDS;
+
+/**
+ * What a carousel's `scroll_until … fully: true` replied, from a closed set (T7a; the carousel judges read it): `unaimable`
+ * (D68's stop: no swipe can bring it whole, the round sent nothing more — it says "drop fully: true" too, so it is
+ * asked first), `unfit` (D52's: as wide as its scroll view), `maxSwipes-hedged` (the bound, with the flush cut a probe
+ * proved: "may still be cut there" — D62's honest end and ADR 0021's residual), `fully-visible` (the stop claimed whole,
+ * by the tree or the eyes, without the unchecked flush clause that says it may be cut — batch-9's false pass reads so),
+ * and `other` (a bound without that hedge, a stuck stop, a plain stop, any other error).
+ */
+export type CarouselReply = 'unaimable' | 'unfit' | 'maxSwipes-hedged' | 'fully-visible' | 'other';
+export function carouselReply(reply: string): CarouselReply {
+  if (isError(reply)) {
+    if (reply.includes(UNAIMABLE)) return 'unaimable';
+    if (reply.includes(UNFIT)) return 'unfit';
+    if (reply.includes(MAX_SWIPES) && reply.includes(PROVEN_CUT)) return 'maxSwipes-hedged';
+    return 'other';
+  }
+  return /^Element .* fully visible (?:by the tree )?after /.test(reply) && !reply.includes(UNCHECKED_CUT) ? 'fully-visible' : 'other';
+}
+
+/** The unfit stop says the tree told no axis of its scroll view, the swipes over it did (D59: scroll-text.ts#unfitText). */
+export const inferredAxisSaid = (reply: string) => reply.includes(INFERRED_AXIS);
 
 // --- the numbers a reply counts ---
 
