@@ -30,7 +30,7 @@ numbered 3 under "Residuals accepted".
 2026-11-05 (performance backlog D59): the amendment "an untold scroll view's axis from the call's own evidence"
 (below) accepted (the coordinator's decision, owner's mandate: backlog D68's option B, its first slice;
 implemented on `feat/d59`); it narrows residual 3, whose accepted text stands.
-2026-11-05 (performance backlog D68): the amendment "a proven cut no swipe can bring whole" (below) accepted (the
+2026-11-05 (performance backlog D68): the amendment "a proven cut another swipe would most likely overshoot" (below) accepted (the
 coordinator's decision, owner's mandate: backlog D68's option B, its second slice; implemented on `feat/d68`); it
 narrows residual 3 again, whose accepted text stands.
 
@@ -624,7 +624,7 @@ to any other. That case is backlog D68's second slice. The inference does not de
 source, so under WDA it also covers a scroll view whose content is not laid out past its frame. The "a little more room
 than FIT_ROOM_PX" case is unchanged.
 
-## Amendment: a proven cut no swipe can bring whole (2026-11-05, performance backlog D68)
+## Amendment: a proven cut another swipe would most likely overshoot (2026-11-05, performance backlog D68)
 
 **Context.** After D59 the RecyclerView half of residual 3 stays. On the lab's `carousel-recycler-free` C is a View
 child exactly as wide as the carousel (948 in 948, 66–1014), and uiautomator lists it cut flush to the carousel, so it
@@ -642,44 +642,60 @@ out instead.
    uncut side (`roomPast`) against the strokes of this call that proved it (`Carried`: each stroke's drawn length and
    how far the match grew, `revealedBy`'s growth). Of those no longer than the next reveal the course would draw
    (within FIT_ROOM_PX), the least carry counts; on a tie of carries, the shorter stroke is named. When the room plus
-   FIT_ROOM_PX is under it, every further stroke pushes the uncut side out past the container instead of bringing the
-   cut one in, so none is sent (`AimFloor`). A drag's carry rises with its length, so a longer stroke says nothing of
+   FIT_ROOM_PX is under it, a further stroke would most likely push the uncut side out past the container rather than
+   bring the cut one in, so none is sent (`AimFloor`). Most likely, not surely: a drag's carry varies a few px from one
+   stroke to the next (Residual), and the rule keeps no margin for that — by the owner's decision, fewer wasted swipes
+   and no wrong advice weigh more than the odd swipe that would have fit. A drag's carry rises with its length, so a longer stroke says nothing of
    a shorter one; with no stroke that short measured, there is no stop.
 2. *The evidence* (`interact/flush-check.ts`, `Memory.carried`). Every stroke whose read was a fresh proof of a cut
    (`revealedBy`, the stroke handed back) is kept with that cut's edge and container, for the whole call (a read
    between that proved nothing, such as a held reveal D62 doubts, keeps them). Only the strokes over the same edge of
    the same container count. The verdict is a new one, `aim` (`FlushAim`), judged after the `axis` and `room` checks
    (with no reveal to send, the cut is the `FlushCut` as before) and before the budget: at the bound it beats the hedged
-   `maxSwipes`. The next reveal's length is the plan's own (`planProbe` with no keyboard line). The ledger's
+   `maxSwipes`. The next reveal's length is the plan's own, the one it would send: above the keyboard the read applied
+   or the witness stood by (after the witness is asked, as for any reveal), so a keyboard that leaves the reveal no
+   room gives the `FlushCut` (`room`), not this stop; at the bound, where no witness is asked, above the keyboard
+   applied or already stood by. The ledger's
    `cardMoves` (D59) is not the measure: it records a position shift only, and a card cut flush on a left or top edge
    grows there without its x or y moving.
 3. *The stop* (`scroll-rounds.ts`, a new outcome `unaimable`). The round stops on the read, sending nothing. A D62
    retry already spent counts among the swipes, as every stroke does.
-4. *The reply* (`scroll-text.ts#unaimableText`, a plain Error, as `unfit`): "scroll_until … stopped after 6 swipes,
-   without swiping further — element is in the viewport but its right edge still lies on its scroll container's
-   (66,380 948x234), where Android cuts a node's bounds to the container, and the last swipe toward it showed 27 px
-   more of it — part of it lies past that edge; only 15 px of room remain on its left side, and a 48-px swipe, no
-   longer than the next would be, moved it 27 px in this call, so any further swipe pushes its left side out past its
-   scroll container instead: no swipe can show it whole — drop fully: true, or accept what it shows; more swipes will
-   not help. Last rect …". It never says "raise maxSwipes" and never claims the element visible. The flush cut's
-   reply, where more swipes can help, is unchanged.
+4. *The reply* (`scroll-text.ts#unaimableText`, a plain Error, as `unfit`) states what was measured and what it makes
+   likely, never an impossibility: "scroll_until … stopped after 6 swipes, without swiping further — element is on
+   screen but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds
+   to the container, and the last swipe toward it showed 27 px more of it — part of it likely lies past that edge
+   still; in this call a 48-px swipe, no longer than the next would be, moved it 27 px, and only 15 px of room remain
+   on its left side, so another swipe would most likely push its left side out past its scroll container rather than
+   show it whole — act on the part that shows (a tap, or an assert on a child inside it), or drop fully: true; more
+   swipes are unlikely to help. Last rect …". It never says "raise maxSwipes" and never claims the element visible.
+   The flush cut's reply, where more swipes can help, is unchanged.
 
 Batch-10's courses replayed on the recycler-free launch tree with C laid at the recorded x
 (tests/interact/scroll-carousel-android.test.ts, "D68") draw the recorded strokes (142, 188, 89, 51, 48, 48 on run
 8). Runs 1–4 and 7–9 now stop `unaimable` after 6 swipes (run 8 with `maxSwipes: 10` too: no 7th stroke). Runs 0, 5 and 6
 (room 24, 28 and 27 px, least carry 24) end `maxSwipes` with batch-10's reply byte for byte. The guards: room no smaller
 than the least carry (the next reveal sent), no stroke as short as the next measured yet, no stroke measured at all,
-a proving read with no stroke handed back, a stroke measured over another edge or another container. The told-axis and
-the D59 `unfit` paths are untouched by construction: a `clipped` match is no stop, so the flush check never sees it.
+a proving read with no stroke handed back, a stroke measured over another edge or another container, a keyboard line
+that leaves the reveal no room (the cut, `room`; before the witness, the witness). The told-axis and the D59 `unfit`
+paths are untouched by construction (and pinned so, "D68: the aim floor leaves both `unfit` paths as they were"): a `clipped` match is no stop, so the flush check never sees it.
 Their tests, the bounded list's S, scroll-sticky-cut's R, LV2's row and form-picker are as before. Manual mutants from
 the .bak files, 17 of them: the comparison (`<=`, no pixel, reversed), the evidence (any stroke length counts, the
 most carry, no measured stroke needed, the edge or container filter dropped, a sample without a stroke, no samples
 kept, the last sample only, the stop after the budget), the round ignoring `aim`, and the reply (room and carry
 swapped, "raise maxSwipes" back, the cut edge named as the uncut side). All were killed; "no samples kept" was killed
-only after a test for the held reveal between strokes was added. The module is in the mutation scope
-(scripts/mutation/scope.json, group core, floor 94): 96.77 % cold, 31 mutants, 1 survivor (the carry tie's `b.drawn < a.drawn` as `<=`, equivalent: equal strokes give the same stop), after a test killed the first run's other survivor (93.55 %); the cold run's groups core 197 s and lab 61 s.
+only after a test for the held reveal between strokes was added. Review round 1's 9 more: at the bound the keyboard ignored, an
+unasked keyboard taken as stood by, no stop at the bound, the stop judged before the witness, and the reply's
+impossibility, its dropped next step, room and carry swapped, "raise maxSwipes": all killed. One survived, equivalent
+in practice: the stop judged on the reveal over the whole screen where a plan above the keyboard exists. The keyboard
+only shortens that plan where the box above it is shorter than half the room, and a stroke no longer than that would
+then have to carry the match more than twice its length to stop — beyond any Android drag measured (at most ~1.25 a
+px; only iOS flings carry 2–3, and iOS never probes);
+where the keyboard leaves no plan at all, the test above kills it. The module is in the mutation scope
+(scripts/mutation/scope.json, group core, floor 94): 96.77 % cold, 31 mutants, 1 survivor (the carry tie's `b.drawn < a.drawn` as `<=`, equivalent: equal strokes give the same stop), after a test killed the first run's other survivor (93.55 %); the cold run's groups core 197 s and lab 61 s; after review round 1 the same score, core 207 s.
 
 Rejected:
+- a margin for the carry's spread (stop only when the room is under the least carry by a few px): it would keep runs 1
+  and 3 swiping to the bound for a ~20 % chance of a fit, and say "raise maxSwipes" in every other case of theirs;
 - a short correction stroke: on a 948-in-948 card it cannot be aimed, and floor strokes are always `carried`, so every
   held one pays D62's extra stroke;
 - reveals sized from the carry measured this call (backlog D68 option C): carry rises with length (0.5 at 48 px, 1.05
@@ -696,7 +712,18 @@ this stop. The golden says nothing of this change: golden against the base of ma
 mismatches as before. A replayed tree never moves, so no proof forms.
 
 **Residual.** Residual 3 is narrowed again. A View-cut card as large as its carousel is now stopped once the call has
-measured a stroke as short as the next one carrying it past the room left. It still runs to the bound when the room
-left at the bound is within a pixel of that carry or more (batch-10's runs 0, 5 and 6), saying "raise maxSwipes",
-where one more swipe lands it within a pixel at best. A Compose card a little narrower than its carousel (`clipped`,
-never a flush stop) is not judged by this rule, and the "a little more room than FIT_ROOM_PX" case is unchanged for it.
+measured a stroke as short as the next one carrying it past the room left. Accepted with it (the owner's decision, for
+fewer wasted swipes and no wrong advice):
+- *The carry's spread.* On batch-10 the 48-px strokes carried C 24–28 px, 24 in 4 of the 20 samples. The rule takes
+  the least carry of this call's own short strokes and keeps no margin, so runs 1 and 3 (24 px left, carries 26, 26
+  and 27, 27) stop, although a further 48-px swipe carrying 24 would have landed C within a pixel: an estimated ~20 %
+  chance each, at best the `fills` hedge. The reply says "most likely", not "cannot".
+- *A card narrower than its carousel.* There the room is the card's slack plus what is left to travel, and a stroke
+  that overshoots can be followed by one back that lands inside the window. The reviewer's example: a 920-px card in
+  the 948-px carousel (c 10, 38 px of room, a 40-px measured carry) — the stop, where an overshoot and a stroke back
+  might have landed it inside its 28-px window. The reply's "most likely … more swipes are unlikely
+  to help" and its next step (act on the part that shows) cover it.
+- It still runs to the bound when the room left at the bound is within a pixel of that carry or more (batch-10's runs
+  0, 5 and 6), saying "raise maxSwipes", where one more swipe lands it within a pixel at best.
+- A Compose card a little narrower than its carousel (`clipped`, never a flush stop) is not judged by this rule, and the
+  "a little more room than FIT_ROOM_PX" case is unchanged for it.
