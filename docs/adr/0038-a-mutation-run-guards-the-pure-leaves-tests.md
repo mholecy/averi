@@ -9,7 +9,7 @@ Amended 2026-11-04 (T2 S1: scripts/truth/batch/ joined the run — see the T2 am
 Amended 2026-11-04 (T2 S2: bounded.ts and abort.ts joined the run — see the T2 amendment's S2 part below).
 Amended 2026-11-04 (T2 S3: preconditions.ts and cases.ts joined the run — see the T2 amendment's S3 part below).
 Amended 2026-11-05 (T2 S5: lab-chooser.ts and lab-emu.ts joined the run — see the T2 amendment's S5 part below).
-Amended 2026-11-05 (T2 S6a: runner-lines.ts and runner.ts joined the run — see the T2 amendment's S6a part below).
+Amended 2026-11-05 (T2 S6a: runner-lines.ts, runner.ts and records.ts joined the run — see the T2 amendment's S6a part).
 
 ## Context
 
@@ -712,8 +712,8 @@ Where S5 departs, on purpose, from d55-b11.ts, batch-11 (its final, 735-line ver
 
 ### S6a: the runner core (2026-11-05, backlog T2 slice S6, its first part)
 
-The orchestrator split slice S6 in two: S6a, the runner core (this part), and S6b, the lab plumbing. S6a adds two files,
-split as S4's and S5's are: runner-lines.ts, pure — the runner's config from argv and env (`configOf`: `--out`,
+The orchestrator split slice S6 in two: S6a, the runner core (this part), and S6b, the lab plumbing. S6a adds three
+files, split as S4's and S5's are: runner-lines.ts, pure — the runner's config from argv and env (`configOf`: `--out`,
 `--udid`, `--serial`, `--repo`, falling back to AVERI_BATCH_OUT, AVERI_LAB_UDID and AVERI_LAB_SERIAL), every line it
 writes of its own (the checkout line, a need's lab line, a block not run for its needs, the backstop), a non-live
 block's records and their rule, the ERROR lines of a log, this run's part of steps.log, the details printout, and
@@ -729,44 +729,48 @@ owned by the block, the dirty windows, its folder and the lab folder, its verdic
 `verdictAndHand` (a line and its hand lines: S4's compare, S5's cleanUp), the protected-key line slot, `liveRun` and a
 non-live block's `asks` and `record`. abort.ts gains `leave(block, hand)` (a block's hand lines to RESTORE now, said as
 an ERROR), `interrupted`, and `head().errors` (the run's other ERROR lines in the abort SUMMARY); cases.ts's
-`incompleteLine` takes any run result of Completeness's shape (a record's too).
+`incompleteLine` takes any run result of Completeness's shape (a record's too) and the words for nothing asked (`none`),
+so the not-run rule has one source. The code review moved a non-live block's records into a third file, records.ts
+(`recordOf`, `recordGap`, `writeAsked`, `writeDone`, `recordsIn`, `recordsComplete`: batch-12's block_complete), out of
+runner-lines.ts and the runner's class.
 
-runner-lines.ts and runner.ts join the run. runner-lines.ts is tested on its own
+runner-lines.ts, runner.ts and records.ts join the run. runner-lines.ts is tested on its own
 (tests/truth/batch/runner-lines.test.ts) and inside runBatch; runner.ts over a fake process seam that answers git, the
 probes and live.ts by rules, with real files in a temp dir, a fixed clock and pid and a fake live-cases table
 (tests/truth/batch/runner.test.ts: a fake two-block batch, one iOS block and one Android, yields the whole SUMMARY,
 golden-style). The same run on the real process seam is tests/truth/batch/runner-proc.test.ts (its child
 tests/fixtures/batch/runner-child.ts makes a git repo of one commit, runs two blocks, and is sent a Ctrl-C mid-block, or
-ends by itself), in the normal suite only, as abort-proc.test.ts. Baselines, cold: runner-lines.ts 100 % (271 mutants, 2
-timeouts), floor 98; runner.ts 99.27 % after review round 3 (410 mutants, 0 survived, 3 without coverage, each a `?? ''`
-turned into "Stryker was here!" — equivalent because that text holds no `# Live golden:` header (live.ts's log, the
-rejudge summary) and no run's header (steps.log), so stepOutcome and stepsOfRun read it as they read '' — not because
-the file is always there), floor 97; words.ts 100 % (136 mutants); run-dir.ts 99.38 % (161, the same equivalent);
-abort.ts 98.11 % (423 mutants, the same equivalents and unreachable catch); cases.ts 99.64 % (275 mutants, the same
-equivalent). The first cold run left runner.ts at 90.44 % (27 survived, 8 without coverage) and runner-lines.ts at 98.53
-% (4 survived): each was killed by a test or designed away, and one of them showed a real gap — a probe's progress line
-(a lone CR) in a log would have made the SUMMARY refuse its ERROR line, so the run would have lost its SUMMARY (below).
-The cold run of all twenty-six modules took 3 min 45 s. Review round 1: 26 more hand mutants on its decisions, 25 killed
-at once, 1 by a test made stricter (a block named `meta` thrown before a config refusal), and one Stryker survivor (a
-run counter only compared with 0) designed away as a boolean. 95 hand mutants, one per decision branch, each run bounded
-(a timeout counts as killed): 85 killed at once, 9 by tests added for them (no block starts once the abort began, nor
-one whose need was being checked; a judge is never run on nothing; a cut rejudge leaves its run incomplete; complete
-records with no judge are INTERRUPTED; a block's own verdict is not judged again; the rejudge's exit-1 rule; a block's
-stopKept ends its own kept groups only; a block named twice is thrown before a config refusal), 1 designed away (a list
-of the blocks that ran: a block not run always holds its own INCONCLUSIVE line, which the judge's check reads).
+ends by itself), in the normal suite only, as abort-proc.test.ts. Baselines, cold: runner-lines.ts 100 % (318 mutants, 2
+timeouts), floor 98; records.ts 100 % (100 mutants), floor 98; runner.ts 99.20 % after the code review (373 mutants, 0
+survived, 3 without coverage, each a `?? ''` turned into "Stryker was here!" — equivalent because that text holds no `#
+Live golden:` header (live.ts's log, the rejudge summary) and no run's header (steps.log), so stepOutcome and stepsOfRun
+read it as they read '' — not because the file is always there), floor 97; words.ts 100 % (143 mutants); run-dir.ts
+99.38 % (161, the same equivalent); abort.ts 98.10 % (421 mutants, the same equivalents and unreachable catch); cases.ts
+99.64 % (275 mutants, the same equivalent). The first cold run left runner.ts at 90.44 % (27 survived, 8 without
+coverage) and runner-lines.ts at 98.53 % (4 survived): each was killed by a test or designed away, and one of them
+showed a real gap — a probe's progress line (a lone CR) in a log would have made the SUMMARY refuse its ERROR line, so
+the run would have lost its SUMMARY (below). The cold run of all twenty-seven modules took 3 min 51 s. Review round 1:
+26 more hand mutants on its decisions, 25 killed at once, 1 by a test made stricter (a block named `meta` thrown before
+a config refusal), and one Stryker survivor (a run counter only compared with 0) designed away as a boolean. 95 hand
+mutants, one per decision branch, each run bounded (a timeout counts as killed): 85 killed at once, 9 by tests added for
+them (no block starts once the abort began, nor one whose need was being checked; a judge is never run on nothing; a cut
+rejudge leaves its run incomplete; complete records with no judge are INTERRUPTED; a block's own verdict is not judged
+again; the rejudge's exit-1 rule; a block's stopKept ends its own kept groups only; a block named twice is thrown before
+a config refusal), 1 designed away (a list of the blocks that ran: a block not run always holds its own INCONCLUSIVE
+line, which the judge's check reads).
 
 Decisions S6a pins:
 - a failed checkout or precondition makes the blocks INCONCLUSIVE, never a refusal (S3 left the choice to the runner):
   batch-11's way, not batch-12's. The checkout line is `ERROR checkout: <why> — every block INCONCLUSIVE, none run`;
   every block's line is `<label>: INCONCLUSIVE — precondition: <why>`; no block's own precondition is asked then, no
-  need checked, no block run; the SUMMARY is written, and the exit is 2 (EXIT.nothingRan, review round 1): an agent
-  reading only the exit code must not see success. The same 2 when every wanted block was skipped for its needs or
-  preconditions, and the SUMMARY then says so after the blocks' lines: `NOTE no wanted block ran (each one's why above)`
-  (review rounds 2 and 3: it names no exit code, which is exitCodeOf's, and stays when a RESTORE makes the exit 1;
-  EXIT's 2 is "nothing done": refused to start, with no SUMMARY, or no wanted block ran, with that NOTE); 1 for a FAIL
-  or a RESTORE and 130 for an interrupt still come first. The failed checkout line is said once: a NOTE step, no ERROR
-  line besides it in the SUMMARY. A precondition's why is one line (its first); a check that throws is not shown (`its
-  check threw: <first line>`), never the run's error.
+  need checked, no block run; the SUMMARY is written, and the exit is 2 (EXIT.nothingDone, review round 1: one name for
+  2): an agent reading only the exit code must not see success. The same 2 when every wanted block was skipped for its
+  needs or preconditions, and the SUMMARY then says so after the blocks' lines: `NOTE no wanted block ran (each one's
+  why above)` (review rounds 2 and 3: it names no exit code, which is exitCodeOf's, and stays when a RESTORE makes the
+  exit 1; EXIT's 2 is "nothing done": refused to start, with no SUMMARY, or no wanted block ran, with that NOTE); 1 for
+  a FAIL or a RESTORE and 130 for an interrupt still come first. The failed checkout line is said once: a NOTE step, no
+  ERROR line besides it in the SUMMARY. A precondition's why is one line (its first); a check that throws is not shown
+  (`its check threw: <first line>`), never the run's error.
 - the preconditions of every wanted block are asked before the first block runs, as batch-11's prechecks were: a block's
   state is never changed by an earlier block's run before its premise is read.
 - a need is checked in full by the first wanted block that names it, so a need no wanted block names is never checked;
@@ -786,26 +790,30 @@ Decisions S6a pins:
   compare line is none. With nothing asked, `not run (see the ERROR lines)`; with runs asked, S3's incompleteLine over
   every live run's completeness and every record's gap; every run complete but no verdict written, `its <n> run(s) are
   complete, but no verdict line was written (see the ERROR lines)` — never a silent gap.
-- a block's `judge` (its analyzer, device-free) runs at the normal end after finish — the analyses after the restores,
-  as batch-11 and batch-12 ran them — for a block with no verdict of its label (a block not run has its INCONCLUSIVE),
-  through the bounded runner; a throw is an ERROR line `<id> analyze: …` and the backstop follows. The abort judges a
-  block when it already holds a verdict of its label (its own lines, the judge not run again) or when it has a judge and
-  its records are complete: its own `complete()`, else batch-12's block_complete rule (one run asked at least, every
-  live run's record and rejudge summary written, every record what it was asked). A block with complete records and no
-  judge is INTERRUPTED: nothing is invented. A block the abort judged whose judge wrote no verdict of its label gets
-  `<label>: INCONCLUSIVE — interrupted: its judge wrote no verdict` after its lines (review round 1, MAJOR: such a block
-  was missing from the abort SUMMARY): every wanted block has a line in both SUMMARYs, a test asserts it over every
-  state a block can be in at the interrupt.
-- the ERROR lines: this run's steps' (steps.ts), then every line starting ERROR of each `*.log` and analyze.txt in this
-  run's folders (meta, lab, each wanted block, in that order), each once — not another file, not an earlier run's.
-  Counted across all of this run's logs first and bounded (review rounds 1 to 3, `logErrors`): one line per distinct
-  ERROR in first-seen order, bare when said once in one log, else `(×<total>, in <block>/<file>, …)` naming the first 3
-  logs then `+<n> more` (50 of one must not bury a different one, nor one line show three times with three counts); each
-  cut so the whole is at most 700 code points (`…` the last of what is cut); at most ERROR_LINES_SHOWN (20) distinct
-  lines run-wide, then `… <n> more distinct ERROR lines (in <logs>)`; a listed log that cannot be read is `NOTE <file>
-  not read: unreadable`, with `: a folder` when that is known, never skipped silently. Once the abort has begun, no
-  further need of a block is checked. The abort SUMMARY carries them too (head's errors), where batch-12's abort printed
-  the steps' only.
+- a block's `judge` (its analyzer, device-free) runs only for a complete block, on both paths (the code review: a dead
+  live run or a record that does not match got the judge's PASS and the gap vanished) — one rule, `judgeable`: its own
+  `complete()`, else records.ts's recordsComplete (batch-12's block_complete: one run asked at least, every live run's
+  record and rejudge summary written, every record what it was asked), or, for a block that declares `noRecords` (it
+  asks no run and records none), its run returned before any abort began; a `complete()` that throws is not complete. At
+  the normal end it runs after finish — the analyses after the restores, as batch-11 and batch-12 ran them — for a
+  complete block with no verdict of its label, through the bounded runner; a throw is an ERROR line `<id> analyze: …`;
+  an incomplete block gets the backstop's line (incompleteLine). The abort judges a block when it already holds a
+  verdict of its label (its own lines, the judge not run again) or when it has a judge and is complete by the same rule.
+  A block with complete records and no judge is INTERRUPTED: nothing is invented. A block the abort judged whose judge
+  wrote no verdict of its label gets `<label>: INCONCLUSIVE — interrupted: its judge wrote no verdict` after its lines
+  (review round 1, MAJOR: such a block was missing from the abort SUMMARY): every wanted block has a line in both
+  SUMMARYs, a test asserts it over every state a block can be in at the interrupt.
+- the ERROR lines: this run's steps' (steps.ts, named `steps.log`), then every line starting ERROR of each `*.log` and
+  analyze.txt in this run's folders (meta, lab, each wanted block, in that order) — not another file, not an earlier
+  run's. Counted across all of them first, a step's line by what it says, its time aside, shown as first seen (the code
+  review: a line said as a step and repeated in a log is one line) and bounded (review rounds 1 to 3, `logErrors`): one
+  line per distinct ERROR in first-seen order, bare when said once in one log, else `(×<total>, in <block>/<file>, …)`
+  naming the first 3 logs then `+<n> more` (50 of one must not bury a different one, nor one line show three times with
+  three counts); each cut so the whole is at most 700 code points (`…` the last of what is cut); at most
+  ERROR_LINES_SHOWN (20) distinct lines run-wide, then `… <n> more distinct ERROR lines (in <logs>)`; a listed log that
+  cannot be read is `NOTE <file> not read: unreadable`, with `: a folder` when that is known, never skipped silently.
+  Once the abort has begun, no further need of a block is checked. The abort SUMMARY carries the same section (head's
+  errors replace its steps' own), where batch-12's abort printed the steps' only.
 - a probe's text, a judge's or an analyzer's lines are split at CR LF, LF and a lone CR (a progress line) before the
   runner keeps them (`linesOf`, `linesIn`): the SUMMARY refuses a line break, and a probe's output must never cost the
   run its SUMMARY (found in the cold run's review of the survivors). A verdict or protected-key line a block writes with
@@ -890,7 +898,9 @@ Where S6a departs, on purpose, from batch-11 and batch-12:
 - a failed need or precondition is a SKIP step and the block's INCONCLUSIVE, no ERROR line besides.
 - a need is rechecked before each later block (its `alive`, else its check), where batch-11 trusted one check.
 - no wanted block run exits 2, where batch-11 and batch-12 exited 0.
-- the ERROR lines are bounded per file and per line, and an unreadable log is said.
+- the ERROR lines are counted run-wide (the steps' with the logs'), each distinct one once with its total and where, at
+  most 20 shown, each cut at 700; an unreadable log is said.
+- a block is judged only when complete, on both paths; batch-11 and batch-12 analyzed whatever a block left.
 - the abort SUMMARY lists the ERROR lines of this run's logs as well.
 - RESTORE lines from a block mid-run are written at once (`left by <block>`), not at the end.
 - the rejudge is bounded (REJUDGE_SECS).
