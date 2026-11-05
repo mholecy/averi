@@ -66,7 +66,7 @@
 
 import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adapters/types.js';
 import { sleep } from '../util/sleep.js';
-import { heldText, type Difference, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
+import { heldText, type Difference, type FocusUnread, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
 import { landingOf, readingOf, withoutWholeToo, type Expectation, type Landing } from './fill-landing.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
@@ -104,7 +104,8 @@ export interface TypingIntent extends Expectation {
  * What typing achieved, as facts:
  * - `landed`: a read showed the value (`observed`, the last reading) — exactly, or `reformatted` (`reformatOf`: the field
  *   added separators of its own as it was typed; absent when the reading is exact); `placeholder` when the reading is
- *   exactly the field's named placeholder (fill-landing.ts#Landing: not verified);
+ *   exactly the field's named placeholder (fill-landing.ts#Landing: not verified); `focusUnread` when it holds the value
+ *   among text that may not all be the typing (fill-landing.ts#Landing, D64b-3);
  * - `not-taken`: a non-input whose reading never took the text — not the field;
  * - `unread`: no reading to compare (the node withholds its text, or the last read did not find the field);
  * - `missed`: the last reading is not the value after everything was sent again — `differs` what can be said of the
@@ -113,7 +114,7 @@ export interface TypingIntent extends Expectation {
  * `again`: what was sent again, in the order sent (fill-facts.ts#SentAgain; empty: nothing).
  */
 export type Typed =
-  | { kind: 'landed'; observed: string; again: SentAgain[]; reformatted?: Reformat; placeholder?: true }
+  | { kind: 'landed'; observed: string; again: SentAgain[]; reformatted?: Reformat; placeholder?: true; focusUnread?: FocusUnread }
   | { kind: 'not-taken'; observed: string }
   | { kind: 'unread' }
   | { kind: 'missed'; observed: string; again: SentAgain[]; differs: Difference; elsewhere?: OtherInput };
@@ -167,7 +168,13 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
         // (D24 review).
         if (tails() > 0) io.reportDroppedTail();
         if (answer.kind === 'placeholder') return { kind: 'landed', observed, again, placeholder: true };
-        return { kind: 'landed', observed, again, ...(answer.reformatted !== undefined && { reformatted: answer.reformatted }) };
+        return {
+          kind: 'landed',
+          observed,
+          again,
+          ...(answer.reformatted !== undefined && { reformatted: answer.reformatted }),
+          ...(answer.focusUnread !== undefined && { focusUnread: answer.focusUnread }),
+        };
       case 'missed':
         break;
       default: {

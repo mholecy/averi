@@ -67,7 +67,14 @@ describe('landingOf — did this reading land, and how', () => {
     ['masked, held unread: exactly the typed length lands', '••••', { value: 'abcd', held: 'unread' }, { kind: 'landed' }],
     ['masked, held unread: LONGER is said-plain — final, the poll stops', '•••••••', { value: 'abcd', held: 'unread' }, { kind: 'said-plain', differs: { kind: 'masked-said-plain' } }],
     ['masked, held unread: shorter has not landed yet — the poll goes on (keys may be late)', '••', { value: 'abcd', held: 'unread' }, undefined],
-    ['held unread, a PLAIN reading: the content rule, as ever', 'xabcd', { value: 'abcd', held: 'unread' }, { kind: 'landed' }],
+    ['held unread, a PLAIN reading: the content rule, as ever, and what it shows beside the value is said', 'xabcd', { value: 'abcd', held: 'unread' }, { kind: 'landed', focusUnread: { shows: 5 } }],
+    // D64b-3: the re-read skipped and the reading not the value itself — its text may not all be the typing (ADR 0028)
+    ['held unread, the reading the value itself: no word of it', 'abcd', { value: 'abcd', held: 'unread' }, { kind: 'landed' }],
+    ['held unread, a masked reading of the typed length: nothing around it to speak of', '••••', { value: 'abcd', held: 'unread' }, { kind: 'landed' }],
+    ['held unread, partly masked, text beside the value: said, by length', '•••abcd', { value: 'abcd', held: 'unread' }, { kind: 'landed', focusUnread: { shows: 7 } }],
+    ['held unread, reformatted: the reformat says what the field shows, no word of the re-read', 'SK31 1200', { value: 'SK311200', held: 'unread' }, { kind: 'landed', reformatted: { added: 1, respaced: 0 } }],
+    ['held unread, exactly the named placeholder: not verified, no word of the re-read', 'xabcd', { value: 'xabcd', held: 'unread', placeholder: 'xabcd' }, { kind: 'placeholder' }],
+    ['held read, text beside the value: the re-read ran, nothing to say', 'xabcd', { value: 'abcd', held: 0 }, { kind: 'landed' }],
     // a non-input
     ['a non-input that changed to show the value lands', 'Name: Jan', { value: 'Jan', isInput: false, resolvedValue: 'Name' }, { kind: 'landed' }],
     ['a non-input showing its own resolved text has taken nothing', 'Meno', { value: 'e', isInput: false, resolvedValue: 'Meno' }, undefined],
@@ -546,6 +553,14 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
   // field): the focus-inserted case is fill.ts's skipped re-read, ADR 0028's residual 3 since D64 (follow-up D64b)
   it('residual 8 (B): Android\'s skipped post-focus re-read takes `before` as empty; a `+421 ` inserted on focus, no key landed, lands', () => {
     expect(landingOf('+421 ', expecting(e('421', '')))).toEqual({ kind: 'landed' });
+  });
+
+  it('D64b-3: told the re-read was skipped, `+421 ` lands saying what it shows, and so does `+421 421`; readingOf gives the same answer', () => {
+    const skipped = expecting({ value: '421', before: '', held: 'unread' });
+    expect(landingOf('+421 ', skipped)).toEqual({ kind: 'landed', focusUnread: { shows: 5 } });
+    expect(readingOf('+421 ', skipped)).toEqual({ kind: 'landed', focusUnread: { shows: 5 } });
+    expect(landingOf('+421 421', skipped)).toEqual({ kind: 'landed', focusUnread: { shows: 8 } });
+    expect(landingOf('421', skipped)).toEqual({ kind: 'landed' });
   });
 
   it('landingOf: with clear the rule is the value alone, unchanged by D63', () => {

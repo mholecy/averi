@@ -689,8 +689,40 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     fake.typeText = async (text: string) => {
       fake.typed.push(text); // nothing reaches the field
     };
-    const { readBack } = await fillField(fake, { id: 'amount_input' }, '421', FAST);
+    const { readBack, focusUnread } = await fillField(fake, { id: 'amount_input' }, '421', FAST);
     expect(readBack).toEqual({ kind: 'landed' });
+    expect(focusUnread).toEqual({ shows: 5 }); // D64b-3: it lands saying so, with no read more
+    expect(fake.typed).toEqual(['421']);
+  });
+
+  it('D64b-3: only the skipped re-read says its text went unread — not a reading that is the value, a clear fill, or a selector that keeps the re-read', async () => {
+    // Skipped, the reading exactly the value: nothing to say.
+    expect((await fillField(field({ secure: false }), { id: 'amount_input' }, '421', FAST)).focusUnread).toBeUndefined();
+    // The re-read ran (a source that does not say plain): the inserted text is `before`, and the keys land past it.
+    const reread = field({});
+    onFocus(reread, (f) => (f.value = '+421 '));
+    const readBack = await fillField(reread, { id: 'amount_input' }, '421', FAST);
+    expect(readBack.readBack).toEqual({ kind: 'landed' });
+    expect(readBack.focusUnread).toBeUndefined();
+    // With clear: the reading must equal the value.
+    const cleared = field({ secure: false });
+    expect((await fillField(cleared, { id: 'amount_input' }, '421', { ...FAST, clear: true })).focusUnread).toBeUndefined();
+  });
+
+  it('D64b-3: the caveat costs no read: as many tree reads with text around the value as with the value alone', async () => {
+    const reads = async (around: boolean): Promise<number> => {
+      const fake = field({ secure: false });
+      if (around) onFocus(fake, (f) => (f.value = '+421 '));
+      const uiTree = fake.uiTree.bind(fake);
+      let n = 0;
+      fake.uiTree = async () => {
+        n++;
+        return uiTree();
+      };
+      await fillField(fake, { id: 'amount_input' }, '421', FAST);
+      return n;
+    };
+    expect(await reads(true)).toBe(await reads(false));
   });
 
   it('skipped: a masked read-back of exactly the typed length passes, with no append', async () => {
