@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Difference } from '../../src/interact/fill-facts.js';
-import { differenceOf, droppedTail, landingOf, needsHeldCount, tailOf, type Expectation } from '../../src/interact/fill-landing.js';
+import { differenceOf, droppedTail, landingOf, needsHeldCount, readingOf, tailOf, type Expectation, type Reading } from '../../src/interact/fill-landing.js';
 import { SEPARATORS } from '../../src/interact/fill-reformat.js';
+import { isMaskedValue } from '../../src/ui-tree/masked-value.js';
 
 /**
  * Did the fill land? — interact/fill-landing.ts, the one judge of a field's reading. `landingOf`'s table first, then
@@ -57,6 +58,75 @@ describe('landingOf — did this reading land, and how', () => {
     ['an earlier text the field regrouped is still there: no pass as the value alone', '10,001,000', { value: '10001000', before: '1,000' }, undefined],
   ];
   for (const [shape, observed, f, landing] of rows) it(shape, () => expect(landingOf(observed, expecting(f))).toEqual(landing));
+});
+
+/**
+ * A9: one answer about one reading. A tail is orthogonal to a Difference (`Jan` for `Jan Novak` after `Jan`, with clear:
+ * retypable and `unchanged`), and a `not-taken` carries its Miss too (a retry's last reading goes on from it).
+ */
+describe('readingOf — the whole answer about one reading', () => {
+  const rows: [string, string, Partial<Expectation> & Pick<Expectation, 'value'>, Reading][] = [
+    ['a landing is the landing', 'hello', { value: 'hello', clear: true }, { kind: 'landed' }],
+    ['reformatted', 'SK31 1200', { value: 'SK311200' }, { kind: 'landed', reformatted: { added: 1, respaced: 0 } }],
+    ['the named placeholder', 'Search', { value: 'Search', placeholder: 'Search' }, { kind: 'placeholder' }],
+    ['said plain, longer than typed: final, and its difference with it', '•••••••', { value: 'abcd', held: 'unread' }, { kind: 'said-plain', differs: { kind: 'masked-said-plain' } }],
+    ['said plain, shorter: no landing, the same difference, not final', '••', { value: 'abcd', held: 'unread' }, { kind: 'missed', differs: { kind: 'masked-said-plain' } }],
+    ['a non-input showing its own text: not-taken, no tail', 'Meno', { value: 'e', isInput: false, resolvedValue: 'Meno' }, { kind: 'not-taken', differs: { kind: 'length' } }],
+    ['a non-input showing the start of the typing: not-taken, with the tail a retry goes on from', 'Jan', { value: 'Jan Novak', isInput: false, resolvedValue: 'Jan' }, { kind: 'not-taken', tail: { missing: ' Novak', retypable: true }, differs: { kind: 'length' } }],
+    ['a non-input that changed but does not show the value: not-taken', 'Jan', { value: 'Jan Novak', isInput: false, resolvedValue: 'Name' }, { kind: 'not-taken', tail: { missing: ' Novak', retypable: true }, differs: { kind: 'length' } }],
+    ['a non-input that changed to masked: it took the text, and the length missed', '••', { value: 'abcd', isInput: false, resolvedValue: 'Name', clear: true }, { kind: 'missed', differs: { kind: 'masked', held: undefined } }],
+    ['an exact prefix: a tail to type again, its difference a length', 'Jan', { value: 'Jan Novak' }, { kind: 'missed', tail: { missing: ' Novak', retypable: true }, differs: { kind: 'length' } }],
+    ['a grouped prefix: a tail to type again, its difference a dropped tail', '1 234 567,', { value: '1234567,89', clear: true }, { kind: 'missed', tail: { missing: '89', retypable: true }, differs: { kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true } }],
+    ['the orthogonal case: with clear, unchanged since typing began and a tail to type again', 'Jan', { value: 'Jan Novak', before: 'Jan', clear: true }, { kind: 'missed', tail: { missing: ' Novak', retypable: true }, differs: { kind: 'unchanged' } }],
+    ['nothing of the typing in the prefix: a tail to name, none to type again', 'SK31', { value: '12000000', before: 'SK31' }, { kind: 'missed', tail: { missing: '12000000', retypable: false }, differs: { kind: 'unchanged' } }],
+    ['a dropped tail that is a whole landing too: never typed again', '11 ', { value: '11', before: '1' }, { kind: 'missed', tail: { missing: '1', retypable: false }, differs: { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true } }],
+    ['a length that is a whole landing too: never typed again', 'xaa', { value: 'aa', before: 'xa' }, { kind: 'missed', tail: { missing: 'a', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
+    ['the value itself lands, though it is a prefix of what the field should hold too', '55', { value: '55', before: '5' }, { kind: 'landed' }],
+    ['the value decorated, inside the earlier text\'s span: never typed again', '-5-', { value: '-5', before: '-5' }, { kind: 'missed', tail: { missing: '5', retypable: false }, differs: { kind: 'length', wholeToo: true } }],
+    ['no prefix: no tail', 'the', { value: 'teh' }, { kind: 'missed', differs: { kind: 'same-length', positions: 2 } }],
+    ['bullets prove no prefix', '••', { value: '12345' }, { kind: 'missed', differs: { kind: 'masked', held: 0 } }],
+  ];
+  for (const [shape, observed, f, reading] of rows) it(shape, () => expect(readingOf(observed, expecting(f))).toEqual(reading));
+
+  /** A small alphabet swept whole: what no row can promise, and every answer there is. */
+  it('the invariants, over every reading of a small alphabet', () => {
+    const CHARS = ['1', '2', 'a', 'A', 'b', ' ', '-', '•'];
+    const readings = [''];
+    for (let at = 0, n = 0; n < 3; n++) {
+      const end = readings.length;
+      for (; at < end; at++) for (const c of CHARS) readings.push(readings[at] + c);
+    }
+    const seen = new Set<string>();
+    for (const value of ['1', '11', '12', 'ab', '1 '])
+      for (const before of [null, '', '1', '12', 'a'])
+        for (const clear of [false, true])
+          for (const held of [0, 'unread'] as const)
+            for (const placeholder of [undefined, '1'])
+              for (const input of [{ isInput: true, resolvedValue: null }, { isInput: false, resolvedValue: '12' }])
+                for (const observed of readings) {
+                  const e: Expectation = { value, before, clear, held, placeholder, ...input };
+                  const r = readingOf(observed, e);
+                  const wrong = (why: string) => new Error(`${why}: ${JSON.stringify({ observed, e, r })}`);
+                  // what a non-input proves: only by changing, to bullets or to show the value (a landing took it too)
+                  const took = input.isInput || (observed !== input.resolvedValue && (isMaskedValue(observed) || observed.includes(value)));
+                  if ((r.kind === 'not-taken') !== !took) throw wrong('not-taken iff the text was not taken');
+                  if (r.kind === 'said-plain' && !(held === 'unread' && isMaskedValue(observed))) throw wrong('said-plain is a masked reading, the count unread');
+                  seen.add(r.kind);
+                  if (r.kind !== 'missed' && r.kind !== 'not-taken') continue;
+                  const { tail, differs } = r;
+                  seen.add(differs.kind);
+                  if ('wholeToo' in differs && differs.wholeToo === true) {
+                    if (tail === undefined || tail.retypable) throw wrong('wholeToo is a tail never typed again');
+                    seen.add('wholeToo');
+                  }
+                  if (differs.kind === 'dropped-tail' && tail?.missing.length !== differs.dropped) throw wrong('a dropped-tail names the tail');
+                  if (tail?.retypable === true && observed.includes('•')) throw wrong('a bullet proves no tail');
+                  if (tail?.retypable === true && differs.kind === 'unchanged') seen.add('retypable and unchanged');
+                }
+    expect([...seen].sort()).toEqual(
+      ['case', 'dropped-tail', 'landed', 'length', 'masked', 'masked-said-plain', 'missed', 'not-taken', 'placeholder', 'retypable and unchanged', 'said-plain', 'same-length', 'separated', 'unchanged', 'wholeToo'].sort(),
+    );
+  });
 });
 
 const intent = (value: string, before: string | null = null, clear = false, placeholder?: string) => ({ value, before, clear, placeholder });
