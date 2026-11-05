@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { basename, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
@@ -25,19 +25,32 @@ export const THIS_CHECKOUT = 'this checkout';
 /** The averi checkout (its root): the catalog, the truth runs, and live.ts's own src when no `--side` is given. */
 export const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
+/** The prefixes of a `--side` checkout's label outside the repo (sideLabel): a calibration checkout's, any other's. */
+export const SIDE_LABEL = { cal: '<cal>', scratch: '<scratch>' } as const;
+
 /**
  * The `side` a record names (T8): THIS_CHECKOUT with no `--side`; otherwise a portable label — never the host's
  * absolute path (a record is committed) and never THIS_CHECKOUT (a `--side` run is a calibration, not held to
  * live-known.ts: summarize). A checkout inside the repo by its repo-relative path ("." the repo itself); one outside
- * by its folder, under `<cal>/` when it is calibrate.ts's `differential-cal-<sha>`, else under `<scratch>/`.
+ * by its folder, under SIDE_LABEL.cal when it is calibrate.ts's `differential-cal-<sha>`, else under SIDE_LABEL.scratch.
+ * A relative `--side` resolves from `cwd`, as live.ts loads it.
  */
-export function sideLabel(side: string | undefined, root: string = ROOT): string {
+export function sideLabel(side: string | undefined, { root = ROOT, cwd = process.cwd() }: { root?: string; cwd?: string } = {}): string {
   if (side === undefined) return THIS_CHECKOUT;
-  const path = resolve(side);
+  const path = resolve(cwd, side);
   const inRepo = relative(root, path);
-  if (!inRepo.startsWith('..') && !isAbsolute(inRepo)) return inRepo === '' ? '.' : inRepo;
+  const outside = inRepo === '..' || inRepo.startsWith(`..${sep}`) || isAbsolute(inRepo);
+  if (!outside) return inRepo === '' ? '.' : inRepo;
   const dir = basename(path);
-  return `${dir.startsWith('differential-cal-') ? '<cal>' : '<scratch>'}/${dir}`;
+  return `${dir.startsWith('differential-cal-') ? SIDE_LABEL.cal : SIDE_LABEL.scratch}/${dir}`;
+}
+
+/**
+ * A record's `side` that names no host: THIS_CHECKOUT, a label sideLabel writes, or an older relative one (`../r8`) —
+ * never absolute, never under a home (`~`), never empty.
+ */
+export function isPortableSide(side: unknown): boolean {
+  return side === THIS_CHECKOUT || (typeof side === 'string' && side !== '' && !isAbsolute(side) && !side.startsWith('~'));
 }
 
 /** What a run read, case by case (`--record`): judged again without a device by `--rejudge`. */

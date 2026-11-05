@@ -58,11 +58,14 @@ node --import tsx /path/to/run-tools.mts /path/to/<scenario>.json /path/to/out
 ```ts
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
+// <averi>: your averi checkout — write its path in the two imports below.
 import { Client } from '<averi>/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js';
 import { StdioClientTransport } from '<averi>/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js';
 
-const SERVER = process.env.AVERI_SERVER ?? '<averi>/dist/mcp/server.js';
-const APP_CWD = process.env.AVERI_APP_CWD ?? '<finportal>/app';
+// AVERI_SERVER: averi's built server (<averi>/dist/mcp/server.js); AVERI_APP_CWD: the app's checkout (<finportal>/app).
+const SERVER = process.env.AVERI_SERVER;
+const APP_CWD = process.env.AVERI_APP_CWD;
+if (!SERVER || !APP_CWD) { console.error('set AVERI_SERVER (averi\'s dist/mcp/server.js) and AVERI_APP_CWD (the app checkout)'); process.exit(2); }
 
 type Step = { name: string; args?: Record<string, unknown>; label?: string; timeoutMs?: number };
 const [stepsFile, outDirArg] = process.argv.slice(2);
