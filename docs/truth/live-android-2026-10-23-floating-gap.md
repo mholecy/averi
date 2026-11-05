@@ -86,3 +86,22 @@ submit (55,1928 970×132) wholly in the gap and ks's centre under the panel. kf1
 swipes` (kf2 then `Tapped`, 1 submit, the IME still up); kf3 got no stop, the postcode untouched, and averi's
 `scroll_until … failed after 3 swipes … never intersected the 1080x1015 screen above the soft keyboard over
 [87,1015][1024,1807]`.
+
+## 2026-11-05 — D69: the judge reads the panel twice; a misquote is a MISMATCH
+
+One read could not tell a panel dragged during the calls from averi reading the device wrong, so a reply quoting
+another panel (or none) was SKIP, never a finding. Now live.ts reads averi's touchable query again once a kf case's
+calls are done, onto the final state (`state.imeTouchable`, the same `withMeasuredPanel`), and
+`live-forms.ts#panelAfterCalls` admits a panel from it by the same `measuredPanel`, beside the launch's strip:
+- the second read admits another panel: SKIP "the panel moved (launch A, after B)"; none: SKIP "the panel not measured
+  again after the calls (launch A, after: no measured panel (…))". Both are checked before kf1/kf2's premise, before
+  any quote and before ok;
+- the two reads agree and kf1/kf2's evidence does not quote the panel over ks, or kf3's refusal does not name it:
+  MISMATCH "averi quoted keyboard X over ks (or: no panel) — the panel measured at launch and again after the calls is
+  P" (kf3: "averi named over [..][..] …");
+- no second read (every record before D69): judged as before, the misquote SKIP word for word.
+
+The 3-s `late` re-read reads the app only, so `live-cases.ts#judged` carries the second read onto it
+(`lateWithPanel`): a later read cannot turn the MISMATCH into the SKIP of a record with one read. The branches are
+pinned on the fu1 record and batch-11's fixture (tests/truth/live-forms.test.ts, "D69"), the second region given per
+test; the MISMATCH cannot be provoked on the device without injecting a fault. One adb shell more per kf case.

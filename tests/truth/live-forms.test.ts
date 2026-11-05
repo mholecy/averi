@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { selectCases } from '../../scripts/truth/live-cases.js';
+import { judged, lateWithPanel, selectCases } from '../../scripts/truth/live-cases.js';
 import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedKept } from '../../scripts/truth/live-forms.js';
 import { knownEntry } from '../../scripts/truth/live-known.js';
 import type { LabState } from '../../scripts/truth/schema.js';
@@ -308,6 +308,118 @@ describe('kf1–kf3 on batch-11\'s real run: the panel dragged over the submit (
     const other = replies[0].replaceAll('[87,1243][1024,2035]', '[71,1092][1008,1884]');
     expect(judgeFloatingGap('kf3')(state, [other], 'uiautomator', launched)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^averi's reply does not name the measured panel over \[87,1243\]\[1024,2035\]: ERROR scroll_until/) });
     expect(judgeFloatingGap('kf3')(state, ['Element id:"lab.form-keyboard-floating.ks" fully visible after 0 swipes'], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/ks's centre lies in the measured panel/) });
+  });
+});
+
+describe('D69: the panel read again after the calls — moved is SKIP naming both reads; a misquote over two agreeing reads is averi\'s MISMATCH', () => {
+  // live.ts reads averi's touchable query a second time once the calls are done (withMeasuredPanel on the final state,
+  // `state.imeTouchable`). The judge admits a panel from it as from the launch's read: the two agree, or the case is
+  // not run. Where they agree, a reply quoting another panel (or none) is averi's own reading wrong, not a precondition.
+  const fu1 = readLiveRecord('android-forms-r1023b-fu1-cr-1.json');
+  const b11 = JSON.parse(readFileSync(new URL('../fixtures/live-android-forms-b11-kf-floated.json', import.meta.url), 'utf8')) as LiveRecord;
+  /** A recorded kf case, its launch AND its final state given the region of `atLaunch` and `after` (withRegion). */
+  const twice = (record: LiveRecord, id: string, atLaunch: string, after: string | LabState['imeTouchable']) => {
+    const r = floated(record, id, atLaunch);
+    const state = typeof after === 'string' && after.startsWith('(') ? withRegion(r.state, after) : { ...r.state, imeTouchable: after };
+    return { ...r, state };
+  };
+  const MOVED = `(359,1100,1040,1743)${STRIP}`;
+  const noPanel = 'FAIL  element id:"lab.form-keyboard-floating.ks" fill within dE00 8 of #FFFFFF — measured #FFFFFF';
+
+  it('(d) the two reads agree and the replies quote the panel: kf1–kf3 ok, as with one read', () => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { replies, launched, state } = twice(fu1, id, FU1_REGION, FU1_REGION);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched).outcome).toBe('ok');
+    }
+  });
+
+  it('(a) the panel moved between the reads: SKIP naming both — before ok, before a misquote\'s MISMATCH, before the premise', () => {
+    const why = 'the panel moved (launch 359,1269 681x643, after 359,1100 681x643)';
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { replies, launched, state } = twice(fu1, id, FU1_REGION, MOVED);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched)).toEqual({ outcome: 'SKIP', why });
+      const misquoted = id === 'kf3' ? [replies[0].replaceAll('[359,1269][1040,1912]', '[71,1092][1008,1884]')] : [noPanel, ...replies.slice(1)];
+      expect(judgeFloatingGap(id)(state, misquoted, 'uiautomator', launched)).toEqual({ outcome: 'SKIP', why });
+    }
+    // b11: the launch's panel covers the submit (kf1/kf2's premise fails), and it moved: the move is said first.
+    for (const id of ['kf1', 'kf2'] as const) {
+      const { replies, launched, state } = twice(b11, id, B11_REGION, `(87,1136,1024,1928)${STRIP}`);
+      expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched)).toEqual({ outcome: 'SKIP', why: 'the panel moved (launch 87,1243 937x792, after 87,1136 937x792)' });
+    }
+  });
+
+  it('(a) a second read that admits no panel: SKIP naming the launch\'s panel and why the second read has none, never ok', () => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      for (const [after, why] of [
+        [{ error: 'adb: device offline' }, 'no measured panel (the IME region read failed)'],
+        [STRIP, 'no measured panel (the region holds no rect beyond the strip 0,2088 1080x132)'],
+      ] as const) {
+        const { replies, launched, state } = twice(fu1, id, FU1_REGION, after);
+        expect(judgeFloatingGap(id)(state, replies, 'uiautomator', launched)).toEqual({ outcome: 'SKIP', why: `the panel not measured again after the calls (launch 359,1269 681x643, after: ${why})` });
+      }
+    }
+  });
+
+  it('(b) kf1/kf2: the reads agree, the evidence quotes another panel or none — MISMATCH naming what averi quoted and what was measured', () => {
+    for (const id of ['kf1', 'kf2'] as const) {
+      const { replies, launched, state } = twice(fu1, id, FU1_REGION, FU1_REGION);
+      const other = replies[0].replace('keyboard 359,1269 681x643', 'keyboard 87,1243 937x792');
+      expect(other).not.toBe(replies[0]);
+      expect(judgeFloatingGap(id)(state, [other, ...replies.slice(1)], 'uiautomator', launched)).toEqual({
+        outcome: 'MISMATCH',
+        why: `averi quoted keyboard 87,1243 937x792 over ks — the panel measured at launch and again after the calls is 359,1269 681x643: ${other.split('\n')[0].slice(0, 220)}`,
+      });
+      expect(judgeFloatingGap(id)(state, [noPanel, ...replies.slice(1)], 'uiautomator', launched)).toEqual({
+        outcome: 'MISMATCH',
+        why: `averi quoted no panel over ks — the panel measured at launch and again after the calls is 359,1269 681x643: ${noPanel}`,
+      });
+    }
+  });
+
+  it('(b) kf3: the reads agree (fu1, and b11\'s rebuilt region), the refusal names another panel or none — MISMATCH naming both', () => {
+    for (const [record, region, named] of [
+      [fu1, FU1_REGION, 'over [359,1269][1040,1912]'],
+      [b11, B11_REGION, 'over [87,1243][1024,2035]'],
+    ] as const) {
+      const { replies, launched, state } = twice(record, 'kf3', region, region);
+      expect(replies[0]).toContain(named);
+      const other = replies[0].replaceAll(named, 'over [71,1092][1008,1884]');
+      expect(judgeFloatingGap('kf3')(state, [other], 'uiautomator', launched)).toEqual({
+        outcome: 'MISMATCH',
+        why: `averi named over [71,1092][1008,1884] — the panel measured at launch and again after the calls is ${named}: ${other.split('\n')[0].slice(0, 220)}`,
+      });
+      const none = replies[0].replaceAll(` ${named}`, '');
+      expect(judgeFloatingGap('kf3')(state, [none], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi named no panel — the panel measured at launch and again after the calls is over \[/) });
+    }
+  });
+
+  it('(c) no second read (a record before D69): today\'s SKIP, word for word', () => {
+    for (const id of ['kf1', 'kf2'] as const) {
+      const { replies, launched, state } = floated(fu1, id, FU1_REGION);
+      expect(state.imeTouchable).toBeUndefined();
+      expect(judgeFloatingGap(id)(state, [noPanel, ...replies.slice(1)], 'uiautomator', launched)).toEqual({ outcome: 'SKIP', why: `averi's reply does not quote the measured panel 359,1269 681x643 over ks: ${noPanel}` });
+    }
+    const { replies, launched, state } = floated(b11, 'kf3', B11_REGION);
+    const other = replies[0].replaceAll('[87,1243][1024,2035]', '[71,1092][1008,1884]');
+    expect(judgeFloatingGap('kf3')(state, [other], 'uiautomator', launched)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^averi's reply does not name the measured panel over \[87,1243\]\[1024,2035\]: /) });
+  });
+
+  it('the late re-read carries the second read: a later read cannot turn the MISMATCH into "no second read"\'s SKIP (live-cases.ts#judged)', async () => {
+    const [kf1] = await selectCases({ platform: 'android', app: 'native', groups: ['forms'], only: ['kf1'] });
+    expect(kf1.id).toBe('kf1');
+    const { replies, launched, state } = twice(fu1, 'kf1', FU1_REGION, FU1_REGION);
+    const misquoted = [noPanel, ...replies.slice(1)];
+    // `late` as live.ts reads it, 3 s on: the app's state, no IME region of its own.
+    const late: LabState = { ...state, readAt: 1 };
+    delete late.imeTouchable;
+    const verdict = judged(kf1, 'uiautomator', misquoted, launched, [], state, late);
+    expect(verdict).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi quoted no panel over ks/) });
+    expect(verdict.why).not.toMatch(/only 3 s later/);
+    expect(lateWithPanel(state, late)).toEqual({ ...late, imeTouchable: state.imeTouchable });
+    // A record before D69 (no second read): late as it was, the verdict today's SKIP.
+    const { state: unread } = floated(fu1, 'kf1', FU1_REGION);
+    expect(lateWithPanel(unread, late)).toBe(late);
+    expect(judged(kf1, 'uiautomator', misquoted, launched, [], unread, late)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^averi's reply does not quote the measured panel/) });
   });
 });
 

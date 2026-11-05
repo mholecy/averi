@@ -296,10 +296,10 @@ export class IosLab implements LabDevice {
 export const IME_INPUT_SHOWN = 'dumpsys input_method | grep -m1 -w mInputShown';
 
 /**
- * The kf cases' one device read (live.ts; LabState.imeTouchable): `launched` with what averi's touchable query answered
- * right after the launch. A device the guard refuses rethrows — the run stops, as any other call there would; a read
- * that fails past the guard is said on stderr (`log`) and kept as `{ error }`, which live-forms.ts#measuredPanel reads
- * as "no measured panel (the IME region read failed)".
+ * The kf cases' device read (live.ts; LabState.imeTouchable): the state with what averi's touchable query answered —
+ * right after the launch, and again once the calls are done (D69). A device the guard refuses rethrows — the run stops,
+ * as any other call there would; a read that fails past the guard is said on stderr (`log`) and kept as `{ error }`,
+ * which live-forms.ts#measuredPanel reads as "no measured panel (the IME region read failed)".
  */
 export async function withMeasuredPanel(
   launched: LabState,

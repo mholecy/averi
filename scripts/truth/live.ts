@@ -205,7 +205,7 @@ if (rejudging !== undefined) {
           console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
           continue;
         }
-        // The one device read the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel).
+        // The first of the two device reads the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel).
         if (c.measuresPanel && android !== undefined) launched = await withMeasuredPanel(launched, android);
         const config = await configFor(source, c);
         const replies: string[] = [];
@@ -218,7 +218,10 @@ if (rejudging !== undefined) {
         await pause(800);
         // Stamped with when it was read (LabState.readAt): the ensure judges ask it.
         const stamped = (s: LabState | undefined) => (s === undefined ? s : { ...s, readAt: Date.now() / 1000 });
-        const state = stamped(await lab.state())!;
+        const read = stamped(await lab.state())!;
+        // The second (D69): the panel again once the calls are done, kept on the final state — the judge holds the two
+        // reads to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged).
+        const state = c.measuresPanel && android !== undefined ? await withMeasuredPanel(read, android) : read;
         let late: LabState | undefined;
         if (c.group !== 'visibility' && c.judge(state, replies, source, launched, after).outcome !== 'ok') {
           await pause(3_000);
