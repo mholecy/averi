@@ -46,6 +46,16 @@ const NOTE =
   'chooser. averi taps nothing itself. Naming the activity (`activity:` on the launch step / launch_app) starts it ' +
   'without the chooser.';
 
+/**
+ * open_deep_link's reply over the chooser with no sheet read (D55's; the pre-D55c text): the one literal every
+ * fail-open case below pins, byte for byte. batch-13 rerun 1 recorded it live for shared and pair, 3/3 each (D55d).
+ */
+const LINK_FAILED_OPEN = (url: string) =>
+  `Android has not opened ${url} yet: its chooser (android/com.android.internal.app.ResolverActivity) is in front, ` +
+  'asking which app opens it. Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one ' +
+  '(never "Always": it changes the device\'s default for such links); press_key back drops the link. averi taps ' +
+  'nothing itself.';
+
 // The replies with Android's chooser in front, end to end — a real AndroidAdapter through flow/launch.ts and the reply
 // text (tool-text.ts): launch_app's ⚠ line and the flow's `⚠ launch` line name the chooser (D55b; ADR 0041's D55b
 // amendment, D56's shape on iOS), and open_deep_link's reply over the same chooser stays D55's, byte for byte.
@@ -79,22 +89,24 @@ flows:
 
   it("open_deep_link's reply over the chooser is D55's, unchanged (batch-11's raise, as averi replied it)", async () => {
     const adapter = await chooserUp();
-    expect(deepLinkText('android', 'averilab://shared/open', await adapter.openDeepLink('averilab://shared/open'))).toBe(
-      'Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
-        'is in front, asking which app opens it. Take a ui_snapshot, tap the app you mean, then its "Just once" button ' +
-        'if it shows one (never "Always": it changes the device\'s default for such links); press_key back drops the ' +
-        'link. averi taps nothing itself.',
-    );
+    expect(deepLinkText('android', 'averilab://shared/open', await adapter.openDeepLink('averilab://shared/open'))).toBe(LINK_FAILED_OPEN('averilab://shared/open'));
   });
 });
 
-/** The `uiautomator dump`s D55c fails open on, each named: each leaves the replies above byte for byte. */
+const withDefault = (link: 'shared' | 'pair') => readFileSync(new URL(`../fixtures/uiautomator-lab-resolver-with-default-${link}.xml`, import.meta.url), 'utf8');
+
+/**
+ * The `uiautomator dump`s D55c fails open on, each named: each leaves the replies above byte for byte. The last two
+ * are batch-13 rerun 1's real resolver_list_with_default trees (D55d; android-chooser.test.ts pins why each is no sheet).
+ */
 const FAILED_DUMPS: [string, string | Error][] = [
   ['no XML', ''],
   ['"null root node"', 'ERROR: null root node returned by UiTestAutomationBridge.\n'],
   ['a failed dump', execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', 255, "adb: device 'e' not found\n")],
   ['a timed-out dump', execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', null, '', { timedOut: true })],
   ['another layout (the lab\'s own screen)', readFileSync(new URL('../fixtures/uiautomator-lab-open.xml', import.meta.url), 'utf8')],
+  ['the with_default chooser of averilab://shared/open (batch-13)', withDefault('shared')],
+  ['the with_default chooser of averilab://pair/open (batch-13)', withDefault('pair')],
 ];
 
 // D55c (ADR 0041's D55c amendment): the same replies when the chooser's dump is batch-10's fresh layout — the sheet
@@ -156,17 +168,20 @@ flows:
 
   it.each(FAILED_DUMPS)('%s: open_deep_link\'s and launch_app\'s replies are D55\'s and D55b\'s, byte for byte', async (_dump, dump) => {
     const linked = await (await chooserUp(dump)).openDeepLink('averilab://shared/open');
-    expect(deepLinkText('android', 'averilab://shared/open', linked)).toBe(
-      'Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
-        'is in front, asking which app opens it. Take a ui_snapshot, tap the app you mean, then its "Just once" button ' +
-        'if it shows one (never "Always": it changes the device\'s default for such links); press_key back drops the ' +
-        'link. averi taps nothing itself.',
-    );
+    expect(deepLinkText('android', 'averilab://shared/open', linked)).toBe(LINK_FAILED_OPEN('averilab://shared/open'));
     const launched = await launchApp(await chooserUp(dump), undefined, new EngineSession(), {
       appId: 'dev.averi.lab',
       intent: { action: 'android.intent.action.VIEW', data: 'averilab://shared/x' },
     });
     expect(launchText('android', launched)).toBe(`Launched dev.averi.lab on android\n⚠ ${NOTE}`);
+  });
+
+  // D55d: each link batch-13 rerun 1 raised, with its own with_default tree in front, replies the pre-D55c text for
+  // its own URL — what averi replied live, 3/3 per link.
+  it.each(['shared', 'pair'] as const)("averilab://%s/open over its own with_default tree: open_deep_link's reply as batch-13 recorded it, byte for byte", async (link) => {
+    const url = `averilab://${link}/open`;
+    const adapter = await chooserUp(withDefault(link));
+    expect(deepLinkText('android', url, await adapter.openDeepLink(url))).toBe(LINK_FAILED_OPEN(url));
   });
 });
 
