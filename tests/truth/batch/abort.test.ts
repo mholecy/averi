@@ -110,7 +110,7 @@ const block = (name: string, over: Partial<AbortBlock> = {}): AbortBlock => ({
 
 function guardOf(
   blocks: AbortBlock[] = [block('kf'), block('E5')],
-  over: { head?: () => { checkout: string; labs: string[]; protectedLines: string[] }; graceMs?: number; installSecs?: number; clock?: () => Date; judgeBudgetSecs?: number; fs?: BatchFs } = {},
+  over: { head?: () => { checkout: string; labs: string[]; protectedLines: string[]; errors?: string[] }; graceMs?: number; installSecs?: number; clock?: () => Date; judgeBudgetSecs?: number; fs?: BatchFs } = {},
 ) {
   return new AbortGuard({
     name: 'batch-n',
@@ -1008,5 +1008,66 @@ describe('markDirty — the state-file protocol: dirty until a verified restore 
       expect(markDirty(nodeFs, join(out, name))).toBe('unreadable');
       expect(text(join(out, name))).toBe(body);
     }
+  });
+});
+
+describe('leave — a block\'s hand lines outside any window go to RESTORE now (T2 S6a: S4\'s compare caught a late writer after the restore)', () => {
+  it('appended under `<name> run <id> left by <block> at <date>`, said as an ERROR, and counted by finish\'s return and the exit code', async () => {
+    const guard = guardOf();
+    let written: string[] = [];
+    let ended: string[] = [];
+    await guard.run(async () => {
+      written = guard.leave('D43', ['D43 (iOS, a late writer): defaults write x']);
+      ended = await guard.finish();
+    });
+    expect(written).toEqual(['batch-n run 1 left by D43 at 2026-11-04 09:44:26; state to put back by hand:', 'D43 (iOS, a late writer): defaults write x']);
+    expect(text(restoreFile())).toBe(`${written.join('\n')}\n`);
+    expect(ended).toEqual(written);
+    expect(text(join(out, 'steps.log'))).toContain(`09:44:26 ERROR D43: state not provably put back — the hand commands are in ${restoreFile()}`);
+    expect(exitCodeOf({ name: 'b', runId: '1', checkout: CHECKOUT, labs: [], blocks: [], protectedLines: [], restore: { file: restoreFile(), written: ended }, errors: [] })).toBe(1);
+  });
+
+  it('no hand line: nothing written, nothing said', async () => {
+    const guard = guardOf();
+    await guard.run(async () => expect(guard.leave('D43', [])).toEqual([]));
+    expect(existsSync(restoreFile())).toBe(false);
+    expect(text(join(out, 'steps.log'))).not.toContain('ERROR');
+  });
+
+  it('during the abort too: the lines are never dropped, and its SUMMARY shows them', async () => {
+    const guard = guardOf();
+    await interrupt(guard, () => {
+      guard.open('E5', window({ restore: async () => (guard.leave('D43', ['D43: compare it by hand']), { ok: true, how: 'read back' }) }));
+    });
+    expect(summaryText()).toContain('D43: compare it by hand');
+    expect(text(restoreFile())).toContain('left by D43 at');
+  });
+
+  it('a RESTORE that cannot be written: the lines once on stderr, still counted (no window left to say it)', async () => {
+    const guard = guardOf(undefined, { fs: { ...nodeFs, append: (p, t) => (p === restoreFile() ? (() => { throw new Error('ENOSPC'); })() : nodeFs.append(p, t)) } });
+    let written: string[] = [];
+    await guard.run(async () => void (written = guard.leave('D43', ['D43: h'])));
+    expect(written).toEqual(['batch-n run 1 left by D43 at 2026-11-04 09:44:26; state to put back by hand:', 'D43: h']);
+    expect(seam.said).toEqual([`batch-n: ${restoreFile()} could not be written (ENOSPC):\n${written.join('\n')}\n`]);
+  });
+});
+
+describe('interrupted — whether the abort has begun, for the runner\'s body (T2 S6a: no block starts and no SUMMARY of its own once it has)', () => {
+  it('false while the run goes; true from the first signal on', async () => {
+    const guard = guardOf();
+    let before: boolean | undefined;
+    const exited = interrupt(guard, () => void (before = guard.interrupted));
+    await exited;
+    expect(before).toBe(false);
+    expect(guard.interrupted).toBe(true);
+  });
+});
+
+describe('head\'s errors — the run\'s other ERROR lines (its blocks\' logs) in the abort SUMMARY, after this run\'s steps (T2 S6a, batch-12.sh:668)', () => {
+  it('appended after the step log\'s ERROR lines, each once', async () => {
+    const guard = guardOf(undefined, { head: () => ({ checkout: CHECKOUT, labs: [], protectedLines: [], errors: ['ERROR from a probe log', 'ERROR from a probe log'] }) });
+    await interrupt(guard);
+    const lines = summaryText().split('\n');
+    expect(lines.slice(-4)).toEqual(['09:44:26 ERROR batch-n interrupted (run 1) by SIGINT', 'ERROR from a probe log', '======== SUMMARY end (run 1, INTERRUPTED)', '']);
   });
 });
