@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect, UiNode } from '../../src/adapters/types.js';
+import type { CallMotion } from '../../src/interact/unfit-axis.js';
 import { FIT_ROOM_PX, judgeRead, shortOf, strokeLine, unfitAlong, unfitRoom, type ReadJudgement, type RoundRead } from '../../src/interact/scroll-read.js';
 import type { KeyboardCover } from '../../src/ui-tree/keyboard-cover.js';
 import type { UsableScreen } from '../../src/ui-tree/usable-screen.js';
@@ -290,6 +291,8 @@ describe('unfitAlong — a target too large for its scroll view to show whole', 
   /** C laid at x 45, `width` wide: clipped at the carousel's left, its right side inside it. */
   const card = (width: number): Rect => ({ x: 45, y: 380, width, height: 234 });
   const facts = { screen: CAROUSEL, drawn: CAROUSEL, clipped: ['left'] as const };
+  /** A call that has moved nothing yet: no axis inferred (D59). */
+  const STILL: CallMotion = { direction: 'left', moves: [] };
 
   it.each([
     [CAROUSEL.width - 2, false],
@@ -297,68 +300,75 @@ describe('unfitAlong — a target too large for its scroll view to show whole', 
     [CAROUSEL.width, true],
     [CAROUSEL.width + 1, true],
   ])(`the boundary, FIT_ROOM_PX (${FIT_ROOM_PX}) under the room: %d wide in 948 — unfit %s`, (width, unfit) => {
-    expect(unfitAlong(facts, card(width), VIEWS)).toEqual(unfit ? { along: 'horizontal', size: width, scrollView: carousel.node } : undefined);
+    expect(unfitAlong(facts, card(width), VIEWS, STILL)).toEqual(unfit ? { along: 'horizontal', size: width, scrollView: carousel.node } : undefined);
   });
 
   it('the room is the scroll view\'s, read by `unfitRoom`', () => {
-    const unfit = unfitAlong(facts, card(948), VIEWS);
+    const unfit = unfitAlong(facts, card(948), VIEWS, STILL);
     expect(unfit === undefined ? undefined : unfitRoom(unfit)).toBe(948);
   });
 
   it('a 900-wide card in the 948 carousel (48 of room) fits', () => {
-    expect(unfitAlong(facts, card(900), VIEWS)).toBeUndefined();
+    expect(unfitAlong(facts, card(900), VIEWS, STILL)).toBeUndefined();
   });
 
   it('along the vertical too: a row as tall as its vertical list, clipped at the top', () => {
     const list: Rect = { x: 0, y: 200, width: 402, height: 400 };
     const views = [{ node: node({ role: 'scrollable', rect: list }), axis: 'vertical' as const }];
-    expect(unfitAlong({ screen: list, drawn: list, clipped: ['top'] }, { x: 24, y: 190, width: 354, height: 400 }, views)).toEqual({ along: 'vertical', size: 400, scrollView: views[0].node });
+    expect(unfitAlong({ screen: list, drawn: list, clipped: ['top'] }, { x: 24, y: 190, width: 354, height: 400 }, views, STILL)).toEqual({ along: 'vertical', size: 400, scrollView: views[0].node });
   });
 
   it('not clipped along that axis — a target that already fits, or one clipped across it only: none', () => {
-    expect(unfitAlong({ ...facts, clipped: [] }, card(948), VIEWS)).toBeUndefined();
-    expect(unfitAlong({ ...facts, clipped: ['top'] }, { x: 66, y: 370, width: 948, height: 200 }, VIEWS)).toBeUndefined();
+    expect(unfitAlong({ ...facts, clipped: [] }, card(948), VIEWS, STILL)).toBeUndefined();
+    expect(unfitAlong({ ...facts, clipped: ['top'] }, { x: 66, y: 370, width: 948, height: 200 }, VIEWS, STILL)).toBeUndefined();
   });
 
   it('a side uiautomator cut at the screen on that axis: its size unknown — none; one on the other axis only does not count', () => {
-    expect(unfitAlong({ ...facts, unknownPast: ['right'] }, card(948), VIEWS)).toBeUndefined();
-    expect(unfitAlong({ ...facts, unknownPast: ['left'] }, card(948), VIEWS)).toBeUndefined();
-    expect(unfitAlong({ ...facts, unknownPast: ['bottom'] }, card(948), VIEWS)).toEqual({ along: 'horizontal', size: 948, scrollView: carousel.node });
+    expect(unfitAlong({ ...facts, unknownPast: ['right'] }, card(948), VIEWS, STILL)).toBeUndefined();
+    expect(unfitAlong({ ...facts, unknownPast: ['left'] }, card(948), VIEWS, STILL)).toBeUndefined();
+    expect(unfitAlong({ ...facts, unknownPast: ['bottom'] }, card(948), VIEWS, STILL)).toEqual({ along: 'horizontal', size: 948, scrollView: carousel.node });
   });
 
   it('no drawn frame (no scroll view told, idb\'s), or no scroll view: none', () => {
-    expect(unfitAlong({ screen: CAROUSEL, clipped: ['left'] }, card(948), VIEWS)).toBeUndefined();
-    expect(unfitAlong(facts, card(948), [])).toBeUndefined();
+    expect(unfitAlong({ screen: CAROUSEL, clipped: ['left'] }, card(948), VIEWS, STILL)).toBeUndefined();
+    expect(unfitAlong(facts, card(948), [], STILL)).toBeUndefined();
   });
 
   it('a frame judged in that is cut short of the drawn frame on that axis (a keyboard line, a band): none — on the other axis only, it counts', () => {
-    expect(unfitAlong({ screen: { ...CAROUSEL, height: 200 }, drawn: CAROUSEL, clipped: ['left'] }, card(948), VIEWS)).toEqual({ along: 'horizontal', size: 948, scrollView: carousel.node });
-    expect(unfitAlong({ screen: { ...CAROUSEL, x: 70, width: 944 }, drawn: CAROUSEL, clipped: ['left'] }, card(948), VIEWS)).toBeUndefined();
-    expect(unfitAlong({ screen: { ...CAROUSEL, x: 70 }, drawn: CAROUSEL, clipped: ['left'] }, card(948), VIEWS)).toBeUndefined();
-    expect(unfitAlong({ screen: { ...CAROUSEL, width: 940 }, drawn: CAROUSEL, clipped: ['left'] }, card(948), VIEWS)).toBeUndefined();
+    expect(unfitAlong({ screen: { ...CAROUSEL, height: 200 }, drawn: CAROUSEL, clipped: ['left'] }, card(948), VIEWS, STILL)).toEqual({ along: 'horizontal', size: 948, scrollView: carousel.node });
+    expect(unfitAlong({ screen: { ...CAROUSEL, x: 70, width: 944 }, drawn: CAROUSEL, clipped: ['left'] }, card(948), VIEWS, STILL)).toBeUndefined();
+    expect(unfitAlong({ screen: { ...CAROUSEL, x: 70 }, drawn: CAROUSEL, clipped: ['left'] }, card(948), VIEWS, STILL)).toBeUndefined();
+    expect(unfitAlong({ screen: { ...CAROUSEL, width: 940 }, drawn: CAROUSEL, clipped: ['left'] }, card(948), VIEWS, STILL)).toBeUndefined();
   });
 
   it('B1: the drawn frame shrunk by an outer scroll view\'s position (the page cuts the carousel to 600 of its 948): none, though the card is larger than that frame', () => {
     const shrunk: Rect = { ...CAROUSEL, width: 600 };
-    expect(unfitAlong({ screen: shrunk, drawn: shrunk, clipped: ['left'] }, { x: 40, y: 380, width: 900, height: 234 }, VIEWS)).toBeUndefined();
+    expect(unfitAlong({ screen: shrunk, drawn: shrunk, clipped: ['left'] }, { x: 40, y: 380, width: 900, height: 234 }, VIEWS, STILL)).toBeUndefined();
     // Within FIT_ROOM_PX of the room-giving view, the frame still counts as its.
     const near: Rect = { ...CAROUSEL, width: 947 };
-    expect(unfitAlong({ screen: near, drawn: near, clipped: ['left'] }, card(948), VIEWS)).toEqual({ along: 'horizontal', size: 948, scrollView: carousel.node });
+    expect(unfitAlong({ screen: near, drawn: near, clipped: ['left'] }, card(948), VIEWS, STILL)).toEqual({ along: 'horizontal', size: 948, scrollView: carousel.node });
     const short: Rect = { ...CAROUSEL, width: 946 };
-    expect(unfitAlong({ screen: short, drawn: short, clipped: ['left'] }, card(948), VIEWS)).toBeUndefined();
+    expect(unfitAlong({ screen: short, drawn: short, clipped: ['left'] }, card(948), VIEWS, STILL)).toBeUndefined();
   });
 
   it('the room-giving view is the smallest along the axis, whichever is nearest', () => {
     const outer = { node: node({ role: 'scrollable', rect: CAROUSEL }), axis: 'horizontal' as const };
     const inner = { node: node({ role: 'scrollable', rect: { ...CAROUSEL, width: 1200 } }), axis: 'horizontal' as const };
-    expect(unfitAlong(facts, card(948), [inner, outer])).toEqual({ along: 'horizontal', size: 948, scrollView: outer.node });
+    expect(unfitAlong(facts, card(948), [inner, outer], STILL)).toEqual({ along: 'horizontal', size: 948, scrollView: outer.node });
     // Two of one size: the nearest.
     const twin = { node: node({ role: 'scrollable', rect: CAROUSEL }), axis: 'horizontal' as const };
-    expect(unfitAlong(facts, card(948), [twin, outer])?.scrollView).toBe(twin.node);
+    expect(unfitAlong(facts, card(948), [twin, outer], STILL)?.scrollView).toBe(twin.node);
   });
 
-  it('M1: the room-giving view scrolls on the other axis, or the tree does not tell: none', () => {
-    expect(unfitAlong(facts, card(948), [{ ...carousel, axis: 'vertical' }, page])).toBeUndefined();
-    expect(unfitAlong(facts, card(948), [{ ...carousel, axis: undefined }, page])).toBeUndefined();
+  it('M1: the room-giving view scrolls on the other axis, or the tree does not tell and the call has moved nothing: none', () => {
+    expect(unfitAlong(facts, card(948), [{ ...carousel, axis: 'vertical' }, page], STILL)).toBeUndefined();
+    expect(unfitAlong(facts, card(948), [{ ...carousel, axis: undefined }, page], STILL)).toBeUndefined();
+  });
+
+  it('D59: the tree does not tell, and a stroke over the carousel moved the card along x this call: unfit, said inferred — a told axis across it still none', () => {
+    const moved: CallMotion = { direction: 'left', moves: [{ drawn: { from: { x: 200, y: 497 }, to: { x: 768, y: 497 } }, along: 'horizontal' }] };
+    expect(unfitAlong(facts, card(948), [{ ...carousel, axis: undefined }, page], moved)).toEqual({ along: 'horizontal', size: 948, scrollView: carousel.node, inferred: true });
+    expect(unfitAlong(facts, card(948), [{ ...carousel, axis: 'vertical' }, page], moved)).toBeUndefined();
+    expect(unfitAlong(facts, card(948), VIEWS, moved)).toEqual({ along: 'horizontal', size: 948, scrollView: carousel.node });
   });
 });

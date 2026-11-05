@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Rect, Stroke } from '../../src/adapters/types.js';
-import { cardMoved, inferredAlong, type AxisEvidence } from '../../src/interact/unfit-axis.js';
+import { inferredAlong, type AxisEvidence } from '../../src/interact/unfit-axis.js';
 import { node } from '../helpers/fake.js';
 
 /**
@@ -67,6 +67,11 @@ describe('inferredAlong: all four hold, or no axis is inferred', () => {
     expect(inferredAlong({ ...E, moves: [{ drawn: BELOW, along: 'horizontal' }, { drawn: OVER, along: 'horizontal' }] })).toBe(true);
   });
 
+  it('no drawn frame (no scroll view told): refused', () => {
+    expect(inferredAlong({ ...E, drawn: undefined })).toBe(false);
+    expect(inferredAlong({ ...E, unknownPast: undefined })).toBe(true);
+  });
+
   it('vertical: a column the tree does not tell, a down call, a row cut at its bottom, moved along y', () => {
     const column = node({ role: 'container', rect: at(0, 221, 1080, 1933) });
     const down: Stroke = { from: { x: 540, y: 1800 }, to: { x: 540, y: 600 } };
@@ -74,25 +79,5 @@ describe('inferredAlong: all four hold, or no axis is inferred', () => {
     expect(inferredAlong(v)).toBe(true);
     expect(inferredAlong({ ...v, direction: 'right' })).toBe(false);
     expect(inferredAlong({ ...v, moves: [{ drawn: down, along: 'horizontal' }] })).toBe(false);
-  });
-});
-
-describe('cardMoved: the one axis the same card moved along between two reads', () => {
-  it('along x only, by more than a pixel: horizontal — by its start or by its end (a card cut at the screen grows)', () => {
-    expect(cardMoved(at(574, 380, 506, 234), at(231, 380, 849, 234))).toBe('horizontal');
-    expect(cardMoved(at(0, 380, 846, 234), at(0, 380, 900, 234))).toBe('horizontal');
-    expect(cardMoved(at(10, 380, 900, 234), at(8, 380, 902, 234))).toBe('horizontal');
-  });
-  it('along y only: vertical', () => {
-    expect(cardMoved(at(0, 900, 1080, 140), at(0, 700, 1080, 140))).toBe('vertical');
-    expect(cardMoved(at(0, 900, 1080, 140), at(0, 900, 1080, 142))).toBe('vertical');
-  });
-  it('a pixel or less: no move', () => {
-    expect(cardMoved(at(45, 380, 948, 234), at(46, 380, 948, 234))).toBeUndefined();
-    expect(cardMoved(at(45, 380, 948, 234), at(45, 381, 948, 233))).toBeUndefined();
-  });
-  it('both ways: no one axis', () => {
-    expect(cardMoved(at(45, 380, 948, 234), at(100, 300, 948, 234))).toBeUndefined();
-    expect(cardMoved(at(45, 380, 948, 234), at(45, 380, 900, 200))).toBeUndefined();
   });
 });
