@@ -66,16 +66,30 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  * (S3: `.cases` first, live.ts with its record, then its rejudge) and a non-live block's records (`asks`, `record`).
  * The SUMMARY's ERROR lines are this run's steps' and every ERROR line of this run's logs (`*.log`, analyze.txt).
  *
- * A batch, outside the repo (`node --import tsx batch-13.ts --out <dir> --udid <sim> --serial <emu>`):
+ * A batch, outside the repo (`node --import tsx batch-13.ts --out <dir> --udid <sim> --serial <emu>`), composes the
+ * lab plumbing's needs, blocks and windows (T2 S6b: lab-build.ts, android-lab.ts, ios-lab.ts) — nothing here learns
+ * about a device:
  *
  *     const at = (f) => pathToFileURL(join(repo, 'scripts/truth/batch', f)).href;
- *     const { runBatch } = await import(at('runner.ts'));
- *     const { configOf } = await import(at('runner-lines.ts'));
- *     await runBatch({ name: 'batch-13', knobs, needs: { android: androidLab }, blocks: [kf, E5],
+ *     const mods = ['runner', 'runner-lines', 'lab-build', 'android-lab', 'ios-lab'];
+ *     const [{ runBatch }, { configOf }, { labBuild, labBlock }, { androidLab }, { iosLab, iosCheck, wdaWindow }] =
+ *       await Promise.all(mods.map((f) => import(at(`${f}.ts`))));
+ *     const build = labBuild();
+ *     const android = androidLab({ build: build.built.android });
+ *     const ios = iosLab();
+ *     const D43 = { id: 'D43', label: 'D43 verdict', needs: ['ios'], async run(ctx) {
+ *       const sim = await ios.open(ctx);                              // the guard again, over the block's own calls
+ *       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
+ *       await wdaWindow(ctx, sim.lab, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
+ *         work: async () => (await iosCheck(ctx, sim.lab, 'wda 1')) ?? ctx.liveRun('ios-wda-1', asked, { secs }) });
+ *       await ios.endStretch(ctx, sim.lab);                           // the finportal key's line
+ *     }, judge };
+ *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android-build', 'android']), kf, D43],
+ *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly],
  *       config: configOf(process.argv.slice(2), process.env, repo) });
  *
- * Not here (S6b, lab plumbing): the needs' checks themselves, the WDA window's orchestration, the lab build, the
- * tri-state reads around a block. Nothing here calls a device: every call is the batch's, through `bounded`.
+ * A need is checked by the first block naming it and rechecked (its `alive`) before each later one; the WDA window is
+ * a dirty window, so the abort puts it back the same way; `lastly` ends what S2's kept groups cannot own.
  */
 
 /** A need a block names: the lab devices (`ios`, `android`), or any other the batch gives a check for. */
@@ -155,8 +169,8 @@ export interface BlockCtx<K = unknown> {
   /** A live run (S3): its `.cases` first, then live.ts with its record, then the rejudge, each a bounded step. */
   liveRun(name: string, asked: Asked, o: { secs: number; rejudgeSecs?: number }): Promise<LiveOutcome>;
   /**
-   * A live run's `.cases` now, before a stretch that may never reach it (batch-11's WDA window wrote its runs' before its
-   * backup): a later liveRun of that name, asked the same, writes none again; asked otherwise, it throws.
+   * A live run's `.cases` now, before a stretch that may never reach it (batch-11's WDA window wrote its runs' before
+   * its backup): a later liveRun of that name, asked the same, writes none again; asked otherwise, it throws.
    */
   asksLive(name: string, asked: Asked): void;
   /** What a non-live run is asked, written before it runs (never overwritten). */

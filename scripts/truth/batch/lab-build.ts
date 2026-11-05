@@ -14,10 +14,10 @@ import { exitText, failedCall, nameInLine } from './words.js';
  * why (the runner's need rule), and a block that does not need it runs on the app already installed: main's catalog
  * `--check`ed first, once for both (S3's not-ported row: a stale cells.json builds nothing); the iOS build (xcodegen,
  * xcodebuild) and the Android build (`gradlew assembleDebug` under JDK 17), each a bounded step logged in the lab
- * folder, its product's cells.json main's; then `gradlew --stop`, after every Android build: the Gradle daemon leaves the
- * call's group by design, so S2's group kill cannot reach it. xcodebuild needs no pkill: its group ends with it (S2).
- * The devices' needs (ios-lab.ts, android-lab.ts) install this run's build (`built`) before their cells check; and
- * `labBlock` is batch-11's and batch-12's `lab` block — `ONLY=lab` runs just its needs.
+ * folder, its product's cells.json main's; then `gradlew --stop`, after every Android build: the Gradle daemon leaves
+ * the call's group by design, so S2's group kill cannot reach it. xcodebuild needs no pkill: its group ends with it
+ * (S2). The devices' needs (ios-lab.ts, android-lab.ts) install this run's build (`built`) before their cells check;
+ * and `labBlock` is batch-11's and batch-12's `lab` block — `ONLY=lab` runs just its needs.
  */
 
 /** A build's bound when the batch names none (batch-11's B_BUILD). */

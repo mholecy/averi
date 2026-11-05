@@ -52,7 +52,9 @@ export interface LabCtx {
   step(word: StepWord, text: string): void;
 }
 
-/** The lab simulator, guarded (LabSim's guard), with the raw calls the plumbing makes: simctl, idb, pkill, lsof, kill. */
+/**
+ * The lab simulator, guarded (LabSim's guard), with the raw calls the plumbing makes: simctl, idb, pkill, lsof, kill.
+ */
 export class IosSim {
   private constructor(
     readonly sim: LabSim,
@@ -91,7 +93,9 @@ export class IosSim {
 
 // ------------------------------------------------------------------------------------- the lab's processes
 
-/** What ends the lab's processes: a Run and the lab simulator's udid (an IosSim, or a guarded udid at the run's end). */
+/**
+ * What ends the lab's processes: a Run and the lab simulator's udid (an IosSim, or a guarded udid at the run's end).
+ */
 interface Killer {
   run: Run;
   udid: string;
@@ -176,8 +180,8 @@ export type Dismissal = { state: 'none' } | { state: 'dismissed'; how: string } 
 
 /**
  * A leftover "Open in …?" confirmation (open-in-alert.py): read; found, Cancel tapped at its centre — at most
- * ALERT_TAPS times, each followed by ALERT_WAIT_MS and a fresh read; stuck when it has no Cancel with a frame or is still
- * up. Nothing but that Cancel is ever tapped.
+ * ALERT_TAPS times, each followed by ALERT_WAIT_MS and a fresh read; stuck when it has no Cancel with a frame or is
+ * still up. Nothing but that Cancel is ever tapped.
  */
 export async function dismissOpenIn(lab: IosSim): Promise<Dismissal> {
   const read = async () => openInAlertOf(await lab.idb(['ui', 'describe-all', '--json']));
@@ -267,7 +271,9 @@ export interface IosLabOptions {
   wait?: (ms: number) => Promise<unknown>;
 }
 
-/** What a batch has of the lab simulator: the need, the guarded simulator for a block, the stretch's end, the last step. */
+/**
+ * What a batch has of the lab simulator: the need, the guarded simulator for a block, the stretch's end, the last step.
+ */
 export interface IosLab {
   need: NeedSpec;
   /** The lab simulator over a block's (or a need's) calls, guarded; why not. */
@@ -367,7 +373,9 @@ export function wdaWindowSpec(lab: IosSim, stateFile: string, o: { block?: strin
 }
 
 export interface WdaWindowOptions {
-  /** The live runs the window holds: their `.cases` written first, so a run it never reaches is seen (asked, not run). */
+  /**
+   * The live runs the window holds: their `.cases` written first, so a run it never reaches is seen (asked, not run).
+   */
   runs?: readonly { name: string; asked: Asked }[];
   /** What runs under WebDriverAgent (the block's live runs, each after its health check). */
   work(): Promise<void>;
@@ -379,11 +387,11 @@ export interface WdaWindowOptions {
 
 /**
  * batch-11's WDA window (623–655), in its order: the `.cases` of its runs; the health check; the backup (S4) — failed,
- * the block's INCONCLUSIVE naming why, and nothing changed or run (b11-dry d43-backupfail); the window opened; the work;
- * the window put back (the WebDriverAgent ended, the 4 s wait, port 8120 free, the domains key by key) — its line one of
- * the block's verdict lines, and the window closed only when it verified, else left for RESTORE; the end check; then,
- * with the state clean, the compare (a late writer: its line a verdict line, its hand lines to RESTORE). Whether the
- * work ran.
+ * the block's INCONCLUSIVE naming why, and nothing changed or run (b11-dry d43-backupfail); the window opened; the
+ * work; the window put back (the WebDriverAgent ended, the 4 s wait, port 8120 free, the domains key by key) — its line
+ * one of the block's verdict lines, and the window closed only when it verified, else left for RESTORE; the end check;
+ * then, with the state clean, the compare (a late writer: its line a verdict line, its hand lines to RESTORE). Whether
+ * the work ran.
  */
 export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<boolean> {
   for (const r of o.runs ?? []) ctx.asksLive(r.name, r.asked);

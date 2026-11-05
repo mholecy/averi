@@ -24,7 +24,8 @@ function labUdid(udid: string): string {
 
 /**
  * The lab's WebDriverAgent by its exact patterns (batch-11.sh:321–325 kill_lab_wda): its own derived data
- * (lab-device.ts#LAB_WDA_DERIVED_DATA, never device-check's `averi-wda`) and the runner under the lab simulator's folder.
+ * (lab-device.ts#LAB_WDA_DERIVED_DATA, never device-check's `averi-wda`) and the runner under the lab simulator's
+ * folder.
  */
 export const wdaKillPatterns = (udid: string): string[] => ['averi-wda-lab', `Devices/${labUdid(udid)}/.*WebDriverAgentRunner`];
 
@@ -54,7 +55,9 @@ export function portOf(r: CallResult): PortRead {
   return { state: 'busy', pids: lines.map(Number) };
 }
 
-/** The restore line's port part (d43-gate.ts's restoreLine): free, free after a kill, still listened on, or not read. */
+/**
+ * The restore line's port part (d43-gate.ts's restoreLine): free, free after a kill, still listened on, or not read.
+ */
 export function portPart(p: PortRead, killed: boolean): string {
   if (p.state === 'free') return `port ${LAB_WDA_PORT} free${killed ? ' (a listener killed)' : ''}`;
   if (p.state === 'busy') return `port ${LAB_WDA_PORT} still has a listener (pid ${p.pids.join(', ')})`;
@@ -90,7 +93,9 @@ export function wdaRestoreOf(r: RestoreSaid, port: PortRead, killed: boolean, ud
 
 // ----------------------------------------------------------------------------------------- the Open-in alert
 
-/** A SpringBoard "Open in “<app>”?" confirmation in an idb tree: none, found (Cancel's centre if it has one), unread. */
+/**
+ * A SpringBoard "Open in “<app>”?" confirmation in an idb tree: none, found (Cancel's centre if it has one), unread.
+ */
 export type OpenInAlert = { state: 'none' } | { state: 'found'; label: string; buttons: string[]; cancel: Point | undefined } | { state: 'unread'; why: string };
 
 const OPEN_IN = /^Open in\b/;
