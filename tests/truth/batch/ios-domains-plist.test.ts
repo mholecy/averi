@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -61,6 +61,11 @@ describe("TYPED_PY on the host's plistlib (batch-10: bool true read int 0 after 
     const after = typedMapOf(typedRead('c.plist', plist('<dict><key>k</key><integer>0</integer></dict>')).out);
     if (typeof before === 'string' || typeof after === 'string') throw new Error('not read');
     expect(decideRestore({ domain: 'com.apple.Accessibility', backupPath: '/b', backup: before, now: after })).toMatchObject({ verdict: 'act', actions: [{ op: 'write', key: 'k', flag: '-bool', value: 'false' }] });
+  });
+
+  it("the host's export of a domain not there (an empty dictionary, exit 0) reads as an empty map — so it proves nothing absent", () => {
+    const r = typedRead('m.plist', readFileSync(join(import.meta.dirname, '..', '..', 'fixtures', 'batch', 'defaults-host-export-missing-domain.plist'), 'utf8'));
+    expect([r.code, typedMapOf(r.out)]).toEqual([0, {}]);
   });
 
   it('a top level that is no dictionary, or no plist at all, exits non-zero: never read as an empty domain', () => {

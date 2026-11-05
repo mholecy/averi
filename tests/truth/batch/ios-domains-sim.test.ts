@@ -61,6 +61,9 @@ afterEach(() => {
 
 type Rule = (cmd: string, args: readonly string[]) => CallResult | undefined;
 
+/** The host's `defaults read` of a domain that is not there (defaults-host-domain-not-found.txt), naming `domain`. */
+const notFound = (domain: string): string => readFileSync(join(FIXTURES, 'defaults-host-domain-not-found.txt'), 'utf8').replace('com.apple.Preferences', domain);
+
 /**
  * A fake lab simulator. `domains`: its settings (absent: not there); `name`: what simctl lists it as; `rules`: answers
  * tried first, in order (a refused write, a hung export); `unreadable`: host files plistlib cannot read.
@@ -91,8 +94,8 @@ function fakeSim(opts: { domains?: Record<string, Record<string, KeyVal>>; name?
     const [domain, key] = [args[5], args[6]];
     const map = domains.get(domain);
     if (verb === 'export') {
-      if (map === undefined) return exit(1, `Domain ${domain} does not exist`);
-      writeFileSync(args[6], JSON.stringify(map));
+      // The host's defaults: a domain not there exports an empty dictionary, exit 0 (defaults-host-export-missing-domain.plist).
+      writeFileSync(args[6], JSON.stringify(map ?? {}));
       return ok();
     }
     if (verb === 'write') {
@@ -100,7 +103,7 @@ function fakeSim(opts: { domains?: Record<string, Record<string, KeyVal>>; name?
       return ok();
     }
     if (verb === 'delete') {
-      if (key === undefined) return domains.delete(domain) ? ok() : exit(1, `Domain ${domain} does not exist`);
+      if (key === undefined) return domains.delete(domain) ? ok() : exit(1, notFound(domain));
       if (map === undefined || !Object.hasOwn(map, key)) return exit(1, readFileSync(join(FIXTURES, 'schemeapproval-absent-b9-delete.txt'), 'utf8'));
       const rest = { ...map };
       delete rest[key];
@@ -108,7 +111,9 @@ function fakeSim(opts: { domains?: Record<string, Record<string, KeyVal>>; name?
       return ok();
     }
     if (verb === 'read') {
-      const kv = map?.[key];
+      if (map === undefined) return exit(1, notFound(domain));
+      if (key === undefined) return ok(`${JSON.stringify(map)}\n`);
+      const kv = map[key];
       return kv === undefined ? exit(1, readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8')) : ok(`${kv.v ?? kv.c}\n`);
     }
     if (verb === 'import') {
@@ -202,28 +207,55 @@ describe("backup — the state file written dirty before the window's first chan
     expect(py.every((c) => c.call?.secs === PLIST_SECS && c.args[0] === '-I' && c.args[1] === '-c' && c.args[2] === TYPED_PY)).toBe(true);
   });
 
-  it("absent only on defaults' own words for that domain: another domain's \"does not exist\", or a session's, is a failure (T2 S4 review round 1)", async () => {
-    for (const said of ['Domain com.apple.Other does not exist', 'Session does not exist', 'domain com.apple.keyboard.preferences does not exist', 'Domain comXappleXkeyboardXpreferences does not exist', 'NoDomain com.apple.keyboard.preferences does not exist']) {
-      const file = join(mkdtempSync(join(dir, 'a-')), 'state.json');
-      const r = await backup(await labOf(fakeSim({ rules: [(_, a) => (a[4] === 'export' ? exit(1, said) : undefined)] })), file);
-      expect(r).toEqual({ ok: false, why: `defaults export com.apple.keyboard.preferences: exit 1 ${said} — no state written` });
+  it("a domain not there exports an empty dictionary (the host's defaults): absent only when `defaults read <domain>` says \"Domain '<it>' not found.\" (T2 S4 review round 2)", async () => {
+    const domains = before();
+    delete domains['com.apple.Preferences'];
+    const fake = fakeSim({ domains });
+    const r = await backup(await labOf(fake), stateFile());
+    expect(r.ok && r.line).toContain('com.apple.Preferences absent');
+    expect(readState().domains[1]).toEqual({ name: 'com.apple.Preferences', backup: null });
+    expect(fake.defaults()).toEqual([
+      `export com.apple.keyboard.preferences ${backupPathOf(stateFile(), 'com.apple.keyboard.preferences')}`,
+      `export com.apple.Preferences ${backupPathOf(stateFile(), 'com.apple.Preferences')}`,
+      'read com.apple.Preferences',
+      `export ${A11Y} ${backupPathOf(stateFile(), A11Y)}`,
+    ]);
+  });
+
+  it('a domain there but empty is no absent one: its empty backup recorded, so the restore may import it', async () => {
+    const fake = fakeSim({ domains: { ...before(), 'com.apple.Preferences': {} } });
+    const r = await backup(await labOf(fake), stateFile());
+    expect(r.ok && r.line).toContain('com.apple.Preferences exported');
+    expect(readState().domains[1]).toEqual({ name: 'com.apple.Preferences', backup: backupPathOf(stateFile(), 'com.apple.Preferences') });
+  });
+
+  it('an empty export whose read cannot tell absent from empty fails the backup: another domain named, other words, past its bound', async () => {
+    const domains = before();
+    delete domains['com.apple.Preferences'];
+    for (const [said, why] of [
+      [exit(1, notFound('com.apple.Other')), `exit 1 Error: Domain 'com.apple.Other' not found.`],
+      [exit(1, 'Error: Domain com.apple.Preferences not found.'), 'exit 1 Error: Domain com.apple.Preferences not found.'],
+      [exit(1, notFound('comXappleXPreferences')), `exit 1 Error: Domain 'comXappleXPreferences' not found.`],
+      [exit(2, notFound('com.apple.Preferences')), `exit 2 Error: Domain 'com.apple.Preferences' not found.`],
+      [{ ...timedOut, code: 1, err: notFound('com.apple.Preferences') }, `past its bound (exit 1) Error: Domain 'com.apple.Preferences' not found.`],
+    ] as [CallResult, string][]) {
+      const file = join(mkdtempSync(join(dir, 'e-')), 'state.json');
+      const r = await backup(await labOf(fakeSim({ domains, rules: [(_, a) => (a[4] === 'read' ? said : undefined)] })), file);
+      expect(r).toEqual({ ok: false, why: `com.apple.Preferences exported empty, and defaults read com.apple.Preferences cannot tell absent from empty: ${why} — no state written` });
+      expect(existsSync(file)).toBe(false);
     }
   });
 
-  it('a domain that does not exist is recorded absent (backup null), not a failure', async () => {
-    const domains = before();
-    delete domains['com.apple.Preferences'];
-    const r = await backup(await labOf(fakeSim({ domains })), stateFile());
-    expect(r.ok && r.line).toContain('com.apple.Preferences absent');
-    expect(readState().domains[1]).toEqual({ name: 'com.apple.Preferences', backup: null });
+  it("an export that fails is a failure whatever it says, the host's not-found words too: absent is only the read's answer", async () => {
+    const r = await backup(await labOf(fakeSim({ rules: [(_, a) => (a[4] === 'export' ? exit(1, notFound(a[5])) : undefined)] })), stateFile());
+    expect(r).toEqual({ ok: false, why: "defaults export com.apple.keyboard.preferences: exit 1 Error: Domain 'com.apple.keyboard.preferences' not found. — no state written" });
   });
 
   it('an export that fails, passes its bound, or writes no file: no state written — so the window changes nothing', async () => {
     const cases: [Rule, string][] = [
       [(_, a) => (a[4] === 'export' && a[5] === A11Y ? exit(5, 'boom') : undefined), `defaults export ${A11Y}: exit 5 boom — no state written`],
       [(_, a) => (a[4] === 'export' ? timedOut : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) — no state written'],
-      [(_, a) => (a[4] === 'export' ? { ...timedOut, code: 1, err: 'Domain com.apple.keyboard.preferences does not exist' } : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 1) Domain com.apple.keyboard.preferences does not exist — no state written'],
-      [(_, a) => (a[4] === 'export' ? ok('Domain com.apple.keyboard.preferences does not exist') : undefined), 'defaults export com.apple.keyboard.preferences: exit 0 but no file written — no state written'],
+      [(_, a) => (a[4] === 'export' ? ok() : undefined), 'defaults export com.apple.keyboard.preferences: exit 0 but no file written — no state written'],
       [(_, a) => (a[4] === 'export' ? (writeFileSync(a[6], '{}'), timedOut) : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) — no state written'],
     ];
     for (const [rule, why] of cases) {
@@ -372,7 +404,7 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
       stateFile(),
     );
     expect(r.line).toBe('D43 WDA-window restore: OK — com.apple.keyboard.preferences equal, com.apple.Preferences put back (deleted late in com.apple.Preferences; refused in com.apple.Preferences: delete gone (exit 1)), com.apple.Accessibility equal');
-    expect(fake.defaults().filter((d) => !d.startsWith('export'))).toEqual(['delete com.apple.Preferences gone', 'delete com.apple.Preferences late']);
+    expect(fake.defaults().filter((d) => !d.startsWith('export'))).toEqual(['read com.apple.Preferences', 'delete com.apple.Preferences gone', 'delete com.apple.Preferences late']); // the backup's absent probe first
     expect(fake.domains.get('com.apple.Preferences')).toEqual({});
     expect(readState().dirty).toBe(false);
   });
@@ -398,7 +430,7 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
     const r = await restore(sim, stateFile());
     expect(r.line).toContain('com.apple.Preferences NOT equal to its backup after refused in com.apple.Preferences: delete late (exit 1) — keys differ: late extra (absent before the run: its keys deleted one by one, the domain itself never deleted, and it still holds keys)');
     expect(!r.ok && r.hand).toEqual([`D43 (iOS): xcrun simctl spawn ${LAB} defaults delete com.apple.Preferences late`]);
-    expect(fake.defaults().filter((d) => !d.startsWith('export'))).toEqual(['delete com.apple.Preferences late']);
+    expect(fake.defaults().filter((d) => !d.startsWith('export'))).toEqual(['read com.apple.Preferences', 'delete com.apple.Preferences late']); // the backup's absent probe first
   });
 
   it('a state file naming the schemeapproval domain cannot sneak a call in: refused whole, nothing run, the state kept dirty', async () => {
@@ -485,6 +517,11 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect(c.line).not.toMatch(/[\n\r]/);
     expect(COMPARE_VALUE_CHARS).toBe(60);
     writeFileSync(stateFile(), JSON.stringify({ ...readState(), dirty: false })); // the first compare marked it dirty
+    // Cut by code points (T2 S4 review round 2): an emoji across the cut stays whole, never half a surrogate pair.
+    const emoji = `"${'z'.repeat(COMPARE_VALUE_CHARS - 2)}😀😀"`;
+    fake.domains.set(A11Y, { ...exported(A11Y, 'backup'), u: { t: 'string', c: emoji } });
+    expect((await compare(sim, stateFile())).domains[2]).toMatchObject({ changes: [`u absent → string "${'z'.repeat(COMPARE_VALUE_CHARS - 2)}😀…`] });
+    writeFileSync(stateFile(), JSON.stringify({ ...readState(), dirty: false }));
     const exact = 'y'.repeat(COMPARE_VALUE_CHARS - 2);
     fake.domains.set(A11Y, { ...exported(A11Y, 'backup'), e: { t: 'string', c: JSON.stringify(exact), v: exact }, n: { t: 'dict', c: '{\n}' } });
     expect((await compare(sim, stateFile())).domains[2]).toMatchObject({ changes: [`e absent → string ${JSON.stringify(exact)}`, 'n absent → dict "{\\n}"'] });
@@ -607,15 +644,20 @@ describe("readProtected — the finportal key, read only: a value, absent or unr
     expect(await readProtected(await labOf(reading(exit(1, said))))).toEqual({ state: 'absent' });
   });
 
-  it("batch-9's delete variant (the same error, then \"Defaults have not been changed.\") reads absent too; so does a domain not there", async () => {
+  it("batch-9's delete variant (the same error, then \"Defaults have not been changed.\") reads absent too; so does the host's `Domain '<it>' not found.`", async () => {
     const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b9-delete.txt'), 'utf8');
     expect(await readProtected(await labOf(reading(exit(1, said))))).toEqual({ state: 'absent' });
-    expect(await readProtected(await labOf(reading({ ...exit(1), out: `Domain ${PROTECTED.domain} does not exist` })))).toEqual({ state: 'absent' });
+    expect(await readProtected(await labOf(reading({ ...exit(1), out: notFound(PROTECTED.domain) })))).toEqual({ state: 'absent' });
+  });
+
+  it('the unverified `Domain <it> does not exist` wording is no absent (T2 S4 review round 2: never seen from defaults): unreadable', async () => {
+    expect(await readProtected(await labOf(reading(exit(1, `Domain ${PROTECTED.domain} does not exist`))))).toEqual({ state: 'unreadable', why: `exit 1 Domain ${PROTECTED.domain} does not exist` });
   });
 
   it("absent only on the words naming this domain: a key not found in another domain, or another domain missing, is unreadable", async () => {
     expect(await readProtected(await labOf(reading(exit(1, "Error: Could not find key 'k' in domain 'com.apple.other'."))))).toEqual({ state: 'unreadable', why: "exit 1 Error: Could not find key 'k' in domain 'com.apple.other'." });
-    expect(await readProtected(await labOf(reading(exit(1, 'Domain com.apple.other does not exist'))))).toMatchObject({ state: 'unreadable' });
+    expect(await readProtected(await labOf(reading(exit(1, notFound('com.apple.other')))))).toMatchObject({ state: 'unreadable' });
+    expect(await readProtected(await labOf(reading(exit(1, notFound(PROTECTED.domain.replaceAll('.', 'X'))))))).toMatchObject({ state: 'unreadable' });
     expect(await readProtected(await labOf(reading(exit(1, `Could not find key in domain '${PROTECTED.domain}'`))))).toMatchObject({ state: 'unreadable' });
   });
 
@@ -665,6 +707,15 @@ describe("domainsWindow — the WDA window as abort.ts's dirty window (batch-11.
       `D43 (iOS): xcrun simctl spawn ${LAB} defaults import ${A11Y} ${backupPathOf(stateFile(), A11Y)}`,
     ]);
     expect(w.hand.join('\n')).not.toContain('import com.apple.Preferences');
+  });
+
+  it('a state file there but unreadable when the abort asks: said first, with why, then the line saying both (T2 S4 review round 2)', async () => {
+    const sim = await labOf(fakeSim());
+    writeFileSync(stateFile(), '{"dirty": tr');
+    const w = domainsWindow(sim, stateFile());
+    expect(w.hand).toHaveLength(2);
+    expect(w.hand[0]).toBe(`D43 (iOS): the state file ${stateFile()} is unreadable: it is no JSON`);
+    expect(w.hand[1]).toMatch(/^D43 \(iOS\): the simulator settings not provably put back: compare /);
   });
 
   it('not put back: why is its line, its hand lines the typed commands; no block or secs named, none set', async () => {

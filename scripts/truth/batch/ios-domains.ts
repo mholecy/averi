@@ -378,15 +378,33 @@ async function backupOf(sim: LabSim, d: DomainsState['domains'][number]): Promis
 /** A regex's text for `s` taken literally. */
 const literal = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** defaults' words for a domain that does not exist (`Domain <domain> does not exist`), naming this domain only. */
-const domainMissing = (domain: string): RegExp => new RegExp(`\\bDomain ${literal(domain)} does not exist`);
+/**
+ * defaults' words for a read of a domain that is not there, naming this domain only: `Domain '<domain>' not found.` —
+ * the host's defaults (Darwin 27, seen by the T2 S4 review; no simulator stderr of it was captured: batch-13 records
+ * the simulator's own).
+ */
+const notFoundSaid = (domain: string): RegExp => new RegExp(`\\bDomain '${literal(domain)}' not found\\.`);
 
-/** Export a domain to `path` and read it typed: its map (null: the domain does not exist), or why not. */
+/**
+ * Export a domain to `path` and read it typed, or why not. A domain that is not there exports an empty dictionary,
+ * exit 0 (the host's defaults), so the map never says absent: diffMaps reads an empty domain as an absent one, and
+ * only `absentOf` tells the two apart where it matters, at the backup.
+ */
 async function readDomain(sim: LabSim, domain: string, path: string): Promise<{ map: DomainMap } | { why: string }> {
   const r = await sim.defaults(['export', domain, path]);
   if (r.code === 0 && sim.fs.exists(path)) return typedOf(sim, path);
-  if (r.code !== 0 && !r.timedOut && domainMissing(domain).test(r.err + r.out)) return { map: null };
   return { why: `defaults export ${domain}: ${r.code === 0 ? 'exit 0 but no file written' : exitText(r)}` };
+}
+
+/**
+ * Whether a domain that exported empty is absent: `defaults read <domain>` exit 1 with `Domain '<domain>' not found.`
+ * (not past its bound) is absent; exit 0 is there, empty; anything else cannot tell, and is why not.
+ */
+async function absentOf(sim: LabSim, domain: string): Promise<boolean | { why: string }> {
+  const r = await sim.defaults(['read', domain]);
+  if (r.code === 0) return false;
+  if (r.code === 1 && !r.timedOut && notFoundSaid(domain).test(r.err + r.out)) return true;
+  return { why: `${domain} exported empty, and defaults read ${domain} cannot tell absent from empty: ${exitText(r)}` };
 }
 
 // ---------------------------------------------------------------------------------------- the state file
@@ -460,7 +478,10 @@ export async function backup(sim: LabSim, stateFile: string): Promise<Backup> {
     if (sim.fs.exists(path)) return { ok: false, why: `${nameInLine(path)} is there already: a backup is never overwritten — no state written` };
     const read = await readDomain(sim, name, path);
     if ('why' in read) return { ok: false, why: `${read.why} — no state written` };
-    domains.push({ name, backup: read.map === null ? null : path });
+    // An empty export proves nothing (an absent domain exports one too): the read says absent or there.
+    const absent = Object.keys(read.map ?? {}).length === 0 ? await absentOf(sim, name) : false;
+    if (typeof absent === 'object') return { ok: false, why: `${absent.why} — no state written` };
+    domains.push({ name, backup: absent ? null : path });
   }
   const state: DomainsState = { dirty: true, udid: sim.udid, port: LAB_WDA_PORT, domains };
   sim.fs.createExclusive(stateFile, `${JSON.stringify(state, null, 2)}\n`);
@@ -599,8 +620,9 @@ export interface Comparison {
 /** A typed value as a compare line shows it: `<type> <canonical value>`, one line, cut at COMPARE_VALUE_CHARS; absent. */
 function shownValue(kv: KeyVal | undefined): string {
   if (kv === undefined) return 'absent';
-  const c = nameInLine(kv.c);
-  return `${kv.t} ${c.length > COMPARE_VALUE_CHARS ? `${c.slice(0, COMPARE_VALUE_CHARS)}…` : c}`;
+  // By code points, so the cut never splits a surrogate pair (an emoji stays whole or goes).
+  const c = [...nameInLine(kv.c)];
+  return `${kv.t} ${c.length > COMPARE_VALUE_CHARS ? `${c.slice(0, COMPARE_VALUE_CHARS).join('')}…` : c.join('')}`;
 }
 
 /** Nothing compared, and why: every domain unread, the line a WARN, no hand line, the state file left as it is. */
@@ -664,21 +686,21 @@ export type ProtectedRead = { state: 'value'; value: string } | { state: 'absent
 
 /**
  * The stderr of a read of a key that is not there, in this domain (batch-8's and batch-9's, committed:
- * `Could not find key '…' in domain '<domain>'.`), or of this domain not there (defaults' `Domain <domain> does not exist`).
+ * `Could not find key '…' in domain '<domain>'.`), or of this domain not there (`Domain '<domain>' not found.`).
  */
 const ABSENT_KEY = new RegExp(`Could not find key '[^'\\n]*' in domain '${literal(PROTECTED.domain)}'`);
 
 /**
  * `defaults read <schemeapproval> <finportal key>` (batch-11.sh:337–340): exit 0, its value (the output's trailing
- * line breaks dropped, as `$(…)` did); exit 1 with defaults' "Could not find key … in domain '<it>'" or "Domain <it>
- * does not exist", absent — never unreadable (batch-8's first run read an absent key as unreadable and was VOID);
+ * line breaks dropped, as `$(…)` did); exit 1 with defaults' "Could not find key … in domain '<it>'" or "Domain '<it>'
+ * not found.", absent — never unreadable (batch-8's first run read an absent key as unreadable and was VOID);
  * anything else, a timeout too, or those words about another domain, unreadable, with why.
  */
 export async function readProtected(sim: LabSim): Promise<ProtectedRead> {
   const r = await sim.defaults(['read', PROTECTED.domain, PROTECTED.key]);
   if (r.code === 0) return { state: 'value', value: r.out.replace(/\n+$/, '') };
   const said = r.err + r.out;
-  if (r.code === 1 && !r.timedOut && (ABSENT_KEY.test(said) || domainMissing(PROTECTED.domain).test(said))) return { state: 'absent' };
+  if (r.code === 1 && !r.timedOut && (ABSENT_KEY.test(said) || notFoundSaid(PROTECTED.domain).test(said))) return { state: 'absent' };
   return { state: 'unreadable', why: exitText(r) };
 }
 
@@ -717,7 +739,9 @@ export function domainsWindow(sim: LabSim, stateFile: string, opts: { block?: st
     get hand() {
       const st = stateIn(sim.fs.read(stateFile));
       if (typeof st !== 'string') return st.domains.flatMap((d) => handLines(HAND_PREFIX, sim.udid, domainHand(d.name, d.backup, [])));
+      // A state file there that cannot be read is said first: the person must look at it before trusting any backup.
       return [
+        ...(sim.fs.exists(stateFile) ? [`${HAND_PREFIX}the state file ${nameInLine(stateFile)} is unreadable: ${st}`] : []),
         `${HAND_PREFIX}the simulator settings not provably put back: compare ${DOMAINS.join(', ')} with the state file ${nameInLine(stateFile)} and the .backup.plist files beside it — a domain with a backup: xcrun simctl spawn ${shq(sim.udid)} defaults import <domain> <its backup>; one absent before (backup null): defaults delete <domain> <key> for each key it holds, never the whole domain`,
       ];
     },

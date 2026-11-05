@@ -24,3 +24,9 @@ Beside this folder, the stderr of a `defaults` call on a key that is not there (
 `../schemeapproval-absent-b8-read.txt` (batch-8's first run, a read: exit 1, which batch-8 took for "unreadable" and
 so made the run VOID) and `../schemeapproval-absent-b9-delete.txt` (batch-9, a delete: the same error and
 "Defaults have not been changed.").
+
+And two the reviewer of T2 S4 saw from the host's `defaults` (Darwin 27; no simulator stderr of them was captured —
+batch-13 records the simulator's own): `../defaults-host-domain-not-found.txt`, a read of a domain that is not there
+(exit 1; the domain named here is com.apple.Preferences, the tests put in the one they ask), and
+`../defaults-host-export-missing-domain.plist`, what an export of such a domain writes (exit 0, an empty dictionary):
+an empty export alone never proves a domain absent.
