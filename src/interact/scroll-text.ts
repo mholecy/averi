@@ -765,23 +765,26 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
 }
 
 /** The words of an axis for `unfitText`: how a target's size along it is said. */
-const SIZE_WORDS: Readonly<Record<Unfit['along'], { readonly as: string; readonly more: string }>> = {
-  vertical: { as: 'tall', more: 'taller' },
-  horizontal: { as: 'wide', more: 'wider' },
+const SIZE_WORDS: Readonly<Record<Unfit['along'], { readonly as: string; readonly more: string; readonly moved: string }>> = {
+  vertical: { as: 'tall', more: 'taller', moved: 'up and down' },
+  horizontal: { as: 'wide', more: 'wider', moved: 'sideways' },
 };
 
 /**
  * The `unfit` failure (scroll-read.ts#Unfit, D52): a `fully: true` match as wide or as tall as the scroll view that
  * scrolls it along that axis, or more — where it is clipped and how much of it is drawn, its size against that scroll
- * view's (the one whose size it was judged by, quoted), why no swipe shows it whole, and the way out. A plain Error, as
+ * view's (the one whose size it was judged by, quoted; where the tree told no axis of it, that the swipes over it
+ * moved the element along this one — D59), why no swipe shows it whole, and the way out. A plain Error, as
  * `stuck`: the element was there and seen. Never a claim it is visible.
  */
 function unfitText(o: Extract<ScrollOutcome, { kind: 'unfit' }>, describe: string): string {
   const { judged, viewport, unfit } = o;
   const { facts } = judged.standing;
   const where = judged.under === undefined ? 'in the viewport' : `in the viewport above the soft keyboard over ${frameText(judged.under.topCover)}`;
-  const view = `its scroll view ${nodeText(unfit.scrollView)}`;
   const words = SIZE_WORDS[unfit.along];
+  // Its axis inferred (D59): why the axis is taken as the one the size is judged along.
+  const inferred = unfit.inferred === true ? ` (the tree does not say which way it scrolls: the swipes over it moved the element ${words.moved})` : '';
+  const view = `its scroll view ${nodeText(unfit.scrollView)}${inferred}`;
   const why =
     unfit.size > unfitRoom(unfit)
       ? `${words.more} than ${view}: no scroll offset shows all of it`

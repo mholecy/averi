@@ -27,6 +27,9 @@ merged ee517997).
 2026-11-02 (performance backlog D52): the amendment "a target too large for its scroll view" (below) accepted
 (orchestrator, owner's mandate: option A of the D52 analysis; implemented on `fix/d52-unfit-fully`), and its residual,
 numbered 3 under "Residuals accepted".
+2026-11-05 (performance backlog D59): the amendment "an untold scroll view's axis from the call's own evidence"
+(below) accepted (the coordinator's decision, owner's mandate: backlog D68's option B, its first slice;
+implemented on `feat/d59`); it narrows residual 3, whose accepted text stands.
 
 ## Context
 
@@ -535,3 +538,85 @@ the bound.
 
 **Device check.** Optional, for the next owner batch: Android E2 `left-fully` ×3, expecting `unfit` 3 of 3 within 3
 swipes, with the wall time against batch-3's.
+
+## Amendment: an untold scroll view's axis from the call's own evidence (2026-11-05, performance backlog D59)
+
+**Context.** D52's `unfit` stop needs the room-giving scroll view to scroll on the axis the match is judged along "as
+the tree tells it". On Android the tree tells an axis by class only (adapters/android.ts's AXIS_BY_CLASS:
+ScrollView, ListView, GridView vertical; HorizontalScrollView, ViewPager horizontal). A Compose LazyRow dumps as a
+plain `android.view.View`, a RecyclerView or a ViewPager2 by its own class, and none of them carries an axis. Measured
+on batch-9 (Android API 33, main e734fedf, the lab's `carousel-lazy-free`, `left fully: true` after a 440-px pre-drag,
+3 runs): C is 948 px wide in the 948-px LazyRow (66–1014), the case D52 stops on. Run 0 ran 6 strokes and 3 turns to
+maxSwipes in 16.5 s and ended "stayed CLIPPED at left, 99 % … turned round 3 times", with C at 64 and both its sides
+known. The round's own log said "room-giver container 66,380 948x234 axis UNTOLD → unfitAlong's axis gate FAILS".
+Runs 1–2 landed within a pixel of 66, the `fills` hedge. The derived record is
+tests/fixtures/d59-b9-lazy-predrag.json. Batch-9 also measured three of the conditions below on both free carousels
+(6 pre-drag reads): no axis told, the carousel C's nearest scroll view, and C cut at the carousel's own edges.
+
+**Decision.**
+1. *The inference* (`interact/unfit-axis.ts#inferredAlong`, pure, a new module). Where the room-giver's axis is
+   untold, `unfitAlong` takes the axis it judges along as that view's axis only when all four hold:
+   1. the room-giver is the match's nearest scroll view (`Clips.drawnIn`'s first `scrollers`);
+   2. the call's direction runs along that axis;
+   3. the match is cut on an edge along that axis that lies on the room-giver's own edge (the drawn frame's, within a
+      pixel, `flushEdges`), and not at the screen's (`unknownPast`). In the round today, D52's own gates (the drawn
+      frame is the judged one and is the room-giver's extent within FIT_ROOM_PX, no `unknownPast` side) already imply
+      this one. It stays in the module as defence in depth, and only the module's own table can tell it apart;
+   4. earlier in this call, a stroke drawn over the room-giver (both its ends inside it) moved the match along that
+      axis, measured on the read after it (`CardMove`, below). Without this one, a row clipped at both sides of an
+      untold column (a LazyColumn's) under a sideways call would read "as wide as its scroll view" across the
+      column's axis, where D52 keeps the stuck and layout-defect sentences.
+   A told axis always wins: the inference is asked only where the tree tells none, and a told axis across the
+   judged one gives no `unfit`, as before. There is no new device call. The strokes are the ones the call sent anyway.
+2. *The movement record* (`interact/motion-ledger.ts#cardMoves`, beside the ledger's other rules of "the same"). Each
+   read after a stroke that finds the judged match as the same node (`nodeIdentity`), its position shifted more than
+   FIT_ROOM_PX along one axis and no more than that across it (`motion-ledger.ts#cardMoved`), records that stroke as
+   drawn and that axis. A size change alone is no move: a 2-px height change with the same top is jitter, not a
+   stroke's carry. The cost: a card uiautomator cuts at the screen's left edge keeps its listed x at 0 while it comes
+   in, so that stroke records nothing. The round passes the call's direction and these moves to `unfitAlong`, which
+   now always takes them (`unfit-axis.ts#CallMotion`).
+3. *The reply* (`scroll-text.ts#unfitText`). D52's text, with one clause after the quoted scroll view when the axis was
+   inferred (`Unfit.inferred`): "… as wide as its scroll view container (66,380 948x234) (the tree does not say which
+   way it scrolls: the swipes over it moved the element sideways): fully: true holds at one exact scroll offset only,
+   …" ("up and down" for a vertical one). The agent is told why the stop was reached on a view the tree gives no axis
+   for. A told axis's reply is byte-identical to D52's.
+
+E2's course replayed on the lazy-free tree with C laid in the LazyRow (tests/interact/scroll-carousel-android.test.ts,
+"D59") now fails `unfit` on the 4th read after 3 strokes, as the told-axis carousel does. Batch-9 run 0's own listed
+rects (577, cut at the screen, then 64) fail after 1 stroke. The guards, each condition alone: no stroke yet, strokes that left C where it was, a call across
+the carousel, strokes drawn off the carousel, a nested untold scroller nearest, C cut at the screen, 48 px of room. The
+RecyclerView's View-cut card (listed cut to the carousel, never `clipped`) gets no `unfit`, as before; that is
+backlog D68's second slice. A LazyColumn's row cut at both of its sides under a sideways call, unmoved or moved only up
+and down, gets no `unfit` either, nor does scroll-sticky-cut's R (VA1's replay, its growth from under the header no
+move; carried up through the list's bottom, 110 tall in 1238), whose outcomes are as before. Manual mutants from the module's .bak, each condition and the reply's clause
+emptied to true or '': all killed, conditions 1, 2 and 4 and the clause by the round's tests too, condition 3 only by
+the module's own table (implied in the round, above). The module is in the mutation scope (scripts/mutation/scope.json,
+group core, floor 98): 100 % cold, 42 mutants, the cold run's groups core 199 s and lab 61 s.
+
+Rejected:
+- the axis from conditions 1–3 alone, as the backlog row first said: the LazyColumn case above;
+- a probe stroke to measure the axis: a device call the strokes already sent make needless;
+- a class list for Compose and RecyclerView: a plain `android.view.View` names nothing, and a RecyclerView may scroll
+  either way.
+
+**Consequences.** On the lab's lazy-free carousel, `fully: true` on C is expected to fail `unfit` within about 3 swipes,
+not 6 and 3 turns (a live check after merge, lab only). Batch-9's runs 1–2 "reached" after 6 strokes, ending at 65
+(1 px past the carousel's 66, within FIT_ROOM_PX, so not `clipped`) with the `fills` hedge. Batch-9 kept only their
+first and last reads, not the course between. Their last read alone gives the same `fills` hedge as before. On E2's
+6-stroke course from the same start (574), the one recorded for this card's shape, the 4th read has C at 45 with both
+sides known after a stroke that moved it, and the call stops `unfit` after 3 swipes. So 2 of batch-9's 3 runs that
+reached would likely now stop `unfit`, if their course read C clipped with both sides known on the way, which the
+records cannot tell; the live check will. That stop is honest: C is as wide as the carousel, so only one offset shows
+it whole, and a landing within a pixel of it under the `fills` hedge was luck, not aim. The golden says nothing of this change: golden against the
+base of main (v3), 0 of 1611 checks changed, 120 mismatches as before; no golden row reaches the free carousels, and
+the LazyColumn cells' `fully` rows have no along-axis move. A target the tree tells nothing of, met on a read before any
+stroke of the call, gets no `unfit` until a stroke has moved it. Under uiautomator that read cuts the card at the
+screen's edge anyway, so it needs a stroke regardless.
+
+**Residual.** Residual 3 is narrowed. The "as large as a scroll view whose axis the tree does not tell" case remains
+for a match whose rect the source cuts to that scroll view, and for one no stroke of the call has moved yet. The first
+is a dependency, not a rule: a RecyclerView's (or a ViewPager2's) card is a View child, listed cut flush to the
+carousel and never `clipped`, so D59 does not reach it. Should a dump ever list one clipped, D59 would apply to it as
+to any other. That case is backlog D68's second slice. The inference does not depend on the
+source, so under WDA it also covers a scroll view whose content is not laid out past its frame. The "a little more room
+than FIT_ROOM_PX" case is unchanged.

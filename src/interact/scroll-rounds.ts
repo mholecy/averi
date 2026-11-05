@@ -12,7 +12,7 @@ import { SIDES } from '../ui-tree/sides.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 import type { Target, WaitEvidence } from './resolve.js';
 import { fullyClaimed, judgeRead, scrollViewsOf, shortOf, stops, strokeLine, unfitAlong, type AppliedKeyboard, type InFrameShort, type Judged, type ReadJudgement, type RoundRead, type Since, type TreeFacts, type Unfit } from './scroll-read.js';
-import { heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
+import { cardMoves, heldBack as heldBackBy, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type Streaks, type StrokePhysics, type UnseenStrokes } from './motion-ledger.js';
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
 import { carried, planStroke, seeRead, startStrokes, strokedAcross, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokedAcross, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, unknownCentreNeeds, type Course, type EndProof, type EndTurn, type NextStroke, type PastSide } from './course.js';
@@ -1036,7 +1036,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     // bound (D52: batch-3 E2, 6 strokes and 3 turns), and a still one would read "stuck … a layout defect". Stop on the
     // first read that knows its size, before the stuck turn, saying why. Its scroll views are asked only of a clipped match.
     const clippedUnderFully = fully && best.standing.facts.clipped.length > 0;
-    const unfit = clippedUnderFully ? unfitAlong(best.standing.facts, best.node.rect, scrollViewsOf(now.facts.scene.clips, best.node)) : undefined;
+    // Its scroll view's axis untold (Android's LazyRow): the call's own evidence, its direction and the strokes that moved it (D59).
+    const unfit = clippedUnderFully ? unfitAlong(best.standing.facts, best.node.rect, scrollViewsOf(now.facts.scene.clips, best.node), { direction: s.rules.direction, moves: cardMoves(s.motion) }) : undefined;
     if (unfit !== undefined) return stop(s, { kind: 'unfit', swipes: s.swipes, judged: best, viewport, unfit });
     // Still clipped (`fully: true`) or under something of the app — only a
     // swipe that MOVES it can help.

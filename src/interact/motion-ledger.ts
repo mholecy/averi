@@ -1,8 +1,8 @@
-import type { Rect, Stroke, UiNode } from '../adapters/types.js';
+import type { Rect, ScrollAxis, Stroke, UiNode } from '../adapters/types.js';
 import { isUntold, sameRectWithinPixel, sameSizeWithinPixel } from '../ui-tree/geometry.js';
 import { listedOnce, nodeIdentity, sameTreeWithinPixel } from '../ui-tree/read-tree.js';
 import { carriedUnder, goesOver, NO_REGION, seeRegion, type CarriedUnder, type MotionShown, type RegionMemory } from './motion-shown.js';
-import type { Since, TreeFacts } from './scroll-read.js';
+import { FIT_ROOM_PX, SPAN, type Since, type TreeFacts } from './scroll-read.js';
 import { sameStroke, type Direction } from './swipe.js';
 
 export type { CarriedUnder, MotionShown } from './motion-shown.js';
@@ -26,6 +26,8 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  * - `regionOf(ledger)` / `overRegion(ledger, toward)` — the region as the target's one scroll view, for the stroke plan,
  *   and whether a stroke toward `toward` goes over it (motion-shown.ts#goesOver).
  * - `lastDrawn`, `unseenStrokes`, `treeMoved` — what the probe, the fast fail and the bound read of the run so far.
+ * - `cardMoves` — each stroke whose read found the judged card moved along one axis (`CardMove`): what the `unfit` stop
+ *   infers an untold scroll view's axis from (D59, interact/unfit-axis.ts#inferredAlong).
  *
  * EACH QUESTION KEEPS ITS OWN "same". Every question here is within a pixel (a unit of the source's frames); the
  * exact-rect side of docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md d2 — the scroll view a proof or a carry
@@ -44,6 +46,8 @@ export type { CarriedUnder, MotionShown } from './motion-shown.js';
  *   within a pixel, carried along the stroke's axis by more than a pixel, and none as far as the finger drew;
  * - SLOWING: the same node (ui-tree/read-tree.ts#nodeIdentity) moved less over this settle than over the one before;
  * - the CARRY SAMPLE: the same node at the same size (within a pixel each way) after a course stroke;
+ * - the CARD MOVE: the same node after a stroke, its position shifted more than a pixel along one axis and not across
+ *   it (`cardMoved`) — a size change alone is no move;
  * - the REGION: motion-shown.ts's own rules (a node listed once, its delta within a 20th).
  * Not here: whether a margin text and the target were carried together since the eyes saw them — measured from that
  * sighting, which the margin memo keeps, not from the last read (interact/margin-memo.ts#movedTogether).
@@ -111,6 +115,25 @@ export interface Streaks {
   readonly tree: number;
 }
 
+/** One stroke of the run and the one axis the read after it found the judged card moved along (`cardMoved`): what the ledger records of each stroke read (`cardMoves`), for unfit-axis.ts#inferredAlong (D59). */
+export interface CardMove {
+  readonly drawn: Stroke;
+  readonly along: ScrollAxis;
+}
+
+/**
+ * The one axis the same card's position shifted along between two reads — more than FIT_ROOM_PX (a pixel, the
+ * sources' rounding) along it, no more than that across it — or undefined: unmoved, moved both ways, or only resized.
+ * The position, not a side: a size change alone (a 2-px height change with the same top) is no move. Cost: a card
+ * uiautomator cuts at the screen's left edge keeps its listed x there while it comes in, so that stroke is no move.
+ */
+export function cardMoved(before: Rect, after: Rect): ScrollAxis | undefined {
+  const shifted = (axis: ScrollAxis): boolean => Math.abs(after[SPAN[axis].at] - before[SPAN[axis].at]) > FIT_ROOM_PX;
+  const x = shifted('horizontal');
+  if (x === shifted('vertical')) return undefined;
+  return x ? 'horizontal' : 'vertical';
+}
+
 /** What one read that read says about motion (`seeMotion`). */
 export interface Moved {
   /**
@@ -174,6 +197,8 @@ interface Memory {
   readonly unseen: UnseenStrokes | undefined;
   /** The region the motion showed, on a tree that tells no scroll view, and the listing the next read is measured against (motion-shown.ts#RegionMemory): kept across a read that finds no target, dropped by a read that finds it on a told tree. */
   readonly region: RegionMemory;
+  /** Each stroke whose read found the judged card — the same node — moved along one axis (`cardMoves`), in order. */
+  readonly moves: readonly CardMove[];
 }
 
 const open = (l: MotionLedger): Memory => l as unknown as Memory;
@@ -194,6 +219,7 @@ export function startLedger(): MotionLedger {
     treeMoved: false,
     unseen: undefined,
     region: NO_REGION,
+    moves: [],
   });
 }
 
@@ -256,6 +282,9 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
     since === 'stroke' && carryToward !== undefined && judged !== undefined && before !== undefined && sameNode && sameSizeWithinPixel(before.rect, judged.rect) && lastDrawn !== undefined
       ? { moved: motionToward(before.rect, judged.rect, carryToward), drawn: lastDrawn }
       : undefined;
+  // The card move (`CardMove`): a read after a stroke that found the same node moved along one axis.
+  const along = since === 'stroke' && judged !== undefined && before !== undefined && sameNode && lastDrawn !== undefined ? cardMoved(before.rect, judged.rect) : undefined;
+  const moves = along === undefined || lastDrawn === undefined ? m.moves : [...m.moves, { drawn: lastDrawn, along }];
   // The region (motion-shown.ts): seen only on a read that found the target, and only where its tree tells no scroll
   // view of it; a read that finds it where the tree tells its scroll views drops the region and its listing.
   const region = judged === undefined ? m.region : isUntold(facts.scene.clips.drawnIn(judged)) ? seeRegion(m.region, facts.tree, judged, gesture) : NO_REGION;
@@ -272,6 +301,7 @@ export function seeMotion(ledger: MotionLedger, { drawn, read }: { readonly draw
     treeMoved,
     unseen,
     region,
+    moves,
   };
   return { ledger: close(next), moved: { unmoved: { judged: judgedUnmoved, all: allUnmoved, tree: treeUnmoved }, streaks, slowing, carry, rebounding, strokeRead } };
 }
@@ -298,6 +328,9 @@ export function overRegion(ledger: MotionLedger, toward: Direction): boolean {
 
 /** The last stroke drawn, a probe's too, kept until the next (`Memory.lastDrawn`); undefined until the first. */
 export const lastDrawn = (ledger: MotionLedger): Stroke | undefined => open(ledger).lastDrawn;
+
+/** Each stroke of the run whose read found the judged card moved along one axis (`CardMove`), in order; none until one did. */
+export const cardMoves = (ledger: MotionLedger): readonly CardMove[] => open(ledger).moves;
 
 /** The blank strokes in a row (`UnseenStrokes`) — what an `absent` failure at a bound that is not the content's end carries. */
 export const unseenStrokes = (ledger: MotionLedger): UnseenStrokes | undefined => open(ledger).unseen;

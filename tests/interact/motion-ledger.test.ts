@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { everyNode, type Rect, type Stroke, type UiNode } from '../../src/adapters/types.js';
 import { parseIdbDescribeAll } from '../../src/adapters/ios-tree-source.js';
-import { heldBack, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type StrokePhysics } from '../../src/interact/motion-ledger.js';
+import { cardMoved, cardMoves, heldBack, lastDrawn, overRegion, regionOf, seeMotion, startLedger, treeMoved, unseenStrokes, type LedgerRead, type MotionLedger, type Moved, type StrokePhysics } from '../../src/interact/motion-ledger.js';
 import type { Since } from '../../src/interact/scroll-read.js';
 import type { Direction } from '../../src/interact/swipe.js';
 import { sceneOf } from '../../src/ui-tree/standing.js';
@@ -204,6 +204,59 @@ describe('the carry sample', () => {
   it('measured against the last read that judged a match: a read between with none keeps it', () => {
     const { moved } = play([before, { drawn: DRAG, at: [] }, { drawn: DRAG, at: [at(51, 641, 300, 64)], carryToward: 'down' }]);
     expect(moved[2]?.carry?.moved).toBe(259);
+  });
+});
+
+describe('cardMoved: the one axis the same card\'s position shifted along between two reads (D59)', () => {
+  it('along x only, by more than a pixel: horizontal — whatever its size does', () => {
+    expect(cardMoved(at(574, 380, 506, 234), at(231, 380, 849, 234))).toBe('horizontal');
+    expect(cardMoved(at(231, 380, 849, 234), at(0, 380, 846, 234))).toBe('horizontal');
+    expect(cardMoved(at(10, 380, 900, 234), at(8, 380, 902, 234))).toBe('horizontal');
+  });
+  it('along y only: vertical', () => {
+    expect(cardMoved(at(0, 900, 1080, 140), at(0, 700, 1080, 140))).toBe('vertical');
+    expect(cardMoved(at(0, 900, 1080, 140), at(0, 898, 1080, 140))).toBe('vertical');
+  });
+  it('a size change alone is no move: the same origin, the height 2 px more (jitter), or a card cut at the screen\'s left growing', () => {
+    expect(cardMoved(at(0, 900, 1080, 140), at(0, 900, 1080, 142))).toBeUndefined();
+    expect(cardMoved(at(45, 380, 948, 234), at(45, 380, 948, 236))).toBeUndefined();
+    expect(cardMoved(at(0, 380, 846, 234), at(0, 380, 900, 234))).toBeUndefined();
+  });
+  it('a pixel or less: no move', () => {
+    expect(cardMoved(at(45, 380, 948, 234), at(46, 380, 948, 234))).toBeUndefined();
+    expect(cardMoved(at(45, 380, 948, 234), at(45, 381, 948, 233))).toBeUndefined();
+  });
+  it('both ways: no one axis', () => {
+    expect(cardMoved(at(45, 380, 948, 234), at(100, 300, 948, 234))).toBeUndefined();
+    expect(cardMoved(at(45, 380, 948, 234), at(47, 382, 900, 200))).toBeUndefined();
+  });
+});
+
+describe('the card moves (D59: motion-ledger.ts#CardMove)', () => {
+  const LEFT: Stroke = { from: { x: 200, y: 497 }, to: { x: 768, y: 497 } };
+  const OTHER: Stroke = { from: { x: 300, y: 497 }, to: { x: 700, y: 497 } };
+  const start: Row = { since: 'start', at: [at(574, 380, 506, 234)] };
+
+  it('each read after a stroke that found the same node moved along one axis: that stroke and that axis, in order — any size (a card cut at the screen grows)', () => {
+    const { ledger } = play([start, { drawn: LEFT, at: [at(231, 380, 849, 234)] }, { drawn: OTHER, at: [at(0, 380, 846, 234)] }]);
+    expect(cardMoves(ledger)).toEqual([
+      { drawn: LEFT, along: 'horizontal' },
+      { drawn: OTHER, along: 'horizontal' },
+    ]);
+    expect(cardMoves(play([start, { drawn: LEFT, at: [at(574, 200, 506, 234)] }]).ledger)).toEqual([{ drawn: LEFT, along: 'vertical' }]);
+  });
+
+  it('none before a stroke, after a settle, for another node, for a read with no judged match, unmoved, or moved both ways — and an earlier one kept', () => {
+    expect(cardMoves(startLedger())).toEqual([]);
+    expect(cardMoves(play([start]).ledger)).toEqual([]);
+    expect(cardMoves(play([start, { since: 'settle', drawn: LEFT, at: [at(231, 380, 849, 234)] }]).ledger)).toEqual([]);
+    expect(cardMoves(play([start, { drawn: LEFT, at: [at(231, 380, 849, 234)], name: 'G' }]).ledger)).toEqual([]);
+    expect(cardMoves(play([start, { drawn: LEFT, at: [at(574, 380, 506, 234)] }]).ledger)).toEqual([]);
+    expect(cardMoves(play([start, { drawn: LEFT, at: [at(231, 300, 849, 234)] }]).ledger)).toEqual([]);
+    expect(cardMoves(play([start, { drawn: LEFT, at: [at(574, 380, 506, 236)] }]).ledger)).toEqual([]);
+    expect(cardMoves(play([{ drawn: LEFT, at: [at(231, 380, 849, 234)] }]).ledger)).toEqual([]);
+    const kept = play([start, { drawn: LEFT, at: [at(231, 380, 849, 234)] }, { drawn: OTHER, at: [] }, { drawn: OTHER, at: [at(231, 380, 849, 234)] }]);
+    expect(cardMoves(kept.ledger)).toEqual([{ drawn: LEFT, along: 'horizontal' }]);
   });
 });
 
