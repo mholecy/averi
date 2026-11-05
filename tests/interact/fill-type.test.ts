@@ -498,4 +498,17 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     expect(await typeAndConfirm(io, { ...intent, value: '11', before: '1' })).toMatchObject({ kind: 'missed', differs: { kind: 'dropped-tail', wholeToo: true } });
     expect(typed).toEqual(['11']);
   });
+
+  // D64 round 3: keys proven typed elsewhere are no select-all, so the reading's whole-landing hedge goes with them
+  // (fill-landing.ts#withoutWholeToo) — the reply must not say both.
+  it.each([
+    ['11 ', '11', '1', '1', { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }],
+    ['-5-', '-5', '-5', '5', { kind: 'length' }],
+  ])('`%s` for `%s` after `%s`, a sibling gaining the missing `%s`: missed, elsewhere, no hedge', async (shown, value, before, gained, differs) => {
+    const { io, intent, typed } = scripted({ prefilled: before, format: () => shown, elsewhere: () => gained });
+    const missed = await typeAndConfirm(io, { ...intent, value, before });
+    expect(missed).toEqual({ kind: 'missed', observed: shown, again: [], differs, elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } } });
+    expect(missed.kind === 'missed' && missed.differs).toStrictEqual(differs);
+    expect(typed).toEqual([value]);
+  });
 });

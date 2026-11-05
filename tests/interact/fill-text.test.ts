@@ -385,14 +385,15 @@ describe('fillFailureText — every error a fill throws', () => {
     expect(mismatch({ kind: 'length' }, 2, 3)).toBe('fill: typed 2 characters but the field shows 3 (content withheld from this error)');
   });
 
-  // D64 round 3 (NIT): keys proven typed elsewhere are no select-all — the hedge would contradict that clause
-  it('a whole landing too whose typing left the field says where it went, without the select-all hedge', () => {
+  // D64 round 3 (NIT): keys proven typed elsewhere are no select-all — fill-type.ts takes the hedge off first
+  // (fill-landing.ts#withoutWholeToo; pinned there, in fill-type.test.ts, and in bytes in fill.test.ts); here, the clause
+  it('a typing that left the field says where it went, after what the Difference says', () => {
     const elsewhere = { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } };
     const LEFT = '; the typing left the field: textfield id:"o" (0,40 100x20) changed while it typed (the focus moved), so nothing was typed again';
-    expect(fillFailureText({ code: 'mismatch', typed: 2, shows: 2, differs: { kind: 'length', wholeToo: true }, elsewhere })).toBe(
+    expect(fillFailureText({ code: 'mismatch', typed: 2, shows: 2, differs: { kind: 'length' }, elsewhere })).toBe(
       `fill: typed 2 characters but the field shows 2 (content withheld from this error)${LEFT}`,
     );
-    expect(fillFailureText({ code: 'mismatch', typed: 2, shows: 3, differs: { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true }, elsewhere })).toBe(
+    expect(fillFailureText({ code: 'mismatch', typed: 2, shows: 3, differs: { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }, elsewhere })).toBe(
       'fill: typed 2 characters but the field shows 3 — the first 1 typed character is there, grouped by the field (separators of its own added), ' +
         'the last 1 did not land: dropped, or refused by the field (a length cap, a character it does not take) — not a transformed input; ' +
         `content withheld from this error${LEFT}`,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Difference } from '../../src/interact/fill-facts.js';
-import { differenceOf, droppedTail, landingOf, needsHeldCount, readingOf, tailOf, type Expectation, type Reading } from '../../src/interact/fill-landing.js';
+import { differenceOf, droppedTail, landingOf, needsHeldCount, readingOf, tailOf, withoutWholeToo, type Expectation, type Reading } from '../../src/interact/fill-landing.js';
 import { SEPARATORS } from '../../src/interact/fill-reformat.js';
 import { isMaskedValue } from '../../src/ui-tree/masked-value.js';
 
@@ -126,6 +126,28 @@ describe('readingOf — the whole answer about one reading', () => {
     expect([...seen].sort()).toEqual(
       ['case', 'dropped-tail', 'landed', 'length', 'masked', 'masked-said-plain', 'missed', 'not-taken', 'placeholder', 'retypable and unchanged', 'said-plain', 'same-length', 'separated', 'unchanged', 'wholeToo'].sort(),
     );
+  });
+});
+
+/** Keys proven typed elsewhere are no select-all (fill-type.ts's `elsewhere`): the hedge goes, the rest of the Difference stays. */
+describe('withoutWholeToo — a Difference without its whole-landing hedge', () => {
+  it('a dropped tail keeps its counts, a length its kind: the key itself is gone', () => {
+    expect(withoutWholeToo({ kind: 'dropped-tail', landed: 1, dropped: 2, grouped: true, wholeToo: true })).toStrictEqual({ kind: 'dropped-tail', landed: 1, dropped: 2, grouped: true });
+    expect(withoutWholeToo({ kind: 'length', wholeToo: true })).toStrictEqual({ kind: 'length' });
+  });
+
+  it('a Difference without the hedge is as it was', () => {
+    const rows: Difference[] = [
+      { kind: 'length' },
+      { kind: 'dropped-tail', landed: 1, dropped: 2, grouped: false },
+      { kind: 'unchanged' },
+      { kind: 'masked', held: 3 },
+      { kind: 'masked-said-plain' },
+      { kind: 'case', positions: 1 },
+      { kind: 'same-length', positions: 2 },
+      { kind: 'separated', added: 2 },
+    ];
+    for (const d of rows) expect(withoutWholeToo(d)).toStrictEqual(d);
   });
 });
 

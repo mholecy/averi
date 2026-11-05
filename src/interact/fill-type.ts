@@ -66,7 +66,7 @@
 import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adapters/types.js';
 import { sleep } from '../util/sleep.js';
 import { heldText, type Difference, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
-import { landingOf, readingOf, type Expectation, type Landing } from './fill-landing.js';
+import { landingOf, readingOf, withoutWholeToo, type Expectation, type Landing } from './fill-landing.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
 export interface FieldIo {
@@ -178,7 +178,9 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       again.push({ kind: 'whole', wiped: wipe > 0 });
       await io.type(value);
     } else {
-      return { kind: 'missed', observed, again, differs: answer.differs, ...(where.kind === 'elsewhere' && { elsewhere: where.input }) };
+      // D64: keys proven typed elsewhere are no select-all, so a whole landing's hedge is not said beside that clause.
+      if (where.kind === 'elsewhere') return { kind: 'missed', observed, again, differs: withoutWholeToo(answer.differs), elsewhere: where.input };
+      return { kind: 'missed', observed, again, differs: answer.differs };
     }
     const prior = observed;
     read = { ...(await pollValue(io.read, landing, intent.pollMs)), prior };

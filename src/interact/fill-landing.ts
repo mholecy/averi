@@ -100,6 +100,16 @@ export function readingOf(observed: string, e: Expectation): Reading {
 }
 
 /**
+ * The Difference without its whole-landing hedge (`wholeToo`): keys proven typed elsewhere are no select-all, so a reply
+ * that says where they went must not say that too (fill-type.ts's `elsewhere`). Every other Difference as it was. Pure.
+ */
+export function withoutWholeToo(d: Difference): Difference {
+  if (d.kind !== 'dropped-tail' && d.kind !== 'length') return d;
+  const { wholeToo: _hedge, ...rest } = d;
+  return rest;
+}
+
+/**
  * A non-input proves it took the text only by CHANGING to show it: a WDA StaticText exposes its label as its value,
  * and "Meno".includes("e") is no fill; a label that changes on focus (`Name` → `Name*`) is no fill either, and the
  * clear's wipe and retype would delete ITS length into the focused field (review 2026-10-08, rounds 1 and 2). An
