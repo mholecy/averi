@@ -7,7 +7,8 @@ import { FIT_ROOM_PX } from './scroll-read.js';
  * (flush-check.ts's `roomPast`) is how far it may go before that side leaves the container and is cut in its turn. When
  * a stroke no longer than the next one the course would draw was measured, in this same call, to carry the match more
  * than that room (within FIT_ROOM_PX, the sources' rounding), any further stroke pushes the uncut side out past the
- * container instead of bringing the cut one in — no swipe shows the match whole, so none is sent (`aimFloor`).
+ * container instead of bringing the cut one in — most likely, not surely (a drag's carry varies: 48 px carried 24–28
+ * on batch-10's carousel), so no further stroke is sent (`aimFloor`): fewer wasted swipes, and no "raise maxSwipes".
  *
  * Measured, never assumed (batch-10, the lab's RecyclerView carousel, tests/fixtures/d68-b10-recycler-convergence.json):
  * C exactly as wide as the carousel, listed cut flush to it; the reveals travelled half the room each, and short drags

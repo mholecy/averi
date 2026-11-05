@@ -252,7 +252,7 @@ export type RoundStep =
  *   on the first read that knows its size, before any swipe where the tree lists it where it lies.
  * - `unaimable`: a `fully: true` match a probe proved cut at its flush edge, whose uncut side has less room left in its
  *   scroll container than a stroke of this call no longer than the next reveal carried it (flush-check.ts#FlushAim, D68):
- *   any further swipe pushes that side out past the container, so none is sent.
+ *   another swipe would most likely push that side out past the container, so none is sent.
  * - `changed`: the screen changed under the strokes (ui-tree/read-tree.ts#ScreenChange) — the
  *   first read after them is another screen than the read before them; no
  *   stop is judged on it and no further stroke sent, whether the target is
@@ -294,7 +294,7 @@ export type ScrollOutcome = (
   | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' }> }
   /** D52: too large for its scroll view to show whole (scroll-read.ts#Unfit) — `fully: true` only. */
   | { kind: 'unfit'; swipes: number; judged: Judged; viewport: Rect; unfit: Unfit }
-  /** D68: a proven cut no swipe can bring whole (flush-check.ts#FlushAim) — `fully: true` only. */
+  /** D68: a proven cut another swipe would most likely not bring whole (flush-check.ts#FlushAim) — `fully: true` only. */
   | { kind: 'unaimable'; swipes: number; judged: Judged; viewport: Rect; aim: FlushAim }
   | {
       kind: 'bound';
@@ -988,7 +988,7 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       const { verdict } = flush;
       if (verdict.of === 'witness') return ask('witness');
       if (verdict.of === 'probe') return probe(s, verdict);
-      // A proven cut no swipe can bring whole (D68): stop, sending nothing.
+      // A proven cut another swipe would most likely not bring whole (D68): stop, sending nothing.
       if (verdict.of === 'aim') return stop(s, { kind: 'unaimable', swipes: s.swipes, judged: best, viewport, aim: verdict.aim });
       if (verdict.of === 'cut') flushCut = verdict.cut;
       else {

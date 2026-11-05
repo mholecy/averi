@@ -67,10 +67,10 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * Residuals: a first probe the app did not take still reads checked (no stroke before it to doubt by); so does a
  * reveal dropped after a stroke that ran short for another reason (a loaded host), or two strokes dropped in a row.
  *
- * A REVEAL NO SWIPE CAN AIM (D68, interact/aim-floor.ts): on a proven cut, each stroke that proved it is kept with its
+ * A REVEAL NOT WORTH SENDING (D68, interact/aim-floor.ts): on a proven cut, each stroke that proved it is kept with its
  * drawn length and the match's growth (`Memory.carried`); once the room left on the match's uncut side is under what a
- * stroke of this call no longer than the next reveal carried it over that same cut (within a pixel), any reveal pushes
- * that side out past the container — the verdict is `aim` (`FlushAim`), and the round stops, sending nothing, budget
+ * stroke of this call no longer than the next reveal carried it over that same cut (within a pixel), a reveal would most
+ * likely push that side out past the container (a likelihood: a drag's carry varies) — the verdict is `aim` (`FlushAim`), and the round stops, sending nothing, budget
  * left or not. Measured on the lab's RecyclerView carousel (batch-10): C as wide as the carousel, 48-px drags carrying
  * it 24–28 px, 6 swipes ending 15–28 px short with "raise maxSwipes". Not on a first probe (nothing proven, nothing
  * measured), not before a stroke as short as the next one was measured; a stroke over another edge or container says
@@ -164,10 +164,10 @@ export interface FlushCut {
 }
 
 /**
- * A `fully: true` match on a cut the flush check's probe PROVED (`ProvenCut`) that no swipe can bring whole (D68,
+ * A `fully: true` match on a cut the flush check's probe PROVED (`ProvenCut`) that another swipe would most likely not bring whole (D68,
  * interact/aim-floor.ts): it lies flush on that `edge` of that `container` (or `pinned` node), the last proof showed
  * `revealed` px more of it, and the room left on its uncut side is smaller than what a stroke of this call no longer
- * than the next reveal carried it (`floor`) — any further stroke pushes that side out past the container instead.
+ * than the next reveal carried it (`floor`) — a further stroke would most likely push that side out past the container.
  * The round stops on it, sending nothing (scroll-rounds.ts's `unaimable`); never "fully visible", never "raise
  * maxSwipes".
  */
@@ -293,7 +293,8 @@ export interface ProbeMeans {
  * - `flush`: the stop stands as far as the check goes, with its `Flush` — `fills`, `checked` by the probe that came
  *   back, or unchecked for `tap`, `room`, `axis` or `budget`;
  * - `cut`: no stop — the read is short of the cut a probe proved, with no reveal sent (`FlushCut`);
- * - `aim`: no stop and no reveal — no swipe can bring the proven cut's match whole (`FlushAim`, D68): the round stops;
+ * - `aim`: no stop and no reveal — another swipe would most likely push the proven cut's match past rather than bring it
+ *   whole (`FlushAim`, D68): the round stops;
  * - `witness`: ask the witness first, about a band the moot rule left unasked (the probe touches down on the
  *   container's lower part for a bottom edge, which may be under the band) — the round asks, and shows the check the
  *   same read again with the answer;

@@ -487,6 +487,18 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     expect(describeScrollResult(resultOf(carried))).toBe('fully visible after 1 swipe');
   });
 
+  it('D68: the aim floor leaves both `unfit` paths as they were — a clipped card is no flush stop, so the flush check never measures it', () => {
+    // Told axis (carousel-in-list's HorizontalScrollView), E2's course: unfit after 3 swipes, as D52.
+    const told = replay(FULLY_LEFT, E2_RUN_0.map((x) => cAt(x)));
+    expect(told.outcome).toMatchObject({ kind: 'unfit', swipes: 3 });
+    expect(told.outcome).not.toHaveProperty('aim');
+    // Inferred axis (lazy-free's LazyRow), the same course: unfit after 3 swipes, inferred, as D59.
+    const inferred = replay(FULLY_LEFT, E2_RUN_0.map((x) => lazyAt(x)));
+    expect(inferred.outcome).toMatchObject({ kind: 'unfit', swipes: 3, unfit: { inferred: true } });
+    // No probe was sent on either course: the flush check had no cut to prove, nothing to measure.
+    for (const played of [told, inferred]) expect(played.steps.some((s) => s.do === 'stroke' && s.probe === true)).toBe(false);
+  });
+
   it('a told axis is unchanged: carousel-in-list (HorizontalScrollView) stops on its first read with both sides known, no inference said', () => {
     const played = play(FULLY_LEFT, [cAt(40, 1000)]);
     expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0 });
@@ -555,10 +567,11 @@ describe('`fully: true` on a View-cut card no swipe can bring whole (D68): the s
       expect(played.steps.filter((s) => s.do === 'stroke')).toHaveLength(6);
       expect(played.outcome).toMatchObject({ kind: 'unaimable', swipes: 6, aim: { edge: 'right', container: CAROUSEL, revealed: 27, floor: { room: 15, drawn: 48, moved: 27 } } });
       expect(failureOf(played, `id:${RC}`).message).toBe(
-        `scroll_until id:${RC} stopped after 6 swipes, without swiping further — element is in the viewport but its right edge still lies on its scroll container's (66,380 948x234), ` +
-          "where Android cuts a node's bounds to the container, and the last swipe toward it showed 27 px more of it — part of it lies past that edge; " +
-          'only 15 px of room remain on its left side, and a 48-px swipe, no longer than the next would be, moved it 27 px in this call, so any further swipe pushes its left side out past its scroll container instead: ' +
-          'no swipe can show it whole — drop fully: true, or accept what it shows; more swipes will not help. ' +
+        `scroll_until id:${RC} stopped after 6 swipes, without swiping further — element is on screen but its right edge still lies on its scroll container's (66,380 948x234), ` +
+          "where Android cuts a node's bounds to the container, and the last swipe toward it showed 27 px more of it — part of it likely lies past that edge still; " +
+          'in this call a 48-px swipe, no longer than the next would be, moved it 27 px, and only 15 px of room remain on its left side, ' +
+          'so another swipe would most likely push its left side out past its scroll container rather than show it whole — ' +
+          'act on the part that shows (a tap, or an assert on a child inside it), or drop fully: true; more swipes are unlikely to help. ' +
           'Last rect {"x":81,"y":380,"width":933,"height":234} in a 1080x2220 viewport',
       );
     }
@@ -566,9 +579,9 @@ describe('`fully: true` on a View-cut card no swipe can bring whole (D68): the s
 
   it('the agent-facing references quote the reply as the code words it (skill/references/tools.md, troubleshooting.md)', () => {
     const message = failureOf(replay(FULLY_LEFT, run(8).cardX.map(recyclerAt)), 'C').message;
-    const said = message.slice(message.indexOf('element is in the viewport'), message.indexOf('. Last rect'));
+    const said = message.slice(message.indexOf('element is on screen'), message.indexOf('. Last rect'));
     expect(readFileSync(new URL('../../skill/references/tools.md', import.meta.url), 'utf8')).toContain(`'${said}'`);
-    const tail = message.slice(message.indexOf(', no longer than the next would be,'), message.indexOf('. Last rect')).replace(/its left side/g, 'its <side> side').replace('27 px in this call', 'P px in this call');
+    const tail = message.slice(message.indexOf(', no longer than the next would be,'), message.indexOf('. Last rect')).replace(/its left side/g, 'its <side> side').replace('moved it 27 px', 'moved it P px').replace('only 15 px', 'only M px');
     expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(`K-px swipe${tail}\`**`);
   });
 
