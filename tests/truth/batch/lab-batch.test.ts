@@ -209,7 +209,7 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     // The Android build's daemon stopped right after its build; the lab's processes ended at the run's end.
     const gradle = seam.words.filter((w) => w.includes('gradlew'));
     expect(gradle.map((w) => w.split(' ').slice(1).join(' '))).toEqual(['--console=plain assembleDebug', '--stop']);
-    expect(seam.words.slice(-4)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`]);
+    expect(seam.words.slice(-5)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`, `idb disconnect ${LAB_UDID}`]);
     expect(outText()).toContain(`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`);
   });
 
@@ -333,7 +333,8 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(await done).toBe(130);
     expect(outText()).toMatch(/OK   WDA window put back \(verified by the abort\): D43 WDA-window restore: OK — .*com\.apple\.Accessibility put back .*; port 8120 free/);
     expect(summary()).toContain('RESTORE: none — everything dirty was put back and verified');
-    expect(seam.words.at(-1)).toBe(`pkill -f idb_companion --udid ${LAB_UDID}`);
+    // The companion's entry dropped after its pkill on the abort's end too (batch-13).
+    expect(seam.words.slice(-2)).toEqual([`pkill -f idb_companion --udid ${LAB_UDID}`, `idb disconnect ${LAB_UDID}`]);
     expect(world.domains.get('com.apple.Accessibility')!.ApplicationAccessibilityEnabled).toEqual({ t: 'bool', c: 'true', v: 'true' });
   });
 

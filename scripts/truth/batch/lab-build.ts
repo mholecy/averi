@@ -77,8 +77,8 @@ export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?:
 
 /** A lab device as its need checks it (ios-lab.ts, android-lab.ts): opened, this run's build installed, its cells. */
 export interface DeviceCheck<T> {
-  /** Guarded and readied (the reset, a first read): the device, or why not. */
-  open(): Promise<Opened<T>>;
+  /** Guarded and readied (the reset, a first read): the device — with a warning the readying left (batch-13) — or why not. */
+  open(): Promise<Opened<T> & { warning?: string }>;
   /** How the build is installed (`simctl install`), for its why, and the call that does it. */
   installWord: string;
   install(device: T, built: string): Promise<CallResult>;
@@ -90,8 +90,8 @@ export interface DeviceCheck<T> {
 
 /**
  * A device need's one shape (code review): the device opened; its build asked (askBuild); met, installed; the installed
- * app's cells.json main's (else not met, the rerun hint); met — with the build's warning when it failed (batch-11's
- * `LAB …: WARN — …`).
+ * app's cells.json main's (else not met, the rerun hint); met — with the readying's warning (batch-13: the companion
+ * entry's) and the build's when it failed (batch-11's `LAB …: WARN — …`), joined in that order.
  */
 export async function checkDevice<T>(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }, d: DeviceCheck<T>): Promise<NeedResult> {
   const opened = await d.open();
@@ -106,7 +106,8 @@ export async function checkDevice<T>(c: NeedCtx, o: { build?: BuildRef; requireB
   const cells = await d.cells(device);
   if ('why' in cells) return { ok: false, why: `${cells.why} ${RERUN_HINT}` };
   const how = `${d.describe(device)}; ${asked.built === undefined ? NOT_REBUILT : REBUILT}; ${cells.how}`;
-  return asked.warning === undefined ? { ok: true, how } : { ok: true, how, warning: asked.warning };
+  const warnings = [opened.warning, asked.warning].filter((w) => w !== undefined);
+  return warnings.length === 0 ? { ok: true, how } : { ok: true, how, warning: warnings.join('; ') };
 }
 
 /** A Gradle call's whole: its wrapper, its folder, its env (the JDK, the SDK) and its log. */

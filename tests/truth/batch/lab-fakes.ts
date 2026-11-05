@@ -33,6 +33,12 @@ export interface Result {
 const ok = (out = ''): Result => ({ code: 0, out, err: '' });
 const exit = (code: number, err = '', out = ''): Result => ({ code, out, err });
 
+/**
+ * idb's words for a call whose stored companion is gone (batch-13 rerun 1, `idb ui describe-all`), its socket's
+ * folder put as a placeholder.
+ */
+export const STALE_COMPANION_ERR = `Failed to connect to companion at address DomainSocketAddress(path='<idb state folder>/${LAB_UDID}_companion.sock'): [Errno 2] No such file or directory`;
+
 /** The Open-in alert's elements as idb lists them, Cancel at the centre (140, 420). */
 export const ALERT_TREE = [
   { AXLabel: 'Open in “AveriLab”?', type: 'StaticText' },
@@ -71,6 +77,14 @@ export interface WorldOptions {
   /** What the roles and clipboard reads print before and after a block (API 33: no such command). */
   roles?: [string, string];
   clipboard?: [string, string];
+  /**
+   * idb's local companion list for the lab simulator at the start: no entry (idb spawns one at its first call), a live
+   * companion, or a stale entry (its companion ended, the entry left: batch-13 rerun 1) — every idb call for the udid
+   * then fails fast with "Failed to connect to companion", until `idb disconnect <udid>` drops it.
+   */
+  companion?: 'none' | 'live' | 'stale';
+  /** `idb disconnect` fails (exit 1) or passes its bound. */
+  disconnectFails?: 'exit' | 'timeout';
   /** The builds: which step fails. */
   buildFails?: 'catalog' | 'xcodegen' | 'xcodebuild' | 'gradlew' | 'java';
   /** What the built APK's cells.json holds (CATALOG unless given). */
@@ -95,6 +109,7 @@ export function labWorld(o: WorldOptions) {
     listed: new Set<number>(),
     alertUp: (o.alertTaps ?? 0) > 0,
     reachable: () => o.reachable !== false,
+    companion: o.companion ?? 'none',
   };
   const app = join(o.dir, 'container', 'AveriLab.app');
   rmSync(app, { recursive: true, force: true });
@@ -162,7 +177,18 @@ export function labWorld(o: WorldOptions) {
   };
 
   const idb = (args: readonly string[]): Result => {
+    // `idb kill` clears every companion idb knows, device-check's too (batch-13): never.
+    if (args[0] === 'kill') violations.push(`idb kill: ${args.join(' ')}`);
+    if (args[0] === 'disconnect') {
+      if (args.length !== 2 || args[1] !== LAB_UDID) violations.push(`idb disconnect not of the lab simulator alone: ${args.join(' ')}`);
+      if (o.disconnectFails === 'timeout') return { code: 142, out: '', err: '', timedOut: true };
+      if (o.disconnectFails === 'exit') return exit(1, 'DisconnectCommandException: Could not disconnect');
+      st.companion = 'none';
+      return ok();
+    }
     if (args.at(-2) !== '--udid' || args.at(-1) !== LAB_UDID) violations.push(`idb not for the lab simulator: ${args.join(' ')}`);
+    if (st.companion === 'stale') return exit(1, STALE_COMPANION_ERR);
+    st.companion = 'live';
     if (args[1] === 'describe-all') {
       if (st.sick === 'describe-all') return exit(1, 'No translation object returned');
       if (args[2] !== '--json') return ok('[]');
@@ -181,6 +207,12 @@ export function labWorld(o: WorldOptions) {
     const pattern = args[1];
     const allowed = ['DerivedData/averi-wda-lab([/ ]|$)', `Devices/${LAB_UDID}/.*WebDriverAgentRunner`, `idb_companion --udid ${LAB_UDID}`];
     if (args[0] !== '-f' || !allowed.includes(pattern)) violations.push(`pkill by a pattern not the lab's: ${args.join(' ')}`);
+    if (pattern === allowed[2]) {
+      // A pkill ends the companion, and idb's list keeps its entry (fb-idb prunes only in list_targets).
+      if (st.companion !== 'live') return exit(1);
+      st.companion = 'stale';
+      return ok();
+    }
     if (pattern === allowed[0]) {
       // The runner's exit flips Accessibility (batch-10): at the window's kill, once more after the restore when late.
       if (st.wda) flip();
