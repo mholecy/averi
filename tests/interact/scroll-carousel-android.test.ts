@@ -383,10 +383,21 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 1, unfit: { along: 'horizontal', size: after.width, inferred: true } });
   });
 
-  it('runs 1–2 landed at 65 (1 px over the carousel\'s left, within the slack): not unfit — the stop as before', () => {
+  it("runs 1–2 (\"reached\" after 6 strokes, ending at 65): batch-9 kept only their first and last reads, not the course between — the last read alone is the fills hedge as batch-9 replied; on E2's 6-stroke course from the same start they stop unfit after 3 swipes", () => {
+    for (const r of B9.runs.slice(1)) {
+      expect(r.kind).toBe('reached');
+      expect(r.listed.after).toEqual({ x: 65, y: 380, width: 948, height: 234 });
+    }
     const { before, after } = B9.runs[1].listed;
-    const played = replay(FULLY_LEFT, [lazyAt(before.x), lazyAt(after.x), lazyAt(after.x), lazyAt(after.x), lazyAt(after.x)]);
-    expect(played.outcome?.kind).not.toBe('unfit');
+    // The recorded reads alone: 65 lies within FIT_ROOM_PX of the carousel's 66 — not clipped, so not unfit; batch-9's own words.
+    const ends = replay(FULLY_LEFT, [lazyAt(before.x), ...Array.from({ length: 8 }, () => lazyAt(after.x))]);
+    expect(ends.outcome).toMatchObject({ kind: 'visible', swipes: 1 });
+    expect(describeScrollResult(resultOf(ends))).toBe(`fully visible after 1 swipe${B9.runs[1].reply.slice(B9.runs[1].reply.indexOf(';'))}`);
+    // E2's course (D52's record of this card's shape, from the same 574): its 4th read, C at 45 with both sides known
+    // after a stroke that moved it, stops unfit — honest, C being as wide as the carousel: one offset only shows it whole.
+    const course = replay(FULLY_LEFT, [before.x, 231, -102, 45, 189, 131, after.x].map((x) => lazyAt(x)));
+    expect(course.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
+    expect(course.outcome).toMatchObject({ kind: 'unfit', swipes: 3, unfit: { inferred: true } });
   });
 
   it('(4) no stroke yet: C at 45 at the first read, both sides known — no unfit, stroked for (a told axis would stop here)', () => {
@@ -457,6 +468,23 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     // Moved, but up and down (not along the call): no unfit either.
     const vertical = replay(FULLY_LEFT, [900, 800, 700, 600, 500, 400, 300, 250].map(rowAt));
     expect(vertical.outcome?.kind).not.toBe('unfit');
+  });
+
+  it("scroll-sticky-cut (a LazyColumn, axis untold, its merged sticky header — VA1) in the D59 shape: `fully: true` along the list's axis; R growing out from under the header is no move (a size change), and R carried up through the list's bottom, moved along it, is 110 tall in 1238 — no unfit either way, the outcomes as before", () => {
+    const STICKY = readFileSync(new URL('../fixtures/truth/android-averi_lab-api33/scroll-sticky-cut.xml', import.meta.url), 'utf8');
+    const rAt = (bounds: string): Row => {
+      const tree = parseDump(STICKY.replaceAll('bounds="[128,457][953,567]"', `bounds="${bounds}"`));
+      const r = [...everyNode(tree)].find((n) => n.identifier === 'lab.scroll-sticky-cut.R');
+      if (r === undefined) throw new Error('no R');
+      return { tree, found: [r] };
+    };
+    const FULLY = { ...RULES, fully: true };
+    const va1 = play({ ...FULLY, direction: 'down' }, [rAt('[128,457][953,567]'), rAt('[128,457][953,633]'), rAt('[128,457][953,633]')]);
+    expect(va1.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stop']);
+    expect(describeScrollResult(resultOf(va1))).toMatch(/^fully visible after 2 swipes; its top edge lies on the edge of container id:lab\.scroll-sticky-cut\.header/);
+    const carried = replay({ ...FULLY, direction: 'down' }, [rAt('[128,1480][953,1541]'), rAt('[128,1200][953,1310]'), rAt('[128,1200][953,1310]')]);
+    expect(carried.outcome).toMatchObject({ kind: 'visible' });
+    expect(describeScrollResult(resultOf(carried))).toBe('fully visible after 1 swipe');
   });
 
   it('a told axis is unchanged: carousel-in-list (HorizontalScrollView) stops on its first read with both sides known, no inference said', () => {
