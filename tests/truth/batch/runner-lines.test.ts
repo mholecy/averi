@@ -43,23 +43,33 @@ describe('configOf — the out folder and the device ids from argv, then env; no
     const e = env({ KF_RUNS: '2' });
     expect(configOf(['--out', '/o', '--udid', 'U-1', '--serial', 'emulator-5554', '--repo', '/r'], e)).toEqual({
       ok: true,
-      config: { out: '/o', repo: '/r', udid: 'U-1', serial: 'emulator-5554', env: e },
+      config: { out: '/o', repo: '/r', udid: 'U-1', serial: 'emulator-5554', env: e, androidHome: expect.any(String) },
     });
   });
 
   it('the env is the fallback (AVERI_BATCH_OUT, AVERI_LAB_UDID, AVERI_LAB_SERIAL); argv wins over it; an empty variable is unset', () => {
     expect(configOf([], env({ AVERI_BATCH_OUT: '/e', AVERI_LAB_UDID: 'U-e', AVERI_LAB_SERIAL: 'S-e' }), '/r')).toEqual({
       ok: true,
-      config: { out: '/e', repo: '/r', udid: 'U-e', serial: 'S-e', env: { AVERI_BATCH_OUT: '/e', AVERI_LAB_UDID: 'U-e', AVERI_LAB_SERIAL: 'S-e' } },
+      config: { out: '/e', repo: '/r', udid: 'U-e', serial: 'S-e', env: { AVERI_BATCH_OUT: '/e', AVERI_LAB_UDID: 'U-e', AVERI_LAB_SERIAL: 'S-e' }, androidHome: expect.any(String) },
     });
     const r = configOf(['--out', '/a', '--serial', 'S-a'], env({ AVERI_BATCH_OUT: '/e', AVERI_LAB_SERIAL: 'S-e', AVERI_LAB_UDID: '' }), '/r');
-    expect(r.ok && r.config).toEqual({ out: '/a', repo: '/r', serial: 'S-a', env: expect.anything() });
+    expect(r.ok && r.config).toEqual({ out: '/a', repo: '/r', serial: 'S-a', env: expect.anything(), androidHome: expect.any(String) });
     expect(r.ok && 'udid' in r.config).toBe(false);
   });
 
   it('no device id given: none in the config, not an empty one (a need for it fails, S6b)', () => {
     const r = configOf(['--out', '/o'], env(), '/r');
-    expect(r.ok && Object.keys(r.config).sort()).toEqual(['env', 'out', 'repo']);
+    expect(r.ok && Object.keys(r.config).sort()).toEqual(['androidHome', 'env', 'out', 'repo']);
+  });
+
+  it('the Android SDK for a lab build: ANDROID_HOME, else the one under the home folder given (T2 S6b code review: read here, not in lab-build.ts)', () => {
+    const at = (e: Record<string, string>) => {
+      const r = configOf(['--out', '/o'], env(e), '/r', '/hm');
+      return r.ok ? r.config.androidHome : undefined;
+    };
+    expect(at({ ANDROID_HOME: '/sdk' })).toBe('/sdk');
+    expect(at({})).toBe('/hm/Library/Android/sdk');
+    expect(at({ ANDROID_HOME: '' })).toBe('/hm/Library/Android/sdk');
   });
 
   it('the repo defaults to the checkout this module lives in (live-cases.ts\'s ROOT)', () => {
@@ -121,6 +131,9 @@ describe('labLine and needsLine — a need checked once, its lab line in the SUM
   it('LAB <need>: OK — how; ERROR — why', () => {
     expect(labLine('android', { ok: true, how: 'emulator-5554, averi_lab' })).toBe('LAB android: OK — emulator-5554, averi_lab');
     expect(labLine('ios', { ok: false, why: 'no lab simulator booted' })).toBe('LAB ios: ERROR — no lab simulator booted');
+    // Met with a warning, typed (T2 S6b review round 1; its code review: the warning is the outcome, not a flag).
+    expect(labLine('android', { ok: true, how: 'averi_lab emulator S', warning: 'the build failed; the app already installed is used' })).toBe('LAB android: WARN — the build failed; the app already installed is used: averi_lab emulator S');
+    expect(labLine('android', { ok: true, how: 'x\nmore', warning: 'w' })).toBe('LAB android: WARN — w: x');
   });
 
   it('a why or how holding a line break keeps its first line: the SUMMARY line never breaks, and making it never throws', () => {

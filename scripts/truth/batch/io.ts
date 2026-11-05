@@ -125,3 +125,15 @@ export const nodeFs: BatchFs = {
     }
   },
 };
+
+/**
+ * A fresh path in `dir` for `name`: itself, or `<stem>-2<ext>`, … — the first not there, through `fs`: what a run keeps
+ * is never overwritten (T2 S6b: a pulled APK, a kept tree, an installed cells.json).
+ */
+export function freshIn(fs: BatchFs, dir: string, name: string): string {
+  const dot = name.lastIndexOf('.');
+  const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
+  let path = join(dir, name);
+  for (let n = 2; fs.exists(path); n++) path = join(dir, `${stem}-${n}${ext}`);
+  return path;
+}

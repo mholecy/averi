@@ -915,3 +915,239 @@ Where S6a departs, on purpose, from batch-11 and batch-12:
 - the rejudge is bounded (REJUDGE_SECS).
 - a verdict written after the interrupt is not kept.
 - what the runner keeps of a probe's or an analyzer's text is split at a lone CR too.
+
+### S6b: the lab plumbing (2026-11-05, backlog T2 slice S6, its second part)
+
+S6b adds four files on top of runBatch, nothing in runner.ts learning about a device: lab-lines.ts, pure — what a read
+of the lab says (port 8120's listeners, a pkill's exit, the Open-in alert in an idb tree, an installed cells.json
+against main's catalog, a JDK), the WDA window's restore line with its port part, the exact patterns the lab's own
+processes are ended by, and the shapes the three share (`Opened<T>`, the device need's words) — and three io files over
+the injected `Run` and `BatchFs`: ios-lab.ts (the `ios` need and its recheck, the health check with the Open-in alert,
+the reset, the WDA window on its normal path and as the abort's dirty window, the iOS stretch's end, the run's last
+step), android-lab.ts (the `android` need and its recheck, a need on the handler counts, the tri-state reads around a
+block, a tree kept with its fitness as a fixture, the probe's own restore, the chooser's stretch) and lab-build.ts (the
+two build needs, main's catalog checked once before either, `gradlew --stop`, the `lab` block). One pure file for the
+three, not one each: they share its shapes (the cells compare both devices and both builds make, the patterns the iOS
+kit and the run's end use), and each io file's own decisions are few — a file per pair would hold a handful of lines.
+Each kit is a function of its options (`iosLab`, `androidLab`, `labBuild`) returning the `Need`s for runBatch (`{ check,
+alive }`, S6a) and the block helpers, so a batch spreads them into its `needs` and calls the helpers from its blocks.
+The guards are lab-device.ts's, reused through S4's `LabSim` and S5's `LabEmu`, never copied. runner.ts gains three
+generic things: `fs` in a block's and a need's ctx; `asksLive` (a live run's `.cases` before a stretch that may never
+reach it; its ask compared by records.ts's `canonicalJson`); and `lastly`, the run's last steps — abort.ts's `lastly`,
+run on both ends after the kept groups are ended. runner.ts's header now shows how a scratch `batch-N.ts` composes the
+needs, the blocks and the WDA window.
+
+The four join the run. Tests: lab-lines.test.ts; ios-lab.test.ts, android-lab.test.ts, lab-build.test.ts over one fake
+lab (tests/truth/batch/lab-fakes.ts: a simulator whose domains live in memory, `defaults export` writing the typed map
+and plistlib reading it back, its WebDriverAgent's exit flipping com.apple.Accessibility from bool to int as batch-10
+measured, port 8120's listeners, the Open-in alert, the app's container; an emulator over batch-10's and batch-9's
+committed API 33 reads; the host's pkill, lsof, kill, unzip and builds), every call checked in afterEach for b11-dry's
+VIOLATIONs made exact — device-check's simulator or ports named, a write to the schemeapproval domain, a pkill by a
+pattern not the lab's, a kill of a pid port 8120 did not list, an adb call for another serial, any `input tap`, an idb
+tap anywhere but the alert's Cancel; and lab-batch.test.ts, a fake batch through runBatch over a fake process seam (git
+and live.ts answered as runner.test.ts does, every lab call by the fake lab): the lab block, an Android block with the
+tri-state reads around its live run, an iOS block whose live run is in the WDA window — the whole SUMMARY, needs not
+met, ONLY=lab, a build that fails, the abort inside the WDA window. Each under 2 s; no device. Baselines, cold, after
+the code review (the final run; the numbers each round gave before are superseded and kept in scope.json): lab-lines.ts
+100 % (272 mutants), ios-lab.ts 100 % (359, 1 timeout), android-lab.ts 100 % (180), lab-build.ts 100 % (266), each floor
+98; runner-lines.ts 100 % (341), records.ts 100 % (96, canonicalJson now its), io.ts 96.43 % (84: freshIn now its, none
+of its mutants surviving; the same three equivalents), runner.ts 99.32 % (444, the same three without coverage),
+abort.ts 98.67 % (451: open's stateFile check, named before, and S6a's judges' budget `left <= 0` turned `< 0`, a
+boundary only a left of exactly 0 ms reaches — killed in one cold run on timing — both equivalent), their floors kept.
+The final cold run of all thirty-one modules took 313 s (the runs of this slice: 298 to 324 s). Two partial Stryker
+rounds on the four first: 93.46 % over them (66 survived, 4 without coverage), then 99.53 % (5 survived), each survivor
+killed by a test or designed away — an equivalent `typeof` filter, a release file read whose absence the regex test hid,
+a re-read of port 8120 that changed nothing but a call, `?? nodeFs` where LabSim's default parameter already is; the
+first cold run left two in runner.ts (the last steps handed only when there are some; an ask's fields in their order),
+designed away and pinned. 43 hand mutants, one per decision branch, each run bounded (a timeout counts as killed): 42
+killed at once, 1 by a test made stricter (the handlers' need's recheck reading its first answer again).
+
+Decisions S6b pins:
+- the builds are needs (`ios-build`, `android-build`): one that fails makes every block that names it INCONCLUSIVE
+  naming why, by the runner's need rule; a block that does not name it runs on the app installed. main's catalog is
+  `--check`ed once for the run, a bounded child of the checkout under test (`catalog.ts --check`, 120 s, its log in the
+  lab folder), before either build: stale, both builds not met, "nothing built". Each build's product is proven too —
+  the built app's cells.json, the built APK's assets/cells.json, main's catalog byte for byte. A need's recheck is its
+  product still on disk.
+- the iOS build: `xcodegen generate` then `xcodebuild -scheme AveriLab -destination id=<udid> -derivedDataPath build
+  build`, each bounded (BUILD_SECS 2400 s, batch-11's B_BUILD, unless the batch names one), logged; never device-check's
+  simulator as its destination; no pkill: its group ends at its bound (S2). The Android build: `java_home -v 17` and its
+  home's release file (read only once there is a home, its own why when it cannot be), then `gradlew --console=plain
+  assembleDebug` under that JDK and the SDK the config names (configOf: ANDROID_HOME, else the SDK under the home folder
+  — read there, not in lab-build.ts), then `gradlew --stop` after every build, failed or not — the daemon leaves the
+  call's group by design; a stop that fails is a WARN.
+- the device needs ask their build themselves (review round 1, MAJOR 2: installing this run's build must not depend on
+  the order of a block's needs, nor of the blocks): `iosLab({ build: kit.ios })`, `androidLab({ build: kit.android })`;
+  each kit's build runs once for the run (`ensure`, shared with the build need's own check), so it is built and
+  installed once whoever asks first. Met, the need installs it before its cells check: the iOS need by `simctl install`,
+  the Android need by `adb install -r` — batch-11's lab install (its 1b/1c), not batch-12's E5 install -r, which stays
+  the batch's own step. Failed, the need goes on to the app already installed, batch-11's way: its lab line `LAB <need>:
+  WARN — <the build's why>; the app already installed is used: …` (a NeedResult met may now carry its `warning`, the lab
+  line rendering it: review round 1, MINOR 3) — or, with `requireBuild`, it is not met.
+- the `ios` need: the udid given and guarded (LabSim), the reset (unless `reset: false`), the finportal key's first read
+  (a NOTE step), this run's build installed, the installed app's cells.json — read through `simctl get_app_container`,
+  bounded, a copy kept in the lab folder — main's catalog. Its `alive`: the guard and `idb ui describe-all`, a read; no
+  swipe, no reset.
+- the reset is batch-11's order (the companion and the lab's WebDriverAgent ended, shutdown, boot and bootstatus -b
+  under boundFor's 300 s, 3 s, the lab launched, 3 s, the health check), but it starts no idb_companion by hand:
+  batch-11 ran `idb_companion --udid <udid> --grpc-port 10971 &` with IDB_COMPANION set, and a daemon cannot run under a
+  bound; idb's client starts its own in the call's kept group (KEEPS_GROUP in bounded.ts), ended by stopKept and by the
+  run's last step. Residual: batch-13's shakedown shows whether describe-all answers so on a freshly booted simulator.
+- the health check before a run (`iosCheck`, batch-11's ios_check) is the batch's to call: the lab's WebDriverAgent
+  ended, 2 s, the Open-in alert, then describe-all and a swipe. The alert (open-in-alert.py): Cancel only, at the centre
+  of the button labelled so, at most 2 taps each read again after 1 s; a stuck alert or a failed health check resets; a
+  reset that fails is an ERROR step and the check's why (the batch then skips the run, whose `.cases` makes the backstop
+  say "asked but never ran"). An alert read that fails is a NOTE and the health check decides (open-in-alert.py's exit 2
+  was no 1, so batch-11 went on to its health check too).
+- the WDA window (`wdaWindow`), batch-11's order: the `.cases` of its runs (asksLive) → the health check → the backup
+  (S4) → the window opened as an S2 dirty window (its state file, its block) → the work → the window put back: the lab's
+  WebDriverAgent ended (pkill by its two patterns, `kill` to each listener of 8120), 4 s, port 8120 read — listened on,
+  its listeners killed and read again after 1.5 s (d43-gate.ts) — then, only with the port proven free, the domains
+  restored key by key (S4) → its line, `D43 WDA-window restore: … ; port 8120 free`, one of the block's verdict lines →
+  the window closed only when that verified, else left open, so finish writes its hand lines to RESTORE and an abort
+  tries it once more → the end check → the compare (S4), only once the state reads clean, by verdictAndHand. The abort's
+  restore is the same put-back over its detached runner; its hand lines are the WebDriverAgent's kill first, then S4's
+  per domain, then the compare by hand (review round 1, MINOR 4).
+- the port (review round 1, BLOCKER): while port 8120 is not proven free — a listener left after its kill, or lsof
+  unread — nothing is restored at all: a runner still running undoes a restore at its exit (batch-10's flip), and a
+  state then clean would hide it. The line is `NOT VERIFIED — port 8120 still has a listener (pid …): the domains not
+  put back …; the state file left dirty`, the window is not put back (the next run refuses), nothing is compared, and
+  RESTORE holds the WebDriverAgent's kill, each domain's import, then the compare — pinned whole, on the abort and on
+  the normal path (lab-batch.test.ts).
+- `d43-backupfail`, and a health check before the window that fails past a reset: the block's own `INCONCLUSIVE — the
+  WDA window did not run: <why> — no wda run (nothing changed)` and an ERROR step; nothing backed up or changed; the
+  runs' `.cases` stay, asked and never run.
+- the finportal key: read first in the `ios` need's check (after the reset, as batch-11 read it after its initial
+  reset), last by `endStretch(ctx, sim)` in the batch's last iOS block, into S6a's protected-key slot (`protectedLine`);
+  a start never read is unread, an ERROR line, never unchanged. A batch whose last iOS block does not run has no such
+  line.
+- the run's last step (`ios.lastly`): the lab's WebDriverAgent (its two patterns; port 8120's listeners, read again
+  after their kill) and the lab simulator's idb_companion (`idb_companion --udid <udid>`) ended by exact pattern, after
+  S2's kept groups — what they cannot own: a runner launchd holds, a companion that left its group — on both ends, only
+  for a simulator the guard cleared this run; a NOTE, or a WARN naming what is not proven. abort.ts's `lastly` is
+  bounded by LASTLY_SECS (60 s), its calls a scope stopped at the bound, a throw an ERROR line; runner.ts runs the
+  batch's `lastly: LastStep[]` in order, a throw an ERROR line and the next still run.
+- the Gradle daemon after an abort inside the Android build (review round 1, MINOR 6): the abort stops the build and
+  refuses its own `gradlew --stop`; the build kit's `lastly` then runs `gradlew --stop` (bounded, from the build's
+  folder, its JDK and SDK) at the run's end, on both ends, whenever a build was started and its own stop did not return
+  — a NOTE, or a WARN when the stop fails.
+- the patterns: lab-lines.ts throws before it names device-check's simulator, in any case; the WebDriverAgent's is
+  anchored on the lab's derived data, `DerivedData/averi-wda-lab([/ ]|$)` (review round 1, NIT 7), so it matches the
+  lab's xcodebuild and runner but never device-check's `DerivedData/averi-wda`, a folder named `averi-wda-labx`, this
+  node process or a batch's own command line naming a folder `averi-wda-lab-runs` (pinned); lsof asks port 8120 only; a
+  kill never names this process.
+- the `android` need: the serial given and guarded (LabEmu), this run's build installed `-r`, the lab installed (`adb
+  get-state` first, then `pm path`), its APK pulled into the lab folder (a fresh file: a second check never overwrites
+  the first pull; `kit.pulled()` is the one a reinstall puts back), its assets/cells.json main's (a copy kept), the
+  handler counts read (HANDLER_URLS, batch-11's shared and cell, unless the batch names others; a count that cannot be
+  read is said "not read", never a number) and kept in android-handlers.txt. Its `alive`: the guard, `get-state`, `pm
+  path`.
+- the handler counts as a precondition are a need (`handlersNeed({ url: n })`), read again each time it is asked: S6a's
+  preconditions are asked before any block runs, before any device need, so no device read can be one.
+- the tri-state reads (`withReads(ctx, emu, { roles, clipboard }, work)`): each asked read before and after the work,
+  compared (S5's compareReads), each line one of the block's verdict lines under its own label, never the block's — the
+  backstop still asks for the block's own verdict. On API 33 both are unread: a WARN `not compared`, never OK.
+- a tree a block keeps (`keepTree`) is always written, a fresh file, as evidence; S5's sanitizeFixture says in a NOTE
+  whether it is fit to commit as it is — the run folder is outside the repo, so an unfit tree is never refused.
+- the probe's own restore (`probeRestore`, S5's StateRestore): `node --import tsx <probe> --restore <args> --state
+  <file>`, from the checkout (its cwd, where `--import tsx` resolves), bounded; put back only when it exits 0 and its
+  state file reads clean; its command, every word shell-quoted, for a hand line. The chooser's stretch
+  (`chooserStretch`): S5's window opened with its cleanup label and block, the work, cleanUp's line and hand lines by
+  verdictAndHand, the window closed.
+- the `lab` block (`labBlock(needs, { build })`): batch-11's and batch-12's, its folder the lab folder; it runs only its
+  needs and says PASS when they were met — so `ONLY=lab` checks the lab and runs nothing else; a need not met makes it
+  INCONCLUSIVE naming why; a build that failed while its device need went on to the installed app makes it a WARN naming
+  the build, never "every lab need met" (review round 1, MAJOR 2).
+- `asksLive(name, asked)` writes a live run's `.cases` at once; a later `liveRun` of that name asked the same writes
+  none again, asked otherwise throws — what a run was asked is never overwritten. The ask is compared as canonical JSON
+  (canonicalJson in records.ts, a run's identity asked and done: every object's fields sorted at every depth; review
+  round 1, NIT 8).
+
+S6b's checklist (the S6a part's rows marked S6b, the S4 and S5 parts' "not ported → S6"), each with its tests:
+- S2, `gradlew --stop` with the lab build → lab-build.test.ts "the Android build … then gradlew --stop — always", "a
+  build that fails: --stop still called after it"; lab-batch.test.ts "the whole SUMMARY of a clean run", "the lab build
+  failing".
+- S2, the pkill of the lab's WebDriverAgent → ios-lab.test.ts "the lab's WebDriverAgent ended by its exact patterns,
+  port 8120 only", "the run's last step"; abort.test.ts and runner.test.ts "the run's last steps (lastly)"; lab-batch's
+  clean run (its last four calls). idb_companion's: the same, and "the reset in batch-11's order".
+- S3, the catalog's `--check` before the lab build → lab-build.test.ts "main's catalog --check before any build, once
+  for both", "stale: both builds not met".
+- S4, the WDA window's orchestration: the `.cases` first → ios-lab.test.ts "the whole window" (`asks …, state none`),
+  runner.test.ts "asksLive"; the kill and the 4 s wait before the restore → "the restore comes after the WDA kill and
+  the wait", "the whole window" (the waits); the port 8120 free check → "a listener of 8120 left after the wait"; the
+  finportal reads at the stretch's start and end → "the ios need … met", "the finportal key's first read", "the iOS
+  stretch's end"; the compare after the end check → "the whole window", "a late writer", lab-batch "a late writer after
+  the restore"; `d43-backupfail` → ios-lab "d43-backupfail", lab-batch "d43-backupfail"; the restore line's port part →
+  lab-lines.test.ts "the WDA window's restore line"; the abort's put-back → ios-lab "as the abort's dirty window",
+  lab-batch "the abort inside the WDA window".
+- S4, the iOS lab install verification → ios-lab.test.ts "the ios need … met", "a reset that fails, an install … a
+  cells.json not main's, no app", "reset: false … an app with no cells.json keeps no copy".
+- S5, the Android lab check at the batch's start (the pulled APK's cells.json, the handler counts as a precondition,
+  `ONLY=lab`) → android-lab.test.ts "the android need …", "the handlers' need"; lab-batch "ONLY=lab runs just the lab
+  check".
+- S5, the tri-state reads, `handlers` at the lab check, `sanitizeFixture` over a kept tree → android-lab.test.ts "the
+  tri-state reads around a block", "a tree kept"; lab-batch's clean run.
+- lab-emu.ts's header, the probe's own state put back (`StateRestore`) → android-lab.test.ts "the probe's own state put
+  back"; the chooser's stretch → "the chooser's stretch".
+- ios-domains.ts's header, the WDA kill and the 4 s wait before the restore → as S4's row above.
+- spec S6b's tests (a fake batch, need failures, ONLY=lab, the abort inside the WDA window, a lab build failure,
+  `gradlew --stop` after the build) → lab-batch.test.ts, each named.
+
+What of batch-11's and batch-12's lab plumbing S6b does not port, each with the reason:
+- batch-11's explicit idb_companion start (`--grpc-port 10971`, IDB_COMPANION): above — a daemon cannot run under a
+  bound; idb starts its own in a kept group. batch-13 shows whether that holds.
+- the `adb devices` presence check before the Android guard (batch-11.sh:426): the guard's `emu avd name` fails for a
+  serial adb does not list ("no emulator adb can name"), the same INCONCLUSIVE, one call fewer.
+- the `shasum` of the catalog and of main's APK (batch-12.sh:342, 373): evidence a reader never used; the cells.json
+  copies kept in the lab folder say what was compared.
+- batch-12's APK_OK (main's APK checked without installing it, for E5's install -r): E5's own step; lab-build.ts proves
+  its built APK's cells.json the same way.
+- batch-12's with_default and `pair` trees, d55-b11.ts's legs and its analyzer: still the probes' (S5's row), batch-13
+  captures the trees.
+- folding ios-domains.ts's freshPathOf and lab-emu.ts's freshApkOf into io.ts's freshIn: each is pinned by its own tests
+  and floor; a refactor for later, not this slice's.
+
+Where S6b departs, on purpose, from batch-11 and batch-12:
+- a failed build makes the blocks that name its need INCONCLUSIVE; a block naming only the device need runs on the app
+  already installed with batch-11's WARN lab line (unless the batch requires the build).
+- the `ios` need's recheck is a read (describe-all), where batch-11 checked the lab once and trusted it.
+- while port 8120 is not proven free the domains are not restored at all; d43-gate.ts restored them all the same and
+  only kept its state dirty.
+- the lab's WebDriverAgent and companion are ended at the run's end only for a simulator the guard cleared this run;
+  batch-11 pkilled them by its udid whatever happened.
+- a kept tree is written whatever sanitizeFixture says, its fitness said.
+
+Review round 1 (an independent reviewer): a BLOCKER — an abort inside the WDA window with a listener left on 8120 put
+the domains back, the state read clean, and the runner's later exit flipped Accessibility again with nothing in RESTORE
+to import (now: no restore while the port is not free, above); a MAJOR — this run's build was installed only when the
+build need came before the device need (now: the device need asks its build); four MINOR and four NIT findings, each
+above. 13 more hand mutants on the fixes, each bounded: all 13 killed at once. Its cold run (superseded by the final run
+above): lab-lines.ts 100 % (283 mutants), ios-lab.ts 100 % (382), android-lab.ts 100 % (198), lab-build.ts 100 % (238),
+runner-lines.ts 100 % (351), runner.ts 99.33 %, abort.ts 98.67 % (the same two equivalents), in 306 s; three survivors
+of its first cold run (an OK restore's empty hand lines, an empty build answer, the lab block's failures joined)
+designed away or pinned.
+
+Review round 2: an lsof that fails or passes its bound (the port unread) blocks the restore exactly as a listener does,
+now pinned (nothing written back, the state dirty, the hand lines kept); only a `gradlew --stop` that succeeded clears
+the build kit's marker, so a stop cut by the abort or failed leaves the daemon to the last step (an abort landing during
+`--stop`, pinned); and a block whose WDA window was not put back never ends PASS — `wdaWindow` returns `{ ran, putBack
+}` and, not put back, writes the block's own `INCONCLUSIVE — the lab's settings not put back (see RESTORE)` at once, so
+no judge's PASS stands for it. 4 more hand mutants, each bounded: all killed at once.
+
+Code review (Standards and Spec): one builder for the WDA window's hand lines (lab-lines.ts's `wdaHandOf`: the
+WebDriverAgent's kill first, each domain's import, the compare by hand), used by the blocked put-back, the window's hand
+getter and a restore that fails with the port free — so the abort's RESTORE and the normal end's hold the same lines
+(MAJOR, pinned whole both ways); the end-of-run Gradle stop says why its marker was kept (`its build was cut short`, or
+`its --stop failed: <why>`); the lab's WebDriverAgent is ended through one function (`killLabWda`: the pkills, then
+`portFree`), the run's last step too; and, by structure: `freshIn` moved to io.ts, the pure half holding no fs probe;
+ANDROID_HOME's default in configOf (`BatchConfig.androidHome`); `isDeviceCheckSimulator` in lab-device.ts, every guard
+and pattern asking it; NO_UDID and NO_SERIAL in runner-lines.ts; one device-need shape (lab-build.ts's `checkDevice`:
+opened, its build asked, installed, its cells, met — with its warning) and its words; one `gradlew --stop` helper over a
+`GradleCall`; `Opened<T>` for a guarded device; NeedResult's warning typed (`warning?: string`, the lab line rendering
+`WARN — <warning>: <how>`); `canonicalJson` in records.ts, called directly. 8 more hand mutants, each bounded: all
+killed at once.
+
+The mutation run's headroom: the cold run of thirty-one modules takes about 5 minutes (298 to 324 s; 313 s the final)
+against its 600 s bound; a slice like this one adds about 60 s. When a cold run nears the bound (say past 480 s), do not
+raise it silently: split the run (scope.json's modules in two `--mutate` halves, each held to the same floors, both run
+before a merge), or raise the bound by a decision recorded in this ADR.

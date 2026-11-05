@@ -6,7 +6,7 @@ import { nodeFs, type BatchFs } from './io.js';
 import { liveTableOf, type LiveSelection, type LiveTable } from './live-table.js';
 import { ancestor, casesOnMain, cellsOnMain, checkout, preconditionLine, type Git, type Precondition } from './preconditions.js';
 import { nodeProcess, type ProcessSeam } from './proc.js';
-import { recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
+import { canonicalJson, recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
 import { blockName, layoutOf, META, newRunId, openRun, refusalLines, refusals, type Stateful } from './run-dir.js';
 import {
   backstopLine,
@@ -66,26 +66,41 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  * (S3: `.cases` first, live.ts with its record, then its rejudge) and a non-live block's records (`asks`, `record`).
  * The SUMMARY's ERROR lines are this run's steps' and every ERROR line of this run's logs (`*.log`, analyze.txt).
  *
- * A batch, outside the repo (`node --import tsx batch-13.ts --out <dir> --udid <sim> --serial <emu>`):
+ * A batch, outside the repo (`node --import tsx batch-13.ts --out <dir> --udid <sim> --serial <emu>`), composes the
+ * lab plumbing's needs, blocks and windows (T2 S6b: lab-build.ts, android-lab.ts, ios-lab.ts) — nothing here learns
+ * about a device:
  *
  *     const at = (f) => pathToFileURL(join(repo, 'scripts/truth/batch', f)).href;
- *     const { runBatch } = await import(at('runner.ts'));
- *     const { configOf } = await import(at('runner-lines.ts'));
- *     await runBatch({ name: 'batch-13', knobs, needs: { android: androidLab }, blocks: [kf, E5],
+ *     const mods = ['runner', 'runner-lines', 'lab-build', 'android-lab', 'ios-lab'];
+ *     const [{ runBatch }, { configOf }, { labBuild, labBlock }, { androidLab }, { iosLab, iosCheck, wdaWindow }] =
+ *       await Promise.all(mods.map((f) => import(at(`${f}.ts`))));
+ *     const build = labBuild();
+ *     const android = androidLab({ build: build.android });
+ *     const ios = iosLab({ build: build.ios });
+ *     const D43 = { id: 'D43', label: 'D43 verdict', needs: ['ios'], async run(ctx) {
+ *       const sim = await ios.open(ctx);                              // the guard again, over the block's own calls
+ *       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
+ *       await wdaWindow(ctx, sim.value, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
+ *         work: async () => (await iosCheck(ctx, sim.value, 'wda 1')) ?? ctx.liveRun('ios-wda-1', asked, { secs }) });
+ *       await ios.endStretch(ctx, sim.value);                           // the finportal key's line
+ *     }, judge };
+ *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],
+ *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly],
  *       config: configOf(process.argv.slice(2), process.env, repo) });
  *
- * Not here (S6b, lab plumbing): the needs' checks themselves, the WDA window's orchestration, the lab build, the
- * tri-state reads around a block. Nothing here calls a device: every call is the batch's, through `bounded`.
+ * A need is checked by the first block naming it and rechecked (its `alive`) before each later one; the WDA window is
+ * a dirty window, so the abort puts it back the same way; `lastly` ends what S2's kept groups cannot own.
  */
 
 /** A need a block names: the lab devices (`ios`, `android`), or any other the batch gives a check for. */
 export type Need = 'ios' | 'android' | (string & {});
 
-/** What a need's check gets: bounded calls, the lab folder, the config, the steps. */
+/** What a need's check gets: bounded calls, the lab folder, the config, the run's fs, the steps. */
 export interface NeedCtx {
   bounded: Run;
   labDir: string;
   config: BatchConfig;
+  fs: BatchFs;
   step(word: StepWord, text: string): void;
 }
 export type NeedCheck = (c: NeedCtx) => Promise<NeedResult>;
@@ -126,6 +141,8 @@ export interface BlockCtx<K = unknown> {
   /** The lab folder of this run. */
   readonly labDir: string;
   readonly config: BatchConfig;
+  /** The run's fs (io.ts): the lab plumbing reads and writes through it. */
+  readonly fs: BatchFs;
   readonly knobs: K;
   /** A probe, bounded in a group of its own (owner: this block); the abort stops it. */
   readonly bounded: Run;
@@ -151,6 +168,11 @@ export interface BlockCtx<K = unknown> {
   protectedLine(line: string): void;
   /** A live run (S3): its `.cases` first, then live.ts with its record, then the rejudge, each a bounded step. */
   liveRun(name: string, asked: Asked, o: { secs: number; rejudgeSecs?: number }): Promise<LiveOutcome>;
+  /**
+   * A live run's `.cases` now, before a stretch that may never reach it (batch-11's WDA window wrote its runs' before
+   * its backup): a later liveRun of that name, asked the same, writes none again; asked otherwise, it throws.
+   */
+  asksLive(name: string, asked: Asked): void;
   /** What a non-live run is asked, written before it runs (never overwritten). */
   asks(name: string, record: BlockRecord): void;
   /** What it did, once it is done: the block is complete only when this matches what it was asked. */
@@ -184,6 +206,14 @@ export interface Block<K = unknown> {
   details?: readonly DetailSpec[];
 }
 
+/** What a last step gets: detached calls (they run while the run is being stopped too) and the steps. */
+export interface LastCtx {
+  run: Run;
+  step(word: StepWord, text: string): void;
+}
+/** One of the run's last steps (`lastly`): the lab's processes S2 cannot own, ended by their exact pattern (S6b). */
+export type LastStep = (l: LastCtx) => Promise<void>;
+
 /** The runner's io: every file and process through the module's seams; the clock and pid for the run's id. */
 export interface RunIo {
   fs: BatchFs;
@@ -208,6 +238,12 @@ export interface RunBatchOptions<S extends KnobSpec> {
   config: ConfigRead;
   /** The batch's own refusals (run-dir.ts#refusals' batchReasons). */
   batchReasons?: readonly string[];
+  /**
+   * The run's last steps, in order, on both ends (abort.ts#lastly): after the windows went to RESTORE and the kept
+   * groups ended — at the normal end before the judges, at the abort before its SUMMARY. A throw is an ERROR line, and
+   * the next step still runs.
+   */
+  lastly?: readonly LastStep[];
   io?: Partial<RunIo>;
 }
 
@@ -254,7 +290,7 @@ export async function runBatch<S extends KnobSpec>(o: RunBatchOptions<S>): Promi
   const opened = openRun(io.fs, { out: config.out, runId, blocks: all, wanted });
   if (!opened.ok) return refused([opened.error]);
   const blocks = o.blocks.filter((b) => selection.wanted.includes(b.id));
-  const run = new BatchRun(o.name, runId, config, knobs.values, blocks, needs, opened.dirs, io);
+  const run = new BatchRun(o.name, runId, config, knobs.values, blocks, needs, opened.dirs, io, o.lastly ?? []);
   for (const w of selection.warnings) run.log.note(w);
   return run.go();
 }
@@ -285,6 +321,7 @@ class BatchRun<K> {
     private readonly needs: Readonly<Record<string, NeedSpec>>,
     private readonly dirs: Readonly<Record<string, string>>,
     private readonly io: RunIo,
+    lastly: readonly LastStep[],
   ) {
     const layout = layoutOf(config.out, name, dirs[META]);
     this.restoreFile = layout.restoreFile;
@@ -301,10 +338,23 @@ class BatchRun<K> {
       graceMs: io.graceMs,
       installSecs: io.installSecs,
       judgeBudgetSecs: io.judgeBudgetSecs,
+      // None given, none run: lastSteps over no step does nothing.
+      lastly: (run: Run) => this.lastSteps(lastly, run),
       head: () => ({ checkout: this.checkout ?? NOT_READ_CHECKOUT, labs: this.labs, protectedLines: this.protectedLines, errors: this.runErrors() }),
       blocks: blocks.map((b) => this.abortBlock(b)),
     });
     for (const b of blocks) this.lines.set(b.id, []);
+  }
+
+  /** Each last step in order; one that throws an ERROR line, and the next still run. */
+  private async lastSteps(steps: readonly LastStep[], run: Run): Promise<void> {
+    for (const [i, step] of steps.entries()) {
+      try {
+        await step({ run, step: (w, t) => this.log.step(w, t) });
+      } catch (e) {
+        this.log.error(`the run's last step ${i + 1} failed: ${firstLineOf(messageOf(e))}`);
+      }
+    }
   }
 
   private get git(): Git {
@@ -422,7 +472,7 @@ class BatchRun<K> {
   /** A need's check run: its answer, or, when it throws, a failed one (an ERROR line, unless the abort has begun). */
   private async asked(need: string, check: NeedCheck): Promise<NeedResult> {
     try {
-      return await check({ bounded: this.guard.bounded, labDir: this.dirs[LAB], config: this.config, step: (w, t) => this.log.step(w, t) });
+      return await check({ bounded: this.guard.bounded, labDir: this.dirs[LAB], config: this.config, fs: this.io.fs, step: (w, t) => this.log.step(w, t) });
     } catch (e) {
       const why = `its check threw: ${firstLineOf(messageOf(e))}`;
       if (!this.guard.interrupted) this.log.error(`LAB ${need}: ${why}`);
@@ -451,11 +501,14 @@ class BatchRun<K> {
     const recording = (call: string): void => {
       if (b.noRecords === true) throw new Error(`${b.id} declared noRecords, yet called ${call}: a block that asks or records runs declares none`);
     };
+    // What asksLive wrote, by name: liveRun writes no .cases for it again.
+    const preAsked = new Map<string, string>();
     return {
       id: b.id,
       dir,
       labDir: this.dirs[LAB],
       config: this.config,
+      fs: io.fs,
       knobs: this.knobs,
       bounded,
       step: (w, t) => log.step(w, t),
@@ -480,18 +533,25 @@ class BatchRun<K> {
         if (guard.interrupted) log.step('NOTE', `a protected-key line after the interrupt not kept: ${l}`);
         else this.protectedLines.push(l);
       },
-      liveRun: (name, asked, o) => (recording('liveRun'), this.liveRun(b, bounded, name, asked, o)),
+      liveRun: (name, asked, o) => (recording('liveRun'), this.liveRun(b, bounded, name, asked, o, preAsked)),
+      asksLive: (name, asked) => {
+        recording('asksLive');
+        writeCases(io.fs, dir, name, asked);
+        preAsked.set(name, canonicalJson(asked));
+      },
       asks: (name, record) => (recording('asks'), writeAsked(io.fs, dir, name, record)),
       record: (name, record) => (recording('record'), writeDone(io.fs, dir, name, record)),
     };
   }
 
   /** batch-11's live_run: the `.cases` first, live.ts with its record, then its rejudge — each a bounded step. */
-  private async liveRun(b: Block<K>, bounded: Run, name: string, asked: Asked, o: LiveBounds): Promise<LiveOutcome> {
+  private async liveRun(b: Block<K>, bounded: Run, name: string, asked: Asked, o: LiveBounds, preAsked: ReadonlyMap<string, string>): Promise<LiveOutcome> {
     const { fs } = this.io;
     const { repo } = this.config;
     const dir = this.dirs[b.id];
-    writeCases(fs, dir, name, asked);
+    const before = preAsked.get(name);
+    if (before === undefined) writeCases(fs, dir, name, asked);
+    else if (before !== canonicalJson(asked)) throw new Error(`${b.id}: the live run ${name} was asked otherwise before (asksLive): what a run was asked is never overwritten`);
     const f = runFiles(dir, name);
     const what = `${b.id} live ${name}`;
     const device = deviceArgs(asked, this.config);

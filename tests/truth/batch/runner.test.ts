@@ -167,7 +167,7 @@ const needs = {
   ios: async () => ({ ok: true as const, how: 'averi-lab iPhone 17' }),
 };
 
-function go(blocks: Block[], over: Partial<Pick<RunBatchOptions<KnobSpec>, 'knobs' | 'needs' | 'batchReasons'>> & { env?: Record<string, string>; argv?: string[]; io?: Partial<RunIo> } = {}): Promise<number> {
+function go(blocks: Block[], over: Partial<Pick<RunBatchOptions<KnobSpec>, 'knobs' | 'needs' | 'batchReasons' | 'lastly'>> & { env?: Record<string, string>; argv?: string[]; io?: Partial<RunIo> } = {}): Promise<number> {
   const { env = {}, argv = ['--out', out, '--repo', repo, '--serial', 'emulator-5554', '--udid', 'U-1'], io, ...rest } = over;
   return runBatch({
     name: 'batch-t',
@@ -1231,5 +1231,80 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
     const asked: Asked = { platform: 'ios', app: 'native', sources: ['wda'], cases: ['p7w'] };
     await go([plain('D43', { run: async (ctx) => void (await ctx.liveRun('ios-wda-1', asked, { secs: 60, rejudgeSecs: 30 })) })]);
     expect(seam.words().find((w) => w.includes('--record'))).toContain('--udid U-1 --sources wda --groups forms --cases p7w');
+  });
+});
+
+describe('asksLive: a live run\'s .cases written before a stretch that may never reach it (T2 S6b: batch-11\'s WDA window wrote its .cases before its backup, 625–627)', () => {
+  it('the .cases written at once; liveRun of that name and the same asked later runs without writing it again', async () => {
+    seam.watch = [join(dirOf('kf'), 'android-kf-1.cases')];
+    await go([kfBlock({ run: async (ctx) => {
+      ctx.asksLive('android-kf-1', KF);
+      await ctx.bounded('probe', ['backup'], { secs: 5 });
+      // The same ask built in another field order: the same ask.
+      await ctx.liveRun('android-kf-1', { cases: KF.cases, sources: KF.sources, app: KF.app, platform: KF.platform }, { secs: 60 });
+    } })]);
+    expect(seam.seen[seam.words().indexOf('probe backup')]).toEqual({ [join(dirOf('kf'), 'android-kf-1.cases')]: true });
+    expect(summary()).toContain('kf live verdict: PASS — kf1, kf2, kf3 ok');
+  });
+
+  it('asked and never run: the backstop says so (b11-dry d43-backupfail: "asked but never ran", never a missing line)', async () => {
+    await go([kfBlock({ judge: undefined, run: async (ctx) => ctx.asksLive('android-kf-1', KF) })]);
+    expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — asked but never ran (no record, log or summary beside its .cases)');
+  });
+
+  it('liveRun of that name asked otherwise, or a second asksLive of it: the batch\'s mistake, thrown (what a run was asked is never overwritten)', async () => {
+    const other: Asked = { ...KF, cases: ['kf1'] };
+    await go([kfBlock({ run: async (ctx) => (ctx.asksLive('android-kf-1', KF), void (await ctx.liveRun('android-kf-1', other, { secs: 60 }))) })]);
+    expect(summary().join('\n')).toContain('android-kf-1 was asked otherwise before');
+    rmSync(out, { recursive: true, force: true });
+    await go([kfBlock({ run: async (ctx) => (ctx.asksLive('android-kf-1', KF), ctx.asksLive('android-kf-1', KF)) })]);
+    expect(summary().join('\n')).toContain('android-kf-1.cases already exists');
+  });
+
+  it('a noRecords block that calls it: thrown, as for liveRun', async () => {
+    await go([plain('p', { noRecords: true, run: async (ctx) => ctx.asksLive('r', KF) })]);
+    expect(summary().join('\n')).toContain('p declared noRecords, yet called asksLive');
+  });
+});
+
+describe('the run\'s fs in a block\'s and a need\'s ctx: the lab plumbing reads and writes through it (io.ts, T2 S6b)', () => {
+  it('both get the run\'s own BatchFs', async () => {
+    const seen: unknown[] = [];
+    await go([plain('kf', { needs: ['android'], run: async (ctx) => (seen.push(ctx.fs), ctx.verdict('PASS')) })], {
+      needs: { android: async (c: NeedCtx) => (seen.push(c.fs), { ok: true as const, how: 'x' }) },
+    });
+    expect(seen).toEqual([nodeFs, nodeFs]);
+  });
+});
+
+describe('the run\'s last steps (lastly): each after the kept groups, on both ends, through detached calls (T2 S6b: batch-11.sh:660, 205–206)', () => {
+  const pkill: NonNullable<RunBatchOptions<KnobSpec>['lastly']>[number] = async ({ run, step }) => {
+    const r = await run('probe', ['pkill-wda'], { secs: 5 });
+    step('NOTE', `the lab's WebDriverAgent: probe exit ${r.code}`);
+  };
+
+  it('the normal end: after the windows went to RESTORE and the kept groups ended, before the judges and the SUMMARY; a throw an ERROR line, the next step still run', async () => {
+    const order: string[] = [];
+    await go([plain('A', { run: async (ctx) => (await ctx.bounded('idb', ['a'], { secs: 5 }), ctx.verdict('PASS')) })], {
+      lastly: [
+        async () => {
+          order.push(`first, the companion ${seam.signals.includes('SIGTERM idb a') ? 'ended' : 'alive'}`);
+          throw new Error('pkill: refused\nmore');
+        },
+        async (l) => (order.push('second'), pkill(l)),
+      ],
+    });
+    expect(order).toEqual(['first, the companion ended', 'second']);
+    expect(outText()).toContain("NOTE the lab's WebDriverAgent: probe exit 0");
+    expect(summary()).toContain("09:44:26 ERROR the run's last step 1 failed: pkill: refused");
+  });
+
+  it('the abort: run after the restores, its calls detached (they start while the run is being stopped)', async () => {
+    const done = go([plain('E5', { run: async (ctx) => void (await ctx.bounded('probe', ['hang'], { secs: 30 })) })], { lastly: [pkill] });
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(seam.words()).toContain('probe pkill-wda');
+    expect(text(join(out, 'steps.log'))).toContain("NOTE the lab's WebDriverAgent: probe exit 0");
   });
 });

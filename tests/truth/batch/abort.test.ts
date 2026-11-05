@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AbortGuard, JUDGE_BUDGET_SECS, markDirty, type AbortBlock, type WindowSpec } from '../../../scripts/truth/batch/abort.js';
+import { AbortGuard, JUDGE_BUDGET_SECS, LASTLY_SECS, markDirty, type AbortBlock, type AbortGuardOptions, type WindowSpec } from '../../../scripts/truth/batch/abort.js';
 import { MAX_SECS } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs, type BatchFs } from '../../../scripts/truth/batch/io.js';
 import type { Ended, KillResult, ProcessSeam, Started } from '../../../scripts/truth/batch/proc.js';
@@ -110,7 +110,7 @@ const block = (name: string, over: Partial<AbortBlock> = {}): AbortBlock => ({
 
 function guardOf(
   blocks: AbortBlock[] = [block('kf'), block('E5')],
-  over: { head?: () => { checkout: string; labs: string[]; protectedLines: string[]; errors?: string[] }; graceMs?: number; installSecs?: number; clock?: () => Date; judgeBudgetSecs?: number; fs?: BatchFs } = {},
+  over: { head?: () => { checkout: string; labs: string[]; protectedLines: string[]; errors?: string[] }; graceMs?: number; installSecs?: number; clock?: () => Date; judgeBudgetSecs?: number; fs?: BatchFs; lastly?: AbortGuardOptions['lastly']; lastlySecs?: number } = {},
 ) {
   return new AbortGuard({
     name: 'batch-n',
@@ -125,6 +125,8 @@ function guardOf(
     clock: 'clock' in over ? over.clock : clock,
     graceMs: over.graceMs ?? 5,
     installSecs: over.installSecs,
+    lastly: over.lastly,
+    lastlySecs: over.lastlySecs,
   });
 }
 
@@ -1100,5 +1102,99 @@ describe('head\'s errors — the abort SUMMARY\'s ERROR section when the runner 
     await interrupt(guard);
     expect(summaryText().split('\n').slice(-3)).toEqual(['09:44:26 ERROR batch-n interrupted (run 1) by SIGINT (×2, in steps.log, kf/p.log)', '======== SUMMARY end (run 1, INTERRUPTED)', '']);
     expect(summaryText().split('\n')).not.toContain('09:44:26 ERROR batch-n interrupted (run 1) by SIGINT');
+  });
+});
+
+describe('the run\'s last steps (`lastly`): after the kept groups, on both ends, through detached calls (T2 S6b: batch-11 pkilled the lab\'s WebDriverAgent and idb_companion at its end and at the end of on_abort)', () => {
+  it('finish(): the kept groups ended first, then the last steps with a detached runner; a kill of its calls not delivered gets its RESTORE line', async () => {
+    const guard = guardOf(undefined, {
+      lastly: async (run) => {
+        seam.events.push('lastly');
+        const r = run('pkill', ['-f', 'averi-wda-lab'], { secs: 10 });
+        await tick();
+        seam.started.at(-1)!.end({ code: 1, signal: null });
+        await r;
+      },
+    });
+    seam.leftGroups.add(100);
+    await guard.run(async () => {
+      const r = guard.bounded('idb', ['connect', 'U']);
+      await tick();
+      seam.started[0].end({ code: 0, signal: null });
+      await r;
+    });
+    seam.refusePids.add(101);
+    const written = await guard.finish();
+    expect(seam.events.slice(0, 5)).toEqual(['start idb connect U', 'SIGTERM -100', 'SIGKILL -100', 'lastly', 'start pkill -f averi-wda-lab']);
+    expect(written).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 101 may still be running: kill -9 -101, then check what the run's last steps end"]);
+  });
+
+  it('the abort: after the restores, the judging and the kept groups\' stop, before the SUMMARY; its calls start while stopping (detached)', async () => {
+    const guard = guardOf([block('kf', { complete: () => true, judge: async () => (seam.events.push('judge kf'), ['kf: PASS']) })], {
+      lastly: async (run) => {
+        seam.events.push(`lastly, summary ${existsSync(join(out, 'meta', 'summary.txt')) ? 'written' : 'not written'}`);
+        const r = run('pkill', ['-f', 'idb_companion --udid U'], { secs: 10 });
+        await tick();
+        seam.started.at(-1)!.end({ code: 0, signal: null });
+        await r;
+      },
+    });
+    expect(await interrupt(guard, () => guard.open('E5', window({ restore: async () => (seam.events.push('restore E5'), { ok: true, how: 'x' }) })))).toBe(130);
+    expect(seam.events).toEqual(['restore E5', 'judge kf', 'lastly, summary not written', 'start pkill -f idb_companion --udid U', 'SIGKILL -100']);
+    expect(summaryText()).toContain('kf: PASS');
+  });
+
+  it('the abort with a kept group (idb_companion): the kept group ended first, then the last steps (review round 1, MINOR 5)', async () => {
+    const guard = guardOf([block('kf')], { lastly: async () => void seam.events.push(`lastly, group 100 ${seam.leftGroups.has(100) ? 'alive' : 'ended'}`) });
+    seam.leftGroups.add(100);
+    let opened = false;
+    const ran = guard.run(async () => {
+      const r = guard.bounded('idb', ['connect', 'U']);
+      await tick();
+      seam.started[0].end({ code: 0, signal: null });
+      await r;
+      guard.open('E5', window({ restore: async () => (seam.events.push('restore E5'), { ok: true, how: 'x' }) }));
+      opened = true;
+      await new Promise(() => {});
+    });
+    ran.catch(() => {});
+    for (let i = 0; i < 100 && !opened; i++) await tick(5);
+    seam.handlers?.signal('SIGINT');
+    expect(await seam.exit$).toBe(130);
+    expect(seam.events).toEqual(['start idb connect U', 'restore E5', 'SIGTERM -100', 'SIGKILL -100', 'lastly, group 100 ended']);
+  });
+
+  it('last steps that throw: an ERROR line naming why; the end goes on (finish returns, the abort exits 130 with its SUMMARY)', async () => {
+    const throwing = async () => {
+      throw new Error('pkill: no such file\nsecond line');
+    };
+    const ended = guardOf(undefined, { lastly: throwing });
+    await ended.run(async () => {});
+    expect(await ended.finish()).toEqual([]);
+    expect(text(join(out, 'steps.log'))).toContain("ERROR the run's last steps failed: pkill: no such file");
+    const aborted = guardOf(undefined, { lastly: throwing });
+    expect(await interrupt(aborted)).toBe(130);
+    expect(summaryText()).toContain("ERROR the run's last steps failed: pkill: no such file");
+  });
+
+  it('last steps that never settle are bounded (lastlySecs; LASTLY_SECS by default): their calls stopped, an ERROR line, the SUMMARY still written', async () => {
+    expect(LASTLY_SECS).toBe(60);
+    const guard = guardOf(undefined, {
+      lastlySecs: 0.05,
+      lastly: async (run) => {
+        await run('pkill', ['-f', 'averi-wda-lab'], { secs: 10 });
+      },
+    });
+    expect(await interrupt(guard)).toBe(130);
+    // SIGTERM ends it here; the SIGKILL after the grace, and the one at its leader's end (bounded.ts).
+    expect(seam.events).toEqual(['start pkill -f averi-wda-lab', 'SIGTERM -100', 'SIGKILL -100', 'SIGKILL -100']);
+    expect(summaryText()).toContain("ERROR the run's last steps passed their bound (0.05 s): stopped there");
+  });
+
+  it('none given: nothing more is done at either end', async () => {
+    const guard = guardOf();
+    await guard.run(async () => {});
+    expect(await guard.finish()).toEqual([]);
+    expect(seam.events).toEqual([]);
   });
 });

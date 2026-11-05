@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { incompleteLine, type Asked } from './cases.js';
@@ -30,6 +31,8 @@ export interface BatchConfig {
   serial?: string;
   /** The env the knobs and ONLY= are read from. */
   env: Env;
+  /** The Android SDK a lab build uses (ANDROID_HOME, else the SDK under the home folder); none: the build's own. */
+  androidHome?: string;
 }
 
 /** The config, or why the batch must not start (refusal lines: exit 2, nothing done). */
@@ -43,9 +46,10 @@ const FALLBACK = { out: 'AVERI_BATCH_OUT', udid: 'AVERI_LAB_UDID', serial: 'AVER
  * The config from a batch's argv (`--out <dir> --udid <sim> --serial <emu> [--repo <checkout>]`), each value falling
  * back to its env variable (an empty one is unset), the repo to `repo` (this module's checkout). No out folder, a
  * relative out or repo, an unknown option, a flag without its value (none, or another flag next) or a flag given twice:
- * refused, every error at once, in order. A device id not given is left out, never empty.
+ * refused, every error at once, in order. A device id not given is left out, never empty. The Android SDK: ANDROID_HOME,
+ * else the one under `home` (T2 S6b code review: the lab build reads the config, not the home folder).
  */
-export function configOf(argv: readonly string[], env: Env, repo = MODULE_REPO): ConfigRead {
+export function configOf(argv: readonly string[], env: Env, repo = MODULE_REPO, home = homedir()): ConfigRead {
   const errors: string[] = [];
   const given: Partial<Record<'out' | 'repo' | 'udid' | 'serial', string>> = {};
   for (let i = 0; i < argv.length; i++) {
@@ -72,7 +76,8 @@ export function configOf(argv: readonly string[], env: Env, repo = MODULE_REPO):
   if (errors.length > 0) return { ok: false, errors };
   const [udid, serial] = [valueOf('udid'), valueOf('serial')];
   // No error: the out folder was given (its absence is one).
-  return { ok: true, config: { out: out as string, repo: theRepo, ...(udid === undefined ? {} : { udid }), ...(serial === undefined ? {} : { serial }), env } };
+  const androidHome = env.ANDROID_HOME === undefined || env.ANDROID_HOME === '' ? join(home, 'Library', 'Android', 'sdk') : env.ANDROID_HOME;
+  return { ok: true, config: { out: out as string, repo: theRepo, ...(udid === undefined ? {} : { udid }), ...(serial === undefined ? {} : { serial }), env, androidHome } };
 }
 
 /** The lab folder: made on every run (batch-11's O_lab), for what the lab checks keep: a pulled APK, a log. */
@@ -90,10 +95,18 @@ export function checkoutLine(r: CheckoutPrecondition): string {
 export const NOT_READ_CHECKOUT = 'NOTE checkout: not read before the interrupt';
 
 /** A need's answer (S6b supplies the checks): met, and how; or not, and why. */
-export type NeedResult = { ok: true; how: string } | { ok: false; why: string };
+export type NeedResult = { ok: true; how: string; warning?: string } | { ok: false; why: string };
 
-/** A need's lab line: `LAB <need>: OK — <how>` or `LAB <need>: ERROR — <why>`, its first line only. */
-export const labLine = (need: string, r: NeedResult): string => verdictLine(`LAB ${need}`, r.ok ? 'OK' : 'ERROR', firstLineOf(r.ok ? r.how : r.why));
+/**
+ * A need's lab line, its first line only: `LAB <need>: OK — <how>`; met with a warning (this run's build failed, the
+ * app already installed is used — T2 S6b review round 1), `LAB <need>: WARN — <warning>: <how>`; not met, `LAB <need>:
+ * ERROR — <why>`.
+ */
+export function labLine(need: string, r: NeedResult): string {
+  const label = `LAB ${need}`;
+  if (!r.ok) return verdictLine(label, 'ERROR', firstLineOf(r.why));
+  return r.warning === undefined ? verdictLine(label, 'OK', firstLineOf(r.how)) : verdictLine(label, 'WARN', firstLineOf(`${r.warning}: ${r.how}`));
+}
 
 /** A block not run for its failed needs: `<label>: INCONCLUSIVE — <need>: <why>; …`, in the block's order. */
 export const needsLine = (label: string, failed: readonly { need: string; why: string }[]): string =>
@@ -265,10 +278,14 @@ export interface LiveRunSpec {
   record: string;
 }
 
+/** A device id not given (`--udid`, `--serial`, or their env): no run, and no lab need, on that platform. */
+export const NO_UDID = 'no lab simulator udid given (--udid or AVERI_LAB_UDID)';
+export const NO_SERIAL = 'no lab emulator serial given (--serial or AVERI_LAB_SERIAL)';
+
 /** The device flags for a live run, or why there are none: the device id not given. */
 export function deviceArgs(asked: Asked, ids: DeviceIds): { args: string[] } | { why: string } {
-  if (asked.platform === 'android') return ids.serial === undefined ? { why: 'no lab emulator serial given (--serial or AVERI_LAB_SERIAL)' } : { args: ['--serial', ids.serial] };
-  return ids.udid === undefined ? { why: 'no lab simulator udid given (--udid or AVERI_LAB_UDID)' } : { args: ['--udid', ids.udid, '--sources', asked.sources.join(',')] };
+  if (asked.platform === 'android') return ids.serial === undefined ? { why: NO_SERIAL } : { args: ['--serial', ids.serial] };
+  return ids.udid === undefined ? { why: NO_UDID } : { args: ['--udid', ids.udid, '--sources', asked.sources.join(',')] };
 }
 
 const groupsOf = (asked: Asked): string => (asked.groups ?? DEFAULT_GROUPS).join(',');
