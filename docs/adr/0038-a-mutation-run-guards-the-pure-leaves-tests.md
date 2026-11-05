@@ -921,20 +921,21 @@ Where S6a departs, on purpose, from batch-11 and batch-12:
 S6b adds four files on top of runBatch, nothing in runner.ts learning about a device: lab-lines.ts, pure — what a read
 of the lab says (port 8120's listeners, a pkill's exit, the Open-in alert in an idb tree, an installed cells.json
 against main's catalog, a JDK), the WDA window's restore line with its port part, the exact patterns the lab's own
-processes are ended by, and `freshIn` (a kept file never overwritten) — and three io files over the injected `Run` and
-`BatchFs`: ios-lab.ts (the `ios` need and its recheck, the health check with the Open-in alert, the reset, the WDA
-window on its normal path and as the abort's dirty window, the iOS stretch's end, the run's last step), android-lab.ts
-(the `android` need and its recheck, a need on the handler counts, the tri-state reads around a block, a tree kept with
-its fitness as a fixture, the probe's own restore, the chooser's stretch) and lab-build.ts (the two build needs, main's
-catalog checked once before either, `gradlew --stop`, the `lab` block). One pure file for the three, not one each: they
-share its shapes (the cells compare both devices and both builds make, the patterns the iOS kit and the run's end use),
-and each io file's own decisions are few — a file per pair would hold a handful of lines. Each kit is a function of its
-options (`iosLab`, `androidLab`, `labBuild`) returning the `Need`s for runBatch (`{ check, alive }`, S6a) and the block
-helpers, so a batch spreads them into its `needs` and calls the helpers from its blocks. The guards are lab-device.ts's,
-reused through S4's `LabSim` and S5's `LabEmu`, never copied. runner.ts gains three generic things: `fs` in a block's
-and a need's ctx; `asksLive` (a live run's `.cases` before a stretch that may never reach it); and `lastly`, the run's
-last steps — abort.ts's `lastly`, run on both ends after the kept groups are ended. runner.ts's header now shows how a
-scratch `batch-N.ts` composes the needs, the blocks and the WDA window.
+processes are ended by, and the shapes the three share (`Opened<T>`, the device need's words) — and three io files over
+the injected `Run` and `BatchFs`: ios-lab.ts (the `ios` need and its recheck, the health check with the Open-in alert,
+the reset, the WDA window on its normal path and as the abort's dirty window, the iOS stretch's end, the run's last
+step), android-lab.ts (the `android` need and its recheck, a need on the handler counts, the tri-state reads around a
+block, a tree kept with its fitness as a fixture, the probe's own restore, the chooser's stretch) and lab-build.ts (the
+two build needs, main's catalog checked once before either, `gradlew --stop`, the `lab` block). One pure file for the
+three, not one each: they share its shapes (the cells compare both devices and both builds make, the patterns the iOS
+kit and the run's end use), and each io file's own decisions are few — a file per pair would hold a handful of lines.
+Each kit is a function of its options (`iosLab`, `androidLab`, `labBuild`) returning the `Need`s for runBatch (`{ check,
+alive }`, S6a) and the block helpers, so a batch spreads them into its `needs` and calls the helpers from its blocks.
+The guards are lab-device.ts's, reused through S4's `LabSim` and S5's `LabEmu`, never copied. runner.ts gains three
+generic things: `fs` in a block's and a need's ctx; `asksLive` (a live run's `.cases` before a stretch that may never
+reach it; its ask compared by records.ts's `canonicalJson`); and `lastly`, the run's last steps — abort.ts's `lastly`,
+run on both ends after the kept groups are ended. runner.ts's header now shows how a scratch `batch-N.ts` composes the
+needs, the blocks and the WDA window.
 
 The four join the run. Tests: lab-lines.test.ts; ios-lab.test.ts, android-lab.test.ts, lab-build.test.ts over one fake
 lab (tests/truth/batch/lab-fakes.ts: a simulator whose domains live in memory, `defaults export` writing the typed map
@@ -946,18 +947,20 @@ pattern not the lab's, a kill of a pid port 8120 did not list, an adb call for a
 tap anywhere but the alert's Cancel; and lab-batch.test.ts, a fake batch through runBatch over a fake process seam (git
 and live.ts answered as runner.test.ts does, every lab call by the fake lab): the lab block, an Android block with the
 tri-state reads around its live run, an iOS block whose live run is in the WDA window — the whole SUMMARY, needs not
-met, ONLY=lab, a build that fails, the abort inside the WDA window. Each under 2 s; no device. Baselines, cold:
-lab-lines.ts 100 % (289 mutants, 1 timeout), ios-lab.ts 100 % (378, 1 timeout), android-lab.ts 100 % (196), lab-build.ts
-100 % (177), each floor 98; runner.ts 99.33 % (446, the same three without coverage), abort.ts 98.67 % (451: open's
-stateFile check, named before, and S6a's judges' budget `left <= 0` turned `< 0`, a boundary only a left of exactly 0 ms
-reaches — killed in the run before on timing — both equivalent), their floors kept. The cold run of all thirty-one
-modules took 4 min 57 s (298 s, under the 600 s bound). Two partial Stryker rounds on the four first: 93.46 % over them
-(66 survived, 4 without coverage), then 99.53 % (5 survived), each survivor killed by a test or designed away — an
-equivalent `typeof` filter, a release file read whose absence the regex test hid, a re-read of port 8120 that changed
-nothing but a call, `?? nodeFs` where LabSim's default parameter already is; the first cold run left two in runner.ts
-(the last steps handed only when there are some; an ask's fields in their order), designed away and pinned. 43 hand
-mutants, one per decision branch, each run bounded (a timeout counts as killed): 42 killed at once, 1 by a test made
-stricter (the handlers' need's recheck reading its first answer again).
+met, ONLY=lab, a build that fails, the abort inside the WDA window. Each under 2 s; no device. Baselines, cold, after
+the code review (the final run; the numbers each round gave before are superseded and kept in scope.json): lab-lines.ts
+100 % (272 mutants), ios-lab.ts 100 % (359, 1 timeout), android-lab.ts 100 % (180), lab-build.ts 100 % (266), each floor
+98; runner-lines.ts 100 % (341), records.ts 100 % (96, canonicalJson now its), io.ts 96.43 % (84: freshIn now its, none
+of its mutants surviving; the same three equivalents), runner.ts 99.32 % (444, the same three without coverage),
+abort.ts 98.67 % (451: open's stateFile check, named before, and S6a's judges' budget `left <= 0` turned `< 0`, a
+boundary only a left of exactly 0 ms reaches — killed in one cold run on timing — both equivalent), their floors kept.
+The final cold run of all thirty-one modules took 313 s (the runs of this slice: 298 to 324 s). Two partial Stryker
+rounds on the four first: 93.46 % over them (66 survived, 4 without coverage), then 99.53 % (5 survived), each survivor
+killed by a test or designed away — an equivalent `typeof` filter, a release file read whose absence the regex test hid,
+a re-read of port 8120 that changed nothing but a call, `?? nodeFs` where LabSim's default parameter already is; the
+first cold run left two in runner.ts (the last steps handed only when there are some; an ask's fields in their order),
+designed away and pinned. 43 hand mutants, one per decision branch, each run bounded (a timeout counts as killed): 42
+killed at once, 1 by a test made stricter (the handlers' need's recheck reading its first answer again).
 
 Decisions S6b pins:
 - the builds are needs (`ios-build`, `android-build`): one that fails makes every block that names it INCONCLUSIVE
@@ -970,16 +973,17 @@ Decisions S6b pins:
   build`, each bounded (BUILD_SECS 2400 s, batch-11's B_BUILD, unless the batch names one), logged; never device-check's
   simulator as its destination; no pkill: its group ends at its bound (S2). The Android build: `java_home -v 17` and its
   home's release file (read only once there is a home, its own why when it cannot be), then `gradlew --console=plain
-  assembleDebug` under that JDK and ANDROID_HOME (the env's, else the SDK under the home folder), then `gradlew --stop`
-  after every build, failed or not — the daemon leaves the call's group by design; a stop that fails is a WARN.
+  assembleDebug` under that JDK and the SDK the config names (configOf: ANDROID_HOME, else the SDK under the home folder
+  — read there, not in lab-build.ts), then `gradlew --stop` after every build, failed or not — the daemon leaves the
+  call's group by design; a stop that fails is a WARN.
 - the device needs ask their build themselves (review round 1, MAJOR 2: installing this run's build must not depend on
   the order of a block's needs, nor of the blocks): `iosLab({ build: kit.ios })`, `androidLab({ build: kit.android })`;
   each kit's build runs once for the run (`ensure`, shared with the build need's own check), so it is built and
   installed once whoever asks first. Met, the need installs it before its cells check: the iOS need by `simctl install`,
   the Android need by `adb install -r` — batch-11's lab install (its 1b/1c), not batch-12's E5 install -r, which stays
   the batch's own step. Failed, the need goes on to the app already installed, batch-11's way: its lab line `LAB <need>:
-  WARN — <the build's why>; the app already installed is used: …` (a NeedResult may now carry `warn`; review round 1,
-  MINOR 3) — or, with `requireBuild`, it is not met.
+  WARN — <the build's why>; the app already installed is used: …` (a NeedResult met may now carry its `warning`, the lab
+  line rendering it: review round 1, MINOR 3) — or, with `requireBuild`, it is not met.
 - the `ios` need: the udid given and guarded (LabSim), the reset (unless `reset: false`), the finportal key's first read
   (a NOTE step), this run's build installed, the installed app's cells.json — read through `simctl get_app_container`,
   bounded, a copy kept in the lab folder — main's catalog. Its `alive`: the guard and `idb ui describe-all`, a read; no
@@ -1056,7 +1060,8 @@ Decisions S6b pins:
   the build, never "every lab need met" (review round 1, MAJOR 2).
 - `asksLive(name, asked)` writes a live run's `.cases` at once; a later `liveRun` of that name asked the same writes
   none again, asked otherwise throws — what a run was asked is never overwritten. The ask is compared as canonical JSON
-  (canonicalJson in runner-lines.ts: every object's fields sorted at every depth; review round 1, NIT 8).
+  (canonicalJson in records.ts, a run's identity asked and done: every object's fields sorted at every depth; review
+  round 1, NIT 8).
 
 S6b's checklist (the S6a part's rows marked S6b, the S4 and S5 parts' "not ported → S6"), each with its tests:
 - S2, `gradlew --stop` with the lab build → lab-build.test.ts "the Android build … then gradlew --stop — always", "a
@@ -1099,8 +1104,8 @@ What of batch-11's and batch-12's lab plumbing S6b does not port, each with the 
   its built APK's cells.json the same way.
 - batch-12's with_default and `pair` trees, d55-b11.ts's legs and its analyzer: still the probes' (S5's row), batch-13
   captures the trees.
-- folding ios-domains.ts's freshPathOf and lab-emu.ts's freshApkOf into freshIn: each is pinned by its own tests and
-  floor; a refactor for later, not this slice's.
+- folding ios-domains.ts's freshPathOf and lab-emu.ts's freshApkOf into io.ts's freshIn: each is pinned by its own tests
+  and floor; a refactor for later, not this slice's.
 
 Where S6b departs, on purpose, from batch-11 and batch-12:
 - a failed build makes the blocks that name its need INCONCLUSIVE; a block naming only the device need runs on the app
@@ -1116,10 +1121,11 @@ Review round 1 (an independent reviewer): a BLOCKER — an abort inside the WDA 
 the domains back, the state read clean, and the runner's later exit flipped Accessibility again with nothing in RESTORE
 to import (now: no restore while the port is not free, above); a MAJOR — this run's build was installed only when the
 build need came before the device need (now: the device need asks its build); four MINOR and four NIT findings, each
-above. 13 more hand mutants on the fixes, each bounded: all 13 killed at once. Its cold run: lab-lines.ts 100 % (283
-mutants), ios-lab.ts 100 % (382), android-lab.ts 100 % (198), lab-build.ts 100 % (238), runner-lines.ts 100 % (351),
-runner.ts 99.33 %, abort.ts 98.67 % (the same two equivalents), in 306 s; three survivors of its first cold run (an
-OK restore's empty hand lines, an empty build answer, the lab block's failures joined) designed away or pinned.
+above. 13 more hand mutants on the fixes, each bounded: all 13 killed at once. Its cold run (superseded by the final run
+above): lab-lines.ts 100 % (283 mutants), ios-lab.ts 100 % (382), android-lab.ts 100 % (198), lab-build.ts 100 % (238),
+runner-lines.ts 100 % (351), runner.ts 99.33 %, abort.ts 98.67 % (the same two equivalents), in 306 s; three survivors
+of its first cold run (an OK restore's empty hand lines, an empty build answer, the lab block's failures joined)
+designed away or pinned.
 
 Review round 2: an lsof that fails or passes its bound (the port unread) blocks the restore exactly as a listener does,
 now pinned (nothing written back, the state dirty, the hand lines kept); only a `gradlew --stop` that succeeded clears
@@ -1128,7 +1134,20 @@ the build kit's marker, so a stop cut by the abort or failed leaves the daemon t
 }` and, not put back, writes the block's own `INCONCLUSIVE — the lab's settings not put back (see RESTORE)` at once, so
 no judge's PASS stands for it. 4 more hand mutants, each bounded: all killed at once.
 
-The mutation run's headroom: the cold run of thirty-one modules takes about 5 minutes (298 s) against its 600 s bound;
-a slice like this one adds about 60 s. When a cold run nears the bound (say past 480 s), do not raise it silently:
-split the run (scope.json's modules in two `--mutate` halves, each held to the same floors, both run before a merge),
-or raise the bound by a decision recorded in this ADR.
+Code review (Standards and Spec): one builder for the WDA window's hand lines (lab-lines.ts's `wdaHandOf`: the
+WebDriverAgent's kill first, each domain's import, the compare by hand), used by the blocked put-back, the window's hand
+getter and a restore that fails with the port free — so the abort's RESTORE and the normal end's hold the same lines
+(MAJOR, pinned whole both ways); the end-of-run Gradle stop says why its marker was kept (`its build was cut short`, or
+`its --stop failed: <why>`); the lab's WebDriverAgent is ended through one function (`killLabWda`: the pkills, then
+`portFree`), the run's last step too; and, by structure: `freshIn` moved to io.ts, the pure half holding no fs probe;
+ANDROID_HOME's default in configOf (`BatchConfig.androidHome`); `isDeviceCheckSimulator` in lab-device.ts, every guard
+and pattern asking it; NO_UDID and NO_SERIAL in runner-lines.ts; one device-need shape (lab-build.ts's `checkDevice`:
+opened, its build asked, installed, its cells, met — with its warning) and its words; one `gradlew --stop` helper over a
+`GradleCall`; `Opened<T>` for a guarded device; NeedResult's warning typed (`warning?: string`, the lab line rendering
+`WARN — <warning>: <how>`); `canonicalJson` in records.ts, called directly. 8 more hand mutants, each bounded: all
+killed at once.
+
+The mutation run's headroom: the cold run of thirty-one modules takes about 5 minutes (298 to 324 s; 313 s the final)
+against its 600 s bound; a slice like this one adds about 60 s. When a cold run nears the bound (say past 480 s), do not
+raise it silently: split the run (scope.json's modules in two `--mutate` halves, each held to the same floors, both run
+before a merge), or raise the bound by a decision recorded in this ADR.
