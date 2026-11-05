@@ -740,8 +740,8 @@ probes and live.ts by rules, with real files in a temp dir, a fixed clock and pi
 (tests/truth/batch/runner.test.ts: a fake two-block batch, one iOS block and one Android, yields the whole SUMMARY,
 golden-style). The same run on the real process seam is tests/truth/batch/runner-proc.test.ts (its child
 tests/fixtures/batch/runner-child.ts makes a git repo of one commit, runs two blocks, and is sent a Ctrl-C mid-block, or
-ends by itself), in the normal suite only, as abort-proc.test.ts. Baselines, cold: runner-lines.ts 100 % (318 mutants, 2
-timeouts), floor 98; records.ts 100 % (100 mutants), floor 98; runner.ts 99.20 % after the code review (373 mutants, 0
+ends by itself), in the normal suite only, as abort-proc.test.ts. Baselines, cold: runner-lines.ts 100 % (322 mutants, 2
+timeouts), floor 98; records.ts 100 % (73 mutants), floor 98; runner.ts 99.27 % after review round 5 (409 mutants, 0
 survived, 3 without coverage, each a `?? ''` turned into "Stryker was here!" — equivalent because that text holds no `#
 Live golden:` header (live.ts's log, the rejudge summary) and no run's header (steps.log), so stepOutcome and stepsOfRun
 read it as they read '' — not because the file is always there), floor 97; words.ts 100 % (143 mutants); run-dir.ts
@@ -749,7 +749,7 @@ read it as they read '' — not because the file is always there), floor 97; wor
 99.64 % (275 mutants, the same equivalent). The first cold run left runner.ts at 90.44 % (27 survived, 8 without
 coverage) and runner-lines.ts at 98.53 % (4 survived): each was killed by a test or designed away, and one of them
 showed a real gap — a probe's progress line (a lone CR) in a log would have made the SUMMARY refuse its ERROR line, so
-the run would have lost its SUMMARY (below). The cold run of all twenty-seven modules took 3 min 51 s. Review round 1:
+the run would have lost its SUMMARY (below). The cold run of all twenty-seven modules took 3 min 54 s. Review round 1:
 26 more hand mutants on its decisions, 25 killed at once, 1 by a test made stricter (a block named `meta` thrown before
 a config refusal), and one Stryker survivor (a run counter only compared with 0) designed away as a boolean. 95 hand
 mutants, one per decision branch, each run bounded (a timeout counts as killed): 85 killed at once, 9 by tests added for
