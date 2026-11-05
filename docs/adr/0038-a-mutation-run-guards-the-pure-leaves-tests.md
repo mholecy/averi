@@ -1226,4 +1226,5 @@ reset's shape (`{ ok: true, warning? }` or `{ ok: false, why }`, where it return
 `.ok` before its live run) and `wdaWindow` returns the warnings of its two checks (`warnings`); the stale-companion
 sentence names the likely cause only; the guard reads its AVD line and adb's words through one first-non-blank-line
 helper, with no assignment inside its catch. 4 more hand mutants, each bounded: all killed (the end check's warning
-only after a test made the end check reset).
+only after a test made the end check reset). Its cold run, 368 s: ios-lab.ts 100 % (392 mutants, 1 timeout counted
+killed), every other module at or above the run before; floors unchanged.

@@ -142,7 +142,7 @@
   "scripts/truth/batch/ios-lab.ts": {
     "tests": ["tests/truth/batch/ios-lab.test.ts", "tests/truth/batch/lab-batch.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-05 (T2 batch-13 fixes: endCompanion — pkill, then idb disconnect — in the reset and the last step, ResetResult, the stale-companion why; cold): 380 mutants, 1 timeout (counted killed), 0 survived — after two equivalents of its first cold run (99.49 %: an optional field spread only when defined) were designed away; 100 % on 2026-11-05 (T2 S6b code review: checkDevice, portFree once, Opened; cold, final): 359 mutants, 1 timeout (counted killed), 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 2, cold): 388 mutants, 1 timeout (counted killed), 0 survived"
+    "baseline": "100 % on 2026-11-05 (T2 batch-13 code review: iosCheck returns the reset's shape, wdaWindow its checks' warnings; cold): 392 mutants, 1 timeout (counted killed), 0 survived; 100 % on 2026-11-05 (T2 batch-13 fixes: endCompanion — pkill, then idb disconnect — in the reset and the last step, ResetResult, the stale-companion why; cold): 380 mutants, 1 timeout (counted killed), 0 survived — after two equivalents of its first cold run (99.49 %: an optional field spread only when defined) were designed away; 100 % on 2026-11-05 (T2 S6b code review: checkDevice, portFree once, Opened; cold, final): 359 mutants, 1 timeout (counted killed), 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 2, cold): 388 mutants, 1 timeout (counted killed), 0 survived"
   },
   "scripts/truth/batch/android-lab.ts": {
     "tests": ["tests/truth/batch/android-lab.test.ts", "tests/truth/batch/lab-batch.test.ts"],
