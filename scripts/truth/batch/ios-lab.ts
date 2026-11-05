@@ -144,12 +144,13 @@ export async function killLabWda(k: Killer): Promise<{ port: PortRead; killed: b
 /**
  * The lab simulator's idb_companion ended (pkill by its exact pattern), then its entry dropped from idb's local
  * companion list (`idb disconnect <udid>`, bounded; batch-13): a pkill alone leaves an entry the next run's idb trusts.
- * `pkill`: pkill's why when it failed; `warning`: the disconnect's when it failed — never a block's failure by itself.
+ * `whys`: what failed, pkill's then the disconnect's; `warning`: the disconnect's alone — never a block's failure by
+ * itself.
  */
-export async function endCompanion(k: { run: Run; udid: string }): Promise<{ pkill?: string; warning?: string }> {
+export async function endCompanion(k: { run: Run; udid: string }): Promise<{ whys: string[]; warning: string | undefined }> {
   const killed = pkillOf(await k.run('pkill', ['-f', companionPattern(k.udid)], { secs: HOST_SECS }));
   const warning = disconnectWarning(await k.run('idb', disconnectArgv(k.udid), { secs: HOST_SECS }));
-  return { ...('why' in killed && { pkill: killed.why }), ...(warning !== undefined && { warning }) };
+  return { whys: [...('why' in killed ? [killed.why] : []), ...(warning === undefined ? [] : [warning])], warning };
 }
 
 /**
@@ -165,9 +166,7 @@ export function endLabProcesses(guarded: () => string | undefined, wait: (ms: nu
     const { port, killed, whys } = await killLabWda({ run, udid, wait });
     const part = portPart(port, killed);
     if (port.state !== 'free') whys.push(part);
-    const companion = await endCompanion({ run, udid });
-    if (companion.pkill !== undefined) whys.push(companion.pkill);
-    if (companion.warning !== undefined) whys.push(companion.warning);
+    whys.push(...(await endCompanion({ run, udid })).whys);
     const said = `the lab's WebDriverAgent (${part}) and idb_companion of ${nameInLine(udid)} ended`;
     if (whys.length === 0) step('NOTE', said);
     else step('WARN', `${said}, not all proven: ${whys.join('; ')}`);
@@ -325,7 +324,7 @@ export function iosLab(o: IosLabOptions = {}): IosLab {
         if (!r.ok) return { ok: false, why: `the initial iOS reset failed: ${r.why}` };
         start = await readProtected(lab.sim);
         c.step('NOTE', `${PROTECTED.domain}'s finportal key at the iOS stretch's start: ${readText(start)} (read only: no batch writes it)`);
-        return r.warning === undefined ? opened : { ...opened, warning: r.warning };
+        return { ...opened, warning: r.warning };
       },
       installWord: 'simctl install',
       install: (lab, built) => lab.simctl(['install', lab.udid, built]),

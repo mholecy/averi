@@ -78,7 +78,7 @@ export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?:
 /** A lab device as its need checks it (ios-lab.ts, android-lab.ts): opened, this run's build installed, its cells. */
 export interface DeviceCheck<T> {
   /** Guarded and readied (the reset, a first read): the device — with a warning the readying left (batch-13) — or why not. */
-  open(): Promise<Opened<T> & { warning?: string }>;
+  open(): Promise<Opened<T> & { warning?: string | undefined }>;
   /** How the build is installed (`simctl install`), for its why, and the call that does it. */
   installWord: string;
   install(device: T, built: string): Promise<CallResult>;
