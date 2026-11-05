@@ -48,8 +48,8 @@ import type { Point } from '../../../src/adapters/types.js';
  *
  * Every call goes to the lab AVD only: a `LabEmu` is had only through lab-device.ts's Android guard (`adb -s <serial>
  * emu avd name` says `averi_lab`), and every adb call names its serial first. Nothing here taps but `tapSafely`, at the
- * point safeTap gives, never inside an "Always" node; nothing writes a setting, a role or a preferred activity; the only
- * writes are the reinstall's own uninstall and install, after the state file is marked dirty. Files are never
+ * point safeTap gives, never inside an "Always" node; nothing writes a setting, a role or a preferred activity; the
+ * only writes are the reinstall's own uninstall and install, after the state file is marked dirty. Files are never
  * overwritten: a pulled APK is a fresh file.
  *
  * What S6 adds around it: the block's steps, its `.cases`, the SUMMARY assembly, the probe's own state put back (its
