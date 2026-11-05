@@ -30,6 +30,7 @@ import {
   shellReadOf,
   stateHand,
   treeOf,
+  unflaggedOf,
   unknownInstallHand,
   unreachableOf,
   type AcceptedEntry,
@@ -134,13 +135,18 @@ describe("preferredOf — only the `Preferred Activities User N:` block (d55-b11
     expect(lastChosenOf(p).map((e) => e.component)).toEqual(['dev.averi.lab/.Twin']);
   });
 
-  it('an entry with no mAlways line is a leak (never assumed last-chosen); one with no Authority has no authority key', () => {
+  it('an entry with no mAlways line is neither a default nor last-chosen: it cannot be compared, so --check says unproven (T2 S5 code review); one with no Authority has no authority key', () => {
     const p = readOf(withEntries(labEntry('none').replace('          Authority: "shared": -1', '')));
     if (p.state !== 'read') throw new Error('unread');
     expect(p.lab).toEqual([expect.objectContaining({ always: undefined })]);
     expect(Object.keys(p.lab[0])).toEqual(['text', 'component', 'always']);
-    expect(leaksOf(p)).toHaveLength(1);
+    expect(leaksOf(p)).toEqual([]);
     expect(lastChosenOf(p)).toEqual([]);
+    expect(unflaggedOf(p)).toHaveLength(1);
+    expect(checkExit(launcher, p, [])).toBe(3);
+    expect(checkLine(launcher, p, [])).toMatch(/^D55 check: ERROR — chooser no; preferred read \(1 user\); lab entries 1 \(defaults 0, last-chosen 0, no mAlways 1\); first: /);
+    // A default beside it is still a default.
+    expect(checkExit(launcher, readOf(withEntries(labEntry('none'), labEntry('true'))), [])).toBe(1);
   });
 
   it("a lab entry by its component (another scheme) or by its scheme (another app's activity); mAlways read from the entry's first line after it only", () => {
@@ -534,7 +540,7 @@ describe('the readers at their edges (T2 S5 mutation round: each test kills a su
     expect(p.lab[0].text).toMatch(/^9d3a2b9 dev\.averi\.lab\/\.Twin \| mMatch=0x300000 mAlways=false \| Selected from:/);
   });
 
-  it("an entry of one line (the block's last) has no mAlways: a leak; trailing spaces on an entry or a header line are no other line", () => {
+  it("an entry of one line (the block's last) has no mAlways: unproven; trailing spaces on an entry or a header line are no other line", () => {
     const p = readOf('Preferred Activities User 0:  \n  Schemes:\n      averilab:\n        9d3a2b9 dev.averi.lab/.Twin  \n');
     expect(p).toEqual({ state: 'read', users: 1, lab: [{ text: '9d3a2b9 dev.averi.lab/.Twin', component: 'dev.averi.lab/.Twin', always: undefined }] });
   });
@@ -693,6 +699,12 @@ describe('safeTap fails closed (T2 S5 review round 1)', () => {
     // A tag read wrong (a single-quoted value holding the words `resource-id="…"`): its id is not src's, refused.
     const shifted = resolverXml().replace('<node index="0" text="" resource-id="" class="android.widget.FrameLayout"', '<node index="0" hint=\' resource-id="x:id/ghost"\' text="" resource-id="" class="android.widget.FrameLayout"');
     expect(treeOf(shifted)).toMatchObject({ why: expect.stringMatching(/^the dump's tags and src's tree disagree at node \d+: tag resource-id "x:id\/ghost", tree identifier null$/) });
+  });
+
+  it('a row by number or label with more than one resolver_list is not unique (T2 S5 code review)', () => {
+    const two = resolverXml().replace('resource-id="android:id/profile_pager"', 'resource-id="android:id/resolver_list"');
+    expect(safeTap(tree(two), { row: 1 })).toEqual({ ok: false, refusal: 'not-unique', why: '2 resolver_list nodes (need exactly 1)' });
+    expect(safeTap(tree(two), { row: 'AveriLab twin' })).toEqual({ ok: false, refusal: 'not-unique', why: '2 resolver_list nodes (need exactly 1)' });
   });
 
   it("a dump whose nodes and src's parsed tree differ (a node in a comment) is no tree: nothing could be judged node by node", () => {
