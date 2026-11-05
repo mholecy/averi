@@ -1,7 +1,9 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
+import { GROUP_ENV } from '../../scripts/mutation/group.mjs';
 import {
   checkFloors, GROUP_BOUND_MS, main, planRuns, readScope, scoreOf, spawnBounded,
   type MutateDeps, type MutationReport, type Scope, type Spawned,
@@ -102,12 +104,26 @@ describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)
     expect(planRuns(['-m', 'scripts/truth/batch/lab-x.ts', '--force'], two)).toEqual({
       runs: [{ group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts', '--force'] }],
     });
+    expect(planRuns(['-m=src/a.ts'], two)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts'] }] });
     expect(planRuns(['--mutate=src/a.ts:1:2-3:4'], two)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/a.ts:1:2-3:4'] }] });
   });
 
-  it('--mutate without --group: a file no scope entry names, or no file, is a refusal', () => {
-    expect(planRuns(['--mutate', 'src/a.ts,src/*.ts'], two)).toEqual({
-      refusal: 'npm run mutate: --mutate src/*.ts: not a scripts/mutation/scope.json module (give --group to mutate it)',
+  it('--mutate without --group: a glob goes to the group of each module it matches', () => {
+    expect(planRuns(['--mutate', 'src/*.ts', '--force'], two)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/*.ts', '--force'] }] });
+    expect(planRuns(['--mutate', 'scripts/truth/batch/lab-*.ts'], two)).toEqual({
+      runs: [{ group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-*.ts'] }],
+    });
+    expect(planRuns(['--mutate', '**/*.ts'], two)).toEqual({
+      runs: [{ group: 'core', args: ['--mutate', '**/*.ts'] }, { group: 'lab', args: ['--mutate', '**/*.ts'] }],
+    });
+  });
+
+  it('--mutate without --group: a pattern matching no scope entry, or no file, is a refusal', () => {
+    expect(planRuns(['--mutate', 'src/a.ts,src/zz/*.ts'], two)).toEqual({
+      refusal: 'npm run mutate: --mutate src/zz/*.ts: matches no scripts/mutation/scope.json module (give --group to mutate it)',
+    });
+    expect(planRuns(['--mutate', 'src/a'], two)).toEqual({
+      refusal: 'npm run mutate: --mutate src/a: matches no scripts/mutation/scope.json module (give --group to mutate it)',
     });
     expect(planRuns(['--mutate'], two)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
     expect(planRuns(['-m', ''], two)).toEqual({ refusal: 'npm run mutate: --mutate needs a file' });
@@ -126,7 +142,7 @@ function fakeDeps(o: { spawned?: Partial<Record<string, Partial<Spawned>>>; repo
   const deps: MutateDeps = {
     readScope: () => o.scope ?? two,
     spawn: (args, env, boundMs) => {
-      const group = env.AVERI_MUTATE_GROUP;
+      const group = env[GROUP_ENV];
       events.push(`spawn ${group} ${args.join(' ')} ${boundMs}`);
       clock += group === 'core' ? 212_400 : 98_600;
       return Promise.resolve({ status: 0, signal: null, timedOut: false, interrupted: false, ...o.spawned?.[group] });
@@ -207,6 +223,13 @@ describe('main — the groups one after the other, the run failing if either fai
     expect(out.slice(-2)).toEqual(['npm run mutate: core failed (exit 130) in 212 s', 'npm run mutate: lab not run: the run was interrupted']);
   });
 
+  it('an interrupt Stryker handles itself (it exits, with 130): its exit, and no later group runs', async () => {
+    const { deps, events, out } = fakeDeps({ spawned: { core: { status: 130, interrupted: true } } });
+    expect(await main([], deps)).toBe(130);
+    expect(events.filter((e) => e.startsWith('spawn'))).toEqual(['spawn core run 600000']);
+    expect(out.slice(-2)).toEqual(['npm run mutate: core failed (exit 130) in 212 s', 'npm run mutate: lab not run: the run was interrupted']);
+  });
+
   it('Stryker not started, or killed by a signal: a failure saying why', async () => {
     const started = fakeDeps({ spawned: { core: { status: null, error: 'spawn stryker ENOENT' } } });
     expect(await main(['--group', 'core'], started.deps)).toBe(1);
@@ -227,7 +250,9 @@ describe('main — the groups one after the other, the run failing if either fai
     expect(await main(['--group', 'all'], refused.deps)).toBe(2);
     expect(refused.events).toEqual([]);
     expect(refused.out).toEqual(['E npm run mutate: --group all: not a group (core or lab)']);
-    const bad = fakeDeps({ scope: { ...two, 'src/b.ts': { tests: ['tests/b.test.ts'], floor: 90, baseline: '', group: 'x' } } });
+    // scope.json as read: its group not yet checked.
+    const unchecked: Scope = JSON.parse(JSON.stringify({ ...two, 'src/b.ts': { tests: ['tests/b.test.ts'], floor: 90, baseline: '', group: 'x' } }));
+    const bad = fakeDeps({ scope: unchecked });
     expect(await main([], bad.deps)).toBe(2);
     expect(bad.events).toEqual([]);
     expect(bad.out).toEqual(['E npm run mutate: src/b.ts: group "x" in scripts/mutation/scope.json is not core or lab']);
@@ -246,25 +271,30 @@ describe('spawnBounded — a group\'s Stryker in a process group of its own, bou
 
   it('past its bound: its whole group goes, a grandchild too', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'mutate-bound-'));
-    const pidFile = join(dir, 'grandchild');
-    // The grandchild ignores SIGTERM: only the SIGKILL to the group once its leader has gone ends it.
-    const grandchild = JSON.stringify("process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)");
-    const script = `const c = require('node:child_process').spawn(process.execPath, ['-e', ${grandchild}], { stdio: 'ignore' });
-      require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(c.pid)); setInterval(() => {}, 1000);`;
-    const run = await node(['-e', script], quiet, 400);
-    expect(run).toMatchObject({ status: null, timedOut: true, interrupted: false });
-    const pid = Number(readFileSync(pidFile, 'utf8'));
-    await new Promise((r) => setTimeout(r, 100));
-    expect(() => process.kill(pid, 0)).toThrow();
-    rmSync(dir, { recursive: true, force: true });
+    try {
+      const pidFile = join(dir, 'grandchild');
+      // The grandchild ignores SIGTERM: only the SIGKILL to the group once its leader has gone ends it.
+      const grandchild = JSON.stringify("process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)");
+      const script = `const c = require('node:child_process').spawn(process.execPath, ['-e', ${grandchild}], { stdio: 'ignore' });
+        require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(c.pid)); setInterval(() => {}, 1000);`;
+      const run = await node(['-e', script], quiet, 400);
+      expect(run).toMatchObject({ status: null, timedOut: true, interrupted: false });
+      const pid = Number(readFileSync(pidFile, 'utf8'));
+      await new Promise((r) => setTimeout(r, 100));
+      expect(() => process.kill(pid, 0)).toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
-  it('an interrupt of mutate.ts goes to the group, and the run says it was interrupted', async () => {
-    const listeners = [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')];
-    const running = node(['-e', 'setInterval(() => {}, 1000)'], quiet, 5000);
-    await new Promise((r) => setTimeout(r, 200));
-    process.emit('SIGINT', 'SIGINT'); // as node calls a signal's listener
-    expect(await running).toEqual({ status: null, signal: 'SIGINT', timedOut: false, interrupted: true });
-    expect([process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')]).toEqual(listeners);
-  });
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    it(`${signal} to mutate.ts goes to the group, the run says it was interrupted, and its listeners go`, async () => {
+      const signals = new EventEmitter();
+      const running = spawnBounded(process.execPath, process.cwd(), signals)(['-e', 'setInterval(() => {}, 1000)'], quiet, 5000);
+      await new Promise((r) => setTimeout(r, 200));
+      signals.emit(signal, signal); // as node calls a signal's listener
+      expect(await running).toEqual({ status: null, signal, timedOut: false, interrupted: true });
+      expect([signals.listenerCount('SIGINT'), signals.listenerCount('SIGTERM')]).toEqual([0, 0]);
+    });
+  }
 });

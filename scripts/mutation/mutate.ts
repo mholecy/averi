@@ -1,9 +1,11 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, matchesGlob } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../is-main.js';
-import { GROUP_ENV, GROUPS, groupScope, readScopeFile, scopeErrors, scopeOf, type Group } from './group.mjs';
+import {
+  filesOf, GROUP_ENV, GROUP_WORDS, GROUPS, groupScope, isGroup, readScopeFile, scopeErrors, type Group, type Scope,
+} from './group.mjs';
 
 /**
  * `npm run mutate`: Stryker over the modules scope.json names, one group at a time (core, then lab: one Stryker
@@ -14,8 +16,7 @@ import { GROUP_ENV, GROUPS, groupScope, readScopeFile, scopeErrors, scopeOf, typ
  *   (npm run mutate -- --force: both groups, cold; npm run mutate -- --group lab --force: lab alone, cold)
  */
 
-/** scripts/mutation/scope.json: per mutated module, its direct tests (globs), its floor, its baseline and its group. */
-export type Scope = Readonly<Record<string, { tests: readonly string[]; floor: number; baseline: string; group: string }>>;
+export type { Scope };
 
 /** What `checkFloors` reads of Stryker's JSON report (mutation-testing-report-schema). */
 export interface MutationReport {
@@ -72,42 +73,41 @@ export interface GroupRun {
   args: string[];
 }
 
-const GROUP_WORDS = GROUPS.join(' or ');
-const isGroup = (name: string): name is Group => (GROUPS as readonly string[]).includes(name);
+/** The options planRuns reads (the rest go to Stryker as given): each its slot, and what its missing value is. */
+const OPTIONS = {
+  '--group': { slot: 'group', needs: `a group (${GROUP_WORDS})` },
+  '--tempDirName': { slot: 'tempDir', needs: 'a name' },
+  '--mutate': { slot: 'mutate', needs: 'a file' },
+  '-m': { slot: 'mutate', needs: 'a file' },
+} as const;
+type Option = keyof typeof OPTIONS;
+const isOption = (arg: string): arg is Option => Object.hasOwn(OPTIONS, arg);
 
 /**
  * The groups a run starts, in order, each with its Stryker arguments; or a refusal. `--group <name>` picks one group
  * (none: all, in GROUPS' order) and is not passed on. `--tempDirName <name>` becomes `<name>-<group>`, each group its
- * own sandbox. Without `--group`, `--mutate <files>` sends each file to the group whose scope.json entry it is (a
- * Stryker range after it kept) and starts only the groups named; a file no entry names is a refusal. With `--group`,
- * `--mutate` is passed on as given. Pure.
+ * own sandbox. Without `--group`, each `--mutate` pattern (a path or a glob, a Stryker range after a path kept) is
+ * matched against scope.json's modules and goes to the group of each it matches; only the groups matched run, and a
+ * pattern matching none is a refusal. With `--group`, `--mutate` is passed on as given. Pure.
  */
 export function planRuns(args: readonly string[], scope: Scope): { runs: GroupRun[] } | { refusal: string } {
   const refuse = (why: string) => ({ refusal: `npm run mutate: ${why}` });
-  let group: Group | undefined;
-  let tempDir: string | undefined;
-  let mutate: string | undefined;
+  const given: { group?: string; tempDir?: string; mutate?: string } = {};
   const rest: string[] = [];
   for (let i = 0; i < args.length; i++) {
-    const [option, inline] = args[i].startsWith('--') && args[i].includes('=') ? args[i].split(/=(.*)/s, 2) : [args[i], undefined];
-    if (option !== '--group' && option !== '--tempDirName' && option !== '--mutate' && option !== '-m') {
+    const [name, inline] = args[i].includes('=') ? args[i].split(/=(.*)/s, 2) : [args[i], undefined];
+    if (!isOption(name)) {
       rest.push(args[i]);
       continue;
     }
+    const { slot, needs } = OPTIONS[name];
     const value = inline ?? (args[i + 1]?.startsWith('-') === false ? args[++i] : undefined);
-    if (option === '--group') {
-      if (group !== undefined) return refuse('--group given twice: give one, or none for both');
-      if (value === undefined || value === '') return refuse(`--group needs a group (${GROUP_WORDS})`);
-      if (!isGroup(value)) return refuse(`--group ${value}: not a group (${GROUP_WORDS})`);
-      group = value;
-    } else if (option === '--tempDirName') {
-      if (value === undefined || value === '') return refuse('--tempDirName needs a name');
-      tempDir = value;
-    } else {
-      if (value === undefined || value === '') return refuse('--mutate needs a file');
-      mutate = value;
-    }
+    if (value === undefined || value === '') return refuse(`${name === '-m' ? '--mutate' : name} needs ${needs}`);
+    if (slot === 'group' && given.group !== undefined) return refuse('--group given twice: give one, or none for both');
+    given[slot] = value;
   }
+  const { group, tempDir, mutate } = given;
+  if (group !== undefined && !isGroup(group)) return refuse(`--group ${group}: not a group (${GROUP_WORDS})`);
   const argsOf = (g: Group, files: string | undefined): string[] => [
     ...(files === undefined ? [] : ['--mutate', files]),
     ...rest,
@@ -117,11 +117,10 @@ export function planRuns(args: readonly string[], scope: Scope): { runs: GroupRu
   if (mutate === undefined) return { runs: GROUPS.map((g) => ({ group: g, args: argsOf(g, undefined) })) };
   const byGroup = new Map<Group, string[]>();
   for (const pattern of mutate.split(',')) {
-    const owner = scope[pattern.replace(/:\d.*$/s, '')]?.group;
-    if (owner === undefined || !isGroup(owner)) {
-      return refuse(`--mutate ${pattern}: not a scripts/mutation/scope.json module (give --group to mutate it)`);
-    }
-    byGroup.set(owner, [...(byGroup.get(owner) ?? []), pattern]);
+    const path = pattern.replace(/:\d.*$/s, '');
+    const owners = new Set(Object.entries(scope).filter(([file]) => matchesGlob(file, path)).map(([, m]) => m.group));
+    if (owners.size === 0) return refuse(`--mutate ${pattern}: matches no scripts/mutation/scope.json module (give --group to mutate it)`);
+    for (const owner of owners) byGroup.set(owner, [...(byGroup.get(owner) ?? []), pattern]);
   }
   return { runs: GROUPS.filter((g) => byGroup.has(g)).map((g) => ({ group: g, args: argsOf(g, byGroup.get(g)?.join(',')) })) };
 }
@@ -139,12 +138,18 @@ export interface Spawned {
 /** Starts `args` with `env` added to ours, stopped past `boundMs`. */
 export type Spawner = (args: readonly string[], env: Readonly<Record<string, string>>, boundMs: number) => Promise<Spawned>;
 
+/** Where this process's interrupts come from: `process`, or a test's emitter. */
+export interface SignalSource {
+  on(signal: 'SIGINT' | 'SIGTERM', listener: (signal: NodeJS.Signals) => void): unknown;
+  off(signal: 'SIGINT' | 'SIGTERM', listener: (signal: NodeJS.Signals) => void): unknown;
+}
+
 /**
  * `command` in a process group of its own, its output ours. Past `boundMs` the group gets SIGTERM, and SIGKILL
- * KILL_GRACE_MS later; an interrupt of this process (SIGINT, SIGTERM) is passed to the group, which no longer gets the
- * terminal's; once the command has ended, its group gets SIGKILL: no Stryker worker outlives its run.
+ * KILL_GRACE_MS later; an interrupt of this process (SIGINT, SIGTERM, from `signals`) is passed to the group, which no
+ * longer gets the terminal's; once the command has ended, its group gets SIGKILL: no Stryker worker outlives its run.
  */
-export function spawnBounded(command: string, cwd: string): Spawner {
+export function spawnBounded(command: string, cwd: string, signals: SignalSource = process): Spawner {
   return (args, env, boundMs) =>
     new Promise((resolve) => {
       let timedOut = false;
@@ -163,8 +168,8 @@ export function spawnBounded(command: string, cwd: string): Spawner {
         interrupted = true;
         signalGroup(signal);
       };
-      process.on('SIGINT', onInterrupt);
-      process.on('SIGTERM', onInterrupt);
+      signals.on('SIGINT', onInterrupt);
+      signals.on('SIGTERM', onInterrupt);
       const bound = setTimeout(() => {
         timedOut = true;
         signalGroup('SIGTERM');
@@ -173,8 +178,8 @@ export function spawnBounded(command: string, cwd: string): Spawner {
       const end = (ended: Omit<Spawned, 'timedOut' | 'interrupted'>): void => {
         clearTimeout(bound);
         clearTimeout(kill);
-        process.off('SIGINT', onInterrupt);
-        process.off('SIGTERM', onInterrupt);
+        signals.off('SIGINT', onInterrupt);
+        signals.off('SIGTERM', onInterrupt);
         signalGroup('SIGKILL');
         resolve({ ...ended, timedOut, interrupted });
       };
@@ -218,7 +223,7 @@ async function runGroup(run: GroupRun, scope: Scope, deps: MutateDeps): Promise<
     deps.error(`npm run mutate: ${group}: ${why}`);
     return code;
   };
-  const report = scopeOf({ [GROUP_ENV]: group }, scope).files.json;
+  const report = filesOf(group).json;
   // A report left by an earlier run must not be read as this one's.
   deps.removeReport(report);
   const stryker = await deps.spawn(['run', ...run.args], { [GROUP_ENV]: group }, GROUP_BOUND_MS);
@@ -276,5 +281,11 @@ export async function main(args: readonly string[], deps: MutateDeps = realDeps)
 }
 
 if (isMain(import.meta.url)) {
-  void main(process.argv.slice(2)).then((code) => process.exit(code));
+  main(process.argv.slice(2)).then(
+    (code) => process.exit(code),
+    (e: unknown) => {
+      console.error(`npm run mutate: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    },
+  );
 }

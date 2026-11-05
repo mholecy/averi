@@ -14,9 +14,17 @@ export const GROUPS = /** @type {const} */ (['core', 'lab']);
 export const GROUP_ENV = 'AVERI_MUTATE_GROUP';
 
 const SCOPE = 'scripts/mutation/scope.json';
-const GROUP_WORDS = GROUPS.join(' or ');
+/** The groups in words, for a line naming them: `core or lab`. */
+export const GROUP_WORDS = GROUPS.join(' or ');
 
-/** @returns {Record<string, { tests: string[], floor: number, baseline: string, group: string }>} */
+/**
+ * Whether `name` is one of GROUPS.
+ * @param {unknown} name
+ * @returns {name is typeof GROUPS[number]}
+ */
+export const isGroup = (name) => /** @type {readonly unknown[]} */ (GROUPS).includes(name);
+
+/** scope.json as written: its groups are checked by scopeErrors, never here. */
 export const readScopeFile = () => JSON.parse(readFileSync(new URL('./scope.json', import.meta.url), 'utf8'));
 
 /**
@@ -29,7 +37,7 @@ export function scopeErrors(scope) {
   const errors = [];
   for (const [file, { group }] of Object.entries(scope)) {
     if (group === undefined) errors.push(`${file}: has no group in ${SCOPE} (${GROUP_WORDS})`);
-    else if (!(/** @type {readonly unknown[]} */ (GROUPS).includes(group))) {
+    else if (!isGroup(group)) {
       errors.push(`${file}: group ${JSON.stringify(group)} in ${SCOPE} is not ${GROUP_WORDS}`);
     }
   }
@@ -59,20 +67,24 @@ export function scopeOf(env, scope = readScopeFile()) {
   const errors = scopeErrors(scope);
   if (errors.length > 0) throw new Error(`${SCOPE}: ${errors.join('; ')}`);
   const group = env[GROUP_ENV];
-  if (group !== undefined && !(/** @type {readonly string[]} */ (GROUPS).includes(group))) {
+  if (group !== undefined && !isGroup(group)) {
     throw new Error(`${GROUP_ENV}=${group}: not a mutation group (${GROUP_WORDS})`);
   }
   const own = group === undefined ? scope : groupScope(scope, group);
+  return { group, scope: own, tests: [...new Set(Object.values(own).flatMap((m) => m.tests))], files: filesOf(group) };
+}
+
+/**
+ * A group's own files — its incremental file, its JSON and HTML reports, its temp dir — each suffixed `-<group>`;
+ * no group: the unsuffixed names. Pure.
+ * @param {string | undefined} group
+ */
+export function filesOf(group) {
   const suffix = group === undefined ? '' : `-${group}`;
   return {
-    group,
-    scope: own,
-    tests: [...new Set(Object.values(own).flatMap((m) => m.tests))],
-    files: {
-      incremental: `reports/mutation/stryker-incremental${suffix}.json`,
-      json: `reports/mutation/mutation${suffix}.json`,
-      html: `reports/mutation/mutation${suffix}.html`,
-      tempDir: `node_modules/.stryker-tmp${suffix}`,
-    },
+    incremental: `reports/mutation/stryker-incremental${suffix}.json`,
+    json: `reports/mutation/mutation${suffix}.json`,
+    html: `reports/mutation/mutation${suffix}.html`,
+    tempDir: `node_modules/.stryker-tmp${suffix}`,
   };
 }
