@@ -518,25 +518,28 @@ class BatchRun<K> {
    * The one completeness rule, both paths (code review, review round 5): a block's own `complete()` when it gives one
    * (true: complete; false or a throw: not, and the backstop reads its runs); a `noRecords` block, complete once its run
    * returned before any abort; else S3's completeness over every live run and records.ts's gap of every record —
-   * complete only when incompleteLine has nothing to say, never by its files being there. Nothing asked: unasked.
+   * complete only when incompleteLine has nothing to say (else `gap`, its line), never by its files being there. Nothing
+   * asked: not complete, and no gap.
    */
-  private async assess(b: Block<K>): Promise<{ state: 'complete' | 'unasked' } | { state: 'incomplete'; line: string }> {
+  private async assess(b: Block<K>): Promise<{ complete: boolean; gap: string | undefined }> {
     const dir = this.dirs[b.id];
+    let complete = false;
+    let gap: string | undefined;
     if (b.complete !== undefined) {
-      let complete = false;
       try {
         complete = b.complete({ dir, fs: this.io.fs });
       } catch {
         // a complete() that throws: not complete
       }
-      return { state: complete ? 'complete' : 'unasked' };
+    } else if (b.noRecords === true) complete = this.finished.has(b.id);
+    else {
+      const runs = await this.askedRuns(b);
+      gap = runs.length === 0 ? undefined : incompleteLine(b.label, runs);
+      complete = runs.length > 0 && gap === undefined;
     }
-    if (b.noRecords === true) return { state: this.finished.has(b.id) ? 'complete' : 'unasked' };
-    const runs = await this.askedRuns(b);
-    if (runs.length === 0) return { state: 'unasked' };
-    const line = incompleteLine(b.label, runs);
-    return line === undefined ? { state: 'complete' } : { state: 'incomplete', line };
+    return { complete, gap };
   }
+
 
   /** Every run a block asked: each live run's completeness (S3), then each record's gap (records.ts). */
   private async askedRuns(b: Block<K>): Promise<AskedRun[]> {
@@ -562,12 +565,12 @@ class BatchRun<K> {
       complete: async () => {
         if (own()) return true;
         const a = await this.assess(b);
-        return a.state === 'incomplete' || (a.state === 'complete' && b.judge !== undefined);
+        return a.gap !== undefined || (a.complete && b.judge !== undefined);
       },
       judge: async (run) => {
         if (own()) return this.lines.get(b.id)!;
         const a = await this.assess(b);
-        if (a.state === 'incomplete') return [a.line];
+        if (a.gap !== undefined) return [a.gap];
         const lines = linesIn(await b.judge!({ ...files, run }));
         // No wanted block is ever missing from the abort SUMMARY: a judge that wrote no verdict of its label says so.
         return hasVerdictOf(lines, b.label) ? lines : [...lines, judgedNothingLine(b.label)];
@@ -584,7 +587,7 @@ class BatchRun<K> {
     const own = () => hasVerdictOf(this.lines.get(b.id)!, b.label);
     if (own()) return;
     const a = await this.assess(b);
-    if (a.state === 'complete' && b.judge !== undefined) {
+    if (a.complete && b.judge !== undefined) {
       try {
         const lines = linesIn(await b.judge({ dir: this.dirs[b.id], fs: this.io.fs, run: this.guard.bounded }));
         this.log.step('OK', `${b.id} analyze`);

@@ -731,8 +731,8 @@ non-live block's `asks` and `record`. abort.ts gains `leave(block, hand)` (a blo
 an ERROR), `interrupted`, and `head().errors` (the run's other ERROR lines in the abort SUMMARY); cases.ts's
 `incompleteLine` takes any run result of Completeness's shape (a record's too) and the words for nothing asked (`none`),
 so the not-run rule has one source. The code review moved a non-live block's records into a third file, records.ts
-(`recordOf`, `recordGap`, `writeAsked`, `writeDone`, `recordsIn`, `recordsComplete`: batch-12's block_complete), out of
-runner-lines.ts and the runner's class.
+(`recordOf`, `recordGap`, `recordGapIn`, `writeAsked`, `writeDone`, `recordsIn`), out of runner-lines.ts and the
+runner's class; its file-presence `recordsComplete` went in review round 5 (completeness is `assess`'s, below).
 
 runner-lines.ts, runner.ts and records.ts join the run. runner-lines.ts is tested on its own
 (tests/truth/batch/runner-lines.test.ts) and inside runBatch; runner.ts over a fake process seam that answers git, the
@@ -791,21 +791,26 @@ Decisions S6a pins:
   every live run's completeness and every record's gap; every run complete but no verdict written, `its <n> run(s) are
   complete, but no verdict line was written (see the ERROR lines)` — never a silent gap.
 - a block's `judge` (its analyzer, device-free) runs only for a complete block, on both paths (the code review: a dead
-  live run or a record that does not match got the judge's PASS and the gap vanished) — one rule, `judgeable`: its own
-  `complete()`, else records.ts's recordsComplete (batch-12's block_complete: one run asked at least, every live run's
-  record and rejudge summary written, every record what it was asked), or, for a block that declares `noRecords` (it
-  asks no run and records none), its run returned before any abort began; a `complete()` that throws is not complete. At
-  the normal end it runs after finish — the analyses after the restores, as batch-11 and batch-12 ran them — for a
-  complete block with no verdict of its label, through the bounded runner; a throw is an ERROR line `<id> analyze: …`;
-  an incomplete block gets the backstop's line (incompleteLine). The abort judges a block when it already holds a
-  verdict of its label (its own lines, the judge not run again) or when it has a judge and is complete by the same rule.
-  A block with complete records and no judge is INTERRUPTED: nothing is invented. A block the abort judged whose judge
-  wrote no verdict of its label gets `<label>: INCONCLUSIVE — interrupted: its judge wrote no verdict` after its lines
-  (review round 1, MAJOR: such a block was missing from the abort SUMMARY): every wanted block has a line in both
-  SUMMARYs, a test asserts it over every state a block can be in at the interrupt.
+  live run or a record that does not match got the judge's PASS and the gap vanished) — one rule, `assess`, on both
+  paths (review round 5: files being there proved nothing — a rejudge summary holding kf1 of kf1–3 got the judge's
+  PASS): its own `complete()` when it gives one (a throw: not complete); for a block that declares `noRecords` (it asks
+  no run and records none — one that asks, records or runs live anyway throws, naming it), its run returned before any
+  abort began; else S3's completeness over every live run plus records.ts's gap of every record, complete only when
+  incompleteLine has nothing to say. At the normal end it runs after finish — the analyses after the restores, as
+  batch-11 and batch-12 ran them — for a complete block with no verdict of its label, through the bounded runner; a
+  throw is an ERROR line `<id> analyze: …`; an incomplete block gets the backstop's line (incompleteLine). The abort, by
+  the same rule: a block with a verdict of its label keeps its own lines (the judge not run again); an incomplete one is
+  INCONCLUSIVE with its gap (incompleteLine: an interrupted run is usually incomplete, and that is the honest line); a
+  complete one with a judge is judged; one that asked nothing, or is complete with no judge, INTERRUPTED. abort.ts's
+  `AbortBlock.complete` may now be async. A block with complete records and no judge is INTERRUPTED: nothing is
+  invented. A block the abort judged whose judge wrote no verdict of its label gets `<label>: INCONCLUSIVE —
+  interrupted: its judge wrote no verdict` after its lines (review round 1, MAJOR: such a block was missing from the
+  abort SUMMARY): every wanted block has a line in both SUMMARYs, a test asserts it over every state a block can be in
+  at the interrupt.
 - the ERROR lines: this run's steps' (steps.ts, named `steps.log`), then every line starting ERROR of each `*.log` and
   analyze.txt in this run's folders (meta, lab, each wanted block, in that order) — not another file, not an earlier
-  run's. Counted across all of them first, a step's line by what it says, its time aside, shown as first seen (the code
+  run's. Counted across all of them first, a step's line by what it says, its time aside (steps.log's lines only,
+  `timed`: another log's line starting with a time is no ERROR line, batch-12's `^ERROR`), shown as first seen (the code
   review: a line said as a step and repeated in a log is one line) and bounded (review rounds 1 to 3, `logErrors`): one
   line per distinct ERROR in first-seen order, bare when said once in one log, else `(×<total>, in <block>/<file>, …)`
   naming the first 3 logs then `+<n> more` (50 of one must not bury a different one, nor one line show three times with

@@ -198,6 +198,7 @@ describe('logErrors — this run\'s ERROR lines from its logs, counted across th
   });
 
   it('a step line\'s time is set aside only at the line\'s start: a time inside an ERROR line is part of what it says', () => {
+    expect(logErrors([{ ...log('steps.log', 'ERROR at 09:00:00 x\n10:00:00 ERROR at x'), timed: true }])).toEqual(['ERROR at 09:00:00 x', '10:00:00 ERROR at x']);
     expect(logErrors([{ ...log('steps.log', '09:00:00 ERROR a\n10:00:00 ERROR a'), timed: true }, log('p.log', 'ERROR a 09:00:00 b\nERROR a b')])).toEqual(['09:00:00 ERROR a (×2, in steps.log)', 'ERROR a 09:00:00 b', 'ERROR a b']);
   });
 

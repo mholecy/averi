@@ -646,15 +646,15 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
   });
 
   it('a noRecords block that asks, records or runs live: the batch\'s mistake, thrown at that call (review round 5, R4, R5)', async () => {
-    for (const run of [
-      async (ctx: Parameters<Block['run']>[0]) => ctx.asks('c', { kind: 'runs', runs: 1 }),
-      async (ctx: Parameters<Block['run']>[0]) => ctx.record('c', { kind: 'runs', runs: 1 }),
-      async (ctx: Parameters<Block['run']>[0]) => void (await ctx.liveRun('k', KF, { secs: 60 })),
-    ]) {
+    for (const [call, run] of [
+      ['asks', async (ctx: Parameters<Block['run']>[0]) => ctx.asks('c', { kind: 'runs', runs: 1 })],
+      ['record', async (ctx: Parameters<Block['run']>[0]) => ctx.record('c', { kind: 'runs', runs: 1 })],
+      ['liveRun', async (ctx: Parameters<Block['run']>[0]) => void (await ctx.liveRun('k', KF, { secs: 60 }))],
+    ] as const) {
       rmSync(out, { recursive: true, force: true });
       seam = new FakeSeam([git(), probes, live()]);
       expect(await go([plain('E5', { noRecords: true, run })])).toBe(130);
-      expect(summary().join('\n')).toContain('E5 declared noRecords');
+      expect(summary().join('\n')).toContain(`E5 declared noRecords, yet called ${call}: a block that asks or records runs declares none`);
       expect(seam.words().some((w) => w.includes('live.ts'))).toBe(false);
     }
   });
