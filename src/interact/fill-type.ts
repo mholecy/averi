@@ -66,7 +66,7 @@
 import { everyNode, INPUT_ROLE, type TypingDelivery, type UiNode } from '../adapters/types.js';
 import { sleep } from '../util/sleep.js';
 import { heldText, type Difference, type OtherInput, type Reformat, type SentAgain } from './fill-facts.js';
-import { differenceOf, droppedTail, landingOf, tailOf, tookText, type Expectation, type Landing } from './fill-landing.js';
+import { landingOf, readingOf, type Expectation, type Landing } from './fill-landing.js';
 
 /** The field as the typing sees it: send text, delete characters, read what it shows. */
 export interface FieldIo {
@@ -144,27 +144,28 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     const { observed } = read;
     // undefined: the node withholds its text, or was not found — nothing to compare.
     if (observed === undefined) return { kind: 'unread' };
+    // What the reading is, whole: the poll's landing where it ended on one, else a reading that missed.
+    const answer = read.landed ?? readingOf(observed, intent);
     // A non-input that never took the text is not the field: never wiped (its length is not the field's), never
     // retyped. Asked of the first reading only, as it always was: after a retry the last reading is a mismatch.
-    if (again.length === 0 && !tookText(observed, intent)) return { kind: 'not-taken', observed };
-    if (read.landed !== undefined) {
+    if (answer.kind === 'not-taken' && again.length === 0) return { kind: 'not-taken', observed };
+    // Final, but no landing: the field said plain shows bullets of another length (fill-landing.ts#Landing). Before
+    // reportDroppedTail: a held count 'unread' means no tail was retyped (fill.ts skips the re-read only where
+    // !retypesTail).
+    if (answer.kind === 'said-plain') return { kind: 'missed', observed, again, differs: answer.differs };
+    if (answer.kind === 'landed' || answer.kind === 'placeholder') {
       // A drop is proven only by its repair: the typing landed whole through a tail typed again. A capped or
       // trimming field (maxLength, an IBAN or phone mask) keeps its strict prefix for good — its retype moves nothing
       // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
       // (D24 review).
-      const landed = read.landed;
-      // Final, but no landing: the field said plain shows bullets of another length (fill-landing.ts#Landing). Before
-      // reportDroppedTail: a held count 'unread' means no tail was retyped (fill.ts skips the re-read only where
-      // !retypesTail).
-      if (landed.kind === 'said-plain') return { kind: 'missed', observed, again, differs: differenceOf(observed, intent) };
       if (tails() > 0) io.reportDroppedTail();
-      if (landed.kind === 'placeholder') return { kind: 'landed', observed, again, placeholder: true };
-      return { kind: 'landed', observed, again, ...(landed.reformatted !== undefined && { reformatted: landed.reformatted }) };
+      if (answer.kind === 'placeholder') return { kind: 'landed', observed, again, placeholder: true };
+      return { kind: 'landed', observed, again, ...(answer.reformatted !== undefined && { reformatted: answer.reformatted }) };
     }
-    const where = whereTyped(others, io.screen(), tailOf(observed, intent)?.missing);
+    const where = whereTyped(others, io.screen(), answer.tail?.missing);
     const tail =
-      retypesTail(intent.delivery) && where.kind === 'field' && read.steady && tails() < MAX_TAIL_RETYPES
-        ? droppedTail(observed, intent)
+      retypesTail(intent.delivery) && where.kind === 'field' && read.steady && tails() < MAX_TAIL_RETYPES && answer.tail?.retypable === true
+        ? answer.tail.missing
         : undefined;
     if (tail !== undefined && (tails() === 0 || observed !== read.prior)) {
       await io.type(tail);
@@ -177,7 +178,7 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
       again.push({ kind: 'whole', wiped: wipe > 0 });
       await io.type(value);
     } else {
-      return { kind: 'missed', observed, again, differs: differenceOf(observed, intent), ...(where.kind === 'elsewhere' && { elsewhere: where.input }) };
+      return { kind: 'missed', observed, again, differs: answer.differs, ...(where.kind === 'elsewhere' && { elsewhere: where.input }) };
     }
     const prior = observed;
     read = { ...(await pollValue(io.read, landing, intent.pollMs)), prior };

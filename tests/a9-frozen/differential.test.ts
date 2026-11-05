@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import type { UiNode } from '../../src/adapters/types.js';
 import type { Difference, FillFailure, OtherInput } from '../../src/interact/fill-facts.js';
@@ -105,7 +106,7 @@ describe('A9 differential: readingOf against the old composition', () => {
         }
       }
     }
-    console.log(`A9 differential rows: ${rows}`, Object.fromEntries([...kinds].sort()));
+    writeFileSync(`${process.env.TMPDIR}/a9-rows.json`, JSON.stringify({ rows, kinds: Object.fromEntries([...kinds].sort()) }, null, 1));
     expect(rows).toBeGreaterThan(500_000);
     for (const kind of ['landed', 'placeholder', 'said-plain:masked-said-plain', 'missed:unchanged', 'missed:unchanged:retypable', 'missed:length:retypable', 'missed:dropped-tail:retypable', 'missed:dropped-tail:tail', 'missed:length:tail', 'not-taken:length', 'missed:masked', 'missed:separated', 'missed:case', 'missed:same-length']) {
       expect(kinds.get(kind) ?? 0, kind).toBeGreaterThan(0);
@@ -277,7 +278,7 @@ describe('A9 differential: scripted reads through both typeAndConfirm', () => {
       }
       if (was.typed.kind === 'landed' && was.typed.again.some((a) => a.kind === 'tail')) note('landed through a tail');
     }
-    console.log(`A9 differential scripts: ${SCRIPTS}`, Object.fromEntries([...seen].sort()));
+    writeFileSync(`${process.env.TMPDIR}/a9-scripts.json`, JSON.stringify({ SCRIPTS, seen: Object.fromEntries([...seen].sort()) }, null, 1));
     for (const k of ['landed', 'not-taken', 'unread', 'missed', 'reported', 'wiped', 'again:tail', 'again:whole', 'again:two tails', 'missed:elsewhere', 'missed:wholeToo', 'missed:wholeToo+elsewhere', 'missed:masked-said-plain', 'landed through a tail']) {
       expect(seen.get(k) ?? 0, k).toBeGreaterThan(0);
     }
