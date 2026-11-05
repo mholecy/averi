@@ -76,8 +76,9 @@ export function inferredAlong(e: AxisEvidence): boolean {
   const { along, roomGiver } = e;
   const nearest = e.nearest === roomGiver;
   const directed = axisOf(e.direction) === along;
+  // The drawn frame's edges along `along` that are the room-giver's own (flushEdges asked along it gives only those).
   const own = flushEdges(e.drawn, roomGiver.rect, along);
-  const cutAtOwn = e.clipped.some((edge) => axisOfEdge(edge) === along && own.includes(edge)) && !e.unknownPast.some((edge) => axisOfEdge(edge) === along);
+  const cutAtOwn = e.clipped.some((edge) => own.includes(edge)) && !e.unknownPast.some((edge) => axisOfEdge(edge) === along);
   const over = (s: Stroke): boolean => containsPoint(roomGiver.rect, s.from) && containsPoint(roomGiver.rect, s.to);
   const measured = e.moves.some((m) => m.along === along && over(m.drawn));
   return nearest && directed && cutAtOwn && measured;
