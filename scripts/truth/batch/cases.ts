@@ -55,8 +55,8 @@ const LIVE_SHAPE = 'is not what a live run is asked (platform ios or android, ap
  * Write `<dir>/<name>.cases`: what the live run is asked, as JSON. Called before anything of the run is done. Only a
  * live run's (`Asked`, checked at run time too: nothing is written for anything else): runsIn and completeness read
  * every `.cases` as one, so a non-live block keeps its own record elsewhere (batch-12's E5 wrote `{"runs":3}`; the
- * runner's, S6). Never overwritten (io.ts's exclusive create): a run folder is never reused, so a second .cases of one
- * name is the batch's mistake. Returns its path.
+ * runner's asks and record, T2 S6a). Never overwritten (io.ts's exclusive create): a run folder is never reused, so a
+ * second .cases of one name is the batch's mistake. Returns its path.
  */
 export function writeCases(fs: BatchFs, dir: string, name: string, asked: Asked): string {
   plainSegment('run name', name);

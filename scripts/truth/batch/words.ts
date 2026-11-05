@@ -8,8 +8,8 @@ import type { CallResult } from './bounded.js';
  * first: `kf live verdict: INCONCLUSIVE — the premise does not hold`. The SUMMARY gathers the run's verdict lines in a
  * fixed order between two markers; whoever waits for a batch waits for `======== SUMMARY` (unchanged since batch-1).
  *
- * Not here yet (backlog T2): the ERROR lines batch-12 collected from each block's logs and analyze.txt — the runner
- * (slice S6) knows those files and hands them in with `errors`. The RESTORE block needs no `grep "run $RUN_ID"`
+ * The ERROR lines batch-12 collected from each block's logs and analyze.txt are the runner's to read (runner.ts, T2
+ * S6a): it knows those files and hands them in with `errors`. The RESTORE block needs no `grep "run $RUN_ID"`
  * filter any more: a run refuses to start while a RESTORE file exists (run-dir.ts#refusals) and only appends to it,
  * so what it prints is what this run wrote (`restore.written`, header line included, as batch-12's `cat`).
  */

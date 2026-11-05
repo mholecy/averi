@@ -44,8 +44,8 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  *
  * 1. the config (runner-lines.ts#configOf: `--out`, `--udid`, `--serial`, or their env), ONLY= and the knobs
  *    (select.ts), each error a refusal;
- * 2. the refusals (run-dir.ts): a RESTORE left, an earlier run's state file not clean, an out folder inside the checkout,
- *    the batch's own reasons — every refusal exits 2 with nothing done: no folder, no call;
+ * 2. the refusals (run-dir.ts): a RESTORE left, an earlier run's state file not clean, an out folder inside the
+ *    checkout, the batch's own reasons — every refusal exits 2 with nothing done: no folder, no call;
  * 3. the run opened: one fresh `run-<id>` folder per wanted block, meta's, and the lab folder on every run; its own
  *    `.out` and steps.log (steps.ts, no tee);
  * 4. the AbortGuard armed (abort.ts): a signal, a throw out of a block or an uncaught error from here on puts the dirty
@@ -512,7 +512,7 @@ class BatchRun<K> {
     return live.length + records.length > 0 && live.every((n) => written(runFiles(dir, n).record) && written(runFiles(dir, n).summary)) && records.every((n) => this.recordGapOf(dir, n) === undefined);
   }
 
-  /** The block as the abort sees it: a verdict of its own already kept, or its records complete and a judge to read them. */
+  /** The block as the abort sees it: a verdict of its own kept already, or complete records and a judge for them. */
   private abortBlock(b: Block<K>): AbortBlock {
     const dir = this.dirs[b.id];
     const files = { dir, fs: this.io.fs };
@@ -551,7 +551,7 @@ class BatchRun<K> {
     this.verdict(b, backstopLine(b.label, runs));
   }
 
-  /** Every ERROR line of this run's logs: each run folder's `*.log` and analyze.txt, meta's and lab's first (openRun's order). */
+  /** Every ERROR line of this run's logs: each run folder's `*.log` and analyze.txt, in openRun's order. */
   private logErrors(): string[] {
     const { fs } = this.io;
     return Object.values(this.dirs).flatMap((d) => fs.list(d).filter((n) => n.endsWith('.log') || n === 'analyze.txt').flatMap((n) => errorLinesIn(fs.read(join(d, n)) ?? '')));

@@ -75,7 +75,7 @@ export function configOf(argv: readonly string[], env: Env, repo = MODULE_REPO):
   return { ok: true, config: { out: out as string, repo: theRepo, ...(udid === undefined ? {} : { udid }), ...(serial === undefined ? {} : { serial }), env } };
 }
 
-/** The lab folder: made on every run (batch-11's O_lab), for what the lab checks keep — a pulled APK, the catalog's log. */
+/** The lab folder: made on every run (batch-11's O_lab), for what the lab checks keep: a pulled APK, a log. */
 export const LAB = 'lab';
 
 /**

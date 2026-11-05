@@ -109,7 +109,7 @@ export interface AbortGuardOptions {
   judgeBudgetSecs?: number;
 }
 
-/** What the abort SUMMARY says besides the blocks: the checkout line, the lab lines, the protected keys', more ERRORs. */
+/** What the abort SUMMARY says besides the blocks: the checkout line, the lab lines, the protected keys', ERRORs. */
 export interface AbortHead {
   checkout: string;
   labs: readonly string[];

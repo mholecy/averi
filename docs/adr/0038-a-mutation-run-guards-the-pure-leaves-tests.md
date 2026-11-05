@@ -9,6 +9,7 @@ Amended 2026-11-04 (T2 S1: scripts/truth/batch/ joined the run — see the T2 am
 Amended 2026-11-04 (T2 S2: bounded.ts and abort.ts joined the run — see the T2 amendment's S2 part below).
 Amended 2026-11-04 (T2 S3: preconditions.ts and cases.ts joined the run — see the T2 amendment's S3 part below).
 Amended 2026-11-05 (T2 S5: lab-chooser.ts and lab-emu.ts joined the run — see the T2 amendment's S5 part below).
+Amended 2026-11-05 (T2 S6a: runner-lines.ts and runner.ts joined the run — see the T2 amendment's S6a part below).
 
 ## Context
 
@@ -708,3 +709,162 @@ Where S5 departs, on purpose, from d55-b11.ts, batch-11 (its final, 735-line ver
 - the "other clickable node" rule is any other node there (src's tree has no `clickable`), stricter than d55-b11.ts's.
 - hand lines are adb commands with every word shell-quoted, `D55 (Android): …`, ending in the probe's restore command
   when the batch gives one, where batch-11's named d55-b11.ts's CLI inline.
+
+### S6a: the runner core (2026-11-05, backlog T2 slice S6, its first part)
+
+The orchestrator split slice S6 in two: S6a, the runner core (this part), and S6b, the lab plumbing. S6a adds two
+files, split as S4's and S5's are: runner-lines.ts, pure — the runner's config from argv and env (`configOf`: `--out`,
+`--udid`, `--serial`, `--repo`, falling back to AVERI_BATCH_OUT, AVERI_LAB_UDID and AVERI_LAB_SERIAL), every line it
+writes of its own (the checkout line, a need's lab line, a block not run for its needs, the backstop), a non-live
+block's records and their rule, the ERROR lines of a log, this run's part of steps.log, the details printout, and
+live.ts's argv — and runner.ts, the io: `runBatch`, which composes words, select, run-dir, steps, bounded, abort,
+preconditions, cases and live-table into one run, in this order: the config, ONLY= and the knobs, each error a refusal →
+the refusals (RESTORE, a dirty state file, an out folder inside the checkout, the batch's own) → the run's folders (one
+fresh `run-<id>` per wanted block, meta's, and the `lab` folder on every run) and its own output → the AbortGuard armed
+→ the preconditions (the checkout, then every wanted block's own, all before the first block runs) → each wanted block
+in the batch's order, its needs first → the windows still open to RESTORE (finish) → each block's judge → the backstop →
+the details → the SUMMARY → the exit code. A refusal exits 2 with no folder made and no call. A block is `{ id, label,
+needs, preconditions?, stateful?, run(ctx), judge?, complete?, details? }`; its ctx gives the steps, bounded probes
+owned by the block, the dirty windows, its folder and the lab folder, its verdict lines (several), `restoreHand`,
+`verdictAndHand` (a line and its hand lines: S4's compare, S5's cleanUp), the protected-key line slot, `liveRun` and a
+non-live block's `asks` and `record`. abort.ts gains `leave(block, hand)` (a block's hand lines to RESTORE now, said as
+an ERROR), `interrupted`, and `head().errors` (the run's other ERROR lines in the abort SUMMARY); cases.ts's
+`incompleteLine` takes any run result of Completeness's shape (a record's too).
+
+runner-lines.ts and runner.ts join the run. runner-lines.ts is tested on its own
+(tests/truth/batch/runner-lines.test.ts) and inside runBatch; runner.ts over a fake process seam that answers git, the
+probes and live.ts by rules, with real files in a temp dir, a fixed clock and pid and a fake live-cases table
+(tests/truth/batch/runner.test.ts: a fake two-block batch, one iOS block and one Android, yields the whole SUMMARY,
+golden-style). The same run on the real process seam is tests/truth/batch/runner-proc.test.ts (its child
+tests/fixtures/batch/runner-child.ts makes a git repo of one commit, runs two blocks, and is sent a Ctrl-C mid-block, or
+ends by itself), in the normal suite only, as abort-proc.test.ts. Baselines, cold: runner-lines.ts 100 % (271 mutants, 2
+timeouts), floor 98; runner.ts 98.88 % (357 mutants, 0 survived, 4 without coverage, each a `?? ''` for a file that is
+always there when read — a call's log, which its append-open creates, steps.log, a log its folder lists — equivalent),
+floor 96; abort.ts 98.11 % (423 mutants, the same equivalents and unreachable catch); cases.ts 99.64 % (275 mutants, the
+same equivalent). The first cold run left runner.ts at 90.44 % (27 survived, 8 without coverage) and runner-lines.ts at
+98.53 % (4 survived): each was killed by a test or designed away, and one of them showed a real gap — a probe's progress
+line (a lone CR) in a log would have made the SUMMARY refuse its ERROR line, so the run would have lost its SUMMARY
+(below). The cold run of all twenty-six modules took 3 min 45 s. 95 hand mutants, one per decision branch, each run
+bounded (a timeout counts as killed): 85 killed at once, 9 by tests added for them (no block starts once the abort
+began, nor one whose need was being checked; a judge is never run on nothing; a cut rejudge leaves its run incomplete;
+complete records with no judge are INTERRUPTED; a block's own verdict is not judged again; the rejudge's exit-1 rule; a
+block's stopKept ends its own kept groups only; a block named twice is thrown before a config refusal), 1 designed away
+(a list of the blocks that ran: a block not run always holds its own INCONCLUSIVE line, which the judge's check reads).
+
+Decisions S6a pins:
+- a failed checkout or precondition makes the blocks INCONCLUSIVE, never a refusal (S3 left the choice to the runner):
+  batch-11's way, not batch-12's. The checkout line is `ERROR checkout: <why> — every block INCONCLUSIVE, none run`;
+  every block's line is `<label>: INCONCLUSIVE — precondition: <why>`; no block's own precondition is asked then, no
+  need checked, no block run; the SUMMARY is written, and the exit is 0 unless something else fails (S1: an ERROR or an
+  INCONCLUSIVE alone never fails the run). A precondition's why is one line (its first); a check that throws is not
+  shown (`its check threw: <first line>`), never the run's error.
+- the preconditions of every wanted block are asked before the first block runs, as batch-11's prechecks were: a block's
+  state is never changed by an earlier block's run before its premise is read.
+- a need is checked once, by the first wanted block that names it, so a need no wanted block names is never checked; its
+  lab line (`LAB <need>: OK — <how>` or `ERROR — <why>`, one line) goes to the SUMMARY in the order checked. A block
+  whose need failed is `<label>: INCONCLUSIVE — <need>: <why>; …`, every failed need named, and not run; a check that
+  throws is a failed need and an ERROR line. A block naming a need the batch gives no check for, an id twice, an id that
+  is no plain path segment or a label with a colon: the batch's mistake, thrown before anything — before a config
+  refusal too.
+- a block not run (its precondition or need) gets a `SKIP <id> not run: <why>` step, not an ERROR: its INCONCLUSIVE line
+  says the why once. batch-11 also wrote an ERROR line for it.
+- the backstop reads a verdict of the block's own label (`<label>:` at a line's start, batch-11's grep): a cleanup or
+  compare line is none. With nothing asked, `not run (see the ERROR lines)`; with runs asked, S3's incompleteLine over
+  every live run's completeness and every record's gap; every run complete but no verdict written, `its <n> run(s) are
+  complete, but no verdict line was written (see the ERROR lines)` — never a silent gap.
+- a block's `judge` (its analyzer, device-free) runs at the normal end after finish — the analyses after the restores,
+  as batch-11 and batch-12 ran them — for a block with no verdict of its label (a block not run has its INCONCLUSIVE),
+  through the bounded runner; a throw is an ERROR line `<id> analyze: …` and the backstop follows. The abort judges a
+  block when it already holds a verdict of its label (its own lines, the judge not run again) or when it has a judge and
+  its records are complete: its own `complete()`, else batch-12's block_complete rule (one run asked at least, every
+  live run's record and rejudge summary written, every record what it was asked). A block with complete records and no
+  judge is INTERRUPTED: nothing is invented.
+- the ERROR lines: this run's steps' (steps.ts), then every line starting ERROR of each `*.log` and analyze.txt in this
+  run's folders (meta, lab, each wanted block, in that order), each once — not another file, not an earlier run's. The
+  abort SUMMARY carries them too (head's errors), where batch-12's abort printed the steps' only.
+- a probe's text, a judge's or an analyzer's lines are split at CR LF, LF and a lone CR (a progress line) before the
+  runner keeps them (`linesOf`, `linesIn`): the SUMMARY refuses a line break, and a probe's output must never cost the
+  run its SUMMARY (found in the cold run's review of the survivors). A verdict or protected-key line a block writes with
+  a break is the batch's mistake, thrown before it is kept, so the abort SUMMARY never meets it.
+- `restoreHand` and `verdictAndHand` write RESTORE at once (abort.ts's `leave`), under `<name> run <id> left by <block>
+  at <date> <time>; state to put back by hand:`, with an ERROR line naming the file; the SUMMARY's RESTORE section and
+  the exit code (1) count them, and the next run refuses to start. batch-11 wrote its LATE_HAND only at the end; a line
+  written at once survives an interrupt after it. A RESTORE that cannot be written sends the lines to stderr once.
+- once the abort has begun, no block starts (nor one whose need was being checked), the normal end's judges and SUMMARY
+  never run, and a verdict a block writes after it (its probe stopped, the block goes on) is only noted, not kept: what
+  it says then is not trusted. The exit is called synchronously right after the normal SUMMARY, so no signal can start a
+  second SUMMARY between them.
+- a non-live block's record: `asks(name, {kind: 'runs', runs})` writes `<name>.asked.json` before the run and
+  `record(name, …)` `<name>.done.json` once done, each exclusive (never overwritten); a record before its asks, a value
+  that is no record (a negative or a fraction) or a name that is no plain segment is thrown. Complete only when the runs
+  recorded equal the runs asked; more is a gap too. One kind for now; another is a member of the union. Kept apart from
+  S3's `.cases` (live runs only).
+- `liveRun`: the `.cases` written first; live.ts from the checkout under test (`<repo>/scripts/truth/live.ts`, the
+  running node, cwd the repo), its log to `<name>.log` through the call's log, bounded by the secs given (B_LIVE); a
+  record written: its rejudge, bounded by `rejudgeSecs` or REJUDGE_SECS (120 s; batch-11 ran it unbounded), into
+  `<name>.rejudge.txt`; each step's word S3's stepOutcome (the judged exit-1 rule for both). No device id for its
+  platform: FAIL, nothing run, the `.cases` kept, so the backstop says "asked but never ran". Android gets `--serial`
+  alone, iOS `--udid` and `--sources`; `--app` only for an app other than native.
+- the config: argv first, the env second, an empty variable unset; the out folder and the repo absolute (RESTORE's hand
+  lines name absolute paths); every error at once. A device id not given is left out of the config, and a need for it
+  (S6b) fails. The repo defaults to the module's own checkout (MODULE_REPO).
+- the `lab` folder is made on every run, wanted or not; a batch's block named `lab` (batch-11's and batch-12's) is that
+  folder.
+
+S6 obligations (every line of the T2 amendment, the module's headers and spec T2 that hands work to S6 or the runner),
+each with the test that covers it in S6a, or S6b:
+- S1, the missing-verdict backstop → runner.test.ts "the backstop: a wanted block with no verdict line …"; runner-lines
+  "backstopLine", "hasVerdictOf".
+- S1, the per-run steps and details printout → runner.test.ts "the details before the SUMMARY …"; runner-lines
+  "stepsOfRun", "detailLines and detailsLines".
+- S1, the `lab` folder made on every run → runner.test.ts "the run's folders: … the lab folder on every run".
+- S1 and words.ts's header, the ERROR lines from each block's logs and analyze.txt → runner.test.ts "the ERROR lines:
+  …"; abort.test.ts "head's errors"; runner-lines "errorLinesIn".
+- S2, `gradlew --stop` with the lab build step → S6b.
+- S2, the pkill of idb_companion and the lab's WebDriverAgent → the companion: a block's kept groups ended by its own
+  `stopKept` and the rest by finish (runner.test.ts "a block's calls are its own"); the WebDriverAgent's kill → S6b.
+- S3, a non-live block's own record (batch-12's `{"runs":3}`) → runner.test.ts "a non-live block's record …" and the
+  abort's "a non-live record complete is judged by the abort; an incomplete one INTERRUPTED"; runner-lines "recordOf and
+  recordGap".
+- S3, the catalog's `--check` before the lab build → S6b.
+- S3, `live_run` (live.ts with its record, then its rejudge, each a bounded step) → runner.test.ts "liveRun: …".
+- S3, the backstop "not run (see the ERROR lines)" with incompleteLine's lines → runner.test.ts "a live run that died".
+- S3 and preconditions.ts's header, refuse or INCONCLUSIVE for a failed checkout or ancestry → runner.test.ts
+  "preconditions: a failed one makes the block INCONCLUSIVE, never a refusal …".
+- S4, the compare's line as one of the D43 block's verdict lines and its hand lines to RESTORE (exit 1, the next run
+  refuses) → runner.test.ts "a fake two-block batch …" (verdictAndHand), "RESTORE and the exit code"; abort.test.ts
+  "leave".
+- S4, the WDA window's orchestration (the `.cases` first, the WDA kill and the 4 s wait before the restore, the port
+  8120 free check, the finportal reads at the iOS stretch's start and end, the compare after the end check,
+  `d43-backupfail`'s INCONCLUSIVE), the restore line's port part → S6b; the protected-key line's slot is S6a's
+  (`protectedLine`, the two-block test).
+- S4, the iOS lab install verification (the installed cells.json against main's catalog) → S6b.
+- S5, the Android lab check at the batch's start (the pulled APK's cells.json against the catalog, the handler counts as
+  a precondition, `ONLY=lab`) → S6b.
+- S5, the tri-state reads S6 wires (`readRoleHolders`, `readClipboard` before and after a block, `compareReads`,
+  `comparedLine`), `handlers` at the lab check, `sanitizeFixture` over a kept tree → S6b.
+- lab-emu.ts's header, the probe's own state put back (`StateRestore`) → S6b; its "the block's steps, its `.cases`, the
+  SUMMARY assembly" → S6a (the ctx's steps, liveRun, the SUMMARY: the two-block test).
+- ios-domains.ts's header, the WDA kill and the 4 s wait before the restore → S6b; "the steps, the SUMMARY assembly" →
+  S6a.
+- spec T2 S6, a fake two-block batch (iOS + Android, injected exec) yields the full SUMMARY, and a need's failure →
+  INCONCLUSIVE → runner.test.ts "a fake two-block batch …", "needs: …".
+- spec T2 S6, the abort mid-block → exit 130 with the abort SUMMARY → runner.test.ts "the abort mid-block …" and
+  runner-proc.test.ts (a real Ctrl-C).
+- spec T2 S6, backlog T2 → done: not in the branch (the orchestrator's docs commit, after S6b).
+
+What of batch-11's and batch-12's runner S6a does not port, each with the slice that owns it or the reason:
+- the lab plumbing above (S6b): the needs' checks, the lab build and its catalog check, the WDA window, the lab install
+  checks, the tri-state reads, the finportal reads, idb_companion's and WDA's pkill by name.
+- batch-11's `commit.txt` (HEAD, branch, main, the dirty count): the checkout line carries what a reader needs, and the
+  details print it.
+- batch-11's per-block details greps: a block names its own (`details: [{file, match?, cut?}]`).
+- `cd $MAIN`: every call names its cwd or repo (`git -C`, live.ts's cwd).
+
+Where S6a departs, on purpose, from batch-11 and batch-12:
+- a failed need or precondition is a SKIP step and the block's INCONCLUSIVE, no ERROR line besides.
+- the abort SUMMARY lists the ERROR lines of this run's logs as well.
+- RESTORE lines from a block mid-run are written at once (`left by <block>`), not at the end.
+- the rejudge is bounded (REJUDGE_SECS).
+- a verdict written after the interrupt is not kept.
+- what the runner keeps of a probe's or an analyzer's text is split at a lone CR too.
