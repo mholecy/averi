@@ -347,6 +347,15 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     expect(existsSync(dirOf('meta'))).toBe(false);
   });
 
+  it('an out folder that cannot be made (EPERM: the sandbox): refused, exit 2, its line on the terminal — never a stack trace, no SUMMARY, no call (T2b batch-13 gap 7)', async () => {
+    const fs = { ...nodeFs, mkdirExclusive: () => { throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' }); } };
+    expect(await go([plain('kf')], { io: { fs } })).toBe(2);
+    expect(terminal).toEqual([`ERROR the run folder ${dirOf('meta')} cannot be made (EPERM); made before it: none — nothing was done\n`]);
+    expect(seam.exits).toEqual([2]);
+    expect(seam.calls).toEqual([]);
+    expect(existsSync(out)).toBe(false);
+  });
+
   it('a block that is not stateful: an earlier state file in its folder is not its to read, so no refusal', async () => {
     mkdirSync(join(out, 'E5', 'run-old'), { recursive: true });
     writeFileSync(join(out, 'E5', 'run-old', 'state.json'), '{"dirty":true}');

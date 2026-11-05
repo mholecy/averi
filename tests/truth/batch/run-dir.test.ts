@@ -223,9 +223,21 @@ describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or 
     expect(readFileSync(join(out, 'E5/run-X/data.json'), 'utf8')).toBe('kept');
   });
 
-  it('a folder that cannot be made for another reason throws that reason, never "already exists"', () => {
-    const denied = { ...nodeFs, mkdirExclusive: () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }); } };
-    expect(() => openRun(denied, { out, runId: 'X', blocks: BLOCKS, wanted: BLOCKS })).toThrow(/^EACCES: permission denied$/);
+  it('a folder that cannot be made for another reason: a refusal naming its code and the folders made before it, never "already exists", never a throw (T2b batch-13 gap 7)', () => {
+    const deniedAt = (n: number, e: unknown) => {
+      let made = 0;
+      return { ...nodeFs, mkdirExclusive: (p: string) => (++made === n ? (() => { throw e; })() : nodeFs.mkdirExclusive(p)) };
+    };
+    const eperm = Object.assign(new Error('EPERM: operation not permitted, mkdir\n  at x'), { code: 'EPERM' });
+    expect(openRun(deniedAt(1, eperm), { out, runId: 'X', blocks: BLOCKS, wanted: BLOCKS })).toEqual({ ok: false, error: `ERROR the run folder ${join(out, 'meta/run-X')} cannot be made (EPERM); made before it: none — nothing was done` });
+    expect(tree()).toEqual([]);
+    expect(openRun(deniedAt(3, eperm), { out, runId: 'Y', blocks: BLOCKS, wanted: BLOCKS })).toEqual({
+      ok: false,
+      error: `ERROR the run folder ${join(out, 'kf/run-Y')} cannot be made (EPERM); made before it: ${join(out, 'meta/run-Y')}, ${join(out, 'lab/run-Y')} — nothing was done`,
+    });
+    // No code: the error's first line; a thrown non-Error: as a string.
+    expect(openRun(deniedAt(1, new Error('denied\nmore')), { out, runId: 'Z', blocks: BLOCKS, wanted: BLOCKS })).toMatchObject({ error: expect.stringContaining('cannot be made (denied); made before it: none') });
+    expect(openRun(deniedAt(1, 'no'), { out, runId: 'W', blocks: BLOCKS, wanted: BLOCKS })).toMatchObject({ error: expect.stringContaining('cannot be made (no);') });
   });
 
   it('blockName: the one rule for a block\'s name, which openRun and the runner both ask (T2 S6a review round 1)', () => {

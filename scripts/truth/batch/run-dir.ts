@@ -1,6 +1,6 @@
 import { join, relative, sep } from 'node:path';
 import { isEexist, type BatchFs } from './io.js';
-import { NOTHING_DONE, oneLine, refusedLine, stepLine, twoDigits } from './words.js';
+import { firstLineOf, messageOf, NOTHING_DONE, oneLine, refusedLine, stepLine, twoDigits } from './words.js';
 
 /**
  * Where a run writes, and when it must not start.
@@ -153,7 +153,8 @@ export type OpenedRun = { ok: true; dirs: Readonly<Record<string, string>> } | {
  * Make this run's folders: `<out>/meta/run-<id>/` and one per wanted block — none for a block not wanted. First every
  * block's folder of this id, wanted or not, and meta's, must not exist: any one that does refuses, and nothing is
  * made. Each mkdir is exclusive too, so a folder made between the check and the mkdir refuses as well (the folders
- * made before it stay, empty: nothing is ever removed). A RUN_ID or block name that is no plain path segment is a
+ * made before it stay, empty: nothing is ever removed). A folder that cannot be made for another reason refuses too,
+ * naming its code and the folders made before it. A RUN_ID or block name that is no plain path segment is a
  * programming error.
  */
 export function openRun(fs: BatchFs, { out, runId, blocks, wanted }: { out: string; runId: string; blocks: readonly string[]; wanted: readonly string[] }): OpenedRun {
@@ -173,7 +174,11 @@ export function openRun(fs: BatchFs, { out, runId, blocks, wanted }: { out: stri
       fs.mkdirExclusive(dirOf(b));
     } catch (e) {
       if (isEexist(e)) return refused(dirOf(b));
-      throw e;
+      // Any other reason (EPERM from a sandbox, EACCES): a refusal too, never a stack trace (T2b, batch-13 gap 7); the
+      // folders made before it are named, as they stay (empty: nothing is ever removed).
+      const made = Object.values(dirs);
+      const why = (e as NodeJS.ErrnoException).code ?? firstLineOf(messageOf(e));
+      return { ok: false, error: refusedLine(`the run folder ${dirOf(b)} cannot be made (${why}); made before it: ${made.length === 0 ? 'none' : made.join(', ')}`) };
     }
     dirs[b] = dirOf(b);
   }
