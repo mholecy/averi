@@ -1,7 +1,7 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
 import { frameText, rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
-import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
+import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, focusTextNotReadSaid, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { rectIntersection, sameRect } from '../../src/adapters/types.js';
@@ -131,6 +131,12 @@ const labFaultWhy = (got: string | undefined, inserted: string): string =>
   : got.startsWith(inserted) ? `lab fault: the field took the keys (holds ${JSON.stringify(got)})`
   : `lab fault: the field holds ${JSON.stringify(got)}, neither the prefix nor the prefix and keys`;
 
+/** fp2's hedged Filled (`refusedOnFocus`), accepted and counted under ADR 0028's residual 3, live-known.ts's wording. */
+export const FOCUS_UNREAD_HEDGE = {
+  id: 'D64b-3-hedge',
+  residual: "residual:ADR 0028 residual 3 — a prefix inserted on focus that holds the value lands on the skipped re-read: Android's Filled says on a ⚠ line that the text after focus was not read",
+};
+
 /**
  * fp2 (D64b): one fill without clear into a field that puts `inserted` in itself on focus and refuses every key —
  * form-focus-prefix's dialRefuses, `+421 ` held whatever `421` is typed. The one-call sibling of `refusedHolding`, its
@@ -139,13 +145,17 @@ const labFaultWhy = (got: string | undefined, inserted: string): string =>
  * it — LOUD `loud-untouched`, said so, or a MISMATCH `fill-claim-unfocused` over a Filled (averi's false claim, which
  * the fp2 KNOWN entry does not match; D64b-1's reviews); a claim of done over anything but `inserted` means the field
  * took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No KNOWN entry matches a SKIP.
- * Then refusedLadder with "did not change": ok only on an error saying so with `inserted` held (what the post-focus
- * re-read lets averi say: it read `inserted` before typing); a claim of done over `inserted` is a MISMATCH `fill-claim`
- * — Android's today, where that re-read is skipped and the reading passes by containment (ADR 0028 residual 3).
+ * Then, D64b-3: under uiautomator, the one source that skips that re-read, a Filled over `inserted` whose ⚠ line says
+ * the text after focus was not read (replies.ts#focusTextNotReadSaid) is an honest hedge — ok, counted under its residual
+ * (`FOCUS_UNREAD_HEDGE`, the carousel's hedged maxSwipes' way: LiveVerdict.accepted), as the reply does not claim the
+ * text is the typing. Then refusedLadder with "did not change": ok only on an error saying so with `inserted` held (what
+ * the post-focus re-read lets averi say: it read `inserted` before typing); any other claim of done over `inserted` is
+ * a MISMATCH `fill-claim` no KNOWN entry matches: a plain Filled, or a hedge from a source that re-reads (idb, wda: it
+ * would mean they skip it).
  */
 export const refusedOnFocus =
   (tag: string, inserted: string) =>
-  (s: LabState, replies: string[], _source: Source, _launched: LabState): LiveVerdict => {
+  (s: LabState, replies: string[], source: Source, _launched: LabState): LiveVerdict => {
     const got = valueOf(s, tag);
     const last = replies[replies.length - 1];
     if (got === undefined || got === '') {
@@ -159,6 +169,9 @@ export const refusedOnFocus =
       return { outcome: 'LOUD', cls: 'loud-untouched', kind: replyKind(last), why: `the tap never focused the field (no focus event for ${tag}), which ${held}; averi: ${short(last)}` };
     }
     if (claimsDone(last) && got !== inserted) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };
+    if (source === 'uiautomator' && focusTextNotReadSaid(last)) {
+      return { outcome: 'ok', kind: replyKind(last), why: `Filled, hedged on its ⚠ line, over ${JSON.stringify(got)}: ${last.replace('\n', ' ')}`, accepted: FOCUS_UNREAD_HEDGE };
+    }
     return refusedLadder(got, inserted, last, 'did not change');
   };
 

@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { FOCUS_TEXT_NOT_READ } from '../../src/interact/fill-text.js';
 import { boundText } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 
@@ -126,6 +127,14 @@ export function replyKind(reply: string): ReplyKind {
 export const claimsDone = (reply: string) => /^(Filled|Cleared|Tapped)/.test(reply) && !/NOT verified/.test(reply);
 
 // --- what a reply says beyond its kind ---
+
+/**
+ * A fill's reply hedges its Filled on a ⚠ line of its own: the field's text after focus was not read, so it may not all
+ * come from the keys (D64b-3, fill-text.ts's `focus-unread` caveat). Asked on the caveat's lines alone: a selector the
+ * head echoes is no hedge, and no more is a plain Filled. What it is worth is live-forms.ts#refusedOnFocus's to say.
+ */
+export const focusTextNotReadSaid = (reply: string) =>
+  claimsDone(reply) && reply.split('\n').slice(1).some((line) => line.startsWith('⚠ ') && line.includes(FOCUS_TEXT_NOT_READ));
 
 /** The reply's first line — an assert's first verdict line, under its `N/N asserts …` summary — at most 200 characters. */
 export const firstLine = (reply: string) => {

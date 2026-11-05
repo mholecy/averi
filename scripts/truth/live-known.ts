@@ -48,7 +48,6 @@ const IOS_NON_ASCII = 'bug:2026-10-15-lab-ios-type-text-cannot-type-non-ascii.md
 const ANDROID_NON_ASCII = 'bug:2026-10-16-lab-android-type-text-types-a-prefix-then-fails-on-non-ascii.md';
 const SECURE_CLEARED = 'residual:ADR 0028 residual 2 — iOS clears a secure field when typing resumes: a no-clear fill into a prefilled one leaves what was typed, and averi says so';
 const BLIND_TAIL = 'residual:ADR 0034 residual 2 — a flow\'s blind `type:` cannot type again a tail a reformatting field dropped: `fill:` is the remedy';
-const FOCUS_PREFIX = 'residual:ADR 0028 residual 3 — a prefix inserted on focus that holds the value passes the skipped re-read: Android replies Filled though the field took none of the typing';
 const EAGER_FULL = 'residual:ADR 0034 residual 10 — a full reading that ends in an eager trailing mark fails `separated`: averi refuses it by design, the app holds the value';
 
 /**
@@ -224,12 +223,9 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // dismissal), struck off at its final src (94fc318b): under a cover whose order is not told scroll_until stops
     // before any swipe, nothing stroked, in two runs of two (ios-vis-r8-l4-3.json, -4.json).
   ]),
-  // fp2 (D64b): `421` typed without clear by sole id into form-focus-prefix's dialRefuses, which inserts `+421 ` on focus
-  // and refuses every key. Android skips the post-focus re-read there (fill.ts, ADR 0028): the reading `+421 ` is judged
-  // against an empty `before`, holds `421`, and averi replies Filled — a MISMATCH fill-claim on a Filled (`other`).
-  // Filed from the code path (fill.ts's skip gate), before any device run: batch D64b-2 reads it, D64b-3's caveat
-  // fixes it. iOS (idb, wda) re-reads after focus: not filed.
-  ...each('android uiautomator', ['fp2'], FOCUS_PREFIX, 'fill-claim', 'other'),
+  // fp2 is not filed since D64b-3: Android's Filled there says on a ⚠ line that the text after focus was not read, an
+  // honest hedge accepted and counted by its judge (live-forms.ts#refusedOnFocus, ADR 0028 residual 3); a Filled without
+  // that line is a MISMATCH nothing here matches.
   // The forms group (D31; D40's device run at main 40ba3dd1: ios-forms-d40-1.json, ios-rn-forms-d40-1.json,
   // android-forms-d40-1.json). A fill's LOUD names what it left — the field as the launch left it, or changed.
   // Android: since D43a (ADR 0037) averi refuses `Š` / `’` before the focus tap — `input text` cannot type them — so
