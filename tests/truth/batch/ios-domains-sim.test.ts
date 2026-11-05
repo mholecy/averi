@@ -86,8 +86,8 @@ function fakeSim(opts: { domains?: Record<string, Record<string, KeyVal>>; name?
     const [domain, key] = [args[5], args[6]];
     const map = domains.get(domain);
     if (verb === 'export') {
-      // The host's defaults: a domain not there exports an empty dictionary, exit 0
-      // (defaults-host-export-missing-domain.plist).
+      // A domain not there exports an empty dictionary, exit 0: the host's as XML, the simulator's as a binary plist
+      // (defaults-host-/defaults-sim-export-missing-domain.plist, batch-13); this fake writes the typed map instead.
       writeFileSync(args[6], JSON.stringify(map ?? {}));
       return ok();
     }

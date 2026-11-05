@@ -27,8 +27,14 @@ so made the run VOID) and `../schemeapproval-absent-b9-delete.txt` (batch-9, a d
 `../schemeapproval-absent-protected-key.txt` is derived from batch-8's line, its key replaced by
 `com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport` (T2 S4 code review).
 
-And two the reviewer of T2 S4 saw from the host's `defaults` (Darwin 27; no simulator stderr of them was captured —
-batch-13 records the simulator's own): `../defaults-host-domain-not-found.txt`, a read of a domain that is not there
-(exit 1; the domain named here is com.apple.Preferences, the tests put in the one they ask), and
-`../defaults-host-export-missing-domain.plist`, what an export of such a domain writes (exit 0, an empty dictionary):
-an empty export alone never proves a domain absent.
+And two the reviewer of T2 S4 saw from the host's `defaults` (Darwin 27): `../defaults-host-domain-not-found.txt`, a
+read of a domain that is not there (exit 1; the domain named here is com.apple.Preferences, the tests put in the one
+they ask), and `../defaults-host-export-missing-domain.plist`, what an export of such a domain writes (exit 0, an empty
+dictionary, as XML): an empty export alone never proves a domain absent.
+
+batch-13 read the same on the lab simulator (iOS 27.0): its `defaults` says, byte for byte, what the host's does for a
+domain that is not there (`Error: Domain '<d>' not found.`, exit 1) and for a key that is not there (`Error: Could not
+find key '<k>' in domain '<d>'.`, exit 1). Its export of a domain not there is the one form that differs: exit 0, the
+same empty dictionary written as a 42-byte binary plist (`bplist00…`), kept as
+`../defaults-sim-export-missing-domain.plist` exactly as written (it names no device and no path). plistlib reads both
+forms as the same empty map, so the backup classifies them alike.

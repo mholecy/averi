@@ -125,8 +125,9 @@ async function backupOf(sim: LabSim, entry: DomainEntry): Promise<{ map: DomainM
 
 /**
  * Export a domain to `path` and read it typed, or why not. A domain that is not there exports an empty dictionary,
- * exit 0 (the host's defaults), so the map never says absent: diffMaps reads an empty domain as an absent one, and
- * only the backup's `defaults read` probe (ios-defaults.ts's absentIn) tells the two apart, where it matters.
+ * exit 0 (the host's defaults as XML, the lab simulator's as a binary plist — batch-13; plistlib reads both), so the
+ * map never says absent: diffMaps reads an empty domain as an absent one, and only the backup's `defaults read` probe
+ * (ios-defaults.ts's absentIn) tells the two apart, where it matters.
  */
 async function readDomain(sim: LabSim, domain: string, path: string): Promise<{ map: Record<string, KeyVal> } | { why: string }> {
   const r = await sim.defaults(['export', domain, path]);
