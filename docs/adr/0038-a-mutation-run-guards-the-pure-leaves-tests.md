@@ -793,20 +793,24 @@ Decisions S6a pins:
 - a block's `judge` (its analyzer, device-free) runs only for a complete block, on both paths (the code review: a dead
   live run or a record that does not match got the judge's PASS and the gap vanished) — one rule, `assess`, on both
   paths (review round 5: files being there proved nothing — a rejudge summary holding kf1 of kf1–3 got the judge's
-  PASS): its own `complete()` when it gives one (a throw: not complete); for a block that declares `noRecords` (it asks
-  no run and records none — one that asks, records or runs live anyway throws, naming it), its run returned before any
-  abort began; else S3's completeness over every live run plus records.ts's gap of every record, complete only when
-  incompleteLine has nothing to say. At the normal end it runs after finish — the analyses after the restores, as
-  batch-11 and batch-12 ran them — for a complete block with no verdict of its label, through the bounded runner; a
-  throw is an ERROR line `<id> analyze: …`; an incomplete block gets the backstop's line (incompleteLine). The abort, by
-  the same rule: a block with a verdict of its label keeps its own lines (the judge not run again); an incomplete one is
-  INCONCLUSIVE with its gap (incompleteLine: an interrupted run is usually incomplete, and that is the honest line); a
-  complete one with a judge is judged; one that asked nothing, or is complete with no judge, INTERRUPTED. abort.ts's
-  `AbortBlock.complete` may now be async. A block with complete records and no judge is INTERRUPTED: nothing is
-  invented. A block the abort judged whose judge wrote no verdict of its label gets `<label>: INCONCLUSIVE —
-  interrupted: its judge wrote no verdict` after its lines (review round 1, MAJOR: such a block was missing from the
-  abort SUMMARY): every wanted block has a line in both SUMMARYs, a test asserts it over every state a block can be in
-  at the interrupt.
+  PASS): S3's completeness over every live run plus records.ts's gap of every record, complete only when incompleteLine
+  has nothing to say; a block's own `complete()` only adds a requirement (review round 6: it hid a live run's gap; false
+  or a throw: not complete), and alone makes a block that asked nothing complete (a premise verdict, a capture); a block
+  that declares `noRecords` (it asks no run and records none — one that asks, records or runs live anyway throws, naming
+  it) is complete once its run returned before any abort began, and its `complete()` holds if given. At the normal end
+  it runs after finish — the analyses after the restores, as batch-11 and batch-12 ran them — for a complete block with
+  no verdict of its label, through the bounded runner; a throw is an ERROR line `<id> analyze: …`; an incomplete block
+  gets the backstop's line (incompleteLine). The abort, by the same rule: a block with a verdict of its label keeps its
+  own lines (the judge not run again); one whose run had started but not returned when the abort began stays
+  INTERRUPTED, its gap the why and `rerun ONLY=<block>` kept (review round 6); one whose run returned but is incomplete
+  is INCONCLUSIVE with its gap (incompleteLine); a complete one with a judge is judged; one that asked nothing, or is
+  complete with no judge, INTERRUPTED. abort.ts's `AbortBlock.complete` may now be async and may say why a block is not
+  complete (a string); it is read within what is left of the judges' budget — past it `completeness not read in time`, a
+  throw `completeness not read: <first line>`, no budget left the budget's why (review round 6: a table that never
+  loaded would have held the abort). A block with complete records and no judge is INTERRUPTED: nothing is invented. A
+  block the abort judged whose judge wrote no verdict of its label gets `<label>: INCONCLUSIVE — interrupted: its judge
+  wrote no verdict` after its lines (review round 1, MAJOR: such a block was missing from the abort SUMMARY): every
+  wanted block has a line in both SUMMARYs, a test asserts it over every state a block can be in at the interrupt.
 - the ERROR lines: this run's steps' (steps.ts, named `steps.log`), then every line starting ERROR of each `*.log` and
   analyze.txt in this run's folders (meta, lab, each wanted block, in that order) — not another file, not an earlier
   run's. Counted across all of them first, a step's line by what it says, its time aside (steps.log's lines only,

@@ -453,17 +453,17 @@ export class AbortGuard {
     const budget = this.options.judgeBudgetSecs ?? JUDGE_BUDGET_SECS;
     const until = Date.now() + budget * 1000;
     const spent = `the abort's judging budget of ${budget} s was spent`;
-    let skip = lateRestore ? 'a restore passed its bound, so the abort judges nothing more' : undefined;
+    const skip = lateRestore ? 'a restore passed its bound, so the abort judges nothing more' : undefined;
     const reports: BlockReport[] = [];
     for (const b of this.options.blocks) {
       let report: BlockReport;
-      const c = cut.has(b.block) ? {} : await this.completeOf(b, until, spent);
-      if (c !== true) report = { block: b.block, lines: b.linesSoFar(), interrupted: true, ...(c.why === undefined ? {} : { why: c.why }) };
+      // One budget for reading each block's completeness and judging it: none left, nothing more is read.
+      const left = (until - Date.now()) / 1000;
+      const c = cut.has(b.block) ? {} : left <= 0 ? { why: spent } : await this.completeOf(b, left);
+      if (c !== true) report = { block: b.block, lines: b.linesSoFar(), interrupted: true, why: c.why };
       else {
-        const left = (until - Date.now()) / 1000;
-        if (skip === undefined && left <= 0) skip = spent;
-        // A judge past what was left spent the budget: the next block finds none left.
-        const judged = skip === undefined ? await this.judged(b, left) : { why: skip };
+        // A judge past what was left spent the budget (within settles late at once on none): the next finds none left.
+        const judged = skip === undefined ? await this.judged(b, (until - Date.now()) / 1000) : { why: skip };
         if (judged === 'late') report = { block: b.block, lines: b.linesSoFar(), interrupted: true, why: spent };
         else report = 'lines' in judged ? { block: b.block, lines: judged.lines } : { block: b.block, lines: b.linesSoFar(), interrupted: true, why: judged.why };
       }
@@ -475,12 +475,10 @@ export class AbortGuard {
   }
 
   /**
-   * Whether a block is complete, read within what is left of the judges' budget (T2 S6a review round 6): true; or not,
-   * and why when known — its own why, `completeness not read in time`, a throw's first line, or the budget spent.
+   * Whether a block is complete, read within `left` seconds of the judges' budget (T2 S6a review round 6): true; or not,
+   * and why when known — its own why, `completeness not read in time`, or a throw's first line.
    */
-  private async completeOf(b: AbortBlock, until: number, spent: string): Promise<true | { why?: string }> {
-    const left = (until - Date.now()) / 1000;
-    if (left <= 0) return { why: spent };
+  private async completeOf(b: AbortBlock, left: number): Promise<true | { why?: string }> {
     let r: Awaited<ReturnType<typeof within<boolean | string>>>;
     try {
       r = await within(left, Promise.resolve().then(() => b.complete()));

@@ -737,6 +737,13 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     expect(summaryText()).toContain("E5: INTERRUPTED — not judged (the abort's judging budget of 0.05 s was spent; rerun ONLY=E5)");
   });
 
+  it('the judge gets what is left after its block\'s completeness was read: one budget for both (T2 S6a review round 6)', async () => {
+    const after = <T,>(ms: number, v: T) => new Promise<T>((r) => setTimeout(() => r(v), ms));
+    const guard = guardOf([block('kf', { complete: () => after(250, true), judge: () => after(120, ['kf verdict: PASS']) })], { judgeBudgetSecs: 0.3 });
+    await interrupt(guard);
+    expect(summaryText()).toContain("kf: INTERRUPTED — not judged (the abort's judging budget of 0.3 s was spent; rerun ONLY=kf)");
+  });
+
   it('a judge that throws, or a complete() that throws, leaves the block INTERRUPTED and names why', async () => {
     const guard = guardOf([
       block('kf', { complete: () => true, judge: async () => {
