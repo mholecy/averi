@@ -25,6 +25,7 @@ import {
   recordGap,
   recordOf,
   rejudgeArgs,
+  linesIn,
   stepsOfRun,
   type AskedRun,
   type BatchConfig,
@@ -35,7 +36,7 @@ import {
 } from './runner-lines.js';
 import { knobs as readKnobs, selectBlocks, type KnobSpec, type KnobValues } from './select.js';
 import { StepLog, terminalOf, type Terminal } from './steps.js';
-import { EXIT, exitCodeOf, firstLineOf, messageOf, parseVerdictLine, summaryLines, verdictLine, type StepWord, type Verdict } from './words.js';
+import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, verdictLine, type StepWord, type Verdict } from './words.js';
 
 /**
  * runBatch: a device batch's run, start to end, composed of the module's parts — a batch, kept outside the repo, gives
@@ -297,7 +298,6 @@ class BatchRun<K> {
     try {
       return await this.guard.run(async () => {
         const pre = await this.preconditions();
-        if (pre === undefined) return EXIT.interrupted;
         for (const b of this.blocks) {
           if (this.guard.interrupted) return EXIT.interrupted;
           await this.runBlock(b, pre.get(b.id));
@@ -316,14 +316,17 @@ class BatchRun<K> {
     }
   }
 
-  /** The checkout, then each block's own: its INCONCLUSIVE line when one is not shown. Undefined once interrupted. */
-  private async preconditions(): Promise<Map<string, string | undefined> | undefined> {
+  /**
+   * The checkout, then each block's own: its INCONCLUSIVE line when one is not shown. Interrupted meanwhile: none, and
+   * the checkout line not set — git's answer to a stopped call is no checkout's.
+   */
+  private async preconditions(): Promise<Map<string, string | undefined>> {
+    const lines = new Map<string, string | undefined>();
     const ck = await checkout(this.git);
-    if (this.guard.interrupted) return undefined;
+    if (this.guard.interrupted) return lines;
     this.checkout = checkoutLine(ck);
     this.log.note(this.checkout);
     const kit = this.kit();
-    const lines = new Map<string, string | undefined>();
     for (const b of this.blocks) {
       if (!ck.ok) lines.set(b.id, preconditionLine(b.label, [ck]));
       else {
@@ -364,7 +367,8 @@ class BatchRun<K> {
 
   private notRun(b: Block<K>, line: string): void {
     this.verdict(b, line);
-    this.log.step('SKIP', `${b.id} not run: ${parseVerdictLine(line)?.why}`);
+    // A line of verdictLine's own making, with a why: it parses.
+    this.log.step('SKIP', `${b.id} not run: ${parseVerdictLine(line)!.why}`);
   }
 
   /** A need's answer, checked once: by the first block that names it. Its lab line in the order checked. */
@@ -391,8 +395,13 @@ class BatchRun<K> {
     return r;
   }
 
-  /** A verdict line kept for the SUMMARY and in the block's verdict.txt. Once interrupted, only noted: not trusted. */
+  /**
+   * A verdict line kept for the SUMMARY and in the block's verdict.txt — checked first: one holding a line break is the
+   * batch's mistake, thrown before it is kept, so no SUMMARY (the abort's too) ever refuses it. Once interrupted, only
+   * noted: a block whose probe the abort stopped goes on, and what it says then is not trusted.
+   */
   private verdict(b: Block<K>, line: string): void {
+    oneLine(line, `${b.id}'s verdict line`);
     if (this.guard.interrupted) return this.log.step('NOTE', `${b.id}: a verdict after the interrupt not kept: ${line}`);
     this.lines.get(b.id)!.push(line);
     this.io.fs.append(join(this.dirs[b.id], 'verdict.txt'), `${line}\n`);
@@ -432,14 +441,14 @@ class BatchRun<K> {
       stopKept: () => guard.stopKept(b.id),
       verdict: (v, why, label = b.label) => this.verdict(b, verdictLine(label, v, why)),
       verdictLines: (lines) => {
-        for (const l of lines) this.verdict(b, l);
+        for (const l of linesIn(lines)) this.verdict(b, l);
       },
       restoreHand: (hand) => void guard.leave(b.id, hand),
       verdictAndHand: (r) => {
         this.verdict(b, r.line);
         guard.leave(b.id, r.hand);
       },
-      protectedLine: (l) => void this.protectedLines.push(l),
+      protectedLine: (l) => void this.protectedLines.push(oneLine(l, 'a protected-key line')),
       liveRun: (name, asked, o) => this.liveRun(b, bounded, name, asked, o),
       asks: (name, record) => exclusive(recordFiles(dir, name).asked, recordText(name, record), 'was asked'),
       record: (name, record) => {
@@ -511,7 +520,7 @@ class BatchRun<K> {
     return {
       block: b.id,
       complete: () => own() || (b.judge !== undefined && (b.complete?.(files) ?? this.recordsComplete(dir))),
-      judge: async (run) => (own() ? this.lines.get(b.id)! : await b.judge!({ ...files, run })),
+      judge: async (run) => (own() ? this.lines.get(b.id)! : linesIn(await b.judge!({ ...files, run }))),
       linesSoFar: () => this.lines.get(b.id)!,
     };
   }
@@ -520,7 +529,7 @@ class BatchRun<K> {
   private async judgeAtEnd(b: Block<K>): Promise<void> {
     if (b.judge === undefined || hasVerdictOf(this.lines.get(b.id)!, b.label)) return;
     try {
-      const lines = await b.judge({ dir: this.dirs[b.id], fs: this.io.fs, run: this.guard.bounded });
+      const lines = linesIn(await b.judge({ dir: this.dirs[b.id], fs: this.io.fs, run: this.guard.bounded }));
       this.log.step('OK', `${b.id} analyze`);
       for (const l of lines) this.verdict(b, l);
     } catch (e) {
@@ -542,11 +551,10 @@ class BatchRun<K> {
     this.verdict(b, backstopLine(b.label, runs));
   }
 
-  /** Every ERROR line of this run's logs: each run folder's `*.log` and analyze.txt, meta's and lab's first. */
+  /** Every ERROR line of this run's logs: each run folder's `*.log` and analyze.txt, meta's and lab's first (openRun's order). */
   private logErrors(): string[] {
     const { fs } = this.io;
-    const dirs = [this.dirs[META], this.dirs[LAB], ...this.blocks.filter((b) => b.id !== LAB).map((b) => this.dirs[b.id])];
-    return dirs.flatMap((d) => fs.list(d).filter((n) => n.endsWith('.log') || n === 'analyze.txt').flatMap((n) => errorLinesIn(fs.read(join(d, n)) ?? '')));
+    return Object.values(this.dirs).flatMap((d) => fs.list(d).filter((n) => n.endsWith('.log') || n === 'analyze.txt').flatMap((n) => errorLinesIn(fs.read(join(d, n)) ?? '')));
   }
 
   /** The details, then the SUMMARY; the exit called with its code. */

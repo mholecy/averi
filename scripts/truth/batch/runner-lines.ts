@@ -69,9 +69,10 @@ export function configOf(argv: readonly string[], env: Env, repo = MODULE_REPO):
   if (out === undefined) errors.push(refusedLine(`no out folder: pass --out <dir> or set ${FALLBACK.out}`));
   else if (!isAbsolute(out)) errors.push(refusedLine(`the out folder ${nameInLine(out)} is not an absolute path`));
   if (!isAbsolute(theRepo)) errors.push(refusedLine(`the repo ${nameInLine(theRepo)} is not an absolute path`));
-  if (errors.length > 0 || out === undefined) return { ok: false, errors };
+  if (errors.length > 0) return { ok: false, errors };
   const [udid, serial] = [valueOf('udid'), valueOf('serial')];
-  return { ok: true, config: { out, repo: theRepo, ...(udid === undefined ? {} : { udid }), ...(serial === undefined ? {} : { serial }), env } };
+  // No error: the out folder was given (its absence is one).
+  return { ok: true, config: { out: out as string, repo: theRepo, ...(udid === undefined ? {} : { udid }), ...(serial === undefined ? {} : { serial }), env } };
 }
 
 /** The lab folder: made on every run (batch-11's O_lab), for what the lab checks keep — a pulled APK, the catalog's log. */
@@ -142,11 +143,13 @@ const NO_RECORD = 'is no record of runs (kind "runs", runs: a whole number)';
 
 /** The text's record, or undefined when it is none (no JSON or another shape). */
 function parsedRecord(text: string): BlockRecord | undefined {
+  let v: unknown;
   try {
-    return recordOf(JSON.parse(text));
+    v = JSON.parse(text);
   } catch {
-    return undefined;
+    // no JSON: no record
   }
+  return recordOf(v);
 }
 
 /**
@@ -163,12 +166,17 @@ export function recordGap(name: string, askedText: string | undefined, doneText:
   return done.runs === asked.runs ? undefined : `asked ${asked.runs} run(s), recorded ${done.runs}`;
 }
 
+/**
+ * A probe's or an analyzer's text as lines: split at CR LF, LF and a lone CR (a progress line a terminal overwrites),
+ * so no line the runner keeps holds a break — the SUMMARY refuses one, and must never be lost to a probe's output.
+ */
+export const linesOf = (text: string): string[] => text.split(/\r\n|\n|\r/);
+
+/** `texts` as lines (linesOf), empty ones dropped: what a judge or an analyzer hands in. */
+export const linesIn = (texts: readonly string[]): string[] => texts.flatMap(linesOf).filter((l) => l !== '');
+
 /** The lines of a log or an analyze.txt that start with ERROR (a step line's word; batch-12's `grep -h '^ERROR'`). */
-export const errorLinesIn = (text: string): string[] =>
-  text
-    .split('\n')
-    .map((l) => l.replace(/\r$/, ''))
-    .filter((l) => l.startsWith('ERROR'));
+export const errorLinesIn = (text: string): string[] => linesOf(text).filter((l) => l.startsWith('ERROR'));
 
 /** This run's part of steps.log: from its header line (steps.ts#StepLog.open) to the end; none without one. */
 export function stepsOfRun(steps: string, name: string, runId: string): string[] {
@@ -192,8 +200,7 @@ export interface DetailSpec {
 /** A file's detail lines: matched (String#search, so a g flag holds no state), empty ones out, cut, indented 3. */
 export function detailLines(spec: DetailSpec, text: string): string[] {
   const keep = (l: string): boolean => (spec.match === undefined ? !l.startsWith('==') : l.search(spec.match) >= 0);
-  return text
-    .split('\n')
+  return linesOf(text)
     .filter((l) => l !== '' && keep(l))
     .map((l) => `   ${[...l].slice(0, spec.cut ?? DETAIL_CHARS).join('')}`);
 }
