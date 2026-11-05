@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { judged, lateWithPanel, selectCases } from '../../scripts/truth/live-cases.js';
-import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedKept, refusedOnFocus } from '../../scripts/truth/live-forms.js';
+import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedHolding, refusedKept, refusedOnFocus } from '../../scripts/truth/live-forms.js';
 import { knownEntry, knownLive } from '../../scripts/truth/live-known.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 import { differenceOf, landingOf } from '../../src/interact/fill-landing.js';
@@ -794,6 +794,27 @@ describe('f15 (D63): digits the full date field refuses, though its text holds t
 });
 
 /**
+ * refusedHolding's first-fill check (D64b-1 final review): below the field's change, and its kind the first reply's — a
+ * first fill that failed with a field changed is LOUD `loud-changed` on the last reply's kind; with the field kept, a
+ * MISMATCH `failed-holds` on the FIRST reply's kind, however the last reply reads. Synthetic replies, D40's f1 state.
+ */
+describe('refusedHolding: a failed first fill, its kind not the last reply\'s', () => {
+  const f1 = recordedCase(readLiveRecord('ios-forms-d40-1.json'), 'wda', 'f1');
+  const left = (value: string) => withFieldValue(f1, 'date', value).state;
+  const FIRST_FAILED = 'ERROR fill: typed 8 characters but the field shows 10';
+  const NOT_VERIFIED = 'Filled id:"lab.form-format.date" (4 characters) — NOT verified: the field could not be read';
+  const judge = refusedHolding('date', '31.12.2026', 'did not change');
+
+  it('the field changed: LOUD loud-changed on the last reply\'s kind, before the first fill\'s failure is asked', () => {
+    expect(judge(left('20.26.2026'), [FIRST_FAILED, NOT_VERIFIED], 'wda', f1.launched)).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed', kind: 'other' });
+  });
+
+  it('the field kept: MISMATCH failed-holds on the first reply\'s kind (refused), not the last\'s (other)', () => {
+    expect(judge(left('31.12.2026'), [FIRST_FAILED, NOT_VERIFIED], 'wda', f1.launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds', kind: 'refused' });
+  });
+});
+
+/**
  * f16 (D64): form-format's `date` keeps 8 digits, so `12` typed without clear after `31.12.202` keeps only the `1` — the
  * app holds `31.12.2021`, a reading that holds `12` only inside `31.12`, none of it past the earlier text. Before D64
  * averi passed it by containment; it must now fail (live-forms.ts#refusedCapped). Not yet run on a device; judged over
@@ -980,7 +1001,10 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     fields: { dialLands: { value: '', focused: false, error: null }, dialRefuses: { value: '', focused: false, error: null } },
     focus: null,
   };
-  const syntheticLeft = (tag: string, value: string): LabState => ({ ...SYNTHETIC_LAUNCHED, fields: { ...SYNTHETIC_LAUNCHED.fields, [tag]: { value, focused: true, error: null } }, focus: tag });
+  /** The end state, the field focused by the fill's tap: its value, and the `focus` event the app logged for it. */
+  const syntheticLeft = (tag: string, value: string): LabState => ({ ...SYNTHETIC_LAUNCHED, fields: { ...SYNTHETIC_LAUNCHED.fields, [tag]: { value, focused: true, error: null } }, focus: tag, events: [{ kind: 'focus', tag, at: 1 }] });
+  /** The end state with no `focus` event for the field: the tap never reached it. */
+  const syntheticUnfocused = (state: LabState): LabState => ({ ...state, focus: null, events: [] });
   const cases = async (platform: 'ios' | 'android') => selectCases({ platform, app: 'native', groups: ['forms'], only: FP_IDS });
   const FILLED = (tag: string) => `Filled id:"lab.form-focus-prefix.${tag}" (3 characters)`;
   const UNCHANGED = 'ERROR fill: typed 3 characters but the field shows 5 — the field did not change: the typing did not reach it, or the field refused it (content withheld from this error)';
@@ -1037,11 +1061,28 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     const judge = refusedOnFocus('dialRefuses', '+421 ');
     const NOT_INSERTED = { outcome: 'SKIP', why: 'lab fault: the field did not insert its prefix (holds "")' };
     const MISSING = { outcome: 'SKIP', why: 'lab fault: the field did not insert its prefix (is missing from the app\'s state)' };
-    const missing: LabState = { ...SYNTHETIC_LAUNCHED, fields: { dialLands: SYNTHETIC_LAUNCHED.fields!.dialLands } };
+    const missing: LabState = { ...SYNTHETIC_LAUNCHED, fields: { dialLands: SYNTHETIC_LAUNCHED.fields!.dialLands }, events: [{ kind: 'focus', tag: 'dialRefuses', at: 1 }] };
     for (const reply of [UNCHANGED, 'ERROR fill: typed 3 characters but the field shows 0', FILLED('dialRefuses'), 'Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) — NOT verified: the field could not be read']) {
       expect(judge(syntheticLeft('dialRefuses', ''), [reply], 'idb', SYNTHETIC_LAUNCHED), reply).toEqual(NOT_INSERTED);
       expect(judge(missing, [reply], 'uiautomator', SYNTHETIC_LAUNCHED), reply).toEqual(MISSING);
     }
+  });
+
+  it('refusedOnFocus (final review): an empty or missing field with no focus event for it — the tap never focused it, averi\'s miss, not the lab\'s: LOUD loud-untouched, said so', () => {
+    const judge = refusedOnFocus('dialRefuses', '+421 ');
+    const MISS = 'ERROR fill: id:"lab.form-focus-prefix.dialRefuses" was not tapped';
+    expect(judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), [MISS], 'idb', SYNTHETIC_LAUNCHED)).toEqual({ outcome: 'LOUD', cls: 'loud-untouched', kind: 'refused', why: `the tap never focused the field (no focus event for dialRefuses), which holds ""; averi: ${MISS}` });
+    const missing: LabState = { ...SYNTHETIC_LAUNCHED, fields: { dialLands: SYNTHETIC_LAUNCHED.fields!.dialLands } };
+    expect(judge(syntheticUnfocused(missing), [MISS], 'uiautomator', SYNTHETIC_LAUNCHED)).toEqual({ outcome: 'LOUD', cls: 'loud-untouched', kind: 'refused', why: `the tap never focused the field (no focus event for dialRefuses), which is missing from the app's state; averi: ${MISS}` });
+    // A focus event for another field is none for this one.
+    const otherFocused = { ...syntheticLeft('dialRefuses', ''), events: [{ kind: 'focus' as const, tag: 'dialLands', at: 1 }] };
+    expect(judge(otherFocused, [MISS], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
+    // A tap logged on the field is no focus event.
+    const tappedOnly = { ...syntheticLeft('dialRefuses', ''), events: [{ kind: 'tap' as const, tag: 'dialRefuses', at: 1 }] };
+    expect(judge(tappedOnly, [MISS], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
+    // An unfocus event (tag '') is none either.
+    const blurred = { ...syntheticLeft('dialRefuses', ''), events: [{ kind: 'focus' as const, tag: '', at: 1 }] };
+    expect(judge(blurred, [MISS], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
   });
 
   it('refusedOnFocus (review round 2): the lab fault worded by what the field holds — empty, no prefix inserted; the prefix and more, the keys taken; else neither', () => {

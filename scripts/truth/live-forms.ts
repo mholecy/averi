@@ -134,19 +134,28 @@ const labFaultWhy = (got: string | undefined, inserted: string): string =>
 /**
  * fp2 (D64b): one fill without clear into a field that puts `inserted` in itself on focus and refuses every key —
  * form-focus-prefix's dialRefuses, `+421 ` held whatever `421` is typed. The one-call sibling of `refusedHolding`, its
- * premise its own: the field missing or empty means the prefix was never inserted — the lab's fault, a SKIP whatever
- * averi replied, checked first; a claim of done over anything but `inserted` means the field took the keys it must
- * refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No KNOWN entry matches a SKIP. Then refusedLadder with
- * "did not change": ok only on an error saying so with `inserted` held (what the post-focus re-read lets averi say: it
- * read `inserted` before typing); a claim of done over `inserted` is a MISMATCH `fill-claim` — Android's today, where
- * that re-read is skipped and the reading passes by containment (ADR 0028 residual 3).
+ * premise its own, checked first: the field missing or empty means the prefix was never inserted — the lab's fault, a
+ * SKIP whatever averi replied, where the app logged a `focus` event for the field; with none, averi's tap never focused
+ * it — LOUD `loud-untouched`, said so (D64b-1's final review); a claim of done over anything but `inserted` means the
+ * field took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No KNOWN entry matches a
+ * SKIP. Then refusedLadder with "did not change": ok only on an error saying so with `inserted` held (what the
+ * post-focus re-read lets averi say: it read `inserted` before typing); a claim of done over `inserted` is a MISMATCH
+ * `fill-claim` — Android's today, where that re-read is skipped and the reading passes by containment (ADR 0028
+ * residual 3).
  */
 export const refusedOnFocus =
   (tag: string, inserted: string) =>
   (s: LabState, replies: string[], _source: Source, _launched: LabState): LiveVerdict => {
     const got = valueOf(s, tag);
     const last = replies[replies.length - 1];
-    if (got === undefined || got === '' || (claimsDone(last) && got !== inserted)) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };
+    if (got === undefined || got === '') {
+      // No prefix: the lab's fault only where the tap focused the field (the app logs a `focus` event per field); else
+      // averi's tap never reached it.
+      if (s.events.some((e) => e.kind === 'focus' && e.tag === tag)) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };
+      const held = got === undefined ? "is missing from the app's state" : 'holds ""';
+      return { outcome: 'LOUD', cls: 'loud-untouched', kind: replyKind(last), why: `the tap never focused the field (no focus event for ${tag}), which ${held}; averi: ${short(last)}` };
+    }
+    if (claimsDone(last) && got !== inserted) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };
     return refusedLadder(got, inserted, last, 'did not change');
   };
 
