@@ -504,6 +504,7 @@ const FORMS: Omit<Case, 'group'>[] = [
   // MISMATCH fill-claim under uiautomator (ADR 0028 residual 3, filed in live-known.ts) until averi says so. iOS keeps
   // the re-read: fp2 there reads `+421 ` before typing and is refused as "did not change" (ok expected; batch D64b-2
   // reads both). Not h1/h2: the ensure group owns those ids.
+  // fp1: an Android Filled withholds the content, so the reply cannot be checked for `+421 421` — `holds` judges the model.
   { id: 'fp1', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus: the keys land after it', calls: [fill(FP, 'dialLands', '421')], judge: holds('dialLands', '+421 421') },
   { id: 'fp2', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus and refuses every key: did not change — expected MISMATCH fill-claim on Android (uiautomator: the post-focus re-read skipped, the inserted `+421 ` holds `421`; ADR 0028 residual 3); ok expected on iOS (idb, wda: the re-read runs)', calls: [fill(FP, 'dialRefuses', '421')], judge: refusedOnFocus('dialRefuses', '+421 ') },
   // The same on React Native (`--app react-native`): rn-format's fields, onChangeText reformatting (src/format.ts).

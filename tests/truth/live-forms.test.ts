@@ -1023,8 +1023,15 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     expect(judge(syntheticLeft('dialRefuses', '+421 '), ['Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) — NOT verified: the field could not be read'], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
     // The words without an error are no refusal: a NOT verified reply saying them is LOUD, not ok.
     expect(judge(syntheticLeft('dialRefuses', '+421 '), ['Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) — NOT verified: the field did not change'], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
-    // A Filled is a claim whatever the field holds.
-    expect(judge(syntheticLeft('dialRefuses', '+421 421'), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    // A Filled over the inserted text alone is the false Filled: MISMATCH fill-claim.
+    expect(judge(syntheticLeft('dialRefuses', '+421 '), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+  });
+
+  it('refusedOnFocus (review round 1): a Filled while the field took the keys is the lab\'s fault, not averi\'s — SKIP naming what it holds; the fp2 known entry does not match it', () => {
+    const judge = refusedOnFocus('dialRefuses', '+421 ');
+    const v = judge(syntheticLeft('dialRefuses', '+421 421'), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED);
+    expect(v).toEqual({ outcome: 'SKIP', why: 'lab fault: the field took the keys (holds "+421 421")' });
+    expect(knownLive('android', 'uiautomator', 'fp2', v.cls, v.kind)).toBeUndefined();
   });
 
   it('known: fp2 under uiautomator alone, a fill-claim on a Filled (`other`), ADR 0028 residual 3; fp1 nowhere, fp2 not under idb or WDA (they re-read after focus)', () => {

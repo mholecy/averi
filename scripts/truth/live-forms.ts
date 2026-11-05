@@ -114,9 +114,10 @@ export const refusedCapped = (tag: string, kept: string) => refusedHolding(tag, 
  * form-focus-prefix's dialRefuses, `+421 ` held whatever `421` is typed. `refusedHolding` reads two calls; this is its
  * one-call sibling, the launch's empty field the baseline. Ok only when the app holds `inserted` and the reply is an
  * error saying the field did not change (what the post-focus re-read lets averi say: it read `inserted` before typing).
- * A claim of done is a MISMATCH `fill-claim` — Android's today, where that re-read is skipped and the reading passes by
- * containment (ADR 0028 residual 3); the field holding anything but `inserted` is LOUD `loud-changed`; held, but no
- * error saying so, LOUD `loud-untouched`.
+ * A claim of done over `inserted` is a MISMATCH `fill-claim` — Android's today, where that re-read is skipped and the
+ * reading passes by containment (ADR 0028 residual 3); a claim over anything else is the lab's fault (it took the keys
+ * it must refuse), a SKIP no KNOWN entry matches (review round 1). No claim: the field holding anything but `inserted`
+ * is LOUD `loud-changed`; held, but no error saying so, LOUD `loud-untouched`.
  */
 export const refusedOnFocus =
   (tag: string, inserted: string) =>
@@ -124,7 +125,11 @@ export const refusedOnFocus =
     const got = valueOf(s, tag);
     const last = replies[replies.length - 1];
     const kind = replyKind(last);
-    if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the field refused the typing; the app holds ${JSON.stringify(got)}` };
+    if (claimsDone(last)) {
+      // A claim over a field holding other than `inserted`: the lab failed to refuse the keys — averi's Filled may be true.
+      if (got !== inserted) return { outcome: 'SKIP', why: `lab fault: the field took the keys (holds ${JSON.stringify(got)})` };
+      return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the field refused the typing; the app holds ${JSON.stringify(got)}` };
+    }
     if (got !== inserted) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(inserted)}; averi: ${short(last)}` };
     if (!isError(last) || !last.includes('did not change')) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the field kept ${JSON.stringify(inserted)}, but not refused as "did not change": ${short(last)}` };
     return { outcome: 'ok', kind, why: `refused as "did not change", the field kept ${JSON.stringify(inserted)}: ${short(last)}` };
