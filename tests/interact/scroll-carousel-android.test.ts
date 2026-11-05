@@ -564,6 +564,14 @@ describe('`fully: true` on a View-cut card no swipe can bring whole (D68): the s
     }
   });
 
+  it('the agent-facing references quote the reply as the code words it (skill/references/tools.md, troubleshooting.md)', () => {
+    const message = failureOf(replay(FULLY_LEFT, run(8).cardX.map(recyclerAt)), 'C').message;
+    const said = message.slice(message.indexOf('element is in the viewport'), message.indexOf('. Last rect'));
+    expect(readFileSync(new URL('../../skill/references/tools.md', import.meta.url), 'utf8')).toContain(`'${said}'`);
+    const tail = message.slice(message.indexOf(', no longer than the next would be,'), message.indexOf('. Last rect')).replace(/its left side/g, 'its <side> side').replace('27 px in this call', 'P px in this call');
+    expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(`K-px swipe${tail}\`**`);
+  });
+
   it.each(B10.runs.map((r) => [r.run, STOPPED.includes(r.run)] as const))('run %d: the stop %s — else maxSwipes and the flush cut as batch-10 replied', (n, stops) => {
     const played = replay(FULLY_LEFT, run(n).cardX.map(recyclerAt));
     const room = run(n).cardX[6] - 66;
