@@ -489,6 +489,13 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(await clearLabEntry(emu.using(run), files())).toMatchObject({ ok: false, why: expect.stringMatching(/^the reinstall not proven: after the reinstall, D55 check: ERROR — /), hand: [expect.stringMatching(/^D55 \(Android\): the chooser and the preferred activities not proven/)] });
   });
 
+  it('a last-chosen entry not accepted left after the reinstall (exit 6) is no default: proven (hand mutant)', async () => {
+    const o = files();
+    const fake = fakeEmu({ entries: [{ flag: 'true' }, { flag: 'false', authority: 'pair' }], writes: true });
+    expect(await clearLabEntry(await emuOf(fake), o)).toMatchObject({ ok: true, check: { exit: 6 } });
+    expect(o.progress.step).toBe('proven');
+  });
+
   it("a chooser that stays over a preferred read that fails (exit 4) proves nothing: not proven, never \"cleared\" (T2 S5 review round 1, its repro)", async () => {
     const o = files();
     let reinstalled = false;
@@ -521,6 +528,9 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
       hand: [expect.stringContaining(`adb -s ${SERIAL} uninstall dev.averi.lab && adb -s ${SERIAL} install ${o.apk}`)],
     });
     expect(fake.words()).not.toContain(`install ${o.apk}`);
+    // The uninstall failing with adb gone after it: unknown, its hand line `pm path` first (mutation round).
+    const gone = fakeEmu({ entries: [{ flag: 'true' }], writes: true, rules: [(w) => (w[0] === 'uninstall' ? exit(1, 'error: closed') : w[0] === 'get-state' ? exit(1, 'error: closed') : undefined)] });
+    expect(await clearLabEntry(await emuOf(gone), files())).toMatchObject({ ok: false, hand: [expect.stringMatching(/^D55 \(Android\): whether the lab is installed is unknown/)] });
   });
 });
 
@@ -655,6 +665,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
   });
 
   it("the probe's state put back after the install is proven, over the abort's Run; its failure is the window's", async () => {
+    files();
     const fake = fakeEmu();
     const seen: unknown[] = [];
     const w = await windowOf(fake, {
@@ -666,6 +677,26 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     });
     expect(await w.restore(fake.run)).toEqual({ ok: false, why: 'D55 restore: NOT VERIFIED — the state file not read back equal', hand: ['D55 (Android): the probe --restore'] });
     expect(seen).toEqual([true]);
+    // With no hand line of its own, the RESTORE line names its command (T2 S5 review round 1).
+    const bare = fakeEmu();
+    const w3 = await windowOf(bare, { putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED' })) });
+    expect(await w3.restore(bare.run)).toEqual({ ok: false, why: 'NOT VERIFIED', hand: [`D55 (Android): the lab's state not put back: ${RESTORE_CMD}`] });
+    // A restore giving an empty hand: its command too (mutation round).
+    const empty = fakeEmu();
+    const w5 = await windowOf(empty, { putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED', hand: [] })) });
+    expect(await w5.restore(empty.run)).toEqual({ ok: false, why: 'NOT VERIFIED', hand: [`D55 (Android): the lab's state not put back: ${RESTORE_CMD}`] });
+    // Inside the reinstall, `pm path` itself not answering: unknown, nothing installed (mutation round).
+    const slow = fakeEmu({ writes: true, rules: [(w) => (w[1] === 'pm' ? timedOut : undefined)] });
+    expect(await (await windowOf(slow, { progress: { step: 'started' } })).restore(slow.run)).toEqual({
+      ok: false,
+      why: `interrupted during the reinstall: whether the lab is installed is unknown (pm path: past its bound (exit ${TIMED_OUT}))`,
+      hand: [expect.stringMatching(/^D55 \(Android\): whether the lab is installed is unknown/)],
+    });
+    expect(slow.words().some((x) => x.startsWith('install'))).toBe(false);
+    // The catalog unreadable inside the reinstall: not proven, said.
+    const noCat = fakeEmu();
+    const w4 = await windowOf(noCat, { progress: { step: 'started' }, catalog: join(dir, 'none.json') });
+    expect(await w4.restore(noCat.run)).toMatchObject({ ok: false, why: `interrupted during the reinstall: the installed lab not proven the pulled APK: the catalog ${join(dir, 'none.json')} cannot be read` });
     const ok2 = fakeEmu();
     const w2 = await windowOf(ok2, { putBack: restoreOf(async () => ({ ok: true, how: 'put back' })) });
     expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: 'chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)' });

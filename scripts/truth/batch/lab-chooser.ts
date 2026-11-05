@@ -279,18 +279,51 @@ export function installedOf(getState: CallResult, pmPath?: CallResult): Installe
 /** The bounds as dumped: no node widened under what is drawn over it (src's parser asks; the tap is judged raw). */
 export const NOT_JUDGED: DrawnOverStrip = () => () => false;
 
+/** What src's tree drops of a node, read from its own tag: its resource-id, text and content-desc apart, its enabled. */
+export interface RawAttrs {
+  /** Each as written in the tag; undefined when the tag has none. */
+  resourceId: string | undefined;
+  text: string | undefined;
+  contentDesc: string | undefined;
+  /** `true` or `false` as dumped; undefined (no `enabled`) is never taken as enabled. */
+  enabled: string | undefined;
+}
+
+/** A dump read twice: src's tree for its structure and bounds, and each node's own tag for what src's tree drops. */
+export interface Dump {
+  root: UiNode;
+  attrs(n: UiNode): RawAttrs;
+}
+
 /**
- * A `uiautomator dump /dev/tty` output as src's tree: the XML up to its last `>` (uiautomator appends a status line;
- * android.ts#dumpedTree reads it so), parsed by src's parser — or why not.
+ * One attribute of a node's tag as written; undefined when the tag has none. Not entity-decoded: uiautomator writes an
+ * entity only for `&`, `<`, `>`, `"` and control characters, none of them in a resource id or in the word "always".
  */
-export function treeOf(raw: string): UiNode | { why: string } {
+const attrOf = (tag: string, name: string): string | undefined => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
+
+/**
+ * A `uiautomator dump /dev/tty` output as a Dump: the XML up to its last `>` (uiautomator appends a status line;
+ * android.ts#dumpedTree reads it so), parsed by src's parser, and its `<node>` tags read in the same order — src's tree
+ * and the tags are both in document order, node for node. A dump whose tags and parsed nodes do not pair up is no
+ * tree: nothing could be judged of a node then.
+ */
+export function treeOf(raw: string): Dump | { why: string } {
   const end = raw.lastIndexOf('>');
   if (end === -1) return { why: `no XML in the dump: ${firstLineOf(raw)}` };
+  const xml = raw.slice(0, end + 1);
+  let root: UiNode;
   try {
-    return parseUiautomatorXml(raw.slice(0, end + 1), NOT_JUDGED);
+    root = parseUiautomatorXml(xml, NOT_JUDGED);
   } catch (e) {
     return { why: `the dump did not parse: ${firstLineOf(messageOf(e))}` };
   }
+  const nodes = [...everyNode(root)];
+  const tags = [...xml.matchAll(/<node\b[^>]*>/g)].map((m) => m[0]);
+  if (tags.length !== nodes.length) return { why: `the dump's ${tags.length} node tags are not the parsed tree's ${nodes.length} nodes` };
+  const byNode = new Map(
+    nodes.map((n, i) => [n, { resourceId: attrOf(tags[i], 'resource-id'), text: attrOf(tags[i], 'text'), contentDesc: attrOf(tags[i], 'content-desc'), enabled: attrOf(tags[i], 'enabled') }]),
+  );
+  return { root, attrs: (n) => byNode.get(n)! };
 }
 
 /** Whether `a` is an ancestor of `n`, by the tree's parent links. */
@@ -305,10 +338,14 @@ function aboveIn(root: UiNode): IsAbove {
 }
 
 /**
- * "Always", by its id (`button_always`, whatever its label: a localized one too) or by the word in its label, any case
- * (`String`: a node with no label reads "null", no "always").
+ * "Always", each field on its own (src's label shows content-desc before text, so a text "Always" behind another
+ * content-desc would hide): its resource-id's last segment `button_always`, whatever its words (a localized one too),
+ * or the word "always", any case, in its text or its content-desc. A row of an app named "Always…" is refused too: safe
+ * by design, the tap is never needed there.
  */
-export const isAlways = (n: UiNode): boolean => n.identifier === 'button_always' || /\balways\b/i.test(String(n.label));
+const ALWAYS_WORD = /\balways\b/i;
+// `String`: a field the tag lacks reads "undefined", neither an id nor the word.
+export const isAlways = (a: RawAttrs): boolean => /(?:^|\/)button_always$/.test(String(a.resourceId)) || ALWAYS_WORD.test(String(a.text)) || ALWAYS_WORD.test(String(a.contentDesc));
 
 /** Half-open, as pixels are: a rect's far edge is the next node's first pixel. */
 const contains = (r: Rect, p: Point): boolean => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
@@ -325,7 +362,7 @@ function nodeText(n: UiNode): string {
 
 /** What a batch may tap on the chooser: a row, by its label (text1 or text2) or its number from 1; or "Just once". */
 export type TapTarget = { row: string } | { row: number } | 'once';
-export type TapRefusal = 'no-target' | 'not-unique' | 'no-sheet' | 'always' | 'disabled' | 'outside' | 'off-centre' | 'other-node';
+export type TapRefusal = 'no-target' | 'not-unique' | 'no-sheet' | 'always' | 'disabled' | 'enabled-unshown' | 'outside' | 'off-centre' | 'other-node';
 /** The one point to tap, or a named refusal with why. */
 export type SafeTap = { ok: true; point: Point; why: string } | { ok: false; refusal: TapRefusal; why: string };
 
@@ -364,22 +401,27 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
  * it (a scrim, a sibling laid there). src's tree carries no `clickable`, so "another node" is any node there, which is
  * every clickable one and more: rows are not clickable in uiautomator (batch-10), the list above takes the click.
  */
-export function safeTap(tree: UiNode, target: TapTarget, at?: Point): SafeTap {
+export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
+  const tree = dump.root;
+  const always$ = (n: UiNode): boolean => isAlways(dump.attrs(n));
   const all = [...everyNode(tree)];
   const found = targetOf(all, target);
   if ('ok' in found) return found;
   const { node, name } = found;
   if (chooserSheet(tree) === undefined) return refused('no-sheet', "the tree is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none)");
   // The target itself, or a label inside it (a row's text1 or text2).
-  if ([...everyNode(node)].some(isAlways)) return refused('always', `${name} reads as "Always"`);
+  if ([...everyNode(node)].some(always$)) return refused('always', `${name} reads as "Always"`);
   if (node.disabled === true) return refused('disabled', `${name} is disabled`);
+  // Fail closed: enabled only when the dump says so (d55-b11.ts and pure-b12.ts read `enabled="true"`).
+  if (dump.attrs(node).enabled !== 'true') return refused('enabled-unshown', `${name}: the dump does not say it is enabled`);
   const centre = rectCentre(node.rect);
   const point = at ?? centre;
   if (!contains(node.rect, point)) return refused('outside', `the point ${pointText(point)} is outside ${name} ${rectText(node.rect)}`);
   if (Math.abs(point.x - centre.x) > CENTRE_SLACK_PX || Math.abs(point.y - centre.y) > CENTRE_SLACK_PX) {
     return refused('off-centre', `the point ${pointText(point)} is not ${name}'s centre ${pointText(centre)} within ${CENTRE_SLACK_PX} px`);
   }
-  const always = all.find((n) => isAlways(n) && overlaps(n.rect, node.rect));
+  // An ancestor "Always" holds the target, so it overlaps it: refused here too.
+  const always = all.find((n) => always$(n) && overlaps(n.rect, node.rect));
   if (always !== undefined) {
     return refused('always', contains(always.rect, point) ? `the point ${pointText(point)} is inside "Always" (${nodeText(always)})` : `${name} overlaps "Always" (${nodeText(always)})`);
   }
@@ -406,23 +448,33 @@ export function sanitizeFixture(text: string, serial: string): { ok: boolean; hi
 /** `adb -s <serial> <words…>`, each word quoted as a shell reads it back (adb-shell.ts#shellQuote). */
 export const adbLine = (serial: string, words: readonly string[]): string => ['adb', '-s', serial, ...words].map(shellQuote).join(' ');
 
-/** A lab default left: what clears it (batch-12's hand line; the uninstall wipes the lab's data). */
-export const defaultHand = (serial: string, apk: string): string =>
+/** A lab default left: what clears it (batch-12's hand line; the uninstall wipes the lab's data), then `then`. */
+export const defaultHand = (serial: string, apk: string, then: string): string =>
   `${HAND_PREFIX}a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: ` +
-  `${adbLine(serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(serial, ['install', apk])} (clears it; wipes the lab's data, ` +
-  "so put the lab's state back after), then read the preferred activities again";
+  `${adbLine(serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(serial, ['install', apk])} (clears it; wipes the lab's data); then: ${then}`;
 
 /** Interrupted inside the reinstall with adb unreachable: whether the lab is installed is unknown, never "missing". */
-export const unknownInstallHand = (serial: string, apk: string): string =>
+export const unknownInstallHand = (serial: string, apk: string, then: string): string =>
   `${HAND_PREFIX}whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb ` +
-  `answers, ${adbLine(serial, ['shell', 'pm', 'path', LAB_PACKAGE])}; if it prints nothing, ${adbLine(serial, ['install', apk])}; ` +
-  "then put the lab's state back";
+  `answers, ${adbLine(serial, ['get-state'])} (device), then ${adbLine(serial, ['shell', 'pm', 'path', LAB_PACKAGE])}; if it ` +
+  `prints nothing, ${adbLine(serial, ['install', apk])}; then: ${then}`;
 
 /** The lab proven not installed: install it again. */
-export const missingHand = (serial: string, apk: string): string =>
-  `${HAND_PREFIX}the lab APK is NOT installed: ${adbLine(serial, ['install', apk])}, then put the lab's state back`;
+export const missingHand = (serial: string, apk: string, then: string): string => `${HAND_PREFIX}the lab APK is NOT installed: ${adbLine(serial, ['install', apk])}; then: ${then}`;
+
+/** The installed lab not proven the pulled APK (a pull, an unzip, or its cells.json differing): the proof by hand. */
+export const cellsHand = (serial: string, apk: string, catalog: string, why: string, then: string): string =>
+  `${HAND_PREFIX}the installed lab not proven the pulled APK (${why}): ${adbLine(serial, ['shell', 'pm', 'path', LAB_PACKAGE])}, ` +
+  `${adbLine(serial, ['pull'])} <that path> <a file>, unzip -p <that file> assets/cells.json must equal ${shellQuote(catalog)}; if not, ` +
+  `${adbLine(serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(serial, ['install', apk])}; then: ${then}`;
 
 /** The chooser or the preferred activities not proven put back: what to read, and what to press. */
 export const checkHand = (serial: string): string =>
   `${HAND_PREFIX}the chooser and the preferred activities not proven put back: ${adbLine(serial, ['shell', ...PREFERRED_ARGV])} ` +
   `(no lab entry with mAlways=true may be left); a chooser in front: ${adbLine(serial, ['shell', 'input', 'keyevent', 'KEYCODE_BACK'])}`;
+
+/** The probe's state not put back, its restore failing with no hand line of its own: its command. */
+export const stateHand = (command: string): string => `${HAND_PREFIX}the lab's state not put back: ${command}`;
+
+/** Exit 6's words: the cleanup's WARN and the abort's, one text. */
+export const lastChosenWhy = (why: string): string => `a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): ${why}`;

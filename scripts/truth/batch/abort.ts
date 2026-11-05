@@ -50,8 +50,11 @@ import { EXIT, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine
  * undeliveredHand) are the parts to move into files of their own, each behind the guard.
  */
 
-/** A restore's outcome: put back and verified (`how`, for the step line), or not (`why`, its hand lines, its word). */
-export type Putback = { ok: true; how: string } | { ok: false; why: string; hand?: readonly string[]; verdict?: 'FAIL' | 'ERROR' };
+/**
+ * A restore's outcome: put back and verified (`how`, for the step line; WARN when what is left is no change to put
+ * back, but worth saying: the chooser's last-chosen entry), or not (`why`, its hand lines, its word).
+ */
+export type Putback = { ok: true; how: string; verdict?: 'WARN' } | { ok: false; why: string; hand?: readonly string[]; verdict?: 'FAIL' | 'ERROR' };
 
 export interface WindowSpec {
   /** Put it back and verify it, with the detached runner only (a second Ctrl-C must not kill it). */
@@ -270,7 +273,7 @@ export class AbortGuard {
   }
 
   /** A step line the abort cannot be stopped by: one the log fails to write is dropped. */
-  private say(word: 'OK' | 'NOTE' | 'ERROR', text: string): void {
+  private say(word: 'OK' | 'WARN' | 'NOTE' | 'ERROR', text: string): void {
     try {
       this.options.log.step(word, text);
     } catch {
@@ -370,7 +373,7 @@ export class AbortGuard {
       }
       const { p } = b;
       late ||= b.late === true;
-      if (p.ok) this.say('OK', `${name} put back (verified by the abort): ${p.how}`);
+      if (p.ok) this.say(p.verdict ?? 'OK', `${name} put back (verified by the abort): ${p.how}`);
       else {
         const own = p.hand !== undefined && p.hand.length > 0 ? p.hand : spec.hand;
         hand.push(...(b.late === true && b.running !== true ? [`${name}: its restore was stopped at its bound (${spec.secs ?? RESTORE_SECS} s), part-way — check the state it left before the hand commands below`] : []), ...own);
@@ -378,7 +381,7 @@ export class AbortGuard {
       }
       // A cleanup label has a wanted block: open() refuses one without.
       if (spec.cleanup !== undefined) {
-        const line = p.ok ? verdictLine(spec.cleanup, 'OK', `${p.how} (verified by the abort)`) : verdictLine(spec.cleanup, p.verdict ?? 'ERROR', `${p.why} (the abort)`);
+        const line = p.ok ? verdictLine(spec.cleanup, p.verdict ?? 'OK', `${p.how} (verified by the abort)`) : verdictLine(spec.cleanup, p.verdict ?? 'ERROR', `${p.why} (the abort)`);
         cleanups.set(spec.block, [...(cleanups.get(spec.block) ?? []), line]);
       }
     }

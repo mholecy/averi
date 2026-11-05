@@ -303,7 +303,7 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
   });
 
   it('isAlways: the id button_always (its last segment), or "always" as a word in the text or the content-desc, each read on its own, any case (T2 S5 review round 1); never "Just once" or "Alwaysy"', () => {
-    const a = (resourceId: string, text = '', contentDesc = ''): RawAttrs => ({ resourceId, text, contentDesc, enabled: 'true' });
+    const a = (resourceId: string | undefined, text: string | undefined = '', contentDesc: string | undefined = ''): RawAttrs => ({ resourceId, text, contentDesc, enabled: 'true' });
     expect(isAlways(a('android:id/button_always', 'Immer'))).toBe(true);
     expect(isAlways(a('button_always'))).toBe(true);
     expect(isAlways(a('', ' ALWAYS '))).toBe(true);
@@ -316,6 +316,7 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
     expect(isAlways(a('android:id/button_always_x'))).toBe(false);
     expect(isAlways(a('x:id/my_button_always'))).toBe(false);
     expect(isAlways(a(''))).toBe(false);
+    expect(isAlways(a(undefined, undefined, undefined))).toBe(false);
   });
 
   it("a point given outside the target, or more than 2 px off its centre (batch-12's row-1 rule), is refused", () => {
@@ -662,6 +663,16 @@ describe('safeTap fails closed (T2 S5 review round 1)', () => {
     const bar = resolverXml(true).replace('resource-id="android:id/button_bar" class="android.widget.LinearLayout" package="android" content-desc=""', 'resource-id="android:id/button_bar" class="android.widget.LinearLayout" package="android" content-desc="Always"');
     expect(bar).not.toBe(resolverXml(true));
     expect(safeTap(tree(bar), 'once')).toEqual({ ok: false, refusal: 'always', why: 'the point (723, 2058) is inside "Always" (button_bar "Always")' });
+  });
+
+  it('a tag with no text, resource-id or content-desc is no "Always"; "Always" in quotes is (the tags read as written)', () => {
+    const over = (attrs: string) =>
+      resolverXml().replace(
+        '<node index="3" text="" resource-id="android:id/button_bar_container"',
+        `<node index="9" ${attrs} class="android.view.View" package="android" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1850][1080,1900]" /><node index="3" text="" resource-id="android:id/button_bar_container"`,
+      );
+    expect(safeTap(tree(over('')), { row: 2 })).toMatchObject({ ok: false, refusal: 'other-node' });
+    expect(safeTap(tree(over('text="&quot;always&quot;"')), { row: 2 })).toMatchObject({ ok: false, refusal: 'always' });
   });
 
   it("a dump whose nodes and src's parsed tree differ (a node in a comment) is no tree: nothing could be judged node by node", () => {
