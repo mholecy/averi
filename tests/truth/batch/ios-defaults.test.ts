@@ -14,6 +14,7 @@ import {
   PROTECTED,
   protectedLine,
   restoreDomain,
+  shellQuote,
   stateIn,
   TYPED_PY,
   backupPathOf,
@@ -21,12 +22,12 @@ import {
   type DomainMap,
   type KeyVal,
   type RestoreInput,
-} from '../../../scripts/truth/batch/ios-domains.js';
+} from '../../../scripts/truth/batch/ios-defaults.js';
 import { exitCodeOf, type Summary } from '../../../scripts/truth/batch/words.js';
 
-// scripts/truth/batch/ios-domains.ts, its pure parts: the typed diff, d43-gate.ts's restore rule over batch-10's real
-// exports (tests/fixtures/batch/d43-b10/, typed maps), the one `defaults` argv builder and its read-only domain, the
-// state file's shape and the protected-key line. The parts over a simulator, through a recording fake Run, are
+// scripts/truth/batch/ios-defaults.ts, the pure module: the typed diff, d43-gate.ts's restore rule over batch-10's
+// real exports (tests/fixtures/batch/d43-b10/, typed maps), the one `defaults` argv builder and its read-only domain,
+// the state file's shape and the protected-key line. ios-domains.ts over a simulator, through a recording fake Run, is
 // tests/truth/batch/ios-domains-sim.test.ts.
 
 const FIXTURES = join(import.meta.dirname, '..', '..', 'fixtures', 'batch', 'd43-b10');
@@ -215,6 +216,17 @@ describe('restoreDomain — decideRestore driven to its end (d43-gate.ts:722)', 
     expect(r.equal).toBe(true);
   });
 
+  it("the fallback's two exits each where it ran: its delete's and its import's, told apart (T2 S4 code review: one table of the actions)", async () => {
+    const backup = { a: int(1) };
+    let imports = 0;
+    const r = await restoreDomain(input({ backup, now: { a: int(1), x: int(9) } }), {
+      run: async (args) => (args[0] === 'import' ? (imports++ === 0 ? 0 : 3) : args.length === 2 ? 5 : 1),
+      read: async () => ({ a: int(1), x: int(9) }),
+    });
+    expect(r.performed).toMatchObject({ import: 0, fallback: { delete: 5, import: 3 } });
+    expect(r.equal).toBe(false);
+  });
+
   it('NOT VERIFIED ends it with the plan: nothing runs after', async () => {
     let calls = 0;
     const r = await restoreDomain(input({ backup: { a: int(1) }, now: { a: int(2) }, done: 'fallback' }), { run: async () => (calls++, 0), read: async () => null });
@@ -277,6 +289,17 @@ describe('defaultsArgv — the only `defaults` builder; only the three domains w
   it('a verb it does not run, an option first, or no verb: thrown', () => {
     expect(() => defaultsArgv(UDID, ['-currentHost', 'write', A11Y, 'k', '-int', '1'])).toThrow('defaults "-currentHost": not a verb this module runs (read, export, write, delete, import)');
     expect(() => defaultsArgv(UDID, [])).toThrow('defaults "": not a verb');
+  });
+});
+
+describe('shellQuote — a hand line a person pastes (d43-gate.ts\'s shq, renamed in the T2 S4 code review)', () => {
+  it('a plain word as given; anything else single-quoted, a quote in it as \'\\\'\'', () => {
+    expect(shellQuote('com.apple.Accessibility')).toBe('com.apple.Accessibility');
+    expect(shellQuote('a@b%c+d=e:f,g./h-i_9')).toBe('a@b%c+d=e:f,g./h-i_9');
+    expect(shellQuote('a b')).toBe("'a b'");
+    expect(shellQuote("it's")).toBe("'it'\\''s'");
+    expect(shellQuote('')).toBe("''");
+    expect(shellQuote('x\ny')).toBe("'x\ny'");
   });
 });
 

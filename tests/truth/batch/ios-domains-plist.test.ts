@@ -3,9 +3,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { decideRestore, TYPED_PY, typedMapOf } from '../../../scripts/truth/batch/ios-domains.js';
+import { decideRestore, TYPED_PY, typedMapOf } from '../../../scripts/truth/batch/ios-defaults.js';
 
-// ios-domains.ts's typed read (TYPED_PY) through the host's real python3 plistlib, on XML plists written here: the
+// ios-defaults.ts's typed read (TYPED_PY) through the host's real python3 plistlib, on XML plists written here: the
 // read the fakes of ios-domains-sim.test.ts stand in for. Kept apart, in the normal suite only: it starts python3,
 // which the mutation run's tests do not. Each run bounded (spawnSync's timeout); no device.
 
@@ -63,7 +63,7 @@ describe("TYPED_PY on the host's plistlib (batch-10: bool true read int 0 after 
     expect(decideRestore({ domain: 'com.apple.Accessibility', backupPath: '/b', backup: before, now: after })).toMatchObject({ verdict: 'act', actions: [{ op: 'write', key: 'k', flag: '-bool', value: 'false' }] });
   });
 
-  it("the host's export of a domain not there (an empty dictionary, exit 0) reads as an empty map — so it proves nothing absent", () => {
+  it("the host's export of a domain not there (an empty dictionary, exit 0) reads as an empty map — so it proves nothing absent (T2 S4 review round 2)", () => {
     const r = typedRead('m.plist', readFileSync(join(import.meta.dirname, '..', '..', 'fixtures', 'batch', 'defaults-host-export-missing-domain.plist'), 'utf8'));
     expect([r.code, typedMapOf(r.out)]).toEqual([0, {}]);
   });
