@@ -1,0 +1,179 @@
+{
+  "note": "D59, batch-9 (averi_lab emulator, Android 13 API 33, 1080x2220), on main e734fedf: scroll_until id:lab.carousel-lazy-free.C direction:left fully:true after a 440-px pre-drag, 3 runs. Trimmed: no tree (the batch kept none), window focus, timestamps and device paths dropped; the lab's own state (card, clip, offset) and the target's listed rect before the call and after it, the room-giver as the round saw it, the reply.",
+  "probe": "D59 probe v2",
+  "commit": "e734fedf",
+  "cell": "carousel-lazy-free",
+  "target": "lab.carousel-lazy-free.C",
+  "direction": "left",
+  "fully": true,
+  "runs": [
+    {
+      "run": 0,
+      "predragPx": 440,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 437,
+        "after": 950
+      },
+      "card": {
+        "before": {
+          "x": 577,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 64,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "before": {
+          "x": 577,
+          "y": 380,
+          "width": 503,
+          "height": 234
+        },
+        "after": {
+          "x": 64,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "roomGiver": {
+        "rect": {
+          "x": 66,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "axis": null,
+        "nearest": true
+      },
+      "kind": "maxSwipes",
+      "swipes": 6,
+      "ms": 16470,
+      "reply": "ERROR scroll_until id:lab.carousel-lazy-free.C failed after 6 swipes (maxSwipes) — element reached the viewport but stayed CLIPPED at left, 99% of it is in the viewport (last rect {\"x\":64,\"y\":380,\"width\":948,\"height\":234}). It was turned round 3 times: a swipe carried it past the viewport (a fling), or it lay at the edge the swipes push it out through, so the next was drawn the other way"
+    },
+    {
+      "run": 1,
+      "predragPx": 440,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 440,
+        "after": 949
+      },
+      "card": {
+        "before": {
+          "x": 574,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 65,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "before": {
+          "x": 574,
+          "y": 380,
+          "width": 506,
+          "height": 234
+        },
+        "after": {
+          "x": 65,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "roomGiver": {
+        "rect": {
+          "x": 66,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "axis": null,
+        "nearest": true
+      },
+      "kind": "reached",
+      "swipes": 6,
+      "ms": 16349,
+      "reply": "Element id:lab.carousel-lazy-free.C fully visible after 6 swipes; but it fills its scroll container (66,380 948x234) exactly — its left and right edges lie on the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — it may be cut there, a rect assert or screenshot may measure part of it; usual for a card as tall as its carousel — check with a screenshot"
+    },
+    {
+      "run": 2,
+      "predragPx": 440,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 443,
+        "after": 949
+      },
+      "card": {
+        "before": {
+          "x": 571,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 65,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "before": {
+          "x": 571,
+          "y": 380,
+          "width": 509,
+          "height": 234
+        },
+        "after": {
+          "x": 65,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "roomGiver": {
+        "rect": {
+          "x": 66,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "axis": null,
+        "nearest": true
+      },
+      "kind": "reached",
+      "swipes": 6,
+      "ms": 16399,
+      "reply": "Element id:lab.carousel-lazy-free.C fully visible after 6 swipes; but it fills its scroll container (66,380 948x234) exactly — its left and right edges lie on the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — it may be cut there, a rect assert or screenshot may measure part of it; usual for a card as tall as its carousel — check with a screenshot"
+    }
+  ]
+}
