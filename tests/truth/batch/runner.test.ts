@@ -155,6 +155,8 @@ beforeEach(() => {
   terminal = [];
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
+// T2c: a test that hangs past vitest's timeout never runs its finally; its fake timers and Date end here all the same.
+afterEach(() => void vi.useRealTimers());
 
 const dirOf = (block: string) => join(out, block, `run-${ID}`);
 const text = (p: string) => readFileSync(p, 'utf8');

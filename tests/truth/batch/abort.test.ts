@@ -93,6 +93,8 @@ beforeEach(() => {
   terminal.length = 0;
 });
 afterEach(() => rmSync(out, { recursive: true, force: true }));
+// T2c: a test that hangs past vitest's timeout never runs its finally; its fake timers and Date end here all the same.
+afterEach(() => void vi.useRealTimers());
 
 const clock = () => new Date(2026, 10, 4, 9, 44, 26);
 const restoreFile = () => join(out, RESTORE_FILE);
@@ -767,6 +769,24 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     expect(summaryText()).toContain('kf: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=kf)');
     expect(summaryText()).toContain("E5: INTERRUPTED — not judged (the abort's judging budget of 0.3 s was spent; rerun ONLY=E5)");
     expect(summaryText()).not.toContain('E5 verdict: PASS');
+  });
+
+  it.each([
+    [299, 'kf verdict: PASS'],
+    [301, 'kf: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=kf)'],
+  ])('T2c: completeness is read within what is left of the budget, the bound pinned on fake time — a budget of 300 ms, completeness at %i ms', async (completeMs, line) => {
+    const after = <T,>(ms: number, v: T) => new Promise<T>((r) => setTimeout(() => r(v), ms));
+    const guard = guardOf([block('kf', { complete: () => after(completeMs, true), judge: async () => ['kf verdict: PASS'] })], { judgeBudgetSecs: 0.3 });
+    expect(await interruptOnFakeTime(guard)).toEqual([130]);
+    expect(summaryText()).toContain(line);
+  });
+
+  it('T2c: the next block\'s completeness gets only what the block before it left (fake time): 100 ms spent of 300, one at 250 ms is not read in time', async () => {
+    const after = <T,>(ms: number, v: T) => new Promise<T>((r) => setTimeout(() => r(v), ms));
+    const guard = guardOf([block('kf', { complete: () => after(100, true) }), block('E5', { complete: () => after(250, true) })], { judgeBudgetSecs: 0.3 });
+    expect(await interruptOnFakeTime(guard)).toEqual([130]);
+    expect(summaryText()).toContain('kf verdict: PASS');
+    expect(summaryText()).toContain('E5: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=E5)');
   });
 
   it.each([

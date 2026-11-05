@@ -1430,6 +1430,8 @@ single run lab-batch.test.ts was the first killer of some), but core's own tests
 narrower include can only lower a score, a loud floor failure, never a false pass. Every module's score and mutant count
 is the same as in T2b-1's final single run; floors unchanged.
 
-T2c (2026-11-05): the judging budget's races in abort.test.ts and runner.test.ts's late need ends run on fake time
+### T2c: the budget tests on fake time (2026-11-05, backlog T2c)
+
+The judging budget's races in abort.test.ts and runner.test.ts's late need ends run on fake time
 (setTimeout, clearTimeout and Date faked), no longer on tiny real timers; `left <= 0` turned `< 0` is killed by a block
 left exactly 0 ms, so abort.ts is 98.89 % (1 survivor, the stateFile equivalent), its floor kept at 96.
