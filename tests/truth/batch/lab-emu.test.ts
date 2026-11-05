@@ -715,6 +715,10 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     const noCat = fakeEmu();
     const w4 = await windowOf(noCat, { progress: { step: 'started' }, catalog: join(dir, 'none.json') });
     expect(await w4.restore(noCat.run)).toMatchObject({ ok: false, why: `interrupted during the reinstall: the installed lab not proven the pulled APK: the catalog ${join(dir, 'none.json')} cannot be read` });
+    // Inside the reinstall, a state restore that verifies: the check's words, nothing more (mutation round).
+    const fine = fakeEmu();
+    const w6 = await windowOf(fine, { progress: { step: 'started' }, putBack: restoreOf(async () => ({ ok: true, how: 'put back' })) });
+    expect(await w6.restore(fine.run)).toEqual({ ok: true, how: 'chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)' });
     const ok2 = fakeEmu();
     const w2 = await windowOf(ok2, { putBack: restoreOf(async () => ({ ok: true, how: 'put back' })) });
     expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped: the lab's state stays as the probe left it" });

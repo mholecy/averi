@@ -578,9 +578,9 @@ as `*-api33-b<N>-*.txt`; and T4's resolver trees) and lab-emu.test.ts (a fake em
 defaults but never a last-chosen entry, as batch-11 measured; every call checked in afterEach for another serial, an
 `input tap` inside an "Always" node of the last tree dumped (read from its XML, not by the module's isAlways), a
 `pm`/`settings`/`cmd`/`am` write, and an uninstall or install outside a reinstall). Each under 2 s; no device.
-Baselines after review round 2, cold: lab-chooser.ts 99.88 % (851 mutants, 1 equivalent survivor: `chooserOf`'s state
-check, which an unread read with no chooser makes moot), floor 97; lab-emu.ts 100 % (438 mutants, 3 timeouts), floor
-98; abort.ts 98.04 % (its WARN put back; the same survivors). The cold run of all twenty-four modules took 3 min 24 s.
+Baselines after the code review, cold: lab-chooser.ts 99.89 % (882 mutants, 1 equivalent survivor: `chooserOf`'s state
+check, which an unread read with no chooser makes moot), floor 97; lab-emu.ts 100 % (386 mutants, 3 timeouts), floor
+98; abort.ts 98.04 % (its WARN put back; the same survivors). The cold run of all twenty-four modules took 3 min 27 s.
 40 hand mutants, one per decision branch or boundary, each run bounded (a timeout counts as killed): 39 killed at once;
 the 40th (a node inside the target under the point refused) killed by a test added for it. Review round 1: 15 more, on
 its fixes, 13 killed at once, 2 (exit 6 not proving a reinstall; an entity decoded wrong) by tests added for them — the
@@ -590,45 +590,59 @@ Decisions S5 pins:
 - the preferred read is only the `Preferred Activities User N:` block(s), each to the next top-level line, read line by
   line; a read that failed or a dump with no such block is unread, never "no lab entry". A lab entry is one whose
   component is `dev.averi.lab/…` or whose lines hold `Scheme: "averilab"`; its mAlways is read from its first line
-  after it only. `mAlways=true`, or no mAlways line, is a leak; `mAlways=false` the last-chosen entry "Just once"
-  writes. A non-lab default (Gmail's mailto) is no lab leak.
+  after it only. `mAlways=true` is a leak (a default); `mAlways=false` the last-chosen entry "Just once" writes; an
+  entry with no mAlways line cannot be compared, so --check says unproven (exit 3, ERROR, the check's hand line, no
+  write) — never a leak, so it never triggers a reinstall (code review). A non-lab default (Gmail's mailto) is no lab
+  leak.
 - --check's exits are batch-12's final ones, where they differ from d55-b11.ts: 0 clean, 1 a leak, 3 unproven, 4 a
   chooser up, 5 last-chosen entries every one accepted, 6 a last-chosen entry not accepted; and batch-12's order — a
   leak first, then a chooser in front, then unproven, then the last-chosen (d55-b11.ts put 5 before 4). The accepted
   list is the batch's, passed in (`AcceptedEntry`: Authority and component); none passed, every last-chosen entry is 6.
+- one table, CHECK_OUTCOME (code review), gives each exit its verdict word, whether it proves the lab put back, its
+  words around --check's own and its hand lines; --check's line, `clearLabEntry`'s proof, `cleanUp` and the window's
+  restore all read it, so the window's words are the cleanup's, exit by exit.
 - the cleanup by exit (batch-11.sh's D55 cleanup, batch-12's e5_check): 0 and 5 OK; 6 a WARN, no RESTORE, no
   reinstall tried; 3 and 4 ERROR with a hand line, 4 after BACK, HOME and a second check; 1 FAIL even when the
   reinstall clears it ("Always" is never tapped, so a default predates the batch or is a defect), the reinstall's
   hand lines when it does not.
 - `clearLabEntry` (only for a default): refused, nothing done, with no pulled APK, no catalog to compare with, or a
-  probe state file that cannot be marked dirty; then the state marked dirty, BACK/HOME, `progress` started, uninstall,
-  install of the pulled APK, `pm path` (after `adb get-state`), the APK pulled to a fresh `reinstalled[-n].apk`, its
-  `assets/cells.json` equal to main's catalog, --check exiting 0, 5 or 6 — nothing else proves it (review round 1: a
-  chooser in front over a preferred read that failed, exit 4, hid the read; every other exit is not proven, its hand
-  line the check's); only then `progress` proven and the probe's state put back (`StateRestore`: the probe's
-  `--restore`, and its command for a RESTORE line when it fails with no hand line of its own). Each step that fails
-  gets its own hand line: the uninstall's (again), the install's (`pm path`, then the install), the pull's, unzip's or
-  cells.json's (the proof by hand, then uninstall and install), the check's; each ends `then: <command>`, the
-  probe's restore or the preferred read again. The module never writes the probe's state clean itself:
-  the reinstall wipes the lab's data, and only the probe's restore, which writes it back and reads it back, may; the
-  spec's "written clean only after the proof" holds as that order. No probe state at all: a WARN, as batch-11's.
-- `installedOf`/`labInstalled`: `adb get-state` first; not `device` is unknown and `pm path` is not asked; then
-  `package:<path>` exit 0 installed, exit 1 with nothing said missing, anything else unknown. Unknown is never
-  "missing", never "put back".
+  probe state file that cannot be marked dirty — a missing one too (code review: the protocol needs its dirty mark
+  first), its hand line naming the state file and the commands; then the state marked dirty, BACK/HOME, `progress`
+  started, uninstall, install of the pulled APK, `pm path` (after `adb get-state`), the APK pulled to a fresh
+  `reinstalled[-n].apk`, its `assets/cells.json` equal to main's catalog, --check exiting 0, 5 or 6 — nothing else
+  proves it (review round 1: a chooser in front over a preferred read that failed, exit 4, hid the read; every other
+  exit is not proven, its hand line the check's); only then `progress` proven and the probe's state put back
+  (`StateRestore`: the probe's `--restore`, and its command for a RESTORE line when it fails with no hand line of its
+  own). Each step that fails gets its own hand line: the uninstall's (again), the install's (`pm path`, then the
+  install), the pull's, unzip's or cells.json's (the proof by hand, then uninstall and install), the check's; each ends
+  `then: <command>`, the probe's restore or the preferred read again. The module never writes the probe's state clean
+  itself: the reinstall wipes the lab's data, and only the probe's restore, which writes it back and reads it back, may;
+  the spec's "written clean only after the proof" holds as that order.
+- `labInstalled`: `adb get-state` first (`unreachableOf`); not `device` is unknown and `pm path` is not asked; then
+  `installedOf` reads `pm path`: `package:<path>` exit 0 installed, exit 1 with nothing said missing, anything else
+  unknown. Unknown is never "missing", never "put back".
 - `chooserWindow`'s restore: `adb get-state` first, before any key (review round 1): unreachable is unknown at once,
   nothing pressed and nothing put back; then BACK/HOME; inside the reinstall, `pm path`: unknown is not put back
   (hand: get-state, `pm path` once adb answers, then the install if it prints nothing), missing is installed again
   from the pulled APK, and the lab installed — again or found so — is proven by its cells.json as clearLabEntry proves
-  it, or not put back; the probe's `StateRestore`; then --check: 0 and 5 put back, 6 put back with a WARN in the
-  cleanup's own words (`lastChosenWhy`; abort.ts's Putback may now carry `verdict: 'WARN'`, its step and cleanup
-  line then WARN, no RESTORE), a default FAIL, the rest ERROR. Its hand lines are read when the abort asks: inside the
-  reinstall the install line first.
+  it, or not put back; the probe's `StateRestore` only once a reinstall started, since only that wipes the lab's data
+  (code review; before it, "nothing was wiped: the lab's state stays as the probe left it"); then --check, by
+  CHECK_OUTCOME: 0 and 5 put back, 6 put back with a WARN in the cleanup's own words (abort.ts's Putback may now carry
+  `verdict: 'WARN'`, its step and cleanup line then WARN, no RESTORE), a default FAIL, the rest ERROR. Its hand lines
+  are read when the abort asks: inside the reinstall the install line first, then the check's, then the state
+  restore's command — never an uninstall no default was measured for (code review).
+- a row target with more than one `resolver_list` is `not-unique`, naming the count (code review).
+- the tri-state reads S6 wires: `readRoleHolders` and `readClipboard` (the clipboard by `cmd clipboard help`, API 33's
+  `No shell command implementation.` unread) before and after a block, `compareReads` and `comparedLine` for their
+  lines; `handlers` at the lab check; `sanitizeFixture` over any tree a batch keeps as a fixture. S5 gives the pieces,
+  tested; S6's runner calls them.
 - `treeOf` reads a dump twice (review round 1): src's parser for the tree and its bounds, and each `<node>` tag, paired
-  with the tree node for node in document order, for what src's tree drops — resource-id, text and content-desc
-  apart (src's label is content-desc before text), and `enabled`. A dump whose tags and parsed nodes do not pair up is
-  no tree: their counts differ, or a tag's resource-id is not its node's identifier (review round 2). Tags are matched
-  quote-aware (a `>` inside a quoted value ends none), and "Always" is asked of src's identifier as well as the tag. The tags are read as written, not entity-decoded: uiautomator writes an entity only for `&`, `<`, `>`, `"`
-  and control characters, none in a resource id or in the word "always".
+  with the tree node for node in document order, for what src's tree drops — resource-id, text and content-desc apart
+  (src's label is content-desc before text), and `enabled`. A dump whose tags and parsed nodes do not pair up is no
+  tree: their counts differ, or a tag's resource-id is not its node's identifier (review round 2). Tags are matched
+  quote-aware (a `>` inside a quoted value ends none), and "Always" is asked of src's identifier as well as the tag. The
+  tags are read as written, not entity-decoded: uiautomator writes an entity only for `&`, `<`, `>`, `"` and control
+  characters, none in a resource id or in the word "always".
 - `safeTap(dump, target, at?)` returns the one point or a named refusal: `no-target`, `not-unique` (a label two rows
   share: both lab rows say "AveriLab"), `no-sheet` (chooserSheet reads none: AOSP's with_default header, no chooser),
   `always` (the target or a label inside it reads as "Always"; any "Always" node holding the point or overlapping the
@@ -665,9 +679,9 @@ What S5 does not port, each with the slice that owns it or the reason:
 - the Android lab check at the batch's start (pulling the installed APK, its cells.json against the catalog, the handler
   counts as a precondition, `ONLY=lab`): S6, the runner, from these pieces.
 - the probe's own state put back (`run-as … cat > files/lab-state.json` with stdin): bounded.ts's Run takes no stdin,
-  and the probe owns its before-state; it comes in as `PutBack`.
-- batch-12's with_default and `pair` trees: not among this slice's sources (batch-12's records are not in them); the
-  with_default refusal is tested on T4's tree with AOSP's header added.
+  and the probe owns its before-state; it comes in as a `StateRestore`.
+- batch-12's with_default and `pair` trees: not committed — lost with the scratch run folders; the with_default refusal
+  is tested on T4's tree with AOSP's header synthesised; batch-13 captures the real one.
 - d55-b11.ts's E1/E3/D55b/E2 legs, its `--analyze`, twinRow's label rule and treeFacts: the probe's, out of the repo
   (spec T2 §4).
 - batch-12's `install -r` path (main's APK over the lab, data kept): a batch's own step, not the safety core.
