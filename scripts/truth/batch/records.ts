@@ -96,3 +96,16 @@ export function writeDone(fs: BatchFs, dir: string, name: string, record: BlockR
   if (!fs.exists(f.asked)) throw new Error(`${name}: recorded before it was asked (asks first)`);
   writeOnce(fs, f.done, text, 'recorded');
 }
+
+/**
+ * A JSON value as one key (T2 S6b review round 1, NIT 8; here since its code review: a run's identity, asked and done): every object's fields sorted, at every depth, so two equal
+ * values built in another field order give the same text; arrays keep their order.
+ */
+export function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  if (typeof v !== 'object' || v === null) return JSON.stringify(v);
+  const o = v as Record<string, unknown>;
+  // A field set to undefined is no field (JSON.stringify drops it too).
+  const keys = Object.keys(o).sort().filter((k) => o[k] !== undefined);
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(',')}}`;
+}

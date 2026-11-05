@@ -65,8 +65,8 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
     const fs = { ...nodeFs };
     const settled: number[] = [];
     const r = await androidLab({ settle: async (ms) => void settled.push(ms) }).open({ bounded: runOf(world), config: config(), fs });
-    expect(r.ok && r.emu.fs).toBe(fs);
-    if (r.ok) await r.emu.key('KEYCODE_HOME');
+    expect(r.ok && r.value.fs).toBe(fs);
+    if (r.ok) await r.value.key('KEYCODE_HOME');
     expect(settled).toEqual([1000]);
   });
 
@@ -89,18 +89,18 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
   it('the lab not installed, adb unreachable, the cells.json not main\'s: not met, each its why — unreachable is unknown, never missing', async () => {
     const check = () => (androidLab({ settle }).need as Spec).check(needCtx());
     fresh({ installed: false });
-    expect(await check()).toEqual({ ok: false, why: 'the lab APK is not installed (pm path)' });
+    expect(await check()).toEqual({ ok: false, why: 'the lab APK is not installed (pm path) (rerun with ONLY=lab,…)' });
     fresh({ reachable: false });
-    expect(await check()).toEqual({ ok: false, why: 'whether the lab is installed is unknown (adb get-state: exit 1 error: device offline)' });
+    expect(await check()).toEqual({ ok: false, why: 'whether the lab is installed is unknown (adb get-state: exit 1 error: device offline) (rerun with ONLY=lab,…)' });
     fresh({ apkCells: '{"cells":[]}\n' });
     expect(await check()).toEqual({ ok: false, why: `the installed APK (${DEVICE_APK})'s cells.json is not main's (rerun with ONLY=lab,…)` });
   });
 
   it('a pull that fails, or an unzip that fails: not met, never compared as equal', async () => {
     const r = await (androidLab({ settle }).need as Spec).check(needCtx(async (cmd, args, call) => (args.includes('pull') ? { code: 1, timedOut: false, signal: null, out: '', err: 'adb: error: remote object does not exist' } : runOf(world)(cmd, args, call))));
-    expect(r).toEqual({ ok: false, why: 'the installed APK not pulled (exit 1 adb: error: remote object does not exist)' });
+    expect(r).toEqual({ ok: false, why: 'the installed APK not pulled (exit 1 adb: error: remote object does not exist) (rerun with ONLY=lab,…)' });
     const none = await (androidLab({ settle }).need as Spec).check(needCtx(async (cmd, args, call) => (args.includes('pull') ? { code: 0, timedOut: false, signal: null, out: '', err: '' } : runOf(world)(cmd, args, call))));
-    expect(none).toEqual({ ok: false, why: 'the installed APK not pulled (exit 0 but no file)' });
+    expect(none).toEqual({ ok: false, why: 'the installed APK not pulled (exit 0 but no file) (rerun with ONLY=lab,…)' });
     const u = await (androidLab({ settle }).need as Spec).check(needCtx(async (cmd, args, call) => (cmd === 'unzip' ? { code: 11, timedOut: false, signal: null, out: '', err: 'caution: filename not matched' } : runOf(world)(cmd, args, call))));
     expect(u).toEqual({ ok: false, why: `the installed APK (${DEVICE_APK})'s cells.json could not be read (rerun with ONLY=lab,…)` });
     expect(existsSync(join(dir, 'lab', 'android-installed-cells.json'))).toBe(false);
@@ -120,7 +120,7 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
   it('this run\'s build failed: a WARN, the APK already installed used (batch-11); required by the batch: not met (review round 1, MAJOR 2)', async () => {
     const failed = { ensure: async () => ({ ok: false as const, why: 'the Android build failed (exit 1; android-build.log)' }), built: () => undefined };
     const r = await (androidLab({ settle, build: failed }).need as Spec).check(needCtx());
-    expect(r).toMatchObject({ ok: true, warn: true, how: expect.stringMatching(/^the Android build failed \(exit 1; android-build\.log\); the app already installed is used: averi_lab emulator LAB-SERIAL; not rebuilt;/) });
+    expect(r).toMatchObject({ ok: true, warning: 'the Android build failed (exit 1; android-build.log); the app already installed is used', how: expect.stringMatching(/^averi_lab emulator LAB-SERIAL; not rebuilt;/) });
     expect(world.calls.some((c) => c.includes('install -r'))).toBe(false);
     expect(await (androidLab({ settle, build: failed, requireBuild: true }).need as Spec).check(needCtx())).toEqual({ ok: false, why: "this run's build failed, and the batch requires it: the Android build failed (exit 1; android-build.log)" });
   });

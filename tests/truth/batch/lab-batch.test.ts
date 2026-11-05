@@ -140,7 +140,7 @@ function batch(o: { labNeeds?: string[]; d55First?: boolean } = {}) {
     run: async (ctx) => {
       const emu = await android.open(ctx);
       if (!emu.ok) return ctx.verdict('INCONCLUSIVE', emu.why);
-      await withReads(ctx, emu.emu, { roles: 'D55 browser role', clipboard: 'D55 clipboard' }, () => ctx.liveRun('android-kf-1', KF, { secs: 60 }));
+      await withReads(ctx, emu.value, { roles: 'D55 browser role', clipboard: 'D55 clipboard' }, () => ctx.liveRun('android-kf-1', KF, { secs: 60 }));
     },
     judge: judgeOf('D55 verdict'),
   };
@@ -152,13 +152,13 @@ function batch(o: { labNeeds?: string[]; d55First?: boolean } = {}) {
     run: async (ctx) => {
       const sim = await ios.open(ctx);
       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
-      await wdaWindow(ctx, sim.lab, {
+      await wdaWindow(ctx, sim.value, {
         runs: [{ name: 'ios-wda-d43-1', asked: P7W }],
         work: async () => {
-          if ((await iosCheck(ctx, sim.lab, 'D43 wda 1')) === undefined) await ctx.liveRun('ios-wda-d43-1', P7W, { secs: 60 });
+          if ((await iosCheck(ctx, sim.value, 'D43 wda 1')) === undefined) await ctx.liveRun('ios-wda-d43-1', P7W, { secs: 60 });
         },
       });
-      await ios.endStretch(ctx, sim.lab);
+      await ios.endStretch(ctx, sim.value);
     },
     judge: judgeOf('D43 verdict'),
   };
@@ -349,7 +349,7 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     ].join('\n');
   };
 
-  it('a listener of 8120 that stays, interrupted: nothing restored, the state dirty; RESTORE the WDA\'s kill, each domain, the compare; exit 130', async () => {
+  it('a listener of 8120 that stays, interrupted: nothing restored, the state dirty; RESTORE the WDA\'s kill, each domain, the compare; exit 130 (review round 1, BLOCKER)', async () => {
     fresh({ stickyListener: true });
     seam.hang = '--sources wda';
     const done = go(batch());
@@ -372,14 +372,14 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('interrupted'));
   });
 
-  it('…and on the normal path: the window left open, RESTORE at the end the same lines; the block INCONCLUSIVE', async () => {
+  it('…and on the normal path: the window left open, RESTORE at the end the same lines; the block INCONCLUSIVE (code review, MAJOR 1)', async () => {
     fresh({ restoreFails: true });
     expect(await go(batch())).toBe(1);
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('ended'));
     expect(summary()).toContain("D43 verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
   });
 
-  it('the same on the normal path: the window left open, its hand lines in RESTORE at the end, in the same order; exit 1', async () => {
+  it('the same on the normal path: the window left open, its hand lines in RESTORE at the end, in the same order; exit 1 (review round 1, BLOCKER)', async () => {
     fresh({ stickyListener: true });
     expect(await go(batch())).toBe(1);
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('ended'));

@@ -34,10 +34,10 @@ afterEach(() => {
 });
 
 const fresh = (o: Omit<WorldOptions, 'dir'> = {}) => (world = labWorld({ dir, ...o }));
-const needCtx = (run: Run = runOf(world), udid: string | null = LAB_UDID, env: Record<string, string> = {}): NeedCtx => ({
+const needCtx = (run: Run = runOf(world), udid: string | null = LAB_UDID, env: Record<string, string> = {}, androidHome?: string): NeedCtx => ({
   bounded: run,
   labDir: join(dir, 'lab'),
-  config: { out: join(dir, 'out'), repo, env, ...(udid === null ? {} : { udid }) },
+  config: { out: join(dir, 'out'), repo, env, ...(udid === null ? {} : { udid }), ...(androidHome === undefined ? {} : { androidHome }) },
   fs: nodeFs,
   step: (w, t) => void steps.push(`${w} ${t}`),
 });
@@ -131,10 +131,13 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     expect([IOS_BUILD_NEED, ANDROID_BUILD_NEED]).toEqual(['ios-build', 'android-build']);
   });
 
-  it('ANDROID_HOME not set: the SDK under the home folder, as batch-11 gave it', async () => {
+  it('the SDK the config names (configOf: ANDROID_HOME, else the one under the home folder — code review), none named: the build\'s own', async () => {
     const run = runOf(world);
-    await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(run));
-    expect(run.seen.find((s) => s.words.endsWith('assembleDebug'))?.env?.ANDROID_HOME).toMatch(/\/Library\/Android\/sdk$/);
+    await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(run, LAB_UDID, {}, '/h/Library/Android/sdk'));
+    expect(run.seen.find((s) => s.words.endsWith('assembleDebug'))?.env?.ANDROID_HOME).toBe('/h/Library/Android/sdk');
+    const bare = runOf(world);
+    await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(bare));
+    expect(bare.seen.find((s) => s.words.endsWith('assembleDebug'))?.env).toEqual({ JAVA_HOME: join(dir, 'jdk17') });
   });
 
   it('a build that fails: --stop still called after it, then not met naming its log', async () => {
@@ -205,7 +208,7 @@ describe('the Gradle daemon after an interrupted Android build (review round 1, 
     const run = runOf(world);
     await b.lastly({ run, step: say });
     const cwd = join(repo, 'fixtures/apps/android');
-    expect(run.seen).toEqual([{ words: `${join(cwd, 'gradlew')} --stop`, secs: GRADLE_STOP_SECS, cwd, log: join(dir, 'lab', 'android-build.log'), env: { JAVA_HOME: join(dir, 'jdk17'), ANDROID_HOME: expect.any(String) } }]);
+    expect(run.seen).toEqual([{ words: `${join(cwd, 'gradlew')} --stop`, secs: GRADLE_STOP_SECS, cwd, log: join(dir, 'lab', 'android-build.log'), env: { JAVA_HOME: join(dir, 'jdk17') } }]);
     expect(steps).toEqual(['NOTE lab android: the Gradle daemon stopped at the run\'s end (its build was cut short)']);
   });
 

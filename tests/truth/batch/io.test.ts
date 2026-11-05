@@ -2,7 +2,7 @@ import { fstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpath
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { nodeFs } from '../../../scripts/truth/batch/io.js';
+import { freshIn, nodeFs } from '../../../scripts/truth/batch/io.js';
 
 // scripts/truth/batch/io.ts: the module's one filesystem seam, held to its contract on real files in a temp dir —
 // above all, that nothing it does removes or overwrites what a run wrote.
@@ -118,5 +118,23 @@ describe('nodeFs.withAppend: a child\'s log, opened for append and handed over a
       throw new Error('boom');
     })).toThrow('boom');
     expect(() => fstatSync(kept)).toThrow(/EBADF/);
+  });
+});
+
+describe('a kept file is never overwritten (T2 S6b; moved here in its code review: a run\'s evidence is never replaced)', () => {
+  it('freshIn: the name itself, or the next free -2, -3 before its extension', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'batch-lab-lines-'));
+    try {
+      expect(freshIn(nodeFs, dir, 'x.json')).toBe(join(dir, 'x.json'));
+      writeFileSync(join(dir, 'x.json'), '');
+      writeFileSync(join(dir, 'x-2.json'), '');
+      expect(freshIn(nodeFs, dir, 'x.json')).toBe(join(dir, 'x-3.json'));
+      writeFileSync(join(dir, 'noext'), '');
+      expect(freshIn(nodeFs, dir, 'noext')).toBe(join(dir, 'noext-2'));
+      writeFileSync(join(dir, '.hidden'), '');
+      expect(freshIn(nodeFs, dir, '.hidden')).toBe(join(dir, '.hidden-2'));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

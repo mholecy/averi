@@ -58,7 +58,7 @@ const fresh = (o: Omit<WorldOptions, 'dir'> = {}) => (world = labWorld({ dir, ..
 async function simOf(run: Run = runOf(world)): Promise<IosSim> {
   const r = await IosSim.open(LAB_UDID, run, { wait });
   if (!r.ok) throw new Error(r.why);
-  return r.lab;
+  return r.value;
 }
 const config = (over: { udid?: string } = { udid: LAB_UDID }) => ({ out: join(dir, 'out'), repo: join(dir, 'repo'), env: {}, ...over });
 const steps: string[] = [];
@@ -143,7 +143,7 @@ describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only 
     expect(r).toEqual({ port: { state: 'busy', pids: [4242, process.pid] }, killed: true, whys: [] });
   });
 
-  it('a pkill or a kill that fails is said in its whys; an unread port in the port it returns (its caller says it)', async () => {
+  it('a pkill or a kill that fails is said in its whys; an unread port in the port it returns, its caller says it (code review, NIT 3)', async () => {
     const r = await killLabWda({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 3, timedOut: false, signal: null, out: '', err: `${cmd} broke` }), udid: LAB_UDID, wait });
     expect(r).toEqual({ port: { state: 'unread', why: 'lsof: exit 2 lsof broke' }, killed: false, whys: ['pkill: exit 3 pkill broke', 'pkill: exit 3 pkill broke'] });
     const k = await killLabWda({ run: async (cmd) => ({ code: cmd === 'kill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), udid: LAB_UDID, wait });
@@ -307,7 +307,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
   it('this run\'s build failed: batch-11\'s WARN — its why, the app already installed is used — unless the batch requires the build (review round 1, MAJOR 2)', async () => {
     const failed = { ensure: async () => ({ ok: false as const, why: 'the iOS build failed (exit 65; ios-build.log)' }), built: () => undefined };
     const check = (o: object) => (iosLab({ wait, reset: false, ...o }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
-    expect(await check({ build: failed })).toEqual({ ok: true, warn: true, how: "the iOS build failed (exit 65; ios-build.log); the app already installed is used: averi-lab iPhone 17 simulator, iOS 27.0; not rebuilt; the installed cells.json is main's" });
+    expect(await check({ build: failed })).toEqual({ ok: true, warning: 'the iOS build failed (exit 65; ios-build.log); the app already installed is used', how: "averi-lab iPhone 17 simulator, iOS 27.0; not rebuilt; the installed cells.json is main's" });
     expect(words().some((w) => w.includes('simctl install'))).toBe(false);
     expect(await check({ build: failed, requireBuild: true })).toEqual({ ok: false, why: "this run's build failed, and the batch requires it: the iOS build failed (exit 65; ios-build.log)" });
   });
@@ -417,7 +417,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const { ctx, events } = blockCtx();
     // A listener that comes up during the 4 s wait (another runner's exit): killed at the port check.
     const opened = await IosSim.open(LAB_UDID, runOf(world), { wait: async (ms) => void (ms === WDA_EXIT_WAIT_MS && (world.st.listeners = [4343])) });
-    await wdaWindow(ctx, (opened as { lab: IosSim }).lab, { work: async () => void world.startWda() });
+    await wdaWindow(ctx, (opened as { value: IosSim }).value, { work: async () => void world.startWda() });
     expect(events.find((e) => e.startsWith('verdict D43 WDA-window restore'))).toMatch(/; port 8120 free \(a listener killed\)$/);
     expect(words()).toContain('kill -TERM 4343');
     fresh({ stickyListener: true });

@@ -3,13 +3,13 @@ import { LAB_APP, pause } from '../lab-device.js';
 import type { WindowSpec } from './abort.js';
 import type { Asked } from './cases.js';
 import type { Call, CallResult, Run } from './bounded.js';
-import type { BatchFs } from './io.js';
+import { freshIn, type BatchFs } from './io.js';
 import { PROTECTED, protectedLine, type ProtectedRead } from './ios-defaults.js';
 import { backup, compare, domainsWindow, LabSim, readProtected, restore } from './ios-domains.js';
-import { CATALOG_PATH, cellsWhy, companionPattern, freshIn, LSOF_ARGV, openInAlertOf, pkillOf, portOf, portPart, wdaBlockedOf, wdaHandOf, wdaKillPatterns, wdaRestoredOf, type PortRead } from './lab-lines.js';
-import { askBuild, metWith, type BuildRef } from './lab-build.js';
+import { CATALOG_PATH, cellsWhy, companionPattern, LSOF_ARGV, openInAlertOf, pkillOf, portOf, portPart, wdaBlockedOf, wdaHandOf, wdaKillPatterns, wdaRestoredOf, type Opened, type PortRead } from './lab-lines.js';
+import { checkDevice, type BuildRef } from './lab-build.js';
 import type { BlockCtx, LastStep, NeedCtx, NeedSpec } from './runner.js';
-import type { BatchConfig, NeedResult } from './runner-lines.js';
+import { NO_UDID, type BatchConfig, type NeedResult } from './runner-lines.js';
 import { STATE_FILE, stateOf } from './run-dir.js';
 import { exitText, failedCall, nameInLine, type StepWord } from './words.js';
 
@@ -65,9 +65,9 @@ export class IosSim {
   ) {}
 
   /** The lab simulator `udid`, or why it is refused (nothing was done to it). */
-  static async open(udid: string, run: Run, o: { fs?: BatchFs; wait?: (ms: number) => Promise<unknown> } = {}): Promise<{ ok: true; lab: IosSim } | { ok: false; why: string }> {
+  static async open(udid: string, run: Run, o: { fs?: BatchFs; wait?: (ms: number) => Promise<unknown> } = {}): Promise<Opened<IosSim>> {
     const r = await LabSim.open(udid, run, o.fs);
-    return r.ok ? { ok: true, lab: new IosSim(r.sim, run, o.wait ?? pause) } : r;
+    return r.ok ? { ok: true, value: new IosSim(r.sim, run, o.wait ?? pause) } : r;
   }
 
   get udid(): string {
@@ -274,7 +274,7 @@ export interface IosLabOptions {
 export interface IosLab {
   need: NeedSpec;
   /** The lab simulator over a block's (or a need's) calls, guarded; why not. */
-  open(c: { bounded: Run; config: BatchConfig; fs: BatchFs }): Promise<{ ok: true; lab: IosSim } | { ok: false; why: string }>;
+  open(c: { bounded: Run; config: BatchConfig; fs: BatchFs }): Promise<Opened<IosSim>>;
   /** The iOS stretch's end: the finportal key read again, its line to the SUMMARY's protected-key slot. */
   endStretch(ctx: BlockCtx, lab: IosSim): Promise<void>;
   /** The run's last step: the lab's WebDriverAgent and idb_companion ended, once the guard cleared the simulator. */
@@ -292,34 +292,34 @@ const readText = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine
 export function iosLab(o: IosLabOptions = {}): IosLab {
   let start: ProtectedRead | undefined;
   let guarded: string | undefined;
-  const open: IosLab['open'] = async (c) =>
-    c.config.udid === undefined ? { ok: false, why: 'no lab simulator udid given (--udid or AVERI_LAB_UDID)' } : IosSim.open(c.config.udid, c.bounded, { fs: c.fs, wait: o.wait });
-  const check = async (c: NeedCtx): Promise<NeedResult> => {
-    const opened = await open(c);
-    if (!opened.ok) return opened;
-    const { lab } = opened;
-    guarded = lab.udid;
-    if (o.reset !== false) {
-      const why = await reset(c, lab);
-      if (why !== undefined) return { ok: false, why: `the initial iOS reset failed: ${why}` };
-    }
-    start = await readProtected(lab.sim);
-    c.step('NOTE', `${PROTECTED.domain}'s finportal key at the iOS stretch's start: ${readText(start)} (read only: no batch writes it)`);
-    const asked = await askBuild(c, o);
-    if ('why' in asked) return { ok: false, why: asked.why };
-    const { built } = asked;
-    if (built !== undefined) {
-      const r = await lab.simctl(['install', lab.udid, built]);
-      if (failedCall(r)) return { ok: false, why: `this run's build not installed (simctl install: ${exitText(r)})` };
-    }
-    const cells = await installedCells(lab, { repo: c.config.repo, labDir: c.labDir });
-    if (cells !== undefined) return { ok: false, why: `${cells} (rerun with ONLY=lab,…)` };
-    return metWith(`${lab.sim.description}${o.reset === false ? '' : ', reset'}; ${built === undefined ? 'not rebuilt' : "this run's build installed"}; the installed cells.json is main's`, asked.warn);
-  };
+  const open: IosLab['open'] = async (c) => (c.config.udid === undefined ? { ok: false, why: NO_UDID } : IosSim.open(c.config.udid, c.bounded, { fs: c.fs, wait: o.wait }));
+  const check = (c: NeedCtx): Promise<NeedResult> =>
+    checkDevice<IosSim>(c, o, {
+      async open() {
+        const opened = await open(c);
+        if (!opened.ok) return opened;
+        const lab = opened.value;
+        guarded = lab.udid;
+        if (o.reset !== false) {
+          const why = await reset(c, lab);
+          if (why !== undefined) return { ok: false, why: `the initial iOS reset failed: ${why}` };
+        }
+        start = await readProtected(lab.sim);
+        c.step('NOTE', `${PROTECTED.domain}'s finportal key at the iOS stretch's start: ${readText(start)} (read only: no batch writes it)`);
+        return opened;
+      },
+      installWord: 'simctl install',
+      install: (lab, built) => lab.simctl(['install', lab.udid, built]),
+      async cells(lab) {
+        const why = await installedCells(lab, { repo: c.config.repo, labDir: c.labDir });
+        return why === undefined ? { how: "the installed cells.json is main's" } : { why };
+      },
+      describe: (lab) => `${lab.sim.description}${o.reset === false ? '' : ', reset'}`,
+    });
   const alive = async (c: NeedCtx): Promise<NeedResult> => {
     const opened = await open(c);
     if (!opened.ok) return opened;
-    const tree = await opened.lab.idb(['ui', 'describe-all']);
+    const tree = await opened.value.idb(['ui', 'describe-all']);
     return failedCall(tree) ? { ok: false, why: `idb ui describe-all: ${exitText(tree)}` } : { ok: true, how: 'idb answers' };
   };
   return {

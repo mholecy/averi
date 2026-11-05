@@ -1,11 +1,10 @@
-import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { DEVICE_CHECK_SIMULATOR } from '../lab-device.js';
+import { isDeviceCheckSimulator } from '../lab-device.js';
 import type { CallResult, Run } from './bounded.js';
 import { CELLS_ENTRY, UNZIP_SECS } from './lab-emu.js';
-import { CATALOG_PATH, cellsWhy, javaHomeOf } from './lab-lines.js';
+import { CATALOG_PATH, cellsWhy, javaHomeOf, NOT_REBUILT, REBUILT, RERUN_HINT, type Opened } from './lab-lines.js';
 import type { Block, LastStep, Need, NeedCtx, NeedSpec } from './runner.js';
-import type { NeedResult } from './runner-lines.js';
+import { NO_UDID, type NeedResult } from './runner-lines.js';
 import { exitText, failedCall, nameInLine } from './words.js';
 
 /**
@@ -61,7 +60,7 @@ export interface LabBuild {
 }
 
 /** What a device need does with its build: install this product (none: not rebuilt), with a warning; or not met. */
-export type BuildAnswer = { built?: string; warn?: string } | { why: string };
+export type BuildAnswer = { built?: string; warning?: string } | { why: string };
 
 /**
  * A device need's build (T2 S6b review round 1, MAJOR 2): asked by the need itself, so the order of a block's needs
@@ -73,12 +72,42 @@ export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?:
   const r = await o.build.ensure(c);
   if (r.ok) return { built: o.build.built() };
   if (o.requireBuild === true) return { why: `this run's build failed, and the batch requires it: ${r.why}` };
-  return { warn: r.why };
+  return { warning: `${r.why}; the app already installed is used` };
 }
 
-/** A device need met, its how prefixed by the build's warning when there is one (batch-11's `LAB …: WARN — …`). */
-export const metWith = (how: string, warn: string | undefined): NeedResult =>
-  warn === undefined ? { ok: true, how } : { ok: true, warn: true, how: `${warn}; the app already installed is used: ${how}` };
+/** A lab device as its need checks it (ios-lab.ts, android-lab.ts): opened, this run's build installed, its cells. */
+export interface DeviceCheck<T> {
+  /** Guarded and readied (the reset, a first read): the device, or why not. */
+  open(): Promise<Opened<T>>;
+  /** How the build is installed (`simctl install`), for its why, and the call that does it. */
+  installWord: string;
+  install(device: T, built: string): Promise<CallResult>;
+  /** The installed app's cells.json against main's: its how part, or why not. */
+  cells(device: T): Promise<{ how: string } | { why: string }>;
+  /** The device as the how names it. */
+  describe(device: T): string;
+}
+
+/**
+ * A device need's one shape (code review): the device opened; its build asked (askBuild); met, installed; the installed
+ * app's cells.json main's (else not met, the rerun hint); met — with the build's warning when it failed (batch-11's
+ * `LAB …: WARN — …`).
+ */
+export async function checkDevice<T>(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }, d: DeviceCheck<T>): Promise<NeedResult> {
+  const opened = await d.open();
+  if (!opened.ok) return opened;
+  const device = opened.value;
+  const asked = await askBuild(c, o);
+  if ('why' in asked) return { ok: false, why: asked.why };
+  if (asked.built !== undefined) {
+    const r = await d.install(device, asked.built);
+    if (failedCall(r)) return { ok: false, why: `this run's build not installed (${d.installWord}: ${exitText(r)})` };
+  }
+  const cells = await d.cells(device);
+  if ('why' in cells) return { ok: false, why: `${cells.why} ${RERUN_HINT}` };
+  const how = `${d.describe(device)}; ${asked.built === undefined ? NOT_REBUILT : REBUILT}; ${cells.how}`;
+  return asked.warning === undefined ? { ok: true, how } : { ok: true, how, warning: asked.warning };
+}
 
 /** A Gradle call's whole: its wrapper, its folder, its env (the JDK, the SDK) and its log. */
 export interface GradleCall {
@@ -117,8 +146,8 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     const stale = await catalogFresh(c);
     if (stale !== undefined) return { ok: false, why: `${stale} — nothing built` };
     const udid = c.config.udid;
-    if (udid === undefined) return { ok: false, why: 'no lab simulator udid given (--udid or AVERI_LAB_UDID): the iOS build names its destination' };
-    if (udid.toUpperCase() === DEVICE_CHECK_SIMULATOR) return { ok: false, why: `${udid} is the device-check simulator: never a build's destination` };
+    if (udid === undefined) return { ok: false, why: `${NO_UDID}: the iOS build names its destination` };
+    if (isDeviceCheckSimulator(udid)) return { ok: false, why: `${udid} is the device-check simulator: never a build's destination` };
     const cwd = join(c.config.repo, 'fixtures/apps/ios');
     const log = join(c.labDir, 'ios-build.log');
     const gen = await c.bounded('xcodegen', ['generate'], { secs: CATALOG_SECS, cwd, log });
@@ -140,7 +169,8 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     if ('why' in checked) return { ok: false, why: checked.why };
     const cwd = join(c.config.repo, 'fixtures/apps/android');
     const log = join(c.labDir, 'android-build.log');
-    const env = { ...c.config.env, JAVA_HOME: checked.home, ANDROID_HOME: c.config.env.ANDROID_HOME ?? join(homedir(), 'Library', 'Android', 'sdk') };
+    // The SDK the config names (runner-lines.ts#configOf: ANDROID_HOME, else the one under the home folder).
+    const env = { ...c.config.env, JAVA_HOME: checked.home, ...(c.config.androidHome !== undefined && { ANDROID_HOME: c.config.androidHome }) };
     const gradlew = join(cwd, 'gradlew');
     const call: GradleCall = { gradlew, cwd, env, log };
     gradle = { call, why: 'its build was cut short' };

@@ -136,6 +136,8 @@ async function settled(lab: Pick<LabDevice, 'state'>, cell: string): Promise<Lab
 export const LAB_SIMULATOR_PREFIX = 'averi-lab ';
 /** The device-check simulator: refused whatever it is named (its settings and WDA are device-check's). */
 export const DEVICE_CHECK_SIMULATOR = '37956039-94EA-4F51-93E5-94F7723A4578';
+/** Whether `udid` is the device-check simulator, whatever its case: every lab guard and pattern refuses it. */
+export const isDeviceCheckSimulator = (udid: string): boolean => udid.toUpperCase() === DEVICE_CHECK_SIMULATOR;
 /** The lab's AVD (`adb emu avd name`); any other emulator or device is refused. */
 export const LAB_AVD = 'averi_lab';
 /** The device-check simulator's WebDriverAgent ports (averi gives the first simulator 8100, the next 8101): refused. */
@@ -188,7 +190,7 @@ export class IosLab implements LabDevice {
    */
   guard(): Promise<string> {
     this.guarded ??= (async () => {
-      if (this.udid.toUpperCase() === DEVICE_CHECK_SIMULATOR) throw new Error(`${this.udid} is the device-check simulator — the lab runs on its own (averi-lab …) only`);
+      if (isDeviceCheckSimulator(this.udid)) throw new Error(`${this.udid} is the device-check simulator — the lab runs on its own (averi-lab …) only`);
       const { devices } = JSON.parse((await this.simctl('list', 'devices', '-j')).stdout) as { devices: Record<string, { udid: string; name: string }[]> };
       for (const [runtime, list] of Object.entries(devices)) {
         const d = list.find((x) => x.udid === this.udid);

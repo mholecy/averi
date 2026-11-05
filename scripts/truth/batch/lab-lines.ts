@@ -1,24 +1,30 @@
-import { DEVICE_CHECK_SIMULATOR } from '../lab-device.js';
-import { join } from 'node:path';
+import type { Point } from '../../../src/adapters/types.js';
+import { isDeviceCheckSimulator } from '../lab-device.js';
 import type { CallResult } from './bounded.js';
-import type { BatchFs } from './io.js';
 import { HAND_PREFIX, LAB_WDA_PORT, RESTORE_LABEL, shellQuote } from './ios-defaults.js';
 import { exitText, failedCall, firstLineOf, verdictLine } from './words.js';
-import type { Point } from '../../../src/adapters/types.js';
 
 /**
  * The lab plumbing's pure half (T2 S6b; ios-lab.ts, android-lab.ts and lab-build.ts hold the calls and the files):
  * what a read of the lab says — port 8120's listeners, a pkill's exit, the Open-in alert in an idb tree, an installed
  * cells.json against main's catalog, a JDK — the WDA window's restore line with its port part, and the exact patterns
- * the lab's own processes are ended by. Strings in, strings out, as runner-lines.ts.
+ * the lab's own processes are ended by, and the shapes the three share. Strings in, strings out, as runner-lines.ts.
  */
+
+/** What opening a guarded lab device gives: the device, or why it was refused (nothing was done to it). */
+export type Opened<T> = { ok: true; value: T } | { ok: false; why: string };
+
+/** A device need's words for this run's build: installed, or not rebuilt; and the rerun hint for an installed app off. */
+export const REBUILT = "this run's build installed";
+export const NOT_REBUILT = 'not rebuilt';
+export const RERUN_HINT = '(rerun with ONLY=lab,…)';
 
 /** main's catalog in the checkout under test (catalog.ts#CATALOG_FILE): every lab app bundles it. */
 export const CATALOG_PATH = 'fixtures/apps/cells.json';
 
 /** A simulator a pattern may name: never device-check's (lab-device.ts), whatever its case. */
 function labUdid(udid: string): string {
-  if (udid.toUpperCase() === DEVICE_CHECK_SIMULATOR) throw new Error(`${udid} is the device-check simulator: no lab process is ended by its name`);
+  if (isDeviceCheckSimulator(udid)) throw new Error(`${udid} is the device-check simulator: no lab process is ended by its name`);
   return udid;
 }
 
@@ -155,15 +161,6 @@ export function cellsWhy(installed: string | undefined, catalog: string | undefi
   if (catalog === undefined) return `main's catalog (${CATALOG_PATH}) could not be read`;
   if (installed === undefined) return `${where}'s cells.json could not be read`;
   return installed === catalog ? undefined : `${where}'s cells.json is not main's`;
-}
-
-/** A fresh path in `dir` for `name`: itself, or `<stem>-2<ext>`, … — the first not there (never overwritten). */
-export function freshIn(fs: BatchFs, dir: string, name: string): string {
-  const dot = name.lastIndexOf('.');
-  const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
-  let path = join(dir, name);
-  for (let n = 2; fs.exists(path); n++) path = join(dir, `${stem}-${n}${ext}`);
-  return path;
 }
 
 // -------------------------------------------------------------------------------------------- the builds

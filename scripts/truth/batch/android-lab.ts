@@ -1,14 +1,14 @@
 import { basename, join } from 'node:path';
 import { LAB_AVD, pause } from '../lab-device.js';
 import type { Run } from './bounded.js';
-import type { BatchFs } from './io.js';
+import { freshIn, type BatchFs } from './io.js';
 import { shellQuote } from './ios-defaults.js';
 import { CLEANUP_LABEL, compareReads, comparedLine, sanitizeFixture, type ShellRead } from './lab-chooser.js';
 import { CELLS_ENTRY, chooserWindow, cleanUp, handlers, LabEmu, labInstalled, readClipboard, readRoleHolders, UNZIP_SECS, type Cleanup, type ReinstallOptions, type StateRestore } from './lab-emu.js';
-import { CATALOG_PATH, cellsWhy, freshIn } from './lab-lines.js';
-import { askBuild, metWith, type BuildRef } from './lab-build.js';
+import { CATALOG_PATH, cellsWhy, type Opened } from './lab-lines.js';
+import { checkDevice, type BuildRef } from './lab-build.js';
 import type { BlockCtx, NeedCtx, NeedSpec } from './runner.js';
-import type { BatchConfig, NeedResult } from './runner-lines.js';
+import { NO_SERIAL, type BatchConfig, type NeedResult } from './runner-lines.js';
 import { stateOf } from './run-dir.js';
 import { exitText, failedCall, nameInLine } from './words.js';
 
@@ -53,7 +53,7 @@ export interface AndroidLab {
   /** The handler counts read at the check, by URL. */
   counts(): Readonly<Record<string, number | { why: string }>>;
   /** The lab emulator over a block's (or a need's) calls, guarded; why not. */
-  open(c: { bounded: Run; config: BatchConfig; fs: BatchFs }): Promise<{ ok: true; emu: LabEmu } | { ok: false; why: string }>;
+  open(c: { bounded: Run; config: BatchConfig; fs: BatchFs }): Promise<Opened<LabEmu>>;
   /** A need on the handler counts a block expects (`{url: n}`), read again each time it is asked. */
   handlersNeed(expect: Readonly<Record<string, number>>): NeedSpec;
 }
@@ -69,40 +69,39 @@ export function androidLab(o: AndroidLabOptions = {}): AndroidLab {
   const counts: Record<string, number | { why: string }> = {};
   const urls = o.handlers ?? HANDLER_URLS;
   const open: AndroidLab['open'] = async (c) => {
-    if (c.config.serial === undefined) return { ok: false, why: 'no lab emulator serial given (--serial or AVERI_LAB_SERIAL)' };
+    if (c.config.serial === undefined) return { ok: false, why: NO_SERIAL };
     const r = await LabEmu.open(c.config.serial, c.bounded, { fs: c.fs, settle: o.settle ?? pause });
-    return r.ok ? { ok: true, emu: r.emu } : r;
+    return r.ok ? { ok: true, value: r.emu } : r;
   };
-  const check = async (c: NeedCtx): Promise<NeedResult> => {
-    const opened = await open(c);
-    if (!opened.ok) return opened;
-    const { emu } = opened;
-    const asked = await askBuild(c, o);
-    if ('why' in asked) return { ok: false, why: asked.why };
-    const { built } = asked;
-    if (built !== undefined) {
-      const r = await emu.adb(['install', '-r', built]);
-      if (failedCall(r)) return { ok: false, why: `this run's build not installed (adb install -r: ${exitText(r)})` };
-    }
+  /** The installed APK pulled, its cells.json main's, the handlers counted: its how part, or why not. */
+  const cells = async (c: NeedCtx, emu: LabEmu): Promise<{ how: string } | { why: string }> => {
     const installed = await labInstalled(emu);
-    if (installed.state !== 'installed') return { ok: false, why: installed.state === 'missing' ? 'the lab APK is not installed (pm path)' : `whether the lab is installed is unknown (${installed.why})` };
+    if (installed.state !== 'installed') return { why: installed.state === 'missing' ? 'the lab APK is not installed (pm path)' : `whether the lab is installed is unknown (${installed.why})` };
     const local = freshIn(c.fs, c.labDir, 'installed.apk');
     const pull = await emu.adb(['pull', installed.path, local]);
-    if (failedCall(pull) || !c.fs.exists(local)) return { ok: false, why: `the installed APK not pulled (${failedCall(pull) ? exitText(pull) : 'exit 0 but no file'})` };
+    if (failedCall(pull) || !c.fs.exists(local)) return { why: `the installed APK not pulled (${failedCall(pull) ? exitText(pull) : 'exit 0 but no file'})` };
     pulled = local;
-    const cells = await emu.run('unzip', ['-p', local, CELLS_ENTRY], { secs: UNZIP_SECS });
-    if (!failedCall(cells)) c.fs.createExclusive(freshIn(c.fs, c.labDir, 'android-installed-cells.json'), cells.out);
-    const why = cellsWhy(failedCall(cells) ? undefined : cells.out, c.fs.read(join(c.config.repo, CATALOG_PATH)), `the installed APK (${nameInLine(installed.path)})`);
-    if (why !== undefined) return { ok: false, why: `${why} (rerun with ONLY=lab,…)` };
+    const unzipped = await emu.run('unzip', ['-p', local, CELLS_ENTRY], { secs: UNZIP_SECS });
+    if (!failedCall(unzipped)) c.fs.createExclusive(freshIn(c.fs, c.labDir, 'android-installed-cells.json'), unzipped.out);
+    const why = cellsWhy(failedCall(unzipped) ? undefined : unzipped.out, c.fs.read(join(c.config.repo, CATALOG_PATH)), `the installed APK (${nameInLine(installed.path)})`);
+    if (why !== undefined) return { why };
     for (const url of urls) counts[url] = await handlers(emu, url);
     const said = urls.map((u) => `${u} ${countText(counts[u])}`).join(', ');
     c.fs.append(join(c.labDir, 'android-handlers.txt'), `handlers: ${said}\n`);
-    return metWith(`${LAB_EMULATOR} ${nameInLine(emu.serial)}; ${built === undefined ? 'not rebuilt' : "this run's build installed"}; the APK's ${CELLS_ENTRY} is main's (pulled: ${local}); handlers: ${said}`, asked.warn);
+    return { how: `the APK's ${CELLS_ENTRY} is main's (pulled: ${local}); handlers: ${said}` };
   };
+  const check = (c: NeedCtx): Promise<NeedResult> =>
+    checkDevice<LabEmu>(c, o, {
+      open: () => open(c),
+      installWord: 'adb install -r',
+      install: (emu, built) => emu.adb(['install', '-r', built]),
+      cells: (emu) => cells(c, emu),
+      describe: (emu) => `${LAB_EMULATOR} ${nameInLine(emu.serial)}`,
+    });
   const alive = async (c: NeedCtx): Promise<NeedResult> => {
     const opened = await open(c);
     if (!opened.ok) return opened;
-    const installed = await labInstalled(opened.emu);
+    const installed = await labInstalled(opened.value);
     if (installed.state === 'installed') return { ok: true, how: 'adb answers; the lab installed' };
     return { ok: false, why: installed.state === 'missing' ? 'the lab APK is not installed (pm path)' : installed.why };
   };
@@ -118,7 +117,7 @@ export function androidLab(o: AndroidLabOptions = {}): AndroidLab {
         const off: string[] = [];
         const read: string[] = [];
         for (const [url, want] of Object.entries(expect)) {
-          const n = await handlers(opened.emu, url);
+          const n = await handlers(opened.value, url);
           read.push(`${url} ${countText(n)}`);
           if (n !== want) off.push(`${url} has ${countText(n)} handler(s), ${want} expected`);
         }

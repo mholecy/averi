@@ -1,14 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { DEVICE_CHECK_SIMULATOR } from '../../../scripts/truth/lab-device.js';
 import { TIMED_OUT, type CallResult } from '../../../scripts/truth/batch/bounded.js';
 import {
   cellsWhy,
   companionPattern,
-  freshIn,
   LSOF_ARGV,
   openInAlertOf,
   pkillOf,
@@ -191,23 +186,5 @@ describe('the JDK for the Android build (batch-11.sh:309–310: `java_home -v 17
     expect(javaHomeOf(exit(1, 'Unable to find any JVMs\n', '/jdk\n'), release('JAVA_VERSION="17"'))).toEqual({ why: 'no JDK 17 (java_home -v 17 → nothing: exit 1 Unable to find any JVMs)' });
     expect(javaHomeOf(ok(' \n'), release('JAVA_VERSION="17"'))).toEqual({ why: 'no JDK 17 (java_home -v 17 → nothing)' });
     expect(read).toEqual([]);
-  });
-});
-
-describe('a kept file is never overwritten (io.ts: a run\'s evidence is never replaced)', () => {
-  it('freshIn: the name itself, or the next free -2, -3 before its extension', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'batch-lab-lines-'));
-    try {
-      expect(freshIn(nodeFs, dir, 'x.json')).toBe(join(dir, 'x.json'));
-      writeFileSync(join(dir, 'x.json'), '');
-      writeFileSync(join(dir, 'x-2.json'), '');
-      expect(freshIn(nodeFs, dir, 'x.json')).toBe(join(dir, 'x-3.json'));
-      writeFileSync(join(dir, 'noext'), '');
-      expect(freshIn(nodeFs, dir, 'noext')).toBe(join(dir, 'noext-2'));
-      writeFileSync(join(dir, '.hidden'), '');
-      expect(freshIn(nodeFs, dir, '.hidden')).toBe(join(dir, '.hidden-2'));
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
   });
 });

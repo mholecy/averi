@@ -6,11 +6,10 @@ import { nodeFs, type BatchFs } from './io.js';
 import { liveTableOf, type LiveSelection, type LiveTable } from './live-table.js';
 import { ancestor, casesOnMain, cellsOnMain, checkout, preconditionLine, type Git, type Precondition } from './preconditions.js';
 import { nodeProcess, type ProcessSeam } from './proc.js';
-import { recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
+import { canonicalJson, recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
 import { blockName, layoutOf, META, newRunId, openRun, refusalLines, refusals, type Stateful } from './run-dir.js';
 import {
   backstopLine,
-  canonicalJson,
   checkoutLine,
   detailLines,
   detailsLines,
@@ -81,9 +80,9 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  *     const D43 = { id: 'D43', label: 'D43 verdict', needs: ['ios'], async run(ctx) {
  *       const sim = await ios.open(ctx);                              // the guard again, over the block's own calls
  *       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
- *       await wdaWindow(ctx, sim.lab, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
- *         work: async () => (await iosCheck(ctx, sim.lab, 'wda 1')) ?? ctx.liveRun('ios-wda-1', asked, { secs }) });
- *       await ios.endStretch(ctx, sim.lab);                           // the finportal key's line
+ *       await wdaWindow(ctx, sim.value, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
+ *         work: async () => (await iosCheck(ctx, sim.value, 'wda 1')) ?? ctx.liveRun('ios-wda-1', asked, { secs }) });
+ *       await ios.endStretch(ctx, sim.value);                           // the finportal key's line
  *     }, judge };
  *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],
  *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly],
@@ -538,7 +537,7 @@ class BatchRun<K> {
       asksLive: (name, asked) => {
         recording('asksLive');
         writeCases(io.fs, dir, name, asked);
-        preAsked.set(name, askedKey(asked));
+        preAsked.set(name, canonicalJson(asked));
       },
       asks: (name, record) => (recording('asks'), writeAsked(io.fs, dir, name, record)),
       record: (name, record) => (recording('record'), writeDone(io.fs, dir, name, record)),
@@ -552,7 +551,7 @@ class BatchRun<K> {
     const dir = this.dirs[b.id];
     const before = preAsked.get(name);
     if (before === undefined) writeCases(fs, dir, name, asked);
-    else if (before !== askedKey(asked)) throw new Error(`${b.id}: the live run ${name} was asked otherwise before (asksLive): what a run was asked is never overwritten`);
+    else if (before !== canonicalJson(asked)) throw new Error(`${b.id}: the live run ${name} was asked otherwise before (asksLive): what a run was asked is never overwritten`);
     const f = runFiles(dir, name);
     const what = `${b.id} live ${name}`;
     const device = deviceArgs(asked, this.config);
@@ -714,9 +713,6 @@ class BatchRun<K> {
     return code;
   }
 }
-
-/** What a run was asked, as a key (runner-lines.ts#canonicalJson): two equal asks built apart compare equal. */
-const askedKey = (asked: Asked): string => canonicalJson(asked);
 
 /** A precondition check's answer, its why one line; a check that throws is not shown, never the run's error. */
 async function shown(check: PreconditionCheck, kit: PreconditionKit): Promise<Precondition> {
