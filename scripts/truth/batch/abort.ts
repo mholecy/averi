@@ -77,8 +77,8 @@ export interface WindowSpec {
 /** A wanted block, as the abort SUMMARY sees it. */
 export interface AbortBlock {
   block: string;
-  /** Its records complete, so it can be judged without a device (batch-12's block_complete). */
-  complete(): boolean;
+  /** Its records complete, so it can be judged without a device (batch-12's block_complete); its reading may be async. */
+  complete(): boolean | Promise<boolean>;
   /** Its verdict lines, judged now — device-free, through the detached runner (batch-12's b12-analyze.ts). */
   judge(run: Run): Promise<readonly string[]>;
   /** The lines it wrote before the interrupt (its verdict.txt). */
@@ -454,7 +454,7 @@ export class AbortGuard {
     const reports: BlockReport[] = [];
     for (const b of this.options.blocks) {
       let report: BlockReport;
-      if (cut.has(b.block) || !this.completeOf(b)) report = { block: b.block, lines: b.linesSoFar(), interrupted: true };
+      if (cut.has(b.block) || !(await this.completeOf(b))) report = { block: b.block, lines: b.linesSoFar(), interrupted: true };
       else {
         const left = (until - Date.now()) / 1000;
         if (skip === undefined && left <= 0) skip = spent;
@@ -470,9 +470,9 @@ export class AbortGuard {
     return reports;
   }
 
-  private completeOf(b: AbortBlock): boolean {
+  private async completeOf(b: AbortBlock): Promise<boolean> {
     try {
-      return b.complete();
+      return await b.complete();
     } catch {
       return false;
     }

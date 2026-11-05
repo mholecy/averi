@@ -890,22 +890,22 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(checked).toEqual(['android']);
   });
 
-  it('a live run whose rejudge was cut: its records are not complete, so it is not judged (batch-12: every .cases its record and rejudge)', async () => {
+  it('a live run whose rejudge was cut: not complete, not judged — INCONCLUSIVE with its gap (batch-12: every .cases its record and rejudge; review round 5)', async () => {
     seam.rules = [git(), probes, live({ rejudge: { hang: true } })];
     const done = go([kfBlock()]);
     await until(() => seam.words().some((w) => w.includes('--rejudge')));
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
-    expect(summary()).toContain('kf: INTERRUPTED — its records are not complete, not judged (rerun ONLY=kf)');
+    expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — android-kf-1.rejudge.txt has no `# Live golden:` line (the rejudge did not finish); uiautomator: kf1, kf2, kf3 missing from the summary');
   });
 
-  it('interrupted inside live.ts (no record yet): the run is not complete, so not judged', async () => {
+  it('interrupted inside live.ts (no record yet): not complete, not judged — INCONCLUSIVE with its gap (review round 5)', async () => {
     seam.rules = [git(), probes, (cmd, args) => (args.includes('--record') ? { hang: true } : undefined)];
     const done = go([kfBlock()]);
     await until(() => seam.words().some((w) => w.includes('--record')));
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
-    expect(summary()).toContain('kf: INTERRUPTED — its records are not complete, not judged (rerun ONLY=kf)');
+    expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — no record (android-kf-1.json); android-kf-1.log has no `# Live golden:` line (live.ts did not finish); no rejudge summary (android-kf-1.rejudge.txt)');
   });
 
   it('the abort\'s judge and a block\'s complete() read its folder', async () => {
@@ -1067,7 +1067,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(summary()[1]).toBe('NOTE checkout: not read before the interrupt');
   });
 
-  it('a non-live record complete is judged by the abort; an incomplete one INTERRUPTED', async () => {
+  it('a non-live record complete is judged by the abort; an incomplete one INCONCLUSIVE with its gap (review round 5)', async () => {
     const recorded = (id: string, runs: number) =>
       plain(id, {
         run: async (ctx) => {
@@ -1081,7 +1081,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
     expect(summary()).toContain('T6 verdict: PASS — judged by the abort');
-    expect(summary()).toContain('T7: INTERRUPTED — its records are not complete, not judged (rerun ONLY=T7)');
+    expect(summary()).toContain('T7 verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: c — asked 3 run(s), recorded 2');
   });
 
   it('a block\'s own complete() overrides the record rule, either way (batch-12\'s kf premise, T6\'s capture)', async () => {

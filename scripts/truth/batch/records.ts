@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import { runFiles, runsIn } from './cases.js';
 import { isEexist, type BatchFs } from './io.js';
 import { plainSegment } from './run-dir.js';
 
@@ -7,9 +6,8 @@ import { plainSegment } from './run-dir.js';
  * A non-live block's records (T2 S6a; batch-12's E5 and T6 wrote `{"runs":N}` as a `.cases`, which S3 keeps for live
  * runs): what a run is asked, written before it runs (`<name>.asked.json`), and what it did, once done
  * (`<name>.done.json`), each written once, never overwritten. A run is complete when what it recorded is what it was
- * asked; a block's records are complete — batch-12's block_complete — when it asked one run at least and every live
- * run's record and rejudge summary is written and every record is complete. One kind of record for now; another is a
- * new member of the union.
+ * asked (runner.ts reads every record's gap beside every live run's completeness, one rule on both paths). One kind of
+ * record for now; another is a new member of the union.
  */
 
 export interface RunsRecord {
@@ -97,15 +95,4 @@ export function writeDone(fs: BatchFs, dir: string, name: string, record: BlockR
   const text = recordText(name, record);
   if (!fs.exists(f.asked)) throw new Error(`${name}: recorded before it was asked (asks first)`);
   writeOnce(fs, f.done, text, 'recorded');
-}
-
-/**
- * Whether a block's records are complete without a device or the table (batch-12's block_complete): one run asked at
- * least; every live run's record and rejudge summary written; every record what it was asked.
- */
-export function recordsComplete(fs: BatchFs, dir: string): boolean {
-  const live = runsIn(fs, dir);
-  const records = recordsIn(fs, dir);
-  const written = (p: string) => (fs.read(p) ?? '') !== '';
-  return live.length + records.length > 0 && live.every((n) => written(runFiles(dir, n).record) && written(runFiles(dir, n).summary)) && records.every((n) => recordGapIn(fs, dir, n) === undefined);
 }

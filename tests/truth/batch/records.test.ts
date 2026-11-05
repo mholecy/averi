@@ -1,13 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { recordFiles, recordGap, recordGapIn, recordOf, recordsComplete, recordsIn, writeAsked, writeDone } from '../../../scripts/truth/batch/records.js';
+import { recordFiles, recordGap, recordGapIn, recordOf, recordsIn, writeAsked, writeDone } from '../../../scripts/truth/batch/records.js';
 
-// scripts/truth/batch/records.ts: a non-live block's records — what a run is asked, then what it did — and when a
-// block's records are complete (batch-12's block_complete). Real files in a temp dir; runner.test.ts runs them inside
-// runBatch. The titles name the fix and the batch or review that found it.
+// scripts/truth/batch/records.ts: a non-live block's records — what a run is asked, then what it did — and each
+// one's gap. Real files in a temp dir; runner.test.ts runs them inside runBatch, beside the live runs' completeness.
+// The titles name the fix and the batch or review that found it.
 
 let dir: string;
 beforeEach(() => {
@@ -47,7 +47,7 @@ describe('recordOf and recordGap — a non-live block\'s own record, apart from 
 });
 
 
-describe('the records in a folder, written once each, and when a block\'s are complete (T2 S6a code review: moved out of the runner)', () => {
+describe('the records in a folder, written once each, and their gaps (T2 S6a code review: moved out of the runner)', () => {
   it('writeAsked then writeDone; recordsIn lists each asked, sorted; recordGapIn reads both files', () => {
     writeAsked(nodeFs, dir, 'b', { kind: 'runs', runs: 2 });
     writeAsked(nodeFs, dir, 'a', { kind: 'runs', runs: 1 });
@@ -66,26 +66,5 @@ describe('the records in a folder, written once each, and when a block\'s are co
     expect(() => writeAsked(nodeFs, dir, 'e', { kind: 'runs', runs: -1 })).toThrow('e: {"kind":"runs","runs":-1} is no record of runs');
     expect(() => writeAsked(nodeFs, dir, 'e.f', { kind: 'runs', runs: 1 })).toThrow('run name "e.f": one plain path segment is needed');
     expect(() => writeAsked(nodeFs, join(dir, 'gone'), 'g', { kind: 'runs', runs: 1 })).toThrow(/ENOENT/);
-  });
-
-  it('recordsComplete: one run asked at least; every live run\'s record and rejudge summary written; every record what it asked (batch-12\'s block_complete)', () => {
-    expect(recordsComplete(nodeFs, dir)).toBe(false);
-    writeFileSync(join(dir, 'k.cases'), '{}');
-    expect(recordsComplete(nodeFs, dir)).toBe(false);
-    writeFileSync(join(dir, 'k.json'), '{}');
-    expect(recordsComplete(nodeFs, dir)).toBe(false);
-    writeFileSync(join(dir, 'k.rejudge.txt'), '');
-    expect(recordsComplete(nodeFs, dir)).toBe(false);
-    writeFileSync(join(dir, 'k.rejudge.txt'), '# Live golden: 1 case');
-    expect(recordsComplete(nodeFs, dir)).toBe(true);
-    writeAsked(nodeFs, dir, 'r', { kind: 'runs', runs: 2 });
-    writeDone(nodeFs, dir, 'r', { kind: 'runs', runs: 1 });
-    expect(recordsComplete(nodeFs, dir)).toBe(false);
-  });
-
-  it('a folder with records alone is complete when each matches', () => {
-    writeAsked(nodeFs, dir, 'r', { kind: 'runs', runs: 2 });
-    writeDone(nodeFs, dir, 'r', { kind: 'runs', runs: 2 });
-    expect(recordsComplete(nodeFs, dir)).toBe(true);
   });
 });

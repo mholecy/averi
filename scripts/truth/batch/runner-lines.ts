@@ -156,6 +156,8 @@ export interface RunLog {
   path: string;
   text: string | undefined;
   why?: string;
+  /** Its lines start with a step's time (steps.log): set aside to count them. */
+  timed?: boolean;
 }
 
 /** A step line's time, `HH:MM:SS ` (steps.ts#StepLog.note). */
@@ -174,8 +176,8 @@ export function logErrors(logs: readonly RunLog[]): string[] {
     // An unread log holds no line to count: it is said below, as a NOTE.
     if (log.text === undefined) continue;
     for (const line of linesOf(log.text)) {
-      // A step line (steps.log's) is timed: counted by what it says, shown as first seen.
-      const said = line.replace(STEP_TIME, '');
+      // A step line (steps.log's, `timed`) is counted by what it says, shown as first seen; any other log's as it is.
+      const said = log.timed === true ? line.replace(STEP_TIME, '') : line;
       if (!said.startsWith('ERROR')) continue;
       const e = seen.get(said) ?? { first: line, n: 0, in: [] };
       e.n++;
