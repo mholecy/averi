@@ -138,8 +138,8 @@ function walk(observed: string, expectedChars: readonly string[]): { tokens: num
  * space) — with at least one SEPARATORS character added and nothing else: how many were added (every one, not the
  * groups), else undefined. `reformatOf`'s walk, without its grouping rules: what those rules refuse (a cents mask's
  * `12.34` for `1234`, a sign, mixed or trailing marks, groups of one, autocorrect's `a lot` for `alot`) is a separated
- * reading — and so is what they pass, so ask only of a reading that did not land (fill-landing.ts#readingOf, its one
- * caller). Pure, O(reading).
+ * reading — and so is what they pass, so ask only of a reading that did not land (fill-landing.ts#differenceOf, its
+ * one caller, which only readingOf asks). Pure, O(reading).
  */
 export function separatedOf(observed: string, expected: string): number | undefined {
   const walked = walkWhole(observed, [...expected]);

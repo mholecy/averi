@@ -328,9 +328,10 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
  * What can be said of a reading that missed the value — the classification of the kinds (fill-facts.ts#Difference),
  * first match wins (2026-10-09, the fill-clear deepening; until then fill.ts chose `unchanged`, `masked` and the partly
  * masked `length` in a ternary at the throw, and a helper of its own the rest):
- * 0. `masked-said-plain`: a masked reading where the held count is `'unread'` (`landingOf`'s `said-plain`; one of the
- *    typed length lands, so it never gets here). Before `unchanged`: no reading of a field whose count was never
- *    read says more than that (A2, 2026-11-01; until then fill.ts built this Difference itself).
+ * 0. `masked-said-plain`: a masked reading that did not land where the held count is `'unread'` (`landingOf`'s
+ *    `said-plain`, a longer one without clear, carries this Difference itself and never gets here; one of the typed
+ *    length lands). Before `unchanged`: no reading of a field whose count was never read says more than that
+ *    (A2, 2026-11-01; until then fill.ts built this Difference itself).
  * 1. `unchanged`: the reading is exactly what the field showed when typing began — whatever it is, bullets included
  *    (probes D and D2 were told "the app transformed the input").
  * 2. `masked`: bullets only, compared by length; `held` without clear.

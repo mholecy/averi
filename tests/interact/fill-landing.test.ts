@@ -12,8 +12,10 @@ import { isMaskedValue } from '../../src/ui-tree/masked-value.js';
  * it through `readingOf`, whose `tail` and `differs` the helpers below read.
  */
 
+type Asked = Partial<Expectation> & Pick<Expectation, 'value'>;
+
 /** An input typed into without clear, nothing before, no placeholder, nothing held — `f` says what differs. */
-const expecting = (f: Partial<Expectation> & Pick<Expectation, 'value'>): Expectation => ({
+const expecting = (f: Asked): Expectation => ({
   clear: false,
   before: null,
   placeholder: undefined,
@@ -23,29 +25,27 @@ const expecting = (f: Partial<Expectation> & Pick<Expectation, 'value'>): Expect
   ...f,
 });
 
-type Asked = Partial<Expectation> & Pick<Expectation, 'value'>;
-
 /** The reading's tail, undefined where it landed or names none. */
-const tailOf = (observed: string, f: Asked) => {
+const tailAskedOf = (observed: string, f: Asked) => {
   const r = readingOf(observed, expecting(f));
   return 'tail' in r ? r.tail : undefined;
 };
 
 /** What a reading proves dropped: the tail fill-type.ts may type again, else undefined. */
-const droppedTail = (observed: string, f: Asked): string | undefined => {
-  const tail = tailOf(observed, f);
+const retypableTailOf = (observed: string, f: Asked): string | undefined => {
+  const tail = tailAskedOf(observed, f);
   return tail?.retypable === true ? tail.missing : undefined;
 };
 
 /** The Difference of a reading that missed. A reading that landed has none, and a row that expects one is wrong. */
-const differenceOf = (observed: string, f: Asked): Difference => {
+const notLandedDiffers = (observed: string, f: Asked): Difference => {
   const r = readingOf(observed, expecting(f));
   if (r.kind === 'landed' || r.kind === 'placeholder') throw new Error(`\`${observed}\` landed: it has no Difference`);
   return r.differs;
 };
 
 describe('landingOf — did this reading land, and how', () => {
-  const rows: [string, string, Partial<Expectation> & Pick<Expectation, 'value'>, ReturnType<typeof landingOf>][] = [
+  const rows: [string, string, Asked, ReturnType<typeof landingOf>][] = [
     // exact, with clear: raw equality
     ['with clear the reading must EQUAL the value', 'hello', { value: 'hello', clear: true }, { kind: 'landed' }],
     ['with clear more than the value does not land', 'xhello', { value: 'hello', clear: true }, undefined],
@@ -87,7 +87,7 @@ describe('landingOf — did this reading land, and how', () => {
  * retypable and `unchanged`), and a `not-taken` carries its NotLanded too (a retry's last reading goes on from it).
  */
 describe('readingOf — the whole answer about one reading', () => {
-  const rows: [string, string, Partial<Expectation> & Pick<Expectation, 'value'>, Reading][] = [
+  const rows: [string, string, Asked, Reading][] = [
     ['a landing is the landing', 'hello', { value: 'hello', clear: true }, { kind: 'landed' }],
     ['reformatted', 'SK31 1200', { value: 'SK311200' }, { kind: 'landed', reformatted: { added: 1, respaced: 0 } }],
     ['the named placeholder', 'Search', { value: 'Search', placeholder: 'Search' }, { kind: 'placeholder' }],
@@ -175,32 +175,32 @@ describe('withoutWholeToo — a Difference without its whole-landing hedge', () 
 
 const intent = (value: string, before: string | null = null, clear = false, placeholder?: string) => ({ value, before, clear, placeholder });
 
-describe('droppedTail — a strict prefix with some of the typing in it, else nothing', () => {
+describe('the tail to type again — a strict prefix with some of the typing in it, else nothing', () => {
   it('a prefix of the value: the rest of it', () => {
-    expect(droppedTail('Jan', intent('Jan Novak'))).toBe(' Novak');
-    expect(droppedTail('SK31 1', intent('SK31 1200'))).toBe('200');
+    expect(retypableTailOf('Jan', intent('Jan Novak'))).toBe(' Novak');
+    expect(retypableTailOf('SK31 1', intent('SK31 1200'))).toBe('200');
   });
 
   it('without clear the field should hold its earlier text and the value; with clear the value alone', () => {
-    expect(droppedTail('9.9912', intent('12.34', '9.99'))).toBe('.34');
-    expect(droppedTail('12', intent('12.34', '9.99', true))).toBe('.34');
+    expect(retypableTailOf('9.9912', intent('12.34', '9.99'))).toBe('.34');
+    expect(retypableTailOf('12', intent('12.34', '9.99', true))).toBe('.34');
   });
 
   it('nothing of the typing landed, the whole of it, more than it, or other text: nothing', () => {
-    expect(droppedTail('9.99', intent('12.34', '9.99'))).toBeUndefined();
-    expect(droppedTail('', intent('12.34'))).toBeUndefined();
-    expect(droppedTail('12.34', intent('12.34'))).toBeUndefined();
-    expect(droppedTail('12.345', intent('12.34'))).toBeUndefined();
-    expect(droppedTail('Jan', intent('jan novak'))).toBeUndefined();
-    expect(droppedTail('9.812', intent('12.34', '9.99'))).toBeUndefined(); // the earlier text changed
+    expect(retypableTailOf('9.99', intent('12.34', '9.99'))).toBeUndefined();
+    expect(retypableTailOf('', intent('12.34'))).toBeUndefined();
+    expect(retypableTailOf('12.34', intent('12.34'))).toBeUndefined();
+    expect(retypableTailOf('12.345', intent('12.34'))).toBeUndefined();
+    expect(retypableTailOf('Jan', intent('jan novak'))).toBeUndefined();
+    expect(retypableTailOf('9.812', intent('12.34', '9.99'))).toBeUndefined(); // the earlier text changed
   });
 
   it('a reading with a bullet (masked) proves no prefix; a placeholder is no content', () => {
-    expect(droppedTail('••', intent('12345'))).toBeUndefined();
-    expect(droppedTail('•••3', intent('12345'))).toBeUndefined();
-    expect(droppedTail('••', intent('••••'))).toBeUndefined(); // even a value of bullets: the reading cannot be told from a mask
-    expect(droppedTail('Search', intent('Sea', null, false, 'Search'))).toBeUndefined();
-    expect(droppedTail('Se', intent('Sea', 'Search', false, 'Search'))).toBe('a');
+    expect(retypableTailOf('••', intent('12345'))).toBeUndefined();
+    expect(retypableTailOf('•••3', intent('12345'))).toBeUndefined();
+    expect(retypableTailOf('••', intent('••••'))).toBeUndefined(); // even a value of bullets: the reading cannot be told from a mask
+    expect(retypableTailOf('Search', intent('Sea', null, false, 'Search'))).toBeUndefined();
+    expect(retypableTailOf('Se', intent('Sea', 'Search', false, 'Search'))).toBe('a');
   });
 });
 
@@ -210,46 +210,46 @@ describe('droppedTail — a strict prefix with some of the typing in it, else no
  * `1 234 567,` for `1234567,89`. The prefix must be exact by typed characters, with only grouping added, under
  * `reformatOf`'s rules judged over the WHOLE typing (one separator kind, letters split only in a code, thousands).
  */
-describe('droppedTail — a reformatted strict prefix (D28)', () => {
+describe('the tail to type again — a reformatted strict prefix (D28)', () => {
   it('an amount grouped by thousands, an IBAN grouped in fours: the rest of the typing', () => {
-    expect(droppedTail('1 234 567,', intent('1234567,89', null, true))).toBe('89');
-    expect(droppedTail('SK31 1200 0', intent('SK3112000000'))).toBe('000');
-    expect(droppedTail('SK31 1200', intent('SK3112000000'))).toBe('0000');
+    expect(retypableTailOf('1 234 567,', intent('1234567,89', null, true))).toBe('89');
+    expect(retypableTailOf('SK31 1200 0', intent('SK3112000000'))).toBe('000');
+    expect(retypableTailOf('SK31 1200', intent('SK3112000000'))).toBe('0000');
   });
 
   it('Android-shaped readings: a no-break or narrow no-break space as the grouping', () => {
-    expect(droppedTail('1\u00A0234\u00A0567', intent('1234567,89', null, true))).toBe(',89');
-    expect(droppedTail('12\u202F345', intent('1234567'))).toBe('67');
+    expect(retypableTailOf('1\u00A0234\u00A0567', intent('1234567,89', null, true))).toBe(',89');
+    expect(retypableTailOf('12\u202F345', intent('1234567'))).toBe('67');
   });
 
   it('without clear: the earlier text first, and some of the typing in the prefix', () => {
-    expect(droppedTail('SK31 1200', intent('12000000', 'SK31'))).toBe('0000');
-    expect(droppedTail('SK31', intent('12000000', 'SK31'))).toBeUndefined(); // nothing of the typing landed
+    expect(retypableTailOf('SK31 1200', intent('12000000', 'SK31'))).toBe('0000');
+    expect(retypableTailOf('SK31', intent('12000000', 'SK31'))).toBeUndefined(); // nothing of the typing landed
   });
 
   it('only grouping added: a trailing mark, a changed character, two separator kinds, a lone grouping — nothing', () => {
-    expect(droppedTail('SK31 1300', intent('SK3112000000'))).toBeUndefined();
-    expect(droppedTail('1 234.567', intent('12345678'))).toBeUndefined();
-    expect(droppedTail('1-2', intent('1234'))).toBeUndefined(); // groups of one
-    expect(droppedTail('1 2', intent('1234'))).toBeUndefined();
-    expect(droppedTail('••• •', intent('12345'))).toBeUndefined(); // bullets
-    expect(droppedTail('SK31 1200 0000', intent('SK3112000000'))).toBeUndefined(); // the whole typing: no tail
+    expect(retypableTailOf('SK31 1300', intent('SK3112000000'))).toBeUndefined();
+    expect(retypableTailOf('1 234.567', intent('12345678'))).toBeUndefined();
+    expect(retypableTailOf('1-2', intent('1234'))).toBeUndefined(); // groups of one
+    expect(retypableTailOf('1 2', intent('1234'))).toBeUndefined();
+    expect(retypableTailOf('••• •', intent('12345'))).toBeUndefined(); // bullets
+    expect(retypableTailOf('SK31 1200 0000', intent('SK3112000000'))).toBeUndefined(); // the whole typing: no tail
   });
 
   it('the whole typing with an eager trailing mark is no prefix: no tail', () => {
-    expect(droppedTail('SK31 1200 0000 ', intent('SK3112000000'))).toBeUndefined();
+    expect(retypableTailOf('SK31 1200 0000 ', intent('SK3112000000'))).toBeUndefined();
   });
 
   it('a typed space the field shows as a no-break space is part of the prefix (respaced)', () => {
-    expect(droppedTail('1\u00A0234', intent('1 23456'))).toBe('56');
+    expect(retypableTailOf('1\u00A0234', intent('1 23456'))).toBe('56');
   });
 
   it('the rules are the whole typing\'s: a letter split is a code\'s only when the WHOLE typing is one, and a `.`/`,` it holds is never a thousands mark', () => {
-    expect(droppedTail('a1bc de', intent('a1bcde f'))).toBeUndefined(); // the prefix is a code, the typing (a typed space) is not
-    expect(droppedTail('a1bc de', intent('a1bcdefg'))).toBe('fg');
-    expect(droppedTail('1,234', intent('1234,5'))).toBeUndefined(); // the typing's own `,` is its decimal point
-    expect(droppedTail('1.234', intent('1234,5'))).toBe(',5');
-    expect(droppedTail('a lot', intent('alotmore'))).toBeUndefined(); // prose: autocorrect, not a format
+    expect(retypableTailOf('a1bc de', intent('a1bcde f'))).toBeUndefined(); // the prefix is a code, the typing (a typed space) is not
+    expect(retypableTailOf('a1bc de', intent('a1bcdefg'))).toBe('fg');
+    expect(retypableTailOf('1,234', intent('1234,5'))).toBeUndefined(); // the typing's own `,` is its decimal point
+    expect(retypableTailOf('1.234', intent('1234,5'))).toBe(',5');
+    expect(retypableTailOf('a lot', intent('alotmore'))).toBeUndefined(); // prose: autocorrect, not a format
   });
 });
 
@@ -258,58 +258,58 @@ describe('droppedTail — a reformatted strict prefix (D28)', () => {
  * prefix and that mark (`SK31 1200 ` for `SK3112000000`). The mark is judged as if the next typed character had landed
  * after it, under every rule of `reformatOf` — so the tail is retyped, and the verdict names it, as any dropped tail.
  */
-describe('droppedTail — a prefix that ends in an eager trailing mark (D60)', () => {
+describe('the tail to type again — a prefix that ends in an eager trailing mark (D60)', () => {
   it('an IBAN, a card, a phone, a dotted date: the rest of the typing', () => {
-    expect(droppedTail('SK31 1200 ', intent('SK3112000000', null, true))).toBe('0000');
-    expect(droppedTail('SK31 ', intent('SK3112000000', null, true))).toBe('12000000');
-    expect(droppedTail('4111 1111 ', intent('4111111111111111', null, true))).toBe('11111111');
-    expect(droppedTail('903 123 ', intent('903123456', null, true))).toBe('456');
-    expect(droppedTail('31.12.', intent('31122026', null, true))).toBe('2026');
+    expect(retypableTailOf('SK31 1200 ', intent('SK3112000000', null, true))).toBe('0000');
+    expect(retypableTailOf('SK31 ', intent('SK3112000000', null, true))).toBe('12000000');
+    expect(retypableTailOf('4111 1111 ', intent('4111111111111111', null, true))).toBe('11111111');
+    expect(retypableTailOf('903 123 ', intent('903123456', null, true))).toBe('456');
+    expect(retypableTailOf('31.12.', intent('31122026', null, true))).toBe('2026');
   });
 
   it('without clear: after a vanished placeholder, a vanished mask template, or the earlier text', () => {
-    expect(droppedTail('SK31 1200 ', intent('SK3112000000', 'SK00 0000 0000 \u2026'))).toBe('0000'); // D29
-    expect(droppedTail('31.12.', intent('31122026', '__.__.____'))).toBe('2026'); // D51
-    expect(droppedTail('SK31 1200 ', intent('12000000', 'SK31'))).toBe('0000');
+    expect(retypableTailOf('SK31 1200 ', intent('SK3112000000', 'SK00 0000 0000 \u2026'))).toBe('0000'); // D29
+    expect(retypableTailOf('31.12.', intent('31122026', '__.__.____'))).toBe('2026'); // D51
+    expect(retypableTailOf('SK31 1200 ', intent('12000000', 'SK31'))).toBe('0000');
   });
 
   it('the earlier text and a mark alone: nothing of the typing landed, no tail', () => {
-    expect(droppedTail('SK31 ', intent('12000000', 'SK31'))).toBeUndefined();
-    expect(tailOf('SK31 ', intent('12000000', 'SK31'))).toEqual({ missing: '12000000', retypable: false });
+    expect(retypableTailOf('SK31 ', intent('12000000', 'SK31'))).toBeUndefined();
+    expect(tailAskedOf('SK31 ', intent('12000000', 'SK31'))).toEqual({ missing: '12000000', retypable: false });
   });
 
   it('a mark the typing holds itself, or one the rules refuse: no tail', () => {
-    expect(droppedTail('12/', intent('1234/56', null, true))).toBeUndefined(); // the typed-mark guard
-    expect(droppedTail('+421 903 ', intent('+421 903123456', null, true))).toBeUndefined(); // ADR 0034 residual 5
-    expect(droppedTail('SK31 1200-', intent('SK3112000000', null, true))).toBeUndefined();
-    expect(droppedTail('12.', intent('1234', null, true))).toBeUndefined();
+    expect(retypableTailOf('12/', intent('1234/56', null, true))).toBeUndefined(); // the typed-mark guard
+    expect(retypableTailOf('+421 903 ', intent('+421 903123456', null, true))).toBeUndefined(); // ADR 0034 residual 5
+    expect(retypableTailOf('SK31 1200-', intent('SK3112000000', null, true))).toBeUndefined();
+    expect(retypableTailOf('12.', intent('1234', null, true))).toBeUndefined();
   });
 });
 
-describe('tailOf — what the field is missing, and how much of the typing it holds', () => {
+describe('the tail — what the field is missing, and whether some of the typing is there', () => {
   const e = (value: string, before: string | null = null, clear = false) => ({ value, clear, before, placeholder: undefined });
 
   it('the rest, the typed characters landed, and the reformat', () => {
-    expect(tailOf('1 234 567,', e('1234567,89', null, true))).toEqual({ missing: '89', retypable: true });
-    expect(differenceOf('1 234 567,', e('1234567,89', null, true))).toEqual({ kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true });
-    expect(tailOf('Jan', e('Jan Novak'))).toEqual({ missing: ' Novak', retypable: true });
+    expect(tailAskedOf('1 234 567,', e('1234567,89', null, true))).toEqual({ missing: '89', retypable: true });
+    expect(notLandedDiffers('1 234 567,', e('1234567,89', null, true))).toEqual({ kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true });
+    expect(tailAskedOf('Jan', e('Jan Novak'))).toEqual({ missing: ' Novak', retypable: true });
   });
 
   it('without clear the earlier text is no landed typing', () => {
-    expect(tailOf('SK31 1200', e('12000000', 'SK31'))).toEqual({ missing: '0000', retypable: true });
-    expect(differenceOf('SK31 1200', e('12000000', 'SK31'))).toEqual({ kind: 'dropped-tail', landed: 4, dropped: 4, grouped: true });
-    expect(tailOf('SK31', e('12000000', 'SK31'))).toEqual({ missing: '12000000', retypable: false });
+    expect(tailAskedOf('SK31 1200', e('12000000', 'SK31'))).toEqual({ missing: '0000', retypable: true });
+    expect(notLandedDiffers('SK31 1200', e('12000000', 'SK31'))).toEqual({ kind: 'dropped-tail', landed: 4, dropped: 4, grouped: true });
+    expect(tailAskedOf('SK31', e('12000000', 'SK31'))).toEqual({ missing: '12000000', retypable: false });
   });
 
   it('a bullet in the reading or in the earlier text: none', () => {
-    expect(tailOf('••', e('12345'))).toBeUndefined();
-    expect(tailOf('••1', e('2', '••'))).toBeUndefined();
+    expect(tailAskedOf('••', e('12345'))).toBeUndefined();
+    expect(tailAskedOf('••1', e('2', '••'))).toBeUndefined();
   });
 
   it('some of the typing in the prefix is a dropped tail; none of it, or no prefix, is not', () => {
-    expect(droppedTail('Jan', e('Jan Novak'))).toBe(' Novak');
-    expect(droppedTail('SK31', e('12000000', 'SK31'))).toBeUndefined();
-    expect(droppedTail('XY', e('12000000', 'SK31'))).toBeUndefined();
+    expect(retypableTailOf('Jan', e('Jan Novak'))).toBe(' Novak');
+    expect(retypableTailOf('SK31', e('12000000', 'SK31'))).toBeUndefined();
+    expect(retypableTailOf('XY', e('12000000', 'SK31'))).toBeUndefined();
   });
 });
 
@@ -353,23 +353,23 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
     expect(landingOf('SK31 1200 0000', expecting(e('SK3112000000', PH, true)))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
     // cleared, the field must hold the value alone: `SK31` shown before it is no earlier text to judge after
     expect(landingOf('SK31 1200 0000', expecting(e('12000000', 'SK31', true)))).toBeUndefined();
-    expect(tailOf('SK31 12', e('12000000', 'SK31', true))).toBeUndefined();
+    expect(tailAskedOf('SK31 12', e('12000000', 'SK31', true))).toBeUndefined();
   });
 
-  it('tailOf: a prefix of the value alone — the missing tail, all of what landed the typing', () => {
-    expect(tailOf('SK31 1200 0', e('SK3112000000', PH))).toEqual({ missing: '000', retypable: true });
-    expect(differenceOf('SK31 1200 0', e('SK3112000000', PH))).toEqual({ kind: 'dropped-tail', landed: 9, dropped: 3, grouped: true });
-    expect(tailOf('SK31', e('SK3112000000', PH))).toEqual({ missing: '12000000', retypable: true });
+  it('the tail: a prefix of the value alone — the missing tail, all of what landed the typing', () => {
+    expect(tailAskedOf('SK31 1200 0', e('SK3112000000', PH))).toEqual({ missing: '000', retypable: true });
+    expect(notLandedDiffers('SK31 1200 0', e('SK3112000000', PH))).toEqual({ kind: 'dropped-tail', landed: 9, dropped: 3, grouped: true });
+    expect(tailAskedOf('SK31', e('SK3112000000', PH))).toEqual({ missing: '12000000', retypable: true });
   });
 
-  it('tailOf: a real earlier text still shown is unchanged — judged after it alone', () => {
-    expect(tailOf('SK31 1200', e('12000000', 'SK31'))).toEqual({ missing: '0000', retypable: true });
-    expect(differenceOf('SK31 1200', e('12000000', 'SK31'))).toEqual({ kind: 'dropped-tail', landed: 4, dropped: 4, grouped: true });
+  it('the tail: a real earlier text still shown is unchanged — judged after it alone', () => {
+    expect(tailAskedOf('SK31 1200', e('12000000', 'SK31'))).toEqual({ missing: '0000', retypable: true });
+    expect(notLandedDiffers('SK31 1200', e('12000000', 'SK31'))).toEqual({ kind: 'dropped-tail', landed: 4, dropped: 4, grouped: true });
     // starts with the earlier `1`: no prefix of `1` + `12345678`, and not judged as the value alone
-    expect(tailOf('1234 5', e('12345678', '1'))).toBeUndefined();
+    expect(tailAskedOf('1234 5', e('12345678', '1'))).toBeUndefined();
     // an earlier text the field regrouped (`SK3112` shown `SK31 12…`) no longer starts the reading as typed: judged after it first
-    expect(tailOf('SK31 1200', e('0000', 'SK3112'))).toEqual({ missing: '00', retypable: true });
-    expect(differenceOf('SK31 1200', e('0000', 'SK3112'))).toEqual({ kind: 'dropped-tail', landed: 2, dropped: 2, grouped: true });
+    expect(tailAskedOf('SK31 1200', e('0000', 'SK3112'))).toEqual({ missing: '00', retypable: true });
+    expect(notLandedDiffers('SK31 1200', e('0000', 'SK3112'))).toEqual({ kind: 'dropped-tail', landed: 2, dropped: 2, grouped: true });
     expect(landingOf('SK31 1200 00', expecting(e('0000', 'SK3112')))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
   });
 
@@ -377,7 +377,7 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
   // field regrouped (`1,000` shown `10,00…`) is still there, and the reading is judged after it alone.
   it('an earlier text the field regrouped is still there: judged after it, never as the value alone', () => {
     expect(landingOf('10,001,000', expecting(e('10001000', '1,000')))).toBeUndefined();
-    expect(tailOf('100,010', e('1000105', '1,000'))).toBeUndefined();
+    expect(tailAskedOf('100,010', e('1000105', '1,000'))).toBeUndefined();
   });
 
   // D29 review round 2, MINOR-A (the owner's decision): an earlier text with no letters or digits (a dash) keeps the
@@ -395,13 +395,13 @@ describe('an earlier text that vanished — an unnamed placeholder (D29)', () =>
   // MINOR-3: the earlier text first — a reading that is a prefix of the earlier text itself (`SK` of `SK00 …`) is no
   // proof that the typing landed: nothing of it counted, nothing typed again.
   it('a reading that is a prefix of the earlier text too: judged after the earlier text first — none of the typing landed', () => {
-    expect(tailOf('SK', e('SK3112000000', PH))?.retypable).toBe(false); // a prefix of the earlier text alone
-    expect(droppedTail('SK', e('SK3112000000', PH))).toBeUndefined();
+    expect(tailAskedOf('SK', e('SK3112000000', PH))?.retypable).toBe(false); // a prefix of the earlier text alone
+    expect(retypableTailOf('SK', e('SK3112000000', PH))).toBeUndefined();
   });
 
-  it('tailOf: the earlier text vanished but other text took its place — none', () => {
-    expect(tailOf('XY12', e('1234', PH))).toBeUndefined();
-    expect(tailOf('SK31 1300', e('SK3112000000', PH))).toBeUndefined();
+  it('the tail: the earlier text vanished but other text took its place — none', () => {
+    expect(tailAskedOf('XY12', e('1234', PH))).toBeUndefined();
+    expect(tailAskedOf('SK31 1300', e('SK3112000000', PH))).toBeUndefined();
   });
 });
 
@@ -434,21 +434,21 @@ describe('an unnamed placeholder whose letters and digits start the value\'s (D6
     expect(landingOf('1 234', expecting(e('1234', '1234')))).toBeUndefined();
   });
 
-  it('differenceOf: mixed marks after the unnamed `+421` are separated, not a length', () => {
-    expect(differenceOf('421 903-123-456', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'separated', added: 3 });
+  it('the difference: mixed marks after the unnamed `+421` are separated, not a length', () => {
+    expect(notLandedDiffers('421 903-123-456', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'separated', added: 3 });
   });
 
   // the wording only, never a pass: a full reading with an eager trailing mark (D60's `separated`) under the unnamed `+421`
-  it('differenceOf: a full reading with an eager trailing mark after the unnamed `+421` is separated, not a length', () => {
-    expect(differenceOf('421 903 123 456 ', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'separated', added: 4 });
+  it('the difference: a full reading with an eager trailing mark after the unnamed `+421` is separated, not a length', () => {
+    expect(notLandedDiffers('421 903 123 456 ', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'separated', added: 4 });
     expect(landingOf('421 903 123 456 ', expecting(e('421903123456', '+421')))).toBeUndefined();
   });
 
   // residual 6: the equality form — a dropped tail under the unnamed placeholder is not typed again; clear: true is the remedy
-  it('tailOf: a dropped tail under the unnamed `+421` is no tail — not typed again (ADR 0034 residual 6)', () => {
-    expect(tailOf('421 903 123', e('421903123456', '+421'))).toBeUndefined();
-    expect(droppedTail('421 903 123', e('421903123456', '+421'))).toBeUndefined();
-    expect(differenceOf('421 903 123', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'length' });
+  it('the tail: a dropped tail under the unnamed `+421` is no tail — not typed again (ADR 0034 residual 6)', () => {
+    expect(tailAskedOf('421 903 123', e('421903123456', '+421'))).toBeUndefined();
+    expect(retypableTailOf('421 903 123', e('421903123456', '+421'))).toBeUndefined();
+    expect(notLandedDiffers('421 903 123', { value: '421903123456', clear: false, before: '+421', placeholder: undefined, held: 0 })).toEqual({ kind: 'length' });
   });
 });
 
@@ -479,20 +479,20 @@ describe('a mask template is no earlier text (D51)', () => {
 
   it('landingOf: an earlier date the field kept, or replaced on focus', () => {
     expect(landingOf('01.01.2000', expecting(e('31122026', '01.01.2000')))).toBeUndefined();
-    expect(differenceOf('01.01.2000', expecting(e('31122026', '01.01.2000')))).toEqual({ kind: 'unchanged' });
+    expect(notLandedDiffers('01.01.2000', expecting(e('31122026', '01.01.2000')))).toEqual({ kind: 'unchanged' });
     expect(landingOf('31.12.2026', expecting(e('31122026', '01.01.2000')))).toEqual({ kind: 'landed', reformatted: { added: 2, respaced: 0 } });
   });
 
-  it('tailOf: a dotted date\'s prefix after the template is a dropped tail, the template itself none of the typing', () => {
-    expect(tailOf('31.12.20', e('31122026', MASK))).toEqual({ missing: '26', retypable: true });
-    expect(differenceOf('31.12.20', e('31122026', MASK))).toEqual({ kind: 'dropped-tail', landed: 6, dropped: 2, grouped: true });
-    expect(droppedTail('31.12.20', e('31122026', MASK))).toBe('26');
-    expect(tailOf(MASK, e('31122026', MASK))?.retypable).toBe(false); // the template tried first: nothing of the typing landed
-    expect(droppedTail(MASK, e('31122026', MASK))).toBeUndefined();
+  it('the tail: a dotted date\'s prefix after the template is a dropped tail, the template itself none of the typing', () => {
+    expect(tailAskedOf('31.12.20', e('31122026', MASK))).toEqual({ missing: '26', retypable: true });
+    expect(notLandedDiffers('31.12.20', e('31122026', MASK))).toEqual({ kind: 'dropped-tail', landed: 6, dropped: 2, grouped: true });
+    expect(retypableTailOf('31.12.20', e('31122026', MASK))).toBe('26');
+    expect(tailAskedOf(MASK, e('31122026', MASK))?.retypable).toBe(false); // the template tried first: nothing of the typing landed
+    expect(retypableTailOf(MASK, e('31122026', MASK))).toBeUndefined();
   });
 
-  it('differenceOf: a typing longer than the date field takes is a dropped tail, grouped', () => {
-    expect(differenceOf('31.12.2026', expecting(e('311220261', null)))).toEqual({ kind: 'dropped-tail', landed: 8, dropped: 1, grouped: true });
+  it('the difference: a typing longer than the date field takes is a dropped tail, grouped', () => {
+    expect(notLandedDiffers('31.12.2026', expecting(e('311220261', null)))).toEqual({ kind: 'dropped-tail', landed: 8, dropped: 1, grouped: true });
   });
 });
 
@@ -514,7 +514,7 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
     ['31.12.2026', '2026', 'the date field at its 8-digit cap'],
   ])('landingOf: `%s` typed `%s` (%s), nothing landed: none, and the difference is unchanged', (shown, value) => {
     expect(landingOf(shown, expecting(e(value, shown)))).toBeUndefined();
-    expect(differenceOf(shown, expecting(e(value, shown)))).toEqual({ kind: 'unchanged' });
+    expect(notLandedDiffers(shown, expecting(e(value, shown)))).toEqual({ kind: 'unchanged' });
   });
 
   // residual: a reading that is both the earlier text and the value cannot be told from a select-all field that retyped
@@ -539,7 +539,7 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
   it('D64 (A): a reading that moved but holds none of the typing past the earlier text has not landed; its tail is dropped', () => {
     // `w` landed, `orld` went elsewhere: the value is only inside the earlier text `Hello world`
     expect(landingOf('Hello worldw', expecting(e('world', 'Hello world')))).toBeUndefined();
-    expect(droppedTail('Hello worldw', e('world', 'Hello world'))).toBe('orld');
+    expect(retypableTailOf('Hello worldw', e('world', 'Hello world'))).toBe('orld');
   });
 
   // a `before` of `''` is taken at its word (an eager formatter can turn a typed `421` into `+421 ` from a truly empty
@@ -554,7 +554,7 @@ describe('a reading unchanged since typing began has not landed (D63)', () => {
 
   it('landingOf: a masked reading unchanged since typing began is judged by its length, as before', () => {
     expect(landingOf('•••••', expecting({ value: '•••', before: '•••••', held: 5 }))).toBeUndefined();
-    expect(differenceOf('•••••', expecting({ value: '•••', before: '•••••', held: 5 }))).toEqual({ kind: 'unchanged' });
+    expect(notLandedDiffers('•••••', expecting({ value: '•••', before: '•••••', held: 5 }))).toEqual({ kind: 'unchanged' });
   });
 });
 
@@ -582,8 +582,8 @@ describe('without clear, the value must be in the typing past the earlier text (
     ['Note: hellohe', 'hello', 'Note: hello', 'llo', 'an iOS React Native burst that kept a prefix'],
   ])('`%s` typed `%s` after `%s`: no landing, the tail `%s` dropped, the difference a length (%s)', (shown, value, before, tail) => {
     expect(landingOf(shown, e(value, before))).toBeUndefined();
-    expect(droppedTail(shown, e(value, before))).toBe(tail);
-    expect(differenceOf(shown, e(value, before))).toEqual({ kind: 'length' });
+    expect(retypableTailOf(shown, e(value, before))).toBe(tail);
+    expect(notLandedDiffers(shown, e(value, before))).toEqual({ kind: 'length' });
   });
 
   // the overlap form (an occurrence that only ENDS past the earlier text) would pass this: only `ld` landed
@@ -649,7 +649,7 @@ describe('without clear, the value must be in the typing past the earlier text (
     ['Hello world', 'world', 'Hello wor', 'only `ld` landed, the value across the seam'],
   ])('`%s` typed `%s` after `%s` (%s): no landing, and no tail to type again', (shown, value, before) => {
     expect(landingOf(shown, e(value, before))).toBeUndefined();
-    expect(droppedTail(shown, e(value, before))).toBeUndefined();
+    expect(retypableTailOf(shown, e(value, before))).toBeUndefined();
   });
 
   // the value typed again over itself (residual 7's shape) into a select-all field that adds a mark: the reading is the
@@ -659,20 +659,20 @@ describe('without clear, the value must be in the typing past the earlier text (
     [' 42 ', ' 42', ' 42'],
   ])('`%s` typed `%s` after `%s`: the value alone, decorated — no tail to type again', (shown, value, before) => {
     expect(landingOf(shown, e(value, before))).toBeUndefined();
-    expect(droppedTail(shown, e(value, before))).toBeUndefined();
+    expect(retypableTailOf(shown, e(value, before))).toBeUndefined();
   });
 
   // the decorated-value clause asks that the reading hold the value: a dropped trailing mark has the value's letters
   // and digits but not the value, and is typed again
   it('a typed `12/` that kept `12` (with or without an earlier text) still has its `/` typed again', () => {
-    expect(droppedTail('12', e('12/', null))).toBe('/');
-    expect(droppedTail('Note: 12', e('12/', 'Note: '))).toBe('/');
+    expect(retypableTailOf('12', e('12/', null))).toBe('/');
+    expect(retypableTailOf('Note: 12', e('12/', 'Note: '))).toBe('/');
   });
 
   // review round 2, NIT-2: the miss keeps its kind, and says it is a whole landing too, for the wording
-  it('differenceOf: `11 ` after `1` and `a1 1` after `a1` are dropped tails that are whole landings too', () => {
-    expect(differenceOf('11 ', e('11', '1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
-    expect(differenceOf('a1 1', e('1 ', 'a1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
+  it('the difference: `11 ` after `1` and `a1 1` after `a1` are dropped tails that are whole landings too', () => {
+    expect(notLandedDiffers('11 ', e('11', '1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
+    expect(notLandedDiffers('a1 1', e('1 ', 'a1'))).toEqual({ kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true, wholeToo: true });
   });
 
   // D64 code review: every shape whose tail is not typed again is marked, whatever its kind — an exact prefix reads
@@ -681,18 +681,18 @@ describe('without clear, the value must be in the typing past the earlier text (
     ['-5-', '-5', '-5'],
     [' 42 ', ' 42', ' 42'],
     ['xaa', 'aa', 'xa'],
-  ])('differenceOf: `%s` for `%s` after `%s`, no tail typed again, is a length that is a whole landing too', (shown, value, before) => {
-    expect(differenceOf(shown, e(value, before))).toEqual({ kind: 'length', wholeToo: true });
+  ])('the difference: `%s` for `%s` after `%s`, no tail typed again, is a length that is a whole landing too', (shown, value, before) => {
+    expect(notLandedDiffers(shown, e(value, before))).toEqual({ kind: 'length', wholeToo: true });
   });
 
-  it('differenceOf: a length whose tail is typed again is not marked (`Hello worldwor`, the seam `Hello world`)', () => {
-    expect(differenceOf('Hello worldwor', e('world', 'Hello world'))).toEqual({ kind: 'length' });
-    expect(differenceOf('Hello world', e('world', 'Hello wor'))).toEqual({ kind: 'length' });
+  it('the difference: a length whose tail is typed again is not marked (`Hello worldwor`, the seam `Hello world`)', () => {
+    expect(notLandedDiffers('Hello worldwor', e('world', 'Hello world'))).toEqual({ kind: 'length' });
+    expect(notLandedDiffers('Hello world', e('world', 'Hello wor'))).toEqual({ kind: 'length' });
   });
 
   it('a value only inside the earlier text is no full landing: the tail is still typed again (`Note: hellohe`, f16)', () => {
-    expect(droppedTail('Note: hellohe', e('hello', 'Note: hello'))).toBe('llo');
-    expect(droppedTail('31.12.2021', e('12', '31.12.202'))).toBe('2');
+    expect(retypableTailOf('Note: hellohe', e('hello', 'Note: hello'))).toBe('llo');
+    expect(retypableTailOf('31.12.2021', e('12', '31.12.202'))).toBe('2');
   });
 
   // ADR 0034's D64 amendment, residual R-a: on the safe side
@@ -705,10 +705,10 @@ describe('without clear, the value must be in the typing past the earlier text (
   });
 });
 
-describe('differenceOf — what a missed read-back differs by, without content', () => {
+describe('the difference — what a missed read-back differs by, without content', () => {
   /** A row: the reading, and what it is judged against. */
-  type Row = { observed: string } & Partial<Expectation> & Pick<Expectation, 'value'>;
-  const differs = ({ observed, ...f }: Row): Difference => differenceOf(observed, expecting(f));
+  type Row = { observed: string } & Asked;
+  const differs = ({ observed, ...f }: Row): Difference => notLandedDiffers(observed, expecting(f));
   const rows: [string, Row, Difference][] = [
     // 0. masked-said-plain — before unchanged: the held count was never read, so no reading proves what the field held
     ['bullets, held unread (said plain), longer than typed', { observed: '•••••••', value: 'abcd', held: 'unread' }, { kind: 'masked-said-plain' }],
@@ -780,14 +780,14 @@ describe('differenceOf — what a missed read-back differs by, without content',
 });
 
 /**
- * D28's invariant, swept: the typing and the verdict judge a prefix alike. Every reading that `tailOf` says holds some
- * of the typing, reformatted by the field, is a `dropped-tail` to `differenceOf` — with the same count landed. The
+ * D28's invariant, swept: the typing and the verdict judge a prefix alike. Every reading whose tail holds some
+ * of the typing, reformatted by the field, is a `dropped-tail` in its difference — with the same count landed. The
  * readings are every prefix of the expected text grouped as fields group it (fours, thousands from the right, pairs;
  * spaces, no-break spaces and the marks), after an earlier text, a vanished unnamed placeholder or none. D60: a prefix
  * that ends in a mark is what an eager field (a mark once a group is complete) shows after a drop, so the same prefixes
  * sweep it — an eager grouping adds no prefix of its own (only the full reading with its mark, which is no prefix).
  */
-describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
+describe('the tail and the difference agree on a dropped tail (D28)', () => {
   const groupLeft = (t: string, n: number, sep: string) => (t.match(new RegExp(`.{1,${n}}`, 'gu')) ?? []).join(sep);
   const groupRight = (t: string, n: number, sep: string) => [...groupLeft([...t].reverse().join(''), n, sep)].reverse().join('');
   // A mark's kind, all spaces one (as fill-reformat.ts#holdsMark): an added mark is one the typing holds no kind of.
