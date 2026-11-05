@@ -1,5 +1,5 @@
 import { minTapPiece } from '../../src/ui-tree/draw-order.js';
-import { rectText } from '../../src/ui-tree/geometry.js';
+import { frameText, rectText } from '../../src/ui-tree/geometry.js';
 import { firedSince, touchesSince, touchPointsText, type LiveVerdict } from './live-visibility.js';
 import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, missedTarget, presentedRemedySaid, replyKind, swipesOf, windowHintSaid } from './replies.js';
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
@@ -23,7 +23,7 @@ import { probePoint, within } from './truth.js';
 export type Source = IosTreeSourceKind | Extract<SourceKind, 'uiautomator'>;
 
 export const valueOf = (s: LabState, tag: string) => s.fields?.[tag]?.value;
-export const short = (reply: string) => reply.split('\n')[0].slice(0, 220);
+export const short = (reply: string | undefined) => (reply === undefined ? '(no reply)' : reply.split('\n')[0].slice(0, 220));
 
 /**
  * The model must hold `want` in `tag`; the last reply's claim is held to it (LOUD / MISMATCH as above). Not ok, the
@@ -332,8 +332,14 @@ export function measuredPanel(launched: LabState, strip: Rect): { panel: Rect } 
   }
 }
 
-/** The measured panel and the strip beside it, or the SKIP that says why there is none: both kf branches' one read. */
-function panelAtLaunch(launched: LabState): { panel: Rect; strip: Rect } | { skip: LiveVerdict } {
+/** The panel measured at launch and the strip beside it (the inset the app hears of). */
+interface Measured {
+  panel: Rect;
+  strip: Rect;
+}
+
+/** The measured panel and the strip beside it, or the SKIP that says why there is none: both kf branches' first read. */
+function panelAtLaunch(launched: LabState): Measured | { skip: LiveVerdict } {
   const strip = launched.keyboard?.frame;
   if (strip === undefined) return { skip: { outcome: 'SKIP', why: 'no IME at launch' } };
   const measured = measuredPanel(launched, strip);
@@ -347,24 +353,44 @@ function panelAtLaunch(launched: LabState): { panel: Rect; strip: Rect } | { ski
  * none) is averi's reading wrong — a MISMATCH, not "not run". Another panel, or none: the SKIP naming both reads, since
  * a moved panel voids the premise and the evidence alike.
  */
-export function panelAfterCalls(s: LabState, launch: Rect, strip: Rect): 'unread' | 'agreed' | { skip: LiveVerdict } {
+export function panelAfterCalls(s: LabState, { panel, strip }: Measured): AfterCalls | { skip: LiveVerdict } {
   if (s.imeTouchable === undefined) return 'unread';
   const after = measuredPanel(s, strip);
-  if ('why' in after) return { skip: { outcome: 'SKIP', why: `the panel not measured again after the calls (launch ${rectText(launch)}, after: ${after.why})` } };
-  if (sameRect(after.panel, launch)) return 'agreed';
-  return { skip: { outcome: 'SKIP', why: `the panel moved (launch ${rectText(launch)}, after ${rectText(after.panel)})` } };
+  if ('why' in after) return { skip: { outcome: 'SKIP', why: `the panel not measured again after the calls (launch ${rectText(panel)}, after: ${after.why})` } };
+  if (sameRect(after.panel, panel)) return 'agreed';
+  return { skip: { outcome: 'SKIP', why: `the panel moved (launch ${rectText(panel)}, after ${rectText(after.panel)})` } };
 }
 
+/** What the read after the calls says of the launch's panel when it does not void the case: none taken, or the same. */
+type AfterCalls = 'unread' | 'agreed';
+
 /** Each distinct quote in the reply matching `pattern` (every panel averi named, a `g` regex), or "no panel". */
-const quoted = (reply: string | undefined, pattern: RegExp): string => [...new Set([...(reply ?? '').matchAll(pattern)].map((m) => m[0]))].join(', ') || 'no panel';
-const BOTH_READS = 'the panel measured at launch and again after the calls is';
+const quoted = (reply: string, pattern: RegExp): string => [...new Set([...reply.matchAll(pattern)].map((m) => m[0]))].join(', ') || 'no panel';
+/** The MISMATCH's measured side: the one panel both reads admitted. */
+const MEASURED_TWICE = 'the panel measured at launch and again after the calls is';
+/** The pixel poll's panel quote, `keyboard x,y wxh` (src/verify/pixel-poll.ts#keyboardCovers: `keyboard ${rectText(keyboard)}`). */
+const KEYBOARD_QUOTE = /keyboard \d+,\d+ \d+x\d+/g;
+/** scroll_until's panel quote, `over [l,t][r,b]` (src/interact/scroll-text.ts: `the soft keyboard over ${frameText(…)}`). */
+const OVER_QUOTE = /over \[\d+,\d+\]\[\d+,\d+\]/g;
 /**
  * kf3's refusal as averi words it (src/interact/scroll-text.ts: `scroll_until <target> failed …` / `stopped …`, the
  * tool's ERROR prefix before it), not the device failing its tree read (TREE_READ_FAILED) and not another tool error.
  */
 const scrollVerdict = (reply: string): boolean => /^ERROR scroll_until [^\s:]/.test(reply) && !reply.includes(TREE_READ_FAILED);
-/** An averi call that errored, not a reading of the panel: a harness fault, named so (as judgeMissUnderSheet names one). */
-const harnessFault = (reply: string): LiveVerdict => ({ outcome: 'MISMATCH', why: `a harness fault, not a verdict on the panel over ks: ${short(reply)}` });
+/** An averi call that errored (or none recorded), not a reading of the panel: a harness fault, named so (as judgeMissUnderSheet names one). */
+const harnessFault = (said: string): LiveVerdict => ({ outcome: 'MISMATCH', why: `a harness fault, not a verdict on the panel over ks: ${said}` });
+
+/**
+ * A reply that does not quote the measured panel, past the reads' own checks (panelAfterCalls): with no second read
+ * (a record before D69), the one-read SKIP (`oneRead`); with both reads agreeing, a reply that is no reading of the
+ * panel (`reads` false: an errored call) a harness fault, else averi's misreading — the MISMATCH naming what it quoted
+ * (`verb`, `pattern`, `where`) and what both reads measured (`measured`). kf1/kf2's evidence and kf3's refusal alike.
+ */
+function misquoted(afterCalls: AfterCalls, reply: string, reads: boolean, q: { oneRead: string; verb: 'quoted' | 'named'; pattern: RegExp; where: string; measured: string }): LiveVerdict {
+  if (afterCalls === 'unread') return { outcome: 'SKIP', why: `${q.oneRead}: ${short(reply)}` };
+  if (!reads) return harnessFault(short(reply));
+  return { outcome: 'MISMATCH', why: `averi ${q.verb} ${quoted(reply, q.pattern)}${q.where} — ${MEASURED_TWICE} ${q.measured}: ${short(reply)}` };
+}
 
 const NOT_THE_PREMISE = "not the case's premise (the submit wholly between the panel and the strip)";
 
@@ -412,6 +438,11 @@ export const judgeFloatingGap =
   (s: LabState, replies: string[], _source: string, launched: LabState): LiveVerdict => {
     const docked = floatingAtLaunch(launched);
     if (docked !== undefined) return docked;
+    // A record short of the case's replies (live-cases.ts: kf1 two calls, kf2 three, kf3 one) holds no verdict on averi:
+    // asked once the reads are judged, right before a reply is.
+    const calls = { kf1: 2, kf2: 3, kf3: 1 }[kind];
+    const holds = `the record holds ${replies.length} of the case's ${calls} replies`;
+    const missing: LiveVerdict | undefined = replies.length >= calls ? undefined : s.imeTouchable === undefined ? { outcome: 'SKIP', why: holds } : harnessFault(holds);
     const submits = (s.submits ?? []).length;
     const touches = touchesSince(s, launched);
     const logged = `${touches.length} touch(es) the app logged${touches.length === 0 ? '' : ` at ${touchPointsText(touches)}`}`;
@@ -422,20 +453,19 @@ export const judgeFloatingGap =
       const measured = panelAtLaunch(launched);
       if ('skip' in measured) return measured.skip;
       const { panel } = measured;
-      const again = panelAfterCalls(s, panel, measured.strip);
-      if (typeof again === 'object') return again.skip;
+      const afterCalls = panelAfterCalls(s, measured);
+      if (typeof afterCalls === 'object') return afterCalls.skip;
       // Not run unless ks starts under the measured panel: elsewhere a visible claim is no evidence either way.
       if (!inPanel(launched.frames.ks, panel)) return { outcome: 'SKIP', why: `ks's centre at launch lies outside the measured panel ${rectText(panel)}` };
+      if (missing !== undefined) return missing;
       const ks = s.frames.ks;
       const where = ks == null ? 'ks not laid out' : `ks ${ks.y}–${ks.y + ks.height}`;
       if (replyKind(scroll) === 'visible' && (ks == null || inPanel(ks, panel))) return { outcome: 'MISMATCH', why: `averi says ${short(scroll)} — ks's centre lies in the measured panel (${where}); ${logged}` };
       // An ok refusal names the panel (not the 132-px strip alone): averi read the panel the launch measured.
-      const panelAsNamed = `over [${panel.x},${panel.y}][${panel.x + panel.width},${panel.y + panel.height}]`;
-      if (scroll?.includes(panelAsNamed) !== true) {
+      const panelAsNamed = `over ${frameText(panel)}`;
+      if (!scroll.includes(panelAsNamed)) {
         // Only averi's own scroll_until verdict read the panel: a failed tree read, or another error, is no reading.
-        if (again === 'agreed' && isError(scroll) && !scrollVerdict(scroll)) return harnessFault(scroll);
-        if (again === 'agreed') return { outcome: 'MISMATCH', why: `averi named ${quoted(scroll, /over \[\d+,\d+\]\[\d+,\d+\]/g)} — ${BOTH_READS} ${panelAsNamed}: ${short(scroll)}` };
-        return { outcome: 'SKIP', why: `averi's reply does not name the measured panel ${panelAsNamed}: ${short(scroll)}` };
+        return misquoted(afterCalls, scroll, !isError(scroll) || scrollVerdict(scroll), { oneRead: `averi's reply does not name the measured panel ${panelAsNamed}`, verb: 'named', pattern: OVER_QUOTE, where: '', measured: panelAsNamed });
       }
       return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panel (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
     }
@@ -445,15 +475,14 @@ export const judgeFloatingGap =
     const measured = panelAtLaunch(launched);
     if ('skip' in measured) return measured.skip;
     const { panel, strip } = measured;
-    const again = panelAfterCalls(s, panel, strip);
-    if (typeof again === 'object') return again.skip;
+    const afterCalls = panelAfterCalls(s, measured);
+    if (typeof afterCalls === 'object') return afterCalls.skip;
     const premise = gapPremise(launched.frames.submit, panel, strip);
     if ('why' in premise) return { outcome: 'SKIP', why: premise.why };
-    if (evidence?.includes(`keyboard ${rectText(panel)}`) !== true) {
+    if (missing !== undefined) return missing;
+    if (!evidence.includes(`keyboard ${rectText(panel)}`)) {
       // An errored assert ran no poll: it never read the panel.
-      if (again === 'agreed' && isError(evidence)) return harnessFault(evidence);
-      if (again === 'agreed') return { outcome: 'MISMATCH', why: `averi quoted ${quoted(evidence, /keyboard \d+,\d+ \d+x\d+/g)} over ks — ${BOTH_READS} ${rectText(panel)}: ${short(evidence)}` };
-      return { outcome: 'SKIP', why: `averi's reply does not quote the measured panel ${rectText(panel)} over ks: ${short(evidence)}` };
+      return misquoted(afterCalls, evidence, !isError(evidence), { oneRead: `averi's reply does not quote the measured panel ${rectText(panel)} over ks`, verb: 'quoted', pattern: KEYBOARD_QUOTE, where: ' over ks', measured: rectText(panel) });
     }
     if (replyKind(scroll) !== 'visible') return { outcome: 'MISMATCH', why: `refused, though the submit lies wholly between the panel and the strip: ${short(scroll)}` };
     // kf2's one touch is its tap, sent after the scroll; any other is a stroke.

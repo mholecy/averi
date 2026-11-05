@@ -101,10 +101,19 @@ calls are done, onto the final state (`state.imeTouchable`, the same `withMeasur
   P" (kf3: "averi named over [..][..] …"), every distinct panel averi quoted named; an averi call that errored (an
   assert that ran no poll; for kf3, an error that is not averi's own `scroll_until <target> …` verdict, or one whose
   tree read failed, scroll-text.ts#TREE_READ_FAILED) is "a harness fault, not a verdict on the panel over
-  ks", as the picker-sheet cases name one;
+  ks", as the picker-sheet cases name one; so is a record short of the case's replies (a SKIP with no second read);
+  a visible kf3 stop is ok only when it names the panel it was judged above (`, judged above the soft keyboard over
+  [l,t][r,b]`);
 - no second read (every record before D69): judged as before, the misquote SKIP word for word.
 
 The 3-s `late` re-read reads the app only, so `live-cases.ts#judged` carries the second read onto it
 (`lateWithPanel`): a later read cannot turn the MISMATCH into the SKIP of a record with one read. The branches are
 pinned on the fu1 record and batch-11's fixture (tests/truth/live-forms.test.ts, "D69"), the second region given per
 test; the MISMATCH cannot be provoked on the device without injecting a fault. One adb shell more per kf case.
+
+One parser, one command (D69's second part): the capture's `truth.ts#imePanels` now parses the touchable dump with
+averi's own `parseInputShown` and `parseTouchableRegion`, but keeps the harness's own rule (every rect but the band,
+never `panelsBeyond`: ground truth must not use the rule it checks); both committed `.ime.json` captures read as
+before. `AndroidLab.ime` sends averi's `INPUT_SHOWN_COMMAND` (exported from src/adapters/android.ts), no copy of it.
+
+Live check: pending (lab, one kf case).

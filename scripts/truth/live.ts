@@ -206,7 +206,9 @@ if (rejudging !== undefined) {
           continue;
         }
         // The first of the two device reads the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel).
-        if (c.measuresPanel && android !== undefined) launched = await withMeasuredPanel(launched, android);
+        // The kf cases' panel reads, on the Android lab only.
+        const panelLab = c.measuresPanel === true ? android : undefined;
+        if (panelLab !== undefined) launched = await withMeasuredPanel(launched, panelLab);
         const config = await configFor(source, c);
         const replies: string[] = [];
         const after: (LabState | undefined)[] = [];
@@ -221,7 +223,7 @@ if (rejudging !== undefined) {
         const read = stamped(await lab.state())!;
         // The second (D69): the panel again once the calls are done, kept on the final state — the judge holds the two
         // reads to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged).
-        const state = c.measuresPanel && android !== undefined ? await withMeasuredPanel(read, android) : read;
+        const state = panelLab !== undefined ? await withMeasuredPanel(read, panelLab) : read;
         let late: LabState | undefined;
         if (c.group !== 'visibility' && c.judge(state, replies, source, launched, after).outcome !== 'ok') {
           await pause(3_000);

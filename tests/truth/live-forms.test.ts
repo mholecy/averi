@@ -425,6 +425,25 @@ describe('D69: the panel read again after the calls — moved is SKIP naming bot
     }
   });
 
+  it('kf3: a visible stop with ks clear of the panel, over two agreeing reads — ok only when the stop names the panel it was judged above (scroll-text.ts: ", judged above the soft keyboard over [l,t][r,b]")', () => {
+    const { launched, state } = twice(fu1, 'kf3', FU1_REGION, FU1_REGION);
+    const clear = { ...state, frames: { ...state.frames, ks: { x: 55, y: 1100, width: 970, height: 99 } } };
+    const stop = 'Element id:"lab.form-keyboard-floating.ks" fully visible after 1 swipe';
+    expect(judgeFloatingGap('kf3')(clear, [`${stop}, judged above the soft keyboard over [359,1269][1040,1912]`], 'uiautomator', launched)).toMatchObject({ outcome: 'ok', why: expect.stringMatching(/^stopped with ks's centre clear of the measured panel \(ks 1100–1199\)/) });
+    expect(judgeFloatingGap('kf3')(clear, [stop], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi named no panel — /) });
+  });
+
+  it('a record missing a reply is judged, not thrown: a harness fault where the reads agree, the one-read SKIP where there is no second read', () => {
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { replies, launched, state } = twice(fu1, id, FU1_REGION, FU1_REGION);
+      const short = replies.slice(0, -1);
+      const verdict = judgeFloatingGap(id)(state, short, 'uiautomator', launched);
+      expect(verdict).toEqual({ outcome: 'MISMATCH', why: `a harness fault, not a verdict on the panel over ks: the record holds ${short.length} of the case's ${replies.length} replies` });
+    }
+    const { replies, launched, state } = floated(fu1, 'kf1', FU1_REGION);
+    expect(judgeFloatingGap('kf1')(state, [], 'uiautomator', launched)).toEqual({ outcome: 'SKIP', why: `the record holds 0 of the case's ${replies.length} replies` });
+  });
+
   it('(b) the MISMATCH names every panel averi quoted, the strip first or not', () => {
     const { replies, launched, state } = twice(fu1, 'kf1', FU1_REGION, FU1_REGION);
     const both = replies[0].replace('keyboard 359,1269 681x643', 'keyboard 0,2088 1080x132, keyboard 87,1243 937x792');
