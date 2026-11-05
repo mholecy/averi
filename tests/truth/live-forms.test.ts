@@ -1018,7 +1018,6 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
   it('refusedOnFocus: the inserted text not held — LOUD loud-changed (keys landed, or nothing inserted); held but another error, or no claim — LOUD loud-untouched', () => {
     const judge = refusedOnFocus('dialRefuses', '+421 ');
     expect(judge(syntheticLeft('dialRefuses', '+421 421'), [UNCHANGED], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed' });
-    expect(judge(syntheticLeft('dialRefuses', ''), ['ERROR fill: typed 3 characters but the field shows 0'], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed' });
     expect(judge(syntheticLeft('dialRefuses', '+421 '), ['ERROR fill: typed 3 characters but the field shows 5'], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched', kind: 'refused' });
     expect(judge(syntheticLeft('dialRefuses', '+421 '), ['Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) — NOT verified: the field could not be read'], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
     // The words without an error are no refusal: a NOT verified reply saying them is LOUD, not ok.
@@ -1032,6 +1031,17 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     const v = judge(syntheticLeft('dialRefuses', '+421 421'), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED);
     expect(v).toEqual({ outcome: 'SKIP', why: 'lab fault: the field took the keys (holds "+421 421")' });
     expect(knownLive('android', 'uiautomator', 'fp2', v.cls, v.kind)).toBeUndefined();
+  });
+
+  it('refusedOnFocus (code review): no prefix inserted is the premise failed — SKIP whatever averi replied, checked first; a missing field said so, not "holds undefined"', () => {
+    const judge = refusedOnFocus('dialRefuses', '+421 ');
+    const NOT_INSERTED = { outcome: 'SKIP', why: 'lab fault: the field did not insert its prefix (holds "")' };
+    const MISSING = { outcome: 'SKIP', why: 'lab fault: the field did not insert its prefix (is missing from the app\'s state)' };
+    const missing: LabState = { ...SYNTHETIC_LAUNCHED, fields: { dialLands: SYNTHETIC_LAUNCHED.fields!.dialLands } };
+    for (const reply of [UNCHANGED, 'ERROR fill: typed 3 characters but the field shows 0', FILLED('dialRefuses'), 'Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) — NOT verified: the field could not be read']) {
+      expect(judge(syntheticLeft('dialRefuses', ''), [reply], 'idb', SYNTHETIC_LAUNCHED), reply).toEqual(NOT_INSERTED);
+      expect(judge(missing, [reply], 'uiautomator', SYNTHETIC_LAUNCHED), reply).toEqual(MISSING);
+    }
   });
 
   it('refusedOnFocus (review round 2): the lab fault worded by what the field holds — empty, no prefix inserted; the prefix and more, the keys taken; else neither', () => {

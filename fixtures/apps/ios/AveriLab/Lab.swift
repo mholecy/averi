@@ -75,6 +75,8 @@ struct FieldSpec: Decodable, Identifiable {
     let focusInsert: String?
     /// D64b: `refused` — the field refuses every key (schema.ts#CatalogField.keys).
     let keys: String?
+    /// `keys: refused` (Forms.kt's `keysRefused`).
+    var keysRefused: Bool { keys == "refused" }
 
     var id: String { tag }
 }

@@ -157,14 +157,14 @@ struct FormScreen: View {
     /// may keep showing it (D28's trap), the screen and the model apart.
     @ViewBuilder private func input(_ f: FieldSpec) -> some View {
         let placeholder = f.placeholder ?? ""
-        if f.format != nil || f.focusInsert != nil || f.keys == "refused", f.kind != "pin", f.kind != "country" {
+        if f.format != nil || f.focusInsert != nil || f.keysRefused, f.kind != "pin", f.kind != "country" {
             FormattingTextField(
                 id: fieldID(f),
                 placeholder: placeholder,
                 format: f.format,
                 keyboard: f.kind == "amount" ? .decimalPad : .default,
                 focusInsert: f.focusInsert,
-                refusesKeys: f.keys == "refused",
+                refusesKeys: f.keysRefused,
                 text: binding(f.tag)
             ) { on in
                 if on { editing = f.tag } else if editing == f.tag { editing = nil }
