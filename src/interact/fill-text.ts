@@ -255,7 +255,7 @@ const LOST_WHY_TEXT: Record<LostWhy, string> = {
   unmatched: ' (the selector no longer matches it)',
 };
 
-/** D64b-3's clause, the words the truth harness holds a hedged Filled to (scripts/truth/replies.ts#focusTextNotReadSaid). */
+/** D64b-3's clause, the words the truth harness holds a hedged Filled to (`focusTextNotReadSaid` in scripts/truth/replies.ts). */
 export const FOCUS_TEXT_NOT_READ = 'its text after focus was not read';
 
 const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
