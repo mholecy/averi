@@ -1,6 +1,6 @@
 import { basename, dirname, join } from 'node:path';
 import type { CallResult } from './bounded.js';
-import { firstLineOf, nameInLine, stepLine, verdictLine } from './words.js';
+import { exitText, nameInLine, stepLine, verdictLine } from './words.js';
 
 /**
  * The lab simulator's settings as values and words, pure (no Run, no file): what ios-domains.ts reads, decides and
@@ -359,12 +359,6 @@ export function stateIn(text: string | undefined): DomainsState | string {
 }
 
 // --------------------------------------------------------------------------------------- what defaults said
-
-/** A failed call in words: `exit n <its first line>`, or that it passed its bound. */
-export const exitText = (r: CallResult): string => {
-  const said = firstLineOf(r.err + r.out);
-  return `${r.timedOut ? `past its bound (exit ${r.code})` : `exit ${r.code}`}${said === '' ? '' : ` ${said}`}`;
-};
 
 /** A regex's text for `s` taken literally. */
 const literal = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

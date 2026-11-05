@@ -15,7 +15,6 @@ import {
   domainHand,
   domainPart,
   DOMAINS,
-  exitText,
   HAND_PREFIX,
   LAB_WDA_PORT,
   LATE_HAND_PREFIX,
@@ -38,7 +37,7 @@ import {
   type KeyVal,
   type ProtectedRead,
 } from './ios-defaults.js';
-import { firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './words.js';
+import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './words.js';
 
 /**
  * The lab simulator's settings around the WDA window (batch-10's D43 gate, batch-11's WDA window), over the
