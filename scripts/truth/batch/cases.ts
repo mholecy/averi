@@ -55,8 +55,8 @@ const LIVE_SHAPE = 'is not what a live run is asked (platform ios or android, ap
  * Write `<dir>/<name>.cases`: what the live run is asked, as JSON. Called before anything of the run is done. Only a
  * live run's (`Asked`, checked at run time too: nothing is written for anything else): runsIn and completeness read
  * every `.cases` as one, so a non-live block keeps its own record elsewhere (batch-12's E5 wrote `{"runs":3}`; the
- * runner's, S6). Never overwritten (io.ts's exclusive create): a run folder is never reused, so a second .cases of one
- * name is the batch's mistake. Returns its path.
+ * runner's asks and record, T2 S6a). Never overwritten (io.ts's exclusive create): a run folder is never reused, so a
+ * second .cases of one name is the batch's mistake. Returns its path.
  */
 export function writeCases(fs: BatchFs, dir: string, name: string, asked: Asked): string {
   plainSegment('run name', name);
@@ -230,10 +230,16 @@ export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: Ba
 /**
  * The block's INCONCLUSIVE when a run it asked is not complete: `<label>: INCONCLUSIVE — <k> of <n> run(s) incomplete:
  * <name> — <why> | …`; and when it asked none (no `.cases` in its folder), `not run`, never no line at all. Undefined
- * when every run is complete: then the analyzer judges.
+ * when every run is complete: then the analyzer judges. A run is a live run's Completeness, or any other result of that
+ * shape (runner.ts: a non-live block's record, T2 S6a); `none` is the why when nothing was asked (the runner's backstop
+ * gives its own: one rule, two wordings).
  */
-export function incompleteLine(label: string, runs: readonly { name: string; result: Completeness }[]): string | undefined {
-  if (runs.length === 0) return verdictLine(label, 'INCONCLUSIVE', 'not run: no .cases in its folder (nothing was asked)');
+export function incompleteLine(
+  label: string,
+  runs: readonly { name: string; result: { ok: true; asked?: Asked } | { ok: false; why: string } }[],
+  none = 'not run: no .cases in its folder (nothing was asked)',
+): string | undefined {
+  if (runs.length === 0) return verdictLine(label, 'INCONCLUSIVE', none);
   const bad = runs.flatMap((r) => (r.result.ok ? [] : [`${nameInLine(r.name)} — ${r.result.why}`]));
   return bad.length === 0 ? undefined : verdictLine(label, 'INCONCLUSIVE', `${bad.length} of ${runs.length} run(s) incomplete: ${bad.join(' | ')}`);
 }

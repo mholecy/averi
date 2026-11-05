@@ -3,7 +3,7 @@ import type { BatchFs } from './io.js';
 import type { ProcessSeam } from './proc.js';
 import { stateOf, writeRestore } from './run-dir.js';
 import type { StepLog } from './steps.js';
-import { EXIT, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine, type BlockReport } from './words.js';
+import { EXIT, firstLineOf, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine, type BlockReport } from './words.js';
 
 /**
  * The dirty windows, and what stops a run inside one: batch-6's `on_abort`, batch-7's TRAPEXIT, batch-11's detached
@@ -77,8 +77,11 @@ export interface WindowSpec {
 /** A wanted block, as the abort SUMMARY sees it. */
 export interface AbortBlock {
   block: string;
-  /** Its records complete, so it can be judged without a device (batch-12's block_complete). */
-  complete(): boolean;
+  /**
+   * Its records complete, so it can be judged without a device (batch-12's block_complete): true; else false, or why
+   * not (a string, said in its INTERRUPTED line). Its reading may be async; it is read within the judges' budget.
+   */
+  complete(): boolean | string | Promise<boolean | string>;
   /** Its verdict lines, judged now — device-free, through the detached runner (batch-12's b12-analyze.ts). */
   judge(run: Run): Promise<readonly string[]>;
   /** The lines it wrote before the interrupt (its verdict.txt). */
@@ -93,8 +96,8 @@ export interface AbortGuardOptions {
   seam: ProcessSeam;
   /** run-dir.ts#layoutOf's restoreFile. */
   restoreFile: string;
-  /** The SUMMARY's fixed lines, read when it is written. */
-  head(): { checkout: string; labs: readonly string[]; protectedLines: readonly string[] };
+  /** The SUMMARY's fixed lines and, when given, its ERROR section (AbortHead), read when it is written. */
+  head(): AbortHead;
   /** The wanted blocks, in the batch's order. */
   blocks: readonly AbortBlock[];
   clock?: () => Date;
@@ -104,6 +107,15 @@ export interface AbortGuardOptions {
   installSecs?: number;
   /** The judges' one budget in seconds, for all blocks together (120 by default). */
   judgeBudgetSecs?: number;
+}
+
+/** What the abort SUMMARY says besides the blocks: the checkout line, the lab lines, the protected keys', ERRORs. */
+export interface AbortHead {
+  checkout: string;
+  labs: readonly string[];
+  protectedLines: readonly string[];
+  /** Its whole ERROR section (runner.ts: the steps' and the logs', counted together); none: the steps' ERROR lines. */
+  errors?: readonly string[];
 }
 
 /** A restore's bound when its window names none (batch-12's B_RESTORE). */
@@ -179,6 +191,11 @@ export class AbortGuard {
     });
   }
 
+  /** Whether the abort has begun: the runner then starts no block and prints no SUMMARY of its own. */
+  get interrupted(): boolean {
+    return this.aborting !== undefined;
+  }
+
   /** A probe, bounded in a group of its own; the abort stops it. */
   get bounded(): Run {
     return this.calls.bounded;
@@ -249,6 +266,19 @@ export class AbortGuard {
   }
 
   /**
+   * State a block leaves not provably put back outside any window (S4's compare: a late writer after the restore): its
+   * hand lines appended to RESTORE now, under `<name> run <id> left by <block> at <date>`, and said as an ERROR. The
+   * SUMMARY's RESTORE section and the exit code count them (finish's return, the abort's SUMMARY). While the abort runs
+   * too: a hand line is never dropped. A RESTORE that cannot be written sends them to stderr once, as the abort does.
+   * Returns the lines written; none for no hand line.
+   */
+  leave(block: string, hand: readonly string[]): string[] {
+    const written = this.writeRestore(`left by ${block}`, hand);
+    if (written.length > 0) this.say('ERROR', `${block}: state not provably put back — the hand commands are in ${this.options.restoreFile}`);
+    return written;
+  }
+
+  /**
    * End the kept groups (idb_companion) of `owner`'s calls (Call.owner), or all when none is given: a block done with
    * its companion ends it, as batch-12 did after each iOS block. A kill not delivered is said at once and gets its
    * RESTORE line at the next write (finish or the abort).
@@ -293,7 +323,10 @@ export class AbortGuard {
     return [...byGroup.values()].map((u) => `group ${u.pid} may still be running: kill -9 -${u.pid}, then check ${u.owner ?? whoseState(names)}`);
   }
 
-  private writeRestore(how: 'ended' | 'interrupted', hand: readonly string[]): string[] {
+  /**
+   * `how`: ended (finish, which throws when it cannot write), interrupted (the abort), or `left by <block>` (leave).
+   */
+  private writeRestore(how: 'ended' | 'interrupted' | `left by ${string}`, hand: readonly string[]): string[] {
     const { name, runId, restoreFile, fs } = this.options;
     const now = this.now();
     const header = `${name} run ${runId} ${how} at ${dateOf(now)} ${timeOf(now)}`;
@@ -347,7 +380,8 @@ export class AbortGuard {
       // RESTORE: its line is appended. stopKept never rejects (bounded.ts turns every kill failure into a result).
       await this.calls.stopKept();
       this.writeRestore('interrupted', this.undeliveredHand(names));
-      log.summary(summaryLines({ ...this.headOf(), name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors: log.errors(), interrupted: { at: timeOf(at) } }));
+      const { errors = log.errors(), ...head } = this.headOf();
+      log.summary(summaryLines({ ...head, name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors, interrupted: { at: timeOf(at) } }));
     } catch (e) {
       // The abort's own failure (its SUMMARY could not be written): said on stderr, and the exit is 130 still.
       seam.stderr(`${this.options.name}: the abort failed: ${messageOf(e)}\n`);
@@ -419,16 +453,17 @@ export class AbortGuard {
     const budget = this.options.judgeBudgetSecs ?? JUDGE_BUDGET_SECS;
     const until = Date.now() + budget * 1000;
     const spent = `the abort's judging budget of ${budget} s was spent`;
-    let skip = lateRestore ? 'a restore passed its bound, so the abort judges nothing more' : undefined;
+    const skip = lateRestore ? 'a restore passed its bound, so the abort judges nothing more' : undefined;
     const reports: BlockReport[] = [];
     for (const b of this.options.blocks) {
       let report: BlockReport;
-      if (cut.has(b.block) || !this.completeOf(b)) report = { block: b.block, lines: b.linesSoFar(), interrupted: true };
+      // One budget for reading each block's completeness and judging it: none left, nothing more is read.
+      const left = (until - Date.now()) / 1000;
+      const c = cut.has(b.block) ? {} : left <= 0 ? { why: spent } : await this.completeOf(b, left);
+      if (c !== true) report = { block: b.block, lines: b.linesSoFar(), interrupted: true, why: c.why };
       else {
-        const left = (until - Date.now()) / 1000;
-        if (skip === undefined && left <= 0) skip = spent;
-        // A judge past what was left spent the budget: the next block finds none left.
-        const judged = skip === undefined ? await this.judged(b, left) : { why: skip };
+        // A judge past what was left spent the budget (within settles late at once on none): the next finds none left.
+        const judged = skip === undefined ? await this.judged(b, (until - Date.now()) / 1000) : { why: skip };
         if (judged === 'late') report = { block: b.block, lines: b.linesSoFar(), interrupted: true, why: spent };
         else report = 'lines' in judged ? { block: b.block, lines: judged.lines } : { block: b.block, lines: b.linesSoFar(), interrupted: true, why: judged.why };
       }
@@ -439,12 +474,20 @@ export class AbortGuard {
     return reports;
   }
 
-  private completeOf(b: AbortBlock): boolean {
+  /**
+   * Whether a block is complete, read within `left` seconds of the judges' budget (T2 S6a review round 6): true; or not,
+   * and why when known — its own why, `completeness not read in time`, or a throw's first line.
+   */
+  private async completeOf(b: AbortBlock, left: number): Promise<true | { why?: string }> {
+    let r: Awaited<ReturnType<typeof within<boolean | string>>>;
     try {
-      return b.complete();
-    } catch {
-      return false;
+      r = await within(left, Promise.resolve().then(() => b.complete()));
+    } catch (e) {
+      return { why: `completeness not read: ${firstLineOf(messageOf(e))}` };
     }
+    if (r.late) return { why: 'completeness not read in time' };
+    if (r.value === true) return true;
+    return typeof r.value === 'string' ? { why: r.value } : {};
   }
 
   /** A block judged within what is left of the budget: its lines; or why not; or `late`, its calls stopped. */
@@ -462,7 +505,7 @@ export class AbortGuard {
     }
   }
 
-  private headOf(): { checkout: string; labs: readonly string[]; protectedLines: readonly string[] } {
+  private headOf(): AbortHead {
     try {
       return this.options.head();
     } catch (e) {

@@ -8,7 +8,7 @@ import { firstLineOf, messageOf, nameInLine, verdictLine } from './words.js';
  * block needs is an ancestor of it; the live cases and lab cells it uses are main's. One that is not shown makes the
  * block INCONCLUSIVE, naming why (`preconditionLine`) — never a number from a run whose premise does not hold
  * (batch-2-README: "it gives INCONCLUSIVE rather than a number"). batch-12 refused to start on a failed checkout or
- * ancestry instead; which a batch does with the result is its own (the runner, S6), the result is the same.
+ * ancestry instead; runner.ts (T2 S6a) makes the blocks INCONCLUSIVE, batch-11's way; the result is the same.
  *
  * Every answer is git's, read through a bounded call (bounded.ts, git's own 30 s bound): never a grep of a symbol in
  * the sources (batch-11-README:101), and never git run unbounded, as batch-11's was. The cases and cells are read from

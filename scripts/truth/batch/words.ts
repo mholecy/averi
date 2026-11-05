@@ -8,8 +8,8 @@ import type { CallResult } from './bounded.js';
  * first: `kf live verdict: INCONCLUSIVE — the premise does not hold`. The SUMMARY gathers the run's verdict lines in a
  * fixed order between two markers; whoever waits for a batch waits for `======== SUMMARY` (unchanged since batch-1).
  *
- * Not here yet (backlog T2): the ERROR lines batch-12 collected from each block's logs and analyze.txt — the runner
- * (slice S6) knows those files and hands them in with `errors`. The RESTORE block needs no `grep "run $RUN_ID"`
+ * The ERROR lines batch-12 collected from each block's logs and analyze.txt are the runner's to read (runner.ts, T2
+ * S6a): it knows those files and hands them in with `errors`. The RESTORE block needs no `grep "run $RUN_ID"`
  * filter any more: a run refuses to start while a RESTORE file exists (run-dir.ts#refusals) and only appends to it,
  * so what it prints is what this run wrote (`restore.written`, header line included, as batch-12's `cat`).
  */
@@ -31,8 +31,12 @@ export type Verdict = (typeof VERDICTS)[number];
 /** The SUMMARY's opening marker. Its end marker starts with it too: `======== SUMMARY end (run <id>)`. */
 export const SUMMARY_MARKER = '======== SUMMARY';
 
-/** A batch's exit codes: 2 refused to start (nothing done, no SUMMARY); 130 interrupted (the abort SUMMARY printed). */
-export const EXIT = { ok: 0, failed: 1, refused: 2, interrupted: 130 } as const;
+/**
+ * A batch's exit codes: 1 a FAIL or a RESTORE; 2 nothing done — either refused to start (no SUMMARY), or no wanted
+ * block ran (a failed checkout, every need or precondition failed: the SUMMARY, with NONE_RAN_LINE after each block's
+ * why); 130 interrupted (the abort SUMMARY printed).
+ */
+export const EXIT = { ok: 0, failed: 1, nothingDone: 2, interrupted: 130 } as const;
 
 const LINE_BREAK = /[\n\r]/;
 
@@ -45,7 +49,7 @@ export function oneLine(line: string, what = 'a line'): string {
 /** A step line: the word padded to four, then the text (`OK   x`, `DONE x`, `ERROR x`). */
 export const stepLine = (word: StepWord, text: string): string => `${word.padEnd(4)} ${text}`;
 
-/** What every refusal line ends with: the batch exits 2 (EXIT.refused) and has done nothing. */
+/** What every refusal line ends with: the batch exits 2 (EXIT.nothingDone) and has done nothing. */
 export const NOTHING_DONE = ' — nothing was done';
 
 /** A refusal: `ERROR <text> — nothing was done`. */
@@ -136,6 +140,8 @@ export interface Summary {
   errors: readonly string[];
   /** Set when the run was interrupted: the time of the interrupt (HH:MM:SS). */
   interrupted?: { at: string };
+  /** No wanted block ran (runner.ts, T2 S6a review round 1): the exit is 2, never success. */
+  noneRan?: boolean;
 }
 
 /**
@@ -147,6 +153,12 @@ export const interruptedBlock = (block: string, linesSoFar: readonly string[], w
   verdictLine(block, 'INTERRUPTED', why === undefined ? `its records are not complete, not judged (rerun ONLY=${block})` : `not judged (${why}; rerun ONLY=${block})`),
 ];
 
+/**
+ * The SUMMARY's line, after the blocks', whenever no wanted block ran (T2 S6a review rounds 2, 3): it names no exit
+ * code, which is exitCodeOf's — 2, or 1 when a RESTORE was written.
+ */
+export const NONE_RAN_LINE = "NOTE no wanted block ran (each one's why above)";
+
 /** The SUMMARY's body, before deduplication. */
 function bodyOf(s: Summary): string[] {
   return [
@@ -154,6 +166,7 @@ function bodyOf(s: Summary): string[] {
     ...(s.interrupted === undefined ? [] : [`INTERRUPTED: ${s.name} run ${s.runId} was interrupted at ${s.interrupted.at}`]),
     ...s.labs,
     ...s.blocks.flatMap((b) => (b.interrupted === true ? interruptedBlock(b.block, b.lines, b.why) : b.lines)),
+    ...(s.noneRan === true ? [NONE_RAN_LINE] : []),
     ...s.protectedLines,
     ...(s.restore.written.length === 0 ? ['RESTORE: none — everything dirty was put back and verified'] : [`RESTORE: state not provably put back — ${s.restore.file}:`, ...s.restore.written]),
     ...s.errors,
@@ -171,13 +184,15 @@ export function summaryLines(s: Summary): string[] {
 }
 
 /**
- * The run's exit code: 130 when interrupted, whatever else; 1 when any SUMMARY line but an ERROR line says FAIL or
- * this run wrote a RESTORE; else 0. (Refused to start: EXIT.refused, with no SUMMARY.) An ERROR line, an INCONCLUSIVE
- * or a SKIP alone exits 0: the SUMMARY says it, the exit code is for a FAIL or for state left on a device.
+ * The run's exit code: 130 when interrupted, whatever else; 1 when any SUMMARY line but an ERROR line says FAIL or this
+ * run wrote a RESTORE; 2 when no wanted block ran ("nothing was done": an agent reading only the exit code must not see
+ * success); else 0. (Refused to start: EXIT.nothingDone too, with no SUMMARY.) An ERROR line, an INCONCLUSIVE or a SKIP
+ * alone exits 0 when a block ran: the SUMMARY says it, the exit code is for a FAIL or for state left on a device.
  */
-export function exitCodeOf(s: Summary): 0 | 1 | 130 {
+export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
   if (s.interrupted !== undefined) return EXIT.interrupted;
   if (s.restore.written.length > 0) return EXIT.failed;
   const judged = [s.checkout, ...s.labs, ...s.blocks.flatMap((b) => b.lines), ...s.protectedLines];
-  return judged.some(failsIn) ? EXIT.failed : EXIT.ok;
+  if (judged.some(failsIn)) return EXIT.failed;
+  return s.noneRan === true ? EXIT.nothingDone : EXIT.ok;
 }

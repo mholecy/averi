@@ -2,8 +2,8 @@ import { refusedLine, stepLine } from './words.js';
 
 /**
  * What a run does, decided before anything is done: which blocks (ONLY=) and with which knobs. Pure — the env is a
- * plain record. A refusal is a list of lines for the batch to print before it exits 2 (words.ts#EXIT.refused), with no
- * device call, no build and no folder made.
+ * plain record. A refusal is a list of lines for the batch to print before it exits 2 (words.ts#EXIT.nothingDone), with
+ * no device call, no build and no folder made.
  */
 
 /** The blocks a run does, in the batch's order; or why it must not start. */
