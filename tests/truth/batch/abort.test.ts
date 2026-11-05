@@ -1063,11 +1063,20 @@ describe('interrupted — whether the abort has begun, for the runner\'s body (T
   });
 });
 
-describe('head\'s errors — the run\'s other ERROR lines (its blocks\' logs) in the abort SUMMARY, after this run\'s steps (T2 S6a, batch-12.sh:668)', () => {
-  it('appended after the step log\'s ERROR lines, each once', async () => {
-    const guard = guardOf(undefined, { head: () => ({ checkout: CHECKOUT, labs: [], protectedLines: [], errors: ['ERROR from a probe log', 'ERROR from a probe log'] }) });
+describe('head\'s errors — the abort SUMMARY\'s ERROR section when the runner gives one (T2 S6a code review: the steps\' and the logs\' counted together)', () => {
+  it('given, it is the whole section, read when the SUMMARY is written (the steps\' lines then included); none given: the steps\' ERROR lines', async () => {
+    let at: string[] = [];
+    const guard = guardOf(undefined, { head: () => ({ checkout: CHECKOUT, labs: [], protectedLines: [], errors: (at = [...log.errors(), 'ERROR from a probe log (×2, in kf/p.log)']) }) });
     await interrupt(guard);
     const lines = summaryText().split('\n');
-    expect(lines.slice(-4)).toEqual(['09:44:26 ERROR batch-n interrupted (run 1) by SIGINT', 'ERROR from a probe log', '======== SUMMARY end (run 1, INTERRUPTED)', '']);
+    expect(at[0]).toBe('09:44:26 ERROR batch-n interrupted (run 1) by SIGINT');
+    expect(lines.slice(-4)).toEqual(['09:44:26 ERROR batch-n interrupted (run 1) by SIGINT', 'ERROR from a probe log (×2, in kf/p.log)', '======== SUMMARY end (run 1, INTERRUPTED)', '']);
+  });
+
+  it('the runner\'s section replaces the steps\' own lines: a step line it counted in is not printed twice', async () => {
+    const guard = guardOf(undefined, { head: () => ({ checkout: CHECKOUT, labs: [], protectedLines: [], errors: ['09:44:26 ERROR batch-n interrupted (run 1) by SIGINT (×2, in steps.log, kf/p.log)'] }) });
+    await interrupt(guard);
+    expect(summaryText().split('\n').slice(-3)).toEqual(['09:44:26 ERROR batch-n interrupted (run 1) by SIGINT (×2, in steps.log, kf/p.log)', '======== SUMMARY end (run 1, INTERRUPTED)', '']);
+    expect(summaryText().split('\n')).not.toContain('09:44:26 ERROR batch-n interrupted (run 1) by SIGINT');
   });
 });

@@ -618,10 +618,35 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(summary()).toContain('kf live verdict: INCONCLUSIVE — its 1 run(s) are complete, but no verdict line was written (see the ERROR lines)');
   });
 
+  it('a block whose live run died is not judged: its judge\'s PASS never hides the gap; incompleteLine says it (code review c1)', async () => {
+    seam.rules = [git(), probes, live({ code: 2, header: false, noRecord: true })];
+    const judged: string[] = [];
+    await go([kfBlock({ judge: async () => (judged.push('kf'), ['kf live verdict: PASS']) })]);
+    expect(judged).toEqual([]);
+    expect(summary().find((l) => l.startsWith('kf live verdict:'))).toMatch(/^kf live verdict: INCONCLUSIVE — 1 of 1 run\(s\) incomplete: android-kf-1 — no record/);
+  });
+
+  it('a block whose record does not match what it asked is not judged either', async () => {
+    const judged: string[] = [];
+    await go([plain('E5', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 3 }), ctx.record('c', { kind: 'runs', runs: 2 })), judge: async () => (judged.push('E5'), ['E5 verdict: PASS']) })]);
+    expect(judged).toEqual([]);
+    expect(summary()).toContain('E5 verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: c — asked 3 run(s), recorded 2');
+  });
+
+  it('a block that asked nothing is judged only when it declared it records nothing (noRecords), once its run returned', async () => {
+    const judged: string[] = [];
+    const j = (id: string) => async () => (judged.push(id), [`${id} verdict: PASS`]);
+    await go([plain('a', { run: async () => {}, judge: j('a') }), plain('b', { run: async () => {}, noRecords: true, judge: j('b') })]);
+    expect(judged).toEqual(['b']);
+    expect(summary()).toContain('a verdict: INCONCLUSIVE — not run (see the ERROR lines)');
+    expect(summary()).toContain('b verdict: PASS');
+  });
+
   it('the judges run after finish: every window still open written to RESTORE and the kept groups ended first (review round 1)', async () => {
     let seen: { restore: boolean; signals: string[] } | undefined;
     await go([
       plain('a', {
+        noRecords: true,
         run: async (ctx) => (ctx.open('W', { hand: ['W: by hand'], restore: async () => ({ ok: true, how: 'x' }) }), void (await ctx.bounded('idb', ['a'], { secs: 5 }))),
         judge: async () => ((seen = { restore: existsSync(join(out, 'RESTORE.txt')), signals: [...seam.signals] }), ['a verdict: PASS']),
       }),
@@ -633,7 +658,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     const judged: string[] = [];
     const judge = (id: string) => async (j: { dir: string }) => (judged.push(`${id} ${j.dir}`), [`${id} verdict: PASS — judged`]);
     await go([
-      plain('a', { judge: judge('a'), run: async () => {} }),
+      plain('a', { judge: judge('a'), run: async () => {}, noRecords: true }),
       plain('b', { judge: judge('b') }),
       plain('c', { judge: judge('c'), needs: ['android'] }),
       plain('d', { judge: judge('d'), preconditions: [async () => ({ ok: false, why: 'no' })] }),
@@ -641,7 +666,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(judged).toEqual([`a ${dirOf('a')}`]);
     expect(summary()).toContain('a verdict: PASS — judged');
     rmSync(out, { recursive: true, force: true });
-    await go([plain('a', { run: async () => {}, judge: async () => ['a live x: PASS\r\na verdict: PASS\r\n'] })]);
+    await go([plain('a', { run: async () => {}, noRecords: true, judge: async () => ['a live x: PASS\r\na verdict: PASS\r\n'] })]);
     expect(summary().slice(2, 4)).toEqual(['a live x: PASS', 'a verdict: PASS']);
     expect(outText()).toContain('OK   a analyze');
   });
@@ -666,6 +691,11 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
     ]);
     const errors = summary().slice(summary().indexOf('RESTORE: none — everything dirty was put back and verified') + 1, -1);
     expect(errors).toEqual(['ERROR the catalog drifted', 'ERROR the analyzer\'s own', `ERROR the cell did not open (×2, in kf/probe.log)`]);
+  });
+
+  it('an ERROR said as a step and repeated in a log: one line, counted together, steps.log named (code review a4)', async () => {
+    await go([plain('kf', { run: async (ctx) => (ctx.err('the cell did not open'), writeFileSync(join(ctx.dir, 'probe.log'), 'ERROR the cell did not open\nERROR the cell did not open\n'), ctx.verdict('PASS')) })]);
+    expect(summary().filter((l) => l.includes('the cell did not open'))).toEqual(['09:44:26 ERROR the cell did not open (×3, in steps.log, kf/probe.log)']);
   });
 
   it('one ERROR in several of this run\'s logs: one line, its total and where (review round 3: 50 in p, 1 in q, 2 in r)', async () => {
@@ -844,7 +874,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
   });
 
   it('interrupted during the normal end\'s judging: only the abort\'s SUMMARY, never a second', async () => {
-    const done = go([plain('a', { run: async () => {}, judge: async ({ run }) => (await run('probe', ['hang'], { secs: 30 }), ['a verdict: PASS — judged']) })]);
+    const done = go([plain('a', { run: async () => {}, noRecords: true, judge: async ({ run }) => (await run('probe', ['hang'], { secs: 30 }), ['a verdict: PASS — judged']) })]);
     await until(() => seam.words().includes('probe hang'));
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
@@ -860,6 +890,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(await done).toBe(130);
     await tick(10);
     expect(judged).toEqual([]);
+    expect(outText()).not.toContain('finish() ignored');
   });
 
   it('records complete, judged by the abort, but its judge wrote no verdict of its label: INCONCLUSIVE saying so, never missing (review round 1, MAJOR)', async () => {
@@ -927,6 +958,18 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
       expect(summary().some((l) => /ERROR LAB/.test(l))).toBe(false);
       expect(outText()).toContain('NOTE LAB android: its answer after the interrupt not kept');
     }
+  });
+
+  it('a noRecords block is complete for the abort only once its run returned: finished, judged; cut mid-run, INTERRUPTED (code review c1)', async () => {
+    const done = go([
+      plain('a', { run: async () => {}, noRecords: true, judge: async () => ['a verdict: PASS — judged'] }),
+      plain('E5', { noRecords: true, run: async (ctx) => void (await ctx.bounded('probe', ['hang'], { secs: 30 })), judge: async () => ['E5 verdict: PASS — never'] }),
+    ]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(summary()).toContain('a verdict: PASS — judged');
+    expect(summary()).toContain('E5: INTERRUPTED — its records are not complete, not judged (rerun ONLY=E5)');
   });
 
   it('records complete but no judge to read them: INTERRUPTED, nothing invented', async () => {
