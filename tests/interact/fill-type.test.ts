@@ -363,8 +363,8 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(moved.typed).toEqual(['SK3112000000']); // no wipe: the deletes would go where the typing went
   });
 
-  // Review round 1: the landing is computed once (`landing`), and fill-landing.ts#tookText gates it — after a retry too, where the
-  // loop's own not-taken check is no longer asked.
+  // Review round 1: fill-landing.ts#tookText gates the landing — after a retry too, where the loop's own not-taken check
+  // no longer returns.
   it('a non-input that ends on its own resolved text after the wipe and retype has not landed', async () => {
     const { io, intent, field } = scripted();
     field.value = 'X';
@@ -378,6 +378,77 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
   it('a non-input proves it took the text only by showing it exactly: no reformat there', async () => {
     const { io, intent } = scripted({ format: group4 });
     expect((await typeAndConfirm(io, { ...intent, value: 'SK3112000000', isInput: false })).kind).toBe('not-taken');
+  });
+});
+
+/**
+ * A9 review round 1: arms of the switch only a script of reads reaches, each pinned against a hand mutant (`again` lost,
+ * the tail gate's `tails() === 0`, the report skipped). `rounds`: per typing sent, the poll's reads; the last repeats.
+ */
+describe('typeAndConfirm — the arms after a retry', () => {
+  function byRounds(rounds: string[][]) {
+    const typed: string[] = [];
+    let reads = 0;
+    let dropped = 0;
+    const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: null });
+    const io: FieldIo = {
+      type: async (text) => {
+        typed.push(text);
+        reads = 0;
+      },
+      wipe: async () => undefined,
+      read: async () => {
+        const round = rounds[Math.min(typed.length - 1, rounds.length - 1)];
+        return round[Math.min(reads++, round.length - 1)];
+      },
+      screen: () => node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field] }),
+      reportDroppedTail: () => {
+        dropped++;
+      },
+    };
+    const intent: TypingIntent = { value: 'abcd', clear: false, isInput: true, resolvedValue: null, before: null, placeholder: undefined, held: 0, pollMs: 1, field, delivery: 'on-return' };
+    return { io, intent, typed, reported: () => dropped };
+  }
+
+  // Said-plain needs no clear (with clear a masked reading of another length has not landed), so what was sent before
+  // it can only be a tail.
+  it('said-plain after a tail typed again keeps what was sent, and reports no drop', async () => {
+    const { io, intent, typed, reported } = byRounds([['ab'], ['•••••••']]);
+    expect(await typeAndConfirm(io, { ...intent, held: 'unread' })).toEqual({
+      kind: 'missed',
+      observed: '•••••••',
+      again: [{ kind: 'tail', length: 2 }],
+      differs: { kind: 'masked-said-plain' },
+    });
+    expect(typed).toEqual(['abcd', 'cd']);
+    expect(reported()).toBe(0);
+  });
+
+  it('a first tail on a reading unchanged by the whole retype is still typed: no tail was sent to have moved nothing', async () => {
+    // the first poll ends still moving, so no tail: the wipe and retype; the second holds still on the same reading
+    const { io, intent, typed, reported } = byRounds([['a', 'a', 'a', 'a', 'ab'], ['ab'], ['abcd']]);
+    expect(await typeAndConfirm(io, { ...intent, clear: true })).toEqual({
+      kind: 'landed',
+      observed: 'abcd',
+      again: [
+        { kind: 'whole', wiped: true },
+        { kind: 'tail', length: 2 },
+      ],
+    });
+    expect(typed).toEqual(['abcd', 'abcd', 'cd']);
+    expect(reported()).toBe(1);
+  });
+
+  it('a placeholder landing through a tail typed again reports the drop', async () => {
+    const { io, intent, typed, reported } = byRounds([['Sea'], ['Search']]);
+    expect(await typeAndConfirm(io, { ...intent, value: 'Search', placeholder: 'Search' })).toEqual({
+      kind: 'landed',
+      observed: 'Search',
+      again: [{ kind: 'tail', length: 3 }],
+      placeholder: true,
+    });
+    expect(typed).toEqual(['Search', 'rch']);
+    expect(reported()).toBe(1);
   });
 });
 

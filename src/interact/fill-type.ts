@@ -29,7 +29,7 @@
  *      the typing is there with its value — an auto-advancing code box that
  *      moved the focus would get the tail too; a sibling the app recomputed
  *      proves nothing either way, and stops the tail too). Since D28 the
- *      prefix may be REFORMATTED (fill-landing.ts#Miss): a field that groups as it is
+ *      prefix may be REFORMATTED (fill-landing.ts#NotLanded): a field that groups as it is
  *      typed shows `1 234 567,` for a typed `1234567,89` that lost `89` —
  *      exact by typed characters, only grouping added, `reformatOf`'s rules
  *      judged over the whole typing (iOS React Native, rf2, 2026-10-31: the
@@ -43,7 +43,7 @@
  *      `MAX_TAIL_RETYPES` times, and again only while each retype moved the
  *      field. Which reading proves a dropped tail — a strict prefix with some
  *      of the typing in it, no bullet, the earlier text unchanged — is
- *      fill-landing.ts's (`Miss.tail`, `retypable`): only a strict prefix proves which
+ *      fill-landing.ts's (`NotLanded.tail`, `retypable`): only a strict prefix proves which
  *      characters are missing, so a retype can never duplicate one that is
  *      there. Measured on React Native 0.88's
  *      controlled single-line TextInput under `idb ui text`: 6 of 12 fills
@@ -108,8 +108,8 @@ export interface TypingIntent extends Expectation {
  * - `not-taken`: a non-input whose reading never took the text — not the field;
  * - `unread`: no reading to compare (the node withholds its text, or the last read did not find the field);
  * - `missed`: the last reading is not the value after everything was sent again — `differs` what can be said of the
- *   difference (fill-landing.ts#Miss); `elsewhere` when another input changed while typing (the focus left the field —
- *   nothing was sent again then), `differs` without its whole-landing hedge then (fill-landing.ts#withoutWholeToo).
+ *   difference (fill-landing.ts#NotLanded); `elsewhere` when another input changed while typing (the focus left the
+ *   field — nothing was sent again then), `differs` without its whole-landing hedge then (fill-landing.ts#withoutWholeToo).
  * `again`: what was sent again, in the order sent (fill-facts.ts#SentAgain; empty: nothing).
  */
 export type Typed =
@@ -131,7 +131,8 @@ export const MAX_TAIL_RETYPES = 2;
 /** Type the value and confirm it landed; send again what the rules above allow. */
 export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise<Typed> {
   const { value, clear } = intent;
-  // Whether a reading landed, and how — computed once per reading, by the poll.
+  // Whether a reading landed, and how — the poll's question, of every read; `readingOf` asks it again of the reading a
+  // poll ended on without a landing.
   const landing = (observed: string): Landing | undefined => landingOf(observed, intent);
 
   // What every other input held when typing began: the proof that the typing stayed in the field (`whereTyped`).
@@ -147,21 +148,33 @@ export async function typeAndConfirm(io: FieldIo, intent: TypingIntent): Promise
     if (observed === undefined) return { kind: 'unread' };
     // What the reading is, whole: the poll's landing where it ended on one, else a reading that missed.
     const answer = read.landed ?? readingOf(observed, intent);
-    // A non-input that never took the text is not the field: never wiped (its length is not the field's), never
-    // retyped. Asked of the first reading only, as it always was: after a retry the last reading is a mismatch.
-    if (answer.kind === 'not-taken' && again.length === 0) return { kind: 'not-taken', observed };
-    // Final, but no landing: the field said plain shows bullets of another length (fill-landing.ts#Landing). Before
-    // reportDroppedTail: a held count 'unread' means no tail was retyped (fill.ts skips the re-read only where
-    // !retypesTail).
-    if (answer.kind === 'said-plain') return { kind: 'missed', observed, again, differs: answer.differs };
-    if (answer.kind === 'landed' || answer.kind === 'placeholder') {
-      // A drop is proven only by its repair: the typing landed whole through a tail typed again. A capped or
-      // trimming field (maxLength, an IBAN or phone mask) keeps its strict prefix for good — its retype moves nothing
-      // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
-      // (D24 review).
-      if (tails() > 0) io.reportDroppedTail();
-      if (answer.kind === 'placeholder') return { kind: 'landed', observed, again, placeholder: true };
-      return { kind: 'landed', observed, again, ...(answer.reformatted !== undefined && { reformatted: answer.reformatted }) };
+    switch (answer.kind) {
+      case 'not-taken':
+        // A non-input that never took the text is not the field: never wiped (its length is not the field's), never
+        // retyped. Asked of the first reading only, as it always was: after a retry the last reading is a mismatch.
+        if (again.length === 0) return { kind: 'not-taken', observed };
+        break;
+      case 'said-plain':
+        // Final, but no landing: the field said plain shows bullets of another length (fill-landing.ts#Landing). Before
+        // reportDroppedTail: a held count 'unread' means no tail was retyped (fill.ts skips the re-read only where
+        // !retypesTail).
+        return { kind: 'missed', observed, again, differs: answer.differs };
+      case 'landed':
+      case 'placeholder':
+        // A drop is proven only by its repair: the typing landed whole through a tail typed again. A capped or
+        // trimming field (maxLength, an IBAN or phone mask) keeps its strict prefix for good — its retype moves nothing
+        // and the fill fails — and is no drop: reported, it would make every later typing into that app pay the split
+        // (D24 review).
+        if (tails() > 0) io.reportDroppedTail();
+        if (answer.kind === 'placeholder') return { kind: 'landed', observed, again, placeholder: true };
+        return { kind: 'landed', observed, again, ...(answer.reformatted !== undefined && { reformatted: answer.reformatted }) };
+      case 'missed':
+        break;
+      default: {
+        // A new kind of reading must say here whether it goes on to what is sent again.
+        const unhandled: never = answer;
+        return unhandled;
+      }
     }
     const where = whereTyped(others, io.screen(), answer.tail?.missing);
     const tail =

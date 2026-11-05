@@ -833,24 +833,32 @@ tests/truth/live-rejudge.test.ts.
 
 A2 moved the landing rule into one module, but its interface stayed five questions about one reading, in an order
 fill-type.ts had to know. `interact/fill-landing.ts` now answers once: `readingOf` is total, a `Landing` or a miss
-(`not-taken`, `missed`) with its `Miss`, the tail and the Difference. `landingOf` stays, the poll's question; `tookText`,
-`tailOf`, `droppedTail` (folded into `Miss.tail.retypable`), `differenceOf` and `Tail` are private. So:
+(`not-taken`, `missed`) with its `NotLanded`, the tail and the Difference. `landingOf` stays, the poll's question; `tookText`,
+`tailOf`, `droppedTail` (folded into `NotLanded.tail.retypable`), `differenceOf` and `Tail` are private. So:
 
 - A2's amendment above: `landedReformat`, `landedSome`, `priorText` and `priorsOf` are asked through `landingOf` and
   `readingOf`.
 - D53's PRECONDITION above is gone as a precondition: only `readingOf` asks `differenceOf`, of a reading that did not
   land. What it would read of one that lands is no longer reachable.
-- `wholeLandingToo` is asked once, in the `Miss`. The `elsewhere` hedge moved with it: fill-type.ts applies
+- `wholeLandingToo` is asked once, in the `NotLanded`. The `elsewhere` hedge moved with it: fill-type.ts applies
   `withoutWholeToo` on that branch and fill-text.ts only words the Difference it is given (until now it stripped
   `wholeToo` by `as never`), so a `Typed` says what its reply says.
 - The three earlier-text policies stay as they are, `typedPartOf`'s literal slice deliberate (A2's amendment).
 
 Behaviour-preserving: a temporary differential over the frozen modules (rows of reading, value, earlier text, clear,
 placeholder, held count and input; scripted reads through both `typeAndConfirm`, comparing the ordered device calls and
-sleeps, `Typed` and the failure's bytes) found no difference, and was deleted with the change. One correction to the D64
-amendment above: `55` for `55` after `5` lands (the reading is the value itself, residual 7), so it never was a `length`
-that is a whole landing too; `xaa` for `aa` after `xa` is. Likewise the D53 row `a-b1234` after `ab` lands, and the row is
-now `a-b12.34`.
+sleeps, `Typed` and the failure's bytes) found no difference, and was deleted with the change. On the `elsewhere` branch
+it compared `Typed` without `differs`, which there loses `wholeToo` on purpose, and the failure's bytes.
+
+Two corrections to the D64 amendment above, neither a change of behaviour: `55` for `55` after `5` lands (`showsExactly`:
+the reading is the value itself, on the base too), so it is no `length` that is a whole landing too, as its hedge passage
+says (`xaa` for `aa` after `xa` is); and the passage on the real-world shape is wrong that `55` typed after `5` "fails
+loudly, by length, and never ends in a wrong Filled". Where the second key dropped, it replies Filled at once, nothing
+typed again, where an append should have left `555`. Residual 7 does not cover this: its reading is the earlier text as
+well, nothing moved, and "the field does hold the value" answers it; here the reading moved, and the field holds the
+value only on the select-all reading the tree cannot tell apart. It reaches every value that what should be held starts
+with (`1212` after `12`, keys dropped). Unmeasured on a device, and not accepted here: backlog row D71. The D53 row
+`a-b1234` after `ab` lands too, and the row is now `a-b12.34`.
 
 ## Residuals accepted
 

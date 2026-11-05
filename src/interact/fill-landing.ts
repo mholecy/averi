@@ -4,8 +4,8 @@
  * the typing and the verdict judging the same reading differently. One reading, one answer (A9, 2026-11-05: until then
  * fill-type.ts asked five questions of one reading, in an order it had to know):
  * - `readingOf`: the whole answer, for any reading — a landing, or a miss (`not-taken` or `missed`) with what can be
- *   said of it (`Miss`): the tail it proves dropped and whether that may be typed again, and the difference, without
- *   content.
+ *   said of it (`NotLanded`): the tail it proves dropped and whether that may be typed again, and the difference,
+ *   without content.
  * - `landingOf`: the poll's question, all it needs of up to five readings a round — is this one final? Exactly,
  *   reformatted, only as the field's placeholder, or a masked reading that proves the field was wrongly said plain.
  *   Without clear, the value must be in what was typed past the earlier text, unless the reading is the value itself
@@ -67,7 +67,7 @@ export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'plac
  * with clear, is `unchanged` and has a tail to type again; a tail the typing's own gates refuse (the bounds, a reading
  * still moving) still needs its difference.
  */
-export interface Miss {
+export interface NotLanded {
   /**
    * The reading is a strict prefix of what the field should hold (`tailOf`): `missing` the rest, what `whereTyped`
    * compares a sibling's gain with. `retypable`: it proves that much dropped, some of the typing there and no whole
@@ -80,10 +80,10 @@ export interface Miss {
 
 /**
  * The one answer about one reading: a `Landing`, or a miss — `not-taken` when a non-input never took the text
- * (`tookText`), else `missed`. `not-taken` carries a `Miss` too: only the first reading of a typing ends on it, and
- * after a retry fill-type.ts goes on from it.
+ * (`tookText`), else `missed`. `not-taken` carries a `NotLanded` too: only the first reading of a typing ends on it,
+ * and after a retry fill-type.ts goes on from it.
  */
-export type Reading = Landing | ({ kind: 'not-taken' } & Miss) | ({ kind: 'missed' } & Miss);
+export type Reading = Landing | ({ kind: 'not-taken' } & NotLanded) | ({ kind: 'missed' } & NotLanded);
 
 /**
  * Whether a reading landed, and how; undefined when it did not. The rules:
@@ -112,11 +112,11 @@ export function landingOf(observed: string, e: Expectation): Landing | undefined
 export function readingOf(observed: string, e: Expectation): Reading {
   const landing = landingOf(observed, e);
   if (landing !== undefined) return landing;
-  return { kind: tookText(observed, e) ? 'missed' : 'not-taken', ...missOf(observed, e) };
+  return { kind: tookText(observed, e) ? 'missed' : 'not-taken', ...notLandedOf(observed, e) };
 }
 
-/** What can be said of a reading that did not land (`Miss`); whether it is a whole landing too is asked here alone. */
-function missOf(observed: string, e: Expectation): Miss {
+/** What can be said of a reading that did not land (`NotLanded`); whether it is a whole landing too is asked here. */
+function notLandedOf(observed: string, e: Expectation): NotLanded {
   const tail = tailOf(observed, e);
   const wholeToo = landedSome(tail) && wholeLandingToo(heldText(observed, e.placeholder), e);
   return {
@@ -285,8 +285,8 @@ const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined 
  * What the field is missing of what it should hold (its text before the typing, unless cleared — or vanished, then
  * none: `priorsOf`, D29 — then the value), when its reading is a strict prefix of that — exactly or reformatted
  * (`prefixOf`, D28; ending in an eager trailing mark too, D60) — and shows no bullet: a `Tail`, else undefined. The one
- * definition of a dropped tail: the typing retypes it (`Miss.tail`) and the verdict names it (`differenceOf`), so the
- * two judge a prefix alike. Pure.
+ * definition of a dropped tail: the typing retypes it (`NotLanded.tail`) and the verdict names it (`differenceOf`), so
+ * the two judge a prefix alike. Pure.
  */
 function tailOf(observed: string, e: TextExpectation): Tail | undefined {
   const held = heldText(observed, e.placeholder);
@@ -325,7 +325,7 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
 }
 
 /**
- * What can be said of a reading that missed the value — ONE classification of the kinds (fill-facts.ts#Difference),
+ * What can be said of a reading that missed the value — the classification of the kinds (fill-facts.ts#Difference),
  * first match wins (2026-10-09, the fill-clear deepening; until then fill.ts chose `unchanged`, `masked` and the partly
  * masked `length` in a ternary at the throw, and a helper of its own the rest):
  * 0. `masked-said-plain`: a masked reading where the held count is `'unread'` (`landingOf`'s `said-plain`; one of the
@@ -350,8 +350,8 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
  *    is a length difference. Letter case by toLowerCase/toUpperCase of each UTF-16 unit — enough for the measured
  *    auto-capitalisation; a case pair whose forms differ in length (`ß`/`SS`) reads as a plain difference, never as a
  *    pass.
- * `tail` and `wholeToo` are `missOf`'s, asked once for the two answers of a `Miss`. Only `readingOf` asks, of a reading
- * that did not land: one `reformatOf` passes (`1 234` for `1234`) would read `separated` here. Pure, O(observed ×
+ * `tail` and `wholeToo` are `notLandedOf`'s, asked once for the two answers of a `NotLanded`. Only `readingOf` asks, of
+ * a reading that did not land: one `reformatOf` passes (`1 234` for `1234`) would read `separated` here. Pure, O(observed ×
  * value).
  */
 function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>, tail: Tail | undefined, wholeToo: boolean): Difference {

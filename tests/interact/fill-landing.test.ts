@@ -84,7 +84,7 @@ describe('landingOf — did this reading land, and how', () => {
 
 /**
  * A9: one answer about one reading. A tail is orthogonal to a Difference (`Jan` for `Jan Novak` after `Jan`, with clear:
- * retypable and `unchanged`), and a `not-taken` carries its Miss too (a retry's last reading goes on from it).
+ * retypable and `unchanged`), and a `not-taken` carries its NotLanded too (a retry's last reading goes on from it).
  */
 describe('readingOf — the whole answer about one reading', () => {
   const rows: [string, string, Partial<Expectation> & Pick<Expectation, 'value'>, Reading][] = [
@@ -129,9 +129,9 @@ describe('readingOf — the whole answer about one reading', () => {
                   const e: Expectation = { value, before, clear, held, placeholder, ...input };
                   const r = readingOf(observed, e);
                   const wrong = (why: string) => new Error(`${why}: ${JSON.stringify({ observed, e, r })}`);
-                  // what a non-input proves: only by changing, to bullets or to show the value (a landing took it too)
-                  const took = input.isInput || (observed !== input.resolvedValue && (isMaskedValue(observed) || observed.includes(value)));
-                  if ((r.kind === 'not-taken') !== !took) throw wrong('not-taken iff the text was not taken');
+                  // an input is never not-taken; a non-input still showing its own text always is (the rows pin the rest)
+                  if (input.isInput && r.kind === 'not-taken') throw wrong('an input took the text');
+                  if (!input.isInput && observed === input.resolvedValue && r.kind !== 'not-taken') throw wrong('a non-input proves it took the text only by changing');
                   if (r.kind === 'said-plain' && !(held === 'unread' && isMaskedValue(observed))) throw wrong('said-plain is a masked reading, the count unread');
                   seen.add(r.kind);
                   if (r.kind !== 'missed' && r.kind !== 'not-taken') continue;
@@ -801,10 +801,12 @@ describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
     { value: '0000', before: 'SK3112' },
     { value: 'Jan Novak', clear: true },
     { value: '1 23456' },
+    { value: '11', before: '1' }, // a whole landing too, grouped: `11 `
   ];
   it('every reformatted prefix with some of the typing in it is a dropped tail, the same count landed', () => {
     let swept = 0;
     let trailing = 0;
+    let heldBack = 0;
     for (const c of cases) {
       const e = expecting({ value: '', ...c });
       const whole = (e.clear ? '' : (e.before ?? '')) + e.value;
@@ -816,15 +818,21 @@ describe('tailOf and differenceOf agree on a dropped tail (D28)', () => {
         for (let k = 1; k <= [...shape].length; k++) {
           const reading = [...shape].slice(0, k).join('');
           const r = readingOf(reading, e);
-          // an exact prefix is a length; some of the typing in a prefix the field grouped is a dropped tail, and says how much
-          if (r.kind !== 'missed' || r.tail?.retypable !== true || whole.startsWith(reading) || e.value.startsWith(reading)) continue;
+          // Some of the typing in a prefix: a tail to type again, or one held back as a whole landing too. An exact prefix
+          // is a length; the reformat itself is private now, so a prefix that is no literal start of what the field
+          // should hold is what the field grouped. A reading that lands has no tail to agree on (it never was asked).
+          if (r.kind !== 'missed' || r.tail === undefined || whole.startsWith(reading) || e.value.startsWith(reading)) continue;
+          const held = 'wholeToo' in r.differs && r.differs.wholeToo === true;
+          if (!r.tail.retypable && !held) continue; // none of the typing in it
           swept++;
+          if (held) heldBack++;
           const last = [...reading].at(-1) ?? '';
           if (SEPARATORS.has(last) && ![...whole].some((c) => kindOf(c) === kindOf(last))) trailing++; // an added mark last: D60's
-          expect(r.differs, JSON.stringify({ reading, c })).toMatchObject({ kind: 'dropped-tail', dropped: r.tail.missing.length });
+          expect(r.differs, JSON.stringify({ reading, c })).toMatchObject({ kind: 'dropped-tail', landed: e.value.length - r.tail.missing.length, dropped: r.tail.missing.length });
         }
     }
     expect(swept).toBeGreaterThan(50); // the sweep is not vacuous
+    expect(heldBack).toBeGreaterThan(0); // nor the tails held back as a whole landing too
     expect(trailing).toBeGreaterThan(200); // nor its D60 part: prefixes that end in an added (eager) trailing mark
   });
 });

@@ -315,10 +315,12 @@ export interface OtherInput {
 
 /**
  * What differs between the typed value and a read-back that did not match
- * it, without carrying either string — classified by ONE function,
- * interact/fill-landing.ts#readingOf's miss, all eight kinds (until 2026-10-09
- * fill.ts chose `unchanged`, `masked` and a partly masked `length` in a
- * ternary at the throw, and a helper of its own the rest):
+ * it, without carrying either string — classified in ONE module,
+ * interact/fill-landing.ts (`readingOf`: all eight kinds of a reading that did
+ * not land; `landingOf`'s final `said-plain` carries its `masked-said-plain`
+ * itself; until 2026-10-09 fill.ts chose `unchanged`, `masked` and a partly
+ * masked `length` in a ternary at the throw, and a helper of its own the
+ * rest):
  * - `masked`: the field shows bullets, compared by length only; `held` the
  *   bullets it held after focus, without `clear` (undefined with it).
  * - `masked-said-plain`: the field shows bullets, though its source said it
@@ -342,7 +344,7 @@ export interface OtherInput {
  *   Review of this branch: probes D and D2 were told "the app transformed
  *   the input".
  * - `dropped-tail` (D28): the field holds the first `landed` characters of
- *   the typing, reformatted (interact/fill-landing.ts#Miss): `grouped`
+ *   the typing, reformatted (interact/fill-landing.ts#NotLanded): `grouped`
  *   when the field added separators of its own, else it only showed its typed
  *   spaces as another kind of space (`Jan\u00A0` for `Jan Novak`) — and not the last
  *   `dropped` — a tail the
