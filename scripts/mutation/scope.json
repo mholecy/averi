@@ -26,8 +26,8 @@
   "src/interact/unfit-axis.ts": {
     "group": "core",
     "tests": ["tests/interact/unfit-axis.test.ts"],
-    "floor": 96,
-    "baseline": "98.51 % on 2026-11-05 (D59, inferredAlong and cardMoved; cold, after condition 3 dropped its axisOfEdge test, which flushEdges along the axis already made, an equivalent survivor of the first cold run at 97.22 %): 67 mutants, 1 survived, 0 without coverage — sideShift's 'vertical' emptied, equivalent (the ternary's other branch is the vertical one)"
+    "floor": 98,
+    "baseline": "100 % on 2026-11-05 (D59 review round 1, cardMoved moved to motion-ledger.ts, AxisEvidence from StandingFacts and CallMotion; cold): 42 mutants, 0 survived, 0 timeouts; 98.51 % on 2026-11-05 (D59, inferredAlong and cardMoved; cold, after condition 3 dropped its axisOfEdge test, an equivalent survivor of the first cold run at 97.22 %): 67 mutants, 1 survived, 0 timeouts — sideShift's 'vertical' emptied, equivalent (gone with sideShift)"
   },
   "src/ui-tree/draw-order.ts": {
     "group": "core",

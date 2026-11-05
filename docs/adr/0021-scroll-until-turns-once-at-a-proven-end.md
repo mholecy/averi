@@ -591,7 +591,7 @@ and down, gets no `unfit` either, nor does scroll-sticky-cut's R (VA1's replay, 
 move; carried up through the list's bottom, 110 tall in 1238), whose outcomes are as before. Manual mutants from the module's .bak, each condition and the reply's clause
 emptied to true or '': all killed, conditions 1, 2 and 4 and the clause by the round's tests too, condition 3 only by
 the module's own table (implied in the round, above). The module is in the mutation scope (scripts/mutation/scope.json,
-group core): 98.51 % on the first restructured cold run, the cold runs core about 195 s, lab about 60 s.
+group core, floor 98): 100 % cold, 42 mutants, the cold run's groups core 199 s and lab 61 s.
 
 Rejected:
 - the axis from conditions 1–3 alone, as the backlog row first said: the LazyColumn case above;
