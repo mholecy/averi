@@ -403,14 +403,14 @@ export function chooserWindow(emu: LabEmu, o: ChooserWindowOptions): WindowSpec 
       }
       // The probe's restore whenever its state file is not clean: it also undoes what the probe changed itself (it
       // force-stops the lab, puts its state file back), whatever the reinstall did (review round 4, as batch-11 and
-      // batch-12 ran it); a note when no reinstall started, so nothing was wiped.
+      // batch-12 ran it); a note, after it verified, when no reinstall started: nothing was wiped, the state put back.
       let kept = '';
       if (o.putBack !== undefined) {
         if (o.stateFile !== undefined && stateOf(lab.fs, o.stateFile) === 'clean') kept = "; the probe's state file is clean: nothing to put back";
         else {
           const back = await o.putBack.restore(run);
           if (!back.ok) return { ...back, hand: stateHandOf(back, o.putBack) };
-          if (o.progress.step === 'not started') kept = "; nothing was wiped: the lab's state stays as the probe left it";
+          if (o.progress.step === 'not started') kept = "; nothing was wiped; the probe's state put back";
         }
       }
       const check = await checkAfterDismissal(lab, o.accepted);

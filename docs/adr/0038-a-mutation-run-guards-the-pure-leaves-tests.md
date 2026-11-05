@@ -631,12 +631,12 @@ Decisions S5 pins:
   corrected in review round 4: the code review ran it only once a reinstall had started, but the probe's `--restore`
   also undoes what the probe changed itself (it force-stops the lab, puts its state file back; the probe marks its state
   dirty mid-run), and abort.ts needs that file clean after, as batch-11 and batch-12 ran it; a clean state file needs no
-  restore and says so; when no reinstall started, the note "nothing was wiped: the lab's state stays as the probe left
-  it" is added, never instead of the restore; then --check, by CHECK_OUTCOME: 0 and 5 put back, 6 put back with a WARN
-  in the cleanup's own words (abort.ts's Putback may now carry `verdict: 'WARN'`, its step and cleanup line then WARN,
-  no RESTORE), a default FAIL, the rest ERROR. Its hand lines are read when the abort asks: inside the reinstall the
-  install line first, then the check's, then the state restore's command — never an uninstall no default was measured
-  for (code review).
+  restore and says so; when no reinstall started, the note "nothing was wiped; the probe's state put back" is added
+  after a restore that verified (review round 5), never instead of it; then --check, by CHECK_OUTCOME: 0 and 5 put back,
+  6 put back with a WARN in the cleanup's own words (abort.ts's Putback may now carry `verdict: 'WARN'`, its step and
+  cleanup line then WARN, no RESTORE), a default FAIL, the rest ERROR. Its hand lines are read when the abort asks:
+  inside the reinstall the install line first, then the check's, then the state restore's command — never an uninstall
+  no default was measured for (code review).
 - a row target with more than one `resolver_list` is `not-unique`, naming the count (code review).
 - the tri-state reads S6 wires: `readRoleHolders` and `readClipboard` (the clipboard by `cmd clipboard help`, API 33's
   `No shell command implementation.` unread) before and after a block, `compareReads` and `comparedLine` for their
