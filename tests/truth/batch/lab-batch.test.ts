@@ -10,7 +10,6 @@ import { labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 import { runBatch, type Block } from '../../../scripts/truth/batch/runner.js';
-import { STATE_FILE } from '../../../scripts/truth/batch/run-dir.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import { CATALOG, LAB_SERIAL, LAB_UDID, labWorld, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
@@ -147,7 +146,7 @@ function batch() {
     id: 'D43',
     label: 'D43 verdict',
     needs: ['ios'],
-    stateful: { stateFile: STATE_FILE, hand: ['D43 (iOS): put the domains back by hand'] },
+    stateful: { what: 'the WDA window not put back', hand: (file) => [`put the domains back from the backups beside ${file}`] },
     run: async (ctx) => {
       const sim = await ios.open(ctx);
       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
