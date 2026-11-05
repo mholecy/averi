@@ -39,7 +39,7 @@ describe('appInfoNames — the names an app\'s Application may carry, from `simc
 describe('appInfoBundle — where the app\'s executable lives, from `simctl appinfo`', () => {
   it('the top-level Path (quoted, with spaces) and CFBundleExecutable of the recorded output', () => {
     expect(appInfoBundle(BANK_APPINFO)).toEqual({
-      path: '/Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app',
+      path: '/Users/tester/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app',
       executable: 'Internal',
     });
     expect(appInfoBundle('{\n    CFBundleExecutable = "My App";\n    Path = "/a b/My App.app";\n}\n')).toEqual({ path: '/a b/My App.app', executable: 'My App' });

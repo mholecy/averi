@@ -14,8 +14,9 @@ import { THIS_CHECKOUT } from '../../../scripts/truth/live-cases.js';
  *
  * The path rules are bounded — an anchored path shape, never a bare word — so prose (`back/home/enter`, a deep link's
  * `myport://home/…`, a placeholder `/Users/…`) and the lab's own facts (a simulator runtime's
- * `CoreSimulator/Volumes/…`) pass; each rule's test names what it allows. A UUID counts only in the batch module's
- * directories: elsewhere it is a lab fact (a simulator udid in a judged reply).
+ * `CoreSimulator/Volumes/…`) pass; each rule's test names what it allows, and the tests' made-up sample homes and
+ * temporary files are named in SAMPLES. A UUID counts only in the batch module's directories: elsewhere it is a lab
+ * fact (a simulator udid in a judged reply).
  *
  * The forbidden fragments are built here, never written whole, so this file holds none of them itself and is scanned
  * like any other.
@@ -26,8 +27,8 @@ const ROOT = join(import.meta.dirname, '..', '..', '..');
 const BATCH_DIRS = ['scripts/truth/batch', 'tests/truth/batch', ...readdirSync(join(ROOT, 'tests', 'fixtures')).filter((n) => n.startsWith('batch')).map((n) => `tests/fixtures/${n}`)];
 /** The committed live records (T8): every file under them, the raw diagnosis folders included. */
 const RECORDS = 'docs/truth/live-records';
-/** The trees held to the path rules besides the batch module's (T8): the notes, the records among them, the skill. */
-const WIDE = ['docs', 'skill', 'README.md', 'ARCHITECTURE.md'];
+/** The trees held to the path rules besides the batch module's (T8): the notes, the records among them, the skill, the tests and their fixtures. */
+const WIDE = ['docs', 'skill', 'README.md', 'ARCHITECTURE.md', 'tests'];
 
 /** Every file under a tree (a file: itself). */
 const filesUnder = (path: string): string[] =>
@@ -36,8 +37,18 @@ const filesUnder = (path: string): string[] =>
 const slash = '/';
 const user = userInfo().username;
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** A name as given (trimmed), or none when it is shorter than 3 characters: too short to mean a name. */
-const asOwner = (name: string): string | undefined => (name.trim().length >= 3 ? name.trim() : undefined);
+/** Accents folded (NFD, the combining marks dropped): a name typed without its accents is still the name. */
+const folded = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '');
+/**
+ * A name as given (folded, its parts single-spaced), or none when it could be a code word: a name counts with two parts
+ * or more, or as one part of 4 letters or more (`Max`, `Lab`: maxScroll, the lab app).
+ */
+const asOwner = (name: string): string | undefined => {
+  const parts = folded(name).trim().split(/\s+/).filter((p) => p !== '');
+  return parts.length >= 2 || (parts.length === 1 && [...parts[0]].length >= 4) ? parts.join(' ') : undefined;
+};
+/** A name (asOwner's) as whole words, any case, any spacing between its parts; read off a folded line (rulesHitting). */
+const ownerRe = (name: string) => new RegExp(`(?<![\\p{L}\\p{N}_])${name.split(' ').map(escaped).join('\\s+')}(?![\\p{L}\\p{N}_])`, 'iu');
 /** The owner's name as git knows it (`git config user.name`), read at run time so no name is ever written here. */
 function ownerName(): string | undefined {
   try {
@@ -65,9 +76,9 @@ const PATHS: readonly { what: string; re: RegExp }[] = [
   { what: 'a home directory', re: new RegExp(`(^|[^\\w.~${slash}-]|file:${slash}${slash})${slash}(Users|home)${slash}${seg}`) },
   // A simulator runtime's image mounts under CoreSimulator/Volumes/: the lab's, no host's.
   { what: 'a mounted volume', re: new RegExp(`(?<!CoreSimulator)${slash}Volumes${slash}${seg}`) },
-  { what: "this machine's home directory", re: new RegExp(escaped(homedir())) },
-  { what: "the user's home as ~user/", re: new RegExp(`~${escaped(user)}${slash}`) },
-  ...(owner === undefined ? [] : [{ what: "the owner's name (git config user.name)", re: new RegExp(escaped(owner), 'i') }]),
+  { what: "this machine's home directory", re: new RegExp(escaped(folded(homedir()))) },
+  { what: "the user's home as ~user/", re: new RegExp(`~${escaped(folded(user))}${slash}`) },
+  ...(owner === undefined ? [] : [{ what: "the owner's name (git config user.name)", re: ownerRe(owner) }]),
 ];
 /** Held over the batch module's directories alone: elsewhere a UUID is a lab fact (a simulator udid in a reply). */
 const BATCH_ONLY: readonly { what: string; re: RegExp }[] = [
@@ -83,12 +94,26 @@ const FORBIDDEN = [...PATHS, ...BATCH_ONLY];
  */
 const portable = (side: unknown) => side === THIS_CHECKOUT || (typeof side === 'string' && side !== '' && !isAbsolute(side) && !side.startsWith('~'));
 
+/**
+ * The made-up host paths tests use as samples (T8), each named: struck from a line before the rules read it. Whole
+ * names only: a longer one (a home `meyer`, a temporary `xavier`) is still caught.
+ */
+const SAMPLES: readonly { what: string; re: RegExp }[] = [
+  { what: 'a made-up home: /Users/me, /Users/lab, /Users/tester, /Users/a b, /home/x', re: new RegExp(`${slash}(Users${slash}(me|lab|tester|a b)|home${slash}x)\\b`, 'g') },
+  { what: 'a made-up temporary file: /tmp/x…, /tmp/App.app, /tmp/averi-test-baselines, /var/folders/x/', re: new RegExp(`(?<![\\w.-])${slash}tmp${slash}(x|App\\.app|averi-test-baselines)\\b|${slash}var${slash}folders${slash}x${slash}`, 'g') },
+];
+/** What of the rules a line holds, its accents folded and its samples struck. */
+const rulesHitting = (rules: readonly { what: string; re: RegExp }[], line: string): string[] => {
+  const read = SAMPLES.reduce((l, sample) => l.replace(sample.re, '<sample>'), folded(line));
+  return rules.filter((f) => f.re.test(read)).map((f) => f.what);
+};
+
 /** Each line of each file that holds a fragment: `file:line: what`. */
 const hitsIn = (files: readonly string[], rules: readonly { what: string; re: RegExp }[]): string[] =>
   files.flatMap((file) =>
     readFileSync(join(ROOT, file), 'utf8')
       .split('\n')
-      .flatMap((line, i) => rules.filter((f) => f.re.test(line)).map((f) => `${file}:${i + 1}: ${f.what}`)),
+      .flatMap((line, i) => rulesHitting(rules, line).map((what) => `${file}:${i + 1}: ${what}`)),
   );
 
 describe('path hygiene: the batch module, the live records and the notes hold no machine- or session-bound path (T2 S1, T8)', () => {
@@ -100,7 +125,8 @@ describe('path hygiene: the batch module, the live records and the notes hold no
     expect(wide.filter((f) => f.startsWith(`${RECORDS}/`)).length).toBeGreaterThan(200);
     expect(wide.filter((f) => f.startsWith('docs/bugs/')).length).toBeGreaterThan(30);
     expect(wide.filter((f) => f.startsWith('skill/')).length).toBeGreaterThan(0);
-    expect(wide).toEqual(expect.arrayContaining(['README.md', 'ARCHITECTURE.md']));
+    expect(wide).toEqual(expect.arrayContaining(['README.md', 'ARCHITECTURE.md', 'tests/helpers/simctl-appinfo.ts']));
+    expect(wide.filter((f) => f.startsWith('tests/fixtures/truth/')).length).toBeGreaterThan(0);
   });
 
   it("no file of the batch module's names a scratchpad, a temporary folder, the evidence folder, a home directory, the user or a UUID", () => {
@@ -121,12 +147,12 @@ describe('path hygiene: the batch module, the live records and the notes hold no
   });
 
   it('each pattern catches what it names (a pattern that matches nothing guards nothing)', () => {
-    const caught = (s: string) => FORBIDDEN.filter((f) => f.re.test(s)).map((f) => f.what);
+    const caught = (s: string) => rulesHitting(FORBIDDEN, s);
     expect(caught(['', 'private', 'tmp', 'x'].join(slash))).toContain('a macOS temporary folder');
     expect(caught(['', 'private', 'var', 'x'].join(slash))).toContain('a macOS temporary folder');
     expect(caught(['', 'var', 'folders', 'ab'].join(slash))).toContain('a macOS per-user temporary folder');
-    expect(caught(`cd ${slash}tmp${slash}x`)).toContain('a temporary folder');
-    expect(caught(`x${slash}claude-502${slash}y`)).toContain("the session's temporary root");
+    expect(caught(`cd ${slash}tmp${slash}run-1`)).toContain('a temporary folder');
+    expect(caught(`x${slash}claude-123${slash}y`)).toContain("the session's temporary root");
     expect(caught(`a${slash}scratch` + `pad${slash}b`)).toContain('a scratchpad path');
     expect(caught('averi-' + 'evidence')).toContain('the evidence folder');
     expect(caught(`${slash}Users${slash}someone`)).toContain('a home directory');
@@ -149,7 +175,7 @@ describe('path hygiene: the batch module, the live records and the notes hold no
   });
 
   it('what each path rule allows: prose, placeholders, a deep link, the lab simulator runtime (T8)', () => {
-    const caught = (s: string) => PATHS.filter((f) => f.re.test(s)).map((f) => f.what);
+    const caught = (s: string) => rulesHitting(PATHS, s);
     // a home directory: a path inside a word, a deep link's host, a placeholder
     expect(caught('pressKey(back/home/enter)')).toEqual([]);
     expect(caught(`myport:${slash}${slash}home${slash}x`)).toEqual([]);
@@ -164,12 +190,37 @@ describe('path hygiene: the batch module, the live records and the notes hold no
     expect(caught('<scratch>/r23-eyes, <cal>/differential-cal-d928789, ../r8')).toEqual([]);
   });
 
-  it('a name from git counts from 3 characters, trimmed; an unset or shorter one is skipped (made-up names only)', () => {
-    expect([asOwner('Ada Example\n'), asOwner('Abc'), asOwner('Ab'), asOwner('  Ab \n'), asOwner('')]).toEqual(['Ada Example', 'Abc', undefined, undefined, undefined]);
+  it('what the tests may hold: made-up homes and temporary files, each named — and nothing like them (T8)', () => {
+    const caught = (s: string) => rulesHitting(PATHS, s);
+    for (const sample of ['me', 'lab', 'tester', 'a b']) expect(caught(`'${slash}Users${slash}${sample}${slash}Library'`)).toEqual([]);
+    expect(caught(`HOME: '${slash}home${slash}x'`)).toEqual([]);
+    expect(caught(`install('${slash}tmp${slash}App.app'), log: ${slash}tmp${slash}x.log, '${slash}tmp${slash}x', ${slash}tmp${slash}averi-test-baselines`)).toEqual([]);
+    expect(caught(`classify('${slash}var${slash}folders${slash}x${slash}averi-ocr')`)).toEqual([]);
+    expect(caught(`'${slash}Users${slash}meyer${slash}x'`)).toContain('a home directory');
+    expect(caught(`'${slash}home${slash}xavier${slash}x'`)).toContain('a home directory');
+    expect(caught(`'${slash}tmp${slash}xavier'`)).toContain('a temporary folder');
+    expect(caught(`'${slash}var${slash}folders${slash}xy${slash}z'`)).toContain('a macOS per-user temporary folder');
   });
 
-  it.runIf(owner !== undefined)("the owner's name, read from git at run time, is caught in any case", () => {
+  it('a name from git counts when it has two parts, or one of 4 letters or more, accents folded; an unset or shorter one is skipped (made-up names only)', () => {
+    expect([asOwner('Ada Example\n'), asOwner('Abcd'), asOwner('Al Bo'), asOwner('Max'), asOwner('Lab'), asOwner('  Ab \n'), asOwner(''), asOwner('Zoë Ünder')]).toEqual([
+      'Ada Example', 'Abcd', 'Al Bo', undefined, undefined, undefined, undefined, 'Zoe Under',
+    ]);
+  });
+
+  it("the owner's name: whole words, any case, accents folded on both sides — no code word (made-up names only)", () => {
+    const named = (name: string, line: string) => rulesHitting([{ what: 'owner', re: ownerRe(asOwner(name) ?? '') }], line).length > 0;
+    expect(named('Zoë Ünder', 'by Zoe Under')).toBe(true);
+    expect(named('Zoe Under', 'by ZOË  ÜNDER.')).toBe(true);
+    expect(named('Zoë Ünder', 'zoeunder, Zoe Underhill, Zoe')).toBe(false);
+    expect(named('Maxi', 'maxiScroll, maximum, Maxi1, setMaxi')).toBe(false);
+    expect(named('Maxi', 'asked Maxi.')).toBe(true);
+  });
+
+  it.runIf(owner !== undefined)("the owner's name, read from git at run time, is caught in any case, accented or not", () => {
     const name = owner ?? '';
-    expect(FORBIDDEN.filter((f) => f.re.test(`by ${name.toUpperCase()}`)).map((f) => f.what)).toContain("the owner's name (git config user.name)");
+    const hit = (line: string) => rulesHitting(FORBIDDEN, line);
+    expect(hit(`by ${name.toUpperCase()}`)).toContain("the owner's name (git config user.name)");
+    expect(hit(`by ${name.normalize('NFD').replace(/\p{M}/gu, '')}`)).toContain("the owner's name (git config user.name)");
   });
 });
