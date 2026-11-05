@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { layoutOf, newRunId, openRun, plainSegment, refusals, refusalLines, stateOf, writeRestore, type Stateful } from '../../../scripts/truth/batch/run-dir.js';
+import { blockName, layoutOf, newRunId, openRun, plainSegment, refusals, refusalLines, stateOf, writeRestore, type Stateful } from '../../../scripts/truth/batch/run-dir.js';
 
 // scripts/truth/batch/run-dir.ts: where a run writes (one fresh `run-<RUN_ID>` folder per block, never emptied or
 // reused) and when it must not start at all (a RESTORE file left, an earlier run's state not clean). Real files in a
@@ -226,6 +226,12 @@ describe('openRun — one fresh run-<RUN_ID> folder per block, never emptied or 
   it('a folder that cannot be made for another reason throws that reason, never "already exists"', () => {
     const denied = { ...nodeFs, mkdirExclusive: () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }); } };
     expect(() => openRun(denied, { out, runId: 'X', blocks: BLOCKS, wanted: BLOCKS })).toThrow(/^EACCES: permission denied$/);
+  });
+
+  it('blockName: the one rule for a block\'s name, which openRun and the runner both ask (T2 S6a review round 1)', () => {
+    expect(blockName('kf')).toBe('kf');
+    expect(blockName('lab')).toBe('lab');
+    for (const b of ['', '..', 'a/b', '-x', 'meta', 'k f']) expect(() => blockName(b), b).toThrow(`block name ${JSON.stringify(b)}: one plain path segment, not "meta", is needed`);
   });
 
   it('a RUN_ID or block name that could leave its folder is a programming error', () => {

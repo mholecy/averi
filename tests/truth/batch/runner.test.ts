@@ -6,7 +6,7 @@ import type { Asked } from '../../../scripts/truth/batch/cases.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
-import { runBatch, type Block, type NeedCtx, type RunBatchOptions, type RunIo } from '../../../scripts/truth/batch/runner.js';
+import { runBatch, type Block, type NeedCtx, type NeedSpec, type RunBatchOptions, type RunIo } from '../../../scripts/truth/batch/runner.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import type { KnobSpec } from '../../../scripts/truth/batch/select.js';
 
@@ -367,7 +367,8 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     await expect(go([plain('kf', { needs: ['tv'] })])).rejects.toThrow('kf needs tv, which has no check (needs: android, ios)');
     await expect(go([plain('kf'), plain('kf')])).rejects.toThrow('block kf is named twice');
     await expect(go([plain('kf', { label: 'kf: x' })])).rejects.toThrow('holds a colon');
-    await expect(go([plain('k f')])).rejects.toThrow('block "k f": one plain path segment is needed');
+    await expect(go([plain('k f')])).rejects.toThrow('block name "k f": one plain path segment, not "meta", is needed');
+    await expect(go([plain('meta')])).rejects.toThrow('block name "meta": one plain path segment, not "meta", is needed');
     await expect(runBatch({ name: 'batch-t', blocks: [plain('kf'), plain('kf')], config: { ok: false, errors: ['ERROR x — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } })).rejects.toThrow('block kf is named twice');
     expect(terminal).toEqual([]);
     expect(seam.calls).toEqual([]);
@@ -440,11 +441,12 @@ describe('a block\'s ctx: its steps, its lines, its folder (S1\'s steps.ts under
 // ------------------------------------------------------------------------------------------------ preconditions
 
 describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refusal; the SUMMARY is written (S3: the runner\'s choice, batch-11\'s way)', () => {
-  it('HEAD ≠ main: the checkout line says so, every block INCONCLUSIVE with its why, none run, no need checked, exit 0', async () => {
+  it('HEAD ≠ main: the checkout line says so (once: a NOTE step, no ERROR line besides), every block INCONCLUSIVE with its why, none run, no need checked, exit 2 (review round 1)', async () => {
     seam.rules = [git({ 'refs/heads/main': ok(`${OTHER}\n`) }), probes, live()];
     const ran: string[] = [];
     const code = await go([kfBlock({ run: async () => void ran.push('kf') }), d43Block({ run: async () => void ran.push('D43'), preconditions: [async (k) => k.ancestor('c'.repeat(40), 'M_D43')] })]);
-    expect(code).toBe(0);
+    expect(code).toBe(2);
+    expect(seam.exits).toEqual([2]);
     const why = "the checkout's HEAD (aaaaaaaa) is not main's (bbbbbbbb) — git switch main, then rerun";
     expect(summary()).toEqual([
       '======== SUMMARY',
@@ -452,9 +454,9 @@ describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refu
       `kf live verdict: INCONCLUSIVE — precondition: ${why}`,
       `D43 live verdict: INCONCLUSIVE — precondition: ${why}`,
       'RESTORE: none — everything dirty was put back and verified',
-      `09:44:26 ERROR checkout: ${why} — every block INCONCLUSIVE, none run`,
       `======== SUMMARY end (run ${ID})`,
     ]);
+    expect(outText()).toContain(`09:44:26 NOTE checkout: ${why} — every block INCONCLUSIVE, none run\n`);
     expect(ran).toEqual([]);
     expect(seam.words().some((w) => w.startsWith('git cat-file'))).toBe(false);
   });
@@ -502,17 +504,55 @@ describe('needs: each checked once, when the first wanted block needing it comes
     expect(outText()).toContain('SKIP kf not run: android: adb unreachable (get-state exit 1)');
   });
 
-  it('a need shared by two blocks is checked once; its lab line once; a need no wanted block names is never checked', async () => {
+  it('a need is checked in full by the first block naming it, then its cheap `alive` before each later one; its lab line once; a need no wanted block names never checked (review round 1)', async () => {
     const checked: string[] = [];
-    const n = { android: async () => (checked.push('android'), { ok: true as const, how: 'up' }), ios: async () => (checked.push('ios'), { ok: true as const, how: 'up' }) };
-    await go([plain('a', { needs: ['android'] }), plain('b', { needs: ['android'] }), plain('c', { needs: ['ios'] })], { needs: n, env: { ONLY: 'a,b' } });
-    expect(checked).toEqual(['android']);
+    const n: Record<string, NeedSpec> = {
+      android: { check: async () => (checked.push('android check'), { ok: true, how: 'up' }), alive: async () => (checked.push('android alive'), { ok: true, how: 'still up' }) },
+      ios: async () => (checked.push('ios'), { ok: true as const, how: 'up' }),
+    };
+    await go([plain('a', { needs: ['android'] }), plain('b', { needs: ['android'] }), plain('c', { needs: ['android'] }), plain('d', { needs: ['ios'] })], { needs: n, env: { ONLY: 'a,b,c' } });
+    expect(checked).toEqual(['android check', 'android alive', 'android alive']);
     expect(summary().filter((l) => l.startsWith('LAB '))).toEqual(['LAB android: OK — up']);
+    expect(summary()).toContain('c verdict: PASS');
+  });
+
+  it('a need with no `alive` is rechecked in full before each later block (never trusted blindly)', async () => {
+    const checked: string[] = [];
+    await go([plain('a', { needs: ['android'] }), plain('b', { needs: ['android'] })], { needs: { ...needs, android: async () => (checked.push('android'), { ok: true, how: 'up' }) } });
+    expect(checked).toEqual(['android', 'android']);
+    expect(summary().filter((l) => l.startsWith('LAB '))).toEqual(['LAB android: OK — up']);
+  });
+
+  it('a recheck that fails: that block INCONCLUSIVE naming the need, a lab line saying before which block; the later ones not rechecked', async () => {
+    const answers = [true, false];
+    const checked: string[] = [];
+    const n: Record<string, NeedSpec> = { android: { check: async () => ({ ok: true, how: 'up' }), alive: async () => (checked.push('alive'), answers.shift() ? { ok: true, how: 'up' } : { ok: false, why: 'the emulator went offline' }) } };
+    await go([plain('a', { needs: ['android'] }), plain('b', { needs: ['android'] }), plain('c', { needs: ['android'] }), plain('d', { needs: ['android'] })], { needs: n });
+    expect(checked).toEqual(['alive', 'alive']);
+    expect(summary()).toContain('a verdict: PASS');
+    expect(summary()).toContain('b verdict: PASS');
+    expect(summary()).toContain('c verdict: INCONCLUSIVE — android: the emulator went offline');
+    expect(summary()).toContain('d verdict: INCONCLUSIVE — android: the emulator went offline');
+    expect(summary().filter((l) => l.startsWith('LAB '))).toEqual(['LAB android: OK — up', 'LAB android: ERROR — the emulator went offline (rechecked before c)']);
+  });
+
+  it('a need whose first check failed is not checked again: every later block INCONCLUSIVE with the same why', async () => {
+    const checked: string[] = [];
+    await go([plain('a', { needs: ['android'] }), plain('b', { needs: ['android'] })], { needs: { android: async () => (checked.push('x'), { ok: false, why: 'down' }) } });
+    expect(checked).toEqual(['x']);
+    expect(summary()).toContain('b verdict: INCONCLUSIVE — android: down');
+  });
+
+  it('no wanted block ran (every need failed): exit 2, "nothing was done" — never success (review round 1); one that ran: its own exit', async () => {
+    const down = { ...needs, android: async () => ({ ok: false as const, why: 'down' }) };
+    expect(await go([plain('a', { needs: ['android'] }), plain('b', { preconditions: [async () => ({ ok: false, why: 'no' })] })], { needs: down })).toBe(2);
+    rmSync(out, { recursive: true, force: true });
+    expect(await go([plain('a', { needs: ['android'] }), plain('c')], { needs: down })).toBe(0);
   });
 
   it('two needs failed: both named; a check that throws is a failed need and an ERROR line, never the run\'s abort', async () => {
     const n = { android: async () => ({ ok: false as const, why: 'down' }), ios: async (): Promise<never> => { throw new Error('simctl gone'); } };
-    expect(await go([plain('B2', { needs: ['ios', 'android'] })], { needs: n })).toBe(0);
+    expect(await go([plain('B2', { needs: ['ios', 'android'] })], { needs: n })).toBe(2);
     expect(summary()).toContain('B2 verdict: INCONCLUSIVE — ios: its check threw: simctl gone; android: down');
     expect(summary().some((l) => /ERROR LAB ios: its check threw: simctl gone$/.test(l))).toBe(true);
   });
@@ -574,6 +614,17 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(summary()).toContain('kf live verdict: INCONCLUSIVE — its 1 run(s) are complete, but no verdict line was written (see the ERROR lines)');
   });
 
+  it('the judges run after finish: every window still open written to RESTORE and the kept groups ended first (review round 1)', async () => {
+    let seen: { restore: boolean; signals: string[] } | undefined;
+    await go([
+      plain('a', {
+        run: async (ctx) => (ctx.open('W', { hand: ['W: by hand'], restore: async () => ({ ok: true, how: 'x' }) }), void (await ctx.bounded('idb', ['a'], { secs: 5 }))),
+        judge: async () => ((seen = { restore: existsSync(join(out, 'RESTORE.txt')), signals: [...seam.signals] }), ['a verdict: PASS']),
+      }),
+    ]);
+    expect(seen).toEqual({ restore: true, signals: ['SIGTERM idb a'] });
+  });
+
   it('the judge on the normal path: only for a block that ran and wrote no verdict of its own; its run and folder given', async () => {
     const judged: string[] = [];
     const judge = (id: string) => async (j: { dir: string }) => (judged.push(`${id} ${j.dir}`), [`${id} verdict: PASS — judged`]);
@@ -616,6 +667,12 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
   it('a probe log\'s progress line (a lone CR) never breaks the SUMMARY: each overwritten part its own line', async () => {
     expect(await go([plain('kf', { run: async (ctx) => (writeFileSync(join(ctx.dir, 'p.log'), '10%\rERROR stalled\r20%\n'), ctx.verdict('PASS')) })])).toBe(0);
     expect(summary()).toContain('ERROR stalled');
+  });
+
+  it('a log the folder lists but that cannot be read: a NOTE naming it in the SUMMARY; a long ERROR line cut (review round 1)', async () => {
+    await go([plain('kf', { run: async (ctx) => (mkdirSync(join(ctx.dir, 'stuck.log')), writeFileSync(join(ctx.dir, 'p.log'), `ERROR ${'x'.repeat(900)}\n`), ctx.verdict('PASS')) })]);
+    expect(summary()).toContain(`NOTE ${join(dirOf('kf'), 'stuck.log')} not read: unreadable (no file, or no permission)`);
+    expect(summary().find((l) => l.startsWith('ERROR x'))).toHaveLength(700);
   });
 
   it('an ERROR inside a verdict line is that block\'s verdict, never an ERROR line (S1)', async () => {
@@ -767,6 +824,73 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(judged).toEqual([]);
   });
 
+  it('records complete, judged by the abort, but its judge wrote no verdict of its label: INCONCLUSIVE saying so, never missing (review round 1, MAJOR)', async () => {
+    const T6 = (judge: string[]) => plain('T6', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 1 }), ctx.record('c', { kind: 'runs', runs: 1 })), judge: async () => judge });
+    for (const lines of [[], ['T6 sample: 3 of 3']]) {
+      rmSync(out, { recursive: true, force: true });
+      seam = new FakeSeam([git(), probes, live()]);
+      const done = go([T6(lines), e5()]);
+      await until(() => seam.words().includes('probe hang'));
+      seam.handlers!.signal('SIGINT');
+      expect(await done).toBe(130);
+      expect(summary()).toEqual(expect.arrayContaining([...lines, 'T6 verdict: INCONCLUSIVE — interrupted: its judge wrote no verdict']));
+    }
+  });
+
+  it('every wanted block has a line in the abort SUMMARY, whatever its state at the interrupt (review round 1: the invariant)', async () => {
+    const blocks = [
+      plain('own'),
+      plain('skipped', { preconditions: [async () => ({ ok: false, why: 'no' })] }),
+      plain('down', { needs: ['android'] }),
+      plain('empty', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 1 }), ctx.record('c', { kind: 'runs', runs: 1 })), judge: async () => [] }),
+      plain('half', { run: async (ctx) => ctx.asks('c', { kind: 'runs', runs: 2 }), judge: async () => ['half verdict: PASS'] }),
+      e5(),
+      plain('later', { judge: async () => ['later verdict: PASS'] }),
+    ];
+    const done = go(blocks, { needs: { ...needs, android: async () => ({ ok: false, why: 'down' }) } });
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    for (const b of blocks) expect(summary().some((l) => l.startsWith(`${b.label}:`) || l.startsWith(`${b.id}:`)), b.id).toBe(true);
+  });
+
+  it('every wanted block has a line in the normal SUMMARY too', async () => {
+    const blocks = [plain('own'), plain('skipped', { preconditions: [async () => ({ ok: false, why: 'no' })] }), plain('down', { needs: ['android'] }), plain('silent', { run: async () => {} }), plain('judged', { run: async () => {}, judge: async () => [] })];
+    await go(blocks, { needs: { ...needs, android: async () => ({ ok: false, why: 'down' }) } });
+    for (const b of blocks) expect(summary().some((l) => l.startsWith(`${b.label}:`)), b.id).toBe(true);
+  });
+
+  it('a protected-key line written after the interrupt is only noted: it never reaches the abort SUMMARY (review round 1, MAJOR)', async () => {
+    const done = go([plain('E5', { run: async (ctx) => (await ctx.bounded('probe', ['hang'], { secs: 30 }), ctx.protectedLine('OK   the finportal key unchanged')) })]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    await tick(5);
+    expect(summary()).not.toContain('OK   the finportal key unchanged');
+    expect(outText()).toContain('NOTE a protected-key line after the interrupt not kept: OK   the finportal key unchanged');
+  });
+
+  it('a need whose check ends after the interrupt (its probe stopped): no LAB line blaming the lab, no ERROR — only noted (review round 1, MAJOR)', async () => {
+    for (const ending of ['fails', 'throws']) {
+      rmSync(out, { recursive: true, force: true });
+      seam = new FakeSeam([git(), probes, live()]);
+      const n = {
+        android: async (c: NeedCtx) => {
+          await c.bounded('probe', ['hang'], { secs: 30 });
+          if (ending === 'throws') throw new Error('adb gone');
+          return { ok: false as const, why: 'its probe was stopped' };
+        },
+      };
+      const done = go([plain('kf', { needs: ['android'] })], { needs: n });
+      await until(() => seam.words().includes('probe hang'));
+      seam.handlers!.signal('SIGINT');
+      expect(await done).toBe(130);
+      expect(summary().some((l) => l.startsWith('LAB '))).toBe(false);
+      expect(summary().some((l) => /ERROR LAB/.test(l))).toBe(false);
+      expect(outText()).toContain('NOTE LAB android: its answer after the interrupt not kept');
+    }
+  });
+
   it('records complete but no judge to read them: INTERRUPTED, nothing invented', async () => {
     const done = go([plain('T6', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 1 }), ctx.record('c', { kind: 'runs', runs: 1 })) }), e5()]);
     await until(() => seam.words().includes('probe hang'));
@@ -914,6 +1038,12 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
     seam.rules = [git(), probes, live({ rejudge: { code: 2, log: 'Error: no record\n' } })];
     await go([kfBlock()]);
     expect(outText()).toContain(`FAIL kf rejudge android-kf-1 (exit 2) — see ${join(dirOf('kf'), 'android-kf-1.rejudge.txt')}`);
+  });
+
+  it('the rejudge is bounded by rejudgeSecs: past it, its group stopped and the step FAIL (review round 1)', async () => {
+    seam.rules = [git(), probes, live({ rejudge: { hang: true } })];
+    await go([kfBlock({ run: async (ctx) => void (await ctx.liveRun('android-kf-1', KF, { secs: 60, rejudgeSecs: 0.05 })) })]);
+    expect(outText()).toContain(`FAIL kf rejudge android-kf-1 (timed out (exit 142: past its bound)) — see ${join(dirOf('kf'), 'android-kf-1.rejudge.txt')}`);
   });
 
   it('exit 1 without it is FAIL: live.ts died before judging (batch-10\'s judged exit-1 rule)', async () => {

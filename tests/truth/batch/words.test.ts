@@ -202,7 +202,7 @@ describe('interruptedBlock — an unfinished block in the abort SUMMARY', () => 
 describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batch-12; batch-11 exited 0 whatever its verdicts)', () => {
   it('0 when every line passes and nothing is left to put back', () => {
     expect(exitCodeOf(base)).toBe(EXIT.ok);
-    expect(EXIT).toEqual({ ok: 0, failed: 1, refused: 2, interrupted: 130 });
+    expect(EXIT).toEqual({ ok: 0, failed: 1, refused: 2, nothingRan: 2, interrupted: 130 });
   });
 
   it('1 on a FAIL in any block, lab or protected-key line', () => {
@@ -218,6 +218,15 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
 
   it('an ERROR line, an INCONCLUSIVE or a SKIP alone is not a FAIL: 0', () => {
     expect(exitCodeOf({ ...base, errors: ['09:00:00 ERROR kf: FAIL'], blocks: [{ block: 'T6', lines: ['T6 verdict: INCONCLUSIVE — not possible', 'T6 x: SKIP'] }] })).toBe(0);
+  });
+
+  it('2 when no wanted block ran (T2 S6a review round 1: a failed checkout, every need or precondition failed) — "nothing was done", never success', () => {
+    const none = { ...base, noneRan: true };
+    expect(exitCodeOf(none)).toBe(EXIT.nothingRan);
+    expect(exitCodeOf({ ...base, noneRan: false })).toBe(0);
+    expect(exitCodeOf({ ...none, restore: { file: 'R', written: ['x'] } })).toBe(1);
+    expect(exitCodeOf({ ...none, blocks: [{ block: 'E5', lines: ['E5 verdict: FAIL'] }] })).toBe(1);
+    expect(exitCodeOf({ ...none, interrupted: { at: '10:12:00' } })).toBe(130);
   });
 
   it('130 when interrupted, whatever its verdicts and RESTORE', () => {

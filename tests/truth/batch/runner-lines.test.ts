@@ -9,8 +9,13 @@ import {
   detailLines,
   detailsLines,
   deviceArgs,
+  ERRORS_PER_FILE,
   errorLinesIn,
+  fileErrors,
   hasVerdictOf,
+  judgedNothingLine,
+  liveCalls,
+  REJUDGE_SECS,
   linesIn,
   linesOf,
   labLine,
@@ -205,6 +210,41 @@ describe('errorLinesIn — the ERROR lines a block\'s log or analyze.txt holds (
 
   it('a lone CR ends a line too (a progress line a terminal overwrites): no ERROR line holds a break, so the SUMMARY never refuses it', () => {
     expect(errorLinesIn('50%\rERROR a\r60%\rERROR b\r\nERROR c\rok')).toEqual(['ERROR a', 'ERROR b', 'ERROR c']);
+  });
+});
+
+describe('fileErrors — one log\'s ERROR lines for the SUMMARY, bounded (T2 S6a review round 1)', () => {
+  it('each cut at DETAIL_CHARS code points, `…` its last; at most ERRORS_PER_FILE, then how many more and where', () => {
+    expect(ERRORS_PER_FILE).toBe(20);
+    const long = `ERROR ${'x'.repeat(800)}`;
+    expect(fileErrors('/d/a.log', `${long}\nok`)).toEqual([`${[...long].slice(0, DETAIL_CHARS - 1).join('')}…`]);
+    expect(fileErrors('/d/a.log', `ERROR ${'y'.repeat(DETAIL_CHARS - 6)}`)).toEqual([`ERROR ${'y'.repeat(DETAIL_CHARS - 6)}`]);
+    const many = Array.from({ length: 23 }, (_, i) => `ERROR e${i}`).join('\n');
+    const got = fileErrors('/d/b.log', many);
+    expect(got).toHaveLength(21);
+    expect(got[19]).toBe('ERROR e19');
+    expect(got[20]).toBe('… 3 more ERROR lines in /d/b.log');
+    expect(fileErrors('/d/c.log', Array.from({ length: 20 }, () => 'ERROR z').join('\n'))).toHaveLength(20);
+  });
+
+  it('a log that could not be read: a NOTE naming it, never silently skipped', () => {
+    expect(fileErrors('/d/stuck.log', undefined)).toEqual(['NOTE /d/stuck.log not read: unreadable (no file, or no permission)']);
+    expect(fileErrors('/d/a.log', 'ok\n')).toEqual([]);
+  });
+});
+
+describe('liveCalls — live.ts\'s and its rejudge\'s calls: each bounded, from the checkout, logged beside the run (batch-11.sh:473–481)', () => {
+  it('live.ts by the secs given, the rejudge by rejudgeSecs, else REJUDGE_SECS (120 s: batch-11 ran it unbounded)', () => {
+    const files = { log: '/d/a.log', summary: '/d/a.rejudge.txt' };
+    expect(REJUDGE_SECS).toBe(120);
+    expect(liveCalls({ repo: '/r', secs: 60, files })).toEqual({ live: { secs: 60, cwd: '/r', log: '/d/a.log' }, rejudge: { secs: 120, cwd: '/r', log: '/d/a.rejudge.txt' } });
+    expect(liveCalls({ repo: '/r', secs: 60, rejudgeSecs: 30, files }).rejudge.secs).toBe(30);
+  });
+});
+
+describe('judgedNothingLine — a block the abort judged whose judge wrote no verdict of its label (T2 S6a review round 1)', () => {
+  it('INCONCLUSIVE, saying so: no wanted block is ever missing from the abort SUMMARY', () => {
+    expect(judgedNothingLine('T6 verdict')).toBe('T6 verdict: INCONCLUSIVE — interrupted: its judge wrote no verdict');
   });
 });
 
