@@ -90,10 +90,13 @@ export function checkoutLine(r: CheckoutPrecondition): string {
 export const NOT_READ_CHECKOUT = 'NOTE checkout: not read before the interrupt';
 
 /** A need's answer (S6b supplies the checks): met, and how; or not, and why. */
-export type NeedResult = { ok: true; how: string } | { ok: false; why: string };
+export type NeedResult = { ok: true; how: string; warn?: boolean } | { ok: false; why: string };
 
-/** A need's lab line: `LAB <need>: OK — <how>` or `LAB <need>: ERROR — <why>`, its first line only. */
-export const labLine = (need: string, r: NeedResult): string => verdictLine(`LAB ${need}`, r.ok ? 'OK' : 'ERROR', firstLineOf(r.ok ? r.how : r.why));
+/**
+ * A need's lab line: `LAB <need>: OK — <how>` (WARN when met with a warning: this run's build failed, the app already
+ * installed is used — T2 S6b review round 1) or `LAB <need>: ERROR — <why>`, its first line only.
+ */
+export const labLine = (need: string, r: NeedResult): string => verdictLine(`LAB ${need}`, !r.ok ? 'ERROR' : r.warn === true ? 'WARN' : 'OK', firstLineOf(r.ok ? r.how : r.why));
 
 /** A block not run for its failed needs: `<label>: INCONCLUSIVE — <need>: <why>; …`, in the block's order. */
 export const needsLine = (label: string, failed: readonly { need: string; why: string }[]): string =>

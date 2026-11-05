@@ -285,15 +285,36 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(world.domains.get('com.apple.Accessibility')!.ApplicationAccessibilityEnabled).toEqual({ t: 'bool', c: 'true', v: 'true' });
   });
 
-  it('a listener of 8120 that stays: not put back — the port\'s hand line in RESTORE, exit 130', async () => {
+  /** RESTORE.txt when port 8120 stays listened on: the WDA's kill, each domain, the compare (review round 1, BLOCKER). */
+  const blockedRestore = (how: string) => {
+    const dir = dirOf('D43');
+    return [
+      `batch-l run ${ID} ${how} at 2026-11-05 09:44:26; state to put back by hand:`,
+      `D43 (iOS): the lab's WebDriverAgent may still be running (port 8120 not proven free): pkill -f 'DerivedData/averi-wda-lab([/ ]|$)'; pkill -f 'Devices/${LAB_UDID}/.*WebDriverAgentRunner'; lsof -t -n -P -sTCP:LISTEN -i tcp:8120 | xargs kill`,
+      ...['com.apple.keyboard.preferences', 'com.apple.Preferences', 'com.apple.Accessibility'].map((d) => `D43 (iOS): xcrun simctl spawn ${LAB_UDID} defaults import ${d} ${join(dir, `state.${d}.backup.plist`)}`),
+      `D43 (iOS): then read each domain back (defaults export) and compare it with its backup beside ${join(dir, 'state.json')}; only when every one is equal, set the state file's dirty to false`,
+      '',
+    ].join('\n');
+  };
+
+  it('a listener of 8120 that stays, interrupted: nothing restored, the state dirty; RESTORE the WDA\'s kill, each domain, the compare; exit 130', async () => {
     fresh({ stickyListener: true });
     seam.hang = '--sources wda';
     const done = go(batch());
     await until(() => seam.words.some((w) => w.includes('--sources wda')));
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
-    const restore = readFileSync(join(out, 'RESTORE.txt'), 'utf8');
-    expect(restore).toContain("D43 (iOS): the lab's WebDriverAgent may still be running (port 8120 not proven free): pkill -f averi-wda-lab;");
+    expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('interrupted'));
     expect(summary()).toContain(`RESTORE: state not provably put back — ${join(out, 'RESTORE.txt')}:`);
+    expect(seam.words.some((w) => / defaults (write|import|delete) /.test(w))).toBe(false);
+    expect(JSON.parse(readFileSync(join(dirOf('D43'), 'state.json'), 'utf8')).dirty).toBe(true);
   });
+
+  it('the same on the normal path: the window left open, its hand lines in RESTORE at the end, in the same order; exit 1', async () => {
+    fresh({ stickyListener: true });
+    expect(await go(batch())).toBe(1);
+    expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('ended'));
+    expect(summary().some((l) => l.startsWith('D43 WDA-window compare'))).toBe(false);
+  });
+
 });

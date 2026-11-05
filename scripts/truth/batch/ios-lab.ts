@@ -6,7 +6,7 @@ import type { Call, CallResult, Run } from './bounded.js';
 import type { BatchFs } from './io.js';
 import { PROTECTED, protectedLine, type ProtectedRead } from './ios-defaults.js';
 import { backup, compare, domainsWindow, LabSim, readProtected, restore } from './ios-domains.js';
-import { CATALOG_PATH, cellsWhy, companionPattern, freshIn, LSOF_ARGV, openInAlertOf, pkillOf, portHand, portOf, portPart, wdaKillPatterns, wdaRestoreOf, type PortRead } from './lab-lines.js';
+import { CATALOG_PATH, cellsWhy, companionPattern, freshIn, LSOF_ARGV, openInAlertOf, pkillOf, compareHand, portHand, portOf, portPart, wdaBlockedOf, wdaKillPatterns, wdaRestoredOf, type PortRead } from './lab-lines.js';
 import type { BlockCtx, LastStep, NeedCtx, NeedSpec } from './runner.js';
 import type { BatchConfig, NeedResult } from './runner-lines.js';
 import { STATE_FILE, stateOf } from './run-dir.js';
@@ -347,8 +347,10 @@ async function putBackWda(lab: IosSim, stateFile: string): Promise<{ ok: boolean
   await killLabWda(lab);
   await lab.wait(WDA_EXIT_WAIT_MS);
   const { port, killed } = await portFree(lab);
+  // A runner still listening would undo a restore at its exit: nothing is put back until it is gone.
+  if (port.state !== 'free') return wdaBlockedOf(port, killed, lab.udid, domainsWindow(lab.sim, stateFile).hand, stateFile);
   const r = await restore(lab.sim, stateFile);
-  return wdaRestoreOf({ ok: r.ok, line: r.line, hand: r.ok ? [] : r.hand }, port, killed, lab.udid);
+  return wdaRestoredOf({ ok: r.ok, line: r.line, hand: r.ok ? [] : r.hand }, killed);
 }
 
 /**
@@ -364,7 +366,7 @@ export function wdaWindowSpec(lab: IosSim, stateFile: string, o: { block?: strin
     },
     // Read when asked, as S4's: the state file's domains then.
     get hand() {
-      return [...domains.hand, portHand(lab.udid)];
+      return [portHand(lab.udid), ...domains.hand, compareHand(stateFile)];
     },
     stateFile,
     ...(o.block !== undefined && { block: o.block }),
