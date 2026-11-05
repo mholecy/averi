@@ -195,7 +195,8 @@ function files(state: unknown = { dirty: false, serial: SERIAL, before: { runnin
 }
 /** The probe's state restore as the batch hands it in: its call, and its command for a RESTORE line. */
 const RESTORE_CMD = 'node --import tsx d55-probe.ts --restore --serial LAB-SERIAL --state state.json';
-const restoreOf = (restore: StateRestore['restore']): StateRestore => ({ restore, command: RESTORE_CMD });
+const STATE_CMD = 'node --import tsx d55-probe.ts --state state.json';
+const restoreOf = (restore: StateRestore['restore']): StateRestore => ({ restore, command: RESTORE_CMD, stateCommand: STATE_CMD });
 const readState = (o: ReinstallOptions) => JSON.parse(readFileSync(o.stateFile, 'utf8')) as { dirty: boolean };
 
 describe("LabEmu.open — lab-device.ts's Android guard before any other call (batch-11.sh's android_guard)", () => {
@@ -409,7 +410,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(r).toEqual({
       ok: false,
       why: `the state file ${o.stateFile} cannot be marked dirty (missing) — nothing done`,
-      hand: [`D55 (Android): no reinstall without the probe's state file ${o.stateFile} marked dirty first (missing): write it (${RESTORE_CMD}), then adb -s ${SERIAL} uninstall dev.averi.lab && adb -s ${SERIAL} install ${o.apk}; then: ${RESTORE_CMD}`],
+      hand: [`D55 (Android): no reinstall was done: the probe's state file ${o.stateFile} was not marked dirty (missing); run ${STATE_CMD} first, then clear the default by hand: adb -s ${SERIAL} uninstall dev.averi.lab && adb -s ${SERIAL} install ${o.apk}`],
     });
     expect(fake.words()).toEqual(['emu avd name']);
   });
@@ -724,12 +725,34 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped: the lab's state stays as the probe left it" });
   });
 
-  it("outside a reinstall the probe's state restore is not run: nothing was wiped (T2 S5 code review)", async () => {
+  it("outside a reinstall, a dirty state file is put back by the probe's restore — it also undoes the probe's own changes; the note that nothing was wiped added (T2 S5 review round 4: the code review's decision reversed)", async () => {
+    const o = files({ dirty: true, serial: SERIAL });
     const fake = fakeEmu();
-    let asked = false;
-    const w = await windowOf(fake, { putBack: restoreOf(async () => ((asked = true), { ok: true, how: 'x' })) });
+    let asked = 0;
+    const w = await windowOf(fake, {
+      stateFile: o.stateFile,
+      putBack: restoreOf(async () => {
+        asked++;
+        writeFileSync(o.stateFile, JSON.stringify({ dirty: false, serial: SERIAL }));
+        return { ok: true, how: 'D55 restore: OK' };
+      }),
+    });
     expect(await w.restore(fake.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped: the lab's state stays as the probe left it" });
-    expect(asked).toBe(false);
+    expect(asked).toBe(1);
+    expect(readState(o).dirty).toBe(false);
+  });
+
+  it('a state file already clean needs no restore: none run, said (T2 S5 review round 4)', async () => {
+    const o = files({ dirty: false, serial: SERIAL });
+    let asked = 0;
+    const w = await windowOf(fakeEmu(), { stateFile: o.stateFile, progress: { step: 'started' }, putBack: restoreOf(async () => (asked++, { ok: true, how: 'x' })) });
+    expect(await w.restore(fakeEmu().run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); the probe's state file is clean: nothing to put back" });
+    expect(asked).toBe(0);
+    // An unreadable one is not clean: the restore runs.
+    const bad = files('{not json');
+    const w2 = await windowOf(fakeEmu(), { stateFile: bad.stateFile, putBack: restoreOf(async () => (asked++, { ok: true, how: 'x' })) });
+    expect(await w2.restore(fakeEmu().run)).toMatchObject({ ok: true });
+    expect(asked).toBe(1);
   });
 
   it('after the restore: the window\'s words are the cleanup\'s, exit by exit (T2 S5 code review: one table)', async () => {
