@@ -524,7 +524,7 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
   });
 
   it('an ERROR inside a verdict line is that block\'s verdict, never an ERROR line (S1)', async () => {
-    await go([plain('E5', { run: async (ctx) => ctx.verdict('ERROR', 'the lab not proven installed', 'E5 cleanup') })]);
+    await go([plain('E5', { run: async (ctx) => (ctx.verdict('ERROR', 'the lab not proven installed', 'E5 cleanup'), ctx.verdict('PASS')) })]);
     expect(summary()).toContain('E5 cleanup: ERROR — the lab not proven installed');
     expect(summary().filter((l) => /ERROR/.test(l) && !l.startsWith('E5 cleanup'))).toEqual([]);
   });

@@ -93,8 +93,11 @@ export interface AbortGuardOptions {
   seam: ProcessSeam;
   /** run-dir.ts#layoutOf's restoreFile. */
   restoreFile: string;
-  /** The SUMMARY's fixed lines, read when it is written. */
-  head(): { checkout: string; labs: readonly string[]; protectedLines: readonly string[] };
+  /**
+   * The SUMMARY's fixed lines, read when it is written; and the run's other ERROR lines (its blocks' logs, runner.ts),
+   * after this run's steps'.
+   */
+  head(): AbortHead;
   /** The wanted blocks, in the batch's order. */
   blocks: readonly AbortBlock[];
   clock?: () => Date;
@@ -104,6 +107,14 @@ export interface AbortGuardOptions {
   installSecs?: number;
   /** The judges' one budget in seconds, for all blocks together (120 by default). */
   judgeBudgetSecs?: number;
+}
+
+/** What the abort SUMMARY says besides the blocks: the checkout line, the lab lines, the protected keys', more ERRORs. */
+export interface AbortHead {
+  checkout: string;
+  labs: readonly string[];
+  protectedLines: readonly string[];
+  errors?: readonly string[];
 }
 
 /** A restore's bound when its window names none (batch-12's B_RESTORE). */
@@ -179,6 +190,11 @@ export class AbortGuard {
     });
   }
 
+  /** Whether the abort has begun: the runner then starts no block and prints no SUMMARY of its own. */
+  get interrupted(): boolean {
+    return this.aborting !== undefined;
+  }
+
   /** A probe, bounded in a group of its own; the abort stops it. */
   get bounded(): Run {
     return this.calls.bounded;
@@ -249,6 +265,19 @@ export class AbortGuard {
   }
 
   /**
+   * State a block leaves not provably put back outside any window (S4's compare: a late writer after the restore): its
+   * hand lines appended to RESTORE now, under `<name> run <id> left by <block> at <date>`, and said as an ERROR. The
+   * SUMMARY's RESTORE section and the exit code count them (finish's return, the abort's SUMMARY). While the abort runs
+   * too: a hand line is never dropped. A RESTORE that cannot be written sends them to stderr once, as the abort does.
+   * Returns the lines written; none for no hand line.
+   */
+  leave(block: string, hand: readonly string[]): string[] {
+    const written = this.writeRestore(`left by ${block}`, hand);
+    if (written.length > 0) this.say('ERROR', `${block}: state not provably put back — the hand commands are in ${this.options.restoreFile}`);
+    return written;
+  }
+
+  /**
    * End the kept groups (idb_companion) of `owner`'s calls (Call.owner), or all when none is given: a block done with
    * its companion ends it, as batch-12 did after each iOS block. A kill not delivered is said at once and gets its
    * RESTORE line at the next write (finish or the abort).
@@ -293,7 +322,8 @@ export class AbortGuard {
     return [...byGroup.values()].map((u) => `group ${u.pid} may still be running: kill -9 -${u.pid}, then check ${u.owner ?? whoseState(names)}`);
   }
 
-  private writeRestore(how: 'ended' | 'interrupted', hand: readonly string[]): string[] {
+  /** `how`: ended (finish, which throws when it cannot write), interrupted (the abort), or `left by <block>` (leave). */
+  private writeRestore(how: string, hand: readonly string[]): string[] {
     const { name, runId, restoreFile, fs } = this.options;
     const now = this.now();
     const header = `${name} run ${runId} ${how} at ${dateOf(now)} ${timeOf(now)}`;
@@ -347,7 +377,8 @@ export class AbortGuard {
       // RESTORE: its line is appended. stopKept never rejects (bounded.ts turns every kill failure into a result).
       await this.calls.stopKept();
       this.writeRestore('interrupted', this.undeliveredHand(names));
-      log.summary(summaryLines({ ...this.headOf(), name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors: log.errors(), interrupted: { at: timeOf(at) } }));
+      const { errors = [], ...head } = this.headOf();
+      log.summary(summaryLines({ ...head, name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors: [...log.errors(), ...errors], interrupted: { at: timeOf(at) } }));
     } catch (e) {
       // The abort's own failure (its SUMMARY could not be written): said on stderr, and the exit is 130 still.
       seam.stderr(`${this.options.name}: the abort failed: ${messageOf(e)}\n`);
@@ -462,7 +493,7 @@ export class AbortGuard {
     }
   }
 
-  private headOf(): { checkout: string; labs: readonly string[]; protectedLines: readonly string[] } {
+  private headOf(): AbortHead {
     try {
       return this.options.head();
     } catch (e) {

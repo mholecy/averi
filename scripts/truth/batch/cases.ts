@@ -230,9 +230,10 @@ export async function completeness({ fs = nodeFs, dir, name, select }: { fs?: Ba
 /**
  * The block's INCONCLUSIVE when a run it asked is not complete: `<label>: INCONCLUSIVE — <k> of <n> run(s) incomplete:
  * <name> — <why> | …`; and when it asked none (no `.cases` in its folder), `not run`, never no line at all. Undefined
- * when every run is complete: then the analyzer judges.
+ * when every run is complete: then the analyzer judges. A run is a live run's Completeness, or any other result of that
+ * shape (runner.ts: a non-live block's record, T2 S6a).
  */
-export function incompleteLine(label: string, runs: readonly { name: string; result: Completeness }[]): string | undefined {
+export function incompleteLine(label: string, runs: readonly { name: string; result: { ok: true; asked?: Asked } | { ok: false; why: string } }[]): string | undefined {
   if (runs.length === 0) return verdictLine(label, 'INCONCLUSIVE', 'not run: no .cases in its folder (nothing was asked)');
   const bad = runs.flatMap((r) => (r.result.ok ? [] : [`${nameInLine(r.name)} — ${r.result.why}`]));
   return bad.length === 0 ? undefined : verdictLine(label, 'INCONCLUSIVE', `${bad.length} of ${runs.length} run(s) incomplete: ${bad.join(' | ')}`);
