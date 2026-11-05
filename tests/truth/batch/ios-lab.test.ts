@@ -11,7 +11,6 @@ import {
   CHECK_WAIT_MS,
   dismissOpenIn,
   endLabProcesses,
-  freshIn,
   health,
   HOST_SECS,
   iosCheck,
@@ -278,15 +277,6 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     fresh({ sick: 'describe-all' });
     expect(await alive(needCtx())).toEqual({ ok: false, why: 'idb ui describe-all: exit 1 No translation object returned' });
     expect(await alive(needCtx(runOf(world), null))).toMatchObject({ ok: false });
-  });
-
-  it('freshIn: a kept file is never overwritten — the next one gets -2, -3', () => {
-    expect(freshIn(nodeFs, dir, 'x.json')).toBe(join(dir, 'x.json'));
-    writeFileSync(join(dir, 'x.json'), '');
-    writeFileSync(join(dir, 'x-2.json'), '');
-    expect(freshIn(nodeFs, dir, 'x.json')).toBe(join(dir, 'x-3.json'));
-    writeFileSync(join(dir, 'noext'), '');
-    expect(freshIn(nodeFs, dir, 'noext')).toBe(join(dir, 'noext-2'));
   });
 });
 

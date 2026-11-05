@@ -1,5 +1,7 @@
 import { DEVICE_CHECK_SIMULATOR } from '../lab-device.js';
+import { join } from 'node:path';
 import type { CallResult } from './bounded.js';
+import type { BatchFs } from './io.js';
 import { HAND_PREFIX, LAB_WDA_PORT, RESTORE_LABEL, shellQuote } from './ios-defaults.js';
 import { exitText, failedCall, firstLineOf, parseVerdictLine, verdictLine } from './words.js';
 import type { Point } from '../../../src/adapters/types.js';
@@ -138,6 +140,15 @@ export function cellsWhy(installed: string | undefined, catalog: string | undefi
   if (catalog === undefined) return `main's catalog (${CATALOG_PATH}) could not be read`;
   if (installed === undefined) return `${where}'s cells.json could not be read`;
   return installed === catalog ? undefined : `${where}'s cells.json is not main's`;
+}
+
+/** A fresh path in `dir` for `name`: itself, or `<stem>-2<ext>`, … — the first not there (never overwritten). */
+export function freshIn(fs: BatchFs, dir: string, name: string): string {
+  const dot = name.lastIndexOf('.');
+  const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
+  let path = join(dir, name);
+  for (let n = 2; fs.exists(path); n++) path = join(dir, `${stem}-${n}${ext}`);
+  return path;
 }
 
 // -------------------------------------------------------------------------------------------- the builds

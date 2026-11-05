@@ -6,7 +6,7 @@ import type { Call, CallResult, Run } from './bounded.js';
 import { nodeFs, type BatchFs } from './io.js';
 import { PROTECTED, protectedLine, type ProtectedRead } from './ios-defaults.js';
 import { backup, compare, domainsWindow, LabSim, readProtected, restore } from './ios-domains.js';
-import { CATALOG_PATH, cellsWhy, companionPattern, LSOF_ARGV, openInAlertOf, pkillOf, portHand, portOf, portPart, wdaKillPatterns, wdaRestoreOf, type PortRead } from './lab-lines.js';
+import { CATALOG_PATH, cellsWhy, companionPattern, freshIn, LSOF_ARGV, openInAlertOf, pkillOf, portHand, portOf, portPart, wdaKillPatterns, wdaRestoreOf, type PortRead } from './lab-lines.js';
 import type { BlockCtx, LastStep, NeedCtx, NeedSpec } from './runner.js';
 import type { BatchConfig, NeedResult } from './runner-lines.js';
 import { STATE_FILE, stateOf } from './run-dir.js';
@@ -236,15 +236,6 @@ export async function iosCheck(c: LabCtx, lab: IosSim, label: string): Promise<s
 }
 
 // --------------------------------------------------------------------------------------- the installed lab
-
-/** A fresh path in `dir` for `name`: itself, or `<stem>-2<ext>`, … — the first not there (never overwritten). */
-export function freshIn(fs: BatchFs, dir: string, name: string): string {
-  const dot = name.lastIndexOf('.');
-  const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
-  let path = join(dir, name);
-  for (let n = 2; fs.exists(path); n++) path = join(dir, `${stem}-${n}${ext}`);
-  return path;
-}
 
 /**
  * The installed app's cells.json against main's catalog, byte for byte (batch-11.sh:402–404): its container read

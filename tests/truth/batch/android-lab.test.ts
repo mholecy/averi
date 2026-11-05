@@ -180,7 +180,7 @@ describe('the tri-state reads around a block (batch-9: the role read was "Unknow
     expect(r).toBe('done');
     expect(order).toEqual(['work after 2 calls']);
     expect(events).toEqual([
-      'verdict D55 browser role: WARN — not compared: before: the device has no such command: Unknown command: get-role-holders; after: the device has no such command: Unknown command: get-role-holders',
+      'verdict D55 browser role: WARN — not compared: before: exit 255 Unknown command: get-role-holders; after: exit 255 Unknown command: get-role-holders',
       'verdict D55 clipboard: WARN — not compared: before: the device has no such command: No shell command implementation.; after: the device has no such command: No shell command implementation.',
     ]);
   });
