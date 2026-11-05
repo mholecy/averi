@@ -1121,6 +1121,13 @@ mutants), ios-lab.ts 100 % (382), android-lab.ts 100 % (198), lab-build.ts 100 %
 runner.ts 99.33 %, abort.ts 98.67 % (the same two equivalents), in 306 s; three survivors of its first cold run (an
 OK restore's empty hand lines, an empty build answer, the lab block's failures joined) designed away or pinned.
 
+Review round 2: an lsof that fails or passes its bound (the port unread) blocks the restore exactly as a listener does,
+now pinned (nothing written back, the state dirty, the hand lines kept); only a `gradlew --stop` that succeeded clears
+the build kit's marker, so a stop cut by the abort or failed leaves the daemon to the last step (an abort landing during
+`--stop`, pinned); and a block whose WDA window was not put back never ends PASS — `wdaWindow` returns `{ ran, putBack
+}` and, not put back, writes the block's own `INCONCLUSIVE — the lab's settings not put back (see RESTORE)` at once, so
+no judge's PASS stands for it. 4 more hand mutants, each bounded: all killed at once.
+
 The mutation run's headroom: the cold run of thirty-one modules takes about 5 minutes (298 s) against its 600 s bound;
 a slice like this one adds about 60 s. When a cold run nears the bound (say past 480 s), do not raise it silently:
 split the run (scope.json's modules in two `--mutate` halves, each held to the same floors, both run before a merge),
