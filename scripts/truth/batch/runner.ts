@@ -585,7 +585,8 @@ class BatchRun<K> {
   private takeLateEnds(): void {
     for (const l of this.lateEnds) {
       if (!l.settled() || l.lines.length === 0) continue;
-      const at = l.unread === undefined ? -1 : this.protectedLines.indexOf(l.unread);
+      // None (no endUnread): -1, as for a line not there.
+      const at = (this.protectedLines as (string | undefined)[]).indexOf(l.unread);
       if (at < 0) this.protectedLines.push(...l.lines);
       else this.protectedLines.splice(at, 1, ...l.lines);
     }

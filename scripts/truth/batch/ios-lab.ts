@@ -47,14 +47,12 @@ export const HOST_SECS = 10;
 /** The need's name in a batch's `needs`. */
 export const IOS_NEED = 'ios';
 /**
- * The need's end's bound (T2b review round 1, BLOCKER): the bounds of its calls — the guard's `simctl list`, the key's
- * `defaults read` — each with its stop (SIGTERM's grace, the pipes' close grace), summed. With every call bounded, the
+ * The need's end's bound (T2b review round 1, BLOCKER): the bounds of its two calls — the guard's `simctl list`, the
+ * key's `defaults read`, each xcrun's own (boundFor: any but a boot or an install) — each with its stop (SIGTERM's
+ * grace, the pipes' close grace), summed. With every call bounded, the
  * end cannot pass its bound before its calls do, so its read always reaches the SUMMARY.
  */
-export const IOS_END_SECS = [['simctl', 'list', 'devices', '-j'], ['simctl', 'spawn', '<udid>', 'defaults', 'read']].reduce(
-  (t, args) => t + boundFor('xcrun', args)! + (GRACE_MS + CLOSE_GRACE_MS) / 1000,
-  0,
-);
+export const IOS_END_SECS = 2 * (boundFor('xcrun', [])! + (GRACE_MS + CLOSE_GRACE_MS) / 1000);
 
 /** What a lab helper is given: bounded calls and the steps (a need's ctx and a block's are both). */
 export interface LabCtx {

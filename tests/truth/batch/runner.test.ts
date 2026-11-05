@@ -666,9 +666,14 @@ describe('a need\'s end: once per need met, after the last block and before the 
 
   it('a late end with no unread line of its own: its settled lines still taken; one not settled by the SUMMARY: the unread line stands, its later line never kept', async () => {
     const slow = plain('slow', { noRecords: true, run: async () => {}, judge: async () => (await tick(120), ['slow verdict: PASS']) });
-    let n = { android: ending([], 'android', { endSecs: 0.02, end: async (c) => (await tick(60), c.protectedLine('FAIL late')) }) };
-    expect(await go([plain('a', { needs: ['android'] }), slow], { needs: n })).toBe(1);
-    expect(summary()).toContain('FAIL late');
+    let n: Record<string, NeedSpec> = {
+      android: ending([], 'android', { endSecs: 0.02, end: async (c) => (await tick(60), c.protectedLine('FAIL late')) }),
+      ios: ending([], 'ios', { end: async (c) => c.protectedLine('OK   the other key unchanged') }),
+    };
+    expect(await go([plain('a', { needs: ['android', 'ios'] }), slow], { needs: n })).toBe(1);
+    const slot = summary().indexOf('slow verdict: PASS') + 1;
+    expect(summary().slice(slot, slot + 2)).toEqual(['OK   the other key unchanged', 'FAIL late']);
+    expect(summary()).not.toContain('undefined');
     rmSync(out, { recursive: true, force: true });
     n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async (c) => (await tick(150), c.protectedLine('FAIL later')) }) };
     expect(await go([plain('a', { needs: ['android'] })], { needs: n })).toBe(0);
