@@ -1144,6 +1144,26 @@ describe('the run\'s last steps (`lastly`): after the kept groups, on both ends,
     expect(summaryText()).toContain('kf: PASS');
   });
 
+  it('the abort with a kept group (idb_companion): the kept group ended first, then the last steps (review round 1, MINOR 5)', async () => {
+    const guard = guardOf([block('kf')], { lastly: async () => void seam.events.push(`lastly, group 100 ${seam.leftGroups.has(100) ? 'alive' : 'ended'}`) });
+    seam.leftGroups.add(100);
+    let opened = false;
+    const ran = guard.run(async () => {
+      const r = guard.bounded('idb', ['connect', 'U']);
+      await tick();
+      seam.started[0].end({ code: 0, signal: null });
+      await r;
+      guard.open('E5', window({ restore: async () => (seam.events.push('restore E5'), { ok: true, how: 'x' }) }));
+      opened = true;
+      await new Promise(() => {});
+    });
+    ran.catch(() => {});
+    for (let i = 0; i < 100 && !opened; i++) await tick(5);
+    seam.handlers?.signal('SIGINT');
+    expect(await seam.exit$).toBe(130);
+    expect(seam.events).toEqual(['start idb connect U', 'restore E5', 'SIGTERM -100', 'SIGKILL -100', 'lastly, group 100 ended']);
+  });
+
   it('last steps that throw: an ERROR line naming why; the end goes on (finish returns, the abort exits 130 with its SUMMARY)', async () => {
     const throwing = async () => {
       throw new Error('pkill: no such file\nsecond line');

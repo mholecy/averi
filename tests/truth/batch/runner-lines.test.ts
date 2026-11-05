@@ -18,6 +18,7 @@ import {
   REJUDGE_SECS,
   linesIn,
   linesOf,
+  canonicalJson,
   labLine,
   liveArgs,
   liveStepText,
@@ -362,5 +363,16 @@ describe('the lines meet words.ts\'s exit rule', () => {
       errors: [],
     };
     expect(exitCodeOf(s)).toBe(0);
+  });
+});
+
+describe('canonicalJson — a value as one key, its objects\' fields sorted at every depth (T2 S6b review round 1, NIT 8: asksLive\'s key)', () => {
+  it('two equal values built in another field order give one key; nested objects keep every field; arrays keep their order', () => {
+    expect(canonicalJson({ b: 1, a: { d: [2, 1], c: null } })).toBe('{"a":{"c":null,"d":[2,1]},"b":1}');
+    expect(canonicalJson({ a: { c: null, d: [2, 1] }, b: 1 })).toBe(canonicalJson({ b: 1, a: { d: [2, 1], c: null } }));
+    expect(canonicalJson([{ y: 1, x: 2 }, 'z'])).toBe('[{"x":2,"y":1},"z"]');
+    expect(canonicalJson({ a: [1], b: undefined })).toBe('{"a":[1]}');
+    expect(canonicalJson({ a: [1] })).not.toBe(canonicalJson({ a: [1], c: [] }));
+    expect(canonicalJson('s')).toBe('"s"');
   });
 });

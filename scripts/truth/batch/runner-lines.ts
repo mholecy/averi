@@ -75,6 +75,19 @@ export function configOf(argv: readonly string[], env: Env, repo = MODULE_REPO):
   return { ok: true, config: { out: out as string, repo: theRepo, ...(udid === undefined ? {} : { udid }), ...(serial === undefined ? {} : { serial }), env } };
 }
 
+/**
+ * A JSON value as one key (T2 S6b review round 1, NIT 8): every object's fields sorted, at every depth, so two equal
+ * values built in another field order give the same text; arrays keep their order.
+ */
+export function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  if (typeof v !== 'object' || v === null) return JSON.stringify(v);
+  const o = v as Record<string, unknown>;
+  // A field set to undefined is no field (JSON.stringify drops it too).
+  const keys = Object.keys(o).sort().filter((k) => o[k] !== undefined);
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(',')}}`;
+}
+
 /** The lab folder: made on every run (batch-11's O_lab), for what the lab checks keep: a pulled APK, a log. */
 export const LAB = 'lab';
 

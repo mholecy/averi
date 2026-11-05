@@ -10,6 +10,7 @@ import { recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from 
 import { blockName, layoutOf, META, newRunId, openRun, refusalLines, refusals, type Stateful } from './run-dir.js';
 import {
   backstopLine,
+  canonicalJson,
   checkoutLine,
   detailLines,
   detailsLines,
@@ -714,8 +715,8 @@ class BatchRun<K> {
   }
 }
 
-/** What a run was asked, as a key: its fields in one order, so two equal asks built apart compare equal. */
-const askedKey = (asked: Asked): string => JSON.stringify(asked, Object.keys(asked).sort());
+/** What a run was asked, as a key (runner-lines.ts#canonicalJson): two equal asks built apart compare equal. */
+const askedKey = (asked: Asked): string => canonicalJson(asked);
 
 /** A precondition check's answer, its why one line; a check that throws is not shown, never the run's error. */
 async function shown(check: PreconditionCheck, kit: PreconditionKit): Promise<Precondition> {
