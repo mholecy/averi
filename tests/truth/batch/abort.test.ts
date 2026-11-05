@@ -9,6 +9,7 @@ import type { Ended, KillResult, ProcessSeam, Started } from '../../../scripts/t
 import { RESTORE_FILE } from '../../../scripts/truth/batch/run-dir.js';
 import { StepLog } from '../../../scripts/truth/batch/steps.js';
 import { exitCodeOf } from '../../../scripts/truth/batch/words.js';
+import { ABORT_FAKE_MS, advanceUntil, onFakeTime } from './fake-time.js';
 
 // scripts/truth/batch/abort.ts over a fake process seam: the dirty windows, and what an interrupt, a throw or an
 // unhandled rejection does with them — batch-6's on_abort, batch-7's TRAPEXIT, batch-11's detached restores, batch-12's
@@ -93,13 +94,15 @@ beforeEach(() => {
   terminal.length = 0;
 });
 afterEach(() => rmSync(out, { recursive: true, force: true }));
-// T2c: a test that hangs past vitest's timeout never runs its finally; its fake timers and Date end here all the same.
+// A test hung past vitest's timeout leaves no fake timers or Date to the next (T2c; fake-time.ts).
 afterEach(() => void vi.useRealTimers());
 
 const clock = () => new Date(2026, 10, 4, 9, 44, 26);
 const restoreFile = () => join(out, RESTORE_FILE);
 const text = (p: string) => readFileSync(p, 'utf8');
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
+/** `v` after `ms`, on whatever timers are in use. */
+const after = <T,>(ms: number, v: T) => new Promise<T>((r) => setTimeout(() => r(v), ms));
 const CHECKOUT = "OK checkout: main's HEAD 5c63edd1, clean";
 
 const block = (name: string, over: Partial<AbortBlock> = {}): AbortBlock => ({
@@ -147,22 +150,16 @@ async function interrupt(guard: AbortGuard, body: () => void | Promise<void> = (
   return seam.exit$;
 }
 
-/**
- * `interrupt()` on fake time (T2c): setTimeout, clearTimeout and Date faked, then time advanced 1 ms at a time until the
- * abort exits. A budget race is then decided by the times the test gives, never by a stall of the machine. Real timers
- * are back when it returns, however it ends.
- */
-async function interruptOnFakeTime(guard: AbortGuard): Promise<readonly number[]> {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
-  try {
-    void guard.run(async () => void (await new Promise(() => {}))).catch(() => {});
-    await vi.advanceTimersByTimeAsync(0);
-    seam.handlers?.signal('SIGINT');
-    for (let i = 0; i < 1000 && seam.exits.length === 0; i++) await vi.advanceTimersByTimeAsync(1);
-    return seam.exits;
-  } finally {
-    vi.useRealTimers();
-  }
+/** `interrupt()` inside onFakeTime (fake-time.ts, T2c): SIGINT once the body waits, fake time advanced until the exit. */
+async function interruptFaked(guard: AbortGuard, body: () => void | Promise<void> = () => {}): Promise<readonly number[]> {
+  void guard.run(async () => {
+    await body();
+    await new Promise(() => {}); // the run waits here, as a probe would
+  }).catch(() => {});
+  await vi.advanceTimersByTimeAsync(0);
+  seam.handlers?.signal('SIGINT');
+  await advanceUntil(() => seam.exits.length > 0, ABORT_FAKE_MS, 'the abort did not exit');
+  return seam.exits;
 }
 
 const summaryText = () => text(join(out, 'meta', 'summary.txt'));
@@ -205,12 +202,8 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
 
   it('with no clock given, the time is now\'s (T2c: now fixed on a fake Date, a second before the top of the hour, which a run can then never cross)', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 10, 5, 13, 59, 59) });
-    try {
-      const guard = guardOf(undefined, { clock: undefined });
-      await interrupt(guard);
-    } finally {
-      vi.useRealTimers();
-    }
+    await interrupt(guardOf(undefined, { clock: undefined }));
+    vi.useRealTimers();
     expect(summaryText()).toContain('INTERRUPTED: batch-n run 1 was interrupted at 13:59:59');
   });
 
@@ -368,21 +361,11 @@ describe('the abort on SIGINT, SIGTERM or SIGHUP — the dirty windows put back,
 
 describe('the abort leaves no timer behind: the runner can end on its own (review round 1)', () => {
   it('a restore and a judge settled in time: every bound\'s timer cleared', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    try {
+    await onFakeTime(async () => {
       const guard = guardOf([block('kf', { complete: () => true })]);
-      void guard.run(async () => {
-        guard.open('E5', window());
-        await new Promise(() => {});
-      }).catch(() => {});
-      await vi.advanceTimersByTimeAsync(0);
-      seam.handlers?.signal('SIGINT');
-      for (let i = 0; i < 20 && seam.exits.length === 0; i++) await vi.advanceTimersByTimeAsync(1);
-      expect(seam.exits).toEqual([130]);
+      expect(await interruptFaked(guard, () => guard.open('E5', window()))).toEqual([130]);
       expect(vi.getTimerCount()).toBe(0);
-    } finally {
-      vi.useRealTimers();
-    }
+    });
   });
 });
 
@@ -758,14 +741,14 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
   it('completeness is read within the judging budget: one that never settles is not complete, said so; the next block still read (T2 S6a review round 6; T2c: on fake time)', async () => {
     const slow = () => new Promise<boolean>((r) => setTimeout(() => r(true), 20));
     const guard = guardOf([block('kf', { complete: () => new Promise<boolean>(() => {}) }), block('E5', { complete: slow, judge: async () => ['E5 verdict: PASS'] })], { judgeBudgetSecs: 0.05 });
-    expect(await interruptOnFakeTime(guard)).toEqual([130]);
+    expect(await onFakeTime(() => interruptFaked(guard))).toEqual([130]);
     expect(summaryText()).toContain('kf: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=kf)');
     expect(summaryText()).toContain("E5: INTERRUPTED — not judged (the abort's judging budget of 0.05 s was spent; rerun ONLY=E5)");
   });
 
-  it('T2c: exactly nothing left of the budget is spent (fake time): a block complete at once, its judge at once, is not judged once the block before it took the whole budget', async () => {
+  it('exactly nothing left of the budget is spent: a block complete at once, its judge at once, is not judged once the block before it took the whole budget (T2c: on fake time)', async () => {
     const guard = guardOf([block('kf', { complete: () => new Promise<boolean>(() => {}) }), block('E5', { complete: () => true, judge: async () => ['E5 verdict: PASS'] })], { judgeBudgetSecs: 0.3 });
-    expect(await interruptOnFakeTime(guard)).toEqual([130]);
+    expect(await onFakeTime(() => interruptFaked(guard))).toEqual([130]);
     expect(summaryText()).toContain('kf: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=kf)');
     expect(summaryText()).toContain("E5: INTERRUPTED — not judged (the abort's judging budget of 0.3 s was spent; rerun ONLY=E5)");
     expect(summaryText()).not.toContain('E5 verdict: PASS');
@@ -774,17 +757,15 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
   it.each([
     [299, 'kf verdict: PASS'],
     [301, 'kf: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=kf)'],
-  ])('T2c: completeness is read within what is left of the budget, the bound pinned on fake time — a budget of 300 ms, completeness at %i ms', async (completeMs, line) => {
-    const after = <T,>(ms: number, v: T) => new Promise<T>((r) => setTimeout(() => r(v), ms));
+  ])('completeness is read within what is left of the budget, the bound pinned — a budget of 300 ms, completeness at %i ms (T2c: on fake time)', async (completeMs, line) => {
     const guard = guardOf([block('kf', { complete: () => after(completeMs, true), judge: async () => ['kf verdict: PASS'] })], { judgeBudgetSecs: 0.3 });
-    expect(await interruptOnFakeTime(guard)).toEqual([130]);
+    expect(await onFakeTime(() => interruptFaked(guard))).toEqual([130]);
     expect(summaryText()).toContain(line);
   });
 
-  it('T2c: the next block\'s completeness gets only what the block before it left (fake time): 100 ms spent of 300, one at 250 ms is not read in time', async () => {
-    const after = <T,>(ms: number, v: T) => new Promise<T>((r) => setTimeout(() => r(v), ms));
+  it('the next block\'s completeness gets only what the block before it left: 100 ms spent of 300, one at 250 ms is not read in time (T2c: on fake time)', async () => {
     const guard = guardOf([block('kf', { complete: () => after(100, true) }), block('E5', { complete: () => after(250, true) })], { judgeBudgetSecs: 0.3 });
-    expect(await interruptOnFakeTime(guard)).toEqual([130]);
+    expect(await onFakeTime(() => interruptFaked(guard))).toEqual([130]);
     expect(summaryText()).toContain('kf verdict: PASS');
     expect(summaryText()).toContain('E5: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=E5)');
   });
@@ -792,10 +773,9 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
   it.each([
     [49, 'kf verdict: PASS'],
     [51, "kf: INTERRUPTED — not judged (the abort's judging budget of 0.3 s was spent; rerun ONLY=kf)"],
-  ])('the judge gets what is left after its block\'s completeness was read: one budget for both (T2 S6a review round 6; T2c: on fake time, the bound pinned — completeness at 250 ms of 300, a judge of %i ms)', async (judgeMs, line) => {
-    const after = <T,>(ms: number, v: T) => new Promise<T>((r) => setTimeout(() => r(v), ms));
+  ])('the judge gets what is left after its block\'s completeness was read: one budget for both, the bound pinned — completeness at 250 ms of 300, a judge of %i ms (T2 S6a review round 6; T2c: on fake time)', async (judgeMs, line) => {
     const guard = guardOf([block('kf', { complete: () => after(250, true), judge: () => after(judgeMs, ['kf verdict: PASS']) })], { judgeBudgetSecs: 0.3 });
-    expect(await interruptOnFakeTime(guard)).toEqual([130]);
+    expect(await onFakeTime(() => interruptFaked(guard))).toEqual([130]);
     expect(summaryText()).toContain(line);
   });
 
@@ -824,7 +804,7 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
       ],
       { judgeBudgetSecs: 0.05 },
     );
-    expect(await interruptOnFakeTime(guard)).toEqual([130]);
+    expect(await onFakeTime(() => interruptFaked(guard))).toEqual([130]);
     const s = summaryText();
     expect(s).toContain("kf: INTERRUPTED — not judged (the abort's judging budget of 0.05 s was spent; rerun ONLY=kf)");
     expect(s).toContain("T6: INTERRUPTED — not judged (the abort's judging budget of 0.05 s was spent; rerun ONLY=T6)");

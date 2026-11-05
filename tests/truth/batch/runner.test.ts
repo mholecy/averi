@@ -9,6 +9,7 @@ import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../.
 import { NEED_END_SECS, runBatch, type Block, type NeedCheck as NeedCtxCheck, type NeedCtx, type NeedEndCtx, type NeedSpec, type RunBatchOptions, type RunIo } from '../../../scripts/truth/batch/runner.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import type { KnobSpec } from '../../../scripts/truth/batch/select.js';
+import { BATCH_FAKE_MS, advanceUntil, onFakeTime } from './fake-time.js';
 
 // scripts/truth/batch/runner.ts: runBatch over a fake process seam — git, the probes and live.ts answered by rules —
 // with real files in a temp dir, a fixed clock and pid, and a fake live-cases table: no process started, no device.
@@ -155,7 +156,7 @@ beforeEach(() => {
   terminal = [];
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
-// T2c: a test that hangs past vitest's timeout never runs its finally; its fake timers and Date end here all the same.
+// A test hung past vitest's timeout leaves no fake timers or Date to the next (T2c; fake-time.ts).
 afterEach(() => void vi.useRealTimers());
 
 const dirOf = (block: string) => join(out, block, `run-${ID}`);
@@ -192,26 +193,14 @@ async function until(ok: () => boolean, ms = 1000): Promise<void> {
   for (const end = Date.now() + ms; Date.now() < end; await tick(2)) if (ok()) return;
   throw new Error('the condition never held');
 }
-/**
- * `body` on fake time (T2c): setTimeout, clearTimeout and Date faked, so a race of a bound against a wait is decided by
- * the times the test gives, never by a stall of the machine. Real timers are back when it returns, however it ends.
- */
-async function onFakeTime(body: () => Promise<void>): Promise<void> {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
-  try {
-    await body();
-  } finally {
-    vi.useRealTimers();
-  }
-}
-/** `go` on fake time: time advanced 1 ms at a time until the batch has ended. */
+/** `go` inside onFakeTime (fake-time.ts, T2c): fake time advanced until the batch has ended. */
 async function goFaked(...args: Parameters<typeof go>): Promise<number> {
   let ended: { code: number } | { error: unknown } | undefined;
   void go(...args).then((code) => void (ended = { code }), (error: unknown) => void (ended = { error }));
-  for (let i = 0; i < 2000 && ended === undefined; i++) await vi.advanceTimersByTimeAsync(1);
-  if (ended === undefined) throw new Error('the batch did not end within 2 s of fake time');
-  if ('error' in ended) throw ended.error;
-  return ended.code;
+  await advanceUntil(() => ended !== undefined, BATCH_FAKE_MS, 'the batch did not end');
+  const e = ended!; // advanceUntil threw unless the batch ended
+  if ('error' in e) throw e.error;
+  return e.code;
 }
 
 // ------------------------------------------------------------------------------------------------ the whole batch
