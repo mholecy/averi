@@ -348,8 +348,8 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
       const { cfg } = await loadForCall(TOOL_CONFIG.open_deep_link(p), cp);
       // The project's iOS app (D49a): a link to its own scheme waits until it is in front (adapters/ios.ts). On
       // android the policy reads no config, so none is handed over (and android.ts ignores it).
-      const outcome = await (await deviceFor(p, iosToolSettings(cfg, p))).openDeepLink(url, { appId: cfg?.app.ios?.bundleId });
-      return text(deepLinkText(p, url, outcome));
+      const answer = await (await deviceFor(p, iosToolSettings(cfg, p))).openDeepLink(url, { appId: cfg?.app.ios?.bundleId });
+      return text(deepLinkText(p, url, answer));
     },
   );
 

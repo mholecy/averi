@@ -1,7 +1,7 @@
 import { IdbEmptyTreeError, type ApplicationLabel } from './ios-tree-source.js';
 import type { IosTreeSourceKind } from './ios-node.js';
-import { ALERT_ADVICE, alertButtonsText, namesApp, titleAsksToOpen } from './ios-system-alert.js';
-import type { DeepLinkOutcome, LinkAlert, SystemAlert } from './types.js';
+import { namesApp, titleAsksToOpen } from './ios-system-alert.js';
+import type { AppHolder, SystemAlert } from './types.js';
 import { errorMessage } from '../util/error-message.js';
 import { formatSeconds } from '../util/duration.js';
 import { sleep } from '../util/sleep.js';
@@ -161,10 +161,11 @@ import { sleep } from '../util/sleep.js';
  * amendment): an unanswered "Open in “AveriLab”?" keeps every later launch
  * behind it (batch-2), and D48's "read again" cannot answer it. Its wait ends
  * on it as a link's does, and the launch's note names the alert and its
- * buttons' centres (alertNote) in place of D48's — the launch still never
+ * buttons' centres in place of D48's — the launch still never
  * fails. Never "it asks": the alert belongs to something earlier, and may name
  * another app; so a WDA launch, which has no names cached, asks no appinfo for
- * it. Not on Android: the previous app's
+ * it. The alert goes up as a fact (AppHolder's `alert`, A10), on both verbs;
+ * interact/app-holder-text.ts#appHolderText words it. Not on Android: the previous app's
  * tree after a switch has not been measured there (uiautomator dumps the
  * focused window), so android.ts waits for nothing.
  */
@@ -238,23 +239,21 @@ export interface ForegroundCheck {
 }
 
 /**
- * Read until the Application label is one of the bundle's names (see the
- * module comment), and return the note to show when the wait ended without
- * confirming that — none when it confirmed it, or (a launch only) the
- * source does not ask. A link (`check.link`, D49a) has a note in every case
- * but the match and the alert, led by what the wait knows: it SAW another app or SpringBoard
- * (LINK_SAW), it could not check (LINK_UNCHECKED), or WebDriverAgent is not
- * running yet and nothing was asked (notAsked) — never a bare "Opened" for a
- * link that may wait behind iOS's "Open in …?". When it found that alert (D54), a link's outcome is the alert instead,
- * and a launch's note names it (alertNote, D56).
+ * Read until the Application label is one of the bundle's names (see the module comment), and return what holds the
+ * app: nothing when it confirmed that or (a launch only) the source does not ask; iOS's system alert when it found one
+ * (D54, D56), `asksForApp` judged with the names the wait held; else the caveat, which stays a sentence from here
+ * (adapters/types.ts#AppHolder says why). A link (`check.link`, D49a) has a caveat in every case but the match and the
+ * alert, led by what the wait knows: it SAW another app or SpringBoard (LINK_SAW), it could not check (LINK_UNCHECKED),
+ * or WebDriverAgent is not running yet and nothing was asked (notAsked) — never a bare "Opened" for a link that may wait
+ * behind iOS's "Open in …?".
  */
-export async function awaitForeground(check: ForegroundCheck): Promise<DeepLinkOutcome> {
+export async function awaitForeground(check: ForegroundCheck): Promise<AppHolder> {
   const end = await poll(check);
-  if (end.kind === 'matched') return {};
-  if (end.kind === 'alert') return check.link === undefined ? { note: alertNote(check.bundleId, end.alert) } : { alert: linkAlertOf(end) };
-  if (check.link === undefined) return end.kind === 'declined' ? {} : { note: end.note };
-  if (end.kind === 'declined') return { note: notAsked(check.bundleId) };
-  return { note: `${(end.kind === 'saw' ? LINK_SAW : LINK_UNCHECKED)(check.bundleId)}${end.note}` };
+  if (end.kind === 'matched') return { holder: 'none' };
+  if (end.kind === 'alert') return { holder: 'alert', alert: { ...end.alert, asksForApp: namesApp(end.alert.title, end.names) } };
+  if (check.link === undefined) return end.kind === 'declined' ? { holder: 'none' } : { holder: 'unknown', caveat: end.note };
+  if (end.kind === 'declined') return { holder: 'unknown', caveat: notAsked(check.bundleId) };
+  return { holder: 'unknown', caveat: `${(end.kind === 'saw' ? LINK_SAW : LINK_UNCHECKED)(check.bundleId)}${end.note}` };
 }
 
 /**
@@ -369,7 +368,7 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
 /**
  * WDA's system alert at the bound (D54; a launch's too, D56): one `check.alert()`, and — for a link only — the names
  * it is judged against (appinfo's, which the link's scheme lookup has cached; unreadable names are no name). A launch
- * asks no names: its note never judges the title (alertNote), and a WDA launch has none cached. Fails open: a read
+ * asks no names: its text never judges the title (AppHolder), and a WDA launch has none cached. Fails open: a read
  * that throws, or holds no alert, is undefined, and the wait's note is the one of before.
  */
 async function alertAtBound(check: ForegroundCheck): Promise<AlertEnd | undefined> {
@@ -389,20 +388,6 @@ function idbAlert(read: Extract<ApplicationLabel, { kind: 'label' }>, names: rea
   const { candidate } = read;
   return candidate !== undefined && titleAsksToOpen(candidate.title, names) ? candidate : undefined;
 }
-
-/** A found alert as a link's outcome carries it: whether its title names the app (`asksForApp`, namesApp). */
-const linkAlertOf = ({ alert, names }: AlertEnd): LinkAlert => ({ ...alert, asksForApp: namesApp(alert.title, names) });
-
-/**
- * A launch's note when a system alert holds it (D56): iOS has not brought the app forward, the alert's title verbatim
- * and its buttons' centres, and the advice open_deep_link's reply gives (ios-system-alert.ts) — then D48's read again,
- * since what comes forward once it is answered is unmeasured. Always "a system alert is up", never "it asks": the
- * alert belongs to something earlier (a link), and may name another app. No "3 s after": idb ends at the read that
- * lists it, WDA at the bound.
- */
-const alertNote = (bundleId: string, alert: SystemAlert): string =>
-  `iOS has not brought ${bundleId} forward yet: a system alert is up, "${alert.title}" — ${alertButtonsText(alert)}. ${ALERT_ADVICE} — ` +
-  'then read again before trusting a read';
 
 /** What a "could not check" note quotes of an error: its first line — the cause, not a stack or a paragraph of advice. */
 const headline = (e: unknown): string => errorMessage(e).split('\n')[0];

@@ -561,7 +561,7 @@ describe('launch_app — the entry activity', () => {
     expect(byTool).toEqual({ appId: 'md.bank.app', ...entry, activity });
   });
 
-  // 2026-10-09: what the adapter's launch says (LaunchOutcome.note — iOS's
+  // 2026-10-09: what the adapter's launch says (AppHolder's caveat — iOS's
   // foreground wait, adapters/ios-foreground.ts) reaches the reply.
   it("the launch's note reaches the reply as a ⚠ line; a launch with none replies with the one line", async () => {
     const ios = home();

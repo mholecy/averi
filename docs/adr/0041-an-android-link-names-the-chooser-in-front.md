@@ -11,6 +11,8 @@ Amended 2026-11-03 (D55b: `launch_app`'s `-p` start and monkey's refusal read th
 `fix/d55b-launch-chooser`).
 Amended 2026-11-05 (D55d: batch-13's with_default trees committed as fixtures and the fail-open pinned on them;
 implemented on `test/d55d`).
+Amended 2026-11-06 (A10: the chooser goes up as a fact, on both verbs, and its words move above the adapters; replies
+byte for byte; implemented on `arch/a10-app-holder`).
 
 ## Context
 
@@ -192,7 +194,7 @@ physical keys but with factor 2.0%.": the wrong cause, and a warning quoted as t
 - After a `started` `-p` start, `launchApp` reads the focus once (`chooserInFront`, D55's read: the same command, 2 s
   bound, `chooserInFocus` and fail-open). When it names the chooser, the launch returns `{ note }`: the headline
   stays `Launched`, and the reply's ⚠ line and the flow's `⚠ launch` line carry
-  `adapters/android-chooser.ts#launchChooserNote`:
+  `launchChooserNote`, then in `adapters/android-chooser.ts` (since A10 `interact/app-holder-text.ts#appHolderText`):
 
   > Android has not brought dev.averi.lab forward yet: its chooser
   > (android/com.android.internal.app.ResolverActivity) is in front, and dev.averi.lab is not. Take a ui_snapshot, tap
@@ -320,7 +322,8 @@ started `.Twin`, row 2's app. Its three dumps on the chooser took 2514, 2020 and
   labels verbatim, centres (`rectCentre`, now in `adapters/types.ts` beside `Rect`, re-exported by
   `ui-tree/geometry.ts`; the alert judge uses it too) and `disabled`. Anything else, or any throw, timeout or XML-less dump, is
   no sheet, and the reply is D55's (or D55b's) byte for byte.
-- The reply (`mcp/tool-text.ts#chooserText`; `launchChooserNote`, which now takes the `LinkChooser`) keeps D55's or
+- The reply (`mcp/tool-text.ts`'s chooserText; `launchChooserNote`, which now takes the `LinkChooser`; both since A10
+  `interact/app-holder-text.ts#appHolderText`) keeps D55's or
   D55b's first sentence and replaces the advice with the sheet and its own advice (`chooserSheetText`:
   `chooserSheetSays`, then `sheetAdvice`, beside `chooserAdvice`, whose ending both share). On the fixture:
 
@@ -449,3 +452,29 @@ header holds `icon`, `title` "Open with AveriLab" and `button_bar` with "Just on
   rule.
 - The D55c live check's "the with_default tree is not yet a committed fixture (backlog D55d)" is superseded by this
   amendment.
+
+## Amendment: the chooser is a fact of one closed answer, worded above the adapters (2026-11-06, A10)
+
+**Context.** After a link the chooser went up as `{ chooser }`, after a `-p` start as a `{ note }` sentence, and
+`mcp/tool-text.ts` imported `adapters/android-chooser.ts` for the words, against ARCHITECTURE.md §2 (the architecture
+review of 2026-11-05). D55b's "No type, `launchText` or engine change" was what let the shapes differ.
+
+**Decision.** No reply, device call or order changes. The title stays `Launched`: a launch never fails for what holds
+it.
+- `launch` and `openDeepLink` answer one closed type, `adapters/types.ts#AppHolder` (ADR 0032's A10 amendment has the
+  iOS half): the chooser is `{ holder: 'chooser', chooser }` on both verbs, with its sheet when read. The focus read and
+  the dump (D55, D55c) stay in `AndroidAdapter`: they are device reads, and `chooserInFocus` and `chooserSheet` stay
+  the pure judges.
+- `CHOOSER_ADVICE`, `chooserAdvice`, `sheetAdvice`, `chooserSheetSays`, `chooserSheetText` and `launchChooserNote` are
+  gone from `android-chooser.ts`, their sentences now `interact/app-holder-text.ts#appHolderText`'s.
+- One thing stays worded in the adapter, on purpose: monkey's refusal (`monkeyChooserRefusal`, `chooserAlsoInFront`).
+  It is a thrown error, not an answer: its message is built where the refusal is read and may not import upward
+  (ARCHITECTURE.md §2), and `tests/adapters/android.test.ts` pins it there. So its advice, `REFUSAL_ADVICE`, repeats the
+  bytes of a launch's advice in `appHolderText`, each side pinned whole.
+
+**Tests.** The byte pins moved with the words to `tests/interact/app-holder-text.test.ts`, literally the same strings;
+`android.test.ts` pins the adapter's answer as the same notes through `appHolderText`, and
+`tests/mcp/android-chooser-replies.test.ts` is unchanged.
+
+Residual: a change to the launch's chooser advice must be made twice (the words module and `REFUSAL_ADVICE`); the two
+pins are independent, so neither fails if only one is changed. Worth a row only if that wording moves again.

@@ -1409,7 +1409,7 @@ flows:
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app' });
   });
 
-  // 2026-10-09: the launch's caveat (LaunchOutcome.note — iOS's foreground
+  // 2026-10-09: the launch's caveat (AppHolder's caveat — iOS's foreground
   // wait giving up, adapters/ios-foreground.ts) is a ⚠ line right under the
   // launch line, in launch_app's words; the flow goes on.
   it("the launch's note is a `⚠ launch` line right under the launch line, and the flow goes on; no note, no line", async () => {
