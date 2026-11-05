@@ -386,8 +386,10 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
  * the tail gate's `tails() === 0`, the report skipped). `rounds`: per typing sent, the poll's reads; the last repeats.
  */
 describe('typeAndConfirm — the arms after a retry', () => {
-  function byRounds(rounds: string[][]) {
+  function byRounds(rounds: string[][], siblingAfter: (string | null)[] = []) {
     const typed: string[] = [];
+    const sibling = (): UiNode =>
+      node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: typed.length === 0 ? null : (siblingAfter[typed.length - 1] ?? null) });
     let reads = 0;
     let dropped = 0;
     const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: null });
@@ -401,7 +403,7 @@ describe('typeAndConfirm — the arms after a retry', () => {
         const round = rounds[Math.min(typed.length - 1, rounds.length - 1)];
         return round[Math.min(reads++, round.length - 1)];
       },
-      screen: () => node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field] }),
+      screen: () => node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field, sibling()] }),
       reportDroppedTail: () => {
         dropped++;
       },
@@ -410,8 +412,9 @@ describe('typeAndConfirm — the arms after a retry', () => {
     return { io, intent, typed, reported: () => dropped };
   }
 
-  // Said-plain needs no clear (with clear a masked reading of another length has not landed), so what was sent before
-  // it can only be a tail.
+  // Said-plain needs no clear (with clear a masked reading of another length has not landed), so a retype before it is a
+  // tail. A held count 'unread' with `on-return` is reachable only at this module's interface: fill.ts never builds it,
+  // which is why the arm's own comment can say that no tail was retyped there.
   it('said-plain after a tail typed again keeps what was sent, and reports no drop', async () => {
     const { io, intent, typed, reported } = byRounds([['ab'], ['•••••••']]);
     expect(await typeAndConfirm(io, { ...intent, held: 'unread' })).toEqual({
@@ -437,6 +440,19 @@ describe('typeAndConfirm — the arms after a retry', () => {
     });
     expect(typed).toEqual(['abcd', 'abcd', 'cd']);
     expect(reported()).toBe(1);
+  });
+
+  // After a retry `not-taken` goes on to what is sent again: here to `whereTyped`, which names the other input.
+  it('a non-input not-taken after the whole retype, a sibling gaining the missing part: missed, elsewhere', async () => {
+    const { io, intent, typed } = byRounds([['xabcd'], ['ab']], [null, 'cd']);
+    expect(await typeAndConfirm(io, { ...intent, clear: true, isInput: false, resolvedValue: 'Name' })).toEqual({
+      kind: 'missed',
+      observed: 'ab',
+      again: [{ kind: 'whole', wiped: true }],
+      differs: { kind: 'length' },
+      elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } },
+    });
+    expect(typed).toEqual(['abcd', 'abcd']);
   });
 
   it('a placeholder landing through a tail typed again reports the drop', async () => {
