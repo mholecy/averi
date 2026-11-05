@@ -340,6 +340,19 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     expect(terminal.join('')).toContain(`${join(out, 'E5', 'run-old', 'state.json')} is dirty (E5 not put back):\n  → node e5.ts --restore --state ${join(out, 'E5', 'run-old', 'state.json')}\n`);
   });
 
+  it('a run folder of this run\'s id already there: refused, nothing written into it (S1: never reused)', async () => {
+    mkdirSync(dirOf('kf'), { recursive: true });
+    expect(await go([plain('kf')])).toBe(2);
+    expect(terminal).toEqual([`ERROR the run folder ${dirOf('kf')} already exists — nothing was done\n`]);
+    expect(existsSync(dirOf('meta'))).toBe(false);
+  });
+
+  it('a block that is not stateful: an earlier state file in its folder is not its to read, so no refusal', async () => {
+    mkdirSync(join(out, 'E5', 'run-old'), { recursive: true });
+    writeFileSync(join(out, 'E5', 'run-old', 'state.json'), '{"dirty":true}');
+    expect(await go([plain('E5')])).toBe(0);
+  });
+
   it('the batch\'s own reasons refuse too (batch-12\'s pre-D62 worktree)', async () => {
     expect(await go([plain('kf')], { batchReasons: ['the pre-D62 worktree is still registered'] })).toBe(2);
     expect(terminal.join('')).toContain('the pre-D62 worktree is still registered\n');
@@ -354,7 +367,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     await expect(go([plain('kf', { needs: ['tv'] })])).rejects.toThrow('kf needs tv, which has no check (needs: android, ios)');
     await expect(go([plain('kf'), plain('kf')])).rejects.toThrow('block kf is named twice');
     await expect(go([plain('kf', { label: 'kf: x' })])).rejects.toThrow('holds a colon');
-    await expect(go([plain('k f')])).rejects.toThrow('one plain path segment');
+    await expect(go([plain('k f')])).rejects.toThrow('block "k f": one plain path segment is needed');
     await expect(runBatch({ name: 'batch-t', blocks: [plain('kf'), plain('kf')], config: { ok: false, errors: ['ERROR x — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } })).rejects.toThrow('block kf is named twice');
     expect(terminal).toEqual([]);
     expect(seam.calls).toEqual([]);
@@ -363,6 +376,12 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
 });
 
 describe('the run\'s folders: one fresh run-<id> per wanted block, and the lab folder on every run (batch-11.sh:116–121)', () => {
+  it('with no clock or pid given, the run\'s id is now\'s and this process\'s (`date +%Y%m%d-%H%M%S`-$$)', async () => {
+    await runBatch({ name: 'batch-t', blocks: [plain('kf')], config: { ok: true, config: configFrom(['--out', out, '--repo', repo], {}) }, io: { seam, terminal: (t) => void terminal.push(t), table, graceMs: 5 } });
+    const [run] = nodeFs.list(join(out, 'meta'));
+    expect(run).toMatch(new RegExp(`^run-${new Date().getFullYear()}\\d{4}-\\d{6}-${process.pid}$`));
+  });
+
   it('meta, lab and each wanted block\'s folder made; an unwanted block gets none', async () => {
     await go([plain('kf'), plain('E5')], { env: { ONLY: 'kf' } });
     expect([dirOf('meta'), dirOf('lab'), dirOf('kf')].map(existsSync)).toEqual([true, true, true]);
@@ -376,6 +395,45 @@ describe('the run\'s folders: one fresh run-<id> per wanted block, and the lab f
     seen = undefined;
     await go([plain('lab', { run: async (ctx) => void (seen = { dir: ctx.dir, lab: ctx.labDir }) })], { io: { pid: 4243 } });
     expect(seen).toEqual({ dir: join(out, 'lab', 'run-20261105-094426-4243'), lab: join(out, 'lab', 'run-20261105-094426-4243') });
+  });
+});
+
+describe('a block\'s ctx: its steps, its lines, its folder (S1\'s steps.ts under the runner)', () => {
+  it('step, note, err and print land in the .out (and steps.log); each verdict line is printed before the SUMMARY', async () => {
+    await go([plain('kf', { run: async (ctx) => (ctx.step('OK', 'kf probe'), ctx.note('NOTE kf noted'), ctx.print('kf printed'), ctx.err('kf erred'), ctx.verdict('PASS', 'ok')) })]);
+    const before = outText().split('======== SUMMARY')[0];
+    expect(before).toContain('09:44:26 OK   kf probe\n');
+    expect(before).toContain('09:44:26 NOTE kf noted\n');
+    expect(before).toContain('\nkf printed\n');
+    expect(before).toContain('\nkf verdict: PASS — ok\n');
+    expect(text(join(out, 'steps.log'))).toContain('09:44:26 ERROR kf erred\n');
+  });
+
+  it('verdictLines: an analyzer\'s lines as they are, each of its lines (CR LF, a lone CR) one line, empty ones dropped', async () => {
+    await go([plain('kf', { run: async (ctx) => ctx.verdictLines(['kf live kf1: PASS\r\nkf verdict: PASS\r\n', '']) })]);
+    expect(summary().slice(2, 4)).toEqual(['kf live kf1: PASS', 'kf verdict: PASS']);
+  });
+
+  it('a verdict or protected-key line holding a line break is the batch\'s mistake: thrown (the abort), and the abort SUMMARY is still printed', async () => {
+    expect(await go([plain('kf', { run: async (ctx) => ctx.verdictAndHand({ line: 'kf verdict: PASS\nx', hand: [] }) })])).toBe(130);
+    expect(summary()[0]).toBe('======== SUMMARY');
+    expect(summary().join('\n')).toContain("by an error: kf's verdict line holds a line break");
+    rmSync(out, { recursive: true, force: true });
+    seam = new FakeSeam([git(), probes, live()]);
+    expect(await go([plain('kf', { run: async (ctx) => ctx.protectedLine('OK x\ny') })])).toBe(130);
+    expect(summary().join('\n')).toContain('by an error: a protected-key line holds a line break');
+  });
+
+  it('a file of a record that cannot be written for another reason than EEXIST: its own error, not "already exists"', async () => {
+    expect(await go([plain('E5', { run: async (ctx) => (rmSync(ctx.dir, { recursive: true }), ctx.asks('c', { kind: 'runs', runs: 1 })) })])).toBe(130);
+    expect(summary().join('\n')).toContain('ENOENT');
+    expect(summary().join('\n')).not.toContain('already exists');
+  });
+
+  it('a details spec naming a file the block did not write prints nothing for it', async () => {
+    await go([plain('kf', { details: [{ file: 'never.log' }] })]);
+    const o = outText().split('\n');
+    expect(o[o.indexOf(`-- kf (${dirOf('kf')}/)`) + 1]).toBe(`== DONE — all outputs in ${out}/<block>/run-${ID} ==`);
   });
 });
 
@@ -468,9 +526,11 @@ describe('needs: each checked once, when the first wanted block needing it comes
         return r.code === 0 ? { ok: true as const, how: 'emu answers' } : { ok: false as const, why: 'no' };
       },
     };
-    await go([plain('kf', { needs: ['android'] })], { needs: n });
+    await go([plain('kf', { needs: ['android'] })], { needs: { android: async (c: NeedCtx) => (c.step('NOTE', 'android: the emulator asked'), n.android(c)) } });
     expect(got).toEqual({ labDir: dirOf('lab'), serial: 'emulator-5554' });
     expect(seam.words()).toContain('probe emu');
+    expect(outText()).toContain('09:44:26 NOTE android: the emulator asked\n');
+    expect(outText()).toContain('09:44:26 LAB android: OK — emu answers\n');
   });
 });
 
@@ -491,6 +551,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     await go([plain('D62', { run: async (ctx) => ctx.err('D62: the lab is not main\'s — skipped') })]);
     expect(summary()).toContain('D62 verdict: INCONCLUSIVE — not run (see the ERROR lines)');
     expect(summary()).toContain("09:44:26 ERROR D62: the lab is not main's — skipped");
+    expect(outText()).not.toContain('analyze');
   });
 
   it('a cleanup or compare line is no verdict of the block: the backstop still comes', async () => {
@@ -524,6 +585,9 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     ], { needs: { ...needs, android: async () => ({ ok: false, why: 'down' }) } });
     expect(judged).toEqual([`a ${dirOf('a')}`]);
     expect(summary()).toContain('a verdict: PASS — judged');
+    rmSync(out, { recursive: true, force: true });
+    await go([plain('a', { run: async () => {}, judge: async () => ['a live x: PASS\r\na verdict: PASS\r\n'] })]);
+    expect(summary().slice(2, 4)).toEqual(['a live x: PASS', 'a verdict: PASS']);
     expect(outText()).toContain('OK   a analyze');
   });
 });
@@ -547,6 +611,11 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
     ]);
     const errors = summary().slice(summary().indexOf('RESTORE: none — everything dirty was put back and verified') + 1, -1);
     expect(errors).toEqual(['ERROR the catalog drifted', 'ERROR the analyzer\'s own', 'ERROR the cell did not open']);
+  });
+
+  it('a probe log\'s progress line (a lone CR) never breaks the SUMMARY: each overwritten part its own line', async () => {
+    expect(await go([plain('kf', { run: async (ctx) => (writeFileSync(join(ctx.dir, 'p.log'), '10%\rERROR stalled\r20%\n'), ctx.verdict('PASS')) })])).toBe(0);
+    expect(summary()).toContain('ERROR stalled');
   });
 
   it('an ERROR inside a verdict line is that block\'s verdict, never an ERROR line (S1)', async () => {
@@ -607,6 +676,7 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(await done).toBe(130);
     expect(seam.exits).toEqual([130]);
     expect(ran).toEqual([]);
+    expect(outText()).toContain('NOTE E5: a verdict after the interrupt not kept: E5 verdict: PASS — never reached in time');
     expect(summary()).toEqual([
       '======== SUMMARY',
       "OK checkout: main's HEAD aaaaaaaa, clean",
@@ -654,6 +724,47 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
     expect(summary()).toContain('kf: INTERRUPTED — its records are not complete, not judged (rerun ONLY=kf)');
+  });
+
+  it('interrupted inside live.ts (no record yet): the run is not complete, so not judged', async () => {
+    seam.rules = [git(), probes, (cmd, args) => (args.includes('--record') ? { hang: true } : undefined)];
+    const done = go([kfBlock()]);
+    await until(() => seam.words().some((w) => w.includes('--record')));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(summary()).toContain('kf: INTERRUPTED — its records are not complete, not judged (rerun ONLY=kf)');
+  });
+
+  it('the abort\'s judge and a block\'s complete() read its folder', async () => {
+    const T6 = plain('T6', {
+      run: async (ctx) => writeFileSync(join(ctx.dir, 'static.txt'), 'captured'),
+      complete: ({ dir, fs }) => fs.exists(join(dir, 'static.txt')),
+      judge: async ({ dir, fs }) => [`T6 verdict: PASS — ${fs.read(join(dir, 'static.txt'))}`],
+    });
+    const done = go([T6, e5()]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(summary()).toContain('T6 verdict: PASS — captured');
+  });
+
+  it('interrupted during the normal end\'s judging: only the abort\'s SUMMARY, never a second', async () => {
+    const done = go([plain('a', { run: async () => {}, judge: async ({ run }) => (await run('probe', ['hang'], { secs: 30 }), ['a verdict: PASS — judged']) })]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(seam.exits).toEqual([130]);
+    expect(text(join(dirOf('meta'), 'summary.txt')).split('======== SUMMARY end').length).toBe(2);
+  });
+
+  it('interrupted in the last block: the normal end\'s judges are not run (the abort judges what is complete)', async () => {
+    const judged: string[] = [];
+    const done = go([plain('a', { run: async () => {}, judge: async () => (judged.push('a'), ['a verdict: PASS']) }), e5()]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    await tick(10);
+    expect(judged).toEqual([]);
   });
 
   it('records complete but no judge to read them: INTERRUPTED, nothing invented', async () => {
@@ -783,6 +894,7 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
     expect(JSON.parse(text(join(dirOf('kf'), 'android-kf-1.cases')))).toEqual(KF);
     expect(got).toEqual({ live: { word: 'OK', why: 'exit 0' }, rejudge: { word: 'OK', why: 'exit 0' } });
     expect(text(join(dirOf('kf'), 'android-kf-1.rejudge.txt'))).toContain(LIVE_GOLDEN_HEADER);
+    expect(outText()).toContain(`\n== kf live android-kf-1 (log: ${join(dirOf('kf'), 'android-kf-1.log')}) ==\n`);
     expect(outText()).toContain('OK   kf live android-kf-1\n');
     expect(outText()).toContain('OK   kf rejudge android-kf-1\n');
   });
@@ -822,7 +934,9 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
   });
 
   it('no device id for its platform: FAIL, nothing run, the .cases kept (asked, never ran — the backstop says so)', async () => {
-    await go([kfBlock({ judge: undefined })], { argv: ['--out', out, '--repo', repo] });
+    let got: unknown;
+    await go([kfBlock({ judge: undefined, run: async (ctx) => void (got = await ctx.liveRun('android-kf-1', KF, { secs: 60 })) })], { argv: ['--out', out, '--repo', repo] });
+    expect(got).toEqual({ live: { word: 'FAIL', why: 'no lab emulator serial given (--serial or AVERI_LAB_SERIAL)' } });
     expect(seam.words().some((w) => w.includes('live.ts'))).toBe(false);
     expect(outText()).toContain('FAIL kf live android-kf-1: no lab emulator serial given (--serial or AVERI_LAB_SERIAL)');
     expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — asked but never ran (no record, log or summary beside its .cases)');

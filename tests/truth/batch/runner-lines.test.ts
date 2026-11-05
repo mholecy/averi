@@ -11,6 +11,8 @@ import {
   deviceArgs,
   errorLinesIn,
   hasVerdictOf,
+  linesIn,
+  linesOf,
   labLine,
   liveArgs,
   liveStepText,
@@ -200,6 +202,20 @@ describe('errorLinesIn — the ERROR lines a block\'s log or analyze.txt holds (
     expect(errorLinesIn('ok\nERROR a\r\n  ERROR not at the start\nE5 cleanup: ERROR — x\nERROR b\nERRORS c\n')).toEqual(['ERROR a', 'ERROR b', 'ERRORS c']);
     expect(errorLinesIn('')).toEqual([]);
   });
+
+  it('a lone CR ends a line too (a progress line a terminal overwrites): no ERROR line holds a break, so the SUMMARY never refuses it', () => {
+    expect(errorLinesIn('50%\rERROR a\r60%\rERROR b\r\nERROR c\rok')).toEqual(['ERROR a', 'ERROR b', 'ERROR c']);
+  });
+});
+
+describe('linesOf and linesIn — what a probe, a judge or an analyzer hands in, as lines (T2 S6a: the SUMMARY refuses a break)', () => {
+  it('split at CR LF, LF and a lone CR, in order', () => {
+    expect(linesOf('a\r\nb\nc\rd')).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('linesIn: each text\'s lines, empty ones dropped', () => {
+    expect(linesIn(['kf live verdict: PASS\r\n', '', 'x\n\ny'])).toEqual(['kf live verdict: PASS', 'x', 'y']);
+  });
 });
 
 describe('stepsOfRun — this run\'s part of steps.log (batch-11.sh:700, `sed -n "/ batch-11 run $RUN_ID,/,$p"`)', () => {
@@ -218,7 +234,7 @@ describe('detailLines and detailsLines — the details printout before the SUMMA
   it('a file\'s lines, those starting `==` left out (step banners), empty ones too, each indented and cut at 700 code points', () => {
     expect(DETAIL_CHARS).toBe(700);
     const long = `E5 ${'x'.repeat(800)}`;
-    expect(detailLines({ file: 'a.log' }, `== E5 a ==\nE5 a verdict: PASS\n\n${long}\n`)).toEqual(['   E5 a verdict: PASS', `   ${long.slice(0, 700)}`]);
+    expect(detailLines({ file: 'a.log' }, `== E5 a ==\nE5 a verdict: PASS\n\n${long}\n==> a banner\nE5 total ==\r\nE5 x\rE5 y`)).toEqual(['   E5 a verdict: PASS', `   ${long.slice(0, 700)}`, '   E5 total ==', '   E5 x', '   E5 y']);
   });
 
   it('`match` keeps the lines it matches only (a g flag holds no state: `search`); `cut` sets the length', () => {
