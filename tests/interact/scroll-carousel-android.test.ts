@@ -369,6 +369,14 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     );
   });
 
+  it("the agent-facing references quote the inferred axis's clause as the code words it (skill/references/tools.md, troubleshooting.md)", () => {
+    const message = failureOf(replay(FULLY_LEFT, E2_RUN_0.map((x) => lazyAt(x))), 'C').message;
+    const clause = message.slice(message.indexOf('(the tree does not say'), message.indexOf('): fully: true') + 1);
+    expect(clause).toBe('(the tree does not say which way it scrolls: the swipes over it moved the element sideways)');
+    expect(readFileSync(new URL('../../skill/references/tools.md', import.meta.url), 'utf8')).toContain(`'${clause}'`);
+    expect(readFileSync(new URL('../../skill/references/troubleshooting.md', import.meta.url), 'utf8')).toContain(`\`${clause}\``);
+  });
+
   it("batch-9 run 0's own rects: one stroke from the listed 577 (cut at the screen) to the listed 64 — unfit after 1 swipe, not 6 and 3 turns", () => {
     const { before, after } = B9.runs[0].listed;
     const played = replay(FULLY_LEFT, [lazyAt(before.x), lazyAt(after.x)]);
