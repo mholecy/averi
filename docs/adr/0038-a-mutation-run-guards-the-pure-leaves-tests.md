@@ -1056,7 +1056,7 @@ Decisions S6b pins:
   the build, never "every lab need met" (review round 1, MAJOR 2).
 - `asksLive(name, asked)` writes a live run's `.cases` at once; a later `liveRun` of that name asked the same writes
   none again, asked otherwise throws — what a run was asked is never overwritten. The ask is compared as canonical JSON
-  (runner-lines.ts#canonicalJson: every object's fields sorted at every depth; review round 1, NIT 8).
+  (canonicalJson in runner-lines.ts: every object's fields sorted at every depth; review round 1, NIT 8).
 
 S6b's checklist (the S6a part's rows marked S6b, the S4 and S5 parts' "not ported → S6"), each with its tests:
 - S2, `gradlew --stop` with the lab build → lab-build.test.ts "the Android build … then gradlew --stop — always", "a
