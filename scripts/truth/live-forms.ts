@@ -110,6 +110,27 @@ export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(ta
 export const refusedCapped = (tag: string, kept: string) => refusedHolding(tag, kept);
 
 /**
+ * fp2 (D64b): one fill without clear into a field that puts `inserted` in itself on focus and refuses every key —
+ * form-focus-prefix's dialRefuses, `+421 ` held whatever `421` is typed. `refusedHolding` reads two calls; this is its
+ * one-call sibling, the launch's empty field the baseline. Ok only when the app holds `inserted` and the reply is an
+ * error saying the field did not change (what the post-focus re-read lets averi say: it read `inserted` before typing).
+ * A claim of done is a MISMATCH `fill-claim` — Android's today, where that re-read is skipped and the reading passes by
+ * containment (ADR 0028 residual 3); the field holding anything but `inserted` is LOUD `loud-changed`; held, but no
+ * error saying so, LOUD `loud-untouched`.
+ */
+export const refusedOnFocus =
+  (tag: string, inserted: string) =>
+  (s: LabState, replies: string[], _source: Source, _launched: LabState): LiveVerdict => {
+    const got = valueOf(s, tag);
+    const last = replies[replies.length - 1];
+    const kind = replyKind(last);
+    if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the field refused the typing; the app holds ${JSON.stringify(got)}` };
+    if (got !== inserted) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(inserted)}; averi: ${short(last)}` };
+    if (!isError(last) || !last.includes('did not change')) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the field kept ${JSON.stringify(inserted)}, but not refused as "did not change": ${short(last)}` };
+    return { outcome: 'ok', kind, why: `refused as "did not change", the field kept ${JSON.stringify(inserted)}: ${short(last)}` };
+  };
+
+/**
  * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds, over the fill's reply), AND the tree shows
  * the same text (the `shows` assert after it) — a format applied to the model alone, or to the screen alone (SwiftUI's
  * binding setter may leave the TextField showing what was typed), is a MISMATCH here even when the fill passed:

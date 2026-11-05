@@ -71,6 +71,10 @@ struct FieldSpec: Decodable, Identifiable {
     /// `display` (schema.ts#CatalogField.formatIn) is Compose's alone: SwiftUI has no display-only transform, so here
     /// the model is formatted all the same.
     let formatIn: String?
+    /// D64b (schema.ts#CatalogField.focusInsert): put in on focus while the field is empty, the caret after it.
+    let focusInsert: String?
+    /// D64b: `refused` — the field refuses every key (schema.ts#CatalogField.keys).
+    let keys: String?
 
     var id: String { tag }
 }

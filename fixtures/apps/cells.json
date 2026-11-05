@@ -414,6 +414,20 @@
       }
     },
     {
+      "id": "form-focus-prefix",
+      "family": "forms",
+      "layer": "none",
+      "targets": [],
+      "form": {
+        "title": "Contact details",
+        "fields": [
+          { "tag": "dialLands", "kind": "text", "title": "Phone – dial code added", "focusInsert": "+421 " },
+          { "tag": "dialRefuses", "kind": "text", "title": "Phone – dial code, no typing", "focusInsert": "+421 ", "keys": "refused" }
+        ],
+        "submit": { "tag": "submit", "title": "Continue" }
+      }
+    },
+    {
       "id": "scroll-bounded",
       "family": "edges",
       "layer": "none",

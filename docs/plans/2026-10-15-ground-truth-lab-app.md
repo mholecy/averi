@@ -580,6 +580,27 @@ said "fully visible" 3/3 with C 367–376 px cut, main ended hedged 3/3; sticky 
 kf1–kf3 did not run: D67's read measured the panel where batch-11 left it (fact 20). T6: no iOS lab control is
 disabled (form-shared-id: 13 elements, all enabled), so D66's idb capture is not possible in the lab.
 
+### D64b — a dial code inserted on focus, not captured
+
+One cell for ADR 0028 residual 3 (a prefix the field inserts on focus, which Android's skipped post-focus re-read never
+sees). Nothing captured moves, so no golden row (as L7's cells):
+
+- `forms/form-focus-prefix` (both platforms): `dialLands` and `dialRefuses`, plain text fields with no placeholder and
+  no format, and the submit. Both put `+421 ` in themselves when they take the focus while empty, the caret after it
+  (`focusInsert`, schema.ts#CatalogField); dialLands then takes the keys (`421` → `+421 421`), dialRefuses refuses every
+  one (`keys: refused`: an input filter rejecting all input, so it holds `+421 ` whatever is typed). Forms.kt routes
+  them through the TextFieldValue field the formats use (the cursor put at the end of the inserted text) and drops
+  every change to dialRefuses; Forms.swift through FormattingTextField, whose delegate puts the text in as editing
+  begins and refuses each key before the field changes (a SwiftUI TextField whose setter ignores a key may keep
+  showing it: D28's trap).
+- Live forms cases fp1 and fp2 (not h1/h2: the ensure group owns those ids), one fill of `421` each, by sole id, no
+  clear — on Android the path whose post-focus re-read is skipped (fill.ts, ADR 0028). fp1 is judged by `holds`
+  (`+421 421`), ok expected on every source. fp2 by live-forms.ts#refusedOnFocus: ok only on an error saying the field
+  did not change, with `+421 ` held; a Filled is a MISMATCH `fill-claim`. Expected: under uiautomator that MISMATCH
+  (averi reads `+421 ` against an empty `before` and passes it by containment), filed in live-known.ts as ADR 0028
+  residual 3 until D64b-3's caveat; under idb and wda ok (the re-read runs, reads `+421 ` before typing, and the
+  unchanged reading is refused as "did not change"), not filed. Batch D64b-2 builds both apps and reads the two cases.
+
 ### Device facts (batches 1–13)
 
 Measured on the lab devices (the iOS 27.0 simulator, averi_lab API 33) and written nowhere else before; the batch's raw

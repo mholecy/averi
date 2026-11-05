@@ -152,14 +152,19 @@ struct FormScreen: View {
 
     /// The field's input, under its identifier (fieldID) — a formatting field's set on its UITextField itself, so the tree
     /// holds one element by that identifier, the text field, as a SwiftUI field's does.
+    /// A field that inserts on focus or refuses the keys (D64b) is a FormattingTextField too: its delegate puts the text
+    /// in as the focus comes and refuses a key before the field changes — a SwiftUI TextField whose setter ignores a key
+    /// may keep showing it (D28's trap), the screen and the model apart.
     @ViewBuilder private func input(_ f: FieldSpec) -> some View {
         let placeholder = f.placeholder ?? ""
-        if f.format != nil, f.kind != "pin", f.kind != "country" {
+        if f.format != nil || f.focusInsert != nil || f.keys == "refused", f.kind != "pin", f.kind != "country" {
             FormattingTextField(
                 id: fieldID(f),
                 placeholder: placeholder,
                 format: f.format,
                 keyboard: f.kind == "amount" ? .decimalPad : .default,
+                focusInsert: f.focusInsert,
+                refusesKeys: f.keys == "refused",
                 text: binding(f.tag)
             ) { on in
                 if on { editing = f.tag } else if editing == f.tag { editing = nil }
@@ -264,6 +269,10 @@ struct FormattingTextField: UIViewRepresentable {
     let placeholder: String
     let format: String?
     let keyboard: UIKeyboardType
+    /// D64b: put in on focus while the field is empty, the caret after it (a dial code, `+421 `).
+    var focusInsert: String? = nil
+    /// D64b: every key refused — the field changes only from outside (a focusInsert, a prefill).
+    var refusesKeys = false
     @Binding var text: String
     /// The field took (true) or lost (false) the focus.
     let editing: (Bool) -> Void
@@ -301,6 +310,7 @@ struct FormattingTextField: UIViewRepresentable {
         init(_ parent: FormattingTextField) { self.parent = parent }
 
         func textField(_ field: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+            if parent.refusesKeys { return false }
             let edited = ((field.text ?? "") as NSString).replacingCharacters(in: range, with: string)
             let shown = formatted(parent.format, edited)
             field.text = shown
@@ -311,7 +321,15 @@ struct FormattingTextField: UIViewRepresentable {
             return false
         }
 
-        func textFieldDidBeginEditing(_ field: UITextField) { parent.editing(true) }
+        func textFieldDidBeginEditing(_ field: UITextField) {
+            if let insert = parent.focusInsert, (field.text ?? "").isEmpty {
+                field.text = insert
+                let end = field.endOfDocument
+                field.selectedTextRange = field.textRange(from: end, to: end)
+                parent.text = insert
+            }
+            parent.editing(true)
+        }
         func textFieldDidEndEditing(_ field: UITextField) { parent.editing(false) }
 
         func textFieldShouldReturn(_ field: UITextField) -> Bool {

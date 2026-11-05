@@ -196,6 +196,17 @@ export interface CatalogField {
    */
   formatIn?: 'display';
   /**
+   * D64b: the text the field puts in itself when it takes the focus while empty, the caret after it (a dial code,
+   * `+421 `) — the app's model holds it from the focus on. ADR 0028 residual 3's shape: averi's post-focus re-read, where
+   * skipped, never sees it.
+   */
+  focusInsert?: string;
+  /**
+   * D64b: `refused` — the field refuses every key (an input filter that rejects all input): what it holds changes only
+   * by its `focusInsert`, a prefill or the picker, never by typing.
+   */
+  keys?: 'refused';
+  /**
    * What the field shows when a submit finds it invalid; without it, `Required` identified `lab.<cell>.<tag>_error`.
    */
   error?: Message;
