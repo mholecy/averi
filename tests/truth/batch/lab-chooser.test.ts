@@ -7,20 +7,26 @@ import {
   acceptedOf,
   CHECK_EXIT,
   checkExit,
+  checkHand,
   checkLine,
+  checkWhy,
   compareReads,
   comparedLine,
+  defaultHand,
   focusOf,
   handlersOf,
   installedOf,
   isAlways,
   lastChosenOf,
   leaksOf,
+  missingHand,
   preferredOf,
   sanitizeFixture,
   safeTap,
   shellReadOf,
   treeOf,
+  unknownInstallHand,
+  unreachableOf,
   type AcceptedEntry,
   type FocusRead,
   type PreferredRead,
@@ -447,5 +453,40 @@ describe('sanitizeFixture — no device path or serial in a fixture (d55-b11.ts:
     // Built from parts, as the hygiene test builds its own: no committed file here may hold a host path whole.
     const slash = '/';
     for (const p of ['/storage/', `${slash}Users${slash}`, '/private/', `${slash}tmp${slash}`]) expect(sanitizeFixture(`a ${p}b`, 'SERIAL-X').hits).toEqual([p]);
+  });
+});
+
+describe('the hand lines — each names the exact step, every word quoted as a shell reads it back (adb-shell.ts#shellQuote)', () => {
+  const APK = 'lab dir/installed.apk';
+
+  it('a lab default: uninstall && install of the pulled APK (batch-12 e5_check exit 1)', () => {
+    expect(defaultHand('LAB-1', APK)).toBe(
+      'D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install \'lab dir/installed.apk\' (clears it; wipes the lab\'s data, so put the lab\'s state back after), then read the preferred activities again',
+    );
+  });
+
+  it("unknown inside a reinstall: `pm path` once adb answers, the install only if it prints nothing (batch-12 on_abort's ir=2)", () => {
+    expect(unknownInstallHand('LAB-1', APK)).toBe(
+      "D55 (Android): whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb answers, adb -s LAB-1 shell pm path dev.averi.lab; if it prints nothing, adb -s LAB-1 install 'lab dir/installed.apk'; then put the lab's state back",
+    );
+  });
+
+  it('missing: the install; not proven clean: the preferred read and BACK', () => {
+    expect(missingHand('LAB-1', APK)).toBe("D55 (Android): the lab APK is NOT installed: adb -s LAB-1 install 'lab dir/installed.apk', then put the lab's state back");
+    expect(checkHand("it's")).toBe(
+      "D55 (Android): the chooser and the preferred activities not proven put back: adb -s 'it'\\''s' shell dumpsys package preferred (no lab entry with mAlways=true may be left); a chooser in front: adb -s 'it'\\''s' shell input keyevent KEYCODE_BACK",
+    );
+  });
+
+  it('unreachableOf: undefined only for get-state `device`', () => {
+    expect(unreachableOf(ok('device\n'))).toBeUndefined();
+    expect(unreachableOf(ok('\n'))).toBe('adb get-state: "", not device');
+    expect(unreachableOf(exit(1, '', 'error: no devices'))).toBe('adb get-state: exit 1 error: no devices');
+    expect(unreachableOf({ ...timedOut, code: 0, out: 'device\n' })).toBe('adb get-state: past its bound (exit 0) device');
+  });
+
+  it('checkWhy is the check line after its word', () => {
+    const p = readOf(BLOCK);
+    expect(checkLine(launcher, p, [])).toBe(`D55 check: OK — ${checkWhy(launcher, p, [])}`);
   });
 });

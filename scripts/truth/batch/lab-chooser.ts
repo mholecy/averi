@@ -164,19 +164,22 @@ const focusText = (f: FocusRead): string =>
   f.state === 'unread' ? `chooser unread (${f.why})` : f.chooser === undefined ? 'chooser no' : `chooser yes (${f.chooser})`;
 
 /**
- * --check's line: `D55 check: <word> — chooser no|yes (<component>)|unread (<why>); preferred read (<n> user[s]); lab
- * entries <n> (defaults <d>, last-chosen <l>[, accepted <a>])[; first: <its text>]` or `preferred unread (<why>)`.
+ * What --check read, in words: `chooser no|yes (<component>)|unread (<why>); preferred read (<n> user[s]); lab entries
+ * <n> (defaults <d>, last-chosen <l>[, accepted <a>])[; first: <its text>]`, or `…; preferred unread (<why>)`.
  */
-export function checkLine(focus: FocusRead, preferred: PreferredRead, accepted: readonly AcceptedEntry[]): string {
-  const word = checkWordOf(checkExit(focus, preferred, accepted));
-  if (preferred.state === 'unread') return verdictLine(CHECK_LABEL, word, `${focusText(focus)}; preferred unread (${preferred.why})`);
+export function checkWhy(focus: FocusRead, preferred: PreferredRead, accepted: readonly AcceptedEntry[]): string {
+  if (preferred.state === 'unread') return `${focusText(focus)}; preferred unread (${preferred.why})`;
   const last = lastChosenOf(preferred);
   const ok = last.filter((e) => acceptedOf(e, accepted) !== undefined).length;
   const counts = `defaults ${leaksOf(preferred).length}, last-chosen ${last.length}${last.length > 0 ? `, accepted ${ok}` : ''}`;
   const first = preferred.lab.length > 0 ? `; first: ${cut(preferred.lab[0].text, ENTRY_CHARS)}` : '';
   const users = `${preferred.users} user${preferred.users === 1 ? '' : 's'}`;
-  return verdictLine(CHECK_LABEL, word, `${focusText(focus)}; preferred read (${users}); lab entries ${preferred.lab.length} (${counts})${first}`);
+  return `${focusText(focus)}; preferred read (${users}); lab entries ${preferred.lab.length} (${counts})${first}`;
 }
+
+/** --check's line: `D55 check: <its exit's word> — <checkWhy>`. */
+export const checkLine = (focus: FocusRead, preferred: PreferredRead, accepted: readonly AcceptedEntry[]): string =>
+  verdictLine(CHECK_LABEL, checkWordOf(checkExit(focus, preferred, accepted)), checkWhy(focus, preferred, accepted));
 
 // ------------------------------------------------------------------------------------------- the tri-state reads
 
@@ -228,6 +231,13 @@ export function handlersOf(r: CallResult): number | { why: string } {
   return listed === Number(said[1]) ? listed : { why: `query-activities said ${said[1]} activities but listed ${listed}` };
 }
 
+/** Why `adb get-state` says the emulator cannot be asked (not `device`), or undefined when it can. */
+export function unreachableOf(getState: CallResult): string | undefined {
+  if (getState.code !== 0 || getState.timedOut) return `adb get-state: ${exitText(getState)}`;
+  const state = getState.out.trim();
+  return state === 'device' ? undefined : `adb get-state: ${nameInLine(state)}, not device`;
+}
+
 /** The lab installed (its APK's path on the device), missing, or unknown with why — unreachable is never missing. */
 export type Installed = { state: 'installed'; path: string } | { state: 'missing' } | { state: 'unknown'; why: string };
 
@@ -236,9 +246,8 @@ export type Installed = { state: 'installed'; path: string } | { state: 'missing
  * `package:<path>` with exit 0 installed, exit 1 with nothing said missing, anything else unknown.
  */
 export function installedOf(getState: CallResult, pmPath?: CallResult): Installed {
-  if (getState.code !== 0 || getState.timedOut) return { state: 'unknown', why: `adb get-state: ${exitText(getState)}` };
-  const state = getState.out.trim();
-  if (state !== 'device') return { state: 'unknown', why: `adb get-state: ${nameInLine(state)}, not device` };
+  const unreachable = unreachableOf(getState);
+  if (unreachable !== undefined) return { state: 'unknown', why: unreachable };
   if (pmPath === undefined) return { state: 'unknown', why: 'pm path was not read' };
   if (pmPath.timedOut) return { state: 'unknown', why: `pm path: ${exitText(pmPath)}` };
   if (pmPath.code === 1 && `${pmPath.out}${pmPath.err}`.trim() === '') return { state: 'missing' };
@@ -376,3 +385,24 @@ export function sanitizeFixture(text: string, serial: string): { ok: boolean; hi
 
 /** `adb -s <serial> <words…>`, each word quoted as a shell reads it back (adb-shell.ts#shellQuote). */
 export const adbLine = (serial: string, words: readonly string[]): string => ['adb', '-s', serial, ...words].map(shellQuote).join(' ');
+
+/** A lab default left: what clears it (batch-12's hand line; the uninstall wipes the lab's data). */
+export const defaultHand = (serial: string, apk: string): string =>
+  `${HAND_PREFIX}a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: ` +
+  `${adbLine(serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(serial, ['install', apk])} (clears it; wipes the lab's data, ` +
+  "so put the lab's state back after), then read the preferred activities again";
+
+/** Interrupted inside the reinstall with adb unreachable: whether the lab is installed is unknown, never "missing". */
+export const unknownInstallHand = (serial: string, apk: string): string =>
+  `${HAND_PREFIX}whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb ` +
+  `answers, ${adbLine(serial, ['shell', 'pm', 'path', LAB_PACKAGE])}; if it prints nothing, ${adbLine(serial, ['install', apk])}; ` +
+  "then put the lab's state back";
+
+/** The lab proven not installed: install it again. */
+export const missingHand = (serial: string, apk: string): string =>
+  `${HAND_PREFIX}the lab APK is NOT installed: ${adbLine(serial, ['install', apk])}, then put the lab's state back`;
+
+/** The chooser or the preferred activities not proven put back: what to read, and what to press. */
+export const checkHand = (serial: string): string =>
+  `${HAND_PREFIX}the chooser and the preferred activities not proven put back: ${adbLine(serial, ['shell', ...PREFERRED_ARGV])} ` +
+  `(no lab entry with mAlways=true may be left); a chooser in front: ${adbLine(serial, ['shell', 'input', 'keyevent', 'KEYCODE_BACK'])}`;
