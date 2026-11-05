@@ -427,7 +427,8 @@ must be the same reveal sent again (± 2 px a point; flush-check.ts: "the same r
 `no-retry`. The carousel group takes no `late` re-read (as the visibility group): a read 3 s on would let a fling or a
 snap finish behind the reply's back, and the stop is judged on the app as scroll_until left it. Not part of T7a, filed
 as a follow-up: a `--side` pre-D62 (0eab7789) calibration run of lv-d62-drop, expecting the false "fully visible", and
-its live-known calibration entry.
+its live-known calibration entry. Live check 2026-11-05: docs/truth/live-records/android-carousel-t7a-1.json, -2.json
+and -3.json (three runs on the AVD, 8 of 8 ok each) replace the synthetic fixture as evidence.
 
 ### Alongside
 

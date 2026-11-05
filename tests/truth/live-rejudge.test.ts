@@ -423,6 +423,12 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['android-forms-d61-whole.json', 'forms', { cases: 54, ok: 49, loud: 2, mismatches: 0, skipped: 3 }],
     ['ios-idb-forms-d61-whole.json', 'forms', { cases: 46, ok: 42, loud: 3, mismatches: 1 }],
     ['ios-wda-forms-d61-whole.json', 'forms', { cases: 46, ok: 42, loud: 3, mismatches: 1, preD43Wda: true }],
+    // T7a's live check at 75774dfd (2026-11-05): the carousel group three times on the AVD, every case ok — never "fully
+    // visible" with C cut, D62's retry seen on the drop leg (the dropped reveal sent again, 0 px off), D37's pager read
+    // at rest on C; hedged 1, 0 and 1 of 3 unaimable legs (lv-d59b-recycler, accepted under ADR 0021's D68 residual).
+    ['android-carousel-t7a-1.json', 'carousel', { cases: 8, ok: 8, loud: 0, mismatches: 0 }],
+    ['android-carousel-t7a-2.json', 'carousel', { cases: 8, ok: 8, loud: 0, mismatches: 0 }],
+    ['android-carousel-t7a-3.json', 'carousel', { cases: 8, ok: 8, loud: 0, mismatches: 0 }],
   ])('%s (--groups %s): every case not ok known, the counts as recorded', { timeout: 60_000 }, async (record, groups, want) => {
     const { code, out } = await rejudgeInProcess(record, groups);
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
