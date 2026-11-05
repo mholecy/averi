@@ -44,7 +44,7 @@ import {
 
 // scripts/truth/batch/lab-chooser.ts, the pure module: the preferred-activities read over API 33's real dumps (batch-9's
 // whole `dumpsys package`, batch-10's `preferred` block), --check's exit, safeTap over T4's committed resolver trees
-// (tests/fixtures/uiautomator-lab-resolver*.xml, batch-10's and batch-11's captures) parsed by src's own parser, the
+// (tests/fixtures/uiautomator-lab-resolver*.xml, batch-10's, batch-11's and batch-13's captures) parsed by src's own parser, the
 // tri-state reads (batch-9's role holder and clipboard), the handler count and the install read. The calls around them,
 // through a recording fake emulator, are tests/truth/batch/lab-emu.test.ts.
 
@@ -52,6 +52,8 @@ const BATCH = join(import.meta.dirname, '..', '..', 'fixtures', 'batch');
 const T4 = join(import.meta.dirname, '..', '..', 'fixtures');
 const fixture = (name: string): string => readFileSync(join(BATCH, name), 'utf8');
 const resolverXml = (selected = false): string => readFileSync(join(T4, `uiautomator-lab-resolver${selected ? '-selected' : ''}.xml`), 'utf8');
+/** batch-13 rerun 1's real resolver_list_with_default trees (D55d), one per link. */
+const withDefaultXml = (link: 'shared' | 'pair'): string => readFileSync(join(T4, `uiautomator-lab-resolver-with-default-${link}.xml`), 'utf8');
 
 const ok = (out = '', err = ''): CallResult => ({ code: 0, timedOut: false, signal: null, out, err });
 const exit = (code: number, out = '', err = ''): CallResult => ({ code, timedOut: false, signal: null, out, err });
@@ -253,6 +255,8 @@ describe('checkExit — --check\'s exits (d55-b11.ts --check; batch-12\'s final 
 });
 
 describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345; batch-12\'s guardRow1/guardOnce), over T4\'s resolver trees', () => {
+  /** safeTap's refusal off the chooser's fresh sheet: a synthetic with_default header and batch-13's real trees alike. */
+  const notFresh = { ok: false, refusal: 'no-sheet', why: "the tree is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none)" };
   const tree = (xml = resolverXml()): Dump => {
     const t = treeOf(xml);
     if ('why' in t) throw new Error(t.why);
@@ -359,9 +363,15 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
       '<node index="0" text="Open with" resource-id="android:id/title"',
       '<node index="9" text="" resource-id="android:id/icon" class="android.widget.ImageView" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[22,1480][110,1568]" /><node index="0" text="Open with" resource-id="android:id/title"',
     );
-    const notFresh = { ok: false, refusal: 'no-sheet', why: "the tree is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none)" };
     expect(safeTap(tree(withDefault), 'once')).toEqual(notFresh);
     expect(safeTap(tree(withDefault), { row: 2 })).toEqual(notFresh);
+  });
+
+  // D55d: batch-13 rerun 1's live verdicts, 8/8 — on each real with_default tree, row 1 and "Just once" are refused as
+  // no sheet, no tap sent (a target the tree lacks is no-target first: only the targets it holds are pinned here).
+  it.each(['shared', 'pair'] as const)("D55d: the real with_default tree of averilab://%s/open (batch-13 rerun 1): row 1 and \"Just once\" refused, no-sheet", (link) => {
+    expect(safeTap(tree(withDefaultXml(link)), { row: 1 })).toEqual(notFresh);
+    expect(safeTap(tree(withDefaultXml(link)), 'once')).toEqual(notFresh);
   });
 });
 
@@ -469,7 +479,7 @@ describe('sanitizeFixture — no device path or serial in a fixture (d55-b11.ts:
   it("every committed chooser fixture is clean: T4's resolver trees and S5's reads", () => {
     const names = readdirSync(BATCH).filter((n) => n.includes('api33'));
     expect(names.length).toBeGreaterThanOrEqual(8);
-    for (const text of [...names.map(fixture), resolverXml(), resolverXml(true)]) expect(sanitizeFixture(text, 'emulator-5554')).toEqual({ ok: true, hits: [] });
+    for (const text of [...names.map(fixture), resolverXml(), resolverXml(true), withDefaultXml('shared'), withDefaultXml('pair')]) expect(sanitizeFixture(text, 'emulator-5554')).toEqual({ ok: true, hits: [] });
   });
 
   it('a device path or the serial is a hit, each once; an empty serial is never one', () => {

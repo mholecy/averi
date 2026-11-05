@@ -9,6 +9,8 @@ never matched; implemented on `fix/d55r-focused-app-api33`).
 Amended 2026-11-03 (batch-11: D55 device-verified with D55r's fix — the last paragraph of the D55r amendment).
 Amended 2026-11-03 (D55b: `launch_app`'s `-p` start and monkey's refusal read the same focus; implemented on
 `fix/d55b-launch-chooser`).
+Amended 2026-11-05 (D55d: batch-13's with_default trees committed as fixtures and the fail-open pinned on them;
+implemented on `test/d55d`).
 
 ## Context
 
@@ -409,3 +411,41 @@ list, an OEM's layout, monkey's refusal, a hung dump's bound never seen live; th
 committed fixture (backlog D55d). "Device check: none yet" above is superseded by this paragraph, and the lab AVD now
 has no fresh chooser left (`shared` and `pair` both keep a last-chosen entry): a later fresh-chooser check needs a new
 two-handler host.
+
+## Amendment: the with_default chooser's real trees are fixtures, the fail-open pinned on them (2026-11-05, D55d)
+
+**Context.** The D55c live check above saw `resolver_list_with_default` fail open, but its tree was not kept as a
+fixture. Batch-13 rerun 1 (2026-11-05, averi_lab emulator, API 33, main 73f5ad0d) raised both two-handler links with
+their last-chosen entries in place, 3 times each: `averilab://shared/open` (last chosen `.Twin`) and
+`averilab://pair/open` (last chosen `.MainActivity`). Every reply was byte-identical to D55's pre-D55c text, 3/3 per
+link, and the batch's own safeTap refused row 1 and "Just once" as `no-sheet` on every tree, 8/8, no tap sent. The
+probe's own `uiautomator dump` and averi's were byte-identical. Shared's tree has 25 nodes, as batch-12's had. A
+header holds `icon`, `title` "Open with AveriLab" and `button_bar` with "Just once" at (723, 1723) and "Always" at
+(936, 1723), both enabled. Below it are a "Use a different app" text and `resolver_list` with one row at
+(540, 2074) whose `text1` is "AveriLab". Pair's tree has 26 nodes: the same, except that its row also holds `text2`
+"AveriLab twin" and the dump marks it not clickable (shared's row is marked clickable).
+
+**Decision.** Tests and documents only; no reply and no code path changes.
+- Both trees are committed whole, as the device wrote them, with one XML comment after the prolog naming their source:
+  `tests/fixtures/uiautomator-lab-resolver-with-default-shared.xml` and `…-pair.xml`.
+- android-chooser.test.ts pins `android-chooser.ts#chooserSheet` as undefined on each, with the facts that decide it.
+  These are: one `resolver_list` whose only row is its direct child, an `icon` outside it, no `text1` outside it,
+  and the title. A counterfactual pins the deciding node: with the header's `icon` removed, each tree reads as a
+  one-row sheet, pair's row with its `text2` as `detail`. Rows are chosen by structure, and `clickable` is never
+  read, so pair's non-clickable row changes nothing.
+- android-chooser-replies.test.ts adds both trees to its fail-open dumps, so `open_deep_link`'s reply and
+  `launch_app`'s `-p` note stay D55's and D55b's byte for byte. It also pins each link's own reply as batch-13
+  recorded it. The pre-D55c text is now one literal in that file, shared by every fail-open case.
+- lab-chooser.test.ts pins `safeTap`'s live verdicts (scripts/truth/batch/lab-chooser.ts) on each tree: row 1 and
+  "Just once" give `no-sheet`.
+
+**Consequences.**
+- Residual: on the real layout the with_default rejection rests on one node, the header's `icon`. The header holds
+  `title`, not `text1`, so the `text1` half of the rule never applies there; only the synthetic case kills a mutant
+  of it. A with_default layout without that icon (an OEM's, a later API's) would be quoted as a one-row sheet titled
+  "Open with <app>". The title would still name the app, but the reply would not say it is preselected. A second
+  signal is a future item, needed only if a live tree ever lacks the icon.
+- The real trees kill no mutant that the synthetic `icon` case misses. They pin the measured layout, not a new
+  rule.
+- The D55c live check's "the with_default tree is not yet a committed fixture (backlog D55d)" is superseded by this
+  amendment.
