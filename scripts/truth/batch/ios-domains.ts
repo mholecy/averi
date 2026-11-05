@@ -390,7 +390,7 @@ const notFoundSaid = (domain: string): RegExp => new RegExp(`\\bDomain '${litera
  * exit 0 (the host's defaults), so the map never says absent: diffMaps reads an empty domain as an absent one, and
  * only `absentOf` tells the two apart where it matters, at the backup.
  */
-async function readDomain(sim: LabSim, domain: string, path: string): Promise<{ map: DomainMap } | { why: string }> {
+async function readDomain(sim: LabSim, domain: string, path: string): Promise<{ map: Record<string, KeyVal> } | { why: string }> {
   const r = await sim.defaults(['export', domain, path]);
   if (r.code === 0 && sim.fs.exists(path)) return typedOf(sim, path);
   return { why: `defaults export ${domain}: ${r.code === 0 ? 'exit 0 but no file written' : exitText(r)}` };
@@ -479,7 +479,7 @@ export async function backup(sim: LabSim, stateFile: string): Promise<Backup> {
     const read = await readDomain(sim, name, path);
     if ('why' in read) return { ok: false, why: `${read.why} — no state written` };
     // An empty export proves nothing (an absent domain exports one too): the read says absent or there.
-    const absent = Object.keys(read.map ?? {}).length === 0 ? await absentOf(sim, name) : false;
+    const absent = Object.keys(read.map).length === 0 ? await absentOf(sim, name) : false;
     if (typeof absent === 'object') return { ok: false, why: `${absent.why} — no state written` };
     domains.push({ name, backup: absent ? null : path });
   }
@@ -654,7 +654,7 @@ async function compareOne(sim: LabSim, stateFile: string, d: DomainsState['domai
   if ('why' in now) return { name: d.name, outcome: 'unread', why: now.why };
   const plan = decideRestore({ domain: d.name, backupPath: d.backup, backup: before.map, now: now.map });
   if (plan.verdict === 'equal') return { name: d.name, outcome: 'unchanged' };
-  const changes = plan.differ.map((x) => `${nameInLine(x.key)} ${shownValue(before.map?.[x.key])} → ${shownValue(now.map?.[x.key])}`);
+  const changes = plan.differ.map((x) => `${nameInLine(x.key)} ${shownValue(before.map?.[x.key])} → ${shownValue(now.map[x.key])}`);
   return { name: d.name, outcome: 'changed', differ: plan.differ, changes, hand: domainHand(d.name, d.backup, plan.hand) };
 }
 
