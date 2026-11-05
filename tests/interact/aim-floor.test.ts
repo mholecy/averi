@@ -52,5 +52,7 @@ describe('aimFloor: the stop when the shortest measured stroke would carry the m
     expect(aimFloor({ room: 10, next: 48, carried: [{ drawn: 48, moved: 27 }, { drawn: 40, moved: 20 }, { drawn: 48, moved: 24 }] })).toEqual({ room: 10, drawn: 40, moved: 20 });
     expect(aimFloor({ room: 10, next: 48, carried: [{ drawn: 48, moved: 20 }, { drawn: 40, moved: 20 }] })).toEqual({ room: 10, drawn: 40, moved: 20 });
     expect(aimFloor({ room: 10, next: 48, carried: [{ drawn: 40, moved: 20 }, { drawn: 48, moved: 20 }] })).toEqual({ room: 10, drawn: 40, moved: 20 });
+    // A shorter stroke with a larger carry is no tie: the least carry still decides.
+    expect(aimFloor({ room: 22, next: 48, carried: [{ drawn: 48, moved: 20 }, { drawn: 40, moved: 27 }] })).toBeUndefined();
   });
 });
