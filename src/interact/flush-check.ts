@@ -489,17 +489,24 @@ function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, 
   const scrollViews = chain.slice(at);
   if (probeAcrossOnly({ toward: way.toward, facts, scrollViews })) return unchecked('axis');
   const probeOver = (keyboardTop: number | undefined) => planProbe(means.strokes, { ...way, gesture: means.gesture, facts, scrollViews, keyboardTop });
-  const over = probeOver(undefined);
-  if (over === undefined) return unchecked('room');
+  if (probeOver(undefined) === undefined) return unchecked('room');
   // THE AIM FLOOR (D68, interact/aim-floor.ts): on a proven cut, the room left on the match's uncut side under what a
-  // stroke of this call no longer than this reveal carried it over this cut — no swipe brings it whole, so none is sent,
-  // budget left or not (a D62 retry already spent counts among the swipes).
-  if (proven !== undefined && over.stroke.points !== undefined) {
+  // stroke of this call no longer than the reveal the plan would send (`planned`, clear of the keyboard it is drawn
+  // above) carried it over this cut — another swipe would most likely push it past, so none is sent, budget left or not
+  // (a D62 retry already spent counts among the swipes).
+  const aimed = (planned: { stroke: PlannedStroke }): FlushVerdict | undefined => {
+    if (proven === undefined || planned.stroke.points === undefined) return undefined;
     const measured = after.carried.filter((c) => c.edge === edge && sameRectWithinPixel(c.container, container));
-    const floor = aimFloor({ room: roomPast(judged.node.rect, container, edge), next: strokeLength(over.stroke.points), carried: measured });
-    if (floor !== undefined) return { of: 'aim', aim: { of: 'flushAim', judged, ...where, revealed: proven.revealed, floor } };
+    const floor = aimFloor({ room: roomPast(judged.node.rect, container, edge), next: strokeLength(planned.stroke.points), carried: measured });
+    return floor === undefined ? undefined : { of: 'aim', aim: { of: 'flushAim', judged, ...where, revealed: proven.revealed, floor } };
+  };
+  // At the bound no witness is asked: the reveal is judged above the keyboard the read applied, or the one the witness
+  // stood by.
+  if (!means.budget) {
+    const known = means.cover ?? (means.corroborated === true ? means.offered : undefined);
+    const atBound = probeOver(strokeLine(known, facts)?.y);
+    return (atBound === undefined ? undefined : aimed(atBound)) ?? unchecked('budget');
   }
-  if (!means.budget) return unchecked('budget');
   // Clear of a keyboard as any stroke is — and one the moot rule never asked about (the stop was clean either way) is
   // asked about now: the probe touches down on the container's lower part for a bottom edge, which may be under the
   // band.
@@ -513,5 +520,7 @@ function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, 
   // whole screen is `room` with no witness asked.
   const planned = probeOver(strokeLine(probeCover, facts)?.y);
   if (planned === undefined) return unchecked('room');
+  const stop = aimed(planned);
+  if (stop !== undefined) return stop;
   return { of: 'probe', toward: way.toward, stroke: planned.stroke, memory: planned.memory, check: close({ ...after, probe: { rect: { ...judged.node.rect }, edge } }) };
 }
