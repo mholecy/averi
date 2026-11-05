@@ -778,4 +778,8 @@ The end-to-end pins (`tests/mcp/ios-alert-replies.test.ts`, `tests/flow/launch-a
 characterization recorded 260 replies with their device calls at the base and after (both verbs on real adapters, MCP
 and flow): identical.
 
+`npm run mutate -- --group core --force`: `interact/app-holder-text.ts` joins the run at 97.70 % (floor 95; 87 mutants, 2
+survived, both equivalent on the `none` case); `android-chooser.ts` 100 % (152 mutants); every other score unchanged. Golden
+Changed 0 (it replays tree reads, no launch or link seam).
+
 Residual: the amended text above names `alertNote` and `alertText`, which no longer exist, as they were at their date.
