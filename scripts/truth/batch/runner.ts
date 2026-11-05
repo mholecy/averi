@@ -1,13 +1,13 @@
 import { join } from 'node:path';
-import { AbortGuard, type AbortBlock, type WindowSpec } from './abort.js';
+import { AbortGuard, within, type AbortBlock, type WindowSpec } from './abort.js';
 import type { Call, Run } from './bounded.js';
 import { completeness, incompleteLine, runFiles, runsIn, selectorOf, stepOutcome, writeCases, type Asked } from './cases.js';
 import { nodeFs, type BatchFs } from './io.js';
 import { liveTableOf, type LiveSelection, type LiveTable } from './live-table.js';
 import { ancestor, casesOnMain, cellsOnMain, checkout, preconditionLine, type Git, type Precondition } from './preconditions.js';
 import { nodeProcess, type ProcessSeam } from './proc.js';
-import { canonicalJson, recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
-import { blockName, layoutOf, META, newRunId, openRun, refusalLines, refusals, type Stateful } from './run-dir.js';
+import { recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
+import { blockName, layoutOf, META, newRunId, openRun, plainSegment, refusalLines, refusals, type Stateful } from './run-dir.js';
 import {
   backstopLine,
   checkoutLine,
@@ -22,6 +22,16 @@ import {
   liveCalls,
   liveStepText,
   NOT_READ_CHECKOUT,
+  ABORT_UNREAD,
+  callsNotRecordedNote,
+  endLateWhy,
+  endThrewWhy,
+  lateLineNote,
+  needEndError,
+  NEED_CALLS_MAX,
+  needCallLine,
+  needCallsCutLine,
+  needCallsFile,
   needsLine,
   rejudgeArgs,
   linesIn,
@@ -32,11 +42,12 @@ import {
   type ConfigRead,
   type DetailSpec,
   type LiveBounds,
+  type NeedCall,
   type NeedResult,
 } from './runner-lines.js';
 import { knobs as readKnobs, selectBlocks, type KnobSpec, type KnobValues } from './select.js';
 import { StepLog, terminalOf, type Terminal } from './steps.js';
-import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, verdictLine, type StepWord, type Verdict } from './words.js';
+import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, timeOf, verdictLine, type StepWord, type Verdict } from './words.js';
 
 /**
  * runBatch: a device batch's run, start to end, composed of the module's parts — a batch, kept outside the repo, gives
@@ -56,7 +67,8 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  * 6. each wanted block, in the batch's order: its needs (each checked once, by the first block that names it; S6b
  *    supplies the checks — the lab simulator, the lab emulator), a failed one making it INCONCLUSIVE, not run; then its
  *    `run(ctx)`;
- * 7. the normal end: every window still open to RESTORE (finish); each block that ran with no verdict of its own judged
+ * 7. the normal end: each need met that has an `end`, once (NeedSpec: the ios need's finportal read, its protected-key
+ *    line); every window still open to RESTORE (finish); each block that ran with no verdict of its own judged
  *    (`judge`, device-free); the backstop for a wanted block still without one; the details; the SUMMARY; the exit code
  *    (words.ts#exitCodeOf).
  *
@@ -80,22 +92,35 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  *     const D43 = { id: 'D43', label: 'D43 verdict', needs: ['ios'], async run(ctx) {
  *       const sim = await ios.open(ctx);                              // the guard again, over the block's own calls
  *       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
- *       await wdaWindow(ctx, sim.value, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
- *         work: async () => { if ((await iosCheck(ctx, sim.value, 'wda 1')).ok) await ctx.liveRun('ios-wda-1', asked, { secs }); } });
- *       await ios.endStretch(ctx, sim.value);                           // the finportal key's line
- *     }, judge };
+ *       const said = [];                                              // the work's checks' warnings
+ *       const w = await wdaWindow(ctx, sim.value, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
+ *         work: async () => {
+ *           const fit = await iosCheck(ctx, sim.value, 'wda 1');      // { ok, warning? } or { ok: false, why }
+ *           if (!fit.ok) return ctx.verdict('INCONCLUSIVE', `${fit.why} — no wda run`);
+ *           if (fit.warning !== undefined) said.push(fit.warning);
+ *           await ctx.liveRun('ios-wda-1', asked, { secs });
+ *         } });
+ *       const warnings = [...w.warnings, ...said];                   // the window's two checks', then the work's
+ *       if (warnings.length > 0) ctx.step('WARN', `D43: ${warnings.join('; ')}`);
+ *     }, judge };                                                     // the finportal key: the ios need's end reads it
  *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],
  *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly],
  *       config: configOf(process.argv.slice(2), process.env, repo) });
  *
- * A need is checked by the first block naming it and rechecked (its `alive`) before each later one; the WDA window is
- * a dirty window, so the abort puts it back the same way; `lastly` ends what S2's kept groups cannot own.
+ * A need is checked by the first block naming it and rechecked (its `alive`) before each later one, and its `end` runs
+ * once the last block is done (the ios need's: the finportal key's second read, its line in the SUMMARY — a CHANGED key
+ * fails the run, no block need judge it; T2b). The WDA window is a dirty window, so the abort puts it back the same way;
+ * a check's warning (a companion entry that may be stale, batch-13) is the block's to say, in its own words — batch-13
+ * put them on its verdict line. `lastly` ends what S2's kept groups cannot own.
  */
 
 /** A need a block names: the lab devices (`ios`, `android`), or any other the batch gives a check for. */
 export type Need = 'ios' | 'android' | (string & {});
 
-/** What a need's check gets: bounded calls, the lab folder, the config, the run's fs, the steps. */
+/**
+ * What a need's check gets: bounded calls — each recorded in the lab folder's `<need>-calls.jsonl` (T2b, batch-13 gap 6;
+ * runner-lines.ts#needCallLine) — the lab folder, the config, the run's fs, the steps.
+ */
 export interface NeedCtx {
   bounded: Run;
   labDir: string;
@@ -104,12 +129,36 @@ export interface NeedCtx {
   step(word: StepWord, text: string): void;
 }
 export type NeedCheck = (c: NeedCtx) => Promise<NeedResult>;
+/** What a need's end gets: a need's ctx and the protected-key line slot (BlockCtx#protectedLine's). */
+export interface NeedEndCtx extends NeedCtx {
+  protectedLine(line: string): void;
+}
+export type NeedEnd = (c: NeedEndCtx) => Promise<void>;
+/** A need's end's bound when its spec names none: a few bounded reads, each with its own bound. */
+export const NEED_END_SECS = 60;
 /**
  * A need's checks (S6b supplies them): `check` in full, by the first block naming it; then before each later block
  * naming it, `alive` — a cheap one (the emulator still answers) — or, with none, `check` again: a need met once is
- * never trusted blindly for a later block. A bare NeedCheck is `{ check }`.
+ * never trusted blindly for a later block. A bare NeedCheck is `{ check }`. Its `end` (T2b, batch-13 gap 4: the ios
+ * need's second read of the finportal key, which no block need remember): once the last block is done, before the
+ * windows still open go to RESTORE, once per need met at least once in the run — a need down later too (review round
+ * 1, MAJOR); never one never met or never asked — within `endSecs` (NEED_END_SECS unless given; a need whose end makes
+ * bounded calls derives it from their bounds, so it cannot pass it first). A throw or its bound passed is an ERROR line
+ * and, with `endUnread`, the protected-key line that says its key unread and why; an end past its bound that settles
+ * before the SUMMARY is assembled has its lines taken in place of that one (a late FAIL exits 1: review round 1,
+ * BLOCKER). Not at the abort: it exits 130 whatever a read says; its SUMMARY gets `endUnread`'s line for each need met
+ * whose end had not had its say, so the slot is never silent about a key not read.
  */
-export type NeedSpec = NeedCheck | { check: NeedCheck; alive?: NeedCheck };
+export type NeedSpec = NeedCheck | ({ check: NeedCheck; alive?: NeedCheck } & NeedEnding);
+/** A need's end, its bound and the line for a key it could not say (NeedSpec). */
+export interface NeedEnding {
+  end?: NeedEnd;
+  endSecs?: number;
+  endUnread?: (why: string) => string;
+}
+/** A NeedSpec as an object: a bare NeedCheck is `{ check }`. */
+type NeedObject = Exclude<NeedSpec, NeedCheck>;
+const needObjectOf = (spec: NeedSpec): NeedObject => (typeof spec === 'function' ? { check: spec } : spec);
 
 /** What a block's preconditions are asked through: S3's checks over this run's git and main's table. */
 export interface PreconditionKit {
@@ -252,8 +301,12 @@ function assertLabel(label: string): void {
   verdictLine(label, 'INCONCLUSIVE');
 }
 
-/** The batch's own mistakes, thrown before anything is done: a block's name, its label, a need without a check. */
+/**
+ * The batch's own mistakes, thrown before anything is done: a block's name, its label, a need without a check, a need's
+ * name that is no plain path segment (its calls' file is named by it).
+ */
 function assertBlocks(blocks: readonly Block<never>[], needs: Readonly<Record<string, NeedSpec>>): void {
+  for (const n of Object.keys(needs)) plainSegment('need', n);
   const ids = blocks.map((b) => b.id);
   for (const b of blocks) {
     blockName(b.id);
@@ -304,8 +357,17 @@ class BatchRun<K> {
   private readonly protectedLines: string[] = [];
   /** Each need's answer so far: its first check's, then a failed recheck's (a need down stays down). */
   private readonly needResults = new Map<string, NeedResult>();
+  /** The needs met at least once, in the order first met: each one's end is asked (NeedSpec). */
+  private readonly metOnce = new Set<string>();
+  /** The needs whose end has had its say before any interrupt: a line within its bound, or its unread line. */
+  private readonly endsSaid = new Set<string>();
+  /** The ends past their bound: their unread line, the lines they wrote since, whether they have settled. */
+  private readonly lateEnds: { unread: string | undefined; lines: string[]; settled: () => boolean }[] = [];
   /** Whether any wanted block ran: none, and the exit is 2. */
   private anyRan = false;
+  /** How many calls of each need were recorded so far, and the needs whose record could not be written (noted once). */
+  private readonly needCalls = new Map<string, number>();
+  private readonly unrecorded = new Set<string>();
   /** The blocks whose run returned: a `noRecords` block is complete only then. */
   private readonly finished = new Set<string>();
   private checkout: string | undefined;
@@ -340,7 +402,7 @@ class BatchRun<K> {
       judgeBudgetSecs: io.judgeBudgetSecs,
       // None given, none run: lastSteps over no step does nothing.
       lastly: (run: Run) => this.lastSteps(lastly, run),
-      head: () => ({ checkout: this.checkout ?? NOT_READ_CHECKOUT, labs: this.labs, protectedLines: this.protectedLines, errors: this.runErrors() }),
+      head: () => ({ checkout: this.checkout ?? NOT_READ_CHECKOUT, labs: this.labs, protectedLines: [...this.protectedLines, ...this.abortUnread()], errors: this.runErrors() }),
       blocks: blocks.map((b) => this.abortBlock(b)),
     });
     for (const b of blocks) this.lines.set(b.id, []);
@@ -370,6 +432,8 @@ class BatchRun<K> {
           if (this.guard.interrupted) return EXIT.interrupted;
           await this.runBlock(b, pre.get(b.id));
         }
+        // Interrupted meanwhile, endNeeds calls no end, and the body stops right after it.
+        await this.endNeeds();
         if (this.guard.interrupted) return EXIT.interrupted;
         const restore = await this.guard.finish();
         // A block not run has its INCONCLUSIVE line already: only the blocks that ran are judged.
@@ -452,17 +516,18 @@ class BatchRun<K> {
    * stopped) is only noted: the lab is not blamed for the interrupt.
    */
   private async needOf(need: string, id: string): Promise<NeedResult> {
-    const spec = this.needs[need];
-    const { check, alive = check } = typeof spec === 'function' ? { check: spec } : spec;
+    const { check, alive = check } = this.specOf(need);
     const known = this.needResults.get(need);
     if (known !== undefined && !known.ok) return known;
-    const r = await this.asked(need, known === undefined ? check : alive);
+    const r = await (known === undefined ? this.asked(need, check, 'check') : this.asked(need, alive, 'alive'));
     if (this.guard.interrupted) {
       this.log.step('NOTE', `LAB ${need}: its answer after the interrupt not kept: ${r.ok ? r.how : r.why}`);
       return r;
     }
     if (known !== undefined && r.ok) return r;
     this.needResults.set(need, r);
+    // Set here only by a first check or a failed recheck: met here is met for the first time.
+    if (r.ok) this.metOnce.add(need);
     const line = labLine(need, known === undefined || r.ok ? r : { ok: false, why: `${r.why} (rechecked before ${id})` });
     this.labs.push(line);
     this.log.note(line);
@@ -470,14 +535,115 @@ class BatchRun<K> {
   }
 
   /** A need's check run: its answer, or, when it throws, a failed one (an ERROR line, unless the abort has begun). */
-  private async asked(need: string, check: NeedCheck): Promise<NeedResult> {
+  private async asked(need: string, check: NeedCheck, phase: Exclude<NeedCall['phase'], 'end'>): Promise<NeedResult> {
     try {
-      return await check({ bounded: this.guard.bounded, labDir: this.dirs[LAB], config: this.config, fs: this.io.fs, step: (w, t) => this.log.step(w, t) });
+      return await check(this.needCtx(need, phase));
     } catch (e) {
       const why = `its check threw: ${firstLineOf(messageOf(e))}`;
       if (!this.guard.interrupted) this.log.error(`LAB ${need}: ${why}`);
       return { ok: false, why };
     }
+  }
+
+  /** Each need met at least once, in the order first met, that has an end: its end, once (NeedSpec); none once interrupted. */
+  private async endNeeds(): Promise<void> {
+    for (const need of this.metOnce) {
+      const spec = this.specOf(need);
+      if (this.guard.interrupted || spec.end === undefined) continue;
+      await this.runEnd(need, spec.end, spec);
+    }
+  }
+
+  /**
+   * One need's end, within its bound. A throw, or the bound passed: an ERROR line and its unread line (endUnread); past
+   * its bound, the lines it writes later are kept aside, taken if it settles before the SUMMARY (takeLateEnds).
+   */
+  private async runEnd(need: string, end: NeedEnd, { endSecs = NEED_END_SECS, endUnread }: NeedEnding): Promise<void> {
+    let open = true;
+    let settled = false;
+    const late: string[] = [];
+    // A line kept before the interrupt is its say: the abort's SUMMARY then adds no unread line for it.
+    const say = (l: string): void => {
+      this.keepProtected(l);
+      if (!this.guard.interrupted) this.endsSaid.add(need);
+    };
+    const protectedLine = (l: string): void => {
+      if (open) return say(l);
+      // The step first: one line, as its own rule asks.
+      this.log.step('NOTE', lateLineNote(need, l));
+      late.push(l);
+    };
+    const unread = (why: string): string | undefined => {
+      this.log.error(needEndError(need, why));
+      const line = endUnread?.(why);
+      if (line !== undefined) say(line);
+      return line;
+    };
+    const ending = end({ ...this.needCtx(need, 'end'), protectedLine });
+    ending.then(() => void (settled = true), () => {});
+    try {
+      const r = await within(endSecs, ending);
+      if (r.late) this.lateEnds.push({ unread: unread(endLateWhy(endSecs)), lines: late, settled: () => settled });
+    } catch (e) {
+      unread(endThrewWhy(messageOf(e)));
+    } finally {
+      open = false;
+    }
+  }
+
+  /** Each end past its bound that has settled by now, with lines: those lines in place of its unread line. No wait. */
+  private takeLateEnds(): void {
+    for (const l of this.lateEnds) {
+      if (!l.settled() || l.lines.length === 0) continue;
+      // None (no endUnread): -1, as for a line not there.
+      const at = this.protectedLines.findIndex((p) => p === l.unread);
+      if (at < 0) this.protectedLines.push(...l.lines);
+      else this.protectedLines.splice(at, 1, ...l.lines);
+    }
+  }
+
+  /** The abort SUMMARY's line for each need met whose end had not had its say: its key unread (endUnread). */
+  private abortUnread(): string[] {
+    return [...this.metOnce].flatMap((need) => {
+      const { endUnread } = this.specOf(need);
+      return this.endsSaid.has(need) || endUnread === undefined ? [] : [endUnread(ABORT_UNREAD)];
+    });
+  }
+
+  /** A need's spec as an object (needObjectOf). */
+  private specOf(need: string): NeedObject {
+    return needObjectOf(this.needs[need]);
+  }
+
+  /** What a need's check, alive and end get: each bounded call recorded, `phase` its part. */
+  private needCtx(need: string, phase: NeedCall['phase']): NeedCtx {
+    const bounded: Run = async (cmd, args, call = {}) => {
+      const result = await this.guard.bounded(cmd, args, call);
+      this.recordCall({ need, phase, at: timeOf(this.io.clock()), cmd, args, secs: call.secs, result });
+      return result;
+    };
+    return { bounded, labDir: this.dirs[LAB], config: this.config, fs: this.io.fs, step: (w, t) => this.log.step(w, t) };
+  }
+
+  /** A need's call appended to its file — up to NEED_CALLS_MAX, then one line saying so; a write that fails, one NOTE. */
+  private recordCall(c: NeedCall): void {
+    const n = (this.needCalls.get(c.need) ?? 0) + 1;
+    this.needCalls.set(c.need, n);
+    if (n > NEED_CALLS_MAX + 1) return;
+    try {
+      this.io.fs.append(needCallsFile(this.dirs[LAB], c.need), n > NEED_CALLS_MAX ? needCallsCutLine(c.need) : needCallLine(c));
+    } catch (e) {
+      if (this.unrecorded.has(c.need)) return;
+      this.unrecorded.add(c.need);
+      this.log.step('NOTE', callsNotRecordedNote(c.need, messageOf(e)));
+    }
+  }
+
+  /** A protected-key line kept for the SUMMARY — one line; once interrupted only noted, never in the abort SUMMARY. */
+  private keepProtected(l: string): void {
+    oneLine(l, 'a protected-key line');
+    if (this.guard.interrupted) this.log.step('NOTE', `a protected-key line after the interrupt not kept: ${l}`);
+    else this.protectedLines.push(l);
   }
 
   /**
@@ -527,12 +693,7 @@ class BatchRun<K> {
         this.verdict(b, r.line);
         guard.leave(b.id, r.hand);
       },
-      protectedLine: (l) => {
-        oneLine(l, 'a protected-key line');
-        // As a verdict after the interrupt: only noted, never in the abort SUMMARY.
-        if (guard.interrupted) log.step('NOTE', `a protected-key line after the interrupt not kept: ${l}`);
-        else this.protectedLines.push(l);
-      },
+      protectedLine: (l) => this.keepProtected(l),
       liveRun: (name, asked, o) => (recording('liveRun'), this.liveRun(b, bounded, name, asked, o, preAsked)),
       asksLive: (name, asked) => {
         recording('asksLive');
@@ -685,6 +846,7 @@ class BatchRun<K> {
   /** The details, then the SUMMARY; the exit called with its code. */
   private end(restore: readonly string[]): number {
     const { fs } = this.io;
+    this.takeLateEnds();
     const checkout = this.checkout!;
     const details = detailsLines({
       checkout,

@@ -562,6 +562,11 @@ describe("cleanUp — the block's cleanup by --check's exit (batch-11.sh:539–5
     expect(c).toMatchObject({ verdict: 'OK', line: 'D55 cleanup: OK — chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)', hand: [] });
   });
 
+  it('its label: `D55 cleanup` unless one is given (T2b batch-13 gap 2: E5 said D55 before)', async () => {
+    const c = await cleanUp(await emuOf(fakeEmu()), { ...files(), label: 'E5 cleanup' });
+    expect(c.line).toBe('E5 cleanup: OK — chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)');
+  });
+
   it("5, the accepted last-chosen entry: OK, never \"cleared\" by a reinstall (batch-12 fixed batch-11's defect 1/2)", async () => {
     const fake = fakeEmu({ entries: [{ flag: 'false' }] });
     const c = await cleanUp(await emuOf(fake), files());

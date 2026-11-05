@@ -196,3 +196,17 @@ export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
   if (judged.some(failsIn)) return EXIT.failed;
   return s.noneRan === true ? EXIT.nothingDone : EXIT.ok;
 }
+
+/**
+ * A JSON value as one key (T2 S6b review round 1, NIT 8: a run's identity, asked and done; here since T2b-1's code
+ * review, so the pure halves need no io): every object's fields sorted, at every depth, so two equal values built in
+ * another field order give the same text; arrays keep their order.
+ */
+export function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  if (typeof v !== 'object' || v === null) return JSON.stringify(v);
+  const o = v as Record<string, unknown>;
+  // A field set to undefined is no field (JSON.stringify drops it too).
+  const keys = Object.keys(o).sort().filter((k) => o[k] !== undefined);
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(',')}}`;
+}

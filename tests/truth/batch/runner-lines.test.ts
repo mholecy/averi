@@ -24,6 +24,17 @@ import {
   MODULE_REPO,
   NOT_READ_CHECKOUT,
   NOT_RUN,
+  ABORT_UNREAD,
+  callsNotRecordedNote,
+  endLateWhy,
+  endThrewWhy,
+  lateLineNote,
+  needEndError,
+  NEED_CALL_CHARS,
+  NEED_CALLS_MAX,
+  needCallLine,
+  needCallsCutLine,
+  needCallsFile,
   needsLine,
   rejudgeArgs,
   stepsOfRun,
@@ -372,5 +383,42 @@ describe('the lines meet words.ts\'s exit rule', () => {
       errors: [],
     };
     expect(exitCodeOf(s)).toBe(0);
+  });
+});
+
+describe('needCallLine — one call of a need, recorded in lab/<need>-calls.jsonl (T2b batch-13 gap 6: batch-13 wrapped the ios need\'s calls itself)', () => {
+  const result = (over: Partial<{ code: number; timedOut: boolean; out: string; err: string }> = {}) => ({ code: 0, timedOut: false, signal: null, out: 'the whole tree\n', err: '', ...over });
+  const call = { need: 'ios', phase: 'check' as const, at: '09:44:26', cmd: '/usr/bin/xcrun', args: ['simctl', 'boot', 'U-1'], secs: 300, result: result() };
+
+  it('one JSON line, its fields sorted: the need, the phase, the time, the command\'s base name, its args, its bound, its exit — no output of a call that answered', () => {
+    expect(needCallLine(call)).toBe('{"args":["simctl","boot","U-1"],"at":"09:44:26","cmd":"xcrun","code":0,"need":"ios","phase":"check","secs":300,"timedOut":false}\n');
+    expect(JSON.parse(needCallLine({ ...call, secs: undefined }))).not.toHaveProperty('secs');
+  });
+
+  it('a call that failed or passed its bound: its first line said (stderr\'s before stdout\'s, as the steps say it), one line', () => {
+    expect(JSON.parse(needCallLine({ ...call, phase: 'alive', result: result({ code: 1, err: 'No translation object returned\nmore', out: 'x' }) }))).toMatchObject({ phase: 'alive', code: 1, said: 'No translation object returned' });
+    expect(JSON.parse(needCallLine({ ...call, phase: 'end', result: result({ code: 142, timedOut: true, out: '' }) }))).toMatchObject({ phase: 'end', timedOut: true, said: '' });
+    expect(needCallLine({ ...call, args: ['a\nb'] }).split('\n')).toHaveLength(2);
+  });
+
+  it('bounded: an argument or a said line past NEED_CALL_CHARS code points cut with …; the file\'s name; past NEED_CALLS_MAX calls, one line says so', () => {
+    expect([NEED_CALL_CHARS, NEED_CALLS_MAX]).toEqual([200, 500]);
+    const long = '😀'.repeat(NEED_CALL_CHARS + 1);
+    const r = JSON.parse(needCallLine({ ...call, args: [long, 'x'.repeat(NEED_CALL_CHARS)], result: result({ code: 2, err: long }) })) as { args: string[]; said: string };
+    expect(r.args).toEqual([`${'😀'.repeat(NEED_CALL_CHARS)}…`, 'x'.repeat(NEED_CALL_CHARS)]);
+    expect(r.said).toBe(`${'😀'.repeat(NEED_CALL_CHARS)}…`);
+    expect(needCallsFile('/runs/lab', 'ios')).toBe(join('/runs/lab', 'ios-calls.jsonl'));
+    expect(needCallsCutLine('ios')).toBe('{"dropped":"the calls past the first 500 not recorded","need":"ios"}\n');
+  });
+});
+
+describe('a need\'s end in words: its whys, its notes, the abort\'s unread why (T2b-1 code review: the runner builds none inline)', () => {
+  it('the whys an unread line and the ERROR line carry; the LAB ERROR line; the notes', () => {
+    expect(endLateWhy(0.02)).toBe('its end did not finish within 0.02 s');
+    expect(endThrewWhy('simctl gone\nmore')).toBe('its end threw: simctl gone');
+    expect(needEndError('ios', endLateWhy(246))).toBe('LAB ios: its end did not finish within 246 s');
+    expect(lateLineNote('ios', 'FAIL x')).toBe("LAB ios: a protected-key line after its end's bound, kept if its end finishes before the SUMMARY: FAIL x");
+    expect(callsNotRecordedNote('ios', 'ENOSPC: no space\nmore')).toBe('LAB ios: its calls not recorded (ENOSPC: no space)');
+    expect(ABORT_UNREAD).toBe('not read at its end: the run was interrupted (the abort reads nothing)');
   });
 });

@@ -35,6 +35,28 @@ export const LATE_HAND_PREFIX = 'D43 (iOS, changed after the restore — a late 
 export const RESTORE_LABEL = 'D43 WDA-window restore';
 /** The compare's verdict label (batch-11's `D43 WDA-window compare:` line). */
 export const COMPARE_LABEL = 'D43 WDA-window compare';
+/**
+ * What a domains window's lines call it (T2b, batch-13 gap 3): its restore's and its compare's verdict labels, its
+ * backup's step, its RESTORE lines' starts (`hand`, and `lateHand` for a late writer's). The WDA window's are
+ * D43_LABELS; another block's window (batch-13's D65) takes domainLabels(its id), so no line of it says D43.
+ */
+export interface DomainLabels {
+  restore: string;
+  compare: string;
+  backup: string;
+  hand: string;
+  lateHand: string;
+}
+/** The WDA window's labels (batch-11's): the default of every domains-window function. */
+export const D43_LABELS: DomainLabels = { restore: RESTORE_LABEL, compare: COMPARE_LABEL, backup: 'D43 backup', hand: HAND_PREFIX, lateHand: LATE_HAND_PREFIX };
+/** Another block's domains-window labels, as batch-13 wrote D65's: `<id> window restore`, `<id> (iOS): `, …. */
+export const domainLabels = (id: string): DomainLabels => ({
+  restore: `${id} window restore`,
+  compare: `${id} window compare`,
+  backup: `${id} backup`,
+  hand: `${id} (iOS): `,
+  lateHand: `${id} (iOS, changed after the restore — a late writer): `,
+});
 /** How much of a value a compare line shows, in code points, before `…`: the line stays short whatever a key holds. */
 export const COMPARE_VALUE_CHARS = 60;
 
@@ -412,15 +434,16 @@ const shown = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine(p.
 
 /**
  * The SUMMARY's protected-key line (batch-11.sh:584–585), from the reads at the iOS stretch's start and end:
- * `OK … unchanged` only when both were read (a value, or absent) and are the same; else an ERROR saying CHANGED or
- * unread — unread is never unchanged.
+ * `OK … unchanged` only when both were read (a value, or absent) and are the same; CHANGED a FAIL — the run exits 1
+ * (words.ts#exitCodeOf: a FAIL step line; T2b, batch-13 gap 4: an ERROR before, and a changed key exited 0); unread an
+ * ERROR — never unchanged, and not the batch's failure: the SUMMARY says it, exit 0 alone.
  */
 export function protectedLine(start: ProtectedRead, end: ProtectedRead): string {
   const what = `${PROTECTED.domain}'s ${PROTECTED_SHORT}`;
   const bothRead = start.state !== 'unreadable' && end.state !== 'unreadable';
   if (bothRead && valueOf(start) === valueOf(end)) return stepLine('OK', `${what} unchanged (${shown(start)}; read only)`);
-  const how = bothRead ? 'CHANGED' : 'unread';
-  return stepLine('ERROR', `${what} ${how}: ${shown(start)} at the start, ${shown(end)} at the end — no batch writes it: read it by hand (batch-5's backup stays read only)`);
+  const said = `${shown(start)} at the start, ${shown(end)} at the end — no batch writes it: read it by hand (batch-5's backup stays read only)`;
+  return bothRead ? stepLine('FAIL', `${what} CHANGED: ${said}`) : stepLine('ERROR', `${what} unread: ${said}`);
 }
 
 // ------------------------------------------------------------------------------------------------- the lines
@@ -454,10 +477,10 @@ export function domainPart(d: DomainRestore): string {
   return `${d.name} NOT equal to its backup${did === '' ? '' : ` after ${did}`}${keys} (${d.why})`;
 }
 
-/** The restore's `OK — …` line. */
-export const restoredLine = (why: string): string => verdictLine(RESTORE_LABEL, 'OK', why);
-/** The restore's `ERROR — NOT VERIFIED — …` line. */
-export const notVerifiedLine = (why: string): string => verdictLine(RESTORE_LABEL, 'ERROR', `NOT VERIFIED — ${why}`);
+/** The restore's `OK — …` line, the WDA window's label unless one is given. */
+export const restoredLine = (why: string, label = RESTORE_LABEL): string => verdictLine(label, 'OK', why);
+/** The restore's `ERROR — NOT VERIFIED — …` line, the WDA window's label unless one is given. */
+export const notVerifiedLine = (why: string, label = RESTORE_LABEL): string => verdictLine(label, 'ERROR', `NOT VERIFIED — ${why}`);
 
 /**
  * A typed value as a compare line shows it: `<type> <canonical value>`, one line, cut at COMPARE_VALUE_CHARS code

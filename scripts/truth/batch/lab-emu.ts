@@ -343,7 +343,7 @@ async function provenCells(emu: LabEmu, devicePath: string, catalog: string, o: 
 
 export interface Cleanup {
   verdict: Verdict;
-  /** `D55 cleanup: <verdict> — <why>`. */
+  /** `<label>: <verdict> — <why>`, `D55 cleanup` unless a label is given. */
   line: string;
   /** RESTORE lines: none when nothing is left to do by hand. */
   hand: string[];
@@ -355,13 +355,14 @@ export interface Cleanup {
  * a chooser is in front; then by its exit, CHECK_OUTCOME's word, words and hand lines — 0 and 5 OK; 6 a WARN, no
  * RESTORE (no reinstall clears a last-chosen entry, so none is tried: batch-12 fixed batch-11's); 3 and 4 ERROR; 1, a
  * lab default, FAIL even when the reinstall clears it ("Always" is never tapped, so a default predates the batch or is
- * a defect), the reinstall's hand lines when it does not.
+ * a defect), the reinstall's hand lines when it does not. Its line's label `o.label`, CLEANUP_LABEL unless given
+ * (T2b, batch-13 gap 2: batch-13's E5 said `D55 cleanup`).
  */
-export async function cleanUp(emu: LabEmu, o: ReinstallOptions): Promise<Cleanup> {
+export async function cleanUp(emu: LabEmu, o: ReinstallOptions & { label?: string }): Promise<Cleanup> {
   const check = await checkAfterDismissal(emu, o.accepted);
   const outcome = CHECK_OUTCOME[check.exit];
   const words = outcome.words(checkWhy(check.focus, check.preferred, o.accepted));
-  const done = (text: string, hand: string[]): Cleanup => ({ verdict: outcome.word, line: verdictLine(CLEANUP_LABEL, outcome.word, text), hand, check });
+  const done = (text: string, hand: string[]): Cleanup => ({ verdict: outcome.word, line: verdictLine(o.label ?? CLEANUP_LABEL, outcome.word, text), hand, check });
   if (check.exit !== CHECK_EXIT.leak) return done(words, outcome.hand(handBaseOf(emu, o)));
   const r = await clearLabEntry(emu, o);
   return r.ok ? done(`${words}; cleared: ${r.how}`, []) : done(`${words}; NOT cleared: ${r.why}`, r.hand);

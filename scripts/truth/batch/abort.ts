@@ -137,8 +137,8 @@ export const JUDGE_BUDGET_SECS = 120;
 export const LASTLY_SECS = 60;
 
 
-/** What `p` settled to, or `late` once `secs` have passed with it unsettled. */
-async function within<T>(secs: number, p: Promise<T>): Promise<{ late: false; value: T } | { late: true }> {
+/** What `p` settled to, or `late` once `secs` have passed with it unsettled (the runner's need ends too). */
+export async function within<T>(secs: number, p: Promise<T>): Promise<{ late: false; value: T } | { late: true }> {
   let timer: NodeJS.Timeout | undefined;
   const late = new Promise<{ late: true }>((resolve) => (timer = setTimeout(() => resolve({ late: true }), secs * 1000)));
   try {

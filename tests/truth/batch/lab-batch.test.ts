@@ -15,10 +15,10 @@ import { CATALOG, LAB_SERIAL, LAB_UDID, labWorld, type LabWorld, type WorldOptio
 
 // The lab plumbing under runBatch (T2 S6b, spec S6b's tests): a fake batch — the lab block (the Android build and the
 // device checks), an Android block with the tri-state reads around its live run, an iOS block whose live run is in the
-// WDA window and which ends the iOS stretch — over a fake process seam that answers git and live.ts as runner.test.ts
-// does and every lab call through the fake lab (lab-fakes.ts), with real files in a temp dir, a fixed clock and pid.
-// The whole SUMMARY; a need that fails; ONLY=lab; a build that fails; the abort inside the WDA window; the lab's
-// processes at the run's end. Every call is checked for b11-dry's VIOLATIONs made exact (afterEach). No device.
+// WDA window after its own health check (the finportal key read by the ios need's end) — over a fake process seam that
+// answers git and live.ts as runner.test.ts does and every lab call through the fake lab (lab-fakes.ts), with real
+// files in a temp dir, a fixed clock and pid. The whole SUMMARY; a need that fails; ONLY=lab; a build that fails; the
+// work's check not fit; the abort inside the WDA window; the lab's processes at the run's end. Every call is checked for b11-dry's VIOLATIONs made exact (afterEach). No device.
 
 const HEAD = 'a'.repeat(40);
 const ID = '20261105-094426-4242';
@@ -34,6 +34,8 @@ class LabSeam implements ProcessSeam {
   private readonly ended = new Set<number>();
   /** A call whose words include this runs until its group is signalled. */
   hang: string | undefined;
+  /** A call whose words include this fails: exit 149, as a boot that cannot be made. */
+  fails: string | undefined;
   constructor(
     public world: LabWorld,
     private readonly repo: string,
@@ -89,6 +91,7 @@ class LabSeam implements ProcessSeam {
       if (source === 'wda') this.world.startWda();
       return { code: 0, out: summaryOf(cases, source), err: '' };
     }
+    if (this.fails !== undefined && `${cmd} ${args.join(' ')}`.includes(this.fails)) return { code: 149, out: '', err: 'Unable to boot device' };
     return this.world.answer(cmd, args, { cwd: options.cwd });
   }
 }
@@ -127,8 +130,13 @@ const outText = () => readFileSync(join(dirOf('meta'), 'batch-l.out'), 'utf8');
 const KF: Asked = { platform: 'android', app: 'native', sources: ['uiautomator'], cases: ['kf1'] };
 const P7W: Asked = { platform: 'ios', app: 'native', sources: ['wda'], cases: ['p7w'] };
 
-/** The fake batch: the lab block, an Android block with the tri-state reads, an iOS block in the WDA window. */
-function batch(o: { labNeeds?: string[]; d55First?: boolean } = {}) {
+/**
+ * The fake batch: the lab block, an Android block with the tri-state reads, an iOS block in the WDA window — its work's
+ * health check first (`beforeWork` changes the lab before it), a check not fit its INCONCLUSIVE naming why; each
+ * window's outcome kept in `windows`.
+ */
+function batch(o: { labNeeds?: string[]; d55First?: boolean; beforeWork?: () => void } = {}) {
+  const windows: Awaited<ReturnType<typeof wdaWindow>>[] = [];
   const build = labBuild();
   const android = androidLab({ build: build.android, settle: noWait });
   const ios = iosLab({ wait: noWait });
@@ -152,19 +160,22 @@ function batch(o: { labNeeds?: string[]; d55First?: boolean } = {}) {
     run: async (ctx) => {
       const sim = await ios.open(ctx);
       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
-      await wdaWindow(ctx, sim.value, {
+      const w = await wdaWindow(ctx, sim.value, {
         runs: [{ name: 'ios-wda-d43-1', asked: P7W }],
         work: async () => {
-          if ((await iosCheck(ctx, sim.value, 'D43 wda 1')).ok) await ctx.liveRun('ios-wda-d43-1', P7W, { secs: 60 });
+          o.beforeWork?.();
+          const fit = await iosCheck(ctx, sim.value, 'D43 wda 1');
+          if (fit.ok) await ctx.liveRun('ios-wda-d43-1', P7W, { secs: 60 });
+          else ctx.verdict('INCONCLUSIVE', `${fit.why} — no wda run`);
         },
       });
-      await ios.endStretch(ctx, sim.value);
+      windows.push(w);
     },
     judge: judgeOf('D43 verdict'),
   };
   const lab = labBlock(o.labNeeds ?? ['android-build', 'android'], { build });
   const blocks = o.d55First === true ? [d55, lab, d43] : [lab, d55, d43];
-  return { build, android, ios, blocks, needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly] };
+  return { build, android, ios, blocks, windows, needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly] };
 }
 
 function go(b: ReturnType<typeof batch>, env: Record<string, string> = {}): Promise<number> {
@@ -213,14 +224,15 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     expect(outText()).toContain(`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`);
   });
 
-  it('a late writer after the restore: the compare WARN, its hand lines in RESTORE, exit 1; the finportal key CHANGED an ERROR line', async () => {
+  it('a late writer after the restore: the compare WARN, its hand lines in RESTORE, exit 1; the finportal key CHANGED a FAIL line, from the ios need\'s end (T2b batch-13 gap 4)', async () => {
     fresh({ lateFlip: true, finportal: '1', finportalEnd: '2' });
     expect(await go(batch())).toBe(1);
     const s = summary();
     expect(s.find((l) => l.startsWith('D43 WDA-window compare:'))).toMatch(/^D43 WDA-window compare: WARN — com\.apple\.Accessibility: .* — the state file marked dirty again; the hand lines are in RESTORE$/);
     expect(s).toContain(`RESTORE: state not provably put back — ${join(out, 'RESTORE.txt')}:`);
     expect(s.some((l) => l.startsWith('D43 (iOS, changed after the restore — a late writer): xcrun simctl spawn LAB-SIMULATOR-UDID defaults write com.apple.Accessibility'))).toBe(true);
-    expect(s.find((l) => l.includes('finportal'))).toMatch(/^ERROR com\.apple\.launchservices\.schemeapproval's -->sk\.finportal\.myport CHANGED: 1 at the start, 2 at the end/);
+    expect(s.filter((l) => l.includes('finportal'))).toHaveLength(1);
+    expect(s.find((l) => l.includes('finportal'))).toMatch(/^FAIL com\.apple\.launchservices\.schemeapproval's -->sk\.finportal\.myport CHANGED: 1 at the start, 2 at the end/);
   });
 
   it('d43-backupfail: the D43 block INCONCLUSIVE naming the backup\'s why, nothing changed, its .cases asked and never ran', async () => {
@@ -229,6 +241,39 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     expect(summary()).toContain('D43 verdict: INCONCLUSIVE — the WDA window did not run: the simulator domains could not be backed up — no wda run (nothing changed): defaults export com.apple.Preferences: exit 1 export com.apple.Preferences failed — no state written');
     expect(existsSync(join(dirOf('D43'), 'ios-wda-d43-1.cases'))).toBe(true);
     expect(seam.words.some((w) => w.includes('--sources wda'))).toBe(false);
+  });
+});
+
+describe('the work\'s own health check inside the WDA window (T2b batch-13: never at batch level before, only in the dry harness)', () => {
+  it('not fit ({ok: false}: sick, and its reset cannot boot): the block INCONCLUSIVE naming why, no wda run, the window still put back and compared; exit 0', async () => {
+    const b = batch({ beforeWork: () => ((world.st.sick = 'describe-all'), (seam.fails = 'simctl boot')) });
+    expect(await go(b)).toBe(0);
+    const s = summary();
+    expect(s).toContain('D43 verdict: INCONCLUSIVE — the iOS reset before D43 wda 1 failed: simctl boot: exit 149 Unable to boot device — no wda run');
+    expect(s.find((l) => l.startsWith('D43 WDA-window restore:'))).toMatch(/^D43 WDA-window restore: OK — /);
+    expect(s).toContain('D43 WDA-window compare: OK — every domain still equals its backup after the end check');
+    expect(s).toContain('RESTORE: none — everything dirty was put back and verified');
+    expect(seam.words.some((w) => w.includes('--sources wda'))).toBe(false);
+    expect(b.windows).toEqual([{ ran: true, putBack: true, warnings: [] }]);
+  });
+});
+
+describe('the finportal key CHANGED fails the run by itself: the ios need\'s end reads it, no block of the batch\'s own judges it (T2b batch-13 gap 4)', () => {
+  it('a clean run whose key changed: exit 1, its FAIL line in the protected-key slot, after the blocks\' lines', async () => {
+    fresh({ finportal: '1', finportalEnd: '2' });
+    expect(await go(batch())).toBe(1);
+    const s = summary();
+    expect(s.slice(-4, -1)).toEqual([
+      'D43 verdict: PASS — its runs complete',
+      "FAIL com.apple.launchservices.schemeapproval's -->sk.finportal.myport CHANGED: 1 at the start, 2 at the end — no batch writes it: read it by hand (batch-5's backup stays read only)",
+      'RESTORE: none — everything dirty was put back and verified',
+    ]);
+  });
+
+  it('ONLY=D55: the ios need never met, so never ended — no finportal line, exit 0', async () => {
+    fresh({ finportal: '1', finportalEnd: '2' });
+    expect(await go(batch(), { ONLY: 'D55' })).toBe(0);
+    expect(summary().some((l) => l.includes('finportal'))).toBe(false);
   });
 });
 

@@ -275,4 +275,14 @@ describe('the chooser\'s stretch (batch-11\'s D55, batch-12\'s E5): the window, 
     expect(spec?.cleanup).toBe('D55 cleanup');
     expect(events).toEqual([`open ${CHOOSER_WINDOW}`, 'work', expect.stringMatching(/^verdict D55 cleanup: OK — /), `close ${CHOOSER_WINDOW}`]);
   });
+
+  it('its own cleanup label, one for both paths: the cleanup\'s line and the window\'s (the abort\'s) carry it (T2b batch-13 gap 2)', async () => {
+    const { ctx, events, windows } = blockCtx();
+    let spec: WindowSpec | undefined;
+    await chooserStretch(ctx, await emuOf(), { apk: join(dir, 'lab', 'installed.apk'), catalog: join(dir, 'repo', 'fixtures', 'apps', 'cells.json'), dir: ctx.dir, accepted: [], progress: reinstallProgress(), stateFile: join(ctx.dir, 'state.json'), cleanup: 'E5 cleanup' }, async () => {
+      spec = windows.get(CHOOSER_WINDOW);
+    });
+    expect(spec?.cleanup).toBe('E5 cleanup');
+    expect(events).toEqual([`open ${CHOOSER_WINDOW}`, expect.stringMatching(/^verdict E5 cleanup: OK — chooser no; /), `close ${CHOOSER_WINDOW}`]);
+  });
 });

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_WDA_PORTS } from '../../../scripts/truth/lab-device.js';
 import { TIMED_OUT, type Call, type CallResult, type Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { backupPathOf, COMPARE_VALUE_CHARS, DOMAINS, PROTECTED, TYPED_PY, type KeyVal } from '../../../scripts/truth/batch/ios-defaults.js';
+import { backupPathOf, COMPARE_VALUE_CHARS, D43_LABELS, domainLabels, DOMAINS, PROTECTED, TYPED_PY, type KeyVal } from '../../../scripts/truth/batch/ios-defaults.js';
 import { backup, compare, domainsWindow, freshPathOf, LabSim, PLIST_SECS, readProtected, restore } from '../../../scripts/truth/batch/ios-domains.js';
 import { stateOf } from '../../../scripts/truth/batch/run-dir.js';
 
@@ -134,9 +134,9 @@ const threeDomains = () => DOMAINS.map((name) => ({ name, backup: backupPathOf(s
 const readState = () => JSON.parse(readFileSync(stateFile(), 'utf8')) as { dirty: boolean; udid: string; port: number; domains: { name: string; backup: string | null }[] };
 
 /** The window as batch-10 ran it: the backup, then the runner's exit flipping Accessibility (its `after` export). */
-async function windowRun(fake: ReturnType<typeof fakeSim>): Promise<LabSim> {
+async function windowRun(fake: ReturnType<typeof fakeSim>, labels = D43_LABELS): Promise<LabSim> {
   const sim = await labOf(fake);
-  expect((await backup(sim, stateFile())).ok).toBe(true);
+  expect((await backup(sim, stateFile(), labels)).ok).toBe(true);
   fake.domains.set(A11Y, exported(A11Y, 'after'));
   return sim;
 }
@@ -726,5 +726,89 @@ describe("domainsWindow — the WDA window as abort.ts's dirty window (batch-11.
     expect(p.ok).toBe(false);
     expect(!p.ok && p.why).toMatch(/^D43 WDA-window restore: ERROR — NOT VERIFIED — /);
     expect(!p.ok && p.hand).toHaveLength(3);
+  });
+});
+
+describe('a domains window of another block: its own labels on every line, none says D43 (T2b batch-13 gap 3: batch-13\'s D65 relabelled them by regex)', () => {
+  const L = domainLabels('D65');
+  const noD43 = (lines: readonly string[]) => expect(lines.filter((l) => l.includes('D43'))).toEqual([]);
+  const LATE = 'D65 (iOS, changed after the restore — a late writer): ';
+
+  it('the backup\'s step line, the restore\'s OK lines (put back, nothing put back, nothing to do)', async () => {
+    const fake = fakeSim();
+    const sim = await labOf(fake);
+    expect(await restore(sim, stateFile(), L)).toMatchObject({ ok: true, line: 'D65 window restore: OK — nothing to do (no state file: the window backed nothing up, so changed nothing)' });
+    const b = await backup(sim, stateFile(), L);
+    expect(b.ok && b.line).toMatch(/^OK {3}D65 backup: com\.apple\.keyboard\.preferences exported, /);
+    expect((await restore(sim, stateFile(), L)).line).toBe('D65 window restore: OK — every domain equals its backup (nothing put back)');
+    expect((await restore(sim, stateFile(), L)).line).toBe('D65 window restore: OK — nothing to do (the state file is clean)');
+    writeFileSync(stateFile(), JSON.stringify({ ...readState(), dirty: true }));
+    fake.domains.set(A11Y, exported(A11Y, 'after'));
+    expect((await restore(sim, stateFile(), L)).line).toMatch(/^D65 window restore: OK — com\.apple\.keyboard\.preferences equal, .* put back \(wrote back /);
+  });
+
+  it('NOT VERIFIED: another simulator\'s state, a read-back still differing, a state that cannot be cleared — each line and hand line D65\'s', async () => {
+    const fake = fakeSim();
+    const sim = await labOf(fake);
+    writeFileSync(stateFile(), JSON.stringify({ dirty: true, udid: 'OTHER', port: 8120, domains: threeDomains() }));
+    const other = await restore(sim, stateFile(), L);
+    expect(other.line).toBe(`D65 window restore: ERROR — NOT VERIFIED — the state file is for OTHER, not ${LAB}`);
+    expect(!other.ok && other.hand).toEqual([`D65 (iOS): compare the simulator's ${DOMAINS.join(', ')} with the .backup.plist files beside ${stateFile()}`]);
+    writeFileSync(stateFile(), '{"dirty": tru');
+    expect((await restore(sim, stateFile(), L)).line).toBe(`D65 window restore: ERROR — NOT VERIFIED — the state file ${stateFile()}: it is no JSON`);
+    rmSync(stateFile());
+    const refused = fakeSim({ rules: [(_, a) => (a[4] === 'write' || a[4] === 'import' ? exit(1, 'refused') : undefined)] });
+    const r = await restore(await windowRun(refused, L), stateFile(), L);
+    expect(r.line).toMatch(/^D65 window restore: ERROR — NOT VERIFIED — /);
+    expect(!r.ok && r.hand.every((h) => h.startsWith(`D65 (iOS): xcrun simctl spawn ${LAB} defaults write `))).toBe(true);
+    for (const f of readdirSync(dir)) rmSync(join(dir, f));
+    const ok = fakeSim();
+    await windowRun(ok, L);
+    const stuck = await LabSim.open(LAB, ok.run, { ...nodeFs, replace: () => { throw new Error('EISDIR: no'); } });
+    const c = await restore(stuck.ok ? stuck.sim : sim, stateFile(), L);
+    expect(c.line).toBe(`D65 window restore: ERROR — NOT VERIFIED — every domain equals its backup, but ${stateFile()} could not be cleared (EISDIR: no)`);
+    noD43([other.line, r.line, c.line, ...(!other.ok ? other.hand : []), ...(!r.ok ? r.hand : []), ...(!c.ok ? c.hand : [])]);
+  });
+
+  it('the compare: OK, a late writer\'s WARN with its hand lines, an unread domain, a state not compared', async () => {
+    const fake = fakeSim({ unreadable: new Set([join(dir, 'state.com.apple.Preferences.compare-2.plist')]) });
+    const sim = await windowRun(fake, L);
+    expect((await compare(sim, stateFile(), L)).line).toBe('D65 window compare: WARN — not compared: the restore has not verified (the state file is dirty)');
+    await restore(sim, stateFile(), L);
+    expect((await compare(sim, stateFile(), L)).line).toBe('D65 window compare: OK — every domain still equals its backup after the end check');
+    fake.domains.set(A11Y, { ...exported(A11Y, 'backup'), AutomationEnabled: { t: 'int', c: '0', v: '0' } });
+    const c = await compare(sim, stateFile(), L);
+    expect(c.line).toMatch(/^D65 window compare: WARN — com\.apple\.Preferences unread \(.*\); com\.apple\.Accessibility: AutomationEnabled bool true → int 0 — the state file marked dirty again; the hand lines are in RESTORE$/);
+    expect(c.hand).toEqual([
+      `${LATE}com.apple.Preferences could not be compared: read it and compare it with its backup beside ${stateFile()} by hand`,
+      `${LATE}xcrun simctl spawn ${LAB} defaults write ${A11Y} AutomationEnabled -bool true`,
+    ]);
+    noD43([c.line, ...c.hand]);
+  });
+
+  it('the window (the abort\'s): its restore\'s line and its hand lines — per domain, no state, a state unreadable — D65\'s', async () => {
+    const fake = fakeSim();
+    const sim = await labOf(fake);
+    const w = domainsWindow(sim, stateFile(), { labels: L });
+    expect(w.hand).toEqual([expect.stringMatching(/^D65 \(iOS\): the simulator settings not provably put back: /)]);
+    await backup(sim, stateFile(), L);
+    expect(w.hand).toEqual(DOMAINS.map((d) => `D65 (iOS): xcrun simctl spawn ${LAB} defaults import ${d} ${backupPathOf(stateFile(), d)}`));
+    fake.domains.set(A11Y, exported(A11Y, 'after'));
+    const p = await w.restore(fake.run);
+    expect(p.ok && p.how).toMatch(/^D65 window restore: OK — /);
+    writeFileSync(stateFile(), '{"dirty": tr');
+    expect(w.hand).toEqual([`D65 (iOS): the state file ${stateFile()} is unreadable: it is no JSON`, expect.stringMatching(/^D65 \(iOS\): the simulator settings not provably put back: /)]);
+    const refused = fakeSim({ rules: [(_, a) => (a[4] === 'write' || a[4] === 'import' ? exit(1) : undefined)] });
+    for (const f of readdirSync(dir)) rmSync(join(dir, f));
+    const rsim = await windowRun(refused, L);
+    const q = await domainsWindow(rsim, stateFile(), { labels: L }).restore(refused.run);
+    expect(!q.ok && q.why).toMatch(/^D65 window restore: ERROR — NOT VERIFIED — /);
+    expect(!q.ok && q.hand).toHaveLength(3);
+    noD43(q.ok ? [] : [q.why, ...(q.hand ?? [])]);
+  });
+
+  it('domainLabels: `<id> window restore|compare`, `<id> backup`, the hand lines\' starts; D43_LABELS are the WDA window\'s, unchanged', () => {
+    expect(L).toEqual({ restore: 'D65 window restore', compare: 'D65 window compare', backup: 'D65 backup', hand: 'D65 (iOS): ', lateHand: LATE });
+    expect(D43_LABELS).toEqual({ restore: 'D43 WDA-window restore', compare: 'D43 WDA-window compare', backup: 'D43 backup', hand: 'D43 (iOS): ', lateHand: 'D43 (iOS, changed after the restore — a late writer): ' });
   });
 });

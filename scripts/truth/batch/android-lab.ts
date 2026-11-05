@@ -210,12 +210,14 @@ export function probeRestore(o: ProbeRestoreOptions): StateRestore {
 /**
  * The chooser's stretch (batch-11's D55, batch-12's E5): its dirty window opened (lab-emu.ts#chooserWindow, its
  * cleanup label the abort writes), the work, then the cleanup (lab-emu.ts#cleanUp) — its line one of the block's
- * verdict lines and its hand lines to RESTORE at once — and the window closed: what is left is in RESTORE.
+ * verdict lines and its hand lines to RESTORE at once — and the window closed: what is left is in RESTORE. One cleanup
+ * label for both paths, `D55 cleanup` unless `o.cleanup` (T2b, batch-13 gap 2).
  */
 export async function chooserStretch(ctx: BlockCtx, emu: LabEmu, o: ReinstallOptions & { cleanup?: string; secs?: number }, work: () => Promise<void>): Promise<Cleanup> {
-  ctx.open(CHOOSER_WINDOW, chooserWindow(emu, { ...o, block: ctx.id, cleanup: o.cleanup ?? CLEANUP_LABEL }));
+  const label = o.cleanup ?? CLEANUP_LABEL;
+  ctx.open(CHOOSER_WINDOW, chooserWindow(emu, { ...o, block: ctx.id, cleanup: label }));
   await work();
-  const c = await cleanUp(emu, o);
+  const c = await cleanUp(emu, { ...o, label });
   ctx.verdictAndHand({ line: c.line, hand: c.hand });
   ctx.close(CHOOSER_WINDOW);
   return c;
