@@ -510,10 +510,13 @@ export const cellsHand = (b: HandBase, catalog: string, why: string): string =>
   `${adbLine(b.serial, ['pull'])} <that path> <a file>, unzip -p <that file> assets/cells.json must equal ${shellQuote(catalog)}; if not, ` +
   `${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])}; then: ${b.then}`;
 
-/** No reinstall without the probe's state file marked dirty first: the state named, the order to do it in by hand. */
-export const stateFileHand = (b: HandBase, stateFile: string, why: string): string =>
-  `${HAND_PREFIX}no reinstall without the probe's state file ${shellQuote(stateFile)} marked dirty first (${why}): write it ` +
-  `(${b.then}), then ${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])}; then: ${b.then}`;
+/**
+ * No reinstall was done: the probe's state file was not marked dirty (review round 4: a `--restore` with no state does
+ * nothing, so the line names the probe's `--state` run — its command when the batch gives one).
+ */
+export const stateFileHand = (b: HandBase, stateFile: string, why: string, stateCommand?: string): string =>
+  `${HAND_PREFIX}no reinstall was done: the probe's state file ${shellQuote(stateFile)} was not marked dirty (${why}); run ` +
+  `${stateCommand ?? "the probe's --state"} first, then clear the default by hand: ${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])}`;
 
 /** The chooser or the preferred activities not proven put back: what to read, and what to press. */
 export const checkHand = (serial: string): string =>

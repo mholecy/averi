@@ -503,7 +503,7 @@ describe('the hand lines — each names the exact step and its commands, every w
       "D55 (Android): the installed lab not proven the pulled APK (its cells.json differs): adb -s LAB-1 shell pm path dev.averi.lab, adb -s LAB-1 pull <that path> <a file>, unzip -p <that file> assets/cells.json must equal cells.json; if not, adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore",
     );
     expect(stateFileHand(B, 'state dir/state.json', 'missing')).toBe(
-      "D55 (Android): no reinstall was done: the probe's state file 'state dir/state.json' was not marked dirty (missing); run the probe's --state first, then clear the default by hand: adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install 'lab dir/installed.apk' (T2 S5 review round 4)".replace(' (T2 S5 review round 4)', ''),
+      "D55 (Android): no reinstall was done: the probe's state file 'state dir/state.json' was not marked dirty (missing); run the probe's --state first, then clear the default by hand: adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install 'lab dir/installed.apk'",
     );
     expect(stateFileHand(B, 's.json', 'unreadable', 'node probe.ts --state s.json')).toBe(
       "D55 (Android): no reinstall was done: the probe's state file s.json was not marked dirty (unreadable); run node probe.ts --state s.json first, then clear the default by hand: adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install 'lab dir/installed.apk'",

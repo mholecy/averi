@@ -5,6 +5,7 @@ import { AndroidLab, pause } from '../lab-device.js';
 import { markDirty, type Putback, type WindowSpec } from './abort.js';
 import { execOf, type Call, type CallResult, type Run } from './bounded.js';
 import { nodeFs, type BatchFs } from './io.js';
+import { stateOf } from './run-dir.js';
 import {
   adbLine,
   cellsHand,
@@ -231,6 +232,8 @@ export const reinstallProgress = (): ReinstallProgress => ({ step: 'not started'
 export interface StateRestore {
   restore(run: Run): Promise<Putback>;
   command: string;
+  /** The probe's run that writes its state file (`--state`), for a hand line when there is none to mark dirty. */
+  stateCommand?: string;
 }
 
 /** What the reinstall and the chooser's window share. */
@@ -294,7 +297,7 @@ export async function clearLabEntry(emu: LabEmu, o: ReinstallOptions): Promise<R
   } catch (e) {
     marked = firstLineOf(messageOf(e));
   }
-  if (marked !== 'marked') return nothingDone(`the state file ${nameInLine(o.stateFile)} cannot be marked dirty (${marked})`, stateFileHand(base, o.stateFile, marked));
+  if (marked !== 'marked') return nothingDone(`the state file ${nameInLine(o.stateFile)} cannot be marked dirty (${marked})`, stateFileHand(base, o.stateFile, marked, o.putBack?.stateCommand));
   await dismissChooser(emu);
   o.progress.step = 'started';
   const notProven = (why: string, installed: Installed, hand: string): Reinstalled => ({ ok: false, why: `the reinstall not proven: ${why}; ${installedText(installed)}`, hand: [hand] });
@@ -382,7 +385,7 @@ const unknownDuringReinstall = (b: HandBase, why: string): Putback => ({ ok: fal
  * first (unreachable: unknown at once, nothing pressed, never "missing" and never "put back"; review round 1); BACK and
  * HOME; when interrupted inside the reinstall, the install read: missing is installed again from the pulled APK, and
  * the lab installed — again or found so — is proven by its cells.json as the reinstall proves it, or not put back; the
- * probe's state put back (`putBack`) only after a reinstall started, since only that wipes it (code review); then
+ * probe's state put back (`putBack`) whenever its state file is not clean (review round 4); then
  * --check (BACK and HOME again on a chooser), judged by CHECK_OUTCOME: the cleanup's word and words, exit by exit, a
  * WARN put back for 6. Its hand lines name the exact step, and an uninstall only for a default measured.
  */
@@ -398,11 +401,18 @@ export function chooserWindow(emu: LabEmu, o: ChooserWindowOptions): WindowSpec 
         const proof = await reinstalledProof(lab, o, base);
         if (proof !== undefined) return proof;
       }
+      // The probe's restore whenever its state file is not clean: it also undoes what the probe changed itself (it
+      // force-stops the lab, puts its state file back), whatever the reinstall did (review round 4, as batch-11 and
+      // batch-12 ran it); a note when no reinstall started, so nothing was wiped.
       let kept = '';
-      if (o.putBack !== undefined && o.progress.step !== 'not started') {
-        const back = await o.putBack.restore(run);
-        if (!back.ok) return { ...back, hand: stateHandOf(back, o.putBack) };
-      } else if (o.putBack !== undefined) kept = "; nothing was wiped: the lab's state stays as the probe left it";
+      if (o.putBack !== undefined) {
+        if (o.stateFile !== undefined && stateOf(lab.fs, o.stateFile) === 'clean') kept = "; the probe's state file is clean: nothing to put back";
+        else {
+          const back = await o.putBack.restore(run);
+          if (!back.ok) return { ...back, hand: stateHandOf(back, o.putBack) };
+          if (o.progress.step === 'not started') kept = "; nothing was wiped: the lab's state stays as the probe left it";
+        }
+      }
       const check = await checkAfterDismissal(lab, o.accepted);
       const outcome = CHECK_OUTCOME[check.exit];
       const words = outcome.words(checkWhy(check.focus, check.preferred, o.accepted));

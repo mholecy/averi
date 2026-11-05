@@ -577,14 +577,14 @@ first lines, the Activity Resolver Table's averilab handlers as a decoy and the 
 as `*-api33-b<N>-*.txt`; and T4's resolver trees) and lab-emu.test.ts (a fake emulator whose uninstall clears the lab's
 defaults but never a last-chosen entry, as batch-11 measured; every call checked in afterEach for another serial, an
 `input tap` inside an "Always" node of the last tree dumped (read from its XML, not by the module's isAlways), a
-`pm`/`settings`/`cmd`/`am` write, and an uninstall or install outside a reinstall). Each under 2 s; no device.
-Baselines after the code review, cold: lab-chooser.ts 99.89 % (882 mutants, 1 equivalent survivor: `chooserOf`'s state
-check, which an unread read with no chooser makes moot), floor 97; lab-emu.ts 100 % (386 mutants, 3 timeouts), floor
-98; abort.ts 98.04 % (its WARN put back; the same survivors). The cold run of all twenty-four modules took 3 min 27 s.
-40 hand mutants, one per decision branch or boundary, each run bounded (a timeout counts as killed): 39 killed at once;
-the 40th (a node inside the target under the point refused) killed by a test added for it. Review round 1: 15 more, on
-its fixes, 13 killed at once, 2 (exit 6 not proving a reinstall; an entity decoded wrong) by tests added for them — the
-decoder then designed away (below).
+`pm`/`settings`/`cmd`/`am` write, and an uninstall or install outside a reinstall). Each under 2 s; no device. Baselines
+after review round 4, cold: lab-chooser.ts 99.89 % (884 mutants, 1 equivalent survivor: `chooserOf`'s state check, which
+an unread read with no chooser makes moot), floor 97; lab-emu.ts 99.75 % (392 mutants, 3 timeouts, 1 equivalent: the
+window's state-file check, which stateOf of no path makes moot), floor 98; abort.ts 98.04 % (its WARN put back; the same
+survivors). The cold run of all twenty-four modules took 3 min 29 s. 40 hand mutants, one per decision branch or
+boundary, each run bounded (a timeout counts as killed): 39 killed at once; the 40th (a node inside the target under the
+point refused) killed by a test added for it. Review round 1: 15 more, on its fixes, 13 killed at once, 2 (exit 6 not
+proving a reinstall; an entity decoded wrong) by tests added for them — the decoder then designed away (below).
 
 Decisions S5 pins:
 - the preferred read is only the `Preferred Activities User N:` block(s), each to the next top-level line, read line by
@@ -607,30 +607,36 @@ Decisions S5 pins:
   hand lines when it does not.
 - `clearLabEntry` (only for a default): refused, nothing done, with no pulled APK, no catalog to compare with, or a
   probe state file that cannot be marked dirty — a missing one too (code review: the protocol needs its dirty mark
-  first), its hand line naming the state file and the commands; then the state marked dirty, BACK/HOME, `progress`
-  started, uninstall, install of the pulled APK, `pm path` (after `adb get-state`), the APK pulled to a fresh
-  `reinstalled[-n].apk`, its `assets/cells.json` equal to main's catalog, --check exiting 0, 5 or 6 — nothing else
-  proves it (review round 1: a chooser in front over a preferred read that failed, exit 4, hid the read; every other
-  exit is not proven, its hand line the check's); only then `progress` proven and the probe's state put back
-  (`StateRestore`: the probe's `--restore`, and its command for a RESTORE line when it fails with no hand line of its
-  own). Each step that fails gets its own hand line: the uninstall's (again), the install's (`pm path`, then the
-  install), the pull's, unzip's or cells.json's (the proof by hand, then uninstall and install), the check's; each ends
-  `then: <command>`, the probe's restore or the preferred read again. The module never writes the probe's state clean
-  itself: the reinstall wipes the lab's data, and only the probe's restore, which writes it back and reads it back, may;
-  the spec's "written clean only after the proof" holds as that order.
+  first), its hand line saying no reinstall was done because the state file was not marked dirty, and naming the probe's
+  `--state` run (`StateRestore.stateCommand`, else those words) before the uninstall and install by hand (review round
+  4: a `--restore` with no state does nothing); then the state marked dirty, BACK/HOME, `progress` started, uninstall,
+  install of the pulled APK, `pm path` (after `adb get-state`), the APK pulled to a fresh `reinstalled[-n].apk`, its
+  `assets/cells.json` equal to main's catalog, --check exiting 0, 5 or 6 — nothing else proves it (review round 1: a
+  chooser in front over a preferred read that failed, exit 4, hid the read; every other exit is not proven, its hand
+  line the check's); only then `progress` proven and the probe's state put back (`StateRestore`: the probe's
+  `--restore`, and its command for a RESTORE line when it fails with no hand line of its own). Each step that fails gets
+  its own hand line: the uninstall's (again), the install's (`pm path`, then the install), the pull's, unzip's or
+  cells.json's (the proof by hand, then uninstall and install), the check's; each ends `then: <command>`, the probe's
+  restore or the preferred read again. The module never writes the probe's state clean itself: the reinstall wipes the
+  lab's data, and only the probe's restore, which writes it back and reads it back, may; the spec's "written clean only
+  after the proof" holds as that order.
 - `labInstalled`: `adb get-state` first (`unreachableOf`); not `device` is unknown and `pm path` is not asked; then
   `installedOf` reads `pm path`: `package:<path>` exit 0 installed, exit 1 with nothing said missing, anything else
   unknown. Unknown is never "missing", never "put back".
 - `chooserWindow`'s restore: `adb get-state` first, before any key (review round 1): unreachable is unknown at once,
-  nothing pressed and nothing put back; then BACK/HOME; inside the reinstall, `pm path`: unknown is not put back
-  (hand: get-state, `pm path` once adb answers, then the install if it prints nothing), missing is installed again
-  from the pulled APK, and the lab installed — again or found so — is proven by its cells.json as clearLabEntry proves
-  it, or not put back; the probe's `StateRestore` only once a reinstall started, since only that wipes the lab's data
-  (code review; before it, "nothing was wiped: the lab's state stays as the probe left it"); then --check, by
-  CHECK_OUTCOME: 0 and 5 put back, 6 put back with a WARN in the cleanup's own words (abort.ts's Putback may now carry
-  `verdict: 'WARN'`, its step and cleanup line then WARN, no RESTORE), a default FAIL, the rest ERROR. Its hand lines
-  are read when the abort asks: inside the reinstall the install line first, then the check's, then the state
-  restore's command — never an uninstall no default was measured for (code review).
+  nothing pressed and nothing put back; then BACK/HOME; inside the reinstall, `pm path`: unknown is not put back (hand:
+  get-state, `pm path` once adb answers, then the install if it prints nothing), missing is installed again from the
+  pulled APK, and the lab installed — again or found so — is proven by its cells.json as clearLabEntry proves it, or not
+  put back; the probe's `StateRestore` whenever its state file is not clean, whatever the reinstall step — a decision
+  corrected in review round 4: the code review ran it only once a reinstall had started, but the probe's `--restore`
+  also undoes what the probe changed itself (it force-stops the lab, puts its state file back; the probe marks its state
+  dirty mid-run), and abort.ts needs that file clean after, as batch-11 and batch-12 ran it; a clean state file needs no
+  restore and says so; when no reinstall started, the note "nothing was wiped: the lab's state stays as the probe left
+  it" is added, never instead of the restore; then --check, by CHECK_OUTCOME: 0 and 5 put back, 6 put back with a WARN
+  in the cleanup's own words (abort.ts's Putback may now carry `verdict: 'WARN'`, its step and cleanup line then WARN,
+  no RESTORE), a default FAIL, the rest ERROR. Its hand lines are read when the abort asks: inside the reinstall the
+  install line first, then the check's, then the state restore's command — never an uninstall no default was measured
+  for (code review).
 - a row target with more than one `resolver_list` is `not-unique`, naming the count (code review).
 - the tri-state reads S6 wires: `readRoleHolders` and `readClipboard` (the clipboard by `cmd clipboard help`, API 33's
   `No shell command implementation.` unread) before and after a block, `compareReads` and `comparedLine` for their
