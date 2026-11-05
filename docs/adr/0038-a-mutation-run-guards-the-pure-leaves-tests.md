@@ -12,7 +12,7 @@ Amended 2026-11-05 (T2 S5: lab-chooser.ts and lab-emu.ts joined the run — see 
 Amended 2026-11-05 (T2 S6a: runner-lines.ts, runner.ts and records.ts joined the run — see the T2 amendment's S6a part
 below).
 Amended 2026-11-05 (T2 batch-13 fixes: idb disconnect after each companion end, the Android guard's adb words, the
-simulator's binary export — see the T2 amendment's batch-13 part below).
+simulator's binary export, and batch-13's live check — see the T2 amendment's batch-13 part below).
 
 ## Context
 
@@ -1228,3 +1228,11 @@ sentence names the likely cause only; the guard reads its AVD line and adb's wor
 helper, with no assignment inside its catch. 4 more hand mutants, each bounded: all killed (the end check's warning
 only after a test made the end check reset). Its cold run, 368 s: ios-lab.ts 100 % (392 mutants, 1 timeout counted
 killed), every other module at or above the run before; floors unchanged.
+
+Live check (batch-13 rerun 2, 2026-11-05, main 51778d00). The reset ran the pkill, then `idb disconnect <lab udid>`
+(exit 0, silent), then the WDA kill, the shutdown, the boot and the health check; describe-all spawned a fresh companion
+(exit 0, 6.4 s) where rerun 1's stale entry had failed it in 0.25 s, and after the run's last step idb's list was empty.
+Every lab need was met on both devices. Over the three runs every block reached its verdict on the module (T6i's one
+BROKEN was the batch script's reading of capture's progress lines, not the module's), and no run left anything to
+restore. batch-13 is done; the four lazy/recycler carousels wait for T6c (backlog), rn-format-eager for a batch that
+builds the RN app.

@@ -548,7 +548,7 @@ said "fully visible" 3/3 with C 367–376 px cut, main ended hedged 3/3; sticky 
 kf1–kf3 did not run: D67's read measured the panel where batch-11 left it (fact 20). T6: no iOS lab control is
 disabled (form-shared-id: 13 elements, all enabled), so D66's idb capture is not possible in the lab.
 
-### Device facts (batches 1–12)
+### Device facts (batches 1–13)
 
 Measured on the lab devices (the iOS 27.0 simulator, averi_lab API 33) and written nowhere else before; the batch's raw
 evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is named; it is not edited from here.
@@ -627,6 +627,25 @@ evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is na
     per swipe), moved it about 228 px up to 87,1015 937×792 (bottom 1807), and that place survived BACK and a cold
     `am start`. For 1–2 s after a drag the touchable region reads as almost the whole screen, `(0,66,1080,2220)`, so
     the region is read 3–4 s later (batch-12 ONLY=kf, D67's PASS).
+21. A batch does not start the lab AVD: an Android block needs averi_lab running as emulator-5554 (the guard refuses a
+    serial adb cannot reach, with adb's own words, and touches nothing); the iOS need shuts its simulator down and boots
+    it itself (batch-13).
+22. idb keeps its local companions in a list in its own state and trusts an entry for a udid without checking that its
+    companion lives: after the companion is killed, idb's calls for that udid fail at once with "Failed to connect to
+    companion … No such file or directory" until `idb disconnect <udid>` drops the entry (`idb kill` would end every
+    companion). With no entry, the first describe-all after a boot starts its own companion and answers in about 6 s
+    (batch-13; ADR 0038's batch-13 part).
+23. On iOS 27.0 the simulator's `defaults` writes the host's stderr, byte for byte, for a missing domain and a missing
+    key; its export of a missing domain is a 42-byte binary plist of an empty dictionary, exit 0, where the host writes
+    XML (batch-13; ADR 0038's batch-13 part).
+24. `open_deep_link tel:…` on the simulator: `simctl openurl` exits 115, LSApplicationWorkspaceErrorDomain code 115,
+    "Simulator device failed to open tel:…", in about 0.4 s, 2/2 byte-identical (batch-13; backlog D65).
+25. With a last-chosen entry, `pair`'s chooser is fact 17's with_default layout with 26 nodes: its row shows `text1`
+    "AveriLab" and `text2` "AveriLab twin" (the row's text block [132,2018][431,2130]) and the row container is not
+    clickable; `shared`'s row is one line and clickable. Both fail open, 3/3 each (batch-13, D55d).
+26. The held cells' captures read the bare phase on both platforms: iOS idb a lone Application, WDA Application >
+    Window > containers, Android the decor chain only, no text. capture reads right after the launch reports ready,
+    while the cell is still bare, so no spinner or Welcome phase is captured (batch-13, T6).
 
 ## Workflow per bug, once phase 3 is in
 
