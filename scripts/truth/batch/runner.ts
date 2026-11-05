@@ -260,8 +260,8 @@ class BatchRun<K> {
   private readonly protectedLines: string[] = [];
   /** Each need's answer so far: its first check's, then a failed recheck's (a need down stays down). */
   private readonly needResults = new Map<string, NeedResult>();
-  /** How many wanted blocks ran: none, and the exit is 2. */
-  private ran = 0;
+  /** Whether any wanted block ran: none, and the exit is 2. */
+  private anyRan = false;
   private checkout: string | undefined;
   private readonly restoreFile: string;
   private readonly stepsFile: string;
@@ -372,7 +372,7 @@ class BatchRun<K> {
     // A need checked while the abort began (its probe stopped): the block is not started.
     if (this.guard.interrupted) return;
     this.log.print(`== ${b.id} (${this.dirs[b.id]}/) ==`);
-    this.ran++;
+    this.anyRan = true;
     await b.run(this.ctxOf(b));
   }
 
@@ -617,7 +617,7 @@ class BatchRun<K> {
       protectedLines: this.protectedLines,
       restore: { file: this.restoreFile, written: restore },
       errors: [...this.log.errors(), ...this.logErrors()],
-      noneRan: this.ran === 0,
+      noneRan: !this.anyRan,
     };
     this.log.summary(summaryLines(summary));
     const code = exitCodeOf(summary);
