@@ -188,14 +188,21 @@ const cutTo = (line: string, max: number): string => {
 };
 
 /**
- * One file's ERROR lines for the SUMMARY: each cut at DETAIL_CHARS, at most ERRORS_PER_FILE, then `… <n> more ERROR
- * lines in <file>`. A file its folder lists that could not be read (`text` undefined): a NOTE naming it, never skipped.
+ * One file's ERROR lines for the SUMMARY: each distinct one once, in first-seen order, `(×<n>)` after one said n times
+ * (a probe looping on one error never buries another); each cut so the whole is at most DETAIL_CHARS; at most
+ * ERRORS_PER_FILE distinct ones, then `… <n> more distinct ERROR lines in <file>`. A file its folder lists that could
+ * not be read (`text` undefined): a NOTE naming it, with what is known of why, never skipped.
  */
-export function fileErrors(file: string, text: string | undefined): string[] {
-  if (text === undefined) return [`NOTE ${nameInLine(file)} not read: unreadable (no file, or no permission)`];
-  const all = errorLinesIn(text);
-  const more = all.length - ERRORS_PER_FILE;
-  return [...all.slice(0, ERRORS_PER_FILE).map((l) => cutTo(l, DETAIL_CHARS)), ...(more > 0 ? [`… ${more} more ERROR lines in ${nameInLine(file)}`] : [])];
+export function fileErrors(file: string, text: string | undefined, why?: string): string[] {
+  if (text === undefined) return [`NOTE ${nameInLine(file)} not read: unreadable${why === undefined ? '' : `: ${why}`}`];
+  const counts = new Map<string, number>();
+  for (const l of errorLinesIn(text)) counts.set(l, (counts.get(l) ?? 0) + 1);
+  const shown = [...counts].slice(0, ERRORS_PER_FILE).map(([l, n]) => {
+    const times = n > 1 ? ` (×${n})` : '';
+    return `${cutTo(l, DETAIL_CHARS - times.length)}${times}`;
+  });
+  const more = counts.size - ERRORS_PER_FILE;
+  return [...shown, ...(more > 0 ? [`… ${more} more distinct ERROR lines in ${nameInLine(file)}`] : [])];
 }
 
 /** A block the abort judged whose judge wrote no verdict of its label: still a line of its own. */

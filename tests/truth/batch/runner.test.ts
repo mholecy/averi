@@ -454,6 +454,7 @@ describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refu
       `ERROR checkout: ${why} — every block INCONCLUSIVE, none run`,
       `kf live verdict: INCONCLUSIVE — precondition: ${why}`,
       `D43 live verdict: INCONCLUSIVE — precondition: ${why}`,
+      "NOTE no wanted block ran (each one's why above) — exit 2",
       'RESTORE: none — everything dirty was put back and verified',
       `======== SUMMARY end (run ${ID})`,
     ]);
@@ -649,7 +650,7 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
 // ------------------------------------------------------------------------------------------------ ERROR lines
 
 describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\' logs and analyze.txt, each once (batch-6, batch-12.sh:667–668)', () => {
-  it('a block\'s .log and analyze.txt and the lab folder\'s logs read; another file, and an earlier run\'s logs, not; a line twice printed once', async () => {
+  it('a block\'s .log and analyze.txt and the lab folder\'s logs read; another file, and an earlier run\'s logs, not; a line twice printed once, with its count (review round 2)', async () => {
     mkdirSync(join(out, 'kf', 'run-old'), { recursive: true });
     writeFileSync(join(out, 'kf', 'run-old', 'probe.log'), 'ERROR an earlier run\'s\n');
     await go([
@@ -664,7 +665,7 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
       }),
     ]);
     const errors = summary().slice(summary().indexOf('RESTORE: none — everything dirty was put back and verified') + 1, -1);
-    expect(errors).toEqual(['ERROR the catalog drifted', 'ERROR the analyzer\'s own', 'ERROR the cell did not open']);
+    expect(errors).toEqual(['ERROR the catalog drifted', 'ERROR the analyzer\'s own', 'ERROR the cell did not open (×2)']);
   });
 
   it('a probe log\'s progress line (a lone CR) never breaks the SUMMARY: each overwritten part its own line', async () => {

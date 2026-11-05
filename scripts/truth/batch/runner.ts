@@ -365,6 +365,8 @@ class BatchRun<K> {
     if (precondition !== undefined) return this.notRun(b, precondition);
     const failed: { need: string; why: string }[] = [];
     for (const need of b.needs) {
+      // The abort began during an earlier need's check: no further need is asked (its probe would be refused anyway).
+      if (this.guard.interrupted) break;
       const r = await this.needOf(need, b.id);
       if (!r.ok) failed.push({ need, why: r.why });
     }
@@ -591,7 +593,7 @@ class BatchRun<K> {
       fs
         .list(d)
         .filter((n) => n.endsWith('.log') || n === 'analyze.txt')
-        .flatMap((n) => fileErrors(join(d, n), fs.read(join(d, n)))),
+        .flatMap((n) => fileErrors(join(d, n), fs.read(join(d, n)), fs.list(join(d, n)).length > 0 ? 'a folder' : undefined)),
     );
   }
 

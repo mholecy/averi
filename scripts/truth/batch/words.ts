@@ -32,8 +32,9 @@ export type Verdict = (typeof VERDICTS)[number];
 export const SUMMARY_MARKER = '======== SUMMARY';
 
 /**
- * A batch's exit codes: 2 refused to start (nothing done, no SUMMARY), or started but no wanted block ran (a failed
- * checkout, every need or precondition failed: the SUMMARY says why); 130 interrupted (the abort SUMMARY printed).
+ * A batch's exit codes: 2 nothing done — either refused to start (no SUMMARY), or no wanted block ran (a failed checkout,
+ * every need or precondition failed: the SUMMARY, with NONE_RAN_LINE after each block's why); 130 interrupted (the abort
+ * SUMMARY printed).
  */
 export const EXIT = { ok: 0, failed: 1, refused: 2, nothingRan: 2, interrupted: 130 } as const;
 
@@ -152,6 +153,9 @@ export const interruptedBlock = (block: string, linesSoFar: readonly string[], w
   verdictLine(block, 'INTERRUPTED', why === undefined ? `its records are not complete, not judged (rerun ONLY=${block})` : `not judged (${why}; rerun ONLY=${block})`),
 ];
 
+/** The SUMMARY's line, after the blocks', when no wanted block ran: why the exit is 2 (T2 S6a review round 2). */
+export const NONE_RAN_LINE = "NOTE no wanted block ran (each one's why above) — exit 2";
+
 /** The SUMMARY's body, before deduplication. */
 function bodyOf(s: Summary): string[] {
   return [
@@ -159,6 +163,7 @@ function bodyOf(s: Summary): string[] {
     ...(s.interrupted === undefined ? [] : [`INTERRUPTED: ${s.name} run ${s.runId} was interrupted at ${s.interrupted.at}`]),
     ...s.labs,
     ...s.blocks.flatMap((b) => (b.interrupted === true ? interruptedBlock(b.block, b.lines, b.why) : b.lines)),
+    ...(s.noneRan === true ? [NONE_RAN_LINE] : []),
     ...s.protectedLines,
     ...(s.restore.written.length === 0 ? ['RESTORE: none — everything dirty was put back and verified'] : [`RESTORE: state not provably put back — ${s.restore.file}:`, ...s.restore.written]),
     ...s.errors,
