@@ -354,9 +354,11 @@ export function panelAfterCalls(s: LabState, launch: Rect, strip: Rect): 'unread
   return { skip: { outcome: 'SKIP', why: `the panel moved (launch ${rectText(launch)}, after ${rectText(after.panel)})` } };
 }
 
-/** The reply's quote matching `pattern` (the panel averi named), or "no panel". */
-const quoted = (reply: string | undefined, pattern: RegExp): string => reply?.match(pattern)?.[0] ?? 'no panel';
+/** Each distinct quote in the reply matching `pattern` (every panel averi named, a `g` regex), or "no panel". */
+const quoted = (reply: string | undefined, pattern: RegExp): string => [...new Set([...(reply ?? '').matchAll(pattern)].map((m) => m[0]))].join(', ') || 'no panel';
 const BOTH_READS = 'the panel measured at launch and again after the calls is';
+/** An averi call that errored, not a reading of the panel: a harness fault, named so (as judgeMissUnderSheet names one). */
+const harnessFault = (reply: string): LiveVerdict => ({ outcome: 'MISMATCH', why: `a harness fault, not a verdict on the panel over ks: ${short(reply)}` });
 
 const NOT_THE_PREMISE = "not the case's premise (the submit wholly between the panel and the strip)";
 
@@ -424,7 +426,9 @@ export const judgeFloatingGap =
       // An ok refusal names the panel (not the 132-px strip alone): averi read the panel the launch measured.
       const panelAsNamed = `over [${panel.x},${panel.y}][${panel.x + panel.width},${panel.y + panel.height}]`;
       if (scroll?.includes(panelAsNamed) !== true) {
-        if (again === 'agreed') return { outcome: 'MISMATCH', why: `averi named ${quoted(scroll, /over \[\d+,\d+\]\[\d+,\d+\]/)} — ${BOTH_READS} ${panelAsNamed}: ${short(scroll)}` };
+        // An error that is no scroll refusal (it counts no swipes) never read the panel.
+        if (again === 'agreed' && isError(scroll) && swipesOf(scroll) === undefined) return harnessFault(scroll);
+        if (again === 'agreed') return { outcome: 'MISMATCH', why: `averi named ${quoted(scroll, /over \[\d+,\d+\]\[\d+,\d+\]/g)} — ${BOTH_READS} ${panelAsNamed}: ${short(scroll)}` };
         return { outcome: 'SKIP', why: `averi's reply does not name the measured panel ${panelAsNamed}: ${short(scroll)}` };
       }
       return { outcome: 'ok', why: `${replyKind(scroll) === 'visible' ? `stopped with ks's centre clear of the measured panel (${where})` : `no stop (${where})`}, postcode untouched; ${logged}: ${short(scroll)}` };
@@ -440,7 +444,9 @@ export const judgeFloatingGap =
     const premise = gapPremise(launched.frames.submit, panel, strip);
     if ('why' in premise) return { outcome: 'SKIP', why: premise.why };
     if (evidence?.includes(`keyboard ${rectText(panel)}`) !== true) {
-      if (again === 'agreed') return { outcome: 'MISMATCH', why: `averi quoted ${quoted(evidence, /keyboard \d+,\d+ \d+x\d+/)} over ks — ${BOTH_READS} ${rectText(panel)}: ${short(evidence)}` };
+      // An errored assert ran no poll: it never read the panel.
+      if (again === 'agreed' && isError(evidence)) return harnessFault(evidence);
+      if (again === 'agreed') return { outcome: 'MISMATCH', why: `averi quoted ${quoted(evidence, /keyboard \d+,\d+ \d+x\d+/g)} over ks — ${BOTH_READS} ${rectText(panel)}: ${short(evidence)}` };
       return { outcome: 'SKIP', why: `averi's reply does not quote the measured panel ${rectText(panel)} over ks: ${short(evidence)}` };
     }
     if (replyKind(scroll) !== 'visible') return { outcome: 'MISMATCH', why: `refused, though the submit lies wholly between the panel and the strip: ${short(scroll)}` };

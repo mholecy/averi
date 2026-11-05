@@ -96,7 +96,8 @@ export interface LabDevice {
   ime?(): Promise<ImeCapture>;
   /**
    * Android: averi's touchable query (src/adapters/android.ts#TOUCHABLE_COMMAND) now, raw — the IME window's touchable region beside `mInputShown`,
-   * read once at a kf case's launch (live.ts; LabState.imeTouchable). Leaves the keyboard up. Absent on iOS.
+   * read at a kf case's launch and again once its calls are done (live.ts, withMeasuredPanel; LabState.imeTouchable,
+   * D69). Leaves the keyboard up. Absent on iOS.
    */
   imeTouchable?(): Promise<string>;
   /**

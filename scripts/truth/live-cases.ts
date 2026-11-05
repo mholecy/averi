@@ -213,8 +213,9 @@ const FORMS: Omit<Case, 'group'>[] = [
   },
   // FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md):
   // Gboard floated by hand (no adb setting does it), its panel over the form and the pinned submit in the strip below it
-  // — live-forms.ts#judgeFloatingGap, against the panel the IME's region names at launch (measuresPanel); a run whose
-  // Gboard came up docked is SKIP, and so is one where the panel does not lie as the case's premise needs.
+  // — live-forms.ts#judgeFloatingGap, against the panel the IME's region names at launch and again after the calls
+  // (measuresPanel, D69); a run whose Gboard came up docked is SKIP, and so is one where the panel does not lie as the
+  // case's premise needs.
   {
     id: 'kf1',
     cell: KF,

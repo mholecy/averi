@@ -98,7 +98,9 @@ calls are done, onto the final state (`state.imeTouchable`, the same `withMeasur
   any quote and before ok;
 - the two reads agree and kf1/kf2's evidence does not quote the panel over ks, or kf3's refusal does not name it:
   MISMATCH "averi quoted keyboard X over ks (or: no panel) — the panel measured at launch and again after the calls is
-  P" (kf3: "averi named over [..][..] …");
+  P" (kf3: "averi named over [..][..] …"), every distinct panel averi quoted named; an averi call that errored (an
+  assert that ran no poll, or a kf3 error counting no swipes) is "a harness fault, not a verdict on the panel over
+  ks", as the picker-sheet cases name one;
 - no second read (every record before D69): judged as before, the misquote SKIP word for word.
 
 The 3-s `late` re-read reads the app only, so `live-cases.ts#judged` carries the second read onto it

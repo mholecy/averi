@@ -393,6 +393,27 @@ describe('D69: the panel read again after the calls — moved is SKIP naming bot
     }
   });
 
+  it('(b) an averi call that errored (no assert run, no scroll refusal) is a harness fault named so, never "averi quoted no panel" — as judgeMissUnderSheet names one', () => {
+    const fault = 'ERROR MCP error -32603: adb: device offline';
+    for (const id of ['kf1', 'kf2', 'kf3'] as const) {
+      const { replies, launched, state } = twice(fu1, id, FU1_REGION, FU1_REGION);
+      expect(judgeFloatingGap(id)(state, [fault, ...replies.slice(1)], 'uiautomator', launched)).toEqual({ outcome: 'MISMATCH', why: `a harness fault, not a verdict on the panel over ks: ${fault}` });
+    }
+    // No second read: today's SKIP, unchanged.
+    const { replies, launched, state } = floated(fu1, 'kf1', FU1_REGION);
+    expect(judgeFloatingGap('kf1')(state, [fault, ...replies.slice(1)], 'uiautomator', launched)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^averi's reply does not quote the measured panel/) });
+  });
+
+  it('(b) the MISMATCH names every panel averi quoted, the strip first or not', () => {
+    const { replies, launched, state } = twice(fu1, 'kf1', FU1_REGION, FU1_REGION);
+    const both = replies[0].replace('keyboard 359,1269 681x643', 'keyboard 0,2088 1080x132, keyboard 87,1243 937x792');
+    expect(both).not.toBe(replies[0]);
+    expect(judgeFloatingGap('kf1')(state, [both, ...replies.slice(1)], 'uiautomator', launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi quoted keyboard 0,2088 1080x132, keyboard 87,1243 937x792 over ks — /) });
+    const kf3 = twice(fu1, 'kf3', FU1_REGION, FU1_REGION);
+    const named = kf3.replies[0].replaceAll('over [359,1269][1040,1912]', 'over [0,2088][1080,2220] and over [71,1092][1008,1884]');
+    expect(judgeFloatingGap('kf3')(kf3.state, [named], 'uiautomator', kf3.launched)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi named over \[0,2088\]\[1080,2220\], over \[71,1092\]\[1008,1884\] — /) });
+  });
+
   it('(c) no second read (a record before D69): today\'s SKIP, word for word', () => {
     for (const id of ['kf1', 'kf2'] as const) {
       const { replies, launched, state } = floated(fu1, id, FU1_REGION);
