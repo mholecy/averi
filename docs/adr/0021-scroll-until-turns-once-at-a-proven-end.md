@@ -693,7 +693,7 @@ only shortens that plan where the box above it is shorter than half the room, an
 then have to carry the match more than twice its length to stop — beyond any Android drag measured (at most ~1.25 a
 px; only iOS flings carry 2–3, and iOS never probes);
 where the keyboard leaves no plan at all, the test above kills it. The module is in the mutation scope
-(scripts/mutation/scope.json, group core, floor 94): 96.77 % cold, 31 mutants, 1 survivor (the carry tie's `b.drawn < a.drawn` as `<=`, equivalent: equal strokes give the same stop), after a test killed the first run's other survivor (93.55 %); the cold run's groups core 197 s and lab 61 s; after review round 1 the same score, core 207 s.
+(scripts/mutation/scope.json, group core, floor 94): 96.77 % cold, 31 mutants, 1 survivor (the carry tie's `b.drawn < a.drawn` as `<=`, equivalent: equal strokes give the same stop), after a test killed the first run's other survivor (93.55 %); the cold run's groups core 197 s and lab 61 s; after review round 1 the same score, core 207 s; after the code review the same, core 202 s.
 
 Rejected:
 - a margin for the carry's spread (stop only when the room is under the least carry by a few px): it would keep runs 1
