@@ -1116,7 +1116,10 @@ Review round 1 (an independent reviewer): a BLOCKER — an abort inside the WDA 
 the domains back, the state read clean, and the runner's later exit flipped Accessibility again with nothing in RESTORE
 to import (now: no restore while the port is not free, above); a MAJOR — this run's build was installed only when the
 build need came before the device need (now: the device need asks its build); four MINOR and four NIT findings, each
-above. 13 more hand mutants on the fixes, each bounded: all 13 killed at once.
+above. 13 more hand mutants on the fixes, each bounded: all 13 killed at once. Its cold run: lab-lines.ts 100 % (283
+mutants), ios-lab.ts 100 % (382), android-lab.ts 100 % (198), lab-build.ts 100 % (238), runner-lines.ts 100 % (351),
+runner.ts 99.33 %, abort.ts 98.67 % (the same two equivalents), in 306 s; three survivors of its first cold run (an
+OK restore's empty hand lines, an empty build answer, the lab block's failures joined) designed away or pinned.
 
 The mutation run's headroom: the cold run of thirty-one modules takes about 5 minutes (298 s) against its 600 s bound;
 a slice like this one adds about 60 s. When a cold run nears the bound (say past 480 s), do not raise it silently:

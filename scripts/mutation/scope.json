@@ -137,21 +137,21 @@
   "scripts/truth/batch/lab-lines.ts": {
     "tests": ["tests/truth/batch/lab-lines.test.ts", "tests/truth/batch/ios-lab.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-05 (T2 S6b, cold): 289 mutants, 1 timeout (counted killed), 0 survived"
+    "baseline": "100 % on 2026-11-05 (T2 S6b review round 1, cold): 283 mutants, 1 timeout (counted killed), 0 survived"
   },
   "scripts/truth/batch/ios-lab.ts": {
     "tests": ["tests/truth/batch/ios-lab.test.ts", "tests/truth/batch/lab-batch.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-05 (T2 S6b, cold): 378 mutants, 1 timeout (counted killed), 0 survived"
+    "baseline": "100 % on 2026-11-05 (T2 S6b review round 1, cold): 382 mutants, 1 timeout (counted killed), 0 survived"
   },
   "scripts/truth/batch/android-lab.ts": {
     "tests": ["tests/truth/batch/android-lab.test.ts", "tests/truth/batch/lab-batch.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-05 (T2 S6b, cold): 196 mutants, 0 survived"
+    "baseline": "100 % on 2026-11-05 (T2 S6b review round 1, cold): 198 mutants, 0 survived"
   },
   "scripts/truth/batch/lab-build.ts": {
     "tests": ["tests/truth/batch/lab-build.test.ts", "tests/truth/batch/lab-batch.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-05 (T2 S6b, cold): 177 mutants, 0 survived"
+    "baseline": "100 % on 2026-11-05 (T2 S6b review round 1, cold): 238 mutants, 0 survived"
   }
 }
