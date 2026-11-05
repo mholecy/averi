@@ -42,7 +42,7 @@ describe('landingOf — did this reading land, and how', () => {
     ['masked with clear: another length does not land', '•••••', { value: 'abcd', clear: true }, undefined],
     // masked, the held count unread (the post-focus re-read skipped, ADR 0028): only the typed length passes
     ['masked, held unread: exactly the typed length lands', '••••', { value: 'abcd', held: 'unread' }, { kind: 'landed' }],
-    ['masked, held unread: LONGER is said-plain — final, the poll stops', '•••••••', { value: 'abcd', held: 'unread' }, { kind: 'said-plain' }],
+    ['masked, held unread: LONGER is said-plain — final, the poll stops', '•••••••', { value: 'abcd', held: 'unread' }, { kind: 'said-plain', differs: { kind: 'masked-said-plain' } }],
     ['masked, held unread: shorter has not landed yet — the poll goes on (keys may be late)', '••', { value: 'abcd', held: 'unread' }, undefined],
     ['held unread, a PLAIN reading: the content rule, as ever', 'xabcd', { value: 'abcd', held: 'unread' }, { kind: 'landed' }],
     // a non-input

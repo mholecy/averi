@@ -56,7 +56,14 @@ type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeho
  *   reading, and the fill fails `masked-said-plain` (`differenceOf`). A SHORTER masked reading has not landed and the
  *   poll goes on — its keys may still arrive; the timing of both is as it was when fill.ts overrode a landed reading.
  */
-export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'placeholder' } | { kind: 'said-plain' };
+export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'placeholder' } | { kind: 'said-plain'; differs: { kind: 'masked-said-plain' } };
+
+export interface Miss {
+  tail?: { missing: string; retypable: boolean };
+  differs: Difference;
+}
+
+export type Reading = Landing | ({ kind: 'not-taken' } & Miss) | ({ kind: 'missed' } & Miss);
 
 /**
  * Whether a reading landed, and how; undefined when it did not. The rules:
@@ -76,9 +83,20 @@ export function landingOf(observed: string, e: Expectation): Landing | undefined
   if (!tookText(observed, e)) return undefined;
   const reformatted = landedReformat(observed, e);
   if (reformatted === undefined && !showsExactly(observed, e)) return undefined;
-  if (bulletsSaidPlain(observed, e) && observed.length !== e.value.length) return { kind: 'said-plain' };
+  if (bulletsSaidPlain(observed, e) && observed.length !== e.value.length) return { kind: 'said-plain', differs: { kind: 'masked-said-plain' } };
   if (e.placeholder !== undefined && observed === e.placeholder) return { kind: 'placeholder' };
   return { kind: 'landed', ...(reformatted !== undefined && { reformatted }) };
+}
+
+export function readingOf(observed: string, e: Expectation): Reading {
+  const landing = landingOf(observed, e);
+  if (landing !== undefined) return landing;
+  const tail = tailOf(observed, e);
+  const miss: Miss = {
+    ...(tail !== undefined && { tail: { missing: tail.missing, retypable: droppedTail(observed, e) !== undefined } }),
+    differs: differenceOf(observed, e),
+  };
+  return { kind: tookText(observed, e) ? 'missed' : 'not-taken', ...miss };
 }
 
 /**
