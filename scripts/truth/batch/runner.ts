@@ -407,7 +407,7 @@ class BatchRun<K> {
           if (this.guard.interrupted) return EXIT.interrupted;
           await this.runBlock(b, pre.get(b.id));
         }
-        if (this.guard.interrupted) return EXIT.interrupted;
+        // Interrupted meanwhile, endNeeds calls no end, and the body stops right after it.
         await this.endNeeds();
         if (this.guard.interrupted) return EXIT.interrupted;
         const restore = await this.guard.finish();
@@ -522,9 +522,10 @@ class BatchRun<K> {
   /** Each need met, in the order checked, that has an end: its end, once (NeedSpec); none once the abort began. */
   private async endNeeds(): Promise<void> {
     for (const [need, r] of this.needResults) {
-      const spec = this.needs[need];
-      if (!r.ok || this.guard.interrupted || typeof spec === 'function' || spec.end === undefined) continue;
-      await this.ended(need, spec.end, spec.endSecs ?? NEED_END_SECS);
+      // A bare NeedCheck (a function) has no `end` property: read as one with none.
+      const { end, endSecs = NEED_END_SECS } = this.needs[need] as { end?: NeedEnd; endSecs?: number };
+      if (!r.ok || this.guard.interrupted || end === undefined) continue;
+      await this.ended(need, end, endSecs);
     }
   }
 
@@ -533,7 +534,7 @@ class BatchRun<K> {
     let open = true;
     const protectedLine = (l: string): void => {
       if (open) return this.keepProtected(l);
-      oneLine(l, 'a protected-key line');
+      // One line, as the step's own rule asks.
       this.log.step('NOTE', `LAB ${need}: a protected-key line after its end's bound not kept: ${l}`);
     };
     try {
