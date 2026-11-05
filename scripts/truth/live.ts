@@ -10,7 +10,7 @@ import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause, withMeasuredPanel } from './lab-device.js';
-import { hookSwipes, preDrag, SwipeHook, type PreDragged, type SwipeEntry } from './live-carousel.js';
+import { hookSwipes, preDragOrSkip, SwipeHook, type PreDragged, type SwipeEntry } from './live-carousel.js';
 import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, sideLabel, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
@@ -209,11 +209,19 @@ if (rejudging !== undefined) {
         const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
         if (warmUpError !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
         let launched = await lab.launch(c.cell);
-        // The carousel group's raw pre-drag (Case.preDrag): the calls start from the state it left.
+        // The carousel group's raw pre-drag (Case.preDrag): the calls start from the state it left. One that failed is
+        // the case's SKIP (lv-d62's skipFails then fails the run), never the whole run thrown out.
         let dragged: PreDragged | undefined;
         if (c.preDrag !== undefined) {
-          if (android === undefined) throw new Error(`${c.id}: a pre-drag is the Android lab's only`);
-          ({ preDrag: dragged, launched } = await preDrag(android, launched, c.preDrag));
+          const done = android === undefined ? { skip: 'a pre-drag is the Android lab\'s only' } : await preDragOrSkip(android, launched, c.preDrag);
+          if ('skip' in done) {
+            const verdict: LiveVerdict = { outcome: 'SKIP', why: done.skip };
+            results.push({ source, c, verdict, replies: [] });
+            record.results.push({ source, id: c.id, skip: done.skip, replies: [], launched, after: [], state: undefined });
+            console.error(`${source} ${c.id} SKIP: ${done.skip}`);
+            continue;
+          }
+          ({ preDrag: dragged, launched } = done);
         }
         if (c.keyboard && launched.keyboard?.visible !== true) {
           const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };

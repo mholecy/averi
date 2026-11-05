@@ -1,7 +1,7 @@
 {
   "note": "T7a's carousel group, synthetic: a live.ts RunRecord (scripts/truth/live-cases.ts) assembled from the D68 and D59 live checks (averi_lab emulator, Android 13 API 33, 1080x2220, 2026-11-05). Real: every scroll_until reply, the app's C frame, clip, offsets and carousel.index before and after the call, and the app's strokes of lv-d62-control, lv-d68-launch and lv-d59b-recycler. Synthesized: averi's swipe log (no probe logged it; drawn at the band's centre as D59b's live recheck measured), the strokes' offsets where only their count was kept, lv-d62-drop's drop (D68 case 1 run 1's strokes less the dropped one, the D59 check's hedged reply), and both d37-snap cases (the batch-9 shape: at rest on C, the first read listing C at the clip). Trimmed: window focus, the tree facts and device paths.",
   "platform": "android",
-  "side": "this checkout",
+  "side": "<synthetic>/d68-d59-live-checks",
   "results": [
     {
       "source": "uiautomator",

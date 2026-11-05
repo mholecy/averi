@@ -4,6 +4,7 @@ import { short } from './live-forms.js';
 import { strokesSince, type LiveVerdict } from './live-visibility.js';
 import { carouselReply, inferredAxisSaid, isError, replyKind, snapshotNodes, swipesOf, type CarouselReply } from './replies.js';
 import { labId, labSelector, type LabState, type Rect } from './schema.js';
+import { TOUCH_SLACK } from './truth.js';
 
 /**
  * The carousel group (T7a, Android, the native lab app; `live.ts --groups carousel`): what the device batches proved
@@ -19,8 +20,12 @@ import { labId, labSelector, type LabState, type Rect } from './schema.js';
  * (replies.ts#carouselReply). The hard verdict on every `fully: true` case: never "fully visible" while C is still cut.
  */
 
-/** The cut the oracle forgives, in px: a View's rect and the app's frame may differ by a pixel or two (batch-12's). */
-export const CUT_TOLERANCE_PX = 2;
+/**
+ * The cut the oracle forgives, in px: truth.ts's TOUCH_SLACK, the lab's one slack — a View's rect and the app's frame
+ * may differ by a pixel or two (batch-12's CUT_TOL), far under the cuts the lab's carousels leave (17–44 px short at the
+ * bound on carousel-recycler-free, 372 px in batch-9's false pass).
+ */
+export const CUT_TOLERANCE_PX = TOUCH_SLACK;
 
 /** The lab's carousel clip on averi_lab (1080x2220): every L7 carousel cell's and carousel-in-list's `carousel`. */
 export const LAB_CAROUSEL: Rect = { x: 66, y: 380, width: 948, height: 234 };
@@ -136,6 +141,18 @@ export async function preDrag(lab: PreDragLab, launch: LabState, px: number, wai
   return { preDrag: { ...stroke, launch }, launched };
 }
 
+/**
+ * preDrag for live.ts: a pre-drag that fails (adb, the lab gone, no carousel) is that case's SKIP with the reason,
+ * never the whole run thrown out — on lv-d62's legs `skipFails` then fails the run, honestly.
+ */
+export async function preDragOrSkip(lab: PreDragLab, launch: LabState, px: number, wait?: (ms: number) => Promise<unknown>): Promise<{ preDrag: PreDragged; launched: LabState } | { skip: string }> {
+  try {
+    return await preDrag(lab, launch, px, wait);
+  } catch (e) {
+    return { skip: `the pre-drag failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 // --- the oracle ---
 
 /** How far the app's C runs past the carousel's clip on each side (0: not past it), or undefined with no frame or clip. */
@@ -146,7 +163,11 @@ export function cutOf(s: LabState): { left: number; right: number } | undefined 
   return { left: Math.max(0, clip.x - c.x), right: Math.max(0, c.x + c.width - (clip.x + clip.width)) };
 }
 
-/** C is cut in the app (or not laid out at all): more than CUT_TOLERANCE_PX past the clip on a side. */
+/** The lab reported no carousel clip: nothing to judge C against (the judges SKIP, never MISMATCH). */
+export const NO_CLIP = 'the lab reported no carousel clip';
+const hasClip = (s: LabState) => s.scrollViews?.carousel !== undefined;
+
+/** C is cut in the app (or not laid out at all): more than CUT_TOLERANCE_PX past the clip on a side. Asked only with a clip. */
 export function isCut(s: LabState): boolean {
   const cut = cutOf(s);
   return cut === undefined || Math.max(cut.left, cut.right) > CUT_TOLERANCE_PX;
@@ -214,6 +235,7 @@ export function judgeFully(expect: FullyExpect): CarouselJudge {
     const kind = carouselReply(reply);
     const app = appText(state, launched);
     const base = { app, kind: replyKind(reply) };
+    if (!hasClip(state) || ((expect.cutBefore === true || expect.inBand === true) && !hasClip(launched))) return { ...base, outcome: 'SKIP', why: NO_CLIP };
     if (kind === 'fully-visible') {
       return isCut(state)
         ? { ...base, outcome: 'MISMATCH', cls: 'fully-cut', why: `"fully visible" while ${cutText(state)} (the app 800 ms after): ${short(reply)}` }
@@ -298,6 +320,8 @@ export interface CarouselCase {
   preDrag?: number;
   /** The call's Nth stroke dropped (SwipeHook). */
   dropSwipe?: number;
+  /** A SKIP fails the run (live-cases.ts#summarize): lv-d62's premises are the harness's own — a SKIP there means it broke. */
+  skipFails?: true;
   calls: { tool: 'scroll_until' | 'swipe' | 'ui_snapshot'; args: Record<string, unknown> }[];
   judge: CarouselJudge;
 }
@@ -319,6 +343,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     cell: RF,
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
+    skipFails: true,
     says: 'D62/D68 control: after the 440-px pre-drag, fully: true left on the RecyclerView card: `unaimable` (hedged maxSwipes accepted, counted: ADR 0021 D68), never "fully visible" with C cut',
     calls: [fullyC(RF, 'left')],
     judge: judgeFully({ kinds: ['unaimable'], accepted: D68_SPREAD, cutBefore: true }),
@@ -329,6 +354,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
     dropSwipe: 2,
+    skipFails: true,
     says: "D62: the same with the call's second stroke (its first reveal) dropped, resolved as drawn: maxSwipes hedged (\"may still be cut\"), never \"fully visible\" with C cut",
     calls: [fullyC(RF, 'left')],
     judge: judgeFully({ kinds: ['maxSwipes-hedged'], cutBefore: true, dropped: 2 }),
@@ -349,6 +375,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     calls: [fullyC(LF, 'right')],
     judge: judgeFully({ kinds: ['unfit'], inferred: true, inBand: true }),
   },
+  // The same call as lv-d68-launch, kept as its own case: the second sample of the hedged ceiling (UNAIMABLE_LEGS).
   {
     id: 'lv-d59b-recycler',
     cell: RF,
@@ -378,3 +405,44 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     judge: judgeSettledRead(cell),
   })),
 ];
+
+// --- the hedged ceiling (review round 1, the owner's) ---
+
+/** The legs that expect `unaimable` and accept the hedged bound (D68_SPREAD): the ceiling's samples, one a run each. */
+export const UNAIMABLE_LEGS: readonly string[] = ['lv-d62-control', 'lv-d68-launch', 'lv-d59b-recycler'];
+
+/** The fewest judged legs the ceiling is judged on: at ~20 % a leg, all three hedged by chance is 0.2³ ≈ 0.8 %. */
+export const CEILING_MIN_LEGS = 3;
+
+/** A result as the ceiling reads it (live-cases.ts#Result, flattened). */
+export interface CeilingRow {
+  id: string;
+  outcome: LiveVerdict['outcome'];
+  accepted?: string;
+}
+
+/**
+ * The ceiling on D68_SPREAD's acceptance: ADR 0021 accepts the hedged bound on ~20 % of the unaimable legs, so a run
+ * whose every judged leg (not SKIP) ended hedged — CEILING_MIN_LEGS or more — reads as D68's stop reverted, not as
+ * chance (about 0.8 % with three): MISMATCH-class, the run fails (`fails`; held only in a run of this checkout — a
+ * `--side` one is a calibration). Fewer judged: LOUD, no pass claimed, the exit untouched. Always "hedged N of M"; no
+ * line when the run judged no leg.
+ */
+export function hedgedCeiling(rows: readonly CeilingRow[], ofThisCheckout: boolean): { lines: string[]; fails: boolean; hedged: number; judged: number } {
+  const judgedLegs = rows.filter((r) => UNAIMABLE_LEGS.includes(r.id) && r.outcome !== 'SKIP');
+  const hedged = judgedLegs.filter((r) => r.accepted === D68_SPREAD.residual).length;
+  const judged = judgedLegs.length;
+  const count = `hedged ${hedged} of ${judged} judged unaimable leg(s)`;
+  if (judged === 0) return { lines: [], fails: false, hedged, judged };
+  if (!ofThisCheckout) return { lines: [`Hedged ceiling: ${count} — a --side run, a calibration: not held`], fails: false, hedged, judged };
+  if (judged < CEILING_MIN_LEGS) return { lines: [`LOUD (hedged ceiling): ${count} — fewer than ${CEILING_MIN_LEGS} judged, the ceiling unjudged (no pass claimed)`], fails: false, hedged, judged };
+  if (hedged === judged) {
+    return {
+      lines: [`MISMATCH (hedged ceiling): ${count} — ADR 0021's D68 residual accepts the hedged bound on ~20 % of them, and all ${judged} hedged by chance is about ${(0.2 ** judged * 100).toFixed(1)} %: D68's unaimable stop looks reverted — the run fails`],
+      fails: true,
+      hedged,
+      judged,
+    };
+  }
+  return { lines: [`Hedged ceiling: ${count} — within ADR 0021's ~20 % residual`], fails: false, hedged, judged };
+}

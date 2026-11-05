@@ -94,7 +94,7 @@ describe('OCR_FAILED_CLOSED — the OCR fail-closed lines, word for word', () =>
 });
 
 describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a), over real replies and src's own builders", () => {
-  const record = JSON.parse(readFileSync(new URL('../fixtures/live-android-carousel-d68-d59-live.json', import.meta.url), 'utf8')) as { results: { id: string; replies: string[] }[] };
+  const record = JSON.parse(readFileSync(new URL('../fixtures/live-android-carousel-d68-d59-synthetic.json', import.meta.url), 'utf8')) as { results: { id: string; replies: string[] }[] };
   const replyOf = (id: string) => record.results.find((r) => r.id === id)!.replies[0];
   const b10 = JSON.parse(readFileSync(new URL('../fixtures/d68-b10-recycler-convergence.json', import.meta.url), 'utf8')) as { runs: { reply: string }[] };
   const b11 = JSON.parse(readFileSync(new URL('../fixtures/d59b-b11-strokes.json', import.meta.url), 'utf8')) as { records: { reply: string }[] };

@@ -1,19 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../src/adapters/types.js';
-import { CAROUSEL_CASES, D68_SPREAD, hookSwipes, LAB_CAROUSEL, preDrag, preDragStroke, SwipeHook, type SwipeEntry } from '../../scripts/truth/live-carousel.js';
+import { CAROUSEL_CASES, CUT_TOLERANCE_PX, D68_SPREAD, hedgedCeiling, hookSwipes, LAB_CAROUSEL, preDrag, preDragOrSkip, preDragStroke, SwipeHook, UNAIMABLE_LEGS, type SwipeEntry } from '../../scripts/truth/live-carousel.js';
+import { TOUCH_SLACK } from '../../scripts/truth/truth.js';
 import { judged, rejudge, rejudgedResults, selectCases, summarize, type Case, type RunRecord } from '../../scripts/truth/live-cases.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
 /**
  * The carousel group (T7a; scripts/truth/live-carousel.ts), no device: the drop hook and the pre-drag over recorder
- * fakes, and every case's judge over the group's synthetic record (tests/fixtures/live-android-carousel-d68-d59-live.json:
+ * fakes, and every case's judge over the group's synthetic record (tests/fixtures/live-android-carousel-d68-d59-synthetic.json:
  * the D68 and D59 live checks' replies and app states, its `note` says what is synthesized) and over that record bent
  * where a judge must say no — batch-9's false "fully visible" (D62), batch-11's strokes below the band (D59b),
  * batch-10's hedged bound (ADR 0021's D68 residual).
  */
 
-const FIXTURE = 'tests/fixtures/live-android-carousel-d68-d59-live.json';
+const FIXTURE = 'tests/fixtures/live-android-carousel-d68-d59-synthetic.json';
 const RECORD = JSON.parse(readFileSync(new URL(`../../${FIXTURE}`, import.meta.url), 'utf8')) as RunRecord;
 type Recorded = RunRecord['results'][number];
 const recorded = (id: string): Recorded => structuredClone(RECORD.results.find((r) => r.id === id)!);
@@ -109,6 +110,16 @@ describe('preDrag: the probes\' 440-px, 1-s drag left on the carousel, then the 
     await expect(preDrag(lab({ ...launch, cell: 'carousel-lazy-free' }), launch, 440, async () => undefined)).rejects.toThrow(/reports cell carousel-lazy-free/);
     await expect(preDrag(lab(undefined), launch, 440, async () => undefined)).rejects.toThrow(/reports no state/);
   });
+
+  it('preDragOrSkip: a pre-drag that throws (the lab left, adb failed) is the case\'s SKIP with the reason, never the whole run thrown out', async () => {
+    const failing = { swipe: async () => Promise.reject(new Error('adb: device offline')), state: async () => launch };
+    expect(await preDragOrSkip(failing, launch, 440, async () => undefined)).toEqual({ skip: 'the pre-drag failed: adb: device offline' });
+    const gone = { swipe: async () => undefined, state: async () => undefined };
+    expect(await preDragOrSkip(gone, launch, 440, async () => undefined)).toEqual({ skip: `the pre-drag failed: cell ${launch.cell}: after the pre-drag the app reports no state` });
+    const after = recorded('lv-d62-control').launched;
+    const fine = { swipe: async () => undefined, state: async () => after };
+    expect(await preDragOrSkip(fine, launch, 440, async () => undefined)).toMatchObject({ launched: after, preDrag: { durationMs: 1000 } });
+  });
 });
 
 describe('selectCases: the carousel group, Android and the native app only, never by default', () => {
@@ -117,6 +128,23 @@ describe('selectCases: the carousel group, Android and the native app only, neve
     expect(CASES.every((c) => c.group === 'carousel')).toBe(true);
     expect(caseOf('lv-d62-drop')).toMatchObject({ preDrag: 440, dropSwipe: 2 });
     expect(caseOf('lv-d62-control').dropSwipe).toBeUndefined();
+  });
+
+  it('a premise SKIP fails the run on lv-d62-control and lv-d62-drop alone (skipFails: the harness broke), never elsewhere', () => {
+    expect(CASES.filter((c) => c.skipFails === true).map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop']);
+    for (const id of ['lv-d62-control', 'lv-d62-drop']) {
+      const r = recorded(id);
+      r.launched = withC(r.launched, 66);
+      const verdict = verdictOf(r);
+      expect(verdict.outcome).toBe('SKIP');
+      const { exitCode, lines } = summarize({ platform: 'android', sources: ['uiautomator'], results: [{ source: 'uiautomator', c: caseOf(id), verdict, replies: r.replies }], side: 'this checkout' });
+      expect(exitCode).toBe(1);
+      expect(lines).toContain(`SKIPPED where a skip proves nothing — the run fails: uiautomator ${id}`);
+    }
+    const lazy = recorded('lv-d59b-lazy');
+    const verdict = verdictOf({ ...lazy, swipes: undefined });
+    expect(verdict.outcome).toBe('SKIP');
+    expect(summarize({ platform: 'android', sources: ['uiautomator'], results: [{ source: 'uiautomator', c: caseOf('lv-d59b-lazy'), verdict, replies: lazy.replies }], side: 'this checkout' }).exitCode).toBe(0);
   });
 
   it('none by default, none on iOS, none for the React Native app', async () => {
@@ -174,6 +202,25 @@ describe('the hard check: never "fully visible" while C is cut (lv-d62, D68, D52
     expect(verdictOf(r).outcome).toBe('MISMATCH');
     r.state = { ...r.state!, frames: {} };
     expect(verdictOf(r)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/while C not laid out/) });
+  });
+
+  it('no carousel clip reported (after the calls, or before them on a pre-drag case): SKIP, never a MISMATCH — whatever the reply', () => {
+    for (const id of ['lv-d62-control', 'lv-d68-launch', 'd52-e2']) {
+      const r = recorded(id);
+      r.replies = [D62_FALSE_PASS];
+      r.state = withC(r.state!, 438);
+      const { carousel: _c, ...rest } = r.state.scrollViews!;
+      expect(verdictOf({ ...r, state: { ...r.state, scrollViews: rest } })).toMatchObject({ outcome: 'SKIP', why: 'the lab reported no carousel clip' });
+      expect(verdictOf({ ...r, state: { ...r.state, scrollViews: undefined } })).toMatchObject({ outcome: 'SKIP', why: 'the lab reported no carousel clip' });
+    }
+    const control = recorded('lv-d62-control');
+    control.replies = [D62_FALSE_PASS];
+    control.state = withC(control.state!, 438);
+    expect(verdictOf({ ...control, launched: { ...control.launched, scrollViews: {} } })).toMatchObject({ outcome: 'SKIP', why: 'the lab reported no carousel clip' });
+  });
+
+  it('CUT_TOLERANCE_PX is truth.ts\'s TOUCH_SLACK', () => {
+    expect(CUT_TOLERANCE_PX).toBe(TOUCH_SLACK);
   });
 
   it('the summary: a fully-cut MISMATCH no KNOWN explains fails the run', () => {
@@ -316,5 +363,77 @@ describe('D37: the first read after a stroke on a snapping pager lists C where i
       { tool: 'swipe', args: { fromX: 824, fromY: 497, toX: 256, toY: 497, durationMs: 300 } },
       { tool: 'ui_snapshot', args: { filter: 'id:"lab.carousel-lazy.C"' } },
     ]);
+  });
+});
+
+describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged maxSwipes fails (a D68 revert), ADR 0021\'s ~20 % residual named', () => {
+  const HEDGED = B10.runs[0].reply;
+  const legsRecord = (hedged: readonly string[], ids: readonly string[] = UNAIMABLE_LEGS): RunRecord => ({
+    platform: 'android',
+    side: 'this checkout',
+    results: ids.map((id) => ({ ...recorded(id), ...(hedged.includes(id) && { replies: [HEDGED] }) })),
+  });
+  const run = async (record: RunRecord) => summarize({ platform: 'android', sources: ['uiautomator'], results: await rejudgedResults(record, { groups: ['carousel'] }), side: record.side });
+
+  it('the legs: lv-d62-control, lv-d68-launch, lv-d59b-recycler', () => {
+    expect(UNAIMABLE_LEGS).toEqual(['lv-d62-control', 'lv-d68-launch', 'lv-d59b-recycler']);
+  });
+
+  it('a D68-revert record (all three hedged): exit 1, MISMATCH-class, "hedged 3 of 3", ~20 % and the 0.8 % chance named', async () => {
+    const { exitCode, lines } = await run(legsRecord(UNAIMABLE_LEGS));
+    expect(exitCode).toBe(1);
+    const line = lines.find((l) => l.includes('hedged 3 of 3'));
+    expect(line).toMatch(/^MISMATCH \(hedged ceiling\): hedged 3 of 3 judged unaimable leg\(s\)/);
+    expect(line).toMatch(/ADR 0021/);
+    expect(line).toMatch(/~20 %/);
+    expect(line).toMatch(/about 0\.8 %/);
+  });
+
+  it('2 of 3 hedged: accepted, exit 0, "hedged 2 of 3"; none hedged: "hedged 0 of 3"', async () => {
+    const two = await run(legsRecord(['lv-d62-control', 'lv-d59b-recycler']));
+    expect(two.exitCode).toBe(0);
+    expect(two.lines).toContain('Hedged ceiling: hedged 2 of 3 judged unaimable leg(s) — within ADR 0021\'s ~20 % residual');
+    const none = await run(legsRecord([]));
+    expect(none.exitCode).toBe(0);
+    expect(none.lines).toContain('Hedged ceiling: hedged 0 of 3 judged unaimable leg(s) — within ADR 0021\'s ~20 % residual');
+  });
+
+  it('more runs: 4 of 4 hedged fails; 5 of 6 passes', async () => {
+    const four = legsRecord(UNAIMABLE_LEGS, [...UNAIMABLE_LEGS, 'lv-d68-launch']);
+    expect((await run(four)).exitCode).toBe(1);
+    const six = legsRecord(UNAIMABLE_LEGS, [...UNAIMABLE_LEGS, ...UNAIMABLE_LEGS]);
+    six.results[5].replies = recorded('lv-d59b-recycler').replies;
+    const r = await run(six);
+    expect(r.exitCode).toBe(0);
+    expect(r.lines.some((l) => l.includes('hedged 5 of 6'))).toBe(true);
+  });
+
+  it('fewer than 3 judged legs: LOUD, no pass claimed, the exit untouched — even all hedged; a SKIPped leg is not judged', async () => {
+    const two = await run(legsRecord(['lv-d62-control', 'lv-d68-launch'], ['lv-d62-control', 'lv-d68-launch']));
+    expect(two.exitCode).toBe(0);
+    expect(two.lines).toContain('LOUD (hedged ceiling): hedged 2 of 2 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)');
+    const skipped = legsRecord(UNAIMABLE_LEGS);
+    skipped.results[2].swipes = undefined;
+    const r = await run(skipped);
+    expect(r.lines).toContain('LOUD (hedged ceiling): hedged 2 of 2 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)');
+    expect(r.exitCode).toBe(0);
+  });
+
+  it('no leg in the run (another group, or --cases without them): no ceiling line', async () => {
+    const r = await run({ platform: 'android', side: 'this checkout', results: [recorded('d52-e2')] });
+    expect(r.lines.some((l) => /hedged ceiling|Hedged ceiling/.test(l))).toBe(false);
+  });
+
+  it('a --side run (a calibration, a revert on purpose) prints the count, held to nothing', async () => {
+    const r = await run({ ...legsRecord(UNAIMABLE_LEGS), side: '<cal>/differential-cal-0eab7789' });
+    expect(r.exitCode).toBe(0);
+    expect(r.lines).toContain('Hedged ceiling: hedged 3 of 3 judged unaimable leg(s) — a --side run, a calibration: not held');
+  });
+
+  it('hedgedCeiling, pure: counts only the legs, and only judged ones', () => {
+    const row = (id: string, outcome: 'ok' | 'SKIP' | 'LOUD', hedged: boolean) => ({ id, outcome, ...(hedged && { accepted: D68_SPREAD.residual }) });
+    expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'LOUD', false), row('lv-d62-drop', 'ok', false)], true)).toMatchObject({ fails: false, hedged: 2, judged: 3 });
+    expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'ok', true), row('lv-d62-drop', 'ok', false)], true)).toMatchObject({ fails: true, hedged: 3, judged: 3 });
+    expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'SKIP', false)], true)).toMatchObject({ fails: false, hedged: 2, judged: 2 });
   });
 });

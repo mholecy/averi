@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
 import { LAB_APP } from './lab-device.js';
-import { CAROUSEL_CASES, type DeviceLog, type PreDragged, type SwipeEntry } from './live-carousel.js';
+import { CAROUSEL_CASES, hedgedCeiling, type DeviceLog, type PreDragged, type SwipeEntry } from './live-carousel.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
@@ -739,7 +739,10 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
     const counted = results.filter((r) => r.verdict.accepted === residual);
     lines.push(`Accepted under ${residual}: ${counted.length} of ${of.length} judged run(s) of ${[...ids].join(', ')}`, '');
   }
-  return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 ? 1 : 0 };
+  // The carousel group's ceiling on that acceptance (live-carousel.ts#hedgedCeiling): every judged unaimable leg hedged fails the run.
+  const ceiling = hedgedCeiling(results.map((r) => ({ id: r.c.id, outcome: r.verdict.outcome, ...(r.verdict.accepted !== undefined && { accepted: r.verdict.accepted }) })), ofThisCheckout);
+  if (ceiling.lines.length > 0) lines.push(...ceiling.lines, '');
+  return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || ceiling.fails ? 1 : 0 };
 }
 
 /**

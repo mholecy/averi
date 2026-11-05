@@ -412,8 +412,15 @@ without the inferred-axis clause, `maxSwipes-hedged`) is ok, ADR 0021's D68 resi
 `unaimable` is expected) ok and counted in the summary, any other kind LOUD. Harness additions: `Case.preDrag` (a raw
 `input swipe`, lab-device.ts#AndroidLab.swipe), `Case.dropSwipe` (one SwipeHook on the Android adapter the registry
 builds, armed around a case's calls, logging every stroke averi draws into the record's `swipes`). Its judges are
-pinned offline on tests/fixtures/live-android-carousel-d68-d59-live.json (the D68 and D59 live checks' replies and app
-states; tests/truth/live-carousel.test.ts); the group's first device record is left to its live check (lab only).
+pinned offline on tests/fixtures/live-android-carousel-d68-d59-synthetic.json — partly synthesized (the D68 and D59 live
+checks' replies and app states, with the stroke log, some stroke offsets, the drop leg and both D37 cases made up; its
+`note` says which), so it pins the judges only and is no device evidence (tests/truth/live-carousel.test.ts); the
+group's first clean live record (lab only) replaces it as evidence, rejudged by tests/truth/live-rejudge.test.ts. Review
+round 1: a ceiling on the hedged acceptance — a run of this checkout whose every judged unaimable leg (lv-d62-control,
+lv-d68-launch, lv-d59b-recycler; 3 or more judged) ends hedged fails, MISMATCH-class (at ADR 0021's ~20 % all three by
+chance is about 0.8 %: D68 reverted), fewer judged is LOUD, "hedged N of M" always printed; lv-d62's legs fail the run
+on a SKIP (skipFails: their premises are the harness's); a pre-drag that fails is the case's SKIP; no carousel clip
+reported is a SKIP, never a MISMATCH.
 
 ### Alongside
 
