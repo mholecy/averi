@@ -155,6 +155,19 @@ export function needCallLine(c: NeedCall): string {
 /** The line after NEED_CALLS_MAX calls of a need: the rest are not recorded. */
 export const needCallsCutLine = (need: string): string => `${canonicalJson({ need, dropped: `the calls past the first ${NEED_CALLS_MAX} not recorded` })}\n`;
 
+/** Why a need's key is unread when its end passed its bound (the ERROR line's and endUnread's). */
+export const endLateWhy = (secs: number): string => `its end did not finish within ${secs} s`;
+/** Why a need's key is unread when its end threw: its message's first line. */
+export const endThrewWhy = (message: string): string => `its end threw: ${firstLineOf(message)}`;
+/** Why the abort's SUMMARY says a need's key unread (endUnread's why): no end was asked once interrupted. */
+export const ABORT_UNREAD = 'not read at its end: the run was interrupted (the abort reads nothing)';
+/** The ERROR line's text for a need's end that could not say its key. */
+export const needEndError = (need: string, why: string): string => `LAB ${need}: ${why}`;
+/** The NOTE for a protected-key line an end wrote after its bound: kept aside, taken only if it settles in time. */
+export const lateLineNote = (need: string, line: string): string => `LAB ${need}: a protected-key line after its end's bound, kept if its end finishes before the SUMMARY: ${line}`;
+/** The NOTE, once per need, when its calls' file cannot be written: never the need's failure. */
+export const callsNotRecordedNote = (need: string, message: string): string => `LAB ${need}: its calls not recorded (${firstLineOf(message)})`;
+
 /** The backstop's words for a block that asked nothing and wrote no verdict line (batch-11.sh:689–696). */
 export const NOT_RUN = 'not run (see the ERROR lines)';
 

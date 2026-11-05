@@ -22,6 +22,12 @@ import {
   liveCalls,
   liveStepText,
   NOT_READ_CHECKOUT,
+  ABORT_UNREAD,
+  callsNotRecordedNote,
+  endLateWhy,
+  endThrewWhy,
+  lateLineNote,
+  needEndError,
   NEED_CALLS_MAX,
   needCallLine,
   needCallsCutLine,
@@ -143,11 +149,16 @@ export const NEED_END_SECS = 60;
  * BLOCKER). Not at the abort: it exits 130 whatever a read says; its SUMMARY gets `endUnread`'s line for each need met
  * whose end had not had its say, so the slot is never silent about a key not read.
  */
-export type NeedSpec = NeedCheck | { check: NeedCheck; alive?: NeedCheck; end?: NeedEnd; endSecs?: number; endUnread?: (why: string) => string };
-/** A NeedSpec read as an object: a bare NeedCheck (a function) has none of these properties. */
-type NeedEnding = { end?: NeedEnd; endSecs?: number; endUnread?: (why: string) => string };
-/** Why the abort's SUMMARY says a need's key unread: no end was asked once interrupted. */
-export const ABORT_UNREAD = 'not read at its end: the run was interrupted (the abort reads nothing)';
+export type NeedSpec = NeedCheck | ({ check: NeedCheck; alive?: NeedCheck } & NeedEnding);
+/** A need's end, its bound and the line for a key it could not say (NeedSpec). */
+export interface NeedEnding {
+  end?: NeedEnd;
+  endSecs?: number;
+  endUnread?: (why: string) => string;
+}
+/** A NeedSpec as an object: a bare NeedCheck is `{ check }`. */
+type NeedObject = Exclude<NeedSpec, NeedCheck>;
+const needObjectOf = (spec: NeedSpec): NeedObject => (typeof spec === 'function' ? { check: spec } : spec);
 
 /** What a block's preconditions are asked through: S3's checks over this run's git and main's table. */
 export interface PreconditionKit {
@@ -505,8 +516,7 @@ class BatchRun<K> {
    * stopped) is only noted: the lab is not blamed for the interrupt.
    */
   private async needOf(need: string, id: string): Promise<NeedResult> {
-    const spec = this.needs[need];
-    const { check, alive = check } = typeof spec === 'function' ? { check: spec } : spec;
+    const { check, alive = check } = this.specOf(need);
     const known = this.needResults.get(need);
     if (known !== undefined && !known.ok) return known;
     const r = await (known === undefined ? this.asked(need, check, 'check') : this.asked(need, alive, 'alive'));
@@ -525,7 +535,7 @@ class BatchRun<K> {
   }
 
   /** A need's check run: its answer, or, when it throws, a failed one (an ERROR line, unless the abort has begun). */
-  private async asked(need: string, check: NeedCheck, phase: 'check' | 'alive'): Promise<NeedResult> {
+  private async asked(need: string, check: NeedCheck, phase: Exclude<NeedCall['phase'], 'end'>): Promise<NeedResult> {
     try {
       return await check(this.needCtx(need, phase));
     } catch (e) {
@@ -538,9 +548,9 @@ class BatchRun<K> {
   /** Each need met at least once, in the order first met, that has an end: its end, once (NeedSpec); none once interrupted. */
   private async endNeeds(): Promise<void> {
     for (const need of this.metOnce) {
-      const spec = this.needs[need] as NeedEnding;
+      const spec = this.specOf(need);
       if (this.guard.interrupted || spec.end === undefined) continue;
-      await this.ended(need, spec.end, spec);
+      await this.runEnd(need, spec.end, spec);
     }
   }
 
@@ -548,7 +558,7 @@ class BatchRun<K> {
    * One need's end, within its bound. A throw, or the bound passed: an ERROR line and its unread line (endUnread); past
    * its bound, the lines it writes later are kept aside, taken if it settles before the SUMMARY (takeLateEnds).
    */
-  private async ended(need: string, end: NeedEnd, { endSecs = NEED_END_SECS, endUnread }: NeedEnding): Promise<void> {
+  private async runEnd(need: string, end: NeedEnd, { endSecs = NEED_END_SECS, endUnread }: NeedEnding): Promise<void> {
     let open = true;
     let settled = false;
     const late: string[] = [];
@@ -560,11 +570,11 @@ class BatchRun<K> {
     const protectedLine = (l: string): void => {
       if (open) return say(l);
       // The step first: one line, as its own rule asks.
-      this.log.step('NOTE', `LAB ${need}: a protected-key line after its end's bound, kept if its end finishes before the SUMMARY: ${l}`);
+      this.log.step('NOTE', lateLineNote(need, l));
       late.push(l);
     };
     const unread = (why: string): string | undefined => {
-      this.log.error(`LAB ${need}: ${why}`);
+      this.log.error(needEndError(need, why));
       const line = endUnread?.(why);
       if (line !== undefined) say(line);
       return line;
@@ -573,9 +583,9 @@ class BatchRun<K> {
     ending.then(() => void (settled = true), () => {});
     try {
       const r = await within(endSecs, ending);
-      if (r.late) this.lateEnds.push({ unread: unread(`its end did not finish within ${endSecs} s`), lines: late, settled: () => settled });
+      if (r.late) this.lateEnds.push({ unread: unread(endLateWhy(endSecs)), lines: late, settled: () => settled });
     } catch (e) {
-      unread(`its end threw: ${firstLineOf(messageOf(e))}`);
+      unread(endThrewWhy(messageOf(e)));
     } finally {
       open = false;
     }
@@ -586,7 +596,7 @@ class BatchRun<K> {
     for (const l of this.lateEnds) {
       if (!l.settled() || l.lines.length === 0) continue;
       // None (no endUnread): -1, as for a line not there.
-      const at = (this.protectedLines as (string | undefined)[]).indexOf(l.unread);
+      const at = this.protectedLines.findIndex((p) => p === l.unread);
       if (at < 0) this.protectedLines.push(...l.lines);
       else this.protectedLines.splice(at, 1, ...l.lines);
     }
@@ -595,9 +605,14 @@ class BatchRun<K> {
   /** The abort SUMMARY's line for each need met whose end had not had its say: its key unread (endUnread). */
   private abortUnread(): string[] {
     return [...this.metOnce].flatMap((need) => {
-      const { endUnread } = this.needs[need] as NeedEnding;
+      const { endUnread } = this.specOf(need);
       return this.endsSaid.has(need) || endUnread === undefined ? [] : [endUnread(ABORT_UNREAD)];
     });
+  }
+
+  /** A need's spec as an object (needObjectOf). */
+  private specOf(need: string): NeedObject {
+    return needObjectOf(this.needs[need]);
   }
 
   /** What a need's check, alive and end get: each bounded call recorded, `phase` its part. */
@@ -620,7 +635,7 @@ class BatchRun<K> {
     } catch (e) {
       if (this.unrecorded.has(c.need)) return;
       this.unrecorded.add(c.need);
-      this.log.step('NOTE', `LAB ${c.need}: its calls not recorded (${firstLineOf(messageOf(e))})`);
+      this.log.step('NOTE', callsNotRecordedNote(c.need, messageOf(e)));
     }
   }
 

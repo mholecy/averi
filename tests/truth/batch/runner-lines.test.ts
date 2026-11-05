@@ -24,6 +24,12 @@ import {
   MODULE_REPO,
   NOT_READ_CHECKOUT,
   NOT_RUN,
+  ABORT_UNREAD,
+  callsNotRecordedNote,
+  endLateWhy,
+  endThrewWhy,
+  lateLineNote,
+  needEndError,
   NEED_CALL_CHARS,
   NEED_CALLS_MAX,
   needCallLine,
@@ -403,5 +409,16 @@ describe('needCallLine — one call of a need, recorded in lab/<need>-calls.json
     expect(r.said).toBe(`${'😀'.repeat(NEED_CALL_CHARS)}…`);
     expect(needCallsFile('/runs/lab', 'ios')).toBe(join('/runs/lab', 'ios-calls.jsonl'));
     expect(needCallsCutLine('ios')).toBe('{"dropped":"the calls past the first 500 not recorded","need":"ios"}\n');
+  });
+});
+
+describe('a need\'s end in words: its whys, its notes, the abort\'s unread why (T2b-1 code review: the runner builds none inline)', () => {
+  it('the whys an unread line and the ERROR line carry; the LAB ERROR line; the notes', () => {
+    expect(endLateWhy(0.02)).toBe('its end did not finish within 0.02 s');
+    expect(endThrewWhy('simctl gone\nmore')).toBe('its end threw: simctl gone');
+    expect(needEndError('ios', endLateWhy(246))).toBe('LAB ios: its end did not finish within 246 s');
+    expect(lateLineNote('ios', 'FAIL x')).toBe("LAB ios: a protected-key line after its end's bound, kept if its end finishes before the SUMMARY: FAIL x");
+    expect(callsNotRecordedNote('ios', 'ENOSPC: no space\nmore')).toBe('LAB ios: its calls not recorded (ENOSPC: no space)');
+    expect(ABORT_UNREAD).toBe('not read at its end: the run was interrupted (the abort reads nothing)');
   });
 });
