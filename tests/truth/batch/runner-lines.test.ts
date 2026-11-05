@@ -121,6 +121,9 @@ describe('labLine and needsLine — a need checked once, its lab line in the SUM
   it('LAB <need>: OK — how; ERROR — why', () => {
     expect(labLine('android', { ok: true, how: 'emulator-5554, averi_lab' })).toBe('LAB android: OK — emulator-5554, averi_lab');
     expect(labLine('ios', { ok: false, why: 'no lab simulator booted' })).toBe('LAB ios: ERROR — no lab simulator booted');
+    // Met, but with a warning (T2 S6b review round 1: this run's build failed, the app already installed is used).
+    expect(labLine('android', { ok: true, how: 'the build failed; the APK already installed is used', warn: true })).toBe('LAB android: WARN — the build failed; the APK already installed is used');
+    expect(labLine('android', { ok: true, how: 'x', warn: false })).toBe('LAB android: OK — x');
   });
 
   it('a why or how holding a line break keeps its first line: the SUMMARY line never breaks, and making it never throws', () => {

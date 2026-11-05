@@ -16,7 +16,9 @@ import {
   portOf,
   portPart,
   wdaKillPatterns,
-  wdaRestoreOf,
+  wdaBlockedOf,
+  wdaRestoredOf,
+  compareHand,
   javaHomeOf,
 } from '../../../scripts/truth/batch/lab-lines.js';
 
@@ -31,7 +33,7 @@ const LAB = 'LAB-SIMULATOR-UDID';
 
 describe('the lab\'s processes, by their exact patterns (batch-11.sh:321–325 kill_lab_wda; never device-check\'s)', () => {
   it('the WebDriverAgent: the lab\'s own derived data, and the runner under the lab simulator\'s folder; the companion of the lab simulator', () => {
-    expect(wdaKillPatterns(LAB)).toEqual(['averi-wda-lab', `Devices/${LAB}/.*WebDriverAgentRunner`]);
+    expect(wdaKillPatterns(LAB)).toEqual(['DerivedData/averi-wda-lab([/ ]|$)', `Devices/${LAB}/.*WebDriverAgentRunner`]);
     expect(companionPattern(LAB)).toBe(`idb_companion --udid ${LAB}`);
   });
 
@@ -40,6 +42,19 @@ describe('the lab\'s processes, by their exact patterns (batch-11.sh:321–325 k
       expect(() => wdaKillPatterns(udid)).toThrow(/device-check simulator/);
       expect(() => companionPattern(udid)).toThrow(/device-check simulator/);
     }
+  });
+
+  it('anchored (review round 1, NIT 7): the lab\'s xcodebuild and runner match; device-check\'s derived data, this node process and a batch\'s own command line never', () => {
+    const [derived, runner] = wdaKillPatterns(LAB).map((p) => new RegExp(p));
+    expect(derived.test('xcodebuild test-without-building -derivedDataPath /h/Library/Developer/Xcode/DerivedData/averi-wda-lab -destination id=X')).toBe(true);
+    expect(derived.test('/h/Library/Developer/Xcode/DerivedData/averi-wda-lab/Build/Products/WebDriverAgentRunner-Runner.app')).toBe(true);
+    expect(runner.test(`/h/Library/Developer/CoreSimulator/Devices/${LAB}/data/Containers/Bundle/Application/X/WebDriverAgentRunner-Runner.app/WebDriverAgentRunner-Runner`)).toBe(true);
+    for (const line of [
+      'xcodebuild test-without-building -derivedDataPath /h/Library/Developer/Xcode/DerivedData/averi-wda -destination id=Y',
+      '/h/Library/Developer/Xcode/DerivedData/averi-wda-labx/Build',
+      process.argv.join(' '),
+      `node --import tsx /s/batch-13.ts --out /s/averi-wda-lab-runs --udid ${LAB} --serial emulator-5554`,
+    ]) for (const p of [derived, runner]) expect(p.test(line)).toBe(false);
   });
 
   it('a pattern that would match device-check\'s derived data (averi-wda alone) is never one of them', () => {
@@ -80,31 +95,30 @@ describe('port 8120 (d43-gate.ts\'s restore: the port free, else killed): lsof\'
   });
 
   it('its hand line: the lab\'s kill by hand, quoted, for the lab simulator only', () => {
-    expect(portHand(LAB)).toBe(`D43 (iOS): the lab's WebDriverAgent may still be running (port 8120 not proven free): pkill -f averi-wda-lab; pkill -f 'Devices/${LAB}/.*WebDriverAgentRunner'; lsof -t -n -P -sTCP:LISTEN -i tcp:8120 | xargs kill`);
+    expect(portHand(LAB)).toBe(`D43 (iOS): the lab's WebDriverAgent may still be running (port 8120 not proven free): pkill -f 'DerivedData/averi-wda-lab([/ ]|$)'; pkill -f 'Devices/${LAB}/.*WebDriverAgentRunner'; lsof -t -n -P -sTCP:LISTEN -i tcp:8120 | xargs kill`);
     expect(() => portHand(DEVICE_CHECK_SIMULATOR)).toThrow(/device-check simulator/);
   });
 });
 
-describe('the WDA window\'s restore line: S4\'s line and the port part (the port is the runner\'s: ios-defaults.ts#domainPart leaves it out)', () => {
+describe('the WDA window\'s put-back line: S4\'s line and the port part (the port is the runner\'s: ios-defaults.ts#domainPart leaves it out)', () => {
   const restored = { ok: true as const, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back)', hand: [] };
   const failed = { ok: false as const, line: 'D43 WDA-window restore: ERROR — NOT VERIFIED — com.apple.Accessibility NOT equal to its backup', hand: ['D43 (iOS): xcrun simctl spawn U defaults import …'] };
 
-  it('restored and the port free: OK, the port named', () => {
-    expect(wdaRestoreOf(restored, { state: 'free' }, false, LAB)).toEqual({ ok: true, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back); port 8120 free', hand: [] });
+  it('restored with the port free: S4\'s line, the port named — free, or free once a listener was killed', () => {
+    expect(wdaRestoredOf(restored, false)).toEqual({ ok: true, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back); port 8120 free', hand: [] });
+    expect(wdaRestoredOf(restored, true).line).toMatch(/; port 8120 free \(a listener killed\)$/);
+    expect(wdaRestoredOf(failed, false)).toEqual({ ok: false, line: `${failed.line}; port 8120 free`, hand: failed.hand });
   });
 
-  it('restored but the port not proven free (a listener left, or lsof unread): NOT VERIFIED, the kill by hand', () => {
-    expect(wdaRestoreOf(restored, { state: 'busy', pids: [7] }, true, LAB)).toEqual({
+  it('the port not proven free (review round 1, BLOCKER): no restore at all — a runner still running undoes it at its exit; NOT VERIFIED, the state left dirty; the WDA\'s kill first, then each domain\'s lines, then the compare', () => {
+    const domains = ['D43 (iOS): xcrun simctl spawn U defaults import com.apple.Accessibility /s/b.plist'];
+    expect(wdaBlockedOf({ state: 'busy', pids: [7] }, true, LAB, domains, '/s/state.json')).toEqual({
       ok: false,
-      line: 'D43 WDA-window restore: ERROR — NOT VERIFIED — every domain equals its backup (nothing put back); port 8120 still has a listener (pid 7)',
-      hand: [portHand(LAB)],
+      line: 'D43 WDA-window restore: ERROR — NOT VERIFIED — port 8120 still has a listener (pid 7): the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty',
+      hand: [portHand(LAB), ...domains, compareHand('/s/state.json')],
     });
-    expect(wdaRestoreOf(restored, { state: 'unread', why: 'lsof: exit 2' }, false, LAB).ok).toBe(false);
-  });
-
-  it('not restored: its own line and hand lines, the port part added; the port\'s hand line too when it is not free', () => {
-    expect(wdaRestoreOf(failed, { state: 'free' }, false, LAB)).toEqual({ ok: false, line: `${failed.line}; port 8120 free`, hand: failed.hand });
-    expect(wdaRestoreOf(failed, { state: 'busy', pids: [7] }, false, LAB).hand).toEqual([...failed.hand, portHand(LAB)]);
+    expect(wdaBlockedOf({ state: 'unread', why: 'lsof: exit 2' }, false, LAB, [], '/s/state.json').line).toContain('port 8120 not read (lsof: exit 2): the domains not put back');
+    expect(compareHand("/s/a b.json")).toBe("D43 (iOS): then read each domain back (defaults export) and compare it with its backup beside '/s/a b.json'; only when every one is equal, set the state file's dirty to false");
   });
 });
 

@@ -206,7 +206,7 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     // The Android build's daemon stopped right after its build; the lab's processes ended at the run's end.
     const gradle = seam.words.filter((w) => w.includes('gradlew'));
     expect(gradle.map((w) => w.split(' ').slice(1).join(' '))).toEqual(['--console=plain assembleDebug', '--stop']);
-    expect(seam.words.slice(-4)).toEqual(['pkill -f averi-wda-lab', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`]);
+    expect(seam.words.slice(-4)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`]);
     expect(outText()).toContain(`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`);
   });
 

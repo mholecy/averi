@@ -179,9 +179,9 @@ export function labWorld(o: WorldOptions) {
 
   const pkill = (args: readonly string[]): Result => {
     const pattern = args[1];
-    const allowed = ['averi-wda-lab', `Devices/${LAB_UDID}/.*WebDriverAgentRunner`, `idb_companion --udid ${LAB_UDID}`];
+    const allowed = ['DerivedData/averi-wda-lab([/ ]|$)', `Devices/${LAB_UDID}/.*WebDriverAgentRunner`, `idb_companion --udid ${LAB_UDID}`];
     if (args[0] !== '-f' || !allowed.includes(pattern)) violations.push(`pkill by a pattern not the lab's: ${args.join(' ')}`);
-    if (pattern === 'averi-wda-lab') {
+    if (pattern === allowed[0]) {
       // The runner's exit flips Accessibility (batch-10): at the window's kill, once more after the restore when late.
       if (st.wda) flip();
       else if (o.lateFlip === true && st.restored && !st.lateFlipped) (st.lateFlipped = true), flip();

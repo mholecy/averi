@@ -26,7 +26,7 @@ import {
   wdaWindow,
   wdaWindowSpec,
 } from '../../../scripts/truth/batch/ios-lab.js';
-import { portHand } from '../../../scripts/truth/batch/lab-lines.js';
+import { compareHand, portHand } from '../../../scripts/truth/batch/lab-lines.js';
 import type { BlockCtx, NeedCtx } from '../../../scripts/truth/batch/runner.js';
 import { stateOf } from '../../../scripts/truth/batch/run-dir.js';
 import { verdictLine } from '../../../scripts/truth/batch/words.js';
@@ -124,7 +124,7 @@ describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only 
     fresh({ listeners: [4242, 4343] });
     const run = runOf(world);
     const r = await killLabWda({ run, udid: LAB_UDID });
-    expect(run.seen.map((s) => s.words)).toEqual(['pkill -f averi-wda-lab', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120']);
+    expect(run.seen.map((s) => s.words)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120']);
     expect(r).toEqual({ port: { state: 'free' }, whys: [] });
     expect(run.seen.every((s) => s.secs === HOST_SECS)).toBe(true);
   });
@@ -183,7 +183,7 @@ describe('the health check, the Open-in alert and the reset (batch-11.sh:326–3
     expect(await reset(needCtx(), lab)).toBeUndefined();
     expect(words(1)).toEqual([
       `pkill -f idb_companion --udid ${LAB_UDID}`,
-      'pkill -f averi-wda-lab',
+      'pkill -f DerivedData/averi-wda-lab([/ ]|$)',
       `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`,
       'lsof -t -n -P -sTCP:LISTEN -i tcp:8120',
       `xcrun simctl shutdown ${LAB_UDID}`,
@@ -361,7 +361,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const before = world.calls.length;
     await wdaWindow(ctx, lab, { work: async () => void world.startWda() });
     const after = words(before);
-    const kill = after.indexOf('pkill -f averi-wda-lab', after.findIndex((w) => w.includes('export com.apple.Accessibility')));
+    const kill = after.indexOf('pkill -f DerivedData/averi-wda-lab([/ ]|$)', after.findIndex((w) => w.includes('export com.apple.Accessibility')));
     const write = after.findIndex((w) => w.includes('defaults write com.apple.Accessibility'));
     expect(kill).toBeGreaterThan(-1);
     expect(write).toBeGreaterThan(kill);
@@ -396,7 +396,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(stateOf(nodeFs, join(ctx.dir, 'state.json'))).toBe('dirty');
   });
 
-  it('a listener of 8120 left after the wait: killed, read again after 1.5 s — free (a listener killed); one that stays: NOT VERIFIED, the window left open for RESTORE, the compare still read', async () => {
+  it('a listener of 8120 left after the wait: killed, read again after 1.5 s — free (a listener killed); one that stays: no restore, NOT VERIFIED, the state dirty, the window left open for RESTORE, nothing compared (review round 1, BLOCKER)', async () => {
     const { ctx, events } = blockCtx();
     // A listener that comes up during the 4 s wait (another runner's exit): killed at the port check.
     const opened = await IosSim.open(LAB_UDID, runOf(world), { wait: async (ms) => void (ms === WDA_EXIT_WAIT_MS && (world.st.listeners = [4343])) });
@@ -406,11 +406,14 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     fresh({ stickyListener: true });
     const two = blockCtx(runOf(world), 'D43b');
     await wdaWindow(two.ctx, await simOf(), { work: async () => void world.startWda() });
-    expect(two.events).toContain('verdict D43 WDA-window restore: ERROR — NOT VERIFIED — com.apple.keyboard.preferences equal, com.apple.Preferences equal, com.apple.Accessibility put back (wrote back AccessibilityEnabled, ApplicationAccessibilityEnabled, AutomationEnabled in com.apple.Accessibility); port 8120 still has a listener (pid 4242)');
+    expect(two.events).toContain('verdict D43 WDA-window restore: ERROR — NOT VERIFIED — port 8120 still has a listener (pid 4242): the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty');
     expect(two.events).toContain('ERROR the WDA window: the simulator not provably put back — the window stays open, its hand lines go to RESTORE');
     expect(two.windows.has(WDA_WINDOW)).toBe(true);
-    // The domains verified, so the state is clean: the compare still runs (a WebDriverAgent left could write late).
-    expect(two.events.some((e) => e.startsWith('verdict D43 WDA-window compare: OK'))).toBe(true);
+    // Nothing written back while the runner may still exit: the domain stays as its exit left it, the state dirty.
+    expect(words().some((w) => / defaults (write|import|delete) /.test(w))).toBe(false);
+    expect(stateOf(nodeFs, join(two.ctx.dir, 'state.json'))).toBe('dirty');
+    expect(two.events.some((e) => e.includes('compare'))).toBe(false);
+    expect(two.windows.get(WDA_WINDOW)!.hand[0]).toBe(portHand(LAB_UDID));
     // A restore that is not verified leaves the state dirty: nothing is compared (compare would refuse it anyway).
     fresh({ restoreFails: true });
     const three = blockCtx(runOf(world), 'D43c');
@@ -435,12 +438,15 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(spec?.stateFile).toBe(join(ctx.dir, 'state.json'));
     expect(spec?.block).toBe('D43');
     expect(spec !== undefined && 'secs' in spec).toBe(false);
-    expect(spec?.hand.at(-1)).toBe(portHand(LAB_UDID));
-    expect(spec?.hand[0]).toMatch(/^D43 \(iOS\): xcrun simctl spawn LAB-SIMULATOR-UDID defaults import com\.apple\.keyboard\.preferences /);
+    // The WDA's kill first (review round 1, MINOR 4), then S4's per domain, then the compare.
+    expect(spec?.hand[0]).toBe(portHand(LAB_UDID));
+    expect(spec?.hand[1]).toMatch(/^D43 \(iOS\): xcrun simctl spawn LAB-SIMULATOR-UDID defaults import com\.apple\.keyboard\.preferences /);
+    expect(spec?.hand.at(-1)).toBe(compareHand(join(ctx.dir, 'state.json')));
+    expect(spec?.hand).toHaveLength(5);
     const detached = runOf(world);
     waits.length = 0;
     expect(await spec!.restore(detached)).toEqual({ ok: true, how: expect.stringMatching(/^D43 WDA-window restore: OK — .*; port 8120 free$/) });
-    expect(detached.seen[0].words).toBe('pkill -f averi-wda-lab');
+    expect(detached.seen[0].words).toBe('pkill -f DerivedData/averi-wda-lab([/ ]|$)');
     expect(waits).toEqual([WDA_EXIT_WAIT_MS]);
     expect(stateOf(nodeFs, join(ctx.dir, 'state.json'))).toBe('clean');
   });
@@ -454,11 +460,13 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect('secs' in wdaWindowSpec(lab, join(dir, 'state.json'))).toBe(false);
     const { ctx, windows } = blockCtx(runOf(world), 'D43s');
     await wdaWindow(ctx, lab, { secs: 45, work: async () => void expect(windows.get(WDA_WINDOW)?.secs).toBe(45) });
-    expect(await spec.restore(runOf(world))).toEqual({
+    const r = await spec.restore(runOf(world));
+    expect(r).toEqual({
       ok: false,
-      why: 'D43 WDA-window restore: ERROR — NOT VERIFIED — nothing to do (no state file: the window backed nothing up, so changed nothing); port 8120 still has a listener (pid 4242)',
-      hand: [portHand(LAB_UDID)],
+      why: 'D43 WDA-window restore: ERROR — NOT VERIFIED — port 8120 still has a listener (pid 4242): the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty',
+      hand: [portHand(LAB_UDID), ...spec.hand.slice(1, -1), compareHand(join(dir, 'state.json'))],
     });
+    expect(spec.hand[0]).toBe(portHand(LAB_UDID));
   });
 });
 
@@ -476,7 +484,7 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     steps.length = 0;
     const run = runOf(world);
     await ios.lastly({ run, step: (w, t) => void steps.push(`${w} ${t}`) });
-    expect(run.seen.map((s) => s.words)).toEqual(['pkill -f averi-wda-lab', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`]);
+    expect(run.seen.map((s) => s.words)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`]);
     expect(steps).toEqual([`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`]);
     steps.length = 0;
     await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 1 : 2, timedOut: false, signal: null, out: '', err: '' }), step: (w, t) => void steps.push(`${w} ${t}`) });
