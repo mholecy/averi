@@ -195,7 +195,7 @@ describe('the tri-state reads around a block (batch-9: the role read was "Unknow
   });
 });
 
-describe('a tree kept: evidence in the block\'s folder, its fitness as a fixture said (d55-b11.ts#sanitizeFixture)', () => {
+describe('a tree kept: evidence in the block\'s folder, its fitness as a fixture said (lab-chooser.ts#sanitizeFixture)', () => {
   it('a fresh file each time; one holding a device path or the serial is kept but said unfit', () => {
     const { ctx, events } = blockCtx();
     expect(keepTree(ctx, 'resolver.xml', '<hierarchy/>', LAB_SERIAL)).toEqual({ path: join(ctx.dir, 'resolver.xml'), fit: true });
