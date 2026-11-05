@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
 import { LAB_APP } from './lab-device.js';
+import { CAROUSEL_CASES, type DeviceLog, type PreDragged, type SwipeEntry } from './live-carousel.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
@@ -13,7 +14,8 @@ import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, t
 
 /**
  * The live golden's cases and their judging, no device (scripts/truth/live.ts is the CLI that runs them): the forms
- * cases, the visibility cases built from the cells' static truth, the dismissal cases; `judged` (a case's reads, the
+ * cases, the visibility cases built from the cells' static truth, the dismissal cases, the carousel group's
+ * (live-carousel.ts); `judged` (a case's reads, the
  * late one included); `summarize` (the report and the exit code, against live-known.ts); and `rejudge` — a recorded
  * run judged again by this checkout's judges, in process: what `live.ts --rejudge <record>` prints, and what
  * tests/truth/live-rejudge.test.ts reads without a node process a record.
@@ -59,19 +61,34 @@ export interface RunRecord {
   /** The lab app the run drove; absent on records before round 7: the native one. */
   app?: LabApp;
   side: string;
-  results: { source: Source; id: string; skip?: string; replies: string[]; launched: LabState; after: (LabState | undefined)[]; state: LabState | undefined; late?: LabState; warmUpError?: string }[];
+  results: {
+    source: Source;
+    id: string;
+    skip?: string;
+    replies: string[];
+    /** The state the calls started from: the launch's, or — a case with a pre-drag — the one read after it. */
+    launched: LabState;
+    after: (LabState | undefined)[];
+    state: LabState | undefined;
+    late?: LabState;
+    warmUpError?: string;
+    /** A carousel case's raw pre-drag (Case.preDrag) and the launch's state before it. */
+    preDrag?: PreDragged;
+    /** A carousel case's strokes as averi drew them during its calls, a dropped one marked (Case.dropSwipe). */
+    swipes?: SwipeEntry[];
+  }[];
 }
 
 // --- the cases ---
 
 export interface Call {
-  tool: 'type_text' | 'tap' | 'scroll_until' | 'assert' | 'run_flow' | 'press_key' | 'ensure_state' | 'ui_snapshot';
+  tool: 'type_text' | 'tap' | 'scroll_until' | 'assert' | 'run_flow' | 'press_key' | 'ensure_state' | 'ui_snapshot' | 'swipe';
   args: Record<string, unknown>;
 }
 
 export interface Case extends RunsUnder {
   id: string;
-  group: 'forms' | 'visibility' | 'dismissal' | 'ensure';
+  group: 'forms' | 'visibility' | 'dismissal' | 'ensure' | 'carousel';
   cell: string;
   says: string;
   /** averi.yaml `app.ios.keyboardDismiss` for this case. */
@@ -98,12 +115,20 @@ export interface Case extends RunsUnder {
   skipFails?: true;
   /** The platforms it runs on (both when unset). */
   platforms?: readonly Platform[];
+  /**
+   * Android, the carousel group: a raw drag of this many px left on the carousel after the launch, before the calls
+   * (live-carousel.ts#preDrag) — `launched` is then the state read after it.
+   */
+  preDrag?: number;
+  /** Android, the carousel group: the Nth stroke averi draws during the calls is not sent (live-carousel.ts#SwipeHook). */
+  dropSwipe?: number;
   calls: Call[];
   /**
    * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state
-   * read right after call i, for a visibility case (its stop judged before the tap after it ran); else empty.
+   * read right after call i, for a visibility case (its stop judged before the tap after it ran); else empty. `log`: the
+   * strokes averi drew during the calls (a carousel case's; RunRecord `swipes`).
    */
-  judge(state: LabState, replies: string[], source: Source, launched: LabState, after: readonly (LabState | undefined)[]): LiveVerdict;
+  judge(state: LabState, replies: string[], source: Source, launched: LabState, after: readonly (LabState | undefined)[], log?: DeviceLog): LiveVerdict;
 }
 
 const id = labSelector;
@@ -560,7 +585,7 @@ export interface Selection {
   onlyCells?: readonly string[];
 }
 
-/** The cases of a run, in the order it runs them: the forms, the ensure group's, then the visibility cells', then the dismissal's. */
+/** The cases of a run, in the order it runs them: the forms, the ensure group's, the carousel group's, then the visibility cells', then the dismissal's. */
 export async function selectCases({ platform, app, groups, only, onlyCells }: Selection): Promise<Case[]> {
   const catalog = await catalogOf();
   const heldOf = (cell: string): HeldSpec => {
@@ -571,6 +596,7 @@ export async function selectCases({ platform, app, groups, only, onlyCells }: Se
   const cases: Case[] = [
     ...FORMS.map((c) => ({ ...c, group: 'forms' as const })),
     ...ENSURE.map(({ judgeOf, ...c }) => ({ ...c, group: 'ensure' as const, judge: judgeOf(heldOf(c.cell)) })),
+    ...CAROUSEL_CASES.map((c) => ({ ...c, group: 'carousel' as const })),
   ];
   if (groups.includes('visibility')) {
     for (const truth of await truthsOf(platform, app)) {
@@ -624,10 +650,11 @@ export type RejudgeSelection = Omit<Selection, 'platform' | 'app'> & { app?: Lab
  * only: the IME region read after the calls (`state.imeTouchable`, a kf case's second read, D69) is carried onto it, so
  * a later read can never turn a verdict over both reads into one over the launch's alone (`lateWithPanel`).
  */
-export function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined): LiveVerdict {
-  const verdict = c.judge(state, replies, source, launched, after);
+export function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined, swipes?: SwipeEntry[]): LiveVerdict {
+  const log: DeviceLog = swipes === undefined ? {} : { swipes };
+  const verdict = c.judge(state, replies, source, launched, after, log);
   if (verdict.outcome === 'ok' || late === undefined) return verdict;
-  const again = c.judge(lateWithPanel(state, late), replies, source, launched, after);
+  const again = c.judge(lateWithPanel(state, late), replies, source, launched, after, log);
   return again.outcome === verdict.outcome ? verdict : { ...again, why: `${again.why} (only 3 s later; first read: ${verdict.why})` };
 }
 
@@ -642,7 +669,7 @@ export async function rejudgedResults(record: RunRecord, selection: RejudgeSelec
   for (const r of record.results) {
     const c = selected.find((x) => x.id === r.id);
     if (c === undefined) continue;
-    const verdict: LiveVerdict = r.skip !== undefined || r.state === undefined ? { outcome: 'SKIP', why: r.skip ?? 'no state recorded' } : judged(c, r.source, r.replies, r.launched, r.after, r.state, r.late);
+    const verdict: LiveVerdict = r.skip !== undefined || r.state === undefined ? { outcome: 'SKIP', why: r.skip ?? 'no state recorded' } : judged(c, r.source, r.replies, r.launched, r.after, r.state, r.late, r.swipes);
     results.push({ source: r.source, c, verdict, replies: r.replies });
   }
   return results;
@@ -704,6 +731,14 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
   if (cleared.length > 0) lines.push(`Known but ok this run: ${cleared.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
   if (fixed.length > 0) lines.push(`FIXED, not intermittent — strike off live-known.ts: ${fixed.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
   if (failingSkips.length > 0) lines.push(`SKIPPED where a skip proves nothing — the run fails: ${failingSkips.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
+  // An ok on a reply accepted under a residual (LiveVerdict.accepted): counted, per residual, against the runs of the
+  // cases that accept it.
+  for (const residual of [...new Set(results.flatMap((r) => (r.verdict.accepted === undefined ? [] : [r.verdict.accepted])))]) {
+    const ids = new Set(results.filter((r) => r.verdict.accepted === residual).map((r) => r.c.id));
+    const of = results.filter((r) => ids.has(r.c.id) && r.verdict.outcome !== 'SKIP');
+    const counted = results.filter((r) => r.verdict.accepted === residual);
+    lines.push(`Accepted under ${residual}: ${counted.length} of ${of.length} judged run(s) of ${[...ids].join(', ')}`, '');
+  }
   return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 ? 1 : 0 };
 }
 

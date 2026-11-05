@@ -90,7 +90,13 @@ export type VerdictClass =
   | 'held-unsaid'
   | 'held-said'
   | 'window-cut'
-  | 'entry-not-bare';
+  | 'entry-not-bare'
+  // The carousel group (live-carousel.ts, T7a): "fully visible" while C is cut; a reply of another kind than the case's;
+  // strokes drawn outside the carousel's band (D59b); a first read after a stroke that disagrees with the pager at rest (D37).
+  | 'fully-cut'
+  | 'carousel-kind'
+  | 'off-band'
+  | 'unsettled-read';
 
 export interface LiveVerdict {
   outcome: Outcome;
@@ -101,6 +107,11 @@ export interface LiveVerdict {
   app?: string;
   /** What kind of reply the verdict rests on (replies.ts#replyKind, the closed set the static ratchet pins). */
   kind?: ReplyKind;
+  /**
+   * An ok verdict on a reply the case does not expect but accepts under a residual (its note, live-known.ts's wording):
+   * counted in the summary (live-cases.ts#summarize) — the carousel group's hedged maxSwipes (live-carousel.ts#D68_SPREAD).
+   */
+  accepted?: string;
 }
 
 /** What a tap or a stroke made the app log: every event but the touches and focus changes (tap, dismissed, button, tab, select, submit). */

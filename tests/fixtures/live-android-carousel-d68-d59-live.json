@@ -1,0 +1,1159 @@
+{
+  "note": "T7a's carousel group, synthetic: a live.ts RunRecord (scripts/truth/live-cases.ts) assembled from the D68 and D59 live checks (averi_lab emulator, Android 13 API 33, 1080x2220, 2026-11-05). Real: every scroll_until reply, the app's C frame, clip, offsets and carousel.index before and after the call, and the app's strokes of lv-d62-control, lv-d68-launch and lv-d59b-recycler. Synthesized: averi's swipe log (no probe logged it; drawn at the band's centre as D59b's live recheck measured), the strokes' offsets where only their count was kept, lv-d62-drop's drop (D68 case 1 run 1's strokes less the dropped one, the D59 check's hedged reply), and both d37-snap cases (the batch-9 shape: at rest on C, the first read listing C at the clip). Trimmed: window focus, the tree facts and device paths.",
+  "platform": "android",
+  "side": "this checkout",
+  "results": [
+    {
+      "source": "uiautomator",
+      "id": "lv-d62-control",
+      "replies": [
+        "ERROR scroll_until id:lab.carousel-recycler-free.C stopped after 6 swipes, without swiping further — element is on screen but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and the last swipe toward it showed 27 px more of it — part of it likely lies past that edge still; in this call a 48-px swipe, no longer than the next would be, moved it 27 px, and only 19 px of room remain on its left side, so another swipe would most likely push its left side out past its scroll container rather than show it whole — act on the part that shows (a tap, or an assert on a child inside it), or drop fully: true; more swipes are unlikely to help. Last rect {\"x\":85,\"y\":380,\"width\":929,\"height\":234} in a 1080x2220 viewport"
+      ],
+      "preDrag": {
+        "from": {
+          "x": 872,
+          "y": 497
+        },
+        "to": {
+          "x": 432,
+          "y": 497
+        },
+        "durationMs": 1000,
+        "launch": {
+          "cell": "carousel-recycler-free",
+          "ready": true,
+          "screen": {
+            "x": 0,
+            "y": 0,
+            "width": 1080,
+            "height": 2220
+          },
+          "scale": 1,
+          "density": 2.75,
+          "events": [],
+          "scrollViews": {
+            "carousel": {
+              "x": 66,
+              "y": 380,
+              "width": 948,
+              "height": 234
+            }
+          },
+          "frames": {},
+          "offsets": {
+            "carousel": 0,
+            "page": 825,
+            "carousel.index": 0
+          },
+          "strokes": []
+        }
+      },
+      "launched": {
+        "cell": "carousel-recycler-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 573,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "carousel": 441,
+          "page": 825,
+          "carousel.index": 0
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 441,
+            "at": 1793893728.852
+          }
+        ]
+      },
+      "after": [],
+      "state": {
+        "cell": "carousel-recycler-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 85,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "carousel": 929,
+          "page": 825,
+          "carousel.index": 1
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 441,
+            "at": 1793893728.852
+          },
+          {
+            "view": "carousel",
+            "from": 441,
+            "to": 577,
+            "at": 1793893736.372
+          },
+          {
+            "view": "carousel",
+            "from": 577,
+            "to": 772,
+            "at": 1793893738.835
+          },
+          {
+            "view": "carousel",
+            "from": 772,
+            "to": 842,
+            "at": 1793893741.185
+          },
+          {
+            "view": "carousel",
+            "from": 842,
+            "to": 875,
+            "at": 1793893743.467
+          },
+          {
+            "view": "carousel",
+            "from": 875,
+            "to": 902,
+            "at": 1793893745.787
+          },
+          {
+            "view": "carousel",
+            "from": 902,
+            "to": 929,
+            "at": 1793893748.099
+          }
+        ]
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "lv-d62-drop",
+      "replies": [
+        "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) — element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 27 px more of it — part of it lay past that edge, so it may still be cut there (last rect {\"x\":86,\"y\":380,\"width\":928,\"height\":234}); raise maxSwipes or timeoutMs"
+      ],
+      "preDrag": {
+        "from": {
+          "x": 872,
+          "y": 497
+        },
+        "to": {
+          "x": 432,
+          "y": 497
+        },
+        "durationMs": 1000,
+        "launch": {
+          "cell": "carousel-recycler-free",
+          "ready": true,
+          "screen": {
+            "x": 0,
+            "y": 0,
+            "width": 1080,
+            "height": 2220
+          },
+          "scale": 1,
+          "density": 2.75,
+          "events": [],
+          "scrollViews": {
+            "carousel": {
+              "x": 66,
+              "y": 380,
+              "width": 948,
+              "height": 234
+            }
+          },
+          "frames": {},
+          "offsets": {
+            "carousel": 0,
+            "page": 825,
+            "carousel.index": 0
+          },
+          "strokes": []
+        }
+      },
+      "launched": {
+        "cell": "carousel-recycler-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 579,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "carousel": 435,
+          "page": 825,
+          "carousel.index": 0
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 440,
+            "at": 1793893755.789
+          }
+        ]
+      },
+      "after": [],
+      "swipes": [
+        {
+          "from": {
+            "x": 256,
+            "y": 497
+          },
+          "to": {
+            "x": 824,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 256,
+            "y": 497
+          },
+          "to": {
+            "x": 486,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": true
+        },
+        {
+          "from": {
+            "x": 256,
+            "y": 497
+          },
+          "to": {
+            "x": 376,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 256,
+            "y": 497
+          },
+          "to": {
+            "x": 316,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 256,
+            "y": 497
+          },
+          "to": {
+            "x": 304,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 256,
+            "y": 497
+          },
+          "to": {
+            "x": 304,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        }
+      ],
+      "state": {
+        "cell": "carousel-recycler-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 86,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "carousel": 928,
+          "page": 825,
+          "carousel.index": 1
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 440,
+            "at": 1793893755.789
+          },
+          {
+            "view": "carousel",
+            "from": 575,
+            "to": 780,
+            "at": 1793893763.819
+          },
+          {
+            "view": "carousel",
+            "from": 780,
+            "to": 847,
+            "at": 1793893766.149
+          },
+          {
+            "view": "carousel",
+            "from": 847,
+            "to": 877,
+            "at": 1793893768.433
+          },
+          {
+            "view": "carousel",
+            "from": 877,
+            "to": 902,
+            "at": 1793893770.733
+          },
+          {
+            "view": "carousel",
+            "from": 902,
+            "to": 929,
+            "at": 1793893773.05
+          }
+        ]
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "lv-d68-launch",
+      "replies": [
+        "ERROR scroll_until id:lab.carousel-recycler-free.C stopped after 6 swipes, without swiping further — element is on screen but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and the last swipe toward it showed 27 px more of it — part of it likely lies past that edge still; in this call a 48-px swipe, no longer than the next would be, moved it 24 px, and only 22 px of room remain on its left side, so another swipe would most likely push its left side out past its scroll container rather than show it whole — act on the part that shows (a tap, or an assert on a child inside it), or drop fully: true; more swipes are unlikely to help. Last rect {\"x\":88,\"y\":380,\"width\":926,\"height\":234} in a 1080x2220 viewport"
+      ],
+      "launched": {
+        "cell": "carousel-recycler-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {},
+        "offsets": {
+          "carousel": 0,
+          "page": 825,
+          "carousel.index": 0
+        },
+        "strokes": []
+      },
+      "after": [],
+      "state": {
+        "cell": "carousel-recycler-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 88,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "carousel": 926,
+          "page": 825,
+          "carousel.index": 1
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 629,
+            "at": 1793893833.751
+          },
+          {
+            "view": "carousel",
+            "from": 629,
+            "to": 772,
+            "at": 1793893836.184
+          },
+          {
+            "view": "carousel",
+            "from": 772,
+            "to": 840,
+            "at": 1793893838.583
+          },
+          {
+            "view": "carousel",
+            "from": 840,
+            "to": 875,
+            "at": 1793893840.87
+          },
+          {
+            "view": "carousel",
+            "from": 875,
+            "to": 899,
+            "at": 1793893843.183
+          },
+          {
+            "view": "carousel",
+            "from": 899,
+            "to": 926,
+            "at": 1793893845.5
+          }
+        ]
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "lv-d59b-recycler",
+      "replies": [
+        "ERROR scroll_until id:lab.carousel-recycler-free.C stopped after 6 swipes, without swiping further — element is on screen but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and the last swipe toward it showed 27 px more of it — part of it likely lies past that edge still; in this call a 48-px swipe, no longer than the next would be, moved it 26 px, and only 21 px of room remain on its left side, so another swipe would most likely push its left side out past its scroll container rather than show it whole — act on the part that shows (a tap, or an assert on a child inside it), or drop fully: true; more swipes are unlikely to help. Last rect {\"x\":87,\"y\":380,\"width\":927,\"height\":234} in a 1080x2220 viewport"
+      ],
+      "launched": {
+        "cell": "carousel-recycler-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {},
+        "offsets": {
+          "carousel": 0,
+          "page": 825,
+          "carousel.index": 0
+        },
+        "strokes": []
+      },
+      "after": [],
+      "swipes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        }
+      ],
+      "state": {
+        "cell": "carousel-recycler-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 87,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "carousel": 927,
+          "page": 825,
+          "carousel.index": 1
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 635,
+            "at": 1793893858.12
+          },
+          {
+            "view": "carousel",
+            "from": 635,
+            "to": 771,
+            "at": 1793893860.57
+          },
+          {
+            "view": "carousel",
+            "from": 771,
+            "to": 844,
+            "at": 1793893862.949
+          },
+          {
+            "view": "carousel",
+            "from": 844,
+            "to": 874,
+            "at": 1793893865.236
+          },
+          {
+            "view": "carousel",
+            "from": 874,
+            "to": 900,
+            "at": 1793893867.533
+          },
+          {
+            "view": "carousel",
+            "from": 900,
+            "to": 927,
+            "at": 1793893869.833
+          }
+        ]
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "lv-d59b-lazy",
+      "replies": [
+        "ERROR scroll_until id:lab.carousel-lazy-free.C failed after 3 swipes — element is in the viewport but CLIPPED at left: 99% of it is drawn, and it is 948 wide (tree units), as wide as its scroll view container (66,380 948x234) (the tree does not say which way it scrolls: the swipes over it moved the element sideways): fully: true holds at one exact scroll offset only, which no swipe can be aimed at — drop fully: true, or accept what it shows. Last rect {\"x\":64,\"y\":380,\"width\":948,\"height\":234} in a 1080x2220 viewport"
+      ],
+      "launched": {
+        "cell": "carousel-lazy-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {},
+        "offsets": {
+          "page": 825,
+          "carousel": 0,
+          "carousel.index": 0
+        },
+        "strokes": []
+      },
+      "after": [],
+      "swipes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        }
+      ],
+      "state": {
+        "cell": "carousel-lazy-free",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 64,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "page": 825,
+          "carousel": 950,
+          "carousel.index": 1
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 317,
+            "at": 1793886800
+          },
+          {
+            "view": "carousel",
+            "from": 317,
+            "to": 633,
+            "at": 1793886802.3
+          },
+          {
+            "view": "carousel",
+            "from": 633,
+            "to": 950,
+            "at": 1793886804.6
+          }
+        ]
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "d52-e2",
+      "replies": [
+        "ERROR scroll_until id:lab.carousel-in-list.C failed after 3 swipes — element is in the viewport but CLIPPED at left: 97% of it is drawn, and it is 948 wide (tree units), as wide as its scroll view scrollable (66,380 948x234): fully: true holds at one exact scroll offset only, which no swipe can be aimed at — drop fully: true, or accept what it shows. Last rect {\"x\":33,\"y\":380,\"width\":948,\"height\":234} in a 1080x2220 viewport"
+      ],
+      "preDrag": {
+        "from": {
+          "x": 872,
+          "y": 497
+        },
+        "to": {
+          "x": 432,
+          "y": 497
+        },
+        "durationMs": 1000,
+        "launch": {
+          "cell": "carousel-in-list",
+          "ready": true,
+          "screen": {
+            "x": 0,
+            "y": 0,
+            "width": 1080,
+            "height": 2220
+          },
+          "scale": 1,
+          "density": 2.75,
+          "events": [],
+          "scrollViews": {
+            "carousel": {
+              "x": 66,
+              "y": 380,
+              "width": 948,
+              "height": 234
+            }
+          },
+          "frames": {},
+          "offsets": {
+            "page": 825,
+            "carousel": 0
+          },
+          "strokes": []
+        }
+      },
+      "launched": {
+        "cell": "carousel-in-list",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 577,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "page": 825,
+          "carousel": 437
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 437,
+            "at": 1793887000
+          }
+        ]
+      },
+      "after": [],
+      "state": {
+        "cell": "carousel-in-list",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 33,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "page": 825,
+          "carousel": 981
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 437,
+            "at": 1793887000
+          },
+          {
+            "view": "carousel",
+            "from": 437,
+            "to": 618,
+            "at": 1793887003
+          },
+          {
+            "view": "carousel",
+            "from": 618,
+            "to": 800,
+            "at": 1793887005.3
+          },
+          {
+            "view": "carousel",
+            "from": 800,
+            "to": 981,
+            "at": 1793887007.6
+          }
+        ]
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "d37-snap-lazy",
+      "replies": [
+        "Swiped (824,497) → (256,497)",
+        "[\n  {\n    \"role\": \"other\",\n    \"identifier\": \"lab.carousel-lazy.C\",\n    \"label\": null,\n    \"rect\": {\n      \"x\": 66,\n      \"y\": 380,\n      \"width\": 948,\n      \"height\": 234\n    }\n  }\n]"
+      ],
+      "launched": {
+        "cell": "carousel-lazy",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {},
+        "offsets": {
+          "carousel": 0,
+          "page": 825,
+          "carousel.index": 0
+        },
+        "strokes": []
+      },
+      "after": [],
+      "swipes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        }
+      ],
+      "state": {
+        "cell": "carousel-lazy",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "carousel": 948,
+          "page": 825,
+          "carousel.index": 1
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 948,
+            "at": 1793887100
+          }
+        ]
+      }
+    },
+    {
+      "source": "uiautomator",
+      "id": "d37-snap-recycler",
+      "replies": [
+        "Swiped (824,497) → (256,497)",
+        "[\n  {\n    \"role\": \"other\",\n    \"identifier\": \"lab.carousel-recycler.C\",\n    \"label\": null,\n    \"rect\": {\n      \"x\": 66,\n      \"y\": 380,\n      \"width\": 948,\n      \"height\": 234\n    }\n  }\n]"
+      ],
+      "launched": {
+        "cell": "carousel-recycler",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {},
+        "offsets": {
+          "carousel": 0,
+          "page": 825,
+          "carousel.index": 0
+        },
+        "strokes": []
+      },
+      "after": [],
+      "swipes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 256,
+            "y": 497
+          },
+          "durationMs": 300,
+          "dropped": false
+        }
+      ],
+      "state": {
+        "cell": "carousel-recycler",
+        "ready": true,
+        "screen": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2220
+        },
+        "scale": 1,
+        "density": 2.75,
+        "events": [],
+        "scrollViews": {
+          "carousel": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "frames": {
+          "C": {
+            "x": 66,
+            "y": 380,
+            "width": 948,
+            "height": 234
+          }
+        },
+        "offsets": {
+          "carousel": 948,
+          "page": 825,
+          "carousel.index": 1
+        },
+        "strokes": [
+          {
+            "view": "carousel",
+            "from": 0,
+            "to": 948,
+            "at": 1793887100
+          }
+        ]
+      }
+    }
+  ]
+}

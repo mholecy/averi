@@ -398,6 +398,23 @@ both visibility records in vitest (no device; 73/62/3/8 and 222/178/5/39, 0 not 
 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier.md); #7's second fix rerun live at d928789, the
 static pair's before (`pair: 2`).
 
+The live groups (`live.ts --groups …`): `forms` (the default), `visibility`, `dismissal` (iOS), `ensure` (D30) and,
+since T7a (2026-11-05), `carousel` (Android, the native app; scripts/truth/live-carousel.ts) — the carousel probes the
+device batches copied from batch to batch, as cases: `lv-d62-control` and `lv-d62-drop` (carousel-recycler-free after
+the 440-px, 1-s pre-drag, `left fully: true`; the drop leg with the call's second stroke dropped and resolved as
+drawn), `lv-d68-launch` (the same card from a fresh launch, `right`), `lv-d59b-lazy` and `lv-d59b-recycler` (from a
+fresh launch, `right fully: true`, every stroke inside the carousel's band), `d52-e2` (carousel-in-list after the
+pre-drag, `unfit` within 3 swipes) and `d37-snap-lazy`/`-recycler` (one stroke through `swipe`, then `ui_snapshot`: the
+first read lists C where the snapping pager comes to rest). The oracle is the app's: C's frame against the clip, the
+offsets, `carousel.index` and the strokes. The hard verdict on every `fully: true` case: never "fully visible" while C
+is cut (MISMATCH `fully-cut`); the expected reply kind (replies.ts#carouselReply: `unaimable`, `unfit` with or
+without the inferred-axis clause, `maxSwipes-hedged`) is ok, ADR 0021's D68 residual (the hedged bound where
+`unaimable` is expected) ok and counted in the summary, any other kind LOUD. Harness additions: `Case.preDrag` (a raw
+`input swipe`, lab-device.ts#AndroidLab.swipe), `Case.dropSwipe` (one SwipeHook on the Android adapter the registry
+builds, armed around a case's calls, logging every stroke averi draws into the record's `swipes`). Its judges are
+pinned offline on tests/fixtures/live-android-carousel-d68-d59-live.json (the D68 and D59 live checks' replies and app
+states; tests/truth/live-carousel.test.ts); the group's first device record is left to its live check (lab only).
+
 ### Alongside
 
 - P5 (text inventory) is independent and small — any time.
