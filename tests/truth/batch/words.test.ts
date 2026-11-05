@@ -229,6 +229,13 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
     expect(exitCodeOf({ ...none, interrupted: { at: '10:12:00' } })).toBe(130);
   });
 
+  it('the SUMMARY of a run where no wanted block ran says so, after the blocks\' lines, and why the exit is 2 (review round 2)', () => {
+    const lines = summaryLines({ ...base, noneRan: true });
+    expect(lines.indexOf('NOTE no wanted block ran (each one\'s why above) — exit 2')).toBe(lines.indexOf('E5 verdict: PASS — a PASS, c PASS') + 1);
+    expect(summaryLines(base)).not.toContain('NOTE no wanted block ran (each one\'s why above) — exit 2');
+    expect(summaryLines({ ...base, noneRan: false })).toEqual(summaryLines(base));
+  });
+
   it('130 when interrupted, whatever its verdicts and RESTORE', () => {
     const interrupted = { ...base, interrupted: { at: '10:12:00' } };
     expect(exitCodeOf(interrupted)).toBe(130);

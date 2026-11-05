@@ -547,8 +547,10 @@ describe('needs: each checked once, when the first wanted block needing it comes
   it('no wanted block ran (every need failed): exit 2, "nothing was done" — never success (review round 1); one that ran: its own exit', async () => {
     const down = { ...needs, android: async () => ({ ok: false as const, why: 'down' }) };
     expect(await go([plain('a', { needs: ['android'] }), plain('b', { preconditions: [async () => ({ ok: false, why: 'no' })] })], { needs: down })).toBe(2);
+    expect(summary().slice(-4, -1)).toEqual(['b verdict: INCONCLUSIVE — precondition: no', 'NOTE no wanted block ran (each one\'s why above) — exit 2', 'RESTORE: none — everything dirty was put back and verified']);
     rmSync(out, { recursive: true, force: true });
     expect(await go([plain('a', { needs: ['android'] }), plain('c')], { needs: down })).toBe(0);
+    expect(summary().some((l) => l.startsWith('NOTE no wanted block ran'))).toBe(false);
   });
 
   it('two needs failed: both named; a check that throws is a failed need and an ERROR line, never the run\'s abort', async () => {
@@ -671,8 +673,13 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
   });
 
   it('a log the folder lists but that cannot be read: a NOTE naming it in the SUMMARY; a long ERROR line cut (review round 1)', async () => {
-    await go([plain('kf', { run: async (ctx) => (mkdirSync(join(ctx.dir, 'stuck.log')), writeFileSync(join(ctx.dir, 'p.log'), `ERROR ${'x'.repeat(900)}\n`), ctx.verdict('PASS')) })]);
-    expect(summary()).toContain(`NOTE ${join(dirOf('kf'), 'stuck.log')} not read: unreadable (no file, or no permission)`);
+    await go([
+      plain('kf', {
+        run: async (ctx) => (mkdirSync(join(ctx.dir, 'stuck.log')), mkdirSync(join(ctx.dir, 'full.log')), writeFileSync(join(ctx.dir, 'full.log', 'x'), ''), writeFileSync(join(ctx.dir, 'p.log'), `ERROR ${'x'.repeat(900)}\n`), ctx.verdict('PASS')),
+      }),
+    ]);
+    expect(summary()).toContain(`NOTE ${join(dirOf('kf'), 'stuck.log')} not read: unreadable`);
+    expect(summary()).toContain(`NOTE ${join(dirOf('kf'), 'full.log')} not read: unreadable: a folder`);
     expect(summary().find((l) => l.startsWith('ERROR x'))).toHaveLength(700);
   });
 
@@ -773,6 +780,19 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
     expect(ran).toEqual([]);
+  });
+
+  it('no further need of a block is checked once the abort began during one of them (review round 2)', async () => {
+    const checked: string[] = [];
+    const n = {
+      android: async (c: NeedCtx) => (checked.push('android'), await c.bounded('probe', ['hang'], { secs: 30 }), { ok: true as const, how: 'up' }),
+      ios: async () => (checked.push('ios'), { ok: true as const, how: 'up' }),
+    };
+    const done = go([plain('B2', { needs: ['android', 'ios'] })], { needs: n });
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(checked).toEqual(['android']);
   });
 
   it('a live run whose rejudge was cut: its records are not complete, so it is not judged (batch-12: every .cases its record and rejudge)', async () => {

@@ -223,12 +223,22 @@ describe('fileErrors — one log\'s ERROR lines for the SUMMARY, bounded (T2 S6a
     const got = fileErrors('/d/b.log', many);
     expect(got).toHaveLength(21);
     expect(got[19]).toBe('ERROR e19');
-    expect(got[20]).toBe('… 3 more ERROR lines in /d/b.log');
-    expect(fileErrors('/d/c.log', Array.from({ length: 20 }, () => 'ERROR z').join('\n'))).toHaveLength(20);
+    expect(got[20]).toBe('… 3 more distinct ERROR lines in /d/b.log');
+    expect(fileErrors('/d/c.log', Array.from({ length: 20 }, (_, i) => `ERROR z${i}`).join('\n'))).toHaveLength(20);
+  });
+
+  it('a line repeated is said once with its count, before the cap: 50 of one never bury a different one (review round 2)', () => {
+    const log = [...Array.from({ length: 50 }, () => 'ERROR same'), 'ERROR different', 'ERROR same'].join('\n');
+    expect(fileErrors('/d/a.log', log)).toEqual(['ERROR same (×51)', 'ERROR different']);
+    const long = `ERROR ${'x'.repeat(800)}`;
+    const [cut] = fileErrors('/d/a.log', `${long}\n${long}`);
+    expect([...cut]).toHaveLength(DETAIL_CHARS);
+    expect(cut.endsWith('… (×2)')).toBe(true);
   });
 
   it('a log that could not be read: a NOTE naming it, never silently skipped', () => {
-    expect(fileErrors('/d/stuck.log', undefined)).toEqual(['NOTE /d/stuck.log not read: unreadable (no file, or no permission)']);
+    expect(fileErrors('/d/stuck.log', undefined)).toEqual(['NOTE /d/stuck.log not read: unreadable']);
+    expect(fileErrors('/d/stuck.log', undefined, 'a folder')).toEqual(['NOTE /d/stuck.log not read: unreadable: a folder']);
     expect(fileErrors('/d/a.log', 'ok\n')).toEqual([]);
   });
 });
