@@ -192,8 +192,13 @@ describe('logErrors — this run\'s ERROR lines from its logs, counted across th
     expect(logErrors([log('a.log', times(2, 'ERROR x'))])).toEqual(['ERROR x (×2, in a.log)']);
   });
 
+  it('only steps.log\'s lines are timed: in another log a line starting with a time is no ERROR line (batch-12\'s `^ERROR`, review round 5)', () => {
+    expect(logErrors([{ ...log('p.log', '12:00:00 ERROR x\nERROR y'), timed: false }, { ...log('steps.log', '12:00:00 ERROR z'), timed: true }])).toEqual(['ERROR y', '12:00:00 ERROR z']);
+    expect(logErrors([log('p.log', '12:00:00 ERROR x')])).toEqual([]);
+  });
+
   it('a step line\'s time is set aside only at the line\'s start: a time inside an ERROR line is part of what it says', () => {
-    expect(logErrors([log('steps.log', '09:00:00 ERROR a\n10:00:00 ERROR a'), log('p.log', 'ERROR a 09:00:00 b\nERROR a b')])).toEqual(['09:00:00 ERROR a (×2, in steps.log)', 'ERROR a 09:00:00 b', 'ERROR a b']);
+    expect(logErrors([{ ...log('steps.log', '09:00:00 ERROR a\n10:00:00 ERROR a'), timed: true }, log('p.log', 'ERROR a 09:00:00 b\nERROR a b')])).toEqual(['09:00:00 ERROR a (×2, in steps.log)', 'ERROR a 09:00:00 b', 'ERROR a b']);
   });
 
   it('more than WHERE_SHOWN files: the first 3, then how many more', () => {

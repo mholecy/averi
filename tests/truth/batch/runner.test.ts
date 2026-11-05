@@ -626,6 +626,39 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(summary().find((l) => l.startsWith('kf live verdict:'))).toMatch(/^kf live verdict: INCONCLUSIVE — 1 of 1 run\(s\) incomplete: android-kf-1 — no record/);
   });
 
+  it('a live run whose rejudge summary lacks cases asked is not complete: not judged, INCONCLUSIVE naming them (review round 5, R3)', async () => {
+    seam.rules = [git(), probes, live({ rejudge: { log: casesSummary(['kf1']) } })];
+    const judged: string[] = [];
+    await go([kfBlock({ judge: async () => (judged.push('kf'), ['kf live verdict: PASS']) })]);
+    expect(judged).toEqual([]);
+    expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — uiautomator: kf2, kf3 missing from the summary');
+  });
+
+  it('the same on the abort path: an incomplete run is INCONCLUSIVE with its gap, its judge not run (review round 5, R3)', async () => {
+    seam.rules = [git(), probes, live({ rejudge: { log: casesSummary(['kf1']) } })];
+    const judged: string[] = [];
+    const done = go([kfBlock({ judge: async () => (judged.push('kf'), ['kf live verdict: PASS']) }), plain('E5', { run: async (ctx) => void (await ctx.bounded('probe', ['hang'], { secs: 30 })) })]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(judged).toEqual([]);
+    expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — uiautomator: kf2, kf3 missing from the summary');
+  });
+
+  it('a noRecords block that asks, records or runs live: the batch\'s mistake, thrown at that call (review round 5, R4, R5)', async () => {
+    for (const run of [
+      async (ctx: Parameters<Block['run']>[0]) => ctx.asks('c', { kind: 'runs', runs: 1 }),
+      async (ctx: Parameters<Block['run']>[0]) => ctx.record('c', { kind: 'runs', runs: 1 }),
+      async (ctx: Parameters<Block['run']>[0]) => void (await ctx.liveRun('k', KF, { secs: 60 })),
+    ]) {
+      rmSync(out, { recursive: true, force: true });
+      seam = new FakeSeam([git(), probes, live()]);
+      expect(await go([plain('E5', { noRecords: true, run })])).toBe(130);
+      expect(summary().join('\n')).toContain('E5 declared noRecords');
+      expect(seam.words().some((w) => w.includes('live.ts'))).toBe(false);
+    }
+  });
+
   it('a block whose record does not match what it asked is not judged either', async () => {
     const judged: string[] = [];
     await go([plain('E5', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 3 }), ctx.record('c', { kind: 'runs', runs: 2 })), judge: async () => (judged.push('E5'), ['E5 verdict: PASS']) })]);
