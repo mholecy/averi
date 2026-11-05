@@ -722,6 +722,20 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     expect(summaryText()).not.toMatch(/by the abort\)|\(the abort\)/);
   });
 
+  it('complete() may say why it is not (a string): INTERRUPTED with that why, the rerun hint kept (T2 S6a review round 6)', async () => {
+    const guard = guardOf([block('kf', { complete: async () => '1 of 1 run(s) incomplete: kf-1 — no record' }), block('E5', { complete: () => false })]);
+    await interrupt(guard);
+    expect(summaryText()).toContain('kf: INTERRUPTED — not judged (1 of 1 run(s) incomplete: kf-1 — no record; rerun ONLY=kf)');
+    expect(summaryText()).toContain('E5: INTERRUPTED — its records are not complete, not judged (rerun ONLY=E5)');
+  });
+
+  it('completeness is read within the judging budget: one that never settles is not complete, said so; the next block still read (T2 S6a review round 6)', async () => {
+    const guard = guardOf([block('kf', { complete: () => new Promise<boolean>(() => {}) }), block('E5', { complete: () => true, judge: async () => ['E5 verdict: PASS'] })], { judgeBudgetSecs: 0.05 });
+    await interrupt(guard);
+    expect(summaryText()).toContain('kf: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=kf)');
+    expect(summaryText()).toContain("E5: INTERRUPTED — not judged (the abort's judging budget of 0.05 s was spent; rerun ONLY=E5)");
+  });
+
   it('a judge that throws, or a complete() that throws, leaves the block INTERRUPTED and names why', async () => {
     const guard = guardOf([
       block('kf', { complete: () => true, judge: async () => {
@@ -735,7 +749,7 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     const s = summaryText();
     expect(s).toContain('kf: INTERRUPTED — not judged (its judge failed: analyze.txt missing; rerun ONLY=kf)');
     expect(s).toContain('ERROR kf not judged by the abort: analyze.txt missing');
-    expect(s).toContain('T6: INTERRUPTED');
+    expect(s).toContain('T6: INTERRUPTED — not judged (completeness not read: no dir; rerun ONLY=T6)');
   });
 
   it('the judges share one budget (review round 1): a judge that never settles spends it, its calls are stopped, and the blocks after it are not judged', async () => {

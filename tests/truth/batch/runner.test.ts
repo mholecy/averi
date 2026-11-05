@@ -659,6 +659,20 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     }
   });
 
+  it('a block\'s own complete() only adds a requirement: it never hides a live run\'s gap (review round 6, the R3 summary with complete: () => true)', async () => {
+    seam.rules = [git(), probes, live({ rejudge: { log: casesSummary(['kf1']) } })];
+    const judged: string[] = [];
+    await go([kfBlock({ complete: () => true, judge: async () => (judged.push('kf'), ['kf live verdict: PASS']) })]);
+    expect(judged).toEqual([]);
+    expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — uiautomator: kf2, kf3 missing from the summary');
+  });
+
+  it('a noRecords block with its own complete(): both must hold', async () => {
+    const judged: string[] = [];
+    await go([plain('a', { run: async () => {}, noRecords: true, complete: () => false, judge: async () => (judged.push('a'), ['a verdict: PASS']) })]);
+    expect(judged).toEqual([]);
+  });
+
   it('a block whose record does not match what it asked is not judged either', async () => {
     const judged: string[] = [];
     await go([plain('E5', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 3 }), ctx.record('c', { kind: 'runs', runs: 2 })), judge: async () => (judged.push('E5'), ['E5 verdict: PASS']) })]);
@@ -890,22 +904,31 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(checked).toEqual(['android']);
   });
 
-  it('a live run whose rejudge was cut: not complete, not judged — INCONCLUSIVE with its gap (batch-12: every .cases its record and rejudge; review round 5)', async () => {
+  it('a live run whose rejudge was cut: its run had not returned — INTERRUPTED, its gap the why, the rerun hint kept (batch-12: every .cases its record and rejudge; review round 6)', async () => {
     seam.rules = [git(), probes, live({ rejudge: { hang: true } })];
     const done = go([kfBlock()]);
     await until(() => seam.words().some((w) => w.includes('--rejudge')));
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
-    expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — android-kf-1.rejudge.txt has no `# Live golden:` line (the rejudge did not finish); uiautomator: kf1, kf2, kf3 missing from the summary');
+    expect(summary()).toContain('kf: INTERRUPTED — not judged (1 of 1 run(s) incomplete: android-kf-1 — android-kf-1.rejudge.txt has no `# Live golden:` line (the rejudge did not finish); uiautomator: kf1, kf2, kf3 missing from the summary; rerun ONLY=kf)');
   });
 
-  it('interrupted inside live.ts (no record yet): not complete, not judged — INCONCLUSIVE with its gap (review round 5)', async () => {
+  it('interrupted inside live.ts (no record yet): its run had not returned — INTERRUPTED, its gap the why, `rerun ONLY=kf` kept (review round 6)', async () => {
     seam.rules = [git(), probes, (cmd, args) => (args.includes('--record') ? { hang: true } : undefined)];
     const done = go([kfBlock()]);
     await until(() => seam.words().some((w) => w.includes('--record')));
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
-    expect(summary()).toContain('kf live verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: android-kf-1 — no record (android-kf-1.json); android-kf-1.log has no `# Live golden:` line (live.ts did not finish); no rejudge summary (android-kf-1.rejudge.txt)');
+    expect(summary()).toContain('kf: INTERRUPTED — not judged (1 of 1 run(s) incomplete: android-kf-1 — no record (android-kf-1.json); android-kf-1.log has no `# Live golden:` line (live.ts did not finish); no rejudge summary (android-kf-1.rejudge.txt); rerun ONLY=kf)');
+    expect(summary().some((l) => l.startsWith('kf live verdict:'))).toBe(false);
+  });
+
+  it('the abort reads completeness within what is left of its judging budget: a table that never loads — not complete, said so (review round 6)', async () => {
+    const done = go([kfBlock(), plain('E5', { run: async (ctx) => void (await ctx.bounded('probe', ['hang'], { secs: 30 })) })], { io: { table: () => new Promise(() => {}), judgeBudgetSecs: 0.05 } });
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(summary()).toContain('kf: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=kf)');
   });
 
   it('the abort\'s judge and a block\'s complete() read its folder', async () => {
