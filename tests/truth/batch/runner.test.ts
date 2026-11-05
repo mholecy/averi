@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Asked } from '../../../scripts/truth/batch/cases.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
@@ -189,6 +189,27 @@ const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 async function until(ok: () => boolean, ms = 1000): Promise<void> {
   for (const end = Date.now() + ms; Date.now() < end; await tick(2)) if (ok()) return;
   throw new Error('the condition never held');
+}
+/**
+ * `body` on fake time (T2c): setTimeout, clearTimeout and Date faked, so a race of a bound against a wait is decided by
+ * the times the test gives, never by a stall of the machine. Real timers are back when it returns, however it ends.
+ */
+async function onFakeTime(body: () => Promise<void>): Promise<void> {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+  try {
+    await body();
+  } finally {
+    vi.useRealTimers();
+  }
+}
+/** `go` on fake time: time advanced 1 ms at a time until the batch has ended. */
+async function goFaked(...args: Parameters<typeof go>): Promise<number> {
+  let ended: { code: number } | { error: unknown } | undefined;
+  void go(...args).then((code) => void (ended = { code }), (error: unknown) => void (ended = { error }));
+  for (let i = 0; i < 2000 && ended === undefined; i++) await vi.advanceTimersByTimeAsync(1);
+  if (ended === undefined) throw new Error('the batch did not end within 2 s of fake time');
+  if ('error' in ended) throw ended.error;
+  return ended.code;
 }
 
 // ------------------------------------------------------------------------------------------------ the whole batch
@@ -652,48 +673,51 @@ describe('a need\'s end: once per need met, after the last block and before the 
     expect(summary().slice(slot, slot + 3)).toEqual(["ERROR android's key unread: its end threw: simctl gone", 'OK   the key unchanged', 'RESTORE: none — everything dirty was put back and verified']);
   });
 
-  it('an end past its bound (endSecs; NEED_END_SECS unless given): an ERROR line and its unread line; settled before the SUMMARY, its lines replace the unread one — a late FAIL exits 1 (T2b review round 1, BLOCKER)', async () => {
-    expect(NEED_END_SECS).toBe(60);
-    const slow = plain('slow', { noRecords: true, run: async () => {}, judge: async () => (await tick(120), ['slow verdict: PASS']) });
-    const n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async (c) => (await tick(60), c.protectedLine('FAIL late')) }) };
-    expect(await go([plain('a', { needs: ['android'] }), slow], { needs: n })).toBe(1);
-    expect(summary()).toContain('09:44:26 ERROR LAB android: its end did not finish within 0.02 s');
-    const slot = summary().indexOf('slow verdict: PASS') + 1;
-    expect(summary().slice(slot, slot + 2)).toEqual(['FAIL late', 'RESTORE: none — everything dirty was put back and verified']);
-    expect(summary().some((l) => l.includes('key unread'))).toBe(false);
-    expect(text(join(out, 'steps.log'))).toContain("NOTE LAB android: a protected-key line after its end's bound, kept if its end finishes before the SUMMARY: FAIL late");
-  });
+  it('an end past its bound (endSecs; NEED_END_SECS unless given): an ERROR line and its unread line; settled before the SUMMARY, its lines replace the unread one — a late FAIL exits 1 (T2b review round 1, BLOCKER; T2c: on fake time)', () =>
+    onFakeTime(async () => {
+      expect(NEED_END_SECS).toBe(60);
+      const slow = plain('slow', { noRecords: true, run: async () => {}, judge: async () => (await tick(120), ['slow verdict: PASS']) });
+      const n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async (c) => (await tick(60), c.protectedLine('FAIL late')) }) };
+      expect(await goFaked([plain('a', { needs: ['android'] }), slow], { needs: n })).toBe(1);
+      expect(summary()).toContain('09:44:26 ERROR LAB android: its end did not finish within 0.02 s');
+      const slot = summary().indexOf('slow verdict: PASS') + 1;
+      expect(summary().slice(slot, slot + 2)).toEqual(['FAIL late', 'RESTORE: none — everything dirty was put back and verified']);
+      expect(summary().some((l) => l.includes('key unread'))).toBe(false);
+      expect(text(join(out, 'steps.log'))).toContain("NOTE LAB android: a protected-key line after its end's bound, kept if its end finishes before the SUMMARY: FAIL late");
+    }));
 
-  it('a late end with no unread line of its own: its settled lines still taken; one not settled by the SUMMARY: the unread line stands, its later line never kept', async () => {
-    const slow = plain('slow', { noRecords: true, run: async () => {}, judge: async () => (await tick(120), ['slow verdict: PASS']) });
-    let n: Record<string, NeedSpec> = {
-      android: ending([], 'android', { endSecs: 0.02, end: async (c) => (await tick(60), c.protectedLine('FAIL late')) }),
-      ios: ending([], 'ios', { end: async (c) => c.protectedLine('OK   the other key unchanged') }),
-    };
-    expect(await go([plain('a', { needs: ['android', 'ios'] }), slow], { needs: n })).toBe(1);
-    const slot = summary().indexOf('slow verdict: PASS') + 1;
-    expect(summary().slice(slot, slot + 2)).toEqual(['OK   the other key unchanged', 'FAIL late']);
-    expect(summary()).not.toContain('undefined');
-    rmSync(out, { recursive: true, force: true });
-    n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async (c) => (await tick(150), c.protectedLine('FAIL later')) }) };
-    expect(await go([plain('a', { needs: ['android'] })], { needs: n })).toBe(0);
-    await tick(200);
-    expect(summary()).toContain("ERROR android's key unread: its end did not finish within 0.02 s");
-    expect(summary()).not.toContain('FAIL later');
-  });
+  it('a late end with no unread line of its own: its settled lines still taken; one not settled by the SUMMARY: the unread line stands, its later line never kept (T2c: on fake time)', () =>
+    onFakeTime(async () => {
+      const slow = plain('slow', { noRecords: true, run: async () => {}, judge: async () => (await tick(120), ['slow verdict: PASS']) });
+      let n: Record<string, NeedSpec> = {
+        android: ending([], 'android', { endSecs: 0.02, end: async (c) => (await tick(60), c.protectedLine('FAIL late')) }),
+        ios: ending([], 'ios', { end: async (c) => c.protectedLine('OK   the other key unchanged') }),
+      };
+      expect(await goFaked([plain('a', { needs: ['android', 'ios'] }), slow], { needs: n })).toBe(1);
+      const slot = summary().indexOf('slow verdict: PASS') + 1;
+      expect(summary().slice(slot, slot + 2)).toEqual(['OK   the other key unchanged', 'FAIL late']);
+      expect(summary()).not.toContain('undefined');
+      rmSync(out, { recursive: true, force: true });
+      n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async (c) => (await tick(150), c.protectedLine('FAIL later')) }) };
+      expect(await goFaked([plain('a', { needs: ['android'] })], { needs: n })).toBe(0);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(summary()).toContain("ERROR android's key unread: its end did not finish within 0.02 s");
+      expect(summary()).not.toContain('FAIL later');
+    }));
 
-  it('a late end taken only once settled and only with lines: one still running keeps its unread line, its partial line not taken; one settled with none keeps it too', async () => {
-    const slow = plain('slow', { noRecords: true, run: async () => {}, judge: async () => (await tick(120), ['slow verdict: PASS']) });
-    const unreadLine = "ERROR android's key unread: its end did not finish within 0.02 s";
-    let n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async (c) => (await tick(60), c.protectedLine('FAIL partial'), void (await tick(400))) }) };
-    expect(await go([plain('a', { needs: ['android'] }), slow], { needs: n })).toBe(0);
-    expect(summary()).toContain(unreadLine);
-    expect(summary()).not.toContain('FAIL partial');
-    rmSync(out, { recursive: true, force: true });
-    n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async () => void (await tick(60)) }) };
-    expect(await go([plain('a', { needs: ['android'] }), slow], { needs: n })).toBe(0);
-    expect(summary()).toContain(unreadLine);
-  });
+  it('a late end taken only once settled and only with lines: one still running keeps its unread line, its partial line not taken; one settled with none keeps it too (T2c: on fake time)', () =>
+    onFakeTime(async () => {
+      const slow = plain('slow', { noRecords: true, run: async () => {}, judge: async () => (await tick(120), ['slow verdict: PASS']) });
+      const unreadLine = "ERROR android's key unread: its end did not finish within 0.02 s";
+      let n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async (c) => (await tick(60), c.protectedLine('FAIL partial'), void (await tick(400))) }) };
+      expect(await goFaked([plain('a', { needs: ['android'] }), slow], { needs: n })).toBe(0);
+      expect(summary()).toContain(unreadLine);
+      expect(summary()).not.toContain('FAIL partial');
+      rmSync(out, { recursive: true, force: true });
+      n = { android: ending([], 'android', { unread: true, endSecs: 0.02, end: async () => void (await tick(60)) }) };
+      expect(await goFaked([plain('a', { needs: ['android'] }), slow], { needs: n })).toBe(0);
+      expect(summary()).toContain(unreadLine);
+    }));
 
   it('a need met once, then down before a later block: its end still called once (T2b review round 1, MAJOR)', async () => {
     const order: string[] = [];
