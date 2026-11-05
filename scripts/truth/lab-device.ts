@@ -316,6 +316,18 @@ export async function withMeasuredPanel(
   }
 }
 
+/** A text's first non-blank line, trimmed ('' for none): the guard's AVD name and adb's words alike. */
+const firstSaid = (text: string): string => text.split(/\r?\n/).find((l) => l.trim() !== '')?.trim() ?? '';
+
+/**
+ * What adb said when a call of it failed: its stderr's first line (execFile's error, and bounded.ts#execOf's, carry
+ * it), else the error's own first line (adb not started).
+ */
+function adbSaid(e: unknown): string {
+  const stderr = typeof e === 'object' && e !== null && 'stderr' in e && typeof e.stderr === 'string' ? firstSaid(e.stderr) : '';
+  return stderr !== '' ? stderr : firstSaid(e instanceof Error ? e.message : String(e));
+}
+
 export class AndroidLab implements LabDevice {
   readonly platform = 'android';
   readonly app: LabApp;
@@ -338,11 +350,19 @@ export class AndroidLab implements LabDevice {
     return (this.opts.exec ?? exec)('adb', ['-s', this.serial, ...args]);
   }
 
-  /** The emulator is the lab's AVD (`adb emu avd name` says `averi_lab`), or nothing is done to it. */
+  /**
+   * The emulator is the lab's AVD (`adb emu avd name` says `averi_lab`), or nothing is done to it. A read that fails
+   * keeps adb's own words in the refusal (batch-13: an emulator that is down reads as itself, "device '…' not found").
+   */
   guard(): Promise<void> {
     this.guarded ??= (async () => {
-      const avd = (await this.adb('emu', 'avd', 'name').catch(() => ({ stdout: '' }))).stdout.split(/\r?\n/)[0].trim();
-      if (avd !== LAB_AVD) throw new Error(`${this.serial} is ${avd === '' ? 'no emulator adb can name' : `AVD "${avd}"`}, not the lab's ${LAB_AVD}: refused`);
+      const { stdout, said } = await this.adb('emu', 'avd', 'name').then(
+        (r) => ({ stdout: r.stdout, said: '' }),
+        (e: unknown) => ({ stdout: '', said: adbSaid(e) }),
+      );
+      const avd = firstSaid(stdout);
+      const none = `no emulator adb can name${said === '' ? '' : ` (adb: ${said})`}`;
+      if (avd !== LAB_AVD) throw new Error(`${this.serial} is ${avd === '' ? none : `AVD "${avd}"`}, not the lab's ${LAB_AVD}: refused`);
       this.cleared = true;
     })();
     return this.guarded;

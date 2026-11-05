@@ -38,6 +38,25 @@ export const wdaKillPatterns = (udid: string): string[] => ['DerivedData/averi-w
 /** The lab simulator's idb_companion (batch-11.sh:327, 660). */
 export const companionPattern = (udid: string): string => `idb_companion --udid ${labUdid(udid)}`;
 
+/**
+ * idb's argv that drops the lab simulator's entry from idb's local companion list, and only it (batch-13): a pkill of
+ * the companion leaves the entry, and every later idb call for the udid trusts it and fails ("Failed to connect to
+ * companion") — fb-idb prunes dead entries only when it lists targets. Never `idb kill`, which clears every companion
+ * idb knows, device-check's too.
+ */
+export const disconnectArgv = (udid: string): string[] => ['disconnect', labUdid(udid)];
+
+/** What a disconnect that failed leaves: the warning (the entry may be stale), or none when it answered. */
+export const disconnectWarning = (r: CallResult): string | undefined => (failedCall(r) ? `idb's companion entry may be stale — idb disconnect: ${exitText(r)}` : undefined);
+
+/** idb's words when the companion its list names for the udid does not answer (batch-13 rerun 1). */
+const STALE_SAID = /Failed to connect to companion/;
+/** What those words most likely mean, said after them. */
+export const STALE_COMPANION_WHY = "idb's local list names a companion for this simulator that does not answer: most likely a stale entry";
+
+/** An idb call that failed in words (exitText), the stale entry named as the likely cause when idb's words say so. */
+export const idbFailText = (r: CallResult): string => `${exitText(r)}${STALE_SAID.test(r.err + r.out) ? ` — ${STALE_COMPANION_WHY}` : ''}`;
+
 /** pkill's answer: something ended (exit 0) or nothing matched (1); any other exit, or past its bound, why. */
 export function pkillOf(r: CallResult): { ended: boolean } | { why: string } {
   if (!r.timedOut && (r.code === 0 || r.code === 1)) return { ended: r.code === 0 };

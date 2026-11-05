@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEVICE_CHECK_SIMULATOR } from '../../../scripts/truth/lab-device.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { ANDROID_BUILD_NEED, APK_PATH, BUILD_SECS, CATALOG_SECS, GRADLE_STOP_SECS, IOS_APP_PATH, IOS_BUILD_NEED, JAVA_HOME, JAVA_HOME_SECS, LAB_BLOCK, labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
+import { ANDROID_BUILD_NEED, APK_PATH, BUILD_SECS, checkDevice, CATALOG_SECS, GRADLE_STOP_SECS, IOS_APP_PATH, IOS_BUILD_NEED, JAVA_HOME, JAVA_HOME_SECS, LAB_BLOCK, labBlock, labBuild } from '../../../scripts/truth/batch/lab-build.js';
 import type { NeedCtx } from '../../../scripts/truth/batch/runner.js';
 import { CATALOG, LAB_UDID, labWorld, runOf, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
@@ -243,5 +243,24 @@ describe('the lab block never says every need met when this run\'s build failed 
     const block = labBlock(['android'], { build: { failures: () => ['android-build: the Android build failed (exit 1)', 'ios-build: xcodegen not found'] } });
     await block.run({ verdict: (...a: unknown[]) => void said.push(a) } as never);
     expect(said).toEqual([['WARN', "the lab devices checked, but this run's build failed (android-build: the Android build failed (exit 1); ios-build: xcodegen not found): the app already installed is used"]]);
+  });
+});
+
+describe("checkDevice's warnings (batch-13): the readying's (the companion entry's) and a failed build's, joined in that order", () => {
+  const device = (warning?: string) => ({
+    open: async () => ({ ok: true as const, value: 'dev', ...(warning !== undefined && { warning }) }),
+    installWord: 'install',
+    install: async () => ({ code: 0, timedOut: false, signal: null, out: '', err: '' }),
+    cells: async () => ({ how: 'cells main\'s' }),
+    describe: () => 'the device',
+  });
+  const ctx = {} as NeedCtx;
+  const failed = { ensure: async () => ({ ok: false as const, why: 'the build failed' }), built: () => undefined };
+
+  it('batch-13: none, no warning field; the readying\'s alone; both, the readying\'s first', async () => {
+    expect(await checkDevice(ctx, {}, device())).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's" });
+    expect(await checkDevice(ctx, {}, device('entry stale'))).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'entry stale' });
+    expect(await checkDevice(ctx, { build: failed }, device('entry stale'))).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'entry stale; the build failed; the app already installed is used' });
+    expect(await checkDevice(ctx, { build: failed }, device())).toStrictEqual({ ok: true, how: "the device; not rebuilt; cells main's", warning: 'the build failed; the app already installed is used' });
   });
 });

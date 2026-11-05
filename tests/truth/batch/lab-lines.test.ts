@@ -15,7 +15,11 @@ import {
   wdaHandOf,
   wdaRestoredOf,
   compareHand,
+  disconnectArgv,
+  disconnectWarning,
+  idbFailText,
   javaHomeOf,
+  STALE_COMPANION_WHY,
 } from '../../../scripts/truth/batch/lab-lines.js';
 
 // scripts/truth/batch/lab-lines.ts: the lab plumbing's pure half (T2 S6b) — what the port, pkill, the Open-in alert,
@@ -186,5 +190,28 @@ describe('the JDK for the Android build (batch-11.sh:309–310: `java_home -v 17
     expect(javaHomeOf(exit(1, 'Unable to find any JVMs\n', '/jdk\n'), release('JAVA_VERSION="17"'))).toEqual({ why: 'no JDK 17 (java_home -v 17 → nothing: exit 1 Unable to find any JVMs)' });
     expect(javaHomeOf(ok(' \n'), release('JAVA_VERSION="17"'))).toEqual({ why: 'no JDK 17 (java_home -v 17 → nothing)' });
     expect(read).toEqual([]);
+  });
+});
+
+describe("batch-13 fixes: idb's companion entry — the disconnect's argv and warning, the stale entry's words", () => {
+  it('batch-13: `idb disconnect <lab udid>`, the udid alone (never `idb kill`); device-check\'s simulator refused, whatever its case', () => {
+    expect(disconnectArgv(LAB)).toEqual(['disconnect', LAB]);
+    for (const udid of [DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_SIMULATOR.toLowerCase()]) expect(() => disconnectArgv(udid)).toThrow(/device-check simulator/);
+  });
+
+  it('batch-13: a disconnect that answered warns of nothing; one that failed or passed its bound: the entry may be stale, why', () => {
+    expect(disconnectWarning(ok())).toBeUndefined();
+    expect(disconnectWarning(exit(1, 'DisconnectCommandException: Could not disconnect from X:None\nmore'))).toBe("idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect from X:None");
+    expect(disconnectWarning(timedOut)).toBe("idb's companion entry may be stale — idb disconnect: past its bound (exit 142)");
+    expect(disconnectWarning({ ...ok(), timedOut: true })).toBe("idb's companion entry may be stale — idb disconnect: past its bound (exit 0)");
+  });
+
+  it('batch-13 rerun 1: idb\'s "Failed to connect to companion" (stderr or stdout, any line) names the stale entry as the likely cause; other words are left as they are', () => {
+    const said = "Failed to connect to companion at address DomainSocketAddress(path='<idb>/X_companion.sock'): [Errno 2] No such file or directory";
+    expect(idbFailText(exit(1, said))).toBe(`exit 1 ${said} — ${STALE_COMPANION_WHY}`);
+    expect(idbFailText(exit(1, 'Traceback (most recent call last):\n' + said))).toBe(`exit 1 Traceback (most recent call last): — ${STALE_COMPANION_WHY}`);
+    expect(idbFailText(exit(1, '', said))).toBe(`exit 1 ${said} — ${STALE_COMPANION_WHY}`);
+    expect(idbFailText(exit(1, 'No translation object returned'))).toBe('exit 1 No translation object returned');
+    expect(STALE_COMPANION_WHY).toBe("idb's local list names a companion for this simulator that does not answer: most likely a stale entry");
   });
 });

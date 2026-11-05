@@ -6,7 +6,7 @@ import type { Call, CallResult, Run } from './bounded.js';
 import { freshIn, type BatchFs } from './io.js';
 import { PROTECTED, protectedLine, type ProtectedRead } from './ios-defaults.js';
 import { backup, compare, domainsWindow, LabSim, readProtected, restore } from './ios-domains.js';
-import { CATALOG_PATH, cellsWhy, companionPattern, LSOF_ARGV, openInAlertOf, pkillOf, portOf, portPart, wdaBlockedOf, wdaHandOf, wdaKillPatterns, wdaRestoredOf, type Opened, type PortRead } from './lab-lines.js';
+import { CATALOG_PATH, cellsWhy, companionPattern, disconnectArgv, disconnectWarning, idbFailText, LSOF_ARGV, openInAlertOf, pkillOf, portOf, portPart, wdaBlockedOf, wdaHandOf, wdaKillPatterns, wdaRestoredOf, type Opened, type PortRead } from './lab-lines.js';
 import { checkDevice, type BuildRef } from './lab-build.js';
 import type { BlockCtx, LastStep, NeedCtx, NeedSpec } from './runner.js';
 import { NO_UDID, type BatchConfig, type NeedResult } from './runner-lines.js';
@@ -142,9 +142,22 @@ export async function killLabWda(k: Killer): Promise<{ port: PortRead; killed: b
 }
 
 /**
+ * The lab simulator's idb_companion ended (pkill by its exact pattern), then its entry dropped from idb's local
+ * companion list (`idb disconnect <udid>`, bounded; batch-13): a pkill alone leaves an entry the next run's idb trusts.
+ * `whys`: what failed, pkill's then the disconnect's — the last step says them all; `warning`: the disconnect's alone —
+ * the reset carries only that one (a pkill that failed is no reason to stop a reset), never a block's failure by itself.
+ */
+export async function endCompanion(k: { run: Run; udid: string }): Promise<{ whys: string[]; warning: string | undefined }> {
+  const killed = pkillOf(await k.run('pkill', ['-f', companionPattern(k.udid)], { secs: HOST_SECS }));
+  const warning = disconnectWarning(await k.run('idb', disconnectArgv(k.udid), { secs: HOST_SECS }));
+  return { whys: [...('why' in killed ? [killed.why] : []), ...(warning === undefined ? [] : [warning])], warning };
+}
+
+/**
  * The run's last step (batch-11.sh:660 and the end of on_abort): the lab's WebDriverAgent and the lab simulator's
- * idb_companion ended by their exact patterns — what S2's kept groups cannot own (a runner launchd holds, a companion
- * that left its group); only for a simulator the guard cleared this run. A NOTE when done, a WARN naming what failed.
+ * idb_companion ended by their exact patterns, the companion's entry dropped after it (endCompanion; batch-13) — what
+ * S2's kept groups cannot own (a runner launchd holds, a companion that left its group); only for a simulator the
+ * guard cleared this run. A NOTE when done, a WARN naming what failed.
  */
 export function endLabProcesses(guarded: () => string | undefined, wait: (ms: number) => Promise<unknown> = pause): LastStep {
   return async ({ run, step }) => {
@@ -153,8 +166,7 @@ export function endLabProcesses(guarded: () => string | undefined, wait: (ms: nu
     const { port, killed, whys } = await killLabWda({ run, udid, wait });
     const part = portPart(port, killed);
     if (port.state !== 'free') whys.push(part);
-    const companion = pkillOf(await run('pkill', ['-f', companionPattern(udid)], { secs: HOST_SECS }));
-    if ('why' in companion) whys.push(companion.why);
+    whys.push(...(await endCompanion({ run, udid })).whys);
     const said = `the lab's WebDriverAgent (${part}) and idb_companion of ${nameInLine(udid)} ended`;
     if (whys.length === 0) step('NOTE', said);
     else step('WARN', `${said}, not all proven: ${whys.join('; ')}`);
@@ -166,7 +178,7 @@ export function endLabProcesses(guarded: () => string | undefined, wait: (ms: nu
 /** batch-11's ios_health: `idb ui describe-all`, then a swipe; why not, or undefined when both answered. */
 export async function health(lab: IosSim): Promise<string | undefined> {
   const tree = await lab.idb(['ui', 'describe-all']);
-  if (failedCall(tree)) return `describe-all: ${exitText(tree)}`;
+  if (failedCall(tree)) return `describe-all: ${idbFailText(tree)}`;
   const swipe = await lab.idb(['ui', 'swipe', '200', '600', '200', '400']);
   return failedCall(swipe) ? `swipe: ${exitText(swipe)}` : undefined;
 }
@@ -194,50 +206,59 @@ export async function dismissOpenIn(lab: IosSim): Promise<Dismissal> {
   return found;
 }
 
+/** A reset's outcome: done (with the companion entry's warning when its disconnect failed), or why not. */
+export type ResetResult = { ok: true; warning?: string } | { ok: false; why: string };
+
 /**
- * batch-11's ios_reset: the companion and the lab's WebDriverAgent ended, shutdown, boot and bootstatus (each bounded
- * by boundFor's 300 s), RESET_WAIT_MS, the lab launched, RESET_WAIT_MS, the health check. No companion is started by
- * hand: idb starts its own, kept in its call's group (bounded.ts#KEEPS_GROUP), ended at the run's end. Why not, or
- * undefined.
+ * batch-11's ios_reset: the companion ended and its entry dropped (endCompanion; batch-13), the lab's WebDriverAgent
+ * ended, shutdown, boot and bootstatus (each bounded by boundFor's 300 s), RESET_WAIT_MS, the lab launched,
+ * RESET_WAIT_MS, the health check. No companion is started by hand: idb starts its own (when its list has no entry for
+ * the udid), kept in its call's group (bounded.ts#KEEPS_GROUP), ended at the run's end. A disconnect that failed is
+ * the reset's WARN and its warning; the health check decides whether the reset is done.
  */
-export async function reset(c: LabCtx, lab: IosSim): Promise<string | undefined> {
+export async function reset(c: LabCtx, lab: IosSim): Promise<ResetResult> {
   c.step('NOTE', `ios-reset: ${nameInLine(lab.udid)}, its idb companion and the lab's WebDriverAgent`);
-  await lab.run('pkill', ['-f', companionPattern(lab.udid)], { secs: HOST_SECS });
+  const { warning } = await endCompanion(lab);
   await killLabWda(lab);
   await lab.simctl(['shutdown', lab.udid]);
   for (const words of [['boot', lab.udid], ['bootstatus', lab.udid, '-b']]) {
     const r = await lab.simctl(words);
-    if (failedCall(r)) return `simctl ${words[0]}: ${exitText(r)}`;
+    if (failedCall(r)) return { ok: false, why: `simctl ${words[0]}: ${exitText(r)}` };
   }
   await lab.wait(RESET_WAIT_MS);
   await lab.simctl(['launch', lab.udid, LAB_APP.native.bundle]);
   await lab.wait(RESET_WAIT_MS);
   const sick = await health(lab);
-  if (sick !== undefined) return `the health check after the reset: ${sick}`;
-  c.step('OK', 'ios-reset');
-  return undefined;
+  if (sick !== undefined) return { ok: false, why: `the health check after the reset: ${sick}` };
+  if (warning === undefined) {
+    c.step('OK', 'ios-reset');
+    return { ok: true };
+  }
+  c.step('WARN', `ios-reset: ${warning}`);
+  return { ok: true, warning };
 }
 
 /**
  * batch-11's ios_check before `label`: the lab's WebDriverAgent ended, CHECK_WAIT_MS, the Open-in alert dismissed, the
- * health check; a stuck alert or a failed health check resets the simulator. Why it is not fit to run, or undefined.
+ * health check; a stuck alert or a failed health check resets the simulator. Fit to run — with the reset's warning
+ * when it left one (its companion entry may be stale, batch-13) — or why not.
  */
-export async function iosCheck(c: LabCtx, lab: IosSim, label: string): Promise<string | undefined> {
+export async function iosCheck(c: LabCtx, lab: IosSim, label: string): Promise<ResetResult> {
   await killLabWda(lab);
   await lab.wait(CHECK_WAIT_MS);
   const alert = await dismissOpenIn(lab);
   if (alert.state === 'dismissed') c.step('WARN', `open-in alert before ${label}: dismissed — ${alert.how}`);
   if (alert.state === 'unread') c.step('NOTE', `open-in alert before ${label} not read: ${alert.why}`);
-  let sick = alert.state === 'stuck' ? `the open-in alert could not be dismissed: ${alert.why}` : await health(lab);
+  const sick = alert.state === 'stuck' ? `the open-in alert could not be dismissed: ${alert.why}` : await health(lab);
   if (sick === undefined) {
     c.step('OK', `ios-health before ${label}`);
-    return undefined;
+    return { ok: true };
   }
   c.step('WARN', `ios-health before ${label}: ${sick} — resetting`);
-  sick = await reset(c, lab);
-  if (sick === undefined) return undefined;
-  c.step('ERROR', `ios-reset before ${label} failed: ${sick}`);
-  return `the iOS reset before ${label} failed: ${sick}`;
+  const done = await reset(c, lab);
+  if (done.ok) return done;
+  c.step('ERROR', `ios-reset before ${label} failed: ${done.why}`);
+  return { ok: false, why: `the iOS reset before ${label} failed: ${done.why}` };
 }
 
 // --------------------------------------------------------------------------------------- the installed lab
@@ -300,13 +321,11 @@ export function iosLab(o: IosLabOptions = {}): IosLab {
         if (!opened.ok) return opened;
         const lab = opened.value;
         guarded = lab.udid;
-        if (o.reset !== false) {
-          const why = await reset(c, lab);
-          if (why !== undefined) return { ok: false, why: `the initial iOS reset failed: ${why}` };
-        }
+        const done: ResetResult = o.reset === false ? { ok: true } : await reset(c, lab);
+        if (!done.ok) return { ok: false, why: `the initial iOS reset failed: ${done.why}` };
         start = await readProtected(lab.sim);
         c.step('NOTE', `${PROTECTED.domain}'s finportal key at the iOS stretch's start: ${readText(start)} (read only: no batch writes it)`);
-        return opened;
+        return { ...opened, warning: done.warning };
       },
       installWord: 'simctl install',
       install: (lab, built) => lab.simctl(['install', lab.udid, built]),
@@ -320,7 +339,7 @@ export function iosLab(o: IosLabOptions = {}): IosLab {
     const opened = await open(c);
     if (!opened.ok) return opened;
     const tree = await opened.value.idb(['ui', 'describe-all']);
-    return failedCall(tree) ? { ok: false, why: `idb ui describe-all: ${exitText(tree)}` } : { ok: true, how: 'idb answers' };
+    return failedCall(tree) ? { ok: false, why: `idb ui describe-all: ${idbFailText(tree)}` } : { ok: true, how: 'idb answers' };
   };
   return {
     need: { check, alive },
@@ -395,19 +414,26 @@ export interface WdaWindowOptions {
  * one of the block's verdict lines, and the window closed only when it verified, else left for RESTORE; the end check;
  * then, with the state clean, the compare (a late writer: its line a verdict line, its hand lines to RESTORE). Whether
  * the work ran, and whether the window was put back — not put back, the block's own verdict is INCONCLUSIVE at once, so
- * no judge's PASS can stand for a run that left the lab's settings changed (T2 S6b review round 2).
+ * no judge's PASS can stand for a run that left the lab's settings changed (T2 S6b review round 2); and the warnings its
+ * two checks' resets left (the companion entry's, batch-13), for the block to say.
  */
-export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<{ ran: boolean; putBack: boolean }> {
+export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<{ ran: boolean; putBack: boolean; warnings: string[] }> {
   for (const r of o.runs ?? []) ctx.asksLive(r.name, r.asked);
   const stateFile = o.stateFile ?? join(ctx.dir, STATE_FILE);
+  const warnings: string[] = [];
+  const check = async (label: string): Promise<ResetResult> => {
+    const done = await iosCheck(ctx, lab, label);
+    if (done.ok && done.warning !== undefined) warnings.push(done.warning);
+    return done;
+  };
   // Nothing changed: nothing to put back.
   const notRun = (why: string) => {
     ctx.err(`the WDA window: ${why}`);
     ctx.verdict('INCONCLUSIVE', `the WDA window did not run: ${why}`);
-    return { ran: false, putBack: true };
+    return { ran: false, putBack: true, warnings };
   };
-  const sick = await iosCheck(ctx, lab, 'the WDA window');
-  if (sick !== undefined) return notRun(`${sick} — no wda run (nothing changed)`);
+  const first = await check('the WDA window');
+  if (!first.ok) return notRun(`${first.why} — no wda run (nothing changed)`);
   const b = await backup(lab.sim, stateFile);
   if (!b.ok) return notRun(`the simulator domains could not be backed up — no wda run (nothing changed): ${b.why}`);
   ctx.note(b.line);
@@ -420,8 +446,8 @@ export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions)
     ctx.err(`the WDA window: the simulator not provably put back — the window stays open, its hand lines go to RESTORE`);
     ctx.verdict('INCONCLUSIVE', "the lab's settings not put back (see RESTORE)");
   }
-  await iosCheck(ctx, lab, 'iOS end');
+  await check('iOS end');
   // Compared only once the restore verified (compare refuses a dirty state itself): a late writer is caught here.
   if (stateOf(lab.fs, stateFile) === 'clean') ctx.verdictAndHand(await compare(lab.sim, stateFile));
-  return { ran: true, putBack: put.ok };
+  return { ran: true, putBack: put.ok, warnings };
 }

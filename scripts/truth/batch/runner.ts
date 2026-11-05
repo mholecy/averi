@@ -81,7 +81,7 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  *       const sim = await ios.open(ctx);                              // the guard again, over the block's own calls
  *       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
  *       await wdaWindow(ctx, sim.value, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
- *         work: async () => (await iosCheck(ctx, sim.value, 'wda 1')) ?? ctx.liveRun('ios-wda-1', asked, { secs }) });
+ *         work: async () => { if ((await iosCheck(ctx, sim.value, 'wda 1')).ok) await ctx.liveRun('ios-wda-1', asked, { secs }); } });
  *       await ios.endStretch(ctx, sim.value);                           // the finportal key's line
  *     }, judge };
  *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],

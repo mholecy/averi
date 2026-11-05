@@ -365,8 +365,8 @@ const literal = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * defaults' words for a read of a domain that is not there, naming this domain only: `Domain '<domain>' not found.` —
- * the host's defaults (Darwin 27, seen by the T2 S4 review; no simulator stderr of it was captured: batch-13 records
- * the simulator's own).
+ * the host's defaults (Darwin 27, seen by the T2 S4 review) and the lab simulator's alike (iOS 27.0, batch-13: the
+ * same words, byte for byte).
  */
 const notFoundSaid = (domain: string): RegExp => new RegExp(`\\bDomain '${literal(domain)}' not found\\.`);
 

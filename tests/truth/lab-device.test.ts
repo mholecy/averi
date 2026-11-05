@@ -131,6 +131,19 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     }
   });
 
+  it("batch-13: a guard read that fails keeps adb's first stderr line (execFile's), else its error's first line — still refused, nothing launched", async () => {
+    const down = (e: Error): Exec => async () => Promise.reject(e);
+    const failed = (stderr: string) => Object.assign(new Error(`Command failed: adb -s emulator-5554 emu avd name\n${stderr}`), { stderr });
+    for (const [e, part] of [
+      [failed("error: device 'emulator-5554' not found\n"), "(adb: error: device 'emulator-5554' not found)"],
+      [failed('\nerror: could not connect to TCP port 5554: Connection refused\n'), '(adb: error: could not connect to TCP port 5554: Connection refused)'],
+      [Object.assign(new Error('spawn adb ENOENT'), { stderr: '' }), '(adb: spawn adb ENOENT)'],
+      [new Error('spawn adb ENOENT\nat …'), '(adb: spawn adb ENOENT)'],
+    ] as const) {
+      await expect(new AndroidLab('emulator-5554', { exec: down(e) }).guard()).rejects.toThrow(`emulator-5554 is no emulator adb can name ${part}, not the lab's averi_lab: refused`);
+    }
+  });
+
   it('close() runs nothing on a refused device, nor on one never checked; on the lab AVD it stops the app', async () => {
     const refused = fakeExec('Pixel_7_API_34\r\nOK');
     const other = new AndroidLab('emulator-5554', { exec: refused.exec });

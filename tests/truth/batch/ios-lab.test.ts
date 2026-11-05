@@ -26,11 +26,11 @@ import {
   wdaWindow,
   wdaWindowSpec,
 } from '../../../scripts/truth/batch/ios-lab.js';
-import { compareHand, portHand } from '../../../scripts/truth/batch/lab-lines.js';
+import { compareHand, portHand, STALE_COMPANION_WHY } from '../../../scripts/truth/batch/lab-lines.js';
 import type { BlockCtx, NeedCtx } from '../../../scripts/truth/batch/runner.js';
 import { stateOf } from '../../../scripts/truth/batch/run-dir.js';
 import { verdictLine } from '../../../scripts/truth/batch/words.js';
-import { CATALOG, LAB_UDID, labWorld, runOf, type LabWorld, type WorldOptions } from './lab-fakes.js';
+import { CATALOG, LAB_UDID, labWorld, runOf, STALE_COMPANION_ERR, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
 // scripts/truth/batch/ios-lab.ts over the fake lab (lab-fakes.ts): the `ios` need, the health check and the Open-in
 // alert, the reset, the WDA window on its normal path and as the abort's dirty window, the iOS stretch's end and the
@@ -73,7 +73,7 @@ const builtRef = (app: string) => {
 };
 
 /** A block's ctx as the runner gives it, recording what the block said and did, in order. */
-function blockCtx(run = runOf(world), id = 'D43') {
+function blockCtx(run: Run = runOf(world), id = 'D43') {
   const events: string[] = [];
   const windows = new Map<string, WindowSpec>();
   const ctx = {
@@ -186,9 +186,10 @@ describe('the health check, the Open-in alert and the reset (batch-11.sh:326–3
 
   it('the reset in batch-11\'s order: the companion and the WDA ended, shutdown, boot, bootstatus -b, wait, launch, wait, health', async () => {
     const lab = await simOf();
-    expect(await reset(needCtx(), lab)).toBeUndefined();
+    expect(await reset(needCtx(), lab)).toStrictEqual({ ok: true });
     expect(words(1)).toEqual([
       `pkill -f idb_companion --udid ${LAB_UDID}`,
+      `idb disconnect ${LAB_UDID}`,
       'pkill -f DerivedData/averi-wda-lab([/ ]|$)',
       `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`,
       'lsof -t -n -P -sTCP:LISTEN -i tcp:8120',
@@ -205,35 +206,35 @@ describe('the health check, the Open-in alert and the reset (batch-11.sh:326–3
 
   it('a boot that fails stops the reset there, naming it; a health check failing after it is said', async () => {
     fresh({ bootFails: true });
-    expect(await reset(needCtx(), await simOf())).toBe('simctl boot: exit 149 Unable to boot device');
+    expect(await reset(needCtx(), await simOf())).toEqual({ ok: false, why: 'simctl boot: exit 149 Unable to boot device' });
     expect(words().some((w) => w.includes('launch'))).toBe(false);
     const lab = await simOf(async (cmd, args) => (cmd === 'idb' ? { code: 1, timedOut: false, signal: null, out: '', err: 'gone' } : runOf((fresh(), world))(cmd, args)));
-    expect(await reset(needCtx(), lab)).toBe('the health check after the reset: describe-all: exit 1 gone');
+    expect(await reset(needCtx(), lab)).toEqual({ ok: false, why: 'the health check after the reset: describe-all: exit 1 gone' });
   });
 
   it('iosCheck: the WDA ended, CHECK_WAIT_MS, the alert, the health check — OK; an alert dismissed is a WARN', async () => {
     fresh({ alertTaps: 1 });
     const c = needCtx();
-    expect(await iosCheck(c, await simOf(), 'D43 wda 1')).toBeUndefined();
+    expect(await iosCheck(c, await simOf(), 'D43 wda 1')).toStrictEqual({ ok: true });
     expect(waits).toEqual([CHECK_WAIT_MS, ALERT_WAIT_MS]);
     expect(steps).toEqual(['WARN open-in alert before D43 wda 1: dismissed — Cancel tapped at 140,420 (attempt 1)', 'OK ios-health before D43 wda 1']);
   });
 
   it('iosCheck: a failed health check or a stuck alert resets; a reset that fails too is an ERROR and why it is not fit', async () => {
     fresh({ sick: 'swipe' });
-    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toBeUndefined();
+    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toStrictEqual({ ok: true });
     expect(steps).toContain('WARN ios-health before D43 wda 1: swipe: exit 1 swipe failed — resetting');
     expect(steps.at(-1)).toBe('OK ios-reset');
     steps.length = 0;
     fresh({ alertTaps: 5, bootFails: true });
-    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toBe('the iOS reset before D43 wda 1 failed: simctl boot: exit 149 Unable to boot device');
+    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toEqual({ ok: false, why: 'the iOS reset before D43 wda 1 failed: simctl boot: exit 149 Unable to boot device' });
     expect(steps).toContain('WARN ios-health before D43 wda 1: the open-in alert could not be dismissed: the open-in alert Open in “AveriLab”? is still up after 2 Cancel taps — resetting');
     expect(steps.at(-1)).toBe('ERROR ios-reset before D43 wda 1 failed: simctl boot: exit 149 Unable to boot device');
   });
 
   it('iosCheck: an alert that cannot be read is a NOTE, and the health check decides', async () => {
     const lab = await simOf(async (cmd, args) => (args.includes('--json') ? { code: 2, timedOut: false, signal: null, out: '', err: 'idb: x' } : runOf(world)(cmd, args)));
-    expect(await iosCheck(needCtx(), lab, 'T6')).toBeUndefined();
+    expect(await iosCheck(needCtx(), lab, 'T6')).toStrictEqual({ ok: true });
     expect(steps).toEqual(['NOTE open-in alert before T6 not read: idb ui describe-all: exit 2 idb: x', 'OK ios-health before T6']);
   });
 });
@@ -353,7 +354,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const { ctx, events, windows } = blockCtx();
     const lab = await simOf();
     let ran = false;
-    expect(await wdaWindow(ctx, lab, { runs, work: async () => void ((ran = true), world.startWda(), events.push('work')) })).toEqual({ ran: true, putBack: true });
+    expect(await wdaWindow(ctx, lab, { runs, work: async () => void ((ran = true), world.startWda(), events.push('work')) })).toEqual({ ran: true, putBack: true, warnings: [] });
     expect(ran).toBe(true);
     const state = join(ctx.dir, 'state.json');
     expect(events).toEqual([
@@ -390,7 +391,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     fresh({ exportFails: 'com.apple.Preferences' });
     const { ctx, events } = blockCtx();
     let ran = false;
-    expect(await wdaWindow(ctx, await simOf(), { runs, work: async () => void (ran = true) })).toEqual({ ran: false, putBack: true });
+    expect(await wdaWindow(ctx, await simOf(), { runs, work: async () => void (ran = true) })).toEqual({ ran: false, putBack: true, warnings: [] });
     expect(ran).toBe(false);
     const why = 'the simulator domains could not be backed up — no wda run (nothing changed): defaults export com.apple.Preferences: exit 1 export com.apple.Preferences failed — no state written';
     expect(events.slice(1)).toEqual(['OK ios-health before the WDA window', `ERROR the WDA window: ${why}`, `verdict D43 live verdict: INCONCLUSIVE — the WDA window did not run: ${why}`]);
@@ -400,7 +401,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
   it('the health check before it fails past a reset: INCONCLUSIVE, nothing backed up', async () => {
     fresh({ sick: 'swipe', bootFails: true });
     const { ctx, events } = blockCtx();
-    expect(await wdaWindow(ctx, await simOf(), { work: async () => {} })).toEqual({ ran: false, putBack: true });
+    expect(await wdaWindow(ctx, await simOf(), { work: async () => {} })).toEqual({ ran: false, putBack: true, warnings: [] });
     expect(events.at(-1)).toBe('verdict D43 live verdict: INCONCLUSIVE — the WDA window did not run: the iOS reset before the WDA window failed: simctl boot: exit 149 Unable to boot device — no wda run (nothing changed)');
     expect(existsSync(join(ctx.dir, 'state.json'))).toBe(false);
   });
@@ -464,7 +465,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const run: Run = async (cmd, args, call) => (cmd === 'lsof' && working ? { code: 142, timedOut: true, signal: 'SIGKILL', out: '', err: '' } : runOf(world)(cmd, args, call));
     const lab = await simOf(run);
     const r = await wdaWindow({ ...ctx, bounded: run }, lab, { work: async () => void ((working = true), world.startWda()) });
-    expect(r).toEqual({ ran: true, putBack: false });
+    expect(r).toEqual({ ran: true, putBack: false, warnings: [] });
     expect(events).toContain('verdict D43 WDA-window restore: ERROR — NOT VERIFIED — port 8120 not read (lsof: past its bound (exit 142)): the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty');
     expect(world.calls.some((w) => / defaults (write|import|delete) /.test(w))).toBe(false);
     expect(stateOf(nodeFs, join(ctx.dir, 'state.json'))).toBe('dirty');
@@ -532,10 +533,10 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     steps.length = 0;
     const run = runOf(world);
     await ios.lastly({ run, step: (w, t) => void steps.push(`${w} ${t}`) });
-    expect(run.seen.map((s) => s.words)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`]);
+    expect(run.seen.map((s) => s.words)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`, `idb disconnect ${LAB_UDID}`]);
     expect(steps).toEqual([`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`]);
     steps.length = 0;
-    await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 1 : 2, timedOut: false, signal: null, out: '', err: '' }), step: (w, t) => void steps.push(`${w} ${t}`) });
+    await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 1 : cmd === 'idb' ? 0 : 2, timedOut: false, signal: null, out: '', err: '' }), step: (w, t) => void steps.push(`${w} ${t}`) });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended, not all proven: pkill: exit 2; pkill: exit 2; pkill: exit 2`]);
   });
 
@@ -555,7 +556,107 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), step: say });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 still has a listener (pid 7)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 still has a listener (pid 7)`]);
     steps.length = 0;
-    await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 1, timedOut: false, signal: null, out: '', err: '' }), step: say });
+    await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : cmd === 'idb' ? 0 : 1, timedOut: false, signal: null, out: '', err: '' }), step: say });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 not read (lsof: exit 2)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 not read (lsof: exit 2)`]);
+  });
+});
+
+describe("batch-13 fixes: idb's companion entry dropped after every companion end (`idb disconnect <lab udid>`, never `idb kill`)", () => {
+  const say = (w: string, t: string) => void steps.push(`${w} ${t}`);
+  const check = (o: object = {}) => (iosLab({ wait, ...o }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
+
+  it('batch-13 rerun 1: a stale entry left by the last run is dropped by the reset (pkill, then disconnect, before the boot), so the need is met', async () => {
+    fresh({ companion: 'stale' });
+    expect(await check()).toStrictEqual({ ok: true, how: "averi-lab iPhone 17 simulator, iOS 27.0, reset; not rebuilt; the installed cells.json is main's" });
+    const w = words();
+    expect(w.indexOf(`idb disconnect ${LAB_UDID}`)).toBe(w.indexOf(`pkill -f idb_companion --udid ${LAB_UDID}`) + 1);
+    expect(w.indexOf(`idb disconnect ${LAB_UDID}`)).toBeLessThan(w.indexOf(`xcrun simctl boot ${LAB_UDID}`));
+  });
+
+  it("batch-13: the run's last step disconnects after its pkill, bounded, the lab udid alone — the next run's need is met with no stale entry", async () => {
+    const ios = iosLab({ wait });
+    await (ios.need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
+    expect(world.st.companion).toBe('live');
+    const run = runOf(world);
+    await ios.lastly({ run, step: say });
+    expect(run.seen.slice(-2)).toEqual([
+      { words: `pkill -f idb_companion --udid ${LAB_UDID}`, secs: HOST_SECS },
+      { words: `idb disconnect ${LAB_UDID}`, secs: HOST_SECS },
+    ]);
+    expect(world.st.companion).toBe('none');
+    // The next run, reset or not: its first describe-all reaches a companion of its own.
+    expect(await (iosLab({ wait, reset: false }).need as { alive(c: NeedCtx): Promise<unknown> }).alive(needCtx())).toEqual({ ok: true, how: 'idb answers' });
+  });
+
+  it('batch-13: a disconnect that fails or passes its bound is a warning on the need line, the need judged by its own checks', async () => {
+    fresh({ disconnectFails: 'exit' });
+    expect(await check()).toStrictEqual({
+      ok: true,
+      warning: "idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect",
+      how: "averi-lab iPhone 17 simulator, iOS 27.0, reset; not rebuilt; the installed cells.json is main's",
+    });
+    expect(steps).toContain("WARN ios-reset: idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect");
+    expect(steps).not.toContain('OK ios-reset');
+    // A failed build's warning kept beside it.
+    fresh({ disconnectFails: 'timeout' });
+    const failed = { ensure: async () => ({ ok: false as const, why: 'the iOS build failed (exit 65; ios-build.log)' }), built: () => undefined };
+    expect(await check({ build: failed })).toMatchObject({
+      ok: true,
+      warning: "idb's companion entry may be stale — idb disconnect: past its bound (exit 142); the iOS build failed (exit 65; ios-build.log); the app already installed is used",
+    });
+    // The stale entry still there: the health check fails, and the need is not met, saying why.
+    fresh({ companion: 'stale', disconnectFails: 'exit' });
+    expect(await check()).toMatchObject({ ok: false, why: expect.stringContaining('the initial iOS reset failed: the health check after the reset: describe-all: exit 1 Failed to connect to companion') });
+  });
+
+  it("batch-13: the last step's disconnect failing is a WARN naming it, never a silent NOTE", async () => {
+    fresh({ disconnectFails: 'exit' });
+    await endLabProcesses(() => LAB_UDID, wait)({ run: runOf(world), step: say });
+    expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended, not all proven: idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect`]);
+  });
+
+  it("batch-13: in a block's check the reset disconnects too, and its warning is the reset's WARN", async () => {
+    fresh({ sick: 'swipe' });
+    // The entry dropped, but the disconnect's exit says it failed: the reset goes on, and says so.
+    const run: Run = async (cmd, args, call) => {
+      const r = await runOf(world)(cmd, args, call);
+      return args[0] === 'disconnect' ? { ...r, code: 1, err: 'DisconnectCommandException: Could not disconnect' } : r;
+    };
+    // The reset's warning carried to the check's caller, in the same words (code review).
+    expect(await iosCheck(needCtx(), await simOf(run), 'D43 wda 1')).toStrictEqual({ ok: true, warning: "idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect" });
+    expect(steps.at(-1)).toBe("WARN ios-reset: idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect");
+    expect(words()).toContain(`idb disconnect ${LAB_UDID}`);
+    // Left stale (the disconnect did nothing): the health check after the reset fails, naming the stale entry.
+    steps.length = 0;
+    fresh({ sick: 'swipe', disconnectFails: 'exit' });
+    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toEqual({ ok: false, why: `the iOS reset before D43 wda 1 failed: the health check after the reset: describe-all: exit 1 ${STALE_COMPANION_ERR} — ${STALE_COMPANION_WHY}` });
+  });
+
+  it("batch-13: describe-all failing with idb's \"Failed to connect to companion\" names the stale entry as the likely cause — in the health check's why and alive's", async () => {
+    fresh({ companion: 'stale' });
+    const stale = `exit 1 ${STALE_COMPANION_ERR} — ${STALE_COMPANION_WHY}`;
+    expect(await health(await simOf())).toBe(`describe-all: ${stale}`);
+    expect(await (iosLab({ wait }).need as { alive(c: NeedCtx): Promise<unknown> }).alive(needCtx())).toEqual({ ok: false, why: `idb ui describe-all: ${stale}` });
+    // Any other failure: its own words, nothing added.
+    fresh({ sick: 'describe-all' });
+    expect(await health(await simOf())).toBe('describe-all: exit 1 No translation object returned');
+  });
+});
+
+describe("batch-13 code review: a mid-run reset's companion warning reaches the block, not only the steps", () => {
+  it("batch-13: the WDA window's checks — the one before and the end check — hand their resets' warnings back, in the same words", async () => {
+    fresh({ sick: 'swipe' });
+    const run: Run = async (cmd, args, call) => {
+      const r = await runOf(world)(cmd, args, call);
+      return args[0] === 'disconnect' ? { ...r, code: 1, err: 'DisconnectCommandException: Could not disconnect' } : r;
+    };
+    const { ctx } = blockCtx(run);
+    const r = await wdaWindow(ctx, await simOf(run), { work: async () => void world.startWda() });
+    expect(r).toEqual({ ran: true, putBack: true, warnings: ["idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect"] });
+    // Sick again after the work: the end check resets too, and its warning is kept after the first's.
+    fresh({ sick: 'swipe' });
+    const again = blockCtx(run, 'D43-again');
+    const both = await wdaWindow(again.ctx, await simOf(run), { work: async () => void (world.startWda(), (world.st.sick = 'swipe')) });
+    expect(both.warnings).toHaveLength(2);
   });
 });
