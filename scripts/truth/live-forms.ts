@@ -5,6 +5,7 @@ import { allPassed, ASSERTS_FAILED, claimsDone, claimsTap, firstLine, isError, m
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import type { IosTreeSourceKind } from '../../src/adapters/ios-node.js';
 import { rectIntersection, sameRect } from '../../src/adapters/types.js';
+import { TREE_READ_FAILED } from '../../src/interact/scroll-text.js';
 import { panelsBeyond } from '../../src/ui-tree/keyboard-cover.js';
 import type { SourceKind } from '../differential/corpus.js';
 import type { LabState, Rect } from './schema.js';
@@ -357,6 +358,11 @@ export function panelAfterCalls(s: LabState, launch: Rect, strip: Rect): 'unread
 /** Each distinct quote in the reply matching `pattern` (every panel averi named, a `g` regex), or "no panel". */
 const quoted = (reply: string | undefined, pattern: RegExp): string => [...new Set([...(reply ?? '').matchAll(pattern)].map((m) => m[0]))].join(', ') || 'no panel';
 const BOTH_READS = 'the panel measured at launch and again after the calls is';
+/**
+ * kf3's refusal as averi words it (src/interact/scroll-text.ts: `scroll_until <target> failed …` / `stopped …`, the
+ * tool's ERROR prefix before it), not the device failing its tree read (TREE_READ_FAILED) and not another tool error.
+ */
+const scrollVerdict = (reply: string): boolean => /^ERROR scroll_until [^\s:]/.test(reply) && !reply.includes(TREE_READ_FAILED);
 /** An averi call that errored, not a reading of the panel: a harness fault, named so (as judgeMissUnderSheet names one). */
 const harnessFault = (reply: string): LiveVerdict => ({ outcome: 'MISMATCH', why: `a harness fault, not a verdict on the panel over ks: ${short(reply)}` });
 
@@ -426,8 +432,8 @@ export const judgeFloatingGap =
       // An ok refusal names the panel (not the 132-px strip alone): averi read the panel the launch measured.
       const panelAsNamed = `over [${panel.x},${panel.y}][${panel.x + panel.width},${panel.y + panel.height}]`;
       if (scroll?.includes(panelAsNamed) !== true) {
-        // An error that is no scroll refusal (it counts no swipes) never read the panel.
-        if (again === 'agreed' && isError(scroll) && swipesOf(scroll) === undefined) return harnessFault(scroll);
+        // Only averi's own scroll_until verdict read the panel: a failed tree read, or another error, is no reading.
+        if (again === 'agreed' && isError(scroll) && !scrollVerdict(scroll)) return harnessFault(scroll);
         if (again === 'agreed') return { outcome: 'MISMATCH', why: `averi named ${quoted(scroll, /over \[\d+,\d+\]\[\d+,\d+\]/g)} — ${BOTH_READS} ${panelAsNamed}: ${short(scroll)}` };
         return { outcome: 'SKIP', why: `averi's reply does not name the measured panel ${panelAsNamed}: ${short(scroll)}` };
       }

@@ -404,6 +404,27 @@ describe('D69: the panel read again after the calls — moved is SKIP naming bot
     expect(judgeFloatingGap('kf1')(state, [fault, ...replies.slice(1)], 'uiautomator', launched)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^averi's reply does not quote the measured panel/) });
   });
 
+  it('(b) kf3 split by what the reply is: averi\'s own scroll_until verdicts judged against the panel, a failed tree read or another error a harness fault', () => {
+    const { launched, state } = twice(fu1, 'kf3', FU1_REGION, FU1_REGION);
+    const ks = 'scroll_until id:"lab.form-keyboard-floating.ks"';
+    const judge = (reply: string) => judgeFloatingGap('kf3')(state, [reply], 'uiautomator', launched);
+    // averi's refusals, whatever their swipes wording (scroll-text.ts: stoppedWhen's "before any swipe", timeoutText).
+    const before = `ERROR ${ks} stopped before any swipe — element is in the viewport but under the soft keyboard over [71,1092][1008,1884]; no swipe was sent`;
+    expect(judge(before)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi named over \[71,1092\]\[1008,1884\] — the panel measured/) });
+    const timedOut = `ERROR ${ks} failed after 18000ms (timeout 15000ms; 2 swipes sent; 3 tree reads took 18000ms, the last 6000ms)`;
+    expect(judge(timedOut)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi named no panel — the panel measured/) });
+    const noSwipe = `ERROR ${ks} failed after 38204ms (timeout 15000ms; no swipe was sent; 1 tree read took 38204ms)`;
+    expect(judge(noSwipe)).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi named no panel — /) });
+    // The device's failure, though it counts swipes: a harness fault, not averi's reading.
+    for (const failed of [
+      `ERROR ${ks} failed after 2 swipes — last UI tree read failed: adb: device offline`,
+      `ERROR ${ks} failed after 0 swipes — no UI tree read succeeded, and no swipe is drawn blind (it could land on a sheet, alert or cover over the screen) — last UI tree read failed: adb: device offline`,
+      'ERROR MCP error -32602: Invalid arguments for tool scroll_until',
+    ]) {
+      expect(judge(failed)).toEqual({ outcome: 'MISMATCH', why: `a harness fault, not a verdict on the panel over ks: ${failed.slice(0, 220)}` });
+    }
+  });
+
   it('(b) the MISMATCH names every panel averi quoted, the strip first or not', () => {
     const { replies, launched, state } = twice(fu1, 'kf1', FU1_REGION, FU1_REGION);
     const both = replies[0].replace('keyboard 359,1269 681x643', 'keyboard 0,2088 1080x132, keyboard 87,1243 937x792');

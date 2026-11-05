@@ -99,7 +99,8 @@ calls are done, onto the final state (`state.imeTouchable`, the same `withMeasur
 - the two reads agree and kf1/kf2's evidence does not quote the panel over ks, or kf3's refusal does not name it:
   MISMATCH "averi quoted keyboard X over ks (or: no panel) — the panel measured at launch and again after the calls is
   P" (kf3: "averi named over [..][..] …"), every distinct panel averi quoted named; an averi call that errored (an
-  assert that ran no poll, or a kf3 error counting no swipes) is "a harness fault, not a verdict on the panel over
+  assert that ran no poll; for kf3, an error that is not averi's own `scroll_until <target> …` verdict, or one whose
+  tree read failed, scroll-text.ts#TREE_READ_FAILED) is "a harness fault, not a verdict on the panel over
   ks", as the picker-sheet cases name one;
 - no second read (every record before D69): judged as before, the misquote SKIP word for word.
 

@@ -984,13 +984,19 @@ function unseenText({ strokes, within, toward }: UnseenStrokes): string {
   );
 }
 
+/**
+ * A failure's words when the device's tree read failed (`readFailed`, `neverRead`): the device's fault, not a reading.
+ * Exported for the live golden's kf judge (scripts/truth/live-forms.ts), which tells it from averi's own refusals.
+ */
+export const TREE_READ_FAILED = 'last UI tree read failed';
+
 /** What the target was short of at the bound — one switch over the shortfall. */
 function shortText(short: Shortfall): string {
   switch (short.of) {
     case 'readFailed':
-      return `last UI tree read failed: ${short.error.message}`;
+      return `${TREE_READ_FAILED}: ${short.error.message}`;
     case 'neverRead':
-      return `no UI tree read succeeded, and no swipe is drawn blind (it could land on a sheet, alert or cover over the screen) — last UI tree read failed: ${short.error.message}`;
+      return `no UI tree read succeeded, and no swipe is drawn blind (it could land on a sheet, alert or cover over the screen) — ${TREE_READ_FAILED}: ${short.error.message}`;
     case 'clipped': {
       const { judged } = short;
       const { facts } = judged.standing;
