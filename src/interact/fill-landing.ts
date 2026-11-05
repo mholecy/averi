@@ -91,12 +91,17 @@ export function landingOf(observed: string, e: Expectation): Landing | undefined
 export function readingOf(observed: string, e: Expectation): Reading {
   const landing = landingOf(observed, e);
   if (landing !== undefined) return landing;
+  return { kind: tookText(observed, e) ? 'missed' : 'not-taken', ...missOf(observed, e) };
+}
+
+/** What can be said of a reading that did not land (`Miss`). The whole-landing question is asked here, and only here. */
+function missOf(observed: string, e: Expectation): Miss {
   const tail = tailOf(observed, e);
-  const miss: Miss = {
-    ...(tail !== undefined && { tail: { missing: tail.missing, retypable: droppedTail(observed, e) !== undefined } }),
-    differs: differenceOf(observed, e),
+  const wholeToo = landedSome(tail) && wholeLandingToo(heldText(observed, e.placeholder), e);
+  return {
+    ...(tail !== undefined && { tail: { missing: tail.missing, retypable: landedSome(tail) && !wholeToo } }),
+    differs: differenceOf(observed, e, tail, wholeToo),
   };
-  return { kind: tookText(observed, e) ? 'missed' : 'not-taken', ...miss };
 }
 
 /**
@@ -117,7 +122,7 @@ export function withoutWholeToo(d: Difference): Difference {
  * retry. Masked values cannot show it: for them the change alone is the proof, as their length is for inputs. A
  * reformatted reading (the value split by separators) never contains the value, so a non-input never lands one.
  */
-export const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInput' | 'resolvedValue'>): boolean =>
+const tookText = (observed: string, e: Pick<Expectation, 'value' | 'isInput' | 'resolvedValue'>): boolean =>
   e.isInput || (observed !== e.resolvedValue && (isMaskedValue(observed) || observed.includes(e.value)));
 
 /**
@@ -246,7 +251,7 @@ function landedReformat(observed: string, e: TextExpectation): Reformat | undefi
  * characters of the TYPING the prefix holds (UTF-16 units, as a value's length is counted — 0 when only the field's
  * earlier text is there), `reformatted` when the field reformatted the prefix (separators added, spaces respaced).
  */
-export interface Tail {
+interface Tail {
   missing: string;
   landed: number;
   reformatted?: Reformat;
@@ -262,7 +267,7 @@ const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined 
  * definition of a dropped tail: the typing retypes it (`droppedTail`) and the verdict names it (`differenceOf`), so the
  * two judge a prefix alike. Pure.
  */
-export function tailOf(observed: string, e: TextExpectation): Tail | undefined {
+function tailOf(observed: string, e: TextExpectation): Tail | undefined {
   const held = heldText(observed, e.placeholder);
   if (hasBullet(held) || hasBullet(priorText(e))) return undefined; // the earlier text, `priorsOf`'s first
   return overPriors(held, e, (whole, prior): Tail | undefined => {
@@ -271,16 +276,6 @@ export function tailOf(observed: string, e: TextExpectation): Tail | undefined {
     const { prefix, reformatted } = shown;
     return { missing: whole.slice(prefix.length), landed: prefix.length - prior.length, ...(reformatted !== undefined && { reformatted }) };
   });
-}
-
-/**
- * The characters the field dropped from the END of the typing (`tailOf`, with some of the typing landed: `landedSome`),
- * or undefined when its reading does not prove that — also when it is explained as a whole landing as well
- * (`wholeLandingToo`). What fill-type.ts types again (ADR 0023). Pure.
- */
-export function droppedTail(observed: string, e: TextExpectation): string | undefined {
-  const tail = tailOf(observed, e);
-  return landedSome(tail) && !wholeLandingToo(heldText(observed, e.placeholder), e) ? tail.missing : undefined;
 }
 
 /**
@@ -337,20 +332,17 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
  * Pure, O(observed × value) — run once, for a typing that missed: a PRECONDITION, not checked — a reading that lands
  * (`landingOf`) is never classified, and one `reformatOf` passes (`1 234` for `1234`) would read `separated` here.
  */
-export function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>): Difference {
+function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>, tail: Tail | undefined, wholeToo: boolean): Difference {
   const { value, clear } = e;
   if (bulletsSaidPlain(observed, e)) return { kind: 'masked-said-plain' };
   if (observed === e.before) return { kind: 'unchanged' };
   if (isMaskedValue(observed)) return { kind: 'masked', held: clear ? undefined : heldCount(e) };
   if (hasBullet(observed)) return { kind: 'length' };
-  // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
-  const tail = tailOf(observed, e);
   const held = heldText(observed, e.placeholder);
-  // D64: a tail `droppedTail` would not type again, the reading a whole landing too — said in the reply's wording.
-  const wholeToo = landedSome(tail) && wholeLandingToo(held, e);
+  // D28: a reformatted strict prefix with some of the typing in it is a dropped tail, never "transformed".
   if (landedSome(tail) && tail.reformatted !== undefined) {
     const dropped = { kind: 'dropped-tail', landed: tail.landed, dropped: value.length - tail.landed, grouped: tail.reformatted.added > 0 } as const;
-    return wholeToo ? { ...dropped, wholeToo } : dropped;
+    return wholeToo ? { ...dropped, wholeToo: true } : dropped; // D64: said in the reply's wording
   }
   // D53: every typed character there, in order, with separators the rules refused as grouping — never "a length".
   const added = overPriors(held, e, (whole) => separatedOf(held, whole));
@@ -372,7 +364,7 @@ export function differenceOf(observed: string, e: Pick<Expectation, keyof TextEx
   }
   if (caseOnly !== undefined) return { kind: 'case', positions: caseOnly };
   // an exact strict prefix ends here: its typed part is shorter than the value, so no run is compared
-  if (typed.length !== value.length) return wholeToo ? { kind: 'length', wholeToo } : { kind: 'length' };
+  if (typed.length !== value.length) return wholeToo ? { kind: 'length', wholeToo: true } : { kind: 'length' };
   let differ = 0;
   for (let i = 0; i < value.length; i++) if (typed[i] !== value[i]) differ++;
   return { kind: 'same-length', positions: differ };
