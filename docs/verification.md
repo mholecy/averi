@@ -80,7 +80,8 @@ flows:
   replies Filled with a ⚠ line that its text after focus was not read: the field may have inserted
   that text, and the keys may not have landed at all (`+421 `). Check its value where it matters
   (ADR 0028's D64b-3 amendment). A reading exactly the value says nothing, and cannot be told
-  from one the field inserted; a non-empty plain field's earlier text is the pre-tap reading on
+  from one the field inserted; nor does a reformatted reading (the field's own grouping of the
+  typed characters, said in the reply's aside) get the line; a non-empty plain field's earlier text is the pre-tap reading on
   every source, with no such line.
   Android types one character per `input text` call: bulk injection races Compose's async state
   and drops most characters (measured 3 of 11 landing). averi types printable ASCII

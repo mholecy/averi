@@ -682,8 +682,8 @@ describe('fillField — the post-focus re-read, only where focus can change the 
 
   it('accepted residual 3 (ADR 0028\'s D64 amendment): a "+421 " prefix inserted on focus that holds the typed `421`, none of the typing taken, passes', async () => {
     // With the re-read, `before` would be `+421 ` and the unchanged reading fail as "did not change"; skipped, `before`
-    // is the pre-tap `''`, so the whole reading is the typing and holds the value. Recorded, not wanted (follow-up D64b):
-    // if this ever fails, the residual is closed and ADR 0028 must say so.
+    // is the pre-tap `''`, so the whole reading is the typing and holds the value. Recorded, not wanted (residual 3 as
+    // ADR 0028's D64b-3 amendment restates it): if this ever fails, the residual is closed and ADR 0028 must say so.
     const fake = field({ secure: false });
     onFocus(fake, (f) => (f.value = '+421 '));
     fake.typeText = async (text: string) => {

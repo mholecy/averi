@@ -143,8 +143,9 @@ export const FOCUS_UNREAD_HEDGE = {
  * premise its own, checked first: the field missing or empty means the prefix was never inserted — the lab's fault, a
  * SKIP whatever averi replied, where the app logged a `focus` event for the field; with none, averi's tap never focused
  * it — LOUD `loud-untouched`, said so, or a MISMATCH `fill-claim-unfocused` over a Filled (averi's false claim, a class
- * of its own: a failure other than a claim over the prefix; D64b-1's reviews); a claim of done over anything but `inserted` means the field
- * took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No KNOWN entry matches a SKIP.
+ * of its own: a failure other than a claim over the prefix; D64b-1's reviews); a claim of done over anything but
+ * `inserted` means the field took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No
+ * KNOWN entry matches a SKIP.
  * Then, D64b-3: under uiautomator, the one source that skips that re-read, a Filled over `inserted` whose ⚠ line says
  * the text after focus was not read (replies.ts#focusTextNotReadSaid) is an honest hedge — ok, counted under its residual
  * (`FOCUS_UNREAD_HEDGE`, the carousel's hedged maxSwipes' way: LiveVerdict.accepted), as the reply does not claim the
@@ -164,7 +165,8 @@ export const refusedOnFocus =
       if (s.events.some((e) => e.kind === 'focus' && e.tag === tag)) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };
       const held = got === undefined ? "is missing from the app's state" : 'holds ""';
       const unfocused = `its tap never focused the field (no focus event for ${tag}), which ${held}; averi: ${short(last)}`;
-      // A Filled over it is averi's false claim (the owner's decision): its own cls: a false claim over a field never focused is another failure than one over the prefix.
+      // A Filled over it is averi's false claim (the owner's decision), with its own cls: a claim over a field never
+      // focused is another failure than one over the prefix.
       if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim-unfocused', kind: replyKind(last), why: `averi says Filled but ${unfocused}` };
       return { outcome: 'LOUD', cls: 'loud-untouched', kind: replyKind(last), why: `the tap never focused the field (no focus event for ${tag}), which ${held}; averi: ${short(last)}` };
     }
