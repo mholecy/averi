@@ -64,7 +64,7 @@ export const GIT_SECS = 30;
 export const KEEPS_GROUP: Readonly<Record<string, { keep: boolean; why: string }>> = {
   idb: {
     keep: true,
-    why: 'a local idb client may start idb_companion without a session of its own, in the call\'s group; until a lab check shows it leaves the group, the companion is kept (residual: that check)',
+    why: 'kept on the safe side: fb-idb 1.1.7 spawns its local idb_companion in a group of its own (preexec_fn=os.setpgrp), so the companion leaves the call\'s group, and a group is kept only while it still exists once its leader ended (batch-13)',
   },
   adb: { keep: false, why: 'the adb server it starts calls setsid(), so it leaves the call\'s group and outlives the SIGKILL' },
   xcrun: { keep: false, why: 'simctl hands the simulator to launchd: nothing of the device is in the call\'s group' },
