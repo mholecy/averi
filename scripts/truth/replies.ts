@@ -130,11 +130,11 @@ export const claimsDone = (reply: string) => /^(Filled|Cleared|Tapped)/.test(rep
 
 /**
  * A fill's reply hedges its Filled on a ⚠ line of its own: the field's text after focus was not read, so it may not all
- * come from the keys (D64b-3, fill-text.ts's `focus-unread` caveat). Asked on the caveat's lines alone: a selector the
- * head echoes is no hedge, and no more is a plain Filled. What it is worth is live-forms.ts#refusedOnFocus's to say.
+ * come from the keys (D64b-3, fill-text.ts's `focus-unread` caveat). Only a line that starts `⚠ ` counts, so a selector
+ * the head echoes is no hedge, and no more is a plain Filled. What it is worth is live-forms.ts#refusedOnFocus's to say.
  */
 export const focusTextNotReadSaid = (reply: string) =>
-  claimsDone(reply) && reply.split('\n').slice(1).some((line) => line.startsWith('⚠ ') && line.includes(FOCUS_TEXT_NOT_READ));
+  claimsDone(reply) && reply.split('\n').some((line) => line.startsWith('⚠ ') && line.includes(FOCUS_TEXT_NOT_READ));
 
 /** The reply's first line — an assert's first verdict line, under its `N/N asserts …` summary — at most 200 characters. */
 export const firstLine = (reply: string) => {

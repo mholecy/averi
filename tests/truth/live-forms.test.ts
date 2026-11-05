@@ -993,7 +993,7 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
  * fp1 and fp2 (D64b): form-focus-prefix's fields insert `+421 ` when focused while empty — dialLands then takes the keys,
  * dialRefuses refuses every one. A fill of `421` by sole id without clear: the very path whose post-focus re-read
  * Android skips (fill.ts, ADR 0028), so averi there judges the reading `+421 ` against an empty `before` and passes it by
- * containment (ADR 0028 residual 3). Judged here over SYNTHETIC states (no device has run the cell yet): the launch
+ * containment (ADR 0028 residual 3). Judged here over SYNTHETIC states, so that no device is needed (D64b-2 and D64b-3 ran the cell on Android): the launch
  * with both fields empty, the end state the app's model would hold.
  */
 describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or refused', () => {

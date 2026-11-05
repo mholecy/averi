@@ -200,6 +200,10 @@ on both media:
 
     ⚠ the field shows 8 characters for the 3 typed, and its text after focus was not read, so that text may not all come from these keys (a field can insert text on focus): check its value with ui_snapshot
 
+The number is what the read that landed saw, fp1's 8 in all its three runs here, no fixed property of the field: the poll
+stops at the first landing (`pollValue`, older than this amendment), so keys arriving after a read could leave fp1 landing
+on the prefix alone and saying 4 (inferred, not seen).
+
 Lengths only: a fill's sentences never carry the field's text, which may be a credential (fill-text.ts). A caveat and no
 reason, so not "NOT verified": the same reading is what a field that takes the keys after its prefix shows (fp1), or a
 field that adds a mark of its own to a truly empty one, and the tree cannot tell them apart.
@@ -218,7 +222,10 @@ What keeps its bytes, no `focusUnread`:
   nothing files: the judge is stricter than the KNOWN entry was.
 - fp1's reading gets the same line, true of it: the text before the keys is the field's. `holds` asks the model, as ever.
 - Device reading: the Android parser trims attribute values (fast-xml-parser's default), so `+421 ` is read as `+421`
-  and fp2's line says 4 characters where the app holds 5. Not this amendment's to change; the line says what averi read.
+  and fp2's line says 4 characters where the app holds 5 (pinned in tests/adapters/android.test.ts). Not this amendment's
+  to change: the line says what averi read, and `ui_snapshot` reads through the same parser. The trim also silences the
+  line: a typed `+421` into a field that inserted `+421 ` and refused every key reads as exactly the value, so it replies a
+  plain Filled while the app holds 5 characters (residual 3; the trim's own false failures are backlog D72).
 - A field that adds a mark to a truly empty field (`50%` for `50`, `+421903123456` for `421903123456`) gets the line too on
   Android, a caveat true of it, at no cost to the fill.
 
@@ -244,6 +251,7 @@ miss. A2's amendment above names `differenceOf`, now private. Timing and every r
 3. **A prefix inserted on focus that holds the value passes the skipped re-read** (the D64 amendment, restated by
    D64b-3's): on Android, an empty plain field by sole id that shows `+421 ` once focused and takes none of a typed `421`
    replies Filled — the re-read would have read `+421 ` first and failed it as "did not change" — now with a ⚠ line that
-   its text after focus was not read (measured: live cases fp1, fp2). Silent only where the inserted text IS the value,
-   exactly or with separators (`421`, `4 21`): no reading tells that from the typing. Filed by fp2's judge
+   its text after focus was not read (measured: live cases fp1, fp2). Silent only where the inserted text IS the value as
+   read, exactly or with separators (`421`, `4 21`; on Android also with outer spaces the dump's parser trims, `+421 ` for
+   a typed `+421`, the app holding 5 characters): no reading tells that from the typing. Filed by fp2's judge
    (`FOCUS_UNREAD_HEDGE`), no more in live-known.ts.

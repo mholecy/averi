@@ -704,6 +704,12 @@ describe('fillField — the post-focus re-read, only where focus can change the 
     const readBack = await fillField(reread, { id: 'amount_input' }, '421', FAST);
     expect(readBack.readBack).toEqual({ kind: 'landed' });
     expect(readBack.focusUnread).toBeUndefined();
+    // The re-read ran (a plain field by a label selector, which may stop matching): the same.
+    const byLabel = field({ secure: false });
+    onFocus(byLabel, (f) => (f.value = '+421 '));
+    const labelled = await fillField(byLabel, 'label:Amount', '421', FAST);
+    expect(labelled.readBack).toEqual({ kind: 'landed' });
+    expect(labelled.focusUnread).toBeUndefined();
     // With clear: the reading must equal the value.
     const cleared = field({ secure: false });
     expect((await fillField(cleared, { id: 'amount_input' }, '421', { ...FAST, clear: true })).focusUnread).toBeUndefined();

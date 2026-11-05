@@ -9,7 +9,8 @@
  * - `landingOf`: the poll's question, all it needs of up to five readings a round — is this one final? Exactly,
  *   reformatted, only as the field's placeholder, or a masked reading that proves the field was wrongly said plain.
  *   Without clear, the value must be in what was typed past the earlier text, unless the reading is the value itself
- *   (D64; a reading unchanged since typing began holds none, D63).
+ *   (D64; a reading unchanged since typing began holds none, D63). A landing carries how it was reformatted, or that
+ *   text around the value went unread with the re-read skipped (`focusUnread`, D64b-3).
  * - `withoutWholeToo`: a difference without its whole-landing hedge, for keys proven typed elsewhere.
  * interact/fill-type.ts polls on the second and goes by the first, and fill.ts throws the difference that comes back.
  * fill.ts asks one more (`needsHeldCount`, of a node, not a reading): whether the field can hold bullets the masked

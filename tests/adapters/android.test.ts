@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { PNG as Pngjs } from 'pngjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { landingOf, type Expectation } from '../../src/interact/fill-landing.js';
+import { fillReply } from '../../src/interact/fill-text.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { launchText } from '../../src/mcp/tool-text.js';
 import { AndroidAdapter, parseImeInsets, parseInputShown, parseNavigationBand, parseStatusBand, parseTouchableRegion, parseUiautomatorXml } from '../../src/adapters/android.js';
@@ -56,6 +58,23 @@ UI hierchary dumped to: /dev/tty`;
 
 describe('parseUiautomatorXml', () => {
   const tree = parseDump(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
+
+  // D64b-3 (ADR 0028's amendment): the parser trims a value's outer spaces, so the ⚠ line counts what averi read.
+  describe('a field holding `+421 `, the re-read skipped: the reading is `+421`', () => {
+    const reading = parseDump('<hierarchy><node class="android.widget.EditText" text="+421 " password="false" bounds="[0,0][100,100]" /></hierarchy>').value ?? '';
+    const expecting = (value: string): Expectation => ({ value, clear: false, before: '', placeholder: undefined, isInput: true, resolvedValue: null, held: 'unread' });
+
+    it('`421` typed: the line says 4 characters, where the app holds 5', () => {
+      const landing = landingOf(reading, expecting('421'));
+      expect(landing).toEqual({ kind: 'landed', focusUnread: { shows: 4 } });
+      const focusUnread = landing?.kind === 'landed' ? landing.focusUnread : undefined;
+      expect(fillReply({ role: 'textfield', typed: 3, readBack: { kind: 'landed' }, focusUnread }, 'id:dial')).toContain('\n⚠ the field shows 4 characters for the 3 typed,');
+    });
+
+    it('`+421` typed: exactly the value as read, so no line, whatever the field took (ADR 0028 residual 3)', () => {
+      expect(landingOf(reading, expecting('+421'))).toEqual({ kind: 'landed' });
+    });
+  });
 
   it('normalizes roles, identifiers, labels and bounds', () => {
     expect(tree.role).toBe('container');
