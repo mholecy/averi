@@ -598,7 +598,8 @@ sees). Nothing captured moves, so no golden row (as L7's cells):
   (`+421 421`), ok expected on every source; an Android Filled withholds the content, so the reply itself cannot be
   checked for `+421 421`, only the app's model. fp2 by live-forms.ts#refusedOnFocus: ok only on an error saying the field
   did not change, with `+421 ` held; a Filled over `+421 ` is a MISMATCH `fill-claim`, a Filled over anything else the
-  lab's fault (the field took the keys it must refuse), a SKIP. Expected: under uiautomator that MISMATCH
+  lab's fault, a SKIP worded by what the field holds (empty: no prefix inserted; the prefix and more: the keys taken;
+  else neither). In D64b-2 read fp2's line, not just the exit code: a plain SKIP does not fail the forms run. Expected: under uiautomator that MISMATCH
   (averi reads `+421 ` against an empty `before` and passes it by containment), filed in live-known.ts as ADR 0028
   residual 3 until D64b-3's caveat; under idb and wda ok (the re-read runs, reads `+421 ` before typing, and the
   unchanged reading is refused as "did not change"), not filed. Batch D64b-2 builds both apps and reads the two cases.

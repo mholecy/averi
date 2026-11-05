@@ -110,13 +110,22 @@ export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(ta
 export const refusedCapped = (tag: string, kept: string) => refusedHolding(tag, kept);
 
 /**
+ * refusedOnFocus's lab fault, worded by what the field holds (review round 2): empty, it did not insert its prefix; the
+ * prefix and more, it took the keys; anything else, neither.
+ */
+const labFault = (got: string | undefined, inserted: string): string =>
+  got === '' ? 'lab fault: the field did not insert its prefix (holds "")'
+  : got?.startsWith(inserted) === true ? `lab fault: the field took the keys (holds ${JSON.stringify(got)})`
+  : `lab fault: the field holds ${JSON.stringify(got)}, neither the prefix nor the prefix and keys`;
+
+/**
  * fp2 (D64b): one fill without clear into a field that puts `inserted` in itself on focus and refuses every key —
  * form-focus-prefix's dialRefuses, `+421 ` held whatever `421` is typed. `refusedHolding` reads two calls; this is its
  * one-call sibling, the launch's empty field the baseline. Ok only when the app holds `inserted` and the reply is an
  * error saying the field did not change (what the post-focus re-read lets averi say: it read `inserted` before typing).
  * A claim of done over `inserted` is a MISMATCH `fill-claim` — Android's today, where that re-read is skipped and the
- * reading passes by containment (ADR 0028 residual 3); a claim over anything else is the lab's fault (it took the keys
- * it must refuse), a SKIP no KNOWN entry matches (review round 1). No claim: the field holding anything but `inserted`
+ * reading passes by containment (ADR 0028 residual 3); a claim over anything else is the lab's fault (labFault), a
+ * SKIP no KNOWN entry matches (review rounds 1 and 2). No claim: the field holding anything but `inserted`
  * is LOUD `loud-changed`; held, but no error saying so, LOUD `loud-untouched`.
  */
 export const refusedOnFocus =
@@ -127,7 +136,7 @@ export const refusedOnFocus =
     const kind = replyKind(last);
     if (claimsDone(last)) {
       // A claim over a field holding other than `inserted`: the lab failed to refuse the keys — averi's Filled may be true.
-      if (got !== inserted) return { outcome: 'SKIP', why: `lab fault: the field took the keys (holds ${JSON.stringify(got)})` };
+      if (got !== inserted) return { outcome: 'SKIP', why: labFault(got, inserted) };
       return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the field refused the typing; the app holds ${JSON.stringify(got)}` };
     }
     if (got !== inserted) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(inserted)}; averi: ${short(last)}` };

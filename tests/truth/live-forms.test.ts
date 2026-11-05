@@ -1034,6 +1034,17 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     expect(knownLive('android', 'uiautomator', 'fp2', v.cls, v.kind)).toBeUndefined();
   });
 
+  it('refusedOnFocus (review round 2): the lab fault worded by what the field holds — empty, no prefix inserted; the prefix and more, the keys taken; else neither', () => {
+    const judge = refusedOnFocus('dialRefuses', '+421 ');
+    const claimed = (value: string) => judge(syntheticLeft('dialRefuses', value), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED);
+    expect(claimed('')).toEqual({ outcome: 'SKIP', why: 'lab fault: the field did not insert its prefix (holds "")' });
+    expect(claimed('+421 42')).toEqual({ outcome: 'SKIP', why: 'lab fault: the field took the keys (holds "+421 42")' });
+    expect(claimed('421')).toEqual({ outcome: 'SKIP', why: 'lab fault: the field holds "421", neither the prefix nor the prefix and keys' });
+    expect(claimed('+42')).toEqual({ outcome: 'SKIP', why: 'lab fault: the field holds "+42", neither the prefix nor the prefix and keys' });
+    // The keys before the prefix (the caret left at the start): the prefix is not where the field starts — neither.
+    expect(claimed('421+421 ')).toEqual({ outcome: 'SKIP', why: 'lab fault: the field holds "421+421 ", neither the prefix nor the prefix and keys' });
+  });
+
   it('known: fp2 under uiautomator alone, a fill-claim on a Filled (`other`), ADR 0028 residual 3; fp1 nowhere, fp2 not under idb or WDA (they re-read after focus)', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
     const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => FP_IDS.filter((id) => knownEntry(platform, source, id) !== undefined).map((id) => `${platform} ${source} ${id}`)));
