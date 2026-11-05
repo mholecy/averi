@@ -383,4 +383,15 @@ describe('the flush check stops a proven cut no swipe can bring whole (D68)', ()
     const proved = seeFlush(sent(onClip.verdict), shown(right(80), stroke(142)));
     expect(proved.verdict).toMatchObject({ of: 'probe', toward: 'right' });
   });
+
+  it('every measured stroke of the call is kept, a read between that proved nothing included (a held reveal D62 doubts)', () => {
+    // The probe carried C 140 px; a 48-px reveal 20 more (74 px left: sent on); the next reveal held — doubted, sent
+    // again; that one (drawn 100) carried it 60, leaving 14: the 48-px stroke's 20 px decide.
+    const proved = provedAt(300, 160, 142);
+    const measured = seeFlush(sent(proved.verdict), shown(right(140), stroke(48)));
+    expect(measured.verdict).toMatchObject({ of: 'probe' });
+    const held = seeFlush(sent(measured.verdict), shown(right(140), stroke(48)));
+    expect(held).toMatchObject({ settles: true, verdict: { of: 'probe' } });
+    expect(seeFlush(sent(held.verdict), shown(right(80), stroke(100))).verdict).toMatchObject({ of: 'aim', aim: { floor: { room: 14, drawn: 48, moved: 20 } } });
+  });
 });
