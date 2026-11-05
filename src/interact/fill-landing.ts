@@ -9,7 +9,8 @@
  * - `landingOf`: the poll's question, all it needs of up to five readings a round — is this one final? Exactly,
  *   reformatted, only as the field's placeholder, or a masked reading that proves the field was wrongly said plain.
  *   Without clear, the value must be in what was typed past the earlier text, unless the reading is the value itself
- *   (D64; a reading unchanged since typing began holds none, D63).
+ *   (D64; a reading unchanged since typing began holds none, D63). A landing carries how it was reformatted, or that
+ *   text around the value went unread with the re-read skipped (`focusUnread`, D64b-3).
  * - `withoutWholeToo`: a difference without its whole-landing hedge, for keys proven typed elsewhere.
  * interact/fill-type.ts polls on the second and goes by the first, and fill.ts throws the difference that comes back.
  * fill.ts asks one more (`needsHeldCount`, of a node, not a reading): whether the field can hold bullets the masked
@@ -20,7 +21,7 @@
 
 import { INPUT_ROLE, type UiNode } from '../adapters/types.js';
 import { hasBullet, isMaskedValue } from '../ui-tree/masked-value.js';
-import { heldText, type Difference, type Reformat } from './fill-facts.js';
+import { heldText, type Difference, type FocusUnread, type Reformat } from './fill-facts.js';
 import { maskTemplate, prefixOf, reformatOf, separatedOf, skeleton } from './fill-reformat.js';
 
 /** What the field should hold after the typing, and what the reading is judged against. */
@@ -41,7 +42,8 @@ export interface Expectation {
    * The bullets a masked field held after focus — a masked reading must show these plus the typed length. `'unread'`:
    * fill.ts skipped the post-focus re-read (`needsHeldCount`; docs/adr/0028-a-fill-re-reads-after-focus-only-where-
    * focus-can-change-the-count.md), the field being said plain, so what it held is unknown and only the typed length
-   * passes a masked reading (`landingOf`'s `said-plain`).
+   * passes a masked reading (`landingOf`'s `said-plain`), and what the field holds besides the typing is unknown too:
+   * a plain reading that is not exactly the value lands saying so (`Landing`'s `focusUnread`, D64b-3).
    */
   held: number | 'unread';
 }
@@ -52,6 +54,9 @@ type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeho
 /**
  * A reading that landed:
  * - `landed`: it shows the value — exactly, or `reformatted` (the field added separators of its own: `reformatOf`);
+ *   `focusUnread` (D64b-3, ADR 0028's D64b-3 amendment): the post-focus re-read was skipped and the reading holds the
+ *   value among other text, which may not all come from these keys (`textAroundUnread`). Never with `reformatted`: such
+ *   a reading holds the typed characters and separators alone, and says so already;
  * - `placeholder`: it is exactly the field's named placeholder, which is the value too — typed, or an empty field
  *   with the typing dropped; the tree cannot tell (review of the read-back, probe B). Not verified;
  * - `said-plain`: the held count is `'unread'` and the reading is masked, longer than typed — the field its source said
@@ -60,7 +65,7 @@ type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeho
  *   reading, but no landing: the fill fails with `differs`. A SHORTER masked reading has not landed and the poll goes
  *   on — its keys may still arrive; the timing of both is as it was when fill.ts overrode a landed reading.
  */
-export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'placeholder' } | { kind: 'said-plain'; differs: { kind: 'masked-said-plain' } };
+export type Landing = { kind: 'landed'; reformatted?: Reformat; focusUnread?: FocusUnread } | { kind: 'placeholder' } | { kind: 'said-plain'; differs: { kind: 'masked-said-plain' } };
 
 /**
  * What can be said of a reading that did not land. The two are orthogonal: `Jan` for a typed `Jan Novak` after `Jan`,
@@ -97,7 +102,8 @@ export type Reading = Landing | ({ kind: 'not-taken' } & NotLanded) | ({ kind: '
  * No reading tells the two apart for any Expectation fill.ts builds, through the reformat route either (a reformat
  * needs the whole of the earlier text plus the value), so it is no separate guard.
  * A landed reading is `said-plain` when it shows bullets said plain (`bulletsSaidPlain`) and is longer than typed (a
- * shorter one has not landed), else `placeholder` when it is exactly the named placeholder. Pure.
+ * shorter one has not landed), else `placeholder` when it is exactly the named placeholder, else `landed`, carrying
+ * how it was reformatted, or that text around the value went unread (`textAroundUnread`). Pure.
  */
 export function landingOf(observed: string, e: Expectation): Landing | undefined {
   if (!tookText(observed, e)) return undefined;
@@ -105,7 +111,8 @@ export function landingOf(observed: string, e: Expectation): Landing | undefined
   if (reformatted === undefined && !showsExactly(observed, e)) return undefined;
   if (bulletsSaidPlain(observed, e) && observed.length !== e.value.length) return { kind: 'said-plain', differs: { kind: 'masked-said-plain' } };
   if (e.placeholder !== undefined && observed === e.placeholder) return { kind: 'placeholder' };
-  return { kind: 'landed', ...(reformatted !== undefined && { reformatted }) };
+  if (reformatted !== undefined) return { kind: 'landed', reformatted };
+  return textAroundUnread(observed, e) ? { kind: 'landed', focusUnread: { shows: observed.length } } : { kind: 'landed' };
 }
 
 /** The whole answer about any reading (`Reading`). Pure, O(observed × value): `landingOf` is the poll's. */
@@ -194,6 +201,15 @@ const heldCount = (e: Pick<Expectation, 'held'>): number => (e.held === 'unread'
  * of it but the typed one proves anything. `landingOf`'s `said-plain` and `differenceOf`'s `masked-said-plain`.
  */
 const bulletsSaidPlain = (observed: string, e: Pick<Expectation, 'held'>): boolean => e.held === 'unread' && isMaskedValue(observed);
+
+/**
+ * A plain reading that holds the value among other text, in a field whose text after focus was never read (`'unread'`,
+ * the re-read skipped): `before` is the pre-tap `''`, so the whole reading was taken for the typing, and what a field
+ * inserted on focus cannot be told from it (`+421 ` for a typed `421`, no key landed: ADR 0028's residual 3). Asked of
+ * a reading that landed and is no reformat. A masked one is no such reading: it landed by the typed length, and has no
+ * text beside the value to speak of (`said-plain` takes every other length).
+ */
+const textAroundUnread = (observed: string, e: Pick<Expectation, 'value' | 'held'>): boolean => e.held === 'unread' && observed !== e.value && !isMaskedValue(observed);
 
 /** The text the typing lands after: the field's text before the typing (its placeholder aside), or none once cleared. */
 const priorText = (e: Pick<Expectation, 'clear' | 'before' | 'placeholder'>): string => (e.clear ? '' : heldText(e.before, e.placeholder));

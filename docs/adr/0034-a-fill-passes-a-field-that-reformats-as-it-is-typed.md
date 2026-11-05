@@ -893,7 +893,8 @@ with (`1212` after `12`, keys dropped). Unmeasured on a device, and not accepted
    would close it. (B) On Android, fill.ts skips the post-focus re-read for a sole-id selector on an empty plain field
    and takes `before` as empty; a field that inserts `+421 ` on focus and takes no key reads `+421 `, which contains a
    typed `421`, and replies Filled. Both are pinned as today's behaviour in fill-landing.test.ts. Follow-up: backlog
-   row D64. See the D64 amendment below, and ADR 0028's D64 amendment.
+   row D64. See the D64 amendment below, and ADR 0028's D64 amendment; (B) replies Filled with a ⚠ line since ADR 0028's
+   D64b-3 amendment.
 9. **A caret not at the end, whose typing leaves the reading starting with the earlier text, is refused** (D64's
    amendment, restated in review round 1): without clear, `ab` typed before an earlier `a` reads `aba`, `ab` typed
    inside `aa` reads `aaba`, `ba` typed inside `ab` reads `abab` — each starts with the earlier text and holds no value

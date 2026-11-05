@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FillFailure, FillResult } from '../../src/interact/fill-facts.js';
 import type { Caveat, FillVerdict, Reason } from '../../src/interact/fill-verdict.js';
 import { SEPARATORS } from '../../src/interact/fill-reformat.js';
-import { caveatText, fillFailureText, fillReply, fillStepText, wordingOf } from '../../src/interact/fill-text.js';
+import { caveatText, fillFailureText, fillReply, fillStepText, FOCUS_TEXT_NOT_READ, wordingOf } from '../../src/interact/fill-text.js';
 import { charactersText } from '../../src/util/count.js';
 
 /**
@@ -68,6 +68,19 @@ describe('fillReply and fillStepText — the MCP reply and the flow line of the 
     expect(both('id:amount', fact({ typed: 5, readBack: landed, reformatted: { added: 0, respaced: 2 } })).reply).toBe(
       'Filled id:amount (5 characters, the field shows them reformatted: 2 typed spaces shown as another space)',
     );
+  });
+
+  it('D64b-3: text around the value unread is a ⚠ line on both media, by length, the head as it was', () => {
+    const line = 'the field shows 5 characters for the 3 typed, and its text after focus was not read, so that text may not all come from these keys (a field can insert text on focus): check its value with ui_snapshot';
+    expect(both('id:dial', fact({ typed: 3, readBack: landed, focusUnread: { shows: 5 } }), '421')).toEqual({
+      reply: `Filled id:dial (3 characters)\n⚠ ${line}`,
+      flow: [
+        ['⚠ fill', `id:dial: ${line}`],
+        ['fill', 'id:dial = 421'],
+      ],
+    });
+    expect(caveatText({ code: 'focus-unread', shows: 8, typed: 1 })).toContain('8 characters for the 1 typed,');
+    expect(line).toContain(FOCUS_TEXT_NOT_READ);
   });
 
   it('an added `.` or `,` is a ⚠ caveat on both media, never the aside', () => {

@@ -682,15 +682,53 @@ describe('fillField — the post-focus re-read, only where focus can change the 
 
   it('accepted residual 3 (ADR 0028\'s D64 amendment): a "+421 " prefix inserted on focus that holds the typed `421`, none of the typing taken, passes', async () => {
     // With the re-read, `before` would be `+421 ` and the unchanged reading fail as "did not change"; skipped, `before`
-    // is the pre-tap `''`, so the whole reading is the typing and holds the value. Recorded, not wanted (follow-up D64b):
-    // if this ever fails, the residual is closed and ADR 0028 must say so.
+    // is the pre-tap `''`, so the whole reading is the typing and holds the value. Recorded, not wanted (residual 3 as
+    // ADR 0028's D64b-3 amendment restates it): if this ever fails, the residual is closed and ADR 0028 must say so.
     const fake = field({ secure: false });
     onFocus(fake, (f) => (f.value = '+421 '));
     fake.typeText = async (text: string) => {
       fake.typed.push(text); // nothing reaches the field
     };
-    const { readBack } = await fillField(fake, { id: 'amount_input' }, '421', FAST);
+    const { readBack, focusUnread } = await fillField(fake, { id: 'amount_input' }, '421', FAST);
     expect(readBack).toEqual({ kind: 'landed' });
+    expect(focusUnread).toEqual({ shows: 5 }); // D64b-3: it lands saying so, with no read more
+    expect(fake.typed).toEqual(['421']);
+  });
+
+  it('D64b-3: only the skipped re-read says its text went unread — not a reading that is the value, a clear fill, or a selector that keeps the re-read', async () => {
+    // Skipped, the reading exactly the value: nothing to say.
+    expect((await fillField(field({ secure: false }), { id: 'amount_input' }, '421', FAST)).focusUnread).toBeUndefined();
+    // The re-read ran (a source that does not say plain): the inserted text is `before`, and the keys land past it.
+    const reread = field({});
+    onFocus(reread, (f) => (f.value = '+421 '));
+    const readBack = await fillField(reread, { id: 'amount_input' }, '421', FAST);
+    expect(readBack.readBack).toEqual({ kind: 'landed' });
+    expect(readBack.focusUnread).toBeUndefined();
+    // The re-read ran (a plain field by a label selector, which may stop matching): the same.
+    const byLabel = field({ secure: false });
+    onFocus(byLabel, (f) => (f.value = '+421 '));
+    const labelled = await fillField(byLabel, 'label:Amount', '421', FAST);
+    expect(labelled.readBack).toEqual({ kind: 'landed' });
+    expect(labelled.focusUnread).toBeUndefined();
+    // With clear: the reading must equal the value.
+    const cleared = field({ secure: false });
+    expect((await fillField(cleared, { id: 'amount_input' }, '421', { ...FAST, clear: true })).focusUnread).toBeUndefined();
+  });
+
+  it('D64b-3: the caveat costs no read: as many tree reads with text around the value as with the value alone', async () => {
+    const reads = async (around: boolean): Promise<number> => {
+      const fake = field({ secure: false });
+      if (around) onFocus(fake, (f) => (f.value = '+421 '));
+      const uiTree = fake.uiTree.bind(fake);
+      let n = 0;
+      fake.uiTree = async () => {
+        n++;
+        return uiTree();
+      };
+      await fillField(fake, { id: 'amount_input' }, '421', FAST);
+      return n;
+    };
+    expect(await reads(true)).toBe(await reads(false));
   });
 
   it('skipped: a masked read-back of exactly the typed length passes, with no append', async () => {

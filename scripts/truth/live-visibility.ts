@@ -86,7 +86,8 @@ export type VerdictClass =
   | 'loud-changed'
   | 'fill-claim'
   // fp2 (D64b, live-forms.ts#refusedOnFocus): a Filled while averi's tap never focused the field — a false claim apart
-  // from fill-claim, so ADR 0028 residual 3's KNOWN entry (a fill-claim over the inserted prefix) cannot hide it.
+  // from fill-claim: over a field never focused, a failure other than a claim over the inserted prefix (ADR 0028
+  // residual 3).
   | 'fill-claim-unfocused'
   | 'ensure-claim'
   | 'held-early'

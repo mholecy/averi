@@ -109,6 +109,15 @@ describe('judgeFill — what the facts mean', () => {
     expect(judgeFill(fact({ typed: 0, readBack: { kind: 'no-value' } }))).toMatchObject({ did: 'focused', reasons: [{ code: 'no-value' }] });
   });
 
+  it('D64b-3: text around the value unread is a caveat on a Filled, with the two lengths, and no reason; without it, none', () => {
+    expect(judgeFill(fact({ typed: 3, readBack: landed, focusUnread: { shows: 5 } }))).toMatchObject({
+      did: 'filled',
+      reasons: [],
+      caveats: [{ code: 'focus-unread', shows: 5, typed: 3 }],
+    });
+    expect(judgeFill(fact({ typed: 3, readBack: landed })).caveats).toEqual([]);
+  });
+
   it('caveats: the not-an-input finding first (typed or not), then the masked-append warning; the note rides along', () => {
     const input = { identifier: 'TextFieldWithComponentStyle', rect: { x: 26, y: 343, width: 350, height: 56 }, overlaps: true };
     expect(judgeFill(fact({ typed: 22, role: 'text', readBack: { kind: 'no-value' }, notInput: { input } })).caveats).toEqual([

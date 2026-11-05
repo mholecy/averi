@@ -500,13 +500,16 @@ const FORMS: Omit<Case, 'group'>[] = [
   { id: 'g5', cell: G, says: 'fill, no clear, a phone number typed with its own spaces into the field that groups it', calls: [fill(G, 'phoneGrouped', '+421 903 123 456')], judge: holds('phoneGrouped', '+421 903 123 456') },
   // D64b: form-focus-prefix — both fields put `+421 ` in themselves on focus while empty; dialLands then takes the keys,
   // dialRefuses refuses every one. `421` by sole id, no clear: on Android the post-focus re-read is skipped there
-  // (fill.ts, ADR 0028), so the reading `+421 ` is judged against an empty `before` and holds `421` — fp2 is an EXPECTED
-  // MISMATCH fill-claim under uiautomator (ADR 0028 residual 3, filed in live-known.ts) until averi says so. iOS keeps
-  // the re-read: fp2 there reads `+421 ` before typing and is refused as "did not change" (ok expected; batch D64b-2
-  // reads both). Not h1/h2: the ensure group owns those ids.
-  // fp1: an Android Filled withholds the content, so the reply cannot be checked for `+421 421` — `holds` judges the model.
+  // (fill.ts, ADR 0028), so the reading `+421 ` is judged against an empty `before` and holds `421`: Filled, with D64b-3's
+  // ⚠ line that the text after focus was not read — fp2's honest hedge, accepted and counted (refusedOnFocus, ADR 0028
+  // residual 3), a Filled without the line a MISMATCH nothing files. iOS keeps the re-read: fp2 there reads `+421 ` before
+  // typing and is refused as "did not change" (ok expected; batch D64b-2 reads both). Not h1/h2: the ensure group owns
+  // those ids.
+  // fp1: an Android Filled withholds the content, so the reply cannot be checked for `+421 421` — `holds` judges the
+  // model. Its reading gets the same ⚠ line on Android (text around the value, unread), true of it too; `holds` asks the
+  // model alone, so the line changes nothing here.
   { id: 'fp1', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus: the keys land after it', calls: [fill(FP, 'dialLands', '421')], judge: holds('dialLands', '+421 421') },
-  { id: 'fp2', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus and refuses every key: did not change — expected MISMATCH fill-claim on Android (uiautomator: the post-focus re-read skipped, the inserted `+421 ` holds `421`; ADR 0028 residual 3); ok expected on iOS (idb, wda: the re-read runs)', calls: [fill(FP, 'dialRefuses', '421')], judge: refusedOnFocus('dialRefuses', '+421 ') },
+  { id: 'fp2', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus and refuses every key: did not change on iOS (idb, wda: the re-read runs); on Android (uiautomator: the re-read skipped, the inserted `+421 ` holds `421`) a Filled hedged on its ⚠ line, ok and counted under ADR 0028 residual 3, and without the line a MISMATCH fill-claim', calls: [fill(FP, 'dialRefuses', '421')], judge: refusedOnFocus('dialRefuses', '+421 ') },
   // The same on React Native (`--app react-native`): rn-format's fields, onChangeText reformatting (src/format.ts).
   { id: 'rf1', cell: RF, says: 'fill, no clear, the RN field that groups an IBAN in fours', calls: [fill(RF, 'G.field', 'SK3112000000')], judge: holds('G', 'SK31 1200 0000') },
   { id: 'rf2', cell: RF, says: 'fill, clear, the RN field that groups an amount by thousands', calls: [fill(RF, 'A.field', '1234567,89', true)], judge: holds('A', `1${NBSP}234${NBSP}567,89`) },

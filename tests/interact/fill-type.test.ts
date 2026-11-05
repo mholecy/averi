@@ -67,6 +67,18 @@ function scripted(opts: { keep?: number[]; elsewhere?: (text: string) => string 
 }
 
 describe('typeAndConfirm — type, confirm, and send again only what the field provably dropped', () => {
+  it('D64b-3: the answer\'s focusUnread is handed on with the landing, and only then', async () => {
+    const around = scripted({ prefilled: '+421 ' });
+    expect(await typeAndConfirm(around.io, { ...around.intent, value: '421', before: '', held: 'unread', delivery: 'may-arrive-late' })).toEqual({
+      kind: 'landed',
+      observed: '+421 421',
+      again: [],
+      focusUnread: { shows: 8 },
+    });
+    const exact = scripted();
+    expect(await typeAndConfirm(exact.io, { ...exact.intent, held: 'unread', delivery: 'may-arrive-late' })).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });
+  });
+
   it('a landed typing sends nothing again', async () => {
     const { io, intent, typed, dropped } = scripted();
     expect(await typeAndConfirm(io, intent)).toEqual({ kind: 'landed', observed: 'Jan Novak', again: [] });

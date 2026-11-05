@@ -211,8 +211,9 @@ export async function fillField(
   //   tail's retype — hence the delivery gate: iOS keeps the re-read, Android (never retyping a tail) skips it.
   // - what the field showed before typing (`shownBeforeTyping`): empty before the tap, and taken as empty. The cost:
   //   a plain field that inserts text on focus (a `+421 ` prefix) and takes none of the typing PASSES when the inserted
-  //   text holds the value (`421` typed: ADR 0028 residual 3, follow-up D64b), and otherwise is worded as a length
-  //   mismatch (or same-length), not as "did not change".
+  //   text holds the value (`421` typed), and otherwise is worded as a length mismatch (or same-length), not as "did not
+  //   change". The pass says so where the reading is not exactly the value (`focusUnread`: fill-landing.ts#Landing, from
+  //   the `'unread'` below; ADR 0028's D64b-3 amendment and residual 3).
   // undefined: the re-read is made. Else `from`, the screen the field was resolved on — the wording of a `lost`
   // alone (refetch).
   const delivery = adapter.typingDelivery ?? 'may-arrive-late';
@@ -354,6 +355,7 @@ export async function fillField(
   let readBack: ReadBack = value === '' && clearEnd?.kind === 'lost' ? { kind: 'lost', why: clearEnd.why } : { kind: 'nothing-typed' };
   let retyped: number[] = [];
   let reformatted: FillResult['reformatted'];
+  let focusUnread: FillResult['focusUnread'];
   // Not an input, and nothing shows the text landed in it: name the input
   // the caller probably meant. Warned, NOT refused (2026-10-08): on iOS idb a
   // floating label is a separate `text` node over its field, and a tap on it
@@ -418,6 +420,7 @@ export async function fillField(
     if (typed.kind === 'landed') {
       retyped = typed.again.flatMap((a) => (a.kind === 'tail' ? [a.length] : []));
       reformatted = typed.reformatted;
+      focusUnread = typed.focusUnread;
     }
     readBack =
       typed.kind === 'not-taken'
@@ -446,6 +449,7 @@ export async function fillField(
     readBack,
     ...(retyped.length > 0 && { retyped }),
     ...(reformatted !== undefined && { reformatted }),
+    ...(focusUnread !== undefined && { focusUnread }),
     notInput: readBack.kind === 'landed' ? undefined : await notInput(),
   };
 }

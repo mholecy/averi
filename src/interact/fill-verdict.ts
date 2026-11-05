@@ -51,11 +51,12 @@
  *   typed, read-back `nothing-typed`) that stopped on unchanged deletes is
  *   therefore unverified: `cleared` in deletes, its reason the only one.
  * - `caveats` order: the not-an-input finding, then the masked-append
- *   warning, then a reformat's added point. fill.ts never produces two of
- *   them together: a not-input finding needs a read-back that did not land,
- *   and the other two a landed one — a masked-append an input whose masked
- *   reading took the text, a reformatted point a plain reading (a masked one
- *   is never a reformat).
+ *   warning, then a reformat's added point, then text around the value
+ *   unread. fill.ts never produces two of them together: a not-input finding
+ *   needs a read-back that did not land, and the others a landed one — a
+ *   masked-append an input whose masked reading took the text, after a re-read
+ *   that ran; a reformatted point a plain reading (a masked one is never a
+ *   reformat); a focus-unread a re-read skipped and no reformat.
  *
  * It judges facts, never a reading: what a read-back that missed the value
  * differs by (`Difference`) is interact/fill-landing.ts#readingOf's,
@@ -124,11 +125,18 @@ export interface Sent {
  *   thousands separator by its place, but the reading cannot tell it from a
  *   decimal point (`1.234` for `1234`: de-DE, or a three-decimal mask). The
  *   fill passes, the reformat said here instead of the aside.
+ * - `focus-unread` (D64b-3, FillResult.focusUnread): the field shows `shows`
+ *   characters for the `typed` ones, the value among them, and its text after
+ *   focus was never read: they may not all come from the keys, possibly none
+ *   (ADR 0028 residual 3). The fill passes, as a caveat and not a reason: a
+ *   field that adds a mark or takes keys after an inserted prefix is the
+ *   common reading, and the tree cannot tell the two.
  */
 export type Caveat =
   | { code: 'not-input'; role: string; typed: boolean; input: NearbyInput | 'none' | 'unread' }
   | { code: 'masked-append'; held: number }
-  | { code: 'reformatted-point'; reformat: PointedReformat };
+  | { code: 'reformatted-point'; reformat: PointedReformat }
+  | { code: 'focus-unread'; shows: number; typed: number };
 
 /** A fill, judged. Built only by `judgeFill`; its invariants are the module header's. */
 export interface FillVerdict {
@@ -189,6 +197,7 @@ export function judgeFill(r: FillResult): FillVerdict {
   if (r.maskedAppend !== undefined) caveats.push({ code: 'masked-append', held: r.maskedAppend.held });
   const { reformatted } = r;
   if (reformatted !== undefined && hasPoint(reformatted)) caveats.push({ code: 'reformatted-point', reformat: reformatted });
+  if (r.focusUnread !== undefined) caveats.push({ code: 'focus-unread', shows: r.focusUnread.shows, typed });
   return {
     did: verified ? 'filled' : typed > 0 ? 'typed' : sent !== undefined ? 'cleared' : 'focused',
     typed,

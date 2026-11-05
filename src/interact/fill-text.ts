@@ -255,6 +255,9 @@ const LOST_WHY_TEXT: Record<LostWhy, string> = {
   unmatched: ' (the selector no longer matches it)',
 };
 
+/** D64b-3's clause, the words the truth harness holds a hedged Filled to (`focusTextNotReadSaid` in scripts/truth/replies.ts). */
+export const FOCUS_TEXT_NOT_READ = 'its text after focus was not read';
+
 const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
   'not-input': ({ role, typed, input }) => {
     const head =
@@ -273,6 +276,10 @@ const CAVEAT_SENTENCE: SentenceTable<Caveat> = {
   'masked-append': ({ held }) => `masked field already held ${charactersText(held)} and clear is not set — typing APPENDS; pass clear: true to replace`,
   'reformatted-point': ({ reformat }) =>
     `${reformattedText(reformat)} — it added '${reformat.point}': check it is a thousands separator, not a decimal point`,
+  // Lengths only, like every sentence here: the field's text is never said, and it may be a masked field's.
+  'focus-unread': ({ shows, typed }) =>
+    `the field shows ${charactersText(shows)} for the ${typed} typed, and ${FOCUS_TEXT_NOT_READ}, so that text may not all come from these keys ` +
+    '(a field can insert text on focus): check its value with ui_snapshot',
 };
 
 /**

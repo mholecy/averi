@@ -5,7 +5,8 @@ orchestrator's decision on the owner's standing: fast AND stable — a fill that
 misses a transformed value is unacceptable). Implemented in 5ea9bfd2…546c8804, merged 1083523e. Amended 2026-11-01
 (D31: the residuals numbered under "Residuals accepted", p5's secure field that iOS clears accepted as residual 2).
 Amended 2026-11-03 (D64, docs only: the safety claim and cost C1 corrected — a focus-inserted prefix that holds the
-value passes with no key landed; residual 3 accepted; follow-up D64b).
+value passes with no key landed; residual 3 accepted; follow-up D64b). Amended 2026-11-05 (D64b-3: option B3b, a caveat
+where such a reading is not exactly the value; residual 3 restated).
 
 ## Context
 
@@ -73,7 +74,7 @@ The 350 ms focus delay stays.
 
 - (C1) A plain field that INSERTS text on focus (a `+421 ` prefix) and takes none of the typing is reported as a
   length mismatch, not as "the field did not change" (`shownBeforeTyping` was the empty pre-tap reading). Every key
-  landing still passes (`includes`). See the D64 amendment below.
+  landing still passes (`includes`), with a ⚠ line since D64b-3. See the D64 and D64b-3 amendments below.
 - (C2) An autofilled field said plain fails where the re-read would have passed it with the masked-append warning.
 
 ## Residual
@@ -183,6 +184,63 @@ there; noted for D64b.
 fails with it, still before `reportDroppedTail`; a shorter masked reading gets the same difference from `readingOf`'s
 miss. A2's amendment above names `differenceOf`, now private. Timing and every reply are unchanged.
 
+## Amendment: text around the value, the re-read skipped, is said (2026-11-05, D64b-3)
+
+**Context.** D64b-2's measurement (2026-11-05), on emulator-5554 (averi_lab, API 33) at main 5e54f9e1, three runs each, the same bytes
+every run:
+- fp1 (keys land): ok, `Filled id:"lab.form-focus-prefix.dialLands" (3 characters)`;
+- fp2 (keys refused): MISMATCH `fill-claim`, known as residual 3, `Filled id:"lab.form-focus-prefix.dialRefuses" (3
+  characters)`, the app holding `+421 `;
+- a `uiautomator dump` costs a median 1985 ms right after the tap, 1972 ms after the tap and 350 ms, 1979 ms settled.
+
+**Decision: B3b, not B1c.** B1c (always re-read, the read replacing the 350 ms focus delay) nets about +1.6 s, about +23 %
+on a 7245 ms skipped fill (form-basic), every skipped fill paying it for a field no real app has been seen to be. The
+row's condition, "B1c only if the dump is far cheaper", fails: the dump is as dear at every moment measured. B3b costs
+no device call, no sleep and no change of order.
+
+Where the re-read was skipped (`held: 'unread'`, which fill.ts sets on that one condition and `said-plain` reads too)
+and a reading lands holding the value among other text, the closed answer says so:
+`fill-landing.ts#Landing`'s `landed` carries `focusUnread: { shows }`, no new question beside `readingOf`. fill-type.ts
+hands it on, `FillResult.focusUnread`, `judgeFill`'s caveat `focus-unread`, fill-text.ts's words, the head still Filled,
+on both media:
+
+    ⚠ the field shows 8 characters for the 3 typed, and its text after focus was not read, so that text may not all come from these keys (a field can insert text on focus): check its value with ui_snapshot
+
+The number is what the read that landed saw, fp1's 8 in all its three runs here, no fixed property of the field: the poll
+stops at the first landing (`pollValue`, older than this amendment), so keys arriving after a read could leave fp1 landing
+on the prefix alone and saying 4 (inferred, not seen).
+
+Lengths only: a fill's sentences never carry the field's text, which may be a credential (fill-text.ts). A caveat and no
+reason, so not "NOT verified": the same reading is what a field that takes the keys after its prefix shows (fp1), or a
+field that adds a mark of its own to a truly empty one, and the tree cannot tell them apart.
+
+What keeps its bytes, no `focusUnread`:
+- a reading exactly the value, the common path;
+- a masked reading, which lands at the typed length alone (`said-plain` takes every other): no text beside the value;
+- a `reformatted` landing: it holds the typed characters and separators alone, and the aside already says what the field
+  shows. An inserted text would have to be the value with separators, the shape of the exact reading below;
+- the `placeholder` kind; every fill whose re-read ran; every clear fill (no skip); iOS, which never skips.
+
+**Consequences.**
+- fp2 now replies Filled with the ⚠ line. Its judge (`refusedOnFocus`, scripts/truth/live-forms.ts) takes that, under uiautomator alone,
+  as an honest hedge: ok, counted under this residual (`LiveVerdict.accepted`, as the carousel's hedged maxSwipes), and
+  the case is struck off live-known.ts. A plain Filled over `+421 `, or a hedge from idb or wda, is a MISMATCH `fill-claim`
+  nothing files: the judge is stricter than the KNOWN entry was.
+- fp1's reading gets the same line, true of it: the text before the keys is the field's. `holds` asks the model, as ever.
+- Device reading: the Android parser trims attribute values (fast-xml-parser's default), so `+421 ` is read as `+421`
+  and fp2's line says 4 characters where the app holds 5 (pinned in tests/adapters/android.test.ts). Not this amendment's
+  to change: the line says what averi read, and `ui_snapshot` reads through the same parser. The trim also silences the
+  line: a typed `+421` into a field that inserted `+421 ` and refused every key reads as exactly the value, so it replies a
+  plain Filled while the app holds 5 characters (residual 3; the trim's own false failures are backlog D72).
+- A field that adds a mark to a truly empty field (`50%` for `50`, `+421903123456` for `421903123456`) gets the line too on
+  Android, a caveat true of it, at no cost to the fill.
+
+**Left open, stated.** Residual 3 as restated below. The wider sibling stays a named residual, not covered here: on every
+source, a NON-empty plain field's `before` is its pre-tap reading, never re-read (fill.ts), so a field that inserts on
+focus a text holding the value has the same hole, and no caveat, since `held` is not `'unread'` there. iOS: the owner's
+batch (rebuild the lab app, fp1 and fp2 three times, a forms regression) is still to be read; no change is expected, as
+the re-read runs there.
+
 ## Residuals accepted
 
 1. **A source that wrongly says plain of a masking field**, an autofill of N bullets on focus and exactly N dropped
@@ -190,6 +248,10 @@ miss. A2's amendment above names `differenceOf`, now private. Timing and every r
 2. **iOS clears a secure field when typing resumes.** A no-clear fill into a prefilled secure field leaves only what
    was typed; the read-back's length rule fails it and averi says so (LOUD, the amendment above). Filed in
    live-known.ts as `ios idb|wda p5` (`loud-changed` on `refused`).
-3. **A prefix inserted on focus that holds the value passes the skipped re-read** (the D64 amendment): on Android, an
-   empty plain field by sole id that shows `+421 ` once focused and takes none of a typed `421` replies Filled — the
-   re-read would have read `+421 ` first and failed it as "did not change". Unmeasured; follow-up D64b.
+3. **A prefix inserted on focus that holds the value passes the skipped re-read** (the D64 amendment, restated by
+   D64b-3's): on Android, an empty plain field by sole id that shows `+421 ` once focused and takes none of a typed `421`
+   replies Filled — the re-read would have read `+421 ` first and failed it as "did not change" — now with a ⚠ line that
+   its text after focus was not read (measured: live cases fp1, fp2). Silent only where the inserted text IS the value as
+   read, exactly or with separators (`421`, `4 21`; on Android also with outer spaces the dump's parser trims, `+421 ` for
+   a typed `+421`, the app holding 5 characters): no reading tells that from the typing. Filed by fp2's judge
+   (`FOCUS_UNREAD_HEDGE`), no more in live-known.ts.

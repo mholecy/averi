@@ -603,7 +603,8 @@ sees). Nothing captured moves, so no golden row (as L7's cells):
   not fail the forms run. Expected: under uiautomator that MISMATCH (averi reads `+421 ` against an empty `before` and
   passes it by containment), filed in live-known.ts as ADR 0028 residual 3 until D64b-3's caveat; under idb and wda ok
   (the re-read runs, reads `+421 ` before typing, and the unchanged reading is refused as "did not change"), not filed.
-  Batch D64b-2 builds both apps and reads the two cases.
+  Batch D64b-2 builds both apps and reads the two cases. Since D64b-3 (ADR 0028's amendment) Android's fp2 is a Filled
+  hedged on a ⚠ line, ok and counted, and is no more in live-known.ts; a Filled without the line is a MISMATCH `fill-claim`.
 
 ### Device facts (batches 1–13)
 

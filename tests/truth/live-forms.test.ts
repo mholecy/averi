@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { judged, lateWithPanel, selectCases } from '../../scripts/truth/live-cases.js';
-import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedHolding, refusedKept, refusedOnFocus } from '../../scripts/truth/live-forms.js';
+import { FOCUS_UNREAD_HEDGE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedHolding, refusedKept, refusedOnFocus } from '../../scripts/truth/live-forms.js';
 import { knownEntry, knownLive } from '../../scripts/truth/live-known.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 import { landingOf, readingOf, type Expectation } from '../../src/interact/fill-landing.js';
+import { fillReply } from '../../src/interact/fill-text.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import { readLiveRecord, recordedCase, withFieldValue, type LiveRecord } from '../helpers/live-records.js';
 
@@ -992,7 +993,7 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
  * fp1 and fp2 (D64b): form-focus-prefix's fields insert `+421 ` when focused while empty — dialLands then takes the keys,
  * dialRefuses refuses every one. A fill of `421` by sole id without clear: the very path whose post-focus re-read
  * Android skips (fill.ts, ADR 0028), so averi there judges the reading `+421 ` against an empty `before` and passes it by
- * containment (ADR 0028 residual 3). Judged here over SYNTHETIC states (no device has run the cell yet): the launch
+ * containment (ADR 0028 residual 3). Judged here over SYNTHETIC states, so that no device is needed (D64b-2 and D64b-3 ran the cell on Android): the launch
  * with both fields empty, the end state the app's model would hold.
  */
 describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or refused', () => {
@@ -1039,10 +1040,53 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     expect(fp1.judge(syntheticLeft('dialLands', '+421 '), [FILLED('dialLands')], 'uiautomator', SYNTHETIC_LAUNCHED, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
   });
 
-  it('fp2: the field refused every key — an error saying it did not change is ok; a Filled is a MISMATCH fill-claim (Android today, the skipped re-read)', async () => {
+  it('fp2: the field refused every key — an error saying it did not change is ok; a plain Filled is a MISMATCH fill-claim, and nothing files it', async () => {
     const [, fp2] = await cases('android');
     expect(fp2.judge(syntheticLeft('dialRefuses', '+421 '), [UNCHANGED], 'wda', SYNTHETIC_LAUNCHED, [])).toMatchObject({ outcome: 'ok', kind: 'refused' });
-    expect(fp2.judge(syntheticLeft('dialRefuses', '+421 '), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim', kind: 'other' });
+    const plain = fp2.judge(syntheticLeft('dialRefuses', '+421 '), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED, []);
+    expect(plain).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim', kind: 'other' });
+    expect(knownLive('android', 'uiautomator', 'fp2', plain.cls, plain.kind)).toBeUndefined();
+  });
+
+  // The reply as averi writes it (fill-text.ts), so a word changed there reaches these judges.
+  const hedged = (tag: string, shows: number) => fillReply({ role: 'textfield', typed: 3, readBack: { kind: 'landed' }, focusUnread: { shows } }, `id:"lab.form-focus-prefix.${tag}"`);
+
+  it('fp2 (D64b-3): a Filled hedged on its ⚠ line under uiautomator is ok, counted under residual 3; nowhere else, and for nothing but the prefix held', () => {
+    const judge = refusedOnFocus('dialRefuses', '+421 ');
+    const reply = hedged('dialRefuses', 5);
+    expect(reply).toMatch(/^Filled id:"lab\.form-focus-prefix\.dialRefuses" \(3 characters\)\n⚠ /);
+    expect(judge(syntheticLeft('dialRefuses', '+421 '), [reply], 'uiautomator', SYNTHETIC_LAUNCHED)).toEqual({
+      outcome: 'ok',
+      kind: 'other',
+      why: expect.stringContaining('its text after focus was not read'),
+      accepted: FOCUS_UNREAD_HEDGE,
+    });
+    expect(FOCUS_UNREAD_HEDGE.residual).toMatch(/^residual:ADR 0028 residual 3 — /);
+    // The sources that re-read after focus cannot honestly say it: a fill-claim, and not filed.
+    for (const source of ['idb', 'wda'] as const) {
+      const v = judge(syntheticLeft('dialRefuses', '+421 '), [reply], source, SYNTHETIC_LAUNCHED);
+      expect(v).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+      expect(v.accepted).toBeUndefined();
+    }
+    // The hedge buys nothing else: the keys taken is the lab's fault; an unfocused field averi's false claim.
+    expect(judge(syntheticLeft('dialRefuses', '+421 421'), [reply], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'SKIP' });
+    expect(judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), [reply], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim-unfocused' });
+  });
+
+  it('fp2 (D64b-3): the words alone are no hedge — in the head (a selector echoing them), or on a line that is no ⚠, or behind NOT verified', () => {
+    const judge = refusedOnFocus('dialRefuses', '+421 ');
+    const words = 'its text after focus was not read';
+    for (const reply of [`Filled id:"${words}" (3 characters)`, `Filled id:"x" (3 characters)\n${words}`]) {
+      expect(judge(syntheticLeft('dialRefuses', '+421 '), [reply], 'uiautomator', SYNTHETIC_LAUNCHED), reply).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
+    }
+    expect(judge(syntheticLeft('dialRefuses', '+421 '), [`Typed 3 characters into id:"x" — NOT verified: y\n⚠ ${words}`], 'uiautomator', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
+  });
+
+  it('fp1 (D64b-3): its reading gets the same ⚠ line on Android; `holds` asks the model: ok with the keys there, a MISMATCH fill-claim without — a hedge saves only fp2', async () => {
+    const [fp1] = await cases('android');
+    const reply = hedged('dialLands', 8);
+    expect(fp1.judge(syntheticLeft('dialLands', '+421 421'), [reply], 'uiautomator', SYNTHETIC_LAUNCHED, [])).toEqual({ outcome: 'ok', kind: 'other', why: expect.any(String) });
+    expect(fp1.judge(syntheticLeft('dialLands', '+421 '), [reply], 'uiautomator', SYNTHETIC_LAUNCHED, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'fill-claim' });
   });
 
   it('refusedOnFocus: the inserted text not held — LOUD loud-changed (keys landed, or nothing inserted); held but another error, or no claim — LOUD loud-untouched', () => {
@@ -1115,15 +1159,10 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     expect(claimed('421+421 ')).toEqual({ outcome: 'SKIP', why: 'lab fault: the field holds "421+421 ", neither the prefix nor the prefix and keys' });
   });
 
-  it('known: fp2 under uiautomator alone, a fill-claim on a Filled (`other`), ADR 0028 residual 3; fp1 nowhere, fp2 not under idb or WDA (they re-read after focus)', () => {
+  it('known: neither case anywhere since D64b-3 (fp2 is accepted on its hedge, or not ok)', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
     const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => FP_IDS.filter((id) => knownEntry(platform, source, id) !== undefined).map((id) => `${platform} ${source} ${id}`)));
-    expect(known).toEqual(['android uiautomator fp2']);
-    expect(knownEntry('android', 'uiautomator', 'fp2')).toEqual({ note: expect.stringMatching(/^residual:ADR 0028 residual 3 — /), cls: 'fill-claim', kind: 'other' });
-    expect(knownLive('android', 'uiautomator', 'fp2', 'fill-claim', 'other')).toMatch(/^residual:ADR 0028 residual 3 — /);
-    // Another rule, or another kind of reply, is not known.
-    expect(knownLive('android', 'uiautomator', 'fp2', 'loud-untouched', 'refused')).toBeUndefined();
-    expect(knownLive('android', 'uiautomator', 'fp2', 'fill-claim', 'refused')).toBeUndefined();
+    expect(known).toEqual([]);
     // The ensure group's h2 is not touched by it.
     expect(knownEntry('android', 'uiautomator', 'h2')).toBeUndefined();
   });

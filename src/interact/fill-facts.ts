@@ -150,6 +150,11 @@ export interface FillResult {
    */
   reformatted?: Reformat;
   /**
+   * The read-back landed on text around the value in a field whose text after focus was not read (`FocusUnread`, D64b-3);
+   * absent when the re-read ran or the reading is exactly the value.
+   */
+  focusUnread?: FocusUnread;
+  /**
    * Set when the matched node is not an input (role ≠ INPUT_ROLE) AND the
    * read-back did not show the text in it — a node whose value took the
    * text is an input whatever its role (an iOS search field reads `other`).
@@ -158,6 +163,16 @@ export interface FillResult {
    * not a verdict: the fill does not fail for it).
    */
   notInput?: { input: NearbyInput | 'none' | 'unread' };
+}
+
+/**
+ * A reading landed holding the value among other text, and the post-focus re-read was skipped
+ * (docs/adr/0028-a-fill-re-reads-after-focus-only-where-focus-can-change-the-count.md, its D64b-3 amendment), so that
+ * text may not all come from the keys: a field can insert text on focus (`+421 ` for a typed `421`, no key landed).
+ * `shows` the reading's length. A length, never content, as everywhere here.
+ */
+export interface FocusUnread {
+  shows: number;
 }
 
 /**
