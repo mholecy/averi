@@ -232,7 +232,7 @@ describe('cardMoved: the one axis the same card\'s position shifted along betwee
   });
 });
 
-describe('the card moves (D59: unfit-axis.ts#CardMove)', () => {
+describe('the card moves (D59: motion-ledger.ts#CardMove)', () => {
   const LEFT: Stroke = { from: { x: 200, y: 497 }, to: { x: 768, y: 497 } };
   const OTHER: Stroke = { from: { x: 300, y: 497 }, to: { x: 700, y: 497 } };
   const start: Row = { since: 'start', at: [at(574, 380, 506, 234)] };
