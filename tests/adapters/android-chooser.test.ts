@@ -501,12 +501,14 @@ describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', (
   describe.each([
     ['shared', 25, { label: 'AveriLab', centre: { x: 540, y: 2074 } }],
     ['pair', 26, { label: 'AveriLab', detail: 'AveriLab twin', centre: { x: 540, y: 2074 } }],
-  ] as const)('the with_default chooser of averilab://%s/open (batch-13 rerun 1, real)', (link, nodes, app) => {
+  ] as const)('D55d: the with_default chooser of averilab://%s/open (batch-13 rerun 1, real)', (link, nodes, app) => {
     const withDefault = () => dumped(`uiautomator-lab-resolver-with-default-${link}.xml`);
     const outsideList = (tree: UiNode): UiNode[] => {
       const inList = new Set(everyNode(one(tree, 'resolver_list')));
       return [...everyNode(tree)].filter((n) => !inList.has(n));
     };
+    /** The `icon`s outside the list: the with_default header's. */
+    const headerIcons = (tree: UiNode): UiNode[] => outsideList(tree).filter((n) => n.identifier === 'icon');
 
     it('undefined: the reply fails open to D55\'s', async () => {
       expect(chooserSheet(await withDefault())).toBeUndefined();
@@ -516,8 +518,10 @@ describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', (
       const tree = await withDefault();
       expect([...everyNode(tree)]).toHaveLength(nodes);
       expect(byId(tree, 'resolver_list')).toHaveLength(1);
-      expect(one(tree, 'resolver_list').children).toHaveLength(1);
-      expect(outsideList(tree).filter((n) => n.identifier === 'icon').map((n) => n.rect)).toEqual([{ x: 22, y: 1472, width: 88, height: 88 }]);
+      const [row, ...moreRows] = one(tree, 'resolver_list').children;
+      expect(moreRows).toEqual([]);
+      expect(row === undefined ? [] : byId(row, 'text1').map((n) => n.label)).toEqual(['AveriLab']);
+      expect(headerIcons(tree).map((n) => n.rect)).toEqual([{ x: 22, y: 1472, width: 88, height: 88 }]);
       expect(outsideList(tree).filter((n) => n.identifier === 'text1')).toEqual([]);
       expect(byId(tree, 'title').map((n) => n.label)).toEqual(['Open with AveriLab']);
       expect(byId(tree, 'text2').map((n) => n.label)).toEqual(link === 'pair' ? ['AveriLab twin'] : []);
@@ -525,7 +529,7 @@ describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', (
 
     it('the counterfactual: the header\'s `icon` removed, the rest is read as a one-row sheet (the row\'s text2 its detail; clickable never read)', async () => {
       const tree = await withDefault();
-      const [header] = outsideList(tree).filter((n) => n.identifier === 'icon');
+      const [header] = headerIcons(tree);
       if (header === undefined) throw new Error('no header icon');
       header.identifier = null;
       expect(chooserSheet(tree)).toEqual({

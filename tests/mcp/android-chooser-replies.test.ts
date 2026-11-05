@@ -89,11 +89,13 @@ flows:
 
   it("open_deep_link's reply over the chooser is D55's, unchanged (batch-11's raise, as averi replied it)", async () => {
     const adapter = await chooserUp();
-    expect(deepLinkText('android', 'averilab://shared/open', await adapter.openDeepLink('averilab://shared/open'))).toBe(LINK_FAILED_OPEN('averilab://shared/open'));
+    const linked = await adapter.openDeepLink('averilab://shared/open');
+    expect(deepLinkText('android', 'averilab://shared/open', linked)).toBe(LINK_FAILED_OPEN('averilab://shared/open'));
   });
 });
 
-const withDefault = (link: 'shared' | 'pair') => readFileSync(new URL(`../fixtures/uiautomator-lab-resolver-with-default-${link}.xml`, import.meta.url), 'utf8');
+const withDefault = (link: 'shared' | 'pair') =>
+  readFileSync(new URL(`../fixtures/uiautomator-lab-resolver-with-default-${link}.xml`, import.meta.url), 'utf8');
 
 /**
  * The `uiautomator dump`s D55c fails open on, each named: each leaves the replies above byte for byte. The last two
@@ -105,8 +107,8 @@ const FAILED_DUMPS: [string, string | Error][] = [
   ['a failed dump', execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', 255, "adb: device 'e' not found\n")],
   ['a timed-out dump', execErrorLikeExec('adb -s e exec-out uiautomator dump /dev/tty', null, '', { timedOut: true })],
   ['another layout (the lab\'s own screen)', readFileSync(new URL('../fixtures/uiautomator-lab-open.xml', import.meta.url), 'utf8')],
-  ['the with_default chooser of averilab://shared/open (batch-13)', withDefault('shared')],
-  ['the with_default chooser of averilab://pair/open (batch-13)', withDefault('pair')],
+  ['D55d: the with_default chooser of averilab://shared/open (batch-13 rerun 1)', withDefault('shared')],
+  ['D55d: the with_default chooser of averilab://pair/open (batch-13 rerun 1)', withDefault('pair')],
 ];
 
 // D55c (ADR 0041's D55c amendment): the same replies when the chooser's dump is batch-10's fresh layout — the sheet
@@ -178,7 +180,7 @@ flows:
 
   // D55d: each link batch-13 rerun 1 raised, with its own with_default tree in front, replies the pre-D55c text for
   // its own URL — what averi replied live, 3/3 per link.
-  it.each(['shared', 'pair'] as const)("averilab://%s/open over its own with_default tree: open_deep_link's reply as batch-13 recorded it, byte for byte", async (link) => {
+  it.each(['shared', 'pair'] as const)("D55d: averilab://%s/open over its own with_default tree: open_deep_link's reply as batch-13 rerun 1 recorded it, byte for byte", async (link) => {
     const url = `averilab://${link}/open`;
     const adapter = await chooserUp(withDefault(link));
     expect(deepLinkText('android', url, await adapter.openDeepLink(url))).toBe(LINK_FAILED_OPEN(url));

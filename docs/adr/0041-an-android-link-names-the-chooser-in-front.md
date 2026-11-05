@@ -9,8 +9,8 @@ never matched; implemented on `fix/d55r-focused-app-api33`).
 Amended 2026-11-03 (batch-11: D55 device-verified with D55r's fix — the last paragraph of the D55r amendment).
 Amended 2026-11-03 (D55b: `launch_app`'s `-p` start and monkey's refusal read the same focus; implemented on
 `fix/d55b-launch-chooser`).
-Amended 2026-11-05 (D55d: batch-13's with_default trees committed as fixtures and the fail-open pinned on them — see
-the amendment below).
+Amended 2026-11-05 (D55d: batch-13's with_default trees committed as fixtures and the fail-open pinned on them;
+implemented on `test/d55d`).
 
 ## Context
 
