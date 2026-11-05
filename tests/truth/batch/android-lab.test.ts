@@ -8,7 +8,7 @@ import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import { ANDROID_NEED, androidLab, CHOOSER_WINDOW, chooserStretch, HANDLER_URLS, keepTree, probeRestore, withReads } from '../../../scripts/truth/batch/android-lab.js';
 import { LabEmu, reinstallProgress } from '../../../scripts/truth/batch/lab-emu.js';
 import type { BlockCtx, NeedCtx } from '../../../scripts/truth/batch/runner.js';
-import { CATALOG, DEVICE_APK, LAB_SERIAL, labWorld, runOf, type LabWorld, type WorldOptions } from './lab-fakes.js';
+import { CATALOG, DEVICE_APK, fixture, LAB_SERIAL, labWorld, runOf, type LabWorld, type WorldOptions } from './lab-fakes.js';
 
 // scripts/truth/batch/android-lab.ts over the fake lab (lab-fakes.ts): the `android` need and its recheck, the
 // handlers' need, the tri-state reads around a block, a tree kept with its fitness as a fixture, the probe's own
@@ -143,6 +143,14 @@ describe('the handlers\' need: the counts a block expects (batch-11.sh:445: expe
     const off = android.handlersNeed({ 'averilab://shared/open': 3, 'averilab://cell/open': 2 }) as Spec;
     expect(await off.check(needCtx())).toEqual({ ok: false, why: 'averilab://shared/open has 2 handler(s), 3 expected; averilab://cell/open has 1 handler(s), 2 expected' });
     expect(await off.check(needCtx(runOf(world), null))).toMatchObject({ ok: false });
+  });
+
+  it('its recheck reads the counts again: a handler gone since the check is seen before the next block (hand mutant H43)', async () => {
+    const n = androidLab({ settle }).handlersNeed({ 'averilab://shared/open': 2 }) as Spec;
+    expect(await n.check(needCtx())).toMatchObject({ ok: true });
+    const one = fixture('query-activities-api33-b10-cell.txt');
+    const later: Run = async (cmd, args, call) => (args.includes('query-activities') ? { code: 0, timedOut: false, signal: null, out: one, err: '' } : runOf(world)(cmd, args, call));
+    expect(await n.alive(needCtx(later))).toEqual({ ok: false, why: 'averilab://shared/open has 1 handler(s), 2 expected' });
   });
 });
 
