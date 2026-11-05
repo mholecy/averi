@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parseWdaSourceValue } from '../../src/adapters/wda-source.js';
+import { OPPOSITE_EDGE } from '../../src/ui-tree/geometry.js';
 import {
   absentFromViewport,
   clipsOf,
@@ -865,3 +866,9 @@ describe('subtract, largestRect, rectCentre — the cover arithmetic draw-order.
   });
 });
 
+
+describe('OPPOSITE_EDGE: the side across a rect from each edge', () => {
+  it('top and bottom, left and right, each the other', () => {
+    expect(OPPOSITE_EDGE).toEqual({ top: 'bottom', bottom: 'top', left: 'right', right: 'left' });
+  });
+});

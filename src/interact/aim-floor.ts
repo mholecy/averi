@@ -23,13 +23,13 @@ import { FIT_ROOM_PX } from './scroll-read.js';
  */
 
 /** One stroke of this call over a proven cut: its drawn length, and how far it carried the match's uncut side toward revealing the cut edge (flush-check.ts#revealedBy's growth). */
-export interface Carried {
+export interface StrokeCarry {
   readonly drawn: number;
   readonly moved: number;
 }
 
 /** The stop's facts: the `room` left on the match's uncut side, and the stroke judged — its `drawn` length and the px it `moved` the match. */
-export interface AimFloor {
+export interface Overshoot {
   readonly room: number;
   readonly drawn: number;
   readonly moved: number;
@@ -39,15 +39,15 @@ export interface AimFloor {
 export interface AimAsk {
   readonly room: number;
   readonly next: number;
-  readonly carried: readonly Carried[];
+  readonly strokes: readonly StrokeCarry[];
 }
 
 /**
- * The stop (`AimFloor`) when the least carry of the measured strokes no longer than `next` (within FIT_ROOM_PX) is more
+ * The stop (`Overshoot`) when the least carry of the measured strokes no longer than `next` (within FIT_ROOM_PX) is more
  * than `room` + FIT_ROOM_PX — on a tie of carries the shorter stroke is named — else undefined.
  */
-export function aimFloor({ room, next, carried }: AimAsk): AimFloor | undefined {
-  const short = carried.filter((c) => c.drawn <= next + FIT_ROOM_PX);
+export function aimFloor({ room, next, strokes }: AimAsk): Overshoot | undefined {
+  const short = strokes.filter((c) => c.drawn <= next + FIT_ROOM_PX);
   if (short.length === 0) return undefined;
   const least = short.reduce((a, b) => (b.moved < a.moved || (b.moved === a.moved && b.drawn < a.drawn) ? b : a));
   return room + FIT_ROOM_PX < least.moved ? { room, drawn: least.drawn, moved: least.moved } : undefined;

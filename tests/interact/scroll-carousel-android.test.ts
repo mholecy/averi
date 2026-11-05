@@ -565,7 +565,7 @@ describe('`fully: true` on a View-cut card no swipe can bring whole (D68): the s
     for (const maxSwipes of [6, 10]) {
       const played = replay({ ...FULLY_LEFT, maxSwipes }, run(8).cardX.map(recyclerAt));
       expect(played.steps.filter((s) => s.do === 'stroke')).toHaveLength(6);
-      expect(played.outcome).toMatchObject({ kind: 'unaimable', swipes: 6, aim: { edge: 'right', container: CAROUSEL, revealed: 27, floor: { room: 15, drawn: 48, moved: 27 } } });
+      expect(played.outcome).toMatchObject({ kind: 'unaimable', swipes: 6, aim: { edge: 'right', container: CAROUSEL, revealed: 27, overshoot: { room: 15, drawn: 48, moved: 27 } } });
       expect(failureOf(played, `id:${RC}`).message).toBe(
         `scroll_until id:${RC} stopped after 6 swipes, without swiping further — element is on screen but its right edge still lies on its scroll container's (66,380 948x234), ` +
           "where Android cuts a node's bounds to the container, and the last swipe toward it showed 27 px more of it — part of it likely lies past that edge still; " +
@@ -589,7 +589,7 @@ describe('`fully: true` on a View-cut card no swipe can bring whole (D68): the s
     const played = replay(FULLY_LEFT, run(n).cardX.map(recyclerAt));
     const room = run(n).cardX[6] - 66;
     if (stops) {
-      expect(played.outcome).toMatchObject({ kind: 'unaimable', swipes: 6, aim: { floor: { room } } });
+      expect(played.outcome).toMatchObject({ kind: 'unaimable', swipes: 6, aim: { overshoot: { room } } });
       expect(failureOf(played, `id:${RC}`).message).not.toMatch(/raise maxSwipes/);
     } else {
       expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 6, by: { of: 'maxSwipes' }, short: { of: 'flushCut' } });

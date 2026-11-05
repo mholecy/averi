@@ -142,7 +142,7 @@ export type { RoundRead } from './scroll-read.js';
 export type { EndProof, EndTurn, PastSide } from './course.js';
 
 /** What a stop or a shortfall carries of the flush check (interact/flush-check.ts): the stop's `Flush`, the proven cut's `FlushCut` — part of `ScrollOutcome`, so importable from here. */
-export type { Flush, FlushAim, FlushCut } from './flush-check.js';
+export type { Flush, FlushAim, FlushCut, FlushPlace } from './flush-check.js';
 
 /** What one round saw — the driver's gathering, or a test's table row. */
 export interface RoundSeen {

@@ -5,6 +5,8 @@ way past kept after the remedy, a fill into the strip refused by design, k7's "f
 2026-10-19 (orchestrator, round 7 A6, the owner's delegation): k7's residual closed by the eyes (below). Refined
 2026-10-20 (round 14, LE2): the eyes look for a clip line under idb (below).
 Amended 2026-11-03 (D62: a held reveal after a carried proof is doubted once — see the amendment below).
+Amended 2026-11-05 (D68: a reveal this call's own strokes say would most likely overshoot is not sent — see the
+amendment below).
 
 ## Context
 
@@ -399,7 +401,8 @@ match in its place), has proved the cut — content lay past that edge, and part
    px for 297) cannot carry the uncut edge out; at a content-START edge (top, left) still capped by
    PROBE_MAX_TRAVEL_FRACTION — the pull-to-refresh lies that way after a probe too; a bottom or right edge has no such
    gesture. In every other respect it is a probe: held after it → `checked`; more showing, still flush → another
-   reveal, the room taken anew; out of the flush → the ordinary stop; See the D62 amendment below.
+   reveal, the room taken anew; out of the flush → the ordinary stop; See the D62 amendment below. See the D68
+   amendment below.
 3. at the bound (no swipe or time for the reveal) is NOT "fully visible": the bound fails, its shortfall the cut the
    probe proved (`FlushCut`) — `element reached the viewport but its bottom edge still lies on its scroll container's
    (…), where Android cuts a node's bounds to the container, and a probe swipe toward it showed N px more of it
@@ -407,7 +410,7 @@ match in its place), has proved the cut — content lay past that edge, and part
    "it is cut": the probe proved part of it lay past the edge BEFORE it, not after — the last row of a list cut by
    40 px is whole after a 40-px probe that brought the list to its end, and still flush (the next reveal, had there
    been budget, would have moved nothing and said `checked`). `flush.why: 'budget'` stays for a flush stop never
-   probed; See the D62 amendment below.
+   probed; See the D62 amendment below. See the D68 amendment below.
 4. is remembered: the proof is KEPT (`flush-check.ts#ProvenCut`, in the check the round holds, `scroll-rounds.ts#State.flush`) while every later flush check finds the match
    flush on that edge of that container, and let go when one finds it anywhere else. So a read that cannot send the
    reveal — no swipe or time (`budget`), or a tree changed between the probe and its read: no room for a stroke (a
@@ -494,6 +497,22 @@ both (its 74-px probe carried S 59–62 px, but the reveal after it moved S, so 
 time beyond the budget in the doubted case (main's drop runs and the control both 6 swipes, about 16.1 s). Not
 exercised live: the Cost case proper (a held reveal after S's carried probe, one retry), and residuals (a)–(c). No
 earlier sentence of this amendment is contradicted.
+
+## Amendment: D68 — a reveal this call's own strokes say would most likely overshoot is not sent (2026-11-05)
+
+**Context.** Points 2 and 3 above send a reveal on a proven cut, or fail at the bound naming it. On the lab's
+RecyclerView carousel (C exactly as wide as the carousel, listed cut flush to it) the reveals of half the room met
+short drags that carry the card less than their length: batch-10's 10 runs all ended `maxSwipes`, C 15–28 px short,
+"… may still be cut there …; raise maxSwipes or timeoutMs" — advice more swipes do not honour.
+
+**Decision.** Before a reveal is sent, and at the bound before the `FlushCut`, the flush check asks
+`interact/aim-floor.ts#aimFloor`: when the room left on the match's uncut side is under what a stroke of this call no
+longer than that reveal carried it over the same cut (within a pixel), it sends nothing — the verdict `aim`
+(`flush-check.ts#FlushAim`), the round's `unaimable` stop, a plain failure that says another swipe would most likely
+push the match past rather than show it whole, never "fully visible" and never "raise maxSwipes". Everything else in
+points 2–4 and in the D62 amendment stands: the proof, how it is kept, the doubt, the `FlushCut` when no reveal can be
+sent. The rule, its evidence, the reply and its residuals: ADR 0021's D68 amendment
+(docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md).
 
 ## Residuals accepted
 

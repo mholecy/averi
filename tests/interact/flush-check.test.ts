@@ -348,7 +348,7 @@ describe('the flush check stops a proven cut no swipe can bring whole (D68)', ()
     for (const budget of [true, false]) {
       const seen = seeFlush(sent(proved.verdict), shown(right(80), stroke(48), { budget }));
       expect(seen).toMatchObject({ settles: false, waits: false });
-      expect(seen.verdict).toEqual({ of: 'aim', aim: { of: 'flushAim', judged: expect.objectContaining({ node: expect.objectContaining({ rect: right(80) }) }), edge: 'right', container: CLIP, revealed: 20, floor: { room: 14, drawn: 48, moved: 20 } } });
+      expect(seen.verdict).toEqual({ of: 'aim', aim: { of: 'flushAim', judged: expect.objectContaining({ node: expect.objectContaining({ rect: right(80) }) }), edge: 'right', container: CLIP, revealed: 20, overshoot: { room: 14, drawn: 48, moved: 20 } } });
     }
   });
 
@@ -392,7 +392,7 @@ describe('the flush check stops a proven cut no swipe can bring whole (D68)', ()
     expect(measured.verdict).toMatchObject({ of: 'probe' });
     const held = seeFlush(sent(measured.verdict), shown(right(140), stroke(48)));
     expect(held).toMatchObject({ settles: true, verdict: { of: 'probe' } });
-    expect(seeFlush(sent(held.verdict), shown(right(80), stroke(100))).verdict).toMatchObject({ of: 'aim', aim: { floor: { room: 14, drawn: 48, moved: 20 } } });
+    expect(seeFlush(sent(held.verdict), shown(right(80), stroke(100))).verdict).toMatchObject({ of: 'aim', aim: { overshoot: { room: 14, drawn: 48, moved: 20 } } });
   });
 
   it('judged on the reveal the plan would send above the keyboard: a keyboard line 64 px into the list leaves no room for it — the cut (`room`), not the stop; the line stood by only once the witness was asked; at the bound alike', () => {
@@ -402,7 +402,7 @@ describe('the flush check stops a proven cut no swipe can bring whole (D68)', ()
     const offered: AppliedKeyboard = { topCover: { x: 0, y: 1110, width: 1080, height: 1110 }, above: undefined, remedy: { dismissal: 'none' }, line: { y: 1110, witnessed: true } };
     const proved = seeFlush(sent(seeFlush(startFlush('down'), stopAt(flushOn('bottom', 400))).verdict), stopAt(flushOn('bottom', 453), { drawn: PROBE74 }));
     const read = (more: StopShown) => seeFlush(sent(proved.verdict), stopAt(flushOn('bottom', 480), { drawn: R48, ...more })).verdict;
-    expect(read({})).toMatchObject({ of: 'aim', aim: { floor: { room: 15, drawn: 48, moved: 27 } } });
+    expect(read({})).toMatchObject({ of: 'aim', aim: { overshoot: { room: 15, drawn: 48, moved: 27 } } });
     expect(read({ offered })).toEqual({ of: 'witness' });
     expect(read({ offered, corroborated: true })).toMatchObject({ of: 'cut', cut: { why: 'room', revealed: 27 } });
     expect(read({ offered, corroborated: false })).toMatchObject({ of: 'aim' });

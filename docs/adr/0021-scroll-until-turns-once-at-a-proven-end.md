@@ -639,15 +639,15 @@ out instead.
 
 **Decision.**
 1. *The rule* (`interact/aim-floor.ts#aimFloor`, pure, a new module). On a proven cut, the room left on the match's
-   uncut side (`roomPast`) against the strokes of this call that proved it (`Carried`: each stroke's drawn length and
+   uncut side (`roomPast`) against the strokes of this call that proved it (`StrokeCarry`: each stroke's drawn length and
    how far the match grew, `revealedBy`'s growth). Of those no longer than the next reveal the course would draw
    (within FIT_ROOM_PX), the least carry counts; on a tie of carries, the shorter stroke is named. When the room plus
    FIT_ROOM_PX is under it, a further stroke would most likely push the uncut side out past the container rather than
-   bring the cut one in, so none is sent (`AimFloor`). Most likely, not surely: a drag's carry varies a few px from one
+   bring the cut one in, so none is sent (`Overshoot`, the stop's evidence). Most likely, not surely: a drag's carry varies a few px from one
    stroke to the next (Residual), and the rule keeps no margin for that — by the owner's decision, fewer wasted swipes
    and no wrong advice weigh more than the odd swipe that would have fit. A drag's carry rises with its length, so a longer stroke says nothing of
    a shorter one; with no stroke that short measured, there is no stop.
-2. *The evidence* (`interact/flush-check.ts`, `Memory.carried`). Every stroke whose read was a fresh proof of a cut
+2. *The evidence* (`interact/flush-check.ts`, `Memory.measured`). Every stroke whose read was a fresh proof of a cut
    (`revealedBy`, the stroke handed back) is kept with that cut's edge and container, for the whole call (a read
    between that proved nothing, such as a held reveal D62 doubts, keeps them). Only the strokes over the same edge of
    the same container count. The verdict is a new one, `aim` (`FlushAim`), judged after the `axis` and `room` checks
@@ -658,6 +658,8 @@ out instead.
    applied or already stood by. The ledger's
    `cardMoves` (D59) is not the measure: it records a position shift only, and a card cut flush on a left or top edge
    grows there without its x or y moving.
+   ADR 0013's points 2 and 3 (a proven cut sends a reveal, or fails at the bound) no longer read whole with a reveal
+   withheld, so that ADR carries a short D68 amendment pointing here.
 3. *The stop* (`scroll-rounds.ts`, a new outcome `unaimable`). The round stops on the read, sending nothing. A D62
    retry already spent counts among the swipes, as every stroke does.
 4. *The reply* (`scroll-text.ts#unaimableText`, a plain Error, as `unfit`) states what was measured and what it makes
