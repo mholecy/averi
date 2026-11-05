@@ -13,6 +13,8 @@ Amended 2026-11-05 (T2 S6a: runner-lines.ts, runner.ts and records.ts joined the
 below).
 Amended 2026-11-05 (T2 batch-13 fixes: idb disconnect after each companion end, the Android guard's adb words, the
 simulator's binary export, and batch-13's live check — see the T2 amendment's batch-13 part below).
+Amended 2026-11-05 (T2b-1: a changed protected key exits 1, a need's end and its calls recorded, the out-folder
+refusal, the cleanup's and the domains window's labels — see the T2 amendment's T2b-1 part below).
 
 ## Context
 
@@ -1236,3 +1238,78 @@ Every lab need was met on both devices. Over the three runs every block reached 
 BROKEN was the batch script's reading of capture's progress lines, not the module's), and no run left anything to
 restore. batch-13 is done; the four lazy/recycler carousels wait for T6c (backlog), rn-format-eager for a batch that
 builds the RN app.
+
+### T2b-1: the module gaps batch-13 found (2026-11-05, backlog T2b)
+
+Authoring batch-13 found the module short in six places, each worked around in the batch's own script: a changed
+finportal key exited 0 unless a block of the batch's own judged it; an out folder the sandbox refused ended in a stack
+trace; E5's cleanup line said `D55 cleanup`; D65's domains window said D43 on every line; a need's calls were recorded
+nowhere; and runner.ts's example dropped what wdaWindow and iosCheck return. This part closes them, safety first.
+
+- **A changed protected key fails the run (gap 4).** ios-defaults.ts's `protectedLine` says CHANGED as a FAIL step line
+  (`FAIL com.apple.launchservices.schemeapproval's -->sk.finportal.myport CHANGED: …`); unread stays an ERROR, unchanged
+  OK. NeedSpec gains `end` (and `endSecs`, NEED_END_SECS 60): once the last block is done, before `finish()` puts the
+  windows still open to RESTORE, each need met — in the order checked, once, never one not met or never asked, never once
+  interrupted — has its end called with a need's ctx and the protected-key slot; a throw, or its bound passed, is an
+  ERROR line (`LAB <need>: its end threw: …`, `… did not finish within …`), and the run still writes its SUMMARY; a line
+  the end writes after its bound is only noted. The ios need's end opens the guarded simulator again and reads the key
+  (a simulator refused then is an unread key): a batch needs no finportal block and no ONLY= rewrite to add one.
+  `endStretch` stays, for a block that reads the key mid-run (each line is judged).
+- **An out folder that cannot be made is a refusal (gap 7).** run-dir.ts's `openRun` turns any mkdir error but EEXIST
+  into a refusal line in S1's vocabulary — the folder, the error's code (or its first line), the folders made before it
+  (kept, empty: nothing is removed) — exit 2, no SUMMARY, no call.
+- **cleanUp takes its label (gap 2).** `cleanUp(emu, { …, label })`, CLEANUP_LABEL unless given; chooserStretch passes
+  `o.cleanup` to the cleanup and to the window alike, so the normal line and the abort's carry one label.
+- **A domains window takes its labels (gap 3).** ios-defaults.ts's `DomainLabels` (the restore's and the compare's
+  verdict labels, the backup's step, the RESTORE lines' starts), `D43_LABELS` (today's: the WDA window and lab-lines.ts
+  unchanged) and `domainLabels(id)` (`<id> window restore`, `<id> window compare`, `<id> backup`, `<id> (iOS): `, the
+  late writer's), as batch-13 relabelled D65's by regex; backup, restore, compare and domainsWindow take them.
+- **A need's calls are recorded (gap 6).** The runner wraps the bounded calls of each need's check, alive and end and
+  appends each to the lab folder's `<need>-calls.jsonl` through the run's fs (runner-lines.ts's `needCallLine`: one
+  canonical JSON line — the need, the phase, the time, the command's base name, its args, its bound, its exit, and for
+  a failed call its first line, no more than a step line says; no env), each argument and that line cut at 200 code
+  points, at most 500 calls a need, then one line saying the rest were not recorded. A write that fails is one NOTE,
+  never the need's failure. A need's name must be a plain path segment (its file is named by it).
+- **The batch-level test of the work's own check (test gap)** and **runner.ts's example (gap 8)**: lab-batch.test.ts's
+  D43 now checks inside the WDA window first and says a check not fit as its INCONCLUSIVE; with the lab sick and its
+  reset unable to boot, the block is INCONCLUSIVE naming the reset's why, no wda run is made, and the window is still put
+  back and compared. The header's example keeps wdaWindow's result and says its `warnings` and a failed iosCheck's `why`.
+
+Decision: **a CHANGED protected key exits 1.** No batch writes the schemeapproval domain; a change is a defect or state
+some other process left on the lab simulator, and every iOS verdict of the run was taken over it — success is the
+wrong exit for that. The line keeps batch-11's step-line form and its domain and key; only its word changes, FAIL in
+the step form, which words.ts's exit rule already reads (S1). Unread stays an ERROR and exits 0 alone, as before:
+an unread key is not shown changed, and the SUMMARY says it. Batch-11's protected line (`OK / ERROR`, S4's choice above)
+is so far superseded: OK, FAIL or ERROR.
+
+The abort does not read the key. It exits 130 whatever a read says, so a CHANGED line could not change its exit; its
+SUMMARY reads only what the run kept before the interrupt; and a read there would need an AbortGuard callback with its
+own detached call and bound inside the abort's budget, for a line nobody acts on before a rerun — which reads the key at
+its own start anyway.
+
+Dropped, with reasons:
+- **Gap 1, an export of any domain.** Only batch-13's one-off probe of the simulator's binary export needed it, now
+  pinned by the committed fixture (defaults-sim-export-missing-domain.plist). An `export` writes a host file at a
+  path the caller gives — a simulator's own Preferences plist included — so "a read-only export of any domain" is not a
+  read; done safely it needs a path rule, for no recurring caller. The allowlist stays the one argv builder. Reopen with
+  a second caller.
+- **Gap 5, LastStep given the config and folders; the abort's last steps before its judges.** Its one user was an
+  evidence probe of the batch-13 fix, done and seen live. Moving the abort's last steps before its judges would spend
+  their bound inside the judges' window and end the companion before a judge that may still need a kept group: a worse
+  abort for a probe already done. Gap 6 covers the recurring diagnostic need. Reopen if a recurring last step needs the
+  config.
+
+Tests: words and lines in ios-defaults.test.ts, ios-domains-sim.test.ts, runner-lines.test.ts, run-dir.test.ts,
+lab-emu.test.ts and android-lab.test.ts; the order in runner.test.ts (a need's end: once per need met, after the last
+block, before finish, not for one not met or never asked, not once interrupted, a throw and a bound each an honest line;
+a need's calls; the refusal); ios-lab.test.ts (the ios need's end) and lab-batch.test.ts (a CHANGED key exits 1 with no
+block of the batch's judging it; ONLY= without an iOS block reads nothing). Every title names T2b batch-13 and its gap.
+70 hand mutants, each from a .bak copy and bounded: all killed, two only after a test was added (the abort's own
+SUMMARY never followed by the normal end's finish; a D65 restore over an unreadable state file). The first cold run
+(331 s) left four equivalent survivors in runner.ts — an interrupted check before the needs' ends that endNeeds makes
+again, a bare NeedCheck's typeof (a function has no `end`), and the late line's own oneLine (the step's rule asks it) —
+designed away. The final cold run, 328 s: runner.ts 99.40 % (495 mutants, 0 survived, the same three without coverage),
+runner-lines.ts 100 % (359, 2 timeouts counted killed), ios-domains.ts 100 % (327), ios-lab.ts 100 % (396),
+android-lab.ts 100 % (181), ios-defaults.ts 99.82 % (539, the same equivalent), lab-emu.ts 99.75 % (393, the same
+equivalent), run-dir.ts 99.41 % (169, the same equivalent), every other module as before; floors unchanged (none rises
+by the achieved − 2 rule). The run stays under the ~480 s line; the `--group` split is T2b-2's.
