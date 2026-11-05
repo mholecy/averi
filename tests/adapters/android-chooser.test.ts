@@ -476,8 +476,9 @@ describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', (
     ['a `button_once` with no label', (t) => { one(t, 'button_once').label = ''; }],
     ['a `button_always` with no label', (t) => { one(t, 'button_always').label = null; }],
     // resolver_list_with_default (AOSP android13 core/res/res/layout/resolver_list_with_default.xml): the last-chosen
-    // app's `icon` and `title` in a header above the list — never captured. Quoting the list's rows alone there would
-    // hide the preselected app, so an `icon` or a `text1` outside the list is not the fresh layout.
+    // app's `icon` and `title` in a header above the list (batch-13's real trees: the D55d cases below). Quoting the
+    // list's rows alone there would hide the preselected app, so an `icon` or a `text1` outside the list is not the
+    // fresh layout.
     ['an `icon` outside the list (the with_default header)', (t) => { one(t, 'title_container').children.unshift(leaf('icon', '')); }],
     ['a `text1` outside the list', (t) => { one(t, 'button_bar').children.push(leaf('text1', 'AveriLab')); }],
   ];
@@ -490,6 +491,50 @@ describe('D55c — chooserSheet: the chooser\'s fresh layout, by resource id', (
 
   it('a tree that is not a chooser (a dump of the lab\'s own screen): undefined', async () => {
     expect(chooserSheet(await dumped('uiautomator-lab-open.xml'))).toBeUndefined();
+  });
+
+  // D55d (ADR 0041's D55d amendment): resolver_list_with_default as batch-13 rerun 1 captured it, after a "Just once"
+  // on each link (uiautomator-lab-resolver-with-default-{shared,pair}.xml, whole trees). The header holds the
+  // last-chosen app's `icon` and a `title`, not a `text1`: the header `icon` alone is what rejects the layout, so the
+  // counterfactual below (that one node removed) names it. The real trees kill no mutant the synthetic `icon` case
+  // above misses, and can never kill the `text1` half of the rule.
+  describe.each([
+    ['shared', 25, { label: 'AveriLab', centre: { x: 540, y: 2074 } }],
+    ['pair', 26, { label: 'AveriLab', detail: 'AveriLab twin', centre: { x: 540, y: 2074 } }],
+  ] as const)('the with_default chooser of averilab://%s/open (batch-13 rerun 1, real)', (link, nodes, app) => {
+    const withDefault = () => dumped(`uiautomator-lab-resolver-with-default-${link}.xml`);
+    const outsideList = (tree: UiNode): UiNode[] => {
+      const inList = new Set(everyNode(one(tree, 'resolver_list')));
+      return [...everyNode(tree)].filter((n) => !inList.has(n));
+    };
+
+    it('undefined: the reply fails open to D55\'s', async () => {
+      expect(chooserSheet(await withDefault())).toBeUndefined();
+    });
+
+    it('the facts that decide it: one `resolver_list` with one row (its direct child), the header\'s `icon` outside it, no `text1` outside it, the title "Open with AveriLab", both buttons enabled', async () => {
+      const tree = await withDefault();
+      expect([...everyNode(tree)]).toHaveLength(nodes);
+      expect(byId(tree, 'resolver_list')).toHaveLength(1);
+      expect(one(tree, 'resolver_list').children).toHaveLength(1);
+      expect(outsideList(tree).filter((n) => n.identifier === 'icon').map((n) => n.rect)).toEqual([{ x: 22, y: 1472, width: 88, height: 88 }]);
+      expect(outsideList(tree).filter((n) => n.identifier === 'text1')).toEqual([]);
+      expect(byId(tree, 'title').map((n) => n.label)).toEqual(['Open with AveriLab']);
+      expect(byId(tree, 'text2').map((n) => n.label)).toEqual(link === 'pair' ? ['AveriLab twin'] : []);
+    });
+
+    it('the counterfactual: the header\'s `icon` removed, the rest is read as a one-row sheet (the row\'s text2 its detail; clickable never read)', async () => {
+      const tree = await withDefault();
+      const [header] = outsideList(tree).filter((n) => n.identifier === 'icon');
+      if (header === undefined) throw new Error('no header icon');
+      header.identifier = null;
+      expect(chooserSheet(tree)).toEqual({
+        title: 'Open with AveriLab',
+        apps: [app],
+        once: { label: 'Just once', centre: { x: 723, y: 1723 }, disabled: false },
+        always: { label: 'Always', centre: { x: 936, y: 1723 }, disabled: false },
+      });
+    });
   });
 });
 

@@ -9,7 +9,8 @@ import { parseDump } from '../helpers/android-dumps.js';
 // focus lines naming android/com.android.internal.app.ResolverActivity; the fresh layout (no last-chosen entry), 27
 // nodes, all package `android`, as the device wrote it (uiautomator's trailing status line was not kept). D55c's
 // build reads it by resource id (`resolver_list`, `text1`, `button_once`, `button_always`); the
-// `resolver_list_with_default` layout (after a "Just once") was never captured.
+// `resolver_list_with_default` layout (after a "Just once") is batch-13's uiautomator-lab-resolver-with-default-*.xml
+// (D55d), pinned in android-chooser.test.ts.
 // android-ui-snapshot-lab-resolver.json is averi's own ui_snapshot reply on the same chooser, batch-10's E4a (a later
 // raise of the same link, the same main): the fixture's parse is that reply byte for byte, but for the two `disabled`
 // marks D66 added (docs/adr/0042-a-node-its-source-marks-not-enabled-is-said-disabled.md). The recorded reply is device

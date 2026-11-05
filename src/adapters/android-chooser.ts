@@ -199,9 +199,11 @@ export function chooserAlsoInFront(component: string): string {
  * tests/fixtures/uiautomator-lab-resolver*.xml): exactly one `resolver_list`; at least one row, each a direct child of
  * it holding exactly one labelled `text1` and at most one `text2`; exactly one labelled `button_once` and one labelled
  * `button_always`; and no `icon` and no `text1` outside the list. The last rule is `resolver_list_with_default`'s
- * (AOSP android13, core/res/res/layout/resolver_list_with_default.xml, checked at build time; never captured): it heads
- * the sheet with the last-chosen app's `icon` and `title` above the list, and quoting the list's rows alone there would
- * hide the preselected app. Anything else is undefined: the reply is then D55's, by the component alone.
+ * (AOSP android13, core/res/res/layout/resolver_list_with_default.xml; captured live in batch-13,
+ * tests/fixtures/uiautomator-lab-resolver-with-default-*.xml, D55d): it heads the sheet with the last-chosen app's
+ * `icon` and `title` above the list, and quoting the list's rows alone there would hide the preselected app. On the
+ * real layout the header `icon` alone rejects it (its header holds `title`, no `text1`). Anything else is undefined:
+ * the reply is then D55's, by the component alone.
  */
 export function chooserSheet(tree: UiNode): ChooserSheet | undefined {
   const nodes = [...everyNode(tree)];
