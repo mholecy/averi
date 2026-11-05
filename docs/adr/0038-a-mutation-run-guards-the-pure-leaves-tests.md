@@ -1249,11 +1249,12 @@ nowhere; and runner.ts's example dropped what wdaWindow and iosCheck return. Thi
 - **A changed protected key fails the run (gap 4).** ios-defaults.ts's `protectedLine` says CHANGED as a FAIL step line
   (`FAIL com.apple.launchservices.schemeapproval's -->sk.finportal.myport CHANGED: …`); unread stays an ERROR, unchanged
   OK. NeedSpec gains `end` (and `endSecs`, NEED_END_SECS 60): once the last block is done, before `finish()` puts the
-  windows still open to RESTORE, each need met — in the order checked, once, never one not met or never asked, never once
-  interrupted — has its end called with a need's ctx and the protected-key slot; a throw, or its bound passed, is an
-  ERROR line (`LAB <need>: its end threw: …`, `… did not finish within …`), and the run still writes its SUMMARY; a line
-  the end writes after its bound is only noted. The ios need's end opens the guarded simulator again and reads the key
-  (a simulator refused then is an unread key): a batch needs no finportal block and no ONLY= rewrite to add one.
+  windows still open to RESTORE, each need met at least once — in the order first met, once, never one never met or
+  never asked, never once interrupted — has its end called with a need's ctx and the protected-key slot; a throw, or
+  its bound passed, is an ERROR line (`LAB <need>: its end threw: …`, `… did not finish within …`) and its unread line,
+  and the run still writes its SUMMARY; a line the end writes after its bound is kept aside (review round 1, below).
+  The ios need's end opens the guarded simulator again and reads the key (a simulator refused then is an unread key): a
+  batch needs no finportal block and no ONLY= rewrite to add one.
   `endStretch` stays, for a block that reads the key mid-run (each line is judged).
 - **An out folder that cannot be made is a refusal (gap 7).** run-dir.ts's `openRun` turns any mkdir error but EEXIST
   into a refusal line in S1's vocabulary — the folder, the error's code (or its first line), the folders made before it
@@ -1285,7 +1286,33 @@ is so far superseded: OK, FAIL or ERROR.
 The abort does not read the key. It exits 130 whatever a read says, so a CHANGED line could not change its exit; its
 SUMMARY reads only what the run kept before the interrupt; and a read there would need an AbortGuard callback with its
 own detached call and bound inside the abort's budget, for a line nobody acts on before a rerun — which reads the key at
-its own start anyway.
+its own start anyway. Its SUMMARY still says so in the slot (below).
+
+Review round 1 (one BLOCKER, one MAJOR, two MINOR): a late end turned a CHANGED key into exit 0 — the ios need's end had
+no bound of its own, so it got NEED_END_SECS, 60 s, while its two calls are bounded at 120 s each, and a line it wrote
+after the bound was only noted; and a need met once and then down before a later block never got its end. Now:
+- the ios need's `endSecs` is IOS_END_SECS, computed from its calls' bounds (boundFor's, the guard's `simctl list` and
+  the key's `defaults read`) each with its stop (GRACE_MS and CLOSE_GRACE_MS): 246 s, so with its calls bounded it
+  cannot pass its bound before they do;
+- an end past its bound keeps the lines it writes after aside; the runner checks once, just before it assembles the
+  SUMMARY (no extra wait: after `finish()` and the judges), whether that end has settled, and if it has, with lines,
+  they take the place of its unread line — a late FAIL exits 1;
+- NeedSpec's `endUnread(why)` gives the protected-key line for a key its end could not say; the ios need's names the key
+  unread and why (`… -->sk.finportal.myport unread: <start> at the start, unreadable (its end threw: … | its end did
+  not finish within 246 s) at the end — …`), placed beside the LAB ERROR line, never only that;
+- an end is asked for every need met at least once in the run, in the order first met, a need down later too (its end
+  then opens the guarded simulator again; a refusal or a failed read is its unread line);
+- the abort's SUMMARY adds `endUnread`'s line (`not read at its end: the run was interrupted (the abort reads
+  nothing)`) for each need met whose end had not had its say before the interrupt.
+So the slot says the key on every path: OK, FAIL or unread on the normal end, a need down later, a throw, a bound
+passed; unread at the abort. MINOR 1 is the unread line above; MINOR 2 (a need's calls file keeps the host paths its
+calls name, the checkout's among them) is accepted and said in needCallLine's comment: the file lives in the run's lab
+folder, outside the checkout, beside the run's other files that name them. 26 more hand mutants, each bounded: all
+killed, three only after a test was added (an end still running at the SUMMARY, one settled with no line, a line after
+the interrupt). Its first cold run (359 s) failed ios-lab.ts's floor (97.37 %: IOS_END_SECS's argv words, equivalent
+under xcrun's one bound) and left three equivalents in the late end's placement; both designed away. The final cold
+run, 335 s: runner.ts 99.45 % (543 mutants, 0 survived, the same three without coverage), ios-lab.ts 99.75 % (404, 1
+equivalent: boundFor's empty argv given a word), every other module as before; floors unchanged.
 
 Dropped, with reasons:
 - **Gap 1, an export of any domain.** Only batch-13's one-off probe of the simulator's binary export needed it, now
