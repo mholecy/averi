@@ -116,4 +116,7 @@ averi's own `parseInputShown` and `parseTouchableRegion`, but keeps the harness'
 never `panelsBeyond`: ground truth must not use the rule it checks); both committed `.ime.json` captures read as
 before. `AndroidLab.ime` sends averi's `INPUT_SHOWN_COMMAND` (exported from src/adapters/android.ts), no copy of it.
 
-Live check: pending (lab, one kf case).
+Live check (the kf block run by hand, 2026-11-05, main 454b7108, averi_lab API 33): PASS. The premise held: the
+floating panel at bottom 1807. kf1, kf2 and kf3 all ok. Each record carries both reads, at launch and after the
+calls, equal: `(87,1015,1024,1807)` plus the strip. Rejudging the record gives the same verdicts. 42 s against ~41 s
+for batch-13's kf block: the second read does not show at this resolution.
