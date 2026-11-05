@@ -1,7 +1,7 @@
 # BUG: under WDA, the text of an off-screen UIKit cell is listed at a parked frame (`0,62 286x22`) inside the viewport — `scroll_until … fully: true` answers "fully visible after 0 swipes" for a row 300 pt below the screen
 
 **Measured 2026-10-09 11:34 UTC**, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
-mobile-verify `fix/round-3` @ `347e70d` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch config
+mobile-verify `fix/round-3` @ `347e70d` (`dist/`, stdio, cwd `<mp-native>`), scratch config
 `treeSource: wda` (+ `keyboardDismiss: [tap: { role: text, text: "New Contact" }]`), stock Contacts "New Contact" sheet (UIKit,
 ~4 pages), software keyboard up (`keyboard 0 573 402 301`). Found during the round-3 iOS device check (handoff item j, iOS WDA
 scroll with the keyboard up). Not a round-3 regression: the 610660f-era capture of the same sheet

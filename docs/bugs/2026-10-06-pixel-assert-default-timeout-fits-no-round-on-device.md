@@ -7,7 +7,7 @@
 **Measured 2026-10-06 16:45–17:00 CEST** against `d69511e` (`dist/` built from it), driven by the handoff's stdio driver.
 Android `emulator-5554` (Pixel_3a AVD, API 33, 1080x2220). iOS `iPhone 17` iOS 26.5 (finportal: `treeSource: wda`;
 mp-native: idb). Logs: `$RUN/out/b-android-static*.log`, `b-ios*.log`, `c-a-form.log`, `c-a-spinner.log`, where
-`RUN=/private/tmp/claude-501/-Users-mholecy-dev-mobile-verify/9f3935d1-240c-470b-93c9-c353ad95f1dd/scratchpad/device-run`.
+`RUN=<scratch>/device-run`.
 
 ## Claim
 

@@ -10,7 +10,7 @@ has one owner and names the bound UDID), `882e28f` (tool descriptions derive the
 `4de6a2a` (a verify run decides OCR once; one OCR measurement owner; an unavailable engine fails closed after one read)
 and `820226a` (the screen swipe uses the device's screen box; MCP `swipe` takes `direction` or four coordinates).
 Driven through the stdio MCP driver `run-tools.mts` (with its `sleep` / `sh` pseudo-steps), plus a copy
-`run-tools-p.mts` that overrides only the server's `PATH`. Server cwd `/Users/mholecy/dev/finportal/app`. Its
+`run-tools-p.mts` that overrides only the server's `PATH`. Server cwd `<finportal>/app`. Its
 `averi.yaml` and `.env.averi` were not modified, and every call that reads config passes `configPath` to a scratch copy.
 Devices: `emulator-5554` (Android 13, **`wm size` 1080x2220**, not the 1080x2400 the brief assumed) and `iPhone 17`
 (`D34212DB-2134-43E4-99D8-FA89136C729B`, iOS 26.5, `idb describe`: 402x874 points). App: `sk.finportal.myport`

@@ -2,7 +2,7 @@
 
 > **Status (2026-10-08):** fixed on branch `fix/keyboard-aware-scroll` (with [2026-10-05-android-floating-gboard-keyboard.md](2026-10-05-android-floating-gboard-keyboard.md)), unit-tested on fakes. Direction taken: "plan the stroke inside the uncovered box" — every round reads `readSoftKeyboard` (the oracle on Android, the WDA band on iOS) and, while a keyboard is shown, judges the stop against and draws the stroke in the screen above its top edge; nothing is pressed. After review: the band is applied only when it changes the round and the input method does not deny it (the guard's veto — the window state goes stale after a navigating tap; at most one witness query a round, asked on every round the band matters and never kept — a scroll can hide a confirmed keyboard), a band from the top edge fails at once naming it, and a round whose tree did not read keeps the last read round's stroke box. A stop clipped at the keyboard's edge and every failure name it (`… CLIPPED at bottom, 52% of it is in the viewport above the soft keyboard over [0,1398][1080,2220]`; with `fully: true`, a row still under it at the end of the content fails saying so, with how to hide it). Hiding first was not taken: a `back` (or a configured tap) from a step that sent none, the trade the tap guard rejected. Then **device-checked at `e9e6509`** (the two "Device check" sections below): on Android both symptoms hold fixed (each target in 1 swipe, 637 px a swipe, the clipped wording as designed), one gap — a row wholly under the IME at the end of a non-resizing container swiped for the full 15 s; under WDA the clipped wording holds and a down-swipe now moves the content, but two new failures came from the stroke drawn over the box above the keyboard — a stop caught mid-fling reported as reached (the row came to rest at y -48 / -121 / -133; once 613 → -357 and five more swipes down), and a content-up stroke starting at y 114 in the app's top bar that moved nothing. **Follow-up fix (branch `fix/r2-a-scroll`, after two review rounds; unit-tested on fakes, not yet run on a device):** (1) the stroke over a keyboard is still the uncovered box's, but its touch-down is never inside the keyboard clearance (0.8 of the uncovered height) nor higher than without a keyboard (`swipe.ts#swipeVectorAbove`; only the covered area's top edge is read) — iOS content-up 175 → 458 (was 114 → 458), Android content-up 444 → 1118 (was 280 → 1118); content-down unchanged, iOS 458 → 114 and Android 1118 → 280, as the device checks ran them (no length cut: the fling is answered by (2)); (2) a stop after a stroke is confirmed on one more read after a further settle, the target's rect unchanged — a moved target is judged from the new read, up to 3 such reads a stroke, then reported with `settled: false` ("still moving at the last read"), as is a stop at the deadline; a target a fling carried beyond the far edge after a read saw it short of it turns the next stroke round (`scroll.ts#Motion`), every turn halving the reach of the strokes after it so the scroll converges whatever the app flings (never restored after a turn; never under the larger of 48, twice an assumed 24-unit touch slop, and 3 % of the screen's side along the stroke — 67 px on the Pixel_3a's 2220 height, 26 pt on the iPhone so 48 there; `swipe.ts#shortenStroke`) — e.g. the 681 → -48 overshoot is followed by a 142-pt content-up stroke instead of the 283-pt one — while it stays in the tree (no turn on a lazy list), and a failure counts the turns and says when the target was in the viewport but did not stay; (3) a target in the tree, off the frame, with a non-zero rect, that two identical strokes in a row left — with every other match — where it was fails then, cause "the last 2, swiping …, did not move it: content exhausted, or the swipes were not taken", in the stop bound's words (the keyboard and the remedy named) — `my_note_input` would fail after 2 swipes; the `fully: true` clipped stop's "content exhausted" likewise takes two identical unmoved strokes (it took one). Cost: each confirming read is a round like any other — one more settle and tree read and, on Android, the round's keyboard reading: the window query, the touchable-region query while the keyboard reads shown, and a witness query only when the band matters on that read (1 to 3 adb calls; the table is on `soft-keyboard.ts#readSoftKeyboard`); the rounds number at most 1 + 4 × `maxSwipes` (25 at the defaults) within the deadline. To check on a device: the WDA runs of the iOS device check (priority_select / fees_select down, debit_select up, pad up) — whether the 344-pt content-down stroke's fling now ends in a confirmed stop after a turn, and how far a content-up stroke (175 → 458, and the halved 175 → 317) moves the form with the pad up (unmeasured; the fakes assume up to 650–729 pt) — and on Android that each target is still reached in one swipe and `my_note_input` fails in two. Still open: iOS under the default `treeSource: idb` is unchanged — marking the keyboard idb carries on iOS 27 is a separate step; the pinned app chrome is its own note ([2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md](2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome.md)); and a limitation, not a regression, seen in the Android device check below: uiautomator reports a node's bounds CLIPPED to its scroll container, so `fees_select` partly hidden under the top bar read `{y:242, height:99}` (its siblings are 143 high) and `scroll_until … fully: true` said `fully visible after 0 swipes` — averi cannot see the clipped part from the tree (an open follow-up, no fix designed yet).
 
-**Measured 2026-10-08 16:19–16:21 UTC** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`, SWIFT payment form
+**Measured 2026-10-08 16:19–16:21 UTC** in `<mp-native>` (config `averi.yaml`, SWIFT payment form
 of PR #6, branch `feature/swift-payment`), emulator-5554 (Pixel_3a AVD, sdk_gphone64_arm64, Android 13, 1080x2220,
 Gboard), averi = mobile-verify @ `c35388a` built from source (`npm run build`, `node dist/mcp/server.js` over stdio).
 
@@ -288,7 +288,7 @@ apps (Google Contacts "Create contact" editor, Settings). Strokes were recorded 
 ## Device check (2026-10-09 iOS, re-run at 610660f)
 
 Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`). **The mp-native SWIFT form was
 not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
 `SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
 `scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
@@ -333,7 +333,7 @@ Strokes as sent (idb shim), WDA, Contacts "New Contact" form:
 Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
 form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
 loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
-`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `<mp-native>`.
 Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
 untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
 `HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
@@ -402,12 +402,12 @@ Measured 11:30–11:42 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, 
   scroll_until id:swift_payment.form.my_note_input failed after 5 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard over [0,1398][1080,2220] (last rect {"x":66,"y":1769,"width":948,"height":143}). The soft keyboard was up over [0,1398][1080,2220] in 6 of the 6 rounds read: in those, visibility was judged, and the swipe drawn, in the screen above it — to reach it with the keyboard down, hide it first (press_key back from the MCP tools; `dismissKeyboard: true` on the fill before this step in a flow) and scroll again
   ```
   (17.9 s; at 610660f 3 swipes / 10.5 s). Strokes `input swipe 540 1167 540 473 695` ×5 — 694 px at 695 ms each (drag, not fling), so
-  3 strokes to the end of the form instead of 1, then the 2 unmoved. Screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-46-0.png`: keyboard up, form at its end.
+  3 strokes to the end of the form instead of 1, then the 2 unmoved. Screenshot `<scratch>/averi-repo/run5-android/img-46-0.png`: keyboard up, form at its end.
 - **Holds (j) — `debit_select` up, with a still-moving note.** 11:31:09 `scroll_until { selector: "id:swift_payment.form.debit_select",
   direction: "up", fully: true }` → `Element id:swift_payment.form.debit_select fully visible after 4 swipes; still moving at the last read
   (a fling not yet over, or an animated element?) — a rect or screenshot taken now may not match` (16.6 s). Strokes `540 589 540 1167 579`
   ×3, then `540 589 540 734 300` (145 px — the shortened stroke). debit_select `66,286 948x297` after (the form's top); screenshot
-  `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-49-0.png` shows it whole, IBAN unchanged (the screenshot itself warned "did not settle", the caret). The `settled: false` is
+  `<scratch>/averi-repo/run5-android/img-49-0.png` shows it whole, IBAN unchanged (the screenshot itself warned "did not settle", the caret). The `settled: false` is
   the one-off kind handoff §3 lists; probably the top-edge stretch overscroll still animating at the last read — not chased.
 - **Holds (g) — Contacts, strokes over the editor's container above the IME.** `First name` focused (the editor's scroll container
   resizes to the IME: `0,242 1080x1156`, later `0,242 1080x1043`). 11:40:51 `scroll_until { selector: 'text:"Notes"', fully: true }` →
@@ -444,7 +444,7 @@ box at the keyboard first would change the stroke's length.
 ## Device check (2026-10-09 iOS, re-run at 347e70d)
 
 Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `<mp-native>`), scratch configs only
 (mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
 `scratchpad/averi-repo/run5-ios`. Bank app: cold relaunch at 11:36:52 (with the hardware-keyboard prefs off), PIN-only
 `login_pin_ios_here` (11:37:11, `branch: matched state logged_in`), Account Detail → PAY → SWIFT payment.
@@ -487,7 +487,7 @@ field focused. Strokes from the `adb` shim. Round-4 handoff items 1.5 (round-3 g
   shortened one, so Add fields was already on screen). 12:57:43 `text:"First name"` up → `fully visible after 2 swipes` (10.8 s),
   `540 451 540 1077 627` ×2. Every stroke inside the editor's container and above the IME top of its round — the table's values unchanged.
 - **Holds (h) — nothing typed.** Contacts `First name` still its hint (`val='First name'`) after; IBAN still `AT611904300234573201` after
-  every SWIFT call (tree `val`, screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-69-0.png`); bank search field empty after the 1.6 call. The shim shows no `keyevent`
+  every SWIFT call (tree `val`, screenshot `<scratch>/averi-repo/run6-android/img-69-0.png`); bank search field empty after the 1.6 call. The shim shows no `keyevent`
   / `input text` I did not send (the only ones are the `type_text` fill's 20 `input text` + `keyevent 21/22`).
 - **Holds (§5) — SWIFT `my_note_input`, IBAN focused: no overlay cut.** 13:00:33 `scroll_until { selector:
   "id:swift_payment.form.my_note_input", fully: true }` →
@@ -499,7 +499,7 @@ field focused. Strokes from the `adb` shim. Round-4 handoff items 1.5 (round-3 g
   out after the 4th stroke, before the second unmoved one — the budget, not the rule. Re-run at the form's end, 13:00:57 → `scroll_until
   id:swift_payment.form.my_note_input failed after 2 swipes (the last 2, swiping down, did not move it: content exhausted, or the swipes were
   not taken) — element in tree but never intersected the 1080x1398 screen above the soft keyboard … in 3 of the 3 rounds read …` (8.4 s),
-  `540 1167 540 473 695` ×2 — the round-3 wording. Screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-57-0.png`: keyboard up, form at its end.
+  `540 1167 540 473 695` ×2 — the round-3 wording. Screenshot `<scratch>/averi-repo/run6-android/img-57-0.png`: keyboard up, form at its end.
 
 ### §4 — stroke y vs the IME top (every IME-up stroke of this run)
 

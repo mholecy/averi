@@ -31,7 +31,7 @@ The expected texts below are final for this hash.
 | H | iOS idb flat tree: top-bar chrome listed before the content (Back, title) is not covered by content listed after it that ENDS inside the bar's band (top 20 % of the screen); a menu/sheet reaching past that line still covers — replaces round 5's interim rule | yes | the same note (C3-3) |
 | CR | code review of the round: the status-bar refusal names its remedy (scroll_until only inside a scroll view, else "pinned"); docs and names; no other behaviour change (sweep: 0 diffs) | wording | — |
 
-Build, in `/Users/mholecy/dev/mobile-verify`:
+Build, in `<averi>`:
 
 1. Run `git checkout fix/round-6`.
 2. `git rev-parse --short HEAD` must print the hash in the title. If it does not, stop and ask.

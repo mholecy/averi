@@ -11,19 +11,19 @@ Neither fix can be designed without the answers below. Nothing here changes code
 ## 0. The mission and its limits
 
 Answer the questions in §3 and §4 with measurements, and record them. You **observe and report**:
-- Do NOT change `src/` or `tests/`. Do NOT commit, push or tag. Do NOT edit tracked files in `/Users/mholecy/dev/finportal`.
-- **finportal only** (`/Users/mholecy/dev/finportal/app`, bundle `sk.finportal.myport`). Do not touch mp-native at all.
+- Do NOT change `src/` or `tests/`. Do NOT commit, push or tag. Do NOT edit tracked files in `<finportal>`.
+- **finportal only** (`<finportal>/app`, bundle `sk.finportal.myport`). Do not touch mp-native at all.
   Its safety rules are in [2026-10-06-device-test-agent-instructions.md](2026-10-06-device-test-agent-instructions.md) §1,
   and rules 4 (other sessions), 7 (credentials) and 8 (time budget) apply here unchanged.
 - finportal `login` stops at the 2FA screen by design. Reaching 2FA is fine; never type a code.
-- Throwaway files go under `$RUN=/private/tmp/claude-501/-Users-mholecy-dev-mobile-verify/<your session>/scratchpad/kb-idb-run/`.
+- Throwaway files go under `$RUN=<scratch>/kb-idb-run/`.
 - Results go into the two bug notes as a new section `## Measured 2026-10-xx (pre-fix)` each, in the existing style
   (what was run → what came back, verbatim where short). Leave them uncommitted.
 
 ## 1. Setup
 
 ```sh
-cd /Users/mholecy/dev/mobile-verify && git log -1 --oneline && npm run build
+cd <averi> && git log -1 --oneline && npm run build
 xcrun simctl list devices booted     # iPhone 17, D34212DB-2134-43E4-99D8-FA89136C729B, iOS 26.5
 ps -axo pid,lstart,command | grep -E 'maestro|quality_gate|xcodebuild|gradlew|WebDriverAgentRunner' | grep -v grep
 ```

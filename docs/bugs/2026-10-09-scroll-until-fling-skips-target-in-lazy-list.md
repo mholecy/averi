@@ -121,7 +121,7 @@ Account Detail transaction list (Compose lazy list, `transactions.list.row_0…r
 - **Holds — bank list up.** From the end (rows 32–36 on screen, tab bar hidden): 11:27:03 `scroll_until { selector:
   "id:transactions.list.row_20", direction: "up", fully: true }` → `Element id:transactions.list.row_20 fully visible after 3 swipes`
   (15.0 s; was a 15.9 s "never appeared"). Strokes `input swipe 540 752 540 1804 1054` ×3 (1052 px → 1054 ms ✓; box = the list container
-  0,401 1080x1753). row_20 at y 843 after, rows 19–25 listed (`/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-25-0.png`).
+  0,401 1080x1753). row_20 at y 843 after, rows 19–25 listed (`<scratch>/averi-repo/run5-android/img-25-0.png`).
 - **Holds, from the end — fast fail.** 11:27:49, list at its end: `scroll_until id:transactions.list.row_40, fully: true` → `scroll_until
   id:transactions.list.row_40 failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading,
   or the swipes were not taken) — element never appeared in the tree` (9.1 s); `540 1804 540 752 1054` ×2.

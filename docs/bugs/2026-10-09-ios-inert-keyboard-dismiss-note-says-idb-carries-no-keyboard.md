@@ -60,7 +60,7 @@ as an untyped `other`, which averi does not classify as `role:keyboard`.
 ## Device check (2026-10-09 iOS, re-run at 347e70d)
 
 Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `<mp-native>`), scratch configs only
 (mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
 `scratchpad/averi-repo/run5-ios`.
 

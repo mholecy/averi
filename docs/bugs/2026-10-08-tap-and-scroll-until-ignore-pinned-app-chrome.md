@@ -1,6 +1,6 @@
 # BUG: `tap` and `scroll_until` treat a row hidden behind the app's own pinned chrome (a bottom CTA bar, the top bar) as visible — "Tapped" lands on the bar, "fully visible" is a row nobody can see
 
-**Measured 2026-10-08 20:09–20:13 UTC** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`, iOS tree source
+**Measured 2026-10-08 20:09–20:13 UTC** in `<mp-native>` (config `averi.yaml`, iOS tree source
 default `idb`), SWIFT payment form (branch `feature/swift-payment`), iPhone 17 simulator iOS 27.0
 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509`
 built from source (`dist/`, stdio). No keyboard up during any of these calls.
@@ -102,7 +102,7 @@ neutral area — nothing happened); a bar with a button at that point would have
 ## Device check (2026-10-09 iOS, re-run at 610660f)
 
 Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`). **The mp-native SWIFT form was
 not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
 `SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
 `scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
@@ -123,7 +123,7 @@ CTA. Expected to still reproduce (no fix on this branch).
 Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
 form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
 loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
-`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `<mp-native>`.
 Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
 untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
 `HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on

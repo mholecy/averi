@@ -1,7 +1,7 @@
 # BUG: the iOS launch give-up note says "if the screenshot shows <bundle> … this can be ignored" — measured with the screenshot showing the launched app while idb still served the PREVIOUS app's tree
 
 **Measured 2026-10-09 11:25:29 UTC**, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi =
-mobile-verify `fix/round-3` @ `347e70d` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`), default `treeSource: idb`. Bank
+mobile-verify `fix/round-3` @ `347e70d` (`dist/`, stdio, cwd `<mp-native>`), default `treeSource: idb`. Bank
 app `com.finshape.dbosbanking` ("Skeleton Internal") in front on Account Detail for minutes; Contacts running in the background.
 Found during the round-3 device check of
 [2026-10-09-ios-launch-app-reads-previous-apps-tree.md](2026-10-09-ios-launch-app-reads-previous-apps-tree.md) (item a4).
@@ -59,7 +59,7 @@ switch after a long stay in one app, as here.
 ## Device check (2026-10-09 iOS, re-run at 86eb42d)
 
 Measured 12:53–13:21 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), default `treeSource: idb`,
+`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `<mp-native>`), default `treeSource: idb`,
 `idb` PATH shim; raw `idb ui describe-all` reads (first element's pid / `AXLabel` / node count) beside averi's. Run folder:
 `scratchpad/averi-repo/run6-ios`.
 
@@ -133,15 +133,15 @@ empty. `plutil -convert json -o - <file>` parses it as is. The entry for the ban
 ```
     "com.finshape.dbosbanking" =     {
         ApplicationType = User;
-        Bundle = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app/";
-        BundleContainer = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/";
+        Bundle = "file://<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app/";
+        BundleContainer = "file://<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/";
         CFBundleDisplayName = "Skeleton Internal";
         CFBundleExecutable = Internal;
         CFBundleIdentifier = "com.finshape.dbosbanking";
         CFBundleName = Internal;
         CFBundleShortVersionString = "0.5.2";
         CFBundleVersion = 0;
-        DataContainer = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Data/Application/27AF5801-71E8-4354-A3A8-7C83C4B7FD24/";
+        DataContainer = "file://<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Data/Application/27AF5801-71E8-4354-A3A8-7C83C4B7FD24/";
         GroupContainers =         {
         };
         IsAppClip = 0;
@@ -149,7 +149,7 @@ empty. `plutil -convert json -o - <file>` parses it as is. The entry for the ban
         IsFirstParty = 0;
         IsHidden = 0;
         IsRemovable = 1;
-        Path = "/Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app";
+        Path = "<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app";
         SBAppTags =         (
         );
     };

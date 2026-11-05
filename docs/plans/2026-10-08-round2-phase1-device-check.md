@@ -8,7 +8,7 @@
 `architecture/round2-2026-10-08`; commits `8040351` refactor(interact) ElementNotFoundError, `fb171ef` refactor(mcp)
 one averi.yaml read per tool call). Driven through the handoff's stdio MCP driver `run-tools.mts`
 (docs/plans/2026-10-05-device-verification-handoff.md §2, with the `sleep` / `sh` pseudo-steps of the 2026-10-07
-check), server cwd `/Users/mholecy/dev/finportal/app` (its `averi.yaml` and `.env.averi`, unmodified — every
+check), server cwd `<finportal>/app` (its `averi.yaml` and `.env.averi`, unmodified — every
 broken-config and scratch-flow case passes `configPath` to a copy in the session scratchpad `device-round2/`).
 Devices: `emulator-5554` (sdk_gphone64_arm64, Android 13) and `iPhone 17` (`D34212DB-…`, iOS 26.5,
 `treeSource: wda`). finportal `sk.finportal.myport` debug build, Metro up on 8081. No login was submitted; no

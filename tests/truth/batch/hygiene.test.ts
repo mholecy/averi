@@ -26,8 +26,8 @@ const ROOT = join(import.meta.dirname, '..', '..', '..');
 const BATCH_DIRS = ['scripts/truth/batch', 'tests/truth/batch', ...readdirSync(join(ROOT, 'tests', 'fixtures')).filter((n) => n.startsWith('batch')).map((n) => `tests/fixtures/${n}`)];
 /** The committed live records (T8): every file under them, the raw diagnosis folders included. */
 const RECORDS = 'docs/truth/live-records';
-/** The trees held to the path rules besides the batch module's (T8). */
-const WIDE = [RECORDS];
+/** The trees held to the path rules besides the batch module's (T8): the notes, the records among them, the skill. */
+const WIDE = ['docs', 'skill', 'README.md', 'ARCHITECTURE.md'];
 
 /** Every file under a tree (a file: itself). */
 const filesUnder = (path: string): string[] =>
@@ -92,11 +92,15 @@ const hitsIn = (files: readonly string[], rules: readonly { what: string; re: Re
   );
 
 describe('path hygiene: the batch module, the live records and the notes hold no machine- or session-bound path (T2 S1, T8)', () => {
-  it('scans something: the module, its tests, the live records', () => {
+  it('scans something: the module, its tests, the live records, the notes, the skill', () => {
     const files = BATCH_DIRS.flatMap(filesUnder);
     expect(files.some((f) => f.startsWith('scripts/truth/batch/'))).toBe(true);
     expect(files).toContain(relative(ROOT, join(import.meta.dirname, 'hygiene.test.ts')));
-    expect(WIDE.flatMap(filesUnder).filter((f) => f.startsWith(`${RECORDS}/`)).length).toBeGreaterThan(200);
+    const wide = WIDE.flatMap(filesUnder);
+    expect(wide.filter((f) => f.startsWith(`${RECORDS}/`)).length).toBeGreaterThan(200);
+    expect(wide.filter((f) => f.startsWith('docs/bugs/')).length).toBeGreaterThan(30);
+    expect(wide.filter((f) => f.startsWith('skill/')).length).toBeGreaterThan(0);
+    expect(wide).toEqual(expect.arrayContaining(['README.md', 'ARCHITECTURE.md']));
   });
 
   it("no file of the batch module's names a scratchpad, a temporary folder, the evidence folder, a home directory, the user or a UUID", () => {

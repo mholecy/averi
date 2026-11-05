@@ -19,7 +19,7 @@ APPROVED, plus the code-review fixes:
 - **iOS:** the `launch_app` give-up note is chosen by the label, never licensed by the screenshot
   (`adapters/ios-foreground.ts#notInFront`).
 
-In `/Users/mholecy/dev/mobile-verify`:
+In `<averi>`:
 
 1. `git checkout fix/round-3`.
 2. `git rev-parse --short HEAD` must print `86eb42d`. If it does not, stop and ask.

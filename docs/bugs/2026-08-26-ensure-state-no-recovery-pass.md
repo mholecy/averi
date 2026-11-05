@@ -1,6 +1,6 @@
 # BUG: `ensure_state` cannot recover when the state becomes reachable by an EARLIER reach rung after the LAST rung ran
 
-**Measured 2026-08-26** in `/Users/mholecy/Finshape/skeleton` (Android emulator, app
+**Measured 2026-08-26** in `<skeleton>` (Android emulator, app
 com.finshape.skeleton.dev, state `logged_in` with `reach: [dismiss_post_login_prompts, login]`).
 One `ensure_state` call failed; an **immediately repeated, identical call succeeded with no other
 intervention** — the asymmetry that breaks the tool's own advertised contract ("Idempotent — call

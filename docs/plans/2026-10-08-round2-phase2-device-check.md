@@ -10,7 +10,7 @@ regex refused at parse, `0bde46f` fix(adapters) a screenshot is a PNG or a trans
 secrets / type_pin without digits / SetupError inside `optional:`, `25cb887` fix(flow) detect cycles and reach/requires
 re-entry; plus the phase-1 recheck of `1225d63`). Driven through the handoff's stdio MCP driver `run-tools.mts`
 (docs/plans/2026-10-05-device-verification-handoff.md §2, with the `sleep` / `sh` pseudo-steps), server cwd
-`/Users/mholecy/dev/finportal/app` (its `averi.yaml` and `.env.averi` unmodified — mtimes Sep 22 / Sep 18 after the
+`<finportal>/app` (its `averi.yaml` and `.env.averi` unmodified — mtimes Sep 22 / Sep 18 after the
 run; every scratch case passes `configPath` to a copy in the session scratchpad `device-round2-p2/`). Devices:
 `emulator-5554` (Android 13) and `iPhone 17` (`D34212DB-…`, iOS 26.5, `treeSource: wda`). finportal
 `sk.finportal.myport` debug build, Metro up on 8081. No login was submitted; no `login` / `ensure_state logged_in`

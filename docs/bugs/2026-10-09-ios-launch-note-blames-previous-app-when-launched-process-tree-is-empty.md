@@ -1,7 +1,7 @@
 # BUG: when the launched app's running process has a stuck EMPTY idb tree, the launch give-up note says the tree "is still" the previous app's — no read ever will be labelled with the launched app's name, and the cure (terminate + launch) is not named
 
 **Measured 2026-10-09 12:56:27 and 13:19:58 UTC**, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt),
-averi = mobile-verify `fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), default
+averi = mobile-verify `fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `<mp-native>`), default
 `treeSource: idb`, `idb` PATH shim, raw `idb ui describe-all` reads beside averi's. Found during the round-4 device check of
 [2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md](2026-10-09-ios-launch-give-up-note-says-ignore-when-tree-is-stale.md)
 (items 3.1 and 3.2, 86eb42d section). Run folder: `scratchpad/averi-repo/run6-ios`.

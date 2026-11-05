@@ -6,7 +6,7 @@ no stderr pointer), `6a93602` (WDA drops the unidentified StaticText echo under 
 (ui_snapshot's settle read re-reads an idb empty tree once after 1 s).
 
 The checks were driven through the stdio MCP driver `run-tools-p.mts` (round 3's copy of `run-tools.mts`, which
-overrides only the server's `PATH`), with server cwd `/Users/mholecy/dev/finportal/app`. Its `averi.yaml` and
+overrides only the server's `PATH`), with server cwd `<finportal>/app`. Its `averi.yaml` and
 `.env.averi` were not modified, and every call passed `configPath` to a scratch copy.
 
 Devices:

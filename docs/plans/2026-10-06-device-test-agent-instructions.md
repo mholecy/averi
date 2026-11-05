@@ -17,10 +17,10 @@ handoff's table, plus `ea5c66a` and `c444c79` (the pixel poll, element-region st
 `d69511e` (test only, nothing to prove on a device).
 
 You **observe and report**. You do NOT change `src/` or `tests/`, you do NOT commit, push or tag, and you do NOT
-edit either app repo's tracked files (`/Users/mholecy/dev/finportal`, `/Users/mholecy/Finshape/mp-native`).
+edit either app repo's tracked files (`<finportal>`, `<mp-native>`).
 - Throwaway files (driver, scenario JSON, contracts you author, screenshots, logs) go under
-  `/private/tmp/claude-501/-Users-mholecy-dev-mobile-verify/9f3935d1-240c-470b-93c9-c353ad95f1dd/scratchpad/device-run/`.
-- A finding becomes a note under `/Users/mholecy/dev/mobile-verify/docs/bugs/`, written in the style of the
+  `<scratch>/device-run/`.
+- A finding becomes a note under `<averi>/docs/bugs/`, written in the style of the
   existing notes (claim → measured → code says → suggestion). Leave it uncommitted.
 
 ## 1. Hard safety rules (stop and report instead of breaking any of them)
@@ -40,7 +40,7 @@ edit either app repo's tracked files (`/Users/mholecy/dev/finportal`, `/Users/mh
    - No CONFIRM tap, no `certify_*`, `create_template` or `delete_first_template` flow, and nothing on the certification
      screen.
    - `goto_payment_summary` stops before CONFIRM, so it is allowed.
-3. **Login, logout and `clearState` scenarios run on finportal only** (`/Users/mholecy/dev/finportal/app`). There, login
+3. **Login, logout and `clearState` scenarios run on finportal only** (`<finportal>/app`). There, login
    stops at the 2FA screen by design, so no code is ever typed. Do not try to get past 2FA.
 4. **Do not disturb other sessions.**
    - Another Claude Code session's averi MCP server may be alive: `npm exec averi@0.9.0`, cwd mp-native (pid 703/1199 at
@@ -68,7 +68,7 @@ edit either app repo's tracked files (`/Users/mholecy/dev/finportal`, `/Users/mh
 ## 2. Setup
 
 ```sh
-cd /Users/mholecy/dev/mobile-verify
+cd <averi>
 git log -1 --oneline        # expect d69511e or later on architecture/deepening; record it in the report
 npm run build               # dist/mcp/server.js — the artifact under test
 adb devices                 # emulator-5554
@@ -82,7 +82,7 @@ mobile-verify root. Point it at a project with environment variables:
 # finportal (default APP_CWD)
 node --import tsx $RUN/run-tools.mts $RUN/<scenario>.json $RUN/out/<scenario>
 # mp-native
-AVERI_APP_CWD=/Users/mholecy/Finshape/mp-native node --import tsx $RUN/run-tools.mts $RUN/<scenario>.json $RUN/out/<scenario>
+AVERI_APP_CWD=<mp-native> node --import tsx $RUN/run-tools.mts $RUN/<scenario>.json $RUN/out/<scenario>
 ```
 
 Each scenario spawns its own server from `dist/`. Do NOT use mp-native's `.mcp.json` server (it runs the published
@@ -158,7 +158,7 @@ registered app on that platform. Do Android first, then iOS. iOS reads the **idb
      measured rect, it must FAIL `the screen did not settle: N captures …`.
    - If the spinner is gone before the first capture, say so. That is not a failure, just not measured.
 4. **`verify` with a real contract** (C3, V4+V5, color parity):
-   - Contract: `contract: /Users/mholecy/Finshape/mp-native/convergence/contracts/layout/swift-payment-form.json`.
+   - Contract: `contract: <mp-native>/convergence/contracts/layout/swift-payment-form.json`.
    - State: `swift_payment_form` (or the state name averi.yaml uses for that screen; read it, don't guess).
    - Run it once per platform via `verify`, starting from the form, so `requires:` is already active.
    - Check the section order `## rect parity` / `## color parity` / `## text parity` and the leg wording against handoff §0.

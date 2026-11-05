@@ -8,7 +8,7 @@
 `architecture/top4-2026-10-07`; commits `7f423bf` C1 adb argv, `f30fdd0` C2 start detection, `9a3e691` C4 flow
 engine, `45fd47e` C3 parity window width). Driven through the handoff's stdio MCP driver `run-tools.mts`
 (docs/plans/2026-10-05-device-verification-handoff.md §2, plus `sleep` / `sh` pseudo-steps for device-side
-evidence), server cwd `/Users/mholecy/dev/finportal/app` (its `averi.yaml` and `.env.averi`, unmodified).
+evidence), server cwd `<finportal>/app` (its `averi.yaml` and `.env.averi`, unmodified).
 Devices: `emulator-5554` (sdk_gphone64_arm64, Android 13, 1080x2220 @ 440 dpi) and `iPhone 17`
 (`D34212DB-…`, iOS 26.5, `treeSource: wda`). finportal `sk.finportal.myport` debug build, Metro up on 8081.
 No login was submitted; no `login` / `ensure_state logged_in` was run. Durations are the tool call's own

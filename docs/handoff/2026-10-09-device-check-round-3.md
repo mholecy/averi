@@ -8,7 +8,7 @@ Do not guess.
 
 `fix/round-3` @ `347e70d` = `main` `c11d179` + 41 round-3 fix commits + four architecture deepenings (scroll: one owner of the
 stroke box, keyboard included, and the round deriving its tree facts itself; fill: the clear as the pure
-`fill-clear.ts#clearStep`, and `judgeFill`/`differenceOf` judging the facts fill.ts reports). In `/Users/mholecy/dev/mobile-verify`:
+`fill-clear.ts#clearStep`, and `judgeFill`/`differenceOf` judging the facts fill.ts reports). In `<averi>`:
 
 1. `git checkout fix/round-3`.
 2. `git rev-parse --short HEAD` must print `347e70d`. If it does not, stop and ask.

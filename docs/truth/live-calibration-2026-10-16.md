@@ -1,5 +1,5 @@
 <!-- The live calibration (phase 5), 2026-10-16: scripts/truth/live.ts --side <checkout> runs a note's live cases with an
-older averi's src (calibrate.ts's checkouts, /private/tmp/claude-501/averi-calibration/differential-cal-<sha>) against
+older averi's src (calibrate.ts's checkouts, `<cal>/differential-cal-<sha>`) against
 the REAL lab app — the averi_lab AVD (emulator-5554, API 33, gesture navigation) and the averi-lab iPhone 17 simulator
 (iOS 27.0, WDA on 8120) — the app's tap log, offsets, strokes and form model the oracle. Verdicts are recorded by hand
 in scripts/truth/calibration.json (`live`) and rendered in docs/truth/calibration.md. The iOS sides ran before

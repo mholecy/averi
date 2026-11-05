@@ -1,7 +1,7 @@
 # BUG: on Android `scroll_until … fully: true` certifies a row the app's pinned bars cut, because uiautomator clips each node's bounds to its scroll container
 
 **Measured 2026-10-09 05:58–06:05 UTC**, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard), averi = mobile-verify
-`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`), mp-native SWIFT form
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`), mp-native SWIFT form
 (`com.finshape.skeleton.dev`, Compose; Account Detail → PAY → SWIFT payment). First seen 2026-10-08 at `e9e6509` and noted
 there as an "open follow-up" in [2026-10-08-scroll-until-ignores-android-soft-keyboard.md](2026-10-08-scroll-until-ignores-android-soft-keyboard.md)
 (sections "Device check (2026-10-08, re-run at e9e6509)" and "Device check (2026-10-09 Android bank form …)"); filed on its
@@ -63,28 +63,28 @@ Measured 11:28–11:42 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, 
 and Account Detail; Settings search in landscape for item f. Rows placed by slow manual drags with the real `adb` (not in the shim log).
 Probe cap on this screen: 0.08 × 2220 = 178 px.
 
-- **Holds — Fees (top edge).** Keyboard down, `fees_select` read `66,242 948x102` (cut by the top bar; `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-52-0.png`). 11:32:07
+- **Holds — Fees (top edge).** Keyboard down, `fees_select` read `66,242 948x102` (cut by the top bar; `<scratch>/averi-repo/run5-android/img-52-0.png`). 11:32:07
   `scroll_until { selector: "id:swift_payment.form.fees_select", fully: true }` → `Element id:swift_payment.form.fees_select fully visible
   after 1 swipe` (7.2 s). Shim: one probe `input swipe 540 589 540 766 300` — finger DOWN, 177 px, inside the container. Row after
-  `66,390 948x143`; screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-55-0.png` shows the `Fees*` label and value whole.
+  `66,390 948x143`; screenshot `<scratch>/averi-repo/run5-android/img-55-0.png` shows the `Fees*` label and value whole.
 - **Holds, on a substitute row — bottom edge.** The `priority_select {y:1846,height:133}` shape needs the form taller above it (the
   `iban_notice`); with `DE89…` in a CZK payment no notice appeared on Android, so the form at its top keeps `priority_select` at
   `66,1749 948x143`, whole. Same rule, two rows cut by the container's bottom (1978) instead: `details_toggle` read `66,1924 948x55` →
   11:33:14 `scroll_until … details_toggle, fully: true` → `fully visible after 1 swipe` (7.2 s), probe `540 1631 540 1454 300` (finger UP,
   177 px), the toggle then `66,1731 948x132`; `payee_name_input` then read `66,1894 948x85` → 11:33:32 → `fully visible after 1 swipe`
-  (7.2 s), probe `540 1631 540 1454 300`, row after `66,1704 948x143` (`/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-65-0.png`).
+  (7.2 s), probe `540 1631 540 1454 300`, row after `66,1704 948x143` (`<scratch>/averi-repo/run5-android/img-65-0.png`).
 - **Holds — carousel `fills`.** Account Detail, the account carousel: card `accounts.detail.header 66,275 948x330` in its clip
   `0,275 1080x330`. 11:42:13 `scroll_until { selector: "id:accounts.detail.header", fully: true }` → `Element id:accounts.detail.header
   fully visible after 0 swipes; but it fills its scroll container (0,275 1080x330) exactly — its top and bottom edges lie on the
   container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — it may
   be cut there, a rect assert or screenshot may measure part of it; usual for a card as tall as its carousel — check with a screenshot`
-  (2.1 s). No stroke in the shim. Screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-111-0.png`: the card is whole (not cut).
+  (2.1 s). No stroke in the shim. Screenshot `<scratch>/averi-repo/run5-android/img-111-0.png`: the card is whole (not cut).
 - **Holds — probe vs pull-to-refresh (no refresh on this screen).** Account Detail, list at the top: `transactions.list.filter_panel
   0,825 1080x170` flush with the list container `0,825 1080x1395`. 11:28:24 `scroll_until { selector: "id:transactions.list.filter_panel",
   fully: true }` → `Element id:transactions.list.filter_panel fully visible after 1 swipe; its top edge lies on its scroll container's
   (0,825 1080x1395), and a probe swipe toward it moved nothing — nothing of it is cut there` (4.9 s). Probe `540 1104 540 1281 300`
-  (finger down, 177 px). Screenshot after (`/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/img-31-0.png`): no spinner, no reload. A manual 900-px, 2.5-s pull at the top showed
-  only the stretch overscroll (`/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run5-android/ptr-mid.png`) — this screen has no pull-to-refresh, so "no refresh fired" is shown only in that
+  (finger down, 177 px). Screenshot after (`<scratch>/averi-repo/run5-android/img-31-0.png`): no spinner, no reload. A manual 900-px, 2.5-s pull at the top showed
+  only the stretch overscroll (`<scratch>/averi-repo/run5-android/ptr-mid.png`) — this screen has no pull-to-refresh, so "no refresh fired" is shown only in that
   sense; a screen WITH pull-to-refresh was not found.
 - **Not reached — `budget` / `tap` unchecked wordings.** Not tried (`maxSwipes: 1` opportunistic; `tap` unit-only).
 
@@ -115,14 +115,14 @@ Measured 12:56–12:59 UTC, emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, 
 
 - **Holds — carousel `fills`.** List at the top, bar shown. 12:56:28 `scroll_until { selector: "id:accounts.detail.header", fully: true }` →
   `Element id:accounts.detail.header fully visible after 0 swipes; but it fills its scroll container (0,275 1080x330) exactly — its top and bottom edges lie on the container's, where Android cuts a node's bounds to the container, and no probe swipe can tell which side, if either, is cut — it may be cut there, a rect assert or screenshot may measure part of it; usual for a card as tall as its carousel — check with a screenshot`
-  (2.1 s), verbatim as at 347e70d; no stroke. Screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-25-0.png`.
+  (2.1 s), verbatim as at 347e70d; no stroke. Screenshot `<scratch>/averi-repo/run6-android/img-25-0.png`.
 - **Holds — top-edge probe with the tab bar shown.** 12:56:31 `scroll_until { selector: "id:transactions.list.filter_panel", fully: true }`
   → `Element id:transactions.list.filter_panel fully visible after 1 swipe; its top edge lies on its scroll container's (0,825 1080x1395), and a probe swipe toward it moved nothing — nothing of it is cut there`
   (4.8 s). Probe `input swipe 540 1104 540 1281 300` — identical to 347e70d (a finger-down probe is content-up, never cut by the bar).
 - **Holds (§5) — Fees probe on the SWIFT form.** Keyboard down, `fees_select` read `66,242 948x121` (cut by the top bar). 12:59:42
   `scroll_until { selector: "id:swift_payment.form.fees_select", fully: true }` → `Element id:swift_payment.form.fees_select fully visible
   after 1 swipe` (8.0 s). Shim: one probe `input swipe 540 589 540 766 300` — finger DOWN, 177 px ≤ 178, inside the container, the same
-  stroke as 347e70d. Row after `66,351 948x143`; screenshot `/private/tmp/claude-501/-Users-mholecy-Finshape-mp-native/7fbfe9d5-e34d-4d96-8f31-ac55f222c022/scratchpad/averi-repo/run6-android/img-52-0.png` shows `Fees*` and its value whole. The overlay cut did not
+  stroke as 347e70d. Row after `66,351 948x143`; screenshot `<scratch>/averi-repo/run6-android/img-52-0.png` shows `Fees*` and its value whole. The overlay cut did not
   fire (the CONTINUE bar is not over the container).
 
 ## Device check (2026-10-09 Android, re-run at dd50327)

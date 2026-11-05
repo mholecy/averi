@@ -1,10 +1,10 @@
 # BUGS: four findings from the `user-settings` converge-feature run (averi 0.6.0)
 
-**Measured 2026-08-27** in `/Users/mholecy/Finshape/skeleton` while building and verifying one
+**Measured 2026-08-27** in `<skeleton>` while building and verifying one
 feature (`convergence/feature-specs/user-settings.md`) on both platforms.
 
 **Build under test: 0.6.0 from source.** The consuming repo's `.mcp.json` runs
-`npx tsx /Users/mholecy/dev/mobile-verify/src/mcp/server.ts`, so this is the live tree, not an
+`npx tsx <averi>/src/mcp/server.ts`, so this is the live tree, not an
 installed 0.5.0. Relevant because the four reports already in this directory are CLOSED against
 0.6.0 — none of the findings below is a re-report of those.
 
@@ -356,7 +356,7 @@ what makes them good regression tests.
 ### Setup (once)
 
 ```bash
-cd /Users/mholecy/Finshape/skeleton
+cd <skeleton>
 # submodules are on spike/user-settings: Android 77942756 · iOS a26d2d5 · ops 7426659
 (cd mp-android-skeleton && git log --oneline -1)   # expect 77942756
 (cd mp-ios-skeleton     && git log --oneline -1)   # expect a26d2d5

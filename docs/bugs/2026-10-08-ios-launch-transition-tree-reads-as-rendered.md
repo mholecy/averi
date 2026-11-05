@@ -2,7 +2,7 @@
 
 > **Status (2026-10-08):** fixed on branch `fix/p0-launch-tree`; unmeasured on a device: `isBareTree` (src/ui-tree/bare-tree.ts) recognizes a status bar — a `text` whose whole label is a time, wholly inside the top 8 % of the screen, with a labelled or valued `container`/`other` status item beside it — skips every node wholly above the clock's bottom plus 1 % of the screen, and calls a lone `button` beside such a status bar the launch icon, so both measured shapes (7 and 6 nodes) are bare and the existing guards apply — `unknown` verdicts, the bare ⚠, the second look, the destructive refusal (tests/ui-tree/bare-tree.test.ts, tests/flow/bare-tree-ladder.test.ts, built from the trees below). The bare wording merge task is done (on `fix/keyboard-aware-scroll`): `ui_snapshot`'s note, the ladder's and `bareTimeoutNote`'s now say the tree holds "nothing of the app's (only wrappers, unlabeled decoration, or iOS's status bar and launch icon)". Inferred misses, read as before the fix (not bare): the home screen before the zoom (status bar + several icons); an extra SpringBoard node beside the icon (a Dock `other`); a status bar whose clock has no digits to read (a call or recording pill) or reads otherwise ("18 h 29"); status items with no label or value, or typed as a mapped role, on an early frame; iPhone landscape (no status bar, the icon alone); and the entry probe is a single read, so a read that misses is a destructive rung run at once. Follow-up ideas (to measure): ask idb which app is frontmost, or tell SpringBoard's Application (labelled ' ') from the app's (its display name). To check on the device: the repro's four steps on iOS 27 — the early `ui_snapshot` carries the bare ⚠, the absent assert fails as "could not verify" until the PIN screen renders, `ensure_state pin_seen` answers "already active" after a `⚠ detect … bare` line with no rung run. Triaged P0 (an `absent:` passed and `ensure_state` could run a DESTRUCTIVE rung on SpringBoard's launch tree).
 
-**Measured 2026-10-08 16:28–16:42 UTC** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`, iOS tree source
+**Measured 2026-10-08 16:28–16:42 UTC** in `<mp-native>` (config `averi.yaml`, iOS tree source
 default `idb`; the ladder probe used a scratch config, below), iPhone 17 simulator **iOS 27.0**
 (`37956039-94EA-4F51-93E5-94F7723A4578`), app `com.finshape.dbosbanking` (registered install, cold launch lands on the
 PIN screen), averi = mobile-verify @ `c35388a` built from source (`dist/`, `node dist/mcp/server.js` over stdio).
@@ -175,7 +175,7 @@ Measured 20:06–20:20 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93
 ## Device check (2026-10-09 iOS, re-run at 610660f)
 
 Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`). **The mp-native SWIFT form was
 not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
 `SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
 `scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
@@ -199,7 +199,7 @@ brings a backgrounded app to the front, idb returns the PREVIOUS app's full tree
 Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
 form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
 loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
-`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `<mp-native>`.
 Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
 untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
 `HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
@@ -222,7 +222,7 @@ recorded with an `idb` PATH shim.
 ## Device check (2026-10-09 iOS, re-run at 347e70d)
 
 Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), default `treeSource: idb`,
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `<mp-native>`), default `treeSource: idb`,
 `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder: `scratchpad/averi-repo/run5-ios`.
 
 **Holds — cold launch, foreground wait and bare-tree rules together, no double warning.** Contacts in front; bank app

@@ -6,7 +6,7 @@
 
 > **Follow-up (2026-10-08, bundle C review round 2, not changed):** a clear alone (`value: ""`) whose post-focus read misses a field that read empty before the tap sends no delete and has no read-back, so it is unverified yet said as `Filled … (0 characters)`. Narrow and pre-existing (the clear loop's post-delete miss is fixed: it reads `lost`).
 
-**Measured 2026-10-08 16:30–16:41 UTC** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`, iOS tree source
+**Measured 2026-10-08 16:30–16:41 UTC** in `<mp-native>` (config `averi.yaml`, iOS tree source
 default `idb`), SWIFT payment form of PR #6 (branch `feature/swift-payment`), iPhone 17 simulator iOS 27.0
 (`37956039-94EA-4F51-93E5-94F7723A4578`), averi = mobile-verify @ `c35388a` built from source.
 
@@ -146,7 +146,7 @@ permitted to this session); stock fixtures instead: Settings search (`id:open_se
 ## Device check (2026-10-09 iOS, re-run at 610660f)
 
 Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`). **The mp-native SWIFT form was
 not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
 `SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
 `scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
@@ -197,7 +197,7 @@ pre-existing failure shared with Android and one new wording bug, below.
 Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
 form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
 loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
-`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `<mp-native>`.
 Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
 untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
 `HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
@@ -272,7 +272,7 @@ Measured 05:58–06:03 UTC, mp-native SWIFT form (logged in by the owner), emula
 ## Device check (2026-10-09 iOS, re-run at 347e70d)
 
 Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `<mp-native>`), scratch configs only
 (mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
 `scratchpad/averi-repo/run5-ios`. Bank app: cold relaunch at 11:36:52, PIN-only `login_pin_ios_here` (11:37:11), Account
 Detail → PAY → SWIFT payment; default `treeSource: idb` unless stated.
