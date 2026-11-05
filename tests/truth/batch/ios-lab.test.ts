@@ -242,7 +242,8 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
   it('met: its how names the simulator, the reset, the build and the cells; the installed cells kept in the lab folder', async () => {
     const ios = iosLab({ wait });
     const r = await (ios.need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
-    expect(r).toEqual({ ok: true, how: "averi-lab iPhone 17 simulator, iOS 27.0, reset; not rebuilt; the installed cells.json is main's" });
+    // Exactly met: no warning field at all (code review mutation round).
+    expect(r).toStrictEqual({ ok: true, how: "averi-lab iPhone 17 simulator, iOS 27.0, reset; not rebuilt; the installed cells.json is main's" });
     expect(readFileSync(join(dir, 'lab', 'ios-installed-cells.json'), 'utf8')).toBe(CATALOG);
     expect(steps).toContain("NOTE com.apple.launchservices.schemeapproval's finportal key at the iOS stretch's start: absent (read only: no batch writes it)");
     expect(words()).toContain(`xcrun simctl get_app_container ${LAB_UDID} dev.averi.lab app`);
@@ -288,7 +289,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     expect(await check({ reset: false })).toEqual({ ok: false, why: `the installed app (${world.app})'s cells.json is not main's (rerun with ONLY=lab,…)` });
     fresh({ appCells: null });
     expect(await check({ reset: false })).toEqual({ ok: false, why: 'the lab app is not installed (simctl get_app_container: exit 2 No such file or directory) (rerun with ONLY=lab,…)' });
-    expect(await check({ reset: false, build: builtRef(join(dir, 'no-such.app')) })).toMatchObject({ ok: false, why: expect.stringMatching(/^this run's build not installed/) });
+    expect(await check({ reset: false, build: builtRef(join(dir, 'no-such.app')) })).toEqual({ ok: false, why: `this run's build not installed (simctl install: exit 2 no app at ${join(dir, 'no-such.app')})` });
   });
 
   it('this run\'s build: installed before the cells are compared (batch-11.sh:399–401), said in the how', async () => {
@@ -520,7 +521,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
 describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ended (batch-11.sh:660, and the end of on_abort)', () => {
   it('only once the guard cleared the simulator this run: no call before', async () => {
     const run = runOf(world);
-    await endLabProcesses(() => undefined)({ run, step: (w, t) => void steps.push(`${w} ${t}`) });
+    await endLabProcesses(() => undefined, wait)({ run, step: (w, t) => void steps.push(`${w} ${t}`) });
     expect(run.seen).toEqual([]);
     expect(steps).toEqual([]);
   });
@@ -534,7 +535,7 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     expect(run.seen.map((s) => s.words)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', `pkill -f idb_companion --udid ${LAB_UDID}`]);
     expect(steps).toEqual([`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`]);
     steps.length = 0;
-    await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 1 : 2, timedOut: false, signal: null, out: '', err: '' }), step: (w, t) => void steps.push(`${w} ${t}`) });
+    await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 1 : 2, timedOut: false, signal: null, out: '', err: '' }), step: (w, t) => void steps.push(`${w} ${t}`) });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended, not all proven: pkill: exit 2; pkill: exit 2; pkill: exit 2`]);
   });
 
@@ -551,10 +552,10 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     // Read again through portFree, after its wait (code review, NIT 3).
     expect(waits).toEqual([PORT_RECHECK_MS]);
     steps.length = 0;
-    await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), step: say });
+    await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), step: say });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 still has a listener (pid 7)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 still has a listener (pid 7)`]);
     steps.length = 0;
-    await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 1, timedOut: false, signal: null, out: '', err: '' }), step: say });
+    await endLabProcesses(() => LAB_UDID, wait)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 1, timedOut: false, signal: null, out: '', err: '' }), step: say });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 not read (lsof: exit 2)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 not read (lsof: exit 2)`]);
   });
 });
