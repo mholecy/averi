@@ -124,6 +124,11 @@
     "floor": 98,
     "baseline": "100 % on 2026-11-05 (T2 S6a review round 3: logErrors counts across this run's logs; cold): 350 mutants, 0 survived, 2 timeouts — after its one survivor, an unread log's `?? ''`, was designed away (the log skipped by name); 100 % on 2026-11-05 (T2 S6a review round 2: fileErrors deduplicates with counts; cold): 322 mutants, 0 survived, 2 timeouts; 100 % on 2026-11-05 (T2 S6a review round 1: fileErrors, liveCalls, judgedNothingLine; cold): 306 mutants, 0 survived, 2 timeouts; 100 % on 2026-11-05 (T2 S6a, cold): 271 mutants, 0 survived, 2 timeouts (counted killed) — after the first cold run's 4 survivors were killed by tests (a detail line ending in == kept, one starting with it dropped; a lone CR ends a line) or designed away (configOf's `out === undefined` beside its error, typed by `as`; parsedRecord's catch left empty, the record read after it)"
   },
+  "scripts/truth/batch/records.ts": {
+    "tests": ["tests/truth/batch/records.test.ts", "tests/truth/batch/runner.test.ts"],
+    "floor": 0,
+    "baseline": "pending"
+  },
   "scripts/truth/batch/runner.ts": {
     "tests": ["tests/truth/batch/runner.test.ts"],
     "floor": 97,

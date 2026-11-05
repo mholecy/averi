@@ -32,11 +32,11 @@ export type Verdict = (typeof VERDICTS)[number];
 export const SUMMARY_MARKER = '======== SUMMARY';
 
 /**
- * A batch's exit codes: 2 nothing done — either refused to start (no SUMMARY), or no wanted block ran (a failed checkout,
- * every need or precondition failed: the SUMMARY, with NONE_RAN_LINE after each block's why); 130 interrupted (the abort
- * SUMMARY printed).
+ * A batch's exit codes: 1 a FAIL or a RESTORE; 2 nothing done — either refused to start (no SUMMARY), or no wanted
+ * block ran (a failed checkout, every need or precondition failed: the SUMMARY, with NONE_RAN_LINE after each block's
+ * why); 130 interrupted (the abort SUMMARY printed).
  */
-export const EXIT = { ok: 0, failed: 1, refused: 2, nothingRan: 2, interrupted: 130 } as const;
+export const EXIT = { ok: 0, failed: 1, nothingDone: 2, interrupted: 130 } as const;
 
 const LINE_BREAK = /[\n\r]/;
 
@@ -49,7 +49,7 @@ export function oneLine(line: string, what = 'a line'): string {
 /** A step line: the word padded to four, then the text (`OK   x`, `DONE x`, `ERROR x`). */
 export const stepLine = (word: StepWord, text: string): string => `${word.padEnd(4)} ${text}`;
 
-/** What every refusal line ends with: the batch exits 2 (EXIT.refused) and has done nothing. */
+/** What every refusal line ends with: the batch exits 2 (EXIT.nothingDone) and has done nothing. */
 export const NOTHING_DONE = ' — nothing was done';
 
 /** A refusal: `ERROR <text> — nothing was done`. */
@@ -154,8 +154,8 @@ export const interruptedBlock = (block: string, linesSoFar: readonly string[], w
 ];
 
 /**
- * The SUMMARY's line, after the blocks', whenever no wanted block ran (T2 S6a review rounds 2, 3): it names no exit code,
- * which is exitCodeOf's — 2, or 1 when a RESTORE was written.
+ * The SUMMARY's line, after the blocks', whenever no wanted block ran (T2 S6a review rounds 2, 3): it names no exit
+ * code, which is exitCodeOf's — 2, or 1 when a RESTORE was written.
  */
 export const NONE_RAN_LINE = "NOTE no wanted block ran (each one's why above)";
 
@@ -184,9 +184,9 @@ export function summaryLines(s: Summary): string[] {
 }
 
 /**
- * The run's exit code: 130 when interrupted, whatever else; 1 when any SUMMARY line but an ERROR line says FAIL or
- * this run wrote a RESTORE; 2 when no wanted block ran ("nothing was done": an agent reading only the exit code must
- * not see success); else 0. (Refused to start: EXIT.refused, with no SUMMARY.) An ERROR line, an INCONCLUSIVE or a SKIP
+ * The run's exit code: 130 when interrupted, whatever else; 1 when any SUMMARY line but an ERROR line says FAIL or this
+ * run wrote a RESTORE; 2 when no wanted block ran ("nothing was done": an agent reading only the exit code must not see
+ * success); else 0. (Refused to start: EXIT.nothingDone too, with no SUMMARY.) An ERROR line, an INCONCLUSIVE or a SKIP
  * alone exits 0 when a block ran: the SUMMARY says it, the exit code is for a FAIL or for state left on a device.
  */
 export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
@@ -194,5 +194,5 @@ export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
   if (s.restore.written.length > 0) return EXIT.failed;
   const judged = [s.checkout, ...s.labs, ...s.blocks.flatMap((b) => b.lines), ...s.protectedLines];
   if (judged.some(failsIn)) return EXIT.failed;
-  return s.noneRan === true ? EXIT.nothingRan : EXIT.ok;
+  return s.noneRan === true ? EXIT.nothingDone : EXIT.ok;
 }

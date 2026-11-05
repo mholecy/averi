@@ -109,62 +109,16 @@ export interface AskedRun {
 }
 
 /**
- * The backstop: the line of a wanted block that wrote none of its label. Nothing asked: `not run (see the ERROR
- * lines)`. Some run incomplete: S3's incompleteLine. Every run complete: the analyzer wrote nothing, said so.
+ * The backstop: the line of a wanted block that wrote none of its label. S3's incompleteLine, the one source of the
+ * words for runs not complete — with nothing asked, `not run (see the ERROR lines)` (NOT_RUN, its `none`). Every run
+ * complete: the analyzer wrote nothing, said so.
  */
 export function backstopLine(label: string, runs: readonly AskedRun[]): string {
-  if (runs.length === 0) return verdictLine(label, 'INCONCLUSIVE', NOT_RUN);
-  return incompleteLine(label, runs) ?? verdictLine(label, 'INCONCLUSIVE', `its ${runs.length} run(s) are complete, but no verdict line was written (see the ERROR lines)`);
+  return incompleteLine(label, runs, NOT_RUN) ?? verdictLine(label, 'INCONCLUSIVE', `its ${runs.length} run(s) are complete, but no verdict line was written (see the ERROR lines)`);
 }
 
 /** Whether `lines` hold one of the block's own label (`<label>:` at the start, whatever follows): batch-11's grep. */
 export const hasVerdictOf = (lines: readonly string[], label: string): boolean => lines.some((l) => l.startsWith(`${label}:`));
-
-/**
- * A non-live block's record (batch-12's E5 and T6 wrote `{"runs":N}` as a `.cases`; S3 keeps `.cases` for live runs):
- * how many runs it was asked, then how many it did. One kind for now; another is a new member of the union.
- */
-export interface RunsRecord {
-  kind: 'runs';
-  runs: number;
-}
-export type BlockRecord = RunsRecord;
-
-/** `v` as a record, or undefined: kind `runs` and a whole number of runs, 0 or more. */
-export function recordOf(v: unknown): BlockRecord | undefined {
-  const r = (v ?? {}) as Record<string, unknown>;
-  return r.kind === 'runs' && Number.isSafeInteger(r.runs) && (r.runs as number) >= 0 ? { kind: 'runs', runs: r.runs as number } : undefined;
-}
-
-/** A record's two files: what it was asked, written first, and what it did (`.asked.json`, `.done.json`). */
-export const recordFiles = (dir: string, name: string) => ({ asked: join(dir, `${name}.asked.json`), done: join(dir, `${name}.done.json`) });
-
-const NO_RECORD = 'is no record of runs (kind "runs", runs: a whole number)';
-
-/** The text's record, or undefined when it is none (no JSON or another shape). */
-function parsedRecord(text: string): BlockRecord | undefined {
-  let v: unknown;
-  try {
-    v = JSON.parse(text);
-  } catch {
-    // no JSON: no record
-  }
-  return recordOf(v);
-}
-
-/**
- * Why the record `name` is not complete, or undefined when it is: what it recorded is what it was asked. Its asked file
- * unreadable or no record, nothing recorded, a done file that is no record, another count — each said.
- */
-export function recordGap(name: string, askedText: string | undefined, doneText: string | undefined): string | undefined {
-  if (askedText === undefined) return `${name}.asked.json is unreadable: what it was asked is unknown`;
-  const asked = parsedRecord(askedText);
-  if (asked === undefined) return `${name}.asked.json ${NO_RECORD}`;
-  if (doneText === undefined) return `asked ${asked.runs} run(s), nothing recorded (no ${name}.done.json)`;
-  const done = parsedRecord(doneText);
-  if (done === undefined) return `${name}.done.json ${NO_RECORD}`;
-  return done.runs === asked.runs ? undefined : `asked ${asked.runs} run(s), recorded ${done.runs}`;
-}
 
 /**
  * A probe's or an analyzer's text as lines: split at CR LF, LF and a lone CR (a progress line a terminal overwrites),
@@ -178,7 +132,10 @@ export const linesIn = (texts: readonly string[]): string[] => texts.flatMap(lin
 /** The lines of a log or an analyze.txt that start with ERROR (a step line's word; batch-12's `grep -h '^ERROR'`). */
 export const errorLinesIn = (text: string): string[] => linesOf(text).filter((l) => l.startsWith('ERROR'));
 
-/** How many distinct ERROR lines the SUMMARY shows from this run's logs: a probe looping on errors must not bury the rest. */
+/**
+ * How many distinct ERROR lines the SUMMARY shows from this run's logs: a probe looping on errors must not bury the
+ * rest.
+ */
 export const ERROR_LINES_SHOWN = 20;
 
 /** How many logs an ERROR line's `in …` names before `+<n> more`. */
@@ -201,25 +158,32 @@ export interface RunLog {
   why?: string;
 }
 
+/** A step line's time, `HH:MM:SS ` (steps.ts#StepLog.note). */
+const STEP_TIME = /^\d\d:\d\d:\d\d /;
+
 /**
- * This run's ERROR lines from its logs, for the SUMMARY (T2 S6a review rounds 1–3): counted across every log first, one
- * line per distinct ERROR in first-seen order — said once in one log, bare; else `(×<total>, in <logs>)` — each cut so
- * the whole is at most DETAIL_CHARS; at most ERROR_LINES_SHOWN of them, then `… <n> more distinct ERROR lines (in
- * <logs>)`. Then a NOTE for each log that could not be read, naming its path and what is known of why: never skipped.
+ * This run's ERROR lines, for the SUMMARY (T2 S6a review rounds 1–3, code review): its steps' (steps.log, timed) and
+ * its logs', counted across them all first (a step's line by what it says, its time aside), one line per distinct ERROR
+ * in first-seen order — said once in one log, bare; else `(×<total>, in <logs>)` — each cut so the whole is at most
+ * DETAIL_CHARS; at most ERROR_LINES_SHOWN of them, then `… <n> more distinct ERROR lines (in <logs>)`. Then a NOTE for
+ * each log that could not be read, naming its path and what is known of why: never skipped.
  */
 export function logErrors(logs: readonly RunLog[]): string[] {
-  const seen = new Map<string, { n: number; in: string[] }>();
+  const seen = new Map<string, { first: string; n: number; in: string[] }>();
   for (const log of logs) {
     // An unread log holds no line to count: it is said below, as a NOTE.
     if (log.text === undefined) continue;
-    for (const l of errorLinesIn(log.text)) {
-      const e = seen.get(l) ?? { n: 0, in: [] };
+    for (const line of linesOf(log.text)) {
+      // A step line (steps.log's) is timed: counted by what it says, shown as first seen.
+      const said = line.replace(STEP_TIME, '');
+      if (!said.startsWith('ERROR')) continue;
+      const e = seen.get(said) ?? { first: line, n: 0, in: [] };
       e.n++;
       if (!e.in.includes(log.name)) e.in.push(log.name);
-      seen.set(l, e);
+      seen.set(said, e);
     }
   }
-  const all = [...seen];
+  const all = [...seen.values()].map((e) => [e.first, e] as const);
   const shown = all.slice(0, ERROR_LINES_SHOWN).map(([l, e]) => {
     const tail = e.n > 1 ? ` (×${e.n}, in ${whereOf(e.in)})` : '';
     return `${cutTo(l, DETAIL_CHARS - tail.length)}${tail}`;
@@ -280,22 +244,42 @@ export function detailsLines(d: { checkout: string; runId: string; stepsFile: st
 /** live.ts in the checkout under test. */
 export const LIVE_TS = 'scripts/truth/live.ts';
 
+/** The lab devices' ids a run was given (`--udid`, `--serial`): none, no run on that platform. */
+export interface DeviceIds {
+  udid?: string;
+  serial?: string;
+}
+
+/** A live run's bounds: live.ts's (B_LIVE) and its rejudge's (REJUDGE_SECS when none). */
+export interface LiveBounds {
+  secs: number;
+  rejudgeSecs?: number;
+}
+
+/** What a live run's argv is made of: the checkout under test, what was asked, its record. */
+export interface LiveRunSpec {
+  repo: string;
+  asked: Asked;
+  record: string;
+}
+
 /** The device flags for a live run, or why there are none: the device id not given. */
-export function deviceArgs(asked: Asked, ids: { udid?: string; serial?: string }): { args: string[] } | { why: string } {
+export function deviceArgs(asked: Asked, ids: DeviceIds): { args: string[] } | { why: string } {
   if (asked.platform === 'android') return ids.serial === undefined ? { why: 'no lab emulator serial given (--serial or AVERI_LAB_SERIAL)' } : { args: ['--serial', ids.serial] };
   return ids.udid === undefined ? { why: 'no lab simulator udid given (--udid or AVERI_LAB_UDID)' } : { args: ['--udid', ids.udid, '--sources', asked.sources.join(',')] };
 }
 
 const groupsOf = (asked: Asked): string => (asked.groups ?? DEFAULT_GROUPS).join(',');
 
+/** `node`'s argv before live.ts's own: tsx, then live.ts of the checkout under test. */
+const liveTs = (repo: string): string[] => ['--import', 'tsx', join(repo, LIVE_TS)];
+
 /**
  * live.ts's argv for a run (batch-11's live_run): the device, the app unless native, the groups (forms by default), the
  * cases asked (none: all of the groups), the record.
  */
-export const liveArgs = ({ repo, asked, device, record }: { repo: string; asked: Asked; device: readonly string[]; record: string }): string[] => [
-  '--import',
-  'tsx',
-  join(repo, LIVE_TS),
+export const liveArgs = ({ repo, asked, device, record }: LiveRunSpec & { device: readonly string[] }): string[] => [
+  ...liveTs(repo),
   ...device,
   ...(asked.app === 'native' ? [] : ['--app', asked.app]),
   '--groups',
@@ -308,14 +292,14 @@ export const liveArgs = ({ repo, asked, device, record }: { repo: string; asked:
 /** A live rejudge's bound when none is given: it only judges a record, device-free (batch-11 ran it unbounded). */
 export const REJUDGE_SECS = 120;
 
-/** live.ts's and its rejudge's calls: bounded (the secs given; rejudgeSecs, else REJUDGE_SECS), from the checkout, logged. */
-export const liveCalls = ({ repo, secs, rejudgeSecs, files }: { repo: string; secs: number; rejudgeSecs?: number; files: { log: string; summary: string } }) => ({
+/** live.ts's and its rejudge's calls: bounded (secs; rejudgeSecs, else REJUDGE_SECS), from the checkout, logged. */
+export const liveCalls = ({ repo, secs, rejudgeSecs, files }: LiveBounds & { repo: string; files: { log: string; summary: string } }) => ({
   live: { secs, cwd: repo, log: files.log },
   rejudge: { secs: rejudgeSecs ?? REJUDGE_SECS, cwd: repo, log: files.summary },
 });
 
 /** live.ts's rejudge of a record: main's judges, the same groups (batch-11.sh:479). */
-export const rejudgeArgs = ({ repo, asked, record }: { repo: string; asked: Asked; record: string }): string[] => ['--import', 'tsx', join(repo, LIVE_TS), '--rejudge', record, '--groups', groupsOf(asked)];
+export const rejudgeArgs = ({ repo, asked, record }: LiveRunSpec): string[] => [...liveTs(repo), '--rejudge', record, '--groups', groupsOf(asked)];
 
 /** A live step's text: OK bare; else its why and the log to read (batch-11.sh:234–237). */
 export const liveStepText = (what: string, outcome: { word: 'OK' | 'DONE' | 'FAIL'; why: string }, log: string): string => (outcome.word === 'OK' ? what : `${what} (${outcome.why}) — see ${log}`);

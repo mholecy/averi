@@ -340,6 +340,8 @@ describe('incompleteLine — the block\'s INCONCLUSIVE when a run is not complet
 
   it('no run asked (no .cases in its folder): INCONCLUSIVE, not run — never no line at all', () => {
     expect(incompleteLine('kf live verdict', [])).toBe('kf live verdict: INCONCLUSIVE — not run: no .cases in its folder (nothing was asked)');
+    expect(incompleteLine('E5 verdict', [], 'not run (see the ERROR lines)')).toBe('E5 verdict: INCONCLUSIVE — not run (see the ERROR lines)');
+    expect(incompleteLine('E5 verdict', [{ name: 'a', result: { ok: true } }], 'unused')).toBeUndefined();
   });
 
   it('some incomplete: how many of how many, then each one\'s name and why, ` | ` between them', () => {

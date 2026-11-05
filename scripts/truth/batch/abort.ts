@@ -93,10 +93,7 @@ export interface AbortGuardOptions {
   seam: ProcessSeam;
   /** run-dir.ts#layoutOf's restoreFile. */
   restoreFile: string;
-  /**
-   * The SUMMARY's fixed lines, read when it is written; and the run's other ERROR lines (its blocks' logs, runner.ts),
-   * after this run's steps'.
-   */
+  /** The SUMMARY's fixed lines and, when given, its ERROR section (AbortHead), read when it is written. */
   head(): AbortHead;
   /** The wanted blocks, in the batch's order. */
   blocks: readonly AbortBlock[];
@@ -114,6 +111,7 @@ export interface AbortHead {
   checkout: string;
   labs: readonly string[];
   protectedLines: readonly string[];
+  /** Its whole ERROR section (runner.ts: the steps' and the logs', counted together); none: the steps' ERROR lines. */
   errors?: readonly string[];
 }
 
@@ -322,8 +320,10 @@ export class AbortGuard {
     return [...byGroup.values()].map((u) => `group ${u.pid} may still be running: kill -9 -${u.pid}, then check ${u.owner ?? whoseState(names)}`);
   }
 
-  /** `how`: ended (finish, which throws when it cannot write), interrupted (the abort), or `left by <block>` (leave). */
-  private writeRestore(how: string, hand: readonly string[]): string[] {
+  /**
+   * `how`: ended (finish, which throws when it cannot write), interrupted (the abort), or `left by <block>` (leave).
+   */
+  private writeRestore(how: 'ended' | 'interrupted' | `left by ${string}`, hand: readonly string[]): string[] {
     const { name, runId, restoreFile, fs } = this.options;
     const now = this.now();
     const header = `${name} run ${runId} ${how} at ${dateOf(now)} ${timeOf(now)}`;
@@ -377,8 +377,8 @@ export class AbortGuard {
       // RESTORE: its line is appended. stopKept never rejects (bounded.ts turns every kill failure into a result).
       await this.calls.stopKept();
       this.writeRestore('interrupted', this.undeliveredHand(names));
-      const { errors = [], ...head } = this.headOf();
-      log.summary(summaryLines({ ...head, name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors: [...log.errors(), ...errors], interrupted: { at: timeOf(at) } }));
+      const { errors = log.errors(), ...head } = this.headOf();
+      log.summary(summaryLines({ ...head, name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors, interrupted: { at: timeOf(at) } }));
     } catch (e) {
       // The abort's own failure (its SUMMARY could not be written): said on stderr, and the exit is 130 still.
       seam.stderr(`${this.options.name}: the abort failed: ${messageOf(e)}\n`);

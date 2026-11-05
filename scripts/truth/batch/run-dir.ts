@@ -139,7 +139,9 @@ export function plainSegment(what: string, name: string): string {
 /** The run's own folder (its .out, the checkout line): not a block name. */
 export const META = 'meta';
 
-/** `name`, or a throw when it cannot be a block's: one plain path segment, not META (openRun's and the runner's rule). */
+/**
+ * `name`, or a throw when it cannot be a block's: one plain path segment, not META (openRun's and the runner's rule).
+ */
 export function blockName(name: string): string {
   if (!PLAIN_SEGMENT.test(name) || name === META) throw new Error(`block name ${JSON.stringify(name)}: one plain path segment, not "${META}", is needed`);
   return name;

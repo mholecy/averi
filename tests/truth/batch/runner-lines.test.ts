@@ -25,9 +25,6 @@ import {
   NOT_READ_CHECKOUT,
   NOT_RUN,
   needsLine,
-  recordFiles,
-  recordGap,
-  recordOf,
   rejudgeArgs,
   stepsOfRun,
   WHERE_SHOWN,
@@ -169,37 +166,6 @@ describe('hasVerdictOf — the backstop\'s test: a line of the block\'s own labe
   it('another label, or the label run on, does not: a cleanup or compare line is no verdict of the block', () => {
     expect(hasVerdictOf(['D43 WDA-window compare: OK — …', 'D43 live verdictX: PASS', 'x D43 live verdict: PASS'], 'D43 live verdict')).toBe(false);
     expect(hasVerdictOf([], 'D43 live verdict')).toBe(false);
-  });
-});
-
-describe('recordOf and recordGap — a non-live block\'s own record, apart from the live runs\' .cases (S3 review: batch-12\'s E5/T6 `{"runs":N}`)', () => {
-  it('a record is `{kind: "runs", runs: <whole number>}`', () => {
-    expect(recordOf({ kind: 'runs', runs: 3 })).toEqual({ kind: 'runs', runs: 3 });
-    expect(recordOf({ kind: 'runs', runs: 0 })).toEqual({ kind: 'runs', runs: 0 });
-    for (const bad of [null, undefined, 3, 'runs', [], { runs: 3 }, { kind: 'run', runs: 3 }, { kind: 'runs', runs: -1 }, { kind: 'runs', runs: 1.5 }, { kind: 'runs', runs: '3' }, { kind: 'runs' }]) {
-      expect(recordOf(bad)).toBeUndefined();
-    }
-  });
-
-  it('its two files: `<name>.asked.json` (written first) and `<name>.done.json`, never the live run\'s `.cases` or `.json`', () => {
-    expect(recordFiles('/d', 'e5-c')).toEqual({ asked: join('/d', 'e5-c.asked.json'), done: join('/d', 'e5-c.done.json') });
-  });
-
-  it('complete only when what was recorded matches what was asked', () => {
-    expect(recordGap('c', '{"kind":"runs","runs":3}', '{"kind":"runs","runs":3}')).toBeUndefined();
-  });
-
-  it('nothing recorded, fewer or more runs recorded: each said with both counts', () => {
-    expect(recordGap('c', '{"kind":"runs","runs":3}', undefined)).toBe('asked 3 run(s), nothing recorded (no c.done.json)');
-    expect(recordGap('c', '{"kind":"runs","runs":3}', '{"kind":"runs","runs":2}')).toBe('asked 3 run(s), recorded 2');
-    expect(recordGap('c', '{"kind":"runs","runs":1}', '{"kind":"runs","runs":2}')).toBe('asked 1 run(s), recorded 2');
-  });
-
-  it('a file that is no record (no JSON, another shape, unreadable) is a gap naming it, never a pass', () => {
-    expect(recordGap('c', undefined, '{"kind":"runs","runs":3}')).toBe('c.asked.json is unreadable: what it was asked is unknown');
-    expect(recordGap('c', '{', '{"kind":"runs","runs":3}')).toBe('c.asked.json is no record of runs (kind "runs", runs: a whole number)');
-    expect(recordGap('c', '{"kind":"runs","runs":3}', '{"runs":3}')).toBe('c.done.json is no record of runs (kind "runs", runs: a whole number)');
-    expect(recordGap('c', '{"kind":"runs","runs":3}', 'x')).toBe('c.done.json is no record of runs (kind "runs", runs: a whole number)');
   });
 });
 

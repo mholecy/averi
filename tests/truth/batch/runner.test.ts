@@ -731,7 +731,7 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
 
 // ------------------------------------------------------------------------------------------------ RESTORE, exit
 
-describe('RESTORE and the exit code (words.ts#exitCodeOf: 1 for a FAIL or a RESTORE line; WARN, INCONCLUSIVE, ERROR alone 0)', () => {
+describe('RESTORE and the exit code (words.ts#exitCodeOf: 1 for a FAIL or a RESTORE line; WARN, INCONCLUSIVE, ERROR alone 0 once a block ran — 2 when none ran, pinned under the needs and preconditions)', () => {
   it('restoreHand: the lines appended to RESTORE now, the SUMMARY\'s RESTORE section, exit 1 (S4\'s LATE_HAND)', async () => {
     expect(await go([plain('D43', { run: async (ctx) => (ctx.restoreHand(['D43: compare it by hand']), ctx.verdict('PASS')) })])).toBe(1);
     expect(summary()).toContain('D43: compare it by hand');
@@ -874,7 +874,9 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
   });
 
   it('interrupted during the normal end\'s judging: only the abort\'s SUMMARY, never a second', async () => {
-    const done = go([plain('a', { run: async () => {}, noRecords: true, judge: async ({ run }) => (await run('probe', ['hang'], { secs: 30 }), ['a verdict: PASS — judged']) })]);
+    let calls = 0;
+    // The normal end's judge waits on a probe; the abort's (the block is complete) answers at once.
+    const done = go([plain('a', { run: async () => {}, noRecords: true, judge: async ({ run }) => (calls++ === 0 && (await run('probe', ['hang'], { secs: 30 })), ['a verdict: PASS — judged']) })]);
     await until(() => seam.words().includes('probe hang'));
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);

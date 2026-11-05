@@ -2,11 +2,12 @@ import { join } from 'node:path';
 import { AbortGuard, type AbortBlock, type WindowSpec } from './abort.js';
 import type { Call, Run } from './bounded.js';
 import { completeness, runFiles, runsIn, selectorOf, stepOutcome, writeCases, type Asked } from './cases.js';
-import { isEexist, nodeFs, type BatchFs } from './io.js';
+import { nodeFs, type BatchFs } from './io.js';
 import { liveTableOf, type LiveSelection, type LiveTable } from './live-table.js';
 import { ancestor, casesOnMain, cellsOnMain, checkout, preconditionLine, type Git, type Precondition } from './preconditions.js';
 import { nodeProcess, type ProcessSeam } from './proc.js';
-import { blockName, layoutOf, META, newRunId, openRun, plainSegment, refusalLines, refusals, type Stateful } from './run-dir.js';
+import { recordGapIn, recordsComplete, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
+import { blockName, layoutOf, META, newRunId, openRun, refusalLines, refusals, type Stateful } from './run-dir.js';
 import {
   backstopLine,
   checkoutLine,
@@ -22,18 +23,15 @@ import {
   liveStepText,
   NOT_READ_CHECKOUT,
   needsLine,
-  recordFiles,
-  recordGap,
-  recordOf,
   rejudgeArgs,
   linesIn,
   logErrors,
   stepsOfRun,
   type AskedRun,
   type BatchConfig,
-  type BlockRecord,
   type ConfigRead,
   type DetailSpec,
+  type LiveBounds,
   type NeedResult,
 } from './runner-lines.js';
 import { knobs as readKnobs, selectBlocks, type KnobSpec, type KnobValues } from './select.js';
@@ -93,8 +91,8 @@ export interface NeedCtx {
 export type NeedCheck = (c: NeedCtx) => Promise<NeedResult>;
 /**
  * A need's checks (S6b supplies them): `check` in full, by the first block naming it; then before each later block
- * naming it, `alive` — a cheap one (the emulator still answers) — or, with none, `check` again: a need met once is never
- * trusted blindly for a later block. A bare NeedCheck is `{ check }`.
+ * naming it, `alive` — a cheap one (the emulator still answers) — or, with none, `check` again: a need met once is
+ * never trusted blindly for a later block. A bare NeedCheck is `{ check }`.
  */
 export type NeedSpec = NeedCheck | { check: NeedCheck; alive?: NeedCheck };
 
@@ -171,12 +169,17 @@ export interface Block<K = unknown> {
   stateful?: Omit<Stateful, 'block'>;
   run(ctx: BlockCtx<K>): Promise<void>;
   /**
-   * Its analyzer, device-free: its verdict lines from its folder. Run at the normal end when it wrote no verdict of
-   * its label, and by the abort when its records are complete.
+   * Its analyzer, device-free: its verdict lines from its folder. Run only for a complete block (`complete`) with no
+   * verdict of its label, at the normal end and by the abort; an incomplete block gets the backstop's line instead.
    */
   judge?(j: BlockFiles & { run: Run }): Promise<readonly string[]>;
-  /** Its records complete, for the abort (batch-12's block_complete); none: every asked run complete. */
+  /**
+   * Whether it is complete — judged only then, at the normal end and by the abort (batch-12's block_complete); none:
+   * records.ts's recordsComplete, or for a `noRecords` block, its run returned.
+   */
   complete?(j: BlockFiles): boolean;
+  /** It asks no run and records none (a probe judged from its own files): complete once its run returned. */
+  noRecords?: boolean;
   /** What the details print of its files. */
   details?: readonly DetailSpec[];
 }
@@ -208,13 +211,18 @@ export interface RunBatchOptions<S extends KnobSpec> {
   io?: Partial<RunIo>;
 }
 
-/** The batch's own mistakes, thrown before anything is done. */
-function checkBlocks(blocks: readonly Block<never>[], needs: Readonly<Record<string, NeedSpec>>): void {
+/** A label a verdict line can carry (words.ts#verdictLine's rule), or a throw. */
+function assertLabel(label: string): void {
+  verdictLine(label, 'INCONCLUSIVE');
+}
+
+/** The batch's own mistakes, thrown before anything is done: a block's name, its label, a need without a check. */
+function assertBlocks(blocks: readonly Block<never>[], needs: Readonly<Record<string, NeedSpec>>): void {
   const ids = blocks.map((b) => b.id);
   for (const b of blocks) {
     blockName(b.id);
     if (ids.indexOf(b.id) !== ids.lastIndexOf(b.id)) throw new Error(`block ${b.id} is named twice`);
-    verdictLine(b.label, 'INCONCLUSIVE');
+    assertLabel(b.label);
     for (const n of b.needs) if (needs[n] === undefined) throw new Error(`${b.id} needs ${n}, which has no check (needs: ${Object.keys(needs).join(', ')})`);
   }
 }
@@ -222,12 +230,12 @@ function checkBlocks(blocks: readonly Block<never>[], needs: Readonly<Record<str
 /** The run's whole: the order above. Resolves to the exit code; the seam's exit is called with it too. */
 export async function runBatch<S extends KnobSpec>(o: RunBatchOptions<S>): Promise<number> {
   const needs = o.needs ?? {};
-  checkBlocks(o.blocks, needs);
+  assertBlocks(o.blocks, needs);
   const base = { fs: nodeFs, seam: nodeProcess, terminal: terminalOf(), clock: () => new Date(), pid: process.pid, ...o.io };
   const refused = (lines: readonly string[]): number => {
     for (const l of lines) base.terminal(`${l}\n`);
-    base.seam.exit(EXIT.refused);
-    return EXIT.refused;
+    base.seam.exit(EXIT.nothingDone);
+    return EXIT.nothingDone;
   };
   if (!o.config.ok) return refused(o.config.errors);
   const config = o.config.config;
@@ -262,6 +270,8 @@ class BatchRun<K> {
   private readonly needResults = new Map<string, NeedResult>();
   /** Whether any wanted block ran: none, and the exit is 2. */
   private anyRan = false;
+  /** The blocks whose run returned: a `noRecords` block is complete only then. */
+  private readonly finished = new Set<string>();
   private checkout: string | undefined;
   private readonly restoreFile: string;
   private readonly stepsFile: string;
@@ -376,6 +386,8 @@ class BatchRun<K> {
     this.log.print(`== ${b.id} (${this.dirs[b.id]}/) ==`);
     this.anyRan = true;
     await b.run(this.ctxOf(b));
+    // A run that returns once the abort began (its probe stopped) did not finish: it is not complete.
+    if (!this.guard.interrupted) this.finished.add(b.id);
   }
 
   private notRun(b: Block<K>, line: string): void {
@@ -436,19 +448,6 @@ class BatchRun<K> {
     const dir = this.dirs[b.id];
     const { log, guard, io } = this;
     const bounded: Run = (cmd, args, call: Call = {}) => guard.bounded(cmd, args, { owner: b.id, ...call });
-    const exclusive = (path: string, text: string, what: string) => {
-      try {
-        io.fs.createExclusive(path, text);
-      } catch (e) {
-        if (isEexist(e)) throw new Error(`${path} already exists: what a run ${what} is never overwritten`);
-        throw e;
-      }
-    };
-    const recordText = (name: string, record: BlockRecord): string => {
-      plainSegment('run name', name);
-      if (recordOf(record) === undefined) throw new Error(`${name}: ${JSON.stringify(record)} is no record of runs`);
-      return `${JSON.stringify(record)}\n`;
-    };
     return {
       id: b.id,
       dir,
@@ -479,18 +478,13 @@ class BatchRun<K> {
         else this.protectedLines.push(l);
       },
       liveRun: (name, asked, o) => this.liveRun(b, bounded, name, asked, o),
-      asks: (name, record) => exclusive(recordFiles(dir, name).asked, recordText(name, record), 'was asked'),
-      record: (name, record) => {
-        const f = recordFiles(dir, name);
-        const text = recordText(name, record);
-        if (!io.fs.exists(f.asked)) throw new Error(`${name}: recorded before it was asked (asks first)`);
-        exclusive(f.done, text, 'recorded');
-      },
+      asks: (name, record) => writeAsked(io.fs, dir, name, record),
+      record: (name, record) => writeDone(io.fs, dir, name, record),
     };
   }
 
   /** batch-11's live_run: the `.cases` first, live.ts with its record, then its rejudge — each a bounded step. */
-  private async liveRun(b: Block<K>, bounded: Run, name: string, asked: Asked, o: { secs: number; rejudgeSecs?: number }): Promise<LiveOutcome> {
+  private async liveRun(b: Block<K>, bounded: Run, name: string, asked: Asked, o: LiveBounds): Promise<LiveOutcome> {
     const { fs } = this.io;
     const { repo } = this.config;
     const dir = this.dirs[b.id];
@@ -503,7 +497,7 @@ class BatchRun<K> {
       return { live: { word: 'FAIL', why: device.why } };
     }
     this.log.print(`== ${what} (log: ${f.log}) ==`);
-    const calls = liveCalls({ repo, secs: o.secs, rejudgeSecs: o.rejudgeSecs, files: f });
+    const calls = liveCalls({ ...o, repo, files: f });
     const r = await bounded(process.execPath, liveArgs({ repo, asked, device: device.args, record: f.record }), calls.live);
     const live = stepOutcome(r.code, fs.read(f.log) ?? '');
     this.log.step(live.word, liveStepText(what, live, f.log));
@@ -517,29 +511,17 @@ class BatchRun<K> {
     return { live, rejudge };
   }
 
-  /** The names of the records a block asked: each `<name>.asked.json` in its folder, sorted. */
-  private askedRecords(dir: string): string[] {
-    return this.io.fs
-      .list(dir)
-      .filter((n) => n.endsWith('.asked.json'))
-      .map((n) => n.slice(0, -'.asked.json'.length));
-  }
-
-  private recordGapOf(dir: string, name: string): string | undefined {
-    const f = recordFiles(dir, name);
-    return recordGap(name, this.io.fs.read(f.asked), this.io.fs.read(f.done));
-  }
-
   /**
-   * Whether a block's records are complete without a device or the table (batch-12's block_complete): one run asked at
-   * least; every live run's record and rejudge summary written; every record what it was asked.
+   * Whether a block is complete, so may be judged — one rule for both paths: its own `complete()`, else records.ts's
+   * recordsComplete, or for a `noRecords` block, its run returned. A `complete()` that throws: not complete.
    */
-  private recordsComplete(dir: string): boolean {
-    const { fs } = this.io;
-    const live = runsIn(fs, dir);
-    const records = this.askedRecords(dir);
-    const written = (p: string) => (fs.read(p) ?? '') !== '';
-    return live.length + records.length > 0 && live.every((n) => written(runFiles(dir, n).record) && written(runFiles(dir, n).summary)) && records.every((n) => this.recordGapOf(dir, n) === undefined);
+  private judgeable(b: Block<K>): boolean {
+    const dir = this.dirs[b.id];
+    try {
+      return b.complete?.({ dir, fs: this.io.fs }) ?? (b.noRecords === true ? this.finished.has(b.id) : recordsComplete(this.io.fs, dir));
+    } catch {
+      return false;
+    }
   }
 
   /** The block as the abort sees it: a verdict of its own kept already, or complete records and a judge for them. */
@@ -549,7 +531,7 @@ class BatchRun<K> {
     const own = () => hasVerdictOf(this.lines.get(b.id)!, b.label);
     return {
       block: b.id,
-      complete: () => own() || (b.judge !== undefined && (b.complete?.(files) ?? this.recordsComplete(dir))),
+      complete: () => own() || (b.judge !== undefined && this.judgeable(b)),
       judge: async (run) => {
         if (own()) return this.lines.get(b.id)!;
         const lines = linesIn(await b.judge!({ ...files, run }));
@@ -560,9 +542,12 @@ class BatchRun<K> {
     };
   }
 
-  /** The normal end's judge: for a block with no verdict of its label (so one that ran). A throw is an ERROR line. */
+  /**
+   * The normal end's judge: for a complete block (judgeable) with no verdict of its label — a block not run has its
+   * INCONCLUSIVE, an incomplete one gets the backstop's line. A throw is an ERROR line.
+   */
   private async judgeAtEnd(b: Block<K>): Promise<void> {
-    if (b.judge === undefined || hasVerdictOf(this.lines.get(b.id)!, b.label)) return;
+    if (b.judge === undefined || hasVerdictOf(this.lines.get(b.id)!, b.label) || !this.judgeable(b)) return;
     try {
       const lines = linesIn(await b.judge({ dir: this.dirs[b.id], fs: this.io.fs, run: this.guard.bounded }));
       this.log.step('OK', `${b.id} analyze`);
@@ -579,19 +564,21 @@ class BatchRun<K> {
     const dir = this.dirs[b.id];
     const runs: AskedRun[] = [];
     for (const name of runsIn(fs, dir)) runs.push({ name, result: await completeness({ fs, dir, name, select: selectorOf(table) }) });
-    for (const name of this.askedRecords(dir)) {
-      const why = this.recordGapOf(dir, name);
+    for (const name of recordsIn(fs, dir)) {
+      const why = recordGapIn(fs, dir, name);
       runs.push({ name, result: why === undefined ? { ok: true } : { ok: false, why } });
     }
     this.verdict(b, backstopLine(b.label, runs));
   }
 
   /**
-   * This run's ERROR lines from its logs (runner-lines.ts#logErrors): each run folder's `*.log` and analyze.txt, in
-   * openRun's order, each named `<block>/<file>`; one listed but unreadable says `a folder` when it lists entries.
+   * This run's ERROR lines (runner-lines.ts#logErrors), counted together: its steps' (steps.log) first, then each run
+   * folder's `*.log` and analyze.txt, in openRun's order, each named `<block>/<file>`; one listed but unreadable says
+   * `a folder` when it lists entries. Both SUMMARYs' whole ERROR section.
    */
   private runErrors(): string[] {
     const { fs } = this.io;
+    const steps = { name: 'steps.log', path: this.stepsFile, text: this.log.errors().join('\n') };
     const logs = Object.entries(this.dirs).flatMap(([block, d]) =>
       fs
         .list(d)
@@ -601,7 +588,7 @@ class BatchRun<K> {
           return { name: `${block}/${n}`, path, text: fs.read(path), ...(fs.list(path).length > 0 ? { why: 'a folder' } : {}) };
         }),
     );
-    return logErrors(logs);
+    return logErrors([steps, ...logs]);
   }
 
   /** The details, then the SUMMARY; the exit called with its code. */
@@ -625,7 +612,7 @@ class BatchRun<K> {
       blocks: this.blocks.map((b) => ({ block: b.id, lines: this.lines.get(b.id)! })),
       protectedLines: this.protectedLines,
       restore: { file: this.restoreFile, written: restore },
-      errors: [...this.log.errors(), ...this.runErrors()],
+      errors: this.runErrors(),
       noneRan: !this.anyRan,
     };
     this.log.summary(summaryLines(summary));
