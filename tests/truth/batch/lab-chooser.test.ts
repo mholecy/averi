@@ -686,12 +686,12 @@ describe('safeTap fails closed (T2 S5 review round 1)', () => {
     const t = tree(resolverXml(true));
     // A tag read wrong (its id lost) is still "Always" by src's own identifier.
     const lost: Dump = { root: t.root, attrs: (n) => ({ ...t.attrs(n), resourceId: n.identifier === 'button_always' ? undefined : t.attrs(n).resourceId }) };
-    const grown = tree(resolverXml(true).replace('bounds="[842,1983][1030,2132]"', 'bounds="[700,1983][1030,2132]"'));
+    const grown = tree(resolverXml(true).replace('text="Always"', 'text="Immer"').replace('bounds="[842,1983][1030,2132]"', 'bounds="[700,1983][1030,2132]"'));
     const lostGrown: Dump = { root: grown.root, attrs: (n) => ({ ...grown.attrs(n), resourceId: n.identifier === 'button_always' ? '' : grown.attrs(n).resourceId }) };
     expect(safeTap(lostGrown, 'once')).toMatchObject({ ok: false, refusal: 'always' });
     expect(safeTap(lost, 'once')).toMatchObject({ ok: true });
-    // A comment's tag paired with no node, but the count kept: the ids disagree.
-    const shifted = resolverXml().replace('<node index="0" text="" resource-id="" class="android.widget.FrameLayout"', '<!-- <node resource-id="x:id/ghost"> --><node index="0" text="" resource-id="" class="android.widget.FrameLayout"').replace(/<node index="0" text="" resource-id="android:id\/resolver_button_bar_divider"[^>]*\/>/, '');
+    // A tag read wrong (a single-quoted value holding the words `resource-id="…"`): its id is not src's, refused.
+    const shifted = resolverXml().replace('<node index="0" text="" resource-id="" class="android.widget.FrameLayout"', '<node index="0" hint=\' resource-id="x:id/ghost"\' text="" resource-id="" class="android.widget.FrameLayout"');
     expect(treeOf(shifted)).toMatchObject({ why: expect.stringMatching(/^the dump's tags and src's tree disagree at node \d+: tag resource-id "x:id\/ghost", tree identifier null$/) });
   });
 

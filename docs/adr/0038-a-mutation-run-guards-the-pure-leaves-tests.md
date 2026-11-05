@@ -578,9 +578,9 @@ as `*-api33-b<N>-*.txt`; and T4's resolver trees) and lab-emu.test.ts (a fake em
 defaults but never a last-chosen entry, as batch-11 measured; every call checked in afterEach for another serial, an
 `input tap` inside an "Always" node of the last tree dumped (read from its XML, not by the module's isAlways), a
 `pm`/`settings`/`cmd`/`am` write, and an uninstall or install outside a reinstall). Each under 2 s; no device.
-Baselines after review round 1, cold: lab-chooser.ts 99.88 % (826 mutants, 1 equivalent survivor: `chooserOf`'s state
+Baselines after review round 2, cold: lab-chooser.ts 99.88 % (851 mutants, 1 equivalent survivor: `chooserOf`'s state
 check, which an unread read with no chooser makes moot), floor 97; lab-emu.ts 100 % (438 mutants, 3 timeouts), floor
-98; abort.ts 98.04 % (its WARN put back; the same survivors). The cold run of all twenty-four modules took 3 min 21 s.
+98; abort.ts 98.04 % (its WARN put back; the same survivors). The cold run of all twenty-four modules took 3 min 24 s.
 40 hand mutants, one per decision branch or boundary, each run bounded (a timeout counts as killed): 39 killed at once;
 the 40th (a node inside the target under the point refused) killed by a test added for it. Review round 1: 15 more, on
 its fixes, 13 killed at once, 2 (exit 6 not proving a reinstall; an entity decoded wrong) by tests added for them — the
@@ -626,7 +626,8 @@ Decisions S5 pins:
 - `treeOf` reads a dump twice (review round 1): src's parser for the tree and its bounds, and each `<node>` tag, paired
   with the tree node for node in document order, for what src's tree drops — resource-id, text and content-desc
   apart (src's label is content-desc before text), and `enabled`. A dump whose tags and parsed nodes do not pair up is
-  no tree. The tags are read as written, not entity-decoded: uiautomator writes an entity only for `&`, `<`, `>`, `"`
+  no tree: their counts differ, or a tag's resource-id is not its node's identifier (review round 2). Tags are matched
+  quote-aware (a `>` inside a quoted value ends none), and "Always" is asked of src's identifier as well as the tag. The tags are read as written, not entity-decoded: uiautomator writes an entity only for `&`, `<`, `>`, `"`
   and control characters, none in a resource id or in the word "always".
 - `safeTap(dump, target, at?)` returns the one point or a named refusal: `no-target`, `not-unique` (a label two rows
   share: both lab rows say "AveriLab"), `no-sheet` (chooserSheet reads none: AOSP's with_default header, no chooser),

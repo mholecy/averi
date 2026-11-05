@@ -318,11 +318,15 @@ export function treeOf(raw: string): Dump | { why: string } {
     return { why: `the dump did not parse: ${firstLineOf(messageOf(e))}` };
   }
   const nodes = [...everyNode(root)];
-  const tags = [...xml.matchAll(/<node\b[^>]*>/g)].map((m) => m[0]);
+  // Quote-aware: a `>` inside a quoted value ends no tag (review round 2).
+  const tags = [...xml.matchAll(/<node\b(?:[^>"]|"[^"]*")*>/g)].map((m) => m[0]);
   if (tags.length !== nodes.length) return { why: `the dump's ${tags.length} node tags are not the parsed tree's ${nodes.length} nodes` };
-  const byNode = new Map(
-    nodes.map((n, i) => [n, { resourceId: attrOf(tags[i], 'resource-id'), text: attrOf(tags[i], 'text'), contentDesc: attrOf(tags[i], 'content-desc'), enabled: attrOf(tags[i], 'enabled') }]),
-  );
+  // Paired node for node, or not at all: each tag's resource-id must be its node's identifier (src keeps the last
+  // segment, none for an empty or missing id).
+  const ids = tags.map((t) => attrOf(t, 'resource-id') ?? '');
+  const lag = nodes.findIndex((n, i) => (ids[i].split('/').pop() || null) !== n.identifier);
+  if (lag !== -1) return { why: `the dump's tags and src's tree disagree at node ${lag}: tag resource-id ${JSON.stringify(ids[lag])}, tree identifier ${JSON.stringify(nodes[lag].identifier)}` };
+  const byNode = new Map(nodes.map((n, i) => [n, { resourceId: ids[i], text: attrOf(tags[i], 'text'), contentDesc: attrOf(tags[i], 'content-desc'), enabled: attrOf(tags[i], 'enabled') }]));
   return { root, attrs: (n) => byNode.get(n)! };
 }
 
@@ -403,7 +407,8 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
  */
 export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
   const tree = dump.root;
-  const always$ = (n: UiNode): boolean => isAlways(dump.attrs(n));
+  // src's identifier too (review round 2): a tag read wrong cannot hide an id src read.
+  const always$ = (n: UiNode): boolean => n.identifier === 'button_always' || isAlways(dump.attrs(n));
   const all = [...everyNode(tree)];
   const found = targetOf(all, target);
   if ('ok' in found) return found;
