@@ -722,7 +722,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(await w6.restore(fine.run)).toEqual({ ok: true, how: 'chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)' });
     const ok2 = fakeEmu();
     const w2 = await windowOf(ok2, { putBack: restoreOf(async () => ({ ok: true, how: 'put back' })) });
-    expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped: the lab's state stays as the probe left it" });
+    expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped; the probe's state put back" });
   });
 
   it("outside a reinstall, a dirty state file is put back by the probe's restore — it also undoes the probe's own changes; the note that nothing was wiped added (T2 S5 review round 4: the code review's decision reversed)", async () => {
@@ -737,9 +737,12 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
         return { ok: true, how: 'D55 restore: OK' };
       }),
     });
-    expect(await w.restore(fake.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped: the lab's state stays as the probe left it" });
+    expect(await w.restore(fake.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped; the probe's state put back" });
     expect(asked).toBe(1);
     expect(readState(o).dirty).toBe(false);
+    // The restore failing: its own why, no "put back" claimed (review round 5).
+    const failed = await windowOf(fakeEmu(), { stateFile: o.stateFile.replace('state.json', 'none.json'), putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED', hand: ['h'] })) });
+    expect(await failed.restore(fakeEmu().run)).toEqual({ ok: false, why: 'NOT VERIFIED', hand: ['h'] });
   });
 
   it('a state file already clean needs no restore: none run, said (T2 S5 review round 4)', async () => {
