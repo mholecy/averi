@@ -338,7 +338,8 @@ class BatchRun<K> {
       graceMs: io.graceMs,
       installSecs: io.installSecs,
       judgeBudgetSecs: io.judgeBudgetSecs,
-      ...(lastly.length > 0 && { lastly: (run: Run) => this.lastSteps(lastly, run) }),
+      // None given, none run: lastSteps over no step does nothing.
+      lastly: (run: Run) => this.lastSteps(lastly, run),
       head: () => ({ checkout: this.checkout ?? NOT_READ_CHECKOUT, labs: this.labs, protectedLines: this.protectedLines, errors: this.runErrors() }),
       blocks: blocks.map((b) => this.abortBlock(b)),
     });

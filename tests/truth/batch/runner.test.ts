@@ -1240,7 +1240,8 @@ describe('asksLive: a live run\'s .cases written before a stretch that may never
     await go([kfBlock({ run: async (ctx) => {
       ctx.asksLive('android-kf-1', KF);
       await ctx.bounded('probe', ['backup'], { secs: 5 });
-      await ctx.liveRun('android-kf-1', KF, { secs: 60 });
+      // The same ask built in another field order: the same ask.
+      await ctx.liveRun('android-kf-1', { cases: KF.cases, sources: KF.sources, app: KF.app, platform: KF.platform }, { secs: 60 });
     } })]);
     expect(seam.seen[seam.words().indexOf('probe backup')]).toEqual({ [join(dirOf('kf'), 'android-kf-1.cases')]: true });
     expect(summary()).toContain('kf live verdict: PASS — kf1, kf2, kf3 ok');
