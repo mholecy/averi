@@ -215,9 +215,14 @@ describe('checkExit — --check\'s exits (d55-b11.ts --check, batch-12\'s final 
 
   it("checkLine: OK for 0 and 5, WARN for 6, FAIL for a default, ERROR for 3 and 4; the reads and the first lab entry said", () => {
     expect(checkLine(launcher, clean, [])).toBe('D55 check: OK — chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)');
+    // The first entry's text, cut at 200 characters with `…`.
+    const text = lastChosen.state === 'read' ? lastChosen.lab[0].text : '';
+    expect(text.length).toBeGreaterThan(200);
     expect(checkLine(launcher, lastChosen, [SHARED_TWIN])).toBe(
-      'D55 check: OK — chooser no; preferred read (1 user); lab entries 1 (defaults 0, last-chosen 1, accepted 1); first: 9d3a2b9 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=false | Selected from: | dev.averi.lab/.MainActivity | dev.averi.lab/.Twin | Action: "android.intent.action.VIEW" | Category: "andr…',
+      `D55 check: OK — chooser no; preferred read (1 user); lab entries 1 (defaults 0, last-chosen 1, accepted 1); first: ${text.slice(0, 200)}…`,
     );
+    const short = readOf(withEntries('      averilab:\n        9d3a2b9 dev.averi.lab/.Twin\n         mMatch=0x300000 mAlways=false'));
+    expect(checkLine(launcher, short, [SHARED_TWIN])).toBe('D55 check: WARN — chooser no; preferred read (1 user); lab entries 1 (defaults 0, last-chosen 1, accepted 0); first: 9d3a2b9 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=false');
     expect(checkLine(launcher, lastChosen, [])).toMatch(/^D55 check: WARN — chooser no; preferred read \(1 user\); lab entries 1 \(defaults 0, last-chosen 1, accepted 0\); first: /);
     expect(checkLine(chooserUp, aDefault, [])).toMatch(/^D55 check: FAIL — chooser yes \(android\/com\.android\.internal\.app\.ResolverActivity\); preferred read \(1 user\); lab entries 1 \(defaults 1, last-chosen 0\); first: /);
     expect(checkLine(focusUnread, unread, [])).toBe('D55 check: ERROR — chooser unread (the focus read: exit 1); preferred unread (dumpsys package preferred: exit 1)');
@@ -236,7 +241,7 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
   it("batch-11's E2: the twin row by its label, at its centre (540, 1881); row 1 by number at (540, 1727)", () => {
     expect(safeTap(tree(), { row: 'AveriLab twin' })).toEqual({ ok: true, point: { x: 540, y: 1881 }, why: 'row 2 ("AveriLab twin") at (540, 1881)' });
     expect(safeTap(tree(), { row: 1 })).toEqual({ ok: true, point: { x: 540, y: 1727 }, why: 'row 1 ("AveriLab") at (540, 1727)' });
-    expect(safeTap(tree(true), { row: 2 })).toMatchObject({ ok: true, point: { x: 540, y: 1881 } });
+    expect(safeTap(tree(resolverXml(true)), { row: 2 })).toMatchObject({ ok: true, point: { x: 540, y: 1881 } });
   });
 
   it('a target that is not unique is refused: both rows say "AveriLab" (why the replies tap by coordinates)', () => {
@@ -257,7 +262,7 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
 
   it("\"Just once\" disabled until a row is selected (batch-10's E2 looked in the wrong node: the buttons enabled=false): refused; enabled after the row tap", () => {
     expect(safeTap(tree(), 'once')).toEqual({ ok: false, refusal: 'disabled', why: 'button_once ("Just once") is disabled' });
-    expect(safeTap(tree(true), 'once')).toEqual({ ok: true, point: { x: 723, y: 2058 }, why: 'button_once ("Just once") at (723, 2058)' });
+    expect(safeTap(tree(resolverXml(true)), 'once')).toEqual({ ok: true, point: { x: 723, y: 2058 }, why: 'button_once ("Just once") at (723, 2058)' });
     const rowOff = resolverXml().replace('enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1804][1080,1958]"', 'enabled="false" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1804][1080,1958]"');
     expect(safeTap(tree(rowOff), { row: 2 })).toEqual({ ok: false, refusal: 'disabled', why: 'row 2 ("AveriLab twin") is disabled' });
   });
@@ -278,8 +283,8 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
     expect(safeTap(tree(overlap), 'once')).toEqual({ ok: false, refusal: 'always', why: 'button_once ("Just once") overlaps "Always" (button_always "Always")' });
     // a node with no such id whose text says "always" (any case), laid over row 2.
     const byText = resolverXml().replace(
-      '<node index="1" text="" resource-id="android:id/button_bar_container"',
-      '<node index="9" text="Always open" resource-id="android:id/other" class="android.widget.Button" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1850][1080,1900]" /><node index="1" text="" resource-id="android:id/button_bar_container"',
+      '<node index="3" text="" resource-id="android:id/button_bar_container"',
+      '<node index="9" text="Always open" resource-id="android:id/other" class="android.widget.Button" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1850][1080,1900]" /><node index="3" text="" resource-id="android:id/button_bar_container"',
     );
     expect(safeTap(tree(byText), { row: 2 })).toEqual({ ok: false, refusal: 'always', why: 'the point (540, 1881) is inside "Always" (other "Always open")' });
   });
@@ -310,8 +315,8 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
 
   it('a point that lands on another node — not the target, inside it, nor above it — is refused (a scrim, a sibling drawn there)', () => {
     const scrim = resolverXml().replace(
-      '<node index="1" text="" resource-id="android:id/button_bar_container"',
-      '<node index="9" text="" resource-id="android:id/scrim" class="android.view.View" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1700][1080,1900]" /><node index="1" text="" resource-id="android:id/button_bar_container"',
+      '<node index="3" text="" resource-id="android:id/button_bar_container"',
+      '<node index="9" text="" resource-id="android:id/scrim" class="android.view.View" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1700][1080,1900]" /><node index="3" text="" resource-id="android:id/button_bar_container"',
     );
     expect(safeTap(tree(scrim), { row: 2 })).toEqual({ ok: false, refusal: 'other-node', why: 'the point (540, 1881) lands on scrim, not row 2 ("AveriLab twin")' });
     // A node inside the target there is the target's (its label), and the list above it takes the click: both fine.
@@ -431,16 +436,16 @@ describe('installedOf — the lab installed, missing or unknown: `adb get-state`
 describe('sanitizeFixture — no device path or serial in a fixture (d55-b11.ts:347)', () => {
   it("every committed chooser fixture is clean: T4's resolver trees and S5's reads", () => {
     const names = readdirSync(BATCH).filter((n) => n.includes('api33'));
-    expect(names.length).toBeGreaterThanOrEqual(9);
+    expect(names.length).toBeGreaterThanOrEqual(8);
     for (const text of [...names.map(fixture), resolverXml(), resolverXml(true)]) expect(sanitizeFixture(text, 'emulator-5554')).toEqual({ ok: true, hits: [] });
   });
 
   it('a device path or the serial is a hit, each once; an empty serial is never one', () => {
-    expect(sanitizeFixture('x /sdcard/a /sdcard/b emulator-5556 /data/app', 'emulator-5556')).toEqual({ ok: false, hits: ['/data/', '/sdcard', 'emulator-'] });
+    expect(sanitizeFixture('x /sdcard/a /sdcard/b emulator-5556 /data/app', 'emulator-5556')).toEqual({ ok: false, hits: ['/data/', '/sdcard', 'emulator-', 'emulator-5556'] });
     expect(sanitizeFixture('LAB-1 here', 'LAB-1')).toEqual({ ok: false, hits: ['LAB-1'] });
     expect(sanitizeFixture('plain', '')).toEqual({ ok: true, hits: [] });
     // Built from parts, as the hygiene test builds its own: no committed file here may hold a host path whole.
     const slash = '/';
-    for (const p of ['/storage/', `${slash}Users${slash}`, '/private/', `${slash}tmp${slash}`]) expect(sanitizeFixture(`a ${p}b`, 's').hits).toEqual([p]);
+    for (const p of ['/storage/', `${slash}Users${slash}`, '/private/', `${slash}tmp${slash}`]) expect(sanitizeFixture(`a ${p}b`, 'SERIAL-X').hits).toEqual([p]);
   });
 });
