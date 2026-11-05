@@ -6,6 +6,7 @@ import { shellQuote } from './ios-defaults.js';
 import { CLEANUP_LABEL, compareReads, comparedLine, sanitizeFixture, type ShellRead } from './lab-chooser.js';
 import { CELLS_ENTRY, chooserWindow, cleanUp, handlers, LabEmu, labInstalled, readClipboard, readRoleHolders, UNZIP_SECS, type Cleanup, type ReinstallOptions, type StateRestore } from './lab-emu.js';
 import { CATALOG_PATH, cellsWhy, freshIn } from './lab-lines.js';
+import { askBuild, metWith, type BuildRef } from './lab-build.js';
 import type { BlockCtx, NeedCtx, NeedSpec } from './runner.js';
 import type { BatchConfig, NeedResult } from './runner-lines.js';
 import { stateOf } from './run-dir.js';
@@ -35,8 +36,10 @@ const LAB_EMULATOR = `${LAB_AVD} emulator`;
 const countText = (n: number | { why: string }): string => (typeof n === 'number' ? `${n}` : `not read (${n.why})`);
 
 export interface AndroidLabOptions {
-  /** This run's build of the lab APK (lab-build.ts's built): installed `-r` before the check when there is one. */
-  build?: () => string | undefined;
+  /** This run's build (lab-build.ts's `kit.android`): asked by the need itself, installed `-r` before the check when met. */
+  build?: BuildRef;
+  /** A build that failed makes the need not met (default: the APK already installed is used, as batch-11). */
+  requireBuild?: boolean;
   /** The URLs whose handlers are counted (HANDLER_URLS unless given). */
   handlers?: readonly string[];
   /** The wait after a key event (tests pass one that does not wait). */
@@ -74,7 +77,9 @@ export function androidLab(o: AndroidLabOptions = {}): AndroidLab {
     const opened = await open(c);
     if (!opened.ok) return opened;
     const { emu } = opened;
-    const built = o.build?.();
+    const asked = await askBuild(c, o);
+    if ('why' in asked) return { ok: false, why: asked.why };
+    const { built } = asked;
     if (built !== undefined) {
       const r = await emu.adb(['install', '-r', built]);
       if (failedCall(r)) return { ok: false, why: `this run's build not installed (adb install -r: ${exitText(r)})` };
@@ -92,7 +97,7 @@ export function androidLab(o: AndroidLabOptions = {}): AndroidLab {
     for (const url of urls) counts[url] = await handlers(emu, url);
     const said = urls.map((u) => `${u} ${countText(counts[u])}`).join(', ');
     c.fs.append(join(c.labDir, 'android-handlers.txt'), `handlers: ${said}\n`);
-    return { ok: true, how: `${LAB_EMULATOR} ${nameInLine(emu.serial)}; ${built === undefined ? 'not rebuilt' : "this run's build installed"}; the APK's ${CELLS_ENTRY} is main's (pulled: ${local}); handlers: ${said}` };
+    return metWith(`${LAB_EMULATOR} ${nameInLine(emu.serial)}; ${built === undefined ? 'not rebuilt' : "this run's build installed"}; the APK's ${CELLS_ENTRY} is main's (pulled: ${local}); handlers: ${said}`, asked.warn);
   };
   const alive = async (c: NeedCtx): Promise<NeedResult> => {
     const opened = await open(c);

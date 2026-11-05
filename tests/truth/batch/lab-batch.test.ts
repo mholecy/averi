@@ -126,9 +126,9 @@ const KF: Asked = { platform: 'android', app: 'native', sources: ['uiautomator']
 const P7W: Asked = { platform: 'ios', app: 'native', sources: ['wda'], cases: ['p7w'] };
 
 /** The fake batch: the lab block, an Android block with the tri-state reads, an iOS block in the WDA window. */
-function batch() {
+function batch(o: { labNeeds?: string[]; d55First?: boolean } = {}) {
   const build = labBuild();
-  const android = androidLab({ build: build.built.android, settle: noWait });
+  const android = androidLab({ build: build.android, settle: noWait });
   const ios = iosLab({ wait: noWait });
   const judgeOf = (label: string) => async () => [`${label}: PASS — its runs complete`];
   const d55: Block = {
@@ -160,8 +160,9 @@ function batch() {
     },
     judge: judgeOf('D43 verdict'),
   };
-  const blocks = [labBlock(['android-build', 'android']), d55, d43];
-  return { build, android, ios, blocks, needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly] };
+  const lab = labBlock(o.labNeeds ?? ['android-build', 'android'], { build });
+  const blocks = o.d55First === true ? [d55, lab, d43] : [lab, d55, d43];
+  return { build, android, ios, blocks, needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly] };
 }
 
 function go(b: ReturnType<typeof batch>, env: Record<string, string> = {}): Promise<number> {
@@ -249,9 +250,17 @@ describe('needs not met make their blocks INCONCLUSIVE, the others run (b11-dry 
     const why = `the Android build failed (exit 1; ${join(dirOf('lab'), 'android-build.log')})`;
     expect(s).toContain(`LAB android-build: ERROR — ${why}`);
     expect(s).toContain(`lab check: INCONCLUSIVE — android-build: ${why}`);
-    expect(s.find((l) => l.startsWith('LAB android:'))).toContain('not rebuilt');
+    // batch-11's WARN (review round 1, MINOR 3): the build's why, the APK already installed used.
+    expect(s.find((l) => l.startsWith('LAB android:'))).toMatch(new RegExp(`^LAB android: WARN — ${why.replace(/[()]/g, '\\$&')}; the app already installed is used: averi_lab emulator LAB-SERIAL; not rebuilt;`));
     expect(seam.words.filter((w) => w.includes('gradlew')).at(-1)).toMatch(/--stop$/);
     expect(seam.words.some((w) => w.includes('install -r'))).toBe(false);
+    expect(seam.words.filter((w) => w.includes('assembleDebug'))).toHaveLength(1);
+  });
+
+  it('the lab block naming only the device need: the build failed is a WARN, never "every lab need met" (review round 1, MAJOR 2)', async () => {
+    fresh({ buildFails: 'gradlew' });
+    expect(await go(batch({ labNeeds: ['android'] }))).toBe(0);
+    expect(summary().find((l) => l.startsWith('lab check:'))).toBe(`lab check: WARN — the lab devices checked, but this run's build failed (android-build: the Android build failed (exit 1; ${join(dirOf('lab'), 'android-build.log')})): the app already installed is used`);
   });
 
   it('a simulator that is not the lab\'s: D43 INCONCLUSIVE, its WDA window never opened, no finportal line', async () => {
@@ -264,11 +273,39 @@ describe('needs not met make their blocks INCONCLUSIVE, the others run (b11-dry 
   });
 });
 
+describe('this run\'s build installed once, whatever the order of the needs or the blocks (review round 1, MAJOR 2)', () => {
+  const once = () => {
+    expect(seam.words.filter((w) => w.includes('assembleDebug'))).toHaveLength(1);
+    expect(seam.words.filter((w) => w.includes(' install -r '))).toHaveLength(1);
+    expect(summary().find((l) => l.startsWith('LAB android:'))).toContain("this run's build installed");
+  };
+  it('the Android block before the lab block: its need asks the build itself', async () => {
+    expect(await go(batch({ d55First: true }))).toBe(0);
+    once();
+  });
+  it('the device need listed before the build need in the lab block', async () => {
+    expect(await go(batch({ labNeeds: ['android', 'android-build'] }))).toBe(0);
+    once();
+  });
+});
+
 describe('ONLY=lab runs just the lab check: its needs, no other block (batch-11, batch-12)', () => {
   it('the build and the Android check only; no iOS need asked, no other block run; exit 0', async () => {
     expect(await go(batch(), { ONLY: 'lab' })).toBe(0);
     expect(summary().filter((l) => /^(LAB|lab check|D55|D43)/.test(l)).map((l) => l.split(':')[0])).toEqual(['LAB android-build', 'LAB android', 'lab check']);
     expect(seam.words.some((w) => w.startsWith('xcrun') || w.startsWith('idb'))).toBe(false);
+  });
+});
+
+describe('the Gradle daemon after an abort inside the Android build (review round 1, MINOR 6)', () => {
+  it('SIGINT during assembleDebug: the build stopped, its own --stop refused, then the kit\'s last step runs `gradlew --stop`; exit 130', async () => {
+    seam.hang = 'assembleDebug';
+    const done = go(batch());
+    await until(() => seam.words.some((w) => w.includes('assembleDebug')));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(seam.words.filter((w) => w.includes('gradlew')).map((w) => w.split(' ').slice(1).join(' '))).toEqual(['--console=plain assembleDebug', '--stop']);
+    expect(outText()).toContain("NOTE lab android: the Gradle daemon stopped at the run's end (its build was cut short)");
   });
 });
 

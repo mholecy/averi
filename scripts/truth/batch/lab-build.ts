@@ -4,7 +4,7 @@ import { DEVICE_CHECK_SIMULATOR } from '../lab-device.js';
 import type { CallResult } from './bounded.js';
 import { CELLS_ENTRY, UNZIP_SECS } from './lab-emu.js';
 import { CATALOG_PATH, cellsWhy, javaHomeOf } from './lab-lines.js';
-import type { Block, Need, NeedCtx, NeedSpec } from './runner.js';
+import type { Block, LastStep, Need, NeedCtx, NeedSpec } from './runner.js';
 import type { NeedResult } from './runner-lines.js';
 import { exitText, failedCall, nameInLine } from './words.js';
 
@@ -39,12 +39,46 @@ export const ANDROID_BUILD_NEED = 'android-build';
 /** batch-11's and batch-12's lab block: its folder is the run's lab folder. */
 export const LAB_BLOCK = 'lab';
 
+/**
+ * One platform's build as a device need asks it (T2 S6b review round 1, MAJOR 2): `ensure` runs it once for the run —
+ * whoever asks first, the device need or the build need's own check — and `built` is its product once it was met.
+ */
+export interface BuildRef {
+  ensure(c: NeedCtx): Promise<NeedResult>;
+  built(): string | undefined;
+}
+
 export interface LabBuild {
   /** The two build needs, by name: a batch spreads them into its `needs`. */
   needs: Readonly<Record<typeof IOS_BUILD_NEED | typeof ANDROID_BUILD_NEED, NeedSpec>>;
-  /** This run's builds, once their need was met: the .app, the APK; none: not built this run (or the build failed). */
-  built: { ios(): string | undefined; android(): string | undefined };
+  /** Each platform's build, for its device need (`iosLab({ build: kit.ios })`). */
+  ios: BuildRef;
+  android: BuildRef;
+  /** Each build that was asked and failed: `<need>: <why>`. */
+  failures(): string[];
+  /** The run's last step: `gradlew --stop` when an Android build was started and its own stop never ran (an abort). */
+  lastly: LastStep;
 }
+
+/** What a device need does with its build: install this product (none: not rebuilt), with a warning; or not met. */
+export type BuildAnswer = { built: string | undefined; warn?: string } | { why: string };
+
+/**
+ * A device need's build (T2 S6b review round 1, MAJOR 2): asked by the need itself, so the order of a block's needs
+ * does not matter. None wanted: nothing to install. Met: its product. Failed: not met when the batch requires it, else
+ * batch-11's way — a warning, the app already installed is used.
+ */
+export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }): Promise<BuildAnswer> {
+  if (o.build === undefined) return { built: undefined };
+  const r = await o.build.ensure(c);
+  if (r.ok) return { built: o.build.built() };
+  if (o.requireBuild === true) return { why: `this run's build failed, and the batch requires it: ${r.why}` };
+  return { built: undefined, warn: r.why };
+}
+
+/** A device need met, its how prefixed by the build's warning when there is one (batch-11's `LAB …: WARN — …`). */
+export const metWith = (how: string, warn: string | undefined): NeedResult =>
+  warn === undefined ? { ok: true, how } : { ok: true, warn: true, how: `${warn}; the app already installed is used: ${how}` };
 
 /** A step's failure in words, naming its log: past its bound, its group was ended (bounded.ts). */
 const failedText = (what: string, r: CallResult, log: string): string => `${what} (${r.timedOut ? `past its bound, exit ${r.code} — its process group ended` : exitText(r)}; ${log})`;
@@ -57,6 +91,9 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
   const secs = o.secs ?? BUILD_SECS;
   let catalog: Promise<string | undefined> | undefined;
   const built: { ios?: string; android?: string } = {};
+  const failed = new Map<string, string>();
+  /** The Android build's call, once started, until its own --stop returned: what the last step stops. */
+  let gradle: { gradlew: string; cwd: string; env: NodeJS.ProcessEnv; log: string } | undefined;
   const catalogFresh = (c: NeedCtx): Promise<string | undefined> =>
     (catalog ??= (async () => {
       const log = join(c.labDir, 'catalog-check.log');
@@ -94,9 +131,11 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     const log = join(c.labDir, 'android-build.log');
     const env = { ...c.config.env, JAVA_HOME: checked.home, ANDROID_HOME: c.config.env.ANDROID_HOME ?? join(homedir(), 'Library', 'Android', 'sdk') };
     const gradlew = join(cwd, 'gradlew');
+    gradle = { gradlew, cwd, env, log };
     const build = await c.bounded(gradlew, ['--console=plain', 'assembleDebug'], { secs, cwd, env, log });
     // After every build, whatever it did: the daemon leaves the call's group by design (S2), so it is stopped by name.
     const stop = await c.bounded(gradlew, ['--stop'], { secs: GRADLE_STOP_SECS, cwd, env, log });
+    gradle = undefined;
     if (failedCall(stop)) c.step('WARN', `lab android: gradlew --stop: ${exitText(stop)} — the Gradle daemon may still be running`);
     if (failedCall(build)) return { ok: false, why: failedText('the Android build failed', build, log) };
     const apk = join(c.config.repo, APK_PATH);
@@ -113,12 +152,32 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     if (p === undefined) return { ok: false, why: "this run's build is gone (none)" };
     return c.fs.exists(p) ? { ok: true, how: `${nameInLine(p)} still there` } : { ok: false, why: `this run's build is gone (${nameInLine(p)})` };
   };
+  /** A build run once for the run, its failure kept for failures(). */
+  const once = (need: string, build: (c: NeedCtx) => Promise<NeedResult>) => {
+    let run: Promise<NeedResult> | undefined;
+    return (c: NeedCtx): Promise<NeedResult> =>
+      (run ??= build(c).then((r) => {
+        if (!r.ok) failed.set(need, r.why);
+        return r;
+      }));
+  };
+  const iosOnce = once(IOS_BUILD_NEED, ios);
+  const androidOnce = once(ANDROID_BUILD_NEED, android);
   return {
     needs: {
-      [IOS_BUILD_NEED]: { check: ios, alive: stillThere(() => built.ios) },
-      [ANDROID_BUILD_NEED]: { check: android, alive: stillThere(() => built.android) },
+      [IOS_BUILD_NEED]: { check: iosOnce, alive: stillThere(() => built.ios) },
+      [ANDROID_BUILD_NEED]: { check: androidOnce, alive: stillThere(() => built.android) },
     },
-    built: { ios: () => built.ios, android: () => built.android },
+    ios: { ensure: iosOnce, built: () => built.ios },
+    android: { ensure: androidOnce, built: () => built.android },
+    failures: () => [...failed].map(([need, why]) => `${need}: ${why}`),
+    async lastly({ run, step }) {
+      if (gradle === undefined) return;
+      const { gradlew, cwd, env, log } = gradle;
+      const stop = await run(gradlew, ['--stop'], { secs: GRADLE_STOP_SECS, cwd, env, log });
+      if (failedCall(stop)) step('WARN', `lab android: gradlew --stop at the run's end: ${exitText(stop)} — the Gradle daemon may still be running`);
+      else step('NOTE', "lab android: the Gradle daemon stopped at the run's end (its build was cut short)");
+    },
   };
 }
 
@@ -127,12 +186,17 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
  * them) and says they were met — so `ONLY=lab` checks the lab and runs nothing else; a need not met makes it
  * INCONCLUSIVE naming why (the runner's rule), each need's LAB line the details.
  */
-export function labBlock(needs: readonly Need[]): Block {
+export function labBlock(needs: readonly Need[], o: { build?: Pick<LabBuild, 'failures'> } = {}): Block {
   return {
     id: LAB_BLOCK,
     label: 'lab check',
     needs,
     noRecords: true,
-    run: async (ctx) => ctx.verdict('PASS', `every lab need met: ${needs.join(', ')} (each one's LAB line above)`),
+    run: async (ctx) => {
+      // A device need met on the app already installed after its build failed: never "every lab need met".
+      const failed = o.build?.failures() ?? [];
+      if (failed.length > 0) return ctx.verdict('WARN', `the lab devices checked, but this run's build failed (${failed.join('; ')}): the app already installed is used`);
+      ctx.verdict('PASS', `every lab need met: ${needs.join(', ')} (each one's LAB line above)`);
+    },
   };
 }

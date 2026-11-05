@@ -61,7 +61,7 @@ describe('main\'s catalog --check before any build, once for both (S3\'s not-por
     expect(await need(b, IOS_BUILD_NEED).check(needCtx())).toEqual({ ok: false, why });
     expect(await need(b, ANDROID_BUILD_NEED).check(needCtx())).toEqual({ ok: false, why });
     expect(world.calls.some((c) => /xcode|gradlew/.test(c))).toBe(false);
-    expect(b.built.ios()).toBeUndefined();
+    expect(b.ios.built()).toBeUndefined();
   });
 });
 
@@ -79,7 +79,7 @@ describe('the iOS build (batch-11.sh:297, 302–307): xcodegen, then xcodebuild 
       { words: `xcodebuild -scheme AveriLab -destination id=${LAB_UDID} -derivedDataPath build build`, secs: BUILD_SECS, cwd, log, env: undefined },
     ]);
     expect(readFileSync(log, 'utf8')).toContain('** BUILD SUCCEEDED **');
-    expect(b.built.ios()).toBe(app);
+    expect(b.ios.built()).toBe(app);
     expect(await need(b, IOS_BUILD_NEED).alive(needCtx())).toEqual({ ok: true, how: `${app} still there` });
     expect((await need(labBuild({ secs: 99 }), IOS_BUILD_NEED).check(needCtx(run)), run.seen.at(-1)!.secs)).toBe(99);
   });
@@ -96,7 +96,7 @@ describe('the iOS build (batch-11.sh:297, 302–307): xcodegen, then xcodebuild 
     fresh({ buildFails: 'xcodebuild' });
     const b = labBuild();
     expect(await need(b, IOS_BUILD_NEED).check(needCtx())).toEqual({ ok: false, why: `the iOS build failed (exit 65; ${join(dir, 'lab', 'ios-build.log')})` });
-    expect(b.built.ios()).toBeUndefined();
+    expect(b.ios.built()).toBeUndefined();
     expect(await need(b, IOS_BUILD_NEED).alive(needCtx())).toEqual({ ok: false, why: "this run's build is gone (none)" });
     const late = await need(labBuild(), IOS_BUILD_NEED).check(needCtx(async (cmd, args, call) => (cmd === 'xcodebuild' ? { code: 142, timedOut: true, signal: 'SIGKILL', out: '', err: '' } : runOf((fresh(), world))(cmd, args, call))));
     expect(late).toEqual({ ok: false, why: `the iOS build failed (past its bound, exit 142 — its process group ended; ${join(dir, 'lab', 'ios-build.log')})` });
@@ -123,7 +123,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
       { words: `${join(cwd, 'gradlew')} --stop`, secs: GRADLE_STOP_SECS, cwd, log, env },
       { words: `unzip -p ${apk} assets/cells.json`, secs: 30, cwd: undefined, log: undefined, env: undefined },
     ]);
-    expect(b.built.android()).toBe(apk);
+    expect(b.android.built()).toBe(apk);
     expect(steps).toEqual([]);
     expect(await need(b, ANDROID_BUILD_NEED).alive(needCtx())).toEqual({ ok: true, how: `${apk} still there` });
     rmSync(apk);
@@ -143,7 +143,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     const b = labBuild();
     expect(await need(b, ANDROID_BUILD_NEED).check(needCtx(run))).toEqual({ ok: false, why: `the Android build failed (exit 1; ${join(dir, 'lab', 'android-build.log')})` });
     expect(run.seen.at(-1)!.words).toMatch(/gradlew --stop$/);
-    expect(b.built.android()).toBeUndefined();
+    expect(b.android.built()).toBeUndefined();
   });
 
   it('a --stop that fails is a WARN (the daemon may still run); no JDK 17, no APK, its cells.json not main\'s: not met', async () => {
@@ -198,7 +198,8 @@ describe('the Gradle daemon after an interrupted Android build (review round 1, 
     const b = labBuild();
     const refusing: Run = async (cmd, args, call) => {
       if (args.includes('--stop')) throw new Error(`${cmd} not started: the run is being stopped`);
-      return { code: 143, timedOut: false, signal: 'SIGTERM', out: '', err: '' };
+      if (args.includes('assembleDebug')) return { code: 143, timedOut: false, signal: 'SIGTERM', out: '', err: '' };
+      return runOf(world)(cmd, args, call);
     };
     await expect(need(b, ANDROID_BUILD_NEED).check(needCtx(refusing))).rejects.toThrow(/being stopped/);
     const run = runOf(world);

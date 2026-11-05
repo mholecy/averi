@@ -7,6 +7,7 @@ import type { BatchFs } from './io.js';
 import { PROTECTED, protectedLine, type ProtectedRead } from './ios-defaults.js';
 import { backup, compare, domainsWindow, LabSim, readProtected, restore } from './ios-domains.js';
 import { CATALOG_PATH, cellsWhy, companionPattern, freshIn, LSOF_ARGV, openInAlertOf, pkillOf, compareHand, portHand, portOf, portPart, wdaBlockedOf, wdaKillPatterns, wdaRestoredOf, type PortRead } from './lab-lines.js';
+import { askBuild, metWith, type BuildRef } from './lab-build.js';
 import type { BlockCtx, LastStep, NeedCtx, NeedSpec } from './runner.js';
 import type { BatchConfig, NeedResult } from './runner-lines.js';
 import { STATE_FILE, stateOf } from './run-dir.js';
@@ -263,8 +264,10 @@ export async function installedCells(lab: IosSim, o: { repo: string; labDir: str
 // ------------------------------------------------------------------------------------------------ the need
 
 export interface IosLabOptions {
-  /** This run's build of the lab app (lab-build.ts's built): installed before the cells check when there is one. */
-  build?: () => string | undefined;
+  /** This run's build (lab-build.ts's `kit.ios`): asked by the need itself, installed before the cells check when met. */
+  build?: BuildRef;
+  /** A build that failed makes the need not met (default: the app already installed is used, as batch-11). */
+  requireBuild?: boolean;
   /** The reset at the need's check (batch-11's initial reset); true unless said. */
   reset?: boolean;
   /** The waits; lab-device.ts's pause unless given (tests pass one that does not wait). */
@@ -308,14 +311,16 @@ export function iosLab(o: IosLabOptions = {}): IosLab {
     }
     start = await readProtected(lab.sim);
     c.step('NOTE', `${PROTECTED.domain}'s finportal key at the iOS stretch's start: ${readText(start)} (read only: no batch writes it)`);
-    const built = o.build?.();
+    const asked = await askBuild(c, o);
+    if ('why' in asked) return { ok: false, why: asked.why };
+    const { built } = asked;
     if (built !== undefined) {
       const r = await lab.simctl(['install', lab.udid, built]);
       if (failedCall(r)) return { ok: false, why: `this run's build not installed (simctl install: ${exitText(r)})` };
     }
     const cells = await installedCells(lab, { repo: c.config.repo, labDir: c.labDir });
     if (cells !== undefined) return { ok: false, why: `${cells} (rerun with ONLY=lab,…)` };
-    return { ok: true, how: `${lab.sim.description}${o.reset === false ? '' : ', reset'}; ${built === undefined ? 'not rebuilt' : "this run's build installed"}; the installed cells.json is main's` };
+    return metWith(`${lab.sim.description}${o.reset === false ? '' : ', reset'}; ${built === undefined ? 'not rebuilt' : "this run's build installed"}; the installed cells.json is main's`, asked.warn);
   };
   const alive = async (c: NeedCtx): Promise<NeedResult> => {
     const opened = await open(c);
