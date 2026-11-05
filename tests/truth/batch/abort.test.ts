@@ -707,6 +707,15 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
     expect(s).toContain('W cleanup: ERROR — adb unreachable (the abort)');
   });
 
+  it("a put back with a WARN (T2 S5 review round 1: the chooser's exit 6, a last-chosen entry not accepted): WARN in the step and the cleanup line, no RESTORE", async () => {
+    const guard = guardOf([block('E5')]);
+    await interrupt(guard, () => guard.open('E5', window({ block: 'E5', cleanup: 'E5 cleanup', restore: async () => ({ ok: true, how: 'a last-chosen entry not accepted', verdict: 'WARN' }) })));
+    const s = summaryText();
+    expect(s).toContain('E5 cleanup: WARN — a last-chosen entry not accepted (verified by the abort)');
+    expect(s).toContain('RESTORE: none — everything dirty was put back and verified');
+    expect(text(join(out, 'steps.log'))).toMatch(/WARN E5 put back \(verified by the abort\): a last-chosen entry not accepted/);
+  });
+
   it('a window with no cleanup label adds no cleanup line', async () => {
     const guard = guardOf([block('E5')]);
     await interrupt(guard, () => guard.open('E5', window({ block: 'E5' })));

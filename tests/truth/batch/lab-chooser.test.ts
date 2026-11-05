@@ -7,6 +7,7 @@ import {
   acceptedOf,
   CHECK_EXIT,
   checkExit,
+  cellsHand,
   checkHand,
   checkLine,
   checkWhy,
@@ -18,6 +19,7 @@ import {
   handlersOf,
   installedOf,
   isAlways,
+  lastChosenWhy,
   lastChosenOf,
   leaksOf,
   missingHand,
@@ -26,10 +28,13 @@ import {
   sanitizeFixture,
   safeTap,
   shellReadOf,
+  stateHand,
   treeOf,
   unknownInstallHand,
   unreachableOf,
   type AcceptedEntry,
+  type Dump,
+  type RawAttrs,
   type FocusRead,
   type PreferredRead,
 } from '../../../scripts/truth/batch/lab-chooser.js';
@@ -240,7 +245,7 @@ describe('checkExit — --check\'s exits (d55-b11.ts --check; batch-12\'s final 
 });
 
 describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345; batch-12\'s guardRow1/guardOnce), over T4\'s resolver trees', () => {
-  const tree = (xml = resolverXml()): UiNode => {
+  const tree = (xml = resolverXml()): Dump => {
     const t = treeOf(xml);
     if ('why' in t) throw new Error(t.why);
     return t;
@@ -297,15 +302,20 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
     expect(safeTap(tree(byText), { row: 2 })).toEqual({ ok: false, refusal: 'always', why: 'the point (540, 1881) is inside "Always" (other "Always open")' });
   });
 
-  it('isAlways: the id button_always, or "always" as a word in the label, any case; never "Just once" or "Alwaysy"', () => {
-    const node = (identifier: string | null, label: string | null): UiNode => ({ role: 'button', identifier, label, value: null, rect: { x: 0, y: 0, width: 1, height: 1 }, children: [] });
-    expect(isAlways(node('button_always', 'Immer'))).toBe(true);
-    expect(isAlways(node(null, ' ALWAYS '))).toBe(true);
-    expect(isAlways(node(null, 'Open always'))).toBe(true);
-    expect(isAlways(node('button_once', 'Just once'))).toBe(false);
-    expect(isAlways(node(null, 'Alwaysy'))).toBe(false);
-    expect(isAlways(node('button_always_x', null))).toBe(false);
-    expect(isAlways(node(null, null))).toBe(false);
+  it('isAlways: the id button_always (its last segment), or "always" as a word in the text or the content-desc, each read on its own, any case (T2 S5 review round 1); never "Just once" or "Alwaysy"', () => {
+    const a = (resourceId: string, text = '', contentDesc = ''): RawAttrs => ({ resourceId, text, contentDesc, enabled: 'true' });
+    expect(isAlways(a('android:id/button_always', 'Immer'))).toBe(true);
+    expect(isAlways(a('button_always'))).toBe(true);
+    expect(isAlways(a('', ' ALWAYS '))).toBe(true);
+    expect(isAlways(a('', 'Open always'))).toBe(true);
+    // src's label is content-desc before text: a text "Always" behind a content-desc is still "Always".
+    expect(isAlways(a('', 'Always', 'Open'))).toBe(true);
+    expect(isAlways(a('', 'Open', 'always'))).toBe(true);
+    expect(isAlways(a('android:id/button_once', 'Just once'))).toBe(false);
+    expect(isAlways(a('', 'Alwaysy'))).toBe(false);
+    expect(isAlways(a('android:id/button_always_x'))).toBe(false);
+    expect(isAlways(a('x:id/my_button_always'))).toBe(false);
+    expect(isAlways(a(''))).toBe(false);
   });
 
   it("a point given outside the target, or more than 2 px off its centre (batch-12's row-1 rule), is refused", () => {
@@ -351,7 +361,7 @@ describe('treeOf — a `uiautomator dump /dev/tty` output parsed by src\'s parse
     const t = treeOf(`${resolverXml()}UI hierchary dumped to: /dev/tty\n`);
     if ('why' in t) throw new Error(t.why);
     const count = (n: UiNode): number => 1 + n.children.reduce((s, c) => s + count(c), 0);
-    expect(count(t)).toBe(27);
+    expect(count(t.root)).toBe(27);
   });
 
   it('no XML, or one the parser refuses, is no tree, with why', () => {
@@ -460,26 +470,35 @@ describe('sanitizeFixture — no device path or serial in a fixture (d55-b11.ts:
   });
 });
 
-describe('the hand lines — each names the exact step, every word quoted as a shell reads it back (adb-shell.ts#shellQuote)', () => {
+describe('the hand lines — each names the exact step and its commands, every word quoted as a shell reads it back (adb-shell.ts#shellQuote)', () => {
   const APK = 'lab dir/installed.apk';
+  const THEN = 'node probe.ts --restore';
 
-  it('a lab default: uninstall && install of the pulled APK (batch-12 e5_check exit 1)', () => {
-    expect(defaultHand('LAB-1', APK)).toBe(
-      'D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install \'lab dir/installed.apk\' (clears it; wipes the lab\'s data, so put the lab\'s state back after), then read the preferred activities again',
+  it('a lab default: uninstall && install of the pulled APK, then the command given (batch-12 e5_check exit 1)', () => {
+    expect(defaultHand('LAB-1', APK, THEN)).toBe(
+      'D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install \'lab dir/installed.apk\' (clears it; wipes the lab\'s data); then: node probe.ts --restore',
     );
   });
 
-  it("unknown inside a reinstall: `pm path` once adb answers, the install only if it prints nothing (batch-12 on_abort's ir=2)", () => {
-    expect(unknownInstallHand('LAB-1', APK)).toBe(
-      "D55 (Android): whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb answers, adb -s LAB-1 shell pm path dev.averi.lab; if it prints nothing, adb -s LAB-1 install 'lab dir/installed.apk'; then put the lab's state back",
+  it("unknown inside a reinstall: get-state, then `pm path` once adb answers, the install only if it prints nothing (batch-11.sh's abort; T2 S5 review round 1: its commands named)", () => {
+    expect(unknownInstallHand('LAB-1', APK, THEN)).toBe(
+      "D55 (Android): whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb answers, adb -s LAB-1 get-state (device), then adb -s LAB-1 shell pm path dev.averi.lab; if it prints nothing, adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore",
     );
   });
 
-  it('missing: the install; not proven clean: the preferred read and BACK', () => {
-    expect(missingHand('LAB-1', APK)).toBe("D55 (Android): the lab APK is NOT installed: adb -s LAB-1 install 'lab dir/installed.apk', then put the lab's state back");
+  it('missing: the install; not proven the pulled APK: its cells.json read by hand; not proven clean: the preferred read and BACK', () => {
+    expect(missingHand('LAB-1', APK, THEN)).toBe("D55 (Android): the lab APK is NOT installed: adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore");
+    expect(cellsHand('LAB-1', APK, 'cells.json', 'its cells.json differs', THEN)).toBe(
+      "D55 (Android): the installed lab not proven the pulled APK (its cells.json differs): adb -s LAB-1 shell pm path dev.averi.lab, adb -s LAB-1 pull <that path> <a file>, unzip -p <that file> assets/cells.json must equal cells.json; if not, adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore",
+    );
     expect(checkHand("it's")).toBe(
       "D55 (Android): the chooser and the preferred activities not proven put back: adb -s 'it'\\''s' shell dumpsys package preferred (no lab entry with mAlways=true may be left); a chooser in front: adb -s 'it'\\''s' shell input keyevent KEYCODE_BACK",
     );
+    expect(stateHand('node probe.ts --restore')).toBe("D55 (Android): the lab's state not put back: node probe.ts --restore");
+  });
+
+  it("lastChosenWhy: exit 6's words, one text for the cleanup and the abort", () => {
+    expect(lastChosenWhy('chooser no')).toBe('a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): chooser no');
   });
 
   it('unreachableOf: undefined only for get-state `device`', () => {
@@ -496,7 +515,7 @@ describe('the hand lines — each names the exact step, every word quoted as a s
 });
 
 describe('the readers at their edges (T2 S5 mutation round: each test kills a survivor of the first cold run)', () => {
-  const tree = (xml: string): UiNode => {
+  const tree = (xml: string): Dump => {
     const t = treeOf(xml);
     if ('why' in t) throw new Error(t.why);
     return t;
@@ -561,7 +580,7 @@ describe('the readers at their edges (T2 S5 mutation round: each test kills a su
 
   it('NOT_JUDGED: no node is drawn over, so src\'s parser widens none (the bounds as dumped)', () => {
     const t = tree(resolverXml());
-    expect(NOT_JUDGED(t)(t, { x: 0, y: 0, width: 1, height: 1 })).toBe(false);
+    expect(NOT_JUDGED(t.root)(t.root, { x: 0, y: 0, width: 1, height: 1 })).toBe(false);
   });
 
   it("shellReadOf: a CRLF answer's words without the CR; the words with more after them, or a trailing line break inside, read", () => {
@@ -610,5 +629,46 @@ describe('the readers at their edges (T2 S5 mutation round: each test kills a su
   it('a node a why names: its label alone with no id, its role with neither', () => {
     expect(safeTap(tree(before(resolverXml(), node(null, 'always'))), { row: 2 })).toEqual({ ok: false, refusal: 'always', why: 'the point (540, 1881) is inside "Always" ("always")' });
     expect(safeTap(tree(before(resolverXml(), node(null, null))), { row: 2 })).toEqual({ ok: false, refusal: 'other-node', why: 'the point (540, 1881) lands on other, not row 2 ("AveriLab", "AveriLab twin")' });
+  });
+});
+
+describe('safeTap fails closed (T2 S5 review round 1)', () => {
+  const tree = (xml: string): Dump => {
+    const t = treeOf(xml);
+    if ('why' in t) throw new Error(t.why);
+    return t;
+  };
+  const ROW2 = 'bounds="[0,1804][1080,1958]"';
+
+  it('a target counts as enabled only when the dump says enabled="true": an absent attribute is refused, its enabled state not shown (d55-b11.ts, pure-b12.ts)', () => {
+    const noEnabled = resolverXml(true).replace('enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[604,1983][842,2132]"', 'focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[604,1983][842,2132]"');
+    expect(noEnabled).not.toBe(resolverXml(true));
+    expect(safeTap(tree(noEnabled), 'once')).toEqual({ ok: false, refusal: 'enabled-unshown', why: 'button_once ("Just once"): the dump does not say it is enabled' });
+    const rowNoEnabled = resolverXml().replace(`enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" ${ROW2}`, `focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" ${ROW2}`);
+    expect(rowNoEnabled).not.toBe(resolverXml());
+    expect(safeTap(tree(rowNoEnabled), { row: 2 })).toMatchObject({ ok: false, refusal: 'enabled-unshown' });
+  });
+
+  it('"Always" by text behind a content-desc (src\'s label shows the desc only), or by content-desc alone, is refused', () => {
+    const textBehindDesc = resolverXml(true).replace('text="Just once" resource-id="android:id/button_once" class="android.widget.Button" package="android" content-desc=""', 'text="Always" resource-id="android:id/button_once" class="android.widget.Button" package="android" content-desc="Just once"');
+    expect(textBehindDesc).not.toBe(resolverXml(true));
+    expect(safeTap(tree(textBehindDesc), 'once')).toMatchObject({ ok: false, refusal: 'always', why: 'button_once ("Just once") reads as "Always"' });
+    const descAlways = resolverXml().replace('text="AveriLab twin" resource-id="android:id/text2" class="android.widget.TextView" package="android" content-desc=""', 'text="AveriLab twin" resource-id="android:id/text2" class="android.widget.TextView" package="android" content-desc="Always"');
+    expect(descAlways).not.toBe(resolverXml());
+    expect(safeTap(tree(descAlways), { row: 2 })).toMatchObject({ ok: false, refusal: 'always' });
+  });
+
+  it('an "Always" ancestor of the target is refused (its button bar described "Always")', () => {
+    const bar = resolverXml(true).replace('resource-id="android:id/button_bar" class="android.widget.LinearLayout" package="android" content-desc=""', 'resource-id="android:id/button_bar" class="android.widget.LinearLayout" package="android" content-desc="Always"');
+    expect(bar).not.toBe(resolverXml(true));
+    expect(safeTap(tree(bar), 'once')).toEqual({ ok: false, refusal: 'always', why: 'the point (723, 2058) is inside "Always" (button_bar "Always")' });
+  });
+
+  it("a dump whose nodes and src's parsed tree differ (a node in a comment) is no tree: nothing could be judged node by node", () => {
+    expect(treeOf(resolverXml().replace('<hierarchy rotation="0">', '<hierarchy rotation="0"><!-- <node text="x"> -->'))).toEqual({ why: "the dump's 28 node tags are not the parsed tree's 27 nodes" });
+  });
+
+  it('an entry-shaped lab line under a later top-level section is no entry of the block', () => {
+    expect(readOf(`${BLOCK}Domain verification status:\n  dev.averi.lab:\n        9d3a2b9 dev.averi.lab/.Twin\n         mMatch=0x300000 mAlways=true\n`)).toEqual({ state: 'read', users: 1, lab: [] });
   });
 });

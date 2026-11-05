@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
 import { TIMED_OUT, type Call, type CallResult, type Run } from '../../../scripts/truth/batch/bounded.js';
-import { isAlways, treeOf, type AcceptedEntry } from '../../../scripts/truth/batch/lab-chooser.js';
+import type { AcceptedEntry } from '../../../scripts/truth/batch/lab-chooser.js';
 import {
   CELLS_ENTRY,
   chooserWindow,
@@ -23,9 +23,9 @@ import {
   tapSafely,
   UNZIP_SECS,
   type ReinstallOptions,
+  type StateRestore,
 } from '../../../scripts/truth/batch/lab-emu.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import type { UiNode } from '../../../src/adapters/types.js';
 
 // scripts/truth/batch/lab-emu.ts over an emulator: a recording fake Run stands in for adb (the lab installed or not, its
 // preferred block, the focus, the chooser's tree; uninstall and install changing them as API 33 does — an uninstall
@@ -79,7 +79,18 @@ afterEach(() => {
 type Rule = (words: readonly string[], cmd: string) => CallResult | undefined;
 
 /** Every "Always" node's rect in a tree. */
-const alwaysRects = (t: UiNode): UiNode['rect'][] => [...(isAlways(t) ? [t.rect] : []), ...t.children.flatMap(alwaysRects)];
+type Box = [number, number, number, number];
+/**
+ * Every "Always" node's bounds in a dump, read from the XML itself — not by the module's own isAlways (T2 S5 review
+ * round 1): a node whose resource-id ends in button_always, or whose text or content-desc holds "always", any case.
+ */
+function alwaysBoxes(xml: string): Box[] {
+  const attr = (tag: string, name: string) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? '';
+  return [...xml.matchAll(/<node\b[^>]*>/g)]
+    .map((m) => m[0])
+    .filter((t) => /(^|\/)button_always$/.test(attr(t, 'resource-id')) || /always/i.test(attr(t, 'text')) || /always/i.test(attr(t, 'content-desc')))
+    .map((t) => (/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/.exec(attr(t, 'bounds')) ?? []).slice(1).map(Number) as Box);
+}
 
 /**
  * A fake lab emulator. `avd`: what `emu avd name` says; `installed`; `entries`: the lab's preferred entries (the
@@ -95,7 +106,7 @@ function fakeEmu(opts: { avd?: string; installed?: boolean; entries?: { flag: 't
     reachable: opts.reachable ?? true,
     cells: opts.cells ?? CATALOG_TEXT,
     tree: opts.tree ?? resolverXml(),
-    dumped: undefined as UiNode | undefined,
+    dumped: undefined as string | undefined,
   };
   const calls: { cmd: string; args: readonly string[]; call: Call | undefined }[] = [];
   const taps: string[] = [];
@@ -115,7 +126,7 @@ function fakeEmu(opts: { avd?: string; installed?: boolean; entries?: { flag: 't
       const [x, y] = [Number(words[3]), Number(words[4])];
       taps.push(`${x},${y}`);
       if (st.dumped === undefined) violations.push(`a tap with no tree dumped: ${said}`);
-      for (const r of st.dumped === undefined ? [] : alwaysRects(st.dumped)) if (x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height) violations.push(`input tap inside "Always": ${said}`);
+      for (const [l, t, r, b] of alwaysBoxes(st.dumped ?? '')) if (x >= l && x < r && y >= t && y < b) violations.push(`input tap inside "Always": ${said}`);
     }
     for (const rule of opts.rules ?? []) {
       const r = rule(words, cmd);
@@ -150,8 +161,7 @@ function fakeEmu(opts: { avd?: string; installed?: boolean; entries?: { flag: 't
       return ok(`${words[1]}: 1 file pulled.\n`);
     }
     if (said === 'exec-out uiautomator dump /dev/tty') {
-      const t = treeOf(st.tree);
-      st.dumped = 'why' in t ? undefined : t;
+      st.dumped = st.tree;
       return ok(`${st.tree}UI hierchary dumped to: /dev/tty\n`);
     }
     if (words[0] === 'shell' && words[1] === 'input' && words[2] === 'tap') return ok();
@@ -181,6 +191,9 @@ function files(state: unknown = { dirty: false, serial: SERIAL, before: { runnin
   if (state !== null) writeFileSync(stateFile, typeof state === 'string' ? state : JSON.stringify(state));
   return { apk, catalog, stateFile, dir, accepted: [SHARED_TWIN], progress: reinstallProgress() };
 }
+/** The probe's state restore as the batch hands it in: its call, and its command for a RESTORE line. */
+const RESTORE_CMD = 'node --import tsx d55-probe.ts --restore --serial LAB-SERIAL --state state.json';
+const restoreOf = (restore: StateRestore['restore']): StateRestore => ({ restore, command: RESTORE_CMD });
 const readState = (o: ReinstallOptions) => JSON.parse(readFileSync(o.stateFile, 'utf8')) as { dirty: boolean };
 
 describe("LabEmu.open — lab-device.ts's Android guard before any other call (batch-11.sh's android_guard)", () => {
@@ -343,18 +356,19 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     const seen: string[] = [];
     const fake = fakeEmu({ entries: [{ flag: 'true' }], writes: true });
     const emu = await emuOf(fake);
-    o.putBack = async (run) => {
+    o.putBack = restoreOf(async (run) => {
       seen.push(`${o.progress.step} ${run === emu.run}`);
       return { ok: true, how: 'D55 restore: OK — the state file put back' };
-    };
+    });
     const r = await clearLabEntry(emu, o);
     expect(seen).toEqual(['proven true']);
     expect(r).toMatchObject({ ok: true, how: expect.stringMatching(/; D55 restore: OK — the state file put back$/) });
     const o3 = files();
-    o3.putBack = async () => ({ ok: false, why: 'D55 restore: NOT VERIFIED — no hand given' });
-    expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true })), o3)).toEqual({ ok: false, why: "reinstalled and proven, but the lab's state not put back: D55 restore: NOT VERIFIED — no hand given", hand: [] });
+    // Its failure with no hand line of its own: the RESTORE line names its command (T2 S5 review round 1).
+    o3.putBack = restoreOf(async () => ({ ok: false, why: 'D55 restore: NOT VERIFIED — no hand given' }));
+    expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true })), o3)).toEqual({ ok: false, why: "reinstalled and proven, but the lab's state not put back: D55 restore: NOT VERIFIED — no hand given", hand: [`D55 (Android): the lab's state not put back: ${RESTORE_CMD}`] });
     const o2 = files();
-    o2.putBack = async () => ({ ok: false, why: 'D55 restore: NOT VERIFIED — read back 0 bytes', hand: ['by hand: the probe --restore'] });
+    o2.putBack = restoreOf(async () => ({ ok: false, why: 'D55 restore: NOT VERIFIED — read back 0 bytes', hand: ['by hand: the probe --restore'] }));
     expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true })), o2)).toEqual({ ok: false, why: "reinstalled and proven, but the lab's state not put back: D55 restore: NOT VERIFIED — read back 0 bytes", hand: ['by hand: the probe --restore'] });
   });
 
@@ -387,7 +401,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
 
   it("no probe state at all: reinstalled and proven, a WARN that the lab's data is wiped with nothing to put back (batch-11)", async () => {
     const o = files(null);
-    const r = await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true })), { ...o, putBack: async () => ({ ok: true, how: 'never asked' }) });
+    const r = await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true })), { ...o, putBack: restoreOf(async () => ({ ok: true, how: 'never asked' })) });
     expect(r).toMatchObject({ ok: true, how: expect.stringMatching(/; WARN the reinstall wiped the lab's data, and the probe recorded no state to put back$/) });
   });
 
@@ -397,7 +411,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(await clearLabEntry(await emuOf(fake), o)).toEqual({
       ok: false,
       why: 'the reinstall not proven: after the install (exit 1 Failure [INSTALL_FAILED_INSUFFICIENT_STORAGE]); the lab is NOT installed',
-      hand: [`D55 (Android): the lab APK is NOT installed: adb -s ${SERIAL} install ${o.apk}, then put the lab's state back`],
+      hand: [`D55 (Android): the lab APK is NOT installed: adb -s ${SERIAL} install ${o.apk}; then: adb -s ${SERIAL} shell dumpsys package preferred`],
     });
     expect(o.progress.step).toBe('started');
   });
@@ -410,7 +424,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
       ok: false,
       why: 'the reinstall not proven: after the install (exit 0); whether the lab is installed is unknown (adb get-state: exit 1 error: device offline)',
       hand: [
-        `D55 (Android): whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb answers, adb -s ${SERIAL} shell pm path dev.averi.lab; if it prints nothing, adb -s ${SERIAL} install ${o.apk}; then put the lab's state back`,
+        `D55 (Android): whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb answers, adb -s ${SERIAL} get-state (device), then adb -s ${SERIAL} shell pm path dev.averi.lab; if it prints nothing, adb -s ${SERIAL} install ${o.apk}; then: adb -s ${SERIAL} shell dumpsys package preferred`,
       ],
     });
   });
@@ -420,12 +434,16 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true, cells: '{"cells":[]}\n' })), other)).toMatchObject({
       ok: false,
       why: `the reinstall not proven: the reinstalled APK's ${CELLS_ENTRY} is not the catalog's ${other.catalog}; the lab is installed`,
-      hand: [expect.stringMatching(/^D55 \(Android\): a lab default \(mAlways=true\) is set/)],
+      // The hand line names the step that failed (T2 S5 review round 1).
+      hand: [
+        `D55 (Android): the installed lab not proven the pulled APK (the reinstalled APK's assets/cells.json is not the catalog's ${other.catalog}): adb -s ${SERIAL} shell pm path dev.averi.lab, adb -s ${SERIAL} pull <that path> <a file>, unzip -p <that file> assets/cells.json must equal ${other.catalog}; if not, adb -s ${SERIAL} uninstall dev.averi.lab && adb -s ${SERIAL} install ${other.apk}; then: adb -s ${SERIAL} shell dumpsys package preferred`,
+      ],
     });
     const notPulled = files();
     expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true, rules: [(w) => (w[0] === 'pull' ? exit(1, 'adb: error: failed to stat') : undefined)] })), notPulled)).toMatchObject({
       ok: false,
       why: 'the reinstall not proven: the reinstalled APK not pulled (exit 1 adb: error: failed to stat); the lab is installed',
+      hand: [expect.stringMatching(/^D55 \(Android\): the installed lab not proven the pulled APK \(the reinstalled APK not pulled \(exit 1/)],
     });
     // A pull that fails is no pull, whatever it left behind (T2 S5 mutation round).
     const partial = files();
@@ -442,6 +460,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     expect(await clearLabEntry(await emuOf({ run }), badZip)).toMatchObject({
       ok: false,
       why: `the reinstall not proven: ${CELLS_ENTRY} not read from the reinstalled APK (unzip: exit 9 End-of-central-directory signature not found.); the lab is installed`,
+      hand: [expect.stringMatching(/^D55 \(Android\): the installed lab not proven the pulled APK \(assets\/cells\.json not read/)],
     });
   });
 
@@ -459,7 +478,7 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
   it('the default still listed after the reinstall, or the check unproven after it: not proven', async () => {
     const o = files();
     const sticky = fakeEmu({ entries: [{ flag: 'true' }], writes: true, rules: [(w) => (w[0] === 'uninstall' ? ok('Success\n') : undefined)] });
-    expect(await clearLabEntry(await emuOf(sticky), o)).toMatchObject({ ok: false, why: expect.stringMatching(/^the reinstall not proven: after the reinstall, D55 check: FAIL — .*; the lab is installed$/) });
+    expect(await clearLabEntry(await emuOf(sticky), o)).toMatchObject({ ok: false, why: expect.stringMatching(/^the reinstall not proven: after the reinstall, D55 check: FAIL — .*; the lab is installed$/), hand: [expect.stringMatching(/^D55 \(Android\): a lab default/)] });
     const unread = fakeEmu({ entries: [{ flag: 'true' }], writes: true });
     const emu = await emuOf(unread);
     let reinstalled = false;
@@ -467,7 +486,30 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
       if (args[2] === 'install') reinstalled = true;
       return reinstalled && args.join(' ').endsWith('dumpsys package preferred') ? exit(1) : unread.run(cmd, args, call);
     };
-    expect(await clearLabEntry(emu.using(run), files())).toMatchObject({ ok: false, why: expect.stringMatching(/^the reinstall not proven: after the reinstall, D55 check: ERROR — /) });
+    expect(await clearLabEntry(emu.using(run), files())).toMatchObject({ ok: false, why: expect.stringMatching(/^the reinstall not proven: after the reinstall, D55 check: ERROR — /), hand: [expect.stringMatching(/^D55 \(Android\): the chooser and the preferred activities not proven/)] });
+  });
+
+  it("a chooser that stays over a preferred read that fails (exit 4) proves nothing: not proven, never \"cleared\" (T2 S5 review round 1, its repro)", async () => {
+    const o = files();
+    let reinstalled = false;
+    const fake = fakeEmu({
+      chooser: Infinity,
+      entries: [{ flag: 'true' }],
+      writes: true,
+      rules: [
+        (w) => (w.join(' ').endsWith('KEYCODE_HOME') ? ok() : undefined),
+        (w) => void (w[0] === 'install' && (reinstalled = true)),
+        (w) => (reinstalled && w.join(' ') === 'shell dumpsys package preferred' ? exit(1, 'boom') : undefined),
+      ],
+    });
+    const r = await clearLabEntry(await emuOf(fake), o);
+    expect(r).toEqual({
+      ok: false,
+      why: 'the reinstall not proven: after the reinstall, D55 check: ERROR — chooser yes (android/com.android.internal.app.ResolverActivity); preferred unread (dumpsys package preferred: exit 1 boom); the lab is installed',
+      hand: [`D55 (Android): the chooser and the preferred activities not proven put back: adb -s ${SERIAL} shell dumpsys package preferred (no lab entry with mAlways=true may be left); a chooser in front: adb -s ${SERIAL} shell input keyevent KEYCODE_BACK`],
+    });
+    expect(o.progress.step).toBe('started');
+    expect(readState(o).dirty).toBe(true);
   });
 
   it('the uninstall refused: not proven, the lab still installed with its default — its hand line the uninstall again', async () => {
@@ -520,7 +562,7 @@ describe("cleanUp — the block's cleanup by --check's exit (batch-11.sh:539–5
     const c = await cleanUp(await emuOf(fakeEmu({ entries: [{ flag: 'true' }] })), o);
     expect(c.verdict).toBe('FAIL');
     expect(c.line).toContain(`; NOT cleared: no pulled APK at ${o.apk} to reinstall — nothing done`);
-    expect(c.hand).toEqual([`D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: adb -s ${SERIAL} uninstall dev.averi.lab && adb -s ${SERIAL} install ${o.apk} (clears it; wipes the lab's data, so put the lab's state back after), then read the preferred activities again`]);
+    expect(c.hand).toEqual([`D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: adb -s ${SERIAL} uninstall dev.averi.lab && adb -s ${SERIAL} install ${o.apk} (clears it; wipes the lab's data); then: adb -s ${SERIAL} shell dumpsys package preferred`]);
   });
 
   it('4: BACK and HOME, --check once more — a chooser gone is OK; one that stays is ERROR with its hand line', async () => {
@@ -544,16 +586,16 @@ describe("cleanUp — the block's cleanup by --check's exit (batch-11.sh:539–5
 
 describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.sh:163–177; batch-12 on_abort; b11-dry int-reinstall*)', () => {
   const windowOf = async (fake: ReturnType<typeof fakeEmu>, o: Partial<Parameters<typeof chooserWindow>[1]> = {}) =>
-    chooserWindow(await emuOf(fake), { apk: join(dir, 'installed.apk'), accepted: [SHARED_TWIN], progress: reinstallProgress(), ...o });
+    chooserWindow(await emuOf(fake), { apk: join(dir, 'installed.apk'), catalog: join(dir, 'cells.json'), dir, accepted: [SHARED_TWIN], progress: reinstallProgress(), ...o });
 
   it('outside a reinstall: BACK and HOME, then --check over the abort\'s Run: put back (int-d55)', async () => {
     const fake = fakeEmu({ chooser: 1 });
     const w = await windowOf(fake);
     const detached = fakeEmu({ chooser: 1 });
     expect(await w.restore(detached.run)).toEqual({ ok: true, how: 'chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)' });
-    expect(detached.words()[1]).toBe('shell input keyevent KEYCODE_BACK');
+    // `adb get-state` first, then the dismissal (T2 S5 review round 1).
+    expect(detached.words().slice(0, 3)).toEqual(['get-state', `shell ${CHOOSER_FOCUS_COMMAND}`, 'shell input keyevent KEYCODE_BACK']);
     expect(fake.words()).toEqual(['emu avd name']);
-    expect(detached.words().some((w) => w.includes('get-state'))).toBe(false);
   });
 
   it('interrupted inside the reinstall with the lab gone: installed again from the pulled APK, proven, then checked (int-reinstall-nolab)', async () => {
@@ -561,7 +603,28 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     const fake = fakeEmu({ installed: false, writes: true });
     const w = await windowOf(fake, { progress: { step: 'started' } });
     expect(await w.restore(fake.run)).toMatchObject({ ok: true });
-    expect(fake.words().filter((x) => /get-state|pm path|^install/.test(x))).toEqual(['get-state', 'shell pm path dev.averi.lab', `install ${join(dir, 'installed.apk')}`, 'get-state', 'shell pm path dev.averi.lab']);
+    expect(fake.words().filter((x) => /get-state|pm path|^install|^pull/.test(x))).toEqual(['get-state', 'shell pm path dev.averi.lab', `install ${join(dir, 'installed.apk')}`, 'get-state', 'shell pm path dev.averi.lab', `pull ${DEVICE_APK} ${join(dir, 'reinstalled.apk')}`]);
+  });
+
+  it("outside a reinstall, adb unreachable: unknown at once — no key pressed, nothing called put back (T2 S5 review round 1)", async () => {
+    const fake = fakeEmu();
+    const w = await windowOf(fake);
+    fake.st.reachable = false;
+    expect(await w.restore(fake.run)).toEqual({ ok: false, why: 'adb unreachable, so nothing could be read or put back (adb get-state: exit 1 error: no devices/emulators found)', hand: [expect.stringMatching(/^D55 \(Android\): the chooser and the preferred activities not proven put back/)] });
+    expect(fake.words()).toEqual(['emu avd name', 'get-state']);
+  });
+
+  it('inside the reinstall, the lab installed again or found installed is proven by its cells.json, or not put back (T2 S5 review round 1)', async () => {
+    files();
+    const other = fakeEmu({ installed: false, writes: true, cells: '{"cells":[]}\n' });
+    expect(await (await windowOf(other, { progress: { step: 'started' } })).restore(other.run)).toMatchObject({
+      ok: false,
+      why: `interrupted during the reinstall: the installed lab not proven the pulled APK: the reinstalled APK's assets/cells.json is not the catalog's ${join(dir, 'cells.json')}`,
+      hand: [expect.stringMatching(/^D55 \(Android\): the installed lab not proven the pulled APK/)],
+    });
+    const found = fakeEmu({ writes: true });
+    expect(await (await windowOf(found, { progress: { step: 'started' } })).restore(found.run)).toMatchObject({ ok: true });
+    expect(found.words().filter((x) => /^install|^pull/.test(x))).toEqual([`pull ${DEVICE_APK} ${join(dir, 'reinstalled-2.apk')}`]);
   });
 
   it('interrupted inside the reinstall with adb unreachable: unknown — never "missing", never "put back", nothing installed (int-reinstall-noadb)', async () => {
@@ -570,7 +633,8 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     fake.st.reachable = false;
     const p = await w.restore(fake.run);
     expect(p).toEqual({ ok: false, why: 'interrupted during the reinstall: whether the lab is installed is unknown (adb get-state: exit 1 error: no devices/emulators found)', hand: [expect.stringMatching(/^D55 \(Android\): whether the lab is installed is unknown/)] });
-    expect(fake.words().some((x) => /pm path|^install/.test(x))).toBe(false);
+    // Unknown at once: no key, no pm path, no install after the failed get-state (T2 S5 review round 1).
+    expect(fake.words()).toEqual(['emu avd name', 'get-state']);
   });
 
   it('interrupted inside the reinstall, the install again failing: still missing, or unknown after it — each its own hand line', async () => {
@@ -579,7 +643,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(await (await windowOf(failing, { progress: { step: 'started' } })).restore(failing.run)).toEqual({
       ok: false,
       why: 'interrupted during the reinstall: the lab was not installed; after the install it is still missing',
-      hand: [`D55 (Android): the lab APK is NOT installed: adb -s ${SERIAL} install ${join(dir, 'installed.apk')}, then put the lab's state back`],
+      hand: [`D55 (Android): the lab APK is NOT installed: adb -s ${SERIAL} install ${join(dir, 'installed.apk')}; then: adb -s ${SERIAL} shell dumpsys package preferred`],
     });
     let gets = 0;
     const lost = fakeEmu({ installed: false, writes: true, rules: [(w) => (w[0] === 'get-state' && ++gets > 1 ? exit(1, 'error: closed') : undefined)] });
@@ -595,15 +659,15 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     const seen: unknown[] = [];
     const w = await windowOf(fake, {
       progress: { step: 'started' },
-      putBack: async (run) => {
+      putBack: restoreOf(async (run) => {
         seen.push(run === fake.run);
         return { ok: false, why: 'D55 restore: NOT VERIFIED — the state file not read back equal', hand: ['D55 (Android): the probe --restore'] };
-      },
+      }),
     });
     expect(await w.restore(fake.run)).toEqual({ ok: false, why: 'D55 restore: NOT VERIFIED — the state file not read back equal', hand: ['D55 (Android): the probe --restore'] });
     expect(seen).toEqual([true]);
     const ok2 = fakeEmu();
-    const w2 = await windowOf(ok2, { putBack: async () => ({ ok: true, how: 'put back' }) });
+    const w2 = await windowOf(ok2, { putBack: restoreOf(async () => ({ ok: true, how: 'put back' })) });
     expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: 'chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)' });
   });
 
@@ -614,7 +678,11 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
 
   it('after the restore: a last-chosen entry not accepted is put back with its WARN; a default FAIL; unproven or a chooser that stays, not put back', async () => {
     const other = fakeEmu({ entries: [{ flag: 'false', authority: 'pair' }] });
-    expect(await (await windowOf(other)).restore(other.run)).toMatchObject({ ok: true, how: expect.stringMatching(/^WARN a last-chosen entry not accepted \(no default; no reinstall clears it\): /) });
+    // A WARN, the cleanup's own words (T2 S5 review round 1: the abort and cleanUp agree).
+    const p = await (await windowOf(other)).restore(other.run);
+    const c = await cleanUp(await emuOf(fakeEmu({ entries: [{ flag: 'false', authority: 'pair' }] })), files());
+    expect(p).toEqual({ ok: true, verdict: 'WARN', how: c.line.replace(/^D55 cleanup: WARN — /, '') });
+    expect(c.verdict).toBe('WARN');
     const aDefault = fakeEmu({ entries: [{ flag: 'true' }] });
     expect(await (await windowOf(aDefault)).restore(aDefault.run)).toMatchObject({ ok: false, verdict: 'FAIL', hand: [expect.stringMatching(/^D55 \(Android\): a lab default/)] });
     const unread = fakeEmu({ rules: [(w) => (w.join(' ') === 'shell dumpsys package preferred' ? exit(1) : undefined)] });
