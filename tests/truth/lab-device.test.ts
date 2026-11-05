@@ -1,10 +1,10 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { capture } from '../../scripts/truth/capture-run.js';
 import { AndroidLab, DEVICE_CHECK_SIMULATOR, IosLab, withMeasuredPanel, type Exec } from '../../scripts/truth/lab-device.js';
-import { TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
+import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/android.js';
 import { parseLabApp, type CatalogCell, type LabState } from '../../scripts/truth/schema.js';
 
 // The lab devices' guards (scripts/truth/lab-device.ts): a capture or a live run touches the lab's own simulator or
@@ -178,6 +178,27 @@ describe('AndroidLab: the averi_lab AVD or nothing', () => {
     expect(calls).toEqual(['adb -s emulator-5556 emu avd name', `adb -s emulator-5556 shell ${TOUCHABLE_COMMAND}`]);
     const refused = fakeExec('Pixel_7_API_34\r\nOK');
     await expect(new AndroidLab('emulator-5554', { exec: refused.exec }).imeTouchable()).rejects.toThrow(/refused/);
+  });
+  it('ime(): the capture asks averi\'s own INPUT_SHOWN_COMMAND and TOUCHABLE_COMMAND, shown and again hidden (D69: one command, no copy)', async () => {
+    const { exec, calls } = fakeExec();
+    const answers: Record<string, string> = { [INPUT_SHOWN_COMMAND]: 'mInputShown=true\n', [TOUCHABLE_COMMAND]: B11_DUMP, 'dumpsys window displays': 'displays\n', 'input keyevent 4': '' };
+    const answering: Exec = async (file, args) => {
+      const asked = Object.keys(answers).find((k) => args.slice(3).join(' ') === k);
+      if (asked === undefined) return exec(file, args);
+      calls.push(`${file} ${args.join(' ')}`);
+      return { stdout: answers[asked] };
+    };
+    // ime() hides the keyboard with a back and waits 1.5 s for it: on fake time, real timers back after.
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      const pending = new AndroidLab('emulator-5556', { exec: answering }).ime();
+      await vi.runAllTimersAsync();
+      expect(await pending).toEqual({ shown: { displays: 'displays\n', inputShown: 'mInputShown=true\n', touchable: B11_DUMP }, hidden: { inputShown: 'mInputShown=true\n', touchable: B11_DUMP } });
+    } finally {
+      vi.useRealTimers();
+    }
+    const shell = (command: string) => `adb -s emulator-5556 shell ${command}`;
+    expect(calls).toEqual(['adb -s emulator-5556 emu avd name', shell('dumpsys window displays'), shell(INPUT_SHOWN_COMMAND), shell(TOUCHABLE_COMMAND), shell('input keyevent 4'), shell(INPUT_SHOWN_COMMAND), shell(TOUCHABLE_COMMAND)]);
   });
 });
 

@@ -149,9 +149,25 @@ describe('imePanels — a floating IME\'s panels, from the touchable region', ()
     expect(imePanels('  mInputShown=false\n    touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))\n', BAND)).toEqual([]);
     expect(imePanels(`${shown}    no region here\n`, BAND)).toEqual([]);
   });
-  it('reads the committed docked capture as none', async () => {
-    const ime = JSON.parse(await readFile(new URL('../fixtures/truth/android-averi_lab-api33/form-keyboard.ime.json', import.meta.url), 'utf8'));
-    expect(imePanels(ime.shown.touchable, rect(0, 1398, 1080, 822))).toEqual([]);
+  it('both committed captures read as before (D69, averi\'s parsers): docked none, floating its one panel', async () => {
+    const touchable = async (cell: string) => (JSON.parse(await readFile(new URL(`../fixtures/truth/android-averi_lab-api33/${cell}.ime.json`, import.meta.url), 'utf8')) as { shown: { touchable: string } }).shown.touchable;
+    expect(JSON.stringify(imePanels(await touchable('form-keyboard'), rect(0, 1398, 1080, 822)))).toBe('[]');
+    expect(JSON.stringify(imePanels(await touchable('form-keyboard-floating'), BAND))).toBe('[{"x":71,"y":1092,"width":937,"height":792}]');
+  });
+  // D69: parsed by averi's own readers (src/adapters/android.ts#parseInputShown, #parseTouchableRegion), the harness's
+  // own rule kept — every rect but the band, no panelsBeyond (ground truth must not use the rule it checks).
+  it('whitespace in the region is tolerated, as averi tolerates it', () => {
+    expect(imePanels(`${shown}    touchable region=SkRegion( (71, 1092, 1008, 1884) (0,2088,1080,2220) )\n`, BAND)).toEqual([rect(71, 1092, 937, 792)]);
+  });
+  it('two region lines that disagree, two mInputShown values that disagree, or an inverted rect: none', () => {
+    const floating = '    touchable region=SkRegion((71,1092,1008,1884)(0,2088,1080,2220))\n';
+    expect(imePanels(`${shown}${floating}    touchable region=SkRegion((87,1243,1024,2035)(0,2088,1080,2220))\n`, BAND)).toEqual([]);
+    expect(imePanels(`${shown}  mInputShown=false\n${floating}`, BAND)).toEqual([]);
+    expect(imePanels(`${shown}    touchable region=SkRegion((1008,1092,71,1884)(0,2088,1080,2220))\n`, BAND)).toEqual([]);
+  });
+  it('the harness\'s rule, not averi\'s: no band in the region, or a rect off the screen, is still a panel', () => {
+    expect(imePanels(`${shown}    touchable region=SkRegion((71,1092,1008,1884))\n`, BAND)).toEqual([rect(71, 1092, 937, 792)]);
+    expect(imePanels(`${shown}    touchable region=SkRegion((2000,0,2100,50)(0,2088,1080,2220))\n`, BAND)).toEqual([rect(2000, 0, 100, 50)]);
   });
 });
 

@@ -56,7 +56,8 @@ export interface Case extends RunsUnder {
   keyboard?: true;
   /**
    * Android: right after the launch, the IME window's touchable region is read (LabDevice.imeTouchable) into
-   * `launched.imeTouchable` — the floating panel the kf cases are judged against (live-forms.ts#measuredPanel).
+   * `launched.imeTouchable` — the floating panel the kf cases are judged against (live-forms.ts#measuredPanel) — and
+   * again after the calls into `state.imeTouchable` (D69: the two must agree, live-forms.ts#panelAfterCalls).
    */
   measuresPanel?: true;
   /**
@@ -212,8 +213,9 @@ const FORMS: Omit<Case, 'group'>[] = [
   },
   // FU1 (docs/bugs/2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip.md):
   // Gboard floated by hand (no adb setting does it), its panel over the form and the pinned submit in the strip below it
-  // — live-forms.ts#judgeFloatingGap, against the panel the IME's region names at launch (measuresPanel); a run whose
-  // Gboard came up docked is SKIP, and so is one where the panel does not lie as the case's premise needs.
+  // — live-forms.ts#judgeFloatingGap, against the panel the IME's region names at launch and again after the calls
+  // (measuresPanel, D69); a run whose Gboard came up docked is SKIP, and so is one where the panel does not lie as the
+  // case's premise needs.
   {
     id: 'kf1',
     cell: KF,
@@ -590,14 +592,20 @@ export type RejudgeSelection = Omit<Selection, 'platform' | 'app'> & { app?: Lab
  * Judge one case's reads: the state after the calls; a forms case not ok is read again 3 s later (`late`: a model that
  * catches up was the app's lag, not a lost value) — never a visibility case, whose stop is judged on the state read
  * when scroll_until returned, and which a later read would let a fling finish behind the reply's back. When the re-read
- * comes out the same, the first read's verdict is kept whole — its cls and kind included.
+ * comes out the same, the first read's verdict is kept whole — its cls and kind included. The late read is the app's
+ * only: the IME region read after the calls (`state.imeTouchable`, a kf case's second read, D69) is carried onto it, so
+ * a later read can never turn a verdict over both reads into one over the launch's alone (`lateWithPanel`).
  */
 export function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined): LiveVerdict {
   const verdict = c.judge(state, replies, source, launched, after);
   if (verdict.outcome === 'ok' || late === undefined) return verdict;
-  const again = c.judge(late, replies, source, launched, after);
+  const again = c.judge(lateWithPanel(state, late), replies, source, launched, after);
   return again.outcome === verdict.outcome ? verdict : { ...again, why: `${again.why} (only 3 s later; first read: ${verdict.why})` };
 }
+
+/** `late` with the IME region read after the calls (`state.imeTouchable`), where it read none of its own. */
+export const lateWithPanel = (state: LabState, late: LabState): LabState =>
+  late.imeTouchable !== undefined || state.imeTouchable === undefined ? late : { ...late, imeTouchable: state.imeTouchable };
 
 /** A recorded run judged again with this checkout's judges, no device: the cases `selection` takes, in record order. */
 export async function rejudgedResults(record: RunRecord, selection: RejudgeSelection): Promise<Result[]> {

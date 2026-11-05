@@ -1,3 +1,5 @@
+import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
+import { sameRect } from '../../src/adapters/types.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
 import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
 
@@ -634,17 +636,15 @@ export function outOfProcessKeyboard(platform: Platform, keyboard: Rect | undefi
  * the rects of the touchable region (`dumpsys window InputMethod`'s `touchable region=SkRegion((l,t,r,b)…)`, as
  * ImeCapture.shown.touchable holds it, read while the input method says it is shown) other than the band itself
  * (`band`, the keyboard frame the app hears of: under a floating Gboard only the 132-px strip at the screen's bottom,
- * `[0,2088][1080,2220]` on averi_lab). The harness's own reading of the region averi reads
- * (src/adapters/android.ts#parseTouchableRegion; docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). Docked, the
- * region is the band: none. Unreadable, or the input method not saying shown: none.
+ * `[0,2088][1080,2220]` on averi_lab). Parsed by averi's own readers (src/adapters/android.ts#parseInputShown,
+ * #parseTouchableRegion: one parser of the dump, D69), but admitted by the harness's own rule — every rect but the band
+ * — never by averi's (`ui-tree/keyboard-cover.ts#panelsBeyond`): the capture is ground truth, and must not share the
+ * rule the golden checks (docs/bugs/2026-10-05-android-floating-gboard-keyboard.md). Docked, the region is the band:
+ * none. Unreadable, or the input method not saying shown: none.
  */
 export function imePanels(touchable: string, band: Rect): Rect[] {
-  if (!/\bmInputShown=true\b/.test(touchable)) return [];
-  const region = /touchable region=SkRegion\(((?:\(-?\d+,-?\d+,-?\d+,-?\d+\))*)\)/.exec(touchable);
-  if (region === null) return [];
-  return [...region[1].matchAll(/\((-?\d+),(-?\d+),(-?\d+),(-?\d+)\)/g)]
-    .map(([, l, t, r, b]) => ({ x: +l, y: +t, width: +r - +l, height: +b - +t }))
-    .filter((p) => !(p.x === band.x && p.y === band.y && p.width === band.width && p.height === band.height));
+  if (parseInputShown(touchable) !== 'shown') return [];
+  return (parseTouchableRegion(touchable) ?? []).filter((p) => !sameRect(p, band));
 }
 
 /**

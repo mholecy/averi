@@ -44,7 +44,7 @@ export const ASSERTS_FAILED = /^\d+\/\d+ asserts FAILED/;
 export const ASSERT_SUMMARY = /^\d+\/\d+ asserts|^All \d+ asserts/;
 
 /** averi refused or failed: `ERROR …` — a refusal, a timeout, a stop that gave up. */
-export const isError = (reply: string) => reply.startsWith('ERROR');
+export const isError = (reply: string | undefined) => reply?.startsWith('ERROR') === true;
 
 /** scroll_until stopped on its target: `Element … visible after N swipes` (plain or `fully visible`). */
 export const VISIBLE_STOP = /^Element .* visible after /;

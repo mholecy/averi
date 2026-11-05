@@ -1172,9 +1172,10 @@ const INPUT_SHOWN_RE = /(?:^|\s)mInputShown=(true|false)(?=\s|$)/g;
  * A `rawShell` line (the adapter's named exception to quoted argv, adb-shell.ts):
  * ONE argument for `adb shell`, run by the device's sh as written, so the
  * pipe runs on the device. Every word in it is a constant that needs no
- * quoting.
+ * quoting. Exported for the live golden's IME capture (AndroidLab.ime in
+ * scripts/truth/lab-device.ts), which asks it word for word.
  */
-const INPUT_SHOWN_COMMAND = 'dumpsys input_method | grep -m1 -w mInputShown';
+export const INPUT_SHOWN_COMMAND = 'dumpsys input_method | grep -m1 -w mInputShown';
 
 /**
  * The input method manager's own "is the keyboard shown" out of (a grep of)
