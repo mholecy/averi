@@ -673,4 +673,9 @@ describe("execOf — a Run as lab-device.ts's Exec, for its guards (ios-domains.
     await expect(exec('adb', ['-s', 'x', 'emu'])).rejects.toThrow(/^adb -s x emu: exit 1 error: no devices$/);
     expect(seen).toEqual(['adb ok', 'adb -s x emu']);
   });
+
+  it("batch-13: the throw carries the call's whole stderr, as execFile's does — the Android guard keeps adb's own words from it", async () => {
+    const exec = execOf(async () => ({ code: 1, timedOut: false, signal: null, out: 'out', err: "error: device 'x' not found\nmore" }));
+    await expect(exec('adb', ['-s', 'x', 'emu'])).rejects.toMatchObject({ stderr: "error: device 'x' not found\nmore" });
+  });
 });
