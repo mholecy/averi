@@ -648,6 +648,10 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(judged).toEqual(['b']);
     expect(summary()).toContain('a verdict: INCONCLUSIVE — not run (see the ERROR lines)');
     expect(summary()).toContain('b verdict: PASS');
+    rmSync(out, { recursive: true, force: true });
+    judged.length = 0;
+    await go([plain('c', { noRecords: true, judge: j('c') })]);
+    expect(judged).toEqual([]);
   });
 
   it('the judges run after finish: every window still open written to RESTORE and the kept groups ended first (review round 1)', async () => {
@@ -704,6 +708,9 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
   it('an ERROR said as a step and repeated in a log: one line, counted together, steps.log named (code review a4)', async () => {
     await go([plain('kf', { run: async (ctx) => (ctx.err('the cell did not open'), writeFileSync(join(ctx.dir, 'probe.log'), 'ERROR the cell did not open\nERROR the cell did not open\n'), ctx.verdict('PASS')) })]);
     expect(summary().filter((l) => l.includes('the cell did not open'))).toEqual(['09:44:26 ERROR the cell did not open (×3, in steps.log, kf/probe.log)']);
+    rmSync(out, { recursive: true, force: true });
+    await go([plain('kf', { run: async (ctx) => (ctx.err('one'), ctx.err('two'), ctx.verdict('PASS')) })]);
+    expect(summary().filter((l) => /ERROR (one|two)/.test(l))).toEqual(['09:44:26 ERROR one', '09:44:26 ERROR two']);
   });
 
   it('one ERROR in several of this run\'s logs: one line, its total and where (review round 3: 50 in p, 1 in q, 2 in r)', async () => {
@@ -1066,6 +1073,7 @@ describe('a non-live block\'s record: what it was asked, then what it did — co
   it('asked 3, recorded 3, no verdict: the backstop says the runs are complete but nothing judged them', async () => {
     await go([plain('E5', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 3 }), ctx.record('c', { kind: 'runs', runs: 3 })) })]);
     expect(summary()).toContain('E5 verdict: INCONCLUSIVE — its 1 run(s) are complete, but no verdict line was written (see the ERROR lines)');
+    expect(outText()).not.toContain('analyze');
     expect(JSON.parse(text(join(dirOf('E5'), 'c.asked.json')))).toEqual({ kind: 'runs', runs: 3 });
     expect(JSON.parse(text(join(dirOf('E5'), 'c.done.json')))).toEqual({ kind: 'runs', runs: 3 });
     expect(existsSync(join(dirOf('E5'), 'c.cases'))).toBe(false);

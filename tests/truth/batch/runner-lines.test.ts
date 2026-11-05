@@ -192,6 +192,10 @@ describe('logErrors — this run\'s ERROR lines from its logs, counted across th
     expect(logErrors([log('a.log', times(2, 'ERROR x'))])).toEqual(['ERROR x (×2, in a.log)']);
   });
 
+  it('a step line\'s time is set aside only at the line\'s start: a time inside an ERROR line is part of what it says', () => {
+    expect(logErrors([log('steps.log', '09:00:00 ERROR a\n10:00:00 ERROR a'), log('p.log', 'ERROR a 09:00:00 b\nERROR a b')])).toEqual(['09:00:00 ERROR a (×2, in steps.log)', 'ERROR a 09:00:00 b', 'ERROR a b']);
+  });
+
   it('more than WHERE_SHOWN files: the first 3, then how many more', () => {
     expect(WHERE_SHOWN).toBe(3);
     expect(logErrors(['a', 'b', 'c', 'd', 'e'].map((n) => log(`${n}.log`, 'ERROR x')))).toEqual(['ERROR x (×5, in a.log, b.log, c.log, +2 more)']);

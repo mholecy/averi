@@ -517,11 +517,13 @@ class BatchRun<K> {
    */
   private judgeable(b: Block<K>): boolean {
     const dir = this.dirs[b.id];
+    let complete = false;
     try {
-      return b.complete?.({ dir, fs: this.io.fs }) ?? (b.noRecords === true ? this.finished.has(b.id) : recordsComplete(this.io.fs, dir));
+      complete = b.complete?.({ dir, fs: this.io.fs }) ?? (b.noRecords === true ? this.finished.has(b.id) : recordsComplete(this.io.fs, dir));
     } catch {
-      return false;
+      // a complete() that throws: not complete
     }
+    return complete;
   }
 
   /** The block as the abort sees it: a verdict of its own kept already, or complete records and a judge for them. */
