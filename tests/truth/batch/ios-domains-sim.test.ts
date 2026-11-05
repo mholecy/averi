@@ -5,22 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_WDA_PORTS } from '../../../scripts/truth/lab-device.js';
 import { TIMED_OUT, type Call, type CallResult, type Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import {
-  backup,
-  backupPathOf,
-  compare,
-  COMPARE_VALUE_CHARS,
-  DOMAINS,
-  domainsWindow,
-  freshPathOf,
-  LabSim,
-  PLIST_SECS,
-  PROTECTED,
-  readProtected,
-  restore,
-  TYPED_PY,
-  type KeyVal,
-} from '../../../scripts/truth/batch/ios-domains.js';
+import { backupPathOf, COMPARE_VALUE_CHARS, DOMAINS, PROTECTED, TYPED_PY, type KeyVal } from '../../../scripts/truth/batch/ios-defaults.js';
+import { backup, compare, domainsWindow, freshPathOf, LabSim, PLIST_SECS, readProtected, restore } from '../../../scripts/truth/batch/ios-domains.js';
 import { stateOf } from '../../../scripts/truth/batch/run-dir.js';
 
 // scripts/truth/batch/ios-domains.ts over a simulator: a recording fake Run stands in for xcrun simctl (its domains in
@@ -61,6 +47,12 @@ afterEach(() => {
 
 type Rule = (cmd: string, args: readonly string[]) => CallResult | undefined;
 
+/** batch-8's stderr for a key not there (it named `-->averilab`), naming `key` instead. */
+const B8_KEY = 'com.apple.CoreSimulator.CoreSimulatorBridge-->averilab';
+const keyNotFound = (key: string): string => readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8').replace(B8_KEY, key);
+/** The fixture derived from batch-8's for the protected key itself (schemeapproval-absent-protected-key.txt). */
+const protectedNotFound = (): string => readFileSync(join(FIXTURES, 'schemeapproval-absent-protected-key.txt'), 'utf8');
+
 /** The host's `defaults read` of a domain that is not there (defaults-host-domain-not-found.txt), naming `domain`. */
 const notFound = (domain: string): string => readFileSync(join(FIXTURES, 'defaults-host-domain-not-found.txt'), 'utf8').replace('com.apple.Preferences', domain);
 
@@ -94,7 +86,8 @@ function fakeSim(opts: { domains?: Record<string, Record<string, KeyVal>>; name?
     const [domain, key] = [args[5], args[6]];
     const map = domains.get(domain);
     if (verb === 'export') {
-      // The host's defaults: a domain not there exports an empty dictionary, exit 0 (defaults-host-export-missing-domain.plist).
+      // The host's defaults: a domain not there exports an empty dictionary, exit 0
+      // (defaults-host-export-missing-domain.plist).
       writeFileSync(args[6], JSON.stringify(map ?? {}));
       return ok();
     }
@@ -114,7 +107,7 @@ function fakeSim(opts: { domains?: Record<string, Record<string, KeyVal>>; name?
       if (map === undefined) return exit(1, notFound(domain));
       if (key === undefined) return ok(`${JSON.stringify(map)}\n`);
       const kv = map[key];
-      return kv === undefined ? exit(1, readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8')) : ok(`${kv.v ?? kv.c}\n`);
+      return kv === undefined ? exit(1, keyNotFound(key)) : ok(`${kv.v ?? kv.c}\n`);
     }
     if (verb === 'import') {
       // `defaults import` merges: the backup's keys set, any other key kept (hence the proven-merge fallback).
@@ -222,14 +215,14 @@ describe("backup — the state file written dirty before the window's first chan
     ]);
   });
 
-  it('a domain there but empty is no absent one: its empty backup recorded, so the restore may import it', async () => {
+  it('a domain there but empty is no absent one: its empty backup recorded, so the restore may import it (T2 S4 review round 2)', async () => {
     const fake = fakeSim({ domains: { ...before(), 'com.apple.Preferences': {} } });
     const r = await backup(await labOf(fake), stateFile());
     expect(r.ok && r.line).toContain('com.apple.Preferences exported');
     expect(readState().domains[1]).toEqual({ name: 'com.apple.Preferences', backup: backupPathOf(stateFile(), 'com.apple.Preferences') });
   });
 
-  it('an empty export whose read cannot tell absent from empty fails the backup: another domain named, other words, past its bound', async () => {
+  it('an empty export whose read cannot tell absent from empty fails the backup: another domain named, other words, past its bound (T2 S4 review round 2)', async () => {
     const domains = before();
     delete domains['com.apple.Preferences'];
     for (const [said, why] of [
@@ -246,12 +239,12 @@ describe("backup — the state file written dirty before the window's first chan
     }
   });
 
-  it("an export that fails is a failure whatever it says, the host's not-found words too: absent is only the read's answer", async () => {
+  it("an export that fails is a failure whatever it says, the host's not-found words too: absent is only the read's answer (T2 S4 review round 2)", async () => {
     const r = await backup(await labOf(fakeSim({ rules: [(_, a) => (a[4] === 'export' ? exit(1, notFound(a[5])) : undefined)] })), stateFile());
     expect(r).toEqual({ ok: false, why: "defaults export com.apple.keyboard.preferences: exit 1 Error: Domain 'com.apple.keyboard.preferences' not found. — no state written" });
   });
 
-  it('an export that fails, passes its bound, or writes no file: no state written — so the window changes nothing', async () => {
+  it('an export that fails, passes its bound, or writes no file: no state written — so the window changes nothing (exit 0 with no file, or past its bound with one: T2 S4 review round 1)', async () => {
     const cases: [Rule, string][] = [
       [(_, a) => (a[4] === 'export' && a[5] === A11Y ? exit(5, 'boom') : undefined), `defaults export ${A11Y}: exit 5 boom — no state written`],
       [(_, a) => (a[4] === 'export' ? timedOut : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) — no state written'],
@@ -505,7 +498,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect(fake.defaults().filter((d) => !d.startsWith('export'))).toEqual(['AccessibilityEnabled', 'ApplicationAccessibilityEnabled', 'AutomationEnabled'].map((k) => `write ${A11Y} ${k} -bool true`));
   });
 
-  it("a value shown bounded and on one line: cut at COMPARE_VALUE_CHARS with …; a key with a line break quoted; a key gone shows absent", async () => {
+  it("a value shown bounded and on one line: cut at COMPARE_VALUE_CHARS with … (by code points: T2 S4 review round 2); a key with a line break quoted; a key gone shows absent", async () => {
     const fake = fakeSim();
     const sim = await restored(fake);
     const long = 'x'.repeat(200);
@@ -592,7 +585,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect(fake.calls).toHaveLength(1);
   });
 
-  it('a domain absent before that gained a key, a domain that went: before → after names absent on its side', async () => {
+  it('a domain absent before that gained a key, a domain that went: before → after names absent on its side (T2 S4 review round 1)', async () => {
     const domains = before();
     delete domains['com.apple.Preferences'];
     const fake = fakeSim({ domains });
@@ -607,7 +600,7 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect((c.domains[0] as { changes: string[] }).changes).toContain('AutomaticMinimizationEnabled bool false → absent');
   });
 
-  it('a state file that is gone when it is to be marked dirty: said, the hand lines kept', async () => {
+  it('a state file that is gone when it is to be marked dirty: said, the hand lines kept (T2 S4 review round 1)', async () => {
     const fake = fakeSim();
     const sim = await restored(fake);
     const opened = await LabSim.open(LAB, fake.run, { ...nodeFs, exists: () => false });
@@ -639,13 +632,19 @@ describe("readProtected — the finportal key, read only: a value, absent or unr
     expect(PROTECTED).toEqual({ domain: 'com.apple.launchservices.schemeapproval', key: 'com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport' });
   });
 
-  it("batch-8's stderr for a key not there — exit 1, Could not find key — is absent, never unreadable", async () => {
-    const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8');
-    expect(await readProtected(await labOf(reading(exit(1, said))))).toEqual({ state: 'absent' });
+  it("batch-8's stderr naming the protected key (derived: schemeapproval-absent-protected-key.txt) — exit 1, Could not find key — is absent, never unreadable", async () => {
+    expect(await readProtected(await labOf(reading(exit(1, protectedNotFound()))))).toEqual({ state: 'absent' });
   });
 
-  it("batch-9's delete variant (the same error, then \"Defaults have not been changed.\") reads absent too; so does the host's `Domain '<it>' not found.`", async () => {
-    const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b9-delete.txt'), 'utf8');
+  it("batch-8's own stderr, naming another key (`-->averilab`), is unreadable: a not-found for a key not asked is unexpected (T2 S4 code review)", async () => {
+    const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8');
+    expect(await readProtected(await labOf(reading(exit(1, said))))).toEqual({ state: 'unreadable', why: `exit 1 ${said.trim()}` });
+    expect(await readProtected(await labOf(reading(exit(1, keyNotFound(`${PROTECTED.key}x`)))))).toMatchObject({ state: 'unreadable' });
+    expect(await readProtected(await labOf(reading(exit(1, keyNotFound(PROTECTED.key.replaceAll('.', 'X'))))))).toMatchObject({ state: 'unreadable' });
+  });
+
+  it("batch-9's delete variant (the same error, then \"Defaults have not been changed.\") for the protected key reads absent too; so does the host's `Domain '<it>' not found.` (T2 S4 review round 2)", async () => {
+    const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b9-delete.txt'), 'utf8').replaceAll(B8_KEY, PROTECTED.key);
     expect(await readProtected(await labOf(reading(exit(1, said))))).toEqual({ state: 'absent' });
     expect(await readProtected(await labOf(reading({ ...exit(1), out: notFound(PROTECTED.domain) })))).toEqual({ state: 'absent' });
   });
@@ -663,14 +662,14 @@ describe("readProtected — the finportal key, read only: a value, absent or unr
 
   it('any other failure is unreadable, with why: another exit, exit 1 saying something else, or the absent words with another exit', async () => {
     expect(await readProtected(await labOf(reading(exit(1, 'Permission denied\nmore'))))).toEqual({ state: 'unreadable', why: 'exit 1 Permission denied' });
-    const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8');
+    const said = protectedNotFound();
     expect(await readProtected(await labOf(reading(exit(2, said))))).toEqual({ state: 'unreadable', why: `exit 2 ${said.trim()}` });
     expect(await readProtected(await labOf(reading(exit(127))))).toEqual({ state: 'unreadable', why: 'exit 127' });
   });
 
   it('past its bound (142) is unreadable, even with the absent words on stderr: a read cut short proved nothing', async () => {
     expect(await readProtected(await labOf(reading(timedOut)))).toEqual({ state: 'unreadable', why: 'past its bound (exit 142)' });
-    const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8');
+    const said = protectedNotFound();
     expect(await readProtected(await labOf(reading({ ...timedOut, code: 1, err: said })))).toEqual({ state: 'unreadable', why: `past its bound (exit 1) ${said.trim()}` });
   });
 });

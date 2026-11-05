@@ -23,7 +23,9 @@ phase, so the maps compare as the exports did.
 Beside this folder, the stderr of a `defaults` call on a key that is not there (the schemeapproval domain, read only):
 `../schemeapproval-absent-b8-read.txt` (batch-8's first run, a read: exit 1, which batch-8 took for "unreadable" and
 so made the run VOID) and `../schemeapproval-absent-b9-delete.txt` (batch-9, a delete: the same error and
-"Defaults have not been changed.").
+"Defaults have not been changed."). Both name the key `-->averilab`, not the protected one; for that,
+`../schemeapproval-absent-protected-key.txt` is derived from batch-8's line, its key replaced by
+`com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport` (T2 S4 code review).
 
 And two the reviewer of T2 S4 saw from the host's `defaults` (Darwin 27; no simulator stderr of them was captured —
 batch-13 records the simulator's own): `../defaults-host-domain-not-found.txt`, a read of a domain that is not there
