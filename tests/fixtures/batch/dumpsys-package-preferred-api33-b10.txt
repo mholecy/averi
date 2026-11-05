@@ -1,0 +1,84 @@
+Preferred Activities User 0:
+  Schemes:
+      mailto:
+        eb6cdf5 com.google.android.gm/.ComposeActivityGmailExternal
+         mMatch=0x200000 mAlways=true
+          Selected from:
+            com.google.android.gm/.ComposeActivityGmailExternal
+          Action: "android.intent.action.VIEW"
+          Category: "android.intent.category.BROWSABLE"
+          Category: "android.intent.category.DEFAULT"
+          Scheme: "mailto"
+        714878a com.google.android.gm/.ComposeActivityGmailExternal
+         mMatch=0x200000 mAlways=true
+          Selected from:
+            com.google.android.gm/.ComposeActivityGmailExternal
+          Action: "android.intent.action.SENDTO"
+          Category: "android.intent.category.BROWSABLE"
+          Category: "android.intent.category.DEFAULT"
+          Scheme: "mailto"
+      mms:
+        984d7e4 com.google.android.apps.messaging/.ui.conversation.LaunchConversationActivity
+         mMatch=0x200000 mAlways=true
+          Selected from:
+            com.google.android.apps.messaging/.ui.conversation.LaunchConversationActivity
+          Action: "android.intent.action.SENDTO"
+          Category: "android.intent.category.DEFAULT"
+          Scheme: "mms"
+      sms:
+        436d6d9 com.google.android.apps.messaging/.ui.conversation.LaunchConversationActivity
+         mMatch=0x200000 mAlways=true
+          Selected from:
+            com.google.android.apps.messaging/.ui.conversation.LaunchConversationActivity
+          Action: "android.intent.action.SENDTO"
+          Category: "android.intent.category.DEFAULT"
+          Scheme: "sms"
+      tel:
+        fc0d17e com.google.android.dialer/com.android.dialer.main.impl.MainActivity
+         mMatch=0x200000 mAlways=true
+          Selected from:
+            com.google.android.dialer/com.android.dialer.main.impl.MainActivity
+          Action: "android.intent.action.DIAL"
+          Category: "android.intent.category.DEFAULT"
+          Scheme: "tel"
+      mmsto:
+        b7fcb02 com.google.android.apps.messaging/.ui.conversation.LaunchConversationActivity
+         mMatch=0x200000 mAlways=true
+          Selected from:
+            com.google.android.apps.messaging/.ui.conversation.LaunchConversationActivity
+          Action: "android.intent.action.SENDTO"
+          Category: "android.intent.category.DEFAULT"
+          Scheme: "mmsto"
+      smsto:
+        3a44d76 com.google.android.apps.messaging/.ui.conversation.LaunchConversationActivity
+         mMatch=0x200000 mAlways=true
+          Selected from:
+            com.google.android.apps.messaging/.ui.conversation.LaunchConversationActivity
+          Action: "android.intent.action.SENDTO"
+          Category: "android.intent.category.DEFAULT"
+          Scheme: "smsto"
+
+  Non-Data Actions:
+      android.intent.action.DIAL:
+        8e95583 com.google.android.dialer/com.android.dialer.main.impl.MainActivity
+         mMatch=0x100000 mAlways=true
+          Selected from:
+            com.google.android.dialer/com.android.dialer.main.impl.MainActivity
+          Action: "android.intent.action.DIAL"
+          Category: "android.intent.category.DEFAULT"
+      android.intent.action.MAIN:
+        be6f739 com.google.android.apps.nexuslauncher/.NexusLauncherActivity
+         mMatch=0x100000 mAlways=true
+          Selected from:
+            com.google.android.apps.nexuslauncher/.NexusLauncherActivity
+            com.android.settings/.FallbackHome
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.HOME"
+          Category: "android.intent.category.DEFAULT"
+        a61c6df com.google.android.apps.photos/.home.HomeActivity
+         mMatch=0x100000 mAlways=true
+          Selected from:
+            com.google.android.apps.photos/.home.HomeActivity
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.APP_GALLERY"
+          Category: "android.intent.category.DEFAULT"
