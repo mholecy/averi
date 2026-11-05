@@ -730,7 +730,8 @@ describe('the abort SUMMARY (batch-12): INTERRUPTED, the finished blocks judged 
   });
 
   it('completeness is read within the judging budget: one that never settles is not complete, said so; the next block still read (T2 S6a review round 6)', async () => {
-    const guard = guardOf([block('kf', { complete: () => new Promise<boolean>(() => {}) }), block('E5', { complete: () => true, judge: async () => ['E5 verdict: PASS'] })], { judgeBudgetSecs: 0.05 });
+    const slow = () => new Promise<boolean>((r) => setTimeout(() => r(true), 20));
+    const guard = guardOf([block('kf', { complete: () => new Promise<boolean>(() => {}) }), block('E5', { complete: slow, judge: async () => ['E5 verdict: PASS'] })], { judgeBudgetSecs: 0.05 });
     await interrupt(guard);
     expect(summaryText()).toContain('kf: INTERRUPTED — not judged (completeness not read in time; rerun ONLY=kf)');
     expect(summaryText()).toContain("E5: INTERRUPTED — not judged (the abort's judging budget of 0.05 s was spent; rerun ONLY=E5)");
