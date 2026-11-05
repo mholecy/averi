@@ -1,6 +1,6 @@
 {
  "device": "averi_lab emulator-5554",
- "side": "/private/tmp/claude-501/-Users-mholecy-dev-mobile-verify/91f534df-e959-489e-ae8b-f51fecaee6b3/scratchpad/r23-hint",
+ "side": "<scratch>/r23-hint",
  "results": [
   {
    "case": "assert element",

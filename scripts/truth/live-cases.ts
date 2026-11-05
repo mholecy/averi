@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
@@ -24,6 +24,21 @@ export const THIS_CHECKOUT = 'this checkout';
 
 /** The averi checkout (its root): the catalog, the truth runs, and live.ts's own src when no `--side` is given. */
 export const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+/**
+ * The `side` a record names (T8): THIS_CHECKOUT with no `--side`; otherwise a portable label — never the host's
+ * absolute path (a record is committed) and never THIS_CHECKOUT (a `--side` run is a calibration, not held to
+ * live-known.ts: summarize). A checkout inside the repo by its repo-relative path ("." the repo itself); one outside
+ * by its folder, under `<cal>/` when it is calibrate.ts's `differential-cal-<sha>`, else under `<scratch>/`.
+ */
+export function sideLabel(side: string | undefined, root: string = ROOT): string {
+  if (side === undefined) return THIS_CHECKOUT;
+  const path = resolve(side);
+  const inRepo = relative(root, path);
+  if (!inRepo.startsWith('..') && !isAbsolute(inRepo)) return inRepo === '' ? '.' : inRepo;
+  const dir = basename(path);
+  return `${dir.startsWith('differential-cal-') ? '<cal>' : '<scratch>'}/${dir}`;
+}
 
 /** What a run read, case by case (`--record`): judged again without a device by `--rejudge`. */
 export interface RunRecord {

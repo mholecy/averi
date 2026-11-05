@@ -10,7 +10,7 @@ import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
 import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause, withMeasuredPanel } from './lab-device.js';
-import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, summarize, THIS_CHECKOUT } from './live-cases.js';
+import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, sideLabel, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
 import { callReply, isError } from './replies.js';
@@ -70,7 +70,8 @@ import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.j
  *
  * `--side <checkout>` runs another averi's src (a calibration checkout, calibrate.ts's `differential-cal-<sha>`): its
  * tools, registry, iOS adapter and tree source, loaded as scripts/differential/side.ts loads a side — the live
- * calibration of a note (calibration.json `live`) runs its cases at the note's before and after commits.
+ * calibration of a note (calibration.json `live`) runs its cases at the note's before and after commits. The record
+ * names it by a portable label (live-cases.ts#sideLabel), never the host's path.
  *
  * `ensure` (backlog D30, not in the default groups): ensure_state on the held cells — D2's held "no" (ADR 0033) on a
  * device: h1 and h2 (through a spinner phase) with no wipe ahead, the hold ending the second look heldS after Welcome;
@@ -179,7 +180,7 @@ if (rejudging !== undefined) {
   process.exitCode = exitCode;
 } else {
   const results: Result[] = [];
-  const record: RunRecord = { platform, ...(app !== 'native' && { app }), side: values.side ?? THIS_CHECKOUT, results: [] };
+  const record: RunRecord = { platform, ...(app !== 'native' && { app }), side: sideLabel(values.side), results: [] };
   const selected = await selectCases({ platform, app, groups, only, onlyCells });
   const lab = (ios ?? android)!;
   if (platform === 'ios') console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
