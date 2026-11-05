@@ -417,10 +417,17 @@ checks' replies and app states, with the stroke log, some stroke offsets, the dr
 `note` says which), so it pins the judges only and is no device evidence (tests/truth/live-carousel.test.ts); the
 group's first clean live record (lab only) replaces it as evidence, rejudged by tests/truth/live-rejudge.test.ts. Review
 round 1: a ceiling on the hedged acceptance — a run of this checkout whose every judged unaimable leg (lv-d62-control,
-lv-d68-launch, lv-d59b-recycler; 3 or more judged) ends hedged fails, MISMATCH-class (at ADR 0021's ~20 % all three by
-chance is about 0.8 %: D68 reverted), fewer judged is LOUD, "hedged N of M" always printed; lv-d62's legs fail the run
-on a SKIP (skipFails: their premises are the harness's); a pre-drag that fails is the case's SKIP; no carousel clip
-reported is a SKIP, never a MISMATCH.
+lv-d68-launch, lv-d59b-recycler; 3 or more judged) ends hedged fails, MISMATCH-class (ADR 0021's D68 amendment
+measured the hedged bound on ~3 in 10, batch-10 runs 0, 5, 6: all three by chance is about 2.7 %, and the 3 planned
+runs, 9 legs, make chance negligible — D68 reverted), fewer judged (any leg selected, even every one SKIPped) is LOUD
+and counted in the summary's LOUD tally, "hedged N of M" printed whenever a leg ran; lv-d62's legs fail the run on a
+SKIP (skipFails: their premises are the harness's); a pre-drag that fails is the case's SKIP; no carousel clip reported
+is a SKIP, never a MISMATCH. The drop leg also checks D62's retry in its stroke log: the stroke after the dropped one
+must be the same reveal sent again (± 2 px a point; flush-check.ts: "the same reveal is sent again"), else LOUD
+`no-retry`. The carousel group takes no `late` re-read (as the visibility group): a read 3 s on would let a fling or a
+snap finish behind the reply's back, and the stop is judged on the app as scroll_until left it. Not part of T7a, filed
+as a follow-up: a `--side` pre-D62 (0eab7789) calibration run of lv-d62-drop, expecting the false "fully visible", and
+its live-known calibration entry.
 
 ### Alongside
 

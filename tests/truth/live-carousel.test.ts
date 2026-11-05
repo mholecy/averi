@@ -238,7 +238,7 @@ describe('lv-d62 and D68: the hedged bound accepted and counted where unaimable 
   it.each(['lv-d62-control', 'lv-d68-launch', 'lv-d59b-recycler'])('%s: batch-10\'s hedged maxSwipes is ok, accepted under ADR 0021\'s D68 residual', (id) => {
     const r = recorded(id);
     r.replies = [B10.runs[0].reply];
-    expect(verdictOf(r)).toMatchObject({ outcome: 'ok', accepted: D68_SPREAD.residual });
+    expect(verdictOf(r)).toMatchObject({ outcome: 'ok', accepted: D68_SPREAD });
   });
 
   it('the summary counts them against the runs of the cases that accept them', async () => {
@@ -250,6 +250,14 @@ describe('lv-d62 and D68: the hedged bound accepted and counted where unaimable 
     const { lines, exitCode } = summarize({ platform: 'android', sources: ['uiautomator'], results, side: 'this checkout' });
     expect(exitCode).toBe(0);
     expect(lines).toContain(`Accepted under ${D68_SPREAD.residual}: 1 of 2 judged run(s) of lv-d62-control`);
+  });
+
+  it('two residuals in one run are counted apart, each by its id', () => {
+    const other = { id: 'other', residual: 'residual:another' };
+    const row = (id: string, accepted: { id: string; residual: string }) => ({ source: 'uiautomator' as const, c: caseOf(id), verdict: { outcome: 'ok' as const, why: '', accepted }, replies: [] });
+    const { lines } = summarize({ platform: 'android', sources: ['uiautomator'], results: [row('lv-d62-control', D68_SPREAD), row('lv-d68-launch', other)], side: 'this checkout' });
+    expect(lines).toContain(`Accepted under ${D68_SPREAD.residual}: 1 of 1 judged run(s) of lv-d62-control`);
+    expect(lines).toContain('Accepted under residual:another: 1 of 1 judged run(s) of lv-d68-launch');
   });
 
   it('a kind neither expected nor accepted is LOUD (`carousel-kind`), never a MISMATCH: the drop leg ending unaimable, the control ending stuck', () => {
@@ -275,6 +283,28 @@ describe('lv-d62 and D68: the hedged bound accepted and counted where unaimable 
     expect(verdictOf(lost)).toMatchObject({ outcome: 'SKIP', why: 'the app took 4 carousel stroke(s) of the 5 sent: the drop not shown to hold' });
     const doubled = { ...drop, state: { ...drop.state!, strokes: [...drop.state!.strokes!, drop.state!.strokes!.at(-1)!] } };
     expect(verdictOf(doubled)).toMatchObject({ outcome: 'SKIP', why: 'the app took 6 carousel stroke(s) of the 5 sent: the drop not shown to hold' });
+  });
+
+  it('D62\'s retry: the stroke after the dropped one is the same reveal sent again (± CUT_TOLERANCE_PX a point) — none seen is LOUD `no-retry`', () => {
+    const drop = recorded('lv-d62-drop');
+    expect(drop.swipes![2]).toMatchObject({ from: drop.swipes![1].from, to: drop.swipes![1].to, dropped: false });
+    expect(verdictOf(drop).outcome).toBe('ok');
+    const shift = (dx: number, dy: number, end: 'from' | 'to') => {
+      const r = recorded('lv-d62-drop');
+      const p = r.swipes![2][end];
+      r.swipes![2] = { ...r.swipes![2], [end]: { x: p.x + dx, y: p.y + dy } };
+      return verdictOf(r);
+    };
+    expect(shift(2, 0, 'to').outcome).toBe('ok');
+    expect(shift(0, -2, 'from').outcome).toBe('ok');
+    expect(shift(3, 0, 'to')).toMatchObject({ outcome: 'LOUD', cls: 'no-retry', why: expect.stringMatching(/^no retry seen: stroke 3 is not the dropped reveal sent again/) });
+    expect(shift(0, 3, 'from').cls).toBe('no-retry');
+    expect(shift(-3, 0, 'from').cls).toBe('no-retry');
+    expect(shift(0, -3, 'to').cls).toBe('no-retry');
+    const last = recorded('lv-d62-drop');
+    last.swipes = last.swipes!.slice(0, 2);
+    last.state = { ...last.state!, strokes: last.state!.strokes!.slice(0, 2) };
+    expect(verdictOf(last)).toMatchObject({ outcome: 'LOUD', cls: 'no-retry', why: expect.stringMatching(/^no retry seen: no stroke after the dropped one/) });
   });
 });
 
@@ -366,7 +396,7 @@ describe('D37: the first read after a stroke on a snapping pager lists C where i
   });
 });
 
-describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged maxSwipes fails (a D68 revert), ADR 0021\'s ~20 % residual named', () => {
+describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged maxSwipes fails (a D68 revert), ADR 0021\'s measured ~3 in 10 named', () => {
   const HEDGED = B10.runs[0].reply;
   const legsRecord = (hedged: readonly string[], ids: readonly string[] = UNAIMABLE_LEGS): RunRecord => ({
     platform: 'android',
@@ -379,28 +409,31 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
     expect(UNAIMABLE_LEGS).toEqual(['lv-d62-control', 'lv-d68-launch', 'lv-d59b-recycler']);
   });
 
-  it('a D68-revert record (all three hedged): exit 1, MISMATCH-class, "hedged 3 of 3", ~20 % and the 0.8 % chance named', async () => {
+  it('a D68-revert record (all three hedged): exit 1, MISMATCH-class, "hedged 3 of 3", the measured ~3 in 10 and the 2.7 % chance named', async () => {
     const { exitCode, lines } = await run(legsRecord(UNAIMABLE_LEGS));
     expect(exitCode).toBe(1);
     const line = lines.find((l) => l.includes('hedged 3 of 3'));
     expect(line).toMatch(/^MISMATCH \(hedged ceiling\): hedged 3 of 3 judged unaimable leg\(s\)/);
     expect(line).toMatch(/ADR 0021/);
-    expect(line).toMatch(/~20 %/);
-    expect(line).toMatch(/about 0\.8 %/);
+    expect(line).toMatch(/~3 in 10 \(batch-10 runs 0, 5, 6\)/);
+    expect(line).toMatch(/all 3 hedged by chance is about 2\.7 %/);
+    expect(line).toMatch(/the 3 planned runs \(9 legs\) make chance negligible/);
+    expect(line).not.toMatch(/20 %/);
   });
 
   it('2 of 3 hedged: accepted, exit 0, "hedged 2 of 3"; none hedged: "hedged 0 of 3"', async () => {
     const two = await run(legsRecord(['lv-d62-control', 'lv-d59b-recycler']));
     expect(two.exitCode).toBe(0);
-    expect(two.lines).toContain('Hedged ceiling: hedged 2 of 3 judged unaimable leg(s) — within ADR 0021\'s ~20 % residual');
+    expect(two.lines).toContain('Hedged ceiling: hedged 2 of 3 judged unaimable leg(s) — within ADR 0021\'s measured ~3 in 10');
     const none = await run(legsRecord([]));
     expect(none.exitCode).toBe(0);
-    expect(none.lines).toContain('Hedged ceiling: hedged 0 of 3 judged unaimable leg(s) — within ADR 0021\'s ~20 % residual');
+    expect(none.lines).toContain('Hedged ceiling: hedged 0 of 3 judged unaimable leg(s) — within ADR 0021\'s measured ~3 in 10');
   });
 
-  it('more runs: 4 of 4 hedged fails; 5 of 6 passes', async () => {
+  it('more runs: 4 of 4 hedged fails (about 0.81 %); 5 of 6 passes', async () => {
     const four = legsRecord(UNAIMABLE_LEGS, [...UNAIMABLE_LEGS, 'lv-d68-launch']);
     expect((await run(four)).exitCode).toBe(1);
+    expect((await run(four)).lines.some((l) => l.includes('all 4 hedged by chance is about 0.81 %'))).toBe(true);
     const six = legsRecord(UNAIMABLE_LEGS, [...UNAIMABLE_LEGS, ...UNAIMABLE_LEGS]);
     six.results[5].replies = recorded('lv-d59b-recycler').replies;
     const r = await run(six);
@@ -411,12 +444,27 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
   it('fewer than 3 judged legs: LOUD, no pass claimed, the exit untouched — even all hedged; a SKIPped leg is not judged', async () => {
     const two = await run(legsRecord(['lv-d62-control', 'lv-d68-launch'], ['lv-d62-control', 'lv-d68-launch']));
     expect(two.exitCode).toBe(0);
+    expect(two.lines[1]).toBe('# Live golden: 2 cases, 2 ok, 1 loud, 0 mismatches (0 not known), 0 skipped');
     expect(two.lines).toContain('LOUD (hedged ceiling): hedged 2 of 2 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)');
     const skipped = legsRecord(UNAIMABLE_LEGS);
     skipped.results[2].swipes = undefined;
     const r = await run(skipped);
     expect(r.lines).toContain('LOUD (hedged ceiling): hedged 2 of 2 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)');
     expect(r.exitCode).toBe(0);
+  });
+
+  it('every leg selected but SKIPped: "hedged 0 of 0", LOUD, counted in the tally, the exit untouched by it', async () => {
+    const skipped = legsRecord([], ['lv-d68-launch', 'lv-d59b-recycler']);
+    for (const r of skipped.results) r.state = { ...r.state!, scrollViews: {} };
+    const r = await run(skipped);
+    expect(r.lines).toContain('LOUD (hedged ceiling): hedged 0 of 0 judged unaimable leg(s) — fewer than 3 judged, the ceiling unjudged (no pass claimed)');
+    expect(r.lines[1]).toBe('# Live golden: 2 cases, 0 ok, 1 loud, 0 mismatches (0 not known), 2 skipped');
+    expect(r.exitCode).toBe(0);
+  });
+
+  it('3 judged: no LOUD added to the tally', async () => {
+    const r = await run(legsRecord(['lv-d62-control']));
+    expect(r.lines[1]).toBe('# Live golden: 3 cases, 3 ok, 0 loud, 0 mismatches (0 not known), 0 skipped');
   });
 
   it('no leg in the run (another group, or --cases without them): no ceiling line', async () => {
@@ -430,8 +478,14 @@ describe('the hedged ceiling: a run whose every judged unaimable leg ends hedged
     expect(r.lines).toContain('Hedged ceiling: hedged 3 of 3 judged unaimable leg(s) — a --side run, a calibration: not held');
   });
 
-  it('hedgedCeiling, pure: counts only the legs, and only judged ones', () => {
-    const row = (id: string, outcome: 'ok' | 'SKIP' | 'LOUD', hedged: boolean) => ({ id, outcome, ...(hedged && { accepted: D68_SPREAD.residual }) });
+  it('hedgedCeiling, pure: counts only the legs, and only judged ones; the residual by its id, not its words', () => {
+    const row = (id: string, outcome: 'ok' | 'SKIP' | 'LOUD', hedged: boolean) => ({ c: { id }, verdict: { outcome, ...(hedged && { accepted: D68_SPREAD }) } });
+    const reworded = { c: { id: 'lv-d62-control' }, verdict: { outcome: 'ok' as const, accepted: { ...D68_SPREAD, residual: 'other words' } } };
+    expect(hedgedCeiling([reworded, row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'ok', true)], true)).toMatchObject({ fails: true, hedged: 3 });
+    const other = { c: { id: 'lv-d62-control' }, verdict: { outcome: 'ok' as const, accepted: { ...D68_SPREAD, id: 'another' } } };
+    expect(hedgedCeiling([other, row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'ok', true)], true)).toMatchObject({ fails: false, hedged: 2 });
+    expect(hedgedCeiling([row('lv-d62-control', 'SKIP', false)], true)).toMatchObject({ loud: true, judged: 0 });
+    expect(hedgedCeiling([row('d52-e2', 'ok', false)], true)).toMatchObject({ loud: false, lines: [] });
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'LOUD', false), row('lv-d62-drop', 'ok', false)], true)).toMatchObject({ fails: false, hedged: 2, judged: 3 });
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'ok', true), row('lv-d62-drop', 'ok', false)], true)).toMatchObject({ fails: true, hedged: 3, judged: 3 });
     expect(hedgedCeiling([row('lv-d62-control', 'ok', true), row('lv-d68-launch', 'ok', true), row('lv-d59b-recycler', 'SKIP', false)], true)).toMatchObject({ fails: false, hedged: 2, judged: 2 });

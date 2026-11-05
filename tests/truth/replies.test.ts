@@ -4,8 +4,8 @@ import { everyNode, type PresentationKind, type Rect } from '../../src/adapters/
 import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
-import { describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid } from '../../scripts/truth/replies.js';
+import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
+import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid } from '../../scripts/truth/replies.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 
@@ -159,6 +159,8 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
   it('each phrase it keys on is written in src/interact/scroll-text.ts', () => {
     const source = readFileSync(new URL('../../src/interact/scroll-text.ts', import.meta.url), 'utf8');
     for (const words of CAROUSEL_REPLY_WORDS) expect(source).toContain(words);
+    expect(MAX_SWIPES).toBe('(maxSwipes)');
+    expect(boundText({ of: 'maxSwipes' }, 6).endsWith(MAX_SWIPES)).toBe(true);
     expect(source).toContain('`fully visible by the tree after ${n}`');
   });
 });

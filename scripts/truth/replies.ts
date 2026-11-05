@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { boundText } from '../../src/interact/scroll-text.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, KEYBOARD_UNLISTED, NO_ID_LISTED } from '../../src/ui-tree/miss.js';
 
 /**
@@ -228,20 +229,28 @@ export const refusedAfterDismissal = (reply: string) => /was not tapped: after .
 // --- a carousel's `fully: true` reply (T7a, the carousel group: live-carousel.ts) ---
 
 /**
- * The words carouselReply keys on, each as src/interact/scroll-text.ts writes it (inline there, no constant to import:
- * tests/truth/replies.test.ts holds every one to that file): the unaimable stop's end (#unaimableText, D68), the unfit
- * stop's remedy (#unfitText, D52), the bound's `(maxSwipes)` (#boundText), the flush cut a probe proved (#flushCutText,
- * the hedge D62 keeps), the unchecked flush clause of a stop (#flushText), and the inferred axis (#unfitText, D59).
+ * The bound's own words, derived from src's exported builder (src/interact/scroll-text.ts#boundText: `after N swipes
+ * (maxSwipes)`): its parenthesis.
+ */
+const bound = boundText({ of: 'maxSwipes' }, 1);
+export const MAX_SWIPES = bound.slice(bound.indexOf('('));
+
+/**
+ * The other words carouselReply keys on, pinned, each as src/interact/scroll-text.ts writes it: no export there
+ * produces them alone — they are inline in unexported builders (#unaimableText, #unfitText, #flushCutText) reached only
+ * through a whole ScrollOutcome, or (the unchecked flush clause) inside #flushText's sentence around a container's rect
+ * — so tests/truth/replies.test.ts holds each one to that file and drives the builders that write them. The unaimable
+ * stop's end (D68), the unfit stop's remedy (D52), the flush cut a probe proved (the hedge D62 keeps), the unchecked
+ * flush clause of a stop, and the inferred axis (D59).
  */
 export const CAROUSEL_REPLY_WORDS = [
   'more swipes are unlikely to help',
   '— drop fully: true, or accept what it shows',
-  '(maxSwipes)',
   'so it may still be cut there',
   'it may be cut there',
   '(the tree does not say which way it scrolls: ',
 ] as const;
-const [UNAIMABLE, UNFIT, MAX_SWIPES, PROVEN_CUT, UNCHECKED_CUT, INFERRED_AXIS] = CAROUSEL_REPLY_WORDS;
+const [UNAIMABLE, UNFIT, PROVEN_CUT, UNCHECKED_CUT, INFERRED_AXIS] = CAROUSEL_REPLY_WORDS;
 
 /**
  * What a carousel's `scroll_until … fully: true` replied, from a closed set (T7a; the carousel judges read it): `unaimable`

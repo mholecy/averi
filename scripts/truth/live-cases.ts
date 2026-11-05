@@ -706,9 +706,11 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
   const fixed = ofThisCheckout ? cleared.filter((r) => knownEntry(platform, r.source, r.c.id)?.intermittent !== true) : [];
   /** A case whose SKIP proves nothing (Case.skipFails: the ensure cases, live-ensure.ts): the run fails on it. */
   const failingSkips = results.filter((r) => r.c.skipFails === true && r.verdict.outcome === 'SKIP');
+  /** The carousel group's ceiling on the hedged acceptance (live-carousel.ts#hedgedCeiling): its LOUD counts in the tally. */
+  const ceiling = hedgedCeiling(results, ofThisCheckout);
   const lines = [
     `<!-- averi: ${side}${rejudgedFrom !== undefined ? ` (rejudged from ${rejudgedFrom})` : ''} -->`,
-    `# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD')} loud, ${count('MISMATCH')} mismatches (${unknown.length} not known), ${count('SKIP')} skipped`,
+    `# Live golden: ${results.length} cases, ${count('ok')} ok, ${count('LOUD') + (ceiling.loud ? 1 : 0)} loud, ${count('MISMATCH')} mismatches (${unknown.length} not known), ${count('SKIP')} skipped`,
     '',
   ];
   for (const source of sources) {
@@ -733,14 +735,14 @@ export function summarize({ platform, sources, results, side, rejudgedFrom }: { 
   if (failingSkips.length > 0) lines.push(`SKIPPED where a skip proves nothing — the run fails: ${failingSkips.map((r) => `${r.source} ${r.c.id}`).join(', ')}`, '');
   // An ok on a reply accepted under a residual (LiveVerdict.accepted): counted, per residual, against the runs of the
   // cases that accept it.
-  for (const residual of [...new Set(results.flatMap((r) => (r.verdict.accepted === undefined ? [] : [r.verdict.accepted])))]) {
-    const ids = new Set(results.filter((r) => r.verdict.accepted === residual).map((r) => r.c.id));
+  const residuals = new Map(results.flatMap((r) => (r.verdict.accepted === undefined ? [] : [[r.verdict.accepted.id, r.verdict.accepted.residual] as const])));
+  for (const [id, residual] of residuals) {
+    const ids = new Set(results.filter((r) => r.verdict.accepted?.id === id).map((r) => r.c.id));
     const of = results.filter((r) => ids.has(r.c.id) && r.verdict.outcome !== 'SKIP');
-    const counted = results.filter((r) => r.verdict.accepted === residual);
+    const counted = results.filter((r) => r.verdict.accepted?.id === id);
     lines.push(`Accepted under ${residual}: ${counted.length} of ${of.length} judged run(s) of ${[...ids].join(', ')}`, '');
   }
-  // The carousel group's ceiling on that acceptance (live-carousel.ts#hedgedCeiling): every judged unaimable leg hedged fails the run.
-  const ceiling = hedgedCeiling(results.map((r) => ({ id: r.c.id, outcome: r.verdict.outcome, ...(r.verdict.accepted !== undefined && { accepted: r.verdict.accepted }) })), ofThisCheckout);
+  // The ceiling's line: every judged unaimable leg hedged fails the run.
   if (ceiling.lines.length > 0) lines.push(...ceiling.lines, '');
   return { lines, exitCode: unknown.length > 0 || fixed.length > 0 || failingSkips.length > 0 || ceiling.fails ? 1 : 0 };
 }

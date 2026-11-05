@@ -3,6 +3,7 @@ import { pause } from './lab-device.js';
 import { short } from './live-forms.js';
 import { strokesSince, type LiveVerdict } from './live-visibility.js';
 import { carouselReply, inferredAxisSaid, isError, replyKind, snapshotNodes, swipesOf, type CarouselReply } from './replies.js';
+import type { Case } from './live-cases.js';
 import { labId, labSelector, type LabState, type Rect } from './schema.js';
 import { TOUCH_SLACK } from './truth.js';
 
@@ -110,14 +111,16 @@ export interface PreDragged {
 export const PRE_DRAG_MS = 1_000;
 export const PRE_DRAG_SETTLE_MS = 1_200;
 
+/** A point on the clip's mid-line, `along` its width (0 its left edge, 1 its right), in whole px: the probes' strokes. */
+export const onMidLine = (clip: Rect, along: number): Point => ({ x: Math.round(clip.x + clip.width * along), y: Math.round(clip.y + clip.height / 2) });
+
 /**
  * The probes' pre-drag (D52's E2, D59's, lv-d62's): a slow drag left along the clip's middle, from 85 % of its width,
  * `px` long — C left cut at the clip's right edge.
  */
 export function preDragStroke(clip: Rect, px: number): { from: Point; to: Point; durationMs: number } {
-  const y = Math.round(clip.y + clip.height / 2);
-  const x = Math.round(clip.x + clip.width * 0.85);
-  return { from: { x, y }, to: { x: x - px, y }, durationMs: PRE_DRAG_MS };
+  const from = onMidLine(clip, 0.85);
+  return { from, to: { x: from.x - px, y: from.y }, durationMs: PRE_DRAG_MS };
 }
 
 /** What the pre-drag needs of the lab: a raw stroke (lab-device.ts#AndroidLab.swipe) and the app's state. */
@@ -128,7 +131,8 @@ export interface PreDragLab {
 
 /**
  * The pre-drag on the carousel the launch reported, then the state the calls start from: read once it settled, and
- * the launch's own cell — else the run stops (a pre-drag that left the app is no premise for any case).
+ * the launch's own cell — else it throws (a pre-drag that left the app is no premise for any case), and
+ * preDragOrSkip makes that the case's SKIP.
  */
 export async function preDrag(lab: PreDragLab, launch: LabState, px: number, wait: (ms: number) => Promise<unknown> = pause): Promise<{ preDrag: PreDragged; launched: LabState }> {
   const clip = launch.scrollViews?.carousel;
@@ -192,18 +196,26 @@ export interface DeviceLog {
   swipes?: readonly SwipeEntry[];
 }
 
-export type CarouselJudge = (state: LabState, replies: string[], source: string, launched: LabState, after: readonly (LabState | undefined)[], log?: DeviceLog) => LiveVerdict;
+export type CarouselJudge = Case['judge'];
 
-/** A reply kind accepted, not expected: ok, and counted under its residual (live-cases.ts#summarize). */
+/**
+ * A reply kind accepted, not expected: ok, and counted under its residual (live-cases.ts#summarize) — known by its
+ * `id` (the hedged ceiling compares ids), said by its `residual` (live-known.ts's wording).
+ */
 export interface Accepted {
+  id: string;
   kind: CarouselReply;
   residual: string;
 }
 
+/** The share of D68_SPREAD's runs ADR 0021's D68 amendment measured hedged: 3 of batch-10's 10 (runs 0, 5, 6). */
+export const HEDGED_RATE = 0.3;
+
 /** ADR 0021's D68 residual: the room at the bound within a pixel of the least carry keeps `maxSwipes`, hedged (~3 in 10). */
 export const D68_SPREAD: Accepted = {
+  id: 'D68-spread',
   kind: 'maxSwipes-hedged',
-  residual: 'residual:ADR 0021 D68 — the room left at the bound within a pixel of the least carry keeps maxSwipes, hedged (batch-10 runs 0, 5, 6)',
+  residual: 'residual:ADR 0021 D68 — the room left at the bound within a pixel of the least carry keeps maxSwipes, hedged: measured ~3 in 10 (batch-10 runs 0, 5, 6)',
 };
 
 /** What a `fully: true` carousel case expects. */
@@ -222,6 +234,16 @@ export interface FullyExpect {
   dropped?: number;
   /** D59b: every stroke drawn inside the carousel's band, and the carousel took one at least. */
   inBand?: true;
+}
+
+/** Why the stroke after the `dropped`th is not that stroke sent again (D62's retry), or undefined when it is. */
+function noRetry(swipes: readonly SwipeEntry[], dropped: number): string | undefined {
+  const [held, next] = [swipes[dropped - 1], swipes[dropped]];
+  if (next === undefined) return 'no stroke after the dropped one';
+  const near = (p: Point, q: Point) => Math.abs(p.x - q.x) <= CUT_TOLERANCE_PX && Math.abs(p.y - q.y) <= CUT_TOLERANCE_PX;
+  if (near(held.from, next.from) && near(held.to, next.to)) return undefined;
+  const text = (s: SwipeEntry) => `(${s.from.x},${s.from.y})→(${s.to.x},${s.to.y})`;
+  return `stroke ${dropped + 1} is not the dropped reveal sent again (${text(next)}, not ${text(held)})`;
 }
 
 /**
@@ -249,6 +271,10 @@ export function judgeFully(expect: FullyExpect): CarouselJudge {
       const sent = swipes.filter((s) => !s.dropped).length;
       const taken = carouselStrokes(state, launched).length;
       if (taken !== sent) return { ...base, outcome: 'SKIP', why: `the app took ${taken} carousel stroke(s) of the ${sent} sent: the drop not shown to hold` };
+      // D62's retry (flush-check.ts: a held reveal after a carried proof is doubted and "the same reveal is sent again"):
+      // the stroke after the dropped one is that reveal, its points within CUT_TOLERANCE_PX.
+      const retry = noRetry(swipes, expect.dropped);
+      if (retry !== undefined) return { ...base, outcome: 'LOUD', cls: 'no-retry', why: `no retry seen: ${retry}: ${short(reply)}` };
     }
     if (expect.inBand === true) {
       const swipes = log?.swipes;
@@ -269,7 +295,7 @@ export function judgeFully(expect: FullyExpect): CarouselJudge {
       }
       return { ...base, outcome: 'ok', why: `${kind}, ${cutText(state)}: ${short(reply)}` };
     }
-    if (expect.accepted?.kind === kind) return { ...base, outcome: 'ok', accepted: expect.accepted.residual, why: `${kind}, accepted and counted (${expect.accepted.residual}), ${cutText(state)}: ${short(reply)}` };
+    if (expect.accepted?.kind === kind) return { ...base, outcome: 'ok', accepted: expect.accepted, why: `${kind}, accepted and counted (${expect.accepted.residual}), ${cutText(state)}: ${short(reply)}` };
     return { ...base, outcome: 'LOUD', cls: 'carousel-kind', why: `${kind}, not ${expect.kinds.join(' or ')}: ${short(reply)}` };
   };
 }
@@ -326,62 +352,62 @@ export interface CarouselCase {
   judge: CarouselJudge;
 }
 
-const RF = 'carousel-recycler-free';
-const LF = 'carousel-lazy-free';
+const RECYCLER_FREE = 'carousel-recycler-free';
+const LAZY_FREE = 'carousel-lazy-free';
 const fullyC = (cell: string, direction: 'left' | 'right') => ({ tool: 'scroll_until' as const, args: { selector: `id:${labId(cell, 'C')}`, direction, fully: true } });
 /** The probes' pre-drag length, px. */
 export const PRE_DRAG_PX = 440;
 /** D37's stroke: across 60 % of the lab's clip at its middle, forward (the finger left), 300 ms — d37-snap's short one. */
 const snapStroke = (() => {
-  const y = Math.round(LAB_CAROUSEL.y + LAB_CAROUSEL.height / 2);
-  return { fromX: Math.round(LAB_CAROUSEL.x + LAB_CAROUSEL.width * 0.8), fromY: y, toX: Math.round(LAB_CAROUSEL.x + LAB_CAROUSEL.width * 0.2), toY: y, durationMs: 300 };
+  const [from, to] = [onMidLine(LAB_CAROUSEL, 0.8), onMidLine(LAB_CAROUSEL, 0.2)];
+  return { fromX: from.x, fromY: from.y, toX: to.x, toY: to.y, durationMs: 300 };
 })();
 
 export const CAROUSEL_CASES: readonly CarouselCase[] = [
   {
     id: 'lv-d62-control',
-    cell: RF,
+    cell: RECYCLER_FREE,
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
     skipFails: true,
     says: 'D62/D68 control: after the 440-px pre-drag, fully: true left on the RecyclerView card: `unaimable` (hedged maxSwipes accepted, counted: ADR 0021 D68), never "fully visible" with C cut',
-    calls: [fullyC(RF, 'left')],
+    calls: [fullyC(RECYCLER_FREE, 'left')],
     judge: judgeFully({ kinds: ['unaimable'], accepted: D68_SPREAD, cutBefore: true }),
   },
   {
     id: 'lv-d62-drop',
-    cell: RF,
+    cell: RECYCLER_FREE,
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
     dropSwipe: 2,
     skipFails: true,
     says: "D62: the same with the call's second stroke (its first reveal) dropped, resolved as drawn: maxSwipes hedged (\"may still be cut\"), never \"fully visible\" with C cut",
-    calls: [fullyC(RF, 'left')],
+    calls: [fullyC(RECYCLER_FREE, 'left')],
     judge: judgeFully({ kinds: ['maxSwipes-hedged'], cutBefore: true, dropped: 2 }),
   },
   {
     id: 'lv-d68-launch',
-    cell: RF,
+    cell: RECYCLER_FREE,
     platforms: ['android'],
     says: 'D68: from a fresh launch, fully: true right on the RecyclerView card: `unaimable` (hedged maxSwipes accepted, counted), never "fully visible" with C cut',
-    calls: [fullyC(RF, 'right')],
+    calls: [fullyC(RECYCLER_FREE, 'right')],
     judge: judgeFully({ kinds: ['unaimable'], accepted: D68_SPREAD }),
   },
   {
     id: 'lv-d59b-lazy',
-    cell: LF,
+    cell: LAZY_FREE,
     platforms: ['android'],
     says: "D59b/D59: from a fresh launch (C not in the tree), fully: true right on the LazyRow card: every stroke inside the carousel's band, which takes them; `unfit` with the inferred-axis clause",
-    calls: [fullyC(LF, 'right')],
+    calls: [fullyC(LAZY_FREE, 'right')],
     judge: judgeFully({ kinds: ['unfit'], inferred: true, inBand: true }),
   },
   // The same call as lv-d68-launch, kept as its own case: the second sample of the hedged ceiling (UNAIMABLE_LEGS).
   {
     id: 'lv-d59b-recycler',
-    cell: RF,
+    cell: RECYCLER_FREE,
     platforms: ['android'],
     says: "D59b/D68: the same on the RecyclerView card: every stroke inside the band, which takes them; `unaimable` (hedged maxSwipes accepted, counted)",
-    calls: [fullyC(RF, 'right')],
+    calls: [fullyC(RECYCLER_FREE, 'right')],
     judge: judgeFully({ kinds: ['unaimable'], accepted: D68_SPREAD, inBand: true }),
   },
   {
@@ -411,38 +437,43 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
 /** The legs that expect `unaimable` and accept the hedged bound (D68_SPREAD): the ceiling's samples, one a run each. */
 export const UNAIMABLE_LEGS: readonly string[] = ['lv-d62-control', 'lv-d68-launch', 'lv-d59b-recycler'];
 
-/** The fewest judged legs the ceiling is judged on: at ~20 % a leg, all three hedged by chance is 0.2³ ≈ 0.8 %. */
+/** The fewest judged legs the ceiling is judged on: at HEDGED_RATE a leg, all three hedged by chance is 0.3³ ≈ 2.7 %. */
 export const CEILING_MIN_LEGS = 3;
 
-/** A result as the ceiling reads it (live-cases.ts#Result, flattened). */
-export interface CeilingRow {
-  id: string;
-  outcome: LiveVerdict['outcome'];
-  accepted?: string;
+/** A run's result as the ceiling reads it (live-cases.ts#Result: its case's id, its verdict). */
+export interface CeilingResult {
+  c: { id: string };
+  verdict: Pick<LiveVerdict, 'outcome' | 'accepted'>;
 }
 
+/** `p` as a percentage, two significant digits: 2.7, 0.81. */
+const percent = (p: number) => `${Number((p * 100).toPrecision(2))} %`;
+
 /**
- * The ceiling on D68_SPREAD's acceptance: ADR 0021 accepts the hedged bound on ~20 % of the unaimable legs, so a run
- * whose every judged leg (not SKIP) ended hedged — CEILING_MIN_LEGS or more — reads as D68's stop reverted, not as
- * chance (about 0.8 % with three): MISMATCH-class, the run fails (`fails`; held only in a run of this checkout — a
- * `--side` one is a calibration). Fewer judged: LOUD, no pass claimed, the exit untouched. Always "hedged N of M"; no
- * line when the run judged no leg.
+ * The ceiling on D68_SPREAD's acceptance (live-cases.ts#summarize hands it the run's results): ADR 0021's D68
+ * amendment measured the hedged bound on ~3 in 10 of the unaimable legs (HEDGED_RATE), so a run whose every judged leg
+ * (not SKIP) ended hedged — CEILING_MIN_LEGS or more — reads as D68's stop reverted, not as chance (about 2.7 % with
+ * three; the 3 planned runs, 9 legs, make it negligible): MISMATCH-class, the run fails (`fails`; held only in a run of
+ * this checkout — a `--side` one is a calibration). Fewer judged — any leg selected, even every one SKIPped: LOUD
+ * (`loud`, counted in the summary's tally), no pass claimed, the exit untouched. "hedged N of M" whenever a leg was in
+ * the run; no line when none was.
  */
-export function hedgedCeiling(rows: readonly CeilingRow[], ofThisCheckout: boolean): { lines: string[]; fails: boolean; hedged: number; judged: number } {
-  const judgedLegs = rows.filter((r) => UNAIMABLE_LEGS.includes(r.id) && r.outcome !== 'SKIP');
-  const hedged = judgedLegs.filter((r) => r.accepted === D68_SPREAD.residual).length;
+export function hedgedCeiling(results: readonly CeilingResult[], ofThisCheckout: boolean): { lines: string[]; fails: boolean; loud: boolean; hedged: number; judged: number } {
+  const legs = results.filter((r) => UNAIMABLE_LEGS.includes(r.c.id));
+  const judgedLegs = legs.filter((r) => r.verdict.outcome !== 'SKIP');
+  const hedged = judgedLegs.filter((r) => r.verdict.accepted?.id === D68_SPREAD.id).length;
   const judged = judgedLegs.length;
+  const said = (line: string, more: { fails?: true; loud?: true } = {}) => ({ lines: [line], fails: more.fails === true, loud: more.loud === true, hedged, judged });
   const count = `hedged ${hedged} of ${judged} judged unaimable leg(s)`;
-  if (judged === 0) return { lines: [], fails: false, hedged, judged };
-  if (!ofThisCheckout) return { lines: [`Hedged ceiling: ${count} — a --side run, a calibration: not held`], fails: false, hedged, judged };
-  if (judged < CEILING_MIN_LEGS) return { lines: [`LOUD (hedged ceiling): ${count} — fewer than ${CEILING_MIN_LEGS} judged, the ceiling unjudged (no pass claimed)`], fails: false, hedged, judged };
+  if (legs.length === 0) return { lines: [], fails: false, loud: false, hedged, judged };
+  if (!ofThisCheckout) return said(`Hedged ceiling: ${count} — a --side run, a calibration: not held`);
+  if (judged < CEILING_MIN_LEGS) return said(`LOUD (hedged ceiling): ${count} — fewer than ${CEILING_MIN_LEGS} judged, the ceiling unjudged (no pass claimed)`, { loud: true });
   if (hedged === judged) {
-    return {
-      lines: [`MISMATCH (hedged ceiling): ${count} — ADR 0021's D68 residual accepts the hedged bound on ~20 % of them, and all ${judged} hedged by chance is about ${(0.2 ** judged * 100).toFixed(1)} %: D68's unaimable stop looks reverted — the run fails`],
-      fails: true,
-      hedged,
-      judged,
-    };
+    return said(
+      `MISMATCH (hedged ceiling): ${count} — ADR 0021's D68 amendment measured the hedged bound on ~3 in 10 (batch-10 runs 0, 5, 6), ` +
+        `and all ${judged} hedged by chance is about ${percent(HEDGED_RATE ** judged)} (the 3 planned runs (9 legs) make chance negligible): D68's unaimable stop looks reverted — the run fails`,
+      { fails: true },
+    );
   }
-  return { lines: [`Hedged ceiling: ${count} — within ADR 0021's ~20 % residual`], fails: false, hedged, judged };
+  return said(`Hedged ceiling: ${count} — within ADR 0021's measured ~3 in 10`);
 }

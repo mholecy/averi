@@ -92,11 +92,13 @@ export type VerdictClass =
   | 'window-cut'
   | 'entry-not-bare'
   // The carousel group (live-carousel.ts, T7a): "fully visible" while C is cut; a reply of another kind than the case's;
-  // strokes drawn outside the carousel's band (D59b); a first read after a stroke that disagrees with the pager at rest (D37).
+  // strokes drawn outside the carousel's band (D59b); a first read after a stroke that disagrees with the pager at rest (D37);
+  // the drop leg with no D62 retry seen in its stroke log.
   | 'fully-cut'
   | 'carousel-kind'
   | 'off-band'
-  | 'unsettled-read';
+  | 'unsettled-read'
+  | 'no-retry';
 
 export interface LiveVerdict {
   outcome: Outcome;
@@ -111,7 +113,7 @@ export interface LiveVerdict {
    * An ok verdict on a reply the case does not expect but accepts under a residual (its note, live-known.ts's wording):
    * counted in the summary (live-cases.ts#summarize) — the carousel group's hedged maxSwipes (live-carousel.ts#D68_SPREAD).
    */
-  accepted?: string;
+  accepted?: { id: string; residual: string };
 }
 
 /** What a tap or a stroke made the app log: every event but the touches and focus changes (tap, dismissed, button, tab, select, submit). */

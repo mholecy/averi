@@ -13,7 +13,6 @@ import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause, withMeasuredP
 import { hookSwipes, preDragOrSkip, SwipeHook, type PreDragged, type SwipeEntry } from './live-carousel.js';
 import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, sideLabel, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
-import type { LiveVerdict } from './live-visibility.js';
 import { callReply, isError } from './replies.js';
 import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.js';
 
@@ -209,25 +208,25 @@ if (rejudging !== undefined) {
         const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
         if (warmUpError !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
         let launched = await lab.launch(c.cell);
+        /** The case SKIPped before its calls, `why`: its result and its record (no replies, no state; the launch as read). */
+        const skip = (why: string) => {
+          results.push({ source, c, verdict: { outcome: 'SKIP', why }, replies: [] });
+          record.results.push({ source, id: c.id, skip: why, replies: [], launched, after: [], state: undefined, ...(warmUpError !== undefined && { warmUpError }) });
+          console.error(`${source} ${c.id} SKIP: ${why}`);
+        };
         // The carousel group's raw pre-drag (Case.preDrag): the calls start from the state it left. One that failed is
         // the case's SKIP (lv-d62's skipFails then fails the run), never the whole run thrown out.
-        let dragged: PreDragged | undefined;
+        let preDragged: PreDragged | undefined;
         if (c.preDrag !== undefined) {
-          const done = android === undefined ? { skip: 'a pre-drag is the Android lab\'s only' } : await preDragOrSkip(android, launched, c.preDrag);
-          if ('skip' in done) {
-            const verdict: LiveVerdict = { outcome: 'SKIP', why: done.skip };
-            results.push({ source, c, verdict, replies: [] });
-            record.results.push({ source, id: c.id, skip: done.skip, replies: [], launched, after: [], state: undefined });
-            console.error(`${source} ${c.id} SKIP: ${done.skip}`);
+          const preDragRun = android === undefined ? { skip: 'a pre-drag is the Android lab\'s only' } : await preDragOrSkip(android, launched, c.preDrag);
+          if ('skip' in preDragRun) {
+            skip(preDragRun.skip);
             continue;
           }
-          ({ preDrag: dragged, launched } = done);
+          ({ preDrag: preDragged, launched } = preDragRun);
         }
         if (c.keyboard && launched.keyboard?.visible !== true) {
-          const verdict: LiveVerdict = { outcome: 'SKIP', why: platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch' };
-          results.push({ source, c, verdict, replies: [] });
-          record.results.push({ source, id: c.id, skip: verdict.why, replies: [], launched, after: [], state: undefined, ...(warmUpError !== undefined && { warmUpError }) });
-          console.error(`${source} ${c.id} SKIP: ${verdict.why}`);
+          skip(platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch');
           continue;
         }
         // The first of the two device reads the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel).
@@ -238,8 +237,8 @@ if (rejudging !== undefined) {
         const replies: string[] = [];
         const after: (LabState | undefined)[] = [];
         let swipes: SwipeEntry[] | undefined;
-        const logged = c.group === 'carousel';
-        if (logged) swipeHook.arm(c.dropSwipe);
+        const logsSwipes = c.group === 'carousel';
+        if (logsSwipes) swipeHook.arm(c.dropSwipe);
         try {
           for (const [i, call] of c.calls.entries()) {
             replies.push(await callTool(client, call, config));
@@ -247,7 +246,7 @@ if (rejudging !== undefined) {
             if (c.group === 'visibility' && i < c.calls.length - 1) after.push(await lab.state());
           }
         } finally {
-          swipes = logged ? swipeHook.disarm() : undefined;
+          swipes = logsSwipes ? swipeHook.disarm() : undefined;
         }
         await pause(800);
         // Stamped with when it was read (LabState.readAt): the ensure judges ask it.
@@ -265,7 +264,7 @@ if (rejudging !== undefined) {
         const verdict = judged(c, source, replies, launched, after, state, late, swipes);
         if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
         results.push({ source, c, verdict, replies });
-        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUpError !== undefined && { warmUpError }), ...(dragged !== undefined && { preDrag: dragged }), ...(swipes !== undefined && { swipes }) });
+        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUpError !== undefined && { warmUpError }), ...(preDragged !== undefined && { preDrag: preDragged }), ...(swipes !== undefined && { swipes }) });
         console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
       }
     }
