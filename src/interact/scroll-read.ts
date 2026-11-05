@@ -9,6 +9,8 @@ import { sheetDetent, showsProgress, treeFingerprint, type SheetDetent } from '.
 import type { SeenOrder } from '../ui-tree/seen-order.js';
 import type { KeyboardRemedy } from '../ui-tree/soft-keyboard.js';
 import type { CarriedUnder } from './motion-ledger.js';
+import { inferredAlong, type CardMove } from './unfit-axis.js';
+import type { Direction } from './swipe.js';
 import { bandRect, farEdgeFrames, type ScrollViewCut, type Standing, type StandingFacts, type SystemBar, type TouchPurpose } from '../ui-tree/standing.js';
 import type { UsableScreen } from '../ui-tree/usable-screen.js';
 
@@ -482,6 +484,14 @@ export interface Unfit {
   readonly along: ScrollAxis;
   readonly size: number;
   readonly scrollView: UiNode;
+  /** The tree told no axis for `scrollView`: `along` was inferred from this call's evidence (unfit-axis.ts#inferredAlong, D59) — the reply says so. Absent when told. */
+  readonly inferred?: true;
+}
+
+/** What a call has shown of the axis of a scroll view the tree tells none of (unfit-axis.ts#inferredAlong): its direction, and the strokes that moved the judged card (motion-ledger.ts#cardMoves). */
+export interface CallMotion {
+  readonly direction: Direction;
+  readonly moves: readonly CardMove[];
 }
 
 /** The coordinate and the extent of a rect along an axis. */
@@ -504,14 +514,17 @@ export const unfitRoom = ({ along, scrollView }: Unfit): number => scrollView.re
  *   or another frame, not this one;
  * - the room-giving scroll view — the smallest of them along that axis, the nearest of equals — scrolls ON that axis
  *   as the tree tells it: the one exact offset is that scroll view's, and across it no swipe of it moves the target at
- *   all (the stuck and layout-defect sentences stay theirs);
+ *   all (the stuck and layout-defect sentences stay theirs); where the tree tells none (Android's LazyRow,
+ *   RecyclerView, ViewPager2), as the call's own evidence shows it (`call`, unfit-axis.ts#inferredAlong: nearest, the
+ *   call along it, cut at its own edge, a stroke over it that moved the target along it — D59), said `inferred`. A told
+ *   axis is never overruled;
  * - the drawn frame is that scroll view's along the axis, within FIT_ROOM_PX: an outer scroll view's position that
  *   cuts it shorter (a page list scrolled so its carousel runs past its foot) leaves the target more room once the page
  *   moves, so it may yet fit.
  * A pure function of one read: it may hold before any swipe (WDA lists a row where it lies), or only once a stroke
  * brings both sides inside the screen (uiautomator). D52; ADR 0021's amendment "a target too large for its scroll view".
  */
-export function unfitAlong(facts: Pick<StandingFacts, 'clipped' | 'unknownPast' | 'drawn' | 'screen'>, rect: Rect, views: readonly ScrollViewOf[]): Unfit | undefined {
+export function unfitAlong(facts: Pick<StandingFacts, 'clipped' | 'unknownPast' | 'drawn' | 'screen'>, rect: Rect, views: readonly ScrollViewOf[], call?: CallMotion): Unfit | undefined {
   const { drawn, screen, clipped, unknownPast = [] } = facts;
   if (drawn === undefined) return undefined;
   for (const along of ['vertical', 'horizontal'] as const) {
@@ -520,9 +533,14 @@ export function unfitAlong(facts: Pick<StandingFacts, 'clipped' | 'unknownPast' 
     const judgedInDrawn = screen[at] === drawn[at] && screen[extent] === drawn[extent];
     if (!clipped.some(on) || unknownPast.some(on) || !judgedInDrawn) continue;
     const roomGiver = views.reduce<ScrollViewOf | undefined>((least, v) => (least === undefined || v.node.rect[extent] < least.node.rect[extent] ? v : least), undefined);
-    if (roomGiver === undefined || roomGiver.axis !== along) continue;
+    if (roomGiver === undefined) continue;
+    const inferred =
+      roomGiver.axis === undefined &&
+      call !== undefined &&
+      inferredAlong({ along, direction: call.direction, roomGiver: roomGiver.node, nearest: views[0]?.node, clipped, unknownPast, drawn, moves: call.moves });
+    if (roomGiver.axis !== along && !inferred) continue;
     const room = roomGiver.node.rect[extent];
-    if (drawn[extent] >= room - FIT_ROOM_PX && rect[extent] >= room - FIT_ROOM_PX) return { along, size: rect[extent], scrollView: roomGiver.node };
+    if (drawn[extent] >= room - FIT_ROOM_PX && rect[extent] >= room - FIT_ROOM_PX) return { along, size: rect[extent], scrollView: roomGiver.node, ...(inferred && { inferred: true as const }) };
   }
   return undefined;
 }

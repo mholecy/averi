@@ -312,3 +312,136 @@ describe('course.ts#unknownCentreNeeds — what one more stroke needs for a targ
     expect([CUT_EDGE_CARRY, CUT_EDGE_MIN_DRAG, UNKNOWN_CENTRE_MIN_GAP]).toEqual([1.11, 48, 54]);
   });
 });
+
+/**
+ * D59: the same E2 course on a carousel the tree does not say scrolls sideways — the lab's `carousel-lazy-free`, a
+ * Compose LazyRow dumped as a plain `android.view.View` (tests/fixtures/uiautomator-lab-carousel-lazy-free-launch.xml,
+ * no axis: adapters/android.ts's AXIS_BY_CLASS names none). Its axis is inferred from the call's own evidence
+ * (interact/unfit-axis.ts#inferredAlong): the carousel is C's nearest scroll view, the call runs along x, C is cut at
+ * the carousel's own edge, and a stroke over the carousel earlier in this call moved C along x. batch-9's record
+ * (tests/fixtures/d59-b9-lazy-predrag.json) ran 6 strokes and 3 turns to maxSwipes on it.
+ */
+describe('`fully: true` on a card as wide as a carousel of untold axis (D59): unfit once a stroke over it has moved the card along it', () => {
+  const LAZY = readFileSync(new URL('../fixtures/uiautomator-lab-carousel-lazy-free-launch.xml', import.meta.url), 'utf8');
+  const LC = 'lab.carousel-lazy-free.C';
+  const B9 = JSON.parse(readFileSync(new URL('../fixtures/d59-b9-lazy-predrag.json', import.meta.url), 'utf8')) as {
+    runs: { run: number; kind: string; swipes: number; reply: string; listed: { before: Rect; after: Rect }; roomGiver: { rect: Rect; axis: null; nearest: boolean } }[];
+  };
+  const FULLY_LEFT = { ...RULES, direction: 'left' as const, fully: true };
+  const E2_RUN_0 = [574, 231, -102, 45, 189, 131, 76];
+  /** The lazy-free launch tree with C laid in its LazyRow at screen x `cx`, `width` wide, listed cut at the screen's edges (as uiautomator lists it; not cut to the carousel: Compose). */
+  const lazyAt = (cx: number, width = 948, xml = LAZY, id = LC): Row => {
+    const from = Math.max(cx, 0);
+    const to = Math.min(cx + width, 1080);
+    const card = `<node index="0" text="" resource-id="${id}" class="android.view.View" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[${from},380][${to},614]" />`;
+    const laid = xml.replace(/(bounds="\[66,380\]\[1014,614\]") \/>/, `$1>${card}</node>`);
+    if (laid === xml) throw new Error('lazyAt: no LazyRow');
+    const tree = parseDump(laid);
+    const c = [...everyNode(tree)].find((n) => n.identifier === id);
+    if (c === undefined) throw new Error('no C');
+    return { tree, found: [c] };
+  };
+  const replay = (rules: RoundRules & { screen: { width: number; height: number } }, rows: readonly Row[]): ReturnType<typeof play> => {
+    for (let i = 1; i <= rows.length; i++) {
+      const played = play(rules, rows.slice(0, i));
+      if (played.outcome !== undefined) return played;
+    }
+    throw new Error('replay: no stop');
+  };
+
+  it('the record: C as wide as the carousel, which the round saw nearest and of no axis — run 0 maxSwipes after 6 strokes, 3 turns', () => {
+    expect(B9.runs.map((r) => [r.kind, r.swipes])).toEqual([['maxSwipes', 6], ['reached', 6], ['reached', 6]]);
+    for (const r of B9.runs) expect(r.roomGiver).toEqual({ rect: CAROUSEL, axis: null, nearest: true });
+    expect(B9.runs[0].reply).toContain('turned round 3 times');
+    expect(lazyAt(45).found?.[0]?.rect).toEqual({ x: 45, y: 380, width: 948, height: 234 });
+  });
+
+  it("E2's course on it: unfit on the 4th read after 3 strokes, the axis inferred — and the reply says so", () => {
+    const played = replay(FULLY_LEFT, E2_RUN_0.map((x) => lazyAt(x)));
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
+    for (const s of played.steps) if (s.do === 'stroke') expect(s.box).toEqual(CAROUSEL);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 3, unfit: { along: 'horizontal', size: 948, scrollView: { rect: CAROUSEL }, inferred: true } });
+    expect(failureOf(played, `id:"${LC}"`).message).toBe(
+      `scroll_until id:"${LC}" failed after 3 swipes — element is in the viewport but CLIPPED at left: 98% of it is drawn, ` +
+        'and it is 948 wide (tree units), as wide as its scroll view container (66,380 948x234) (the tree does not say which way it scrolls: the swipes over it moved the element sideways): ' +
+        'fully: true holds at one exact scroll offset only, which no swipe can be aimed at — drop fully: true, or accept what it shows. ' +
+        'Last rect {"x":45,"y":380,"width":948,"height":234} in a 1080x2220 viewport',
+    );
+  });
+
+  it("batch-9 run 0's own rects: one stroke from the listed 577 (cut at the screen) to the listed 64 — unfit after 1 swipe, not 6 and 3 turns", () => {
+    const { before, after } = B9.runs[0].listed;
+    const played = replay(FULLY_LEFT, [lazyAt(before.x), lazyAt(after.x)]);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 1, unfit: { along: 'horizontal', size: after.width, inferred: true } });
+  });
+
+  it('runs 1–2 landed at 65 (1 px over the carousel\'s left, within the slack): not unfit — the stop as before', () => {
+    const { before, after } = B9.runs[1].listed;
+    const played = replay(FULLY_LEFT, [lazyAt(before.x), lazyAt(after.x), lazyAt(after.x), lazyAt(after.x), lazyAt(after.x)]);
+    expect(played.outcome?.kind).not.toBe('unfit');
+  });
+
+  it('(4) no stroke yet: C at 45 at the first read, both sides known — no unfit, stroked for (a told axis would stop here)', () => {
+    expect(play(FULLY_LEFT, [lazyAt(45)]).steps.map((s) => s.do)).toEqual(['stroke']);
+  });
+
+  it('(4) the strokes left C where it was (never moved it): no unfit — the course runs on to its own stop', () => {
+    const played = replay(FULLY_LEFT, Array.from({ length: 8 }, () => lazyAt(45)));
+    expect(played.outcome?.kind).not.toBe('unfit');
+  });
+
+  it("(2) a call across the carousel (`down`), C moved sideways by the strokes: no unfit", () => {
+    const played = replay({ ...FULLY_LEFT, direction: 'down' }, E2_RUN_0.map((x) => lazyAt(x)));
+    expect(played.outcome?.kind).not.toBe('unfit');
+  });
+
+  it("(3) C cut at the screen's edge on the read after the stroke (−102: its left side unknown): no unfit yet", () => {
+    const played = play(FULLY_LEFT, [lazyAt(231), lazyAt(-102)]);
+    expect(played.outcome).toBeUndefined();
+  });
+
+  it('a 900-wide card (48 px of room), moved by a stroke: not unfit — stroked for, as before', () => {
+    const played = play(FULLY_LEFT, [lazyAt(231, 900), lazyAt(45, 900)]);
+    expect(played.outcome).toBeUndefined();
+  });
+
+  it('the RecyclerView (View-cut: its card listed cut to the carousel, never clipped past it): no unfit — the flush rule as before (D68\'s slice)', () => {
+    const RECYCLER = readFileSync(new URL('../fixtures/uiautomator-lab-carousel-recycler-free-launch.xml', import.meta.url), 'utf8');
+    const RC = 'lab.carousel-recycler-free.C';
+    /** C at app x `cx`, listed as a View child is: cut to the carousel's 66..1014. */
+    const recyclerAt = (cx: number): Row => {
+      const from = Math.max(cx, 66);
+      return lazyAt(from, Math.min(cx + 948, 1014) - from, RECYCLER, RC);
+    };
+    expect(recyclerAt(66).found?.[0]?.rect).toEqual(CAROUSEL);
+    expect(recyclerAt(45).found?.[0]?.rect).toEqual({ x: 66, y: 380, width: 927, height: 234 });
+    // batch-10 run 0's card x after each stroke (batch-10's D62 runs, ADR 0013's D62 amendment): it creeps toward 66, cut flush, never clipped.
+    const played = replay(FULLY_LEFT, [576, 433, 241, 174, 141, 117, 90].map(recyclerAt));
+    expect(played.outcome?.kind).not.toBe('unfit');
+  });
+
+  it("a LazyColumn (form-picker's list, axis untold, here inset to 40..1040) under a sideways call, its row cut at both of the list's sides and never moved sideways: no unfit — never \"as wide as its scroll view\" across the list's axis", () => {
+    const PICKER = readFileSync(new URL('../fixtures/uiautomator-lab-form-picker.xml', import.meta.url), 'utf8').replace('bounds="[0,221][1080,2154]"', 'bounds="[40,221][1040,2154]"');
+    const LIST: Rect = { x: 40, y: 221, width: 1000, height: 1933 };
+    const rowAt = (y: number): Row => {
+      const tree = parseDump(PICKER);
+      const fo = [...everyNode(tree)].find((n) => n.identifier === 'lab.form-picker.country.FO');
+      if (fo === undefined) throw new Error('no FO');
+      (fo as { rect: Rect }).rect = { x: 20, y, width: 1040, height: 140 };
+      return { tree, found: [fo] };
+    };
+    const still = replay(FULLY_LEFT, Array.from({ length: 8 }, () => rowAt(900)));
+    expect(still.outcome?.kind).not.toBe('unfit');
+    for (const s of still.steps) if (s.do === 'stroke') expect(s.box).toEqual(LIST);
+    // Moved, but up and down (not along the call): no unfit either.
+    const vertical = replay(FULLY_LEFT, [900, 800, 700, 600, 500, 400, 300, 250].map(rowAt));
+    expect(vertical.outcome?.kind).not.toBe('unfit');
+  });
+
+  it('a told axis is unchanged: carousel-in-list (HorizontalScrollView) stops on its first read with both sides known, no inference said', () => {
+    const played = play(FULLY_LEFT, [cAt(40, 1000)]);
+    expect(played.outcome).toMatchObject({ kind: 'unfit', swipes: 0 });
+    expect(played.outcome !== undefined && 'unfit' in played.outcome && played.outcome.unfit).not.toHaveProperty('inferred');
+    expect(failureOf(played, 'C').message).not.toMatch(/does not say which way/);
+  });
+});
