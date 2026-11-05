@@ -8,6 +8,7 @@ import {
   CHECK_EXIT,
   checkExit,
   cellsHand,
+  CHECK_OUTCOME,
   checkHand,
   checkLine,
   checkWhy,
@@ -19,7 +20,6 @@ import {
   handlersOf,
   installedOf,
   isAlways,
-  lastChosenWhy,
   lastChosenOf,
   leaksOf,
   missingHand,
@@ -28,6 +28,7 @@ import {
   sanitizeFixture,
   safeTap,
   shellReadOf,
+  stateFileHand,
   stateHand,
   treeOf,
   unflaggedOf,
@@ -35,6 +36,7 @@ import {
   unreachableOf,
   type AcceptedEntry,
   type Dump,
+  type HandBase,
   type RawAttrs,
   type FocusRead,
   type PreferredRead,
@@ -431,32 +433,35 @@ describe('handlersOf — `cmd package query-activities --brief` counted (batch-1
   });
 });
 
-describe('installedOf — the lab installed, missing or unknown: `adb get-state` first (batch-12.sh, e5_installed; batch-11 int-reinstall-noadb)', () => {
-  const device = ok('device\n');
+describe('unreachableOf and installedOf — `adb get-state` first, then `pm path` (batch-12.sh, e5_installed; batch-11 int-reinstall-noadb)', () => {
   const path = ok('package:/data/app/~~HASH==/dev.averi.lab-HASH==/base.apk\n');
 
-  it('installed: get-state `device`, then `pm path` exit 0 naming the package — with its path', () => {
-    expect(installedOf(device, path)).toEqual({ state: 'installed', path: '/data/app/~~HASH==/dev.averi.lab-HASH==/base.apk' });
-    expect(installedOf(ok('device\r\n'), ok('package:/x/base.apk\r\n'))).toEqual({ state: 'installed', path: '/x/base.apk' });
+  it('unreachable is unknown, never "missing" and never "put back": get-state failing, past its bound, or not `device`', () => {
+    expect(unreachableOf(ok('device\n'))).toBeUndefined();
+    expect(unreachableOf(ok('device\r\n'))).toBeUndefined();
+    expect(unreachableOf(exit(1, '', 'error: no devices/emulators found'))).toBe('adb get-state: exit 1 error: no devices/emulators found');
+    expect(unreachableOf(timedOut)).toBe(`adb get-state: past its bound (exit ${TIMED_OUT})`);
+    expect(unreachableOf(ok('offline\n'))).toBe('adb get-state: offline, not device');
+    expect(unreachableOf(ok('\n'))).toBe('adb get-state: "", not device');
+    expect(unreachableOf({ ...timedOut, code: 0, out: 'device\n' })).toBe('adb get-state: past its bound (exit 0) device');
+  });
+
+  it('installed: `pm path` exit 0 naming the package — with its path', () => {
+    expect(installedOf(path)).toEqual({ state: 'installed', path: '/data/app/~~HASH==/dev.averi.lab-HASH==/base.apk' });
+    expect(installedOf(ok('package:/x/base.apk\r\n'))).toEqual({ state: 'installed', path: '/x/base.apk' });
   });
 
   it('missing only on `pm path` exit 1 with nothing said', () => {
-    expect(installedOf(device, exit(1))).toEqual({ state: 'missing' });
-    expect(installedOf(device, exit(1, '\n'))).toEqual({ state: 'missing' });
-  });
-
-  it('unreachable is unknown, never "missing" and never "put back": get-state failing, past its bound, or not `device`', () => {
-    expect(installedOf(exit(1, '', 'error: no devices/emulators found'))).toEqual({ state: 'unknown', why: 'adb get-state: exit 1 error: no devices/emulators found' });
-    expect(installedOf(timedOut)).toEqual({ state: 'unknown', why: `adb get-state: past its bound (exit ${TIMED_OUT})` });
-    expect(installedOf(ok('offline\n'), path)).toEqual({ state: 'unknown', why: 'adb get-state: offline, not device' });
-    expect(installedOf(device)).toEqual({ state: 'unknown', why: 'pm path was not read' });
+    expect(installedOf(exit(1))).toEqual({ state: 'missing' });
+    expect(installedOf(exit(1, '\n'))).toEqual({ state: 'missing' });
   });
 
   it('any other `pm path` answer is unknown: exit 1 with words, another exit, past its bound, exit 0 naming no package', () => {
-    expect(installedOf(device, exit(1, '', 'cmd: Failure calling service package'))).toEqual({ state: 'unknown', why: 'pm path: exit 1 cmd: Failure calling service package' });
-    expect(installedOf(device, exit(255))).toEqual({ state: 'unknown', why: 'pm path: exit 255' });
-    expect(installedOf(device, { ...timedOut, code: 1 })).toEqual({ state: 'unknown', why: 'pm path: past its bound (exit 1)' });
-    expect(installedOf(device, ok('\n'))).toEqual({ state: 'unknown', why: 'pm path: exit 0 but no package: line' });
+    expect(installedOf(exit(1, '', 'cmd: Failure calling service package'))).toEqual({ state: 'unknown', why: 'pm path: exit 1 cmd: Failure calling service package' });
+    expect(installedOf(exit(255))).toEqual({ state: 'unknown', why: 'pm path: exit 255' });
+    expect(installedOf({ ...timedOut, code: 1 })).toEqual({ state: 'unknown', why: 'pm path: past its bound (exit 1)' });
+    expect(installedOf(ok('\n'))).toEqual({ state: 'unknown', why: 'pm path: exit 0 but no package: line' });
+    expect(installedOf(ok('x package:/a/base.apk\n'))).toEqual({ state: 'unknown', why: 'pm path: exit 0 but no package: line' });
   });
 });
 
@@ -478,25 +483,27 @@ describe('sanitizeFixture — no device path or serial in a fixture (d55-b11.ts:
 });
 
 describe('the hand lines — each names the exact step and its commands, every word quoted as a shell reads it back (adb-shell.ts#shellQuote)', () => {
-  const APK = 'lab dir/installed.apk';
-  const THEN = 'node probe.ts --restore';
+  const B: HandBase = { serial: 'LAB-1', apk: 'lab dir/installed.apk', then: 'node probe.ts --restore' };
 
   it('a lab default: uninstall && install of the pulled APK, then the command given (batch-12 e5_check exit 1)', () => {
-    expect(defaultHand('LAB-1', APK, THEN)).toBe(
+    expect(defaultHand(B)).toBe(
       'D55 (Android): a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install \'lab dir/installed.apk\' (clears it; wipes the lab\'s data); then: node probe.ts --restore',
     );
   });
 
   it("unknown inside a reinstall: get-state, then `pm path` once adb answers, the install only if it prints nothing (batch-11.sh's abort; T2 S5 review round 1: its commands named)", () => {
-    expect(unknownInstallHand('LAB-1', APK, THEN)).toBe(
+    expect(unknownInstallHand(B)).toBe(
       "D55 (Android): whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb answers, adb -s LAB-1 get-state (device), then adb -s LAB-1 shell pm path dev.averi.lab; if it prints nothing, adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore",
     );
   });
 
-  it('missing: the install; not proven the pulled APK: its cells.json read by hand; not proven clean: the preferred read and BACK', () => {
-    expect(missingHand('LAB-1', APK, THEN)).toBe("D55 (Android): the lab APK is NOT installed: adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore");
-    expect(cellsHand('LAB-1', APK, 'cells.json', 'its cells.json differs', THEN)).toBe(
+  it('missing; not proven the pulled APK; no state to mark dirty; not proven clean; the state not put back', () => {
+    expect(missingHand(B)).toBe("D55 (Android): the lab APK is NOT installed: adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore");
+    expect(cellsHand(B, 'cells.json', 'its cells.json differs')).toBe(
       "D55 (Android): the installed lab not proven the pulled APK (its cells.json differs): adb -s LAB-1 shell pm path dev.averi.lab, adb -s LAB-1 pull <that path> <a file>, unzip -p <that file> assets/cells.json must equal cells.json; if not, adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore",
+    );
+    expect(stateFileHand(B, 'state dir/state.json', 'missing')).toBe(
+      "D55 (Android): no reinstall without the probe's state file 'state dir/state.json' marked dirty first (missing): write it (node probe.ts --restore), then adb -s LAB-1 uninstall dev.averi.lab && adb -s LAB-1 install 'lab dir/installed.apk'; then: node probe.ts --restore",
     );
     expect(checkHand("it's")).toBe(
       "D55 (Android): the chooser and the preferred activities not proven put back: adb -s 'it'\\''s' shell dumpsys package preferred (no lab entry with mAlways=true may be left); a chooser in front: adb -s 'it'\\''s' shell input keyevent KEYCODE_BACK",
@@ -504,15 +511,17 @@ describe('the hand lines — each names the exact step and its commands, every w
     expect(stateHand('node probe.ts --restore')).toBe("D55 (Android): the lab's state not put back: node probe.ts --restore");
   });
 
-  it("lastChosenWhy: exit 6's words, one text for the cleanup and the abort", () => {
-    expect(lastChosenWhy('chooser no')).toBe('a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): chooser no');
-  });
-
-  it('unreachableOf: undefined only for get-state `device`', () => {
-    expect(unreachableOf(ok('device\n'))).toBeUndefined();
-    expect(unreachableOf(ok('\n'))).toBe('adb get-state: "", not device');
-    expect(unreachableOf(exit(1, '', 'error: no devices'))).toBe('adb get-state: exit 1 error: no devices');
-    expect(unreachableOf({ ...timedOut, code: 0, out: 'device\n' })).toBe('adb get-state: past its bound (exit 0) device');
+  it('CHECK_OUTCOME: one table of each exit\'s word, proof, words and hand lines (T2 S5 code review)', () => {
+    expect(Object.fromEntries(Object.entries(CHECK_OUTCOME).map(([k, v]) => [k, [v.word, v.proven, v.hand(B).length]]))).toEqual({ 0: ['OK', true, 0], 1: ['FAIL', false, 1], 3: ['ERROR', false, 1], 4: ['ERROR', false, 1], 5: ['OK', true, 0], 6: ['WARN', true, 0] });
+    expect(CHECK_OUTCOME[0].words('x')).toBe('x');
+    expect(CHECK_OUTCOME[5].words('x')).toBe('x');
+    expect(CHECK_OUTCOME[6].words('chooser no')).toBe('a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): chooser no');
+    expect(CHECK_OUTCOME[1].words('x')).toBe('a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: x');
+    expect(CHECK_OUTCOME[3].words('x')).toBe('the preferred activities or the focus not proven clean: x');
+    expect(CHECK_OUTCOME[4].words('x')).toBe('the chooser is still in front after BACK and HOME: x');
+    expect(CHECK_OUTCOME[1].hand(B)).toEqual([defaultHand(B)]);
+    expect(CHECK_OUTCOME[3].hand(B)).toEqual([checkHand('LAB-1')]);
+    expect(CHECK_OUTCOME[4].hand(B)).toEqual([checkHand('LAB-1')]);
   });
 
   it('checkWhy is the check line after its word', () => {
@@ -611,9 +620,6 @@ describe('the readers at their edges (T2 S5 mutation round: each test kills a su
     expect(handlersOf(ok('1 activity found:\n    dev.averi.lab/.MainActivity extra\n    dev.averi.lab/.Twin\n'))).toBe(1);
   });
 
-  it("installedOf: `package:` at a line's start only", () => {
-    expect(installedOf(ok('device\n'), ok('x package:/a/base.apk\n'))).toEqual({ state: 'unknown', why: 'pm path: exit 0 but no package: line' });
-  });
 
   it("treeOf: everything after the XML's last `>` is dropped, a stray `<` in it too (which the parser would refuse)", () => {
     expect('why' in treeOf(`${resolverXml()}<x`)).toBe(false);

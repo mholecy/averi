@@ -9,6 +9,8 @@ import {
   adbLine,
   cellsHand,
   CHECK_EXIT,
+  CHECK_OUTCOME,
+  CLIPBOARD_ARGV,
   checkExit,
   checkHand,
   checkLine,
@@ -20,11 +22,11 @@ import {
   handlersOf,
   installedOf,
   LAB_PACKAGE,
-  lastChosenWhy,
   missingHand,
   PREFERRED_ARGV,
   preferredOf,
   ROLE_HOLDERS_ARGV,
+  stateFileHand,
   stateHand,
   safeTap,
   shellReadOf,
@@ -33,6 +35,7 @@ import {
   unreachableOf,
   type AcceptedEntry,
   type CheckExit,
+  type HandBase,
   type FocusRead,
   type Installed,
   type PreferredRead,
@@ -40,7 +43,7 @@ import {
   type TapRefusal,
   type TapTarget,
 } from './lab-chooser.js';
-import { exitText, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
+import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
 import type { Point } from '../../../src/adapters/types.js';
 
 /**
@@ -161,17 +164,30 @@ export async function dismissChooser(emu: LabEmu): Promise<{ backs: number }> {
   return { backs };
 }
 
+/** Why `adb get-state` says the emulator cannot be asked, or undefined when it says `device`. */
+export async function unreachable(emu: LabEmu): Promise<string | undefined> {
+  return unreachableOf(await emu.adb(['get-state']));
+}
+
 /** The lab installed, missing or unknown: `adb get-state` first — unreachable is unknown, and `pm path` is not asked. */
 export async function labInstalled(emu: LabEmu): Promise<Installed> {
-  const state = await emu.adb(['get-state']);
-  const unreachable = unreachableOf(state);
-  if (unreachable !== undefined) return { state: 'unknown', why: unreachable };
-  return installedOf(state, await emu.shell(['pm', 'path', LAB_PACKAGE]));
+  const why = await unreachable(emu);
+  if (why !== undefined) return { state: 'unknown', why };
+  return installedOf(await emu.shell(['pm', 'path', LAB_PACKAGE]));
 }
 
 /** The browser role holder (batch-9's read): API 33 says `Unknown command`, which is unread. */
 export async function readRoleHolders(emu: LabEmu): Promise<ShellRead> {
   return shellReadOf(await emu.shell(ROLE_HOLDERS_ARGV));
+}
+
+/**
+ * The clipboard (batch-9's D43 read): API 33's clipboard service has no shell implementation (`cmd clipboard help`
+ * says `No shell command implementation.`, exit 0), so the read is unread there — never "unchanged". The help is the
+ * read: a release with a getter answers it with its commands, which batch-13 records before any getter is trusted.
+ */
+export async function readClipboard(emu: LabEmu): Promise<ShellRead> {
+  return shellReadOf(await emu.shell(CLIPBOARD_ARGV));
 }
 
 /** The activities handling `url` (batch-11.sh's handlers: shared 2, cell 1), or why not. */
@@ -189,13 +205,13 @@ export type Tapped = { tapped: true; point: Point; why: string } | { tapped: fal
  */
 export async function tapSafely(emu: LabEmu, target: TapTarget, at?: Point): Promise<Tapped> {
   const dump = await emu.adb(['exec-out', 'uiautomator', 'dump', '/dev/tty']);
-  if (dump.code !== 0) return { tapped: false, refusal: 'no-tree', why: `uiautomator dump: ${exitText(dump)}` };
+  if (failedCall(dump)) return { tapped: false, refusal: 'no-tree', why: `uiautomator dump: ${exitText(dump)}` };
   const tree = treeOf(dump.out);
   if ('why' in tree) return { tapped: false, refusal: 'no-tree', why: tree.why };
   const guard = safeTap(tree, target, at);
   if (!guard.ok) return { tapped: false, refusal: guard.refusal, why: guard.why };
   const sent = await emu.shell(['input', 'tap', String(guard.point.x), String(guard.point.y)]);
-  if (sent.code !== 0) return { tapped: false, refusal: 'not-sent', why: `input tap: ${exitText(sent)}` };
+  if (failedCall(sent)) return { tapped: false, refusal: 'not-sent', why: `input tap: ${exitText(sent)}` };
   return { tapped: true, point: guard.point, why: guard.why };
 }
 
@@ -217,27 +233,28 @@ export interface StateRestore {
   command: string;
 }
 
-export interface ReinstallOptions {
+/** What the reinstall and the chooser's window share. */
+export interface LabOptions {
   /** The APK pulled at the lab check (batch-11's `lab/installed.apk`): the one reinstalled. */
   apk: string;
-  /** main's catalog (fixtures/apps/cells.json): the reinstalled APK's `assets/cells.json` must equal it byte for byte. */
+  /** main's catalog (fixtures/apps/cells.json): an installed APK's `assets/cells.json` must equal it byte for byte. */
   catalog: string;
-  /** The probe's state file: marked dirty before the uninstall. */
-  stateFile: string;
-  /** Where the reinstalled APK is pulled to (a fresh `reinstalled[-n].apk`, never overwritten). */
+  /** Where an installed APK is pulled to for that proof (a fresh `reinstalled[-n].apk`, never overwritten). */
   dir: string;
   accepted: readonly AcceptedEntry[];
   progress: ReinstallProgress;
   putBack?: StateRestore;
 }
 
+export interface ReinstallOptions extends LabOptions {
+  /** The probe's state file: marked dirty before the uninstall, or no uninstall. */
+  stateFile: string;
+}
+
 export type Reinstalled = { ok: true; how: string; check: Check } | { ok: false; why: string; hand: string[] };
 
-/** --check's exits after which a reinstall is proven: no lab entry, or only last-chosen ones (accepted or not). */
-const PROVEN_EXITS: ReadonlySet<CheckExit> = new Set([CHECK_EXIT.clean, CHECK_EXIT.accepted, CHECK_EXIT.lastChosen]);
-
-/** What a hand line runs after its own commands: the probe's state restore, else the preferred read again. */
-const thenOf = (emu: LabEmu, putBack: StateRestore | undefined): string => putBack?.command ?? adbLine(emu.serial, ['shell', ...PREFERRED_ARGV]);
+/** What a hand line is built from: the serial, the pulled APK, and after it the probe's restore or the preferred read. */
+const handBaseOf = (emu: LabEmu, o: LabOptions): HandBase => ({ serial: emu.serial, apk: o.apk, then: o.putBack?.command ?? adbLine(emu.serial, ['shell', ...PREFERRED_ARGV]) });
 
 /** A failed state restore's hand lines: its own, else its command. */
 const stateHandOf = (p: Putback & { ok: false }, putBack: StateRestore): string[] => {
@@ -254,19 +271,20 @@ export function freshApkOf(fs: BatchFs, dir: string): string {
 }
 
 /**
- * Clear a lab default by reinstalling the pulled APK (batch-11's d55_reinstall): the chooser dismissed, the probe's
- * state file marked dirty, then uninstall and install (`progress` started — an abort from here asks `adb get-state`
- * and `pm path` before anything else); proven by `pm path`, the reinstalled APK's cells.json equal to main's catalog
- * and --check after exiting 0, 5 or 6 (no lab entry left but last-chosen ones — a chooser up or a read that failed
- * proves nothing: review round 1), only then `progress` proven and the probe's state put back (`putBack`), so its
- * state is written clean only after the proof. Refused, nothing done, with no pulled APK, no catalog to compare with,
- * or a state file that cannot be marked dirty. Each step that fails gets its own hand line. A last-chosen entry is
- * never reinstalled for: no reinstall clears it (batch-11 measured).
+ * Clear a lab default by reinstalling the pulled APK (batch-11's d55_reinstall): the probe's state file marked dirty
+ * first — none there, or one that cannot be marked, and nothing is uninstalled (code review: the protocol needs its
+ * dirty mark) — the chooser dismissed, then uninstall and install (`progress` started — an abort from here asks `adb
+ * get-state` and `pm path` before anything else); proven by `pm path`, the reinstalled APK's cells.json equal to main's
+ * catalog and --check after with an exit that proves the lab put back (CHECK_OUTCOME: 0, 5 or 6 — a chooser up or a
+ * read that failed proves nothing: review round 1), only then `progress` proven and the probe's state put back
+ * (`putBack`), so its state is written clean only after the proof. Refused, nothing done, with no pulled APK or no
+ * catalog to compare with too. Each step that fails gets its own hand line. A last-chosen entry is never reinstalled
+ * for: no reinstall clears it (batch-11 measured).
  */
 export async function clearLabEntry(emu: LabEmu, o: ReinstallOptions): Promise<Reinstalled> {
-  const { fs, serial } = emu;
-  const then = thenOf(emu, o.putBack);
-  const nothingDone = (why: string): Reinstalled => ({ ok: false, why: `${why} — nothing done`, hand: [defaultHand(serial, o.apk, then)] });
+  const { fs } = emu;
+  const base = handBaseOf(emu, o);
+  const nothingDone = (why: string, hand = defaultHand(base)): Reinstalled => ({ ok: false, why: `${why} — nothing done`, hand: [hand] });
   if (!fs.exists(o.apk)) return nothingDone(`no pulled APK at ${nameInLine(o.apk)} to reinstall`);
   const catalog = fs.read(o.catalog);
   if (catalog === undefined) return nothingDone(`the catalog ${nameInLine(o.catalog)} cannot be read, so a reinstall could not be proven`);
@@ -276,29 +294,29 @@ export async function clearLabEntry(emu: LabEmu, o: ReinstallOptions): Promise<R
   } catch (e) {
     marked = firstLineOf(messageOf(e));
   }
-  if (marked !== 'marked' && marked !== 'missing') return nothingDone(`the state file ${nameInLine(o.stateFile)} cannot be marked dirty (${marked})`);
+  if (marked !== 'marked') return nothingDone(`the state file ${nameInLine(o.stateFile)} cannot be marked dirty (${marked})`, stateFileHand(base, o.stateFile, marked));
   await dismissChooser(emu);
   o.progress.step = 'started';
   const notProven = (why: string, installed: Installed, hand: string): Reinstalled => ({ ok: false, why: `the reinstall not proven: ${why}; ${installedText(installed)}`, hand: [hand] });
-  const gone = await emu.adb(['uninstall', LAB_PACKAGE]);
-  if (gone.code !== 0) {
+  const uninstalled = await emu.adb(['uninstall', LAB_PACKAGE]);
+  if (failedCall(uninstalled)) {
     const installed = await labInstalled(emu);
-    const hand = installed.state === 'installed' ? defaultHand(serial, o.apk, then) : installHandOf(emu, o.apk, installed, then);
-    return notProven(`the uninstall failed (${exitText(gone)})`, installed, hand);
+    return notProven(`the uninstall failed (${exitText(uninstalled)})`, installed, installed.state === 'installed' ? defaultHand(base) : installHandOf(base, installed));
   }
-  const put = await emu.adb(['install', o.apk]);
+  const installCall = await emu.adb(['install', o.apk]);
   const installed = await labInstalled(emu);
-  if (installed.state !== 'installed') return notProven(`after the install (${put.code === 0 ? 'exit 0' : exitText(put)})`, installed, installHandOf(emu, o.apk, installed, then));
+  if (installed.state !== 'installed') return notProven(`after the install (${failedCall(installCall) ? exitText(installCall) : 'exit 0'})`, installed, installHandOf(base, installed));
   const cells = await provenCells(emu, installed.path, catalog, o);
-  if (cells !== undefined) return notProven(cells, installed, cellsHand(serial, o.apk, o.catalog, cells, then));
+  if (cells !== undefined) return notProven(cells, installed, cellsHand(base, o.catalog, cells));
   const check = await checkAfterDismissal(emu, o.accepted);
-  if (!PROVEN_EXITS.has(check.exit)) return notProven(`after the reinstall, ${check.line}`, installed, check.exit === CHECK_EXIT.leak ? defaultHand(serial, o.apk, then) : checkHand(serial));
+  const outcome = CHECK_OUTCOME[check.exit];
+  if (!outcome.proven) return notProven(`after the reinstall, ${check.line}`, installed, outcome.hand(base)[0]);
   o.progress.step = 'proven';
-  const stateSaid = marked === 'missing' ? "; WARN the reinstall wiped the lab's data, and the probe recorded no state to put back" : '';
-  const back = o.putBack === undefined || marked === 'missing' ? undefined : await o.putBack.restore(emu.run);
-  if (back !== undefined && !back.ok) return { ok: false, why: `reinstalled and proven, but the lab's state not put back: ${back.why}`, hand: stateHandOf(back, o.putBack!) };
   const how = `uninstalled and reinstalled from ${nameInLine(o.apk)} (pm path ${installed.path}; its ${CELLS_ENTRY} the catalog's); ${check.line}`;
-  return { ok: true, how: `${how}${back === undefined ? stateSaid : `; ${back.how}`}`, check };
+  if (o.putBack === undefined) return { ok: true, how, check };
+  const back = await o.putBack.restore(emu.run);
+  if (!back.ok) return { ok: false, why: `reinstalled and proven, but the lab's state not put back: ${back.why}`, hand: stateHandOf(back, o.putBack) };
+  return { ok: true, how: `${how}; ${back.how}`, check };
 }
 
 /** The install read in words. */
@@ -306,16 +324,15 @@ const installedText = (i: Installed): string =>
   i.state === 'unknown' ? `whether the lab is installed is unknown (${i.why})` : i.state === 'missing' ? 'the lab is NOT installed' : 'the lab is installed';
 
 /** The hand line for a lab not proven installed: unknown (never "missing"), or missing. */
-const installHandOf = (emu: LabEmu, apk: string, i: Exclude<Installed, { state: 'installed' }>, then: string): string =>
-  i.state === 'unknown' ? unknownInstallHand(emu.serial, apk, then) : missingHand(emu.serial, apk, then);
+const installHandOf = (b: HandBase, i: Exclude<Installed, { state: 'installed' }>): string => (i.state === 'unknown' ? unknownInstallHand(b) : missingHand(b));
 
 /** Why the installed APK is not proven the catalog's — not pulled, its cells.json not read, or another — or undefined. */
 async function provenCells(emu: LabEmu, devicePath: string, catalog: string, o: { catalog: string; dir: string }): Promise<string | undefined> {
   const local = freshApkOf(emu.fs, o.dir);
   const pulled = await emu.adb(['pull', devicePath, local]);
-  if (pulled.code !== 0 || !emu.fs.exists(local)) return `the reinstalled APK not pulled (${pulled.code === 0 ? 'exit 0 but no file' : exitText(pulled)})`;
+  if (failedCall(pulled) || !emu.fs.exists(local)) return `the reinstalled APK not pulled (${failedCall(pulled) ? exitText(pulled) : 'exit 0 but no file'})`;
   const cells = await emu.run('unzip', ['-p', local, CELLS_ENTRY], { secs: UNZIP_SECS });
-  if (cells.code !== 0) return `${CELLS_ENTRY} not read from the reinstalled APK (unzip: ${exitText(cells)})`;
+  if (failedCall(cells)) return `${CELLS_ENTRY} not read from the reinstalled APK (unzip: ${exitText(cells)})`;
   return cells.out === catalog ? undefined : `the reinstalled APK's ${CELLS_ENTRY} is not the catalog's ${nameInLine(o.catalog)}`;
 }
 
@@ -332,43 +349,24 @@ export interface Cleanup {
 
 /**
  * The block's cleanup (batch-11.sh's D55 cleanup, batch-12's e5_check): --check, BACK and HOME and --check again when
- * a chooser is in front; then by its exit — 0 and 5 OK; 6 a WARN, no RESTORE (no reinstall clears a last-chosen entry,
- * so none is tried: batch-12 fixed batch-11's); 3 and 4 ERROR with a hand line; 1, a lab default, FAIL even when the
- * reinstall clears it ("Always" is never tapped, so a default predates the batch or is a defect), the reinstall's hand
- * lines when it does not.
+ * a chooser is in front; then by its exit, CHECK_OUTCOME's word, words and hand lines — 0 and 5 OK; 6 a WARN, no
+ * RESTORE (no reinstall clears a last-chosen entry, so none is tried: batch-12 fixed batch-11's); 3 and 4 ERROR; 1, a
+ * lab default, FAIL even when the reinstall clears it ("Always" is never tapped, so a default predates the batch or is
+ * a defect), the reinstall's hand lines when it does not.
  */
 export async function cleanUp(emu: LabEmu, o: ReinstallOptions): Promise<Cleanup> {
   const check = await checkAfterDismissal(emu, o.accepted);
-  const why = checkWhy(check.focus, check.preferred, o.accepted);
-  const done = (verdict: Verdict, text: string, hand: string[] = []): Cleanup => ({ verdict, line: verdictLine(CLEANUP_LABEL, verdict, text), hand, check });
-  switch (check.exit) {
-    case CHECK_EXIT.clean:
-    case CHECK_EXIT.accepted:
-      return done('OK', why);
-    case CHECK_EXIT.lastChosen:
-      return done('WARN', lastChosenWhy(why));
-    case CHECK_EXIT.unproven:
-      return done('ERROR', `the preferred activities or the focus not proven clean: ${why}`, [checkHand(emu.serial)]);
-    case CHECK_EXIT.chooser:
-      return done('ERROR', `the chooser is still in front after BACK and HOME: ${why}`, [checkHand(emu.serial)]);
-    case CHECK_EXIT.leak: {
-      const r = await clearLabEntry(emu, o);
-      const left = `a lab default (mAlways=true) was set — "Always" is never tapped, so it predates the batch or is a defect`;
-      return r.ok ? done('FAIL', `${left}; cleared: ${r.how}`) : done('FAIL', `${left}; NOT cleared: ${r.why}`, r.hand);
-    }
-  }
+  const outcome = CHECK_OUTCOME[check.exit];
+  const words = outcome.words(checkWhy(check.focus, check.preferred, o.accepted));
+  const done = (text: string, hand: string[]): Cleanup => ({ verdict: outcome.word, line: verdictLine(CLEANUP_LABEL, outcome.word, text), hand, check });
+  if (check.exit !== CHECK_EXIT.leak) return done(words, outcome.hand(handBaseOf(emu, o)));
+  const r = await clearLabEntry(emu, o);
+  return r.ok ? done(`${words}; cleared: ${r.how}`, []) : done(`${words}; NOT cleared: ${r.why}`, r.hand);
 }
 
 // ------------------------------------------------------------------------------------------------ the window
 
-export interface ChooserWindowOptions {
-  apk: string;
-  /** main's catalog and where to pull to: a lab installed again inside the abort is proven as the reinstall is. */
-  catalog: string;
-  dir: string;
-  accepted: readonly AcceptedEntry[];
-  progress: ReinstallProgress;
-  putBack?: StateRestore;
+export interface ChooserWindowOptions extends LabOptions {
   /** The probe's state file: the abort puts the window back only when it reads clean after (abort.ts). */
   stateFile?: string;
   block?: string;
@@ -376,46 +374,44 @@ export interface ChooserWindowOptions {
   secs?: number;
 }
 
+/** Interrupted inside the reinstall with the install not known: never "missing", never "put back". */
+const unknownDuringReinstall = (b: HandBase, why: string): Putback => ({ ok: false, why: `interrupted during the reinstall: whether the lab is installed is unknown (${why})`, hand: [unknownInstallHand(b)] });
+
 /**
  * The chooser's dirty window (abort.ts): its restore this module's, over the abort's detached runner — `adb get-state`
  * first (unreachable: unknown at once, nothing pressed, never "missing" and never "put back"; review round 1); BACK and
- * HOME; when interrupted inside the reinstall, `pm path`: missing is installed again from the pulled APK, and the lab
- * installed is proven by its cells.json as the reinstall proves it, or not put back; the probe's state put back
- * (`putBack`); then --check (BACK and HOME again on a chooser): 0 and 5 put back, 6 put back with its WARN (the
- * cleanup's words), a default FAIL, the rest ERROR, each with its hand lines. Its hand lines name the exact step.
+ * HOME; when interrupted inside the reinstall, the install read: missing is installed again from the pulled APK, and
+ * the lab installed — again or found so — is proven by its cells.json as the reinstall proves it, or not put back; the
+ * probe's state put back (`putBack`) only after a reinstall started, since only that wipes it (code review); then
+ * --check (BACK and HOME again on a chooser), judged by CHECK_OUTCOME: the cleanup's word and words, exit by exit, a
+ * WARN put back for 6. Its hand lines name the exact step, and an uninstall only for a default measured.
  */
 export function chooserWindow(emu: LabEmu, o: ChooserWindowOptions): WindowSpec {
-  const then = thenOf(emu, o.putBack);
+  const base = handBaseOf(emu, o);
   return {
     async restore(run) {
-      const e = emu.using(run);
-      const state = await e.adb(['get-state']);
-      const unreachable = unreachableOf(state);
-      if (unreachable !== undefined) {
-        return o.progress.step === 'started'
-          ? { ok: false, why: `interrupted during the reinstall: whether the lab is installed is unknown (${unreachable})`, hand: [unknownInstallHand(e.serial, o.apk, then)] }
-          : { ok: false, why: `adb unreachable, so nothing could be read or put back (${unreachable})`, hand: [checkHand(e.serial)] };
-      }
-      await dismissChooser(e);
+      const lab = emu.using(run);
+      const why = await unreachable(lab);
+      if (why !== undefined) return o.progress.step === 'started' ? unknownDuringReinstall(base, why) : { ok: false, why: `adb unreachable, so nothing could be read or put back (${why})`, hand: [checkHand(base.serial)] };
+      await dismissChooser(lab);
       if (o.progress.step === 'started') {
-        const proof = await reinstalledProof(e, o, installedOf(state, await e.shell(['pm', 'path', LAB_PACKAGE])), then);
+        const proof = await reinstalledProof(lab, o, base);
         if (proof !== undefined) return proof;
       }
-      if (o.putBack !== undefined) {
+      let kept = '';
+      if (o.putBack !== undefined && o.progress.step !== 'not started') {
         const back = await o.putBack.restore(run);
         if (!back.ok) return { ...back, hand: stateHandOf(back, o.putBack) };
-      }
-      const check = await checkAfterDismissal(e, o.accepted);
-      const why = checkWhy(check.focus, check.preferred, o.accepted);
-      if (check.exit === CHECK_EXIT.clean || check.exit === CHECK_EXIT.accepted) return { ok: true, how: why };
-      if (check.exit === CHECK_EXIT.lastChosen) return { ok: true, how: lastChosenWhy(why), verdict: 'WARN' };
-      if (check.exit === CHECK_EXIT.leak) return { ok: false, why, hand: [defaultHand(e.serial, o.apk, then)], verdict: 'FAIL' };
-      const left = check.exit === CHECK_EXIT.chooser ? 'the chooser is still in front after BACK and HOME' : 'not proven clean';
-      return { ok: false, why: `${left}: ${why}`, hand: [checkHand(e.serial)] };
+      } else if (o.putBack !== undefined) kept = "; nothing was wiped: the lab's state stays as the probe left it";
+      const check = await checkAfterDismissal(lab, o.accepted);
+      const outcome = CHECK_OUTCOME[check.exit];
+      const words = outcome.words(checkWhy(check.focus, check.preferred, o.accepted));
+      if (outcome.proven) return { ok: true, how: `${words}${kept}`, ...(outcome.word === 'WARN' && { verdict: 'WARN' as const }) };
+      return { ok: false, why: words, hand: outcome.hand(base), ...(outcome.word === 'FAIL' && { verdict: 'FAIL' as const }) };
     },
-    // Read when asked (the abort writes it): inside the reinstall, the install line first.
+    // Read when asked (the abort writes it): inside the reinstall, the install line first; the state restore's command.
     get hand() {
-      return [...(o.progress.step === 'started' ? [unknownInstallHand(emu.serial, o.apk, then)] : []), checkHand(emu.serial), defaultHand(emu.serial, o.apk, then)];
+      return [...(o.progress.step === 'started' ? [unknownInstallHand(base)] : []), checkHand(base.serial), ...(o.putBack === undefined ? [] : [stateHand(o.putBack.command)])];
     },
     ...(o.stateFile !== undefined && { stateFile: o.stateFile }),
     ...(o.block !== undefined && { block: o.block }),
@@ -428,19 +424,19 @@ export function chooserWindow(emu: LabEmu, o: ChooserWindowOptions): WindowSpec 
  * Interrupted inside the reinstall: the lab installed again when missing, then proven the pulled APK by its cells.json;
  * undefined when it is, else the window's outcome, not put back.
  */
-async function reinstalledProof(e: LabEmu, o: ChooserWindowOptions, first: Installed, then: string): Promise<Putback | undefined> {
-  let installed = first;
-  if (installed.state === 'unknown') return { ok: false, why: `interrupted during the reinstall: whether the lab is installed is unknown (${installed.why})`, hand: [unknownInstallHand(e.serial, o.apk, then)] };
+async function reinstalledProof(lab: LabEmu, o: ChooserWindowOptions, base: HandBase): Promise<Putback | undefined> {
+  let installed = await labInstalled(lab);
+  if (installed.state === 'unknown') return unknownDuringReinstall(base, installed.why);
   if (installed.state === 'missing') {
-    await e.adb(['install', o.apk]);
-    installed = await labInstalled(e);
+    await lab.adb(['install', o.apk]);
+    installed = await labInstalled(lab);
     if (installed.state !== 'installed') {
       const said = installed.state === 'unknown' ? `unknown (${installed.why})` : 'still missing';
-      return { ok: false, why: `interrupted during the reinstall: the lab was not installed; after the install it is ${said}`, hand: [installHandOf(e, o.apk, installed, then)] };
+      return { ok: false, why: `interrupted during the reinstall: the lab was not installed; after the install it is ${said}`, hand: [installHandOf(base, installed)] };
     }
   }
-  const catalog = e.fs.read(o.catalog);
-  const cells = catalog === undefined ? `the catalog ${nameInLine(o.catalog)} cannot be read` : await provenCells(e, installed.path, catalog, o);
+  const catalog = lab.fs.read(o.catalog);
+  const cells = catalog === undefined ? `the catalog ${nameInLine(o.catalog)} cannot be read` : await provenCells(lab, installed.path, catalog, o);
   if (cells === undefined) return undefined;
-  return { ok: false, why: `interrupted during the reinstall: the installed lab not proven the pulled APK: ${cells}`, hand: [cellsHand(e.serial, o.apk, o.catalog, cells, then)] };
+  return { ok: false, why: `interrupted during the reinstall: the installed lab not proven the pulled APK: ${cells}`, hand: [cellsHand(base, o.catalog, cells)] };
 }

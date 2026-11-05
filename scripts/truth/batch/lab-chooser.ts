@@ -4,7 +4,7 @@ import { shellQuote } from '../../../src/adapters/adb-shell.js';
 import { everyNode, labelOf, rectCentre, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../../../src/adapters/types.js';
 import { LAB_APP } from '../lab-device.js';
 import type { CallResult } from './bounded.js';
-import { exitText, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
+import { exitText, failedCall, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
 
 /**
  * The lab emulator's "Open with" chooser as values and words, pure (no Run, no file): what lab-emu.ts reads, decides
@@ -34,6 +34,8 @@ export const HAND_PREFIX = 'D55 (Android): ';
 export const PREFERRED_ARGV = ['dumpsys', 'package', 'preferred'] as const;
 /** The browser role holder read (batch-9's d55-probe.ts): API 33 has no such command — unread, never unchanged. */
 export const ROLE_HOLDERS_ARGV = ['cmd', 'role', 'get-role-holders', 'android.app.role.BROWSER'] as const;
+/** The clipboard read (batch-9's D43 probe asked its help first): API 33 has no shell implementation — unread. */
+export const CLIPBOARD_ARGV = ['cmd', 'clipboard', 'help'] as const;
 /** How far a given tap point may lie from its target's centre (batch-12's guardRow1: ±2 px). */
 export const CENTRE_SLACK_PX = 2;
 
@@ -87,7 +89,7 @@ function labEntryOf(e: OpenEntry): LabEntry | undefined {
  * command's output), is unread.
  */
 export function preferredOf(r: CallResult): PreferredRead {
-  if (r.code !== 0 || r.timedOut) return { state: 'unread', why: `${PREFERRED_ARGV.join(' ')}: ${exitText(r)}` };
+  if (failedCall(r)) return { state: 'unread', why: `${PREFERRED_ARGV.join(' ')}: ${exitText(r)}` };
   let users = 0;
   let inBlock = false;
   let open: OpenEntry | undefined;
@@ -116,8 +118,10 @@ export function preferredOf(r: CallResult): PreferredRead {
   return users === 0 ? { state: 'unread', why: 'no `Preferred Activities User N:` block in the dump' } : { state: 'read', users, lab };
 }
 
-/** The leaks: a lab default (`mAlways=true`), or an entry with no mAlways line — never assumed harmless. */
-export const leaksOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always !== false);
+/** The leaks: the lab's defaults (`mAlways=true`). */
+export const leaksOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === true);
+/** Entries with no mAlways line: neither a default nor last-chosen as read — they cannot be compared, so unproven. */
+export const unflaggedOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === undefined);
 /** The last-chosen entries "Just once" writes (`mAlways=false`): no default; AOSP 13's uninstall does not clear them. */
 export const lastChosenOf = (p: { lab: readonly LabEntry[] }): LabEntry[] => p.lab.filter((e) => e.always === false);
 
@@ -143,7 +147,7 @@ export const chooserOf = (f: FocusRead): string | undefined => (f.state === 'rea
  * focus line: its grep exits 1 when nothing matched, which proves no "no chooser".
  */
 export function focusOf(r: CallResult): FocusRead {
-  if (r.code !== 0 || r.timedOut) return { state: 'unread', why: `the focus read: ${exitText(r)}` };
+  if (failedCall(r)) return { state: 'unread', why: `the focus read: ${exitText(r)}` };
   if (!/mCurrentFocus=|mFocusedApp=/.test(r.out)) return { state: 'unread', why: 'the focus read holds no mCurrentFocus= or mFocusedApp= line' };
   return { state: 'read', chooser: chooserInFocus(r.out) };
 }
@@ -152,8 +156,9 @@ export function focusOf(r: CallResult): FocusRead {
 
 /**
  * --check's exits (d55-b11.ts --check, batch-12's final checkExit, in pure-b12.ts): 0 no lab entry, no chooser; 1 a lab
- * default or an entry with no mAlways line (a leak: "Always" is never tapped, so it predates the batch or is a defect);
- * 3 not proven (a read failed, no Preferred Activities block); 4 a chooser in front; 5 only last-chosen entries, every
+ * default (a leak: "Always" is never tapped, so it predates the batch or is a defect); 3 not proven (a read failed, no
+ * Preferred Activities block, or a lab entry with no mAlways line — one that cannot be compared never triggers a
+ * reinstall: code review); 4 a chooser in front; 5 only last-chosen entries, every
  * one accepted; 6 a last-chosen entry not accepted (no default — a WARN, never a RESTORE: no reinstall clears it).
  */
 export const CHECK_EXIT = { clean: 0, leak: 1, unproven: 3, chooser: 4, accepted: 5, lastChosen: 6 } as const;
@@ -163,15 +168,45 @@ export type CheckExit = (typeof CHECK_EXIT)[keyof typeof CHECK_EXIT];
 export function checkExit(focus: FocusRead, preferred: PreferredRead, accepted: readonly AcceptedEntry[]): CheckExit {
   if (preferred.state === 'read' && leaksOf(preferred).length > 0) return CHECK_EXIT.leak;
   if (chooserOf(focus) !== undefined) return CHECK_EXIT.chooser;
-  if (focus.state === 'unread' || preferred.state === 'unread') return CHECK_EXIT.unproven;
+  if (focus.state === 'unread' || preferred.state === 'unread' || unflaggedOf(preferred).length > 0) return CHECK_EXIT.unproven;
   const last = lastChosenOf(preferred);
   if (last.length === 0) return CHECK_EXIT.clean;
   return last.every((e) => acceptedOf(e, accepted) !== undefined) ? CHECK_EXIT.accepted : CHECK_EXIT.lastChosen;
 }
 
-/** Each exit's word: clean and accepted OK, another last-chosen WARN, a default FAIL, the rest ERROR. */
-const CHECK_WORD: Readonly<Record<CheckExit, Verdict>> = { 0: 'OK', 1: 'FAIL', 3: 'ERROR', 4: 'ERROR', 5: 'OK', 6: 'WARN' };
-export const checkWordOf = (exit: CheckExit): Verdict => CHECK_WORD[exit];
+/** What a hand line is built from: the lab's serial, the pulled APK, and the command to run after (`then: …`). */
+export interface HandBase {
+  serial: string;
+  apk: string;
+  then: string;
+}
+
+/**
+ * What each exit means, once, for --check's line, the cleanup and the abort's window alike: its verdict word, whether
+ * it proves the lab put back (a reinstall too), its words around --check's own, and its hand lines.
+ */
+export interface CheckOutcome {
+  word: Verdict;
+  proven: boolean;
+  words(why: string): string;
+  hand(b: HandBase): string[];
+}
+const said = (why: string): string => why;
+const none = (): string[] => [];
+export const CHECK_OUTCOME: Readonly<Record<CheckExit, CheckOutcome>> = {
+  0: { word: 'OK', proven: true, words: said, hand: none },
+  5: { word: 'OK', proven: true, words: said, hand: none },
+  6: {
+    word: 'WARN',
+    proven: true,
+    words: (why) => `a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): ${why}`,
+    hand: none,
+  },
+  1: { word: 'FAIL', proven: false, words: (why) => `a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: ${why}`, hand: (b) => [defaultHand(b)] },
+  3: { word: 'ERROR', proven: false, words: (why) => `the preferred activities or the focus not proven clean: ${why}`, hand: (b) => [checkHand(b.serial)] },
+  4: { word: 'ERROR', proven: false, words: (why) => `the chooser is still in front after BACK and HOME: ${why}`, hand: (b) => [checkHand(b.serial)] },
+};
+export const checkWordOf = (exit: CheckExit): Verdict => CHECK_OUTCOME[exit].word;
 
 /** How much of an entry's text a line quotes, before `…`. */
 const ENTRY_CHARS = 200;
@@ -189,7 +224,8 @@ export function checkWhy(focus: FocusRead, preferred: PreferredRead, accepted: r
   if (preferred.state === 'unread') return `${focusText(focus)}; preferred unread (${preferred.why})`;
   const last = lastChosenOf(preferred);
   const ok = last.filter((e) => acceptedOf(e, accepted) !== undefined).length;
-  const counts = `defaults ${leaksOf(preferred).length}, last-chosen ${last.length}${last.length > 0 ? `, accepted ${ok}` : ''}`;
+  const unflagged = unflaggedOf(preferred).length;
+  const counts = `defaults ${leaksOf(preferred).length}, last-chosen ${last.length}${last.length > 0 ? `, accepted ${ok}` : ''}${unflagged > 0 ? `, no mAlways ${unflagged}` : ''}`;
   const first = preferred.lab.length > 0 ? `; first: ${cut(preferred.lab[0].text, ENTRY_CHARS)}` : '';
   const users = `${preferred.users} user${preferred.users === 1 ? '' : 's'}`;
   return `${focusText(focus)}; preferred read (${users}); lab entries ${preferred.lab.length} (${counts})${first}`;
@@ -211,7 +247,7 @@ export type ShellRead = { state: 'read'; text: string } | { state: 'unread'; why
 const NO_SUCH_COMMAND = /^(?:Unknown command\b.*|No shell command implementation\.)$/m;
 
 export function shellReadOf(r: CallResult): ShellRead {
-  if (r.code !== 0 || r.timedOut) return { state: 'unread', why: exitText(r) };
+  if (failedCall(r)) return { state: 'unread', why: exitText(r) };
   const said = NO_SUCH_COMMAND.exec(`${r.out}\n${r.err}`.replace(/\r/g, ''));
   if (said !== null) return { state: 'unread', why: `the device has no such command: ${said[0]}` };
   return { state: 'read', text: r.out.replace(/[\r\n]+$/, '') };
@@ -240,7 +276,7 @@ export function comparedLine(label: string, c: ReadCompared): string {
  * must be as many as its `N activities found:` line says (`No activities found` is 0); else why not.
  */
 export function handlersOf(r: CallResult): number | { why: string } {
-  if (r.code !== 0 || r.timedOut) return { why: `query-activities: ${exitText(r)}` };
+  if (failedCall(r)) return { why: `query-activities: ${exitText(r)}` };
   const out = r.out.replace(/\r/g, '');
   if (/^No activities found\s*$/m.test(out)) return 0;
   const said = /^(\d+) activit(?:y|ies) found:\s*$/m.exec(out);
@@ -251,7 +287,7 @@ export function handlersOf(r: CallResult): number | { why: string } {
 
 /** Why `adb get-state` says the emulator cannot be asked (not `device`), or undefined when it can. */
 export function unreachableOf(getState: CallResult): string | undefined {
-  if (getState.code !== 0 || getState.timedOut) return `adb get-state: ${exitText(getState)}`;
+  if (failedCall(getState)) return `adb get-state: ${exitText(getState)}`;
   const state = getState.out.trim();
   return state === 'device' ? undefined : `adb get-state: ${nameInLine(state)}, not device`;
 }
@@ -260,16 +296,13 @@ export function unreachableOf(getState: CallResult): string | undefined {
 export type Installed = { state: 'installed'; path: string } | { state: 'missing' } | { state: 'unknown'; why: string };
 
 /**
- * `adb get-state` first, then `pm path <lab>` (batch-12.sh's e5_installed): get-state not `device` is unknown; then
- * `package:<path>` with exit 0 installed, exit 1 with nothing said missing, anything else unknown.
+ * `pm path <lab>`, asked only once `adb get-state` said `device` (batch-12.sh's e5_installed; lab-emu.ts#labInstalled
+ * asks that first): `package:<path>` with exit 0 installed, exit 1 with nothing said missing, anything else unknown.
  */
-export function installedOf(getState: CallResult, pmPath?: CallResult): Installed {
-  const unreachable = unreachableOf(getState);
-  if (unreachable !== undefined) return { state: 'unknown', why: unreachable };
-  if (pmPath === undefined) return { state: 'unknown', why: 'pm path was not read' };
+export function installedOf(pmPath: CallResult): Installed {
   if (pmPath.timedOut) return { state: 'unknown', why: `pm path: ${exitText(pmPath)}` };
   if (pmPath.code === 1 && `${pmPath.out}${pmPath.err}`.trim() === '') return { state: 'missing' };
-  if (pmPath.code !== 0) return { state: 'unknown', why: `pm path: ${exitText(pmPath)}` };
+  if (failedCall(pmPath)) return { state: 'unknown', why: `pm path: ${exitText(pmPath)}` };
   const path = /^package:(\S+)/m.exec(pmPath.out)?.[1];
   return path === undefined ? { state: 'unknown', why: 'pm path: exit 0 but no package: line' } : { state: 'installed', path };
 }
@@ -324,8 +357,11 @@ export function treeOf(raw: string): Dump | { why: string } {
   // Paired node for node, or not at all: each tag's resource-id must be its node's identifier (src keeps the last
   // segment, none for an empty or missing id).
   const ids = tags.map((t) => attrOf(t, 'resource-id') ?? '');
-  const lag = nodes.findIndex((n, i) => (ids[i].split('/').pop() || null) !== n.identifier);
-  if (lag !== -1) return { why: `the dump's tags and src's tree disagree at node ${lag}: tag resource-id ${JSON.stringify(ids[lag])}, tree identifier ${JSON.stringify(nodes[lag].identifier)}` };
+  const firstMismatch = nodes.findIndex((n, i) => (ids[i].split('/').pop() || null) !== n.identifier);
+  if (firstMismatch !== -1) {
+    const at = firstMismatch;
+    return { why: `the dump's tags and src's tree disagree at node ${at}: tag resource-id ${JSON.stringify(ids[at])}, tree identifier ${JSON.stringify(nodes[at].identifier)}` };
+  }
   const byNode = new Map(nodes.map((n, i) => [n, { resourceId: ids[i], text: attrOf(tags[i], 'text'), contentDesc: attrOf(tags[i], 'content-desc'), enabled: attrOf(tags[i], 'enabled') }]));
   return { root, attrs: (n) => byNode.get(n)! };
 }
@@ -380,6 +416,7 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
     return { node: once[0], name: `button_once (${JSON.stringify(once[0].label)})` };
   }
   const lists = nodes.filter((n) => n.identifier === 'resolver_list');
+  if (lists.length > 1) return refused('not-unique', `${lists.length} resolver_list nodes (need exactly 1)`);
   const rows = lists.length === 1 ? lists[0].children : [];
   // A row's labels: its text1 and text2 (AOSP's resolve_list_item), as chooserSheet reads them.
   const labelsOf = (row: UiNode): string[] => [...everyNode(row)].filter((n) => n.identifier === 'text1' || n.identifier === 'text2').flatMap((n) => labelOf(n) ?? []);
@@ -408,14 +445,14 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
 export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
   const tree = dump.root;
   // src's identifier too (review round 2): a tag read wrong cannot hide an id src read.
-  const always$ = (n: UiNode): boolean => n.identifier === 'button_always' || isAlways(dump.attrs(n));
+  const isAlwaysNode = (n: UiNode): boolean => n.identifier === 'button_always' || isAlways(dump.attrs(n));
   const all = [...everyNode(tree)];
   const found = targetOf(all, target);
   if ('ok' in found) return found;
   const { node, name } = found;
   if (chooserSheet(tree) === undefined) return refused('no-sheet', "the tree is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none)");
   // The target itself, or a label inside it (a row's text1 or text2).
-  if ([...everyNode(node)].some(always$)) return refused('always', `${name} reads as "Always"`);
+  if ([...everyNode(node)].some(isAlwaysNode)) return refused('always', `${name} reads as "Always"`);
   if (node.disabled === true) return refused('disabled', `${name} is disabled`);
   // Fail closed: enabled only when the dump says so (d55-b11.ts and pure-b12.ts read `enabled="true"`).
   if (dump.attrs(node).enabled !== 'true') return refused('enabled-unshown', `${name}: the dump does not say it is enabled`);
@@ -426,7 +463,7 @@ export function safeTap(dump: Dump, target: TapTarget, at?: Point): SafeTap {
     return refused('off-centre', `the point ${pointText(point)} is not ${name}'s centre ${pointText(centre)} within ${CENTRE_SLACK_PX} px`);
   }
   // An ancestor "Always" holds the target, so it overlaps it: refused here too.
-  const always = all.find((n) => always$(n) && overlaps(n.rect, node.rect));
+  const always = all.find((n) => isAlwaysNode(n) && overlaps(n.rect, node.rect));
   if (always !== undefined) {
     return refused('always', contains(always.rect, point) ? `the point ${pointText(point)} is inside "Always" (${nodeText(always)})` : `${name} overlaps "Always" (${nodeText(always)})`);
   }
@@ -454,24 +491,29 @@ export function sanitizeFixture(text: string, serial: string): { ok: boolean; hi
 export const adbLine = (serial: string, words: readonly string[]): string => ['adb', '-s', serial, ...words].map(shellQuote).join(' ');
 
 /** A lab default left: what clears it (batch-12's hand line; the uninstall wipes the lab's data), then `then`. */
-export const defaultHand = (serial: string, apk: string, then: string): string =>
+export const defaultHand = (b: HandBase): string =>
   `${HAND_PREFIX}a lab default (mAlways=true) is set — "Always" is never tapped, so it predates the batch or is a defect: ` +
-  `${adbLine(serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(serial, ['install', apk])} (clears it; wipes the lab's data); then: ${then}`;
+  `${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])} (clears it; wipes the lab's data); then: ${b.then}`;
 
 /** Interrupted inside the reinstall with adb unreachable: whether the lab is installed is unknown, never "missing". */
-export const unknownInstallHand = (serial: string, apk: string, then: string): string =>
+export const unknownInstallHand = (b: HandBase): string =>
   `${HAND_PREFIX}whether the lab is installed is unknown (interrupted during its reinstall, adb unreachable): once adb ` +
-  `answers, ${adbLine(serial, ['get-state'])} (device), then ${adbLine(serial, ['shell', 'pm', 'path', LAB_PACKAGE])}; if it ` +
-  `prints nothing, ${adbLine(serial, ['install', apk])}; then: ${then}`;
+  `answers, ${adbLine(b.serial, ['get-state'])} (device), then ${adbLine(b.serial, ['shell', 'pm', 'path', LAB_PACKAGE])}; if it ` +
+  `prints nothing, ${adbLine(b.serial, ['install', b.apk])}; then: ${b.then}`;
 
 /** The lab proven not installed: install it again. */
-export const missingHand = (serial: string, apk: string, then: string): string => `${HAND_PREFIX}the lab APK is NOT installed: ${adbLine(serial, ['install', apk])}; then: ${then}`;
+export const missingHand = (b: HandBase): string => `${HAND_PREFIX}the lab APK is NOT installed: ${adbLine(b.serial, ['install', b.apk])}; then: ${b.then}`;
 
 /** The installed lab not proven the pulled APK (a pull, an unzip, or its cells.json differing): the proof by hand. */
-export const cellsHand = (serial: string, apk: string, catalog: string, why: string, then: string): string =>
-  `${HAND_PREFIX}the installed lab not proven the pulled APK (${why}): ${adbLine(serial, ['shell', 'pm', 'path', LAB_PACKAGE])}, ` +
-  `${adbLine(serial, ['pull'])} <that path> <a file>, unzip -p <that file> assets/cells.json must equal ${shellQuote(catalog)}; if not, ` +
-  `${adbLine(serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(serial, ['install', apk])}; then: ${then}`;
+export const cellsHand = (b: HandBase, catalog: string, why: string): string =>
+  `${HAND_PREFIX}the installed lab not proven the pulled APK (${why}): ${adbLine(b.serial, ['shell', 'pm', 'path', LAB_PACKAGE])}, ` +
+  `${adbLine(b.serial, ['pull'])} <that path> <a file>, unzip -p <that file> assets/cells.json must equal ${shellQuote(catalog)}; if not, ` +
+  `${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])}; then: ${b.then}`;
+
+/** No reinstall without the probe's state file marked dirty first: the state named, the order to do it in by hand. */
+export const stateFileHand = (b: HandBase, stateFile: string, why: string): string =>
+  `${HAND_PREFIX}no reinstall without the probe's state file ${shellQuote(stateFile)} marked dirty first (${why}): write it ` +
+  `(${b.then}), then ${adbLine(b.serial, ['uninstall', LAB_PACKAGE])} && ${adbLine(b.serial, ['install', b.apk])}; then: ${b.then}`;
 
 /** The chooser or the preferred activities not proven put back: what to read, and what to press. */
 export const checkHand = (serial: string): string =>
@@ -480,6 +522,3 @@ export const checkHand = (serial: string): string =>
 
 /** The probe's state not put back, its restore failing with no hand line of its own: its command. */
 export const stateHand = (command: string): string => `${HAND_PREFIX}the lab's state not put back: ${command}`;
-
-/** Exit 6's words: the cleanup's WARN and the abort's, one text. */
-export const lastChosenWhy = (why: string): string => `a last-chosen entry not accepted (mAlways=false: no default; no reinstall clears it, so none is tried — no RESTORE): ${why}`;

@@ -570,7 +570,7 @@ describe("cleanUp — the block's cleanup by --check's exit (batch-11.sh:539–5
     const fake = fakeEmu({ entries: [{ flag: 'true' }], writes: true });
     const c = await cleanUp(await emuOf(fake), o);
     expect(c.verdict).toBe('FAIL');
-    expect(c.line).toMatch(/^D55 cleanup: FAIL — a lab default \(mAlways=true\) was set — "Always" is never tapped, so it predates the batch or is a defect; cleared: uninstalled and reinstalled from /);
+    expect(c.line).toMatch(/^D55 cleanup: FAIL — a lab default \(mAlways=true\) is set — "Always" is never tapped, so it predates the batch or is a defect: chooser no; .*; cleared: uninstalled and reinstalled from /);
     expect(c.hand).toEqual([]);
     expect(fake.st.entries).toEqual([]);
   });
@@ -631,7 +631,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     const fake = fakeEmu({ installed: false, writes: true });
     const w = await windowOf(fake, { progress: { step: 'started' } });
     expect(await w.restore(fake.run)).toMatchObject({ ok: true });
-    expect(fake.words().filter((x) => /get-state|pm path|^install|^pull/.test(x))).toEqual(['get-state', 'shell pm path dev.averi.lab', `install ${join(dir, 'installed.apk')}`, 'get-state', 'shell pm path dev.averi.lab', `pull ${DEVICE_APK} ${join(dir, 'reinstalled.apk')}`]);
+    expect(fake.words().filter((x) => /get-state|pm path|^install|^pull/.test(x))).toEqual(['get-state', 'get-state', 'shell pm path dev.averi.lab', `install ${join(dir, 'installed.apk')}`, 'get-state', 'shell pm path dev.averi.lab', `pull ${DEVICE_APK} ${join(dir, 'reinstalled.apk')}`]);
   });
 
   it("outside a reinstall, adb unreachable: unknown at once — no key pressed, nothing called put back (T2 S5 review round 1)", async () => {
@@ -674,7 +674,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
       hand: [`D55 (Android): the lab APK is NOT installed: adb -s ${SERIAL} install ${join(dir, 'installed.apk')}; then: adb -s ${SERIAL} shell dumpsys package preferred`],
     });
     let gets = 0;
-    const lost = fakeEmu({ installed: false, writes: true, rules: [(w) => (w[0] === 'get-state' && ++gets > 1 ? exit(1, 'error: closed') : undefined)] });
+    const lost = fakeEmu({ installed: false, writes: true, rules: [(w) => (w[0] === 'get-state' && ++gets > 2 ? exit(1, 'error: closed') : undefined)] });
     expect(await (await windowOf(lost, { progress: { step: 'started' } })).restore(lost.run)).toMatchObject({
       ok: false,
       why: 'interrupted during the reinstall: the lab was not installed; after the install it is unknown (adb get-state: exit 1 error: closed)',
@@ -697,11 +697,11 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(seen).toEqual([true]);
     // With no hand line of its own, the RESTORE line names its command (T2 S5 review round 1).
     const bare = fakeEmu();
-    const w3 = await windowOf(bare, { putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED' })) });
+    const w3 = await windowOf(bare, { progress: { step: 'started' }, putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED' })) });
     expect(await w3.restore(bare.run)).toEqual({ ok: false, why: 'NOT VERIFIED', hand: [`D55 (Android): the lab's state not put back: ${RESTORE_CMD}`] });
     // A restore giving an empty hand: its command too (mutation round).
     const empty = fakeEmu();
-    const w5 = await windowOf(empty, { putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED', hand: [] })) });
+    const w5 = await windowOf(empty, { progress: { step: 'proven' }, putBack: restoreOf(async () => ({ ok: false, why: 'NOT VERIFIED', hand: [] })) });
     expect(await w5.restore(empty.run)).toEqual({ ok: false, why: 'NOT VERIFIED', hand: [`D55 (Android): the lab's state not put back: ${RESTORE_CMD}`] });
     // Inside the reinstall, `pm path` itself not answering: unknown, nothing installed (mutation round).
     const slow = fakeEmu({ writes: true, rules: [(w) => (w[1] === 'pm' ? timedOut : undefined)] });
@@ -717,7 +717,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(await w4.restore(noCat.run)).toMatchObject({ ok: false, why: `interrupted during the reinstall: the installed lab not proven the pulled APK: the catalog ${join(dir, 'none.json')} cannot be read` });
     const ok2 = fakeEmu();
     const w2 = await windowOf(ok2, { putBack: restoreOf(async () => ({ ok: true, how: 'put back' })) });
-    expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: 'chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)' });
+    expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: "chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0); nothing was wiped: the lab's state stays as the probe left it" });
   });
 
   it("outside a reinstall the probe's state restore is not run: nothing was wiped (T2 S5 code review)", async () => {
@@ -752,7 +752,7 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     const aDefault = fakeEmu({ entries: [{ flag: 'true' }] });
     expect(await (await windowOf(aDefault)).restore(aDefault.run)).toMatchObject({ ok: false, verdict: 'FAIL', hand: [expect.stringMatching(/^D55 \(Android\): a lab default/)] });
     const unread = fakeEmu({ rules: [(w) => (w.join(' ') === 'shell dumpsys package preferred' ? exit(1) : undefined)] });
-    expect(await (await windowOf(unread)).restore(unread.run)).toMatchObject({ ok: false, why: expect.stringMatching(/^not proven clean: /), hand: [expect.stringMatching(/^D55 \(Android\): the chooser and/)] });
+    expect(await (await windowOf(unread)).restore(unread.run)).toMatchObject({ ok: false, why: expect.stringMatching(/^the preferred activities or the focus not proven clean: /), hand: [expect.stringMatching(/^D55 \(Android\): the chooser and/)] });
     const stays = fakeEmu({ chooser: Infinity, rules: [(w) => (w.join(' ').endsWith('KEYCODE_HOME') ? ok() : undefined)] });
     expect(await (await windowOf(stays)).restore(stays.run)).toMatchObject({ ok: false, why: expect.stringMatching(/^the chooser is still in front after BACK and HOME: /) });
   });

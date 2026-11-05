@@ -4,6 +4,7 @@ import {
   EXIT,
   exitCodeOf,
   exitText,
+  failedCall,
   failsIn,
   firstLineOf,
   interruptedBlock,
@@ -261,5 +262,12 @@ describe("exitText — a failed call in words, for every module of the batch cor
   it('past its bound says so, with its exit', () => {
     expect(exitText(r(142, '', '', true))).toBe('past its bound (exit 142)');
     expect(exitText(r(142, 'partial', '', true))).toBe('past its bound (exit 142) partial');
+  });
+});
+
+describe('failedCall — one predicate for a failed call (T2 S5 code review)', () => {
+  const r = (code: number, timedOut = false): CallResult => ({ code, timedOut, signal: null, out: '', err: '' });
+  it('any exit but 0, or past its bound whatever its code', () => {
+    expect([failedCall(r(0)), failedCall(r(1)), failedCall(r(255)), failedCall(r(0, true)), failedCall(r(142, true))]).toEqual([false, true, true, true, true]);
   });
 });
