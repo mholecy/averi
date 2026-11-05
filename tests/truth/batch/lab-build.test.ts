@@ -151,6 +151,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     writeFileSync(join(dir, 'jdk17', 'release'), 'JAVA_VERSION="21"\n');
     expect(await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx())).toMatchObject({ ok: false, why: expect.stringContaining('its release says no 17') });
     fresh();
+    rmSync(join(repo, APK_PATH), { force: true });
     const noApk = await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx(async (cmd, args, call) => (args.includes('assembleDebug') ? { code: 0, timedOut: false, signal: null, out: '', err: '' } : runOf(world)(cmd, args, call))));
     expect(noApk).toEqual({ ok: false, why: `the Android build exited 0 but left no APK at ${join(repo, APK_PATH)}` });
     fresh({ builtCells: '{"cells":[]}\n' });
