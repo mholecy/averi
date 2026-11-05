@@ -222,8 +222,8 @@ describe("backup — the state file written dirty before the window's first chan
     const cases: [Rule, string][] = [
       [(_, a) => (a[4] === 'export' && a[5] === A11Y ? exit(5, 'boom') : undefined), `defaults export ${A11Y}: exit 5 boom — no state written`],
       [(_, a) => (a[4] === 'export' ? timedOut : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) — no state written'],
-      [(_, a) => (a[4] === 'export' ? { ...timedOut, err: 'Domain x does not exist' } : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) Domain x does not exist — no state written'],
-      [(_, a) => (a[4] === 'export' ? ok('Domain x does not exist') : undefined), 'defaults export com.apple.keyboard.preferences: exit 0 but no file written — no state written'],
+      [(_, a) => (a[4] === 'export' ? { ...timedOut, code: 1, err: 'Domain com.apple.keyboard.preferences does not exist' } : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 1) Domain com.apple.keyboard.preferences does not exist — no state written'],
+      [(_, a) => (a[4] === 'export' ? ok('Domain com.apple.keyboard.preferences does not exist') : undefined), 'defaults export com.apple.keyboard.preferences: exit 0 but no file written — no state written'],
       [(_, a) => (a[4] === 'export' ? (writeFileSync(a[6], '{}'), timedOut) : undefined), 'defaults export com.apple.keyboard.preferences: past its bound (exit 142) — no state written'],
     ];
     for (const [rule, why] of cases) {
@@ -553,6 +553,30 @@ describe("compare — a late writer after the restore (batch-11 review round 1: 
     expect((await compare(sim, stateFile())).line).toBe(`D43 WDA-window compare: WARN — not compared: the state file ${stateFile()}: it is no state of the simulator domains`);
     expect(readFileSync(stateFile(), 'utf8')).toBe('[]');
     expect(fake.calls).toHaveLength(1);
+  });
+
+  it('a domain absent before that gained a key, a domain that went: before → after names absent on its side', async () => {
+    const domains = before();
+    delete domains['com.apple.Preferences'];
+    const fake = fakeSim({ domains });
+    const sim = await labOf(fake);
+    await backup(sim, stateFile());
+    await restore(sim, stateFile());
+    fake.domains.set('com.apple.Preferences', { late: { t: 'int', c: '1', v: '1' } });
+    fake.domains.delete('com.apple.keyboard.preferences');
+    const c = await compare(sim, stateFile());
+    expect(c.domains[1]).toMatchObject({ outcome: 'changed', changes: ['late absent → int 1'], hand: ['defaults delete com.apple.Preferences late'] });
+    expect(c.domains[0]).toMatchObject({ outcome: 'changed' });
+    expect((c.domains[0] as { changes: string[] }).changes).toContain('AutomaticMinimizationEnabled bool false → absent');
+  });
+
+  it('a state file that is gone when it is to be marked dirty: said, the hand lines kept', async () => {
+    const fake = fakeSim();
+    const sim = await restored(fake);
+    const opened = await LabSim.open(LAB, fake.run, { ...nodeFs, exists: () => false });
+    const c = await compare(opened.ok ? opened.sim : sim, stateFile());
+    expect(c.line).toMatch(/ — the state file could not be marked dirty \(missing\); the hand lines are in RESTORE$/);
+    expect(c.hand).toHaveLength(3);
   });
 
   it('a state file that cannot be marked dirty again is said in the line, never thrown (as the restore says one it cannot clear)', async () => {

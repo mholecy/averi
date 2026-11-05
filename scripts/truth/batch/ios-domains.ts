@@ -643,7 +643,7 @@ function comparison(sim: LabSim, stateFile: string, domains: Compared[]): Compar
   let state: string;
   try {
     const marked = markDirty(sim.fs, stateFile);
-    state = marked === 'marked' ? 'the state file marked dirty again' : `the state file ${marked}`;
+    state = marked === 'marked' ? 'the state file marked dirty again' : `the state file could not be marked dirty (${marked})`;
   } catch (e) {
     // As restore says a state file it cannot clear: the line says it, the hand lines still go to RESTORE.
     state = `the state file could not be marked dirty (${firstLineOf(messageOf(e))})`;
