@@ -10,6 +10,7 @@ import {
   checkHand,
   checkLine,
   checkWhy,
+  chooserOf,
   compareReads,
   comparedLine,
   defaultHand,
@@ -20,6 +21,7 @@ import {
   lastChosenOf,
   leaksOf,
   missingHand,
+  NOT_JUDGED,
   preferredOf,
   sanitizeFixture,
   safeTap,
@@ -188,7 +190,7 @@ describe('focusOf — the chooser in front by src\'s chooserInFocus over CHOOSER
   });
 });
 
-describe('checkExit — --check\'s exits (d55-b11.ts --check, batch-12\'s final pure-b12.ts#checkExit)', () => {
+describe('checkExit — --check\'s exits (d55-b11.ts --check; batch-12\'s final checkExit, in pure-b12.ts)', () => {
   const clean = readOf(BLOCK);
   const lastChosen = readOf(withEntries(labEntry('false')));
   const aDefault = readOf(withEntries(labEntry('true')));
@@ -245,7 +247,7 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
   };
 
   it("batch-11's E2: the twin row by its label, at its centre (540, 1881); row 1 by number at (540, 1727)", () => {
-    expect(safeTap(tree(), { row: 'AveriLab twin' })).toEqual({ ok: true, point: { x: 540, y: 1881 }, why: 'row 2 ("AveriLab twin") at (540, 1881)' });
+    expect(safeTap(tree(), { row: 'AveriLab twin' })).toEqual({ ok: true, point: { x: 540, y: 1881 }, why: 'row 2 ("AveriLab", "AveriLab twin") at (540, 1881)' });
     expect(safeTap(tree(), { row: 1 })).toEqual({ ok: true, point: { x: 540, y: 1727 }, why: 'row 1 ("AveriLab") at (540, 1727)' });
     expect(safeTap(tree(resolverXml(true)), { row: 2 })).toMatchObject({ ok: true, point: { x: 540, y: 1881 } });
   });
@@ -270,14 +272,14 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
     expect(safeTap(tree(), 'once')).toEqual({ ok: false, refusal: 'disabled', why: 'button_once ("Just once") is disabled' });
     expect(safeTap(tree(resolverXml(true)), 'once')).toEqual({ ok: true, point: { x: 723, y: 2058 }, why: 'button_once ("Just once") at (723, 2058)' });
     const rowOff = resolverXml().replace('enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1804][1080,1958]"', 'enabled="false" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1804][1080,1958]"');
-    expect(safeTap(tree(rowOff), { row: 2 })).toEqual({ ok: false, refusal: 'disabled', why: 'row 2 ("AveriLab twin") is disabled' });
+    expect(safeTap(tree(rowOff), { row: 2 })).toEqual({ ok: false, refusal: 'disabled', why: 'row 2 ("AveriLab", "AveriLab twin") is disabled' });
   });
 
   it('the target that reads as "Always" — by id or by text, any case — is refused itself', () => {
     const onceSaysAlways = resolverXml(true).replace('text="Just once"', 'text="ALWAYS"');
     expect(safeTap(tree(onceSaysAlways), 'once')).toEqual({ ok: false, refusal: 'always', why: 'button_once ("ALWAYS") reads as "Always"' });
     const rowSaysAlways = resolverXml().replace('text="AveriLab twin"', 'text="always"');
-    expect(safeTap(tree(rowSaysAlways), { row: 'always' })).toEqual({ ok: false, refusal: 'always', why: 'row 2 ("always") reads as "Always"' });
+    expect(safeTap(tree(rowSaysAlways), { row: 'always' })).toEqual({ ok: false, refusal: 'always', why: 'row 2 ("AveriLab", "always") reads as "Always"' });
   });
 
   it('a point inside an "Always" node, or a target overlapping one, is refused — by its id (a localized label) or its text alone', () => {
@@ -307,15 +309,15 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
   });
 
   it("a point given outside the target, or more than 2 px off its centre (batch-12's row-1 rule), is refused", () => {
-    expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1700 })).toEqual({ ok: false, refusal: 'outside', why: 'the point (540, 1700) is outside row 2 ("AveriLab twin") [0,1804 1080x154]' });
+    expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1700 })).toEqual({ ok: false, refusal: 'outside', why: 'the point (540, 1700) is outside row 2 ("AveriLab", "AveriLab twin") [0,1804 1080x154]' });
     // The rect's far edge is the next node's: outside (half-open).
     expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1958 })).toMatchObject({ ok: false, refusal: 'outside' });
     expect(safeTap(tree(), { row: 2 }, { x: 1080, y: 1881 })).toMatchObject({ ok: false, refusal: 'outside' });
     expect(safeTap(tree(), { row: 2 }, { x: -1, y: 1881 })).toMatchObject({ ok: false, refusal: 'outside' });
     expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1803 })).toMatchObject({ ok: false, refusal: 'outside' });
-    expect(safeTap(tree(), { row: 2 }, { x: 543, y: 1881 })).toEqual({ ok: false, refusal: 'off-centre', why: 'the point (543, 1881) is not row 2 ("AveriLab twin")\'s centre (540, 1881) within 2 px' });
+    expect(safeTap(tree(), { row: 2 }, { x: 543, y: 1881 })).toEqual({ ok: false, refusal: 'off-centre', why: 'the point (543, 1881) is not row 2 ("AveriLab", "AveriLab twin")\'s centre (540, 1881) within 2 px' });
     expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1878 })).toMatchObject({ ok: false, refusal: 'off-centre' });
-    expect(safeTap(tree(), { row: 2 }, { x: 542, y: 1879 })).toEqual({ ok: true, point: { x: 542, y: 1879 }, why: 'row 2 ("AveriLab twin") at (542, 1879)' });
+    expect(safeTap(tree(), { row: 2 }, { x: 542, y: 1879 })).toEqual({ ok: true, point: { x: 542, y: 1879 }, why: 'row 2 ("AveriLab", "AveriLab twin") at (542, 1879)' });
     expect(safeTap(tree(), { row: 2 }, { x: 538, y: 1883 })).toMatchObject({ ok: true });
   });
 
@@ -324,9 +326,11 @@ describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345
       '<node index="3" text="" resource-id="android:id/button_bar_container"',
       '<node index="9" text="" resource-id="android:id/scrim" class="android.view.View" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1700][1080,1900]" /><node index="3" text="" resource-id="android:id/button_bar_container"',
     );
-    expect(safeTap(tree(scrim), { row: 2 })).toEqual({ ok: false, refusal: 'other-node', why: 'the point (540, 1881) lands on scrim, not row 2 ("AveriLab twin")' });
-    // A node inside the target there is the target's (its label), and the list above it takes the click: both fine.
-    expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1881 })).toMatchObject({ ok: true });
+    expect(safeTap(tree(scrim), { row: 2 })).toEqual({ ok: false, refusal: 'other-node', why: 'the point (540, 1881) lands on scrim, not row 2 ("AveriLab", "AveriLab twin")' });
+    // A node inside the target there is the target's (its labels' box widened under the point: hand mutant), and the
+    // list above it takes the click: both fine.
+    const inside = resolverXml().replace('bounds="[132,1825][431,1937]"', 'bounds="[132,1825][1000,1937]"');
+    expect(safeTap(tree(inside), { row: 2 }, { x: 540, y: 1881 })).toMatchObject({ ok: true });
     expect(safeTap(tree(), { row: 'AveriLab twin' }, { x: 541, y: 1882 })).toMatchObject({ ok: true });
   });
 
@@ -410,7 +414,7 @@ describe('handlersOf — `cmd package query-activities --brief` counted (batch-1
   });
 });
 
-describe('installedOf — the lab installed, missing or unknown: `adb get-state` first (batch-12.sh#e5_installed, batch-11 int-reinstall-noadb)', () => {
+describe('installedOf — the lab installed, missing or unknown: `adb get-state` first (batch-12.sh, e5_installed; batch-11 int-reinstall-noadb)', () => {
   const device = ok('device\n');
   const path = ok('package:/data/app/~~HASH==/dev.averi.lab-HASH==/base.apk\n');
 
@@ -488,5 +492,123 @@ describe('the hand lines — each names the exact step, every word quoted as a s
   it('checkWhy is the check line after its word', () => {
     const p = readOf(BLOCK);
     expect(checkLine(launcher, p, [])).toBe(`D55 check: OK — ${checkWhy(launcher, p, [])}`);
+  });
+});
+
+describe('the readers at their edges (T2 S5 mutation round: each test kills a survivor of the first cold run)', () => {
+  const tree = (xml: string): UiNode => {
+    const t = treeOf(xml);
+    if ('why' in t) throw new Error(t.why);
+    return t;
+  };
+  const node = (identifier: string | null, label: string | null): string =>
+    `<node index="9" text="${label ?? ''}" resource-id="${identifier ?? ''}" class="android.view.View" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1850][1080,1900]" />`;
+  const before = (xml: string, inserted: string): string => xml.replace('<node index="3" text="" resource-id="android:id/button_bar_container"', `${inserted}<node index="3" text="" resource-id="android:id/button_bar_container"`);
+
+  it("an entry's blank and space-only lines are its own: mAlways read past them, the text without them", () => {
+    const entry = labEntry('false').replace('         mMatch=', '\n   \n         mMatch=');
+    const p = readOf(withEntries(entry));
+    if (p.state !== 'read') throw new Error('unread');
+    expect(p.lab).toHaveLength(1);
+    expect(p.lab[0].always).toBe(false);
+    expect(p.lab[0].text).toMatch(/^9d3a2b9 dev\.averi\.lab\/\.Twin \| mMatch=0x300000 mAlways=false \| Selected from:/);
+  });
+
+  it("an entry of one line (the block's last) has no mAlways: a leak; trailing spaces on an entry or a header line are no other line", () => {
+    const p = readOf('Preferred Activities User 0:  \n  Schemes:\n      averilab:\n        9d3a2b9 dev.averi.lab/.Twin  \n');
+    expect(p).toEqual({ state: 'read', users: 1, lab: [{ text: '9d3a2b9 dev.averi.lab/.Twin', component: 'dev.averi.lab/.Twin', always: undefined }] });
+  });
+
+  it('indented entry lines before any block header are no block\'s (an output cut at its top)', () => {
+    expect(readOf(`  Schemes:\n${labEntry('true')}\n${BLOCK}`)).toEqual({ state: 'read', users: 1, lab: [] });
+  });
+
+  it("a row's text2 with no text is no label of its name", () => {
+    const xml = resolverXml().replace('text="AveriLab twin"', 'text=""');
+    expect(safeTap(tree(xml), { row: 2 })).toMatchObject({ ok: true, why: 'row 2 ("AveriLab") at (540, 1881)' });
+  });
+
+  it("two entries at one indent are two: the first's text stops at the second's line", () => {
+    const two = labEntry('false').replace('      averilab:\n', '') + '\n' + labEntry('true', 'dev.averi.lab/.Twin', 'pair').replace('      averilab:\n', '');
+    const p = readOf(withEntries(`      averilab:\n${two}`));
+    if (p.state !== 'read') throw new Error('unread');
+    expect(p.lab.map((e) => [e.always, e.authority])).toEqual([[false, 'shared'], [true, 'pair']]);
+    expect(p.lab[0].text).not.toContain('mAlways=true');
+  });
+
+  it('a line that only holds a hash and a component after other words, or words after one, is no entry', () => {
+    const decoys = '      averilab:\n          note: ab dev.averi.lab/.Twin\n        9d3a2b9 dev.averi.lab/.Twin extra\n';
+    expect(readOf(BLOCK.replace('  Schemes:\n', `  Schemes:\n${decoys}`))).toEqual({ state: 'read', users: 1, lab: [] });
+  });
+
+  it('an entry text of exactly 200 characters is quoted whole; one more is cut', () => {
+    const base = labEntry('false').split('\n').slice(1, 3);
+    const text = (filler: string) => [...base, `          ${filler}`].map((l) => l.trim()).join(' | ');
+    const fill = 'x'.repeat(200 - text('').length);
+    const p = readOf(withEntries(['      averilab:', ...base, `          ${fill}`].join('\n')));
+    if (p.state !== 'read') throw new Error('unread');
+    expect(p.lab[0].text).toHaveLength(200);
+    expect(checkLine(launcher, p, []).endsWith(`| ${fill}`)).toBe(true);
+    const q = readOf(withEntries(['      averilab:', ...base, `          ${fill}y`].join('\n')));
+    expect(checkLine(launcher, q, [])).toMatch(/x…$/);
+  });
+
+  it('chooserOf: the read one\'s chooser; an unread read shows none', () => {
+    expect(chooserOf(chooserUp)).toBe('android/com.android.internal.app.ResolverActivity');
+    expect(chooserOf(launcher)).toBeUndefined();
+    expect(chooserOf({ state: 'unread', why: 'x' })).toBeUndefined();
+  });
+
+  it('NOT_JUDGED: no node is drawn over, so src\'s parser widens none (the bounds as dumped)', () => {
+    const t = tree(resolverXml());
+    expect(NOT_JUDGED(t)(t, { x: 0, y: 0, width: 1, height: 1 })).toBe(false);
+  });
+
+  it("shellReadOf: a CRLF answer's words without the CR; the words with more after them, or a trailing line break inside, read", () => {
+    expect(shellReadOf(exit(0, 'Unknown command: get-role-holders\r\n'))).toEqual({ state: 'unread', why: 'the device has no such command: Unknown command: get-role-holders' });
+    expect(shellReadOf(ok('No shell command implementation.\r\n'))).toMatchObject({ state: 'unread' });
+    expect(shellReadOf(ok('No shell command implementation. Use x\n'))).toEqual({ state: 'read', text: 'No shell command implementation. Use x' });
+    expect(shellReadOf(ok('a\nb\n'))).toEqual({ state: 'read', text: 'a\nb' });
+  });
+
+  it('handlersOf: CRLF; the lines whole — none indented or with words after, a header with words before or after, a count of two digits', () => {
+    expect(handlersOf(ok(fixture('query-activities-api33-b10-shared.txt').replace(/\n/g, '\r\n')))).toBe(2);
+    expect(handlersOf(ok('No activities found'))).toBe(0);
+    expect(handlersOf(ok('No activities found  \n'))).toBe(0);
+    expect(handlersOf(ok('x No activities found\n'))).toMatchObject({ why: expect.stringMatching(/no `N activities found:` line/) });
+    expect(handlersOf(ok('No activities found yet\n'))).toMatchObject({ why: expect.stringMatching(/no `N activities found:` line/) });
+    expect(handlersOf(ok('x 1 activity found:\n    dev.averi.lab/.MainActivity\n'))).toMatchObject({ why: expect.stringMatching(/no `N activities found:` line/) });
+    expect(handlersOf(ok('1 activity found: x\n    dev.averi.lab/.MainActivity\n'))).toMatchObject({ why: expect.stringMatching(/no `N activities found:` line/) });
+    expect(handlersOf(ok('1 activity found:  \n    dev.averi.lab/.MainActivity  \n'))).toBe(1);
+    expect(handlersOf(ok(`12 activities found:\n${'    dev.averi.lab/.MainActivity\n'.repeat(12)}`))).toBe(12);
+    expect(handlersOf(ok('1 activity found:\n  x dev.averi.lab/.MainActivity\n    dev.averi.lab/.Twin\n'))).toBe(1);
+    expect(handlersOf(ok('1 activity found:\n    dev.averi.lab/.MainActivity extra\n    dev.averi.lab/.Twin\n'))).toBe(1);
+  });
+
+  it("installedOf: `package:` at a line's start only", () => {
+    expect(installedOf(ok('device\n'), ok('x package:/a/base.apk\n'))).toEqual({ state: 'unknown', why: 'pm path: exit 0 but no package: line' });
+  });
+
+  it("treeOf: everything after the XML's last `>` is dropped, a stray `<` in it too (which the parser would refuse)", () => {
+    expect('why' in treeOf(`${resolverXml()}<x`)).toBe(false);
+  });
+
+  it('"Always" just touching the target — left, above, below — is no overlap; its rect\'s first column and row hold the point', () => {
+    const at = (bounds: string) => tree(resolverXml(true).replace('bounds="[842,1983][1030,2132]"', `bounds="${bounds}"`));
+    for (const b of ['[400,1983][604,2132]', '[604,1900][842,1983]', '[604,2132][842,2200]']) expect(safeTap(at(b), 'once')).toMatchObject({ ok: true });
+    expect(safeTap(at('[723,1983][1030,2132]'), 'once')).toEqual({ ok: false, refusal: 'always', why: 'the point (723, 2058) is inside "Always" (button_always "Always")' });
+    expect(safeTap(at('[604,2058][842,2132]'), 'once')).toEqual({ ok: false, refusal: 'always', why: 'the point (723, 2058) is inside "Always" (button_always "Always")' });
+  });
+
+  it("a row's name is its text1 and text2 only, never another label in it (an icon's content-desc)", () => {
+    const xml = resolverXml().replace(/(resource-id="android:id\/icon"[^>]*?)content-desc=""([^>]*bounds="\[22,1837\]\[110,1925\]")/, '$1content-desc="Twin icon"$2');
+    expect(xml).toContain('content-desc="Twin icon"');
+    expect(safeTap(tree(xml), { row: 2 })).toEqual({ ok: true, point: { x: 540, y: 1881 }, why: 'row 2 ("AveriLab", "AveriLab twin") at (540, 1881)' });
+    expect(safeTap(tree(xml), { row: 'Twin icon' })).toMatchObject({ ok: false, refusal: 'no-target' });
+  });
+
+  it('a node a why names: its label alone with no id, its role with neither', () => {
+    expect(safeTap(tree(before(resolverXml(), node(null, 'always'))), { row: 2 })).toEqual({ ok: false, refusal: 'always', why: 'the point (540, 1881) is inside "Always" ("always")' });
+    expect(safeTap(tree(before(resolverXml(), node(null, null))), { row: 2 })).toEqual({ ok: false, refusal: 'other-node', why: 'the point (540, 1881) lands on other, not row 2 ("AveriLab", "AveriLab twin")' });
   });
 });

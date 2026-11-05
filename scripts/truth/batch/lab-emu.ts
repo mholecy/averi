@@ -11,6 +11,7 @@ import {
   checkHand,
   checkLine,
   checkWhy,
+  chooserOf,
   CLEANUP_LABEL,
   defaultHand,
   focusOf,
@@ -147,10 +148,7 @@ async function checkAfterDismissal(emu: LabEmu, accepted: readonly AcceptedEntry
 /** BACK while a chooser is in front (MAX_BACKS at most), then HOME (d55-b11.ts's restore): how many BACKs it took. */
 export async function dismissChooser(emu: LabEmu): Promise<{ backs: number }> {
   let backs = 0;
-  const chooserUp = async () => {
-    const f = focusOf(await emu.rawShell(CHOOSER_FOCUS_COMMAND));
-    return f.state === 'read' && f.chooser !== undefined;
-  };
+  const chooserUp = async () => chooserOf(focusOf(await emu.rawShell(CHOOSER_FOCUS_COMMAND))) !== undefined;
   while (backs < MAX_BACKS && (await chooserUp())) {
     await emu.key('KEYCODE_BACK');
     backs++;
@@ -172,7 +170,7 @@ export async function readRoleHolders(emu: LabEmu): Promise<ShellRead> {
   return shellReadOf(await emu.shell(ROLE_HOLDERS_ARGV));
 }
 
-/** The activities handling `url` (batch-11.sh#handlers: shared 2, cell 1), or why not. */
+/** The activities handling `url` (batch-11.sh's handlers: shared 2, cell 1), or why not. */
 export async function handlers(emu: LabEmu, url: string): Promise<number | { why: string }> {
   return handlersOf(await emu.shell(['cmd', 'package', 'query-activities', '--brief', '-a', 'android.intent.action.VIEW', '-d', url]));
 }

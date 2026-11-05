@@ -1,7 +1,7 @@
 import { chooserInFocus, chooserSheet } from '../../../src/adapters/android-chooser.js';
 import { parseUiautomatorXml } from '../../../src/adapters/android.js';
 import { shellQuote } from '../../../src/adapters/adb-shell.js';
-import { labelOf, rectCentre, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../../../src/adapters/types.js';
+import { everyNode, labelOf, rectCentre, type DrawnOverStrip, type Point, type Rect, type UiNode } from '../../../src/adapters/types.js';
 import { LAB_APP } from '../lab-device.js';
 import type { CallResult } from './bounded.js';
 import { exitText, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
@@ -59,45 +59,60 @@ const indentOf = (line: string): number => line.length - line.trimStart().length
 const isLab = (component: string, lines: readonly string[]): boolean =>
   component.startsWith(`${LAB_PACKAGE}/`) || lines.some((l) => l.trim() === 'Scheme: "averilab"');
 
-/** The lab entries of one block's lines: each entry its first line and every line indented deeper (or blank) after it. */
-function labEntriesOf(block: readonly string[]): LabEntry[] {
-  const lab: LabEntry[] = [];
-  for (let j = 0; j < block.length; j++) {
-    const m = ENTRY_LINE.exec(block[j]);
-    if (m === null) continue;
-    const entry = [block[j]];
-    for (let k = j + 1; k < block.length && (block[k].trim() === '' || indentOf(block[k]) > m[1].length); k++) entry.push(block[k]);
-    if (!isLab(m[2], entry)) continue;
-    const text = entry
-      .map((l) => l.trim())
-      .filter((l) => l !== '')
-      .join(' | ');
-    // mAlways on the entry's own first line after it (`mMatch=0x300000 mAlways=false`) only, never further down.
-    const flag = /\bmAlways=(true|false)\b/.exec(entry.slice(1).find((l) => l.trim() !== '') ?? '')?.[1];
-    const authority = /Authority: "([^"]+)"/.exec(text)?.[1];
-    lab.push({ text, component: m[2], always: flag === undefined ? undefined : flag === 'true', ...(authority !== undefined && { authority }) });
-  }
-  return lab;
+/** An entry while it is read: its first line's indent and component, and its lines so far. */
+interface OpenEntry {
+  indent: number;
+  component: string;
+  lines: string[];
+}
+
+/** A read entry as a lab entry, or undefined when it does not name the lab. */
+function labEntryOf(e: OpenEntry): LabEntry | undefined {
+  if (!isLab(e.component, e.lines)) return undefined;
+  const text = e.lines
+    .map((l) => l.trim())
+    .filter((l) => l !== '')
+    .join(' | ');
+  // mAlways on the entry's own first line after it (`mMatch=0x300000 mAlways=false`) only, never further down; an entry
+  // of one line has none (`String`: "undefined" holds no mAlways).
+  const flag = /\bmAlways=(true|false)\b/.exec(String(e.lines.slice(1).find((l) => l.trim() !== '')))?.[1];
+  const authority = /Authority: "([^"]+)"/.exec(text)?.[1];
+  return { text, component: e.component, always: flag === undefined ? undefined : flag === 'true', ...(authority !== undefined && { authority }) };
 }
 
 /**
- * The preferred read (d55-b11.ts#preferredOf): only the `Preferred Activities User N:` block(s), each running to the
- * next top-level line. A read that failed, or a dump with no such block (API 33's whole dump cut short, another
+ * The preferred read (d55-b11.ts's preferredOf): only the `Preferred Activities User N:` block(s), each running to the
+ * next top-level line; in a block, each entry is its first line (a hash and a component) and every line after it
+ * indented deeper, or blank. A read that failed, or a dump with no such block (API 33's whole dump cut short, another
  * command's output), is unread.
  */
 export function preferredOf(r: CallResult): PreferredRead {
   if (r.code !== 0 || r.timedOut) return { state: 'unread', why: `${PREFERRED_ARGV.join(' ')}: ${exitText(r)}` };
-  const lines = r.out.replace(/\r/g, '').split('\n');
   let users = 0;
+  let inBlock = false;
+  let open: OpenEntry | undefined;
   const lab: LabEntry[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!BLOCK_HEADER.test(lines[i])) continue;
-    users++;
-    const block: string[] = [];
-    for (i++; i < lines.length && !/^\S/.test(lines[i]); i++) block.push(lines[i]);
-    i--;
-    lab.push(...labEntriesOf(block));
+  const close = (): void => {
+    const e = open === undefined ? undefined : labEntryOf(open);
+    if (e !== undefined) lab.push(e);
+    open = undefined;
+  };
+  for (const line of r.out.replace(/\r/g, '').split('\n')) {
+    if (open !== undefined && (line.trim() === '' || indentOf(line) > open.indent)) {
+      open.lines.push(line);
+      continue;
+    }
+    close();
+    if (BLOCK_HEADER.test(line)) {
+      users++;
+      inBlock = true;
+    } else if (/^\S/.test(line)) inBlock = false;
+    else {
+      const m = inBlock ? ENTRY_LINE.exec(line) : null;
+      if (m !== null) open = { indent: m[1].length, component: m[2], lines: [line] };
+    }
   }
+  close();
   return users === 0 ? { state: 'unread', why: 'no `Preferred Activities User N:` block in the dump' } : { state: 'read', users, lab };
 }
 
@@ -120,6 +135,9 @@ export const acceptedOf = (e: LabEntry, accepted: readonly AcceptedEntry[]): Acc
 /** The focus read: the chooser in front (its component) or not (undefined), or unread with why. */
 export type FocusRead = { state: 'read'; chooser: string | undefined } | { state: 'unread'; why: string };
 
+/** The chooser a read shows in front; none for one unread (it shows nothing). */
+export const chooserOf = (f: FocusRead): string | undefined => (f.state === 'read' ? f.chooser : undefined);
+
 /**
  * CHOOSER_FOCUS_COMMAND's read, judged by android-chooser.ts#chooserInFocus. Read only when it exited 0 and holds a
  * focus line: its grep exits 1 when nothing matched, which proves no "no chooser".
@@ -133,7 +151,7 @@ export function focusOf(r: CallResult): FocusRead {
 // ---------------------------------------------------------------------------------------------------- --check
 
 /**
- * --check's exits (d55-b11.ts --check, batch-12's final pure-b12.ts#checkExit): 0 no lab entry, no chooser; 1 a lab
+ * --check's exits (d55-b11.ts --check, batch-12's final checkExit, in pure-b12.ts): 0 no lab entry, no chooser; 1 a lab
  * default or an entry with no mAlways line (a leak: "Always" is never tapped, so it predates the batch or is a defect);
  * 3 not proven (a read failed, no Preferred Activities block); 4 a chooser in front; 5 only last-chosen entries, every
  * one accepted; 6 a last-chosen entry not accepted (no default — a WARN, never a RESTORE: no reinstall clears it).
@@ -144,7 +162,7 @@ export type CheckExit = (typeof CHECK_EXIT)[keyof typeof CHECK_EXIT];
 /** The exit, batch-12's order: a leak first, then a chooser in front, then a read not proven, then the last-chosen. */
 export function checkExit(focus: FocusRead, preferred: PreferredRead, accepted: readonly AcceptedEntry[]): CheckExit {
   if (preferred.state === 'read' && leaksOf(preferred).length > 0) return CHECK_EXIT.leak;
-  if (focus.state === 'read' && focus.chooser !== undefined) return CHECK_EXIT.chooser;
+  if (chooserOf(focus) !== undefined) return CHECK_EXIT.chooser;
   if (focus.state === 'unread' || preferred.state === 'unread') return CHECK_EXIT.unproven;
   const last = lastChosenOf(preferred);
   if (last.length === 0) return CHECK_EXIT.clean;
@@ -218,7 +236,7 @@ export function comparedLine(label: string, c: ReadCompared): string {
 }
 
 /**
- * `cmd package query-activities --brief -a VIEW -d <url>` counted (batch-11.sh#handlers): the component lines, which
+ * `cmd package query-activities --brief -a VIEW -d <url>` counted (batch-11.sh's handlers): the component lines, which
  * must be as many as its `N activities found:` line says (`No activities found` is 0); else why not.
  */
 export function handlersOf(r: CallResult): number | { why: string } {
@@ -242,7 +260,7 @@ export function unreachableOf(getState: CallResult): string | undefined {
 export type Installed = { state: 'installed'; path: string } | { state: 'missing' } | { state: 'unknown'; why: string };
 
 /**
- * `adb get-state` first, then `pm path <lab>` (batch-12.sh#e5_installed): get-state not `device` is unknown; then
+ * `adb get-state` first, then `pm path <lab>` (batch-12.sh's e5_installed): get-state not `device` is unknown; then
  * `package:<path>` with exit 0 installed, exit 1 with nothing said missing, anything else unknown.
  */
 export function installedOf(getState: CallResult, pmPath?: CallResult): Installed {
@@ -275,27 +293,35 @@ export function treeOf(raw: string): UiNode | { why: string } {
   }
 }
 
-/** Every node of the tree, each with its ancestors (nearest first). */
-function withAncestors(root: UiNode): { node: UiNode; up: UiNode[] }[] {
-  const out: { node: UiNode; up: UiNode[] }[] = [];
-  const walk = (node: UiNode, up: UiNode[]): void => {
-    out.push({ node, up });
-    for (const c of node.children) walk(c, [node, ...up]);
+/** Whether `a` is an ancestor of `n`, by the tree's parent links. */
+type IsAbove = (a: UiNode, n: UiNode) => boolean;
+function aboveIn(root: UiNode): IsAbove {
+  const parent = new Map<UiNode, UiNode>();
+  for (const n of everyNode(root)) for (const c of n.children) parent.set(c, n);
+  return (a, n) => {
+    for (let p = parent.get(n); p !== undefined; p = parent.get(p)) if (p === a) return true;
+    return false;
   };
-  walk(root, []);
-  return out;
 }
 
-/** "Always", by its id (`button_always`, a localized label too) or by the word in its label (any case). */
-export const isAlways = (n: UiNode): boolean => n.identifier === 'button_always' || /\balways\b/i.test(n.label ?? '');
+/**
+ * "Always", by its id (`button_always`, whatever its label: a localized one too) or by the word in its label, any case
+ * (`String`: a node with no label reads "null", no "always").
+ */
+export const isAlways = (n: UiNode): boolean => n.identifier === 'button_always' || /\balways\b/i.test(String(n.label));
 
 /** Half-open, as pixels are: a rect's far edge is the next node's first pixel. */
 const contains = (r: Rect, p: Point): boolean => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
 const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 const rectText = (r: Rect): string => `[${r.x},${r.y} ${r.width}x${r.height}]`;
 const pointText = (p: Point): string => `(${p.x}, ${p.y})`;
-/** A node as a why names it: its id, then its label. */
-const nodeText = (n: UiNode): string => [n.identifier, labelOf(n) === undefined ? undefined : `"${labelOf(n)}"`].filter((s) => s !== undefined && s !== null).join(' ');
+
+/** A node as a why names it: its id and its label quoted, either alone, or its role when it has neither. */
+function nodeText(n: UiNode): string {
+  const label = labelOf(n);
+  if (n.identifier === null) return label === undefined ? n.role : JSON.stringify(label);
+  return label === undefined ? n.identifier : `${n.identifier} ${JSON.stringify(label)}`;
+}
 
 /** What a batch may tap on the chooser: a row, by its label (text1 or text2) or its number from 1; or "Just once". */
 export type TapTarget = { row: string } | { row: number } | 'once';
@@ -310,16 +336,13 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
   if (target === 'once') {
     const once = nodes.filter((n) => n.identifier === 'button_once');
     if (once.length !== 1) return refused(once.length === 0 ? 'no-target' : 'not-unique', `${once.length} nodes with id button_once (need exactly 1)`);
-    return { node: once[0], name: `button_once (${JSON.stringify(once[0].label ?? '')})` };
+    return { node: once[0], name: `button_once (${JSON.stringify(once[0].label)})` };
   }
   const lists = nodes.filter((n) => n.identifier === 'resolver_list');
   const rows = lists.length === 1 ? lists[0].children : [];
-  const labelsOf = (row: UiNode): string[] =>
-    withAncestors(row)
-      .map((x) => x.node)
-      .filter((n) => n.identifier === 'text1' || n.identifier === 'text2')
-      .flatMap((n) => labelOf(n) ?? []);
-  const named = (i: number): { node: UiNode; name: string } => ({ node: rows[i], name: `row ${i + 1} (${JSON.stringify(labelsOf(rows[i]).at(-1) ?? '')})` });
+  // A row's labels: its text1 and text2 (AOSP's resolve_list_item), as chooserSheet reads them.
+  const labelsOf = (row: UiNode): string[] => [...everyNode(row)].filter((n) => n.identifier === 'text1' || n.identifier === 'text2').flatMap((n) => labelOf(n) ?? []);
+  const named = (i: number): { node: UiNode; name: string } => ({ node: rows[i], name: `row ${i + 1} (${labelsOf(rows[i]).map((l) => JSON.stringify(l)).join(', ')})` });
   if (typeof target.row === 'number') {
     const n = target.row;
     return Number.isInteger(n) && n >= 1 && n <= rows.length ? named(n - 1) : refused('no-target', `no row ${n} in resolver_list (${rows.length} rows)`);
@@ -332,7 +355,7 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
 }
 
 /**
- * The one point a batch may tap on the chooser (d55-b11.ts#safeTap, batch-12's guardRow1 and guardOnce): the target's
+ * The one point a batch may tap on the chooser (d55-b11.ts's safeTap, batch-12's guardRow1 and guardOnce): the target's
  * centre, or `at` when given (a reply's quoted centre) within CENTRE_SLACK_PX of it. Refused, by name: no such target,
  * or more than one; a tree that is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none: AOSP's
  * with_default layout, no chooser); a target that reads as "Always" itself; a disabled one ("Just once" until a row is
@@ -342,16 +365,13 @@ function targetOf(nodes: readonly UiNode[], target: TapTarget): { node: UiNode; 
  * every clickable one and more: rows are not clickable in uiautomator (batch-10), the list above takes the click.
  */
 export function safeTap(tree: UiNode, target: TapTarget, at?: Point): SafeTap {
-  const all = withAncestors(tree);
-  const found = targetOf(
-    all.map((x) => x.node),
-    target,
-  );
+  const all = [...everyNode(tree)];
+  const found = targetOf(all, target);
   if ('ok' in found) return found;
   const { node, name } = found;
   if (chooserSheet(tree) === undefined) return refused('no-sheet', "the tree is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none)");
   // The target itself, or a label inside it (a row's text1 or text2).
-  if (withAncestors(node).some((x) => isAlways(x.node))) return refused('always', `${name} reads as "Always"`);
+  if ([...everyNode(node)].some(isAlways)) return refused('always', `${name} reads as "Always"`);
   if (node.disabled === true) return refused('disabled', `${name} is disabled`);
   const centre = rectCentre(node.rect);
   const point = at ?? centre;
@@ -359,19 +379,19 @@ export function safeTap(tree: UiNode, target: TapTarget, at?: Point): SafeTap {
   if (Math.abs(point.x - centre.x) > CENTRE_SLACK_PX || Math.abs(point.y - centre.y) > CENTRE_SLACK_PX) {
     return refused('off-centre', `the point ${pointText(point)} is not ${name}'s centre ${pointText(centre)} within ${CENTRE_SLACK_PX} px`);
   }
-  const always = all.find((x) => isAlways(x.node) && overlaps(x.node.rect, node.rect))?.node;
+  const always = all.find((n) => isAlways(n) && overlaps(n.rect, node.rect));
   if (always !== undefined) {
     return refused('always', contains(always.rect, point) ? `the point ${pointText(point)} is inside "Always" (${nodeText(always)})` : `${name} overlaps "Always" (${nodeText(always)})`);
   }
-  const above = all.find((x) => x.node === node)!.up;
-  const other = all.find((x) => contains(x.node.rect, point) && x.node !== node && !x.up.includes(node) && !above.includes(x.node));
-  if (other !== undefined) return refused('other-node', `the point ${pointText(point)} lands on ${nodeText(other.node) || other.node.role}, not ${name}`);
+  const isAbove = aboveIn(tree);
+  const other = all.find((n) => n !== node && contains(n.rect, point) && !isAbove(node, n) && !isAbove(n, node));
+  if (other !== undefined) return refused('other-node', `the point ${pointText(point)} lands on ${nodeText(other)}, not ${name}`);
   return { ok: true, point, why: `${name} at ${pointText(point)}` };
 }
 
 // ------------------------------------------------------------------------------------------------- the fixtures
 
-/** Device paths a captured fixture must not hold (d55-b11.ts#sanitizeFixture), built from parts as the hygiene test's. */
+/** Device paths a captured fixture must not hold (d55-b11.ts's sanitizeFixture), built from parts as the hygiene test's. */
 const slash = '/';
 const DEVICE_PATHS = ['/data/', '/sdcard', '/storage/', `${slash}Users${slash}`, '/private/', `${slash}tmp${slash}`, 'emulator-'];
 

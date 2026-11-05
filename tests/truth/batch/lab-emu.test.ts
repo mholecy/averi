@@ -102,7 +102,7 @@ function fakeEmu(opts: { avd?: string; installed?: boolean; entries?: { flag: 't
   const run: Run = async (cmd, args, call) => {
     calls.push({ cmd, args, call });
     if (cmd === 'unzip') {
-      if (args[0] !== '-p' || args[2] !== CELLS_ENTRY) throw new Error(`no answer for unzip ${args.join(' ')}`);
+      if (args[0] !== '-p' || args[2] !== 'assets/cells.json') throw new Error(`no answer for unzip ${args.join(' ')}`);
       return existsSync(args[1]) ? ok(readFileSync(args[1], 'utf8')) : exit(9, `unzip: cannot find ${args[1]}`);
     }
     if (cmd !== 'adb') throw new Error(`no answer for ${cmd} ${args.join(' ')}`);
@@ -183,7 +183,7 @@ function files(state: unknown = { dirty: false, serial: SERIAL, before: { runnin
 }
 const readState = (o: ReinstallOptions) => JSON.parse(readFileSync(o.stateFile, 'utf8')) as { dirty: boolean };
 
-describe("LabEmu.open — lab-device.ts's Android guard before any other call (batch-11.sh#android_guard)", () => {
+describe("LabEmu.open — lab-device.ts's Android guard before any other call (batch-11.sh's android_guard)", () => {
   it("batch-10's `emu avd name` (averi_lab, CRLF and OK after it): the lab emulator; its calls all name its serial", async () => {
     const fake = fakeEmu();
     const emu = await emuOf(fake);
@@ -250,7 +250,7 @@ describe('dismissChooser — BACK while a chooser is in front, at most 3, then H
   });
 });
 
-describe('labInstalled — `adb get-state` first: unreachable is unknown, never "missing" (batch-12.sh#e5_installed)', () => {
+describe('labInstalled — `adb get-state` first: unreachable is unknown, never "missing" (batch-12.sh, e5_installed)', () => {
   it('installed with its path; missing on `pm path` exit 1 with nothing said', async () => {
     expect(await labInstalled(await emuOf(fakeEmu()))).toEqual({ state: 'installed', path: DEVICE_APK });
     expect(await labInstalled(await emuOf(fakeEmu({ installed: false })))).toEqual({ state: 'missing' });
@@ -272,7 +272,7 @@ describe('labInstalled — `adb get-state` first: unreachable is unknown, never 
   });
 });
 
-describe('readRoleHolders and handlers — the tri-state reads over the device (batch-9 D55, batch-11.sh#handlers)', () => {
+describe('readRoleHolders and handlers — the tri-state reads over the device (batch-9 D55; batch-11.sh, handlers)', () => {
   it("API 33's role holder read is unread, never unchanged; averilab://shared/open has 2 handlers", async () => {
     const emu = await emuOf(fakeEmu());
     expect(await readRoleHolders(emu)).toEqual({ state: 'unread', why: 'exit 255 Unknown command: get-role-holders' });
@@ -284,7 +284,7 @@ describe('tapSafely — the one tap a batch makes on the chooser, at safeTap\'s 
   it("batch-11's row tap: the twin row at (540, 1881), then \"Just once\" once enabled at (723, 2058)", async () => {
     const fake = fakeEmu({ chooser: 1 });
     const emu = await emuOf(fake);
-    expect(await tapSafely(emu, { row: 'AveriLab twin' })).toEqual({ tapped: true, point: { x: 540, y: 1881 }, why: 'row 2 ("AveriLab twin") at (540, 1881)' });
+    expect(await tapSafely(emu, { row: 'AveriLab twin' })).toEqual({ tapped: true, point: { x: 540, y: 1881 }, why: 'row 2 ("AveriLab", "AveriLab twin") at (540, 1881)' });
     fake.st.tree = resolverXml(true);
     expect(await tapSafely(emu, 'once')).toEqual({ tapped: true, point: { x: 723, y: 2058 }, why: 'button_once ("Just once") at (723, 2058)' });
     expect(fake.taps).toEqual(['540,1881', '723,2058']);
@@ -350,6 +350,9 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
     const r = await clearLabEntry(emu, o);
     expect(seen).toEqual(['proven true']);
     expect(r).toMatchObject({ ok: true, how: expect.stringMatching(/; D55 restore: OK — the state file put back$/) });
+    const o3 = files();
+    o3.putBack = async () => ({ ok: false, why: 'D55 restore: NOT VERIFIED — no hand given' });
+    expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true })), o3)).toEqual({ ok: false, why: "reinstalled and proven, but the lab's state not put back: D55 restore: NOT VERIFIED — no hand given", hand: [] });
     const o2 = files();
     o2.putBack = async () => ({ ok: false, why: 'D55 restore: NOT VERIFIED — read back 0 bytes', hand: ['by hand: the probe --restore'] });
     expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true })), o2)).toEqual({ ok: false, why: "reinstalled and proven, but the lab's state not put back: D55 restore: NOT VERIFIED — read back 0 bytes", hand: ['by hand: the probe --restore'] });
@@ -424,6 +427,10 @@ describe('clearLabEntry — the abort-safe reinstall that clears a lab default (
       ok: false,
       why: 'the reinstall not proven: the reinstalled APK not pulled (exit 1 adb: error: failed to stat); the lab is installed',
     });
+    // A pull that fails is no pull, whatever it left behind (T2 S5 mutation round).
+    const partial = files();
+    const partly = fakeEmu({ entries: [{ flag: 'true' }], writes: true, rules: [(w) => (w[0] === 'pull' ? (writeFileSync(w[2], '{"cel'), exit(1, 'adb: error: connection reset')) : undefined)] });
+    expect(await clearLabEntry(await emuOf(partly), partial)).toMatchObject({ ok: false, why: 'the reinstall not proven: the reinstalled APK not pulled (exit 1 adb: error: connection reset); the lab is installed' });
     const noFile = files();
     expect(await clearLabEntry(await emuOf(fakeEmu({ entries: [{ flag: 'true' }], writes: true, rules: [(w) => (w[0] === 'pull' ? ok('pulled') : undefined)] })), noFile)).toMatchObject({
       ok: false,
@@ -597,7 +604,12 @@ describe('chooserWindow — the chooser\'s dirty window for the abort (batch-11.
     expect(seen).toEqual([true]);
     const ok2 = fakeEmu();
     const w2 = await windowOf(ok2, { putBack: async () => ({ ok: true, how: 'put back' }) });
-    expect(await w2.restore(ok2.run)).toMatchObject({ ok: true });
+    expect(await w2.restore(ok2.run)).toEqual({ ok: true, how: 'chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)' });
+  });
+
+  it('after the restore: the accepted last-chosen entry is put back, its check said (T2 S5 mutation round)', async () => {
+    const accepted = fakeEmu({ entries: [{ flag: 'false' }] });
+    expect(await (await windowOf(accepted)).restore(accepted.run)).toMatchObject({ ok: true, how: expect.stringMatching(/^chooser no; preferred read \(1 user\); lab entries 1 \(defaults 0, last-chosen 1, accepted 1\)/) });
   });
 
   it('after the restore: a last-chosen entry not accepted is put back with its WARN; a default FAIL; unproven or a chooser that stays, not put back', async () => {
