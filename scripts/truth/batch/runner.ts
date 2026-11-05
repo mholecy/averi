@@ -86,16 +86,26 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  *     const D43 = { id: 'D43', label: 'D43 verdict', needs: ['ios'], async run(ctx) {
  *       const sim = await ios.open(ctx);                              // the guard again, over the block's own calls
  *       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
- *       await wdaWindow(ctx, sim.value, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
- *         work: async () => { if ((await iosCheck(ctx, sim.value, 'wda 1')).ok) await ctx.liveRun('ios-wda-1', asked, { secs }); } });
- *       await ios.endStretch(ctx, sim.value);                           // the finportal key's line
- *     }, judge };
+ *       const said = [];                                              // the work's checks' warnings
+ *       const w = await wdaWindow(ctx, sim.value, { runs: [{ name: 'ios-wda-1', asked }], // its .cases first, then the backup
+ *         work: async () => {
+ *           const fit = await iosCheck(ctx, sim.value, 'wda 1');      // { ok, warning? } or { ok: false, why }
+ *           if (!fit.ok) return ctx.verdict('INCONCLUSIVE', `${fit.why} — no wda run`);
+ *           if (fit.warning !== undefined) said.push(fit.warning);
+ *           await ctx.liveRun('ios-wda-1', asked, { secs });
+ *         } });
+ *       const warnings = [...w.warnings, ...said];                   // the window's two checks', then the work's
+ *       if (warnings.length > 0) ctx.step('WARN', `D43: ${warnings.join('; ')}`);
+ *     }, judge };                                                     // the finportal key: the ios need's end reads it
  *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],
  *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly],
  *       config: configOf(process.argv.slice(2), process.env, repo) });
  *
- * A need is checked by the first block naming it and rechecked (its `alive`) before each later one; the WDA window is
- * a dirty window, so the abort puts it back the same way; `lastly` ends what S2's kept groups cannot own.
+ * A need is checked by the first block naming it and rechecked (its `alive`) before each later one, and its `end` runs
+ * once the last block is done (the ios need's: the finportal key's second read, its line in the SUMMARY — a CHANGED key
+ * fails the run, no block need judge it; T2b). The WDA window is a dirty window, so the abort puts it back the same way;
+ * a check's warning (a companion entry that may be stale, batch-13) is the block's to say, in its own words — batch-13
+ * put them on its verdict line. `lastly` ends what S2's kept groups cannot own.
  */
 
 /** A need a block names: the lab devices (`ios`, `android`), or any other the batch gives a check for. */
