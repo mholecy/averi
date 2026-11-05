@@ -1,0 +1,446 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import type { UiNode } from '../../../src/adapters/types.js';
+import { TIMED_OUT, type CallResult } from '../../../scripts/truth/batch/bounded.js';
+import {
+  acceptedOf,
+  CHECK_EXIT,
+  checkExit,
+  checkLine,
+  compareReads,
+  comparedLine,
+  focusOf,
+  handlersOf,
+  installedOf,
+  isAlways,
+  lastChosenOf,
+  leaksOf,
+  preferredOf,
+  sanitizeFixture,
+  safeTap,
+  shellReadOf,
+  treeOf,
+  type AcceptedEntry,
+  type FocusRead,
+  type PreferredRead,
+} from '../../../scripts/truth/batch/lab-chooser.js';
+
+// scripts/truth/batch/lab-chooser.ts, the pure module: the preferred-activities read over API 33's real dumps (batch-9's
+// whole `dumpsys package`, batch-10's `preferred` block), --check's exit, safeTap over T4's committed resolver trees
+// (tests/fixtures/uiautomator-lab-resolver*.xml, batch-10's and batch-11's captures) parsed by src's own parser, the
+// tri-state reads (batch-9's role holder and clipboard), the handler count and the install read. The calls around them,
+// through a recording fake emulator, are tests/truth/batch/lab-emu.test.ts.
+
+const BATCH = join(import.meta.dirname, '..', '..', 'fixtures', 'batch');
+const T4 = join(import.meta.dirname, '..', '..', 'fixtures');
+const fixture = (name: string): string => readFileSync(join(BATCH, name), 'utf8');
+const resolverXml = (selected = false): string => readFileSync(join(T4, `uiautomator-lab-resolver${selected ? '-selected' : ''}.xml`), 'utf8');
+
+const ok = (out = '', err = ''): CallResult => ({ code: 0, timedOut: false, signal: null, out, err });
+const exit = (code: number, out = '', err = ''): CallResult => ({ code, timedOut: false, signal: null, out, err });
+const timedOut: CallResult = { code: TIMED_OUT, timedOut: true, signal: 'SIGKILL', out: '', err: '' };
+
+/** batch-9's whole `dumpsys package` (printed for `preferred-activities` on API 33), trimmed. */
+const WHOLE = fixture('dumpsys-package-api33-b9-whole-trimmed.txt');
+/** batch-10's `dumpsys package preferred`: the block alone, Gmail's mailto defaults in it, no lab entry. */
+const BLOCK = fixture('dumpsys-package-preferred-api33-b10.txt');
+
+/**
+ * A lab entry in the block, in the dump's own shape (Gmail's entries above it): no dump with one was kept in the
+ * sources (batch-11's and batch-12's records are not among them), so its words are batch-12's analysis's,
+ * `dev.averi.lab/.Twin mMatch=0x300000 mAlways=false` for `shared`, laid out as the block lays out every entry.
+ * `flag`: the mMatch line's mAlways, or none at all.
+ */
+const labEntry = (flag: 'true' | 'false' | 'none', component = 'dev.averi.lab/.Twin', authority = 'shared', scheme = 'averilab'): string =>
+  [
+    `      ${scheme}:`,
+    `        9d3a2b9 ${component}`,
+    `         mMatch=0x300000${flag === 'none' ? '' : ` mAlways=${flag}`}`,
+    '          Selected from:',
+    '            dev.averi.lab/.MainActivity',
+    '            dev.averi.lab/.Twin',
+    '          Action: "android.intent.action.VIEW"',
+    '          Category: "android.intent.category.BROWSABLE"',
+    '          Category: "android.intent.category.DEFAULT"',
+    `          Scheme: "${scheme}"`,
+    `          Authority: "${authority}": -1`,
+  ].join('\n');
+/** The block with `entries` first under its `Schemes:`. */
+const withEntries = (...entries: string[]): string => BLOCK.replace('  Schemes:\n', `  Schemes:\n${entries.join('\n')}\n`);
+const readOf = (dump: string): PreferredRead => preferredOf(ok(dump));
+
+const launcher: FocusRead = focusOf(ok(fixture('dumpsys-window-focus-api33-b10-launcher-no-header.txt')));
+const chooserUp: FocusRead = focusOf(ok(readFileSync(join(T4, 'dumpsys-window-focus-api33-b10-chooser.txt'), 'utf8')));
+const SHARED_TWIN: AcceptedEntry = { authority: 'shared', component: /^dev\.averi\.lab\/\.Twin$/, why: "batch-11 E2's \"Just once\"" };
+
+describe("preferredOf — only the `Preferred Activities User N:` block (d55-b11.ts:117–148; batch-9's whole-dump read)", () => {
+  it("API 33's whole dump: the block read, the Activity Resolver Table's averilab handlers never a lab entry (batch-9's INCONCLUSIVE and cleanup ERROR)", () => {
+    expect(WHOLE).toContain('Database versions:');
+    expect(WHOLE).toContain('9d3a2b9 dev.averi.lab/.Twin');
+    expect(readOf(WHOLE)).toEqual({ state: 'read', users: 1, lab: [] });
+  });
+
+  it("a dump with no such block is unread, never \"no lab entry\" (batch-9's harness artefact)", () => {
+    const head = WHOLE.slice(0, WHOLE.indexOf('Preferred Activities User 0:'));
+    expect(readOf(head)).toEqual({ state: 'unread', why: 'no `Preferred Activities User N:` block in the dump' });
+    expect(readOf('')).toEqual({ state: 'unread', why: 'no `Preferred Activities User N:` block in the dump' });
+    // The header indented, or with words after it, is no block header.
+    expect(readOf(BLOCK.replace('Preferred Activities User 0:', ' Preferred Activities User 0:')).state).toBe('unread');
+    expect(readOf(BLOCK.replace('Preferred Activities User 0:', 'Preferred Activities User 0: x')).state).toBe('unread');
+  });
+
+  it('a read that failed or passed its bound is unread, with its exit', () => {
+    expect(preferredOf(exit(1, '', 'error: device offline'))).toEqual({ state: 'unread', why: 'dumpsys package preferred: exit 1 error: device offline' });
+    expect(preferredOf({ ...timedOut, out: BLOCK })).toEqual({ state: 'unread', why: `dumpsys package preferred: past its bound (exit ${TIMED_OUT}) Preferred Activities User 0:` });
+  });
+
+  it("batch-10's block: Gmail's mailto default (mAlways=true) is no lab leak; CRLF line ends read the same", () => {
+    expect(BLOCK).toContain('com.google.android.gm/.ComposeActivityGmailExternal');
+    expect(readOf(BLOCK)).toEqual({ state: 'read', users: 1, lab: [] });
+    expect(readOf(BLOCK.replace(/\n/g, '\r\n'))).toEqual({ state: 'read', users: 1, lab: [] });
+  });
+
+  it('a lab entry: its text, component, mAlways and Authority; true a default, false the last-chosen entry "Just once" writes', () => {
+    const p = readOf(withEntries(labEntry('false'), labEntry('true', 'dev.averi.lab/.MainActivity', 'pair')));
+    expect(p).toEqual({
+      state: 'read',
+      users: 1,
+      lab: [
+        {
+          text: '9d3a2b9 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=false | Selected from: | dev.averi.lab/.MainActivity | dev.averi.lab/.Twin | Action: "android.intent.action.VIEW" | Category: "android.intent.category.BROWSABLE" | Category: "android.intent.category.DEFAULT" | Scheme: "averilab" | Authority: "shared": -1',
+          component: 'dev.averi.lab/.Twin',
+          always: false,
+          authority: 'shared',
+        },
+        expect.objectContaining({ component: 'dev.averi.lab/.MainActivity', always: true, authority: 'pair' }),
+      ],
+    });
+    if (p.state !== 'read') throw new Error('unread');
+    expect(leaksOf(p).map((e) => e.component)).toEqual(['dev.averi.lab/.MainActivity']);
+    expect(lastChosenOf(p).map((e) => e.component)).toEqual(['dev.averi.lab/.Twin']);
+  });
+
+  it('an entry with no mAlways line is a leak (never assumed last-chosen); one with no Authority has no authority key', () => {
+    const p = readOf(withEntries(labEntry('none').replace('          Authority: "shared": -1', '')));
+    if (p.state !== 'read') throw new Error('unread');
+    expect(p.lab).toEqual([expect.objectContaining({ always: undefined })]);
+    expect(Object.keys(p.lab[0])).toEqual(['text', 'component', 'always']);
+    expect(leaksOf(p)).toHaveLength(1);
+    expect(lastChosenOf(p)).toEqual([]);
+  });
+
+  it("a lab entry by its component (another scheme) or by its scheme (another app's activity); mAlways read from the entry's first line after it only", () => {
+    const https = labEntry('true', 'dev.averi.lab/.MainActivity', 'example.com', 'https');
+    const other = labEntry('false', 'com.other.app/.Open');
+    // The flag on a later line (a Selected-from component's text) is no mAlways of this entry.
+    const late = labEntry('none').replace('            dev.averi.lab/.Twin', '            mAlways=false');
+    const p = readOf(withEntries(https, other, late));
+    if (p.state !== 'read') throw new Error('unread');
+    expect(p.lab.map((e) => [e.component, e.always])).toEqual([
+      ['dev.averi.lab/.MainActivity', true],
+      ['com.other.app/.Open', false],
+      ['dev.averi.lab/.Twin', undefined],
+    ]);
+  });
+
+  it("a package only named like the lab's is no lab entry: dev.averi.lab.rn's handler is the RN app's", () => {
+    const p = readOf(withEntries(labEntry('true', 'dev.averi.lab.rn/.MainActivity', 'shared', 'averilabrn')));
+    expect(p).toEqual({ state: 'read', users: 1, lab: [] });
+  });
+
+  it("two users' blocks are both read; the block ends at the next top-level header", () => {
+    const two = `${withEntries(labEntry('false'))}\nPreferred Activities User 10:\n  Schemes:\n${labEntry('true')}\n\nDomain verification status:\n${labEntry('true')}\n`;
+    const p = readOf(two);
+    if (p.state !== 'read') throw new Error('unread');
+    expect(p.users).toBe(2);
+    expect(p.lab.map((e) => e.always)).toEqual([false, true]);
+  });
+});
+
+describe('acceptedOf — the last-chosen entries a batch accepts as the lab\'s known state (batch-12 README; pure-b12.ts)', () => {
+  it('by Authority and component, both; none without an Authority', () => {
+    const p = readOf(withEntries(labEntry('false'), labEntry('false', 'dev.averi.lab/.Twin', 'pair'), labEntry('false').replace('          Authority: "shared": -1', '')));
+    if (p.state !== 'read') throw new Error('unread');
+    expect(p.lab.map((e) => acceptedOf(e, [SHARED_TWIN])?.why)).toEqual([SHARED_TWIN.why, undefined, undefined]);
+    expect(acceptedOf(p.lab[0], [{ ...SHARED_TWIN, component: /^dev\.averi\.lab\/\.MainActivity$/ }])).toBeUndefined();
+  });
+});
+
+describe('focusOf — the chooser in front by src\'s chooserInFocus over CHOOSER_FOCUS_COMMAND\'s read', () => {
+  it("batch-10's chooser read names it; its launcher read none", () => {
+    expect(chooserUp).toEqual({ state: 'read', chooser: 'android/com.android.internal.app.ResolverActivity' });
+    expect(launcher).toEqual({ state: 'read', chooser: undefined });
+  });
+
+  it('a read that failed (grep found nothing: exit 1), passed its bound, or holds no focus line is unread', () => {
+    expect(focusOf(exit(1))).toEqual({ state: 'unread', why: 'the focus read: exit 1' });
+    expect(focusOf(timedOut).state).toBe('unread');
+    expect(focusOf(ok('  Display: mDisplayId=0 (organized)\n'))).toEqual({ state: 'unread', why: 'the focus read holds no mCurrentFocus= or mFocusedApp= line' });
+    expect(focusOf(ok('  mFocusedApp=null\n'))).toEqual({ state: 'read', chooser: undefined });
+    expect(focusOf(ok('  mCurrentFocus=null\n'))).toEqual({ state: 'read', chooser: undefined });
+  });
+});
+
+describe('checkExit — --check\'s exits (d55-b11.ts --check, batch-12\'s final pure-b12.ts#checkExit)', () => {
+  const clean = readOf(BLOCK);
+  const lastChosen = readOf(withEntries(labEntry('false')));
+  const aDefault = readOf(withEntries(labEntry('true')));
+  const unread = preferredOf(exit(1));
+  const focusUnread = focusOf(exit(1));
+
+  it('0 clean, 1 a lab default, 3 unproven, 4 a chooser up, 5 accepted last-chosen only, 6 another last-chosen entry', () => {
+    expect(CHECK_EXIT).toEqual({ clean: 0, leak: 1, unproven: 3, chooser: 4, accepted: 5, lastChosen: 6 });
+    expect(checkExit(launcher, clean, [])).toBe(0);
+    expect(checkExit(launcher, aDefault, [])).toBe(1);
+    expect(checkExit(launcher, unread, [])).toBe(3);
+    expect(checkExit(focusUnread, clean, [])).toBe(3);
+    expect(checkExit(chooserUp, clean, [])).toBe(4);
+    expect(checkExit(launcher, lastChosen, [SHARED_TWIN])).toBe(5);
+    expect(checkExit(launcher, lastChosen, [])).toBe(6);
+  });
+
+  it("a default outranks everything, the chooser outranks unproven and last-chosen (batch-12's order; d55-b11.ts put 5 before 4)", () => {
+    expect(checkExit(chooserUp, aDefault, [])).toBe(1);
+    expect(checkExit(focusUnread, aDefault, [])).toBe(1);
+    expect(checkExit(chooserUp, unread, [])).toBe(4);
+    expect(checkExit(chooserUp, lastChosen, [SHARED_TWIN])).toBe(4);
+    expect(checkExit(focusUnread, lastChosen, [SHARED_TWIN])).toBe(3);
+  });
+
+  it('5 needs every last-chosen entry accepted: one not on the list makes it 6', () => {
+    const two = readOf(withEntries(labEntry('false'), labEntry('false', 'dev.averi.lab/.MainActivity', 'pair')));
+    expect(checkExit(launcher, two, [SHARED_TWIN])).toBe(6);
+  });
+
+  it("checkLine: OK for 0 and 5, WARN for 6, FAIL for a default, ERROR for 3 and 4; the reads and the first lab entry said", () => {
+    expect(checkLine(launcher, clean, [])).toBe('D55 check: OK — chooser no; preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)');
+    expect(checkLine(launcher, lastChosen, [SHARED_TWIN])).toBe(
+      'D55 check: OK — chooser no; preferred read (1 user); lab entries 1 (defaults 0, last-chosen 1, accepted 1); first: 9d3a2b9 dev.averi.lab/.Twin | mMatch=0x300000 mAlways=false | Selected from: | dev.averi.lab/.MainActivity | dev.averi.lab/.Twin | Action: "android.intent.action.VIEW" | Category: "andr…',
+    );
+    expect(checkLine(launcher, lastChosen, [])).toMatch(/^D55 check: WARN — chooser no; preferred read \(1 user\); lab entries 1 \(defaults 0, last-chosen 1, accepted 0\); first: /);
+    expect(checkLine(chooserUp, aDefault, [])).toMatch(/^D55 check: FAIL — chooser yes \(android\/com\.android\.internal\.app\.ResolverActivity\); preferred read \(1 user\); lab entries 1 \(defaults 1, last-chosen 0\); first: /);
+    expect(checkLine(focusUnread, unread, [])).toBe('D55 check: ERROR — chooser unread (the focus read: exit 1); preferred unread (dumpsys package preferred: exit 1)');
+    expect(checkLine(chooserUp, clean, [])).toBe('D55 check: ERROR — chooser yes (android/com.android.internal.app.ResolverActivity); preferred read (1 user); lab entries 0 (defaults 0, last-chosen 0)');
+    expect(checkLine(launcher, readOf(`${BLOCK}\nPreferred Activities User 10:\n`), [])).toContain('preferred read (2 users)');
+  });
+});
+
+describe('safeTap — the one point to tap, never "Always" (d55-b11.ts:301–345; batch-12\'s guardRow1/guardOnce), over T4\'s resolver trees', () => {
+  const tree = (xml = resolverXml()): UiNode => {
+    const t = treeOf(xml);
+    if ('why' in t) throw new Error(t.why);
+    return t;
+  };
+
+  it("batch-11's E2: the twin row by its label, at its centre (540, 1881); row 1 by number at (540, 1727)", () => {
+    expect(safeTap(tree(), { row: 'AveriLab twin' })).toEqual({ ok: true, point: { x: 540, y: 1881 }, why: 'row 2 ("AveriLab twin") at (540, 1881)' });
+    expect(safeTap(tree(), { row: 1 })).toEqual({ ok: true, point: { x: 540, y: 1727 }, why: 'row 1 ("AveriLab") at (540, 1727)' });
+    expect(safeTap(tree(true), { row: 2 })).toMatchObject({ ok: true, point: { x: 540, y: 1881 } });
+  });
+
+  it('a target that is not unique is refused: both rows say "AveriLab" (why the replies tap by coordinates)', () => {
+    expect(safeTap(tree(), { row: 'AveriLab' })).toEqual({ ok: false, refusal: 'not-unique', why: '2 rows say "AveriLab" (need exactly 1)' });
+    const twoOnce = resolverXml(true).replace('resource-id="android:id/resolver_button_bar_divider"', 'resource-id="android:id/button_once"');
+    expect(safeTap(tree(twoOnce), 'once')).toEqual({ ok: false, refusal: 'not-unique', why: '2 nodes with id button_once (need exactly 1)' });
+  });
+
+  it('no such target: a row number past the list, row 0, a label no row has, no button_once', () => {
+    expect(safeTap(tree(), { row: 3 })).toEqual({ ok: false, refusal: 'no-target', why: 'no row 3 in resolver_list (2 rows)' });
+    expect(safeTap(tree(), { row: 0 })).toEqual({ ok: false, refusal: 'no-target', why: 'no row 0 in resolver_list (2 rows)' });
+    expect(safeTap(tree(), { row: 'AveriLab twin 2' })).toEqual({ ok: false, refusal: 'no-target', why: 'no row says "AveriLab twin 2"' });
+    const noOnce = resolverXml(true).replace('resource-id="android:id/button_once"', 'resource-id="android:id/button_x"');
+    expect(safeTap(tree(noOnce), 'once')).toEqual({ ok: false, refusal: 'no-target', why: '0 nodes with id button_once (need exactly 1)' });
+    const noList = resolverXml().replace('resource-id="android:id/resolver_list"', 'resource-id="android:id/other_list"');
+    expect(safeTap(tree(noList), { row: 1 })).toEqual({ ok: false, refusal: 'no-target', why: 'no row 1 in resolver_list (0 rows)' });
+  });
+
+  it("\"Just once\" disabled until a row is selected (batch-10's E2 looked in the wrong node: the buttons enabled=false): refused; enabled after the row tap", () => {
+    expect(safeTap(tree(), 'once')).toEqual({ ok: false, refusal: 'disabled', why: 'button_once ("Just once") is disabled' });
+    expect(safeTap(tree(true), 'once')).toEqual({ ok: true, point: { x: 723, y: 2058 }, why: 'button_once ("Just once") at (723, 2058)' });
+    const rowOff = resolverXml().replace('enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1804][1080,1958]"', 'enabled="false" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1804][1080,1958]"');
+    expect(safeTap(tree(rowOff), { row: 2 })).toEqual({ ok: false, refusal: 'disabled', why: 'row 2 ("AveriLab twin") is disabled' });
+  });
+
+  it('the target that reads as "Always" — by id or by text, any case — is refused itself', () => {
+    const onceSaysAlways = resolverXml(true).replace('text="Just once"', 'text="ALWAYS"');
+    expect(safeTap(tree(onceSaysAlways), 'once')).toEqual({ ok: false, refusal: 'always', why: 'button_once ("ALWAYS") reads as "Always"' });
+    const rowSaysAlways = resolverXml().replace('text="AveriLab twin"', 'text="always"');
+    expect(safeTap(tree(rowSaysAlways), { row: 'always' })).toEqual({ ok: false, refusal: 'always', why: 'row 2 ("always") reads as "Always"' });
+  });
+
+  it('a point inside an "Always" node, or a target overlapping one, is refused — by its id (a localized label) or its text alone', () => {
+    // button_always grown over "Just once"'s centre, its label localized: refused by the id.
+    const grown = resolverXml(true).replace('text="Always"', 'text="Immer"').replace('bounds="[842,1983][1030,2132]"', 'bounds="[700,1983][1030,2132]"');
+    expect(safeTap(tree(grown), 'once')).toEqual({ ok: false, refusal: 'always', why: 'the point (723, 2058) is inside "Always" (button_always "Immer")' });
+    // grown only to overlap "Just once"'s right part, not its centre.
+    const overlap = resolverXml(true).replace('bounds="[842,1983][1030,2132]"', 'bounds="[800,1983][1030,2132]"');
+    expect(safeTap(tree(overlap), 'once')).toEqual({ ok: false, refusal: 'always', why: 'button_once ("Just once") overlaps "Always" (button_always "Always")' });
+    // a node with no such id whose text says "always" (any case), laid over row 2.
+    const byText = resolverXml().replace(
+      '<node index="1" text="" resource-id="android:id/button_bar_container"',
+      '<node index="9" text="Always open" resource-id="android:id/other" class="android.widget.Button" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1850][1080,1900]" /><node index="1" text="" resource-id="android:id/button_bar_container"',
+    );
+    expect(safeTap(tree(byText), { row: 2 })).toEqual({ ok: false, refusal: 'always', why: 'the point (540, 1881) is inside "Always" (other "Always open")' });
+  });
+
+  it('isAlways: the id button_always, or "always" as a word in the label, any case; never "Just once" or "Alwaysy"', () => {
+    const node = (identifier: string | null, label: string | null): UiNode => ({ role: 'button', identifier, label, value: null, rect: { x: 0, y: 0, width: 1, height: 1 }, children: [] });
+    expect(isAlways(node('button_always', 'Immer'))).toBe(true);
+    expect(isAlways(node(null, ' ALWAYS '))).toBe(true);
+    expect(isAlways(node(null, 'Open always'))).toBe(true);
+    expect(isAlways(node('button_once', 'Just once'))).toBe(false);
+    expect(isAlways(node(null, 'Alwaysy'))).toBe(false);
+    expect(isAlways(node('button_always_x', null))).toBe(false);
+    expect(isAlways(node(null, null))).toBe(false);
+  });
+
+  it("a point given outside the target, or more than 2 px off its centre (batch-12's row-1 rule), is refused", () => {
+    expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1700 })).toEqual({ ok: false, refusal: 'outside', why: 'the point (540, 1700) is outside row 2 ("AveriLab twin") [0,1804 1080x154]' });
+    // The rect's far edge is the next node's: outside (half-open).
+    expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1958 })).toMatchObject({ ok: false, refusal: 'outside' });
+    expect(safeTap(tree(), { row: 2 }, { x: 1080, y: 1881 })).toMatchObject({ ok: false, refusal: 'outside' });
+    expect(safeTap(tree(), { row: 2 }, { x: -1, y: 1881 })).toMatchObject({ ok: false, refusal: 'outside' });
+    expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1803 })).toMatchObject({ ok: false, refusal: 'outside' });
+    expect(safeTap(tree(), { row: 2 }, { x: 543, y: 1881 })).toEqual({ ok: false, refusal: 'off-centre', why: 'the point (543, 1881) is not row 2 ("AveriLab twin")\'s centre (540, 1881) within 2 px' });
+    expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1878 })).toMatchObject({ ok: false, refusal: 'off-centre' });
+    expect(safeTap(tree(), { row: 2 }, { x: 542, y: 1879 })).toEqual({ ok: true, point: { x: 542, y: 1879 }, why: 'row 2 ("AveriLab twin") at (542, 1879)' });
+    expect(safeTap(tree(), { row: 2 }, { x: 538, y: 1883 })).toMatchObject({ ok: true });
+  });
+
+  it('a point that lands on another node — not the target, inside it, nor above it — is refused (a scrim, a sibling drawn there)', () => {
+    const scrim = resolverXml().replace(
+      '<node index="1" text="" resource-id="android:id/button_bar_container"',
+      '<node index="9" text="" resource-id="android:id/scrim" class="android.view.View" package="android" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1700][1080,1900]" /><node index="1" text="" resource-id="android:id/button_bar_container"',
+    );
+    expect(safeTap(tree(scrim), { row: 2 })).toEqual({ ok: false, refusal: 'other-node', why: 'the point (540, 1881) lands on scrim, not row 2 ("AveriLab twin")' });
+    // A node inside the target there is the target's (its label), and the list above it takes the click: both fine.
+    expect(safeTap(tree(), { row: 2 }, { x: 540, y: 1881 })).toMatchObject({ ok: true });
+    expect(safeTap(tree(), { row: 'AveriLab twin' }, { x: 541, y: 1882 })).toMatchObject({ ok: true });
+  });
+
+  it("no tap off the chooser's fresh sheet as src reads it (chooserSheet): AOSP's with_default header, or no chooser at all", () => {
+    // resolver_list_with_default's header: the last-chosen app's icon above the list (android-chooser.ts#chooserSheet).
+    const withDefault = resolverXml(true).replace(
+      '<node index="0" text="Open with" resource-id="android:id/title"',
+      '<node index="9" text="" resource-id="android:id/icon" class="android.widget.ImageView" package="android" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[22,1480][110,1568]" /><node index="0" text="Open with" resource-id="android:id/title"',
+    );
+    const notFresh = { ok: false, refusal: 'no-sheet', why: "the tree is not the chooser's fresh sheet (android-chooser.ts#chooserSheet reads none)" };
+    expect(safeTap(tree(withDefault), 'once')).toEqual(notFresh);
+    expect(safeTap(tree(withDefault), { row: 2 })).toEqual(notFresh);
+  });
+});
+
+describe('treeOf — a `uiautomator dump /dev/tty` output parsed by src\'s parser, the bounds as dumped', () => {
+  it("the status line after the XML is dropped (android.ts#dumpedTree's reading); the T4 fixture's 27 nodes", () => {
+    const t = treeOf(`${resolverXml()}UI hierchary dumped to: /dev/tty\n`);
+    if ('why' in t) throw new Error(t.why);
+    const count = (n: UiNode): number => 1 + n.children.reduce((s, c) => s + count(c), 0);
+    expect(count(t)).toBe(27);
+  });
+
+  it('no XML, or one the parser refuses, is no tree, with why', () => {
+    expect(treeOf('null root node returned by UiTestAutomationBridge.\n')).toEqual({ why: 'no XML in the dump: null root node returned by UiTestAutomationBridge.' });
+    expect(treeOf('')).toEqual({ why: 'no XML in the dump: ' });
+    expect(treeOf('<hierarchy rotation="0"></hierarchy>')).toEqual({ why: 'the dump did not parse: uiautomator dump contained no nodes' });
+  });
+});
+
+describe('shellReadOf / compareReads — a read that "succeeds" but cannot be compared is unread, never unchanged (batch-9)', () => {
+  it("batch-9's role holder read: `Unknown command: get-role-holders`, exit 255 — unread; the same words with exit 0, unread too", () => {
+    const role = fixture('role-holders-api33-b9-unknown-command.txt');
+    expect(shellReadOf(exit(255, role))).toEqual({ state: 'unread', why: 'exit 255 Unknown command: get-role-holders' });
+    expect(shellReadOf(ok(role))).toEqual({ state: 'unread', why: 'the device has no such command: Unknown command: get-role-holders' });
+    expect(shellReadOf(ok('', role))).toEqual({ state: 'unread', why: 'the device has no such command: Unknown command: get-role-holders' });
+  });
+
+  it("batch-9's `cmd clipboard help`: `No shell command implementation.`, exit 0 — unread", () => {
+    expect(shellReadOf(ok(fixture('clipboard-help-api33-b9.txt')))).toEqual({ state: 'unread', why: 'the device has no such command: No shell command implementation.' });
+  });
+
+  it('a read past its bound is unread; any other exit-0 output is read, trimmed of its line ends', () => {
+    expect(shellReadOf(timedOut)).toEqual({ state: 'unread', why: `past its bound (exit ${TIMED_OUT})` });
+    expect(shellReadOf(ok('com.android.chrome\r\n'))).toEqual({ state: 'read', text: 'com.android.chrome' });
+    expect(shellReadOf(ok(''))).toEqual({ state: 'read', text: '' });
+    // The words inside a line, not at its start, are an answer like any other.
+    expect(shellReadOf(ok('x Unknown command: y'))).toEqual({ state: 'read', text: 'x Unknown command: y' });
+  });
+
+  it('unchanged only when both reads were read and equal; else changed, or unread naming which read', () => {
+    const r = (text: string) => shellReadOf(ok(text));
+    const u = shellReadOf(exit(255, 'Unknown command: get-role-holders\n'));
+    expect(compareReads(r('a'), r('a'))).toEqual({ outcome: 'unchanged', text: 'a' });
+    expect(compareReads(r('a'), r('b'))).toEqual({ outcome: 'changed', before: 'a', after: 'b' });
+    expect(compareReads(u, r('a'))).toEqual({ outcome: 'unread', why: 'before: exit 255 Unknown command: get-role-holders' });
+    expect(compareReads(r('a'), u)).toEqual({ outcome: 'unread', why: 'after: exit 255 Unknown command: get-role-holders' });
+    expect(compareReads(u, u)).toEqual({ outcome: 'unread', why: 'before: exit 255 Unknown command: get-role-holders; after: exit 255 Unknown command: get-role-holders' });
+  });
+
+  it('comparedLine: OK unchanged, ERROR CHANGED, WARN not compared — never OK unread', () => {
+    expect(comparedLine('D55 browser role holder', { outcome: 'unchanged', text: 'com.android.chrome' })).toBe('D55 browser role holder: OK — unchanged ("com.android.chrome")');
+    expect(comparedLine('D55 browser role holder', { outcome: 'unchanged', text: '' })).toBe('D55 browser role holder: OK — unchanged ("")');
+    expect(comparedLine('D55 browser role holder', { outcome: 'changed', before: 'a', after: 'b\nc' })).toBe('D55 browser role holder: ERROR — CHANGED: "a" → "b\\nc"');
+    expect(comparedLine('D55 browser role holder', { outcome: 'unread', why: 'before: exit 255 x' })).toBe('D55 browser role holder: WARN — not compared: before: exit 255 x');
+  });
+});
+
+describe('handlersOf — `cmd package query-activities --brief` counted (batch-11.sh:383, the lab check\'s 2 and 1)', () => {
+  it("batch-10's reads: averilab://shared/open 2 (MainActivity and Twin), averilab://cell/open 1", () => {
+    expect(handlersOf(ok(fixture('query-activities-api33-b10-shared.txt')))).toBe(2);
+    expect(handlersOf(ok(fixture('query-activities-api33-b10-cell.txt')))).toBe(1);
+  });
+
+  it("none: `No activities found` is 0; a header whose count is not the lines', a failed read, or no header, is why not", () => {
+    expect(handlersOf(ok('No activities found\n'))).toBe(0);
+    expect(handlersOf(ok(fixture('query-activities-api33-b10-shared.txt').replace('2 activities found:', '3 activities found:')))).toEqual({ why: 'query-activities said 3 activities but listed 2' });
+    expect(handlersOf(exit(255, '', 'Unknown command'))).toEqual({ why: 'query-activities: exit 255 Unknown command' });
+    expect(handlersOf(ok('dev.averi.lab/.MainActivity\n'))).toEqual({ why: 'query-activities printed no `N activities found:` line: dev.averi.lab/.MainActivity' });
+    expect(handlersOf(ok('1 activity found:\n  Activity #0:\n    dev.averi.lab/.MainActivity\n'))).toBe(1);
+  });
+});
+
+describe('installedOf — the lab installed, missing or unknown: `adb get-state` first (batch-12.sh#e5_installed, batch-11 int-reinstall-noadb)', () => {
+  const device = ok('device\n');
+  const path = ok('package:/data/app/~~HASH==/dev.averi.lab-HASH==/base.apk\n');
+
+  it('installed: get-state `device`, then `pm path` exit 0 naming the package — with its path', () => {
+    expect(installedOf(device, path)).toEqual({ state: 'installed', path: '/data/app/~~HASH==/dev.averi.lab-HASH==/base.apk' });
+    expect(installedOf(ok('device\r\n'), ok('package:/x/base.apk\r\n'))).toEqual({ state: 'installed', path: '/x/base.apk' });
+  });
+
+  it('missing only on `pm path` exit 1 with nothing said', () => {
+    expect(installedOf(device, exit(1))).toEqual({ state: 'missing' });
+    expect(installedOf(device, exit(1, '\n'))).toEqual({ state: 'missing' });
+  });
+
+  it('unreachable is unknown, never "missing" and never "put back": get-state failing, past its bound, or not `device`', () => {
+    expect(installedOf(exit(1, '', 'error: no devices/emulators found'))).toEqual({ state: 'unknown', why: 'adb get-state: exit 1 error: no devices/emulators found' });
+    expect(installedOf(timedOut)).toEqual({ state: 'unknown', why: `adb get-state: past its bound (exit ${TIMED_OUT})` });
+    expect(installedOf(ok('offline\n'), path)).toEqual({ state: 'unknown', why: 'adb get-state: offline, not device' });
+    expect(installedOf(device)).toEqual({ state: 'unknown', why: 'pm path was not read' });
+  });
+
+  it('any other `pm path` answer is unknown: exit 1 with words, another exit, past its bound, exit 0 naming no package', () => {
+    expect(installedOf(device, exit(1, '', 'cmd: Failure calling service package'))).toEqual({ state: 'unknown', why: 'pm path: exit 1 cmd: Failure calling service package' });
+    expect(installedOf(device, exit(255))).toEqual({ state: 'unknown', why: 'pm path: exit 255' });
+    expect(installedOf(device, { ...timedOut, code: 1 })).toEqual({ state: 'unknown', why: 'pm path: past its bound (exit 1)' });
+    expect(installedOf(device, ok('\n'))).toEqual({ state: 'unknown', why: 'pm path: exit 0 but no package: line' });
+  });
+});
+
+describe('sanitizeFixture — no device path or serial in a fixture (d55-b11.ts:347)', () => {
+  it("every committed chooser fixture is clean: T4's resolver trees and S5's reads", () => {
+    const names = readdirSync(BATCH).filter((n) => n.includes('api33'));
+    expect(names.length).toBeGreaterThanOrEqual(9);
+    for (const text of [...names.map(fixture), resolverXml(), resolverXml(true)]) expect(sanitizeFixture(text, 'emulator-5554')).toEqual({ ok: true, hits: [] });
+  });
+
+  it('a device path or the serial is a hit, each once; an empty serial is never one', () => {
+    expect(sanitizeFixture('x /sdcard/a /sdcard/b emulator-5556 /data/app', 'emulator-5556')).toEqual({ ok: false, hits: ['/data/', '/sdcard', 'emulator-'] });
+    expect(sanitizeFixture('LAB-1 here', 'LAB-1')).toEqual({ ok: false, hits: ['LAB-1'] });
+    expect(sanitizeFixture('plain', '')).toEqual({ ok: true, hits: [] });
+    // Built from parts, as the hygiene test builds its own: no committed file here may hold a host path whole.
+    const slash = '/';
+    for (const p of ['/storage/', `${slash}Users${slash}`, '/private/', `${slash}tmp${slash}`]) expect(sanitizeFixture(`a ${p}b`, 's').hits).toEqual([p]);
+  });
+});
