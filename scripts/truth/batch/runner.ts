@@ -515,30 +515,30 @@ class BatchRun<K> {
   }
 
   /**
-   * The one completeness rule, both paths (code review, review round 5): a block's own `complete()` when it gives one
-   * (true: complete; false or a throw: not, and the backstop reads its runs); a `noRecords` block, complete once its run
-   * returned before any abort; else S3's completeness over every live run and records.ts's gap of every record —
-   * complete only when incompleteLine has nothing to say (else `gap`, its line), never by its files being there. Nothing
-   * asked: not complete, and no gap.
+   * The one completeness rule, both paths (code review, review rounds 5, 6): S3's completeness over every live run and
+   * records.ts's gap of every record — complete only when incompleteLine has nothing to say (else `gap`, its line),
+   * never by its files being there; a block's own `complete()`, when it gives one, only adds a requirement (false or a
+   * throw: not complete); a `noRecords` block, its run returned before any abort, and its complete() if given. Nothing
+   * asked: complete only when its own complete() says so.
    */
   private async assess(b: Block<K>): Promise<{ complete: boolean; gap: string | undefined }> {
     const dir = this.dirs[b.id];
-    let complete = false;
-    let gap: string | undefined;
+    // A block's own complete() only adds a requirement (review round 6): it never hides a run's gap.
+    let own = true;
     if (b.complete !== undefined) {
       try {
-        complete = b.complete({ dir, fs: this.io.fs });
+        own = b.complete({ dir, fs: this.io.fs });
       } catch {
-        // a complete() that throws: not complete
+        own = false;
       }
-    } else if (b.noRecords === true) complete = this.finished.has(b.id);
-    else {
-      const runs = await this.askedRuns(b);
-      gap = runs.length === 0 ? undefined : incompleteLine(b.label, runs);
-      complete = runs.length > 0 && gap === undefined;
     }
-    return { complete, gap };
+    if (b.noRecords === true) return { complete: own && this.finished.has(b.id), gap: undefined };
+    const runs = await this.askedRuns(b);
+    const gap = runs.length === 0 ? undefined : incompleteLine(b.label, runs);
+    // Nothing asked: complete only on its own complete()'s word (a premise verdict, a capture), never by default.
+    return { complete: own && gap === undefined && (runs.length > 0 || b.complete !== undefined), gap };
   }
+
 
 
   /** Every run a block asked: each live run's completeness (S3), then each record's gap (records.ts). */
@@ -561,11 +561,13 @@ class BatchRun<K> {
     const own = () => hasVerdictOf(this.lines.get(b.id)!, b.label);
     return {
       block: b.id,
-      // Reportable now: its own verdict; or incomplete (its gap is the honest line); or complete with a judge to read it.
+      // Reportable now: its own verdict; or incomplete once its run returned (its gap is the honest line); or complete
+      // with a judge to read it. A run cut short (started, not returned) stays INTERRUPTED, its gap the why.
       complete: async () => {
         if (own()) return true;
         const a = await this.assess(b);
-        return a.gap !== undefined || (a.complete && b.judge !== undefined);
+        if (a.gap !== undefined) return this.finished.has(b.id) || parseVerdictLine(a.gap)!.why!;
+        return a.complete && b.judge !== undefined;
       },
       judge: async (run) => {
         if (own()) return this.lines.get(b.id)!;

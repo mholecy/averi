@@ -3,7 +3,7 @@ import type { BatchFs } from './io.js';
 import type { ProcessSeam } from './proc.js';
 import { stateOf, writeRestore } from './run-dir.js';
 import type { StepLog } from './steps.js';
-import { EXIT, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine, type BlockReport } from './words.js';
+import { EXIT, firstLineOf, messageOf, stepLine, summaryLines, timeOf, twoDigits, verdictLine, type BlockReport } from './words.js';
 
 /**
  * The dirty windows, and what stops a run inside one: batch-6's `on_abort`, batch-7's TRAPEXIT, batch-11's detached
@@ -77,8 +77,11 @@ export interface WindowSpec {
 /** A wanted block, as the abort SUMMARY sees it. */
 export interface AbortBlock {
   block: string;
-  /** Its records complete, so it can be judged without a device (batch-12's block_complete); its reading may be async. */
-  complete(): boolean | Promise<boolean>;
+  /**
+   * Its records complete, so it can be judged without a device (batch-12's block_complete): true; else false, or why
+   * not (a string, said in its INTERRUPTED line). Its reading may be async; it is read within the judges' budget.
+   */
+  complete(): boolean | string | Promise<boolean | string>;
   /** Its verdict lines, judged now — device-free, through the detached runner (batch-12's b12-analyze.ts). */
   judge(run: Run): Promise<readonly string[]>;
   /** The lines it wrote before the interrupt (its verdict.txt). */
@@ -454,7 +457,8 @@ export class AbortGuard {
     const reports: BlockReport[] = [];
     for (const b of this.options.blocks) {
       let report: BlockReport;
-      if (cut.has(b.block) || !(await this.completeOf(b))) report = { block: b.block, lines: b.linesSoFar(), interrupted: true };
+      const c = cut.has(b.block) ? {} : await this.completeOf(b, until, spent);
+      if (c !== true) report = { block: b.block, lines: b.linesSoFar(), interrupted: true, ...(c.why === undefined ? {} : { why: c.why }) };
       else {
         const left = (until - Date.now()) / 1000;
         if (skip === undefined && left <= 0) skip = spent;
@@ -470,12 +474,22 @@ export class AbortGuard {
     return reports;
   }
 
-  private async completeOf(b: AbortBlock): Promise<boolean> {
+  /**
+   * Whether a block is complete, read within what is left of the judges' budget (T2 S6a review round 6): true; or not,
+   * and why when known — its own why, `completeness not read in time`, a throw's first line, or the budget spent.
+   */
+  private async completeOf(b: AbortBlock, until: number, spent: string): Promise<true | { why?: string }> {
+    const left = (until - Date.now()) / 1000;
+    if (left <= 0) return { why: spent };
+    let r: Awaited<ReturnType<typeof within<boolean | string>>>;
     try {
-      return await b.complete();
-    } catch {
-      return false;
+      r = await within(left, Promise.resolve().then(() => b.complete()));
+    } catch (e) {
+      return { why: `completeness not read: ${firstLineOf(messageOf(e))}` };
     }
+    if (r.late) return { why: 'completeness not read in time' };
+    if (r.value === true) return true;
+    return typeof r.value === 'string' ? { why: r.value } : {};
   }
 
   /** A block judged within what is left of the budget: its lines; or why not; or `late`, its calls stopped. */
