@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { WindowSpec } from '../../../scripts/truth/batch/abort.js';
 import type { Asked } from '../../../scripts/truth/batch/cases.js';
+import type { Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import {
   ALERT_WAIT_MS,
@@ -54,25 +55,25 @@ afterEach(() => {
 });
 
 const fresh = (o: Omit<WorldOptions, 'dir'> = {}) => (world = labWorld({ dir, ...o }));
-async function simOf(run = runOf(world)): Promise<IosSim> {
+async function simOf(run: Run = runOf(world)): Promise<IosSim> {
   const r = await IosSim.open(LAB_UDID, run, { wait });
   if (!r.ok) throw new Error(r.why);
   return r.lab;
 }
 const config = (over: { udid?: string } = { udid: LAB_UDID }) => ({ out: join(dir, 'out'), repo: join(dir, 'repo'), env: {}, ...over });
 const steps: string[] = [];
-const needCtx = (run = runOf(world), udid: string | undefined = LAB_UDID): NeedCtx => ({ bounded: run, labDir: join(dir, 'lab'), config: config(udid === undefined ? {} : { udid }), fs: nodeFs, step: (w, t) => void steps.push(`${w} ${t}`) });
+const needCtx = (run = runOf(world), udid: string | null = LAB_UDID): NeedCtx => ({ bounded: run, labDir: join(dir, 'lab'), config: config(udid === null ? {} : { udid }), fs: nodeFs, step: (w, t) => void steps.push(`${w} ${t}`) });
 beforeEach(() => void (steps.length = 0));
 /** The words of the calls made, from the `n`th on. */
 const words = (from = 0) => world.calls.slice(from);
 
 /** A block's ctx as the runner gives it, recording what the block said and did, in order. */
-function blockCtx(run = runOf(world)) {
+function blockCtx(run = runOf(world), id = 'D43') {
   const events: string[] = [];
   const windows = new Map<string, WindowSpec>();
   const ctx = {
     id: 'D43',
-    dir: join(dir, 'D43'),
+    dir: join(dir, id),
     labDir: join(dir, 'lab'),
     config: config(),
     fs: nodeFs,
@@ -91,7 +92,7 @@ function blockCtx(run = runOf(world)) {
     verdictAndHand: (r: { line: string; hand: readonly string[] }) => void events.push(`verdict ${r.line}`, ...r.hand.map((h) => `hand ${h}`)),
     protectedLine: (l: string) => void events.push(`protected ${l}`),
     liveRun: async () => ({ live: { word: 'OK' as const, why: 'exit 0' } }),
-    asksLive: (name: string) => void events.push(`asks ${name}, state ${existsSync(join(dir, 'D43', 'state.json')) ? 'there' : 'none'}`),
+    asksLive: (name: string) => void events.push(`asks ${name}, state ${existsSync(join(dir, id, 'state.json')) ? 'there' : 'none'}`),
     asks: () => {},
     record: () => {},
   } satisfies BlockCtx;
@@ -243,7 +244,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
   it('no udid given: not met, nothing called; a refused simulator: the guard\'s why', async () => {
     const ios = iosLab({ wait });
     const check = (ios.need as { check(c: NeedCtx): Promise<unknown> }).check;
-    expect(await check(needCtx(runOf(world), undefined))).toEqual({ ok: false, why: 'no lab simulator udid given (--udid or AVERI_LAB_UDID)' });
+    expect(await check(needCtx(runOf(world), null))).toEqual({ ok: false, why: 'no lab simulator udid given (--udid or AVERI_LAB_UDID)' });
     expect(world.calls).toEqual([]);
     fresh({ simName: 'iPhone 17' });
     expect(await check(needCtx())).toMatchObject({ ok: false, why: expect.stringContaining('the lab guard refused') });
@@ -276,7 +277,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     expect(words()).toEqual(['xcrun simctl list devices -j', `idb ui describe-all --udid ${LAB_UDID}`]);
     fresh({ sick: 'describe-all' });
     expect(await alive(needCtx())).toEqual({ ok: false, why: 'idb ui describe-all: exit 1 No translation object returned' });
-    expect(await alive(needCtx(runOf(world), undefined))).toMatchObject({ ok: false });
+    expect(await alive(needCtx(runOf(world), null))).toMatchObject({ ok: false });
   });
 
   it('freshIn: a kept file is never overwritten — the next one gets -2, -3', () => {
@@ -319,7 +320,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const { ctx, events, windows } = blockCtx();
     const lab = await simOf();
     let ran = false;
-    expect(await wdaWindow(ctx, lab, { runs, work: async () => ((ran = true), world.startWda(), events.push('work')) })).toBe(true);
+    expect(await wdaWindow(ctx, lab, { runs, work: async () => void ((ran = true), world.startWda(), events.push('work')) })).toBe(true);
     expect(ran).toBe(true);
     const state = join(ctx.dir, 'state.json');
     expect(events).toEqual([
@@ -328,7 +329,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
       `note OK   D43 backup: com.apple.keyboard.preferences exported, com.apple.Preferences exported, com.apple.Accessibility exported; state ${state} (dirty until the restore verifies)`,
       `open ${WDA_WINDOW}`,
       'work',
-      'verdict D43 WDA-window restore: OK — com.apple.Accessibility put back (wrote back ApplicationAccessibilityEnabled, AutomationEnabled, AccessibilityEnabled in com.apple.Accessibility); port 8120 free',
+      'verdict D43 WDA-window restore: OK — com.apple.keyboard.preferences equal, com.apple.Preferences equal, com.apple.Accessibility put back (wrote back AccessibilityEnabled, ApplicationAccessibilityEnabled, AutomationEnabled in com.apple.Accessibility); port 8120 free',
       `close ${WDA_WINDOW}`,
       'OK ios-health before iOS end',
       'verdict D43 WDA-window compare: OK — every domain still equals its backup after the end check',
@@ -343,7 +344,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const { ctx } = blockCtx();
     const lab = await simOf();
     const before = world.calls.length;
-    await wdaWindow(ctx, lab, { work: async () => world.startWda() });
+    await wdaWindow(ctx, lab, { work: async () => void world.startWda() });
     const after = words(before);
     const kill = after.indexOf('pkill -f averi-wda-lab', after.findIndex((w) => w.includes('export com.apple.Accessibility')));
     const write = after.findIndex((w) => w.includes('defaults write com.apple.Accessibility'));
@@ -374,26 +375,27 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
   it('a late writer (the runner\'s exit after the restore, batch-11 review round 1): the compare WARN, its hand lines to RESTORE, the state marked dirty again', async () => {
     fresh({ lateFlip: true });
     const { ctx, events } = blockCtx();
-    await wdaWindow(ctx, await simOf(), { work: async () => world.startWda() });
+    await wdaWindow(ctx, await simOf(), { work: async () => void world.startWda() });
     expect(events.find((e) => e.startsWith('verdict D43 WDA-window compare'))).toMatch(/^verdict D43 WDA-window compare: WARN — com\.apple\.Accessibility: .*bool true → int 0.* — the state file marked dirty again; the hand lines are in RESTORE$/);
     expect(events.filter((e) => e.startsWith('hand ')).length).toBeGreaterThan(0);
     expect(stateOf(nodeFs, join(ctx.dir, 'state.json'))).toBe('dirty');
   });
 
-  it('a listener of 8120 left after the wait: killed, read again after 1.5 s — free (a listener killed); one that stays: NOT VERIFIED, the window left open, no compare', async () => {
+  it('a listener of 8120 left after the wait: killed, read again after 1.5 s — free (a listener killed); one that stays: NOT VERIFIED, the window left open for RESTORE, the compare still read', async () => {
     const { ctx, events } = blockCtx();
     // A listener that comes up during the 4 s wait (another runner's exit): killed at the port check.
     const opened = await IosSim.open(LAB_UDID, runOf(world), { wait: async (ms) => void (ms === WDA_EXIT_WAIT_MS && (world.st.listeners = [4343])) });
-    await wdaWindow(ctx, (opened as { lab: IosSim }).lab, { work: async () => world.startWda() });
+    await wdaWindow(ctx, (opened as { lab: IosSim }).lab, { work: async () => void world.startWda() });
     expect(events.find((e) => e.startsWith('verdict D43 WDA-window restore'))).toMatch(/; port 8120 free \(a listener killed\)$/);
     expect(words()).toContain('kill -TERM 4343');
     fresh({ stickyListener: true });
-    const two = blockCtx();
-    await wdaWindow(two.ctx, await simOf(), { work: async () => world.startWda() });
-    expect(two.events).toContain('verdict D43 WDA-window restore: ERROR — NOT VERIFIED — com.apple.Accessibility put back (wrote back ApplicationAccessibilityEnabled, AutomationEnabled, AccessibilityEnabled in com.apple.Accessibility); port 8120 still has a listener (pid 4242)');
+    const two = blockCtx(runOf(world), 'D43b');
+    await wdaWindow(two.ctx, await simOf(), { work: async () => void world.startWda() });
+    expect(two.events).toContain('verdict D43 WDA-window restore: ERROR — NOT VERIFIED — com.apple.keyboard.preferences equal, com.apple.Preferences equal, com.apple.Accessibility put back (wrote back AccessibilityEnabled, ApplicationAccessibilityEnabled, AutomationEnabled in com.apple.Accessibility); port 8120 still has a listener (pid 4242)');
     expect(two.events).toContain('ERROR the WDA window: the simulator not provably put back — the window stays open, its hand lines go to RESTORE');
     expect(two.windows.has(WDA_WINDOW)).toBe(true);
-    expect(two.events.some((e) => e.includes('compare'))).toBe(false);
+    // The domains verified, so the state is clean: the compare still runs (a WebDriverAgent left could write late).
+    expect(two.events.some((e) => e.startsWith('verdict D43 WDA-window compare: OK'))).toBe(true);
     expect(waits.filter((w) => w === PORT_RECHECK_MS)).toHaveLength(1);
   });
 

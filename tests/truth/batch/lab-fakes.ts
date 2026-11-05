@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_WDA_PORTS, LAB_APP } from '../../../scripts/truth/lab-device.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
@@ -95,6 +95,7 @@ export function labWorld(o: WorldOptions) {
     reachable: () => o.reachable !== false,
   };
   const app = join(o.dir, 'container', 'AveriLab.app');
+  rmSync(app, { recursive: true, force: true });
   if (o.appCells !== null) {
     mkdirSync(app, { recursive: true });
     writeFileSync(join(app, 'cells.json'), o.appCells ?? CATALOG);
@@ -113,6 +114,7 @@ export function labWorld(o: WorldOptions) {
     if (verb === 'bootstatus') return ok('Device already booted');
     if (verb === 'launch') return ok(`${LAB_APP.native.bundle}: 4242`);
     if (verb === 'install') {
+      if (!existsSync(join(args[3], 'cells.json'))) return exit(2, `no app at ${args[3]}`);
       const cells = readFileSync(join(args[3], 'cells.json'), 'utf8');
       mkdirSync(app, { recursive: true });
       writeFileSync(join(app, 'cells.json'), cells);
