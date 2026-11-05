@@ -15,6 +15,8 @@ Amended 2026-11-05 (T2 batch-13 fixes: idb disconnect after each companion end, 
 simulator's binary export, and batch-13's live check — see the T2 amendment's batch-13 part below).
 Amended 2026-11-05 (T2b-1: a changed protected key exits 1, a need's end and its calls recorded, the out-folder
 refusal, the cleanup's and the domains window's labels — see the T2 amendment's T2b-1 part below).
+Amended 2026-11-05 (T2b-2: the run in two groups, core and lab, one Stryker process each — see the T2 amendment's
+T2b-2 part below).
 
 ## Context
 
@@ -1354,3 +1356,57 @@ the SIGKILL after it, which bounded.ts's group kill rules out but for a group th
 survived, the same three without coverage), runner-lines.ts 100 % (370, 2 timeouts counted killed), words.ts 100 %
 (166), records.ts 100 % (73), ios-lab.ts 99.75 % (404, the same equivalent), every other module as before; floors
 unchanged. It supersedes the cold runs above.
+
+### T2b-2: the run in two groups (2026-11-05, backlog T2b)
+
+The T2b-1 cold runs took 328 to 359 s against the ~480 s line set in the S6b part above, and every batch slice adds
+about 60 s. Decision: **split the run, do not raise the bound.** Each scope.json entry names its `group`, `core` or
+`lab`, and one Stryker process mutates one group against that group's tests only.
+
+- `core`: the ten src/ modules and the batch's runner core — words, select, run-dir, steps, io, bounded, abort,
+  preconditions, cases, live-table, records, runner-lines, runner (23 modules, 6 232 mutants).
+- `lab`: the lab modules — ios-defaults, ios-domains, lab-chooser, lab-emu, lab-lines, ios-lab, android-lab, lab-build
+  (8 modules, 3 296 mutants).
+
+Groups by family, not by count: every test a module lists is a test of its own group (io's run-dir and steps tests,
+runner-lines' and records' runner test in core; lab-chooser's lab-emu test, ios-defaults' ios-domains-sim test in lab),
+so no group's run needs the other's tests. The measured cost, from the last single cold run's report (main after T2b-1,
+each mutant's `duration` summed per module, 3 075 worker-seconds in a 340 s run): core 2 217 s (draw-order 422, geometry
+188, abort 160, ios-typing 155, android-chooser 147, ios-liveness 146, bounded 144, runner-lines 123, preconditions 115,
+fill-reformat 114, every other module under 100), lab 858 s (lab-chooser 255, lab-lines 207, ios-defaults 168, every
+other module under 80). Expected from that: core about 230 s, lab about 100 s, each under 60 % of the 600 s bound (360
+s). Measured, cold, on unchanged code: **core 200 s, lab 62 s**; run one after the other without `--group` (`npm run
+mutate -- --force`), 264 s in all (core 203 s, lab 60 s; about 340 s as one run before). Core holds about three quarters
+of the cost; balancing by moving runner-core modules into lab would split a family whose tests import each other for
+some 30 s, while core's 200 s is already 280 s under the ~480 s line.
+
+Mechanics. `scripts/mutation/group.mjs` (plain JS, so stryker.config.mjs loads it without tsx) checks the groups — an
+entry without one or with an unknown one, or a group no entry names, is an error, and both configs throw on it — and
+gives one Stryker process its group from `AVERI_MUTATE_GROUP`: its modules (stryker.config.mjs's `mutate`), their tests
+(vitest.mutation.config.ts's `include`, read in Stryker's workers too: core's dry run ran 1 525 tests, lab's 346), and
+its own incremental file, reports and temp dir (`reports/mutation/stryker-incremental-<group>.json`,
+`mutation-<group>.json`/`.html`, `node_modules/.stryker-tmp-<group>`). No group in the env — Stryker started by hand —
+is the whole scope under the old names, as before. `npm run mutate` (mutate.ts) takes `--group core|lab`; without it, it
+runs core and then lab, each in a process group of its own bounded at 600 s (SIGTERM, then SIGKILL 10 s later; the group
+SIGKILLed once Stryker has ended, so no worker outlives it), lab running whatever core's result, and fails if either
+fails — the first failure's exit — with one summary line per group (`npm run mutate: core passed in 200 s`). Floors are
+checked per group, exactly as before, against that group's entries. An interrupt goes to the running group and no later
+group starts (exit 130). `--force` passes through; `--tempDirName <name>` becomes `<name>-<group>`; `--mutate <files>`
+without `--group` sends each file to its own group (a Stryker range after it kept) and runs only the groups named, a
+file no entry names a refusal (exit 2, nothing started); with `--group` it is passed on as given, globs too.
+
+So the loop's command, `npm run mutate -- --force --tempDirName .stryker-tmp-<n>`, still runs everything, cold. A merge
+may instead run `npm run mutate -- --group core --force` and `-- --group lab --force` as two commands, both required.
+Adding a module is still its scope.json entry (now with its group) and, outside src/ and scripts/truth/batch/, its
+folder in the sandbox allowlist. The threshold rule from here on: **each group's cold run stays under ~480 s**; when one
+nears it, move modules between groups or add a group by an amendment here (the measured times beside it), or raise the
+bound by a decision recorded here. A run without `--group` may then take longer than one command's 600 s; the merge then
+runs the groups as separate commands.
+
+Tests: tests/mutation/group.test.ts (the group errors, a group's entries, scopeOf's files and its throws, scope.json
+itself) and tests/mutation/mutate.test.ts (planRuns' groups, refusals, tempDirName and --mutate routing; main over a
+fake spawner: the order, each group's report removed before its run, its env and bound, its own floors, a failure not
+stopping the next group, the first failure's exit, a bound passed, an interrupt, no report, a refusal and a scope error
+starting nothing; spawnBounded over node: the exit and env, a bound killing a grandchild that ignores SIGTERM, an
+interrupt passed on and its listeners removed). 39 hand mutants, each from a .bak copy and bounded: all killed. Every
+module's score and mutant count is the same as in T2b-1's final single run; floors unchanged.
