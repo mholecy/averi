@@ -298,14 +298,14 @@ class BatchRun<K> {
       return await this.guard.run(async () => {
         const pre = await this.preconditions();
         if (pre === undefined) return EXIT.interrupted;
-        const ran: Block<K>[] = [];
         for (const b of this.blocks) {
           if (this.guard.interrupted) return EXIT.interrupted;
-          if (await this.runBlock(b, pre.get(b.id))) ran.push(b);
+          await this.runBlock(b, pre.get(b.id));
         }
         if (this.guard.interrupted) return EXIT.interrupted;
         const restore = await this.guard.finish();
-        for (const b of ran) await this.judgeAtEnd(b);
+        // A block not run has its INCONCLUSIVE line already: only the blocks that ran are judged.
+        for (const b of this.blocks) await this.judgeAtEnd(b);
         for (const b of this.blocks) await this.backstop(b);
         if (this.guard.interrupted) return EXIT.interrupted;
         return this.end(restore);
@@ -347,8 +347,8 @@ class BatchRun<K> {
     };
   }
 
-  /** A block: not run for a precondition or a need, its INCONCLUSIVE written; else run. Whether it ran. */
-  private async runBlock(b: Block<K>, precondition: string | undefined): Promise<boolean> {
+  /** A block: not run for a precondition or a need, its INCONCLUSIVE written; else run. */
+  private async runBlock(b: Block<K>, precondition: string | undefined): Promise<void> {
     if (precondition !== undefined) return this.notRun(b, precondition);
     const failed: { need: string; why: string }[] = [];
     for (const need of b.needs) {
@@ -356,16 +356,15 @@ class BatchRun<K> {
       if (!r.ok) failed.push({ need, why: r.why });
     }
     if (failed.length > 0) return this.notRun(b, needsLine(b.label, failed));
-    if (this.guard.interrupted) return false;
+    // A need checked while the abort began (its probe stopped): the block is not started.
+    if (this.guard.interrupted) return;
     this.log.print(`== ${b.id} (${this.dirs[b.id]}/) ==`);
     await b.run(this.ctxOf(b));
-    return true;
   }
 
-  private notRun(b: Block<K>, line: string): false {
+  private notRun(b: Block<K>, line: string): void {
     this.verdict(b, line);
     this.log.step('SKIP', `${b.id} not run: ${parseVerdictLine(line)?.why}`);
-    return false;
   }
 
   /** A need's answer, checked once: by the first block that names it. Its lab line in the order checked. */
@@ -517,7 +516,7 @@ class BatchRun<K> {
     };
   }
 
-  /** The normal end's judge: for a block that ran and wrote no verdict of its label. A throw is an ERROR line. */
+  /** The normal end's judge: for a block with no verdict of its label (so one that ran). A throw is an ERROR line. */
   private async judgeAtEnd(b: Block<K>): Promise<void> {
     if (b.judge === undefined || hasVerdictOf(this.lines.get(b.id)!, b.label)) return;
     try {

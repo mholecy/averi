@@ -32,6 +32,8 @@ interface Answer {
   files?: Record<string, string>;
   /** It runs until its group is signalled. */
   hang?: boolean;
+  /** Something of its group outlives its leader (a daemon: idb_companion) until the group is signalled. */
+  leaves?: boolean;
 }
 type Rule = (cmd: string, args: readonly string[]) => Answer | undefined;
 
@@ -43,6 +45,9 @@ class FakeSeam implements ProcessSeam {
   readonly said: string[] = [];
   private readonly ends = new Map<number, (e: Ended) => void>();
   private readonly ended = new Set<number>();
+  private readonly left = new Set<number>();
+  /** Each signal sent, `<signal> <command>`. */
+  readonly signals: string[] = [];
   private nextPid = 100;
   /** What a call saw when it started: whether each named file was there. */
   readonly seen: Record<string, boolean>[] = [];
@@ -58,6 +63,7 @@ class FakeSeam implements ProcessSeam {
     if (a.log !== undefined && options.logFd !== undefined) writeSync(options.logFd, a.log);
     for (const [path, text] of Object.entries(a.files ?? {})) writeFileSync(path, text);
     const pid = this.nextPid++;
+    if (a.leaves === true) this.left.add(pid);
     let end!: (e: Ended) => void;
     const exited = new Promise<Ended>((r) => (end = r));
     this.ends.set(pid, (e) => {
@@ -69,6 +75,11 @@ class FakeSeam implements ProcessSeam {
     return { pid, exited, closed: exited.then(() => {}), out: () => answer.out ?? '', err: () => answer.err ?? '', release: () => {} };
   }
   killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult {
+    if (signal !== 0 && (this.left.has(pid) || !this.ended.has(pid))) this.signals.push(`${signal} ${this.calls[pid - 100].cmd} ${this.calls[pid - 100].args.join(' ')}`);
+    if (this.left.has(pid)) {
+      if (signal !== 0) this.left.delete(pid);
+      return 'sent';
+    }
     if (this.ended.has(pid)) return 'gone';
     if (signal !== 0) this.ends.get(pid)?.({ code: null, signal });
     return 'sent';
@@ -110,16 +121,19 @@ const casesSummary = (ids: readonly string[]) => [`${LIVE_GOLDEN_HEADER} ${ids.l
  * `--rejudge` writes the summary. `noRecord`: it writes none.
  */
 const live =
-  ({ code = 0, header = true, noRecord = false, logExtra = '' }: { code?: number; header?: boolean; noRecord?: boolean; logExtra?: string } = {}): Rule =>
+  ({ code = 0, header = true, noRecord = false, logExtra = '', rejudge }: { code?: number; header?: boolean; noRecord?: boolean; logExtra?: string; rejudge?: Answer } = {}): Rule =>
   (cmd, args) => {
     if (cmd !== process.execPath || !args.some((a) => a.endsWith('live.ts'))) return undefined;
     const at = (flag: string) => args[args.indexOf(flag) + 1];
-    if (args.includes('--rejudge')) return { log: casesSummary(['kf1', 'kf2', 'kf3']) };
+    if (args.includes('--rejudge')) return rejudge ?? { log: casesSummary(['kf1', 'kf2', 'kf3']) };
     const cases = args.includes('--cases') ? at('--cases').split(',') : [];
     return { code, log: `${header ? casesSummary(cases) : 'live.ts: started\n'}${logExtra}`, files: noRecord ? {} : { [at('--record')]: '{"platform":"android","results":[]}' } };
   };
-/** A probe: `probe <name>` exits 0, `hang` runs until stopped. */
-const probes: Rule = (cmd, args) => (cmd === 'probe' ? (args[0] === 'hang' ? { hang: true } : ok(`${args[0]} done\n`)) : undefined);
+/** A probe: `probe <name>` exits 0, `hang` runs until stopped; `idb …` leaves its companion in its group. */
+const probes: Rule = (cmd, args) => {
+  if (cmd === 'idb') return { leaves: true };
+  return cmd === 'probe' ? (args[0] === 'hang' ? { hang: true } : ok(`${args[0]} done\n`)) : undefined;
+};
 
 const table: LiveTable = async () =>
   ({
@@ -341,6 +355,8 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     await expect(go([plain('kf'), plain('kf')])).rejects.toThrow('block kf is named twice');
     await expect(go([plain('kf', { label: 'kf: x' })])).rejects.toThrow('holds a colon');
     await expect(go([plain('k f')])).rejects.toThrow('one plain path segment');
+    await expect(runBatch({ name: 'batch-t', blocks: [plain('kf'), plain('kf')], config: { ok: false, errors: ['ERROR x — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } })).rejects.toThrow('block kf is named twice');
+    expect(terminal).toEqual([]);
     expect(seam.calls).toEqual([]);
     expect(existsSync(out)).toBe(false);
   });
@@ -455,6 +471,16 @@ describe('needs: each checked once, when the first wanted block needing it comes
     await go([plain('kf', { needs: ['android'] })], { needs: n });
     expect(got).toEqual({ labDir: dirOf('lab'), serial: 'emulator-5554' });
     expect(seam.words()).toContain('probe emu');
+  });
+});
+
+describe('a block\'s calls are its own: stopKept ends the groups it kept, no other block\'s (S2: batch-12 ended the companion after each iOS block)', () => {
+  it('an idb call\'s companion kept past the call; the block\'s stopKept ends it; another block\'s stays to the run\'s end', async () => {
+    await go([
+      plain('A', { run: async (ctx) => (await ctx.bounded('idb', ['a'], { secs: 5 }), ctx.verdict('PASS')) }),
+      plain('B', { run: async (ctx) => (await ctx.bounded('idb', ['b'], { secs: 5 }), await ctx.stopKept(), seam.signals.push('-- B stopped its own'), ctx.verdict('PASS')) }),
+    ]);
+    expect(seam.signals).toEqual(['SIGTERM idb b', '-- B stopped its own', 'SIGTERM idb a']);
   });
 });
 
@@ -598,6 +624,57 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     ]);
   });
 
+  it('no block starts once the abort began: a later block\'s need is never checked, a block with a judge not reached never judged', async () => {
+    const checked: string[] = [];
+    const judged: string[] = [];
+    const done = go([e5(), plain('x', { needs: ['android'], judge: async () => (judged.push('x'), ['x verdict: PASS']) })], { needs: { android: async () => (checked.push('android'), { ok: true, how: 'up' }) } });
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(checked).toEqual([]);
+    expect(judged).toEqual([]);
+    expect(summary()).toContain('x: INTERRUPTED — its records are not complete, not judged (rerun ONLY=x)');
+  });
+
+  it('a need being checked when the abort begins (its probe stopped): its block is not started', async () => {
+    const ran: string[] = [];
+    // A check that says up whatever its probe did: only the abort keeps the block from starting.
+    const n = { android: async (c: NeedCtx) => (await c.bounded('probe', ['hang'], { secs: 30 }), { ok: true as const, how: 'up' }) };
+    const done = go([plain('kf', { needs: ['android'], run: async () => void ran.push('kf') })], { needs: n });
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(ran).toEqual([]);
+  });
+
+  it('a live run whose rejudge was cut: its records are not complete, so it is not judged (batch-12: every .cases its record and rejudge)', async () => {
+    seam.rules = [git(), probes, live({ rejudge: { hang: true } })];
+    const done = go([kfBlock()]);
+    await until(() => seam.words().some((w) => w.includes('--rejudge')));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(summary()).toContain('kf: INTERRUPTED — its records are not complete, not judged (rerun ONLY=kf)');
+  });
+
+  it('records complete but no judge to read them: INTERRUPTED, nothing invented', async () => {
+    const done = go([plain('T6', { run: async (ctx) => (ctx.asks('c', { kind: 'runs', runs: 1 }), ctx.record('c', { kind: 'runs', runs: 1 })) }), e5()]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(summary()).toContain('T6: INTERRUPTED — its records are not complete, not judged (rerun ONLY=T6)');
+  });
+
+  it('a block that wrote its own verdict keeps those lines: its judge is not run again by the abort', async () => {
+    const judged: string[] = [];
+    const done = go([plain('a', { judge: async () => (judged.push('a'), ['a verdict: FAIL — judged again']) }), e5()]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(judged).toEqual([]);
+    expect(summary()).toContain('a verdict: PASS');
+    expect(summary()).not.toContain('a verdict: FAIL — judged again');
+  });
+
   it('a block whose verdict was written before the interrupt keeps it, judged as is; one skipped keeps its INCONCLUSIVE', async () => {
     const done = go([plain('a'), plain('b', { preconditions: [async () => ({ ok: false, why: 'no' })] }), e5()]);
     await until(() => seam.words().includes('probe hang'));
@@ -715,6 +792,16 @@ describe('liveRun: the .cases first, live.ts with its record, then its rejudge �
     await go([kfBlock()]);
     expect(outText()).toContain(`DONE kf live android-kf-1 (exit 1: a MISMATCH or a known case off, judged by the analyzer) — see ${join(dirOf('kf'), 'android-kf-1.log')}`);
     expect(seam.words().some((w) => w.includes('--rejudge'))).toBe(true);
+  });
+
+  it('the rejudge is judged the same way: exit 1 with its header DONE, any other failure FAIL', async () => {
+    seam.rules = [git(), probes, live({ rejudge: { code: 1, log: casesSummary(['kf1']) } })];
+    await go([kfBlock()]);
+    expect(outText()).toContain(`DONE kf rejudge android-kf-1 (exit 1: a MISMATCH or a known case off, judged by the analyzer) — see ${join(dirOf('kf'), 'android-kf-1.rejudge.txt')}`);
+    rmSync(out, { recursive: true, force: true });
+    seam.rules = [git(), probes, live({ rejudge: { code: 2, log: 'Error: no record\n' } })];
+    await go([kfBlock()]);
+    expect(outText()).toContain(`FAIL kf rejudge android-kf-1 (exit 2) — see ${join(dirOf('kf'), 'android-kf-1.rejudge.txt')}`);
   });
 
   it('exit 1 without it is FAIL: live.ts died before judging (batch-10\'s judged exit-1 rule)', async () => {
