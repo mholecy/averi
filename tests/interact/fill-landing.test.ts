@@ -8,7 +8,8 @@ import { isMaskedValue } from '../../src/ui-tree/masked-value.js';
  * Did the fill land? — interact/fill-landing.ts, the one judge of a field's reading. `landingOf`'s table first, then
  * what of a typing a field's reading proves dropped — the only text fillField ever types again
  * (docs/bugs/2026-10-19-ios-fill-loses-the-tail-of-its-text-in-a-react-native-single-line-field.md; the retype itself
- * is fill-type.test.ts's and fill.test.ts's) — then the mismatch's classification, and the agreement of the two.
+ * is fill-type.test.ts's and fill.test.ts's) — then the mismatch's classification, and the agreement of the two: all of
+ * it through `readingOf`, whose `tail` and `differs` the helpers below read.
  */
 
 /** An input typed into without clear, nothing before, no placeholder, nothing held — `f` says what differs. */

@@ -177,6 +177,12 @@ Residuals, stated: residual 3 below. Wider, on every source and not D64's: a NON
 pre-tap reading, never re-read (fill.ts), so a field that inserts on focus a prefix holding the value has the same hole
 there; noted for D64b.
 
+## Amendment: the said-plain landing carries its difference (2026-11-05, A9)
+
+`landingOf`'s `said-plain` now holds `differs: { kind: 'masked-said-plain' }` (fill-landing.ts#Landing) and fill-type.ts
+fails with it, still before `reportDroppedTail`; a shorter masked reading gets the same difference from `readingOf`'s
+miss. A2's amendment above names `differenceOf`, now private. Timing and every reply are unchanged.
+
 ## Residuals accepted
 
 1. **A source that wrongly says plain of a masking field**, an autofill of N bullets on focus and exactly N dropped

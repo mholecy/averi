@@ -363,7 +363,7 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(moved.typed).toEqual(['SK3112000000']); // no wipe: the deletes would go where the typing went
   });
 
-  // Review round 1: the landing is computed once (`landing`), and `tookText` gates it — after a retry too, where the
+  // Review round 1: the landing is computed once (`landing`), and fill-landing.ts#tookText gates it — after a retry too, where the
   // loop's own not-taken check is no longer asked.
   it('a non-input that ends on its own resolved text after the wipe and retype has not landed', async () => {
     const { io, intent, field } = scripted();

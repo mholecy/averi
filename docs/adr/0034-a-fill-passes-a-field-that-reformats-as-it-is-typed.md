@@ -829,6 +829,29 @@ mismatch is numbered below, residual 10, and filed in scripts/truth/live-known.t
 docs/truth/live-records/*-forms-l7-1.json, ios-rn-*-forms-l7-*.json and *-forms-d61-whole.json, replayed by
 tests/truth/live-rejudge.test.ts.
 
+## Amendment: one answer about a reading (2026-11-05, A9)
+
+A2 moved the landing rule into one module, but its interface stayed five questions about one reading, in an order
+fill-type.ts had to know. `interact/fill-landing.ts` now answers once: `readingOf` is total, a `Landing` or a miss
+(`not-taken`, `missed`) with its `Miss`, the tail and the Difference. `landingOf` stays, the poll's question; `tookText`,
+`tailOf`, `droppedTail` (folded into `Miss.tail.retypable`), `differenceOf` and `Tail` are private. So:
+
+- A2's amendment above: `landedReformat`, `landedSome`, `priorText` and `priorsOf` are asked through `landingOf` and
+  `readingOf`.
+- D53's PRECONDITION above is gone as a precondition: only `readingOf` asks `differenceOf`, of a reading that did not
+  land. What it would read of one that lands is no longer reachable.
+- `wholeLandingToo` is asked once, in the `Miss`. The `elsewhere` hedge moved with it: fill-type.ts applies
+  `withoutWholeToo` on that branch and fill-text.ts only words the Difference it is given (until now it stripped
+  `wholeToo` by `as never`), so a `Typed` says what its reply says.
+- The three earlier-text policies stay as they are, `typedPartOf`'s literal slice deliberate (A2's amendment).
+
+Behaviour-preserving: a temporary differential over the frozen modules (rows of reading, value, earlier text, clear,
+placeholder, held count and input; scripted reads through both `typeAndConfirm`, comparing the ordered device calls and
+sleeps, `Typed` and the failure's bytes) found no difference, and was deleted with the change. One correction to the D64
+amendment above: `55` for `55` after `5` lands (the reading is the value itself, residual 7), so it never was a `length`
+that is a whole landing too; `xaa` for `aa` after `xa` is. Likewise the D53 row `a-b1234` after `ab` lands, and the row is
+now `a-b12.34`.
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;

@@ -58,9 +58,9 @@
  *   is never a reformat).
  *
  * It judges facts, never a reading: what a read-back that missed the value
- * differs by (`Difference`) is interact/fill-landing.ts#differenceOf's,
+ * differs by (`Difference`) is interact/fill-landing.ts#readingOf's,
  * carried in the mismatch FillFailure (A2, 2026-11-01; until then
- * `differenceOf` lived here).
+ * its classification lived here).
  *
  * Its one import is the facts (interact/fill-facts.ts, a leaf). It imports
  * neither fill.ts, which measures, nor fill-text.ts, which reads the

@@ -211,3 +211,10 @@ in it, no bullet — is `interact/fill-landing.ts#tailOf` (and `#droppedTail`), 
 the verdict's `dropped-tail` asks the same function. The retype condition on the adapter (`typingDelivery`
 `on-return`) is `interact/fill-type.ts#retypesTail`, asked by the typing and by fill.ts's post-focus re-read gate
 (ADR 0028), which until then each wrote it out. No behaviour changed.
+
+## Amendment: the tail is part of one answer about the reading (2026-11-05, A9)
+
+`#droppedTail` is gone and `#tailOf` is private: fill-type.ts asks `interact/fill-landing.ts#readingOf` once after the
+poll, and a miss carries its tail (`Miss.tail`: `missing`, what `whereTyped` compares with; `retypable`, what the old
+function answered). The definition above and the gates of this ADR (the bounds, a steady reading, `whereTyped`,
+`retypesTail`) are unchanged, and stay fill-type.ts's. No behaviour changed.

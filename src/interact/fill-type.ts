@@ -11,8 +11,9 @@
  * landed or not, the last reading, what was typed again, and for a typing that
  * missed what can be said of the difference. Whether a reading landed, what
  * tail it proves dropped and the difference are interact/fill-landing.ts's
- * (`landingOf`, `droppedTail`, `differenceOf`) — this module asks, never
- * judges a reading itself. Every wording is interact/fill-text.ts's.
+ * (`landingOf` for the poll, then `readingOf`, one answer about the reading it
+ * ended on) — this module goes by the answer, never judges a reading itself.
+ * Every wording is interact/fill-text.ts's.
  *
  * The rules it owns:
  * - the poll: READ_BACK_POLLS (five) reads at `pollMs` until the reading lands, never stopping
@@ -28,7 +29,7 @@
  *      the typing is there with its value — an auto-advancing code box that
  *      moved the focus would get the tail too; a sibling the app recomputed
  *      proves nothing either way, and stops the tail too). Since D28 the
- *      prefix may be REFORMATTED (fill-landing.ts#tailOf): a field that groups as it is
+ *      prefix may be REFORMATTED (fill-landing.ts#Miss): a field that groups as it is
  *      typed shows `1 234 567,` for a typed `1234567,89` that lost `89` —
  *      exact by typed characters, only grouping added, `reformatOf`'s rules
  *      judged over the whole typing (iOS React Native, rf2, 2026-10-31: the
@@ -42,7 +43,7 @@
  *      `MAX_TAIL_RETYPES` times, and again only while each retype moved the
  *      field. Which reading proves a dropped tail — a strict prefix with some
  *      of the typing in it, no bullet, the earlier text unchanged — is
- *      fill-landing.ts#droppedTail's: only a strict prefix proves which
+ *      fill-landing.ts's (`Miss.tail`, `retypable`): only a strict prefix proves which
  *      characters are missing, so a retype can never duplicate one that is
  *      there. Measured on React Native 0.88's
  *      controlled single-line TextInput under `idb ui text`: 6 of 12 fills
@@ -107,8 +108,8 @@ export interface TypingIntent extends Expectation {
  * - `not-taken`: a non-input whose reading never took the text — not the field;
  * - `unread`: no reading to compare (the node withholds its text, or the last read did not find the field);
  * - `missed`: the last reading is not the value after everything was sent again — `differs` what can be said of the
- *   difference (fill-landing.ts#differenceOf); `elsewhere` when another input changed while typing (the focus left the
- *   field — nothing was sent again then).
+ *   difference (fill-landing.ts#Miss); `elsewhere` when another input changed while typing (the focus left the field —
+ *   nothing was sent again then), `differs` without its whole-landing hedge then (fill-landing.ts#withoutWholeToo).
  * `again`: what was sent again, in the order sent (fill-facts.ts#SentAgain; empty: nothing).
  */
 export type Typed =

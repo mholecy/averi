@@ -1,17 +1,21 @@
 /**
  * Did the fill land? — the one module that judges a field's reading against what it should hold (A2, 2026-11-01).
  * Until then that was judged in four modules by three rules of the earlier text, and D28 and D29 were both bugs of
- * the typing and the verdict judging the same reading differently. Three questions, one answer each:
- * - `landingOf`: did this reading land — exactly, reformatted, or only as the field's placeholder — or is it a masked
- *   reading that proves the field was wrongly said plain? Without clear, the value must be in what was typed past the
- *   earlier text, unless the reading is the value itself (D64; a reading unchanged since typing began holds none, D63).
- * - `tailOf` (and `droppedTail`): is it a strict prefix of what the field should hold — the tail a field dropped?
- * - `differenceOf`: what can be said of a reading that missed, without content?
- * interact/fill-type.ts asks the first two as it types, polls and retypes; it asks the third once, for a typing that
- * missed, and fill.ts throws what comes back. fill.ts asks one more (`needsHeldCount`): whether the field can hold
- * bullets the masked rule must count from — its post-focus re-read's gate. Pure: no device, no wait, no sentence. Its
- * imports are the facts (fill-facts.ts), the character rules of a reformatting field (fill-reformat.ts), the mask
- * characters and the input role.
+ * the typing and the verdict judging the same reading differently. One reading, one answer (A9, 2026-11-05: until then
+ * fill-type.ts asked five questions of one reading, in an order it had to know):
+ * - `readingOf`: the whole answer, for any reading — a landing, or a miss (`not-taken` or `missed`) with what can be
+ *   said of it (`Miss`): the tail it proves dropped and whether that may be typed again, and the difference, without
+ *   content.
+ * - `landingOf`: the poll's question, all it needs of up to five readings a round — is this one final? Exactly,
+ *   reformatted, only as the field's placeholder, or a masked reading that proves the field was wrongly said plain.
+ *   Without clear, the value must be in what was typed past the earlier text, unless the reading is the value itself
+ *   (D64; a reading unchanged since typing began holds none, D63).
+ * - `withoutWholeToo`: a difference without its whole-landing hedge, for keys proven typed elsewhere.
+ * interact/fill-type.ts polls on the second and goes by the first, and fill.ts throws the difference that comes back.
+ * fill.ts asks one more (`needsHeldCount`, of a node, not a reading): whether the field can hold bullets the masked
+ * rule must count from — its post-focus re-read's gate. Pure: no device, no wait, no sentence. Its imports are the
+ * facts (fill-facts.ts), the character rules of a reformatting field (fill-reformat.ts), the mask characters and the
+ * input role.
  */
 
 import { INPUT_ROLE, type UiNode } from '../adapters/types.js';
@@ -53,16 +57,32 @@ type TextExpectation = Pick<Expectation, 'value' | 'clear' | 'before' | 'placeho
  * - `said-plain`: the held count is `'unread'` and the reading is masked, longer than typed — the field its source said
  *   is plain shows bullets after all, and no length of it proves anything but the typed one (two dropped keys under
  *   five autofilled bullets would pass `held + typed` with a `held` of 0). Final: the poll stops on it, as on a landed
- *   reading, and the fill fails `masked-said-plain` (`differenceOf`). A SHORTER masked reading has not landed and the
- *   poll goes on — its keys may still arrive; the timing of both is as it was when fill.ts overrode a landed reading.
+ *   reading, but no landing: the fill fails with `differs`. A SHORTER masked reading has not landed and the poll goes
+ *   on — its keys may still arrive; the timing of both is as it was when fill.ts overrode a landed reading.
  */
 export type Landing = { kind: 'landed'; reformatted?: Reformat } | { kind: 'placeholder' } | { kind: 'said-plain'; differs: { kind: 'masked-said-plain' } };
 
+/**
+ * What can be said of a reading that did not land. The two are orthogonal: `Jan` for a typed `Jan Novak` after `Jan`,
+ * with clear, is `unchanged` and has a tail to type again; a tail the typing's own gates refuse (the bounds, a reading
+ * still moving) still needs its difference.
+ */
 export interface Miss {
+  /**
+   * The reading is a strict prefix of what the field should hold (`tailOf`): `missing` the rest, what `whereTyped`
+   * compares a sibling's gain with. `retypable`: it proves that much dropped, some of the typing there and no whole
+   * landing as well (`wholeLandingToo`) — what fill-type.ts may type again, behind its own gates (ADR 0023).
+   */
   tail?: { missing: string; retypable: boolean };
+  /** What differs, without content (`differenceOf`). */
   differs: Difference;
 }
 
+/**
+ * The one answer about one reading: a `Landing`, or a miss — `not-taken` when a non-input never took the text
+ * (`tookText`), else `missed`. `not-taken` carries a `Miss` too: only the first reading of a typing ends on it, and
+ * after a retry fill-type.ts goes on from it.
+ */
 export type Reading = Landing | ({ kind: 'not-taken' } & Miss) | ({ kind: 'missed' } & Miss);
 
 /**
@@ -88,13 +108,14 @@ export function landingOf(observed: string, e: Expectation): Landing | undefined
   return { kind: 'landed', ...(reformatted !== undefined && { reformatted }) };
 }
 
+/** The whole answer about any reading (`Reading`). Pure, O(observed × value): `landingOf` is the poll's. */
 export function readingOf(observed: string, e: Expectation): Reading {
   const landing = landingOf(observed, e);
   if (landing !== undefined) return landing;
   return { kind: tookText(observed, e) ? 'missed' : 'not-taken', ...missOf(observed, e) };
 }
 
-/** What can be said of a reading that did not land (`Miss`). The whole-landing question is asked here, and only here. */
+/** What can be said of a reading that did not land (`Miss`); whether it is a whole landing too is asked here alone. */
 function missOf(observed: string, e: Expectation): Miss {
   const tail = tailOf(observed, e);
   const wholeToo = landedSome(tail) && wholeLandingToo(heldText(observed, e.placeholder), e);
@@ -105,8 +126,8 @@ function missOf(observed: string, e: Expectation): Miss {
 }
 
 /**
- * The Difference without its whole-landing hedge (`wholeToo`): keys proven typed elsewhere are no select-all, so a reply
- * that says where they went must not say that too (fill-type.ts's `elsewhere`). Every other Difference as it was. Pure.
+ * The Difference without its whole-landing hedge (`wholeToo`): keys proven typed elsewhere are no select-all, so a
+ * reply that says where they went must not say that too (fill-type.ts's `elsewhere`). Any other as it was. Pure.
  */
 export function withoutWholeToo(d: Difference): Difference {
   if (d.kind !== 'dropped-tail' && d.kind !== 'length') return d;
@@ -264,7 +285,7 @@ const landedSome = (tail: Tail | undefined): tail is Tail => tail !== undefined 
  * What the field is missing of what it should hold (its text before the typing, unless cleared — or vanished, then
  * none: `priorsOf`, D29 — then the value), when its reading is a strict prefix of that — exactly or reformatted
  * (`prefixOf`, D28; ending in an eager trailing mark too, D60) — and shows no bullet: a `Tail`, else undefined. The one
- * definition of a dropped tail: the typing retypes it (`droppedTail`) and the verdict names it (`differenceOf`), so the
+ * definition of a dropped tail: the typing retypes it (`Miss.tail`) and the verdict names it (`differenceOf`), so the
  * two judge a prefix alike. Pure.
  */
 function tailOf(observed: string, e: TextExpectation): Tail | undefined {
@@ -291,10 +312,10 @@ function tailOf(observed: string, e: TextExpectation): Tail | undefined {
  *   `-5`).
  * A value found only inside the earlier text among more of it (`Note: hellohe` for `hello` after `Note: hello`, f16's
  * `31.12.2021`) is no whole landing, and its tail is typed again. `differenceOf` marks every such miss `wholeToo` — a
- * `dropped-tail` where the field grouped the prefix (`11 `, `a1 1`), a `length` where it is exact (`-5-`, `55` after
- * `5`) — and its reply names the select-all reading and `clear: true`. Brute-forced (D64 review round 1) over small
- * alphabets: no reading that a select-all field, a caret anywhere in the earlier text, or a leading or trailing mark
- * makes of a whole landing is typed into again.
+ * `dropped-tail` where the field grouped the prefix (`11 `, `a1 1`), a `length` where it is exact (`-5-`, `xaa` for
+ * `aa` after `xa`) — and its reply names the select-all reading and `clear: true`. Brute-forced (D64 review round 1)
+ * over small alphabets: no reading that a select-all field, a caret anywhere in the earlier text, or a leading or
+ * trailing mark makes of a whole landing is typed into again.
  */
 function wholeLandingToo(held: string, e: TextExpectation): boolean {
   // The first index an occurrence of the value can start at and still end past the earlier text; a negative start is
@@ -329,8 +350,9 @@ function wholeLandingToo(held: string, e: TextExpectation): boolean {
  *    is a length difference. Letter case by toLowerCase/toUpperCase of each UTF-16 unit — enough for the measured
  *    auto-capitalisation; a case pair whose forms differ in length (`ß`/`SS`) reads as a plain difference, never as a
  *    pass.
- * Pure, O(observed × value) — run once, for a typing that missed: a PRECONDITION, not checked — a reading that lands
- * (`landingOf`) is never classified, and one `reformatOf` passes (`1 234` for `1234`) would read `separated` here.
+ * `tail` and `wholeToo` are `missOf`'s, asked once for the two answers of a `Miss`. Only `readingOf` asks, of a reading
+ * that did not land: one `reformatOf` passes (`1 234` for `1234`) would read `separated` here. Pure, O(observed ×
+ * value).
  */
 function differenceOf(observed: string, e: Pick<Expectation, keyof TextExpectation | 'held'>, tail: Tail | undefined, wholeToo: boolean): Difference {
   const { value, clear } = e;
