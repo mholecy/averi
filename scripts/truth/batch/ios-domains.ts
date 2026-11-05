@@ -1,7 +1,7 @@
 import { basename } from 'node:path';
-import { IosLab, type Exec } from '../lab-device.js';
+import { IosLab } from '../lab-device.js';
 import { markDirty, type WindowSpec } from './abort.js';
-import type { CallResult, Run } from './bounded.js';
+import { execOf, type CallResult, type Run } from './bounded.js';
 import { nodeFs, type BatchFs } from './io.js';
 import {
   absentIn,
@@ -65,15 +65,6 @@ import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } f
 export const PLIST_SECS = 15;
 
 // ----------------------------------------------------------------------------------------- the lab simulator
-
-/** A Run as lab-device.ts's Exec: its stdout, or a throw naming the exit (as execFile rejects). */
-const execOf =
-  (run: Run): Exec =>
-  async (file, args) => {
-    const r = await run(file, args);
-    if (r.code !== 0) throw new Error(`${file} ${args.join(' ')}: ${exitText(r)}`);
-    return { stdout: r.out };
-  };
 
 /**
  * The lab simulator, guarded: had only through `LabSim.open`, which runs lab-device.ts's guard (device-check's udid

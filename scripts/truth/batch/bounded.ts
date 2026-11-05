@@ -2,7 +2,8 @@ import { constants } from 'node:os';
 import { basename } from 'node:path';
 import { nodeFs, type BatchFs } from './io.js';
 import type { Ended, KillResult, ProcessSeam, Started } from './proc.js';
-import { messageOf } from './words.js';
+import type { Exec } from '../lab-device.js';
+import { exitText, messageOf } from './words.js';
 
 /**
  * Every call a batch makes is bounded: a wedged device call cannot hold the batch longer than its bound (batch-7's
@@ -132,6 +133,18 @@ export interface CallResult {
 
 /** Run a command, bounded. */
 export type Run = (cmd: string, args: readonly string[], call?: Call) => Promise<CallResult>;
+
+/**
+ * A Run as lab-device.ts's Exec, which its guards take: the stdout, or a throw naming the exit (as execFile rejects).
+ * The lab simulator's (ios-domains.ts) and the lab emulator's (lab-emu.ts) guard run through it.
+ */
+export const execOf =
+  (run: Run): Exec =>
+  async (file, args) => {
+    const r = await run(file, args);
+    if (r.code !== 0) throw new Error(`${file} ${args.join(' ')}: ${exitText(r)}`);
+    return { stdout: r.out };
+  };
 
 /** `p`'s settling or `ms` passing, whichever first; the timer cleared, so none is left to hold the run open. */
 async function untilOr(p: Promise<unknown>, ms: number): Promise<void> {

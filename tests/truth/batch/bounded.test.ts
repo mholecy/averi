@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { boundFor, Calls, codeOf, EPERM_RETRY_MS, KEEPS_GROUP, keepsGroup, MAX_SECS, NOT_STARTED, TIMED_OUT, undeliveredText, type Undelivered } from '../../../scripts/truth/batch/bounded.js';
+import { boundFor, Calls, codeOf, EPERM_RETRY_MS, execOf, KEEPS_GROUP, keepsGroup, MAX_SECS, NOT_STARTED, TIMED_OUT, undeliveredText, type Undelivered } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
 
@@ -659,5 +659,18 @@ describe('undelivered kills are reported where they happen (review round 3)', ()
     await s.stop();
     expect(seen).toStrictEqual([{ pid: 100, signal: 'SIGKILL', why: 'EINVAL' }, { pid: 101, signal: 'SIGKILL', why: 'EINVAL', owner: "E5's state" }]);
     expect(calls.unproven()).toEqual(seen);
+  });
+});
+
+describe("execOf — a Run as lab-device.ts's Exec, for its guards (ios-domains.ts's, shared since T2 S5)", () => {
+  it('exit 0: the stdout; any other exit: a throw naming the call and its exit, as execFile rejects', async () => {
+    const seen: string[] = [];
+    const exec = execOf(async (cmd, args) => {
+      seen.push(`${cmd} ${args.join(' ')}`);
+      return args[0] === 'ok' ? { code: 0, timedOut: false, signal: null, out: 'averi_lab\n', err: '' } : { code: 1, timedOut: false, signal: null, out: '', err: 'error: no devices\nmore' };
+    });
+    expect(await exec('adb', ['ok'])).toEqual({ stdout: 'averi_lab\n' });
+    await expect(exec('adb', ['-s', 'x', 'emu'])).rejects.toThrow(/^adb -s x emu: exit 1 error: no devices$/);
+    expect(seen).toEqual(['adb ok', 'adb -s x emu']);
   });
 });
