@@ -209,6 +209,14 @@ describe('the Gradle daemon after an interrupted Android build (review round 1, 
     expect(steps).toEqual(['NOTE lab android: the Gradle daemon stopped at the run\'s end (its build was cut short)']);
   });
 
+  it('its own --stop that failed keeps the marker: the last step stops the daemon (review round 2, MINOR 2)', async () => {
+    const b = labBuild();
+    await need(b, ANDROID_BUILD_NEED).check(needCtx(async (cmd, args, call) => (args.includes('--stop') ? { code: 1, timedOut: false, signal: null, out: '', err: 'busy' } : runOf(world)(cmd, args, call))));
+    const run = runOf(world);
+    await b.lastly({ run, step: say });
+    expect(run.seen.map((s) => s.words)).toEqual([`${join(repo, 'fixtures/apps/android', 'gradlew')} --stop`]);
+  });
+
   it('no build started, or its own --stop ran: nothing; a stop that fails: a WARN', async () => {
     const run = runOf(world);
     await labBuild().lastly({ run, step: say });

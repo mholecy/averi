@@ -351,7 +351,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const { ctx, events, windows } = blockCtx();
     const lab = await simOf();
     let ran = false;
-    expect(await wdaWindow(ctx, lab, { runs, work: async () => void ((ran = true), world.startWda(), events.push('work')) })).toBe(true);
+    expect(await wdaWindow(ctx, lab, { runs, work: async () => void ((ran = true), world.startWda(), events.push('work')) })).toEqual({ ran: true, putBack: true });
     expect(ran).toBe(true);
     const state = join(ctx.dir, 'state.json');
     expect(events).toEqual([
@@ -388,7 +388,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     fresh({ exportFails: 'com.apple.Preferences' });
     const { ctx, events } = blockCtx();
     let ran = false;
-    expect(await wdaWindow(ctx, await simOf(), { runs, work: async () => void (ran = true) })).toBe(false);
+    expect(await wdaWindow(ctx, await simOf(), { runs, work: async () => void (ran = true) })).toEqual({ ran: false, putBack: true });
     expect(ran).toBe(false);
     const why = 'the simulator domains could not be backed up — no wda run (nothing changed): defaults export com.apple.Preferences: exit 1 export com.apple.Preferences failed — no state written';
     expect(events.slice(1)).toEqual(['OK ios-health before the WDA window', `ERROR the WDA window: ${why}`, `verdict D43 live verdict: INCONCLUSIVE — the WDA window did not run: ${why}`]);
@@ -398,7 +398,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
   it('the health check before it fails past a reset: INCONCLUSIVE, nothing backed up', async () => {
     fresh({ sick: 'swipe', bootFails: true });
     const { ctx, events } = blockCtx();
-    expect(await wdaWindow(ctx, await simOf(), { work: async () => {} })).toBe(false);
+    expect(await wdaWindow(ctx, await simOf(), { work: async () => {} })).toEqual({ ran: false, putBack: true });
     expect(events.at(-1)).toBe('verdict D43 live verdict: INCONCLUSIVE — the WDA window did not run: the iOS reset before the WDA window failed: simctl boot: exit 149 Unable to boot device — no wda run (nothing changed)');
     expect(existsSync(join(ctx.dir, 'state.json'))).toBe(false);
   });
@@ -430,6 +430,8 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(stateOf(nodeFs, join(two.ctx.dir, 'state.json'))).toBe('dirty');
     expect(two.events.some((e) => e.includes('compare'))).toBe(false);
     expect(two.windows.get(WDA_WINDOW)!.hand[0]).toBe(portHand(LAB_UDID));
+    // Not put back: the block's verdict is never left to a judge's PASS (review round 2).
+    expect(two.events).toContain("verdict D43 live verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
     // A restore that is not verified leaves the state dirty: nothing is compared (compare would refuse it anyway).
     fresh({ restoreFails: true });
     const three = blockCtx(runOf(world), 'D43c');
@@ -438,6 +440,20 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(three.events.some((e) => e.includes('compare'))).toBe(false);
     expect(three.events.some((e) => e.startsWith('asks'))).toBe(false);
     expect(waits.filter((w) => w === PORT_RECHECK_MS)).toHaveLength(1);
+  });
+
+  it('lsof unread (it fails, or passes its bound) blocks the restore as a listener does: nothing written back, the state dirty, the hand lines kept, the block INCONCLUSIVE (review round 2, MINOR 1)', async () => {
+    const { ctx, events, windows } = blockCtx(runOf(world), 'D43u');
+    let working = false;
+    const run: Run = async (cmd, args, call) => (cmd === 'lsof' && working ? { code: 142, timedOut: true, signal: 'SIGKILL', out: '', err: '' } : runOf(world)(cmd, args, call));
+    const lab = await simOf(run);
+    const r = await wdaWindow({ ...ctx, bounded: run }, lab, { work: async () => void ((working = true), world.startWda()) });
+    expect(r).toEqual({ ran: true, putBack: false });
+    expect(events).toContain('verdict D43 WDA-window restore: ERROR — NOT VERIFIED — port 8120 not read (lsof: past its bound (exit 142)): the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty');
+    expect(world.calls.some((w) => / defaults (write|import|delete) /.test(w))).toBe(false);
+    expect(stateOf(nodeFs, join(ctx.dir, 'state.json'))).toBe('dirty');
+    expect(windows.get(WDA_WINDOW)!.hand).toHaveLength(5);
+    expect(events).toContain("verdict D43 live verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
   });
 
   it('as the abort\'s dirty window: its restore over the abort\'s runner kills the WDA, waits, restores; its hand lines S4\'s and the WDA\'s kill', async () => {

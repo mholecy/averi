@@ -48,7 +48,9 @@ class LabSeam implements ProcessSeam {
     let end!: (e: Ended) => void;
     const exited = new Promise<Ended>((r) => (end = r));
     this.ends.set(pid, (e) => (this.ended.add(pid), end(e)));
+    // Only the first call matching hangs: a later one (the last step's --stop) answers.
     if (this.hang === undefined || !said.includes(this.hang)) this.ends.get(pid)!({ code: a.code, signal: null });
+    else this.hang = undefined;
     return { pid, exited, closed: exited.then(() => {}), out: () => (options.logFd === undefined ? a.out : ''), err: () => (options.logFd === undefined ? a.err : ''), release: () => {} };
   }
   killGroup(pid: number, signal: NodeJS.Signals | 0): KillResult {
@@ -309,6 +311,18 @@ describe('the Gradle daemon after an abort inside the Android build (review roun
   });
 });
 
+describe('an abort landing during the build\'s own --stop (review round 2, MINOR 2)', () => {
+  it('its --stop cut: the marker kept, the last step runs --stop again', async () => {
+    seam.hang = 'gradlew --stop';
+    const done = go(batch());
+    await until(() => seam.words.some((w) => w.endsWith('gradlew --stop')));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(seam.words.filter((w) => w.endsWith('gradlew --stop'))).toHaveLength(2);
+    expect(outText()).toContain("NOTE lab android: the Gradle daemon stopped at the run's end (its build was cut short)");
+  });
+});
+
 describe('the abort inside the WDA window: the WDA ended, the wait, the restore; RESTORE hand lines when it is not put back (S2 window, batch-11.sh:195–203)', () => {
   it('SIGINT during the wda live run: the lab\'s WDA ended, the domains put back, verified by the abort; the lab\'s processes ended last; exit 130', async () => {
     seam.hang = '--sources wda';
@@ -352,6 +366,9 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(await go(batch())).toBe(1);
     expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('ended'));
     expect(summary().some((l) => l.startsWith('D43 WDA-window compare'))).toBe(false);
+    // Not put back, never PASS (review round 2): the block's verdict INCONCLUSIVE whatever its judge would say.
+    expect(summary()).toContain("D43 verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
+    expect(summary().some((l) => l.startsWith('D43 verdict: PASS'))).toBe(false);
   });
 
 });
