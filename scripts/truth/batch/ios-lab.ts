@@ -355,7 +355,7 @@ async function putBackWda(lab: IosSim, stateFile: string): Promise<{ ok: boolean
   // A runner still listening would undo a restore at its exit: nothing is put back until it is gone.
   if (port.state !== 'free') return wdaBlockedOf(port, killed, lab.udid, domainsWindow(lab.sim, stateFile).hand, stateFile);
   const r = await restore(lab.sim, stateFile);
-  return wdaRestoredOf({ ok: r.ok, line: r.line, hand: r.ok ? [] : r.hand }, killed);
+  return wdaRestoredOf(r, killed);
 }
 
 /**

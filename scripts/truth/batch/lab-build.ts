@@ -61,7 +61,7 @@ export interface LabBuild {
 }
 
 /** What a device need does with its build: install this product (none: not rebuilt), with a warning; or not met. */
-export type BuildAnswer = { built: string | undefined; warn?: string } | { why: string };
+export type BuildAnswer = { built?: string; warn?: string } | { why: string };
 
 /**
  * A device need's build (T2 S6b review round 1, MAJOR 2): asked by the need itself, so the order of a block's needs
@@ -69,11 +69,11 @@ export type BuildAnswer = { built: string | undefined; warn?: string } | { why: 
  * batch-11's way — a warning, the app already installed is used.
  */
 export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?: boolean }): Promise<BuildAnswer> {
-  if (o.build === undefined) return { built: undefined };
+  if (o.build === undefined) return {};
   const r = await o.build.ensure(c);
   if (r.ok) return { built: o.build.built() };
   if (o.requireBuild === true) return { why: `this run's build failed, and the batch requires it: ${r.why}` };
-  return { built: undefined, warn: r.why };
+  return { warn: r.why };
 }
 
 /** A device need met, its how prefixed by the build's warning when there is one (batch-11's `LAB …: WARN — …`). */

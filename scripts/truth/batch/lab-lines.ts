@@ -70,16 +70,9 @@ export const portHand = (udid: string): string =>
     .map((p) => `pkill -f ${shellQuote(p)}`)
     .join('; ')}; lsof ${LSOF_ARGV.join(' ')} | xargs kill`;
 
-/** A restore as ios-domains.ts gives it, reduced to what the line needs. */
-export interface RestoreSaid {
-  ok: boolean;
-  line: string;
-  hand: readonly string[];
-}
-
 /** The WDA window's restore line when the domains were restored with port 8120 proven free: S4's line, the port part. */
-export function wdaRestoredOf(r: RestoreSaid, killed: boolean): { ok: boolean; line: string; hand: string[] } {
-  return { ok: r.ok, line: `${r.line}; ${portPart({ state: 'free' }, killed)}`, hand: [...r.hand] };
+export function wdaRestoredOf(r: { ok: true; line: string } | { ok: false; line: string; hand: readonly string[] }, killed: boolean): { ok: boolean; line: string; hand: string[] } {
+  return { ok: r.ok, line: `${r.line}; ${portPart({ state: 'free' }, killed)}`, hand: r.ok ? [] : [...r.hand] };
 }
 
 /** The last hand line of a window not put back: the domains read back against their backups, then the state cleared. */

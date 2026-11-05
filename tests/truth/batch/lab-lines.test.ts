@@ -101,7 +101,7 @@ describe('port 8120 (d43-gate.ts\'s restore: the port free, else killed): lsof\'
 });
 
 describe('the WDA window\'s put-back line: S4\'s line and the port part (the port is the runner\'s: ios-defaults.ts#domainPart leaves it out)', () => {
-  const restored = { ok: true as const, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back)', hand: [] };
+  const restored = { ok: true as const, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back)', hand: ['never shown'] };
   const failed = { ok: false as const, line: 'D43 WDA-window restore: ERROR — NOT VERIFIED — com.apple.Accessibility NOT equal to its backup', hand: ['D43 (iOS): xcrun simctl spawn U defaults import …'] };
 
   it('restored with the port free: S4\'s line, the port named — free, or free once a listener was killed', () => {

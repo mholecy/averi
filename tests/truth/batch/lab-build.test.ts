@@ -227,8 +227,8 @@ describe('the Gradle daemon after an interrupted Android build (review round 1, 
 describe('the lab block never says every need met when this run\'s build failed (review round 1, MAJOR 2)', () => {
   it('a build that failed with the installed app used: a WARN naming it, not a PASS', async () => {
     const said: unknown[] = [];
-    const block = labBlock(['android'], { build: { failures: () => ['android-build: the Android build failed (exit 1)'] } });
+    const block = labBlock(['android'], { build: { failures: () => ['android-build: the Android build failed (exit 1)', 'ios-build: xcodegen not found'] } });
     await block.run({ verdict: (...a: unknown[]) => void said.push(a) } as never);
-    expect(said).toEqual([['WARN', "the lab devices checked, but this run's build failed (android-build: the Android build failed (exit 1)): the app already installed is used"]]);
+    expect(said).toEqual([['WARN', "the lab devices checked, but this run's build failed (android-build: the Android build failed (exit 1); ios-build: xcodegen not found): the app already installed is used"]]);
   });
 });
