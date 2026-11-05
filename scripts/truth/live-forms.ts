@@ -136,12 +136,12 @@ const labFaultWhy = (got: string | undefined, inserted: string): string =>
  * form-focus-prefix's dialRefuses, `+421 ` held whatever `421` is typed. The one-call sibling of `refusedHolding`, its
  * premise its own, checked first: the field missing or empty means the prefix was never inserted — the lab's fault, a
  * SKIP whatever averi replied, where the app logged a `focus` event for the field; with none, averi's tap never focused
- * it — LOUD `loud-untouched`, said so (D64b-1's final review); a claim of done over anything but `inserted` means the
- * field took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No KNOWN entry matches a
- * SKIP. Then refusedLadder with "did not change": ok only on an error saying so with `inserted` held (what the
- * post-focus re-read lets averi say: it read `inserted` before typing); a claim of done over `inserted` is a MISMATCH
- * `fill-claim` — Android's today, where that re-read is skipped and the reading passes by containment (ADR 0028
- * residual 3).
+ * it — LOUD `loud-untouched`, said so, or a MISMATCH `fill-claim-unfocused` over a Filled (averi's false claim, which
+ * the fp2 KNOWN entry does not match; D64b-1's reviews); a claim of done over anything but `inserted` means the field
+ * took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No KNOWN entry matches a SKIP.
+ * Then refusedLadder with "did not change": ok only on an error saying so with `inserted` held (what the post-focus
+ * re-read lets averi say: it read `inserted` before typing); a claim of done over `inserted` is a MISMATCH `fill-claim`
+ * — Android's today, where that re-read is skipped and the reading passes by containment (ADR 0028 residual 3).
  */
 export const refusedOnFocus =
   (tag: string, inserted: string) =>
@@ -153,6 +153,9 @@ export const refusedOnFocus =
       // averi's tap never reached it.
       if (s.events.some((e) => e.kind === 'focus' && e.tag === tag)) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };
       const held = got === undefined ? "is missing from the app's state" : 'holds ""';
+      const unfocused = `its tap never focused the field (no focus event for ${tag}), which ${held}; averi: ${short(last)}`;
+      // A Filled over it is averi's false claim (the owner's decision): its own cls, beyond the fp2 KNOWN entry.
+      if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim-unfocused', kind: replyKind(last), why: `averi says Filled but ${unfocused}` };
       return { outcome: 'LOUD', cls: 'loud-untouched', kind: replyKind(last), why: `the tap never focused the field (no focus event for ${tag}), which ${held}; averi: ${short(last)}` };
     }
     if (claimsDone(last) && got !== inserted) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };

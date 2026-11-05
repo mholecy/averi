@@ -1085,6 +1085,19 @@ describe('fp1 and fp2 (D64b): a dial code inserted on focus, the keys taken or r
     expect(judge(blurred, [MISS], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
   });
 
+  it('refusedOnFocus (owner\'s decision): a Filled over an empty or missing field its tap never focused is averi\'s false claim — MISMATCH fill-claim-unfocused, which the fp2 known entry does not match; no claim stays LOUD loud-untouched', () => {
+    const judge = refusedOnFocus('dialRefuses', '+421 ');
+    const filled = FILLED('dialRefuses');
+    const v = judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), [filled], 'uiautomator', SYNTHETIC_LAUNCHED);
+    expect(v).toEqual({ outcome: 'MISMATCH', cls: 'fill-claim-unfocused', kind: 'other', why: `averi says Filled but its tap never focused the field (no focus event for dialRefuses), which holds ""; averi: ${filled}` });
+    expect(knownLive('android', 'uiautomator', 'fp2', v.cls, v.kind)).toBeUndefined();
+    const missing: LabState = { ...SYNTHETIC_LAUNCHED, fields: { dialLands: SYNTHETIC_LAUNCHED.fields!.dialLands } };
+    expect(judge(syntheticUnfocused(missing), [filled], 'uiautomator', SYNTHETIC_LAUNCHED)).toEqual({ outcome: 'MISMATCH', cls: 'fill-claim-unfocused', kind: 'other', why: `averi says Filled but its tap never focused the field (no focus event for dialRefuses), which is missing from the app's state; averi: ${filled}` });
+    // No claim, no focus: LOUD loud-untouched as before; a NOT verified Filled claims nothing.
+    expect(judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), ['ERROR fill: id:"lab.form-focus-prefix.dialRefuses" was not tapped'], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
+    expect(judge(syntheticUnfocused(syntheticLeft('dialRefuses', '')), [`${filled} — NOT verified: the field could not be read`], 'idb', SYNTHETIC_LAUNCHED)).toMatchObject({ outcome: 'LOUD', cls: 'loud-untouched' });
+  });
+
   it('refusedOnFocus (review round 2): the lab fault worded by what the field holds — empty, no prefix inserted; the prefix and more, the keys taken; else neither', () => {
     const judge = refusedOnFocus('dialRefuses', '+421 ');
     const claimed = (value: string) => judge(syntheticLeft('dialRefuses', value), [FILLED('dialRefuses')], 'uiautomator', SYNTHETIC_LAUNCHED);
