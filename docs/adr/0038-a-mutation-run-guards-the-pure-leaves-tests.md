@@ -1286,7 +1286,34 @@ is so far superseded: OK, FAIL or ERROR.
 The abort does not read the key. It exits 130 whatever a read says, so a CHANGED line could not change its exit; its
 SUMMARY reads only what the run kept before the interrupt; and a read there would need an AbortGuard callback with its
 own detached call and bound inside the abort's budget, for a line nobody acts on before a rerun — which reads the key at
-its own start anyway. Its SUMMARY still says so in the slot (below).
+its own start anyway. Its SUMMARY still says so in the slot (review round 1, below).
+
+Dropped, with reasons:
+- **Gap 1, an export of any domain.** Only batch-13's one-off probe of the simulator's binary export needed it, now
+  pinned by the committed fixture (defaults-sim-export-missing-domain.plist). An `export` writes a host file at a
+  path the caller gives — a simulator's own Preferences plist included — so "a read-only export of any domain" is not a
+  read; done safely it needs a path rule, for no recurring caller. The allowlist stays the one argv builder. Reopen with
+  a second caller.
+- **Gap 5, LastStep given the config and folders; the abort's last steps before its judges.** Its one user was an
+  evidence probe of the batch-13 fix, done and seen live. Moving the abort's last steps before its judges would spend
+  their bound inside the judges' window and end the companion before a judge that may still need a kept group: a worse
+  abort for a probe already done. Gap 6 covers the recurring diagnostic need. Reopen if a recurring last step needs the
+  config.
+
+Tests: words and lines in ios-defaults.test.ts, ios-domains-sim.test.ts, runner-lines.test.ts, run-dir.test.ts,
+lab-emu.test.ts and android-lab.test.ts; the order in runner.test.ts (a need's end: once per need met, after the last
+block, before finish, not for one not met or never asked, not once interrupted, a throw and a bound each an honest line;
+a need's calls; the refusal); ios-lab.test.ts (the ios need's end) and lab-batch.test.ts (a CHANGED key exits 1 with no
+block of the batch's judging it; ONLY= without an iOS block reads nothing). Every title names T2b batch-13 and its gap.
+70 hand mutants, each from a .bak copy and bounded: all killed, two only after a test was added (the abort's own
+SUMMARY never followed by the normal end's finish; a D65 restore over an unreadable state file). The first cold run
+(331 s) left four equivalent survivors in runner.ts — an interrupted check before the needs' ends that endNeeds makes
+again, a bare NeedCheck's typeof (a function has no `end`), and the late line's own oneLine (the step's rule asks it) —
+designed away. The slice's cold run before review, 328 s (superseded by the runs below): runner.ts 99.40 % (495 mutants, 0 survived, the same three without coverage),
+runner-lines.ts 100 % (359, 2 timeouts counted killed), ios-domains.ts 100 % (327), ios-lab.ts 100 % (396),
+android-lab.ts 100 % (181), ios-defaults.ts 99.82 % (539, the same equivalent), lab-emu.ts 99.75 % (393, the same
+equivalent), run-dir.ts 99.41 % (169, the same equivalent), every other module as before; floors unchanged (none rises
+by the achieved − 2 rule). The run stays under the ~480 s line; the `--group` split is T2b-2's.
 
 Review round 1 (one BLOCKER, one MAJOR, two MINOR): a late end turned a CHANGED key into exit 0 — the ios need's end had
 no bound of its own, so it got NEED_END_SECS, 60 s, while its two calls are bounded at 120 s each, and a line it wrote
@@ -1310,33 +1337,20 @@ calls name, the checkout's among them) is accepted and said in needCallLine's co
 folder, outside the checkout, beside the run's other files that name them. 26 more hand mutants, each bounded: all
 killed, three only after a test was added (an end still running at the SUMMARY, one settled with no line, a line after
 the interrupt). Its first cold run (359 s) failed ios-lab.ts's floor (97.37 %: IOS_END_SECS's argv words, equivalent
-under xcrun's one bound) and left three equivalents in the late end's placement; both designed away. The final cold
+under xcrun's one bound) and left three equivalents in the late end's placement; both designed away. Its last cold
 run, 335 s: runner.ts 99.45 % (543 mutants, 0 survived, the same three without coverage), ios-lab.ts 99.75 % (404, 1
 equivalent: boundFor's empty argv given a word), every other module as before; floors unchanged.
 
-Dropped, with reasons:
-- **Gap 1, an export of any domain.** Only batch-13's one-off probe of the simulator's binary export needed it, now
-  pinned by the committed fixture (defaults-sim-export-missing-domain.plist). An `export` writes a host file at a
-  path the caller gives — a simulator's own Preferences plist included — so "a read-only export of any domain" is not a
-  read; done safely it needs a path rule, for no recurring caller. The allowlist stays the one argv builder. Reopen with
-  a second caller.
-- **Gap 5, LastStep given the config and folders; the abort's last steps before its judges.** Its one user was an
-  evidence probe of the batch-13 fix, done and seen live. Moving the abort's last steps before its judges would spend
-  their bound inside the judges' window and end the companion before a judge that may still need a kept group: a worse
-  abort for a probe already done. Gap 6 covers the recurring diagnostic need. Reopen if a recurring last step needs the
-  config.
-
-Tests: words and lines in ios-defaults.test.ts, ios-domains-sim.test.ts, runner-lines.test.ts, run-dir.test.ts,
-lab-emu.test.ts and android-lab.test.ts; the order in runner.test.ts (a need's end: once per need met, after the last
-block, before finish, not for one not met or never asked, not once interrupted, a throw and a bound each an honest line;
-a need's calls; the refusal); ios-lab.test.ts (the ios need's end) and lab-batch.test.ts (a CHANGED key exits 1 with no
-block of the batch's judging it; ONLY= without an iOS block reads nothing). Every title names T2b batch-13 and its gap.
-70 hand mutants, each from a .bak copy and bounded: all killed, two only after a test was added (the abort's own
-SUMMARY never followed by the normal end's finish; a D65 restore over an unreadable state file). The first cold run
-(331 s) left four equivalent survivors in runner.ts — an interrupted check before the needs' ends that endNeeds makes
-again, a bare NeedCheck's typeof (a function has no `end`), and the late line's own oneLine (the step's rule asks it) —
-designed away. The final cold run, 328 s: runner.ts 99.40 % (495 mutants, 0 survived, the same three without coverage),
-runner-lines.ts 100 % (359, 2 timeouts counted killed), ios-domains.ts 100 % (327), ios-lab.ts 100 % (396),
-android-lab.ts 100 % (181), ios-defaults.ts 99.82 % (539, the same equivalent), lab-emu.ts 99.75 % (393, the same
-equivalent), run-dir.ts 99.41 % (169, the same equivalent), every other module as before; floors unchanged (none rises
-by the achieved − 2 rule). The run stays under the ~480 s line; the `--group` split is T2b-2's.
+Code review (Standards and Spec): runner-lines.ts stays pure — canonicalJson moved to words.ts (records.ts imports
+io.ts); the need end's whys and notes are runner-lines.ts's named builders (endLateWhy, endThrewWhy, needEndError,
+lateLineNote, callsNotRecordedNote, ABORT_UNREAD); NeedSpec is defined once (NeedCheck | ({ check; alive? } &
+NeedEnding)) and read through one specOf, with no cast; `runEnd`. Two facts the round asked said. IOS_END_SECS, 246 s,
+is a worst-case bound — both calls wedged to their own bounds and stopped — not the normal path's time, a second or
+two. And the residual path: an end past its bound may still be running its read-only calls while `finish()` restores
+the windows and the judges run; if it settles only after the SUMMARY is written, the slot keeps its unread line and a
+FAIL it then writes reaches only steps.log (a NOTE). For the ios need that takes a call that outlives its own bound and
+the SIGKILL after it, which bounded.ts's group kill rules out but for a group the system refuses to signal.
+4 more hand mutants, each bounded: all killed. The final cold run of T2b-1, 340 s: runner.ts 99.45 % (545 mutants, 0
+survived, the same three without coverage), runner-lines.ts 100 % (370, 2 timeouts counted killed), words.ts 100 %
+(166), records.ts 100 % (73), ios-lab.ts 99.75 % (404, the same equivalent), every other module as before; floors
+unchanged. It supersedes the cold runs above.
