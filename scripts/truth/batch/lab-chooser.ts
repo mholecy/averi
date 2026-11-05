@@ -7,9 +7,9 @@ import type { CallResult } from './bounded.js';
 import { exitText, firstLineOf, messageOf, nameInLine, verdictLine, type Verdict } from './words.js';
 
 /**
- * The lab emulator's "Open with" chooser as values and words, pure (no Run, no file): what lab-emu.ts reads, decides and
- * says around a block that may leave the chooser up or a preferred activity behind (batch-9's D55 to batch-12's E5).
- * The preferred-activities read, only its `Preferred Activities User N:` block (API 33 prints the whole `dumpsys
+ * The lab emulator's "Open with" chooser as values and words, pure (no Run, no file): what lab-emu.ts reads, decides
+ * and says around a block that may leave the chooser up or a preferred activity behind (batch-9's D55 to batch-12's
+ * E5). The preferred-activities read, only its `Preferred Activities User N:` block (API 33 prints the whole `dumpsys
  * package` for `preferred-activities`: batch-9's INCONCLUSIVE was that); a lab default (`mAlways=true`, a leak) told
  * from the last-chosen entry "Just once" writes (`mAlways=false`, which no reinstall clears: batch-11); --check's exit;
  * safeTap, the one point a batch may tap on the chooser, never "Always"; the reads that can come back unread (the role
