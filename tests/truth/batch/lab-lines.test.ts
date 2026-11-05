@@ -147,6 +147,7 @@ describe('the Open-in alert (open-in-alert.py, batch-2 block D/A: a leftover "Op
     expect(openInAlertOf(ok('not json'))).toMatchObject({ state: 'unread', why: expect.stringMatching(/^idb ui describe-all printed no JSON list: /) });
     expect(openInAlertOf(ok('{"a":1}'))).toEqual({ state: 'unread', why: 'idb ui describe-all printed no JSON list: {"a":1}' });
     expect(openInAlertOf(ok('[null, 3]'))).toEqual({ state: 'none' });
+    expect(openInAlertOf(tree([null, alert, 3, cancel]))).toEqual({ state: 'found', label: 'Open in “AveriLab”?', buttons: ['Cancel'], cancel: { x: 140, y: 420 } });
   });
 });
 

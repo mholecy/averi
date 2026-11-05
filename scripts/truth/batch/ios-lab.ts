@@ -149,11 +149,14 @@ export function endLabProcesses(guarded: () => string | undefined): LastStep {
     if (udid === undefined) return;
     const { port: first, whys } = await killLabWda({ run, udid });
     // Its listeners were killed: read again, so the line says what is left, not what was there.
-    const port = first.state === 'busy' ? await portNow({ run, udid }) : first;
-    if (first.state === 'busy' && port.state !== 'free') whys.push(portPart(port, false));
+    const killed = first.state === 'busy';
+    const port = killed ? await portNow({ run, udid }) : first;
+    const part = portPart(port, killed);
+    // An unread first read is in the whys already (killLabWda's).
+    if (killed && port.state !== 'free') whys.push(part);
     const companion = pkillOf(await run('pkill', ['-f', companionPattern(udid)], { secs: HOST_SECS }));
     if ('why' in companion) whys.push(companion.why);
-    const said = `the lab's WebDriverAgent (${portPart(port, first.state === 'busy')}) and idb_companion of ${nameInLine(udid)} ended`;
+    const said = `the lab's WebDriverAgent (${part}) and idb_companion of ${nameInLine(udid)} ended`;
     if (whys.length === 0) step('NOTE', said);
     else step('WARN', `${said}, not all proven: ${whys.join('; ')}`);
   };
@@ -346,7 +349,7 @@ async function putBackWda(lab: IosSim, stateFile: string): Promise<{ ok: boolean
  * The WDA window as a dirty window (abort.ts): its restore putBackWda over the abort's detached runner, its state file
  * (put back only when it reads clean after), its hand lines S4's per domain and the WebDriverAgent's kill by hand.
  */
-export function wdaWindowSpec(lab: IosSim, stateFile: string, o: { block?: string; secs?: number } = {}): WindowSpec {
+export function wdaWindowSpec(lab: IosSim, stateFile: string, o: { block?: string; secs?: number | undefined } = {}): WindowSpec {
   const domains = domainsWindow(lab.sim, stateFile, o);
   return {
     async restore(run) {
@@ -395,7 +398,7 @@ export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions)
   const b = await backup(lab.sim, stateFile);
   if (!b.ok) return notRun(`the simulator domains could not be backed up — no wda run (nothing changed): ${b.why}`);
   ctx.note(b.line);
-  ctx.open(WDA_WINDOW, wdaWindowSpec(lab, stateFile, { block: ctx.id, ...(o.secs !== undefined && { secs: o.secs }) }));
+  ctx.open(WDA_WINDOW, wdaWindowSpec(lab, stateFile, { block: ctx.id, secs: o.secs }));
   await o.work();
   const put = await putBackWda(lab, stateFile);
   ctx.verdictLines([put.line]);

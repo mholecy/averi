@@ -128,8 +128,9 @@ export function openInAlertOf(r: CallResult): OpenInAlert {
   if (!Array.isArray(els)) return { state: 'unread', why: `idb ui describe-all printed no JSON list: ${firstLineOf(r.out)}` };
   // An entry that is no element (null, a number) holds no label: never the alert, never a button.
   const all = els as Element[];
-  const alert = all.find((e) => OPEN_IN.test(text(e?.AXLabel)) || OPEN_IN.test(text(e?.AXValue)));
-  if (alert === undefined || alert === null) return { state: 'none' };
+  // Found only by a label: never a null entry.
+  const alert = all.find((e) => OPEN_IN.test(text(e?.AXLabel)) || OPEN_IN.test(text(e?.AXValue))) as NonNullable<Element> | undefined;
+  if (alert === undefined) return { state: 'none' };
   const buttons = all.filter((e): e is NonNullable<Element> => e?.type === 'Button');
   const cancel = buttons.find((e) => text(e.AXLabel).trim().toLowerCase() === 'cancel');
   return { state: 'found', label: text(alert.AXLabel) === '' ? text(alert.AXValue) : text(alert.AXLabel), buttons: buttons.map((b) => text(b.AXLabel)), cancel: cancel === undefined ? undefined : centreOf(cancel) };

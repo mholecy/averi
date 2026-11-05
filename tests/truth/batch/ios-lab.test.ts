@@ -62,7 +62,7 @@ async function simOf(run: Run = runOf(world)): Promise<IosSim> {
 }
 const config = (over: { udid?: string } = { udid: LAB_UDID }) => ({ out: join(dir, 'out'), repo: join(dir, 'repo'), env: {}, ...over });
 const steps: string[] = [];
-const needCtx = (run = runOf(world), udid: string | null = LAB_UDID): NeedCtx => ({ bounded: run, labDir: join(dir, 'lab'), config: config(udid === null ? {} : { udid }), fs: nodeFs, step: (w, t) => void steps.push(`${w} ${t}`) });
+const needCtx = (run: Run = runOf(world), udid: string | null = LAB_UDID): NeedCtx => ({ bounded: run, labDir: join(dir, 'lab'), config: config(udid === null ? {} : { udid }), fs: nodeFs, step: (w, t) => void steps.push(`${w} ${t}`) });
 beforeEach(() => void (steps.length = 0));
 /** The words of the calls made, from the `n`th on. */
 const words = (from = 0) => world.calls.slice(from);
@@ -496,5 +496,8 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     steps.length = 0;
     await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), step: say });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 still has a listener (pid 7)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 still has a listener (pid 7)`]);
+    steps.length = 0;
+    await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 1, timedOut: false, signal: null, out: '', err: '' }), step: say });
+    expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 not read (lsof: exit 2)) and idb_companion of ${LAB_UDID} ended, not all proven: lsof: exit 2`]);
   });
 });
