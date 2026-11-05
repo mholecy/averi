@@ -112,6 +112,10 @@ internal data class FieldSpec(
     val format: String?,
     /** The format only shown (a VisualTransformation), the model as typed. */
     val formatShownOnly: Boolean,
+    /** D64b: put in on focus while the field is empty, the cursor after it (schema.ts#CatalogField.focusInsert). */
+    val focusInsert: String?,
+    /** D64b: every key refused (`keys: refused`) — an input filter rejecting all input. */
+    val keysRefused: Boolean,
 )
 internal data class PickerRow(val code: String, val name: String)
 internal data class PickerSpec(val field: String, val title: String, val open: Boolean, val rows: List<PickerRow>)
@@ -136,7 +140,7 @@ internal fun formOf(o: JSONObject): FormSpec {
     val fs = o.optJSONArray("fields")
     val fields = (0 until (fs?.length() ?: 0)).map { i ->
         val f = fs!!.getJSONObject(i)
-        FieldSpec(f.optString("tag"), f.optString("kind"), f.optString("title"), f.str("titleId"), f.str("fieldId"), f.optString("placeholder"), f.str("prefill"), message(f.optJSONObject("error")), f.str("format"), f.str("formatIn") == "display")
+        FieldSpec(f.optString("tag"), f.optString("kind"), f.optString("title"), f.str("titleId"), f.str("fieldId"), f.optString("placeholder"), f.str("prefill"), message(f.optJSONObject("error")), f.str("format"), f.str("formatIn") == "display", f.str("focusInsert"), f.str("keys") == "refused")
     }
     val s = o.optJSONObject("submit") ?: JSONObject()
     val picker = o.optJSONObject("picker")?.let { p ->
@@ -318,7 +322,11 @@ private fun FormScreen(cell: Cell, form: FormSpec, lab: Lab) {
                 for (f in form.fields) {
                     FieldRow(cell, form, f, lab, fieldID(f), values[f.tag] ?: "", shownError(f), requesters.getValue(f.tag),
                         onValue = { values[f.tag] = it },
-                        onFocus = { has -> if (has) focus = f.tag else if (focus == f.tag) focus = null },
+                        onFocus = { has ->
+                            if (has) focus = f.tag else if (focus == f.tag) focus = null
+                            // D64b: a dial code put in on focus while empty, as a banking app's phone field does.
+                            if (has && (values[f.tag] ?: "").isEmpty()) f.focusInsert?.let { values[f.tag] = it }
+                        },
                         onCountry = {
                             lab.event("tap", f.tag)
                             picker = true
@@ -442,14 +450,17 @@ private fun Input(
             inner()
         }
     }
-    if (f.format != null && !f.formatShownOnly) {
+    if ((f.format != null && !f.formatShownOnly) || f.focusInsert != null || f.keysRefused) {
         // The model reformatted on every change; whenever the text moved, the cursor goes to its end (the typing's
-        // place) — a selection change alone (the commit nudge's DPAD left/right) is kept.
+        // place) — a selection change alone (the commit nudge's DPAD left/right) is kept. A focusInsert field (D64b, no
+        // format: `formatted` keeps its text) is here for that cursor: its inserted text came from outside, and the
+        // String overload would leave the cursor before it. A field refusing every key takes no change at all.
         var edited by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
         val current = if (edited.text == value) edited else TextFieldValue(value, TextRange(value.length))
         BasicTextField(
             value = current,
             onValueChange = { next ->
+                if (f.keysRefused) return@BasicTextField
                 val shown = formatted(f.format, next.text)
                 edited = if (shown == next.text) next else TextFieldValue(shown, TextRange(shown.length))
                 if (shown != value) onValue(shown)

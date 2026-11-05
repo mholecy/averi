@@ -57,8 +57,9 @@ export type Outcome = 'ok' | 'LOUD' | 'MISMATCH' | 'SKIP';
  * a scroll_until for a row not there, at its list's end, that spent more strokes than UNMOVED_STROKES_EXHAUST before
  * failing (the end read as more to come, ABSENT_AT_END). A fill's rules (live-forms.ts#holds): `loud-untouched` (LOUD)
  * the value not held and the field as the launch left it; `loud-changed` (LOUD) not held and the field changed — a part
- * typed, or cleared; `fill-claim` a fill that claims done while the app holds another value; `failed-holds`, the same
- * rule as the visibility group's, where the app holds the value but averi failed. The ensure group's (live-ensure.ts):
+ * typed, or cleared; `fill-claim` a fill that claims done while the app holds another value (`fill-claim-unfocused`
+ * where its tap never focused the field, live-forms.ts#refusedOnFocus); `failed-holds`, the same rule as the visibility
+ * group's, where the app holds the value but averi failed. The ensure group's (live-ensure.ts):
  * `ensure-claim` ensure_state did not fail while the app never reached the state; `held-early` Continue tapped sooner
  * after Welcome than the held line's heldS − EPS_S (the hold began before Welcome — on the spinner); `held-late` no
  * wipe ahead and the tap later than the hold allows (the look ran on); `held-unsaid` in time, the held line missing;
@@ -84,6 +85,9 @@ export type VerdictClass =
   | 'loud-untouched'
   | 'loud-changed'
   | 'fill-claim'
+  // fp2 (D64b, live-forms.ts#refusedOnFocus): a Filled while averi's tap never focused the field — a false claim apart
+  // from fill-claim, so ADR 0028 residual 3's KNOWN entry (a fill-claim over the inserted prefix) cannot hide it.
+  | 'fill-claim-unfocused'
   | 'ensure-claim'
   | 'held-early'
   | 'held-late'

@@ -7,7 +7,7 @@ import { LAB_APP } from './lab-device.js';
 import { CAROUSEL_CASES, hedgedCeiling, type DeviceLog, type PreDragged, type SwipeEntry } from './live-carousel.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
-import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
+import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedOnFocus, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type HeldSpec, type LabApp, type LabState } from './schema.js';
@@ -146,6 +146,7 @@ const F = 'form-format';
 const RF = 'rn-format';
 const G = 'form-grouped';
 const RFE = 'rn-format-eager';
+const FP = 'form-focus-prefix';
 const NBSP = '\u00A0';
 /** A flow that taps a field and types into it with a `type:` step (blind: no read-back), or fills it with a `fill:` one. */
 const typeFlow = (cell: string, tag: string, value: string) => ({ type_it: { steps: [{ tap: { id: labId(cell, tag) } }, { type: { value } }] } });
@@ -497,6 +498,15 @@ const FORMS: Omit<Case, 'group'>[] = [
   { id: 'g3', cell: G, says: 'fill, no clear, a phone number the field groups in threes under a `+421` placeholder', calls: [fill(G, 'phoneGrouped', '421903123456')], judge: holds('phoneGrouped', '421 903 123 456') },
   { id: 'g4', cell: G, says: 'fill, clear, a phone number with its `+421` into the field that groups it', calls: [fill(G, 'phoneGrouped', '+421903123456', true)], judge: holds('phoneGrouped', '+421 903 123 456') },
   { id: 'g5', cell: G, says: 'fill, no clear, a phone number typed with its own spaces into the field that groups it', calls: [fill(G, 'phoneGrouped', '+421 903 123 456')], judge: holds('phoneGrouped', '+421 903 123 456') },
+  // D64b: form-focus-prefix — both fields put `+421 ` in themselves on focus while empty; dialLands then takes the keys,
+  // dialRefuses refuses every one. `421` by sole id, no clear: on Android the post-focus re-read is skipped there
+  // (fill.ts, ADR 0028), so the reading `+421 ` is judged against an empty `before` and holds `421` — fp2 is an EXPECTED
+  // MISMATCH fill-claim under uiautomator (ADR 0028 residual 3, filed in live-known.ts) until averi says so. iOS keeps
+  // the re-read: fp2 there reads `+421 ` before typing and is refused as "did not change" (ok expected; batch D64b-2
+  // reads both). Not h1/h2: the ensure group owns those ids.
+  // fp1: an Android Filled withholds the content, so the reply cannot be checked for `+421 421` — `holds` judges the model.
+  { id: 'fp1', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus: the keys land after it', calls: [fill(FP, 'dialLands', '421')], judge: holds('dialLands', '+421 421') },
+  { id: 'fp2', cell: FP, says: 'fill, no clear, digits into a field that inserted a `+421 ` dial code on focus and refuses every key: did not change — expected MISMATCH fill-claim on Android (uiautomator: the post-focus re-read skipped, the inserted `+421 ` holds `421`; ADR 0028 residual 3); ok expected on iOS (idb, wda: the re-read runs)', calls: [fill(FP, 'dialRefuses', '421')], judge: refusedOnFocus('dialRefuses', '+421 ') },
   // The same on React Native (`--app react-native`): rn-format's fields, onChangeText reformatting (src/format.ts).
   { id: 'rf1', cell: RF, says: 'fill, no clear, the RN field that groups an IBAN in fours', calls: [fill(RF, 'G.field', 'SK3112000000')], judge: holds('G', 'SK31 1200 0000') },
   { id: 'rf2', cell: RF, says: 'fill, clear, the RN field that groups an amount by thousands', calls: [fill(RF, 'A.field', '1234567,89', true)], judge: holds('A', `1${NBSP}234${NBSP}567,89`) },

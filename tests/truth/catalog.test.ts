@@ -43,6 +43,7 @@ describe('the cell catalog', () => {
       'forms/form-shared-id',
       'forms/form-format',
       'forms/form-grouped',
+      'forms/form-focus-prefix',
       'edges/scroll-bounded',
       'edges/scroll-bounded-footer',
       'edges/scroll-sticky',
@@ -161,6 +162,26 @@ describe('L7: form-grouped and rn-format-eager, their own cells beside the captu
     const cells = (await loadCatalog()).cells;
     expect(cells.find((c) => c.id === 'form-format')!.form!.fields.map((f) => [f.tag, f.format])).toEqual([['iban', 'group4'], ['amount', 'thousands'], ['ibanShown', 'group4'], ['date', 'date'], ['phone', undefined]]);
     expect(cells.find((c) => c.id === 'rn-format')!.targets.map((t) => [t.tag, t.format])).toEqual([['G', 'group4'], ['A', 'thousands']]);
+  });
+});
+
+describe('D64b: form-focus-prefix, a dial code the field inserts on focus (ADR 0028 residual 3)', () => {
+  it('dialLands inserts `+421 ` on focus and takes the keys; dialRefuses inserts it and refuses every key; no placeholder, no format; the submit; on both platforms', async () => {
+    const cell = (await loadCatalog()).cells.find((c) => c.id === 'form-focus-prefix')!;
+    expect(cell).toMatchObject({ family: 'forms', layer: 'none', targets: [] });
+    expect(cell.platforms).toBeUndefined();
+    const form = cell.form!;
+    expect(form.fields).toEqual([
+      { tag: 'dialLands', kind: 'text', title: 'Phone – dial code added', focusInsert: '+421 ' },
+      { tag: 'dialRefuses', kind: 'text', title: 'Phone – dial code, no typing', focusInsert: '+421 ', keys: 'refused' },
+    ]);
+    expect(form.submit).toEqual({ tag: 'submit', title: 'Continue' });
+    expect(form.focus).toBeUndefined();
+  });
+
+  it('no other cell inserts on focus or refuses the keys: the captured cells do not move', async () => {
+    const fields = (await loadCatalog()).cells.filter((c) => c.id !== 'form-focus-prefix').flatMap((c) => c.form?.fields ?? []);
+    expect(fields.filter((f) => f.focusInsert !== undefined || f.keys !== undefined)).toEqual([]);
   });
 });
 

@@ -73,25 +73,37 @@ export const refusedKept =
   };
 
 /**
+ * The ladder `refusedHolding` and `refusedOnFocus` share, once their premises hold: a claim of done is a MISMATCH
+ * `fill-claim`; the field other than `kept` is LOUD `loud-changed`; then `firstFailed`'s verdict, when it gives one
+ * (refusedHolding's first fill failed over `kept`); kept, but no error saying `phrase` (when given), LOUD
+ * `loud-untouched`; else ok.
+ */
+const refusedLadder = (got: string | undefined, kept: string, last: string, phrase: string | undefined, firstFailed?: () => LiveVerdict | undefined): LiveVerdict => {
+  const kind = replyKind(last);
+  const refused = phrase === undefined ? 'refused' : `refused as "${phrase}"`;
+  if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the field refused the typing; the app holds ${JSON.stringify(got)}` };
+  if (got !== kept) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(kept)}; averi: ${short(last)}` };
+  const failed = firstFailed?.();
+  if (failed !== undefined) return failed;
+  if (!isError(last) || (phrase !== undefined && !last.includes(phrase))) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the field kept ${JSON.stringify(kept)}, but not ${refused}: ${short(last)}` };
+  return { outcome: 'ok', kind, why: `${refused}, the field kept ${JSON.stringify(kept)}: ${short(last)}` };
+};
+
+/**
  * A second fill without clear that the field refuses, though its text already holds the value — so `holds` cannot catch
  * a false Filled: the app does hold `kept`. Ok only when the app holds `kept`, the first fill did not fail, and the last
  * reply is an error (saying `phrase`, when given). A claim of done is a MISMATCH `fill-claim`; the field other than
  * `kept` is LOUD `loud-changed`; the first fill failed over `kept` is a MISMATCH `failed-holds` (its kind); kept, but
- * no error saying `phrase` and no claim either, is LOUD `loud-untouched`. f15's and f16's judge (below).
+ * no error saying `phrase` and no claim either, is LOUD `loud-untouched` (refusedLadder). f15's and f16's judge
+ * (below).
  */
 export const refusedHolding =
   (tag: string, kept: string, phrase?: string) =>
   (s: LabState, replies: string[], _source: Source, _launched: LabState): LiveVerdict => {
-    const got = valueOf(s, tag);
     const [first] = replies;
-    const last = replies[replies.length - 1];
-    const kind = replyKind(last);
-    const refused = phrase === undefined ? 'refused' : `refused as "${phrase}"`;
-    if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim', kind, why: `averi says ${short(last)} — the field refused the typing; the app holds ${JSON.stringify(got)}` };
-    if (got !== kept) return { outcome: 'LOUD', cls: 'loud-changed', kind, why: `the app holds ${JSON.stringify(got)}, not ${JSON.stringify(kept)}; averi: ${short(last)}` };
-    if (isError(first)) return { outcome: 'MISMATCH', cls: 'failed-holds', kind: replyKind(first), why: `the app holds ${JSON.stringify(kept)}, but averi failed the first fill: ${short(first)}` };
-    if (!isError(last) || (phrase !== undefined && !last.includes(phrase))) return { outcome: 'LOUD', cls: 'loud-untouched', kind, why: `the field kept ${JSON.stringify(kept)}, but not ${refused}: ${short(last)}` };
-    return { outcome: 'ok', kind, why: `${refused}, the field kept ${JSON.stringify(kept)}: ${short(last)}` };
+    return refusedLadder(valueOf(s, tag), kept, replies[replies.length - 1], phrase, () =>
+      isError(first) ? { outcome: 'MISMATCH', cls: 'failed-holds', kind: replyKind(first), why: `the app holds ${JSON.stringify(kept)}, but averi failed the first fill: ${short(first)}` } : undefined,
+    );
   };
 
 /**
@@ -108,6 +120,47 @@ export const refusedUnchanged = (tag: string, kept: string) => refusedHolding(ta
  * tail typed again on iOS and the poll on Android word it alike, by length (`refusedHolding`).
  */
 export const refusedCapped = (tag: string, kept: string) => refusedHolding(tag, kept);
+
+/**
+ * refusedOnFocus's lab fault, worded by what the field holds: missing from the state or empty, it did not insert its
+ * prefix; the prefix and more, it took the keys; anything else, neither (D64b-1's reviews).
+ */
+const labFaultWhy = (got: string | undefined, inserted: string): string =>
+  got === undefined ? "lab fault: the field did not insert its prefix (is missing from the app's state)"
+  : got === '' ? 'lab fault: the field did not insert its prefix (holds "")'
+  : got.startsWith(inserted) ? `lab fault: the field took the keys (holds ${JSON.stringify(got)})`
+  : `lab fault: the field holds ${JSON.stringify(got)}, neither the prefix nor the prefix and keys`;
+
+/**
+ * fp2 (D64b): one fill without clear into a field that puts `inserted` in itself on focus and refuses every key —
+ * form-focus-prefix's dialRefuses, `+421 ` held whatever `421` is typed. The one-call sibling of `refusedHolding`, its
+ * premise its own, checked first: the field missing or empty means the prefix was never inserted — the lab's fault, a
+ * SKIP whatever averi replied, where the app logged a `focus` event for the field; with none, averi's tap never focused
+ * it — LOUD `loud-untouched`, said so, or a MISMATCH `fill-claim-unfocused` over a Filled (averi's false claim, which
+ * the fp2 KNOWN entry does not match; D64b-1's reviews); a claim of done over anything but `inserted` means the field
+ * took the keys it must refuse — a SKIP too (labFaultWhy), averi's Filled maybe true. No KNOWN entry matches a SKIP.
+ * Then refusedLadder with "did not change": ok only on an error saying so with `inserted` held (what the post-focus
+ * re-read lets averi say: it read `inserted` before typing); a claim of done over `inserted` is a MISMATCH `fill-claim`
+ * — Android's today, where that re-read is skipped and the reading passes by containment (ADR 0028 residual 3).
+ */
+export const refusedOnFocus =
+  (tag: string, inserted: string) =>
+  (s: LabState, replies: string[], _source: Source, _launched: LabState): LiveVerdict => {
+    const got = valueOf(s, tag);
+    const last = replies[replies.length - 1];
+    if (got === undefined || got === '') {
+      // No prefix: the lab's fault only where the tap focused the field (the app logs a `focus` event per field); else
+      // averi's tap never reached it.
+      if (s.events.some((e) => e.kind === 'focus' && e.tag === tag)) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };
+      const held = got === undefined ? "is missing from the app's state" : 'holds ""';
+      const unfocused = `its tap never focused the field (no focus event for ${tag}), which ${held}; averi: ${short(last)}`;
+      // A Filled over it is averi's false claim (the owner's decision): its own cls, beyond the fp2 KNOWN entry.
+      if (claimsDone(last)) return { outcome: 'MISMATCH', cls: 'fill-claim-unfocused', kind: replyKind(last), why: `averi says Filled but ${unfocused}` };
+      return { outcome: 'LOUD', cls: 'loud-untouched', kind: replyKind(last), why: `the tap never focused the field (no focus event for ${tag}), which ${held}; averi: ${short(last)}` };
+    }
+    if (claimsDone(last) && got !== inserted) return { outcome: 'SKIP', why: labFaultWhy(got, inserted) };
+    return refusedLadder(got, inserted, last, 'did not change');
+  };
 
 /**
  * D18 review round 1 (MINOR-4): the model holds `want` after the fill (holds, over the fill's reply), AND the tree shows
