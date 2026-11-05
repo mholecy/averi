@@ -738,7 +738,7 @@ probes and live.ts by rules, with real files in a temp dir, a fixed clock and pi
 golden-style). The same run on the real process seam is tests/truth/batch/runner-proc.test.ts (its child
 tests/fixtures/batch/runner-child.ts makes a git repo of one commit, runs two blocks, and is sent a Ctrl-C mid-block, or
 ends by itself), in the normal suite only, as abort-proc.test.ts. Baselines, cold: runner-lines.ts 100 % (271 mutants, 2
-timeouts), floor 98; runner.ts 99.26 % after review round 2 (407 mutants, 0 survived, 3 without coverage, each a `?? ''`
+timeouts), floor 98; runner.ts 99.27 % after review round 3 (410 mutants, 0 survived, 3 without coverage, each a `?? ''`
 turned into "Stryker was here!" — equivalent because that text holds no `# Live golden:` header (live.ts's log, the
 rejudge summary) and no run's header (steps.log), so stepOutcome and stepsOfRun read it as they read '' — not because
 the file is always there), floor 97; words.ts 100 % (136 mutants); run-dir.ts 99.38 % (161, the same equivalent);
@@ -761,11 +761,12 @@ Decisions S6a pins:
   every block's line is `<label>: INCONCLUSIVE — precondition: <why>`; no block's own precondition is asked then, no
   need checked, no block run; the SUMMARY is written, and the exit is 2 (EXIT.nothingRan, review round 1): an agent
   reading only the exit code must not see success. The same 2 when every wanted block was skipped for its needs or
-  preconditions, and the SUMMARY then says so after the blocks' lines: `NOTE no wanted block ran (each one's why above)
-  — exit 2` (review round 2; EXIT's 2 is "nothing done": refused to start, with no SUMMARY, or no wanted block ran, with
-  that NOTE); 1 for a FAIL or a RESTORE and 130 for an interrupt still come first. The failed checkout line is said
-  once: a NOTE step, no ERROR line besides it in the SUMMARY. A precondition's why is one line (its first); a check that
-  throws is not shown (`its check threw: <first line>`), never the run's error.
+  preconditions, and the SUMMARY then says so after the blocks' lines: `NOTE no wanted block ran (each one's why above)`
+  (review rounds 2 and 3: it names no exit code, which is exitCodeOf's, and stays when a RESTORE makes the exit 1;
+  EXIT's 2 is "nothing done": refused to start, with no SUMMARY, or no wanted block ran, with that NOTE); 1 for a FAIL
+  or a RESTORE and 130 for an interrupt still come first. The failed checkout line is said once: a NOTE step, no ERROR
+  line besides it in the SUMMARY. A precondition's why is one line (its first); a check that throws is not shown (`its
+  check threw: <first line>`), never the run's error.
 - the preconditions of every wanted block are asked before the first block runs, as batch-11's prechecks were: a block's
   state is never changed by an earlier block's run before its premise is read.
 - a need is checked in full by the first wanted block that names it, so a need no wanted block names is never checked;
@@ -797,12 +798,14 @@ Decisions S6a pins:
   state a block can be in at the interrupt.
 - the ERROR lines: this run's steps' (steps.ts), then every line starting ERROR of each `*.log` and analyze.txt in this
   run's folders (meta, lab, each wanted block, in that order), each once — not another file, not an earlier run's.
-  Bounded (review round 1, `fileErrors`): each line cut at 700 code points (`…` its last), a line repeated said once in
-  first-seen order with `(×<n>)` (review round 2: 50 of one must not bury a different one), at most ERRORS_PER_FILE (20)
-  distinct lines a file, then `… <n> more distinct ERROR lines in <file>`; a listed log that cannot be read is `NOTE
-  <file> not read: unreadable`, with `: a folder` when that is known, never skipped silently. Once the abort has begun,
-  no further need of a block is checked. The abort SUMMARY carries them too (head's errors), where batch-12's abort
-  printed the steps' only.
+  Counted across all of this run's logs first and bounded (review rounds 1 to 3, `logErrors`): one line per distinct
+  ERROR in first-seen order, bare when said once in one log, else `(×<total>, in <block>/<file>, …)` naming the first 3
+  logs then `+<n> more` (50 of one must not bury a different one, nor one line show three times with three counts); each
+  cut so the whole is at most 700 code points (`…` the last of what is cut); at most ERROR_LINES_SHOWN (20) distinct
+  lines run-wide, then `… <n> more distinct ERROR lines (in <logs>)`; a listed log that cannot be read is `NOTE <file>
+  not read: unreadable`, with `: a folder` when that is known, never skipped silently. Once the abort has begun, no
+  further need of a block is checked. The abort SUMMARY carries them too (head's errors), where batch-12's abort printed
+  the steps' only.
 - a probe's text, a judge's or an analyzer's lines are split at CR LF, LF and a lone CR (a progress line) before the
   runner keeps them (`linesOf`, `linesIn`): the SUMMARY refuses a line break, and a probe's output must never cost the
   run its SUMMARY (found in the cold run's review of the survivors). A verdict or protected-key line a block writes with

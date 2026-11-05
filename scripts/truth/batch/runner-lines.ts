@@ -210,7 +210,9 @@ export interface RunLog {
 export function logErrors(logs: readonly RunLog[]): string[] {
   const seen = new Map<string, { n: number; in: string[] }>();
   for (const log of logs) {
-    for (const l of errorLinesIn(log.text ?? '')) {
+    // An unread log holds no line to count: it is said below, as a NOTE.
+    if (log.text === undefined) continue;
+    for (const l of errorLinesIn(log.text)) {
       const e = seen.get(l) ?? { n: 0, in: [] };
       e.n++;
       if (!e.in.includes(log.name)) e.in.push(log.name);
