@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { CHOOSER_FOCUS_COMMAND } from '../../../src/adapters/android-chooser.js';
 import { DEVICE_CHECK_SIMULATOR, DEVICE_CHECK_WDA_PORTS, LAB_APP } from '../../../scripts/truth/lab-device.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
 import { DOMAINS, PROTECTED, type KeyVal } from '../../../scripts/truth/batch/ios-defaults.js';
@@ -212,6 +213,7 @@ export function labWorld(o: WorldOptions) {
     if (said === `shell pm path ${LAB_APP.native.package}`) return st.installed ? ok(`package:${DEVICE_APK}\n`) : exit(1);
     if (words[0] === 'pull') return writeFileSync(words[2], 'APK'), ok('1 file pulled');
     if (words[0] === 'install') {
+      if (!existsSync(words.at(-1)!)) return exit(1, `adb: failed to stat ${words.at(-1)}: No such file or directory`);
       st.installed = true;
       const apk = readFileSync(words.at(-1)!, 'utf8');
       if (apk.startsWith('BUILT:')) st.apkCells = apk.slice('BUILT:'.length);
@@ -220,6 +222,9 @@ export function labWorld(o: WorldOptions) {
     if (words[0] === 'shell' && words[1] === 'cmd' && words[2] === 'package' && words[3] === 'query-activities') {
       return ok(fixture(said.includes('shared') ? 'query-activities-api33-b10-shared.txt' : 'query-activities-api33-b10-cell.txt'));
     }
+    if (said === `shell ${CHOOSER_FOCUS_COMMAND}`) return ok(fixture('dumpsys-window-focus-api33-b10-launcher-no-header.txt'));
+    if (said === 'shell dumpsys package preferred') return ok(fixture('dumpsys-package-preferred-api33-b10.txt'));
+    if (said === 'shell input keyevent KEYCODE_HOME' || said === 'shell input keyevent KEYCODE_BACK') return ok();
     if (said === 'shell cmd role get-role-holders android.app.role.BROWSER') return readAt('roles', o.roles, 'role-holders-api33-b9-unknown-command.txt', 255);
     if (said === 'shell cmd clipboard help') return readAt('clipboard', o.clipboard, 'clipboard-help-api33-b9.txt', 0);
     return exit(2, `adb ${said}`);
