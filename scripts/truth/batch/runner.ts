@@ -6,7 +6,7 @@ import { nodeFs, type BatchFs } from './io.js';
 import { liveTableOf, type LiveSelection, type LiveTable } from './live-table.js';
 import { ancestor, casesOnMain, cellsOnMain, checkout, preconditionLine, type Git, type Precondition } from './preconditions.js';
 import { nodeProcess, type ProcessSeam } from './proc.js';
-import { canonicalJson, recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
+import { recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
 import { blockName, layoutOf, META, newRunId, openRun, plainSegment, refusalLines, refusals, type Stateful } from './run-dir.js';
 import {
   backstopLine,
@@ -41,7 +41,7 @@ import {
 } from './runner-lines.js';
 import { knobs as readKnobs, selectBlocks, type KnobSpec, type KnobValues } from './select.js';
 import { StepLog, terminalOf, type Terminal } from './steps.js';
-import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, timeOf, verdictLine, type StepWord, type Verdict } from './words.js';
+import { canonicalJson, EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, timeOf, verdictLine, type StepWord, type Verdict } from './words.js';
 
 /**
  * runBatch: a device batch's run, start to end, composed of the module's parts — a batch, kept outside the repo, gives

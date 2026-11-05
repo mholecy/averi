@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { canonicalJson, recordFiles, recordGap, recordGapIn, recordOf, recordsIn, writeAsked, writeDone } from '../../../scripts/truth/batch/records.js';
+import { recordFiles, recordGap, recordGapIn, recordOf, recordsIn, writeAsked, writeDone } from '../../../scripts/truth/batch/records.js';
 
 // scripts/truth/batch/records.ts: a non-live block's records — what a run is asked, then what it did — and each
 // one's gap. Real files in a temp dir; runner.test.ts runs them inside runBatch, beside the live runs' completeness.
@@ -66,16 +66,5 @@ describe('the records in a folder, written once each, and their gaps (T2 S6a cod
     expect(() => writeAsked(nodeFs, dir, 'e', { kind: 'runs', runs: -1 })).toThrow('e: {"kind":"runs","runs":-1} is no record of runs');
     expect(() => writeAsked(nodeFs, dir, 'e.f', { kind: 'runs', runs: 1 })).toThrow('run name "e.f": one plain path segment is needed');
     expect(() => writeAsked(nodeFs, join(dir, 'gone'), 'g', { kind: 'runs', runs: 1 })).toThrow(/ENOENT/);
-  });
-});
-
-describe('canonicalJson — a value as one key, its objects\' fields sorted at every depth (T2 S6b review round 1, NIT 8: asksLive\'s key)', () => {
-  it('two equal values built in another field order give one key; nested objects keep every field; arrays keep their order', () => {
-    expect(canonicalJson({ b: 1, a: { d: [2, 1], c: null } })).toBe('{"a":{"c":null,"d":[2,1]},"b":1}');
-    expect(canonicalJson({ a: { c: null, d: [2, 1] }, b: 1 })).toBe(canonicalJson({ b: 1, a: { d: [2, 1], c: null } }));
-    expect(canonicalJson([{ y: 1, x: 2 }, 'z'])).toBe('[{"x":2,"y":1},"z"]');
-    expect(canonicalJson({ a: [1], b: undefined })).toBe('{"a":[1]}');
-    expect(canonicalJson({ a: [1] })).not.toBe(canonicalJson({ a: [1], c: [] }));
-    expect(canonicalJson('s')).toBe('"s"');
   });
 });

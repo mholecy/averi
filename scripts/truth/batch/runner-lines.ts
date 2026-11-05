@@ -5,8 +5,7 @@ import type { CallResult } from './bounded.js';
 import { incompleteLine, type Asked } from './cases.js';
 import { DEFAULT_GROUPS } from './live-table.js';
 import { shortSha, type CheckoutPrecondition } from './preconditions.js';
-import { canonicalJson } from './records.js';
-import { failedCall, firstLineOf, nameInLine, refusedLine, verdictLine } from './words.js';
+import { canonicalJson, failedCall, firstLineOf, nameInLine, refusedLine, verdictLine } from './words.js';
 
 /**
  * The runner's pure half (runner.ts holds the calls and the files): its config read from argv and env, the lines it

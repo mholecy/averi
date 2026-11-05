@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CallResult } from '../../../scripts/truth/batch/bounded.js';
 import {
+  canonicalJson,
   EXIT,
   exitCodeOf,
   exitText,
@@ -290,5 +291,16 @@ describe('failedCall — one predicate for a failed call (T2 S5 code review)', (
   const r = (code: number, timedOut = false): CallResult => ({ code, timedOut, signal: null, out: '', err: '' });
   it('any exit but 0, or past its bound whatever its code', () => {
     expect([failedCall(r(0)), failedCall(r(1)), failedCall(r(255)), failedCall(r(0, true)), failedCall(r(142, true))]).toEqual([false, true, true, true, true]);
+  });
+});
+
+describe('canonicalJson — a value as one key, its objects\' fields sorted at every depth (T2 S6b review round 1, NIT 8: asksLive\'s key)', () => {
+  it('two equal values built in another field order give one key; nested objects keep every field; arrays keep their order', () => {
+    expect(canonicalJson({ b: 1, a: { d: [2, 1], c: null } })).toBe('{"a":{"c":null,"d":[2,1]},"b":1}');
+    expect(canonicalJson({ a: { c: null, d: [2, 1] }, b: 1 })).toBe(canonicalJson({ b: 1, a: { d: [2, 1], c: null } }));
+    expect(canonicalJson([{ y: 1, x: 2 }, 'z'])).toBe('[{"x":2,"y":1},"z"]');
+    expect(canonicalJson({ a: [1], b: undefined })).toBe('{"a":[1]}');
+    expect(canonicalJson({ a: [1] })).not.toBe(canonicalJson({ a: [1], c: [] }));
+    expect(canonicalJson('s')).toBe('"s"');
   });
 });
