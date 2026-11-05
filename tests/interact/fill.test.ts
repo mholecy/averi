@@ -1702,7 +1702,7 @@ describe('fillField — a textfield whose null value is empty: a dropped fill is
  * (2026-10-09) the clear's RULES behind A, E, I, J, K and the third round
  * are rows of tests/interact/fill-clear.test.ts (clearStep, one reading at a
  * time) and the mismatch's kinds rows of fill-landing.test.ts
- * (differenceOf); what stays here for those is the driver's part — the
+ * (readingOf); what stays here for those is the driver's part — the
  * device calls in their order and count, and the facts it hands on.
  */
 describe('fillField — the review probes of the hint-aware clear (2026-10-09)', () => {
@@ -2106,6 +2106,36 @@ describe('fillField — a field that drops the tail of the typing gets the tail 
     );
     expect(fake.typed).toEqual(['1234']);
     expect([otp2.value, note.value]).toEqual(['2', '34']);
+  });
+
+  // D64 round 3: `11 ` after `1` and `-5-` after `-5` read as whole landings too, and say so (select-all, `clear: true`);
+  // keys proven typed elsewhere are no select-all, so the reply says where they went and not that.
+  it.each([
+    [
+      '11 ',
+      '11',
+      '1',
+      '1',
+      'fill: typed 2 characters but the field shows 3 — the first 1 typed character is there, grouped by the field (separators of its own added), ' +
+        'the last 1 did not land: dropped, or refused by the field (a length cap, a character it does not take) — not a transformed input; ' +
+        'content withheld from this error',
+    ],
+    ['-5-', '-5', '-5', '5', 'fill: typed 2 characters but the field shows 3 (content withheld from this error)'],
+  ])('`%s` for `%s` after `%s`, a sibling gaining `%s`: the reply names the other input, without the select-all hedge', async (shown, value, before, gained, reply) => {
+    resetLayout();
+    const field = el({ role: 'textfield', identifier: 'f', value: before });
+    const other = el({ role: 'textfield', identifier: 'o', value: null });
+    const fake = new FakeAdapter({ form: screen(field, other) }, 'form');
+    fake.typeText = async (text: string) => {
+      fake.typed.push(text);
+      field.value = shown;
+      other.value = gained;
+    };
+    await expect(fillField(fake, { id: 'f' }, value, FAST)).rejects.toHaveProperty(
+      'message',
+      `${reply}; the typing left the field: textfield id:"o" (0,40 100x10) changed while it typed (the focus moved), so nothing was typed again`,
+    );
+    expect(fake.typed).toEqual([value]);
   });
 
   it('with clear, the clear\'s wipe and retype is not sent either: its deletes and its typing would go into the other input', async () => {

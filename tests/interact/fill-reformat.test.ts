@@ -321,7 +321,7 @@ describe('separatedOf — every typed character in order, separators alone added
     expect(separatedOf('Jan\u00A0Novak', 'Jan Novak')).toBeUndefined();
   });
 
-  it('a D51 grouping still passes `reformatOf` (it lands, and differenceOf never sees it)', () => {
+  it('a D51 grouping still passes `reformatOf` (it lands, so no miss is asked of it)', () => {
     expect(reformatOf('31.12.2026', '31122026')).toEqual({ added: 2, respaced: 0 });
     expect(reformatOf('12.34', '1234')).toBeUndefined(); // the cents mask stays refused
   });

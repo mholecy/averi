@@ -363,8 +363,8 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
     expect(moved.typed).toEqual(['SK3112000000']); // no wipe: the deletes would go where the typing went
   });
 
-  // Review round 1: the landing is computed once (`landing`), and `tookText` gates it — after a retry too, where the
-  // loop's own not-taken check is no longer asked.
+  // Review round 1: fill-landing.ts#tookText gates the landing — after a retry too, where the loop's own not-taken check
+  // no longer returns.
   it('a non-input that ends on its own resolved text after the wipe and retype has not landed', async () => {
     const { io, intent, field } = scripted();
     field.value = 'X';
@@ -378,6 +378,93 @@ describe('typeAndConfirm — type, confirm, and send again only what the field p
   it('a non-input proves it took the text only by showing it exactly: no reformat there', async () => {
     const { io, intent } = scripted({ format: group4 });
     expect((await typeAndConfirm(io, { ...intent, value: 'SK3112000000', isInput: false })).kind).toBe('not-taken');
+  });
+});
+
+/**
+ * A9 review round 1: arms of the switch only a script of reads reaches, each pinned against a hand mutant (`again` lost,
+ * the tail gate's `tails() === 0`, the report skipped). `rounds`: per typing sent, the poll's reads; the last repeats.
+ */
+describe('typeAndConfirm — the arms after a retry', () => {
+  function byRounds(rounds: string[][], siblingAfter: (string | null)[] = []) {
+    const typed: string[] = [];
+    const sibling = (): UiNode =>
+      node({ role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 }, value: typed.length === 0 ? null : (siblingAfter[typed.length - 1] ?? null) });
+    let reads = 0;
+    let dropped = 0;
+    const field = node({ role: 'textfield', identifier: 'f', rect: { x: 0, y: 0, width: 100, height: 20 }, value: null });
+    const io: FieldIo = {
+      type: async (text) => {
+        typed.push(text);
+        reads = 0;
+      },
+      wipe: async () => undefined,
+      read: async () => {
+        const round = rounds[Math.min(typed.length - 1, rounds.length - 1)];
+        return round[Math.min(reads++, round.length - 1)];
+      },
+      screen: () => node({ role: 'container', rect: { x: 0, y: 0, width: 400, height: 800 }, children: [field, sibling()] }),
+      reportDroppedTail: () => {
+        dropped++;
+      },
+    };
+    const intent: TypingIntent = { value: 'abcd', clear: false, isInput: true, resolvedValue: null, before: null, placeholder: undefined, held: 0, pollMs: 1, field, delivery: 'on-return' };
+    return { io, intent, typed, reported: () => dropped };
+  }
+
+  // Said-plain needs no clear (with clear a masked reading of another length has not landed), so a retype before it is a
+  // tail. A held count 'unread' with `on-return` is reachable only at this module's interface: fill.ts never builds it,
+  // which is why the arm's own comment can say that no tail was retyped there.
+  it('said-plain after a tail typed again keeps what was sent, and reports no drop', async () => {
+    const { io, intent, typed, reported } = byRounds([['ab'], ['•••••••']]);
+    expect(await typeAndConfirm(io, { ...intent, held: 'unread' })).toEqual({
+      kind: 'missed',
+      observed: '•••••••',
+      again: [{ kind: 'tail', length: 2 }],
+      differs: { kind: 'masked-said-plain' },
+    });
+    expect(typed).toEqual(['abcd', 'cd']);
+    expect(reported()).toBe(0);
+  });
+
+  it('a first tail on a reading unchanged by the whole retype is still typed: no tail was sent to have moved nothing', async () => {
+    // the first poll ends still moving, so no tail: the wipe and retype; the second holds still on the same reading
+    const { io, intent, typed, reported } = byRounds([['a', 'a', 'a', 'a', 'ab'], ['ab'], ['abcd']]);
+    expect(await typeAndConfirm(io, { ...intent, clear: true })).toEqual({
+      kind: 'landed',
+      observed: 'abcd',
+      again: [
+        { kind: 'whole', wiped: true },
+        { kind: 'tail', length: 2 },
+      ],
+    });
+    expect(typed).toEqual(['abcd', 'abcd', 'cd']);
+    expect(reported()).toBe(1);
+  });
+
+  // After a retry `not-taken` goes on to what is sent again: here to `whereTyped`, which names the other input.
+  it('a non-input not-taken after the whole retype, a sibling gaining the missing part: missed, elsewhere', async () => {
+    const { io, intent, typed } = byRounds([['xabcd'], ['ab']], [null, 'cd']);
+    expect(await typeAndConfirm(io, { ...intent, clear: true, isInput: false, resolvedValue: 'Name' })).toEqual({
+      kind: 'missed',
+      observed: 'ab',
+      again: [{ kind: 'whole', wiped: true }],
+      differs: { kind: 'length' },
+      elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } },
+    });
+    expect(typed).toEqual(['abcd', 'abcd']);
+  });
+
+  it('a placeholder landing through a tail typed again reports the drop', async () => {
+    const { io, intent, typed, reported } = byRounds([['Sea'], ['Search']]);
+    expect(await typeAndConfirm(io, { ...intent, value: 'Search', placeholder: 'Search' })).toEqual({
+      kind: 'landed',
+      observed: 'Search',
+      again: [{ kind: 'tail', length: 3 }],
+      placeholder: true,
+    });
+    expect(typed).toEqual(['Search', 'rch']);
+    expect(reported()).toBe(1);
   });
 });
 
@@ -497,5 +584,18 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     const { io, intent, typed } = scripted({ prefilled: '1', format: () => '11 ' });
     expect(await typeAndConfirm(io, { ...intent, value: '11', before: '1' })).toMatchObject({ kind: 'missed', differs: { kind: 'dropped-tail', wholeToo: true } });
     expect(typed).toEqual(['11']);
+  });
+
+  // D64 round 3: keys proven typed elsewhere are no select-all, so the reading's whole-landing hedge goes with them
+  // (fill-landing.ts#withoutWholeToo) — the reply must not say both.
+  it.each([
+    ['11 ', '11', '1', '1', { kind: 'dropped-tail', landed: 1, dropped: 1, grouped: true }],
+    ['-5-', '-5', '-5', '5', { kind: 'length' }],
+  ])('`%s` for `%s` after `%s`, a sibling gaining the missing `%s`: missed, elsewhere, no hedge', async (shown, value, before, gained, differs) => {
+    const { io, intent, typed } = scripted({ prefilled: before, format: () => shown, elsewhere: () => gained });
+    const missed = await typeAndConfirm(io, { ...intent, value, before });
+    expect(missed).toEqual({ kind: 'missed', observed: shown, again: [], differs, elsewhere: { role: 'textfield', identifier: 'o', rect: { x: 0, y: 40, width: 100, height: 20 } } });
+    expect(missed.kind === 'missed' && missed.differs).toStrictEqual(differs);
+    expect(typed).toEqual([value]);
   });
 });

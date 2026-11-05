@@ -4,7 +4,7 @@ import { judged, lateWithPanel, selectCases } from '../../scripts/truth/live-cas
 import { holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneScroll, judgeUnderSheet, refusedHolding, refusedKept, refusedOnFocus } from '../../scripts/truth/live-forms.js';
 import { knownEntry, knownLive } from '../../scripts/truth/live-known.js';
 import type { LabState } from '../../scripts/truth/schema.js';
-import { differenceOf, landingOf } from '../../src/interact/fill-landing.js';
+import { landingOf, readingOf, type Expectation } from '../../src/interact/fill-landing.js';
 import { ACTIVE_WINDOW_HINT } from '../../src/ui-tree/miss.js';
 import { readLiveRecord, recordedCase, withFieldValue, type LiveRecord } from '../helpers/live-records.js';
 
@@ -12,6 +12,12 @@ import { readLiveRecord, recordedCase, withFieldValue, type LiveRecord } from '.
 // check (docs/truth/live-records/android-vis.json, src e98b87e): k3, a fill into note once back hid the IME — refused
 // by design (the owner's decision of 2026-10-18, ADR 0013) — and k7, scroll_until phone under the bar riding on the IME
 // (with round 7's A6 record of it, android-k7-eyes-1.json).
+
+/** The Difference of a reading that missed (fill-landing.ts#readingOf); undefined for one that landed. */
+const differsOf = (observed: string, e: Expectation) => {
+  const r = readingOf(observed, e);
+  return 'differs' in r ? r.differs : undefined;
+};
 
 const record = readLiveRecord('android-vis.json');
 const k = (id: string) => record.results.find((r) => r.id === id)!;
@@ -776,7 +782,7 @@ describe('f15 (D63): digits the full date field refuses, though its text holds t
   it('the reading is what landingOf refuses since D63: unchanged since typing began, its text holding the value', () => {
     const second = { value: '2026', clear: false, before: '31.12.2026', placeholder: undefined, isInput: true, resolvedValue: '31.12.2026', held: 0 as const };
     expect(landingOf('31.12.2026', second)).toBeUndefined();
-    expect(differenceOf('31.12.2026', second)).toEqual({ kind: 'unchanged' });
+    expect(differsOf('31.12.2026', second)).toEqual({ kind: 'unchanged' });
   });
 
   it('refused as unchanged, the date kept: ok; Filled over it (the src before D63): MISMATCH fill-claim', async () => {
@@ -841,7 +847,7 @@ describe('f16 (D64): digits the date field at its cap keeps only the head of, th
   it('the reading is what landingOf refuses since D64: it moved, but holds none of the typing past the earlier text', () => {
     const second = { value: '12', clear: false, before: '31.12.202', placeholder: undefined, isInput: true, resolvedValue: '31.12.202', held: 0 as const };
     expect(landingOf('31.12.2021', second)).toBeUndefined();
-    expect(differenceOf('31.12.2021', second)).toEqual({ kind: 'length' });
+    expect(differsOf('31.12.2021', second)).toEqual({ kind: 'length' });
   });
 
   it('refused, the date kept at its cap: ok; Filled over it (the src before D64): MISMATCH fill-claim', async () => {
@@ -940,12 +946,12 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
   it('rfe1/rfe2 (D60): the drops D40 saw on iOS RN (4 under idb, 2 under wda) end on a group, in the eager mark — a dropped tail by the fill\'s rules; the full value lands', () => {
     const rule = (value: string, clear = false) => ({ value, clear, before: '', placeholder: undefined, isInput: true, resolvedValue: '', held: 0 as const });
     expect(landingOf('SK31 1200 0000 1987 4263 ', rule('SK3112000000198742637541', true))).toBeUndefined();
-    expect(differenceOf('SK31 1200 0000 1987 4263 ', rule('SK3112000000198742637541', true))).toEqual({ kind: 'dropped-tail', landed: 20, dropped: 4, grouped: true });
+    expect(differsOf('SK31 1200 0000 1987 4263 ', rule('SK3112000000198742637541', true))).toEqual({ kind: 'dropped-tail', landed: 20, dropped: 4, grouped: true });
     expect(landingOf('SK31 1200 0000 1987 4263 7541', rule('SK3112000000198742637541', true))).toMatchObject({ kind: 'landed' });
-    expect(differenceOf('SK31 1200 ', rule('SK31120000'))).toEqual({ kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true });
+    expect(differsOf('SK31 1200 ', rule('SK31120000'))).toEqual({ kind: 'dropped-tail', landed: 8, dropped: 2, grouped: true });
     expect(landingOf('SK31 1200 00', rule('SK31120000'))).toMatchObject({ kind: 'landed' });
     // rfe3 (and g2): the full 12 end on a group — the eager mark after them is D53's `separated`, refused by design.
-    expect(differenceOf('SK31 1200 0000 ', rule('SK3112000000'))).toEqual({ kind: 'separated', added: 3 });
+    expect(differsOf('SK31 1200 0000 ', rule('SK3112000000'))).toEqual({ kind: 'separated', added: 3 });
   });
 
   it('rfe1–rfe3: E held as the eager field spaces it — ok, a dropped tail typed again included (D60\'s live reply); a tail left dropped, claimed done — MISMATCH; rfe3 refused while the app holds it — MISMATCH failed-holds, as its `says` expects', async () => {

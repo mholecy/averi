@@ -69,10 +69,12 @@ flows:
   widened by D61: an unnamed placeholder whose letters and digits start the value's).
   Without clear, a reading unchanged since typing began fails as `did not change` unless it is
   the value itself (ADR 0034's D63 amendment).
-  Without clear, the value must be in what was typed after the earlier text, not anywhere in the
-  reading: a field that kept its earlier text and only the start of the typing (a length cap, a
-  dropped tail) is no fill, though its text holds the value; on iOS the tail is typed again
-  (ADR 0034's D64 amendment).
+  Without clear, the reading must be the value itself, or hold it in what was typed after the
+  earlier text, not anywhere in the reading: a field that kept its earlier text and only the start
+  of the typing (a length cap, a dropped tail) is no fill, though its text holds the value; on iOS
+  the tail is typed again (ADR 0034's D64 amendment). A reading that is the value itself cannot be
+  told from a select-all field that replaced its text, so a dropped key can pass there: `55` typed
+  after `5`, the second key lost, replies Filled (ADR 0034's A9 amendment, backlog D71).
   Android types one character per `input text` call: bulk injection races Compose's async state
   and drops most characters (measured 3 of 11 landing). averi types printable ASCII
   (U+0020–U+007E) on both platforms; on iOS with `treeSource: wda` also Latin, Greek, Cyrillic
