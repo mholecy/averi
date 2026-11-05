@@ -95,7 +95,7 @@ describe('port 8120 (d43-gate.ts\'s restore: the port free, else killed): lsof\'
   });
 
   it('its hand line: the lab\'s kill by hand, quoted, for the lab simulator only', () => {
-    expect(portHand(LAB)).toBe(`D43 (iOS): the lab's WebDriverAgent may still be running (port 8120 not proven free): pkill -f 'DerivedData/averi-wda-lab([/ ]|$)'; pkill -f 'Devices/${LAB}/.*WebDriverAgentRunner'; lsof -t -n -P -sTCP:LISTEN -i tcp:8120 | xargs kill`);
+    expect(portHand(LAB)).toBe(`D43 (iOS): first end the lab's WebDriverAgent (a runner still running undoes a restore at its exit): pkill -f 'DerivedData/averi-wda-lab([/ ]|$)'; pkill -f 'Devices/${LAB}/.*WebDriverAgentRunner'; lsof -t -n -P -sTCP:LISTEN -i tcp:8120 | xargs kill`);
     expect(() => portHand(DEVICE_CHECK_SIMULATOR)).toThrow(/device-check simulator/);
   });
 });

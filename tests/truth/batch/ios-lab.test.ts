@@ -442,6 +442,19 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(waits.filter((w) => w === PORT_RECHECK_MS)).toHaveLength(1);
   });
 
+  it('the port free but the restore failing: the window\'s own hand lines from the one builder — the WDA kill, each domain, the compare — as its getter gives them (code review, MAJOR 1)', async () => {
+    fresh({ restoreFails: true });
+    const lab = await simOf();
+    const { ctx, windows } = blockCtx(runOf(world), 'D43f');
+    let spec: WindowSpec | undefined;
+    await wdaWindow(ctx, lab, { work: async () => void (world.startWda(), (spec = windows.get(WDA_WINDOW))) });
+    const r = await spec!.restore(runOf(world));
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.hand).toEqual(spec!.hand);
+    expect(spec!.hand[0]).toBe(portHand(LAB_UDID));
+    expect(spec!.hand.at(-1)).toBe(compareHand(join(ctx.dir, 'state.json')));
+  });
+
   it('lsof unread (it fails, or passes its bound) blocks the restore as a listener does: nothing written back, the state dirty, the hand lines kept, the block INCONCLUSIVE (review round 2, MINOR 1)', async () => {
     const { ctx, events, windows } = blockCtx(runOf(world), 'D43u');
     let working = false;
@@ -531,8 +544,10 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
       return { code: cmd === 'lsof' && !listening ? 1 : cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out, err: '' };
     };
     const say = (w: string, t: string) => void steps.push(`${w} ${t}`);
-    await endLabProcesses(() => LAB_UDID)({ run, step: say });
+    await endLabProcesses(() => LAB_UDID, wait)({ run, step: say });
     expect(steps).toEqual([`NOTE the lab's WebDriverAgent (port 8120 free (a listener killed)) and idb_companion of ${LAB_UDID} ended`]);
+    // Read again through portFree, after its wait (code review, NIT 3).
+    expect(waits).toEqual([PORT_RECHECK_MS]);
     steps.length = 0;
     await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), step: say });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 still has a listener (pid 7)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 still has a listener (pid 7)`]);

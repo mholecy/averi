@@ -319,7 +319,8 @@ describe('an abort landing during the build\'s own --stop (review round 2, MINOR
     seam.handlers!.signal('SIGINT');
     expect(await done).toBe(130);
     expect(seam.words.filter((w) => w.endsWith('gradlew --stop'))).toHaveLength(2);
-    expect(outText()).toContain("NOTE lab android: the Gradle daemon stopped at the run's end (its build was cut short)");
+    // The reason the one the marker was kept for (code review, MINOR 2).
+    expect(outText()).toContain("NOTE lab android: the Gradle daemon stopped at the run's end (its --stop failed: exit 143)");
   });
 });
 
@@ -341,7 +342,7 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     const dir = dirOf('D43');
     return [
       `batch-l run ${ID} ${how} at 2026-11-05 09:44:26; state to put back by hand:`,
-      `D43 (iOS): the lab's WebDriverAgent may still be running (port 8120 not proven free): pkill -f 'DerivedData/averi-wda-lab([/ ]|$)'; pkill -f 'Devices/${LAB_UDID}/.*WebDriverAgentRunner'; lsof -t -n -P -sTCP:LISTEN -i tcp:8120 | xargs kill`,
+      `D43 (iOS): first end the lab's WebDriverAgent (a runner still running undoes a restore at its exit): pkill -f 'DerivedData/averi-wda-lab([/ ]|$)'; pkill -f 'Devices/${LAB_UDID}/.*WebDriverAgentRunner'; lsof -t -n -P -sTCP:LISTEN -i tcp:8120 | xargs kill`,
       ...['com.apple.keyboard.preferences', 'com.apple.Preferences', 'com.apple.Accessibility'].map((d) => `D43 (iOS): xcrun simctl spawn ${LAB_UDID} defaults import ${d} ${join(dir, `state.${d}.backup.plist`)}`),
       `D43 (iOS): then read each domain back (defaults export) and compare it with its backup beside ${join(dir, 'state.json')}; only when every one is equal, set the state file's dirty to false`,
       '',
@@ -359,6 +360,23 @@ describe('the abort inside the WDA window: the WDA ended, the wait, the restore;
     expect(summary()).toContain(`RESTORE: state not provably put back — ${join(out, 'RESTORE.txt')}:`);
     expect(seam.words.some((w) => / defaults (write|import|delete) /.test(w))).toBe(false);
     expect(JSON.parse(readFileSync(join(dirOf('D43'), 'state.json'), 'utf8')).dirty).toBe(true);
+  });
+
+  it('the port free but the key-by-key restore failing, interrupted: the same hand lines, from the one builder (code review, MAJOR 1)', async () => {
+    fresh({ restoreFails: true });
+    seam.hang = '--sources wda';
+    const done = go(batch());
+    await until(() => seam.words.some((w) => w.includes('--sources wda')));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('interrupted'));
+  });
+
+  it('…and on the normal path: the window left open, RESTORE at the end the same lines; the block INCONCLUSIVE', async () => {
+    fresh({ restoreFails: true });
+    expect(await go(batch())).toBe(1);
+    expect(readFileSync(join(out, 'RESTORE.txt'), 'utf8')).toBe(blockedRestore('ended'));
+    expect(summary()).toContain("D43 verdict: INCONCLUSIVE — the lab's settings not put back (see RESTORE)");
   });
 
   it('the same on the normal path: the window left open, its hand lines in RESTORE at the end, in the same order; exit 1', async () => {

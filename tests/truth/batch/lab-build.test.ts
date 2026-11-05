@@ -215,6 +215,8 @@ describe('the Gradle daemon after an interrupted Android build (review round 1, 
     const run = runOf(world);
     await b.lastly({ run, step: say });
     expect(run.seen.map((s) => s.words)).toEqual([`${join(repo, 'fixtures/apps/android', 'gradlew')} --stop`]);
+    // Its reason: the stop that failed, not a cut build (code review, MINOR 2).
+    expect(steps.at(-1)).toBe("NOTE lab android: the Gradle daemon stopped at the run's end (its --stop failed: exit 1 busy)");
   });
 
   it('no build started, or its own --stop ran: nothing; a stop that fails: a WARN', async () => {
