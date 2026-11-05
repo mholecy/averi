@@ -27,7 +27,7 @@ import {
   wdaWindowSpec,
 } from '../../../scripts/truth/batch/ios-lab.js';
 import { compareHand, portHand, STALE_COMPANION_WHY } from '../../../scripts/truth/batch/lab-lines.js';
-import type { BlockCtx, NeedCtx } from '../../../scripts/truth/batch/runner.js';
+import type { BlockCtx, NeedCtx, NeedEndCtx } from '../../../scripts/truth/batch/runner.js';
 import { stateOf } from '../../../scripts/truth/batch/run-dir.js';
 import { verdictLine } from '../../../scripts/truth/batch/words.js';
 import { CATALOG, LAB_UDID, labWorld, runOf, STALE_COMPANION_ERR, type LabWorld, type WorldOptions } from './lab-fakes.js';
@@ -340,9 +340,37 @@ describe('the iOS stretch\'s end: the finportal key read again, its line to the 
     expect(await stretch({ finportal: '1' })).toEqual(["protected OK   com.apple.launchservices.schemeapproval's -->sk.finportal.myport unchanged (1; read only)"]);
   });
 
-  it('CHANGED, or the start never read: an ERROR line — never unchanged', async () => {
-    expect((await stretch({ finportal: '1', finportalEnd: '2' }))[0]).toMatch(/^protected ERROR com\.apple\.launchservices\.schemeapproval's -->sk\.finportal\.myport CHANGED: 1 at the start, 2 at the end/);
+  it('CHANGED: a FAIL line (T2b batch-13 gap 4); the start never read: an ERROR line — never unchanged', async () => {
+    expect((await stretch({ finportal: '1', finportalEnd: '2' }))[0]).toMatch(/^protected FAIL com\.apple\.launchservices\.schemeapproval's -->sk\.finportal\.myport CHANGED: 1 at the start, 2 at the end/);
     expect((await stretch({}, false))[0]).toMatch(/unread: unreadable \(not read at the iOS stretch's start\) at the start, absent at the end/);
+  });
+});
+
+describe('the ios need\'s end (T2b batch-13 gap 4): the runner calls it once the blocks are done; the finportal key read again, its line to the protected-key slot', () => {
+  async function ended(o: Omit<WorldOptions, 'dir'>, c: { startRead?: boolean; udid?: string | null } = {}) {
+    fresh(o);
+    const ios = iosLab({ wait, reset: false });
+    const need = ios.need as { check(c: NeedCtx): Promise<unknown>; end(c: NeedEndCtx): Promise<void> };
+    if (c.startRead !== false) await need.check(needCtx());
+    world.st.restored = true;
+    const lines: string[] = [];
+    const from = world.calls.length;
+    await need.end({ ...needCtx(runOf(world), c.udid === undefined ? LAB_UDID : c.udid), protectedLine: (l) => void lines.push(l) });
+    return { lines, calls: words(from) };
+  }
+
+  it('unchanged: OK; CHANGED: FAIL — read through the guard again, a read only', async () => {
+    const what = "com.apple.launchservices.schemeapproval's -->sk.finportal.myport";
+    expect(await ended({ finportal: '1' })).toEqual({
+      lines: [`OK   ${what} unchanged (1; read only)`],
+      calls: ['xcrun simctl list devices -j', `xcrun simctl spawn ${LAB_UDID} defaults read com.apple.launchservices.schemeapproval com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport`],
+    });
+    expect((await ended({ finportal: '1', finportalEnd: '2' })).lines).toEqual([`FAIL ${what} CHANGED: 1 at the start, 2 at the end — no batch writes it: read it by hand (batch-5's backup stays read only)`]);
+  });
+
+  it('the start never read, or the simulator refused at the end: an ERROR saying unread — never unchanged, never FAIL', async () => {
+    expect((await ended({}, { startRead: false })).lines[0]).toMatch(/^ERROR .* unread: unreadable \(not read at the iOS stretch's start\) at the start, absent at the end/);
+    expect((await ended({}, { udid: null })).lines[0]).toMatch(/^ERROR .* unread: absent at the start, unreadable \(no lab simulator udid given \(--udid or AVERI_LAB_UDID\)\) at the end/);
   });
 });
 

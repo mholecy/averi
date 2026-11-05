@@ -412,15 +412,16 @@ const shown = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine(p.
 
 /**
  * The SUMMARY's protected-key line (batch-11.sh:584–585), from the reads at the iOS stretch's start and end:
- * `OK … unchanged` only when both were read (a value, or absent) and are the same; else an ERROR saying CHANGED or
- * unread — unread is never unchanged.
+ * `OK … unchanged` only when both were read (a value, or absent) and are the same; CHANGED a FAIL — the run exits 1
+ * (words.ts#exitCodeOf: a FAIL step line; T2b, batch-13 gap 4: an ERROR before, and a changed key exited 0); unread an
+ * ERROR — never unchanged, and not the batch's failure: the SUMMARY says it, exit 0 alone.
  */
 export function protectedLine(start: ProtectedRead, end: ProtectedRead): string {
   const what = `${PROTECTED.domain}'s ${PROTECTED_SHORT}`;
   const bothRead = start.state !== 'unreadable' && end.state !== 'unreadable';
   if (bothRead && valueOf(start) === valueOf(end)) return stepLine('OK', `${what} unchanged (${shown(start)}; read only)`);
-  const how = bothRead ? 'CHANGED' : 'unread';
-  return stepLine('ERROR', `${what} ${how}: ${shown(start)} at the start, ${shown(end)} at the end — no batch writes it: read it by hand (batch-5's backup stays read only)`);
+  const said = `${shown(start)} at the start, ${shown(end)} at the end — no batch writes it: read it by hand (batch-5's backup stays read only)`;
+  return bothRead ? stepLine('FAIL', `${what} CHANGED: ${said}`) : stepLine('ERROR', `${what} unread: ${said}`);
 }
 
 // ------------------------------------------------------------------------------------------------- the lines

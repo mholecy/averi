@@ -8,7 +8,7 @@ import { PROTECTED, protectedLine, type ProtectedRead } from './ios-defaults.js'
 import { backup, compare, domainsWindow, LabSim, readProtected, restore } from './ios-domains.js';
 import { CATALOG_PATH, cellsWhy, companionPattern, disconnectArgv, disconnectWarning, idbFailText, LSOF_ARGV, openInAlertOf, pkillOf, portOf, portPart, wdaBlockedOf, wdaHandOf, wdaKillPatterns, wdaRestoredOf, type Opened, type PortRead } from './lab-lines.js';
 import { checkDevice, type BuildRef } from './lab-build.js';
-import type { BlockCtx, LastStep, NeedCtx, NeedSpec } from './runner.js';
+import type { BlockCtx, LastStep, NeedCtx, NeedEndCtx, NeedSpec } from './runner.js';
 import { NO_UDID, type BatchConfig, type NeedResult } from './runner-lines.js';
 import { STATE_FILE, stateOf } from './run-dir.js';
 import { exitText, failedCall, nameInLine, type StepWord } from './words.js';
@@ -19,7 +19,7 @@ import { exitText, failedCall, nameInLine, type StepWord } from './words.js';
  * main's catalog, and the finportal key's first read — and its cheap recheck; the health check before each run, the
  * Open-in alert dismissed; the WDA window (the `.cases` first, the backup, the work, the lab's WebDriverAgent ended,
  * the 4 s wait, port 8120 proven free, the restore key by key, the end check, the compare), registered as a dirty
- * window so the abort puts it back the same way; the iOS stretch's end (the finportal key's second read, its line);
+ * window so the abort puts it back the same way; the need's end (the finportal key's second read, its line; T2b);
  * and the run's last step that ends the lab's WebDriverAgent and idb_companion. What is decided and said is
  * lab-lines.ts's and ios-defaults.ts's; here are the calls, through the injected Run, and the files, through io.ts.
  *
@@ -290,13 +290,17 @@ export interface IosLabOptions {
 }
 
 /**
- * What a batch has of the lab simulator: the need, the guarded simulator for a block, the stretch's end, the last step.
+ * What a batch has of the lab simulator: the need (its end reads the finportal key again), the guarded simulator for a
+ * block, a read of the key mid-run, the last step.
  */
 export interface IosLab {
   need: NeedSpec;
   /** The lab simulator over a block's (or a need's) calls, guarded; why not. */
   open(c: { bounded: Run; config: BatchConfig; fs: BatchFs }): Promise<Opened<IosSim>>;
-  /** The iOS stretch's end: the finportal key read again, its line to the SUMMARY's protected-key slot. */
+  /**
+   * The finportal key read again by a block, mid-run, its line to the SUMMARY's protected-key slot (each line judged):
+   * the need's end reads it anyway once the blocks are done (T2b, batch-13 gap 4).
+   */
   endStretch(ctx: BlockCtx, lab: IosSim): Promise<void>;
   /** The run's last step: the lab's WebDriverAgent and idb_companion ended, once the guard cleared the simulator. */
   lastly: LastStep;
@@ -308,7 +312,9 @@ const readText = (p: ProtectedRead): string => (p.state === 'value' ? nameInLine
 /**
  * The lab simulator kit. The need's check (batch-11.sh:383–410): the udid given and guarded; the reset; the finportal
  * key's first read (the iOS stretch's start, read only); this run's build installed if there is one; the installed
- * cells.json main's. Its `alive`: the guard and `idb ui describe-all` (a read, no swipe).
+ * cells.json main's. Its `alive`: the guard and `idb ui describe-all` (a read, no swipe). Its `end` (the runner's, once
+ * the blocks are done, for a need met; T2b, batch-13 gap 4): the guard again and the key's second read — a simulator
+ * refused then is an unread key — its line to the protected-key slot: CHANGED fails the run.
  */
 export function iosLab(o: IosLabOptions = {}): IosLab {
   let start: ProtectedRead | undefined;
@@ -341,12 +347,16 @@ export function iosLab(o: IosLabOptions = {}): IosLab {
     const tree = await opened.value.idb(['ui', 'describe-all']);
     return failedCall(tree) ? { ok: false, why: `idb ui describe-all: ${idbFailText(tree)}` } : { ok: true, how: 'idb answers' };
   };
+  const lineAt = (end: ProtectedRead): string => protectedLine(start ?? { state: 'unreadable', why: "not read at the iOS stretch's start" }, end);
+  const end = async (c: NeedEndCtx): Promise<void> => {
+    const opened = await open(c);
+    c.protectedLine(lineAt(opened.ok ? await readProtected(opened.value.sim) : { state: 'unreadable', why: opened.why }));
+  };
   return {
-    need: { check, alive },
+    need: { check, alive, end },
     open,
     async endStretch(ctx, lab) {
-      const end = await readProtected(lab.sim);
-      ctx.protectedLine(protectedLine(start ?? { state: 'unreadable', why: "not read at the iOS stretch's start" }, end));
+      ctx.protectedLine(lineAt(await readProtected(lab.sim)));
     },
     lastly: endLabProcesses(() => guarded, o.wait),
   };

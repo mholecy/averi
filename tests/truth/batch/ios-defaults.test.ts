@@ -317,10 +317,10 @@ describe('protectedLine — the finportal key, unchanged | CHANGED | unread (bat
     expect(protectedLine(absent, absent)).toBe(`OK   ${what} unchanged (absent; read only)`);
   });
 
-  it('a value that changed, appeared or went: an ERROR saying CHANGED; a value "absent" is no absent key', () => {
+  it('a value that changed, appeared or went: a FAIL saying CHANGED (T2b batch-13 gap 4: was an ERROR, exit 0); a value "absent" is no absent key', () => {
     const tail = "— no batch writes it: read it by hand (batch-5's backup stays read only)";
-    expect(protectedLine(v('1'), v('2'))).toBe(`ERROR ${what} CHANGED: 1 at the start, 2 at the end ${tail}`);
-    expect(protectedLine(absent, v('1'))).toBe(`ERROR ${what} CHANGED: absent at the start, 1 at the end ${tail}`);
+    expect(protectedLine(v('1'), v('2'))).toBe(`FAIL ${what} CHANGED: 1 at the start, 2 at the end ${tail}`);
+    expect(protectedLine(absent, v('1'))).toBe(`FAIL ${what} CHANGED: absent at the start, 1 at the end ${tail}`);
     expect(protectedLine(v('absent'), absent)).toContain('CHANGED');
     expect(protectedLine(absent, v('absent'))).toContain('CHANGED');
   });
@@ -335,10 +335,13 @@ describe('protectedLine — the finportal key, unchanged | CHANGED | unread (bat
     expect(protectedLine(v('a\nb'), v('a\nb'))).toBe(`OK   ${what} unchanged ("a\\nb"; read only)`);
   });
 
-  it('the line is a step line: an unchanged key exits 0, a CHANGED or unread one is an ERROR the SUMMARY shows (exit 0 alone)', () => {
+  it('the line is a step line: an unchanged key exits 0; a CHANGED one fails the run, exit 1 (T2b batch-13 gap 4); an unread one is an ERROR the SUMMARY shows, exit 0 alone — not OK, not FAIL', () => {
     const summary = (line: string): Summary => ({ name: 'b', runId: 'r', checkout: 'OK   checkout', labs: [], blocks: [], protectedLines: [line], restore: { file: 'R', written: [] }, errors: [] });
     expect(exitCodeOf(summary(protectedLine(v('1'), v('1'))))).toBe(0);
-    expect(exitCodeOf(summary(protectedLine(v('1'), v('2'))))).toBe(0);
+    expect(exitCodeOf(summary(protectedLine(v('1'), v('2'))))).toBe(1);
+    expect(exitCodeOf(summary(protectedLine(absent, v('2'))))).toBe(1);
+    expect(exitCodeOf(summary(protectedLine(v('1'), unreadable)))).toBe(0);
+    expect(protectedLine(v('1'), unreadable)).toMatch(/^ERROR /);
   });
 });
 

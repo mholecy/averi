@@ -6,7 +6,7 @@ import type { Asked } from '../../../scripts/truth/batch/cases.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import type { LiveCases, LiveTable } from '../../../scripts/truth/batch/live-table.js';
 import type { Ended, KillResult, ProcessSeam, StartOptions, Started } from '../../../scripts/truth/batch/proc.js';
-import { runBatch, type Block, type NeedCtx, type NeedSpec, type RunBatchOptions, type RunIo } from '../../../scripts/truth/batch/runner.js';
+import { NEED_END_SECS, runBatch, type Block, type NeedCtx, type NeedEndCtx, type NeedSpec, type RunBatchOptions, type RunIo } from '../../../scripts/truth/batch/runner.js';
 import { LIVE_GOLDEN_HEADER } from '../../../scripts/truth/batch/steps.js';
 import type { KnobSpec } from '../../../scripts/truth/batch/select.js';
 
@@ -585,6 +585,93 @@ describe('a block\'s calls are its own: stopKept ends the groups it kept, no oth
       plain('B', { run: async (ctx) => (await ctx.bounded('idb', ['b'], { secs: 5 }), await ctx.stopKept(), seam.signals.push('-- B stopped its own'), ctx.verdict('PASS')) }),
     ]);
     expect(seam.signals).toEqual(['SIGTERM idb b', '-- B stopped its own', 'SIGTERM idb a']);
+  });
+});
+
+describe('a need\'s end: once per need met, after the last block and before the windows go to RESTORE; its protected-key lines into the SUMMARY\'s slot (T2b batch-13 gap 4)', () => {
+  /** A need met (or not), its end recording when it ran and what it saw. */
+  const ending = (order: string[], name: string, o: { ok?: boolean; end?: (c: NeedEndCtx) => Promise<void>; endSecs?: number } = {}): NeedSpec => ({
+    check: async () => (o.ok === false ? { ok: false, why: `${name} down` } : { ok: true, how: `${name} up` }),
+    end: o.end ?? (async (c) => void order.push(`${name} end: RESTORE ${existsSync(join(out, 'RESTORE.txt')) ? 'written' : 'not yet'}, kept groups ${seam.signals.length === 0 ? 'alive' : 'ended'}, lab ${c.labDir === dirOf('lab')}, serial ${c.config.serial}`)),
+    ...(o.endSecs !== undefined && { endSecs: o.endSecs }),
+  });
+
+  it('called once per need met, after the last block, before finish and the judges; never for a need not met, nor one no wanted block named', async () => {
+    const order: string[] = [];
+    const n = { android: ending(order, 'android'), ios: ending(order, 'ios', { ok: false }), other: ending(order, 'other') };
+    const window = { hand: ['W: by hand'], restore: async () => ({ ok: true as const, how: 'x' }) };
+    expect(
+      await go(
+        [
+          plain('a', { needs: ['android'], run: async (ctx) => (order.push('a'), ctx.verdict('PASS')) }),
+          plain('b', { needs: ['android', 'ios'], run: async () => void order.push('b') }),
+          plain('c', { noRecords: true, run: async (ctx) => (order.push('c'), ctx.open('W', window), void (await ctx.bounded('idb', ['c'], { secs: 5 }))), judge: async () => (order.push('c judged'), ['c verdict: PASS']) }),
+        ],
+        { needs: n },
+      ),
+    ).toBe(1);
+    expect(order).toEqual(['a', 'c', 'android end: RESTORE not yet, kept groups alive, lab true, serial emulator-5554', 'c judged']);
+    expect(summary().some((l) => l.includes('its end'))).toBe(false);
+  });
+
+  it('its protected-key lines in the SUMMARY\'s slot, after the blocks\' and before RESTORE; a FAIL among them exits 1, an ERROR (unread) alone 0', async () => {
+    const line = (l: string) => ({ android: ending([], 'android', { end: async (c) => c.protectedLine(l) }) });
+    expect(await go([plain('a', { needs: ['android'] })], { needs: line('FAIL the finportal key CHANGED') })).toBe(1);
+    expect(summary().slice(-4, -1)).toEqual(['a verdict: PASS', 'FAIL the finportal key CHANGED', 'RESTORE: none — everything dirty was put back and verified']);
+    rmSync(out, { recursive: true, force: true });
+    expect(await go([plain('a', { needs: ['android'] })], { needs: line('ERROR the finportal key unread') })).toBe(0);
+    expect(summary()).toContain('ERROR the finportal key unread');
+  });
+
+  it('its calls bounded, through the run\'s guard; a bare NeedCheck has no end', async () => {
+    const n = { android: ending([], 'android', { end: async (c) => void (await c.bounded('probe', ['end'], { secs: 5 })) }), ios: needs.ios };
+    expect(await go([plain('a', { needs: ['android', 'ios'] })], { needs: n })).toBe(0);
+    expect(seam.words()).toContain('probe end');
+  });
+
+  it('an end that throws: an ERROR line naming the need and its first line; the next need\'s end still runs, the SUMMARY is written', async () => {
+    const order: string[] = [];
+    const n = {
+      android: ending(order, 'android', { end: async () => { throw new Error('simctl gone\nmore'); } }),
+      ios: ending(order, 'ios', { end: async (c) => c.protectedLine('OK   the key unchanged') }),
+    };
+    expect(await go([plain('a', { needs: ['android', 'ios'] })], { needs: n })).toBe(0);
+    expect(summary()).toContain('09:44:26 ERROR LAB android: its end threw: simctl gone');
+    expect(summary()).toContain('OK   the key unchanged');
+  });
+
+  it('an end past its bound (endSecs; NEED_END_SECS unless given): an ERROR line saying so, the SUMMARY written; a line it writes later only noted', async () => {
+    expect(NEED_END_SECS).toBe(60);
+    const n = { android: ending([], 'android', { endSecs: 0.02, end: async (c) => (await tick(80), c.protectedLine('FAIL late')) }) };
+    expect(await go([plain('a', { needs: ['android'] })], { needs: n })).toBe(0);
+    expect(summary()).toContain('09:44:26 ERROR LAB android: its end did not finish within 0.02 s (a protected-key line it writes later is not kept)');
+    await tick(120);
+    expect(summary()).not.toContain('FAIL late');
+    expect(text(join(out, 'steps.log'))).toContain('NOTE LAB android: a protected-key line after its end\'s bound not kept: FAIL late');
+  });
+
+  it('interrupted in the last block: no end is called; interrupted during an end (its probe stopped): exit 130, only the abort\'s SUMMARY, no later end', async () => {
+    const order: string[] = [];
+    const hang = plain('h', { needs: ['android'], run: async (ctx) => void (await ctx.bounded('probe', ['hang'], { secs: 30 })) });
+    let done = go([hang], { needs: { android: ending(order, 'android') } });
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(order).toEqual([]);
+    rmSync(out, { recursive: true, force: true });
+    seam = new FakeSeam([git(), probes, live()]);
+    const n = { android: ending(order, 'android', { end: async (c) => void (await c.bounded('probe', ['hang'], { secs: 30 })) }), ios: ending(order, 'ios') };
+    done = go([plain('a', { needs: ['android', 'ios'] })], { needs: n });
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    await tick(5);
+    expect(order).toEqual([]);
+    expect(seam.exits).toEqual([130]);
+    expect(text(join(dirOf('meta'), 'summary.txt')).split('======== SUMMARY end').length).toBe(2);
+    expect(summary()).toContain('a verdict: PASS');
+    // The body stops at once: the normal end's finish is never asked while the abort puts the windows back.
+    expect(text(join(out, 'steps.log'))).not.toContain('finish() ignored');
   });
 });
 

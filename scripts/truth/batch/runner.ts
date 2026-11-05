@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { AbortGuard, type AbortBlock, type WindowSpec } from './abort.js';
+import { AbortGuard, within, type AbortBlock, type WindowSpec } from './abort.js';
 import type { Call, Run } from './bounded.js';
 import { completeness, incompleteLine, runFiles, runsIn, selectorOf, stepOutcome, writeCases, type Asked } from './cases.js';
 import { nodeFs, type BatchFs } from './io.js';
@@ -56,7 +56,8 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  * 6. each wanted block, in the batch's order: its needs (each checked once, by the first block that names it; S6b
  *    supplies the checks — the lab simulator, the lab emulator), a failed one making it INCONCLUSIVE, not run; then its
  *    `run(ctx)`;
- * 7. the normal end: every window still open to RESTORE (finish); each block that ran with no verdict of its own judged
+ * 7. the normal end: each need met that has an `end`, once (NeedSpec: the ios need's finportal read, its protected-key
+ *    line); every window still open to RESTORE (finish); each block that ran with no verdict of its own judged
  *    (`judge`, device-free); the backstop for a wanted block still without one; the details; the SUMMARY; the exit code
  *    (words.ts#exitCodeOf).
  *
@@ -104,12 +105,23 @@ export interface NeedCtx {
   step(word: StepWord, text: string): void;
 }
 export type NeedCheck = (c: NeedCtx) => Promise<NeedResult>;
+/** What a need's end gets: a need's ctx and the protected-key line slot (BlockCtx#protectedLine's). */
+export interface NeedEndCtx extends NeedCtx {
+  protectedLine(line: string): void;
+}
+export type NeedEnd = (c: NeedEndCtx) => Promise<void>;
+/** A need's end's bound when its spec names none: a few bounded reads, each with its own bound. */
+export const NEED_END_SECS = 60;
 /**
  * A need's checks (S6b supplies them): `check` in full, by the first block naming it; then before each later block
  * naming it, `alive` — a cheap one (the emulator still answers) — or, with none, `check` again: a need met once is
- * never trusted blindly for a later block. A bare NeedCheck is `{ check }`.
+ * never trusted blindly for a later block. A bare NeedCheck is `{ check }`. Its `end` (T2b, batch-13 gap 4: the ios
+ * need's second read of the finportal key, which no block need remember): once the last block is done, before the
+ * windows still open go to RESTORE, once per need met — never for one not met or never asked — within `endSecs`
+ * (NEED_END_SECS); a throw or its bound passed is an ERROR line, and the run goes on to its SUMMARY. Not at the abort:
+ * it exits 130 whatever a read says, and the abort's SUMMARY reads nothing new.
  */
-export type NeedSpec = NeedCheck | { check: NeedCheck; alive?: NeedCheck };
+export type NeedSpec = NeedCheck | { check: NeedCheck; alive?: NeedCheck; end?: NeedEnd; endSecs?: number };
 
 /** What a block's preconditions are asked through: S3's checks over this run's git and main's table. */
 export interface PreconditionKit {
@@ -371,6 +383,8 @@ class BatchRun<K> {
           await this.runBlock(b, pre.get(b.id));
         }
         if (this.guard.interrupted) return EXIT.interrupted;
+        await this.endNeeds();
+        if (this.guard.interrupted) return EXIT.interrupted;
         const restore = await this.guard.finish();
         // A block not run has its INCONCLUSIVE line already: only the blocks that ran are judged.
         for (const b of this.blocks) await this.settle(b);
@@ -472,12 +486,51 @@ class BatchRun<K> {
   /** A need's check run: its answer, or, when it throws, a failed one (an ERROR line, unless the abort has begun). */
   private async asked(need: string, check: NeedCheck): Promise<NeedResult> {
     try {
-      return await check({ bounded: this.guard.bounded, labDir: this.dirs[LAB], config: this.config, fs: this.io.fs, step: (w, t) => this.log.step(w, t) });
+      return await check(this.needCtx());
     } catch (e) {
       const why = `its check threw: ${firstLineOf(messageOf(e))}`;
       if (!this.guard.interrupted) this.log.error(`LAB ${need}: ${why}`);
       return { ok: false, why };
     }
+  }
+
+  /** Each need met, in the order checked, that has an end: its end, once (NeedSpec); none once the abort began. */
+  private async endNeeds(): Promise<void> {
+    for (const [need, r] of this.needResults) {
+      const spec = this.needs[need];
+      if (!r.ok || this.guard.interrupted || typeof spec === 'function' || spec.end === undefined) continue;
+      await this.ended(need, spec.end, spec.endSecs ?? NEED_END_SECS);
+    }
+  }
+
+  /** One need's end, within its bound: a throw, or the bound passed, an ERROR line; a line it writes after, only noted. */
+  private async ended(need: string, end: NeedEnd, secs: number): Promise<void> {
+    let open = true;
+    const protectedLine = (l: string): void => {
+      if (open) return this.keepProtected(l);
+      oneLine(l, 'a protected-key line');
+      this.log.step('NOTE', `LAB ${need}: a protected-key line after its end's bound not kept: ${l}`);
+    };
+    try {
+      const r = await within(secs, end({ ...this.needCtx(), protectedLine }));
+      if (r.late) this.log.error(`LAB ${need}: its end did not finish within ${secs} s (a protected-key line it writes later is not kept)`);
+    } catch (e) {
+      this.log.error(`LAB ${need}: its end threw: ${firstLineOf(messageOf(e))}`);
+    } finally {
+      open = false;
+    }
+  }
+
+  /** What a need's check and end get. */
+  private needCtx(): NeedCtx {
+    return { bounded: this.guard.bounded, labDir: this.dirs[LAB], config: this.config, fs: this.io.fs, step: (w, t) => this.log.step(w, t) };
+  }
+
+  /** A protected-key line kept for the SUMMARY — one line; once interrupted only noted, never in the abort SUMMARY. */
+  private keepProtected(l: string): void {
+    oneLine(l, 'a protected-key line');
+    if (this.guard.interrupted) this.log.step('NOTE', `a protected-key line after the interrupt not kept: ${l}`);
+    else this.protectedLines.push(l);
   }
 
   /**
@@ -527,12 +580,7 @@ class BatchRun<K> {
         this.verdict(b, r.line);
         guard.leave(b.id, r.hand);
       },
-      protectedLine: (l) => {
-        oneLine(l, 'a protected-key line');
-        // As a verdict after the interrupt: only noted, never in the abort SUMMARY.
-        if (guard.interrupted) log.step('NOTE', `a protected-key line after the interrupt not kept: ${l}`);
-        else this.protectedLines.push(l);
-      },
+      protectedLine: (l) => this.keepProtected(l),
       liveRun: (name, asked, o) => (recording('liveRun'), this.liveRun(b, bounded, name, asked, o, preAsked)),
       asksLive: (name, asked) => {
         recording('asksLive');

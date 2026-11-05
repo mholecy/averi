@@ -158,7 +158,6 @@ function batch(o: { labNeeds?: string[]; d55First?: boolean } = {}) {
           if ((await iosCheck(ctx, sim.value, 'D43 wda 1')).ok) await ctx.liveRun('ios-wda-d43-1', P7W, { secs: 60 });
         },
       });
-      await ios.endStretch(ctx, sim.value);
     },
     judge: judgeOf('D43 verdict'),
   };
@@ -213,14 +212,15 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     expect(outText()).toContain(`NOTE the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended`);
   });
 
-  it('a late writer after the restore: the compare WARN, its hand lines in RESTORE, exit 1; the finportal key CHANGED an ERROR line', async () => {
+  it('a late writer after the restore: the compare WARN, its hand lines in RESTORE, exit 1; the finportal key CHANGED a FAIL line, from the ios need\'s end (T2b batch-13 gap 4)', async () => {
     fresh({ lateFlip: true, finportal: '1', finportalEnd: '2' });
     expect(await go(batch())).toBe(1);
     const s = summary();
     expect(s.find((l) => l.startsWith('D43 WDA-window compare:'))).toMatch(/^D43 WDA-window compare: WARN — com\.apple\.Accessibility: .* — the state file marked dirty again; the hand lines are in RESTORE$/);
     expect(s).toContain(`RESTORE: state not provably put back — ${join(out, 'RESTORE.txt')}:`);
     expect(s.some((l) => l.startsWith('D43 (iOS, changed after the restore — a late writer): xcrun simctl spawn LAB-SIMULATOR-UDID defaults write com.apple.Accessibility'))).toBe(true);
-    expect(s.find((l) => l.includes('finportal'))).toMatch(/^ERROR com\.apple\.launchservices\.schemeapproval's -->sk\.finportal\.myport CHANGED: 1 at the start, 2 at the end/);
+    expect(s.filter((l) => l.includes('finportal'))).toHaveLength(1);
+    expect(s.find((l) => l.includes('finportal'))).toMatch(/^FAIL com\.apple\.launchservices\.schemeapproval's -->sk\.finportal\.myport CHANGED: 1 at the start, 2 at the end/);
   });
 
   it('d43-backupfail: the D43 block INCONCLUSIVE naming the backup\'s why, nothing changed, its .cases asked and never ran', async () => {
@@ -229,6 +229,25 @@ describe('a fake lab batch under runBatch: the lab lines from the needs, the rea
     expect(summary()).toContain('D43 verdict: INCONCLUSIVE — the WDA window did not run: the simulator domains could not be backed up — no wda run (nothing changed): defaults export com.apple.Preferences: exit 1 export com.apple.Preferences failed — no state written');
     expect(existsSync(join(dirOf('D43'), 'ios-wda-d43-1.cases'))).toBe(true);
     expect(seam.words.some((w) => w.includes('--sources wda'))).toBe(false);
+  });
+});
+
+describe('the finportal key CHANGED fails the run by itself: the ios need\'s end reads it, no block of the batch\'s own judges it (T2b batch-13 gap 4)', () => {
+  it('a clean run whose key changed: exit 1, its FAIL line in the protected-key slot, after the blocks\' lines', async () => {
+    fresh({ finportal: '1', finportalEnd: '2' });
+    expect(await go(batch())).toBe(1);
+    const s = summary();
+    expect(s.slice(-4, -1)).toEqual([
+      'D43 verdict: PASS — its runs complete',
+      "FAIL com.apple.launchservices.schemeapproval's -->sk.finportal.myport CHANGED: 1 at the start, 2 at the end — no batch writes it: read it by hand (batch-5's backup stays read only)",
+      'RESTORE: none — everything dirty was put back and verified',
+    ]);
+  });
+
+  it('ONLY=D55: the ios need never met, so never ended — no finportal line, exit 0', async () => {
+    fresh({ finportal: '1', finportalEnd: '2' });
+    expect(await go(batch(), { ONLY: 'D55' })).toBe(0);
+    expect(summary().some((l) => l.includes('finportal'))).toBe(false);
   });
 });
 
