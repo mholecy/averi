@@ -107,6 +107,14 @@ export interface AbortGuardOptions {
   installSecs?: number;
   /** The judges' one budget in seconds, for all blocks together (120 by default). */
   judgeBudgetSecs?: number;
+  /**
+   * The run's last steps, on both ends, after the kept groups are ended (T2 S6b: what S2's kept groups cannot own — the
+   * lab's WebDriverAgent, a companion that left its group — ended by an exact pattern), through detached calls, bounded
+   * by `lastlySecs`. A throw or a pass of the bound is an ERROR line; the end goes on.
+   */
+  lastly?: (run: Run) => Promise<void>;
+  /** Their bound in seconds (LASTLY_SECS by default). */
+  lastlySecs?: number;
 }
 
 /** What the abort SUMMARY says besides the blocks: the checkout line, the lab lines, the protected keys', ERRORs. */
@@ -125,6 +133,8 @@ export const RESTORE_SECS = 300;
  * one budget for all keeps the abort's worst case short, and a block not judged in it is INTERRUPTED and rerun.
  */
 export const JUDGE_BUDGET_SECS = 120;
+/** The run's last steps' bound when none is given: a few bounded kills, each with its own bound. */
+export const LASTLY_SECS = 60;
 
 
 /** What `p` settled to, or `late` once `secs` have passed with it unsettled. */
@@ -260,6 +270,7 @@ export class AbortGuard {
     this.windows.clear();
     const written = this.writeRestore('ended', hand);
     await this.calls.stopKept();
+    await this.lastSteps();
     const late = this.writeRestore('ended', this.undeliveredHand(names));
     if (written.length + late.length > 0) this.options.log.error(`state not provably put back — the hand commands are in ${this.options.restoreFile}`);
     return [...this.restoreLines];
@@ -379,6 +390,7 @@ export class AbortGuard {
       // companion only at the end of on_abort). A judge's or a kept group's kill not delivered comes after that
       // RESTORE: its line is appended. stopKept never rejects (bounded.ts turns every kill failure into a result).
       await this.calls.stopKept();
+      await this.lastSteps();
       this.writeRestore('interrupted', this.undeliveredHand(names));
       const { errors = log.errors(), ...head } = this.headOf();
       log.summary(summaryLines({ ...head, name: this.options.name, runId: this.options.runId, blocks, restore: { file: this.options.restoreFile, written: this.restoreLines }, errors, interrupted: { at: timeOf(at) } }));
@@ -502,6 +514,25 @@ export class AbortGuard {
     } catch (e) {
       this.say('ERROR', `${b.block} not judged by the abort: ${messageOf(e)}`);
       return { why: `its judge failed: ${messageOf(e)}` };
+    }
+  }
+
+  /**
+   * The run's last steps (`lastly`), through a scope of detached calls, within their bound: past it their calls are
+   * stopped; a throw or a pass of the bound an ERROR line. Never rejects.
+   */
+  private async lastSteps(): Promise<void> {
+    const { lastly } = this.options;
+    if (lastly === undefined) return;
+    const secs = this.options.lastlySecs ?? LASTLY_SECS;
+    const scope = this.calls.scope("what the run's last steps end");
+    try {
+      const r = await within(secs, lastly(scope.run));
+      if (!r.late) return;
+      await scope.stop();
+      this.say('ERROR', `the run's last steps passed their bound (${secs} s): stopped there`);
+    } catch (e) {
+      this.say('ERROR', `the run's last steps failed: ${firstLineOf(messageOf(e))}`);
     }
   }
 

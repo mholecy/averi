@@ -1126,7 +1126,7 @@ describe('the run\'s last steps (`lastly`): after the kept groups, on both ends,
     seam.refusePids.add(101);
     const written = await guard.finish();
     expect(seam.events.slice(0, 5)).toEqual(['start idb connect U', 'SIGTERM -100', 'SIGKILL -100', 'lastly', 'start pkill -f averi-wda-lab']);
-    expect(written).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 101 may still be running: kill -9 -101, then check the device's state"]);
+    expect(written).toEqual(['batch-n run 1 ended at 2026-11-04 09:44:26; state to put back by hand:', "group 101 may still be running: kill -9 -101, then check what the run's last steps end"]);
   });
 
   it('the abort: after the restores, the judging and the kept groups\' stop, before the SUMMARY; its calls start while stopping (detached)', async () => {
@@ -1140,7 +1140,7 @@ describe('the run\'s last steps (`lastly`): after the kept groups, on both ends,
       },
     });
     expect(await interrupt(guard, () => guard.open('E5', window({ restore: async () => (seam.events.push('restore E5'), { ok: true, how: 'x' }) })))).toBe(130);
-    expect(seam.events).toEqual(['restore E5', 'judge kf', 'lastly, summary not written', 'start pkill -f idb_companion --udid U']);
+    expect(seam.events).toEqual(['restore E5', 'judge kf', 'lastly, summary not written', 'start pkill -f idb_companion --udid U', 'SIGKILL -100']);
     expect(summaryText()).toContain('kf: PASS');
   });
 
@@ -1166,7 +1166,8 @@ describe('the run\'s last steps (`lastly`): after the kept groups, on both ends,
       },
     });
     expect(await interrupt(guard)).toBe(130);
-    expect(seam.events).toEqual(['start pkill -f averi-wda-lab', 'SIGTERM -100', 'SIGKILL -100']);
+    // SIGTERM ends it here; the SIGKILL after the grace, and the one at its leader's end (bounded.ts).
+    expect(seam.events).toEqual(['start pkill -f averi-wda-lab', 'SIGTERM -100', 'SIGKILL -100', 'SIGKILL -100']);
     expect(summaryText()).toContain("ERROR the run's last steps passed their bound (0.05 s): stopped there");
   });
 
