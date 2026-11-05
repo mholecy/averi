@@ -1,0 +1,1 @@
+Error: Could not find key 'com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport' in domain 'com.apple.launchservices.schemeapproval'.

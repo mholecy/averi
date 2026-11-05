@@ -395,3 +395,163 @@ Where S3 departs from batch-11 and batch-12, on purpose:
 - the checkout's repo must be the top of its checkout, and config given through the env is dropped: both batches ran
   git in the shell's env, from `cd $MAIN`.
 - a `.cases` is a live run's only: batch-12 also wrote one for its E5 and T6 blocks, in shapes of their own.
+
+### S4: the iOS settings (2026-11-05, backlog T2 slice S4)
+
+S4 adds two files, split in the code review: ios-defaults.ts, pure — the values and the words — and ios-domains.ts, the
+calls and the files. They hold the lab simulator's three settings domains around the WDA window
+(com.apple.keyboard.preferences, com.apple.Preferences, com.apple.Accessibility) and the read-only schemeapproval key.
+ios-defaults.ts holds what moved from d43-gate.ts almost unchanged: the typed map (per top-level key its plist type, its
+canonical JSON and a scalar's write text, so bool false is never int 0), `diffMaps`, `decideRestore` (each changed or
+missing scalar written back typed, each extra key deleted — a key, never the domain; still differing, the whole backup
+imported; after the import, `defaults delete <domain>` + import only when the import exited 0 and is proven to have
+merged; else NOT VERIFIED with its hand commands; a domain absent before gets key deletes only, never a domain
+delete or an import) and `restoreDomain`, which drives the rule to its end over an injected run and read. With them:
+one table of the restore's actions (what each runs, how its exits are recorded), read by `actionArgs` and
+`restoreDomain`; `defaultsArgv`; the protected key and what its read means (`protectedReadOf`, `protectedLine`); what an
+empty export's `defaults read` probe means (`absentIn`); the state file's shape (`stateIn`, `DomainEntry`); and every
+line. ios-domains.ts holds, over the injected `Run` and `BatchFs`: `LabSim` (had only through lab-device.ts's guard),
+`backup`, `restore`, `compare`, `readProtected` and `domainsWindow` (the window as abort.ts's dirty window, its restore
+over the abort's detached runner). words.ts gains the verdict word WARN, for the compare's line.
+
+Why two files, where the first cut had one: the code review found the one file changing for two reasons — the rule and
+its words, and the simulator calls around them — and its pure half could be read and mutated without a fake simulator at
+all. ios-domains.ts reuses lab-device.ts's guards (spec T2: reuse, not copy) by a static import, so the sandbox's
+allowlist names two more files of scripts/truth/: lab-device.ts and the schema.ts it imports (their other imports are
+src/, already there, or types only) — the S1 part's "none of the rest of scripts/truth/" holds but for these two;
+ios-defaults.ts imports nothing outside scripts/truth/batch/. Their tests: ios-defaults.test.ts (the pure parts over
+batch-10's real exports, committed as typed maps in tests/fixtures/batch/d43-b10/ with the home folder as `~` and the
+udid a placeholder) and ios-domains-sim.test.ts (a fake simulator: its domains in memory, `defaults export` writing the
+typed map to a real temp file that the fake plistlib reads back; every call checked, in afterEach, for device-check's
+udid, ports 8100/8101 and a non-read `defaults` on the schemeapproval domain — b11-dry's VIOLATION checks made exact);
+ios-defaults.ts runs against both, ios-domains.ts against the second. ios-domains-plist.test.ts runs TYPED_PY on the
+host's plistlib over XML plists and is in the normal suite only: it starts python3. Baselines after the code review,
+cold: ios-defaults.ts 99.82 % (544 mutants, 4 timeouts, 1 equivalent survivor: `valueOf`'s state check, which an absent
+read without a value makes moot), floor 97; ios-domains.ts 100 % (334 mutants), floor 98; words.ts stays at 100 % (113
+mutants). The cold run of all twenty-two modules took 2 min 48 s. The S1 hygiene test now also refuses any UUID (a
+device udid or any other id) in the batch module's directories.
+
+Decisions S4 pins:
+- every call goes to the lab simulator: a `LabSim` exists only after `IosLab.guard()` (device-check's udid refused
+  before any call; then `simctl list devices -j` must list the udid under `averi-lab …`), its `simctl list` run through
+  the `Run` given; `using(run)` keeps the guarded simulator over another runner. Nothing in the module names a port.
+- `defaultsArgv` is the module's only `defaults` argv builder, and an allowlist (review round 1). It runs read, export,
+  write, delete and import, nothing else (rename, or an option first, throws). Any verb but a read must name, as its
+  domain, exactly one of the three (no other case, no long s, no plist path, no prefix): everything else throws, so the
+  schemeapproval domain is only ever read. No batch writes that domain since batch-11; a future need is a new decision.
+- the state-file protocol: `backup` writes `{dirty: true, udid, port: 8120, domains: [{name, backup}]}` (d43-gate.ts's
+  shape, so its --restore can still read it) only after every domain was exported and read typed, or found absent; a
+  failure writes none, so the window must not run. A state must name the three domains, each once (review round 1):
+  none, one missing, a duplicate or another domain is refused whole, so a restore can never say "every domain equals its
+  backup" over nothing proven. `restore` clears `dirty` only when every domain's read-back equals its backup, and
+  refuses, doing nothing, a state of another udid or one that cannot be read.
+- `compare` marking the state dirty itself, not leaving it to a person, is confirmed (code review): a late writer means
+  the lab is not at its backup, so the next run must refuse to start until a restore verifies.
+- `compare` runs only on a state the restore has cleared, for the simulator it names (review round 1): on a dirty state
+  every domain is unread, `not compared: the restore has not verified (the state file is dirty)`, never "a late writer";
+  another udid or a state that cannot be read, likewise; then no hand line, the state left as it is. Compared, a domain
+  that changed since or could not be read marks the state dirty again (abort.ts's markDirty; a mark that fails is said
+  in the line, never thrown) and gets LATE_HAND lines for RESTORE.
+- the compare's line is batch-11's verdict line, `D43 WDA-window compare: OK — every domain still equals its backup
+  after the end check` or `D43 WDA-window compare: WARN — <domain>: <key> <before> → <after>, …; <domain> unread (<why>)
+  — the state file marked dirty again; the hand lines are in RESTORE`, each value `<type> <canonical value>` or
+  `absent`, one line (nameInLine) and cut at COMPARE_VALUE_CHARS (60) code points with `…` (never half a surrogate pair,
+  review round 2). WARN is a verdict word since S4; it alone never fails the run. What S6 must surface: the line as one
+  of the D43 block's verdict lines (its BlockReport, so the SUMMARY shows it), and `hand` appended to RESTORE
+  (writeRestore), which exits the run 1 and makes the next run refuse to start until a restore verifies; compare is
+  called after the restore and the end check, as batch-11 did.
+- a plist plistlib cannot read is unread, never an empty map: a backup that fails, a read-back that throws, a compare
+  that says unread. unread is never unchanged, for a domain and for the protected key.
+- absent is defaults' own words for that domain only (review rounds 1 and 2), the host defaults wording (Darwin 27, seen
+  by the round-2 reviewer, committed as tests/fixtures/batch/defaults-host-*; no simulator stderr of a missing domain
+  was captured, the scratch evidence holds none): a read of a domain not there exits 1 with `Domain '<domain>' not
+  found.`, and an export of one exits 0 with an empty dictionary. So an export never says absent, and an empty one
+  proves nothing: `backup` asks `defaults read <domain>` for a domain that exported empty — exit 1 with that domain's
+  `not found` words, not past its bound, is absent (backup null); exit 0 is there and empty (its empty backup kept);
+  anything else fails the backup, `cannot tell absent from empty`. Elsewhere an empty domain and an absent one compare
+  equal (diffMaps), so restore and compare need no probe. `readProtected`: exit 0, the value (its trailing line breaks
+  dropped, as `$(…)` did); exit 1, not past its bound, with `Could not find key '<the finportal key>' in domain
+  '<schemeapproval>'` (batch-8's and batch-9's words; their own lines name `-->averilab`, which reads unreadable — a
+  not-found for a key not asked is unexpected, code review — and a fixture derived from batch-8's names the finportal
+  key) or `Domain '<schemeapproval>' not found.`, absent; anything else — another exit, those words about another
+  domain, a call past its bound whatever its stderr — unreadable, with why. `protectedLine` is OK only when both reads
+  were read and hold the same value (or both are absent); else an ERROR saying CHANGED or unread.
+- a domain absent before is never deleted; the keys it gained are deleted one by one — d43-gate.ts's rule, confirmed in
+  review round 1 (the spec's wording updated). The why: with no backup there is nothing to bring back, so a domain
+  delete could only take keys a system process wrote meanwhile.
+- `domainsWindow`'s hand lines are read from the state file when the abort asks: per domain an import of its backup, or
+  for one absent before `defaults read` and a delete of each key it holds, never an import; with no state yet, one line
+  saying both; with a state file there that cannot be read, a line saying so and why first (review round 2).
+- no file is ever overwritten or removed: each read of a domain is a fresh `<state>.<domain>.<after|readback|compare>
+  [-n].plist` beside the state file, kept, so a restore run twice (the abort's after the block's own) leaves both; an
+  earlier state file or backup at the path refuses the backup.
+- python3's plistlib on a host file is bounded by PLIST_SECS (15 s, d43-gate.ts's); xcrun by bounded.ts's own 120 s.
+
+§1a and §1b rows S4 ports, each to its tests:
+- "D43 keys restored one by one": decideRestore over the real exports (the G4 pair and two domains equal; the flip bool
+  true → int 0 written back `-bool true`; batch-10's read-back equal; the reverse flip bool false → int 0 put back and
+  read equal), the rule stage by stage (extra key, every write flag, the import for a dict, the proven-merge fallback,
+  NOT VERIFIED after an import that did not merge or exited non-zero and after the fallback, absent before),
+  restoreDomain, and over the fake: backup, and restore (batch-10's run end to end and its line, a refused write and
+  import, an unreadable read-back, a domain that fails beside two that are put back, a key already gone with batch-9's
+  stderr, an absent-before domain, a state that cannot be cleared, a state naming no domain or one twice); domainsWindow
+  for the abort path (batch-11.sh:158–164).
+- "schemeapproval key read-only": defaultsArgv (every non-read verb, any key, another case, a long s, a path, a prefix),
+  a forged state naming the domain, the recorder's invariants in every simulator test, readProtected (value, batch-8's
+  and batch-9's stderr as absent, the words about another domain, other failures and 142 as unreadable) and
+  protectedLine.
+- "`sim-domains --compare`": compare (OK; the runner flipping a key after the restore, before → after; bounded and
+  one-line values; an unreadable plist; a backup gone and an export past its bound; a domain absent before that gained a
+  key and one that went; a dirty state, another udid, no state; a state that cannot be marked).
+- §1b "Read-supported vs unchanged" (the tri-state) and "Mark a state file dirty / the state-file protocol": compare's
+  and protectedLine's unread, backup/restore/compare's state file.
+- check.sh 43–44 (`d43-latediff` WARN, `full-pass` compare OK) and `d43-restorefail`'s hand lines: compare and restore.
+
+For batch-13 (the module's first run on the lab simulator): record the simulator's own stderr and exit for a read and an
+export of a missing domain, and for a read of a missing key, and replace the host-wording fixtures with them if they
+differ.
+
+What of batch-11's and batch-12's iOS settings S4 does not port, each with the slice that owns it or the reason:
+- the WDA window's orchestration (the `.cases` first, the kill of the lab's WebDriverAgent and the 4 s wait before the
+  restore, the port 8120 free check d43-gate.ts's restore made, the finportal reads at the iOS stretch's start and end,
+  the compare's step after the end check, `d43-backupfail`'s INCONCLUSIVE): S6, the runner. S4 gives the pieces.
+- the lab install verification for iOS (the installed cells.json byte-equal to main's catalog): it reads the app's
+  container, no read this module does — S6.
+- d43-gate.ts's gate (G1–G5), its `--analyze` and its CLI modes, and sim-domains.ts's CLI: the probes', out of the repo;
+  the module's functions replace `--backup`, `--restore` and `--compare`.
+
+Where S4 departs, on purpose, from d43-gate.ts, sim-domains.ts (with its `--compare`) and batch-11:
+- compare refuses a dirty state, and another udid, itself; batch-11 only ran it on a clean state, and sim-domains.ts
+  checked neither.
+- compare marks the state dirty itself when a domain differs or is unread, so the next run refuses to start; batch-11
+  left the state clean and its LATE_HAND told the human to mark it dirty and run d43-gate.ts --restore. The module's
+  LATE_HAND lines are the per-key `defaults` commands (write, delete, or the import), or "compare it by hand" for an
+  unread domain, prefixed `D43 (iOS, changed after the restore — a late writer):`.
+- the line: batch-11 wrapped sim-domains.ts's `D43 compare: DIFFERS — <domain>: <key> <type> <repr> → <type> <repr>` as
+  `D43 WDA-window compare: WARN — D43 compare: DIFFERS — …`; the module writes `D43 WDA-window compare: WARN — <domain>:
+  <key> <type> <canonical JSON> → …`, the values one line and cut at 60 characters, unread domains and the state's
+  marking in the same line. A state that cannot be read was `D43 compare: UNREAD — …`; here a WARN `not compared: …`. An
+  export that failed was `export failed (exit n)`; here its exit, first line and a passed bound. The OK words are
+  batch-11's.
+- the typed compare is d43-gate.ts's map (type and canonical JSON), where sim-domains.ts compared Python's type name and
+  `repr`: the same bool ≠ int distinction, one reader for restore and compare.
+- `backup` creates the state file dirty in one exclusive write (`createExclusive`), where sim-domains.ts wrote it and
+  the S2 protocol marks an existing one (abort.ts's markDirty): there is none before the backup, and an exclusive create
+  also refuses one an earlier run left — stronger, kept (code review).
+- nothing stale is removed before an export (io.ts removes nothing): each read is a fresh file, and a state or backup
+  already there is refused, where both scripts removed and rewrote theirs.
+- absent is never an export's failure: d43-gate.ts, sim-domains.ts and batch-11 took an export (or read) that failed
+  saying `does not exist` for an absent domain, a wording no captured stderr shows and the host's defaults does not use;
+  the module fails such an export, and tells absent from empty by a `defaults read` probe after an empty export
+  (d43-gate.ts's intent: an absent-before domain is never deleted or imported into, so it must be proven absent, not
+  guessed from an empty export). The protected read is absent on exit 1 with that domain's words only (`Could not find
+  key … in domain '<it>'`, `Domain '<it>' not found.`), not past its bound: batch-11 took any non-zero exit with `does
+  not exist` anywhere.
+- the restore line has no port part (S6 owns the WDA), its label is batch-11's `D43 WDA-window restore`, and its words
+  are words.ts's: `OK — …` or `ERROR — NOT VERIFIED — …` (NOT VERIFIED is no verdict word). Its hand commands go to
+  RESTORE, one line each, `D43 (iOS): xcrun simctl spawn <udid> defaults …`, a path shell-quoted, where d43-gate.ts put
+  them inline after `by hand:` and batch-11's RESTORE named `d43-gate.ts --restore`; restoreDomain keeps no separate log
+  (what it did is its `performed`).
+- the protected-key line keeps batch-11's step-line form and its OK / ERROR, and says unchanged, CHANGED or unread; an
+  unread end is unread, never only "differs". It says "no batch writes it", not "this batch".
+- the typed map's real is `float`, as d43-gate.ts and `defaults write -float` name it.

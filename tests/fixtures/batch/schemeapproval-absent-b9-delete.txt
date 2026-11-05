@@ -1,0 +1,2 @@
+Error: Could not find key 'com.apple.CoreSimulator.CoreSimulatorBridge-->averilab' in domain 'com.apple.launchservices.schemeapproval'.
+Defaults have not been changed.

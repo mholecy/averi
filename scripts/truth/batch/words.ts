@@ -20,9 +20,10 @@ export type StepWord = (typeof STEP_WORDS)[number];
  * Verdict words. A block or one of its parts: PASS, FAIL, INCONCLUSIVE (its precondition not shown, or too few runs
  * judged — never a number from a run that could not set its state up), REPRODUCED (a control side shows the bug the
  * fix removes), OBSERVED (a fact recorded, nothing judged), SKIP (not run, by a knob or a premise). INTERRUPTED: a
- * block the abort SUMMARY could not judge. OK and ERROR: a cleanup line (`E5 cleanup: OK — …`), the lab lines.
+ * block the abort SUMMARY could not judge. OK, WARN and ERROR: a cleanup or check line (`E5 cleanup: OK — …`,
+ * batch-11's `D43 WDA-window compare: WARN — …`), the lab lines. WARN alone never fails the run (exitCodeOf).
  */
-export const VERDICTS = ['PASS', 'FAIL', 'INCONCLUSIVE', 'REPRODUCED', 'OBSERVED', 'SKIP', 'INTERRUPTED', 'OK', 'ERROR'] as const;
+export const VERDICTS = ['PASS', 'FAIL', 'INCONCLUSIVE', 'REPRODUCED', 'OBSERVED', 'SKIP', 'INTERRUPTED', 'OK', 'WARN', 'ERROR'] as const;
 export type Verdict = (typeof VERDICTS)[number];
 
 /** The SUMMARY's opening marker. Its end marker starts with it too: `======== SUMMARY end (run <id>)`. */

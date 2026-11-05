@@ -24,6 +24,9 @@ export default {
     '!/scripts/truth/',
     '/scripts/truth/*',
     '!/scripts/truth/batch/',
+    // ios-domains.ts reuses lab-device.ts's guards (T2 S4), a static import: that file and the one it imports, no more.
+    '!/scripts/truth/lab-device.ts',
+    '!/scripts/truth/schema.ts',
     '!/package.json',
     '!/tsconfig.json',
     '!/tsconfig.test.json',

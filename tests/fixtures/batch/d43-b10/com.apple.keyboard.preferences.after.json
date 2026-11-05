@@ -1,0 +1,43 @@
+{
+  "AutomaticMinimizationEnabled": {
+    "c": "false",
+    "t": "bool",
+    "v": "false"
+  },
+  "DictationLanguagesEnabled": {
+    "c": "{\"en_US\": true, \"sk_SK\": true}",
+    "t": "dict"
+  },
+  "DidShowContinuousPathIntroduction": {
+    "c": "true",
+    "t": "bool",
+    "v": "true"
+  },
+  "HardwareKeyboardLastSeen": {
+    "c": "false",
+    "t": "bool",
+    "v": "false"
+  },
+  "IsMixmojiSuggestionsEnabled": {
+    "c": "false",
+    "t": "bool",
+    "v": "false"
+  },
+  "KeyboardAutocorrection_analyzedAt": {
+    "c": "{\"$date\": \"2026-11-03T09:02:10.342544\"}",
+    "t": "date"
+  },
+  "KeyboardAutocorrection_approxDateOfBuildInstall": {
+    "c": "{\"$date\": \"2026-10-29T21:54:57.792435\"}",
+    "t": "date"
+  },
+  "KeyboardAutocorrection_buildAtLastAnalysis": {
+    "c": "\"24A434\"",
+    "t": "string",
+    "v": "24A434"
+  },
+  "KeyboardsCurrentAndNext": {
+    "c": "[\"en_US@sw=QWERTY;hw=Automatic\", \"en_US@sw=QWERTY;hw=Automatic\"]",
+    "t": "array"
+  }
+}
