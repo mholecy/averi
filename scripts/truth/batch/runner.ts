@@ -135,11 +135,19 @@ export const NEED_END_SECS = 60;
  * naming it, `alive` — a cheap one (the emulator still answers) — or, with none, `check` again: a need met once is
  * never trusted blindly for a later block. A bare NeedCheck is `{ check }`. Its `end` (T2b, batch-13 gap 4: the ios
  * need's second read of the finportal key, which no block need remember): once the last block is done, before the
- * windows still open go to RESTORE, once per need met — never for one not met or never asked — within `endSecs`
- * (NEED_END_SECS); a throw or its bound passed is an ERROR line, and the run goes on to its SUMMARY. Not at the abort:
- * it exits 130 whatever a read says, and the abort's SUMMARY reads nothing new.
+ * windows still open go to RESTORE, once per need met at least once in the run — a need down later too (review round
+ * 1, MAJOR); never one never met or never asked — within `endSecs` (NEED_END_SECS unless given; a need whose end makes
+ * bounded calls derives it from their bounds, so it cannot pass it first). A throw or its bound passed is an ERROR line
+ * and, with `endUnread`, the protected-key line that says its key unread and why; an end past its bound that settles
+ * before the SUMMARY is assembled has its lines taken in place of that one (a late FAIL exits 1: review round 1,
+ * BLOCKER). Not at the abort: it exits 130 whatever a read says; its SUMMARY gets `endUnread`'s line for each need met
+ * whose end had not had its say, so the slot is never silent about a key not read.
  */
-export type NeedSpec = NeedCheck | { check: NeedCheck; alive?: NeedCheck; end?: NeedEnd; endSecs?: number };
+export type NeedSpec = NeedCheck | { check: NeedCheck; alive?: NeedCheck; end?: NeedEnd; endSecs?: number; endUnread?: (why: string) => string };
+/** A NeedSpec read as an object: a bare NeedCheck (a function) has none of these properties. */
+type NeedEnding = { end?: NeedEnd; endSecs?: number; endUnread?: (why: string) => string };
+/** Why the abort's SUMMARY says a need's key unread: no end was asked once interrupted. */
+export const ABORT_UNREAD = 'not read at its end: the run was interrupted (the abort reads nothing)';
 
 /** What a block's preconditions are asked through: S3's checks over this run's git and main's table. */
 export interface PreconditionKit {
@@ -338,6 +346,12 @@ class BatchRun<K> {
   private readonly protectedLines: string[] = [];
   /** Each need's answer so far: its first check's, then a failed recheck's (a need down stays down). */
   private readonly needResults = new Map<string, NeedResult>();
+  /** The needs met at least once, in the order first met: each one's end is asked (NeedSpec). */
+  private readonly metOnce = new Set<string>();
+  /** The needs whose end has had its say before any interrupt: a line within its bound, or its unread line. */
+  private readonly endsSaid = new Set<string>();
+  /** The ends past their bound: their unread line, the lines they wrote since, whether they have settled. */
+  private readonly lateEnds: { unread: string | undefined; lines: string[]; settled: () => boolean }[] = [];
   /** Whether any wanted block ran: none, and the exit is 2. */
   private anyRan = false;
   /** How many calls of each need were recorded so far, and the needs whose record could not be written (noted once). */
@@ -377,7 +391,7 @@ class BatchRun<K> {
       judgeBudgetSecs: io.judgeBudgetSecs,
       // None given, none run: lastSteps over no step does nothing.
       lastly: (run: Run) => this.lastSteps(lastly, run),
-      head: () => ({ checkout: this.checkout ?? NOT_READ_CHECKOUT, labs: this.labs, protectedLines: this.protectedLines, errors: this.runErrors() }),
+      head: () => ({ checkout: this.checkout ?? NOT_READ_CHECKOUT, labs: this.labs, protectedLines: [...this.protectedLines, ...this.abortUnread()], errors: this.runErrors() }),
       blocks: blocks.map((b) => this.abortBlock(b)),
     });
     for (const b of blocks) this.lines.set(b.id, []);
@@ -502,6 +516,8 @@ class BatchRun<K> {
     }
     if (known !== undefined && r.ok) return r;
     this.needResults.set(need, r);
+    // Set here only by a first check or a failed recheck: met here is met for the first time.
+    if (r.ok) this.metOnce.add(need);
     const line = labLine(need, known === undefined || r.ok ? r : { ok: false, why: `${r.why} (rechecked before ${id})` });
     this.labs.push(line);
     this.log.note(line);
@@ -519,32 +535,68 @@ class BatchRun<K> {
     }
   }
 
-  /** Each need met, in the order checked, that has an end: its end, once (NeedSpec); none once the abort began. */
+  /** Each need met at least once, in the order first met, that has an end: its end, once (NeedSpec); none once interrupted. */
   private async endNeeds(): Promise<void> {
-    for (const [need, r] of this.needResults) {
-      // A bare NeedCheck (a function) has no `end` property: read as one with none.
-      const { end, endSecs = NEED_END_SECS } = this.needs[need] as { end?: NeedEnd; endSecs?: number };
-      if (!r.ok || this.guard.interrupted || end === undefined) continue;
-      await this.ended(need, end, endSecs);
+    for (const need of this.metOnce) {
+      const spec = this.needs[need] as NeedEnding;
+      if (this.guard.interrupted || spec.end === undefined) continue;
+      await this.ended(need, spec.end, spec);
     }
   }
 
-  /** One need's end, within its bound: a throw, or the bound passed, an ERROR line; a line it writes after, only noted. */
-  private async ended(need: string, end: NeedEnd, secs: number): Promise<void> {
+  /**
+   * One need's end, within its bound. A throw, or the bound passed: an ERROR line and its unread line (endUnread); past
+   * its bound, the lines it writes later are kept aside, taken if it settles before the SUMMARY (takeLateEnds).
+   */
+  private async ended(need: string, end: NeedEnd, { endSecs = NEED_END_SECS, endUnread }: NeedEnding): Promise<void> {
     let open = true;
-    const protectedLine = (l: string): void => {
-      if (open) return this.keepProtected(l);
-      // One line, as the step's own rule asks.
-      this.log.step('NOTE', `LAB ${need}: a protected-key line after its end's bound not kept: ${l}`);
+    let settled = false;
+    const late: string[] = [];
+    // A line kept before the interrupt is its say: the abort's SUMMARY then adds no unread line for it.
+    const say = (l: string): void => {
+      this.keepProtected(l);
+      if (!this.guard.interrupted) this.endsSaid.add(need);
     };
+    const protectedLine = (l: string): void => {
+      if (open) return say(l);
+      // The step first: one line, as its own rule asks.
+      this.log.step('NOTE', `LAB ${need}: a protected-key line after its end's bound, kept if its end finishes before the SUMMARY: ${l}`);
+      late.push(l);
+    };
+    const unread = (why: string): string | undefined => {
+      this.log.error(`LAB ${need}: ${why}`);
+      const line = endUnread?.(why);
+      if (line !== undefined) say(line);
+      return line;
+    };
+    const ending = end({ ...this.needCtx(need, 'end'), protectedLine });
+    ending.then(() => void (settled = true), () => {});
     try {
-      const r = await within(secs, end({ ...this.needCtx(need, 'end'), protectedLine }));
-      if (r.late) this.log.error(`LAB ${need}: its end did not finish within ${secs} s (a protected-key line it writes later is not kept)`);
+      const r = await within(endSecs, ending);
+      if (r.late) this.lateEnds.push({ unread: unread(`its end did not finish within ${endSecs} s`), lines: late, settled: () => settled });
     } catch (e) {
-      this.log.error(`LAB ${need}: its end threw: ${firstLineOf(messageOf(e))}`);
+      unread(`its end threw: ${firstLineOf(messageOf(e))}`);
     } finally {
       open = false;
     }
+  }
+
+  /** Each end past its bound that has settled by now, with lines: those lines in place of its unread line. No wait. */
+  private takeLateEnds(): void {
+    for (const l of this.lateEnds) {
+      if (!l.settled() || l.lines.length === 0) continue;
+      const at = l.unread === undefined ? -1 : this.protectedLines.indexOf(l.unread);
+      if (at < 0) this.protectedLines.push(...l.lines);
+      else this.protectedLines.splice(at, 1, ...l.lines);
+    }
+  }
+
+  /** The abort SUMMARY's line for each need met whose end had not had its say: its key unread (endUnread). */
+  private abortUnread(): string[] {
+    return [...this.metOnce].flatMap((need) => {
+      const { endUnread } = this.needs[need] as NeedEnding;
+      return this.endsSaid.has(need) || endUnread === undefined ? [] : [endUnread(ABORT_UNREAD)];
+    });
   }
 
   /** What a need's check, alive and end get: each bounded call recorded, `phase` its part. */
@@ -778,6 +830,7 @@ class BatchRun<K> {
   /** The details, then the SUMMARY; the exit called with its code. */
   private end(restore: readonly string[]): number {
     const { fs } = this.io;
+    this.takeLateEnds();
     const checkout = this.checkout!;
     const details = detailsLines({
       checkout,

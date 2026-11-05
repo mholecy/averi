@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { WindowSpec } from '../../../scripts/truth/batch/abort.js';
 import type { Asked } from '../../../scripts/truth/batch/cases.js';
-import type { Run } from '../../../scripts/truth/batch/bounded.js';
+import { boundFor, CLOSE_GRACE_MS, GRACE_MS, type Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
 import {
   ALERT_WAIT_MS,
@@ -13,6 +13,7 @@ import {
   endLabProcesses,
   health,
   HOST_SECS,
+  IOS_END_SECS,
   IOS_NEED,
   iosCheck,
   iosLab,
@@ -366,6 +367,23 @@ describe('the ios need\'s end (T2b batch-13 gap 4): the runner calls it once the
       calls: ['xcrun simctl list devices -j', `xcrun simctl spawn ${LAB_UDID} defaults read com.apple.launchservices.schemeapproval com.apple.CoreSimulator.CoreSimulatorBridge-->sk.finportal.myport`],
     });
     expect((await ended({ finportal: '1', finportalEnd: '2' })).lines).toEqual([`FAIL ${what} CHANGED: 1 at the start, 2 at the end — no batch writes it: read it by hand (batch-5's backup stays read only)`]);
+  });
+
+  it('its bound is its calls\' own bounds summed, each with its stop: it cannot pass its bound before its calls do (T2b review round 1, BLOCKER)', async () => {
+    const { calls } = await ended({ finportal: '1' });
+    const need = iosLab({ wait }).need as { endSecs: number };
+    const stop = (GRACE_MS + CLOSE_GRACE_MS) / 1000;
+    expect(need.endSecs).toBe(calls.reduce((t, w) => t + boundFor(w.split(' ')[0], w.split(' ').slice(1))! + stop, 0));
+    expect(IOS_END_SECS).toBe(need.endSecs);
+    expect(IOS_END_SECS).toBe(2 * (120 + 3));
+  });
+
+  it('its unread line, for the runner when its end threw or passed its bound: the key named, unread, why — never unchanged (T2b review round 1)', async () => {
+    fresh({ finportal: '1' });
+    const ios = iosLab({ wait, reset: false });
+    const need = ios.need as { check(c: NeedCtx): Promise<unknown>; endUnread(why: string): string };
+    await need.check(needCtx());
+    expect(need.endUnread('its end threw: gone')).toBe("ERROR com.apple.launchservices.schemeapproval's -->sk.finportal.myport unread: 1 at the start, unreadable (its end threw: gone) at the end — no batch writes it: read it by hand (batch-5's backup stays read only)");
   });
 
   it('the start never read, or the simulator refused at the end: an ERROR saying unread — never unchanged, never FAIL', async () => {

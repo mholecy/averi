@@ -143,7 +143,9 @@ const cut = (text: string): string => {
  * One call as its line (T2b, batch-13 gap 6: batch-13 wrapped the ios need's calls itself to see why a reset failed):
  * one JSON object, its fields sorted — the need, the phase, the time, the command's base name, its args, its bound, its
  * exit — and, for a call that failed, its first line (stderr's before stdout's), no more of its output than a step line
- * says; no env. Each argument and that line cut at NEED_CALL_CHARS.
+ * says; no env. Each argument and that line cut at NEED_CALL_CHARS. The args keep the host paths a call names (the
+ * checkout's, a build's): accepted (T2b review round 1) — the file lives in the run's lab folder, outside the checkout,
+ * beside the run's other files that name them; the udid and serial are lab facts already there.
  */
 export function needCallLine(c: NeedCall): string {
   const { result: r } = c;
