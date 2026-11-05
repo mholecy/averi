@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { GROUPS, GROUP_ENV, groupScope, readScopeFile, scopeErrors, scopeOf } from '../../scripts/mutation/group.mjs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, matchesGlob, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it, vi } from 'vitest';
+import { filesOf, GROUPS, GROUP_ENV, groupScope, isGroup, readScopeFile, scopeErrors, scopeOf } from '../../scripts/mutation/group.mjs';
 
 // scripts/mutation/group.mjs: the mutation run's groups (ADR 0038, the T2 amendment's T2b-2 part), read by
 // stryker.config.mjs, vitest.mutation.config.ts and mutate.ts alike.
@@ -80,5 +83,67 @@ describe('scopeOf — what stryker.config.mjs and vitest.mutation.config.ts read
 
   it('reads scope.json when no scope is given', () => {
     expect(Object.keys(scopeOf({}).scope)).toEqual(Object.keys(readScopeFile()));
+  });
+});
+
+describe('isGroup and filesOf', () => {
+  it('isGroup: core and lab only', () => {
+    expect(GROUPS.every(isGroup)).toBe(true);
+    for (const name of ['Core', 'all', '', undefined, 1]) expect(isGroup(name)).toBe(false);
+  });
+
+  it('filesOf: a group\'s files suffixed, none: the unsuffixed names', () => {
+    expect(filesOf('core').json).toBe('reports/mutation/mutation-core.json');
+    expect(filesOf(undefined).json).toBe('reports/mutation/mutation.json');
+  });
+});
+
+describe('vitest.mutation.config.ts — a group\'s Stryker runs that group\'s tests (T2b-2)', () => {
+  it('its include is scopeOf\'s tests for the group in the env, or every module\'s with none', async () => {
+    try {
+      for (const group of [...GROUPS, undefined]) {
+        vi.resetModules();
+        vi.unstubAllEnvs();
+        if (group !== undefined) vi.stubEnv(GROUP_ENV, group);
+        const config = (await import('../../vitest.mutation.config.js')).default;
+        expect(config.test?.include).toEqual(scopeOf(group === undefined ? {} : { [GROUP_ENV]: group }).tests);
+      }
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+    expect(scopeOf({ [GROUP_ENV]: 'core' }).tests).not.toEqual(scopeOf({ [GROUP_ENV]: 'lab' }).tests);
+  });
+});
+
+describe('a group\'s tests: every scoped test that imports a module of a group is in that group (T2b-2)', () => {
+  const root = fileURLToPath(new URL('../..', import.meta.url));
+  const scope = readScopeFile();
+  const inGroup = (test: string, group?: string) =>
+    Object.values(scope).some((m) => (group === undefined || m.group === group) && m.tests.some((glob) => matchesGlob(test, glob)));
+  const testFiles = readdirSync(join(root, 'tests'), { recursive: true, encoding: 'utf8' })
+    .filter((f) => f.endsWith('.test.ts'))
+    .map((f) => `tests/${f.split('\\').join('/')}`);
+
+  it('a scoped test importing a module of another group is lab\'s, importing core: the lab builds on core', () => {
+    // Narrowing a group's include can only lower a score (fewer tests to kill a mutant), so the guard is that a scoped
+    // test that imports a module of a group runs in that group. The one known exception: lab's tests import core's
+    // modules as what the lab is built on (runner, bounded, io …), never to check them — core's own tests do that, and
+    // T2b-2's per-mutant compare with the single run found every status unchanged (ADR 0038, T2b-2).
+    const misplaced: string[] = [];
+    for (const test of testFiles.filter((t) => inGroup(t))) {
+      const source = readFileSync(join(root, test), 'utf8');
+      for (const [, a, b] of source.matchAll(/from\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]/g)) {
+        const spec = a ?? b;
+        if (!spec.startsWith('.')) continue;
+        const module = relative(root, join(root, dirname(test), spec)).split('\\').join('/').replace(/\.js$/, '.ts');
+        const group = scope[module]?.group;
+        if (group === undefined || inGroup(test, group)) continue;
+        if (group === 'core' && inGroup(test, 'lab')) continue;
+        misplaced.push(`${test} imports ${module} (${group}) but is not in ${group}'s tests`);
+      }
+    }
+    expect(misplaced).toEqual([]);
+    expect(testFiles.length).toBeGreaterThan(100);
   });
 });
