@@ -13,7 +13,6 @@ import {
   detailLines,
   detailsLines,
   deviceArgs,
-  fileErrors,
   hasVerdictOf,
   judgedNothingLine,
   LAB,
@@ -28,6 +27,7 @@ import {
   recordOf,
   rejudgeArgs,
   linesIn,
+  logErrors,
   stepsOfRun,
   type AskedRun,
   type BatchConfig,
@@ -291,7 +291,7 @@ class BatchRun<K> {
       graceMs: io.graceMs,
       installSecs: io.installSecs,
       judgeBudgetSecs: io.judgeBudgetSecs,
-      head: () => ({ checkout: this.checkout ?? NOT_READ_CHECKOUT, labs: this.labs, protectedLines: this.protectedLines, errors: this.logErrors() }),
+      head: () => ({ checkout: this.checkout ?? NOT_READ_CHECKOUT, labs: this.labs, protectedLines: this.protectedLines, errors: this.runErrors() }),
       blocks: blocks.map((b) => this.abortBlock(b)),
     });
     for (const b of blocks) this.lines.set(b.id, []);
@@ -586,15 +586,22 @@ class BatchRun<K> {
     this.verdict(b, backstopLine(b.label, runs));
   }
 
-  /** Every ERROR line of this run's logs: each run folder's `*.log` and analyze.txt, in openRun's order. */
-  private logErrors(): string[] {
+  /**
+   * This run's ERROR lines from its logs (runner-lines.ts#logErrors): each run folder's `*.log` and analyze.txt, in
+   * openRun's order, each named `<block>/<file>`; one listed but unreadable says `a folder` when it lists entries.
+   */
+  private runErrors(): string[] {
     const { fs } = this.io;
-    return Object.values(this.dirs).flatMap((d) =>
+    const logs = Object.entries(this.dirs).flatMap(([block, d]) =>
       fs
         .list(d)
         .filter((n) => n.endsWith('.log') || n === 'analyze.txt')
-        .flatMap((n) => fileErrors(join(d, n), fs.read(join(d, n)), fs.list(join(d, n)).length > 0 ? 'a folder' : undefined)),
+        .map((n) => {
+          const path = join(d, n);
+          return { name: `${block}/${n}`, path, text: fs.read(path), ...(fs.list(path).length > 0 ? { why: 'a folder' } : {}) };
+        }),
     );
+    return logErrors(logs);
   }
 
   /** The details, then the SUMMARY; the exit called with its code. */
@@ -618,7 +625,7 @@ class BatchRun<K> {
       blocks: this.blocks.map((b) => ({ block: b.id, lines: this.lines.get(b.id)! })),
       protectedLines: this.protectedLines,
       restore: { file: this.restoreFile, written: restore },
-      errors: [...this.log.errors(), ...this.logErrors()],
+      errors: [...this.log.errors(), ...this.runErrors()],
       noneRan: !this.anyRan,
     };
     this.log.summary(summaryLines(summary));

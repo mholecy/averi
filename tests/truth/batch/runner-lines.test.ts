@@ -239,9 +239,9 @@ describe('logErrors — this run\'s ERROR lines from its logs, counted across th
     const [cut] = logErrors([log('a.log', times(2, long))]);
     expect([...cut]).toHaveLength(DETAIL_CHARS);
     expect(cut.endsWith('… (×2, in a.log)')).toBe(true);
-    const got = logErrors([log('a.log', Array.from({ length: 21 }, (_, i) => `ERROR e${i}`).join('\n')), log('b.log', 'ERROR e0\nERROR f1\nERROR f2')]);
+    const got = logErrors([log('a.log', Array.from({ length: 21 }, (_, i) => `ERROR e${i}`).join('\n')), log('b.log', 'ERROR e0\nERROR f1\nERROR f2'), log('c.log', 'ERROR e0')]);
     expect(got).toHaveLength(21);
-    expect(got[0]).toBe('ERROR e0 (×2, in a.log, b.log)');
+    expect(got[0]).toBe('ERROR e0 (×3, in a.log, b.log, c.log)');
     expect(got[19]).toBe('ERROR e19');
     expect(got[20]).toBe('… 3 more distinct ERROR lines (in a.log, b.log)');
     expect(logErrors([log('c.log', Array.from({ length: 20 }, (_, i) => `ERROR z${i}`).join('\n'))])).toHaveLength(20);

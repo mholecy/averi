@@ -153,8 +153,11 @@ export const interruptedBlock = (block: string, linesSoFar: readonly string[], w
   verdictLine(block, 'INTERRUPTED', why === undefined ? `its records are not complete, not judged (rerun ONLY=${block})` : `not judged (${why}; rerun ONLY=${block})`),
 ];
 
-/** The SUMMARY's line, after the blocks', when no wanted block ran: why the exit is 2 (T2 S6a review round 2). */
-export const NONE_RAN_LINE = "NOTE no wanted block ran (each one's why above) — exit 2";
+/**
+ * The SUMMARY's line, after the blocks', whenever no wanted block ran (T2 S6a review rounds 2, 3): it names no exit code,
+ * which is exitCodeOf's — 2, or 1 when a RESTORE was written.
+ */
+export const NONE_RAN_LINE = "NOTE no wanted block ran (each one's why above)";
 
 /** The SUMMARY's body, before deduplication. */
 function bodyOf(s: Summary): string[] {

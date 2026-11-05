@@ -178,8 +178,11 @@ export const linesIn = (texts: readonly string[]): string[] => texts.flatMap(lin
 /** The lines of a log or an analyze.txt that start with ERROR (a step line's word; batch-12's `grep -h '^ERROR'`). */
 export const errorLinesIn = (text: string): string[] => linesOf(text).filter((l) => l.startsWith('ERROR'));
 
-/** How many ERROR lines one file gives the SUMMARY at most: a probe that loops on one error must not bury the rest. */
-export const ERRORS_PER_FILE = 20;
+/** How many distinct ERROR lines the SUMMARY shows from this run's logs: a probe looping on errors must not bury the rest. */
+export const ERROR_LINES_SHOWN = 20;
+
+/** How many logs an ERROR line's `in …` names before `+<n> more`. */
+export const WHERE_SHOWN = 3;
 
 /** `line` at most `max` code points, `…` its last when cut. */
 const cutTo = (line: string, max: number): string => {
@@ -187,22 +190,43 @@ const cutTo = (line: string, max: number): string => {
   return points.length <= max ? line : `${points.slice(0, max - 1).join('')}…`;
 };
 
+/** Names as a line lists them: the first WHERE_SHOWN, then `+<n> more`. */
+const whereOf = (names: readonly string[]): string => [...names.slice(0, WHERE_SHOWN), ...(names.length > WHERE_SHOWN ? [`+${names.length - WHERE_SHOWN} more`] : [])].join(', ');
+
+/** One of this run's logs: its name in a line (`<block>/<file>`), its path, its text (undefined: not read) and why. */
+export interface RunLog {
+  name: string;
+  path: string;
+  text: string | undefined;
+  why?: string;
+}
+
 /**
- * One file's ERROR lines for the SUMMARY: each distinct one once, in first-seen order, `(×<n>)` after one said n times
- * (a probe looping on one error never buries another); each cut so the whole is at most DETAIL_CHARS; at most
- * ERRORS_PER_FILE distinct ones, then `… <n> more distinct ERROR lines in <file>`. A file its folder lists that could
- * not be read (`text` undefined): a NOTE naming it, with what is known of why, never skipped.
+ * This run's ERROR lines from its logs, for the SUMMARY (T2 S6a review rounds 1–3): counted across every log first, one
+ * line per distinct ERROR in first-seen order — said once in one log, bare; else `(×<total>, in <logs>)` — each cut so
+ * the whole is at most DETAIL_CHARS; at most ERROR_LINES_SHOWN of them, then `… <n> more distinct ERROR lines (in
+ * <logs>)`. Then a NOTE for each log that could not be read, naming its path and what is known of why: never skipped.
  */
-export function fileErrors(file: string, text: string | undefined, why?: string): string[] {
-  if (text === undefined) return [`NOTE ${nameInLine(file)} not read: unreadable${why === undefined ? '' : `: ${why}`}`];
-  const counts = new Map<string, number>();
-  for (const l of errorLinesIn(text)) counts.set(l, (counts.get(l) ?? 0) + 1);
-  const shown = [...counts].slice(0, ERRORS_PER_FILE).map(([l, n]) => {
-    const times = n > 1 ? ` (×${n})` : '';
-    return `${cutTo(l, DETAIL_CHARS - times.length)}${times}`;
+export function logErrors(logs: readonly RunLog[]): string[] {
+  const seen = new Map<string, { n: number; in: string[] }>();
+  for (const log of logs) {
+    for (const l of errorLinesIn(log.text ?? '')) {
+      const e = seen.get(l) ?? { n: 0, in: [] };
+      e.n++;
+      if (!e.in.includes(log.name)) e.in.push(log.name);
+      seen.set(l, e);
+    }
+  }
+  const all = [...seen];
+  const shown = all.slice(0, ERROR_LINES_SHOWN).map(([l, e]) => {
+    const tail = e.n > 1 ? ` (×${e.n}, in ${whereOf(e.in)})` : '';
+    return `${cutTo(l, DETAIL_CHARS - tail.length)}${tail}`;
   });
-  const more = counts.size - ERRORS_PER_FILE;
-  return [...shown, ...(more > 0 ? [`… ${more} more distinct ERROR lines in ${nameInLine(file)}`] : [])];
+  const hidden = all.slice(ERROR_LINES_SHOWN);
+  const where = [...new Set(hidden.flatMap(([, e]) => e.in))];
+  const more = hidden.length > 0 ? [`… ${hidden.length} more distinct ERROR lines (in ${whereOf(where)})`] : [];
+  const unread = logs.filter((l) => l.text === undefined).map((l) => `NOTE ${nameInLine(l.path)} not read: unreadable${l.why === undefined ? '' : `: ${l.why}`}`);
+  return [...shown, ...more, ...unread];
 }
 
 /** A block the abort judged whose judge wrote no verdict of its label: still a line of its own. */
