@@ -578,7 +578,7 @@ class BatchRun<K> {
 
   /**
    * The normal end, per block with no verdict of its label: judged when complete (assess) and it has a judge — a throw
-   * an ERROR line; then, still none, the backstop's line — an incomplete block's incompleteLine, else backstopLine.
+   * an ERROR line; then, still none, backstopLine over its runs (an incomplete block's incompleteLine).
    */
   private async settle(b: Block<K>): Promise<void> {
     const own = () => hasVerdictOf(this.lines.get(b.id)!, b.label);
@@ -593,7 +593,8 @@ class BatchRun<K> {
         this.log.error(`${b.id} analyze: ${firstLineOf(messageOf(e))}`);
       }
     }
-    if (!own()) this.verdict(b, a.state === 'incomplete' ? a.line : backstopLine(b.label, await this.askedRuns(b)));
+    // Still none: the backstop, which reads the same runs (an incomplete block's incompleteLine).
+    if (!own()) this.verdict(b, backstopLine(b.label, await this.askedRuns(b)));
   }
 
   /**
