@@ -1,7 +1,7 @@
 import { basename } from 'node:path';
-import { IosLab, type Exec } from '../lab-device.js';
+import { IosLab } from '../lab-device.js';
 import { markDirty, type WindowSpec } from './abort.js';
-import type { CallResult, Run } from './bounded.js';
+import { execOf, type CallResult, type Run } from './bounded.js';
 import { nodeFs, type BatchFs } from './io.js';
 import {
   absentIn,
@@ -15,7 +15,6 @@ import {
   domainHand,
   domainPart,
   DOMAINS,
-  exitText,
   HAND_PREFIX,
   LAB_WDA_PORT,
   LATE_HAND_PREFIX,
@@ -38,7 +37,7 @@ import {
   type KeyVal,
   type ProtectedRead,
 } from './ios-defaults.js';
-import { firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './words.js';
+import { exitText, firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './words.js';
 
 /**
  * The lab simulator's settings around the WDA window (batch-10's D43 gate, batch-11's WDA window), over the
@@ -66,15 +65,6 @@ import { firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './wor
 export const PLIST_SECS = 15;
 
 // ----------------------------------------------------------------------------------------- the lab simulator
-
-/** A Run as lab-device.ts's Exec: its stdout, or a throw naming the exit (as execFile rejects). */
-const execOf =
-  (run: Run): Exec =>
-  async (file, args) => {
-    const r = await run(file, args);
-    if (r.code !== 0) throw new Error(`${file} ${args.join(' ')}: ${exitText(r)}`);
-    return { stdout: r.out };
-  };
 
 /**
  * The lab simulator, guarded: had only through `LabSim.open`, which runs lab-device.ts's guard (device-check's udid

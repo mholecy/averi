@@ -1,3 +1,5 @@
+import type { CallResult } from './bounded.js';
+
 /**
  * The words a device batch speaks, and its SUMMARY. Pure: strings in, strings out.
  *
@@ -67,6 +69,18 @@ export const firstLineOf = (text: string): string => text.split(LINE_BREAK, 1)[0
 
 /** What a thrown value says: an Error's message, anything else as a string. */
 export const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** Whether a call failed: any exit but 0, or past its bound (one predicate for every reader of a CallResult). */
+export const failedCall = (r: CallResult): boolean => r.code !== 0 || r.timedOut;
+
+/**
+ * A failed call in words: `exit n <its first line>`, or that it passed its bound — stderr's first line before stdout's
+ * (ios-defaults.ts's, shared from here since T2 S5).
+ */
+export const exitText = (r: CallResult): string => {
+  const said = firstLineOf(r.err + r.out);
+  return `${r.timedOut ? `past its bound (exit ${r.code})` : `exit ${r.code}`}${said === '' ? '' : ` ${said}`}`;
+};
 
 /**
  * A verdict line, `<label>: <VERDICT>` and ` — <why>` when a reason is given. The label must not hold a colon: the

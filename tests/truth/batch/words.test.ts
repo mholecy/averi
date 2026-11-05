@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { CallResult } from '../../../scripts/truth/batch/bounded.js';
 import {
   EXIT,
   exitCodeOf,
+  exitText,
+  failedCall,
   failsIn,
   firstLineOf,
   interruptedBlock,
@@ -243,5 +246,28 @@ describe('nameInLine and firstLineOf — a name or a tool\'s words inside a why 
 
   it('firstLineOf: up to the first \\n or \\r, trimmed; blanks only are nothing', () => {
     expect([firstLineOf(' fatal: x \r\nmore'), firstLineOf('a\rb'), firstLineOf('  \n'), firstLineOf(''), firstLineOf('one')]).toEqual(['fatal: x', 'a', '', '', 'one']);
+  });
+});
+
+describe("exitText — a failed call in words, for every module of the batch core (ios-defaults.ts's, shared since T2 S5)", () => {
+  const r = (code: number, out: string, err: string, timedOut = false): CallResult => ({ code, timedOut, signal: null, out, err });
+
+  it('`exit n` and the first line said, stderr before stdout; nothing said, the exit alone', () => {
+    expect(exitText(r(1, 'out line\nmore', 'err line\nmore'))).toBe('exit 1 err line');
+    expect(exitText(r(255, 'Unknown command: x\n', ''))).toBe('exit 255 Unknown command: x');
+    expect(exitText(r(2, '', ''))).toBe('exit 2');
+    expect(exitText(r(2, ' \n', ''))).toBe('exit 2');
+  });
+
+  it('past its bound says so, with its exit', () => {
+    expect(exitText(r(142, '', '', true))).toBe('past its bound (exit 142)');
+    expect(exitText(r(142, 'partial', '', true))).toBe('past its bound (exit 142) partial');
+  });
+});
+
+describe('failedCall — one predicate for a failed call (T2 S5 code review)', () => {
+  const r = (code: number, timedOut = false): CallResult => ({ code, timedOut, signal: null, out: '', err: '' });
+  it('any exit but 0, or past its bound whatever its code', () => {
+    expect([failedCall(r(0)), failedCall(r(1)), failedCall(r(255)), failedCall(r(0, true)), failedCall(r(142, true))]).toEqual([false, true, true, true, true]);
   });
 });

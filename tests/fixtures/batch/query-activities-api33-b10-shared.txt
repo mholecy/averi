@@ -1,0 +1,7 @@
+2 activities found:
+  Activity #0:
+    priority=0 preferredOrder=0 match=0x308000 specificIndex=-1 isDefault=true
+    dev.averi.lab/.MainActivity
+  Activity #1:
+    priority=0 preferredOrder=0 match=0x308000 specificIndex=-1 isDefault=true
+    dev.averi.lab/.Twin
