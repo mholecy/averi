@@ -135,14 +135,15 @@ export interface CallResult {
 export type Run = (cmd: string, args: readonly string[], call?: Call) => Promise<CallResult>;
 
 /**
- * A Run as lab-device.ts's Exec, which its guards take: the stdout, or a throw naming the exit (as execFile rejects).
- * The lab simulator's (ios-domains.ts) and the lab emulator's (lab-emu.ts) guard run through it.
+ * A Run as lab-device.ts's Exec, which its guards take: the stdout, or a throw naming the exit with the call's stderr
+ * on it (as execFile rejects: the Android guard keeps adb's words, batch-13). The lab simulator's (ios-domains.ts) and
+ * the lab emulator's (lab-emu.ts) guard run through it.
  */
 export const execOf =
   (run: Run): Exec =>
   async (file, args) => {
     const r = await run(file, args);
-    if (r.code !== 0) throw new Error(`${file} ${args.join(' ')}: ${exitText(r)}`);
+    if (r.code !== 0) throw Object.assign(new Error(`${file} ${args.join(' ')}: ${exitText(r)}`), { stderr: r.err });
     return { stdout: r.out };
   };
 

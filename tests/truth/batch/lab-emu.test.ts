@@ -212,7 +212,18 @@ describe("LabEmu.open — lab-device.ts's Android guard before any other call (b
     expect(await LabEmu.open(SERIAL, other.run)).toEqual({ ok: false, why: `the lab guard refused ${SERIAL} (nothing was done to it): ${SERIAL} is AVD "Pixel_3a", not the lab's averi_lab: refused` });
     expect(other.words()).toEqual(['emu avd name']);
     const none = fakeEmu({ rules: [(w) => (w.join(' ') === 'emu avd name' ? exit(1, 'error: no emulator') : undefined)] });
-    expect(await LabEmu.open(SERIAL, none.run)).toEqual({ ok: false, why: `the lab guard refused ${SERIAL} (nothing was done to it): ${SERIAL} is no emulator adb can name, not the lab's averi_lab: refused` });
+    expect(await LabEmu.open(SERIAL, none.run)).toEqual({ ok: false, why: `the lab guard refused ${SERIAL} (nothing was done to it): ${SERIAL} is no emulator adb can name (adb: error: no emulator), not the lab's averi_lab: refused` });
+  });
+
+  it("batch-13: the emulator down — adb's own first stderr line kept in the refusal, still refused after that one read", async () => {
+    for (const said of [`error: device '${SERIAL}' not found`, 'error: could not connect to TCP port 5554: Connection refused']) {
+      const down = fakeEmu({ rules: [(w) => (w.join(' ') === 'emu avd name' ? exit(1, `${said}\nmore words`) : undefined)] });
+      expect(await LabEmu.open(SERIAL, down.run)).toEqual({ ok: false, why: `the lab guard refused ${SERIAL} (nothing was done to it): ${SERIAL} is no emulator adb can name (adb: ${said}), not the lab's averi_lab: refused` });
+      expect(down.words()).toEqual(['emu avd name']);
+    }
+    // Nothing said (exit 0, nothing printed): no adb part.
+    const silent = fakeEmu({ rules: [(w) => (w.join(' ') === 'emu avd name' ? exit(0) : undefined)] });
+    expect(await LabEmu.open(SERIAL, silent.run)).toEqual({ ok: false, why: `the lab guard refused ${SERIAL} (nothing was done to it): ${SERIAL} is no emulator adb can name, not the lab's averi_lab: refused` });
   });
 
   it('`using` keeps the guarded emulator over another Run, which then gets every call; no guard again', async () => {
