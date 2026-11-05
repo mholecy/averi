@@ -326,3 +326,61 @@ describe('the flush check doubts a reveal that held right after a stroke that ca
     expect(seeFlush(sent(held.verdict), carouselStop(after, untaken)).verdict).toEqual({ of: 'flush', flush: { edge: 'right', container: CLIP, checked: true } });
   });
 });
+
+// D68 (interact/aim-floor.ts): on a proven cut, the room left on the match's uncut side under what a stroke of this
+// call no longer than the next reveal carried it over that cut — no reveal, the round stops (`aim`). The carousel of
+// batch-10's recycler record: C flush with its right edge, the reveal's floor 48 px.
+describe('the flush check stops a proven cut no swipe can bring whole (D68)', () => {
+  const CLIP: Rect = { x: 66, y: 380, width: 948, height: 234 };
+  /** Another carousel the card could lie flush in: wider, its right edge at 1040. */
+  const WIDE: Rect = { x: 40, y: 380, width: 1000, height: 234 };
+  const right = (x: number, list: Rect = CLIP): Rect => ({ x, y: 380, width: list.x + list.width - x, height: 234 });
+  const left = (width: number): Rect => ({ x: 66, y: 380, width, height: 234 });
+  const stroke = (px: number): Stroke => ({ from: { x: 824, y: 497 }, to: { x: 824 - px, y: 497 } });
+  const shown = (rect: Rect, drawn: Stroke | undefined, more: StopShown = {}): FlushStop => stopAt(rect, { list: CLIP, within: SCREEN_BOX, drawn, ...more });
+  /** The check after the first probe on C at `from` and a read after a `px`-px stroke left it at `to` (flush on CLIP's right). */
+  const provedAt = (from: number, to: number, px: number): FlushSeen => seeFlush(sent(seeFlush(startFlush('left'), shown(right(from), undefined)).verdict), shown(right(to), stroke(px)));
+
+  it('the probe proved the cut, a 48-px reveal carried C 20 px, 14 px are left: no reveal — the stop, its facts; budget left or not', () => {
+    const proved = provedAt(200, 100, 142);
+    expect(said(proved)).toEqual({ of: 'probe', toward: 'right', reach: 1, maxTravel: 17 });
+    expect(proved.verdict).toMatchObject({ stroke: { points: { from: { x: 824 }, to: { x: 776 } } } });
+    for (const budget of [true, false]) {
+      const seen = seeFlush(sent(proved.verdict), shown(right(80), stroke(48), { budget }));
+      expect(seen).toMatchObject({ settles: false, waits: false });
+      expect(seen.verdict).toEqual({ of: 'aim', aim: { of: 'flushAim', judged: expect.objectContaining({ node: expect.objectContaining({ rect: right(80) }) }), edge: 'right', container: CLIP, revealed: 20, floor: { room: 14, drawn: 48, moved: 20 } } });
+    }
+  });
+
+  it('the same read after a 100-px stroke (longer than the next, 48): no measured stroke as short — the reveal, or the cut at the bound, as before', () => {
+    const proved = provedAt(200, 100, 142);
+    expect(said(seeFlush(sent(proved.verdict), shown(right(80), stroke(100))))).toEqual({ of: 'probe', toward: 'right', reach: 1, maxTravel: 7 });
+    expect(seeFlush(sent(proved.verdict), shown(right(80), stroke(100), { budget: false })).verdict).toMatchObject({ of: 'cut', cut: { why: 'budget', revealed: 20 } });
+  });
+
+  it('room enough for the least carry: 19 px left after a 48-px stroke carried 20 — the reveal, as before', () => {
+    expect(said(seeFlush(sent(provedAt(200, 105, 142).verdict), shown(right(85), stroke(48))))).toEqual({ of: 'probe', toward: 'right', reach: 1, maxTravel: 9 });
+  });
+
+  it('a proving read with no stroke handed back measures nothing', () => {
+    const proved = provedAt(200, 100, 142);
+    expect(said(seeFlush(sent(proved.verdict), shown(right(80), undefined)))).toEqual({ of: 'probe', toward: 'right', reach: 1, maxTravel: 7 });
+  });
+
+  it('a stroke measured on another edge of the carousel says nothing of this one', () => {
+    const onLeft = seeFlush(sent(seeFlush(startFlush('left'), shown(left(400), undefined)).verdict), shown(left(420), stroke(48)));
+    expect(onLeft.verdict).toMatchObject({ of: 'probe', toward: 'left' });
+    const onRight = seeFlush(sent(onLeft.verdict), shown(right(200), stroke(142)));
+    const proved = seeFlush(sent(onRight.verdict), shown(right(80), stroke(142)));
+    expect(proved.verdict).toMatchObject({ of: 'probe', toward: 'right' });
+  });
+
+  it('a stroke measured over another scroll container says nothing of this one', () => {
+    const wide = (rect: Rect, drawn: Stroke | undefined): FlushStop => shown(rect, drawn, { list: WIDE });
+    const onWide = seeFlush(sent(seeFlush(startFlush('left'), wide(right(400, WIDE), undefined)).verdict), wide(right(380, WIDE), stroke(48)));
+    expect(onWide.verdict).toMatchObject({ of: 'probe', toward: 'right' });
+    const onClip = seeFlush(sent(onWide.verdict), shown(right(200), stroke(142)));
+    const proved = seeFlush(sent(onClip.verdict), shown(right(80), stroke(142)));
+    expect(proved.verdict).toMatchObject({ of: 'probe', toward: 'right' });
+  });
+});

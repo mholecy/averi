@@ -739,6 +739,8 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
     }
     case 'unfit':
       return { message: unfitText(o, describe) };
+    case 'unaimable':
+      return { message: unaimableText(o, describe) };
     case 'bound': {
       const turned =
         o.turns > 0 ? `. It was turned round ${countOf(o.turns, 'time')}: a swipe carried it past the viewport (a fling), or it lay at the edge the swipes push it out through, so the next was drawn the other way` : '';
@@ -793,6 +795,30 @@ function unfitText(o: Extract<ScrollOutcome, { kind: 'unfit' }>, describe: strin
     `${clippedDrawnHead(describe, o.swipes, where, facts.clipped.join('/'), facts)}, ` +
     `and it is ${unfit.size} ${words.as} (tree units), ${why} — drop fully: true, or accept what it shows. ` +
     `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
+  );
+}
+
+/** The side of a rect opposite a cut edge: the uncut one, which a reveal carries toward its container's same side (`unaimableText`). */
+const UNCUT: Readonly<Record<Edge, Edge>> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+
+/**
+ * The `unaimable` stop (flush-check.ts#FlushAim, D68): a `fully: true` match a probe proved cut at its flush edge —
+ * where that edge lies (`flushEdgeText`'s dialect) and what the last proof showed — whose uncut side has less room left
+ * than a stroke of this call no longer than the next carried it: the room, that stroke and its carry, why no swipe
+ * brings it whole, and the way out. A plain Error, as `unfit`: the element was there and seen. Never a claim it is
+ * visible, never "raise maxSwipes": more swipes do not help.
+ */
+function unaimableText(o: Extract<ScrollOutcome, { kind: 'unaimable' }>, describe: string): string {
+  const { aim, viewport } = o;
+  const { floor } = aim;
+  const { where, cuts } = flushEdgeText(aim, 'still lies');
+  const side = UNCUT[aim.edge];
+  return (
+    `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is in the viewport but ${where}, ${cuts}, ` +
+    `and the last swipe toward it showed ${aim.revealed} px more of it — part of it lies past that edge; ` +
+    `only ${floor.room} px of room remain on its ${side} side, and a ${floor.drawn}-px swipe, no longer than the next would be, moved it ${floor.moved} px in this call, ` +
+    `so any further swipe pushes its ${side} side out past its scroll container instead: no swipe can show it whole — drop fully: true, or accept what it shows; more swipes will not help. ` +
+    `Last rect ${JSON.stringify(aim.judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
   );
 }
 

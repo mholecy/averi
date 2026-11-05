@@ -16,7 +16,7 @@ import { cardMoves, heldBack as heldBackBy, lastDrawn, overRegion, regionOf, see
 import { carriedCover, seeMargin, startMargin, type MarginMemo, type Offset } from './margin-memo.js';
 import { carried, planStroke, seeRead, startStrokes, strokedAcross, strokedContent, strokeSent, touchedOn, type PlannedStroke, type PresentedTouchDown, type StrokedAcross, type StrokeKind, type StrokeMemory, type StrokePlan, type TouchedOn } from './stroke-plan.js';
 import { courseFacts, lastSent, nextStroke, probeSent, seeTarget, sent, startCourse, stuckTurn, turnAtEnd, turnBack, unknownCentreNeeds, type Course, type EndProof, type EndTurn, type NextStroke, type PastSide } from './course.js';
-import { probing, seeFlush, startFlush, type Flush, type FlushCheck, type FlushCut, type FlushVerdict, type ProbeMeans } from './flush-check.js';
+import { probing, seeFlush, startFlush, type Flush, type FlushAim, type FlushCheck, type FlushCut, type FlushVerdict, type ProbeMeans } from './flush-check.js';
 import type { Direction } from './swipe.js';
 
 /**
@@ -142,7 +142,7 @@ export type { RoundRead } from './scroll-read.js';
 export type { EndProof, EndTurn, PastSide } from './course.js';
 
 /** What a stop or a shortfall carries of the flush check (interact/flush-check.ts): the stop's `Flush`, the proven cut's `FlushCut` — part of `ScrollOutcome`, so importable from here. */
-export type { Flush, FlushCut } from './flush-check.js';
+export type { Flush, FlushAim, FlushCut } from './flush-check.js';
 
 /** What one round saw — the driver's gathering, or a test's table row. */
 export interface RoundSeen {
@@ -250,6 +250,9 @@ export type RoundStep =
  * - `unfit`: a `fully: true` match in the frame, clipped, as wide or as tall as the scroll view that scrolls it
  *   along that axis, or more (scroll-read.ts#unfitAlong, `unfit`): no swipe shows it whole, so none further is sent —
  *   on the first read that knows its size, before any swipe where the tree lists it where it lies.
+ * - `unaimable`: a `fully: true` match a probe proved cut at its flush edge, whose uncut side has less room left in its
+ *   scroll container than a stroke of this call no longer than the next reveal carried it (flush-check.ts#FlushAim, D68):
+ *   any further swipe pushes that side out past the container, so none is sent.
  * - `changed`: the screen changed under the strokes (ui-tree/read-tree.ts#ScreenChange) — the
  *   first read after them is another screen than the read before them; no
  *   stop is judged on it and no further stroke sent, whether the target is
@@ -291,6 +294,8 @@ export type ScrollOutcome = (
   | { kind: 'overlapped'; swipes: number; judged: Judged; viewport: Rect; cover: Cover; remedy: Extract<Remedy, { of: 'unordered' | 'seenOver' }> }
   /** D52: too large for its scroll view to show whole (scroll-read.ts#Unfit) — `fully: true` only. */
   | { kind: 'unfit'; swipes: number; judged: Judged; viewport: Rect; unfit: Unfit }
+  /** D68: a proven cut no swipe can bring whole (flush-check.ts#FlushAim) — `fully: true` only. */
+  | { kind: 'unaimable'; swipes: number; judged: Judged; viewport: Rect; aim: FlushAim }
   | {
       kind: 'bound';
       swipes: number;
@@ -983,6 +988,8 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
       const { verdict } = flush;
       if (verdict.of === 'witness') return ask('witness');
       if (verdict.of === 'probe') return probe(s, verdict);
+      // A proven cut no swipe can bring whole (D68): stop, sending nothing.
+      if (verdict.of === 'aim') return stop(s, { kind: 'unaimable', swipes: s.swipes, judged: best, viewport, aim: verdict.aim });
       if (verdict.of === 'cut') flushCut = verdict.cut;
       else {
         // The `unlocated` row on a `fully: true` stop only — where the answer

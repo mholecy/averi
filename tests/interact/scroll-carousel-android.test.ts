@@ -494,3 +494,102 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     expect(failureOf(played, 'C').message).not.toMatch(/does not say which way/);
   });
 });
+
+/**
+ * D68: `fully: true` on the lab's RecyclerView carousel (carousel-recycler-free: C a View child exactly as wide as the
+ * carousel, listed cut flush to it, so never `clipped` and never D52's or D59's `unfit`). The flush check's probe
+ * proves the cut, and each reveal travels half the room left (course.ts#probeOf); short drags carry the card less than
+ * their length, so batch-10's 10 runs (tests/fixtures/d68-b10-recycler-convergence.json) all ended `maxSwipes`, 15–28
+ * px short, saying "raise maxSwipes". Once the room left on C's uncut side is under what a stroke no longer than the
+ * next one carried it in this call, no swipe shows it whole (interact/aim-floor.ts): the round stops, sending nothing.
+ */
+describe('`fully: true` on a View-cut card no swipe can bring whole (D68): the stop once the shortest measured stroke carries it past the room left', () => {
+  const RECYCLER = readFileSync(new URL('../fixtures/uiautomator-lab-carousel-recycler-free-launch.xml', import.meta.url), 'utf8');
+  const RC = 'lab.carousel-recycler-free.C';
+  const B10 = JSON.parse(readFileSync(new URL('../fixtures/d68-b10-recycler-convergence.json', import.meta.url), 'utf8')) as {
+    runs: { run: number; clip: Rect; strokes: { from: { x: number }; to: { x: number } }[]; cardX: number[]; listed: { after: Rect }; reply: string }[];
+  };
+  const FULLY_LEFT = { ...RULES, direction: 'left' as const, fully: true };
+  /** The recycler-free launch tree with C laid in its RecyclerView at app x `cx`, listed as a View child is: cut to the carousel's 66..1014. */
+  const recyclerAt = (cx: number): Row => {
+    const from = Math.max(cx, 66);
+    const to = Math.min(cx + 948, 1014);
+    const card = `<node index="0" text="" resource-id="${RC}" class="android.view.View" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[${from},380][${to},614]" />`;
+    const laid = RECYCLER.replace('bounds="[66,380][1014,614]" />', `bounds="[66,380][1014,614]">${card}</node>`);
+    if (laid === RECYCLER) throw new Error('recyclerAt: no RecyclerView');
+    const tree = parseDump(laid);
+    const c = [...everyNode(tree)].find((n) => n.identifier === RC);
+    if (c === undefined) throw new Error('no C');
+    return { tree, found: [c] };
+  };
+  const replay = (rules: RoundRules & { screen: { width: number; height: number } }, rows: readonly Row[]): ReturnType<typeof play> => {
+    for (let i = 1; i <= rows.length; i++) {
+      const played = play(rules, rows.slice(0, i));
+      if (played.outcome !== undefined) return played;
+    }
+    throw new Error('replay: no stop');
+  };
+  const run = (n: number) => B10.runs[n];
+  /** The runs whose last read leaves less room than the least carry of their two 48-px strokes, less a pixel. */
+  const STOPPED = [1, 2, 3, 4, 7, 8, 9];
+
+  it('the record: every run maxSwipes after 6 strokes, C listed cut flush to the carousel at the end, "raise maxSwipes"', () => {
+    expect(B10.runs).toHaveLength(10);
+    for (const r of B10.runs) {
+      expect(r.clip).toEqual(CAROUSEL);
+      expect(r.reply).toMatch(/failed after 6 swipes \(maxSwipes\) — element reached the viewport but its right edge still lies on its scroll container's \(66,380 948x234\).*raise maxSwipes or timeoutMs$/);
+      expect(r.listed.after).toEqual({ x: r.cardX[6], y: 380, width: 1014 - r.cardX[6], height: 234 });
+      expect(r.strokes.slice(4).map((s) => s.from.x - s.to.x)).toEqual([48, 48]);
+    }
+    expect(recyclerAt(81).found?.[0]?.rect).toEqual(run(8).listed.after);
+  });
+
+  it("averi's own course on run 8's card: the same six strokes — the probe, then reveals of half the room down to the 48-px floor", () => {
+    const played = play(FULLY_LEFT, run(8).cardX.map(recyclerAt));
+    expect(travels(played)).toEqual(run(8).strokes.map((s) => s.from.x - s.to.x));
+  });
+
+  it('run 8: 15 px left, its 48-px strokes carried C 27 px each — the stop after 6 swipes, no 7th stroke even with swipes left, and the reply never says "raise maxSwipes"', () => {
+    for (const maxSwipes of [6, 10]) {
+      const played = replay({ ...FULLY_LEFT, maxSwipes }, run(8).cardX.map(recyclerAt));
+      expect(played.steps.filter((s) => s.do === 'stroke')).toHaveLength(6);
+      expect(played.outcome).toMatchObject({ kind: 'unaimable', swipes: 6, aim: { edge: 'right', container: CAROUSEL, revealed: 27, floor: { room: 15, drawn: 48, moved: 27 } } });
+      expect(failureOf(played, `id:${RC}`).message).toBe(
+        `scroll_until id:${RC} stopped after 6 swipes, without swiping further — element is in the viewport but its right edge still lies on its scroll container's (66,380 948x234), ` +
+          "where Android cuts a node's bounds to the container, and the last swipe toward it showed 27 px more of it — part of it lies past that edge; " +
+          'only 15 px of room remain on its left side, and a 48-px swipe, no longer than the next would be, moved it 27 px in this call, so any further swipe pushes its left side out past its scroll container instead: ' +
+          'no swipe can show it whole — drop fully: true, or accept what it shows; more swipes will not help. ' +
+          'Last rect {"x":81,"y":380,"width":933,"height":234} in a 1080x2220 viewport',
+      );
+    }
+  });
+
+  it.each(B10.runs.map((r) => [r.run, STOPPED.includes(r.run)] as const))('run %d: the stop %s — else maxSwipes and the flush cut as batch-10 replied', (n, stops) => {
+    const played = replay(FULLY_LEFT, run(n).cardX.map(recyclerAt));
+    const room = run(n).cardX[6] - 66;
+    if (stops) {
+      expect(played.outcome).toMatchObject({ kind: 'unaimable', swipes: 6, aim: { floor: { room } } });
+      expect(failureOf(played, `id:${RC}`).message).not.toMatch(/raise maxSwipes/);
+    } else {
+      expect(played.outcome).toMatchObject({ kind: 'bound', swipes: 6, by: { of: 'maxSwipes' }, short: { of: 'flushCut' } });
+      expect(failureOf(played, `id:${RC}`).message).toBe(run(n).reply.replace(/^ERROR /, ''));
+    }
+  });
+
+  it('room left no smaller than the least measured carry (run 0: 24 px, carried 24 and 27): with swipes left, the next reveal is sent, as before', () => {
+    const played = play({ ...FULLY_LEFT, maxSwipes: 10 }, run(0).cardX.map(recyclerAt));
+    expect(played.outcome).toBeUndefined();
+    expect(travels(played)).toEqual([...run(0).strokes.map((s) => s.from.x - s.to.x), 48]);
+  });
+
+  it('no stroke no longer than the next measured yet: no stop — run 8 cut short to 15 px of room after its 89-px reveal (the next a 48-px one) is stroked for', () => {
+    const played = play(FULLY_LEFT, [577, 442, 244, 81].map(recyclerAt));
+    expect(played.outcome).toBeUndefined();
+    expect(travels(played)).toEqual([142, 188, 89, 48]);
+  });
+
+  it('no stroke measured at all: at the bound before any probe, the stop unchecked as before — never this one', () => {
+    const played = play({ ...FULLY_LEFT, maxSwipes: 0 }, [recyclerAt(81)]);
+    expect(played.outcome).toMatchObject({ kind: 'visible', flush: { checked: false, why: 'budget' } });
+  });
+});
