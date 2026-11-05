@@ -29,6 +29,12 @@
     "floor": 98,
     "baseline": "100 % on 2026-11-05 (D59 review round 1, cardMoved moved to motion-ledger.ts, AxisEvidence from StandingFacts and CallMotion; cold): 42 mutants, 0 survived, 0 timeouts; 98.51 % on 2026-11-05 (D59, inferredAlong and cardMoved; cold, after condition 3 dropped its axisOfEdge test, an equivalent survivor of the first cold run at 97.22 %): 67 mutants, 1 survived, 0 timeouts — sideShift's 'vertical' emptied, equivalent (gone with sideShift)"
   },
+  "src/interact/aim-floor.ts": {
+    "group": "core",
+    "tests": ["tests/interact/aim-floor.test.ts"],
+    "floor": 94,
+    "baseline": "96.77 % on 2026-11-05 (D68 code review, StrokeCarry and Overshoot named; cold): 31 mutants, the same 1 equivalent survivor; 96.77 % on 2026-11-05 (D68 review round 1, the module's header worded as a likelihood, flush-check.ts's keyboard-aware plan beside it; cold): 31 mutants, the same 1 equivalent survivor; 96.77 % on 2026-11-05 (D68, aimFloor; cold, after a test killed the first run's non-equivalent survivor at 93.55 %, the tie's `b.moved === a.moved` made true): 31 mutants, 1 survived, 0 timeouts — the tie-break's `b.drawn < a.drawn` as `<=`, equivalent: on equal drawn and equal moved, either stroke gives the same AimFloor"
+  },
   "src/ui-tree/draw-order.ts": {
     "group": "core",
     "tests": ["tests/ui-tree/draw-order*.test.ts"],
@@ -39,7 +45,7 @@
     "group": "core",
     "tests": ["tests/ui-tree/geometry*.test.ts"],
     "floor": 93,
-    "baseline": "95.30 % on 2026-11-03 (D55c review round 1, rectCentre moved to adapters/types.ts and re-exported here; cold): 1170 mutants, 55 survived, 0 without coverage — the same survivors, the 6 fewer mutants rectCentre's, now outside the mutated file; 95.32 % on 2026-11-03 (D59b review round 2, toldOn meets the usable screen and leaves out the keyboard's own; cold): 1175 mutants, 55 survived, 0 without coverage — the same survivors, none in toldOn; 95.29 % on 2026-11-03 (D59b review round 1, Clips.toldOn and INPUT_ROLE; cold): 1168 mutants, 55 survived, 0 without coverage — the same survivors, none in toldOn; 95.25 % on 2026-11-03 (D59b, axesOf's nested leaves out text inputs, its test in geometry-clips; cold): 1157 mutants, 55 survived, 0 without coverage — the same survivors, none in the new clause; 95.23 % on 2026-11-02 (D47, walkExtent tie under a root of no area; the root-area checks share one hasArea): 1152 mutants, 55 survived, 0 without coverage; 95.10 % on 2026-11-02 (D45): 1143 mutants, 56 survived, 0 without coverage; 49.52 % from tests/ui-tree/geometry.test.ts alone before D45. draw-order*.test.ts, in the same run, reach it too"
+    "baseline": "95.32 % on 2026-11-05 (D68 code review, OPPOSITE_EDGE; cold): the same survivors, none in OPPOSITE_EDGE; 95.30 % on 2026-11-03 (D55c review round 1, rectCentre moved to adapters/types.ts and re-exported here; cold): 1170 mutants, 55 survived, 0 without coverage — the same survivors, the 6 fewer mutants rectCentre's, now outside the mutated file; 95.32 % on 2026-11-03 (D59b review round 2, toldOn meets the usable screen and leaves out the keyboard's own; cold): 1175 mutants, 55 survived, 0 without coverage — the same survivors, none in toldOn; 95.29 % on 2026-11-03 (D59b review round 1, Clips.toldOn and INPUT_ROLE; cold): 1168 mutants, 55 survived, 0 without coverage — the same survivors, none in toldOn; 95.25 % on 2026-11-03 (D59b, axesOf's nested leaves out text inputs, its test in geometry-clips; cold): 1157 mutants, 55 survived, 0 without coverage — the same survivors, none in the new clause; 95.23 % on 2026-11-02 (D47, walkExtent tie under a root of no area; the root-area checks share one hasArea): 1152 mutants, 55 survived, 0 without coverage; 95.10 % on 2026-11-02 (D45): 1143 mutants, 56 survived, 0 without coverage; 49.52 % from tests/ui-tree/geometry.test.ts alone before D45. draw-order*.test.ts, in the same run, reach it too"
   },
   "src/adapters/ios-liveness.ts": {
     "group": "core",

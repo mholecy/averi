@@ -639,6 +639,9 @@ export type { Edge };
 /** A rect's four sides, in the order every reader asks them: top, bottom, left, right. */
 export const EDGES: readonly Edge[] = ['top', 'bottom', 'left', 'right'];
 
+/** The side across a rect from each edge: a cut edge's uncut side (interact/scroll-text.ts's `unaimable` reply). */
+export const OPPOSITE_EDGE: Readonly<Record<Edge, Edge>> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+
 /**
  * Which viewport edges the rect extends past, in the order a reader scans.
  * Named rather than counted because the edge IS the diagnosis: 'bottom' with

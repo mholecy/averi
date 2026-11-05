@@ -1,5 +1,5 @@
 import type { DeviceScreen, Point, Rect, UiNode } from '../adapters/types.js';
-import { axisOfEdge, containsPoint, coverText, frameText, nodeText, outsideScrollViewText, quoted, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
+import { axisOfEdge, containsPoint, coverText, frameText, nodeText, OPPOSITE_EDGE, outsideScrollViewText, quoted, rectText, wholePast, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import { CLIP_LINE, type EyesFinding, type SurfaceFinding } from '../ui-tree/eyes.js';
 import { UNLOCATED_KEYBOARD } from '../ui-tree/keyboard-cover.js';
 import { tapPoint } from '../ui-tree/selectors.js';
@@ -12,7 +12,7 @@ import { revealText, SIDES } from '../ui-tree/sides.js';
 import { countOf } from '../util/count.js';
 import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
-import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
+import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type FlushPlace, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
 import type { PresentedTouchDown, StrokedAcross, TouchedOn } from './stroke-plan.js';
 import { EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
@@ -416,7 +416,7 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
  * node's edge (`pinned`): where the container's content ends as it shows, and the cut it may make is Compose's at a
  * node drawn after the match, not the container's. `lies`: `still lies` for a cut a probe proved (flush-check.ts#FlushCut).
  */
-function flushEdgeText({ edge, container, pinned }: { edge: Edge; container: Rect; pinned?: QuotedNode }, lies: 'lies' | 'still lies'): { where: string; cuts: string } {
+function flushEdgeText({ edge, container, pinned }: FlushPlace, lies: 'lies' | 'still lies'): { where: string; cuts: string } {
   const box = rectText(container);
   return {
     where:
@@ -739,6 +739,8 @@ function failureText(o: Exclude<ScrollOutcome, { kind: 'visible' }>, describe: s
     }
     case 'unfit':
       return { message: unfitText(o, describe) };
+    case 'unaimable':
+      return { message: unaimableText(o, describe) };
     case 'bound': {
       const turned =
         o.turns > 0 ? `. It was turned round ${countOf(o.turns, 'time')}: a swipe carried it past the viewport (a fling), or it lay at the edge the swipes push it out through, so the next was drawn the other way` : '';
@@ -793,6 +795,30 @@ function unfitText(o: Extract<ScrollOutcome, { kind: 'unfit' }>, describe: strin
     `${clippedDrawnHead(describe, o.swipes, where, facts.clipped.join('/'), facts)}, ` +
     `and it is ${unfit.size} ${words.as} (tree units), ${why} — drop fully: true, or accept what it shows. ` +
     `Last rect ${JSON.stringify(judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
+  );
+}
+
+/**
+ * The `unaimable` stop (flush-check.ts#FlushAim, D68): a `fully: true` match a probe proved cut at its flush edge —
+ * where that edge lies (`flushEdgeText`'s dialect) and what the last proof showed — whose uncut side has less room left
+ * than a stroke of this call no longer than the next carried it: what was measured (that stroke, its carry, the room),
+ * what it makes likely (another swipe pushes the other side out rather than showing it whole — a likelihood, not a
+ * proof: a drag's carry varies), and a next step. A plain Error, as `unfit`: the element was there and seen. Never a
+ * claim it is visible, never "raise maxSwipes".
+ */
+function unaimableText(o: Extract<ScrollOutcome, { kind: 'unaimable' }>, describe: string): string {
+  const { aim, viewport } = o;
+  const { overshoot } = aim;
+  const { where, cuts } = flushEdgeText(aim, 'still lies');
+  // The uncut side, which a reveal carries toward its container's same side.
+  const side = OPPOSITE_EDGE[aim.edge];
+  return (
+    `scroll_until ${describe} stopped ${stoppedWhen(o.swipes)} — element is on screen but ${where}, ${cuts}, ` +
+    `and the last swipe toward it showed ${aim.revealed} px more of it — part of it likely lies past that edge still; ` +
+    `in this call a ${overshoot.drawn}-px swipe, no longer than the next would be, moved it ${overshoot.moved} px, and only ${overshoot.room} px of room remain on its ${side} side, ` +
+    `so another swipe would most likely push its ${side} side out past its scroll container rather than show it whole — ` +
+    `act on the part that shows (a tap, or an assert on a child inside it), or drop fully: true; more swipes are unlikely to help. ` +
+    `Last rect ${JSON.stringify(aim.judged.node.rect)} in a ${viewport.width}x${viewport.height} viewport`
   );
 }
 

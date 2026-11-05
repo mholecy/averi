@@ -1,6 +1,7 @@
 import type { Rect, Stroke } from '../adapters/types.js';
 import { axisOfEdge, EDGES, flushEdges, quoted, sameRectWithinPixel, type Edge, type QuotedNode } from '../ui-tree/geometry.js';
 import type { PinnedEdge } from '../ui-tree/later-edges.js';
+import { aimFloor, type Overshoot, type StrokeCarry } from './aim-floor.js';
 import { probeOf } from './course.js';
 import { strokeLine, type AppliedKeyboard, type Judged, type TreeFacts } from './scroll-read.js';
 import { planProbe, probeAcrossOnly, type PlannedStroke, type StrokeMemory } from './stroke-plan.js';
@@ -66,6 +67,15 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * Residuals: a first probe the app did not take still reads checked (no stroke before it to doubt by); so does a
  * reveal dropped after a stroke that ran short for another reason (a loaded host), or two strokes dropped in a row.
  *
+ * A REVEAL NOT WORTH SENDING (D68, interact/aim-floor.ts): on a proven cut, each stroke that proved it is kept with its
+ * drawn length and the match's growth (`Memory.measured`); once the room left on the match's uncut side is under what a
+ * stroke of this call no longer than the next reveal carried it over that same cut (within a pixel), a reveal would
+ * most likely push that side out past the container (a likelihood: a drag's carry varies) — the verdict is `aim`
+ * (`FlushAim`), and the round stops, sending nothing, budget left or not. Measured on the lab's RecyclerView carousel
+ * (batch-10): C as wide as the carousel, 48-px drags carrying it 24–28 px, 6 swipes ending 15–28 px short with "raise
+ * maxSwipes". Not on a first probe (nothing proven, nothing measured), not before a stroke as short as the next one was
+ * measured; a stroke over another edge or container says nothing of this one.
+ *
  * Toward the edge, never the caller's way (course.ts#probeOf). Along the scroll's axis only (the caller's
  * direction's): a vertical list's cell flush with the left edge of its container is the ordinary grid layout, and a
  * sideways stroke there could turn a page of a pager around it. Not when BOTH edges on the axis are flush — the match
@@ -129,8 +139,19 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * always `edges[0]`: a node pins at the content's start only (top, left), and the far edge is the container's own.
  */
 export type Flush =
-  | ({ edge: Edge; container: Rect; pinned?: QuotedNode } & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'axis' | 'tap' }))
+  | (FlushPlace & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'axis' | 'tap' }))
   | { edges: readonly [Edge, Edge]; container: Rect; pinned?: QuotedNode; checked: false; why: 'fills' };
+
+/**
+ * Where a match lies flush: on that `edge` of that clipping `container`, or on the inner edge of a node `pinned` in it
+ * there (`Flush`). The one location a flush stop, a proven cut (`FlushCut`) and a withheld reveal (`FlushAim`) are told
+ * by, and scroll-text.ts#flushEdgeText says.
+ */
+export interface FlushPlace {
+  edge: Edge;
+  container: Rect;
+  pinned?: QuotedNode;
+}
 
 /**
  * A `fully: true` match on a cut the flush check's probe PROVED (`ProvenCut`) that no reveal could be sent for this
@@ -143,14 +164,26 @@ export type Flush =
  * never scroll-read.ts#shortOf's: the tree alone reads it whole.
  * docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
  */
-export interface FlushCut {
+export interface FlushCut extends FlushPlace {
   of: 'flushCut';
   judged: Judged;
-  edge: Edge;
-  container: Rect;
-  pinned?: QuotedNode;
   revealed: number;
   why: 'budget' | 'room' | 'axis' | 'tap';
+}
+
+/**
+ * A `fully: true` match on a cut the flush check's probe PROVED (`ProvenCut`) that another swipe would most likely not
+ * bring whole (D68, interact/aim-floor.ts): it lies flush on that `edge` of that `container` (or `pinned` node), the
+ * last proof showed `revealed` px more of it, and the room left on its uncut side is smaller than what a stroke of this
+ * call no longer than the next reveal carried it (`overshoot`) — a further stroke would most likely push that side out
+ * past the container. The round stops on it, sending nothing (scroll-rounds.ts's `unaimable`); never "fully visible",
+ * never "raise maxSwipes".
+ */
+export interface FlushAim extends FlushPlace {
+  of: 'flushAim';
+  judged: Judged;
+  revealed: number;
+  overshoot: Overshoot;
 }
 
 /**
@@ -201,6 +234,20 @@ interface Memory {
   readonly proven: ProvenCut | undefined;
   /** The caller's direction (scroll-rounds.ts#RoundRules): the scroll's axis, along which alone the match is asked flush. */
   readonly direction: Direction;
+  /**
+   * Every stroke of this call that proved a cut (`revealedBy`), with the edge and container it proved it on
+   * (`MeasuredStroke`): the aim floor's evidence (D68).
+   */
+  readonly measured: readonly MeasuredStroke[];
+}
+
+/**
+ * A stroke that proved a cut (`revealedBy`): its drawn length and the match's growth (aim-floor.ts#StrokeCarry), on
+ * that `edge` of that `container`.
+ */
+interface MeasuredStroke extends StrokeCarry {
+  readonly edge: Edge;
+  readonly container: Rect;
 }
 
 const open = (check: FlushCheck): Memory => check as unknown as Memory;
@@ -215,7 +262,7 @@ const CARRY_LOSS = 2 * TOUCH_SLOP;
 
 /** The check before the first read, for a scroll toward `direction`: no probe in flight, no cut proven. */
 export function startFlush(direction: Direction): FlushCheck {
-  return close({ probe: undefined, proven: undefined, direction });
+  return close({ probe: undefined, proven: undefined, direction, measured: [] });
 }
 
 /** A probe is in flight: sent, and no read that read since — the read after it is the probe's (the round reads a failed one again, and offers no carry sample of it). */
@@ -257,6 +304,8 @@ export interface ProbeMeans {
  * - `flush`: the stop stands as far as the check goes, with its `Flush` — `fills`, `checked` by the probe that came
  *   back, or unchecked for `tap`, `room`, `axis` or `budget`;
  * - `cut`: no stop — the read is short of the cut a probe proved, with no reveal sent (`FlushCut`);
+ * - `aim`: no stop and no reveal — another swipe would most likely push the proven cut's match past rather than bring
+ *   it whole (`FlushAim`, D68): the round stops;
  * - `witness`: ask the witness first, about a band the moot rule left unasked (the probe touches down on the
  *   container's lower part for a bottom edge, which may be under the band) — the round asks, and shows the check the
  *   same read again with the answer;
@@ -267,6 +316,7 @@ export type FlushVerdict =
   | { readonly of: 'none' }
   | { readonly of: 'flush'; readonly flush: Flush }
   | { readonly of: 'cut'; readonly cut: FlushCut }
+  | { readonly of: 'aim'; readonly aim: FlushAim }
   | { readonly of: 'witness' }
   | { readonly of: 'probe'; readonly toward: Direction; readonly stroke: PlannedStroke; readonly memory: StrokeMemory; readonly check: FlushCheck };
 
@@ -309,7 +359,9 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
   // proven, its doubt spent, and the same reveal goes again (D62).
   const doubted = stroked && proof?.carry === 'carried';
   const proven = doubted ? { ...proof, carry: 'doubted' as const } : proof;
-  const after: Memory = { ...m, probe: undefined, proven };
+  // A fresh proof is a measured stroke: how far it carried the match, for the aim floor (D68).
+  const measured = fresh !== undefined && stop.drawn !== undefined ? [...m.measured, { drawn: strokeLength(stop.drawn), moved: fresh.revealed, edge: fresh.edge, container: fresh.container }] : m.measured;
+  const after: Memory = { ...m, probe: undefined, proven, measured };
   const came: Came = !held ? 'moved' : !stroked ? 'tap' : doubted ? 'doubted' : 'held';
   return { check: close(after), settles: held, waits: proven === undefined, verdict: verdictOf(after, stop, at, came) };
 }
@@ -450,7 +502,23 @@ function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, 
   if (probeAcrossOnly({ toward: way.toward, facts, scrollViews })) return unchecked('axis');
   const probeOver = (keyboardTop: number | undefined) => planProbe(means.strokes, { ...way, gesture: means.gesture, facts, scrollViews, keyboardTop });
   if (probeOver(undefined) === undefined) return unchecked('room');
-  if (!means.budget) return unchecked('budget');
+  // THE AIM FLOOR (D68, interact/aim-floor.ts): on a proven cut, the room left on the match's uncut side under what a
+  // stroke of this call no longer than the reveal the plan would send (`planned`, clear of the keyboard it is drawn
+  // above) carried it over this cut — another swipe would most likely push it past, so none is sent, budget left or not
+  // (a D62 retry already spent counts among the swipes).
+  const aimed = (planned: { stroke: PlannedStroke }): FlushVerdict | undefined => {
+    if (proven === undefined || planned.stroke.points === undefined) return undefined;
+    const strokes = after.measured.filter((c) => c.edge === edge && sameRectWithinPixel(c.container, container));
+    const overshoot = aimFloor({ room: roomPast(judged.node.rect, container, edge), next: strokeLength(planned.stroke.points), strokes });
+    return overshoot === undefined ? undefined : { of: 'aim', aim: { of: 'flushAim', judged, ...where, revealed: proven.revealed, overshoot } };
+  };
+  // At the bound no witness is asked: the reveal is judged above the keyboard the read applied, or the one the witness
+  // stood by.
+  if (!means.budget) {
+    const known = means.cover ?? (means.corroborated === true ? means.offered : undefined);
+    const atBound = probeOver(strokeLine(known, facts)?.y);
+    return (atBound === undefined ? undefined : aimed(atBound)) ?? unchecked('budget');
+  }
   // Clear of a keyboard as any stroke is — and one the moot rule never asked about (the stop was clean either way) is
   // asked about now: the probe touches down on the container's lower part for a bottom edge, which may be under the
   // band.
@@ -464,5 +532,7 @@ function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, 
   // whole screen is `room` with no witness asked.
   const planned = probeOver(strokeLine(probeCover, facts)?.y);
   if (planned === undefined) return unchecked('room');
+  const stop = aimed(planned);
+  if (stop !== undefined) return stop;
   return { of: 'probe', toward: way.toward, stroke: planned.stroke, memory: planned.memory, check: close({ ...after, probe: { rect: { ...judged.node.rect }, edge } }) };
 }

@@ -1,0 +1,1142 @@
+{
+  "note": "D68, batch-10 (averi_lab emulator, Android 13 API 33, 1080x2220), d62-measure on main 139256a2: scroll_until id:lab.carousel-recycler-free.C direction:left fully:true after a 440-px pre-drag, 10 runs. Trimmed: no tree (the batch kept none), the 50-ms samples cut to the card's x before each stroke and after the call (`cardX`, the lab's own state), window focus, timestamps, the control leg and device paths dropped; the strokes as the driver drew them, the target's listed rect after the call, the reply.",
+  "probe": "d62-measure",
+  "commit": "139256a2",
+  "cell": "carousel-recycler-free",
+  "target": "lab.carousel-recycler-free.C",
+  "direction": "left",
+  "fully": true,
+  "predragPx": 440,
+  "runs": [
+    {
+      "run": 0,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 438,
+        "after": 924
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 641,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 737,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 770,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        576,
+        433,
+        241,
+        174,
+        141,
+        117,
+        90
+      ],
+      "card": {
+        "before": {
+          "x": 576,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 90,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 90,
+          "y": 380,
+          "width": 924,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 27 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":90,\"y\":380,\"width\":924,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 1,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 426,
+        "after": 924
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 634,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 729,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 769,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        588,
+        446,
+        257,
+        177,
+        142,
+        116,
+        90
+      ],
+      "card": {
+        "before": {
+          "x": 588,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 90,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 90,
+          "y": 380,
+          "width": 924,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 26 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":90,\"y\":380,\"width\":924,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 2,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 442,
+        "after": 928
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 639,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 735,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 774,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        572,
+        436,
+        244,
+        166,
+        137,
+        110,
+        86
+      ],
+      "card": {
+        "before": {
+          "x": 572,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 86,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 86,
+          "y": 380,
+          "width": 928,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 24 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":86,\"y\":380,\"width\":928,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 3,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 436,
+        "after": 924
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 637,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 734,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 769,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        578,
+        441,
+        247,
+        176,
+        144,
+        117,
+        90
+      ],
+      "card": {
+        "before": {
+          "x": 578,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 90,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 90,
+          "y": 380,
+          "width": 924,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 27 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":90,\"y\":380,\"width\":924,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 4,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 433,
+        "after": 930
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 635,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 734,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 771,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        581,
+        444,
+        246,
+        172,
+        138,
+        111,
+        84
+      ],
+      "card": {
+        "before": {
+          "x": 581,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 84,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 84,
+          "y": 380,
+          "width": 930,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 27 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":84,\"y\":380,\"width\":930,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 5,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 436,
+        "after": 920
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 641,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 736,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 770,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        578,
+        433,
+        243,
+        175,
+        145,
+        118,
+        94
+      ],
+      "card": {
+        "before": {
+          "x": 578,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 94,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 94,
+          "y": 380,
+          "width": 920,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 24 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":94,\"y\":380,\"width\":920,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 6,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 442,
+        "after": 921
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 642,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 732,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 768,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        572,
+        430,
+        251,
+        179,
+        144,
+        120,
+        93
+      ],
+      "card": {
+        "before": {
+          "x": 572,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 93,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 93,
+          "y": 380,
+          "width": 921,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 27 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":93,\"y\":380,\"width\":921,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 7,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 436,
+        "after": 929
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 636,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 735,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 770,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        578,
+        442,
+        245,
+        174,
+        140,
+        113,
+        85
+      ],
+      "card": {
+        "before": {
+          "x": 578,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 85,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 85,
+          "y": 380,
+          "width": 929,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 28 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":85,\"y\":380,\"width\":929,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 8,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 437,
+        "after": 933
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 636,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 735,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 773,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        577,
+        442,
+        244,
+        168,
+        135,
+        108,
+        81
+      ],
+      "card": {
+        "before": {
+          "x": 577,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 81,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 81,
+          "y": 380,
+          "width": 933,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 27 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":81,\"y\":380,\"width\":933,\"height\":234}); raise maxSwipes or timeoutMs"
+    },
+    {
+      "run": 9,
+      "clip": {
+        "x": 66,
+        "y": 380,
+        "width": 948,
+        "height": 234
+      },
+      "offset": {
+        "before": 440,
+        "after": 932
+      },
+      "strokes": [
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 682,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 634,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 739,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 775,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        },
+        {
+          "from": {
+            "x": 824,
+            "y": 497
+          },
+          "to": {
+            "x": 776,
+            "y": 497
+          },
+          "durationMs": 300
+        }
+      ],
+      "cardX": [
+        574,
+        447,
+        236,
+        165,
+        137,
+        109,
+        82
+      ],
+      "card": {
+        "before": {
+          "x": 574,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        },
+        "after": {
+          "x": 82,
+          "y": 380,
+          "width": 948,
+          "height": 234
+        }
+      },
+      "listed": {
+        "after": {
+          "x": 82,
+          "y": 380,
+          "width": 932,
+          "height": 234
+        }
+      },
+      "reply": "ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) \u2014 element reached the viewport but its right edge still lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a probe swipe toward it showed 27 px more of it \u2014 part of it lay past that edge, so it may still be cut there (last rect {\"x\":82,\"y\":380,\"width\":932,\"height\":234}); raise maxSwipes or timeoutMs"
+    }
+  ]
+}
