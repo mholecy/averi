@@ -783,6 +783,14 @@ describe('the abort mid-block: exit 130, the abort SUMMARY with INTERRUPTED (S2\
     expect(ran).toEqual([]);
   });
 
+  it('a later block skipped for its precondition is not even said skipped once the abort began: nothing more of the body runs (review round 2 mutation)', async () => {
+    const done = go([e5(), plain('b', { preconditions: [async () => ({ ok: false, why: 'no' })] })]);
+    await until(() => seam.words().includes('probe hang'));
+    seam.handlers!.signal('SIGINT');
+    expect(await done).toBe(130);
+    expect(outText()).not.toContain('SKIP b not run');
+  });
+
   it('no further need of a block is checked once the abort began during one of them (review round 2)', async () => {
     const checked: string[] = [];
     const n = {
