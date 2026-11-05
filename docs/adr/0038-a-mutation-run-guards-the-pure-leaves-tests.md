@@ -15,6 +15,8 @@ Amended 2026-11-05 (T2 batch-13 fixes: idb disconnect after each companion end, 
 simulator's binary export, and batch-13's live check — see the T2 amendment's batch-13 part below).
 Amended 2026-11-05 (T2b-1: a changed protected key exits 1, a need's end and its calls recorded, the out-folder
 refusal, the cleanup's and the domains window's labels — see the T2 amendment's T2b-1 part below).
+Amended 2026-11-05 (T2b-2: the run in two groups, core and lab, one Stryker process each — see the T2 amendment's
+T2b-2 part below).
 
 ## Context
 
@@ -1354,3 +1356,76 @@ the SIGKILL after it, which bounded.ts's group kill rules out but for a group th
 survived, the same three without coverage), runner-lines.ts 100 % (370, 2 timeouts counted killed), words.ts 100 %
 (166), records.ts 100 % (73), ios-lab.ts 99.75 % (404, the same equivalent), every other module as before; floors
 unchanged. It supersedes the cold runs above.
+
+### T2b-2: the run in two groups (2026-11-05, backlog T2b)
+
+The T2b-1 cold runs took 328 to 359 s against the ~480 s line set in the S6b part above, and every batch slice adds
+about 60 s. Decision: **split the run, do not raise the bound.** Each scope.json entry names its `group`, `core` or
+`lab`, and one Stryker process mutates one group against that group's tests only.
+
+- `core`: the ten src/ modules and the batch's runner core — words, select, run-dir, steps, io, bounded, abort,
+  preconditions, cases, live-table, records, runner-lines, runner (23 modules, 6 232 mutants). - `lab`: the lab modules
+  — ios-defaults, ios-domains, lab-chooser, lab-emu, lab-lines, ios-lab, android-lab, lab-build (8 modules, 3 296
+  mutants).
+
+Groups by family, not by count: every test a module lists is a test of its own group (io's run-dir and steps tests,
+runner-lines' and records' runner test in core; lab-chooser's lab-emu test, ios-defaults' ios-domains-sim test in lab).
+A group's include is narrower than the single run's, and a narrower include can only lower a score: a test of the other
+group no longer runs against its mutants. Lab's tests import core's modules (runner, bounded, io …) as what the lab is
+built on; so each mutant's status in the two group runs was compared with main's single run (by file, mutator,
+replacement and place): all 9 528 the same, none missing (review round 1's cold run: core 196 s, lab 61 s, 257 s in
+all). tests/mutation/group.test.ts guards it from here on: every scoped test that imports a module of a group is in that
+group's tests, the one named exception lab's tests importing core. The measured cost, from the last single cold run's
+report (main after T2b-1, each mutant's `duration` summed per module, 3 075 worker-seconds in a 340 s run): core 2 217 s
+(draw-order 422, geometry 188, abort 160, ios-typing 155, android-chooser 147, ios-liveness 146, bounded 144,
+runner-lines 123, preconditions 115, fill-reformat 114, every other module under 100), lab 858 s (lab-chooser 255,
+lab-lines 207, ios-defaults 168, every other module under 80). Expected from that: core about 230 s, lab about 100 s,
+each under 60 % of the 600 s bound (360 s). Measured, cold, on unchanged code: **core 200 s, lab 62 s**; run one after
+the other without `--group` (`npm run mutate -- --force`), 264 s in all (core 203 s, lab 60 s; about 340 s as one run
+before). Core holds about three quarters of the cost, so core reaches the ~480 s line first; then split core (src/ from
+the runner core, say), not the lab. Balancing now by moving runner-core modules into lab would split a family whose
+tests import each other for some 30 s, while core's 200 s is 280 s under the line.
+
+Mechanics. `scripts/mutation/group.mjs` (plain JS, so stryker.config.mjs loads it without tsx) checks the groups — an
+entry without one or with an unknown one, or a group no entry names, is an error, and both configs throw on it — and
+gives one Stryker process its group from `AVERI_MUTATE_GROUP`: its modules (stryker.config.mjs's `mutate`), their tests
+(vitest.mutation.config.ts's `include`, read in Stryker's workers too: core's dry run ran 1 525 tests, lab's 346), and
+its own incremental file, reports and temp dir (`reports/mutation/stryker-incremental-<group>.json`,
+`mutation-<group>.json`/`.html`, `node_modules/.stryker-tmp-<group>`). No group in the env — Stryker started by hand —
+is the whole scope under the old names, as before. `npm run mutate` (mutate.ts) takes `--group core|lab`; without it, it
+runs core and then lab, each in a process group of its own bounded at 600 s (SIGTERM, then SIGKILL 10 s later; the group
+SIGKILLed once Stryker has ended, so no worker outlives it), lab running whatever core's result, and fails if either
+fails — the first failure's exit — with one summary line per group (`npm run mutate: core passed in 200 s`). Floors are
+checked per group, exactly as before, against that group's entries. An interrupt goes to the running group and no later
+group starts (exit 130). `--force` passes through; `--tempDirName <name>` becomes `<name>-<group>`; `--mutate
+<patterns>` without `--group` matches each pattern, a path or a glob (node's `path.matchesGlob`; a Stryker range after a
+path kept), against scope.json's modules and gives each group the modules it matched there — a path with its range, a
+glob as the paths it matched, never the glob itself, which in the other group would mutate modules whose tests that
+group does not run — running only the groups matched; a pattern matching no module is a refusal (exit 2, nothing
+started); with `--group` it is passed on as given. `path.matchesGlob` is in node from 20.17 only, and a dev tool does
+not raise the published package's `engines` (`>=20`): a pattern is looked up as a scope.json key first, and only one
+with glob characters needs it — on an older node that one is refused, naming Node 20.17, while exact paths still work.
+
+So the loop's command, `npm run mutate -- --force --tempDirName .stryker-tmp-<n>`, still runs everything, cold. A merge
+may instead run `npm run mutate -- --group core --force` and `-- --group lab --force` as two commands, both required.
+Adding a module is still its scope.json entry (now with its group) and, outside src/ and scripts/truth/batch/, its
+folder in the sandbox allowlist. The threshold rule from here on: **each group's cold run stays under ~480 s**; when one
+nears it, move modules between groups or add a group by an amendment here (the measured times beside it), or raise the
+bound by a decision recorded here. A run without `--group` may then take longer than one command's 600 s; the merge then
+runs the groups as separate commands.
+
+Tests: tests/mutation/group.test.ts (the group errors, a group's entries, scopeOf's files and its throws, scope.json
+itself, vitest.mutation.config.ts's include per group, the imports guard above) and tests/mutation/mutate.test.ts
+(planRuns' groups, refusals, tempDirName and --mutate routing; main over a fake spawner: the order, each group's report
+removed before its run, its env and bound, its own floors, a failure not stopping the next group, the first failure's
+exit, a bound passed, an interrupt (Stryker killed by it, or exiting 130), no report, a refusal and a scope error
+starting nothing; spawnBounded over node: the exit and env, a bound killing a grandchild that ignores SIGTERM, SIGINT
+and SIGTERM passed on and their listeners removed). 39 hand mutants, each from a .bak copy and bounded: all killed;
+review round 1 and the code review (glob routing, one group vocabulary — isGroup, GROUP_WORDS, filesOf, one ScopeEntry
+type —, planRuns' option table, an injected signal source, main's rejection a message and exit 1) 25 more: all killed,
+one only after a test was added (`-m=<file>`); review round 2 (a glob's matched modules per group; exact keys first, a
+glob refused without path.matchesGlob) 9 more: all killed, one only after a test was added (a scope key with glob
+characters, looked up as itself). The guard's exception, said exactly: lab's tests may kill core mutants (in main's
+single run lab-batch.test.ts was the first killer of some), but core's own tests must suffice for core's floors; a
+narrower include can only lower a score, a loud floor failure, never a false pass. Every module's score and mutant count
+is the same as in T2b-1's final single run; floors unchanged.

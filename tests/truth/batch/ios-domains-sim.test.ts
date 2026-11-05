@@ -731,7 +731,8 @@ describe("domainsWindow — the WDA window as abort.ts's dirty window (batch-11.
 
 describe('a domains window of another block: its own labels on every line, none says D43 (T2b batch-13 gap 3: batch-13\'s D65 relabelled them by regex)', () => {
   const L = domainLabels('D65');
-  const noD43 = (lines: readonly string[]) => expect(lines.filter((l) => l.includes('D43'))).toEqual([]);
+  // D43 as a label (a word of its own), never inside a word: a line naming a temp folder such as `…/hCD435…` says no D43.
+  const noD43 = (lines: readonly string[]) => expect(lines.filter((l) => /(?<![A-Za-z0-9])D43(?![A-Za-z0-9])/.test(l))).toEqual([]);
   const LATE = 'D65 (iOS, changed after the restore — a late writer): ';
 
   it('the backup\'s step line, the restore\'s OK lines (put back, nothing put back, nothing to do)', async () => {
