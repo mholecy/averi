@@ -6,7 +6,7 @@ import type { Call, CallResult, Run } from './bounded.js';
 import type { BatchFs } from './io.js';
 import { PROTECTED, protectedLine, type ProtectedRead } from './ios-defaults.js';
 import { backup, compare, domainsWindow, LabSim, readProtected, restore } from './ios-domains.js';
-import { CATALOG_PATH, cellsWhy, companionPattern, freshIn, LSOF_ARGV, openInAlertOf, pkillOf, compareHand, portHand, portOf, portPart, wdaBlockedOf, wdaKillPatterns, wdaRestoredOf, type PortRead } from './lab-lines.js';
+import { CATALOG_PATH, cellsWhy, companionPattern, freshIn, LSOF_ARGV, openInAlertOf, pkillOf, portOf, portPart, wdaBlockedOf, wdaHandOf, wdaKillPatterns, wdaRestoredOf, type PortRead } from './lab-lines.js';
 import { askBuild, metWith, type BuildRef } from './lab-build.js';
 import type { BlockCtx, LastStep, NeedCtx, NeedSpec } from './runner.js';
 import type { BatchConfig, NeedResult } from './runner-lines.js';
@@ -94,12 +94,11 @@ export class IosSim {
 
 // ------------------------------------------------------------------------------------- the lab's processes
 
-/**
- * What ends the lab's processes: a Run and the lab simulator's udid (an IosSim, or a guarded udid at the run's end).
- */
+/** What ends the lab's processes: a Run, the lab simulator's udid and the waits (an IosSim, or a guarded udid at the end). */
 interface Killer {
   run: Run;
   udid: string;
+  wait: (ms: number) => Promise<unknown>;
 }
 
 /** Port 8120 read (lab-lines.ts#LSOF_ARGV). */
@@ -116,31 +115,30 @@ async function killListeners(k: Killer, pids: readonly number[]): Promise<string
 }
 
 /**
- * The lab's WebDriverAgent ended (batch-11's kill_lab_wda): pkill by its two exact patterns, then `kill` to each
- * listener of port 8120. Returns the port as read, and the whys of what failed (none: all asked).
+ * Port 8120 proven free (d43-gate.ts's restore): read; listened on, its listeners killed, and read again after
+ * PORT_RECHECK_MS. `killed`: a listener was; `whys`: kills that failed.
  */
-export async function killLabWda(k: Killer): Promise<{ port: PortRead; whys: string[] }> {
+async function portFree(k: Killer): Promise<{ port: PortRead; killed: boolean; whys: string[] }> {
+  const first = await portNow(k);
+  if (first.state !== 'busy') return { port: first, killed: false, whys: [] };
+  const whys = await killListeners(k, first.pids);
+  await k.wait(PORT_RECHECK_MS);
+  return { port: await portNow(k), killed: true, whys };
+}
+
+/**
+ * The lab's WebDriverAgent ended (batch-11's kill_lab_wda): pkill by its two exact patterns, then port 8120 proven free
+ * (portFree). Returns the port as read last, whether a listener was killed, and the whys of what failed (none: all
+ * asked; a port not free is the caller's to say).
+ */
+export async function killLabWda(k: Killer): Promise<{ port: PortRead; killed: boolean; whys: string[] }> {
   const whys: string[] = [];
   for (const p of wdaKillPatterns(k.udid)) {
     const r = pkillOf(await k.run('pkill', ['-f', p], { secs: HOST_SECS }));
     if ('why' in r) whys.push(r.why);
   }
-  const port = await portNow(k);
-  if (port.state === 'busy') whys.push(...(await killListeners(k, port.pids)));
-  if (port.state === 'unread') whys.push(port.why);
-  return { port, whys };
-}
-
-/**
- * Port 8120 proven free, after the wait (d43-gate.ts's restore): read; listened on, its listeners killed, and read
- * again after PORT_RECHECK_MS. `killed`: a listener was.
- */
-async function portFree(lab: IosSim): Promise<{ port: PortRead; killed: boolean }> {
-  const first = await portNow(lab);
-  if (first.state !== 'busy') return { port: first, killed: false };
-  await killListeners(lab, first.pids);
-  await lab.wait(PORT_RECHECK_MS);
-  return { port: await portNow(lab), killed: true };
+  const free = await portFree(k);
+  return { ...free, whys: [...whys, ...free.whys] };
 }
 
 /**
@@ -148,17 +146,13 @@ async function portFree(lab: IosSim): Promise<{ port: PortRead; killed: boolean 
  * idb_companion ended by their exact patterns — what S2's kept groups cannot own (a runner launchd holds, a companion
  * that left its group); only for a simulator the guard cleared this run. A NOTE when done, a WARN naming what failed.
  */
-export function endLabProcesses(guarded: () => string | undefined): LastStep {
+export function endLabProcesses(guarded: () => string | undefined, wait: (ms: number) => Promise<unknown> = pause): LastStep {
   return async ({ run, step }) => {
     const udid = guarded();
     if (udid === undefined) return;
-    const { port: first, whys } = await killLabWda({ run, udid });
-    // Its listeners were killed: read again, so the line says what is left, not what was there.
-    const killed = first.state === 'busy';
-    const port = killed ? await portNow({ run, udid }) : first;
+    const { port, killed, whys } = await killLabWda({ run, udid, wait });
     const part = portPart(port, killed);
-    // An unread first read is in the whys already (killLabWda's).
-    if (killed && port.state !== 'free') whys.push(part);
+    if (port.state !== 'free') whys.push(part);
     const companion = pkillOf(await run('pkill', ['-f', companionPattern(udid)], { secs: HOST_SECS }));
     if ('why' in companion) whys.push(companion.why);
     const said = `the lab's WebDriverAgent (${part}) and idb_companion of ${nameInLine(udid)} ended`;
@@ -335,7 +329,7 @@ export function iosLab(o: IosLabOptions = {}): IosLab {
       const end = await readProtected(lab.sim);
       ctx.protectedLine(protectedLine(start ?? { state: 'unreadable', why: "not read at the iOS stretch's start" }, end));
     },
-    lastly: endLabProcesses(() => guarded),
+    lastly: endLabProcesses(() => guarded, o.wait),
   };
 }
 
@@ -353,17 +347,19 @@ async function putBackWda(lab: IosSim, stateFile: string): Promise<{ ok: boolean
   await lab.wait(WDA_EXIT_WAIT_MS);
   const { port, killed } = await portFree(lab);
   // A runner still listening would undo a restore at its exit: nothing is put back until it is gone.
-  if (port.state !== 'free') return wdaBlockedOf(port, killed, lab.udid, domainsWindow(lab.sim, stateFile).hand, stateFile);
+  if (port.state !== 'free') return wdaBlockedOf(port, killed, windowHand(lab, stateFile));
   const r = await restore(lab.sim, stateFile);
-  return wdaRestoredOf(r, killed);
+  return wdaRestoredOf(r, killed, windowHand(lab, stateFile));
 }
+
+/** The window's hand lines, read when asked (the state file's domains then): the one builder, every end. */
+const windowHand = (lab: IosSim, stateFile: string): string[] => wdaHandOf(lab.udid, domainsWindow(lab.sim, stateFile).hand, stateFile);
 
 /**
  * The WDA window as a dirty window (abort.ts): its restore putBackWda over the abort's detached runner, its state file
  * (put back only when it reads clean after), its hand lines S4's per domain and the WebDriverAgent's kill by hand.
  */
 export function wdaWindowSpec(lab: IosSim, stateFile: string, o: { block?: string; secs?: number | undefined } = {}): WindowSpec {
-  const domains = domainsWindow(lab.sim, stateFile, o);
   return {
     async restore(run) {
       const r = await putBackWda(lab.using(run), stateFile);
@@ -371,7 +367,7 @@ export function wdaWindowSpec(lab: IosSim, stateFile: string, o: { block?: strin
     },
     // Read when asked, as S4's: the state file's domains then.
     get hand() {
-      return [portHand(lab.udid), ...domains.hand, compareHand(stateFile)];
+      return windowHand(lab, stateFile);
     },
     stateFile,
     ...(o.block !== undefined && { block: o.block }),

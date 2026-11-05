@@ -128,24 +128,25 @@ describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only 
   it('pkill by its derived data and by its runner under the lab simulator, then each listener of 8120 killed — each call bounded', async () => {
     fresh({ listeners: [4242, 4343] });
     const run = runOf(world);
-    const r = await killLabWda({ run, udid: LAB_UDID });
+    const r = await killLabWda({ run, udid: LAB_UDID, wait });
     expect(run.seen.map((s) => s.words)).toEqual(['pkill -f DerivedData/averi-wda-lab([/ ]|$)', `pkill -f Devices/${LAB_UDID}/.*WebDriverAgentRunner`, 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120']);
-    expect(r).toEqual({ port: { state: 'free' }, whys: [] });
+    expect(r).toEqual({ port: { state: 'free' }, killed: false, whys: [] });
     expect(run.seen.every((s) => s.secs === HOST_SECS)).toBe(true);
   });
 
-  it('a listener left after pkill: killed by its pid (never this process\'s), read as busy', async () => {
+  it('a listener left after pkill: killed by its pid (never this process\'s), read again after PORT_RECHECK_MS (portFree: one function, code review NIT 3)', async () => {
     fresh({ listeners: [4242, process.pid], stickyListener: true });
     const run = runOf(world);
-    const r = await killLabWda({ run, udid: LAB_UDID });
-    expect(run.seen.slice(3)).toEqual([{ words: 'kill -TERM 4242', secs: HOST_SECS, cwd: undefined, log: undefined, env: undefined }]);
-    expect(r).toEqual({ port: { state: 'busy', pids: [4242, process.pid] }, whys: [] });
+    const r = await killLabWda({ run, udid: LAB_UDID, wait });
+    expect(run.seen.slice(3)).toEqual([{ words: 'kill -TERM 4242', secs: HOST_SECS, cwd: undefined, log: undefined, env: undefined }, { words: 'lsof -t -n -P -sTCP:LISTEN -i tcp:8120', secs: HOST_SECS, cwd: undefined, log: undefined, env: undefined }]);
+    expect(waits).toEqual([PORT_RECHECK_MS]);
+    expect(r).toEqual({ port: { state: 'busy', pids: [4242, process.pid] }, killed: true, whys: [] });
   });
 
-  it('a pkill or a kill that fails, or an unread port, is said in its whys', async () => {
-    const r = await killLabWda({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 3, timedOut: false, signal: null, out: '', err: `${cmd} broke` }), udid: LAB_UDID });
-    expect(r.whys).toEqual(['pkill: exit 3 pkill broke', 'pkill: exit 3 pkill broke', 'lsof: exit 2 lsof broke']);
-    const k = await killLabWda({ run: async (cmd) => ({ code: cmd === 'kill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), udid: LAB_UDID });
+  it('a pkill or a kill that fails is said in its whys; an unread port in the port it returns (its caller says it)', async () => {
+    const r = await killLabWda({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 3, timedOut: false, signal: null, out: '', err: `${cmd} broke` }), udid: LAB_UDID, wait });
+    expect(r).toEqual({ port: { state: 'unread', why: 'lsof: exit 2 lsof broke' }, killed: false, whys: ['pkill: exit 3 pkill broke', 'pkill: exit 3 pkill broke'] });
+    const k = await killLabWda({ run: async (cmd) => ({ code: cmd === 'kill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), udid: LAB_UDID, wait });
     expect(k.whys).toEqual(['kill 7: exit 1']);
   });
 });
@@ -439,7 +440,8 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(three.events.find((e) => e.startsWith('verdict D43 WDA-window restore'))).toMatch(/^verdict D43 WDA-window restore: ERROR — NOT VERIFIED — /);
     expect(three.events.some((e) => e.includes('compare'))).toBe(false);
     expect(three.events.some((e) => e.startsWith('asks'))).toBe(false);
-    expect(waits.filter((w) => w === PORT_RECHECK_MS)).toHaveLength(1);
+    // The listener stays: each portFree (the window's kill, its check after the 4 s, the end check) kills and waits.
+    expect(waits.filter((w) => w === PORT_RECHECK_MS)).toHaveLength(3);
   });
 
   it('the port free but the restore failing: the window\'s own hand lines from the one builder — the WDA kill, each domain, the compare — as its getter gives them (code review, MAJOR 1)', async () => {
@@ -553,6 +555,6 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 still has a listener (pid 7)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 still has a listener (pid 7)`]);
     steps.length = 0;
     await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 2 : 1, timedOut: false, signal: null, out: '', err: '' }), step: say });
-    expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 not read (lsof: exit 2)) and idb_companion of ${LAB_UDID} ended, not all proven: lsof: exit 2`]);
+    expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 not read (lsof: exit 2)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 not read (lsof: exit 2)`]);
   });
 });

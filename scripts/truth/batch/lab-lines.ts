@@ -64,29 +64,38 @@ export function portPart(p: PortRead, killed: boolean): string {
   return `port ${LAB_WDA_PORT} not read (${p.why})`;
 }
 
-/** The lab's WebDriverAgent ended by hand: d43-gate.ts's hand line, the patterns quoted. */
+/** The lab's WebDriverAgent ended by hand, first: d43-gate.ts's hand line, the patterns quoted. */
 export const portHand = (udid: string): string =>
-  `${HAND_PREFIX}the lab's WebDriverAgent may still be running (port ${LAB_WDA_PORT} not proven free): ${wdaKillPatterns(udid)
+  `${HAND_PREFIX}first end the lab's WebDriverAgent (a runner still running undoes a restore at its exit): ${wdaKillPatterns(udid)
     .map((p) => `pkill -f ${shellQuote(p)}`)
     .join('; ')}; lsof ${LSOF_ARGV.join(' ')} | xargs kill`;
-
-/** The WDA window's restore line when the domains were restored with port 8120 proven free: S4's line, the port part. */
-export function wdaRestoredOf(r: { ok: true; line: string } | { ok: false; line: string; hand: readonly string[] }, killed: boolean): { ok: boolean; line: string; hand: string[] } {
-  return { ok: r.ok, line: `${r.line}; ${portPart({ state: 'free' }, killed)}`, hand: r.ok ? [] : [...r.hand] };
-}
 
 /** The last hand line of a window not put back: the domains read back against their backups, then the state cleared. */
 export const compareHand = (stateFile: string): string =>
   `${HAND_PREFIX}then read each domain back (defaults export) and compare it with its backup beside ${shellQuote(stateFile)}; only when every one is equal, set the state file's dirty to false`;
 
 /**
+ * The WDA window's hand lines, the one builder for every end (code review, MAJOR 1): the WebDriverAgent's kill first,
+ * then each domain's (S4's), then the compare.
+ */
+export const wdaHandOf = (udid: string, domainsHand: readonly string[], stateFile: string): string[] => [portHand(udid), ...domainsHand, compareHand(stateFile)];
+
+/**
+ * The WDA window's restore line when the domains were restored with port 8120 proven free: S4's line, the port part;
+ * not verified, the window's hand lines.
+ */
+export function wdaRestoredOf(r: { ok: boolean; line: string }, killed: boolean, hand: readonly string[]): { ok: boolean; line: string; hand: string[] } {
+  return { ok: r.ok, line: `${r.line}; ${portPart({ state: 'free' }, killed)}`, hand: r.ok ? [] : [...hand] };
+}
+
+/**
  * The WDA window while port 8120 is not proven free (T2 S6b review round 1, BLOCKER): nothing restored — a runner still
  * running undoes a restore at its exit — so the state file stays dirty and the window is not put back; its hand lines
- * the WebDriverAgent's kill first, then each domain's (S4's), then the compare.
+ * the window's (wdaHandOf).
  */
-export function wdaBlockedOf(port: PortRead, killed: boolean, udid: string, domainsHand: readonly string[], stateFile: string): { ok: false; line: string; hand: string[] } {
+export function wdaBlockedOf(port: PortRead, killed: boolean, hand: readonly string[]): { ok: false; line: string; hand: string[] } {
   const why = `NOT VERIFIED — ${portPart(port, killed)}: the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty`;
-  return { ok: false, line: verdictLine(RESTORE_LABEL, 'ERROR', why), hand: [portHand(udid), ...domainsHand, compareHand(stateFile)] };
+  return { ok: false, line: verdictLine(RESTORE_LABEL, 'ERROR', why), hand: [...hand] };
 }
 
 // ----------------------------------------------------------------------------------------- the Open-in alert

@@ -17,6 +17,7 @@ import {
   portPart,
   wdaKillPatterns,
   wdaBlockedOf,
+  wdaHandOf,
   wdaRestoredOf,
   compareHand,
   javaHomeOf,
@@ -101,23 +102,26 @@ describe('port 8120 (d43-gate.ts\'s restore: the port free, else killed): lsof\'
 });
 
 describe('the WDA window\'s put-back line: S4\'s line and the port part (the port is the runner\'s: ios-defaults.ts#domainPart leaves it out)', () => {
-  const restored = { ok: true as const, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back)', hand: ['never shown'] };
-  const failed = { ok: false as const, line: 'D43 WDA-window restore: ERROR — NOT VERIFIED — com.apple.Accessibility NOT equal to its backup', hand: ['D43 (iOS): xcrun simctl spawn U defaults import …'] };
+  const restored = { ok: true as const, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back)' };
+  const failed = { ok: false as const, line: 'D43 WDA-window restore: ERROR — NOT VERIFIED — com.apple.Accessibility NOT equal to its backup' };
+  const hand = ['D43 (iOS): the window\'s hand lines'];
 
   it('restored with the port free: S4\'s line, the port named — free, or free once a listener was killed', () => {
-    expect(wdaRestoredOf(restored, false)).toEqual({ ok: true, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back); port 8120 free', hand: [] });
-    expect(wdaRestoredOf(restored, true).line).toMatch(/; port 8120 free \(a listener killed\)$/);
-    expect(wdaRestoredOf(failed, false)).toEqual({ ok: false, line: `${failed.line}; port 8120 free`, hand: failed.hand });
+    expect(wdaRestoredOf(restored, false, hand)).toEqual({ ok: true, line: 'D43 WDA-window restore: OK — every domain equals its backup (nothing put back); port 8120 free', hand: [] });
+    expect(wdaRestoredOf(restored, true, hand).line).toMatch(/; port 8120 free \(a listener killed\)$/);
+    // Not verified: the window's own hand lines (code review, MAJOR 1: one builder for every end).
+    expect(wdaRestoredOf(failed, false, hand)).toEqual({ ok: false, line: `${failed.line}; port 8120 free`, hand });
   });
 
   it('the port not proven free (review round 1, BLOCKER): no restore at all — a runner still running undoes it at its exit; NOT VERIFIED, the state left dirty; the WDA\'s kill first, then each domain\'s lines, then the compare', () => {
     const domains = ['D43 (iOS): xcrun simctl spawn U defaults import com.apple.Accessibility /s/b.plist'];
-    expect(wdaBlockedOf({ state: 'busy', pids: [7] }, true, LAB, domains, '/s/state.json')).toEqual({
+    expect(wdaHandOf(LAB, domains, '/s/state.json')).toEqual([portHand(LAB), ...domains, compareHand('/s/state.json')]);
+    expect(wdaBlockedOf({ state: 'busy', pids: [7] }, true, wdaHandOf(LAB, domains, '/s/state.json'))).toEqual({
       ok: false,
       line: 'D43 WDA-window restore: ERROR — NOT VERIFIED — port 8120 still has a listener (pid 7): the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty',
       hand: [portHand(LAB), ...domains, compareHand('/s/state.json')],
     });
-    expect(wdaBlockedOf({ state: 'unread', why: 'lsof: exit 2' }, false, LAB, [], '/s/state.json').line).toContain('port 8120 not read (lsof: exit 2): the domains not put back');
+    expect(wdaBlockedOf({ state: 'unread', why: 'lsof: exit 2' }, false, []).line).toContain('port 8120 not read (lsof: exit 2): the domains not put back');
     expect(compareHand("/s/a b.json")).toBe("D43 (iOS): then read each domain back (defaults export) and compare it with its backup beside '/s/a b.json'; only when every one is equal, set the state file's dirty to false");
   });
 });

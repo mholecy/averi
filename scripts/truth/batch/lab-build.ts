@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { DEVICE_CHECK_SIMULATOR } from '../lab-device.js';
-import type { CallResult } from './bounded.js';
+import type { CallResult, Run } from './bounded.js';
 import { CELLS_ENTRY, UNZIP_SECS } from './lab-emu.js';
 import { CATALOG_PATH, cellsWhy, javaHomeOf } from './lab-lines.js';
 import type { Block, LastStep, Need, NeedCtx, NeedSpec } from './runner.js';
@@ -80,6 +80,17 @@ export async function askBuild(c: NeedCtx, o: { build?: BuildRef; requireBuild?:
 export const metWith = (how: string, warn: string | undefined): NeedResult =>
   warn === undefined ? { ok: true, how } : { ok: true, warn: true, how: `${warn}; the app already installed is used: ${how}` };
 
+/** A Gradle call's whole: its wrapper, its folder, its env (the JDK, the SDK) and its log. */
+export interface GradleCall {
+  gradlew: string;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  log: string;
+}
+
+/** `gradlew --stop`, bounded (GRADLE_STOP_SECS): after every Android build, and at the run's end when it did not run. */
+const gradleStop = (run: Run, g: GradleCall): Promise<CallResult> => run(g.gradlew, ['--stop'], { secs: GRADLE_STOP_SECS, cwd: g.cwd, env: g.env, log: g.log });
+
 /** A step's failure in words, naming its log: past its bound, its group was ended (bounded.ts). */
 const failedText = (what: string, r: CallResult, log: string): string => `${what} (${r.timedOut ? `past its bound, exit ${r.code} — its process group ended` : exitText(r)}; ${log})`;
 
@@ -93,7 +104,7 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
   const built: { ios?: string; android?: string } = {};
   const failed = new Map<string, string>();
   /** The Android build's call, once started, until its own --stop returned: what the last step stops. */
-  let gradle: { gradlew: string; cwd: string; env: NodeJS.ProcessEnv; log: string } | undefined;
+  let gradle: { call: GradleCall; why: string } | undefined;
   const catalogFresh = (c: NeedCtx): Promise<string | undefined> =>
     (catalog ??= (async () => {
       const log = join(c.labDir, 'catalog-check.log');
@@ -131,12 +142,14 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     const log = join(c.labDir, 'android-build.log');
     const env = { ...c.config.env, JAVA_HOME: checked.home, ANDROID_HOME: c.config.env.ANDROID_HOME ?? join(homedir(), 'Library', 'Android', 'sdk') };
     const gradlew = join(cwd, 'gradlew');
-    gradle = { gradlew, cwd, env, log };
+    const call: GradleCall = { gradlew, cwd, env, log };
+    gradle = { call, why: 'its build was cut short' };
     const build = await c.bounded(gradlew, ['--console=plain', 'assembleDebug'], { secs, cwd, env, log });
     // After every build, whatever it did: the daemon leaves the call's group by design (S2), so it is stopped by name.
-    const stop = await c.bounded(gradlew, ['--stop'], { secs: GRADLE_STOP_SECS, cwd, env, log });
-    // Only a stop that succeeded clears it: one cut or failed leaves the daemon to the last step (review round 2).
-    if (!failedCall(stop)) gradle = undefined;
+    const stop = await gradleStop(c.bounded, call);
+    // Only a stop that succeeded clears it: one cut or failed leaves the daemon to the last step (review round 2), its
+    // reason kept for the step's line (code review).
+    gradle = failedCall(stop) ? { call, why: `its --stop failed: ${exitText(stop)}` } : undefined;
     if (failedCall(stop)) c.step('WARN', `lab android: gradlew --stop: ${exitText(stop)} — the Gradle daemon may still be running`);
     if (failedCall(build)) return { ok: false, why: failedText('the Android build failed', build, log) };
     const apk = join(c.config.repo, APK_PATH);
@@ -174,10 +187,9 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     failures: () => [...failed].map(([need, why]) => `${need}: ${why}`),
     async lastly({ run, step }) {
       if (gradle === undefined) return;
-      const { gradlew, cwd, env, log } = gradle;
-      const stop = await run(gradlew, ['--stop'], { secs: GRADLE_STOP_SECS, cwd, env, log });
+      const stop = await gradleStop(run, gradle.call);
       if (failedCall(stop)) step('WARN', `lab android: gradlew --stop at the run's end: ${exitText(stop)} — the Gradle daemon may still be running`);
-      else step('NOTE', "lab android: the Gradle daemon stopped at the run's end (its build was cut short)");
+      else step('NOTE', `lab android: the Gradle daemon stopped at the run's end (${gradle.why})`);
     },
   };
 }
