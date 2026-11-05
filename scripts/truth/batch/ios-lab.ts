@@ -398,15 +398,17 @@ export interface WdaWindowOptions {
  * work; the window put back (the WebDriverAgent ended, the 4 s wait, port 8120 free, the domains key by key) — its line
  * one of the block's verdict lines, and the window closed only when it verified, else left for RESTORE; the end check;
  * then, with the state clean, the compare (a late writer: its line a verdict line, its hand lines to RESTORE). Whether
- * the work ran.
+ * the work ran, and whether the window was put back — not put back, the block's own verdict is INCONCLUSIVE at once, so
+ * no judge's PASS can stand for a run that left the lab's settings changed (T2 S6b review round 2).
  */
-export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<boolean> {
+export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<{ ran: boolean; putBack: boolean }> {
   for (const r of o.runs ?? []) ctx.asksLive(r.name, r.asked);
   const stateFile = o.stateFile ?? join(ctx.dir, STATE_FILE);
-  const notRun = (why: string): false => {
+  // Nothing changed: nothing to put back.
+  const notRun = (why: string) => {
     ctx.err(`the WDA window: ${why}`);
     ctx.verdict('INCONCLUSIVE', `the WDA window did not run: ${why}`);
-    return false;
+    return { ran: false, putBack: true };
   };
   const sick = await iosCheck(ctx, lab, 'the WDA window');
   if (sick !== undefined) return notRun(`${sick} — no wda run (nothing changed)`);
@@ -418,9 +420,12 @@ export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions)
   const put = await putBackWda(lab, stateFile);
   ctx.verdictLines([put.line]);
   if (put.ok) ctx.close(WDA_WINDOW);
-  else ctx.err(`the WDA window: the simulator not provably put back — the window stays open, its hand lines go to RESTORE`);
+  else {
+    ctx.err(`the WDA window: the simulator not provably put back — the window stays open, its hand lines go to RESTORE`);
+    ctx.verdict('INCONCLUSIVE', "the lab's settings not put back (see RESTORE)");
+  }
   await iosCheck(ctx, lab, 'iOS end');
   // Compared only once the restore verified (compare refuses a dirty state itself): a late writer is caught here.
   if (stateOf(lab.fs, stateFile) === 'clean') ctx.verdictAndHand(await compare(lab.sim, stateFile));
-  return true;
+  return { ran: true, putBack: put.ok };
 }

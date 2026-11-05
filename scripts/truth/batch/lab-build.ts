@@ -135,7 +135,8 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
     const build = await c.bounded(gradlew, ['--console=plain', 'assembleDebug'], { secs, cwd, env, log });
     // After every build, whatever it did: the daemon leaves the call's group by design (S2), so it is stopped by name.
     const stop = await c.bounded(gradlew, ['--stop'], { secs: GRADLE_STOP_SECS, cwd, env, log });
-    gradle = undefined;
+    // Only a stop that succeeded clears it: one cut or failed leaves the daemon to the last step (review round 2).
+    if (!failedCall(stop)) gradle = undefined;
     if (failedCall(stop)) c.step('WARN', `lab android: gradlew --stop: ${exitText(stop)} — the Gradle daemon may still be running`);
     if (failedCall(build)) return { ok: false, why: failedText('the Android build failed', build, log) };
     const apk = join(c.config.repo, APK_PATH);
