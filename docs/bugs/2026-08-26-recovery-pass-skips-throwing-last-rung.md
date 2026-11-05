@@ -22,7 +22,7 @@ deleted) — the **test** was fixed, the **engine path** was not.
 
 ## Evidence (on device, 0.5.0)
 
-Skeleton superrepo (`/Users/mholecy/Finshape/skeleton`), Android emulator, `pm clear`, one
+Skeleton superrepo (`<skeleton>`), Android emulator, `pm clear`, one
 `ensure_state("transaction_filter")`, config at superrepo commit `7eab53e` (login still ended with
 its trailing wait, no post-PIN gate yet): identical failure to pre-fix, **no `↻ recovery` line**,
 timeout text is the login flow's own wait. Control experiment the same evening: with the trailing

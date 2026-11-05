@@ -1,7 +1,7 @@
 # BUG: on iOS, for ~1 s after `launch_app` brings a backgrounded app to the front, idb returns the PREVIOUS app's full tree — not bare, so an `absent:` assert passes and no ⚠ is printed
 
 **Measured 2026-10-09 05:26–05:45 UTC**, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`), averi =
-mobile-verify `fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`), default
+mobile-verify `fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`), default
 `treeSource: idb`. Apps: mp-native's bank app (`com.finshape.dbosbanking`, running, display name "Skeleton Internal") and the
 stock Contacts app (`com.apple.MobileAddressBook`, running, "New Contact" sheet open). Neither was terminated: each
 `launch_app` foregrounds a running app.
@@ -61,7 +61,7 @@ app, a share sheet, the agent checking something in Settings, or Maestro leaving
 ## Device check (2026-10-09 iOS, re-run at 347e70d)
 
 Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), default `treeSource: idb`;
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `<mp-native>`), default `treeSource: idb`;
 scratch configs naming Contacts / the bank app (`launch_contacts`: `- launch: {}` + the absent assert); an `idb` PATH shim.
 Bank app logged in on Account Detail, Contacts running with "New Contact" open; neither terminated for a1–a4.
 Run folder: `scratchpad/averi-repo/run5-ios` (`session.log`, `img-N-0.png`, `appinfo-*.txt`).
@@ -73,15 +73,15 @@ dictionaries (`GroupContainers`) and arrays (`SBAppTags`) present but below the 
 $ xcrun simctl appinfo 37956039-94EA-4F51-93E5-94F7723A4578 com.finshape.dbosbanking
 {
     ApplicationType = User;
-    Bundle = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app/";
-    BundleContainer = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/";
+    Bundle = "file://<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app/";
+    BundleContainer = "file://<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/";
     CFBundleDisplayName = "Skeleton Internal";
     CFBundleExecutable = Internal;
     CFBundleIdentifier = "com.finshape.dbosbanking";
     CFBundleName = Internal;
     CFBundleShortVersionString = "0.5.2";
     CFBundleVersion = 0;
-    DataContainer = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Data/Application/27AF5801-71E8-4354-A3A8-7C83C4B7FD24/";
+    DataContainer = "file://<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Data/Application/27AF5801-71E8-4354-A3A8-7C83C4B7FD24/";
     GroupContainers =     {
     };
     IsAppClip = 0;
@@ -89,7 +89,7 @@ $ xcrun simctl appinfo 37956039-94EA-4F51-93E5-94F7723A4578 com.finshape.dbosban
     IsFirstParty = 0;
     IsHidden = 0;
     IsRemovable = 1;
-    Path = "/Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app";
+    Path = "<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app";
     SBAppTags =     (
     );
 }
@@ -104,9 +104,9 @@ $ xcrun simctl appinfo 37956039-94EA-4F51-93E5-94F7723A4578 com.apple.MobileAddr
     CFBundleName = Contacts;
     CFBundleShortVersionString = "1.0";
     CFBundleVersion = "1.0";
-    DataContainer = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Data/Application/158305D4-0D94-4528-9D76-ACD4A3B5BD42/";
+    DataContainer = "file://<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Data/Application/158305D4-0D94-4528-9D76-ACD4A3B5BD42/";
     GroupContainers =     {
-        "group.com.apple.SuggestedImage.SharedSecureContainer" = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Shared/AppGroup/7EE9DD9D-5589-417F-986C-EA748111CBCE/";
+        "group.com.apple.SuggestedImage.SharedSecureContainer" = "file://<home>/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Shared/AppGroup/7EE9DD9D-5589-417F-986C-EA748111CBCE/";
     };
     IsAppClip = 0;
     IsDeveloperApp = 0;
@@ -203,7 +203,7 @@ appAlive: true
 ## Device check (2026-10-09 iOS, re-run at 86eb42d)
 
 Measured 12:53–13:21 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, server restarted 12:53:13, cwd `/Users/mholecy/Finshape/mp-native`),
+`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, server restarted 12:53:13, cwd `<mp-native>`),
 default `treeSource: idb`, scratch configs `run6-ios/cfg-contacts-idb` (`launch_contacts`: `- launch: {}` + absent `id:"New Contact"`),
 `idb` PATH shim; raw `idb ui describe-all` reads beside averi's. Run folder: `scratchpad/averi-repo/run6-ios`. The give-up note's
 own items (3.1, 3.2, 3.4) are in

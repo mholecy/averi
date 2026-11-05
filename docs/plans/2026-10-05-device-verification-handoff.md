@@ -35,13 +35,13 @@ every one differential- or mutation-tested, none yet exercised end to end agains
   On 2026-10-05 these were `emulator-5554` (sdk_gphone64_arm64, API 33) and `iPhone 17` (iOS 26.5).
 - `idb` and `idb_companion` on PATH; Xcode for the WDA tree source (finportal's `averi.yaml` sets
   `app.ios.treeSource: wda`, so the first iOS tree read may build WebDriverAgent — minutes).
-- The dogfood project: `/Users/mholecy/dev/finportal/app` — `averi.yaml`, a gitignored `.env.averi`
+- The dogfood project: `<finportal>/app` — `averi.yaml`, a gitignored `.env.averi`
   (`AVERI_STAGE_*`, `AVERI_EDU_*`), a debug APK at `android/app/build/outputs/apk/debug/app-debug.apk`
   and `ios/build/MyPort.app`. Flows: `open_app`, `fresh_launch` (destructive), `login`, `switch_to_sk`,
   `open_forgot`, `close_forgot`, `smoke`. States: `logged_out`, `post_launch`, `post_login_fork`, `logged_in`.
 - Build THIS repo and drive its `dist/`, not the `averi` finportal has installed under `tooling/node_modules`:
   ```sh
-  cd /Users/mholecy/dev/mobile-verify && npm run build   # dist/mcp/server.js
+  cd <averi> && npm run build   # dist/mcp/server.js
   ```
 
 ## 2. The driver
@@ -58,11 +58,14 @@ node --import tsx /path/to/run-tools.mts /path/to/<scenario>.json /path/to/out
 ```ts
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { Client } from '/Users/mholecy/dev/mobile-verify/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js';
-import { StdioClientTransport } from '/Users/mholecy/dev/mobile-verify/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js';
+// <averi>: your averi checkout — write its path in the two imports below.
+import { Client } from '<averi>/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js';
+import { StdioClientTransport } from '<averi>/node_modules/@modelcontextprotocol/sdk/dist/esm/client/stdio.js';
 
-const SERVER = process.env.AVERI_SERVER ?? '/Users/mholecy/dev/mobile-verify/dist/mcp/server.js';
-const APP_CWD = process.env.AVERI_APP_CWD ?? '/Users/mholecy/dev/finportal/app';
+// AVERI_SERVER: averi's built server (<averi>/dist/mcp/server.js); AVERI_APP_CWD: the app's checkout (<finportal>/app).
+const SERVER = process.env.AVERI_SERVER;
+const APP_CWD = process.env.AVERI_APP_CWD;
+if (!SERVER || !APP_CWD) { console.error('set AVERI_SERVER (averi\'s dist/mcp/server.js) and AVERI_APP_CWD (the app checkout)'); process.exit(2); }
 
 type Step = { name: string; args?: Record<string, unknown>; label?: string; timeoutMs?: number };
 const [stepsFile, outDirArg] = process.argv.slice(2);

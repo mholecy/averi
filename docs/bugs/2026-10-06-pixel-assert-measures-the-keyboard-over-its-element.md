@@ -5,7 +5,7 @@
 > Shas below are pre-squash branch commits; on main: `d69511e` → `b413ae8`, `6300325` → `926b826`, `f1f9ba8` → `95f75f4`.
 
 **Measured 2026-10-06 16:56 CEST** against `d69511e`, mp-native SWIFT payment form, Android `emulator-5554` (API 33,
-docked Gboard). Log: `$RUN/out/c-a-form.log`, with `RUN=/private/tmp/claude-501/-Users-mholecy-dev-mobile-verify/9f3935d1-240c-470b-93c9-c353ad95f1dd/scratchpad/device-run`.
+docked Gboard). Log: `$RUN/out/c-a-form.log`, with `RUN=<scratch>/device-run`.
 
 ## Claim
 

@@ -8,7 +8,7 @@
 `architecture/round3-2026-10-08` before phase 2's code-review fixups were squashed in (they move swipe code and touch no phase-1 code path), which carries the two phase-1 commits under test: `8413120` refactor(adapters),
 device discovery is the registry's own seam, and `d165ce4` refactor(flow), a Condition is one module that can say "this
 tree cannot decide it". The four later commits on the branch are in the build but were not under test. Driven through the
-stdio MCP driver `run-tools.mts` (with its `sleep` / `sh` pseudo-steps). Server cwd `/Users/mholecy/dev/finportal/app`:
+stdio MCP driver `run-tools.mts` (with its `sleep` / `sh` pseudo-steps). Server cwd `<finportal>/app`:
 its `averi.yaml` and `.env.averi` were not modified, and every engine case passes `configPath` to a scratch copy.
 Devices: `emulator-5554` (sdk_gphone64_arm64, Android 13) and `iPhone 17` (`D34212DB-…`, iOS 26.5, `treeSource: wda`).
 App: the finportal `sk.finportal.myport` debug build (expo dev-client). No login was submitted. No `login` flow and no

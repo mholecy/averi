@@ -67,7 +67,7 @@ over the whole sheet (one screen measured; other UIKit screens not checked).
 ## Device check (2026-10-09 iOS, re-run at 347e70d)
 
 Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `<mp-native>`), scratch configs only
 (mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
 `scratchpad/averi-repo/run5-ios`.
 Contacts "New Contact" (opened after a terminate+launch with `AutomaticMinimizationEnabled`/`HardwareKeyboardLastSeen` set to NO,
@@ -114,7 +114,7 @@ stated on `shadowing` is unchanged by that.
 ## Device check (2026-10-09 iOS, re-run at 86eb42d)
 
 Measured 13:10–13:12 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only, `idb`
+`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `<mp-native>`), scratch configs only, `idb`
 PATH shim. Run folder: `scratchpad/averi-repo/run6-ios`. Setup as in the 347e70d section: `AutomaticMinimizationEnabled` /
 `HardwareKeyboardLastSeen` = NO, Contacts terminate+launch through averi (13:10:4x, 3.6 s), `tap role:button text:"Add"` (idb
 `13:10:56 ui tap 350 822`) → "New Contact" with `First name` focused and the software keyboard up (screenshot `run6-ios/img-45-0.png`).

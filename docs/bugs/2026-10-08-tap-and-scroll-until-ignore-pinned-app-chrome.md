@@ -1,6 +1,6 @@
 # BUG: `tap` and `scroll_until` treat a row hidden behind the app's own pinned chrome (a bottom CTA bar, the top bar) as visible — "Tapped" lands on the bar, "fully visible" is a row nobody can see
 
-**Measured 2026-10-08 20:09–20:13 UTC** in `/Users/mholecy/Finshape/mp-native` (config `averi.yaml`, iOS tree source
+**Measured 2026-10-08 20:09–20:13 UTC** in `<mp-native>` (config `averi.yaml`, iOS tree source
 default `idb`), SWIFT payment form (branch `feature/swift-payment`), iPhone 17 simulator iOS 27.0
 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify `fix/keyboard-aware-scroll` @ `e9e6509`
 built from source (`dist/`, stdio). No keyboard up during any of these calls.
@@ -102,7 +102,7 @@ neutral area — nothing happened); a bar with a button at that point would have
 ## Device check (2026-10-09 iOS, re-run at 610660f)
 
 Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`). **The mp-native SWIFT form was
 not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
 `SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
 `scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
@@ -123,7 +123,7 @@ CTA. Expected to still reproduce (no fix on this branch).
 Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
 form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
 loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
-`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `<mp-native>`.
 Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
 untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
 `HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
@@ -678,7 +678,7 @@ label:"Link number 1" is under the status bar at (99,51), in the top 62 of the s
 
 Measured 2026-10-14 06:55–07:12 UTC on the iPhone 17 simulator, iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt). It
 was the only booted simulator at the start and at the end (`xcrun simctl list devices booted`). averi = mobile-verify `arch/round-14` @
-`e1384aa` (`dist/`, stdio via the HTTP daemon on port 47903, cwd mp-native); `git -C ~/dev/mobile-verify rev-parse --short HEAD` printed
+`e1384aa` (`dist/`, stdio via the HTTP daemon on port 47903, cwd mp-native); `git -C <averi> rev-parse --short HEAD` printed
 `e1384aa` (read-only). **Daemon restart:** my first call (`c __list` with no second argument) crashed the provided daemon. `call.sh`'s
 default `${2:-{\}}` sends the body `{"name":"__list","args":{\}}`, and `daemon.mjs` has no guard around `JSON.parse` (`daemon.out`). I
 restarted it the way the Android daemon had been restarted at 06:55:08: `node daemon.mjs run14-ios` from `averi-repo`, `AVERI_PORT=47903`,
@@ -709,7 +709,7 @@ left running. I did not touch the Android emulator, adb or port 47901.
 
 ## Device check (2026-10-14 Android, re-run at ebe6822)
 
-Round 16 Android device check, 2026-10-14 17:07:57–17:21:08 UTC, emulator-5554 (Pixel_3a AVD, Android 13 / API 33, 1080x2220, gesture navigation, `navigation_mode` = 2 before and after). averi built from `~/dev/mobile-verify` `arch/round-16` at `ebe6822`, checked with `git rev-parse --short HEAD` → `ebe6822` (read-only, detached), daemon on port 47911 via `$R/c`. Apps: mp-native `com.finshape.skeleton.dev` (first, already logged in by the owner, on Account Detail), Google Clock `com.google.android.deskclock`, Settings `com.android.settings`. **No PIN re-login was needed:** mp-native stayed logged in for the whole run. No `ensure_state`/`run_flow`, no `login` rung, no registration, no credentials typed, no `clearState`. **Backend: working.** Account Detail loaded balances (1,121.00 CZK / 2,000.00 CZK, "Account 1 of 4") and a full transaction list. Two transaction details opened with data. The SWIFT form loaded the debit account. No "Mandatory data not loaded" screen appeared. Calls #2–#92 are in `session.log`. The shim log `adb-input.log` has 66 lines, and every line cited below is quoted from it.
+Round 16 Android device check, 2026-10-14 17:07:57–17:21:08 UTC, emulator-5554 (Pixel_3a AVD, Android 13 / API 33, 1080x2220, gesture navigation, `navigation_mode` = 2 before and after). averi built from `<averi>` `arch/round-16` at `ebe6822`, checked with `git rev-parse --short HEAD` → `ebe6822` (read-only, detached), daemon on port 47911 via `$R/c`. Apps: mp-native `com.finshape.skeleton.dev` (first, already logged in by the owner, on Account Detail), Google Clock `com.google.android.deskclock`, Settings `com.android.settings`. **No PIN re-login was needed:** mp-native stayed logged in for the whole run. No `ensure_state`/`run_flow`, no `login` rung, no registration, no credentials typed, no `clearState`. **Backend: working.** Account Detail loaded balances (1,121.00 CZK / 2,000.00 CZK, "Account 1 of 4") and a full transaction list. Two transaction details opened with data. The SWIFT form loaded the debit account. No "Mandatory data not loaded" screen appeared. Calls #2–#92 are in `session.log`. The shim log `adb-input.log` has 66 lines, and every line cited below is quoted from it.
 
 **R15 D.1: row under the floating tab bar. Holds.** Account Detail was nudged with slow coordinate swipes (shim `17:08:57 input swipe 540 1500 540 1440 800`, `17:09:26 … 540 1415 800`, `17:09:40 input swipe 540 1400 540 1452 800`) until `transactions.list.row_3` was at `66,1819 948x143`, its centre (540,1890) under `nav.tab_cards` (tab bar top 1876) (`acct4.txt`, #12). #13 `tap id:transactions.list.row_3` →
 `id:transactions.list.row_3 is under container id:nav.tab_cards (540,1876 219x176) at its centre (540,1891), drawn over it; only a 948x21 part of it shows, under the 65x65 a tap may be moved to — scroll_until it first; nothing was tapped`

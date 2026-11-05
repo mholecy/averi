@@ -6,7 +6,7 @@
 
 **Measured 2026-10-06 16:47–16:52 CEST** against `d69511e`, finportal login screen with `login_username` focused.
 Android `emulator-5554` (API 33) and iOS `iPhone 17` (iOS 26.5, WDA). Logs: `$RUN/out/b-android-caret*.log`,
-`$RUN/out/b-ios.log`, with `RUN=/private/tmp/claude-501/-Users-mholecy-dev-mobile-verify/9f3935d1-240c-470b-93c9-c353ad95f1dd/scratchpad/device-run`.
+`$RUN/out/b-ios.log`, with `RUN=<scratch>/device-run`.
 
 ## Claim
 

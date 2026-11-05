@@ -1,6 +1,6 @@
 # BUG: iOS `ocr` element asserts crop the wrong screen region (WDA tree, modal sheet open)
 
-**Measured 2026-08-26** in `/Users/mholecy/Finshape/skeleton` (config `averi.yaml`,
+**Measured 2026-08-26** in `<skeleton>` (config `averi.yaml`,
 `app.ios.treeSource: wda`, iPhone 17 simulator, app DBOSBanking/Internal, screen 393×852 pt).
 Filed by the parity-hardening session; a task chip pointing here exists in Claude Code.
 

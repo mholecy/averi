@@ -31,15 +31,15 @@ export const appinfo = (
 export const BANK_APPINFO =
   '{\n' +
   '    ApplicationType = User;\n' +
-  '    Bundle = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app/";\n' +
-  '    BundleContainer = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/";\n' +
+  '    Bundle = "file:///Users/tester/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app/";\n' +
+  '    BundleContainer = "file:///Users/tester/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/";\n' +
   '    CFBundleDisplayName = "Skeleton Internal";\n' +
   '    CFBundleExecutable = Internal;\n' +
   '    CFBundleIdentifier = "com.finshape.dbosbanking";\n' +
   '    CFBundleName = Internal;\n' +
   '    CFBundleShortVersionString = "0.5.2";\n' +
   '    CFBundleVersion = 0;\n' +
-  '    DataContainer = "file:///Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Data/Application/27AF5801-71E8-4354-A3A8-7C83C4B7FD24/";\n' +
+  '    DataContainer = "file:///Users/tester/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Data/Application/27AF5801-71E8-4354-A3A8-7C83C4B7FD24/";\n' +
   '    GroupContainers =     {\n' +
   '    };\n' +
   '    IsAppClip = 0;\n' +
@@ -47,7 +47,7 @@ export const BANK_APPINFO =
   '    IsFirstParty = 0;\n' +
   '    IsHidden = 0;\n' +
   '    IsRemovable = 1;\n' +
-  '    Path = "/Users/mholecy/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app";\n' +
+  '    Path = "/Users/tester/Library/Developer/CoreSimulator/Devices/37956039-94EA-4F51-93E5-94F7723A4578/data/Containers/Bundle/Application/95E78B94-6D6B-4B15-8D47-45D88DDC2ABD/Internal.app";\n' +
   '    SBAppTags =     (\n' +
   '    );\n' +
   '}\n';

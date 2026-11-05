@@ -33,7 +33,7 @@ Round 5 is an architecture pass, each item reviewed to APPROVED, followed by a c
 | adb | a timed-out `adb get-state` is worded as a timeout; an `unauthorized` or `offline` device gets its own message | yes, error texts |
 | code review | P1: idb's flat tree gets an interim rule (C3-3); P2: `tap` and `scroll_until` pick among several matches by one rule; P3: a plain `scroll_until` stops only with the centre on screen and uncovered; P4: on idb only, a text over the target is excused as its floating label only if it repeats the target; S1: a stop short of a cover fails led by the cover | yes, see the replies below |
 
-Build, in `/Users/mholecy/dev/mobile-verify`:
+Build, in `<averi>`:
 
 1. Run `git checkout arch/round-5`.
 2. `git rev-parse --short HEAD` must print the hash in the title. If it does not, stop and ask.

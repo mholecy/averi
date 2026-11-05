@@ -1,7 +1,7 @@
 # BUG: `type_text`/`fill` with `clear: true` fails on every empty Android EditText that has a hint — uiautomator reports the hint as the node's text, the clear loop counts it as content, sends deletes into an empty field and throws "field still shows N characters after clearing twice"
 
 **Measured 2026-10-09 05:08–05:16 UTC** on emulator-5554 (Pixel_3a AVD, Android 13, 1080x2220, Gboard), averi =
-mobile-verify `fix/keyboard-aware-scroll` @ `610660f` built from source (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`).
+mobile-verify `fix/keyboard-aware-scroll` @ `610660f` built from source (`dist/`, stdio, cwd `<mp-native>`).
 Fixtures: stock apps only — Google Contacts "Create contact" editor (`am start -a android.intent.action.INSERT -t
 vnd.android.cursor.dir/contact`) and the Settings search field (`com.android.settings`, `id:open_search_view_edit_text`).
 Pre-existing (the clear loop is from `c7d7411`), not a regression of the round-2 branches; it did not show on the mp-native
@@ -151,7 +151,7 @@ N×FORWARD_DEL).
 ## Device check (2026-10-09 iOS, re-run at 347e70d)
 
 Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `<mp-native>`), scratch configs only
 (mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
 `scratchpad/averi-repo/run5-ios`.
 

@@ -1,7 +1,7 @@
 # BUG: fill says "NOT verified … (the screen changed while typing)" when only the field's own clear button appeared — and on the same form a clear alone can never be verified
 
 **Measured 2026-10-09 06:02–06:06 UTC**, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt),
-averi = mobile-verify `fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`),
+averi = mobile-verify `fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`),
 default `treeSource: idb` and a scratch `treeSource: wda`, mp-native SWIFT form (SwiftUI, logged in). Noted earlier in
 [2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md](2026-10-08-ios-fill-unverified-reports-filled-and-cleared.md)
 ("Device check (2026-10-09 iOS bank form …)"); filed on its own here.

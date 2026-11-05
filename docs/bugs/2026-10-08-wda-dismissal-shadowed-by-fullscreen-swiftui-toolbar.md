@@ -2,7 +2,7 @@
 
 > **Status (2026-10-08, after the device check):** the first fix (branch `fix/p3-wda-toolbar-shadow`, merged into `fix/keyboard-aware-scroll`) **did not hold on the device** at `e9e6509` ("Device check" below): the screen-sized `toolbar 'Toolbar'` host was excused, but the form's `scrollable 0 0 402 512` after the title (58 % of the screen, its frame under the translucent top bar, no content at the point) then covered the title and the dismissal was refused `covered by scrollable`. Fixed again on branch `fix/r2-b-shadowing`, unmeasured on a device: `shadowing` (`src/ui-tree/geometry.ts`) excuses (1) a later screen-sized HOST — a non-interactive node with children whose area reaches `SCREEN_SIZED_FRACTION` of the root's rect (the largest rect when the root has none) — and now (2) a non-interactive `scrollable` with children of ANY size (`CONTENT_FRAMED_ROLES`): both cover only through their content at the point; a childless or interactive node, a `webview` under the screen size and a smaller card still cover as themselves. Pinned by tests built from the device-check tree (title, container, the form's scrollable with rows from y 150, the 402×874 toolbar, the pad's band `0 572 402 302`), with and without the toolbar, through `shadowing`, the tap guard and the post-fill dismissal. Re-run the repro with `treeSource: wda` to confirm the title is tapped and the keyboard hides. (`SCREEN_SIZED_FRACTION` lives in `adapters/types.ts` beside `STRUCTURAL_ROLES` since the merge into `fix/keyboard-aware-scroll`.)
 
-**Measured 2026-10-08 16:42–16:43 UTC** in `/Users/mholecy/Finshape/mp-native` (SWIFT payment form, branch
+**Measured 2026-10-08 16:42–16:43 UTC** in `<mp-native>` (SWIFT payment form, branch
 `feature/swift-payment`) with a scratch config — mp-native's `averi.yaml` uses idb and was not edited — iPhone 17
 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`), averi = mobile-verify @ `c35388a` built from source (WDA
 from `averi-wda`'s `WebDriverAgentRunner_iphonesimulator26.5-arm64.xctestrun`).
@@ -13,7 +13,7 @@ Scratch config:
 app:
   ios:
     bundleId: com.finshape.dbosbanking
-    app: /Users/mholecy/Finshape/mp-native/ios/build/Build/Products/Debug-iphonesimulator/Internal.app
+    app: <mp-native>/ios/build/Build/Products/Debug-iphonesimulator/Internal.app
     treeSource: wda
     keyboardDismiss:
       - tap: { id: swift_payment.form.title }
@@ -128,7 +128,7 @@ the point, not its own frame — at least when it is not interactive by itself; 
 ## Device check (2026-10-09 iOS, re-run at 610660f)
 
 Measured 05:22–05:46 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `/Users/mholecy/Finshape/mp-native`). **The mp-native SWIFT form was
+`fix/keyboard-aware-scroll` @ `610660f` (`dist/`, stdio, cwd `<mp-native>`). **The mp-native SWIFT form was
 not reachable this session**: the bank app was still logged in on the device, but every Hive read came back
 `SUBGRAPH_RESPONSE_BODY_EMPTY` from `gds-business` (app log, 07:22–07:45 local — the no-session signature named in mp-native's
 `scripts/hive-probe.mjs`), so the SWIFT form, the own-transfer form, the dashboard list and the Transactions tab all rendered
@@ -178,7 +178,7 @@ re-run** (the SWIFT form did not load).
 Measured 05:56–06:08 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), mp-native SWIFT
 form (`feature/swift-payment`, logged in by the owner-authorised PIN-only `login_pin_ios_here` after a cold relaunch; data
 loaded), averi = mobile-verify `fix/keyboard-aware-scroll` `dist/` built at `610660f` (the branch head has since moved to
-`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `/Users/mholecy/Finshape/mp-native`.
+`57dd6ac`; `dist/` predates those commits — no `fill-verdict.js` in it), stdio, cwd `<mp-native>`.
 Scratch configs only (`treeSource: wda` + `keyboardDismiss: [tap: { id: swift_payment.form.title }]`; mp-native's `averi.yaml`
 untouched). Decimal pad raised the round-1 way: `com.apple.keyboard.preferences` `AutomaticMinimizationEnabled` /
 `HardwareKeyboardLastSeen` set to NO before a cold relaunch, then a focus TAP (not a fill) on
@@ -206,7 +206,7 @@ opened (`priority_sheet.row_0/1` at y 456/502). The form's `scrollable 0 0 402 5
 ## Device check (2026-10-09 iOS, re-run at 347e70d)
 
 Measured 11:25–11:42 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+`fix/round-3` @ `347e70d` (`dist/` built 11:21 UTC, stdio, cwd `<mp-native>`), scratch configs only
 (mp-native's `averi.yaml` untouched), `idb` PATH shim logging every `idb ui tap|swipe|text|key-sequence`. Run folder:
 `scratchpad/averi-repo/run5-ios`. Bank app: cold relaunch at 11:36:52 (with the hardware-keyboard prefs off), PIN-only
 `login_pin_ios_here` (11:37:11, `branch: matched state logged_in`), Account Detail → PAY → SWIFT payment.
@@ -230,7 +230,7 @@ Shim: `11:38:18 ui tap 201 84` (title), `11:38:21 ui tap 201 707` (row). After: 
 ## Device check (2026-10-09 iOS, re-run at 86eb42d)
 
 Measured 13:13–13:15 UTC, iPhone 17 simulator iOS 27.0 (`37956039-94EA-4F51-93E5-94F7723A4578`, 402×874 pt), averi = mobile-verify
-`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `/Users/mholecy/Finshape/mp-native`), scratch configs only
+`fix/round-3` @ `86eb42d` (`dist/` built 12:50 UTC, stdio, cwd `<mp-native>`), scratch configs only
 (mp-native's `averi.yaml` untouched), `idb` PATH shim, hardware-keyboard prefs off. Run folder: `scratchpad/averi-repo/run6-ios`.
 The SWIFT form first showed "That's an error / We could not display the page you requested" (twice, also after TRY AGAIN):
 the bank session had gone stale. Cold relaunch through averi → PIN screen → `login_pin_ios_here` (13:13:52, 7.8 s,
