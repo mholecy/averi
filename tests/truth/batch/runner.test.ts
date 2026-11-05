@@ -370,6 +370,7 @@ describe('refused to start: exit 2, nothing done — no folder, no call (batch-1
     await expect(go([plain('k f')])).rejects.toThrow('block name "k f": one plain path segment, not "meta", is needed');
     await expect(go([plain('meta')])).rejects.toThrow('block name "meta": one plain path segment, not "meta", is needed');
     await expect(runBatch({ name: 'batch-t', blocks: [plain('kf'), plain('kf')], config: { ok: false, errors: ['ERROR x — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } })).rejects.toThrow('block kf is named twice');
+    await expect(runBatch({ name: 'batch-t', blocks: [plain('meta')], config: { ok: false, errors: ['ERROR x — nothing was done'] }, io: { seam, terminal: (t) => void terminal.push(t) } })).rejects.toThrow('block name "meta"');
     expect(terminal).toEqual([]);
     expect(seam.calls).toEqual([]);
     expect(existsSync(out)).toBe(false);

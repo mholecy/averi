@@ -31,8 +31,11 @@ export type Verdict = (typeof VERDICTS)[number];
 /** The SUMMARY's opening marker. Its end marker starts with it too: `======== SUMMARY end (run <id>)`. */
 export const SUMMARY_MARKER = '======== SUMMARY';
 
-/** A batch's exit codes: 2 refused to start (nothing done, no SUMMARY); 130 interrupted (the abort SUMMARY printed). */
-export const EXIT = { ok: 0, failed: 1, refused: 2, interrupted: 130 } as const;
+/**
+ * A batch's exit codes: 2 refused to start (nothing done, no SUMMARY), or started but no wanted block ran (a failed
+ * checkout, every need or precondition failed: the SUMMARY says why); 130 interrupted (the abort SUMMARY printed).
+ */
+export const EXIT = { ok: 0, failed: 1, refused: 2, nothingRan: 2, interrupted: 130 } as const;
 
 const LINE_BREAK = /[\n\r]/;
 
@@ -136,6 +139,8 @@ export interface Summary {
   errors: readonly string[];
   /** Set when the run was interrupted: the time of the interrupt (HH:MM:SS). */
   interrupted?: { at: string };
+  /** No wanted block ran (runner.ts, T2 S6a review round 1): the exit is 2, never success. */
+  noneRan?: boolean;
 }
 
 /**
@@ -172,12 +177,14 @@ export function summaryLines(s: Summary): string[] {
 
 /**
  * The run's exit code: 130 when interrupted, whatever else; 1 when any SUMMARY line but an ERROR line says FAIL or
- * this run wrote a RESTORE; else 0. (Refused to start: EXIT.refused, with no SUMMARY.) An ERROR line, an INCONCLUSIVE
- * or a SKIP alone exits 0: the SUMMARY says it, the exit code is for a FAIL or for state left on a device.
+ * this run wrote a RESTORE; 2 when no wanted block ran ("nothing was done": an agent reading only the exit code must
+ * not see success); else 0. (Refused to start: EXIT.refused, with no SUMMARY.) An ERROR line, an INCONCLUSIVE or a SKIP
+ * alone exits 0 when a block ran: the SUMMARY says it, the exit code is for a FAIL or for state left on a device.
  */
-export function exitCodeOf(s: Summary): 0 | 1 | 130 {
+export function exitCodeOf(s: Summary): 0 | 1 | 2 | 130 {
   if (s.interrupted !== undefined) return EXIT.interrupted;
   if (s.restore.written.length > 0) return EXIT.failed;
   const judged = [s.checkout, ...s.labs, ...s.blocks.flatMap((b) => b.lines), ...s.protectedLines];
-  return judged.some(failsIn) ? EXIT.failed : EXIT.ok;
+  if (judged.some(failsIn)) return EXIT.failed;
+  return s.noneRan === true ? EXIT.nothingRan : EXIT.ok;
 }

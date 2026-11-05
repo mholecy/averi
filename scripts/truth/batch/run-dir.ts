@@ -139,6 +139,12 @@ export function plainSegment(what: string, name: string): string {
 /** The run's own folder (its .out, the checkout line): not a block name. */
 export const META = 'meta';
 
+/** `name`, or a throw when it cannot be a block's: one plain path segment, not META (openRun's and the runner's rule). */
+export function blockName(name: string): string {
+  if (!PLAIN_SEGMENT.test(name) || name === META) throw new Error(`block name ${JSON.stringify(name)}: one plain path segment, not "${META}", is needed`);
+  return name;
+}
+
 export type OpenedRun = { ok: true; dirs: Readonly<Record<string, string>> } | { ok: false; error: string };
 
 /**
@@ -151,7 +157,7 @@ export type OpenedRun = { ok: true; dirs: Readonly<Record<string, string>> } | {
 export function openRun(fs: BatchFs, { out, runId, blocks, wanted }: { out: string; runId: string; blocks: readonly string[]; wanted: readonly string[] }): OpenedRun {
   plainSegment('RUN_ID', runId);
   for (const b of blocks) {
-    if (!PLAIN_SEGMENT.test(b) || b === META) throw new Error(`block name ${JSON.stringify(b)}: one plain path segment, not "${META}", is needed`);
+    blockName(b);
     if (blocks.indexOf(b) !== blocks.lastIndexOf(b)) throw new Error(`block ${b} is named twice`);
   }
   for (const w of wanted) if (!blocks.includes(w)) throw new Error(`wanted block ${w} is not a block of the batch`);

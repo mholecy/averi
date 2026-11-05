@@ -178,6 +178,29 @@ export const linesIn = (texts: readonly string[]): string[] => texts.flatMap(lin
 /** The lines of a log or an analyze.txt that start with ERROR (a step line's word; batch-12's `grep -h '^ERROR'`). */
 export const errorLinesIn = (text: string): string[] => linesOf(text).filter((l) => l.startsWith('ERROR'));
 
+/** How many ERROR lines one file gives the SUMMARY at most: a probe that loops on one error must not bury the rest. */
+export const ERRORS_PER_FILE = 20;
+
+/** `line` at most `max` code points, `…` its last when cut. */
+const cutTo = (line: string, max: number): string => {
+  const points = [...line];
+  return points.length <= max ? line : `${points.slice(0, max - 1).join('')}…`;
+};
+
+/**
+ * One file's ERROR lines for the SUMMARY: each cut at DETAIL_CHARS, at most ERRORS_PER_FILE, then `… <n> more ERROR
+ * lines in <file>`. A file its folder lists that could not be read (`text` undefined): a NOTE naming it, never skipped.
+ */
+export function fileErrors(file: string, text: string | undefined): string[] {
+  if (text === undefined) return [`NOTE ${nameInLine(file)} not read: unreadable (no file, or no permission)`];
+  const all = errorLinesIn(text);
+  const more = all.length - ERRORS_PER_FILE;
+  return [...all.slice(0, ERRORS_PER_FILE).map((l) => cutTo(l, DETAIL_CHARS)), ...(more > 0 ? [`… ${more} more ERROR lines in ${nameInLine(file)}`] : [])];
+}
+
+/** A block the abort judged whose judge wrote no verdict of its label: still a line of its own. */
+export const judgedNothingLine = (label: string): string => verdictLine(label, 'INCONCLUSIVE', 'interrupted: its judge wrote no verdict');
+
 /** This run's part of steps.log: from its header line (steps.ts#StepLog.open) to the end; none without one. */
 export function stepsOfRun(steps: string, name: string, runId: string): string[] {
   const lines = steps.split('\n');
@@ -248,6 +271,15 @@ export const liveArgs = ({ repo, asked, device, record }: { repo: string; asked:
   '--record',
   record,
 ];
+
+/** A live rejudge's bound when none is given: it only judges a record, device-free (batch-11 ran it unbounded). */
+export const REJUDGE_SECS = 120;
+
+/** live.ts's and its rejudge's calls: bounded (the secs given; rejudgeSecs, else REJUDGE_SECS), from the checkout, logged. */
+export const liveCalls = ({ repo, secs, rejudgeSecs, files }: { repo: string; secs: number; rejudgeSecs?: number; files: { log: string; summary: string } }) => ({
+  live: { secs, cwd: repo, log: files.log },
+  rejudge: { secs: rejudgeSecs ?? REJUDGE_SECS, cwd: repo, log: files.summary },
+});
 
 /** live.ts's rejudge of a record: main's judges, the same groups (batch-11.sh:479). */
 export const rejudgeArgs = ({ repo, asked, record }: { repo: string; asked: Asked; record: string }): string[] => ['--import', 'tsx', join(repo, LIVE_TS), '--rejudge', record, '--groups', groupsOf(asked)];
