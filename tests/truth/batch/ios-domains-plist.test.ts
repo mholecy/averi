@@ -96,7 +96,10 @@ describe("TYPED_PY on the host's plistlib (batch-10: bool true read int 0 after 
         if (args[1] === 'list') return res(0, JSON.stringify({ devices: { 'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [{ udid: 'LAB-SIMULATOR-UDID', name: 'averi-lab iPhone 17' }] } }));
         const [verb, domain] = [args[4], args[5]];
         asked.push(`${verb} ${domain}`);
-        if (verb === 'export') return copyFileSync(exported, args[6]), res(0);
+        if (verb === 'export') {
+          copyFileSync(exported, args[6]);
+          return res(0);
+        }
         // batch-13: the simulator's words for a domain not there, byte for byte the host's.
         if (verb === 'read') return res(1, '', `Error: Domain '${domain}' not found.\n`);
         throw new Error(`no answer for ${cmd} ${args.join(' ')}`);

@@ -52,7 +52,7 @@ export const disconnectWarning = (r: CallResult): string | undefined => (failedC
 /** idb's words when the companion its list names for the udid does not answer (batch-13 rerun 1). */
 const STALE_SAID = /Failed to connect to companion/;
 /** What those words most likely mean, said after them. */
-export const STALE_COMPANION_WHY = "idb's local list names a companion for this simulator that does not answer: most likely a stale entry, its companion ended";
+export const STALE_COMPANION_WHY = "idb's local list names a companion for this simulator that does not answer: most likely a stale entry";
 
 /** An idb call that failed in words (exitText), the stale entry named as the likely cause when idb's words say so. */
 export const idbFailText = (r: CallResult): string => `${exitText(r)}${STALE_SAID.test(r.err + r.out) ? ` — ${STALE_COMPANION_WHY}` : ''}`;

@@ -155,7 +155,7 @@ function batch(o: { labNeeds?: string[]; d55First?: boolean } = {}) {
       await wdaWindow(ctx, sim.value, {
         runs: [{ name: 'ios-wda-d43-1', asked: P7W }],
         work: async () => {
-          if ((await iosCheck(ctx, sim.value, 'D43 wda 1')) === undefined) await ctx.liveRun('ios-wda-d43-1', P7W, { secs: 60 });
+          if ((await iosCheck(ctx, sim.value, 'D43 wda 1')).ok) await ctx.liveRun('ios-wda-d43-1', P7W, { secs: 60 });
         },
       });
       await ios.endStretch(ctx, sim.value);

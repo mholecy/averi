@@ -144,8 +144,8 @@ export async function killLabWda(k: Killer): Promise<{ port: PortRead; killed: b
 /**
  * The lab simulator's idb_companion ended (pkill by its exact pattern), then its entry dropped from idb's local
  * companion list (`idb disconnect <udid>`, bounded; batch-13): a pkill alone leaves an entry the next run's idb trusts.
- * `whys`: what failed, pkill's then the disconnect's; `warning`: the disconnect's alone — never a block's failure by
- * itself.
+ * `whys`: what failed, pkill's then the disconnect's — the last step says them all; `warning`: the disconnect's alone —
+ * the reset carries only that one (a pkill that failed is no reason to stop a reset), never a block's failure by itself.
  */
 export async function endCompanion(k: { run: Run; udid: string }): Promise<{ whys: string[]; warning: string | undefined }> {
   const killed = pkillOf(await k.run('pkill', ['-f', companionPattern(k.udid)], { secs: HOST_SECS }));
@@ -240,9 +240,10 @@ export async function reset(c: LabCtx, lab: IosSim): Promise<ResetResult> {
 
 /**
  * batch-11's ios_check before `label`: the lab's WebDriverAgent ended, CHECK_WAIT_MS, the Open-in alert dismissed, the
- * health check; a stuck alert or a failed health check resets the simulator. Why it is not fit to run, or undefined.
+ * health check; a stuck alert or a failed health check resets the simulator. Fit to run — with the reset's warning
+ * when it left one (its companion entry may be stale, batch-13) — or why not.
  */
-export async function iosCheck(c: LabCtx, lab: IosSim, label: string): Promise<string | undefined> {
+export async function iosCheck(c: LabCtx, lab: IosSim, label: string): Promise<ResetResult> {
   await killLabWda(lab);
   await lab.wait(CHECK_WAIT_MS);
   const alert = await dismissOpenIn(lab);
@@ -251,13 +252,13 @@ export async function iosCheck(c: LabCtx, lab: IosSim, label: string): Promise<s
   const sick = alert.state === 'stuck' ? `the open-in alert could not be dismissed: ${alert.why}` : await health(lab);
   if (sick === undefined) {
     c.step('OK', `ios-health before ${label}`);
-    return undefined;
+    return { ok: true };
   }
   c.step('WARN', `ios-health before ${label}: ${sick} — resetting`);
-  const r = await reset(c, lab);
-  if (r.ok) return undefined;
-  c.step('ERROR', `ios-reset before ${label} failed: ${r.why}`);
-  return `the iOS reset before ${label} failed: ${r.why}`;
+  const done = await reset(c, lab);
+  if (done.ok) return done;
+  c.step('ERROR', `ios-reset before ${label} failed: ${done.why}`);
+  return { ok: false, why: `the iOS reset before ${label} failed: ${done.why}` };
 }
 
 // --------------------------------------------------------------------------------------- the installed lab
@@ -320,11 +321,11 @@ export function iosLab(o: IosLabOptions = {}): IosLab {
         if (!opened.ok) return opened;
         const lab = opened.value;
         guarded = lab.udid;
-        const r: ResetResult = o.reset === false ? { ok: true } : await reset(c, lab);
-        if (!r.ok) return { ok: false, why: `the initial iOS reset failed: ${r.why}` };
+        const done: ResetResult = o.reset === false ? { ok: true } : await reset(c, lab);
+        if (!done.ok) return { ok: false, why: `the initial iOS reset failed: ${done.why}` };
         start = await readProtected(lab.sim);
         c.step('NOTE', `${PROTECTED.domain}'s finportal key at the iOS stretch's start: ${readText(start)} (read only: no batch writes it)`);
-        return { ...opened, warning: r.warning };
+        return { ...opened, warning: done.warning };
       },
       installWord: 'simctl install',
       install: (lab, built) => lab.simctl(['install', lab.udid, built]),
@@ -413,19 +414,26 @@ export interface WdaWindowOptions {
  * one of the block's verdict lines, and the window closed only when it verified, else left for RESTORE; the end check;
  * then, with the state clean, the compare (a late writer: its line a verdict line, its hand lines to RESTORE). Whether
  * the work ran, and whether the window was put back — not put back, the block's own verdict is INCONCLUSIVE at once, so
- * no judge's PASS can stand for a run that left the lab's settings changed (T2 S6b review round 2).
+ * no judge's PASS can stand for a run that left the lab's settings changed (T2 S6b review round 2); and the warnings its
+ * two checks' resets left (the companion entry's, batch-13), for the block to say.
  */
-export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<{ ran: boolean; putBack: boolean }> {
+export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions): Promise<{ ran: boolean; putBack: boolean; warnings: string[] }> {
   for (const r of o.runs ?? []) ctx.asksLive(r.name, r.asked);
   const stateFile = o.stateFile ?? join(ctx.dir, STATE_FILE);
+  const warnings: string[] = [];
+  const check = async (label: string): Promise<ResetResult> => {
+    const done = await iosCheck(ctx, lab, label);
+    if (done.ok && done.warning !== undefined) warnings.push(done.warning);
+    return done;
+  };
   // Nothing changed: nothing to put back.
   const notRun = (why: string) => {
     ctx.err(`the WDA window: ${why}`);
     ctx.verdict('INCONCLUSIVE', `the WDA window did not run: ${why}`);
-    return { ran: false, putBack: true };
+    return { ran: false, putBack: true, warnings };
   };
-  const sick = await iosCheck(ctx, lab, 'the WDA window');
-  if (sick !== undefined) return notRun(`${sick} — no wda run (nothing changed)`);
+  const first = await check('the WDA window');
+  if (!first.ok) return notRun(`${first.why} — no wda run (nothing changed)`);
   const b = await backup(lab.sim, stateFile);
   if (!b.ok) return notRun(`the simulator domains could not be backed up — no wda run (nothing changed): ${b.why}`);
   ctx.note(b.line);
@@ -438,8 +446,8 @@ export async function wdaWindow(ctx: BlockCtx, lab: IosSim, o: WdaWindowOptions)
     ctx.err(`the WDA window: the simulator not provably put back — the window stays open, its hand lines go to RESTORE`);
     ctx.verdict('INCONCLUSIVE', "the lab's settings not put back (see RESTORE)");
   }
-  await iosCheck(ctx, lab, 'iOS end');
+  await check('iOS end');
   // Compared only once the restore verified (compare refuses a dirty state itself): a late writer is caught here.
   if (stateOf(lab.fs, stateFile) === 'clean') ctx.verdictAndHand(await compare(lab.sim, stateFile));
-  return { ran: true, putBack: put.ok };
+  return { ran: true, putBack: put.ok, warnings };
 }

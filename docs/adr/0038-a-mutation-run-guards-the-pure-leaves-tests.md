@@ -9,9 +9,10 @@ Amended 2026-11-04 (T2 S1: scripts/truth/batch/ joined the run — see the T2 am
 Amended 2026-11-04 (T2 S2: bounded.ts and abort.ts joined the run — see the T2 amendment's S2 part below).
 Amended 2026-11-04 (T2 S3: preconditions.ts and cases.ts joined the run — see the T2 amendment's S3 part below).
 Amended 2026-11-05 (T2 S5: lab-chooser.ts and lab-emu.ts joined the run — see the T2 amendment's S5 part below).
-Amended 2026-11-05 (T2 S6a: runner-lines.ts, runner.ts and records.ts joined the run — see the T2 amendment's S6a part).
+Amended 2026-11-05 (T2 S6a: runner-lines.ts, runner.ts and records.ts joined the run — see the T2 amendment's S6a part
+below).
 Amended 2026-11-05 (T2 batch-13 fixes: idb disconnect after each companion end, the Android guard's adb words, the
-simulator's binary export — see the T2 amendment's batch-13 part).
+simulator's binary export — see the T2 amendment's batch-13 part below).
 
 ## Context
 
@@ -1156,16 +1157,16 @@ before a merge), or raise the bound by a decision recorded in this ADR.
 
 ### batch-13 fixes (2026-11-05, backlog T2, after batch-13's first device run on main 73f5ad0d)
 
-What the live run found. The module ran its iOS blocks on the lab simulator end to end (the reset, a domains window,
-the WDA window put back key by key, the finportal reads; RESTORE none) and idb started its own companion on a freshly
-booted simulator with no explicit start — but only because idb's local companion list held no entry for the udid. Its
-rerun met no iOS need: the run's last step had pkilled the companion, the entry stayed in idb's list, and every later
-idb call for that udid trusted it and failed fast ("Failed to connect to companion …"); fb-idb drops a dead entry only
-when it lists targets, and spawns a companion only for a udid it has no entry for. The Android need was refused because
-the lab AVD was not running, the INCONCLUSIVE path S6b chose over batch-11's `adb devices` check, which held; but the
-refusal said "no emulator adb can name", adb's own words thrown away. And the simulator's `defaults` says, byte for
-byte, what the host's does for a missing domain and a missing key; its export of a missing domain is the one form that
-differs: a binary plist of an empty dictionary, exit 0, where the host writes XML.
+What the live run found. The module ran its iOS blocks on the lab simulator end to end (the reset, a domains window, the
+WDA window put back key by key, the finportal reads; RESTORE none) and idb started its own companion on a freshly booted
+simulator with no explicit start — but only because idb's local companion list held no entry for the udid. Its rerun met
+no iOS need: the run's last step had pkilled the companion, the entry stayed in idb's list, and every later idb call for
+that udid trusted it and failed fast ("Failed to connect to companion …"); fb-idb drops a dead entry only when it lists
+targets, and spawns a companion only for a udid it has no entry for. The Android need was refused because the lab AVD
+was not running, the INCONCLUSIVE path S6b chose over batch-11's `adb devices` check, which held; but the refusal said
+"no emulator adb can name", adb's own words thrown away. And the simulator's `defaults` says, byte for byte, what the
+host's does for a missing domain and a missing key; its export of a missing domain is the one form that differs: a
+binary plist of an empty dictionary, exit 0, where the host writes XML.
 
 The three fixes:
 - **The companion's entry dropped after every companion end.** ios-lab.ts's `endCompanion`: pkill by the companion's
@@ -1173,21 +1174,22 @@ The three fixes:
   that simulator's entry alone — in the reset (pkill, disconnect, then the WDA, the shutdown, the boot, the health
   check) and in the run's last step, which both ends of the run (finish and the abort) run after the kept groups. A
   disconnect that fails or passes its bound is a typed warning — "idb's companion entry may be stale — idb disconnect:
-  <why>" — on the reset's step (WARN, never OK), the need's line (the need's warning, before a failed build's:
-  lab-build.ts's `checkDevice` joins the readying's and the build's) and the last step's WARN, never a failure by itself:
-  the need is judged by its own checks (a stale entry left fails the health check after the reset). When describe-all
-  fails with idb's "Failed to connect to companion", the health check's and `alive`'s why add one sentence naming a
-  stale entry as the likely cause (`idbFailText`). No kept-group path can end the companion and so leave an entry
-  behind: fb-idb 1.1.7 spawns its local companion with `preexec_fn=os.setpgrp` (companion.py's `_spawn_server`, called
-  with `reparent=True` by management.py's local spawn), so the companion leaves the idb call's process group, and
-  neither `stopKept()` nor the abort's kept-group kill reaches it; only the exact-pattern pkill does, and a disconnect
-  follows each one. (No production block calls `ctx.stopKept()` today.) This mattered: between blocks the runner
-  rechecks a need by its `alive`, for `ios` a bare describe-all with no reset, so a stale entry left mid-run would hold
-  `ios` down for the rest of the run.
-- **The Android guard keeps adb's words.** lab-device.ts's guard keeps adb's first stderr line (execFile's error, and
-  bounded.ts's `execOf`, which now puts the call's stderr on its throw), else the error's first line: "emulator-5554 is
-  no emulator adb can name (adb: error: device 'emulator-5554' not found), not the lab's averi_lab: refused". Still a
-  refusal after that one read; nothing is done to the device.
+  <why>" — on the reset's step (WARN, never OK), what a mid-run check hands back (`iosCheck`'s result, `wdaWindow`'s
+  `warnings`, for the block to say), the need's line (the need's warning, before a failed build's: lab-build.ts's
+  `checkDevice` joins the readying's and the build's) and the last step's WARN, never a failure by itself: the need is
+  judged by its own checks (a stale entry left fails the health check after the reset). When describe-all fails with
+  idb's "Failed to connect to companion", the health check's and `alive`'s why add one sentence naming a stale entry as
+  the likely cause (`idbFailText`). No kept-group path can end the companion and so leave an entry behind: fb-idb 1.1.7
+  spawns its local companion with `preexec_fn=os.setpgrp` (companion.py's `_spawn_server`, called with `reparent=True`
+  by management.py's local spawn), so the companion leaves the idb call's process group, and neither `stopKept()` nor
+  the abort's kept-group kill reaches it; only the exact-pattern pkill does, and a disconnect follows each one. (No
+  production block calls `ctx.stopKept()` today.) This mattered: between blocks the runner rechecks a need by its
+  `alive`, for `ios` a bare describe-all with no reset, so a stale entry left mid-run would hold `ios` down for the rest
+  of the run.
+- **The Android guard keeps adb's words.** lab-device.ts's guard keeps adb's first non-blank stderr line (execFile's
+  error, and bounded.ts's `execOf`, which now puts the call's stderr on its throw), else the error's first line:
+  "emulator-5554 is no emulator adb can name (adb: error: device 'emulator-5554' not found), not the lab's averi_lab:
+  refused". Still a refusal after that one read; nothing is done to the device.
 - **The simulator's export of a missing domain** is committed as written (tests/fixtures/batch/
   defaults-sim-export-missing-domain.plist, 42 bytes; it names no device and no path), and ios-domains-plist.test.ts
   pins that the host's plistlib reads it as the host's empty map and that a backup over it asks `defaults read` and
@@ -1197,24 +1199,31 @@ The three fixes:
 Decision: `idb disconnect <udid>`, never `idb kill`. `kill` clears every companion idb knows and SIGKILLs each one it
 spawned — device-check's simulator's too, which no lab step may touch. `disconnect` takes the udid as its positional
 argument (fb-idb 1.1.7 reads it as a udid only when it matches its simulator-udid pattern, upper-case hex, as simctl
-lists the lab's) and calls the companion set's `remove_companion`, which, under idb's state lockfile, removes only
-the entries of that udid: a no-op, exit 0, when there is none (so a reset on a clean list warns of nothing); a failure
-exits 1. It touches no process: the pkill before it does the ending. The lab fake now holds idb's list (none, live, stale), and flags `idb kill` and any
-disconnect not of the lab udid alone as a violation. S6b's companion residual is answered: idb starts its own companion
-only when its list has no entry for the udid; a pkill leaves one; the module disconnects after each kill. S2's residual
-(whether idb_companion starts in the idb client's group) is closed by the same fb-idb fact: it does not, it starts in a
-group of its own. `KEEPS_GROUP` keeps idb's groups all the same, the safe side at no cost: a group is kept only while
-it still exists once its leader ended, and an idb call whose companion left it leaves none (bounded.ts's comment says
-so).
+lists the lab's) and calls the companion set's `remove_companion`, which, under idb's state lockfile, removes only the
+entries of that udid: a no-op, exit 0, when there is none (so a reset on a clean list warns of nothing); a failure exits
+1. It touches no process: the pkill before it does the ending. The lab fake now holds idb's list (none, live, stale),
+and flags `idb kill` and any disconnect not of the lab udid alone as a violation. S6b's companion residual is answered:
+idb starts its own companion only when its list has no entry for the udid; a pkill leaves one; the module disconnects
+after each kill. S2's residual (whether idb_companion starts in the idb client's group) is closed by the same fb-idb
+fact: it does not, it starts in a group of its own. `KEEPS_GROUP` keeps idb's groups all the same, the safe side at no
+cost: a group is kept only while it still exists once its leader ended, and an idb call whose companion left it leaves
+none (bounded.ts's comment says so).
 
 Tests: ios-lab.test.ts "batch-13 fixes: idb's companion entry dropped …" (rerun 1's stale entry dropped by the reset,
 the last step's disconnect and the next run met, a disconnect that fails or passes its bound on the need line, the last
 step's WARN, a block's reset, the stale-companion why), lab-lines.test.ts "batch-13 fixes: idb's companion entry …",
-lab-emu.test.ts and lab-device.test.ts "batch-13: …" (adb's words), ios-domains-plist.test.ts "batch-13: …" (the
-binary export); lab-batch.test.ts's clean run and abort now end with the disconnect; lab-build.test.ts and
-bounded.test.ts pin checkDevice's joined warnings and execOf's stderr in the modules' own tests, which are all the
-mutation run gives them. 31 hand mutants, each bounded: all killed. The first cold run left two equivalent survivors in
-ios-lab.ts (an optional field spread only when defined and read only when defined), designed away (endCompanion returns
-its whys as a list; the need spreads the reset's warning as it is). The final cold run, 358 s: ios-lab.ts 100 % (380
-mutants, 1 timeout counted killed), lab-lines.ts 100 % (283), lab-build.ts 100 % (273), bounded.ts 99.13 % (229, the
-same two equivalents), every other module as before; floors unchanged (none rises by the achieved − 2 rule).
+lab-emu.test.ts and lab-device.test.ts "batch-13: …" (adb's words), ios-domains-plist.test.ts "batch-13: …" (the binary
+export); lab-batch.test.ts's clean run and abort now end with the disconnect; lab-build.test.ts and bounded.test.ts pin
+checkDevice's joined warnings and execOf's stderr in the modules' own tests, which are all the mutation run gives them.
+31 hand mutants, each bounded: all killed. The first cold run left two equivalent survivors in ios-lab.ts (an optional
+field spread only when defined and read only when defined), designed away (endCompanion returns its whys as a list; the
+need spreads the reset's warning as it is). The final cold run, 358 s: ios-lab.ts 100 % (380 mutants, 1 timeout counted
+killed), lab-lines.ts 100 % (283), lab-build.ts 100 % (273), bounded.ts 99.13 % (229, the same two equivalents), every
+other module as before; floors unchanged (none rises by the achieved − 2 rule).
+
+Code review (Standards and Spec): a mid-run reset's warning reached only the steps, so `iosCheck` now returns the
+reset's shape (`{ ok: true, warning? }` or `{ ok: false, why }`, where it returned a why or undefined: a block tests
+`.ok` before its live run) and `wdaWindow` returns the warnings of its two checks (`warnings`); the stale-companion
+sentence names the likely cause only; the guard reads its AVD line and adb's words through one first-non-blank-line
+helper, with no assignment inside its catch. 4 more hand mutants, each bounded: all killed (the end check's warning
+only after a test made the end check reset).

@@ -316,7 +316,7 @@ export async function withMeasuredPanel(
   }
 }
 
-/** A text's first non-blank line, trimmed ('' for none). */
+/** A text's first non-blank line, trimmed ('' for none): the guard's AVD name and adb's words alike. */
 const firstSaid = (text: string): string => text.split(/\r?\n/).find((l) => l.trim() !== '')?.trim() ?? '';
 
 /**
@@ -356,9 +356,11 @@ export class AndroidLab implements LabDevice {
    */
   guard(): Promise<void> {
     this.guarded ??= (async () => {
-      let said = '';
-      const read = await this.adb('emu', 'avd', 'name').catch((e: unknown) => ((said = adbSaid(e)), { stdout: '' }));
-      const avd = read.stdout.split(/\r?\n/)[0].trim();
+      const { stdout, said } = await this.adb('emu', 'avd', 'name').then(
+        (r) => ({ stdout: r.stdout, said: '' }),
+        (e: unknown) => ({ stdout: '', said: adbSaid(e) }),
+      );
+      const avd = firstSaid(stdout);
       const none = `no emulator adb can name${said === '' ? '' : ` (adb: ${said})`}`;
       if (avd !== LAB_AVD) throw new Error(`${this.serial} is ${avd === '' ? none : `AVD "${avd}"`}, not the lab's ${LAB_AVD}: refused`);
       this.cleared = true;

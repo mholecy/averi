@@ -73,7 +73,7 @@ const builtRef = (app: string) => {
 };
 
 /** A block's ctx as the runner gives it, recording what the block said and did, in order. */
-function blockCtx(run = runOf(world), id = 'D43') {
+function blockCtx(run: Run = runOf(world), id = 'D43') {
   const events: string[] = [];
   const windows = new Map<string, WindowSpec>();
   const ctx = {
@@ -215,26 +215,26 @@ describe('the health check, the Open-in alert and the reset (batch-11.sh:326–3
   it('iosCheck: the WDA ended, CHECK_WAIT_MS, the alert, the health check — OK; an alert dismissed is a WARN', async () => {
     fresh({ alertTaps: 1 });
     const c = needCtx();
-    expect(await iosCheck(c, await simOf(), 'D43 wda 1')).toBeUndefined();
+    expect(await iosCheck(c, await simOf(), 'D43 wda 1')).toStrictEqual({ ok: true });
     expect(waits).toEqual([CHECK_WAIT_MS, ALERT_WAIT_MS]);
     expect(steps).toEqual(['WARN open-in alert before D43 wda 1: dismissed — Cancel tapped at 140,420 (attempt 1)', 'OK ios-health before D43 wda 1']);
   });
 
   it('iosCheck: a failed health check or a stuck alert resets; a reset that fails too is an ERROR and why it is not fit', async () => {
     fresh({ sick: 'swipe' });
-    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toBeUndefined();
+    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toStrictEqual({ ok: true });
     expect(steps).toContain('WARN ios-health before D43 wda 1: swipe: exit 1 swipe failed — resetting');
     expect(steps.at(-1)).toBe('OK ios-reset');
     steps.length = 0;
     fresh({ alertTaps: 5, bootFails: true });
-    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toBe('the iOS reset before D43 wda 1 failed: simctl boot: exit 149 Unable to boot device');
+    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toEqual({ ok: false, why: 'the iOS reset before D43 wda 1 failed: simctl boot: exit 149 Unable to boot device' });
     expect(steps).toContain('WARN ios-health before D43 wda 1: the open-in alert could not be dismissed: the open-in alert Open in “AveriLab”? is still up after 2 Cancel taps — resetting');
     expect(steps.at(-1)).toBe('ERROR ios-reset before D43 wda 1 failed: simctl boot: exit 149 Unable to boot device');
   });
 
   it('iosCheck: an alert that cannot be read is a NOTE, and the health check decides', async () => {
     const lab = await simOf(async (cmd, args) => (args.includes('--json') ? { code: 2, timedOut: false, signal: null, out: '', err: 'idb: x' } : runOf(world)(cmd, args)));
-    expect(await iosCheck(needCtx(), lab, 'T6')).toBeUndefined();
+    expect(await iosCheck(needCtx(), lab, 'T6')).toStrictEqual({ ok: true });
     expect(steps).toEqual(['NOTE open-in alert before T6 not read: idb ui describe-all: exit 2 idb: x', 'OK ios-health before T6']);
   });
 });
@@ -354,7 +354,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const { ctx, events, windows } = blockCtx();
     const lab = await simOf();
     let ran = false;
-    expect(await wdaWindow(ctx, lab, { runs, work: async () => void ((ran = true), world.startWda(), events.push('work')) })).toEqual({ ran: true, putBack: true });
+    expect(await wdaWindow(ctx, lab, { runs, work: async () => void ((ran = true), world.startWda(), events.push('work')) })).toEqual({ ran: true, putBack: true, warnings: [] });
     expect(ran).toBe(true);
     const state = join(ctx.dir, 'state.json');
     expect(events).toEqual([
@@ -391,7 +391,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     fresh({ exportFails: 'com.apple.Preferences' });
     const { ctx, events } = blockCtx();
     let ran = false;
-    expect(await wdaWindow(ctx, await simOf(), { runs, work: async () => void (ran = true) })).toEqual({ ran: false, putBack: true });
+    expect(await wdaWindow(ctx, await simOf(), { runs, work: async () => void (ran = true) })).toEqual({ ran: false, putBack: true, warnings: [] });
     expect(ran).toBe(false);
     const why = 'the simulator domains could not be backed up — no wda run (nothing changed): defaults export com.apple.Preferences: exit 1 export com.apple.Preferences failed — no state written';
     expect(events.slice(1)).toEqual(['OK ios-health before the WDA window', `ERROR the WDA window: ${why}`, `verdict D43 live verdict: INCONCLUSIVE — the WDA window did not run: ${why}`]);
@@ -401,7 +401,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
   it('the health check before it fails past a reset: INCONCLUSIVE, nothing backed up', async () => {
     fresh({ sick: 'swipe', bootFails: true });
     const { ctx, events } = blockCtx();
-    expect(await wdaWindow(ctx, await simOf(), { work: async () => {} })).toEqual({ ran: false, putBack: true });
+    expect(await wdaWindow(ctx, await simOf(), { work: async () => {} })).toEqual({ ran: false, putBack: true, warnings: [] });
     expect(events.at(-1)).toBe('verdict D43 live verdict: INCONCLUSIVE — the WDA window did not run: the iOS reset before the WDA window failed: simctl boot: exit 149 Unable to boot device — no wda run (nothing changed)');
     expect(existsSync(join(ctx.dir, 'state.json'))).toBe(false);
   });
@@ -465,7 +465,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const run: Run = async (cmd, args, call) => (cmd === 'lsof' && working ? { code: 142, timedOut: true, signal: 'SIGKILL', out: '', err: '' } : runOf(world)(cmd, args, call));
     const lab = await simOf(run);
     const r = await wdaWindow({ ...ctx, bounded: run }, lab, { work: async () => void ((working = true), world.startWda()) });
-    expect(r).toEqual({ ran: true, putBack: false });
+    expect(r).toEqual({ ran: true, putBack: false, warnings: [] });
     expect(events).toContain('verdict D43 WDA-window restore: ERROR — NOT VERIFIED — port 8120 not read (lsof: past its bound (exit 142)): the domains not put back (a WebDriverAgent still running undoes a restore at its exit); the state file left dirty');
     expect(world.calls.some((w) => / defaults (write|import|delete) /.test(w))).toBe(false);
     expect(stateOf(nodeFs, join(ctx.dir, 'state.json'))).toBe('dirty');
@@ -622,13 +622,14 @@ describe("batch-13 fixes: idb's companion entry dropped after every companion en
       const r = await runOf(world)(cmd, args, call);
       return args[0] === 'disconnect' ? { ...r, code: 1, err: 'DisconnectCommandException: Could not disconnect' } : r;
     };
-    expect(await iosCheck(needCtx(), await simOf(run), 'D43 wda 1')).toBeUndefined();
+    // The reset's warning carried to the check's caller, in the same words (code review).
+    expect(await iosCheck(needCtx(), await simOf(run), 'D43 wda 1')).toStrictEqual({ ok: true, warning: "idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect" });
     expect(steps.at(-1)).toBe("WARN ios-reset: idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect");
     expect(words()).toContain(`idb disconnect ${LAB_UDID}`);
     // Left stale (the disconnect did nothing): the health check after the reset fails, naming the stale entry.
     steps.length = 0;
     fresh({ sick: 'swipe', disconnectFails: 'exit' });
-    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toBe(`the iOS reset before D43 wda 1 failed: the health check after the reset: describe-all: exit 1 ${STALE_COMPANION_ERR} — ${STALE_COMPANION_WHY}`);
+    expect(await iosCheck(needCtx(), await simOf(), 'D43 wda 1')).toEqual({ ok: false, why: `the iOS reset before D43 wda 1 failed: the health check after the reset: describe-all: exit 1 ${STALE_COMPANION_ERR} — ${STALE_COMPANION_WHY}` });
   });
 
   it("batch-13: describe-all failing with idb's \"Failed to connect to companion\" names the stale entry as the likely cause — in the health check's why and alive's", async () => {
@@ -639,5 +640,23 @@ describe("batch-13 fixes: idb's companion entry dropped after every companion en
     // Any other failure: its own words, nothing added.
     fresh({ sick: 'describe-all' });
     expect(await health(await simOf())).toBe('describe-all: exit 1 No translation object returned');
+  });
+});
+
+describe("batch-13 code review: a mid-run reset's companion warning reaches the block, not only the steps", () => {
+  it("batch-13: the WDA window's checks — the one before and the end check — hand their resets' warnings back, in the same words", async () => {
+    fresh({ sick: 'swipe' });
+    const run: Run = async (cmd, args, call) => {
+      const r = await runOf(world)(cmd, args, call);
+      return args[0] === 'disconnect' ? { ...r, code: 1, err: 'DisconnectCommandException: Could not disconnect' } : r;
+    };
+    const { ctx } = blockCtx(run);
+    const r = await wdaWindow(ctx, await simOf(run), { work: async () => void world.startWda() });
+    expect(r).toEqual({ ran: true, putBack: true, warnings: ["idb's companion entry may be stale — idb disconnect: exit 1 DisconnectCommandException: Could not disconnect"] });
+    // Sick again after the work: the end check resets too, and its warning is kept after the first's.
+    fresh({ sick: 'swipe' });
+    const again = blockCtx(run, 'D43-again');
+    const both = await wdaWindow(again.ctx, await simOf(run), { work: async () => void (world.startWda(), (world.st.sick = 'swipe')) });
+    expect(both.warnings).toHaveLength(2);
   });
 });

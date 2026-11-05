@@ -212,6 +212,6 @@ describe("batch-13 fixes: idb's companion entry — the disconnect's argv and wa
     expect(idbFailText(exit(1, 'Traceback (most recent call last):\n' + said))).toBe(`exit 1 Traceback (most recent call last): — ${STALE_COMPANION_WHY}`);
     expect(idbFailText(exit(1, '', said))).toBe(`exit 1 ${said} — ${STALE_COMPANION_WHY}`);
     expect(idbFailText(exit(1, 'No translation object returned'))).toBe('exit 1 No translation object returned');
-    expect(STALE_COMPANION_WHY).toBe("idb's local list names a companion for this simulator that does not answer: most likely a stale entry, its companion ended");
+    expect(STALE_COMPANION_WHY).toBe("idb's local list names a companion for this simulator that does not answer: most likely a stale entry");
   });
 });
