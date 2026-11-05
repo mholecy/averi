@@ -684,6 +684,55 @@ describe('a need\'s end: once per need met, after the last block and before the 
   });
 });
 
+describe('a need\'s calls recorded in lab/<need>-calls.jsonl, appended through the run\'s fs (T2b batch-13 gap 6: a failed LAB line diagnosed without a rerun)', () => {
+  const callsOf = (need: string) => text(join(dirOf('lab'), `${need}-calls.jsonl`)).split('\n').slice(0, -1).map((l) => JSON.parse(l) as Record<string, unknown>);
+
+  it('its check\'s, its alive\'s and its end\'s calls, in order, each its phase; a block\'s own calls not among them', async () => {
+    const n: Record<string, NeedSpec> = {
+      android: {
+        check: async (c) => (await c.bounded('probe', ['emu'], { secs: 5 }), { ok: true, how: 'up' }),
+        alive: async (c) => (await c.bounded('probe', ['alive'], { secs: 3 }), { ok: true, how: 'up' }),
+        end: async (c) => void (await c.bounded('probe', ['end'], { secs: 7 })),
+      },
+    };
+    await go([plain('a', { needs: ['android'], run: async (ctx) => (await ctx.bounded('probe', ['block'], { secs: 5 }), ctx.verdict('PASS')) }), plain('b', { needs: ['android'] })], { needs: n });
+    expect(callsOf('android')).toEqual([
+      { need: 'android', phase: 'check', at: '09:44:26', cmd: 'probe', args: ['emu'], secs: 5, code: 0, timedOut: false },
+      { need: 'android', phase: 'alive', at: '09:44:26', cmd: 'probe', args: ['alive'], secs: 3, code: 0, timedOut: false },
+      { need: 'android', phase: 'end', at: '09:44:26', cmd: 'probe', args: ['end'], secs: 7, code: 0, timedOut: false },
+    ]);
+  });
+
+  it('a check that throws after its calls: they are still recorded; a call that failed says its first line', async () => {
+    seam.rules = [git(), (cmd, args) => (cmd === 'probe' && args[0] === 'sick' ? { code: 3, err: 'adb: device offline\nmore' } : undefined), probes, live()];
+    const n = { android: async (c: NeedCtx): Promise<never> => { await c.bounded('probe', ['sick'], { secs: 5 }); throw new Error('gone'); } };
+    await go([plain('a', { needs: ['android'] })], { needs: n });
+    expect(callsOf('android')).toEqual([{ need: 'android', phase: 'check', at: '09:44:26', cmd: 'probe', args: ['sick'], secs: 5, code: 3, timedOut: false, said: 'adb: device offline' }]);
+  });
+
+  it('a record that cannot be written: one NOTE per need, never the need\'s failure', async () => {
+    const fs = { ...nodeFs, append: (path: string, t: string) => (path.endsWith('-calls.jsonl') ? (() => { throw new Error('ENOSPC: no space\nmore'); })() : nodeFs.append(path, t)) };
+    const n = { android: async (c: NeedCtx) => (await c.bounded('probe', ['a'], { secs: 5 }), await c.bounded('probe', ['b'], { secs: 5 }), { ok: true as const, how: 'up' }) };
+    expect(await go([plain('a', { needs: ['android'] })], { needs: n, io: { fs } })).toBe(0);
+    expect(summary()).toContain('a verdict: PASS');
+    expect(text(join(out, 'steps.log')).split('\n').filter((l) => l.includes('its calls not recorded'))).toEqual([`09:44:26 NOTE LAB android: its calls not recorded (ENOSPC: no space)`]);
+  });
+
+  it('bounded: past NEED_CALLS_MAX calls of one need, one line says the rest were not recorded', async () => {
+    const n = { android: async (c: NeedCtx) => { for (let i = 0; i < 502; i++) await c.bounded('probe', [String(i)], { secs: 5 }); return { ok: true as const, how: 'up' }; } };
+    await go([plain('a', { needs: ['android'] })], { needs: n });
+    const calls = callsOf('android');
+    expect(calls).toHaveLength(501);
+    expect(calls[499]).toMatchObject({ args: ['499'] });
+    expect(calls[500]).toEqual({ need: 'android', dropped: 'the calls past the first 500 not recorded' });
+  });
+
+  it('a need named by no plain path segment is the batch\'s mistake: thrown before anything', async () => {
+    await expect(go([plain('a', { needs: ['a/b'] })], { needs: { 'a/b': needs.android } })).rejects.toThrow('need "a/b": one plain path segment is needed');
+    expect(seam.calls).toEqual([]);
+  });
+});
+
 // ------------------------------------------------------------------------------------------------ the backstop
 
 describe('the backstop: a wanted block with no verdict line of its label gets one (batch-10/11; b11-dry d43-backupfail, noandroid)', () => {

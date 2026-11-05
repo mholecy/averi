@@ -1,10 +1,12 @@
 import { homedir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { CallResult } from './bounded.js';
 import { incompleteLine, type Asked } from './cases.js';
 import { DEFAULT_GROUPS } from './live-table.js';
 import { shortSha, type CheckoutPrecondition } from './preconditions.js';
-import { firstLineOf, nameInLine, refusedLine, verdictLine } from './words.js';
+import { canonicalJson } from './records.js';
+import { failedCall, firstLineOf, nameInLine, refusedLine, verdictLine } from './words.js';
 
 /**
  * The runner's pure half (runner.ts holds the calls and the files): its config read from argv and env, the lines it
@@ -111,6 +113,46 @@ export function labLine(need: string, r: NeedResult): string {
 /** A block not run for its failed needs: `<label>: INCONCLUSIVE — <need>: <why>; …`, in the block's order. */
 export const needsLine = (label: string, failed: readonly { need: string; why: string }[]): string =>
   verdictLine(label, 'INCONCLUSIVE', failed.map((f) => `${f.need}: ${firstLineOf(f.why)}`).join('; '));
+
+/** How many calls of one need are recorded (T2b): past it, one line says the rest were not. */
+export const NEED_CALLS_MAX = 500;
+/** How much of an argument, or of a failed call's first line, a recorded call keeps, in code points, before `…`. */
+export const NEED_CALL_CHARS = 200;
+
+/** One call a need's check, alive or end made (runner.ts records each), with what it answered. */
+export interface NeedCall {
+  need: string;
+  phase: 'check' | 'alive' | 'end';
+  /** Its time of day (words.ts#timeOf), as the steps say it. */
+  at: string;
+  cmd: string;
+  args: readonly string[];
+  secs?: number;
+  result: CallResult;
+}
+
+/** A need's calls' file in the lab folder: `<need>-calls.jsonl`, appended, never overwritten. */
+export const needCallsFile = (labDir: string, need: string): string => join(labDir, `${need}-calls.jsonl`);
+
+const cut = (text: string): string => {
+  const c = [...text];
+  return c.length > NEED_CALL_CHARS ? `${c.slice(0, NEED_CALL_CHARS).join('')}…` : text;
+};
+
+/**
+ * One call as its line (T2b, batch-13 gap 6: batch-13 wrapped the ios need's calls itself to see why a reset failed):
+ * one JSON object, its fields sorted — the need, the phase, the time, the command's base name, its args, its bound, its
+ * exit — and, for a call that failed, its first line (stderr's before stdout's), no more of its output than a step line
+ * says; no env. Each argument and that line cut at NEED_CALL_CHARS.
+ */
+export function needCallLine(c: NeedCall): string {
+  const { result: r } = c;
+  const said = failedCall(r) ? { said: cut(firstLineOf(r.err + r.out)) } : {};
+  return `${canonicalJson({ need: c.need, phase: c.phase, at: c.at, cmd: basename(c.cmd), args: c.args.map(cut), secs: c.secs, code: r.code, timedOut: r.timedOut, ...said })}\n`;
+}
+
+/** The line after NEED_CALLS_MAX calls of a need: the rest are not recorded. */
+export const needCallsCutLine = (need: string): string => `${canonicalJson({ need, dropped: `the calls past the first ${NEED_CALLS_MAX} not recorded` })}\n`;
 
 /** The backstop's words for a block that asked nothing and wrote no verdict line (batch-11.sh:689–696). */
 export const NOT_RUN = 'not run (see the ERROR lines)';

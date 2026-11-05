@@ -7,7 +7,7 @@ import { liveTableOf, type LiveSelection, type LiveTable } from './live-table.js
 import { ancestor, casesOnMain, cellsOnMain, checkout, preconditionLine, type Git, type Precondition } from './preconditions.js';
 import { nodeProcess, type ProcessSeam } from './proc.js';
 import { canonicalJson, recordGapIn, recordsIn, writeAsked, writeDone, type BlockRecord } from './records.js';
-import { blockName, layoutOf, META, newRunId, openRun, refusalLines, refusals, type Stateful } from './run-dir.js';
+import { blockName, layoutOf, META, newRunId, openRun, plainSegment, refusalLines, refusals, type Stateful } from './run-dir.js';
 import {
   backstopLine,
   checkoutLine,
@@ -22,6 +22,10 @@ import {
   liveCalls,
   liveStepText,
   NOT_READ_CHECKOUT,
+  NEED_CALLS_MAX,
+  needCallLine,
+  needCallsCutLine,
+  needCallsFile,
   needsLine,
   rejudgeArgs,
   linesIn,
@@ -32,11 +36,12 @@ import {
   type ConfigRead,
   type DetailSpec,
   type LiveBounds,
+  type NeedCall,
   type NeedResult,
 } from './runner-lines.js';
 import { knobs as readKnobs, selectBlocks, type KnobSpec, type KnobValues } from './select.js';
 import { StepLog, terminalOf, type Terminal } from './steps.js';
-import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, verdictLine, type StepWord, type Verdict } from './words.js';
+import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, summaryLines, timeOf, verdictLine, type StepWord, type Verdict } from './words.js';
 
 /**
  * runBatch: a device batch's run, start to end, composed of the module's parts — a batch, kept outside the repo, gives
@@ -96,7 +101,10 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
 /** A need a block names: the lab devices (`ios`, `android`), or any other the batch gives a check for. */
 export type Need = 'ios' | 'android' | (string & {});
 
-/** What a need's check gets: bounded calls, the lab folder, the config, the run's fs, the steps. */
+/**
+ * What a need's check gets: bounded calls — each recorded in the lab folder's `<need>-calls.jsonl` (T2b, batch-13 gap 6;
+ * runner-lines.ts#needCallLine) — the lab folder, the config, the run's fs, the steps.
+ */
 export interface NeedCtx {
   bounded: Run;
   labDir: string;
@@ -264,8 +272,12 @@ function assertLabel(label: string): void {
   verdictLine(label, 'INCONCLUSIVE');
 }
 
-/** The batch's own mistakes, thrown before anything is done: a block's name, its label, a need without a check. */
+/**
+ * The batch's own mistakes, thrown before anything is done: a block's name, its label, a need without a check, a need's
+ * name that is no plain path segment (its calls' file is named by it).
+ */
 function assertBlocks(blocks: readonly Block<never>[], needs: Readonly<Record<string, NeedSpec>>): void {
+  for (const n of Object.keys(needs)) plainSegment('need', n);
   const ids = blocks.map((b) => b.id);
   for (const b of blocks) {
     blockName(b.id);
@@ -318,6 +330,9 @@ class BatchRun<K> {
   private readonly needResults = new Map<string, NeedResult>();
   /** Whether any wanted block ran: none, and the exit is 2. */
   private anyRan = false;
+  /** How many calls of each need were recorded so far, and the needs whose record could not be written (noted once). */
+  private readonly needCalls = new Map<string, number>();
+  private readonly unrecorded = new Set<string>();
   /** The blocks whose run returned: a `noRecords` block is complete only then. */
   private readonly finished = new Set<string>();
   private checkout: string | undefined;
@@ -470,7 +485,7 @@ class BatchRun<K> {
     const { check, alive = check } = typeof spec === 'function' ? { check: spec } : spec;
     const known = this.needResults.get(need);
     if (known !== undefined && !known.ok) return known;
-    const r = await this.asked(need, known === undefined ? check : alive);
+    const r = await (known === undefined ? this.asked(need, check, 'check') : this.asked(need, alive, 'alive'));
     if (this.guard.interrupted) {
       this.log.step('NOTE', `LAB ${need}: its answer after the interrupt not kept: ${r.ok ? r.how : r.why}`);
       return r;
@@ -484,9 +499,9 @@ class BatchRun<K> {
   }
 
   /** A need's check run: its answer, or, when it throws, a failed one (an ERROR line, unless the abort has begun). */
-  private async asked(need: string, check: NeedCheck): Promise<NeedResult> {
+  private async asked(need: string, check: NeedCheck, phase: 'check' | 'alive'): Promise<NeedResult> {
     try {
-      return await check(this.needCtx());
+      return await check(this.needCtx(need, phase));
     } catch (e) {
       const why = `its check threw: ${firstLineOf(messageOf(e))}`;
       if (!this.guard.interrupted) this.log.error(`LAB ${need}: ${why}`);
@@ -512,7 +527,7 @@ class BatchRun<K> {
       this.log.step('NOTE', `LAB ${need}: a protected-key line after its end's bound not kept: ${l}`);
     };
     try {
-      const r = await within(secs, end({ ...this.needCtx(), protectedLine }));
+      const r = await within(secs, end({ ...this.needCtx(need, 'end'), protectedLine }));
       if (r.late) this.log.error(`LAB ${need}: its end did not finish within ${secs} s (a protected-key line it writes later is not kept)`);
     } catch (e) {
       this.log.error(`LAB ${need}: its end threw: ${firstLineOf(messageOf(e))}`);
@@ -521,9 +536,28 @@ class BatchRun<K> {
     }
   }
 
-  /** What a need's check and end get. */
-  private needCtx(): NeedCtx {
-    return { bounded: this.guard.bounded, labDir: this.dirs[LAB], config: this.config, fs: this.io.fs, step: (w, t) => this.log.step(w, t) };
+  /** What a need's check, alive and end get: each bounded call recorded, `phase` its part. */
+  private needCtx(need: string, phase: NeedCall['phase']): NeedCtx {
+    const bounded: Run = async (cmd, args, call = {}) => {
+      const result = await this.guard.bounded(cmd, args, call);
+      this.recordCall({ need, phase, at: timeOf(this.io.clock()), cmd, args, secs: call.secs, result });
+      return result;
+    };
+    return { bounded, labDir: this.dirs[LAB], config: this.config, fs: this.io.fs, step: (w, t) => this.log.step(w, t) };
+  }
+
+  /** A need's call appended to its file — up to NEED_CALLS_MAX, then one line saying so; a write that fails, one NOTE. */
+  private recordCall(c: NeedCall): void {
+    const n = (this.needCalls.get(c.need) ?? 0) + 1;
+    this.needCalls.set(c.need, n);
+    if (n > NEED_CALLS_MAX + 1) return;
+    try {
+      this.io.fs.append(needCallsFile(this.dirs[LAB], c.need), n > NEED_CALLS_MAX ? needCallsCutLine(c.need) : needCallLine(c));
+    } catch (e) {
+      if (this.unrecorded.has(c.need)) return;
+      this.unrecorded.add(c.need);
+      this.log.step('NOTE', `LAB ${c.need}: its calls not recorded (${firstLineOf(messageOf(e))})`);
+    }
   }
 
   /** A protected-key line kept for the SUMMARY — one line; once interrupted only noted, never in the abort SUMMARY. */
