@@ -114,7 +114,7 @@ averi can only select what the accessibility tree exposes. Give new screens test
 
 ## Requirements
 
-Node 20+. **Android**: `adb` + a running emulator (macOS/Linux/Windows). **iOS**: macOS with Xcode, a booted simulator, and `idb` — Apple ships simulators only with Xcode. The opt-in `app.ios.treeSource: wda` reads the tree through WebDriverAgent, which averi builds with `xcodebuild` from the `appium-webdriveragent` package — an optional dependency installed with averi (`npx` included); if that optional install was skipped or failed (e.g. `--omit=optional`), `treeSource: wda` fails with a message naming the package. Exact install commands and checks: [SETUP.md, step 0](SETUP.md#step-0--prerequisites).
+Node 20.17+. **Android**: `adb` + a running emulator (macOS/Linux/Windows). **iOS**: macOS with Xcode, a booted simulator, and `idb` — Apple ships simulators only with Xcode. The opt-in `app.ios.treeSource: wda` reads the tree through WebDriverAgent, which averi builds with `xcodebuild` from the `appium-webdriveragent` package — an optional dependency installed with averi (`npx` included); if that optional install was skipped or failed (e.g. `--omit=optional`), `treeSource: wda` fails with a message naming the package. Exact install commands and checks: [SETUP.md, step 0](SETUP.md#step-0--prerequisites).
 
 On a Linux/Windows box you get the full Android toolset — pass `platforms: ["android"]` to `verify` (its default runs both platforms; iOS tools error only when called). OCR-backed checks use the macOS Vision framework: elsewhere `ocr` asserts fail closed and the text/type-size parity tables compare from the accessibility tree instead. Windows is untested — reports welcome.
 

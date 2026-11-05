@@ -19,7 +19,7 @@ PowerShell equivalents (note `curl` there is an alias for `Invoke-WebRequest` â€
 
 ## Step 0 â€” Prerequisites
 
-averi needs Node 20+ and the platform tools for whichever platforms the project targets.
+averi needs Node 20.17+ and the platform tools for whichever platforms the project targets.
 Ask the user which platforms they need if the repo doesn't make it obvious.
 
 **Android** (macOS/Linux/Windows):
