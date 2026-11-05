@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
-import { join, matchesGlob } from 'node:path';
+import * as nodePath from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../is-main.js';
 import {
@@ -83,14 +84,26 @@ const OPTIONS = {
 type Option = keyof typeof OPTIONS;
 const isOption = (arg: string): arg is Option => Object.hasOwn(OPTIONS, arg);
 
+/** A glob matcher: node's `path.matchesGlob`, absent before node 20.17 (the package's engines say >=20). */
+export type GlobMatch = (path: string, glob: string) => boolean;
+const nodeGlob = (nodePath as { matchesGlob?: GlobMatch }).matchesGlob;
+/** What makes a `--mutate` pattern a glob rather than a path. */
+const GLOB_CHARS = /[*?[\]{}!]/;
+
 /**
  * The groups a run starts, in order, each with its Stryker arguments; or a refusal. `--group <name>` picks one group
  * (none: all, in GROUPS' order) and is not passed on. `--tempDirName <name>` becomes `<name>-<group>`, each group its
  * own sandbox. Without `--group`, each `--mutate` pattern (a path or a glob, a Stryker range after a path kept) is
  * matched against scope.json's modules, and each group gets the modules it matched there (a glob as their paths); only
- * the groups matched run, and a pattern matching none is a refusal. With `--group`, `--mutate` is passed on as given. Pure.
+ * the groups matched run, and a pattern matching none is a refusal. A path is looked up as a scope.json key first; a
+ * pattern with glob characters needs `glob` (node's path.matchesGlob, 20.17 and later), refused without it (null). With
+ * `--group`, `--mutate` is passed on as given. Pure.
  */
-export function planRuns(args: readonly string[], scope: Scope): { runs: GroupRun[] } | { refusal: string } {
+export function planRuns(
+  args: readonly string[],
+  scope: Scope,
+  glob: GlobMatch | null = nodeGlob ?? null,
+): { runs: GroupRun[] } | { refusal: string } {
   const refuse = (why: string) => ({ refusal: `npm run mutate: ${why}` });
   const given: { group?: string; tempDir?: string; mutate?: string } = {};
   const rest: string[] = [];
@@ -118,7 +131,11 @@ export function planRuns(args: readonly string[], scope: Scope): { runs: GroupRu
   const byGroup = new Map<Group, string[]>();
   for (const pattern of mutate.split(',')) {
     const path = pattern.replace(/:\d.*$/s, '');
-    const matched = Object.entries(scope).filter(([file]) => matchesGlob(file, path));
+    const isGlob = !(path in scope) && GLOB_CHARS.test(path);
+    if (isGlob && glob === null) {
+      return refuse(`--mutate ${pattern}: a glob needs Node 20.17 or later (path.matchesGlob); give scripts/mutation/scope.json paths, or --group`);
+    }
+    const matched = Object.entries(scope).filter(([file]) => (isGlob && glob !== null ? glob(file, path) : file === path));
     if (matched.length === 0) return refuse(`--mutate ${pattern}: matches no scripts/mutation/scope.json module (give --group to mutate it)`);
     // A path keeps its range; a glob becomes the modules it matched, each to its own group (never the glob: in the other
     // group it would mutate modules whose tests that group does not run).

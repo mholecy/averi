@@ -1402,8 +1402,9 @@ group starts (exit 130). `--force` passes through; `--tempDirName <name>` become
 path kept), against scope.json's modules and gives each group the modules it matched there — a path with its range, a
 glob as the paths it matched, never the glob itself, which in the other group would mutate modules whose tests that
 group does not run — running only the groups matched; a pattern matching no module is a refusal (exit 2, nothing
-started); with `--group` it is passed on as given. `path.matchesGlob` is in node from 20.17, so package.json's `engines`
-is now `>=20.17` (README and SETUP say Node 20.17+).
+started); with `--group` it is passed on as given. `path.matchesGlob` is in node from 20.17 only, and a dev tool does
+not raise the published package's `engines` (`>=20`): a pattern is looked up as a scope.json key first, and only one
+with glob characters needs it — on an older node that one is refused, naming Node 20.17, while exact paths still work.
 
 So the loop's command, `npm run mutate -- --force --tempDirName .stryker-tmp-<n>`, still runs everything, cold. A merge
 may instead run `npm run mutate -- --group core --force` and `-- --group lab --force` as two commands, both required.
@@ -1422,8 +1423,9 @@ starting nothing; spawnBounded over node: the exit and env, a bound killing a gr
 and SIGTERM passed on and their listeners removed). 39 hand mutants, each from a .bak copy and bounded: all killed;
 review round 1 and the code review (glob routing, one group vocabulary — isGroup, GROUP_WORDS, filesOf, one ScopeEntry
 type —, planRuns' option table, an injected signal source, main's rejection a message and exit 1) 25 more: all killed,
-one only after a test was added (`-m=<file>`); review round 2 (a glob's matched modules per group) 2 more: both killed.
-The guard's exception, said exactly: lab's tests may kill core mutants (in main's single run lab-batch.test.ts was the
-first killer of some), but core's own tests must suffice for core's floors; a narrower include can only lower a score, a
-loud floor failure, never a false pass. Every module's score and mutant count is the same as in T2b-1's final single
-run; floors unchanged.
+one only after a test was added (`-m=<file>`); review round 2 (a glob's matched modules per group; exact keys first, a
+glob refused without path.matchesGlob) 9 more: all killed, one only after a test was added (a scope key with glob
+characters, looked up as itself). The guard's exception, said exactly: lab's tests may kill core mutants (in main's
+single run lab-batch.test.ts was the first killer of some), but core's own tests must suffice for core's floors; a
+narrower include can only lower a score, a loud floor failure, never a false pass. Every module's score and mutant count
+is the same as in T2b-1's final single run; floors unchanged.

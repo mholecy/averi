@@ -122,6 +122,28 @@ describe('planRuns — which groups run, each with its Stryker arguments (T2b-2)
     });
   });
 
+  it('--mutate without --group on a node without path.matchesGlob (before 20.17): exact paths work, a glob is refused', () => {
+    expect(planRuns(['--mutate', 'src/a.ts,scripts/truth/batch/lab-x.ts:3-9'], two, null)).toEqual({
+      runs: [
+        { group: 'core', args: ['--mutate', 'src/a.ts'] },
+        { group: 'lab', args: ['--mutate', 'scripts/truth/batch/lab-x.ts:3-9'] },
+      ],
+    });
+    for (const glob of ['src/*.ts', 'src/a.t?', 'src/[ab].ts', 'src/**']) {
+      expect(planRuns(['--mutate', glob], two, null)).toEqual({
+        refusal: `npm run mutate: --mutate ${glob}: a glob needs Node 20.17 or later (path.matchesGlob); give scripts/mutation/scope.json paths, or --group`,
+      });
+    }
+    // A scope.json key is looked up as itself first, glob characters and all (one a glob would not match).
+    const bracketed: Scope = { ...two, 'src/[id].ts': { tests: ['tests/id.test.ts'], floor: 90, baseline: '', group: 'core' } };
+    for (const glob of [null, undefined]) {
+      expect(planRuns(['--mutate', 'src/[id].ts'], bracketed, glob)).toEqual({ runs: [{ group: 'core', args: ['--mutate', 'src/[id].ts'] }] });
+    }
+    expect(planRuns(['--mutate', 'src/zz.ts'], two, null)).toEqual({
+      refusal: 'npm run mutate: --mutate src/zz.ts: matches no scripts/mutation/scope.json module (give --group to mutate it)',
+    });
+  });
+
   it('--mutate without --group: a pattern matching no scope entry, or no file, is a refusal', () => {
     expect(planRuns(['--mutate', 'src/a.ts,src/zz/*.ts'], two)).toEqual({
       refusal: 'npm run mutate: --mutate src/zz/*.ts: matches no scripts/mutation/scope.json module (give --group to mutate it)',

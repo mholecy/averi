@@ -32,7 +32,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=20.17"
+    "node": ">=20"
   },
   "scripts": {
     "prepublishOnly": "npm test && npm run build",
