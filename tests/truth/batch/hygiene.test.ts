@@ -52,8 +52,9 @@ const FORBIDDEN: readonly { what: string; re: RegExp }[] = [
   { what: 'a mounted volume', re: new RegExp(`${slash}Volumes${slash}`) },
   { what: "this machine's home directory", re: new RegExp(escaped(homedir())) },
   { what: "the user's home as ~user/", re: new RegExp(`~${escaped(user)}${slash}`) },
-  // A device's id (T2 S4: the D43 exports held the lab simulator's): fixtures name a placeholder, code takes it from args.
-  { what: 'a device udid', re: new RegExp(['[0-9A-F]{8}', '[0-9A-F]{4}', '[0-9A-F]{4}', '[0-9A-F]{4}', '[0-9A-F]{12}'].join('-'), 'i') },
+  // Any UUID, not only a device's (T2 S4: the D43 exports held the lab simulator's udid and an index id): a device id
+  // comes from args, and a fixture names a placeholder for any id of this shape.
+  { what: 'a UUID (a device udid or any other id)', re: new RegExp(['[0-9A-F]{8}', '[0-9A-F]{4}', '[0-9A-F]{4}', '[0-9A-F]{4}', '[0-9A-F]{12}'].join('-'), 'i') },
   ...(owner === undefined ? [] : [{ what: "the owner's name (git config user.name)", re: new RegExp(escaped(owner), 'i') }]),
 ];
 
@@ -85,7 +86,7 @@ describe("path hygiene: the batch module's directories hold no machine- or sessi
     expect(caught(`${slash}Volumes${slash}Disk`)).toContain('a mounted volume');
     expect(caught(`${homedir()}${slash}x`)).toContain("this machine's home directory");
     expect(caught(`~${user}${slash}y`)).toContain("the user's home as ~user/");
-    expect(caught(['ABCDEF01', '2345', '6789', 'abcd', 'EF0123456789'].join('-'))).toContain('a device udid');
+    expect(caught(['ABCDEF01', '2345', '6789', 'abcd', 'EF0123456789'].join('-'))).toContain('a UUID (a device udid or any other id)');
     expect(caught('LAB-SIMULATOR-UDID, AN-INDEX-UUID')).toEqual([]);
     expect(caught(`an ${user} or ~${user}`)).toEqual([]);
     expect(caught('a relative path: meta/run-1/batch-n.out, or src/tmp/x')).toEqual([]);

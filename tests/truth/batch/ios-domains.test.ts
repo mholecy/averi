@@ -234,19 +234,21 @@ describe('restoreDomain — decideRestore driven to its end (d43-gate.ts:722)', 
   });
 });
 
-describe('defaultsArgv — the only `defaults` builder; the schemeapproval domain read only (batch-11, b11-dry shims/xcrun:21, :26)', () => {
+describe('defaultsArgv — the only `defaults` builder; only the three domains written, the schemeapproval domain read only (batch-11, b11-dry shims/xcrun:21, :26; T2 S4 review round 1: an allowlist)', () => {
   const UDID = 'LAB-SIMULATOR-UDID';
+  const refused = (verb: string, domain: string) => `defaults ${verb} ${JSON.stringify(domain)}: refused — only ${DOMAINS.join(', ')} are exported or written, each by its exact name; ${PROTECTED.domain} is read only`;
 
-  it('builds `simctl spawn <udid> defaults <args>` for every verb the module runs', () => {
+  it('builds `simctl spawn <udid> defaults <args>` for every verb the module runs, on each of the three domains', () => {
     expect(defaultsArgv(UDID, ['export', A11Y, '/o/x.plist'])).toEqual(['simctl', 'spawn', UDID, 'defaults', 'export', A11Y, '/o/x.plist']);
-    for (const verb of ['read', 'write', 'delete', 'import']) expect(defaultsArgv(UDID, [verb, A11Y, 'k'])[4]).toBe(verb);
+    for (const d of DOMAINS) for (const verb of ['read', 'export', 'write', 'delete', 'import']) expect(defaultsArgv(UDID, [verb, d, 'k'])[4]).toBe(verb);
+    expect(defaultsArgv(UDID, ['delete', A11Y])).toEqual(['simctl', 'spawn', UDID, 'defaults', 'delete', A11Y]);
   });
 
-  it('a read of the finportal key is allowed: it is how the key is watched', () => {
+  it('a read of the finportal key is allowed — a read of any domain is: it is how the key is watched', () => {
     expect(defaultsArgv(UDID, ['read', PROTECTED.domain, PROTECTED.key])).toEqual(['simctl', 'spawn', UDID, 'defaults', 'read', PROTECTED.domain, PROTECTED.key]);
   });
 
-  it('write, delete, import and rename on the schemeapproval domain all throw — any key, not only finportal\'s (batch-11: the domain never written)', () => {
+  it("write, delete, import and export on the schemeapproval domain all throw — any key, not only finportal's; rename throws always", () => {
     for (const args of [
       ['write', PROTECTED.domain, PROTECTED.key, '-string', 'x'],
       ['write', PROTECTED.domain, 'another-key', '-bool', 'true'],
@@ -255,20 +257,25 @@ describe('defaultsArgv — the only `defaults` builder; the schemeapproval domai
       ['import', PROTECTED.domain, '/o/x.plist'],
       ['export', PROTECTED.domain, '/o/x.plist'],
     ]) {
-      expect(() => defaultsArgv(UDID, args), args.join(' ')).toThrow(`on ${PROTECTED.domain}: refused — no batch writes that domain (read only)`);
+      expect(() => defaultsArgv(UDID, args), args.join(' ')).toThrow(refused(args[0], PROTECTED.domain));
     }
     expect(() => defaultsArgv(UDID, ['rename', PROTECTED.domain, 'a', 'b'])).toThrow('not a verb this module runs');
+    expect(() => defaultsArgv(UDID, ['rename', A11Y, 'a', 'b'])).toThrow('defaults "rename": not a verb this module runs');
   });
 
-  it('nor sneaked in: another case, a plist path for the domain, the domain as a later argument', () => {
-    expect(() => defaultsArgv(UDID, ['write', 'com.apple.LaunchServices.SchemeApproval', 'k', '-int', '1'])).toThrow('refused');
-    expect(() => defaultsArgv(UDID, ['import', `/Library/Preferences/${PROTECTED.domain}.plist`, '/o/x'])).toThrow('refused');
-    expect(() => defaultsArgv(UDID, ['import', A11Y, `/o/${PROTECTED.domain}.plist`])).toThrow('refused');
+  it('nor sneaked in: another case, a long s, a plist path, a domain a prefix of another, no domain — only the exact names pass', () => {
+    for (const domain of ['com.apple.LaunchServices.SchemeApproval', 'com.apple.launch\u017fervices.schemeapproval', `/Library/Preferences/${PROTECTED.domain}.plist`, `/Library/Preferences/${A11Y}.plist`, 'com.apple.accessibility', `${A11Y}.extra`, ' com.apple.Accessibility', '']) {
+      expect(() => defaultsArgv(UDID, ['write', domain, 'k', '-int', '1']), domain).toThrow(refused('write', domain));
+    }
+    expect(() => defaultsArgv(UDID, ['import'])).toThrow(refused('import', ''));
+  });
+
+  it('a backup path is no domain: an import into one of the three may read any file', () => {
+    expect(defaultsArgv(UDID, ['import', A11Y, `/o/${PROTECTED.domain}.plist`])[5]).toBe(A11Y);
   });
 
   it('a verb it does not run, an option first, or no verb: thrown', () => {
     expect(() => defaultsArgv(UDID, ['-currentHost', 'write', A11Y, 'k', '-int', '1'])).toThrow('defaults "-currentHost": not a verb this module runs (read, export, write, delete, import)');
-    expect(() => defaultsArgv(UDID, ['rename', A11Y, 'a', 'b'])).toThrow('defaults "rename"');
     expect(() => defaultsArgv(UDID, [])).toThrow('defaults "": not a verb');
   });
 });
@@ -341,8 +348,9 @@ describe('the typed read and the state file, read strictly (sim-domains.ts revie
     }
   });
 
-  it('stateIn: d43-gate.ts\'s state shape, its domains the window\'s three only (T2 S4: a forged state names no other), or why not', () => {
-    const ok = { dirty: true, udid: 'U', port: 8120, domains: [{ name: A11Y, backup: '/b' }, { name: 'com.apple.Preferences', backup: null }] };
+  it("stateIn: d43-gate.ts's state shape, its domains the window's three, each once (T2 S4 review round 1: none, one missing, a duplicate or another refused whole), or why not", () => {
+    const three = [{ name: A11Y, backup: '/b' }, { name: 'com.apple.Preferences', backup: null }, { name: 'com.apple.keyboard.preferences', backup: '/k' }];
+    const ok = { dirty: true, udid: 'U', port: 8120, domains: three };
     expect(stateIn(JSON.stringify(ok))).toEqual(ok);
     expect(stateIn(undefined)).toBe('it cannot be read');
     expect(stateIn('{')).toBe('it is no JSON');
@@ -352,6 +360,13 @@ describe('the typed read and the state file, read strictly (sim-domains.ts revie
     for (const d of [null, { backup: null }, { name: 'x' }, { name: 'x', backup: 1 }]) {
       expect(stateIn(JSON.stringify({ dirty: true, udid: 'U', domains: [d] })), JSON.stringify(d)).toBe('a domain in it has no name or backup');
     }
-    expect(stateIn(JSON.stringify({ dirty: true, udid: 'U', domains: [{ name: PROTECTED.domain, backup: null }] }))).toBe(`it names ${PROTECTED.domain}, not one of ${DOMAINS.join(', ')}`);
+    const names = (domains: { name: string; backup: string | null }[]) => stateIn(JSON.stringify({ dirty: true, udid: 'U', domains }));
+    const want = `not the window's ${DOMAINS.join(', ')}, each once`;
+    expect(names([])).toBe(`it names no domain, ${want}`);
+    expect(names(three.slice(0, 2))).toBe(`it names ${A11Y}, com.apple.Preferences, ${want}`);
+    expect(names([...three, three[0]])).toBe(`it names ${A11Y}, com.apple.Preferences, com.apple.keyboard.preferences, ${A11Y}, ${want}`);
+    expect(names([three[0], three[1], three[0]])).toBe(`it names ${A11Y}, com.apple.Preferences, ${A11Y}, ${want}`);
+    expect(names([three[0], three[1], { name: PROTECTED.domain, backup: null }])).toBe(`it names ${A11Y}, com.apple.Preferences, ${PROTECTED.domain}, ${want}`);
+    expect(names([three[0], three[1], { name: 'a\nb', backup: null }])).toBe(`it names ${A11Y}, com.apple.Preferences, "a\\nb", ${want}`);
   });
 });

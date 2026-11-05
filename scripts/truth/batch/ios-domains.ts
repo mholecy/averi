@@ -25,8 +25,8 @@ import { firstLineOf, messageOf, nameInLine, stepLine, verdictLine } from './wor
  * unread is never unchanged.
  *
  * Every call goes to the lab simulator only: a `LabSim` is had only through lab-device.ts's guard (its udid listed as
- * `averi-lab …`, never device-check's), and every `defaults` argv is built by `defaultsArgv`, which refuses any verb
- * but a read on the schemeapproval domain. Nothing here names a port. Files go through io.ts and are never
+ * `averi-lab …`, never device-check's), and every `defaults` argv is built by `defaultsArgv`, which lets anything but
+ * a read name only the window's three domains, by their exact names: the schemeapproval domain is only ever read. Nothing here names a port. Files go through io.ts and are never
  * overwritten: each read of a domain is a fresh file beside the state file, kept as evidence.
  *
  * What S6 adds around it: the WDA kill and the 4 s wait before the restore, the steps, the SUMMARY assembly.
@@ -96,21 +96,22 @@ export const differText = (d: readonly KeyDiff[]): string => d.map((x) => `${x.k
 
 /** The verbs this module runs `defaults` with. */
 const VERBS: ReadonlySet<string> = new Set(['read', 'export', 'write', 'delete', 'import']);
-/** What may touch the schemeapproval domain: a read, nothing else. */
-const PROTECTED_VERBS: ReadonlySet<string> = new Set(['read']);
-const PROTECTED_LOWER = PROTECTED.domain.toLowerCase();
+/** The only domains anything but a read may name: the window's three, each by its exact name. */
+const WRITTEN: ReadonlySet<string> = new Set(DOMAINS);
 
 /**
  * The argv of `xcrun simctl spawn <udid> defaults <args>` — the only place this module builds one. It throws for a
- * verb it does not run (rename, an option first), and for any verb but a read that names the schemeapproval domain
- * anywhere in its arguments, in any case, as a domain or inside a path: the batches no longer write that domain at
- * all; a future need for it is a new decision, not a new call.
+ * verb it does not run (rename, an option first), and for any verb but a read whose domain is not exactly one of the
+ * window's three (an allowlist: another case, a long s, a plist path, a prefix — refused alike). A read may name any
+ * domain: it is how the schemeapproval key is watched. The batches no longer write that domain at all; a future need
+ * for it is a new decision, not a new call.
  */
 export function defaultsArgv(udid: string, args: readonly string[]): string[] {
   const verb = args[0] ?? '';
   if (!VERBS.has(verb)) throw new Error(`defaults ${JSON.stringify(verb)}: not a verb this module runs (${[...VERBS].join(', ')})`);
-  if (!PROTECTED_VERBS.has(verb) && args.some((a) => a.toLowerCase().includes(PROTECTED_LOWER))) {
-    throw new Error(`defaults ${verb} on ${PROTECTED.domain}: refused — no batch writes that domain (read only)`);
+  const domain = args[1] ?? '';
+  if (verb !== 'read' && !WRITTEN.has(domain)) {
+    throw new Error(`defaults ${verb} ${JSON.stringify(domain)}: refused — only ${DOMAINS.join(', ')} are exported or written, each by its exact name; ${PROTECTED.domain} is read only`);
   }
   return ['simctl', 'spawn', udid, 'defaults', ...args];
 }
@@ -374,11 +375,17 @@ async function backupOf(sim: LabSim, d: DomainsState['domains'][number]): Promis
   return 'why' in read ? { why: `its backup: ${read.why}` } : read;
 }
 
+/** A regex's text for `s` taken literally. */
+const literal = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** defaults' words for a domain that does not exist (`Domain <domain> does not exist`), naming this domain only. */
+const domainMissing = (domain: string): RegExp => new RegExp(`\\bDomain ${literal(domain)} does not exist`);
+
 /** Export a domain to `path` and read it typed: its map (null: the domain does not exist), or why not. */
 async function readDomain(sim: LabSim, domain: string, path: string): Promise<{ map: DomainMap } | { why: string }> {
   const r = await sim.defaults(['export', domain, path]);
   if (r.code === 0 && sim.fs.exists(path)) return typedOf(sim, path);
-  if (r.code !== 0 && !r.timedOut && /does not exist/i.test(r.err + r.out)) return { map: null };
+  if (r.code !== 0 && !r.timedOut && domainMissing(domain).test(r.err + r.out)) return { map: null };
   return { why: `defaults export ${domain}: ${r.code === 0 ? 'exit 0 but no file written' : exitText(r)}` };
 }
 
@@ -425,8 +432,12 @@ export function stateIn(text: string | undefined): DomainsState | string {
   for (const d of st.domains as unknown[]) {
     const x = d as { name?: unknown; backup?: unknown } | null;
     if (x === null || typeof x.name !== 'string' || (x.backup !== null && typeof x.backup !== 'string')) return 'a domain in it has no name or backup';
-    // Only the window's own domains are ever put back: a state naming another (the schemeapproval one) is refused whole.
-    if (!(DOMAINS as readonly string[]).includes(x.name)) return `it names ${nameInLine(x.name)}, not one of ${DOMAINS.join(', ')}`;
+  }
+  // The window's three domains, each once, or the state is refused whole: none (a restore would prove nothing), one
+  // missing (it would go unchecked), twice, or another domain (the schemeapproval one, which is never written).
+  const names = (st.domains as { name: string }[]).map((d) => d.name);
+  if (names.length !== DOMAINS.length || DOMAINS.some((d) => !names.includes(d))) {
+    return `it names ${names.length === 0 ? 'no domain' : names.map(nameInLine).join(', ')}, not the window's ${DOMAINS.join(', ')}, each once`;
   }
   return st as DomainsState;
 }
@@ -563,28 +574,52 @@ async function restoreOne(sim: LabSim, stateFile: string, d: DomainsState['domai
 
 // ------------------------------------------------------------------------------------------------- compare
 
-/** A domain after the window's end against its backup: unchanged, changed (its keys), or unread (why) — never OK. */
-export type Compared = { name: string; outcome: 'unchanged' } | { name: string; outcome: 'changed'; differ: KeyDiff[]; hand: string[] } | { name: string; outcome: 'unread'; why: string };
+/** The compare's verdict label (batch-11's `D43 WDA-window compare:` line). */
+export const COMPARE_LABEL = 'D43 WDA-window compare';
+/** How much of a value a compare line shows, before `…`: the line stays short whatever a key holds. */
+export const COMPARE_VALUE_CHARS = 60;
+
+/**
+ * A domain after the window's end against its backup: unchanged; changed (its keys, each `<key> <before> → <after>`,
+ * and the hand commands); or unread, with why — never unchanged.
+ */
+export type Compared =
+  | { name: string; outcome: 'unchanged' }
+  | { name: string; outcome: 'changed'; differ: KeyDiff[]; changes: string[]; hand: string[] }
+  | { name: string; outcome: 'unread'; why: string };
 
 export interface Comparison {
   domains: Compared[];
-  /** `OK   D43 compare: …` when every domain is unchanged; else a WARN naming each changed or unread one. */
+  /** `D43 WDA-window compare: OK — …` when every domain is unchanged; else WARN naming each changed or unread one. */
   line: string;
-  /** The late writer's RESTORE lines (LATE_HAND): none when every domain is unchanged. */
+  /** The late writer's RESTORE lines (LATE_HAND): none when every domain is unchanged, or nothing was compared. */
   hand: string[];
 }
 
+/** A typed value as a compare line shows it: `<type> <canonical value>`, one line, cut at COMPARE_VALUE_CHARS; absent. */
+function shownValue(kv: KeyVal | undefined): string {
+  if (kv === undefined) return 'absent';
+  const c = nameInLine(kv.c);
+  return `${kv.t} ${c.length > COMPARE_VALUE_CHARS ? `${c.slice(0, COMPARE_VALUE_CHARS)}…` : c}`;
+}
+
+/** Nothing compared, and why: every domain unread, the line a WARN, no hand line, the state file left as it is. */
+function notCompared(why: string): Comparison {
+  const said = `not compared: ${why}`;
+  return { domains: DOMAINS.map((name) => ({ name, outcome: 'unread', why: said })), line: verdictLine(COMPARE_LABEL, 'WARN', said), hand: [] };
+}
+
 /**
- * After the window's end (the runner's exit can write after the restore verified): each domain the state file names
- * read again, typed, against its backup. Changed or unread, the state file is marked dirty again (the device is not
- * proven put back) and the hand lines name what to do; unread is never unchanged.
+ * After the window's end check (the runner's exit can write after the restore verified): each domain read again,
+ * typed, against its backup — only once the restore has verified (the state clean) and for this simulator; else
+ * nothing is compared and nothing is called a late writer. Changed or unread, the state file is marked dirty again
+ * (the device is not proven put back) and the hand lines name what to do; unread is never unchanged.
  */
 export async function compare(sim: LabSim, stateFile: string): Promise<Comparison> {
   const st = stateIn(sim.fs.read(stateFile));
-  if (typeof st === 'string') {
-    const why = `the state file ${nameInLine(stateFile)}: ${st}`;
-    return comparison(sim, stateFile, DOMAINS.map((name) => ({ name, outcome: 'unread', why })));
-  }
+  if (typeof st === 'string') return notCompared(`the state file ${nameInLine(stateFile)}: ${st}`);
+  if (st.dirty) return notCompared('the restore has not verified (the state file is dirty)');
+  if (st.udid !== sim.udid) return notCompared(`the state file is for ${nameInLine(st.udid)}, not ${nameInLine(sim.udid)}`);
   const domains: Compared[] = [];
   for (const d of st.domains) domains.push(await compareOne(sim, stateFile, d));
   return comparison(sim, stateFile, domains);
@@ -597,22 +632,29 @@ async function compareOne(sim: LabSim, stateFile: string, d: DomainsState['domai
   if ('why' in now) return { name: d.name, outcome: 'unread', why: now.why };
   const plan = decideRestore({ domain: d.name, backupPath: d.backup, backup: before.map, now: now.map });
   if (plan.verdict === 'equal') return { name: d.name, outcome: 'unchanged' };
-  return { name: d.name, outcome: 'changed', differ: plan.differ, hand: domainHand(d.name, d.backup, plan.hand) };
+  const changes = plan.differ.map((x) => `${nameInLine(x.key)} ${shownValue(before.map?.[x.key])} → ${shownValue(now.map?.[x.key])}`);
+  return { name: d.name, outcome: 'changed', differ: plan.differ, changes, hand: domainHand(d.name, d.backup, plan.hand) };
 }
 
 /** The comparison's line and hand lines; the state file marked dirty when anything is not unchanged. */
 function comparison(sim: LabSim, stateFile: string, domains: Compared[]): Comparison {
   const off = domains.filter((d) => d.outcome !== 'unchanged');
-  if (off.length === 0) return { domains, line: stepLine('OK', 'D43 compare: every domain equals its backup after the window (no late writer)'), hand: [] };
-  const marked = markDirty(sim.fs, stateFile);
-  const said = off.map((d) => (d.outcome === 'changed' ? `${d.name} changed after the restore (${differText(d.differ)})` : `${d.name} unread (${d.why})`)).join('; ');
+  if (off.length === 0) return { domains, line: verdictLine(COMPARE_LABEL, 'OK', 'every domain still equals its backup after the end check'), hand: [] };
+  let state: string;
+  try {
+    const marked = markDirty(sim.fs, stateFile);
+    state = marked === 'marked' ? 'the state file marked dirty again' : `the state file ${marked}`;
+  } catch (e) {
+    // As restore says a state file it cannot clear: the line says it, the hand lines still go to RESTORE.
+    state = `the state file could not be marked dirty (${firstLineOf(messageOf(e))})`;
+  }
+  const said = off.map((d) => (d.outcome === 'changed' ? `${d.name}: ${d.changes.join(', ')}` : `${d.name} unread (${d.why})`)).join('; ');
   const hand = off.flatMap((d) =>
     d.outcome === 'changed'
       ? handLines(LATE_HAND_PREFIX, sim.udid, d.hand)
       : [`${LATE_HAND_PREFIX}${d.name} could not be compared: read it and compare it with its backup beside ${nameInLine(stateFile)} by hand`],
   );
-  const state = marked === 'marked' ? 'the state file marked dirty again' : `the state file ${marked}`;
-  return { domains, line: stepLine('WARN', `D43 compare: ${said} — ${state}; the hand lines are in RESTORE`), hand };
+  return { domains, line: verdictLine(COMPARE_LABEL, 'WARN', `${said} — ${state}; the hand lines are in RESTORE`), hand };
 }
 
 // ---------------------------------------------------------------------------------------- the read-only key
@@ -620,19 +662,23 @@ function comparison(sim: LabSim, stateFile: string, domains: Compared[]): Compar
 /** The finportal key read: its value, absent (the key or its domain not there), or unreadable — never written. */
 export type ProtectedRead = { state: 'value'; value: string } | { state: 'absent' } | { state: 'unreadable'; why: string };
 
-/** The stderr of a read of a key that is not there (batch-8, batch-9), or of a domain that is not (batch-11.sh:339). */
-const ABSENT_SAID = /Could not find key|does not exist/;
+/**
+ * The stderr of a read of a key that is not there, in this domain (batch-8's and batch-9's, committed:
+ * `Could not find key '…' in domain '<domain>'.`), or of this domain not there (defaults' `Domain <domain> does not exist`).
+ */
+const ABSENT_KEY = new RegExp(`Could not find key '[^'\\n]*' in domain '${literal(PROTECTED.domain)}'`);
 
 /**
  * `defaults read <schemeapproval> <finportal key>` (batch-11.sh:337–340): exit 0, its value (the output's trailing
- * line breaks dropped, as `$(…)` did); exit 1 with defaults' "Could not find key" or "does not exist", absent — never
- * unreadable (batch-8's first run read an absent key as unreadable and was VOID); anything else, a timeout too,
- * unreadable, with why.
+ * line breaks dropped, as `$(…)` did); exit 1 with defaults' "Could not find key … in domain '<it>'" or "Domain <it>
+ * does not exist", absent — never unreadable (batch-8's first run read an absent key as unreadable and was VOID);
+ * anything else, a timeout too, or those words about another domain, unreadable, with why.
  */
 export async function readProtected(sim: LabSim): Promise<ProtectedRead> {
   const r = await sim.defaults(['read', PROTECTED.domain, PROTECTED.key]);
   if (r.code === 0) return { state: 'value', value: r.out.replace(/\n+$/, '') };
-  if (r.code === 1 && !r.timedOut && ABSENT_SAID.test(r.err + r.out)) return { state: 'absent' };
+  const said = r.err + r.out;
+  if (r.code === 1 && !r.timedOut && (ABSENT_KEY.test(said) || domainMissing(PROTECTED.domain).test(said))) return { state: 'absent' };
   return { state: 'unreadable', why: exitText(r) };
 }
 
@@ -666,7 +712,15 @@ export function domainsWindow(sim: LabSim, stateFile: string, opts: { block?: st
       const r = await restore(sim.using(run), stateFile);
       return r.ok ? { ok: true, how: r.line } : { ok: false, why: r.line, hand: r.hand };
     },
-    hand: [`${HAND_PREFIX}the simulator settings not provably put back: compare ${DOMAINS.join(', ')} with the .backup.plist files beside ${nameInLine(stateFile)} (xcrun simctl spawn ${shq(sim.udid)} defaults import <domain> <its backup>)`],
+    // Read when asked (the abort writes it): per domain from the state file — an import of its backup, or for one
+    // absent before key deletes, never an import (d43-gate.ts's rule); no state yet, one line saying both.
+    get hand() {
+      const st = stateIn(sim.fs.read(stateFile));
+      if (typeof st !== 'string') return st.domains.flatMap((d) => handLines(HAND_PREFIX, sim.udid, domainHand(d.name, d.backup, [])));
+      return [
+        `${HAND_PREFIX}the simulator settings not provably put back: compare ${DOMAINS.join(', ')} with the state file ${nameInLine(stateFile)} and the .backup.plist files beside it — a domain with a backup: xcrun simctl spawn ${shq(sim.udid)} defaults import <domain> <its backup>; one absent before (backup null): defaults delete <domain> <key> for each key it holds, never the whole domain`,
+      ];
+    },
     stateFile,
     ...(opts.block !== undefined && { block: opts.block }),
     ...(opts.secs !== undefined && { secs: opts.secs }),

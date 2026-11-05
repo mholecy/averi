@@ -50,11 +50,18 @@ describe('verdictLine — one verdict, `<label>: <VERDICT> — <why>`', () => {
   });
 
   it('refuses a word outside the vocabulary (a typo would read as no verdict at all)', () => {
-    expect(() => verdictLine('E5 verdict', 'PASSED' as never)).toThrow(/"PASSED" is not a verdict word \(PASS, FAIL, INCONCLUSIVE, REPRODUCED, OBSERVED, SKIP, INTERRUPTED, OK, ERROR\)/);
+    expect(() => verdictLine('E5 verdict', 'PASSED' as never)).toThrow(/"PASSED" is not a verdict word \(PASS, FAIL, INCONCLUSIVE, REPRODUCED, OBSERVED, SKIP, INTERRUPTED, OK, WARN, ERROR\)/);
   });
 
-  it('the vocabulary: block verdicts, the abort\'s INTERRUPTED, and the cleanup lines\' OK and ERROR', () => {
-    expect(VERDICTS).toEqual(['PASS', 'FAIL', 'INCONCLUSIVE', 'REPRODUCED', 'OBSERVED', 'SKIP', 'INTERRUPTED', 'OK', 'ERROR']);
+  it('the vocabulary: block verdicts, the abort\'s INTERRUPTED, and the cleanup and check lines\' OK, WARN and ERROR', () => {
+    expect(VERDICTS).toEqual(['PASS', 'FAIL', 'INCONCLUSIVE', 'REPRODUCED', 'OBSERVED', 'SKIP', 'INTERRUPTED', 'OK', 'WARN', 'ERROR']);
+  });
+
+  it("WARN is a verdict word (T2 S4 review round 1: batch-11's `D43 WDA-window compare: WARN — …`), read back, and alone exits 0", () => {
+    const line = verdictLine('D43 WDA-window compare', 'WARN', 'a late writer');
+    expect(line).toBe('D43 WDA-window compare: WARN — a late writer');
+    expect(parseVerdictLine(line)).toEqual({ label: 'D43 WDA-window compare', verdict: 'WARN', why: 'a late writer' });
+    expect(failsIn(line)).toBe(false);
   });
 });
 

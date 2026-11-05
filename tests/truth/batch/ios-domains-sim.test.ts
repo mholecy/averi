@@ -9,6 +9,7 @@ import {
   backup,
   backupPathOf,
   compare,
+  COMPARE_VALUE_CHARS,
   DOMAINS,
   domainsWindow,
   freshPathOf,
@@ -130,6 +131,8 @@ async function labOf(fake: { run: Run }): Promise<LabSim> {
 }
 
 const stateFile = () => join(dir, 'state.json');
+/** The three domains as a state file names them, each with its backup path beside the state file. */
+const threeDomains = () => DOMAINS.map((name) => ({ name, backup: backupPathOf(stateFile(), name) }));
 const readState = () => JSON.parse(readFileSync(stateFile(), 'utf8')) as { dirty: boolean; udid: string; port: number; domains: { name: string; backup: string | null }[] };
 
 /** The window as batch-10 ran it: the backup, then the runner's exit flipping Accessibility (its `after` export). */
@@ -197,6 +200,14 @@ describe("backup — the state file written dirty before the window's first chan
     const py = fake.calls.filter((c) => c.cmd === 'python3');
     expect(py).toHaveLength(3);
     expect(py.every((c) => c.call?.secs === PLIST_SECS && c.args[0] === '-I' && c.args[1] === '-c' && c.args[2] === TYPED_PY)).toBe(true);
+  });
+
+  it("absent only on defaults' own words for that domain: another domain's \"does not exist\", or a session's, is a failure (T2 S4 review round 1)", async () => {
+    for (const said of ['Domain com.apple.Other does not exist', 'Session does not exist', 'domain com.apple.keyboard.preferences does not exist', 'Domain comXappleXkeyboardXpreferences does not exist', 'NoDomain com.apple.keyboard.preferences does not exist']) {
+      const file = join(mkdtempSync(join(dir, 'a-')), 'state.json');
+      const r = await backup(await labOf(fakeSim({ rules: [(_, a) => (a[4] === 'export' ? exit(1, said) : undefined)] })), file);
+      expect(r).toEqual({ ok: false, why: `defaults export com.apple.keyboard.preferences: exit 1 ${said} — no state written` });
+    }
   });
 
   it('a domain that does not exist is recorded absent (backup null), not a failure', async () => {
@@ -284,7 +295,7 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
     const fake = fakeSim();
     const sim = await labOf(fake);
     expect(await restore(sim, stateFile())).toEqual({ ok: true, line: 'D43 WDA-window restore: OK — nothing to do (no state file: the window backed nothing up, so changed nothing)', domains: [] });
-    writeFileSync(stateFile(), JSON.stringify({ dirty: false, udid: LAB, port: 8120, domains: [] }));
+    writeFileSync(stateFile(), JSON.stringify({ dirty: false, udid: LAB, port: 8120, domains: threeDomains() }));
     expect((await restore(sim, stateFile())).line).toBe('D43 WDA-window restore: OK — nothing to do (the state file is clean)');
     expect(fake.calls).toHaveLength(1);
   });
@@ -292,7 +303,7 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
   it('NOT VERIFIED, nothing done, for a state of another simulator or one that cannot be read; its hand line says what to compare', async () => {
     const fake = fakeSim();
     const sim = await labOf(fake);
-    writeFileSync(stateFile(), JSON.stringify({ dirty: true, udid: 'OTHER', port: 8120, domains: [] }));
+    writeFileSync(stateFile(), JSON.stringify({ dirty: true, udid: 'OTHER', port: 8120, domains: threeDomains() }));
     const other = await restore(sim, stateFile());
     expect(other).toMatchObject({ ok: false, line: `D43 WDA-window restore: ERROR — NOT VERIFIED — the state file is for OTHER, not ${LAB}`, domains: [], why: `the state file is for OTHER, not ${LAB}` });
     expect(!other.ok && other.hand).toEqual([`D43 (iOS): compare the simulator's ${DOMAINS.join(', ')} with the .backup.plist files beside ${stateFile()}`]);
@@ -393,9 +404,25 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
   it('a state file naming the schemeapproval domain cannot sneak a call in: refused whole, nothing run, the state kept dirty', async () => {
     const fake = fakeSim();
     const sim = await labOf(fake);
-    writeFileSync(stateFile(), JSON.stringify({ dirty: true, udid: LAB, port: 8120, domains: [{ name: PROTECTED.domain, backup: join(dir, 'forged.plist') }] }));
-    expect((await restore(sim, stateFile())).line).toBe(`D43 WDA-window restore: ERROR — NOT VERIFIED — the state file ${stateFile()}: it names ${PROTECTED.domain}, not one of ${DOMAINS.join(', ')}`);
+    const forged = [...threeDomains().slice(0, 2), { name: PROTECTED.domain, backup: join(dir, 'forged.plist') }];
+    writeFileSync(stateFile(), JSON.stringify({ dirty: true, udid: LAB, port: 8120, domains: forged }));
+    expect((await restore(sim, stateFile())).line).toBe(
+      `D43 WDA-window restore: ERROR — NOT VERIFIED — the state file ${stateFile()}: it names com.apple.keyboard.preferences, com.apple.Preferences, ${PROTECTED.domain}, not the window's ${DOMAINS.join(', ')}, each once`,
+    );
     expect((await compare(sim, stateFile())).domains.every((d) => d.outcome === 'unread')).toBe(true);
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it('a state naming no domain, or a domain twice, is never "every domain equals its backup": NOT VERIFIED, nothing done, still dirty (T2 S4 review round 1)', async () => {
+    const fake = fakeSim();
+    const sim = await labOf(fake);
+    for (const domains of [[], [...threeDomains(), threeDomains()[0]], threeDomains().slice(1)]) {
+      writeFileSync(stateFile(), JSON.stringify({ dirty: true, udid: LAB, port: 8120, domains }));
+      const r = await restore(sim, stateFile());
+      expect(r.ok, JSON.stringify(domains)).toBe(false);
+      expect(r.line).toMatch(/^D43 WDA-window restore: ERROR — NOT VERIFIED — the state file .*: it names .*, not the window's .*, each once$/);
+      expect(readState().dirty).toBe(true);
+    }
     expect(fake.calls).toHaveLength(1);
   });
 
@@ -412,65 +439,131 @@ describe("restore — key by key, verified, the state cleared only then (d43-gat
 });
 
 describe("compare — a late writer after the restore (batch-11 review round 1: sim-domains --compare; b11-dry d43-latediff, full-pass)", () => {
-  it('every domain equal after the window: OK, no hand line, the state left clean', async () => {
-    const fake = fakeSim();
+  const LATE = 'D43 (iOS, changed after the restore — a late writer): ';
+  const marked = ' — the state file marked dirty again; the hand lines are in RESTORE';
+  /** backup, the runner's flip, the restore (verified: the state clean) — where batch-11 compared. */
+  async function restored(fake: ReturnType<typeof fakeSim>): Promise<LabSim> {
     const sim = await windowRun(fake);
-    await restore(sim, stateFile());
-    const c = await compare(sim, stateFile());
-    expect(c).toEqual({ domains: DOMAINS.map((name) => ({ name, outcome: 'unchanged' })), line: 'OK   D43 compare: every domain equals its backup after the window (no late writer)', hand: [] });
+    expect((await restore(sim, stateFile())).ok).toBe(true);
+    return sim;
+  }
+
+  it("every domain equal after the end check: batch-11's `D43 WDA-window compare: OK` line, no hand line, the state left clean", async () => {
+    const fake = fakeSim();
+    const sim = await restored(fake);
+    expect(await compare(sim, stateFile())).toEqual({ domains: DOMAINS.map((name) => ({ name, outcome: 'unchanged' })), line: 'D43 WDA-window compare: OK — every domain still equals its backup after the end check', hand: [] });
     expect(readState().dirty).toBe(false);
   });
 
-  it('the runner flips Accessibility again after the restore: WARN, LATE_HAND lines for RESTORE, the state marked dirty again', async () => {
+  it('the runner flips a key again after the restore: WARN naming before → after, typed; LATE_HAND lines; the state marked dirty again', async () => {
     const fake = fakeSim();
-    const sim = await windowRun(fake);
-    await restore(sim, stateFile());
-    fake.domains.set(A11Y, { ...exported(A11Y, 'backup'), AutomationEnabled: { t: 'int', c: '0', v: '0' } });
+    const sim = await restored(fake);
+    fake.domains.set(A11Y, { ...exported(A11Y, 'backup'), AutomationEnabled: { t: 'int', c: '0', v: '0' }, Late: { t: 'string', c: '"x"', v: 'x' } });
     const c = await compare(sim, stateFile());
-    expect(c.line).toBe(`WARN D43 compare: ${A11Y} changed after the restore (AutomationEnabled changed) — the state file marked dirty again; the hand lines are in RESTORE`);
-    expect(c.hand).toEqual([`D43 (iOS, changed after the restore — a late writer): xcrun simctl spawn ${LAB} defaults write ${A11Y} AutomationEnabled -bool true`]);
-    expect(c.domains[2]).toEqual({ name: A11Y, outcome: 'changed', differ: [{ key: 'AutomationEnabled', kind: 'changed' }], hand: [`defaults write ${A11Y} AutomationEnabled -bool true`] });
+    expect(c.line).toBe(`D43 WDA-window compare: WARN — ${A11Y}: AutomationEnabled bool true → int 0, Late absent → string "x"${marked}`);
+    expect(c.hand).toEqual([`${LATE}xcrun simctl spawn ${LAB} defaults write ${A11Y} AutomationEnabled -bool true`, `${LATE}xcrun simctl spawn ${LAB} defaults delete ${A11Y} Late`]);
+    expect(c.domains[2]).toEqual({
+      name: A11Y,
+      outcome: 'changed',
+      differ: [{ key: 'AutomationEnabled', kind: 'changed' }, { key: 'Late', kind: 'extra' }],
+      changes: ['AutomationEnabled bool true → int 0', 'Late absent → string "x"'],
+      hand: [`defaults write ${A11Y} AutomationEnabled -bool true`, `defaults delete ${A11Y} Late`],
+    });
     expect(readState().dirty).toBe(true);
     expect(fake.defaults().filter((d) => !d.startsWith('export'))).toEqual(['AccessibilityEnabled', 'ApplicationAccessibilityEnabled', 'AutomationEnabled'].map((k) => `write ${A11Y} ${k} -bool true`));
   });
 
-  it('a domain whose plist plistlib cannot read is unread — never unchanged — and its hand line says to compare it by hand', async () => {
-    const fake = fakeSim({ unreadable: new Set([join(dir, 'state.com.apple.Preferences.compare.plist')]) });
-    const sim = await labOf(fake);
-    await backup(sim, stateFile());
-    await restore(sim, stateFile());
+  it("a value shown bounded and on one line: cut at COMPARE_VALUE_CHARS with …; a key with a line break quoted; a key gone shows absent", async () => {
+    const fake = fakeSim();
+    const sim = await restored(fake);
+    const long = 'x'.repeat(200);
+    const { AXSDidResetD22Preferences: _, ...rest } = exported(A11Y, 'backup');
+    fake.domains.set(A11Y, { ...rest, 'a\nb': { t: 'string', c: JSON.stringify(long), v: long } });
     const c = await compare(sim, stateFile());
-    expect(c.domains[1]).toEqual({ name: 'com.apple.Preferences', outcome: 'unread', why: 'plistlib could not read state.com.apple.Preferences.compare.plist: exit 1 plistlib.InvalidFileException: Invalid file' });
-    expect(c.line).toBe('WARN D43 compare: com.apple.Preferences unread (plistlib could not read state.com.apple.Preferences.compare.plist: exit 1 plistlib.InvalidFileException: Invalid file) — the state file marked dirty again; the hand lines are in RESTORE');
-    expect(c.hand).toEqual([`D43 (iOS, changed after the restore — a late writer): com.apple.Preferences could not be compared: read it and compare it with its backup beside ${stateFile()} by hand`]);
+    const shownLong = `string ${JSON.stringify(long).slice(0, COMPARE_VALUE_CHARS)}…`;
+    expect(c.domains[2]).toMatchObject({ changes: ['AXSDidResetD22Preferences bool true → absent', `"a\\nb" absent → ${shownLong}`] });
+    expect(c.line).not.toMatch(/[\n\r]/);
+    expect(COMPARE_VALUE_CHARS).toBe(60);
+    writeFileSync(stateFile(), JSON.stringify({ ...readState(), dirty: false })); // the first compare marked it dirty
+    const exact = 'y'.repeat(COMPARE_VALUE_CHARS - 2);
+    fake.domains.set(A11Y, { ...exported(A11Y, 'backup'), e: { t: 'string', c: JSON.stringify(exact), v: exact }, n: { t: 'dict', c: '{\n}' } });
+    expect((await compare(sim, stateFile())).domains[2]).toMatchObject({ changes: [`e absent → string ${JSON.stringify(exact)}`, 'n absent → dict "{\\n}"'] });
+  });
+
+  it('a domain whose plist plistlib cannot read is unread — never unchanged — its hand line says to compare it by hand', async () => {
+    const fake = fakeSim({ unreadable: new Set([join(dir, 'state.com.apple.Preferences.compare.plist')]) });
+    const sim = await restored(fake);
+    const c = await compare(sim, stateFile());
+    const why = 'plistlib could not read state.com.apple.Preferences.compare.plist: exit 1 plistlib.InvalidFileException: Invalid file';
+    expect(c.domains[1]).toEqual({ name: 'com.apple.Preferences', outcome: 'unread', why });
+    expect(c.line).toBe(`D43 WDA-window compare: WARN — com.apple.Preferences unread (${why})${marked}`);
+    expect(c.hand).toEqual([`${LATE}com.apple.Preferences could not be compared: read it and compare it with its backup beside ${stateFile()} by hand`]);
     expect(readState().dirty).toBe(true);
   });
 
-  it('a backup gone, an export past its bound: unread each; a domain absent before that is still absent is unchanged', async () => {
+  it('a backup gone, an export past its bound: unread each, said in order; a domain absent before that is still absent is unchanged', async () => {
     const domains = before();
     delete domains['com.apple.Preferences'];
     const fake = fakeSim({ domains });
     const sim = await labOf(fake);
     await backup(sim, stateFile());
+    await restore(sim, stateFile());
     rmSync(backupPathOf(stateFile(), 'com.apple.keyboard.preferences'));
     const c = await compare(sim.using(async (cmd, args, call) => (args[4] === 'export' && args[5] === A11Y ? timedOut : fake.run(cmd, args, call))), stateFile());
     expect(c.domains.map((d) => d.outcome)).toEqual(['unread', 'unchanged', 'unread']);
-    expect(c.domains[0]).toEqual({ name: 'com.apple.keyboard.preferences', outcome: 'unread', why: 'its backup: plistlib could not read state.com.apple.keyboard.preferences.backup.plist: exit 1 plistlib.InvalidFileException: Invalid file' });
-    expect(c.domains[2]).toEqual({ name: A11Y, outcome: 'unread', why: `defaults export ${A11Y}: past its bound (exit 142)` });
-    expect(c.line).toBe(`WARN D43 compare: com.apple.keyboard.preferences unread (${(c.domains[0] as { why: string }).why}); ${A11Y} unread (defaults export ${A11Y}: past its bound (exit 142)) — the state file marked dirty again; the hand lines are in RESTORE`);
+    const gone = 'its backup: plistlib could not read state.com.apple.keyboard.preferences.backup.plist: exit 1 plistlib.InvalidFileException: Invalid file';
+    expect(c.domains[0]).toEqual({ name: 'com.apple.keyboard.preferences', outcome: 'unread', why: gone });
+    expect(c.line).toBe(`D43 WDA-window compare: WARN — com.apple.keyboard.preferences unread (${gone}); ${A11Y} unread (defaults export ${A11Y}: past its bound (exit 142))${marked}`);
   });
 
-  it('no state file, or one that is no state: every domain unread, the line a WARN, nothing marked (there is nothing to mark)', async () => {
+  it('a state not clean — the restore never verified — is not compared: unread, never "a late writer", no hand line, still dirty, no call', async () => {
+    const fake = fakeSim();
+    const sim = await windowRun(fake);
+    const calls = fake.calls.length;
+    const c = await compare(sim, stateFile());
+    expect(c).toEqual({
+      domains: DOMAINS.map((name) => ({ name, outcome: 'unread', why: 'not compared: the restore has not verified (the state file is dirty)' })),
+      line: 'D43 WDA-window compare: WARN — not compared: the restore has not verified (the state file is dirty)',
+      hand: [],
+    });
+    expect(c.line).not.toContain('late writer');
+    expect(fake.calls).toHaveLength(calls);
+    expect(readState().dirty).toBe(true);
+  });
+
+  it("a state for another simulator is not compared either (restore's rule): unread, nothing done", async () => {
+    const fake = fakeSim();
+    const sim = await restored(fake);
+    writeFileSync(stateFile(), JSON.stringify({ ...readState(), udid: 'OTHER' }));
+    const calls = fake.calls.length;
+    const c = await compare(sim, stateFile());
+    expect(c.line).toBe(`D43 WDA-window compare: WARN — not compared: the state file is for OTHER, not ${LAB}`);
+    expect(c.domains.every((d) => d.outcome === 'unread')).toBe(true);
+    expect([c.hand, fake.calls.length, readState().dirty]).toEqual([[], calls, false]);
+  });
+
+  it('no state file, or one that is no state: not compared, unread, nothing marked — there is nothing to mark', async () => {
     const fake = fakeSim();
     const sim = await labOf(fake);
     const c = await compare(sim, stateFile());
-    expect(c.domains).toEqual(DOMAINS.map((name) => ({ name, outcome: 'unread', why: `the state file ${stateFile()}: it cannot be read` })));
-    expect(c.line).toContain('— the state file missing; the hand lines are in RESTORE');
-    expect(c.hand).toHaveLength(3);
+    expect(c.domains).toEqual(DOMAINS.map((name) => ({ name, outcome: 'unread', why: `not compared: the state file ${stateFile()}: it cannot be read` })));
+    expect(c.line).toBe(`D43 WDA-window compare: WARN — not compared: the state file ${stateFile()}: it cannot be read`);
+    expect(c.hand).toEqual([]);
     writeFileSync(stateFile(), '[]');
-    expect((await compare(sim, stateFile())).line).toContain('— the state file unreadable; the hand lines are in RESTORE');
+    expect((await compare(sim, stateFile())).line).toBe(`D43 WDA-window compare: WARN — not compared: the state file ${stateFile()}: it is no state of the simulator domains`);
     expect(readFileSync(stateFile(), 'utf8')).toBe('[]');
     expect(fake.calls).toHaveLength(1);
+  });
+
+  it('a state file that cannot be marked dirty again is said in the line, never thrown (as the restore says one it cannot clear)', async () => {
+    const fake = fakeSim();
+    const sim = await restored(fake);
+    fake.domains.set(A11Y, exported(A11Y, 'after'));
+    const opened = await LabSim.open(LAB, fake.run, { ...nodeFs, replace: () => { throw new Error('EACCES: no\nmore'); } });
+    const c = await compare(opened.ok ? opened.sim : sim, stateFile());
+    expect(c.line).toMatch(/ — the state file could not be marked dirty \(EACCES: no\); the hand lines are in RESTORE$/);
+    expect(c.hand).toHaveLength(3);
+    expect(readState().dirty).toBe(false);
   });
 });
 
@@ -496,15 +589,23 @@ describe("readProtected — the finportal key, read only: a value, absent or unr
     expect(await readProtected(await labOf(reading({ ...exit(1), out: `Domain ${PROTECTED.domain} does not exist` })))).toEqual({ state: 'absent' });
   });
 
+  it("absent only on the words naming this domain: a key not found in another domain, or another domain missing, is unreadable", async () => {
+    expect(await readProtected(await labOf(reading(exit(1, "Error: Could not find key 'k' in domain 'com.apple.other'."))))).toEqual({ state: 'unreadable', why: "exit 1 Error: Could not find key 'k' in domain 'com.apple.other'." });
+    expect(await readProtected(await labOf(reading(exit(1, 'Domain com.apple.other does not exist'))))).toMatchObject({ state: 'unreadable' });
+    expect(await readProtected(await labOf(reading(exit(1, `Could not find key in domain '${PROTECTED.domain}'`))))).toMatchObject({ state: 'unreadable' });
+  });
+
   it('any other failure is unreadable, with why: another exit, exit 1 saying something else, or the absent words with another exit', async () => {
     expect(await readProtected(await labOf(reading(exit(1, 'Permission denied\nmore'))))).toEqual({ state: 'unreadable', why: 'exit 1 Permission denied' });
-    expect(await readProtected(await labOf(reading(exit(2, 'Could not find key'))))).toEqual({ state: 'unreadable', why: 'exit 2 Could not find key' });
+    const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8');
+    expect(await readProtected(await labOf(reading(exit(2, said))))).toEqual({ state: 'unreadable', why: `exit 2 ${said.trim()}` });
     expect(await readProtected(await labOf(reading(exit(127))))).toEqual({ state: 'unreadable', why: 'exit 127' });
   });
 
   it('past its bound (142) is unreadable, even with the absent words on stderr: a read cut short proved nothing', async () => {
     expect(await readProtected(await labOf(reading(timedOut)))).toEqual({ state: 'unreadable', why: 'past its bound (exit 142)' });
-    expect(await readProtected(await labOf(reading({ ...timedOut, code: 1, err: 'Could not find key' })))).toEqual({ state: 'unreadable', why: 'past its bound (exit 1) Could not find key' });
+    const said = readFileSync(join(FIXTURES, 'schemeapproval-absent-b8-read.txt'), 'utf8');
+    expect(await readProtected(await labOf(reading({ ...timedOut, code: 1, err: said })))).toEqual({ state: 'unreadable', why: `past its bound (exit 1) ${said.trim()}` });
   });
 });
 
@@ -516,12 +617,30 @@ describe("domainsWindow — the WDA window as abort.ts's dirty window (batch-11.
     detached.domains.set(A11Y, exported(A11Y, 'after'));
     const w = domainsWindow(sim, stateFile(), { block: 'D43', secs: 300 });
     expect([w.stateFile, w.block, w.secs]).toEqual([stateFile(), 'D43', 300]);
-    expect(w.hand).toEqual([`D43 (iOS): the simulator settings not provably put back: compare ${DOMAINS.join(', ')} with the .backup.plist files beside ${stateFile()} (xcrun simctl spawn ${LAB} defaults import <domain> <its backup>)`]);
+    expect(w.hand).toEqual(DOMAINS.map((d) => `D43 (iOS): xcrun simctl spawn ${LAB} defaults import ${d} ${backupPathOf(stateFile(), d)}`));
     const p = await w.restore(detached.run);
     expect(p).toEqual({ ok: true, how: 'D43 WDA-window restore: OK — com.apple.keyboard.preferences equal, com.apple.Preferences equal, com.apple.Accessibility put back (wrote back AccessibilityEnabled, ApplicationAccessibilityEnabled, AutomationEnabled in com.apple.Accessibility)' });
     expect(detached.defaults().length).toBeGreaterThan(0);
     expect(fake.defaults().every((d) => d.startsWith('export'))).toBe(true);
     expect(readState().dirty).toBe(false);
+  });
+
+  it("its hand lines read from the state file when asked: a domain absent before gets key deletes, never an import (d43-gate.ts's rule); no state, one line saying both", async () => {
+    const domains = before();
+    delete domains['com.apple.Preferences'];
+    const fake = fakeSim({ domains });
+    const sim = await labOf(fake);
+    const w = domainsWindow(sim, stateFile());
+    expect(w.hand).toEqual([
+      `D43 (iOS): the simulator settings not provably put back: compare ${DOMAINS.join(', ')} with the state file ${stateFile()} and the .backup.plist files beside it — a domain with a backup: xcrun simctl spawn ${LAB} defaults import <domain> <its backup>; one absent before (backup null): defaults delete <domain> <key> for each key it holds, never the whole domain`,
+    ]);
+    await backup(sim, stateFile());
+    expect(w.hand).toEqual([
+      `D43 (iOS): xcrun simctl spawn ${LAB} defaults import com.apple.keyboard.preferences ${backupPathOf(stateFile(), 'com.apple.keyboard.preferences')}`,
+      `D43 (iOS): xcrun simctl spawn ${LAB} defaults read com.apple.Preferences (then defaults delete com.apple.Preferences <key> for each key it holds; never the whole domain)`,
+      `D43 (iOS): xcrun simctl spawn ${LAB} defaults import ${A11Y} ${backupPathOf(stateFile(), A11Y)}`,
+    ]);
+    expect(w.hand.join('\n')).not.toContain('import com.apple.Preferences');
   });
 
   it('not put back: why is its line, its hand lines the typed commands; no block or secs named, none set', async () => {
