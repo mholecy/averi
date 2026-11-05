@@ -76,8 +76,8 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  *     const [{ runBatch }, { configOf }, { labBuild, labBlock }, { androidLab }, { iosLab, iosCheck, wdaWindow }] =
  *       await Promise.all(mods.map((f) => import(at(`${f}.ts`))));
  *     const build = labBuild();
- *     const android = androidLab({ build: build.built.android });
- *     const ios = iosLab();
+ *     const android = androidLab({ build: build.android });
+ *     const ios = iosLab({ build: build.ios });
  *     const D43 = { id: 'D43', label: 'D43 verdict', needs: ['ios'], async run(ctx) {
  *       const sim = await ios.open(ctx);                              // the guard again, over the block's own calls
  *       if (!sim.ok) return ctx.verdict('INCONCLUSIVE', sim.why);
@@ -85,8 +85,8 @@ import { EXIT, exitCodeOf, firstLineOf, messageOf, oneLine, parseVerdictLine, su
  *         work: async () => (await iosCheck(ctx, sim.lab, 'wda 1')) ?? ctx.liveRun('ios-wda-1', asked, { secs }) });
  *       await ios.endStretch(ctx, sim.lab);                           // the finportal key's line
  *     }, judge };
- *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android-build', 'android']), kf, D43],
- *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly],
+ *     await runBatch({ name: 'batch-13', knobs, blocks: [labBlock(['android', 'ios'], { build }), kf, D43],
+ *       needs: { ...build.needs, android: android.need, ios: ios.need }, lastly: [ios.lastly, build.lastly],
  *       config: configOf(process.argv.slice(2), process.env, repo) });
  *
  * A need is checked by the first block naming it and rechecked (its `alive`) before each later one; the WDA window is
