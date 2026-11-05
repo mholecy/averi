@@ -8,16 +8,14 @@ import {
   backupPathOf,
   baseOf,
   changeText,
-  COMPARE_LABEL,
+  D43_LABELS,
   decideRestore,
   defaultsArgv,
   diffMaps,
   domainHand,
   domainPart,
   DOMAINS,
-  HAND_PREFIX,
   LAB_WDA_PORT,
-  LATE_HAND_PREFIX,
   noPerformed,
   notVerifiedLine,
   PROTECTED,
@@ -30,6 +28,7 @@ import {
   TYPED_PY,
   typedMapOf,
   type DomainEntry,
+  type DomainLabels,
   type DomainMap,
   type DomainRestore,
   type DomainsState,
@@ -155,9 +154,10 @@ export type Backup = { ok: true; state: DomainsState; line: string } | { ok: fal
  * Before the window's first change: each domain exported beside `stateFile` and read typed (a plist plistlib cannot
  * read as a dictionary fails the backup), or proven absent; then the state file created, dirty, in one exclusive
  * write. A failure writes no state, so nothing may be changed: the window does not run (batch-11's "no wda run
- * (nothing changed)"). An earlier state file or backup there is never overwritten: refused.
+ * (nothing changed)"). An earlier state file or backup there is never overwritten: refused. Its line's label the
+ * window's (`labels`: the WDA window's unless given; T2b).
  */
-export async function backup(sim: LabSim, stateFile: string): Promise<Backup> {
+export async function backup(sim: LabSim, stateFile: string, labels: DomainLabels = D43_LABELS): Promise<Backup> {
   if (sim.fs.exists(stateFile)) return { ok: false, why: `${nameInLine(stateFile)} is there already: a state file is never overwritten — no state written` };
   const domains: DomainEntry[] = [];
   for (const name of DOMAINS) {
@@ -173,7 +173,7 @@ export async function backup(sim: LabSim, stateFile: string): Promise<Backup> {
   const state: DomainsState = { dirty: true, udid: sim.udid, port: LAB_WDA_PORT, domains };
   sim.fs.createExclusive(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   const said = domains.map((d) => `${d.name} ${d.backup === null ? 'absent' : 'exported'}`).join(', ');
-  return { ok: true, state, line: stepLine('OK', `D43 backup: ${said}; state ${nameInLine(stateFile)} (dirty until the restore verifies)`) };
+  return { ok: true, state, line: stepLine('OK', `${labels.backup}: ${said}; state ${nameInLine(stateFile)} (dirty until the restore verifies)`) };
 }
 
 // ------------------------------------------------------------------------------------------------- restore
@@ -183,41 +183,42 @@ export type Restored =
   | { ok: false; line: string; domains: DomainRestore[]; why: string; hand: string[] };
 
 /** A restore that did nothing, and needed nothing: `<label>: OK — nothing to do (<why>)`. */
-const nothingToDo = (why: string): Restored => ({ ok: true, line: restoredLine(`nothing to do (${why})`), domains: [] });
+const nothingToDo = (why: string, label: string): Restored => ({ ok: true, line: restoredLine(`nothing to do (${why})`, label), domains: [] });
 
 /** A restore not verified before any domain was tried: its line, and the RESTORE lines for the state file. */
-const notVerified = (why: string, hand: string[]): Restored => ({ ok: false, line: notVerifiedLine(why), domains: [], why, hand });
+const notVerified = (why: string, hand: string[], label: string): Restored => ({ ok: false, line: notVerifiedLine(why, label), domains: [], why, hand });
 
 /**
  * Put each domain the state file names back by decideRestore's rule, verified by a fresh read-back each time; then
  * clear the state file's `dirty` — only when every domain's read-back equals its backup. No state file: nothing was
  * backed up, so nothing was changed. A clean one: nothing to do. One for another simulator, or unreadable: NOT
- * VERIFIED, nothing done. Safe to run twice (the abort runs it after the block's own): each read is a new file.
+ * VERIFIED, nothing done. Safe to run twice (the abort runs it after the block's own): each read is a new file. Its
+ * lines' labels the window's (`labels`: the WDA window's unless given; T2b).
  */
-export async function restore(sim: LabSim, stateFile: string): Promise<Restored> {
+export async function restore(sim: LabSim, stateFile: string, labels: DomainLabels = D43_LABELS): Promise<Restored> {
   const { fs } = sim;
-  if (!fs.exists(stateFile)) return nothingToDo('no state file: the window backed nothing up, so changed nothing');
+  if (!fs.exists(stateFile)) return nothingToDo('no state file: the window backed nothing up, so changed nothing', labels.restore);
   const st = stateIn(fs.read(stateFile));
-  const byHand = [`${HAND_PREFIX}compare the simulator's ${DOMAINS.join(', ')} with the .backup.plist files beside ${nameInLine(stateFile)}`];
-  if (typeof st === 'string') return notVerified(`the state file ${nameInLine(stateFile)}: ${st}`, byHand);
-  if (!st.dirty) return nothingToDo('the state file is clean');
-  if (st.udid !== sim.udid) return notVerified(`the state file is for ${nameInLine(st.udid)}, not ${nameInLine(sim.udid)}`, byHand);
+  const byHand = [`${labels.hand}compare the simulator's ${DOMAINS.join(', ')} with the .backup.plist files beside ${nameInLine(stateFile)}`];
+  if (typeof st === 'string') return notVerified(`the state file ${nameInLine(stateFile)}: ${st}`, byHand, labels.restore);
+  if (!st.dirty) return nothingToDo('the state file is clean', labels.restore);
+  if (st.udid !== sim.udid) return notVerified(`the state file is for ${nameInLine(st.udid)}, not ${nameInLine(sim.udid)}`, byHand, labels.restore);
   const domains: DomainRestore[] = [];
   for (const entry of st.domains) domains.push(await restoreOne(sim, stateFile, entry));
   const parts = domains.map(domainPart);
-  const restoreLines = domains.flatMap((d) => (d.readBackEqual ? [] : restoreFileLines(HAND_PREFIX, sim.udid, domainHand(d.name, d.backup, d.hand))));
+  const restoreLines = domains.flatMap((d) => (d.readBackEqual ? [] : restoreFileLines(labels.hand, sim.udid, domainHand(d.name, d.backup, d.hand))));
   if (restoreLines.length === 0) {
     try {
       fs.replace(stateFile, JSON.stringify({ ...st, dirty: false }));
     } catch (e) {
       const why = `every domain equals its backup, but ${nameInLine(stateFile)} could not be cleared (${firstLineOf(messageOf(e))})`;
-      return { ok: false, line: notVerifiedLine(why), domains, why, hand: byHand };
+      return { ok: false, line: notVerifiedLine(why, labels.restore), domains, why, hand: byHand };
     }
     const allEqual = domains.every((d) => d.readBackEqual && d.equalAfterRun);
-    return { ok: true, line: restoredLine(allEqual ? 'every domain equals its backup (nothing put back)' : parts.join(', ')), domains };
+    return { ok: true, line: restoredLine(allEqual ? 'every domain equals its backup (nothing put back)' : parts.join(', '), labels.restore), domains };
   }
   const why = parts.join(', ');
-  return { ok: false, line: notVerifiedLine(why), domains, why, hand: restoreLines };
+  return { ok: false, line: notVerifiedLine(why, labels.restore), domains, why, hand: restoreLines };
 }
 
 /** One domain: its backup and its state now read typed, then restoreDomain; any read or call that fails stops it. */
@@ -263,16 +264,16 @@ export type Compared =
 
 export interface Comparison {
   domains: Compared[];
-  /** `D43 WDA-window compare: OK — …` when every domain is unchanged; else WARN naming each changed or unread one. */
+  /** `<compare label>: OK — …` (`D43 WDA-window compare`) when every domain is unchanged; else WARN naming each changed or unread one. */
   line: string;
   /** The late writer's RESTORE lines (LATE_HAND): none when every domain is unchanged, or nothing was compared. */
   hand: string[];
 }
 
 /** Nothing compared, and why: every domain unread, the line a WARN, no hand line, the state file left as it is. */
-function notCompared(why: string): Comparison {
+function notCompared(why: string, labels: DomainLabels): Comparison {
   const said = `not compared: ${why}`;
-  return { domains: DOMAINS.map((name) => ({ name, outcome: 'unread', why: said })), line: verdictLine(COMPARE_LABEL, 'WARN', said), hand: [] };
+  return { domains: DOMAINS.map((name) => ({ name, outcome: 'unread', why: said })), line: verdictLine(labels.compare, 'WARN', said), hand: [] };
 }
 
 /**
@@ -280,16 +281,17 @@ function notCompared(why: string): Comparison {
  * typed, against its backup — only once the restore has verified (the state clean) and for this simulator; else
  * nothing is compared and nothing is called a late writer. Changed or unread, the state file is marked dirty again
  * (the device is not proven put back; confirmed in review: the next run must refuse until a restore verifies) and the
- * hand lines name what to do; unread is never unchanged.
+ * hand lines name what to do; unread is never unchanged. Its lines' labels the window's (`labels`: the WDA window's
+ * unless given; T2b).
  */
-export async function compare(sim: LabSim, stateFile: string): Promise<Comparison> {
+export async function compare(sim: LabSim, stateFile: string, labels: DomainLabels = D43_LABELS): Promise<Comparison> {
   const st = stateIn(sim.fs.read(stateFile));
-  if (typeof st === 'string') return notCompared(`the state file ${nameInLine(stateFile)}: ${st}`);
-  if (st.dirty) return notCompared('the restore has not verified (the state file is dirty)');
-  if (st.udid !== sim.udid) return notCompared(`the state file is for ${nameInLine(st.udid)}, not ${nameInLine(sim.udid)}`);
+  if (typeof st === 'string') return notCompared(`the state file ${nameInLine(stateFile)}: ${st}`, labels);
+  if (st.dirty) return notCompared('the restore has not verified (the state file is dirty)', labels);
+  if (st.udid !== sim.udid) return notCompared(`the state file is for ${nameInLine(st.udid)}, not ${nameInLine(sim.udid)}`, labels);
   const domains: Compared[] = [];
   for (const entry of st.domains) domains.push(await compareOne(sim, stateFile, entry));
-  return comparison(sim, stateFile, domains);
+  return comparison(sim, stateFile, domains, labels);
 }
 
 async function compareOne(sim: LabSim, stateFile: string, entry: DomainEntry): Promise<Compared> {
@@ -305,9 +307,9 @@ async function compareOne(sim: LabSim, stateFile: string, entry: DomainEntry): P
 }
 
 /** The comparison's line and RESTORE lines; the state file marked dirty when any domain is not unchanged. */
-function comparison(sim: LabSim, stateFile: string, domains: Compared[]): Comparison {
+function comparison(sim: LabSim, stateFile: string, domains: Compared[], labels: DomainLabels): Comparison {
   const notUnchanged = domains.filter((d) => d.outcome !== 'unchanged');
-  if (notUnchanged.length === 0) return { domains, line: verdictLine(COMPARE_LABEL, 'OK', 'every domain still equals its backup after the end check'), hand: [] };
+  if (notUnchanged.length === 0) return { domains, line: verdictLine(labels.compare, 'OK', 'every domain still equals its backup after the end check'), hand: [] };
   let state: string;
   try {
     const marked = markDirty(sim.fs, stateFile);
@@ -319,10 +321,10 @@ function comparison(sim: LabSim, stateFile: string, domains: Compared[]): Compar
   const said = notUnchanged.map((d) => (d.outcome === 'changed' ? `${d.name}: ${d.changes.join(', ')}` : `${d.name} unread (${d.why})`)).join('; ');
   const restoreLines = notUnchanged.flatMap((d) =>
     d.outcome === 'changed'
-      ? restoreFileLines(LATE_HAND_PREFIX, sim.udid, d.hand)
-      : [`${LATE_HAND_PREFIX}${d.name} could not be compared: read it and compare it with its backup beside ${nameInLine(stateFile)} by hand`],
+      ? restoreFileLines(labels.lateHand, sim.udid, d.hand)
+      : [`${labels.lateHand}${d.name} could not be compared: read it and compare it with its backup beside ${nameInLine(stateFile)} by hand`],
   );
-  return { domains, line: verdictLine(COMPARE_LABEL, 'WARN', `${said} — ${state}; the hand lines are in RESTORE`), hand: restoreLines };
+  return { domains, line: verdictLine(labels.compare, 'WARN', `${said} — ${state}; the hand lines are in RESTORE`), hand: restoreLines };
 }
 
 // ---------------------------------------------------------------------------------------- the read-only key
@@ -336,23 +338,25 @@ export async function readProtected(sim: LabSim): Promise<ProtectedRead> {
 
 /**
  * The WDA window's dirty window (abort.ts): its restore this module's, over the abort's detached runner; its state
- * file, so the abort puts it back only when it reads clean after; its hand lines for when it is not put back.
+ * file, so the abort puts it back only when it reads clean after; its hand lines for when it is not put back. Its
+ * lines' labels `opts.labels` (the WDA window's unless given; T2b, batch-13 gap 3: another block's window, D65's).
  */
-export function domainsWindow(sim: LabSim, stateFile: string, opts: { block?: string; secs?: number } = {}): WindowSpec {
+export function domainsWindow(sim: LabSim, stateFile: string, opts: { block?: string; secs?: number; labels?: DomainLabels } = {}): WindowSpec {
+  const labels = opts.labels ?? D43_LABELS;
   return {
     async restore(run) {
-      const r = await restore(sim.using(run), stateFile);
+      const r = await restore(sim.using(run), stateFile, labels);
       return r.ok ? { ok: true, how: r.line } : { ok: false, why: r.line, hand: r.hand };
     },
     // Read when asked (the abort writes it): per domain from the state file — an import of its backup, or for one
     // absent before key deletes, never an import (d43-gate.ts's rule); no state yet, one line saying both.
     get hand() {
       const st = stateIn(sim.fs.read(stateFile));
-      if (typeof st !== 'string') return st.domains.flatMap((d) => restoreFileLines(HAND_PREFIX, sim.udid, domainHand(d.name, d.backup, [])));
+      if (typeof st !== 'string') return st.domains.flatMap((d) => restoreFileLines(labels.hand, sim.udid, domainHand(d.name, d.backup, [])));
       // A state file there that cannot be read is said first: the person must look at it before trusting any backup.
       return [
-        ...(sim.fs.exists(stateFile) ? [`${HAND_PREFIX}the state file ${nameInLine(stateFile)} is unreadable: ${st}`] : []),
-        `${HAND_PREFIX}the simulator settings not provably put back: compare ${DOMAINS.join(', ')} with the state file ${nameInLine(stateFile)} and the .backup.plist files beside it — a domain with a backup: xcrun simctl spawn ${shellQuote(sim.udid)} defaults import <domain> <its backup>; one absent before (backup null): defaults delete <domain> <key> for each key it holds, never the whole domain`,
+        ...(sim.fs.exists(stateFile) ? [`${labels.hand}the state file ${nameInLine(stateFile)} is unreadable: ${st}`] : []),
+        `${labels.hand}the simulator settings not provably put back: compare ${DOMAINS.join(', ')} with the state file ${nameInLine(stateFile)} and the .backup.plist files beside it — a domain with a backup: xcrun simctl spawn ${shellQuote(sim.udid)} defaults import <domain> <its backup>; one absent before (backup null): defaults delete <domain> <key> for each key it holds, never the whole domain`,
       ];
     },
     stateFile,

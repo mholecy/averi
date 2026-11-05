@@ -35,6 +35,28 @@ export const LATE_HAND_PREFIX = 'D43 (iOS, changed after the restore — a late 
 export const RESTORE_LABEL = 'D43 WDA-window restore';
 /** The compare's verdict label (batch-11's `D43 WDA-window compare:` line). */
 export const COMPARE_LABEL = 'D43 WDA-window compare';
+/**
+ * What a domains window's lines call it (T2b, batch-13 gap 3): its restore's and its compare's verdict labels, its
+ * backup's step, its RESTORE lines' starts (`hand`, and `lateHand` for a late writer's). The WDA window's are
+ * D43_LABELS; another block's window (batch-13's D65) takes domainLabels(its id), so no line of it says D43.
+ */
+export interface DomainLabels {
+  restore: string;
+  compare: string;
+  backup: string;
+  hand: string;
+  lateHand: string;
+}
+/** The WDA window's labels (batch-11's): the default of every domains-window function. */
+export const D43_LABELS: DomainLabels = { restore: RESTORE_LABEL, compare: COMPARE_LABEL, backup: 'D43 backup', hand: HAND_PREFIX, lateHand: LATE_HAND_PREFIX };
+/** Another block's domains-window labels, as batch-13 wrote D65's: `<id> window restore`, `<id> (iOS): `, …. */
+export const domainLabels = (id: string): DomainLabels => ({
+  restore: `${id} window restore`,
+  compare: `${id} window compare`,
+  backup: `${id} backup`,
+  hand: `${id} (iOS): `,
+  lateHand: `${id} (iOS, changed after the restore — a late writer): `,
+});
 /** How much of a value a compare line shows, in code points, before `…`: the line stays short whatever a key holds. */
 export const COMPARE_VALUE_CHARS = 60;
 
@@ -455,10 +477,10 @@ export function domainPart(d: DomainRestore): string {
   return `${d.name} NOT equal to its backup${did === '' ? '' : ` after ${did}`}${keys} (${d.why})`;
 }
 
-/** The restore's `OK — …` line. */
-export const restoredLine = (why: string): string => verdictLine(RESTORE_LABEL, 'OK', why);
-/** The restore's `ERROR — NOT VERIFIED — …` line. */
-export const notVerifiedLine = (why: string): string => verdictLine(RESTORE_LABEL, 'ERROR', `NOT VERIFIED — ${why}`);
+/** The restore's `OK — …` line, the WDA window's label unless one is given. */
+export const restoredLine = (why: string, label = RESTORE_LABEL): string => verdictLine(label, 'OK', why);
+/** The restore's `ERROR — NOT VERIFIED — …` line, the WDA window's label unless one is given. */
+export const notVerifiedLine = (why: string, label = RESTORE_LABEL): string => verdictLine(label, 'ERROR', `NOT VERIFIED — ${why}`);
 
 /**
  * A typed value as a compare line shows it: `<type> <canonical value>`, one line, cut at COMPARE_VALUE_CHARS code
