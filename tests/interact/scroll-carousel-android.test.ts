@@ -329,12 +329,12 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
   };
   const FULLY_LEFT = { ...RULES, direction: 'left' as const, fully: true };
   const E2_RUN_0 = [574, 231, -102, 45, 189, 131, 76];
-  /** The lazy-free launch tree with C laid in its LazyRow at screen x `cx`, `width` wide, listed cut at the screen's edges (as uiautomator lists it; not cut to the carousel: Compose). */
-  const lazyAt = (cx: number, width = 948, xml = LAZY, id = LC): Row => {
+  /** The lazy-free launch tree (or `xml`) with C (or `id`) laid in its LazyRow (or the node at `holder`) at screen x `cx`, `width` wide, listed cut at the screen's edges (as uiautomator lists it; not cut to the carousel: Compose). */
+  const lazyAt = (cx: number, width = 948, xml = LAZY, id = LC, holder = '[66,380][1014,614]'): Row => {
     const from = Math.max(cx, 0);
     const to = Math.min(cx + width, 1080);
     const card = `<node index="0" text="" resource-id="${id}" class="android.view.View" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[${from},380][${to},614]" />`;
-    const laid = xml.replace(/(bounds="\[66,380\]\[1014,614\]") \/>/, `$1>${card}</node>`);
+    const laid = xml.replace(`bounds="${holder}" />`, `bounds="${holder}">${card}</node>`);
     if (laid === xml) throw new Error('lazyAt: no LazyRow');
     const tree = parseDump(laid);
     const c = [...everyNode(tree)].find((n) => n.identifier === id);
@@ -392,6 +392,19 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
 
   it("(2) a call across the carousel (`down`), C moved sideways by the strokes: no unfit", () => {
     const played = replay({ ...FULLY_LEFT, direction: 'down' }, E2_RUN_0.map((x) => lazyAt(x)));
+    expect(played.outcome?.kind).not.toBe('unfit');
+  });
+
+  it('(4) the strokes that moved C were drawn off the carousel (as batch-11\'s went over the page, y 1110): no unfit', () => {
+    const page = { from: { x: 864, y: 1110 }, to: { x: 216, y: 1110 } };
+    const played = replay(FULLY_LEFT, E2_RUN_0.map((x, i) => ({ ...lazyAt(x), ...(i > 0 && { drawn: page }) })));
+    expect(played.outcome?.kind).not.toBe('unfit');
+  });
+
+  it('(1) the room-giver is not C\'s nearest scroll view (an untold scroller as wide as the screen nested in the carousel): no unfit', () => {
+    const inner = `<node index="0" text="" resource-id="" class="android.view.View" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="true" long-clickable="false" password="false" selected="false" bounds="[0,380][1080,614]" />`;
+    const nested = LAZY.replace(/(bounds="\[66,380\]\[1014,614\]") \/>/, `$1>${inner}</node>`);
+    const played = replay(FULLY_LEFT, E2_RUN_0.map((x) => lazyAt(x, 948, nested, LC, '[0,380][1080,614]')));
     expect(played.outcome?.kind).not.toBe('unfit');
   });
 
