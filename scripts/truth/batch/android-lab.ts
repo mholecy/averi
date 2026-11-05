@@ -1,5 +1,5 @@
 import { basename, join } from 'node:path';
-import { LAB_AVD } from '../lab-device.js';
+import { LAB_AVD, pause } from '../lab-device.js';
 import type { Run } from './bounded.js';
 import type { BatchFs } from './io.js';
 import { shellQuote } from './ios-defaults.js';
@@ -67,7 +67,7 @@ export function androidLab(o: AndroidLabOptions = {}): AndroidLab {
   const urls = o.handlers ?? HANDLER_URLS;
   const open: AndroidLab['open'] = async (c) => {
     if (c.config.serial === undefined) return { ok: false, why: 'no lab emulator serial given (--serial or AVERI_LAB_SERIAL)' };
-    const r = await LabEmu.open(c.config.serial, c.bounded, { fs: c.fs, ...(o.settle !== undefined && { settle: o.settle }) });
+    const r = await LabEmu.open(c.config.serial, c.bounded, { fs: c.fs, settle: o.settle ?? pause });
     return r.ok ? { ok: true, emu: r.emu } : r;
   };
   const check = async (c: NeedCtx): Promise<NeedResult> => {

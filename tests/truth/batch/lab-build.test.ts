@@ -124,6 +124,11 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
       { words: `unzip -p ${apk} assets/cells.json`, secs: 30, cwd: undefined, log: undefined, env: undefined },
     ]);
     expect(b.built.android()).toBe(apk);
+    expect(steps).toEqual([]);
+    expect(await need(b, ANDROID_BUILD_NEED).alive(needCtx())).toEqual({ ok: true, how: `${apk} still there` });
+    rmSync(apk);
+    expect(await need(b, ANDROID_BUILD_NEED).alive(needCtx())).toEqual({ ok: false, why: `this run's build is gone (${apk})` });
+    expect([IOS_BUILD_NEED, ANDROID_BUILD_NEED]).toEqual(['ios-build', 'android-build']);
   });
 
   it('ANDROID_HOME not set: the SDK under the home folder, as batch-11 gave it', async () => {
@@ -146,7 +151,7 @@ describe('the Android build (batch-11.sh:298, 308–314): JDK 17, gradlew assemb
     expect(r).toMatchObject({ ok: true });
     expect(steps).toEqual(['WARN lab android: gradlew --stop: exit 1 no daemon — the Gradle daemon may still be running']);
     fresh({ buildFails: 'java' });
-    expect(await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx())).toEqual({ ok: false, why: "no JDK 17 (java_home -v 17 → 'nothing': exit 1 Unable to find any JVMs matching version \"17\")" });
+    expect(await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx())).toEqual({ ok: false, why: 'no JDK 17 (java_home -v 17 → nothing: exit 1 Unable to find any JVMs matching version "17")' });
     fresh();
     writeFileSync(join(dir, 'jdk17', 'release'), 'JAVA_VERSION="21"\n');
     expect(await need(labBuild(), ANDROID_BUILD_NEED).check(needCtx())).toMatchObject({ ok: false, why: expect.stringContaining('its release says no 17') });

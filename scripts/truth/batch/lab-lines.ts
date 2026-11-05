@@ -84,7 +84,8 @@ export function wdaRestoreOf(r: RestoreSaid, port: PortRead, killed: boolean, ud
   const hand = [...r.hand, ...(free ? [] : [portHand(udid)])];
   if (!r.ok || free) return { ok: r.ok && free, line: `${r.line}; ${part}`, hand };
   // S4's own OK line: its why, said NOT VERIFIED.
-  return { ok: false, line: verdictLine(RESTORE_LABEL, 'ERROR', `NOT VERIFIED — ${parseVerdictLine(r.line)?.why ?? r.line}; ${part}`), hand };
+  // S4's OK lines (restoredLine) always say why: the why is there to take.
+  return { ok: false, line: verdictLine(RESTORE_LABEL, 'ERROR', `NOT VERIFIED — ${parseVerdictLine(r.line)!.why!}; ${part}`), hand };
 }
 
 // ----------------------------------------------------------------------------------------- the Open-in alert
@@ -95,12 +96,12 @@ export type OpenInAlert = { state: 'none' } | { state: 'found'; label: string; b
 const OPEN_IN = /^Open in\b/;
 const AX_FRAME = /\{\{([-\d.]+),\s*([-\d.]+)\},\s*\{([-\d.]+),\s*([-\d.]+)\}\}/;
 
-type Element = Record<string, unknown>;
+type Element = Record<string, unknown> | null;
 const text = (v: unknown): string => (v === undefined || v === null ? '' : String(v));
 
 /** An element's centre (open-in-alert.py's centre): its `frame`, else its `AXFrame` string; none without one. */
-function centreOf(e: Element): Point | undefined {
-  const f = e.frame as Record<string, unknown> | undefined;
+function centreOf(e: NonNullable<Element>): Point | undefined {
+  const f = e.frame as Record<string, unknown> | null | undefined;
   if (typeof f === 'object' && f !== null && ['x', 'y', 'width', 'height'].every((k) => typeof f[k] === 'number')) {
     const [x, y, w, h] = ['x', 'y', 'width', 'height'].map((k) => f[k] as number);
     return { x: x + w / 2, y: y + h / 2 };
@@ -125,10 +126,11 @@ export function openInAlertOf(r: CallResult): OpenInAlert {
     // no JSON: said below
   }
   if (!Array.isArray(els)) return { state: 'unread', why: `idb ui describe-all printed no JSON list: ${firstLineOf(r.out)}` };
-  const all = els.filter((e): e is Element => typeof e === 'object' && e !== null);
-  const alert = all.find((e) => OPEN_IN.test(text(e.AXLabel)) || OPEN_IN.test(text(e.AXValue)));
-  if (alert === undefined) return { state: 'none' };
-  const buttons = all.filter((e) => e.type === 'Button');
+  // An entry that is no element (null, a number) holds no label: never the alert, never a button.
+  const all = els as Element[];
+  const alert = all.find((e) => OPEN_IN.test(text(e?.AXLabel)) || OPEN_IN.test(text(e?.AXValue)));
+  if (alert === undefined || alert === null) return { state: 'none' };
+  const buttons = all.filter((e): e is NonNullable<Element> => e?.type === 'Button');
   const cancel = buttons.find((e) => text(e.AXLabel).trim().toLowerCase() === 'cancel');
   return { state: 'found', label: text(alert.AXLabel) === '' ? text(alert.AXValue) : text(alert.AXLabel), buttons: buttons.map((b) => text(b.AXLabel)), cancel: cancel === undefined ? undefined : centreOf(cancel) };
 }
@@ -153,11 +155,15 @@ export function freshIn(fs: BatchFs, dir: string, name: string): string {
 
 // -------------------------------------------------------------------------------------------- the builds
 
-/** `java_home -v 17` and its release file: the JDK 17's home, or why there is none (batch-11.sh:309–310). */
-export function javaHomeOf(r: CallResult, release: string | undefined): { home: string } | { why: string } {
+/**
+ * `java_home -v 17` and the home's release file (read through `release`, only once there is a home): the JDK 17's
+ * home, or why there is none (batch-11.sh:309–310).
+ */
+export function javaHomeOf(r: CallResult, release: (home: string) => string | undefined): { home: string } | { why: string } {
   const home = failedCall(r) ? '' : r.out.trim();
-  const said = home === '' ? 'nothing' : home;
-  if (home === '') return { why: `no JDK 17 (java_home -v 17 → '${said}'${failedCall(r) ? `: ${exitText(r)}` : ''})` };
-  if (release === undefined || !/^JAVA_VERSION="17/m.test(release)) return { why: `no JDK 17 (java_home -v 17 → '${said}', its release says no 17)` };
+  if (home === '') return { why: `no JDK 17 (java_home -v 17 → nothing${failedCall(r) ? `: ${exitText(r)}` : ''})` };
+  const said = release(home);
+  if (said === undefined) return { why: `no JDK 17 (java_home -v 17 → '${home}', its release file not read)` };
+  if (!/^JAVA_VERSION="17/m.test(said)) return { why: `no JDK 17 (java_home -v 17 → '${home}', its release says no 17)` };
   return { home };
 }

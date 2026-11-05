@@ -13,6 +13,7 @@ import {
   endLabProcesses,
   health,
   HOST_SECS,
+  IOS_NEED,
   iosCheck,
   iosLab,
   IosSim,
@@ -132,8 +133,8 @@ describe('the lab\'s WebDriverAgent ended by its exact patterns, port 8120 only 
     fresh({ listeners: [4242, process.pid], stickyListener: true });
     const run = runOf(world);
     const r = await killLabWda({ run, udid: LAB_UDID });
-    expect(run.seen.map((s) => s.words).slice(3)).toEqual(['kill -TERM 4242']);
-    expect(r.port).toEqual({ state: 'busy', pids: [4242, process.pid] });
+    expect(run.seen.slice(3)).toEqual([{ words: 'kill -TERM 4242', secs: HOST_SECS, cwd: undefined, log: undefined, env: undefined }]);
+    expect(r).toEqual({ port: { state: 'busy', pids: [4242, process.pid] }, whys: [] });
   });
 
   it('a pkill or a kill that fails, or an unread port, is said in its whys', async () => {
@@ -170,9 +171,9 @@ describe('the health check, the Open-in alert and the reset (batch-11.sh:326–3
 
   it('no Cancel with a frame: stuck at once, nothing tapped; a read that fails: unread', async () => {
     const lab = await simOf(async (cmd, args) =>
-      cmd === 'xcrun' ? runOf(world)(cmd, args) : { code: 0, timedOut: false, signal: null, out: JSON.stringify([{ AXLabel: 'Open in “X”?' }, { AXLabel: 'Open', type: 'Button' }]), err: '' },
+      cmd === 'xcrun' ? runOf(world)(cmd, args) : { code: 0, timedOut: false, signal: null, out: JSON.stringify([{ AXLabel: 'Open in “X”?' }, { AXLabel: 'Open', type: 'Button' }, { AXLabel: 'Help', type: 'Button' }]), err: '' },
     );
-    expect(await dismissOpenIn(lab)).toEqual({ state: 'stuck', why: 'the open-in alert Open in “X”? has no Cancel button with a frame (buttons: Open)' });
+    expect(await dismissOpenIn(lab)).toEqual({ state: 'stuck', why: 'the open-in alert Open in “X”? has no Cancel button with a frame (buttons: Open, Help)' });
     fresh({ sick: 'describe-all' });
     expect(await dismissOpenIn(await simOf())).toEqual({ state: 'unread', why: 'idb ui describe-all: exit 1 No translation object returned' });
   });
@@ -238,6 +239,30 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     expect(r).toEqual({ ok: true, how: "averi-lab iPhone 17 simulator, iOS 27.0, reset; not rebuilt; the installed cells.json is main's" });
     expect(readFileSync(join(dir, 'lab', 'ios-installed-cells.json'), 'utf8')).toBe(CATALOG);
     expect(steps).toContain("NOTE com.apple.launchservices.schemeapproval's finportal key at the iOS stretch's start: absent (read only: no batch writes it)");
+    expect(words()).toContain(`xcrun simctl get_app_container ${LAB_UDID} dev.averi.lab app`);
+    expect(IOS_NEED).toBe('ios');
+  });
+
+  it('the finportal key\'s first read in its step: a value as it is, an unreadable read with why (batch-8: absent is never unreadable)', async () => {
+    fresh({ finportal: 'yes' });
+    const check = () => (iosLab({ wait, reset: false }).need as { check(c: NeedCtx): Promise<unknown> }).check;
+    await check()(needCtx());
+    expect(steps).toContain("NOTE com.apple.launchservices.schemeapproval's finportal key at the iOS stretch's start: yes (read only: no batch writes it)");
+    steps.length = 0;
+    await check()(needCtx(async (cmd, args, call) => (args.includes('read') ? { code: 142, timedOut: true, signal: 'SIGKILL', out: '', err: '' } : runOf(world)(cmd, args, call))));
+    expect(steps).toContain("NOTE com.apple.launchservices.schemeapproval's finportal key at the iOS stretch's start: unreadable (past its bound (exit 142)) (read only: no batch writes it)");
+  });
+
+  it('reset: false asks no reset (no shutdown, no boot); an empty container path is no app; an app with no cells.json keeps no copy', async () => {
+    const check = (run: Run) => (iosLab({ wait, reset: false }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx(run));
+    await check(runOf(world));
+    expect(words().some((w) => /simctl (shutdown|boot)/.test(w))).toBe(false);
+    const empty = await check(async (cmd, args, call) => (args.includes('get_app_container') ? { code: 0, timedOut: false, signal: null, out: ' \n', err: '' } : runOf(world)(cmd, args, call)));
+    expect(empty).toEqual({ ok: false, why: 'the lab app is not installed (simctl get_app_container: no path) (rerun with ONLY=lab,…)' });
+    rmSync(join(dir, 'lab', 'ios-installed-cells.json'));
+    rmSync(join(world.app, 'cells.json'));
+    expect(await check(runOf(world))).toEqual({ ok: false, why: `the installed app (${world.app})'s cells.json could not be read (rerun with ONLY=lab,…)` });
+    expect(existsSync(join(dir, 'lab', 'ios-installed-cells.json'))).toBe(false);
   });
 
   it('no udid given: not met, nothing called; a refused simulator: the guard\'s why', async () => {
@@ -386,6 +411,13 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     expect(two.windows.has(WDA_WINDOW)).toBe(true);
     // The domains verified, so the state is clean: the compare still runs (a WebDriverAgent left could write late).
     expect(two.events.some((e) => e.startsWith('verdict D43 WDA-window compare: OK'))).toBe(true);
+    // A restore that is not verified leaves the state dirty: nothing is compared (compare would refuse it anyway).
+    fresh({ restoreFails: true });
+    const three = blockCtx(runOf(world), 'D43c');
+    await wdaWindow(three.ctx, await simOf(), { work: async () => void world.startWda() });
+    expect(three.events.find((e) => e.startsWith('verdict D43 WDA-window restore'))).toMatch(/^verdict D43 WDA-window restore: ERROR — NOT VERIFIED — /);
+    expect(three.events.some((e) => e.includes('compare'))).toBe(false);
+    expect(three.events.some((e) => e.startsWith('asks'))).toBe(false);
     expect(waits.filter((w) => w === PORT_RECHECK_MS)).toHaveLength(1);
   });
 
@@ -402,6 +434,7 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     }).catch(() => {});
     expect(spec?.stateFile).toBe(join(ctx.dir, 'state.json'));
     expect(spec?.block).toBe('D43');
+    expect(spec !== undefined && 'secs' in spec).toBe(false);
     expect(spec?.hand.at(-1)).toBe(portHand(LAB_UDID));
     expect(spec?.hand[0]).toMatch(/^D43 \(iOS\): xcrun simctl spawn LAB-SIMULATOR-UDID defaults import com\.apple\.keyboard\.preferences /);
     const detached = runOf(world);
@@ -417,7 +450,10 @@ describe('the WDA window (batch-11.sh:623–655): the .cases first, the backup, 
     const lab = await simOf();
     const spec = wdaWindowSpec(lab, join(dir, 'state.json'), { secs: 90 });
     expect(spec.secs).toBe(90);
-    expect(spec.block).toBeUndefined();
+    expect('block' in spec).toBe(false);
+    expect('secs' in wdaWindowSpec(lab, join(dir, 'state.json'))).toBe(false);
+    const { ctx, windows } = blockCtx(runOf(world), 'D43s');
+    await wdaWindow(ctx, lab, { secs: 45, work: async () => void expect(windows.get(WDA_WINDOW)?.secs).toBe(45) });
     expect(await spec.restore(runOf(world))).toEqual({
       ok: false,
       why: 'D43 WDA-window restore: ERROR — NOT VERIFIED — nothing to do (no state file: the window backed nothing up, so changed nothing); port 8120 still has a listener (pid 4242)',
@@ -445,5 +481,20 @@ describe('the run\'s last step: the lab\'s WebDriverAgent and idb_companion ende
     steps.length = 0;
     await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'lsof' ? 1 : 2, timedOut: false, signal: null, out: '', err: '' }), step: (w, t) => void steps.push(`${w} ${t}`) });
     expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 free) and idb_companion of ${LAB_UDID} ended, not all proven: pkill: exit 2; pkill: exit 2; pkill: exit 2`]);
+  });
+
+  it('a listener of 8120 killed by its pid: read again — free after it, a NOTE saying so; one that stays, a WARN', async () => {
+    let listening = true;
+    const run: Run = async (cmd, args) => {
+      if (cmd === 'kill') listening = false;
+      const out = cmd === 'lsof' && listening ? '7\n' : '';
+      return { code: cmd === 'lsof' && !listening ? 1 : cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out, err: '' };
+    };
+    const say = (w: string, t: string) => void steps.push(`${w} ${t}`);
+    await endLabProcesses(() => LAB_UDID)({ run, step: say });
+    expect(steps).toEqual([`NOTE the lab's WebDriverAgent (port 8120 free (a listener killed)) and idb_companion of ${LAB_UDID} ended`]);
+    steps.length = 0;
+    await endLabProcesses(() => LAB_UDID)({ run: async (cmd) => ({ code: cmd === 'pkill' ? 1 : 0, timedOut: false, signal: null, out: cmd === 'lsof' ? '7\n' : '', err: '' }), step: say });
+    expect(steps).toEqual([`WARN the lab's WebDriverAgent (port 8120 still has a listener (pid 7)) and idb_companion of ${LAB_UDID} ended, not all proven: port 8120 still has a listener (pid 7)`]);
   });
 });

@@ -88,9 +88,7 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
   const android = async (c: NeedCtx): Promise<NeedResult> => {
     const stale = await catalogFresh(c);
     if (stale !== undefined) return { ok: false, why: `${stale} — nothing built` };
-    const found = await c.bounded(JAVA_HOME, ['-v', '17'], { secs: JAVA_HOME_SECS });
-    const home = failedCall(found) ? '' : found.out.trim();
-    const checked = javaHomeOf(found, home === '' ? undefined : c.fs.read(join(home, 'release')));
+    const checked = javaHomeOf(await c.bounded(JAVA_HOME, ['-v', '17'], { secs: JAVA_HOME_SECS }), (home) => c.fs.read(join(home, 'release')));
     if ('why' in checked) return { ok: false, why: checked.why };
     const cwd = join(c.config.repo, 'fixtures/apps/android');
     const log = join(c.labDir, 'android-build.log');
@@ -112,7 +110,8 @@ export function labBuild(o: { secs?: number } = {}): LabBuild {
 
   const stillThere = (product: () => string | undefined) => async (c: NeedCtx): Promise<NeedResult> => {
     const p = product();
-    return p !== undefined && c.fs.exists(p) ? { ok: true, how: `${nameInLine(p)} still there` } : { ok: false, why: `this run's build is gone (${p === undefined ? 'none' : nameInLine(p)})` };
+    if (p === undefined) return { ok: false, why: "this run's build is gone (none)" };
+    return c.fs.exists(p) ? { ok: true, how: `${nameInLine(p)} still there` } : { ok: false, why: `this run's build is gone (${nameInLine(p)})` };
   };
   return {
     needs: {

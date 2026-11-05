@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { WindowSpec } from '../../../scripts/truth/batch/abort.js';
 import type { Run } from '../../../scripts/truth/batch/bounded.js';
 import { nodeFs } from '../../../scripts/truth/batch/io.js';
-import { androidLab, CHOOSER_WINDOW, chooserStretch, HANDLER_URLS, keepTree, probeRestore, withReads } from '../../../scripts/truth/batch/android-lab.js';
+import { ANDROID_NEED, androidLab, CHOOSER_WINDOW, chooserStretch, HANDLER_URLS, keepTree, probeRestore, withReads } from '../../../scripts/truth/batch/android-lab.js';
 import { LabEmu, reinstallProgress } from '../../../scripts/truth/batch/lab-emu.js';
 import type { BlockCtx, NeedCtx } from '../../../scripts/truth/batch/runner.js';
 import { CATALOG, DEVICE_APK, LAB_SERIAL, labWorld, runOf, type LabWorld, type WorldOptions } from './lab-fakes.js';
@@ -57,6 +57,16 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
     expect(readFileSync(join(dir, 'lab', 'android-installed-cells.json'), 'utf8')).toBe(CATALOG);
     expect(readFileSync(join(dir, 'lab', 'android-handlers.txt'), 'utf8')).toBe('handlers: averilab://shared/open 2, averilab://cell/open 1\n');
     expect(HANDLER_URLS).toEqual(['averilab://shared/open', 'averilab://cell/open']);
+    expect([ANDROID_NEED, CHOOSER_WINDOW]).toEqual(['android', 'D55 chooser']);
+  });
+
+  it('open: the guarded emulator over the ctx\'s own fs and the kit\'s settle', async () => {
+    const fs = { ...nodeFs };
+    const settled: number[] = [];
+    const r = await androidLab({ settle: async (ms) => void settled.push(ms) }).open({ bounded: runOf(world), config: config(), fs });
+    expect(r.ok && r.emu.fs).toBe(fs);
+    if (r.ok) await r.emu.key('KEYCODE_HOME');
+    expect(settled).toEqual([1000]);
   });
 
   it('a second check pulls into a fresh file: an earlier pull is never overwritten', async () => {
@@ -88,6 +98,8 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
   it('a pull that fails, or an unzip that fails: not met, never compared as equal', async () => {
     const r = await (androidLab({ settle }).need as Spec).check(needCtx(async (cmd, args, call) => (args.includes('pull') ? { code: 1, timedOut: false, signal: null, out: '', err: 'adb: error: remote object does not exist' } : runOf(world)(cmd, args, call))));
     expect(r).toEqual({ ok: false, why: 'the installed APK not pulled (exit 1 adb: error: remote object does not exist)' });
+    const none = await (androidLab({ settle }).need as Spec).check(needCtx(async (cmd, args, call) => (args.includes('pull') ? { code: 0, timedOut: false, signal: null, out: '', err: '' } : runOf(world)(cmd, args, call))));
+    expect(none).toEqual({ ok: false, why: 'the installed APK not pulled (exit 0 but no file)' });
     const u = await (androidLab({ settle }).need as Spec).check(needCtx(async (cmd, args, call) => (cmd === 'unzip' ? { code: 11, timedOut: false, signal: null, out: '', err: 'caution: filename not matched' } : runOf(world)(cmd, args, call))));
     expect(u).toEqual({ ok: false, why: `the installed APK (${DEVICE_APK})'s cells.json could not be read (rerun with ONLY=lab,…)` });
     expect(existsSync(join(dir, 'lab', 'android-installed-cells.json'))).toBe(false);
@@ -128,8 +140,8 @@ describe('the handlers\' need: the counts a block expects (batch-11.sh:445: expe
     const ok = android.handlersNeed({ 'averilab://shared/open': 2, 'averilab://cell/open': 1 }) as Spec;
     expect(await ok.check(needCtx())).toEqual({ ok: true, how: 'handlers as expected: averilab://shared/open 2, averilab://cell/open 1' });
     expect(await ok.alive(needCtx())).toEqual({ ok: true, how: 'handlers as expected: averilab://shared/open 2, averilab://cell/open 1' });
-    const off = android.handlersNeed({ 'averilab://shared/open': 3 }) as Spec;
-    expect(await off.check(needCtx())).toEqual({ ok: false, why: 'averilab://shared/open has 2 handler(s), 3 expected' });
+    const off = android.handlersNeed({ 'averilab://shared/open': 3, 'averilab://cell/open': 2 }) as Spec;
+    expect(await off.check(needCtx())).toEqual({ ok: false, why: 'averilab://shared/open has 2 handler(s), 3 expected; averilab://cell/open has 1 handler(s), 2 expected' });
     expect(await off.check(needCtx(runOf(world), null))).toMatchObject({ ok: false });
   });
 });

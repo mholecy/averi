@@ -3,7 +3,7 @@ import { LAB_APP, pause } from '../lab-device.js';
 import type { WindowSpec } from './abort.js';
 import type { Asked } from './cases.js';
 import type { Call, CallResult, Run } from './bounded.js';
-import { nodeFs, type BatchFs } from './io.js';
+import type { BatchFs } from './io.js';
 import { PROTECTED, protectedLine, type ProtectedRead } from './ios-defaults.js';
 import { backup, compare, domainsWindow, LabSim, readProtected, restore } from './ios-domains.js';
 import { CATALOG_PATH, cellsWhy, companionPattern, freshIn, LSOF_ARGV, openInAlertOf, pkillOf, portHand, portOf, portPart, wdaKillPatterns, wdaRestoreOf, type PortRead } from './lab-lines.js';
@@ -63,7 +63,7 @@ export class IosSim {
 
   /** The lab simulator `udid`, or why it is refused (nothing was done to it). */
   static async open(udid: string, run: Run, o: { fs?: BatchFs; wait?: (ms: number) => Promise<unknown> } = {}): Promise<{ ok: true; lab: IosSim } | { ok: false; why: string }> {
-    const r = await LabSim.open(udid, run, o.fs ?? nodeFs);
+    const r = await LabSim.open(udid, run, o.fs);
     return r.ok ? { ok: true, lab: new IosSim(r.sim, run, o.wait ?? pause) } : r;
   }
 
@@ -147,10 +147,13 @@ export function endLabProcesses(guarded: () => string | undefined): LastStep {
   return async ({ run, step }) => {
     const udid = guarded();
     if (udid === undefined) return;
-    const { port, whys } = await killLabWda({ run, udid });
+    const { port: first, whys } = await killLabWda({ run, udid });
+    // Its listeners were killed: read again, so the line says what is left, not what was there.
+    const port = first.state === 'busy' ? await portNow({ run, udid }) : first;
+    if (first.state === 'busy' && port.state !== 'free') whys.push(portPart(port, false));
     const companion = pkillOf(await run('pkill', ['-f', companionPattern(udid)], { secs: HOST_SECS }));
     if ('why' in companion) whys.push(companion.why);
-    const said = `the lab's WebDriverAgent (${portPart(port, port.state === 'busy')}) and idb_companion of ${nameInLine(udid)} ended`;
+    const said = `the lab's WebDriverAgent (${portPart(port, first.state === 'busy')}) and idb_companion of ${nameInLine(udid)} ended`;
     if (whys.length === 0) step('NOTE', said);
     else step('WARN', `${said}, not all proven: ${whys.join('; ')}`);
   };

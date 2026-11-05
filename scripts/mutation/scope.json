@@ -133,5 +133,25 @@
     "tests": ["tests/truth/batch/runner.test.ts"],
     "floor": 97,
     "baseline": "99.29 % on 2026-11-05 (T2 S6a review round 6: complete() only adds a requirement, a run cut short INTERRUPTED with its gap; cold): 422 mutants, 0 survived, 3 without coverage — the same equivalents; 99.27 % on 2026-11-05 (T2 S6a review round 5: one completeness rule, assess, on both paths; noRecords guarded; cold): 409 mutants, 0 survived, 3 without coverage — the same equivalents; the round's first run left 7 survivors, killed by tests (the noRecords throw's call names) or designed away (assess's state strings, now { complete, gap }); 99.20 % on 2026-11-05 (T2 S6a code review: judgeable on both paths, noRecords, the steps' ERRORs counted with the logs', the records moved out to records.ts; cold): 373 mutants, 0 survived, 3 without coverage — the same equivalents; the first run's 5 survivors killed by tests (the judge's guards, two step ERRORs, the step time) or designed away (judgeable's catch left empty); 99.27 % on 2026-11-05 (T2 S6a review round 3: the logs named <block>/<file> for logErrors; cold): 410 mutants, 0 survived, 3 without coverage — the same equivalents; 99.26 % on 2026-11-05 (T2 S6a review round 2: the none-ran line, the deduplicated ERROR lines, the needs loop stopped at the interrupt; cold): 407 mutants, 0 survived, 3 without coverage — the same equivalents; the round's one survivor, the blocks loop's interrupt check, killed by a test (a later block skipped for its precondition is not said skipped once the abort began); 99.25 % on 2026-11-05 (T2 S6a review round 1: the judged-nothing line, the need's recheck, after-interrupt notes, exit 2 when no block ran, fileErrors; cold): 400 mutants, 0 survived, 3 without coverage — each a `?? ''` turned into \"Stryker was here!\", equivalent because that text holds no `# Live golden:` header (live.ts's log, the rejudge summary: stepOutcome reads the same) and no run's header (steps.log: stepsOfRun finds none either way); the round's one survivor, a run counter only compared with 0 (`ran--`), designed away as a boolean; 98.88 % on 2026-11-05 (T2 S6a, cold): 357 mutants, 0 survived, 4 without coverage — the same equivalents, and a log the folder lists read as \"Stryker was here!\", which holds no ERROR line (now fileErrors' NOTE, covered); the first cold run, at 90.44 % (331 mutants, 27 survived, 8 without coverage), had its survivors killed by tests (a run folder of this id refused, a block not stateful never refused, the default clock and pid, the ctx's steps and print, the lab line noted, a need's step, the abort's judge and complete() reading the folder, a judge-less block's no analyze line, a record's other write error, a details file missing, the no-device outcome and the live banner, an interrupt during the end's judging or the last block) or designed away (preconditions() returning an empty map once interrupted, the SKIP why read with `!`, the log folders taken in openRun's order)"
+  },
+  "scripts/truth/batch/lab-lines.ts": {
+    "tests": ["tests/truth/batch/lab-lines.test.ts", "tests/truth/batch/ios-lab.test.ts"],
+    "floor": 0,
+    "baseline": "TBD"
+  },
+  "scripts/truth/batch/ios-lab.ts": {
+    "tests": ["tests/truth/batch/ios-lab.test.ts", "tests/truth/batch/lab-batch.test.ts"],
+    "floor": 0,
+    "baseline": "TBD"
+  },
+  "scripts/truth/batch/android-lab.ts": {
+    "tests": ["tests/truth/batch/android-lab.test.ts", "tests/truth/batch/lab-batch.test.ts"],
+    "floor": 0,
+    "baseline": "TBD"
+  },
+  "scripts/truth/batch/lab-build.ts": {
+    "tests": ["tests/truth/batch/lab-build.test.ts", "tests/truth/batch/lab-batch.test.ts"],
+    "floor": 0,
+    "baseline": "TBD"
   }
 }

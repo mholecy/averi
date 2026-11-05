@@ -57,8 +57,9 @@ export interface WorldOptions {
   /** Port 8120's listeners now, and whether a kill leaves one (it never goes). */
   listeners?: number[];
   stickyListener?: boolean;
-  /** `defaults export` fails for this domain. */
+  /** `defaults export` fails for this domain; every write, import and delete fails (the restore not verified). */
   exportFails?: string;
+  restoreFails?: boolean;
   /** The finportal key: its value (none: absent), and a value it takes at the end (CHANGED). */
   finportal?: string;
   finportalEnd?: string;
@@ -138,6 +139,7 @@ export function labWorld(o: WorldOptions) {
       }
       return map === undefined ? exit(1, `Domain ${domain} does not exist`) : ok(`${JSON.stringify(map)}\n`);
     }
+    if (o.restoreFails === true && ['write', 'import', 'delete'].includes(dverb)) return exit(1, `defaults ${dverb}: refused`);
     if (dverb === 'write') {
       const [flag, v] = [args[7], args[8]];
       const kv: KeyVal = flag === '-bool' ? { t: 'bool', c: v, v } : flag === '-int' ? { t: 'int', c: String(Number(v)), v } : { t: 'string', c: JSON.stringify(v), v };

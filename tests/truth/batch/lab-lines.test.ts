@@ -61,6 +61,9 @@ describe('port 8120 (d43-gate.ts\'s restore: the port free, else killed): lsof\'
 
   it('exit 1 with nothing printed is free; exit 0 its pids; anything else unread (never free)', () => {
     expect(portOf(exit(1))).toEqual({ state: 'free' });
+    expect(portOf(exit(1, '\n', ' \n'))).toEqual({ state: 'free' });
+    expect(portOf(ok(' 4242 \n\n'))).toEqual({ state: 'busy', pids: [4242] });
+    for (const out of ['42\nabc\n', 'x42\n', '42x\n']) expect(portOf(ok(out)).state).toBe('unread');
     expect(portOf(ok('4242\n4343\n'))).toEqual({ state: 'busy', pids: [4242, 4343] });
     expect(portOf(exit(1, '', '17\n'))).toEqual({ state: 'unread', why: 'lsof: exit 1 17' });
     expect(portOf(exit(2, 'lsof: WARNING'))).toEqual({ state: 'unread', why: 'lsof: exit 2 lsof: WARNING' });
@@ -110,8 +113,9 @@ describe('the Open-in alert (open-in-alert.py, batch-2 block D/A: a leftover "Op
   const alert = { AXLabel: 'Open in “AveriLab”?', type: 'StaticText' };
   const cancel = { AXLabel: 'Cancel', type: 'Button', frame: { x: 100, y: 400, width: 80, height: 40 } };
 
-  it('none: no element labelled (or valued) "Open in …"', () => {
+  it('none: no element labelled (or valued) "Open in …" at its start', () => {
     expect(openInAlertOf(tree([{ AXLabel: 'Opening hours', type: 'StaticText' }, cancel]))).toEqual({ state: 'none' });
+    expect(openInAlertOf(tree([{ AXLabel: 'Not Open in “AveriLab”', type: 'StaticText' }, cancel]))).toEqual({ state: 'none' });
     expect(openInAlertOf(tree([]))).toEqual({ state: 'none' });
   });
 
@@ -122,6 +126,10 @@ describe('the Open-in alert (open-in-alert.py, batch-2 block D/A: a leftover "Op
   it('its label from AXValue when AXLabel is empty; Cancel by its trimmed label, any case; its centre from AXFrame when it has no frame', () => {
     const r = openInAlertOf(tree([{ AXLabel: '', AXValue: 'Open in “AveriLab”?' }, { AXLabel: ' CANCEL ', type: 'Button', AXFrame: '{{10, 20}, {30, 40}}' }]));
     expect(r).toEqual({ state: 'found', label: 'Open in “AveriLab”?', buttons: [' CANCEL '], cancel: { x: 25, y: 40 } });
+    // No AXLabel at all, or a null one: the value is the label; a null frame falls back to AXFrame; AXFrame unspaced.
+    for (const label of [{}, { AXLabel: null }]) {
+      expect(openInAlertOf(tree([{ ...label, AXValue: 'Open in “X”?' }, { AXLabel: 'Cancel', type: 'Button', frame: null, AXFrame: '{{10,20},{30,40}}' }]))).toEqual({ state: 'found', label: 'Open in “X”?', buttons: ['Cancel'], cancel: { x: 25, y: 40 } });
+    }
   });
 
   it('found with no Cancel, or a Cancel with no frame: no point to tap', () => {
@@ -152,12 +160,18 @@ describe('an installed cells.json against main\'s catalog, byte for byte (batch-
 });
 
 describe('the JDK for the Android build (batch-11.sh:309–310: `java_home -v 17`, its release file says 17)', () => {
-  it('a home whose release says JAVA_VERSION="17…: that home; else why', () => {
-    expect(javaHomeOf(ok('/jdk17\n'), 'IMPLEMENTOR="x"\nJAVA_VERSION="17.0.12"\n')).toEqual({ home: '/jdk17' });
-    expect(javaHomeOf(ok('/jdk21\n'), 'JAVA_VERSION="21.0.1"\n')).toEqual({ why: "no JDK 17 (java_home -v 17 → '/jdk21', its release says no 17)" });
-    expect(javaHomeOf(ok('/jdk17\n'), undefined)).toEqual({ why: "no JDK 17 (java_home -v 17 → '/jdk17', its release says no 17)" });
-    expect(javaHomeOf(exit(1, 'Unable to find any JVMs'), undefined)).toEqual({ why: "no JDK 17 (java_home -v 17 → 'nothing': exit 1 Unable to find any JVMs)" });
-    expect(javaHomeOf(ok('\n'), undefined)).toEqual({ why: "no JDK 17 (java_home -v 17 → 'nothing')" });
+  it('a home whose release says JAVA_VERSION="17…: that home; else why — the release read only once there is a home', () => {
+    const read: string[] = [];
+    const release = (text: string | undefined) => (home: string) => (read.push(home), text);
+    expect(javaHomeOf(ok('/jdk17\n'), release('IMPLEMENTOR="x"\nJAVA_VERSION="17.0.12"\n'))).toEqual({ home: '/jdk17' });
+    expect(read).toEqual(['/jdk17']);
+    expect(javaHomeOf(ok('/jdk21\n'), release('JAVA_VERSION="21.0.1"\n'))).toEqual({ why: "no JDK 17 (java_home -v 17 → '/jdk21', its release says no 17)" });
+    expect(javaHomeOf(ok('/jdk\n'), release('IMPLEMENTOR_JAVA_VERSION="17"\n'))).toEqual({ why: "no JDK 17 (java_home -v 17 → '/jdk', its release says no 17)" });
+    expect(javaHomeOf(ok('/jdk17\n'), release(undefined))).toEqual({ why: "no JDK 17 (java_home -v 17 → '/jdk17', its release file not read)" });
+    read.length = 0;
+    expect(javaHomeOf(exit(1, 'Unable to find any JVMs\n', '/jdk\n'), release('JAVA_VERSION="17"'))).toEqual({ why: 'no JDK 17 (java_home -v 17 → nothing: exit 1 Unable to find any JVMs)' });
+    expect(javaHomeOf(ok(' \n'), release('JAVA_VERSION="17"'))).toEqual({ why: 'no JDK 17 (java_home -v 17 → nothing)' });
+    expect(read).toEqual([]);
   });
 });
 
