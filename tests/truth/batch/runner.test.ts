@@ -633,6 +633,14 @@ describe('the backstop: a wanted block with no verdict line of its label gets on
     expect(summary()).toContain('E5 verdict: INCONCLUSIVE — 1 of 1 run(s) incomplete: c — asked 3 run(s), recorded 2');
   });
 
+  it('a complete() that throws is not complete: not judged, the backstop\'s line, never the run\'s abort', async () => {
+    const judged: string[] = [];
+    const code = await go([plain('T6', { run: async () => {}, complete: () => { throw new Error('static.txt unreadable'); }, judge: async () => (judged.push('T6'), ['T6 verdict: PASS']) }), plain('kf')]);
+    expect(code).toBe(0);
+    expect(judged).toEqual([]);
+    expect(summary()).toContain('T6 verdict: INCONCLUSIVE — not run (see the ERROR lines)');
+  });
+
   it('a block that asked nothing is judged only when it declared it records nothing (noRecords), once its run returned', async () => {
     const judged: string[] = [];
     const j = (id: string) => async () => (judged.push(id), [`${id} verdict: PASS`]);
