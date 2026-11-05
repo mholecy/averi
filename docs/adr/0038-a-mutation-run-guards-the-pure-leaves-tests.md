@@ -17,6 +17,8 @@ Amended 2026-11-05 (T2b-1: a changed protected key exits 1, a need's end and its
 refusal, the cleanup's and the domains window's labels — see the T2 amendment's T2b-1 part below).
 Amended 2026-11-05 (T2b-2: the run in two groups, core and lab, one Stryker process each — see the T2 amendment's
 T2b-2 part below).
+Amended 2026-11-05 (T2c: the abort's and the runner's budget tests on fake time, their bounds pinned exactly — see the
+T2 amendment's T2c part below).
 
 ## Context
 
@@ -1429,3 +1431,10 @@ characters, looked up as itself). The guard's exception, said exactly: lab's tes
 single run lab-batch.test.ts was the first killer of some), but core's own tests must suffice for core's floors; a
 narrower include can only lower a score, a loud floor failure, never a false pass. Every module's score and mutant count
 is the same as in T2b-1's final single run; floors unchanged.
+
+### T2c: the budget tests on fake time (2026-11-05, backlog T2c)
+
+The judging budget's races in abort.test.ts and the late need ends in runner.test.ts run on fake time (setTimeout,
+clearTimeout and Date faked, tests/truth/batch/fake-time.ts), no longer on tiny real timers, so a stall of the machine
+cannot flip them; the bounds are pinned exactly, a millisecond inside and a millisecond past, and a block left exactly
+0 ms is spent.
