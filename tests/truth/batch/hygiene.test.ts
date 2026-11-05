@@ -95,25 +95,30 @@ const FORBIDDEN = [...PATHS, ...BATCH_ONLY];
 const portable = (side: unknown) => side === THIS_CHECKOUT || (typeof side === 'string' && side !== '' && !isAbsolute(side) && !side.startsWith('~'));
 
 /**
- * The made-up host paths tests use as samples (T8), each named: struck from a line before the rules read it. Whole
- * names only: a longer one (a home `meyer`, a temporary `xavier`) is still caught.
+ * The made-up host paths tests use as samples (T8), each named: struck from a line of a file under tests/ (where they
+ * occur, and nowhere else) before the rules read it. Whole names only: a home ends at a slash, a quote, a space or the
+ * line's end (`me.smith`, `lab-ops` are still caught); a temporary file at a word's end (`xavier` is still caught).
  */
 const SAMPLES: readonly { what: string; re: RegExp }[] = [
-  { what: 'a made-up home: /Users/me, /Users/lab, /Users/tester, /Users/a b, /home/x', re: new RegExp(`${slash}(Users${slash}(me|lab|tester|a b)|home${slash}x)\\b`, 'g') },
+  { what: `a made-up home: ${['me', 'lab', 'tester', 'a b'].map((n) => `${slash}Users${slash}${n}`).join(', ')}, ${slash}home${slash}x`, re: new RegExp(`${slash}(Users${slash}(me|lab|tester|a b)|home${slash}x)(?=[${slash}'"\`\\s]|$)`, 'g') },
   { what: 'a made-up temporary file: /tmp/x…, /tmp/App.app, /tmp/averi-test-baselines, /var/folders/x/', re: new RegExp(`(?<![\\w.-])${slash}tmp${slash}(x|App\\.app|averi-test-baselines)\\b|${slash}var${slash}folders${slash}x${slash}`, 'g') },
 ];
-/** What of the rules a line holds, its accents folded and its samples struck. */
-const rulesHitting = (rules: readonly { what: string; re: RegExp }[], line: string): string[] => {
-  const read = SAMPLES.reduce((l, sample) => l.replace(sample.re, '<sample>'), folded(line));
+/** What of the rules a line of `file` holds, its accents folded and (under tests/) its samples struck. */
+const rulesHitting = (rules: readonly { what: string; re: RegExp }[], line: string, file: string): string[] => {
+  const samples = file.startsWith('tests/') ? SAMPLES : [];
+  const read = samples.reduce((l, sample) => l.replace(sample.re, '<sample>'), folded(line));
   return rules.filter((f) => f.re.test(read)).map((f) => f.what);
 };
+
+/** A file outside tests/, for the rules' own tests: no sample struck. */
+const NOTE = 'docs/x.md';
 
 /** Each line of each file that holds a fragment: `file:line: what`. */
 const hitsIn = (files: readonly string[], rules: readonly { what: string; re: RegExp }[]): string[] =>
   files.flatMap((file) =>
     readFileSync(join(ROOT, file), 'utf8')
       .split('\n')
-      .flatMap((line, i) => rulesHitting(rules, line).map((what) => `${file}:${i + 1}: ${what}`)),
+      .flatMap((line, i) => rulesHitting(rules, line, file).map((what) => `${file}:${i + 1}: ${what}`)),
   );
 
 describe('path hygiene: the batch module, the live records and the notes hold no machine- or session-bound path (T2 S1, T8)', () => {
@@ -147,7 +152,7 @@ describe('path hygiene: the batch module, the live records and the notes hold no
   });
 
   it('each pattern catches what it names (a pattern that matches nothing guards nothing)', () => {
-    const caught = (s: string) => rulesHitting(FORBIDDEN, s);
+    const caught = (s: string) => rulesHitting(FORBIDDEN, s, NOTE);
     expect(caught(['', 'private', 'tmp', 'x'].join(slash))).toContain('a macOS temporary folder');
     expect(caught(['', 'private', 'var', 'x'].join(slash))).toContain('a macOS temporary folder');
     expect(caught(['', 'var', 'folders', 'ab'].join(slash))).toContain('a macOS per-user temporary folder');
@@ -175,7 +180,7 @@ describe('path hygiene: the batch module, the live records and the notes hold no
   });
 
   it('what each path rule allows: prose, placeholders, a deep link, the lab simulator runtime (T8)', () => {
-    const caught = (s: string) => rulesHitting(PATHS, s);
+    const caught = (s: string) => rulesHitting(PATHS, s, NOTE);
     // a home directory: a path inside a word, a deep link's host, a placeholder
     expect(caught('pressKey(back/home/enter)')).toEqual([]);
     expect(caught(`myport:${slash}${slash}home${slash}x`)).toEqual([]);
@@ -191,15 +196,25 @@ describe('path hygiene: the batch module, the live records and the notes hold no
   });
 
   it('what the tests may hold: made-up homes and temporary files, each named — and nothing like them (T8)', () => {
-    const caught = (s: string) => rulesHitting(PATHS, s);
+    const caught = (s: string) => rulesHitting(PATHS, s, 'tests/x.test.ts');
     for (const sample of ['me', 'lab', 'tester', 'a b']) expect(caught(`'${slash}Users${slash}${sample}${slash}Library'`)).toEqual([]);
     expect(caught(`HOME: '${slash}home${slash}x'`)).toEqual([]);
+    expect(caught(`"${slash}Users${slash}me" or ${slash}Users${slash}lab\tx, cd ${slash}Users${slash}tester`)).toEqual([]);
+    for (const longer of ['me.smith', 'lab-ops', 'tester.john']) expect(caught(`'${slash}Users${slash}${longer}${slash}x'`)).toContain('a home directory');
+    expect(caught(`'${slash}home${slash}x-y${slash}z'`)).toContain('a home directory');
     expect(caught(`install('${slash}tmp${slash}App.app'), log: ${slash}tmp${slash}x.log, '${slash}tmp${slash}x', ${slash}tmp${slash}averi-test-baselines`)).toEqual([]);
     expect(caught(`classify('${slash}var${slash}folders${slash}x${slash}averi-ocr')`)).toEqual([]);
     expect(caught(`'${slash}Users${slash}meyer${slash}x'`)).toContain('a home directory');
     expect(caught(`'${slash}home${slash}xavier${slash}x'`)).toContain('a home directory');
     expect(caught(`'${slash}tmp${slash}xavier'`)).toContain('a temporary folder');
     expect(caught(`'${slash}var${slash}folders${slash}xy${slash}z'`)).toContain('a macOS per-user temporary folder');
+  });
+
+  it('the samples are struck in tests/ alone: a note, the skill, README.md or ARCHITECTURE.md naming one is caught', () => {
+    for (const where of [NOTE, 'skill/x.md', 'README.md', 'ARCHITECTURE.md']) {
+      expect(rulesHitting(PATHS, `cwd ${slash}Users${slash}me${slash}app`, where)).toContain('a home directory');
+      expect(rulesHitting(PATHS, `cd ${slash}tmp${slash}x`, where)).toContain('a temporary folder');
+    }
   });
 
   it('a name from git counts when it has two parts, or one of 4 letters or more, accents folded; an unset or shorter one is skipped (made-up names only)', () => {
@@ -209,7 +224,7 @@ describe('path hygiene: the batch module, the live records and the notes hold no
   });
 
   it("the owner's name: whole words, any case, accents folded on both sides — no code word (made-up names only)", () => {
-    const named = (name: string, line: string) => rulesHitting([{ what: 'owner', re: ownerRe(asOwner(name) ?? '') }], line).length > 0;
+    const named = (name: string, line: string) => rulesHitting([{ what: 'owner', re: ownerRe(asOwner(name) ?? '') }], line, NOTE).length > 0;
     expect(named('Zoë Ünder', 'by Zoe Under')).toBe(true);
     expect(named('Zoe Under', 'by ZOË  ÜNDER.')).toBe(true);
     expect(named('Zoë Ünder', 'zoeunder, Zoe Underhill, Zoe')).toBe(false);
@@ -219,7 +234,7 @@ describe('path hygiene: the batch module, the live records and the notes hold no
 
   it.runIf(owner !== undefined)("the owner's name, read from git at run time, is caught in any case, accented or not", () => {
     const name = owner ?? '';
-    const hit = (line: string) => rulesHitting(FORBIDDEN, line);
+    const hit = (line: string) => rulesHitting(FORBIDDEN, line, NOTE);
     expect(hit(`by ${name.toUpperCase()}`)).toContain("the owner's name (git config user.name)");
     expect(hit(`by ${name.normalize('NFD').replace(/\p{M}/gu, '')}`)).toContain("the owner's name (git config user.name)");
   });
