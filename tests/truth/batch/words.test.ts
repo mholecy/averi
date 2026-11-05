@@ -10,6 +10,7 @@ import {
   interruptedBlock,
   messageOf,
   nameInLine,
+  NONE_RAN_LINE,
   timeOf,
   parseVerdictLine,
   stepLine,
@@ -229,10 +230,14 @@ describe('exitCodeOf — 0, 1 on a FAIL or a RESTORE, 130 when interrupted (batc
     expect(exitCodeOf({ ...none, interrupted: { at: '10:12:00' } })).toBe(130);
   });
 
-  it('the SUMMARY of a run where no wanted block ran says so, after the blocks\' lines, and why the exit is 2 (review round 2)', () => {
+  it('the SUMMARY of a run where no wanted block ran says so after the blocks\' lines, whatever the exit (review rounds 2, 3: a RESTORE makes it 1)', () => {
     const lines = summaryLines({ ...base, noneRan: true });
-    expect(lines.indexOf('NOTE no wanted block ran (each one\'s why above) — exit 2')).toBe(lines.indexOf('E5 verdict: PASS — a PASS, c PASS') + 1);
-    expect(summaryLines(base)).not.toContain('NOTE no wanted block ran (each one\'s why above) — exit 2');
+    expect(NONE_RAN_LINE).toBe("NOTE no wanted block ran (each one's why above)");
+    expect(lines.indexOf(NONE_RAN_LINE)).toBe(lines.indexOf('E5 verdict: PASS — a PASS, c PASS') + 1);
+    expect(summaryLines(base)).not.toContain(NONE_RAN_LINE);
+    const restored = { ...base, noneRan: true, restore: { file: 'R', written: ['h; state to put back by hand:', 'x'] } };
+    expect(summaryLines(restored)).toContain(NONE_RAN_LINE);
+    expect(exitCodeOf(restored)).toBe(1);
     expect(summaryLines({ ...base, noneRan: false })).toEqual(summaryLines(base));
   });
 

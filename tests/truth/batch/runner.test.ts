@@ -454,7 +454,7 @@ describe('preconditions: a failed one makes the block INCONCLUSIVE, never a refu
       `ERROR checkout: ${why} — every block INCONCLUSIVE, none run`,
       `kf live verdict: INCONCLUSIVE — precondition: ${why}`,
       `D43 live verdict: INCONCLUSIVE — precondition: ${why}`,
-      "NOTE no wanted block ran (each one's why above) — exit 2",
+      "NOTE no wanted block ran (each one's why above)",
       'RESTORE: none — everything dirty was put back and verified',
       `======== SUMMARY end (run ${ID})`,
     ]);
@@ -548,7 +548,7 @@ describe('needs: each checked once, when the first wanted block needing it comes
   it('no wanted block ran (every need failed): exit 2, "nothing was done" — never success (review round 1); one that ran: its own exit', async () => {
     const down = { ...needs, android: async () => ({ ok: false as const, why: 'down' }) };
     expect(await go([plain('a', { needs: ['android'] }), plain('b', { preconditions: [async () => ({ ok: false, why: 'no' })] })], { needs: down })).toBe(2);
-    expect(summary().slice(-4, -1)).toEqual(['b verdict: INCONCLUSIVE — precondition: no', 'NOTE no wanted block ran (each one\'s why above) — exit 2', 'RESTORE: none — everything dirty was put back and verified']);
+    expect(summary().slice(-4, -1)).toEqual(['b verdict: INCONCLUSIVE — precondition: no', 'NOTE no wanted block ran (each one\'s why above)', 'RESTORE: none — everything dirty was put back and verified']);
     rmSync(out, { recursive: true, force: true });
     expect(await go([plain('a', { needs: ['android'] }), plain('c')], { needs: down })).toBe(0);
     expect(summary().some((l) => l.startsWith('NOTE no wanted block ran'))).toBe(false);
@@ -665,7 +665,15 @@ describe('the ERROR lines: this run\'s steps and every ERROR line of its blocks\
       }),
     ]);
     const errors = summary().slice(summary().indexOf('RESTORE: none — everything dirty was put back and verified') + 1, -1);
-    expect(errors).toEqual(['ERROR the catalog drifted', 'ERROR the analyzer\'s own', 'ERROR the cell did not open (×2)']);
+    expect(errors).toEqual(['ERROR the catalog drifted', 'ERROR the analyzer\'s own', `ERROR the cell did not open (×2, in kf/probe.log)`]);
+  });
+
+  it('one ERROR in several of this run\'s logs: one line, its total and where (review round 3: 50 in p, 1 in q, 2 in r)', async () => {
+    await go([
+      plain('kf', { run: async (ctx) => (writeFileSync(join(ctx.dir, 'p.log'), Array.from({ length: 50 }, () => 'ERROR same').join('\n')), writeFileSync(join(ctx.labDir, 'q.log'), 'ERROR same\n'), ctx.verdict('PASS')) }),
+      plain('E5', { run: async (ctx) => (writeFileSync(join(ctx.dir, 'r.log'), 'ERROR same\nERROR same\n'), ctx.verdict('PASS')) }),
+    ]);
+    expect(summary().filter((l) => l.includes('ERROR same'))).toEqual(['ERROR same (×53, in lab/q.log, kf/p.log, E5/r.log)']);
   });
 
   it('a probe log\'s progress line (a lone CR) never breaks the SUMMARY: each overwritten part its own line', async () => {

@@ -9,9 +9,9 @@ import {
   detailLines,
   detailsLines,
   deviceArgs,
-  ERRORS_PER_FILE,
+  ERROR_LINES_SHOWN,
   errorLinesIn,
-  fileErrors,
+  logErrors,
   hasVerdictOf,
   judgedNothingLine,
   liveCalls,
@@ -30,6 +30,7 @@ import {
   recordOf,
   rejudgeArgs,
   stepsOfRun,
+  WHERE_SHOWN,
 } from '../../../scripts/truth/batch/runner-lines.js';
 import { exitCodeOf, failsIn, type Summary } from '../../../scripts/truth/batch/words.js';
 
@@ -213,33 +214,44 @@ describe('errorLinesIn — the ERROR lines a block\'s log or analyze.txt holds (
   });
 });
 
-describe('fileErrors — one log\'s ERROR lines for the SUMMARY, bounded (T2 S6a review round 1)', () => {
-  it('each cut at DETAIL_CHARS code points, `…` its last; at most ERRORS_PER_FILE, then how many more and where', () => {
-    expect(ERRORS_PER_FILE).toBe(20);
-    const long = `ERROR ${'x'.repeat(800)}`;
-    expect(fileErrors('/d/a.log', `${long}\nok`)).toEqual([`${[...long].slice(0, DETAIL_CHARS - 1).join('')}…`]);
-    expect(fileErrors('/d/a.log', `ERROR ${'y'.repeat(DETAIL_CHARS - 6)}`)).toEqual([`ERROR ${'y'.repeat(DETAIL_CHARS - 6)}`]);
-    const many = Array.from({ length: 23 }, (_, i) => `ERROR e${i}`).join('\n');
-    const got = fileErrors('/d/b.log', many);
-    expect(got).toHaveLength(21);
-    expect(got[19]).toBe('ERROR e19');
-    expect(got[20]).toBe('… 3 more distinct ERROR lines in /d/b.log');
-    expect(fileErrors('/d/c.log', Array.from({ length: 20 }, (_, i) => `ERROR z${i}`).join('\n'))).toHaveLength(20);
+describe('logErrors — this run\'s ERROR lines from its logs, counted across them all, bounded (T2 S6a review rounds 1–3)', () => {
+  const log = (name: string, text: string | undefined, why?: string) => ({ name, path: `/o/${name}`, text, ...(why === undefined ? {} : { why }) });
+  const times = (n: number, line: string) => Array.from({ length: n }, () => line).join('\n');
+
+  it('one line per distinct ERROR, run-wide, in first-seen order; repeated: its total and where (the reviewer\'s 50 in p, 1 in q, 2 in r); once: bare', () => {
+    expect(logErrors([log('kf/p.log', `${times(50, 'ERROR same')}\nERROR only here`), log('kf/q.log', 'ERROR same'), log('E5/r.log', times(2, 'ERROR same'))])).toEqual([
+      'ERROR same (×53, in kf/p.log, kf/q.log, E5/r.log)',
+      'ERROR only here',
+    ]);
+    expect(logErrors([log('a.log', times(2, 'ERROR x'))])).toEqual(['ERROR x (×2, in a.log)']);
   });
 
-  it('a line repeated is said once with its count, before the cap: 50 of one never bury a different one (review round 2)', () => {
-    const log = [...Array.from({ length: 50 }, () => 'ERROR same'), 'ERROR different', 'ERROR same'].join('\n');
-    expect(fileErrors('/d/a.log', log)).toEqual(['ERROR same (×51)', 'ERROR different']);
+  it('more than WHERE_SHOWN files: the first 3, then how many more', () => {
+    expect(WHERE_SHOWN).toBe(3);
+    expect(logErrors(['a', 'b', 'c', 'd', 'e'].map((n) => log(`${n}.log`, 'ERROR x')))).toEqual(['ERROR x (×5, in a.log, b.log, c.log, +2 more)']);
+  });
+
+  it('each cut so the whole is at most DETAIL_CHARS, `…` the last of what is cut; at most ERROR_LINES_SHOWN distinct, then how many more and where', () => {
+    expect(ERROR_LINES_SHOWN).toBe(20);
     const long = `ERROR ${'x'.repeat(800)}`;
-    const [cut] = fileErrors('/d/a.log', `${long}\n${long}`);
+    expect(logErrors([log('a.log', long)])).toEqual([`${[...long].slice(0, DETAIL_CHARS - 1).join('')}…`]);
+    expect(logErrors([log('a.log', `ERROR ${'y'.repeat(DETAIL_CHARS - 6)}`)])).toEqual([`ERROR ${'y'.repeat(DETAIL_CHARS - 6)}`]);
+    const [cut] = logErrors([log('a.log', times(2, long))]);
     expect([...cut]).toHaveLength(DETAIL_CHARS);
-    expect(cut.endsWith('… (×2)')).toBe(true);
+    expect(cut.endsWith('… (×2, in a.log)')).toBe(true);
+    const got = logErrors([log('a.log', Array.from({ length: 21 }, (_, i) => `ERROR e${i}`).join('\n')), log('b.log', 'ERROR e0\nERROR f1\nERROR f2')]);
+    expect(got).toHaveLength(21);
+    expect(got[0]).toBe('ERROR e0 (×2, in a.log, b.log)');
+    expect(got[19]).toBe('ERROR e19');
+    expect(got[20]).toBe('… 3 more distinct ERROR lines (in a.log, b.log)');
+    expect(logErrors([log('c.log', Array.from({ length: 20 }, (_, i) => `ERROR z${i}`).join('\n'))])).toHaveLength(20);
   });
 
-  it('a log that could not be read: a NOTE naming it, never silently skipped', () => {
-    expect(fileErrors('/d/stuck.log', undefined)).toEqual(['NOTE /d/stuck.log not read: unreadable']);
-    expect(fileErrors('/d/stuck.log', undefined, 'a folder')).toEqual(['NOTE /d/stuck.log not read: unreadable: a folder']);
-    expect(fileErrors('/d/a.log', 'ok\n')).toEqual([]);
+  it('a log that could not be read: a NOTE naming its path, with what is known of why, never silently skipped', () => {
+    expect(logErrors([log('kf/stuck.log', undefined), log('kf/full.log', undefined, 'a folder'), log('kf/a.log', 'ok\n')])).toEqual([
+      'NOTE /o/kf/stuck.log not read: unreadable',
+      'NOTE /o/kf/full.log not read: unreadable: a folder',
+    ]);
   });
 });
 
