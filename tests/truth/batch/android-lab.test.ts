@@ -34,6 +34,7 @@ afterEach(() => {
 const fresh = (o: Omit<WorldOptions, 'dir'> = {}) => (world = labWorld({ dir, ...o }));
 const config = (serial: string | null = LAB_SERIAL) => ({ out: join(dir, 'out'), repo: join(dir, 'repo'), env: {}, ...(serial === null ? {} : { serial }) });
 const needCtx = (run: Run = runOf(world), serial: string | null = LAB_SERIAL): NeedCtx => ({ bounded: run, labDir: join(dir, 'lab'), config: config(serial), fs: nodeFs, step: (w, t) => void steps.push(`${w} ${t}`) });
+const builtRef = (apk: string) => ({ ensure: async () => ({ ok: true as const, how: 'built' }), built: () => apk });
 type Spec = { check(c: NeedCtx): Promise<unknown>; alive(c: NeedCtx): Promise<unknown> };
 const settle = async () => {};
 
@@ -109,11 +110,19 @@ describe('the android need (batch-11.sh:427–450): guard, this run\'s build ins
     fresh({ apkCells: '{"old":1}\n' });
     const apk = join(dir, 'built.apk');
     writeFileSync(apk, `BUILT:${CATALOG}`);
-    const r = await (androidLab({ settle, build: () => apk }).need as Spec).check(needCtx());
+    const r = await (androidLab({ settle, build: builtRef(apk) }).need as Spec).check(needCtx());
     expect(r).toMatchObject({ ok: true, how: expect.stringContaining("; this run's build installed; the APK's assets/cells.json is main's") });
     expect(world.calls[1]).toBe(`adb -s ${LAB_SERIAL} install -r ${apk}`);
-    const bad = await (androidLab({ settle, build: () => join(dir, 'none.apk') }).need as Spec).check(needCtx());
+    const bad = await (androidLab({ settle, build: builtRef(join(dir, 'none.apk')) }).need as Spec).check(needCtx());
     expect(bad).toEqual({ ok: false, why: `this run's build not installed (adb install -r: exit 1 adb: failed to stat ${join(dir, 'none.apk')}: No such file or directory)` });
+  });
+
+  it('this run\'s build failed: a WARN, the APK already installed used (batch-11); required by the batch: not met (review round 1, MAJOR 2)', async () => {
+    const failed = { ensure: async () => ({ ok: false as const, why: 'the Android build failed (exit 1; android-build.log)' }), built: () => undefined };
+    const r = await (androidLab({ settle, build: failed }).need as Spec).check(needCtx());
+    expect(r).toMatchObject({ ok: true, warn: true, how: expect.stringMatching(/^the Android build failed \(exit 1; android-build\.log\); the app already installed is used: averi_lab emulator LAB-SERIAL; not rebuilt;/) });
+    expect(world.calls.some((c) => c.includes('install -r'))).toBe(false);
+    expect(await (androidLab({ settle, build: failed, requireBuild: true }).need as Spec).check(needCtx())).toEqual({ ok: false, why: "this run's build failed, and the batch requires it: the Android build failed (exit 1; android-build.log)" });
   });
 
   it('a count that cannot be read is said, never a number; the URLs are the batch\'s to name', async () => {

@@ -173,3 +173,61 @@ describe('the lab block (batch-11\'s and batch-12\'s `lab`: ONLY=lab checks the 
     expect(said).toEqual([['PASS', "every lab need met: android-build, android (each one's LAB line above)"]]);
   });
 });
+
+describe('the build asked by the device need itself (review round 1, MAJOR 2): one build a run, whoever asks first', () => {
+  it('ensure and the need\'s own check share one run: built once; failures() names a build that failed', async () => {
+    const b = labBuild();
+    const run = runOf(world);
+    expect(await b.ios.ensure(needCtx(run))).toMatchObject({ ok: true });
+    expect(await need(b, IOS_BUILD_NEED).check(needCtx(run))).toMatchObject({ ok: true });
+    expect(run.seen.filter((s) => s.words.startsWith('xcodebuild'))).toHaveLength(1);
+    expect(b.ios.built()).toBe(join(repo, IOS_APP_PATH));
+    expect(b.failures()).toEqual([]);
+    fresh({ buildFails: 'gradlew' });
+    const f = labBuild();
+    await f.android.ensure(needCtx());
+    await need(f, ANDROID_BUILD_NEED).check(needCtx());
+    expect(f.failures()).toEqual([`android-build: the Android build failed (exit 1; ${join(dir, 'lab', 'android-build.log')})`]);
+    expect(f.android.built()).toBeUndefined();
+  });
+});
+
+describe('the Gradle daemon after an interrupted Android build (review round 1, MINOR 6): the kit\'s last step stops it', () => {
+  const say = (w: string, t: string) => void steps.push(`${w} ${t}`);
+  it('a build started whose own --stop never ran (the abort refused it): `gradlew --stop` at the run\'s end, bounded, from the build\'s folder', async () => {
+    const b = labBuild();
+    const refusing: Run = async (cmd, args, call) => {
+      if (args.includes('--stop')) throw new Error(`${cmd} not started: the run is being stopped`);
+      return { code: 143, timedOut: false, signal: 'SIGTERM', out: '', err: '' };
+    };
+    await expect(need(b, ANDROID_BUILD_NEED).check(needCtx(refusing))).rejects.toThrow(/being stopped/);
+    const run = runOf(world);
+    await b.lastly({ run, step: say });
+    const cwd = join(repo, 'fixtures/apps/android');
+    expect(run.seen).toEqual([{ words: `${join(cwd, 'gradlew')} --stop`, secs: GRADLE_STOP_SECS, cwd, log: join(dir, 'lab', 'android-build.log'), env: { JAVA_HOME: join(dir, 'jdk17'), ANDROID_HOME: expect.any(String) } }]);
+    expect(steps).toEqual(['NOTE lab android: the Gradle daemon stopped at the run\'s end (its build was cut short)']);
+  });
+
+  it('no build started, or its own --stop ran: nothing; a stop that fails: a WARN', async () => {
+    const run = runOf(world);
+    await labBuild().lastly({ run, step: say });
+    const b = labBuild();
+    await need(b, ANDROID_BUILD_NEED).check(needCtx());
+    const after = runOf(world);
+    await b.lastly({ run: after, step: say });
+    expect([run.seen, after.seen]).toEqual([[], []]);
+    const c = labBuild();
+    await need(c, ANDROID_BUILD_NEED).check(needCtx(async (cmd, args, call) => { if (args.includes('--stop')) throw new Error('refused'); return runOf(world)(cmd, args, call); })).catch(() => {});
+    await c.lastly({ run: async () => ({ code: 1, timedOut: false, signal: null, out: '', err: 'no daemon' }), step: say });
+    expect(steps.at(-1)).toBe('WARN lab android: gradlew --stop at the run\'s end: exit 1 no daemon — the Gradle daemon may still be running');
+  });
+});
+
+describe('the lab block never says every need met when this run\'s build failed (review round 1, MAJOR 2)', () => {
+  it('a build that failed with the installed app used: a WARN naming it, not a PASS', async () => {
+    const said: unknown[] = [];
+    const block = labBlock(['android'], { build: { failures: () => ['android-build: the Android build failed (exit 1)'] } });
+    await block.run({ verdict: (...a: unknown[]) => void said.push(a) } as never);
+    expect(said).toEqual([['WARN', "the lab devices checked, but this run's build failed (android-build: the Android build failed (exit 1)): the app already installed is used"]]);
+  });
+});

@@ -66,6 +66,11 @@ const needCtx = (run: Run = runOf(world), udid: string | null = LAB_UDID): NeedC
 beforeEach(() => void (steps.length = 0));
 /** The words of the calls made, from the `n`th on. */
 const words = (from = 0) => world.calls.slice(from);
+/** A build need that was met with `app`, counting how often it is asked. */
+const builtRef = (app: string) => {
+  const ref = { asked: 0, ensure: async () => (ref.asked++, { ok: true as const, how: 'built' }), built: () => app };
+  return ref;
+};
 
 /** A block's ctx as the runner gives it, recording what the block said and did, in order. */
 function blockCtx(run = runOf(world), id = 'D43') {
@@ -282,7 +287,7 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     expect(await check({ reset: false })).toEqual({ ok: false, why: `the installed app (${world.app})'s cells.json is not main's (rerun with ONLY=lab,…)` });
     fresh({ appCells: null });
     expect(await check({ reset: false })).toEqual({ ok: false, why: 'the lab app is not installed (simctl get_app_container: exit 2 No such file or directory) (rerun with ONLY=lab,…)' });
-    expect(await check({ reset: false, build: () => join(dir, 'no-such.app') })).toMatchObject({ ok: false, why: expect.stringMatching(/^this run's build not installed/) });
+    expect(await check({ reset: false, build: builtRef(join(dir, 'no-such.app')) })).toMatchObject({ ok: false, why: expect.stringMatching(/^this run's build not installed/) });
   });
 
   it('this run\'s build: installed before the cells are compared (batch-11.sh:399–401), said in the how', async () => {
@@ -290,9 +295,20 @@ describe('the ios need (batch-11.sh:383–410): guard, reset, the finportal key\
     const app = join(dir, 'built.app');
     mkdirSync(app);
     writeFileSync(join(app, 'cells.json'), CATALOG);
-    const r = await (iosLab({ wait, reset: false, build: () => app }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
+    const ref = builtRef(app);
+    const r = await (iosLab({ wait, reset: false, build: ref }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
     expect(r).toEqual({ ok: true, how: "averi-lab iPhone 17 simulator, iOS 27.0; this run's build installed; the installed cells.json is main's" });
     expect(words()).toContain(`xcrun simctl install ${LAB_UDID} ${app}`);
+    // The need asks its build itself (review round 1, MAJOR 2): the build need's order in a block no longer matters.
+    expect(ref.asked).toBe(1);
+  });
+
+  it('this run\'s build failed: batch-11\'s WARN — its why, the app already installed is used — unless the batch requires the build (review round 1, MAJOR 2)', async () => {
+    const failed = { ensure: async () => ({ ok: false as const, why: 'the iOS build failed (exit 65; ios-build.log)' }), built: () => undefined };
+    const check = (o: object) => (iosLab({ wait, reset: false, ...o }).need as { check(c: NeedCtx): Promise<unknown> }).check(needCtx());
+    expect(await check({ build: failed })).toEqual({ ok: true, warn: true, how: "the iOS build failed (exit 65; ios-build.log); the app already installed is used: averi-lab iPhone 17 simulator, iOS 27.0; not rebuilt; the installed cells.json is main's" });
+    expect(words().some((w) => w.includes('simctl install'))).toBe(false);
+    expect(await check({ build: failed, requireBuild: true })).toEqual({ ok: false, why: "this run's build failed, and the batch requires it: the iOS build failed (exit 65; ios-build.log)" });
   });
 
   it('alive: the guard, then describe-all (a read; no swipe, no reset)', async () => {
