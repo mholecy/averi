@@ -82,6 +82,12 @@ describe('T11: what the device did', () => {
     expect(shorts).toEqual([18, 16, 14]);
   });
 
+  it('recovered with no boot: raw-4, 135–146 px of 142, none at 94 or less', () => {
+    const carries = readFileSync(new URL('raw/raw-4-recovered.jsonl', DIR), 'utf8').trim().split('\n').flatMap((l) => (JSON.parse(l) as { strokes: { carry: number }[] }).strokes.map((s) => s.carry));
+    expect(carries).toHaveLength(24);
+    expect([Math.min(...carries), Math.max(...carries)]).toEqual([135, 146]);
+  });
+
   it('strokes the app logged with no motion: 5 of 675 sent, 53, 53, 61, 85 and 233 px drawn', () => {
     const recs = [...OLD_RULE, ['group', 'explore'] as [string, string], ...FIX].flatMap(([dir, prefix]) => recordsIn(dir, prefix)).filter((r) => r.swipes !== undefined && /d62|d68|d59b|e2/.test(r.id));
     const drawn = recs.flatMap((r) => {
@@ -115,6 +121,27 @@ describe('T11: the final wording, a check and not a rate (after the load experim
       expect(x.replies[0]).toContain('calling again tells');
       expect(x.replies[1]).toMatch(/fully visible after 1 swipe; .*nothing of it is cut there$/);
     }
+  });
+});
+
+describe('T11: lv-d62-short, the recorded shape on any device, ABBA over one harness (after the load experiment; a check, the rate is the final A/B)', () => {
+  const short = (prefix: string) => named('lv-d62-short', ['short-probe-check', prefix]);
+  it('base 12 of 12 false, C 430–441 px past the clip; the fix 0 of 12, all maxSwipes hedged', () => {
+    expect(short('base')).toHaveLength(12);
+    expect(short('base').filter(falseClaim)).toHaveLength(12);
+    const cuts = short('base').map((r) => cutOf(r.state)!.right);
+    expect([Math.min(...cuts), Math.max(...cuts)]).toEqual([430, 441]);
+    expect(short('fix').map((r) => carouselReply(r.replies[0]))).toEqual(Array(12).fill('maxSwipes-hedged'));
+  });
+  it('the shape is the recorded one: every probe sent 90 of 142 px, carrying 71–78, 94 or less, then the reveal dropped', () => {
+    for (const r of [...short('base'), ...short('fix')]) {
+      const [probe, reveal] = r.swipes!;
+      expect(Math.abs(probe.from.x - probe.to.x)).toBe(142);
+      expect(probe.from.x - (probe as unknown as { sentTo: { x: number } }).sentTo.x).toBe(90);
+      expect(reveal.dropped).toBe(true);
+    }
+    const carries = [...short('base'), ...short('fix')].map(probeCarry);
+    expect([Math.min(...carries), Math.max(...carries)]).toEqual([71, 78]);
   });
 });
 

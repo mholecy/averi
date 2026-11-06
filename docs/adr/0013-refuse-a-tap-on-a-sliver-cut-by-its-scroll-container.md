@@ -507,9 +507,12 @@ earlier sentence of this amendment is contradicted.
 the Cost paragraph (below); residuals (b) and (c) (below). D62's cause, point 3 and point 5 stand. The D62 live check is
 history, of the rule then.
 
-**Headline: pending.** The A/B that states the fix's rate runs after the owner's cold boot of the AVD. Every number below
-marked *after the load experiment* ran on an AVD whose `system_server` my host-load experiment had restarted
-(07:37–11:39 on 2026-11-06, `sys.system_server.start_count` 11) and states no rate of the fix.
+**Headline: pending.** The A/B that states the fix's rate runs after the owner's cold boot of the AVD, and its first figure will
+be `lv-d62-short`'s, the recorded shape on any device with no load: the probe sent 90 of its 142 px and handed back as drawn,
+the first reveal dropped (`reads.swipes.shorten`, ADR 0044). Ahead of it, over one harness, ABBA, *after the load experiment*:
+base b3ce0150 12 of 12 false "fully visible" (carries 71–78, C 430–441 px past the clip), the fix 0 of 12, all maxSwipes hedged
+(`short-probe-check/`). Every number below marked *after the load experiment* ran on an AVD whose `system_server` my
+host-load experiment had restarted (07:37–11:39 on 2026-11-06, `sys.system_server.start_count` 11) and states no rate of the fix.
 
 **Why the carry line went.** D62 read a proving stroke that fell over 48 px short of its length as "the content ended under
 it". On 2026-11-06, emulator-5554, before the load experiment, raw `input swipe`s of 142 px over 300 ms carried a card
@@ -555,9 +558,13 @@ in T7a's; three of the five are short (53, 53, 61 px), carry loss rather than a 
 (`fixmore-20`) look like swallows. Whether two come in a row without injection is unmeasured: 6 swipes end most runs, and the 8
 `maxSwipes: 12` controls stopped `unaimable` at 6 with no such stroke.
 
-**Not known.** Why strokes carried less from at least 06:59 until at least 12:22, and T7a's figures again from 13:11. Between:
-`adb install -r` of the same APK at 12:45 to undo my dexopt change, the one device change I know of, and not shown to be the
-cause (the same APK went in at 23:03 the night before, with T7a's figures before it and the short ones after). Evidence:
+**Not known.** Why strokes carried less from at least 06:59 until at least 12:22, and T7a's figures again from 13:11. Read before
+any boot, 14:05 (`frames-recovery.txt`, raw-4): raw strokes 135–146 of 142, 0 of 24 at 94 or less; frames 18 ms in the lab app and
+17 ms in Settings against 73 and 81, swap 12 ms against 42, motion events 16 ms apart against about 100; start count 11, the host's
+load about 7, above the 4–5 of the short runs, the AVD's own load 0.3–0.8 against 1.3–2.0 at raw-1. So the slowness was system-wide in
+the AVD, and it ended with no boot. Between: `adb install -r` of the same APK at 12:45 to undo my dexopt change, the one device change I
+know of, and not shown to be the cause (the same APK went in at 23:03 the night before, with T7a's figures before it and the short ones
+after; a lab-app install explains Settings poorly). Evidence:
 `docs/truth/live-records/t11-carousel-visible`, `frames.txt`; rates read back by `tests/truth/t11-records.test.ts`.
 
 ## Amendment: D68 — a reveal this call's own strokes say would most likely overshoot is not sent (2026-11-05)

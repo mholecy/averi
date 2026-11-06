@@ -1,0 +1,31 @@
+# 2026-11-06, before any boot. The host never fell under load 6 in 20 min of waiting with nothing of mine running; measured at the load below.
+before-raw 14:05:21 host=[7.20 6.82 6.80] start_count=11 dev=[0.00 0.05 0.26 1/1700 22885]
+after-raw 14:06:32 host=[7.35 6.93 6.84] start_count=11 dev=[0.57 0.25 0.31 1/1703 23467]
+dev.averi.lab frames 88 total 18.7/24.0  input 3.1/4.8  anim 0.0/3.8  trav 0.1/0.2  draw 0.7/1.4  syncq 0.1/0.5  sync 0.0/0.1  issue 0.2/0.8  swap 12.3/19.6  gap 2.4/7.3
+Total frames rendered: 88
+Janky frames: 2 (2.27%)
+50th percentile: 18ms
+90th percentile: 22ms
+Number Missed Vsync: 0
+Number Slow UI thread: 1
+Number Slow issue draw commands: 0
+  RecentQueue: length=10
+    MotionEvent, age=1132ms
+    MotionEvent, age=1116ms
+    MotionEvent, age=1098ms
+    MotionEvent, age=1080ms
+    MotionEvent, age=1064ms
+    MotionEvent, age=1047ms
+    MotionEvent, age=1030ms
+    MotionEvent, age=1014ms
+    MotionEvent, age=999ms
+    MotionEvent, age=982ms
+  "offsets": {
+    "carousel": 580,
+com.android.settings frames 84 total 18.0/23.8  input 0.4/1.2  anim 0.0/0.6  trav 0.0/0.2  draw 0.1/0.7  syncq 0.2/1.1  sync 0.1/0.8  issue 1.0/3.4  swap 14.1/21.4  gap 2.1/7.1
+Janky frames: 2 (2.35%)
+50th percentile: 17ms
+Number Missed Vsync: 0
+Number Slow UI thread: 0
+Number Slow issue draw commands: 2
+after-frames 14:06:43 host=[7.46 6.96 6.86] start_count=11 dev=[0.56 0.26 0.32 1/1742 23666]
