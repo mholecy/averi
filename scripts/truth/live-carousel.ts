@@ -45,7 +45,7 @@ export interface SwipeEntry {
 export const DROP_DEFAULT_MS = 300;
 
 /**
- * The per-case hook run-case.ts arms around the calls of a case that declares `reads.swipes`: every stroke averi draws is logged, and the `dropSwipe`th
+ * The per-case hook run-case.ts arms around the calls of a case that declares `reads.swipes`: every stroke averi draws is logged, and the `drop`th
  * (1-based, counted from the case's first call) is not sent — resolved after as long as it would have taken, so the
  * scroll loop is handed back the stroke it asked for, as batch-9's app did when it did not take the reveal. Disarmed,
  * it logs nothing and drops nothing.
@@ -54,9 +54,9 @@ export class SwipeHook {
   private log: SwipeEntry[] | undefined;
   private drop: number | undefined;
 
-  arm(dropSwipe?: number): void {
+  arm(drop?: number): void {
     this.log = [];
-    this.drop = dropSwipe;
+    this.drop = drop;
   }
 
   /** The case's strokes, and the hook disarmed. */
@@ -353,7 +353,7 @@ export interface CarouselCase {
 }
 
 /** The carousel cases' reads: the strokes are their oracle, and a later read would let a fling finish. */
-const CAROUSEL_READS: CaseReads = { swipes: true, late: false };
+const CAROUSEL_READS: CaseReads = { swipes: {}, late: false };
 const RECYCLER_FREE = 'carousel-recycler-free';
 const LAZY_FREE = 'carousel-lazy-free';
 const fullyC = (cell: string, direction: 'left' | 'right') => ({ tool: 'scroll_until' as const, args: { selector: `id:${labId(cell, 'C')}`, direction, fully: true } });

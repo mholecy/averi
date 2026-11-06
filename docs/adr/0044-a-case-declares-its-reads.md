@@ -1,7 +1,9 @@
 # 44. A live case declares what it reads; one module runs it
 
 Status: accepted 2026-11-06 (performance backlog row A11, docs/plans/2026-10-30-performance-backlog.md). Harness only.
-Device calls, records, printed lines and the exit code are byte-identical to the loop it replaces.
+Measured against the loop it replaces: two independent throwaway characterizations through fakes (8,733 runs, then 15,269
+by the reviewer), both 0 differences, neither kept; the same ops, timers included; the `src` diff is empty. The live A/B on
+the AVD was inconclusive for the carousel group (T11), and its records were deleted.
 
 ## Context
 
@@ -10,26 +12,28 @@ Device calls, records, printed lines and the exit code are byte-identical to the
 - It inferred phases from three `c.group` branches: `logsSwipes`, the reads between calls, and the late read.
 - The late-read rule was split between the loop (whether) and `judged` in `live-cases.ts` (how), and the record was built in
   two places, a skip's and a run's.
-- T7b adds cases that reach their first screen by a verb the harness does not perform, so a fourth inferred phase was
-  coming.
+- T7b adds cases. lc1–lc3 and lc4'' are ordinary calls, but lc4' reaches its first screen from the launcher, by a verb the
+  harness does not perform, so another phase was coming.
 
 ## Decision
 
 **`runCase(case, source, rig)` in `scripts/truth/run-case.ts` runs one case on one source and answers its record and verdict.
-What a case reads is `Case.reads`, never its group.**
+What a case reads is declared on the case (`Case.reads` and three fields beside it), never inferred from its group.**
 
-- `Case.reads` is `{ betweenCalls?: true; swipes?: true | { drop: number }; late?: false }`: what a case reads around its
+- `Case.reads` is `{ betweenCalls?: true; swipes?: { drop?: number }; late?: false }`: what a case reads around its
   calls. Unset is the forms' cycle. The carousel and visibility cases each carry it, a required field where
   live-carousel.ts and live-visibility.ts build them, beside their judges; `selectCases` only passes it on.
   tests/truth/live-reads.test.ts pins every selectable case of a group to what the loop inferred, with a list of
   exceptions that say why (lv-d62-drop).
-- A drop needs the stroke log, so the two are one field: `dropSwipe` with no log, once silently inert, cannot be written.
+- A drop needs the stroke log, so it lives inside the log's field (`swipes: {}` logs, `swipes: { drop: 2 }` also drops): a
+  drop with no log, once silently inert, cannot be written.
 - The reads before the calls keep their own fields on `Case`: `warmUp`, `preDrag`, `measuresPanel` (which also reads after
   them). So "what a case reads" is `reads` and those three.
 - `c.group` selects a case and names it. No read of it remains in the cycle. A new read costs a field on the declaration,
-  a field on `CaseRecord` and in `caseRecord`, and its read in `runCase`; the loop infers nothing.
+  a field on `CaseRecord` and in `caseRecord`, and its read in `runCase`; one the judge must see also goes through
+  `CaseEvidence`, `judgeOn` and the judge's parameters or `DeviceLog`. The loop infers nothing.
 - The late-read rule's one home is `live-cases.ts`: `wantsLateRead` (whether), `judged` (how), `LATE_READ_MS`. Both take
-  the readings as a record holds them, so a run and a rejudge pass the same shape.
+  `CaseEvidence`, the fields as a record holds them, so a run and a rejudge pass the same shape.
 - **`judged` judges a recorded `late` whatever the case declares today.** A record is what was read then. If `judged` also
   asked `reads.late`, a declaration changed later would turn over the verdicts of old records. The committed records hold
   no late read on a visibility or carousel case, so this is the safe reading rather than a live difference.
@@ -50,6 +54,8 @@ launch. The rest is new work:
 - a start verb for lc4', which starts from the launcher, not from `lab.launch`;
 - a new read for `mFocusedApp` and for no `ResolverActivity` being left, which `LabState` does not carry;
 - a first `state()` with no cell: the lab app has not written, and the cycle assumes a state (T10);
+- `CaseRecord.launched` and the judge's `launched: LabState` are required, and lc4' from the launcher may have no `LabState`
+  to give, so a placeholder or a widened type is T7b's decision;
 - probably a teardown after a chooser, so the next case does not start over it. That is an inference, unmeasured.
 
 A `Case.start` was built here for the first of these and deleted at review: it was a hypothetical seam, and its type could

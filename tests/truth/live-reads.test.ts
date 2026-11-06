@@ -11,7 +11,7 @@ const DECLARED: Record<Case['group'], CaseReads | undefined> = {
   dismissal: undefined,
   ensure: undefined,
   visibility: { betweenCalls: true, late: false },
-  carousel: { swipes: true, late: false },
+  carousel: { swipes: {}, late: false },
 };
 
 const EXCEPTIONS: Record<string, { reads: CaseReads; why: string }> = {

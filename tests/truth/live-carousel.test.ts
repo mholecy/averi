@@ -51,7 +51,7 @@ describe('SwipeHook and hookSwipes: averi\'s strokes logged, the Nth dropped and
     expect(hook.disarm()).toEqual([]);
   });
 
-  it('armed with dropSwipe 2: stroke 2 not sent, waited its duration (or 300 ms with none); every stroke logged; disarm returns the log and stops logging', async () => {
+  it('armed with a drop of 2: stroke 2 not sent, waited its duration (or 300 ms with none); every stroke logged; disarm returns the log and stops logging', async () => {
     const { adapter, hook, sent, waited } = recorder();
     hook.arm(2);
     await adapter.swipe(p(256), p(824), 649);
@@ -127,7 +127,7 @@ describe('selectCases: the carousel group, Android and the native app only, neve
     expect(CASES.map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d68-launch', 'lv-d59b-lazy', 'lv-d59b-recycler', 'd52-e2', 'd37-snap-lazy', 'd37-snap-recycler']);
     expect(CASES.every((c) => c.group === 'carousel')).toBe(true);
     expect(caseOf('lv-d62-drop')).toMatchObject({ preDrag: 440, reads: { swipes: { drop: 2 } } });
-    expect(caseOf('lv-d62-control').reads?.swipes).toBe(true);
+    expect(caseOf('lv-d62-control').reads?.swipes).toEqual({});
   });
 
   it('a premise SKIP fails the run on lv-d62-control and lv-d62-drop alone (skipFails: the harness broke), never elsewhere', () => {

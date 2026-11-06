@@ -84,13 +84,13 @@ describe('runCase: the reads a case declares', () => {
   it('swipes: a call that throws still disarms the hook, and the case throws', async () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
     const rig = rigOver(lab, [], { callTool: async () => Promise.reject(new Error('the server is gone')) });
-    await expect(runCase(aCase({ reads: { swipes: true } }), 'uiautomator', rig)).rejects.toThrow('the server is gone');
+    await expect(runCase(aCase({ reads: { swipes: {} } }), 'uiautomator', rig)).rejects.toThrow('the server is gone');
     expect(lab.log).toEqual(['launch c', 'arm undefined', 'disarm']);
   });
 
   it('swipes without a drop: the hook armed with none', async () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
-    await runCase(aCase({ reads: { swipes: true } }), 'uiautomator', rigOver(lab));
+    await runCase(aCase({ reads: { swipes: {} } }), 'uiautomator', rigOver(lab));
     expect(lab.log).toContain('arm undefined');
   });
 
@@ -128,7 +128,7 @@ describe('runCase: the reads a case declares', () => {
   it('the first verdict is asked over the reads as a late read would be judged: the swipes reach the judge that decides', async () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('first'), read('late')] });
     const stroke = { from: { x: 1, y: 2 }, to: { x: 3, y: 4 }, dropped: false };
-    const c = aCase({ reads: { swipes: true }, judge: (_s, _r, _so, _l, _a, log) => (log?.swipes?.length === 1 ? OK : NOT) });
+    const c = aCase({ reads: { swipes: {} }, judge: (_s, _r, _so, _l, _a, log) => (log?.swipes?.length === 1 ? OK : NOT) });
     await runCase(c, 'uiautomator', rigOver(lab, ['1'], { swipes: { arm: () => undefined, disarm: () => [stroke] } }));
     expect(lab.log).not.toContain('pause 3000');
   });
@@ -284,6 +284,15 @@ describe('runCase: after the calls', () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('first')] });
     await runCase(aCase(), 'idb', rigOver(lab, ['r'], { keepShot: async () => undefined }));
     expect(lab.log).not.toContain('screenshot');
+  });
+
+  it('every key a case can read reaches the record, in the order a recorded file keeps them', async () => {
+    const launch = read('launch', { scrollViews: { carousel: { x: 66, y: 380, width: 948, height: 234 } } } as Partial<LabState>);
+    const lab = new FakeAndroidLab({ launched: launch, states: [read('dragged'), read('first'), read('late')] });
+    const stroke = { from: { x: 1, y: 2 }, to: { x: 3, y: 4 }, dropped: false };
+    const rig = rigOver(lab, ['ERROR: down', 'Tapped a'], { swipes: { arm: () => undefined, disarm: () => [stroke] } });
+    const run = await runCase(aCase({ warmUp: true, preDrag: 440, reads: { swipes: {} }, judge: () => NOT }), 'uiautomator', rig);
+    expect(Object.keys(run.record)).toEqual(['source', 'id', 'replies', 'launched', 'after', 'state', 'late', 'warmUpError', 'preDrag', 'swipes']);
   });
 
   it('a SKIP takes no screenshot', async () => {

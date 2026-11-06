@@ -1442,8 +1442,7 @@ cannot flip them; the bounds are pinned exactly, a millisecond inside and a mill
 
 ## Amendment: run-case.ts joins the run (2026-11-06, backlog A11)
 
-scripts/truth/run-case.ts (ADR 0044) is in the `lab` group, against tests/truth/run-case.test.ts: 98.62 %, 145 mutants, 2 survived, both equivalent (named in
-scope.json); floor 96. It orchestrates
+scripts/truth/run-case.ts (ADR 0044) is in the `lab` group, against tests/truth/run-case.test.ts: 100 %, 142 mutants, 0 survived; floor 98. It orchestrates
 IO, but every device call sits behind its rig and its tests take milliseconds, as with T2's runner.ts.
 
 What changes for the earlier text:

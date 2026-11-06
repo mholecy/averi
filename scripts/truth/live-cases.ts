@@ -98,10 +98,10 @@ export interface CaseReads {
   /** The app read after every call but the last (`after`): a stop is judged as scroll_until left it. */
   betweenCalls?: true;
   /**
-   * The strokes averi draws during the calls, logged by the SwipeHook (RunRecord `swipes`, the judge's `log`). `drop`:
-   * the Nth is not sent (live-carousel.ts#SwipeHook), which needs the log, so the two are one field.
+   * The strokes averi draws during the calls, logged by the SwipeHook (RunRecord `swipes`, the judge's `log`); `{}` logs
+   * them. `drop`: the Nth is not sent (live-carousel.ts#SwipeHook), which needs the log, so it lives inside this field.
    */
-  swipes?: true | { drop: number };
+  swipes?: { drop?: number };
   /** Never read again after a first read not ok (wantsLateRead): a later read would let a fling finish behind the reply's back. */
   late?: false;
 }
@@ -678,17 +678,17 @@ export type RejudgeSelection = Omit<Selection, 'platform' | 'app'> & { app?: Lab
 /** How long after the first read the late one is taken. */
 export const LATE_READ_MS = 3_000;
 
-/** What a case read, as a judge takes it: a record's fields, with a state to judge. */
-export type CaseReadings = Pick<CaseRecord, 'source' | 'replies' | 'launched' | 'after' | 'late' | 'swipes'> & { state: LabState };
+/** What a case's judges weigh: a record's fields, with a state to judge. */
+export type CaseEvidence = Pick<CaseRecord, 'source' | 'replies' | 'launched' | 'after' | 'late' | 'swipes'> & { state: LabState };
 
-/** The case's judge on one state of these readings. */
-const judgeOn = (c: Case, r: CaseReadings, state: LabState): LiveVerdict => c.judge(state, r.replies, r.source, r.launched, r.after, r.swipes === undefined ? {} : { swipes: r.swipes });
+/** The case's judge on one state, over this evidence. */
+const judgeOn = (c: Case, r: CaseEvidence, state: LabState): LiveVerdict => c.judge(state, r.replies, r.source, r.launched, r.after, r.swipes === undefined ? {} : { swipes: r.swipes });
 
 /**
  * Whether a case is read again: its first read is not ok (a model that catches up was the app's lag, not a lost value)
  * and it did not declare `reads.late: false`.
  */
-export const wantsLateRead = (c: Case, r: CaseReadings): boolean => c.reads?.late !== false && judgeOn(c, r, r.state).outcome !== 'ok';
+export const wantsLateRead = (c: Case, r: CaseEvidence): boolean => c.reads?.late !== false && judgeOn(c, r, r.state).outcome !== 'ok';
 
 /**
  * Judge one case's reads: the state after the calls, and the late read if one was taken. A `late` is judged whatever
@@ -697,7 +697,7 @@ export const wantsLateRead = (c: Case, r: CaseReadings): boolean => c.reads?.lat
  * only: the IME region read after the calls (`state.imeTouchable`, a kf case's second read, D69) is carried onto it, so
  * a later read can never turn a verdict over both reads into one over the launch's alone (`lateWithPanel`).
  */
-export function judged(c: Case, r: CaseReadings): LiveVerdict {
+export function judged(c: Case, r: CaseEvidence): LiveVerdict {
   const verdict = judgeOn(c, r, r.state);
   if (verdict.outcome === 'ok' || r.late === undefined) return verdict;
   const again = judgeOn(c, r, lateWithPanel(r.state, r.late));

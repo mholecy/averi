@@ -218,7 +218,7 @@
   "scripts/truth/run-case.ts": {
     "group": "lab",
     "tests": ["tests/truth/run-case.test.ts"],
-    "floor": 96,
-    "baseline": "98.62 % on 2026-11-06 (A11 review round 1: one `swipes` field, `warm !== undefined` dropped; cold): 145 mutants, 2 survived — both `logged === true` emptied to false, equivalent: `true.drop` is undefined, what the true branch hands the hook; 99.32 % on 2026-11-06 (A11; cold): 148 mutants, 1 survived"
+    "floor": 98,
+    "baseline": "100 % on 2026-11-06 (A11 review round 2: `swipes?: { drop?: number }`, no ternary; cold): 142 mutants, 0 survived; 98.62 % on 2026-11-06 (A11 review round 1, `swipes?: true | { drop }`; cold): 145 mutants, 2 survived, both equivalent; 99.32 % on 2026-11-06 (A11; cold): 148 mutants, 1 survived"
   }
 }
