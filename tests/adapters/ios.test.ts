@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +12,7 @@ import { WdaTreeSource } from '../../src/adapters/wda-tree-source.js';
 import { ReadHandOff } from '../../src/ui-tree/read-handoff.js';
 import { fakeFetch, fakeSpawn } from '../helpers/fake-wda.js';
 import { ExecError, type ExecFn, type ExecResult } from '../../src/adapters/exec.js';
+import { NoLinkHandlerError } from '../../src/adapters/ios-link-failure.js';
 import { captureRefusal } from '../../src/verify/capture.js';
 import type { IdbHelper } from '../../src/adapters/idb-helper.js';
 import type { DeviceAdapter, UiNode } from '../../src/adapters/types.js';
@@ -1101,6 +1103,17 @@ describe('IosAdapter.isAppRunning — the host process list first, a no confirme
     );
   });
 
+  it('that line asks the host\'s home: the adapter hands it to the pure leaf', async () => {
+    vi.stubEnv('HOME', '/opt/me');
+    try {
+      const d = device({ pgrep: [fail('/usr/bin/pgrep -f x', 3, 'pgrep: https://h/opt/me/x\n')] });
+      await d.adapter.isAppRunning(BUNDLE);
+      expect(String(stderr.mock.calls[0][0])).toContain('(exit 3: pgrep: https://h~/x)');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('a spawn failure of pgrep is an unreadable list too', async () => {
     const d = device({ pgrep: [fail('/usr/bin/pgrep -f x', null, 'spawn /usr/bin/pgrep EPERM')] });
     expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);
@@ -1204,5 +1217,61 @@ describe('IosAdapter.isAppRunning — the host process list first, a no confirme
     await d.adapter.isAppRunning(BUNDLE);
     await d.adapter.isAppRunning(BUNDLE);
     expect(d.appinfos()).toBe(2);
+  });
+});
+
+describe('openDeepLink when simctl answers (D65)', () => {
+  const failing = (stderr: string, exitCode: number): ExecFn => async (cmd, args) => {
+    if (args.includes('openurl')) throw new ExecError([cmd, ...args].join(' '), exitCode, stderr);
+    return { stdout: Buffer.alloc(0), stderr: '' };
+  };
+  const TEL_STDERR = readFileSync(new URL('../fixtures/simctl-openurl-tel-exit115-b13-stderr.txt', import.meta.url), 'utf8');
+
+  it('code 115 throws the fact, with no trace and no argv in the reply', async () => {
+    const opening = new IosAdapter({ udid: 'AAAA-1111', exec: failing(TEL_STDERR, 115), treeSource: NO_TREE }).openDeepLink('tel:+421900123456');
+    await expect(opening).rejects.toBeInstanceOf(NoLinkHandlerError);
+    await expect(opening).rejects.toThrow(
+      /^No app on this simulator handles tel: links, so nothing opened \(simctl openurl: LSApplicationWorkspaceErrorDomain, code 115\)\. A link to an app's own scheme needs that app installed\.$/,
+    );
+  });
+
+  it('any other simctl failure stays exec\'s error, to the byte', async () => {
+    const opening = new IosAdapter({ udid: 'AAAA-1111', exec: failing('Unable to lookup in current state: Shutdown\n', 149), treeSource: NO_TREE }).openDeepLink('tel:1');
+    await expect(opening).rejects.toBeInstanceOf(ExecError);
+    await expect(opening).rejects.toThrow(/^Command failed \(exit 149\): xcrun simctl openurl AAAA-1111 tel:1\nUnable to lookup in current state: Shutdown$/);
+  });
+});
+
+describe('a failed typing keeps its text out of the message (D70, ADR 0043)', () => {
+  const secret = 'hunter2secret';
+  const failingText: ExecFn = async (cmd, args) => {
+    if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 1, 'companion gone\n');
+    return { stdout: Buffer.alloc(0), stderr: '' };
+  };
+
+  it('the whole text on idb: the command field keeps it, the message never holds it', async () => {
+    const typing = new IosAdapter({ udid: 'AAAA-1111', exec: failingText, treeSource: NO_TREE }).typeText(secret);
+    await expect(typing).rejects.toThrow(/^Command failed \(exit 1\): idb ui text <typed text> --udid AAAA-1111\ncompanion gone$/);
+    await expect(typing).rejects.toMatchObject({ command: `idb ui text ${secret} --udid AAAA-1111` });
+  });
+
+  it('idb\'s own argparse line, which quotes a text taken for an option, is left out; the argv the adapter really sends is recognised', async () => {
+    const exec: ExecFn = async (cmd, args) => {
+      if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 2, "usage: idb ui text [-h] text\nidb ui text: error: argument -h/--help: ignored explicit argument 'unter2'\n");
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).typeText('-hunter2')).rejects.toThrow(
+      /^Command failed \(exit 2\): idb ui text <typed text> --udid AAAA-1111\nusage: idb ui text \[-h\] text\nidb rejected its arguments \(its error line, which can quote the typed text, is left out\)$/,
+    );
+  });
+
+  it("a reader's `.message` of a crash during a typing shows neither the text nor the trace", async () => {
+    const exec: ExecFn = async (cmd, args) => {
+      if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 1, 'Traceback (most recent call last):\n  File "/Users/me/x.py", line 1, in m\nException: gone\n');
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).typeText(secret)).rejects.toThrow(
+      /^Command failed \(exit 1\): idb ui text <typed text> --udid AAAA-1111\nidb crashed: Exception: gone \(Python traceback left out: run the command by hand, with the real text and paths, to see it\)$/,
+    );
   });
 });

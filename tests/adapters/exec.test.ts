@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { exec, ExecError } from '../../src/adapters/exec.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { homedir } from 'node:os';
+import { exec, ExecError, hostHome, hostPathsOut } from '../../src/adapters/exec.js';
 
 describe('exec', () => {
   it('captures stdout as a Buffer', async () => {
@@ -39,5 +40,62 @@ describe('exec', () => {
       name: 'ExecError',
       timedOut: true,
     });
+  });
+});
+
+describe('ExecError: its message is commandFailureText, its fields every byte (D70)', () => {
+  const TRACE = `Traceback (most recent call last):\n  File "${homedir()}/idb/main.py", line 1, in m\nException: boom\n`;
+
+  it('a crash reads one line with no home in the message, and stderr, command and stack keep what detectors and logs read', async () => {
+    const script = `cat >&2 <<'T'\n${TRACE}T\nexit 1`;
+    const err = await exec('sh', ['-c', script]).then(() => undefined, (e: unknown) => e as ExecError);
+    expect(err?.message).toBe(`Command failed (exit 1): sh -c ${script.replace(homedir(), '~')}\nsh crashed: Exception: boom (Python traceback left out: run the command by hand, with the real text and paths, to see it)`);
+    expect(err?.stderr).toBe(TRACE);
+    expect(err?.command).toBe(`sh -c ${script}`);
+    expect(err?.exitCode).toBe(1);
+    expect(err?.stack).toContain('ExecError');
+  });
+
+  it('a typed text is in the command field, never in the message or the stack', () => {
+    const err = new ExecError('idb ui text hunter2 --udid U', 1, 'Command failed: idb ui text hunter2 --udid U\n');
+    expect(err.message).toBe('Command failed (exit 1): idb ui text <typed text> --udid U\nCommand failed: idb ui text <typed text> --udid U');
+    expect(err.stack).not.toContain('hunter2');
+    expect(err.command).toBe('idb ui text hunter2 --udid U');
+  });
+
+  it('a note and a cause still go through it', () => {
+    const cause = new Error('c');
+    const err = new ExecError('adb devices', 1, 'said', false, Buffer.alloc(0), { note: 'tail', cause });
+    expect(err.message).toBe('Command failed (exit 1): adb devices\nsaid\ntail');
+    expect(err.cause).toBe(cause);
+  });
+
+  describe('the home it passes', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('is the real one: the rule only an own home has, past a word\'s start, reaches it', () => {
+      vi.stubEnv('HOME', '/opt/me');
+      expect(new ExecError('c', 1, 'https://h/opt/me/a').message).toBe('Command failed (exit 1): c\nhttps://h~/a');
+    });
+
+    it('hostHome reads it too, and hostPathsOut asks it', () => {
+      vi.stubEnv('HOME', '/opt/me');
+      expect(hostHome()).toBe('/opt/me');
+      expect(hostPathsOut('https://h/opt/me/a')).toBe('https://h~/a');
+    });
+  });
+
+  it('a failure to word it never destroys the error: the raw shape stands, and the fields', () => {
+    const err = new ExecError('adb devices', 1, undefined as unknown as string, false, Buffer.alloc(0), { note: 'tail' });
+    expect(err.message).toBe('Command failed (exit 1): adb');
+    expect(err.exitCode).toBe(1);
+    expect(err.stack).toContain('ExecError');
+    expect(new ExecError(undefined as unknown as string, null, '', true).message).toBe('Command timed out: undefined');
+    expect(new ExecError('idb ui text hunter2 --udid U', 1, undefined as unknown as string).message).toBe('Command failed (exit 1): idb');
+  });
+
+  it('the same failure without any of it stays exec\'s bytes', () => {
+    expect(new ExecError("adb -s emulator-9998 shell monkey -p dev.averi.lab", 1, "adb: device 'emulator-9998' not found\n").message)
+      .toBe("Command failed (exit 1): adb -s emulator-9998 shell monkey -p dev.averi.lab\nadb: device 'emulator-9998' not found");
   });
 });

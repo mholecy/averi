@@ -2237,3 +2237,39 @@ describe('AndroidAdapter.capture — the raw frame, `screencap -p` where the dev
     expect(calls).toEqual([RAW]);
   });
 });
+
+describe('a host path in the stderr the dump\'s diagnosis quotes leaves it (ADR 0043)', () => {
+  const said = 'adb: cannot read /Users/lab/adb.log\n';
+
+  it('the dump\'s own failure', async () => {
+    const exec: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.endsWith('get-state')) return { stdout: Buffer.from('device\n'), stderr: '' };
+      throw new ExecError(full, 1, said);
+    };
+    const reading = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec }).uiTree();
+    await expect(reading).rejects.toThrow(/~\/adb\.log/);
+    await expect(reading).rejects.not.toThrow(/\/Users\//);
+  });
+
+  it('get-state\'s failure', async () => {
+    const exec: ExecFn = async (cmd, args) => {
+      const full = [cmd, ...args].join(' ');
+      if (full.endsWith('get-state')) throw new ExecError(full, 1, said);
+      return { stdout: Buffer.from('Killed'), stderr: '' };
+    };
+    const reading = new AndroidAdapter({ drawnOverStrip, serial: 'emulator-5554', exec }).uiTree();
+    await expect(reading).rejects.toThrow(/adb get-state says "cannot read ~\/adb\.log"/);
+  });
+});
+
+describe('a failed typing keeps its text out of the message (D70, ADR 0043)', () => {
+  it('the argv the adapter really sends is recognised: each character is one call, which a whole-secret redaction could not match, and it stays out', async () => {
+    const exec: ExecFn = async (cmd, args) => {
+      throw new ExecError([cmd, ...args].join(' '), 1, "adb: device 'emulator-9998' not found\n");
+    };
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-9998', exec }).typeText('h')).rejects.toThrow(
+      /^Command failed \(exit 1\): adb -s emulator-9998 shell input text <typed text>\nadb: device 'emulator-9998' not found$/,
+    );
+  });
+});

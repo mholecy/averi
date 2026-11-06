@@ -8,6 +8,7 @@
  * the cache and the launchctl confirmation of every "no".
  */
 import { ExecError } from './exec.js';
+import { withoutHostPaths } from './failure-text.js';
 import type { AppBinary } from './simctl-appinfo.js';
 import { errorMessage } from '../util/error-message.js';
 
@@ -66,15 +67,17 @@ export function pgrepVerdict(error: unknown): 'yes' | 'no' | 'timeout' | 'unread
  * message, whose head is the whole command line with its long pattern.
  * exec puts node's "Command failed: <cmd>" in stderr when the child wrote
  * nothing; that line is dropped (`exit N` alone). No exit code (a spawn
- * failure): the line alone. Not exec's error: its message's first line.
+ * failure): the line alone. Not exec's error: its message's first line. Host paths leave the line; `home` is the
+ * caller's, as this leaf reads nothing.
  */
-export function pgrepReason(error: unknown): string {
+export function pgrepReason(error: unknown, home: string): string {
   if (!(error instanceof ExecError)) return errorMessage(error).split('\n')[0];
-  const line = error.stderr
+  const last = error.stderr
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l !== '' && !l.startsWith('Command failed:'))
     .at(-1);
+  const line = last === undefined ? undefined : withoutHostPaths(last, home);
   if (error.exitCode === null) return line ?? 'no exit code';
   return line === undefined ? `exit ${error.exitCode}` : `exit ${error.exitCode}: ${line}`;
 }

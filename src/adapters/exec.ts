@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { homedir } from 'node:os';
+import { commandFailureText, lastResortText, withoutHostPaths, type CommandFailure } from './failure-text.js';
 
 /** stdout stays a Buffer — screenshots come through this path as binary PNG. */
 export interface ExecResult {
@@ -16,6 +18,35 @@ export interface ExecOptions {
 
 export type ExecFn = (cmd: string, args: string[], opts?: ExecOptions) => Promise<ExecResult>;
 
+/**
+ * The host's home, or none: `os.homedir()` throws when $HOME is unset and the uid has no passwd entry (a container's), and
+ * a throw from ExecError's constructor would leave exec's promise unsettled and take the process down.
+ */
+export function hostHome(): string {
+  try {
+    return homedir();
+  } catch {
+    return '';
+  }
+}
+
+/** `text` with the host's paths out, for a reader that quotes `stderr` itself. */
+export const hostPathsOut = (text: string): string => withoutHostPaths(text, hostHome());
+
+/** The words of a failure, or the last resort's if wording them throws: nothing may destroy the real error. */
+function failureMessage(failure: CommandFailure): string {
+  try {
+    return commandFailureText(failure, hostHome());
+  } catch {
+    return lastResortText(failure);
+  }
+}
+
+/**
+ * A failed host command. Its fields keep every byte, for detectors and logs (a detector reads `stderr`, `exitCode`,
+ * `timedOut`); its `message` is the words an agent reads, whichever layer quotes it (failure-text.ts, ADR 0043). A reader
+ * that quotes `stderr` itself passes it through hostPathsOut.
+ */
 export class ExecError extends Error {
   constructor(
     readonly command: string,
@@ -38,10 +69,7 @@ export class ExecError extends Error {
     options: { note?: string; cause?: unknown } = {},
   ) {
     super(
-      (timedOut
-        ? `Command timed out: ${command}`
-        : `Command failed (exit ${exitCode}): ${command}\n${stderr.trim()}`) +
-        (options.note === undefined ? '' : `\n${options.note}`),
+      failureMessage({ command, exitCode, stderr, timedOut, note: options.note }),
       options.cause === undefined ? undefined : { cause: options.cause },
     );
     this.name = 'ExecError';

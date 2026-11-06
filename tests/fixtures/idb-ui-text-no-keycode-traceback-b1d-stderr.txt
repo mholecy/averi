@@ -1,0 +1,27 @@
+2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main
+Traceback (most recent call last):
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/cli/main.py", line 313, in gen_main
+    await root_command.run(args)
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/common/command.py", line 90, in run
+    return await self.resolve_command_from_args(args).run(args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/cli/__init__.py", line 106, in run
+    await self._run_impl(args)
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/cli/__init__.py", line 128, in _run_impl
+    await self.run_with_client(args=args, client=client)
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/cli/commands/hid.py", line 110, in run_with_client
+    await client.text(text=args.text)
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/common/logging.py", line 113, in _async_wrapper
+    raise ex
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/common/logging.py", line 88, in _async_wrapper
+    value = await function(*args, **kwargs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/grpc/client.py", line 200, in func_wrapper
+    return await func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/grpc/client.py", line 808, in text
+    await self.send_events(text_to_events(text))
+                           ~~~~~~~~~~~~~~^^^^^^
+  File "~/.local/pipx/venvs/fb-idb/lib/python3.13/site-packages/idb/common/hid.py", line 187, in text_to_events
+    raise Exception(f"No keycode found for {character}")
+Exception: No keycode found for Š

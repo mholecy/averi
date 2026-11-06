@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
+import { exec as defaultExec, ExecError, hostHome, type ExecFn } from './exec.js';
 import { simctl } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import type { IdbHelper } from './idb-helper.js';
@@ -12,6 +12,7 @@ import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from '
 import type { AppHolder, DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
+import { noLinkHandler } from './ios-link-failure.js';
 import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, SCHEME_APPROVAL_DOMAIN, schemeApprovalKey, schemeApprovalWrite, urlSchemes } from './ios-url-schemes.js';
 import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -525,12 +526,15 @@ export class IosAdapter implements DeviceAdapter {
    * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes what it wrote before.
    * `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link (D54), the
    * answer names it instead of `unknown`: on idb from the wait's own reads, on WDA from one short `/source`
-   * read at the bound (IosTreeSource.systemAlert) — never a tap.
+   * read at the bound (IosTreeSource.systemAlert) — never a tap. A link no app on the simulator handles throws that
+   * fact (ios-link-failure.ts, D65); any other `openurl` failure is exec's error.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<AppHolder> {
     const approval = await this.linkHandler(url, opts.appId);
     await this.prepareForOpen(`opening ${url}`, approval);
-    await this.simctl(['openurl', this.udid, url]);
+    await this.simctl(['openurl', this.udid, url]).catch((e: unknown) => {
+      throw noLinkHandler(e, url) ?? e;
+    });
     if (approval === undefined) return { holder: 'none' };
     const handler = approval.bundleId;
     // A link's wait answers `unknown` or an alert in every case but a match (ios-foreground.ts#awaitForeground).
@@ -750,6 +754,7 @@ export class IosAdapter implements DeviceAdapter {
       await this.sourceTyper(text);
       return;
     }
+    // This argv's shape is in failure-text.ts's typing list (IDB_TYPING): what is typed stays out of a failure's message.
     // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
     // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
     // split between two idb calls. A one-character text has no rest: one call, no wait.
@@ -906,7 +911,7 @@ export class IosAdapter implements DeviceAdapter {
       case 'unreadable':
         this.hostListUnreadable = true;
         console.error(
-          `averi: the host process list is unreadable (${pgrepReason(failure)}) — ` +
+          `averi: the host process list is unreadable (${pgrepReason(failure, hostHome())}) — ` +
             `app liveness on ${this.udid} asks launchctl instead (~240 ms a check)`,
         );
         return this.launchctlLists(bundleId);

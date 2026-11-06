@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
+import { exec as defaultExec, ExecError, hostPathsOut, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
@@ -558,7 +558,7 @@ export class AndroidAdapter implements DeviceAdapter {
         // 28). Diagnose both like a dump that returned nothing, so the caller
         // never has to read a bare adb error.
         if (e instanceof ExecError) {
-          const last = e.stderr.trim().split('\n').pop() ?? '';
+          const last = hostPathsOut(e.stderr.trim().split('\n').pop() ?? '');
           throw new Error(await this.diagnoseDumpFailure(e.timedOut ? 'timeout' : 'exec-error', last, false), { cause: e });
         }
         throw e;
@@ -620,7 +620,7 @@ export class AndroidAdapter implements DeviceAdapter {
       // `adb get-state` on an offline/missing device exits 1 with
       // "error: device offline" / "error: device '<id>' not found" on stderr.
       state = e instanceof ExecError
-        ? (e.stderr.trim().replace(/^(Command failed:.*\n)?\s*(error|adb):\s*/s, '') || `exit ${e.exitCode}`)
+        ? (hostPathsOut(e.stderr.trim().replace(/^(Command failed:.*\n)?\s*(error|adb):\s*/s, '')) || `exit ${e.exitCode}`)
         : String(e);
     }
     if (state !== 'device') {
@@ -913,6 +913,7 @@ export class AndroidAdapter implements DeviceAdapter {
     // a direct caller cannot leave the field half-typed. An ASCII value pays one regex test, no device call.
     const refusal = refusalOf(text, this.typeable);
     if (refusal !== undefined) throw new Error(`typeText ${refusal}`);
+    // This argv's shape is in failure-text.ts's typing list (ADB_TYPING): what is typed stays out of a failure's message.
     for (const ch of text) {
       await this.shell(['input', 'text', ch === ' ' ? '%s' : ch]);
       await sleep(TYPING_PACE_MS);
