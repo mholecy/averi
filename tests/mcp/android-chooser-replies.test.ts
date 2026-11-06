@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AndroidAdapter } from '../../src/adapters/android.js';
-import type { ExecFn } from '../../src/adapters/exec.js';
+import { ExecError, type ExecFn } from '../../src/adapters/exec.js';
 import { FlowEngine } from '../../src/flow/engine.js';
 import { parseConfig } from '../../src/flow/config.js';
 import { EngineSession, launchApp } from '../../src/flow/launch.js';
@@ -59,26 +59,99 @@ const LINK_FAILED_OPEN = (url: string) =>
 /**
  * A real AndroidAdapter over the lab AVD's monkey as D73 measured it (API 33): without `--pct-syskeys 0` it exits 251 on
  * `** SYS_KEYS …`, with the chooser up or not, and starts nothing; with the flag it exits 0 and starts the app, with the
- * chooser up too. The focus read names the chooser when `chooser` says so. The started stdout
- * (monkey-api33-d73-started-stdout.txt) is a SHAPE RECORD: runStart reads nothing on exit 0, so its bytes guard no averi code.
+ * chooser up too. The focus read names the chooser when `focusNamesChooser` says so, and the tree is the chooser's until
+ * monkey starts and the lab's after it. The started stdout (monkey-api33-d73-started-stdout.txt) is a SHAPE RECORD:
+ * runStart reads nothing on exit 0, so its bytes guard no averi code.
  */
-async function labMonkey(chooser: boolean): Promise<AndroidAdapter> {
+async function adapterOverLabMonkey(focusNamesChooser: boolean): Promise<AndroidAdapter> {
   const started = await fixture('monkey-api33-d73-started-stdout.txt');
   const refused = execErrorLikeExec('adb -s e shell monkey', 251, await fixture('monkey-api33-b11-chooser-exit251-stderr.txt'), {
     stdout: await fixture('monkey-api33-b11-chooser-exit251-stdout.txt'),
   });
-  const focus = await fixture(chooser ? 'dumpsys-window-focus-api33-b11-after-launch-monkey.txt' : 'dumpsys-window-focus-api33-b10-launcher.txt');
+  const focus = await fixture(focusNamesChooser ? 'dumpsys-window-focus-api33-b11-after-launch-monkey.txt' : 'dumpsys-window-focus-api33-b10-launcher.txt');
+  const before = await fixture('uiautomator-lab-resolver.xml');
+  const after = await fixture('uiautomator-lab-open.xml');
+  let launched = false;
   const exec: ExecFn = async (_cmd, args) => {
-    if (args.includes('monkey') && !args.join(' ').includes('--pct-syskeys 0')) throw refused;
-    return { stdout: Buffer.from(args.includes('monkey') ? started : focus), stderr: '' };
+    if (args.includes('monkey')) {
+      if (!args.join(' ').includes('--pct-syskeys 0')) throw refused;
+      launched = true;
+      return { stdout: Buffer.from(started), stderr: '' };
+    }
+    const answer = args.includes('uiautomator') ? (launched ? after : before) : args.some((a) => a.startsWith('dumpsys window')) ? focus : '';
+    return { stdout: Buffer.from(answer), stderr: '' };
   };
   return new AndroidAdapter({ drawnOverStrip, serial: 'e', exec });
 }
 
+const LAB_CONFIG = `
+app:
+  android: { package: dev.averi.lab }
+states:
+  lab:
+    detect: { element: { id: lab.open.A } }
+    reach: [open]
+flows:
+  open:
+    steps:
+      - launch: {}
+`;
+
 describe("launch_app with no activity: the reply over the lab's monkey (D73)", () => {
-  it.each([['from the launcher', false], ['a focus read would name the chooser, but monkey\'s success reads none', true]])('%s: Launched, no ⚠ line', async (_where, chooser) => {
-    const launched = await launchApp(await labMonkey(chooser), undefined, new EngineSession(), { appId: 'dev.averi.lab' });
+  it.each([['from the launcher', false], ["a focus read would name the chooser, but monkey's success reads none", true]])('%s: Launched, no ⚠ line', async (_where, focusNamesChooser) => {
+    const launched = await launchApp(await adapterOverLabMonkey(focusNamesChooser), undefined, new EngineSession(), { appId: 'dev.averi.lab' });
     expect(launchText('android', launched)).toBe('Launched dev.averi.lab on android');
+  });
+
+  it("a flow's `launch` step: one `launch` line, no `⚠ launch`, and the flow goes on", async () => {
+    const trace = await FlowEngine.run(parseConfig(LAB_CONFIG), await adapterOverLabMonkey(true), { env: {}, session: new EngineSession() }, { flow: 'open' });
+    expect(trace).toEqual([
+      { action: 'flow open', detail: 'start' },
+      { action: 'launch', detail: 'dev.averi.lab' },
+      { action: 'flow open', detail: 'done' },
+    ]);
+  });
+
+  it("ensure_state: the chooser's tree misses the state, the rung's launch starts, and the state is reached after it", async () => {
+    const trace = await FlowEngine.run(parseConfig(LAB_CONFIG), await adapterOverLabMonkey(true), { env: {}, session: new EngineSession() }, { state: 'lab' });
+    expect(trace).toEqual([
+      { action: 'flow open', detail: 'start' },
+      { action: 'launch', detail: 'dev.averi.lab' },
+      { action: 'flow open', detail: 'done' },
+      { action: 'state lab', detail: 'reached after open' },
+    ]);
+  });
+});
+
+/**
+ * An ExecError's message names the command it ran (adapters/exec.ts), and launch_app's reply is that message, so a thrown
+ * monkey failure quotes the launch's flags (ADR 0041's D73 amendment, reply 5). The fake builds the command as exec does;
+ * the other tests' short `adb -s e shell monkey` cannot see this.
+ */
+describe('launch_app with no activity: a thrown monkey failure quotes the sent command (D73)', () => {
+  const COMMAND = 'adb -s e shell monkey -p dev.averi.lab --pct-syskeys 0 --pct-nav 0 --pct-majornav 0 -c android.intent.category.LAUNCHER 1';
+  const failingWith = (failure: (command: string) => ExecError): AndroidAdapter => {
+    const exec: ExecFn = async (cmd, args) => {
+      throw failure([cmd, ...args].join(' '));
+    };
+    return new AndroidAdapter({ drawnOverStrip, serial: 'e', exec });
+  };
+  const messageOf = (adapter: AndroidAdapter) =>
+    launchApp(adapter, undefined, new EngineSession(), { appId: 'dev.averi.lab' }).then(() => 'launched', (e: Error) => e.message);
+
+  it('adb gone', async () => {
+    const adapter = failingWith((command) => new ExecError(command, 1, "adb: device 'e' not found\n"));
+    expect(await messageOf(adapter)).toBe(`Command failed (exit 1): ${COMMAND}\nadb: device 'e' not found`);
+  });
+
+  it('a timeout', async () => {
+    const adapter = failingWith((command) => new ExecError(command, null, '', true));
+    expect(await messageOf(adapter)).toBe(`Command timed out: ${COMMAND}`);
+  });
+
+  it("an exit with no `** ` line: monkey's stdout tail added", async () => {
+    const adapter = failingWith((command) => new ExecError(command, 1, 'Error: something\n', false, Buffer.from('bash arg: 1\n')));
+    expect(await messageOf(adapter)).toBe(`Command failed (exit 1): ${COMMAND}\nError: something\nmonkey printed: bash arg: 1`);
   });
 });
 

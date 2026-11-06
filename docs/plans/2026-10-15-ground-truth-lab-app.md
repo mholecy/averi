@@ -658,8 +658,9 @@ evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is na
     but with factor 2.0%.` (batch-11, D55b, 3/3 under the chooser; D73, 3/3 from the launcher, 2/2 under the chooser). That
     line is why it stopped (its `validate()` fails before any event), not a warning, and the chooser plays no part: with
     `--pct-syskeys 0` it exits 0, `Events injected: 1`, and the app comes forward, from the launcher (6/6, both lab apps)
-    and over the chooser (5/5), which leaves no `ResolverActivity` record (5/5; D73, 2026-11-06). With `--pct-nav 0 --pct-majornav 0` too, the launch averi
-    sends: the same, `:Dropped: keys=0`, both lab apps, 6/6 from the launcher and 6/6 over the chooser.
+    and over the chooser (5/5), which leaves no `ResolverActivity` record (5/5; D73, 2026-11-06). With `--pct-nav 0
+    --pct-majornav 0` too, the launch averi sends: the same, `:Dropped: keys=0`, both lab apps, 6/6 from the launcher and
+    6/6 over the chooser.
 15. averi's first uiautomator dump in a `scroll_until` takes about 2.2–2.5 s, and each later round about 2.2 s (6 reads
     13.2–13.9 s); on carousel-recycler-free a 440-px fling in 100 ms settles about 0.8 s after it ends, so it is over
     before averi's first stroke (batch-11, D62).

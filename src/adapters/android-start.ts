@@ -78,8 +78,8 @@ import { ExecError, type ExecResult } from './exec.js';
  * exit 255), `** Error: Unable to connect to activity manager …` (-3, exit
  * 253) and the event-injection errors are Logger.err — both streams are
  * read, so each is a refusal with its line. The rule depends only on the
- * `** ` prefix and the non-zero exit, not on any text. Two cases read as
- * `started` (neither measured):
+ * `** ` prefix and the non-zero exit, not on any text. Three cases read as
+ * `started` (none measured):
  * - an app that CRASHES on monkey's one launch event: per Monkey.java
  *   monkey prints `** Monkey aborted due to error.` to stdout and, with a
  *   count of 1, still exits 0. Defensible — the activity was started, and
@@ -87,7 +87,13 @@ import { ExecError, type ExecResult } from './exec.js';
  *   and not limited to old devices;
  * - a shell-v1 device (Android 6 or older), where adb loses the exit status:
  *   any monkey refusal at exit 0 reads as `started`, as an uncaught
- *   exception in `am` does (AM_ERROR_LINE_RE).
+ *   exception in `am` does (AM_ERROR_LINE_RE);
+ * - monkey exiting 0 with Android's chooser still in front, on an API other
+ *   than the lab's 33 (API 34 and later's `com.android.intentresolver`, say):
+ *   on API 33 the app was in focus and the chooser gone at its return, 5 of 5
+ *   (D73), so its success reads no focus, and the reply would be a bare
+ *   `Launched` with no ⚠ (ADR 0041's D73 amendment; the lab side is backlog
+ *   T7b's lc4'').
  */
 
 /** Which device command made the start: the two report a refusal differently. */

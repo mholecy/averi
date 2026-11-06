@@ -109,8 +109,8 @@ export function chooserInFocus(dump: string): string | undefined {
 /**
  * The advice in monkey's refusal (D55b, chooserAlsoInFront), the one sentence about the chooser the adapter still words:
  * a refusal is a thrown error, whose message the adapter builds, and the adapter may not import upward (ARCHITECTURE.md
- * §2). Its bytes are a launch's advice in interact/app-holder-text.ts#appHolderText, written twice for that reason and pinned whole on
- * each side. Neutral on whose intent the chooser answers: a chooser left up by another app's link reads the same.
+ * §2). Its bytes are a launch's advice in interact/app-holder-text.ts#appHolderText, written twice for that reason and
+ * pinned whole on each side. Neutral on whose intent the chooser answers: a chooser left up by another app's link reads the same.
  */
 const REFUSAL_ADVICE =
   'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it changes ' +

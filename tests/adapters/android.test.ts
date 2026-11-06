@@ -1335,7 +1335,6 @@ describe('AndroidAdapter interactions', () => {
       const { adapter, argvs, timeouts } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt') });
       const error = await failureOf(adapter.launch('dev.averi.lab'));
       expect(error?.message).toBe(`${monkeyRefused(MONKEY_LINE)} ${ALSO_IN_FRONT}`);
-      expect(error?.message).not.toContain('monkey starts nothing over it');
       expect(error?.cause).toBe(failure);
       expect(argvs).toEqual([MONKEY, FOCUS]);
       expect(timeouts[1]).toBe(2_000);
