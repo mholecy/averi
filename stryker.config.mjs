@@ -24,14 +24,14 @@ export default {
     '!/scripts/',
     '/scripts/*',
     '!/scripts/mutation/',
-    // The device batches' core (scripts/truth/batch/, backlog T2): its own folder only, never the rest of scripts/truth/.
+    // catalog.ts's entry guard; run-case.ts's cases import catalog.ts.
+    '!/scripts/is-main.ts',
+    // The device batches' core (scripts/truth/batch/, backlog T2) and scripts/truth's own modules: run-case.ts (A11)
+    // imports the live cases, which import their judges. Sources only: never its batch outputs or calibration data.
     '!/scripts/truth/',
     '/scripts/truth/*',
     '!/scripts/truth/batch/',
-    // ios-domains.ts, lab-chooser.ts and lab-emu.ts reuse lab-device.ts (T2 S4, S5), a static import: that file and the
-    // one it imports, no more.
-    '!/scripts/truth/lab-device.ts',
-    '!/scripts/truth/schema.ts',
+    '!/scripts/truth/*.ts',
     '!/package.json',
     '!/tsconfig.json',
     '!/tsconfig.test.json',

@@ -46,7 +46,7 @@ describe('runCase: launch, calls, a pause, the state', () => {
     const run = await runCase(aCase(), 'idb', rigOver(lab));
     expect(lab.log).toEqual(['launch c', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
     expect(run.verdict).toEqual(OK);
-    expect(run.record).toEqual({ source: 'idb', id: 'x1', replies: ['Tapped a'], launched: read('launch'), after: [], state: { ...read('final'), readAt: 1000 } });
+    expect(run.record).toStrictEqual({ source: 'idb', id: 'x1', replies: ['Tapped a'], launched: read('launch'), after: [], state: { ...read('final'), readAt: 1000 } });
   });
 });
 
@@ -140,6 +140,13 @@ describe('runCase: before the calls', () => {
     expect(run.record.replies).toEqual(['Tapped a']);
     expect(run.record).not.toHaveProperty('warmUpError');
     expect(notes).toEqual([]);
+  });
+
+  it('warmUp asks for the case\'s home element', async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
+    const asked: unknown[] = [];
+    await runCase(aCase({ warmUp: true, calls: [] }), 'idb', rigOver(lab, [], { callTool: async (call) => (asked.push(call), 'ok') }));
+    expect(asked).toEqual([{ tool: 'ui_snapshot', args: { filter: 'id:"lab.c.home"' } }]);
   });
 
   it('warmUp that failed: said once in its first line, kept whole in the record, the case goes on', async () => {

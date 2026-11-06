@@ -19,6 +19,7 @@ Amended 2026-11-05 (T2b-2: the run in two groups, core and lab, one Stryker proc
 T2b-2 part below).
 Amended 2026-11-05 (T2c: the abort's and the runner's budget tests on fake time, their bounds pinned exactly — see the
 T2 amendment's T2c part below).
+Amended 2026-11-06 (A11: scripts/truth/run-case.ts joined the run — see the amendment at the end).
 
 ## Context
 
@@ -1438,3 +1439,11 @@ The judging budget's races in abort.test.ts and the late need ends in runner.tes
 clearTimeout and Date faked, tests/truth/batch/fake-time.ts), no longer on tiny real timers, so a stall of the machine
 cannot flip them; the bounds are pinned exactly, a millisecond inside and a millisecond past, and a block left exactly
 0 ms is spent.
+
+## Amendment: run-case.ts joins the run (2026-11-06, backlog A11)
+
+scripts/truth/run-case.ts (ADR 0044) is in the `lab` group, against tests/truth/run-case.test.ts: 99.32 %, 148 mutants, 1
+survived, equivalent (named in scope.json); floor 97. It orchestrates IO, but every device call sits behind its rig and
+its tests take milliseconds, as with T2's runner.ts. Its cases import their judges, so Stryker's allowlist now takes
+scripts/truth/*.ts rather than lab-device.ts and schema.ts alone, plus scripts/is-main.ts; sources only, nothing of
+scripts/truth's outputs or data.

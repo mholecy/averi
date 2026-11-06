@@ -214,5 +214,11 @@
     "tests": ["tests/truth/batch/lab-build.test.ts", "tests/truth/batch/lab-batch.test.ts"],
     "floor": 98,
     "baseline": "100 % on 2026-11-05 (T2 batch-13 fixes: checkDevice joins the readying's warning and the build's; cold): 273 mutants, 0 survived; 100 % on 2026-11-05 (T2 S6b code review: checkDevice, GradleCall, the stop's reason; cold, final): 266 mutants, 0 survived; superseded: 100 % on 2026-11-05 (T2 S6b review round 2, cold): 241 mutants, 0 survived"
+  },
+  "scripts/truth/run-case.ts": {
+    "group": "lab",
+    "tests": ["tests/truth/run-case.test.ts"],
+    "floor": 97,
+    "baseline": "99.32 % on 2026-11-06 (A11; cold): 148 mutants, 1 survived — line 75's `warm !== undefined` emptied to true, equivalent: isError(undefined) is false"
   }
 }
