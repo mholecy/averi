@@ -511,16 +511,22 @@ Measured 2026-11-06, emulator-5554 (averi_lab, API 33):
 | `--pct-syskeys 0`, the launcher in front, each lab app × 3 | exit 0, its `.MainActivity` in front |
 | `--pct-syskeys 0`, `no.such.pkg`, with and without the chooser, × 1 each | exit 252, stdout `** No activities found to run, monkey aborted.`; the chooser stays in front when up |
 | `-v -v --pct-syskeys 0`, × 1 | factor 8 at 0, `:Switch:`, `Events injected: 1`, `:Dropped: keys=0` |
+| `-v -v --pct-syskeys 0 --pct-nav 0 --pct-majornav 0`, each lab app × 3 from the launcher, × 3 over `shared`'s chooser | 12 of 12: exit 0, no `** ` line, factors 6, 7 and 8 at 0, `:Switch:` to the app's `.MainActivity`, `Events injected: 1`, `:Dropped: keys=0`, the app `mFocusedApp`, no `ResolverActivity` record |
+| the three flags, `no.such.pkg`, × 1 | exit 252, stdout `** No activities found to run, monkey aborted.` |
 
 AOSP, read at android-5.0.0_r1 (Monkey.java, MonkeySourceRandom.java): `--pct-syskeys` sets the system-key factor;
 `run()` returns -5 when `validate()` fails, which is the exit 251 D55b left untraced, and it does so before any event;
 `validateKeys` checks NAV_KEYS, MAJOR_NAV_KEYS and SYS_KEYS in that order; `validateKeyCategory` passes a factor under 0.1
 without looking at the keys;
-`run()` queues the start first and the count bounds the events, so a count of 1 is that start. The device's own
-`/system/framework/monkey.jar` holds the three category names and the three flags.
+`run()` calls `generateActivity()` before `validate()` and injects only after it, in `runMonkeyCycles()`, whose loop the
+count bounds; `--pct-nav` and `--pct-majornav` set FACTOR_NAV and FACTOR_MAJORNAV as `--pct-syskeys` sets FACTOR_SYSOPS. The
+device's own `/system/framework/monkey.jar` holds the three category names and the three flags. That is one old tag
+and API 33's jar: the source of no other release was read.
 
 **Decision.**
-- The launch sends `monkey -p <package> --pct-syskeys 0 -c android.intent.category.LAUNCHER 1`.
+- The launch sends `monkey -p <package> --pct-syskeys 0 --pct-nav 0 --pct-majornav 0 -c android.intent.category.LAUNCHER 1`.
+  Only SYS_KEYS has been seen to abort. The other two flags are there on the same argument (review round 1): the one event
+  is the launch, so no key category has a part in it, and "not seen" is what hid SYS_KEYS.
 - Gone, resting on the warning reading: `MONKEY_EMULATOR_WARNING_RE`, `refusalReasons`, `startSaid`'s lines parameter and
   `monkeyChooserRefusal`. A `** SYS_KEYS` line reaching a refusal is now news (a device the flag did not help), so it is
   quoted like any other `** ` line.
@@ -568,28 +574,38 @@ flow's `launch` step and the ensure_state ladder get replies 1 and 2 through the
 golden launches its cells itself and judges the app's model, so a `launch_app` case would need a new group and a focus
 oracle). `launch_app` with no activity on `dev.averi.lab` and `dev.averi.lab.rn`, × 3 each, under no chooser and under
 `shared`'s chooser. Base 2f6ba8b6: refused 12 of 12, replies 1 and 2, the launcher or the chooser still in front. This
-branch: `Launched` 12 of 12, the app's `.MainActivity` in front 12 of 12, 141–157 ms.
+branch: `Launched` 12 of 12, the app's `.MainActivity` in front 12 of 12, 141–157 ms with the one flag and 138–167 ms with
+the three.
 
 **Tests.** `labMonkey` in `tests/mcp/android-chooser-replies.test.ts` answers as the AVD measured: exit 251 without the flag,
-exit 0 with it, and the reply over it is exactly `Launched …`, with the chooser up too.
-`tests/fixtures/monkey-api33-d73-pct-syskeys-0-stdout.txt` is the started stdout. batch-11's exit-251 fixtures stay, as
+exit 0 with it, and the reply over it is exactly `Launched …`. With a focus read that would name the chooser, it proves
+monkey's success reads none and adds no note; that monkey starts over the chooser is the device's, measured above.
+`tests/fixtures/monkey-api33-d73-started-stdout.txt` is the started stdout under the three flags, a shape record:
+`runStart` reads nothing on exit 0, so its bytes guard no averi code. batch-11's exit-251 fixtures stay, as
 what a refusing device prints.
 
 `npm run mutate -- --force` (both groups, cold, at 8f9286d6): `android-chooser.ts` 100 % (floor 98; 143 mutants, 0
 survived, down from 152 with `monkeyChooserRefusal` gone); every other score unchanged; floors unchanged. `android.ts` and
 `android-start.ts` are not in the mutation scope, so hand mutants, each killed: the flag dropped (12 tests fail), its value
-`1` (12), `chooserAlsoInFront` dropped (5), the `** SYS_KEYS` line filtered from the quote again (5), `startSaid`'s separator (3).
+`1` (12), `chooserAlsoInFront` dropped (5), the `** SYS_KEYS` line filtered from the quote again (5), `startSaid`'s separator (3). Review round 1 changed only comments
+in `android-chooser.ts`, so the run was not repeated; its hand mutants, each killed: `--pct-syskeys` dropped (12 tests
+fail), `--pct-nav` dropped (10), `--pct-majornav` dropped (10).
 
 Golden Changed 0 (it replays tree reads, no launch seam), so it is no evidence either way.
 
 Residuals, stated:
-- Only API 33 on one AVD is measured. `--pct-syskeys` was read in android-5.0.0_r1's source, and no older or newer device
-  was run. An AVD or a device that has those keys is unmeasured; by AOSP's reading the flag only sets a share of events
-  that a count of 1 never reaches, so it should be harmless.
-- A device with no d-pad or no menu key would refuse earlier, on `** NAV_KEYS …` or `** MAJOR_NAV_KEYS …`: `validateKeys`
-  checks them first, at factors the flag leaves non-zero. The lab AVD passes both although its config says `hw.dPad=no`,
-  so `hw.dPad` does not predict it. Not added here, since neither abort has been seen. The refusal quotes its line, and
-  `--pct-nav 0 --pct-majornav 0` is the same remedy.
+- Only API 33 on one AVD is measured. The three flags were read in android-5.0.0_r1's source and found in API 33's jar, and
+  no older or newer device was run. An AVD or a device that has those keys is unmeasured; by AOSP's reading the flags only
+  set shares of events that a count of 1 never reaches, so they should be harmless.
+- If monkey ever exits 0 with the chooser still in front (API 34 and later's `com.android.intentresolver`, unmeasured), the
+  reply is a bare `Launched`, no ⚠. Not reading the focus after monkey's success is a choice: the app was in focus and the
+  chooser gone at monkey's return 5 of 5, and it saves about 70 ms on every such launch. Live case lc4'' covers the lab side.
+- No permanent check runs this path on a device: the lab launches with `am start -W -n` (`lab-device.ts`), the perf
+  baseline names `.MainActivity`, and the differential has no Android launch. So this bug's net is backlog T7b's lc4'
+  (`launch_app` with no activity from the launcher answers `Launched`, the app `mFocusedApp`) and lc4'' (the same over
+  `open_deep_link averilab://shared/open`'s chooser, no `ResolverActivity` left), not built here. Until then the throwaway
+  script's 12 of 12 is a one-time proof.
 - D55b's proposed live case lc4 (the error naming the chooser) is void: monkey under the chooser now answers `Launched`.
+  lc4' and lc4'' take its place.
 - ADR 0041's "The reply does not say what `launch_app` does with the chooser up, because that is unmeasured" is answered
   for monkey: it brings the app forward, and the chooser goes.
