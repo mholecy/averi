@@ -52,20 +52,17 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * read each — ~5.1 s a round — ended cut at the deadline in 2 of the runs recorded. Moves it otherwise: the round
  * judges the new read like any other, and a stop flush again after it is a new candidate with a probe of its own.
  *
- * A REVEAL THAT MOVED NOTHING after a stroke that CARRIED the match its whole drawn length — less CARRY_LOSS, twice
- * the most a drag was measured to lose to the slop and the content's give — is DOUBTED once (D62): that stroke did not
- * end at the content's end, so the stillness after it says the app did not take the reveal, not that nothing lies past
- * the edge (measured, batch-9: a 142-px probe carried a carousel card 135 px, and the reveal after it was never
- * delivered — read as "fully visible"). No `checked`: the cut stays proven (`ProvenCut.carry` `doubted`) and the same
- * reveal is sent again, or, with none to send, the read is short of the cut. A second held reveal is checked; a held
- * reveal after a stroke that ran short (the content ended more than CARRY_LOSS before the stroke's end) and every
- * first probe that held are checked at once, as before. The doubt is the proof's, kept with it (`stillProven`): a read
- * between that moved the match without proving the cut anew (a stroke that was no reveal) leaves it owed, so the next
- * held reveal is doubted all the same — once per proof, at most one extra stroke. Cost: one stroke and one read, in
- * the doubted case only — a legitimate one too when the content ended within CARRY_LOSS of the stroke's end (a row cut
- * by 40 px, which a 74-px probe brings whole, pays one retry before `checked`, and at the bound fails hedged).
- * Residuals: a first probe the app did not take still reads checked (no stroke before it to doubt by); so does a
- * reveal dropped after a stroke that ran short for another reason (a loaded host), or two strokes dropped in a row.
+ * A REVEAL THAT MOVED NOTHING on a proven cut is DOUBTED once (D62, T11): the stillness may mean the app did not take the
+ * reveal, not that nothing lies past the edge (measured, batch-9: a 142-px probe carried a carousel card 135 px, and the
+ * reveal after it was never delivered — read as "fully visible"). No `checked`: the cut stays proven (`ProvenCut.doubted`)
+ * and the same reveal is sent again, or, with none to send, the read is short of the cut. A second held reveal is checked.
+ * How far the proving stroke carried the match decides nothing: on a device whose frames run long the same 142-px stroke
+ * carries a card 36–142 px with its content nowhere near its end (T11), so a short carry does not say the content ended.
+ * The doubt is the proof's, kept with it (`stillProven`): a read between that moved the match without proving the cut anew
+ * (a stroke that was no reveal) leaves it owed, so the next held reveal is doubted all the same — once per proof, at most
+ * one extra stroke. Cost: one stroke and one read on every held reveal, the legitimate pass whose content did end included.
+ * Residuals: a first probe the app did not take still reads checked (no proof to doubt by); so do two reveals dropped in a
+ * row.
  *
  * A REVEAL NOT WORTH SENDING (D68, interact/aim-floor.ts): on a proven cut, each stroke that proved it is kept with its
  * drawn length and the match's growth (`Memory.measured`); once the room left on the match's uncut side is under what a
@@ -200,18 +197,9 @@ interface ProvenCut {
   readonly edge: Edge;
   readonly container: Rect;
   readonly revealed: number;
-  /** How far the stroke that proved it carried the match, and the doubt that follows (`Carry`, D62). */
-  readonly carry: Carry;
+  /** A reveal held on this proof and was sent again (D62, T11): the next that holds is checked. A fresh proof starts anew. */
+  readonly doubted: boolean;
 }
-
-/**
- * The stroke that proved a cut (`revealedBy`), against its drawn length (D62): `short` — it carried the match less
- * than that length less `CARRY_LOSS`, the content ended under it, or no stroke was drawn (the round requires the stroke
- * after every one, scroll-rounds.ts#RoundSeen.drawn, so a proving read always has its own); `carried` — it carried it
- * the whole way, so the next reveal that moves nothing is doubted, sent again; `doubted` — one was, and the next that
- * moves nothing is checked. A fresh proof starts anew.
- */
-type Carry = 'short' | 'carried' | 'doubted';
 
 declare const opaque: unique symbol;
 
@@ -252,13 +240,6 @@ interface MeasuredStroke extends StrokeCarry {
 
 const open = (check: FlushCheck): Memory => check as unknown as Memory;
 const close = (m: Memory): FlushCheck => m as unknown as FlushCheck;
-
-/**
- * The most px a stroke that carried the match its whole way may fall short of its drawn length (`Carry`, D62): twice
- * TOUCH_SLOP — measured losses to the slop and the content's give 7–24 px; batch-9's probe carried C 135 px of 142
- * (or of the 177-px cap, which one slop would miss).
- */
-const CARRY_LOSS = 2 * TOUCH_SLOP;
 
 /** The check before the first read, for a scroll toward `direction`: no probe in flight, no cut proven. */
 export function startFlush(direction: Direction): FlushCheck {
@@ -353,12 +334,11 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
   // The probe moved it and it lies flush on the same edge with more of it showing (`revealedBy`), or it still lies
   // flush on a cut an earlier probe proved (`stillProven`).
   const at = flushOf(stop.judged, stop.facts, m.direction);
-  const fresh = probed !== undefined && !held ? revealedBy(probed, rect, at, stop.drawn) : undefined;
+  const fresh = probed !== undefined && !held ? revealedBy(probed, rect, at) : undefined;
   const proof = fresh ?? stillProven(m.proven, at);
-  // A reveal that moved nothing after a stroke that carried the match its whole length: doubted once — the cut stays
-  // proven, its doubt spent, and the same reveal goes again (D62).
-  const doubted = stroked && proof?.carry === 'carried';
-  const proven = doubted ? { ...proof, carry: 'doubted' as const } : proof;
+  // A reveal that moved nothing: doubted once — the cut stays proven, its doubt spent, and the same reveal goes again (D62, T11).
+  const doubted = stroked && proof !== undefined && !proof.doubted;
+  const proven = doubted ? { ...proof, doubted: true } : proof;
   // A fresh proof is a measured stroke: how far it carried the match, for the aim floor (D68).
   const measured = fresh !== undefined && stop.drawn !== undefined ? [...m.measured, { drawn: strokeLength(stop.drawn), moved: fresh.revealed, edge: fresh.edge, container: fresh.container }] : m.measured;
   const after: Memory = { ...m, probe: undefined, proven, measured };
@@ -369,8 +349,8 @@ export function seeFlush(check: FlushCheck, stop: FlushStop | undefined): FlushS
 /**
  * What the probe in flight came back with, as the verdict reads it (`seeFlush`): `moved` — no probe came back held (none
  * in flight, or the match moved); `held` — the match where it was sent from, after a stroke; `tap` — held, the stroke
- * drawn under twice the slop, which may have been a tap; `doubted` — held after a reveal on a proof whose stroke
- * carried the match its whole length (`Carry` `carried`): no stop, the reveal again (D62).
+ * drawn under twice the slop, which may have been a tap; `doubted` — held after a reveal on a proof not yet doubted
+ * (`ProvenCut.doubted`): no stop, the reveal again (D62, T11).
  */
 type Came = 'moved' | 'held' | 'tap' | 'doubted';
 
@@ -426,16 +406,14 @@ function flushOf(best: Judged, facts: TreeFacts, direction: Direction): FlushAt 
  * pixel, and its uncut edge moved toward revealing the flush one by that growth, within a pixel — the content carried
  * it out from past that edge. Undefined otherwise: no longer flush, flush on another edge or filling its container, no
  * more of it showing (a match that moved but did not grow says nothing of a cut), or grown with its uncut edge where
- * the content did not carry it (a container that grew, another match in its place). Its `carry` (`Carry`): `carried`
- * when it grew by more than `drawn`'s length less `CARRY_LOSS`, else `short` — never `doubted`, a fresh proof.
+ * the content did not carry it (a container that grew, another match in its place). Never doubted: a fresh proof.
  */
-function revealedBy(probed: SentProbe, now: Rect, { chain, flushed }: FlushAt, drawn: Stroke | undefined): ProvenCut | undefined {
+function revealedBy(probed: SentProbe, now: Rect, { chain, flushed }: FlushAt): ProvenCut | undefined {
   if (flushed === undefined || 'fills' in flushed || flushed.edge !== probed.edge) return undefined;
   const was = probed.rect;
   const grown = axisOfEdge(probed.edge) === 'vertical' ? now.height - was.height : now.width - was.width;
   const uncutMoved = uncutToward(now, probed.edge) - uncutToward(was, probed.edge);
-  const carry: Carry = drawn !== undefined && grown > strokeLength(drawn) - CARRY_LOSS ? 'carried' : 'short';
-  return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? { edge: probed.edge, container: chain[flushed.at], revealed: grown, carry } : undefined;
+  return grown > 1 && Math.abs(uncutMoved - grown) <= 1 ? { edge: probed.edge, container: chain[flushed.at], revealed: grown, doubted: false } : undefined;
 }
 
 /** `cut` (`Memory.proven`) while the match still lies flush on its edge of its container (`flushed`, of `chain`), within a pixel; undefined once it lies anywhere else. */
@@ -484,7 +462,7 @@ function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, 
   // no reveal was sent (`FlushCut`).
   const unchecked = (why: 'budget' | 'room' | 'axis' | 'tap'): FlushVerdict =>
     proven === undefined ? { of: 'flush', flush: { ...where, checked: false, why } } : { of: 'cut', cut: { of: 'flushCut', judged, ...where, revealed: proven.revealed, why } };
-  // A probe or reveal that moved nothing: checked — nothing lies past the edge now — unless drawn too short to tell
+  // A probe, or a reveal already doubted, that moved nothing: checked — nothing lies past the edge now — unless drawn too short to tell
   // from a tap, which on a proven cut is no stop but that cut; or doubted (D62), when the reveal goes again below.
   if (came === 'held') return { of: 'flush', flush: { ...where, checked: true } };
   if (came === 'tap') return unchecked('tap');

@@ -64,10 +64,9 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     expect(strokes(played).map((s) => s.do === 'stroke' && s.maxTravel)).toEqual([177, 206, 176]);
   });
 
-  // Rewritten on purpose (D62): this was "a reveal after which it holds is checked" — but the 74-px probe carried S
-  // 60 px, its whole length less twice the slop, so the content did not end under it, and a reveal that then moved
-  // nothing may not have been taken by the app (batch-9). Doubted once: sent again, and checked only if that one holds.
-  it('D62: a reveal that held right after a probe that carried S its whole stroke is sent again — checked when that one holds too, the cut when no swipe is left', () => {
+  // Rewritten on purpose (D62): this was "a reveal after which it holds is checked" — but a reveal that moved nothing
+  // may not have been taken by the app (batch-9). Doubted once: sent again, and checked only if that one holds.
+  it('D62: a reveal that held right after the probe is sent again — checked when that one holds too, the cut when no swipe is left', () => {
     const played = play(RULES, [sAt(0), sAt(60), sAt(60), sAt(60)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
     expect(strokes(played).map((s) => s.do === 'stroke' && s.maxTravel)).toEqual([177, 206, 206]);
@@ -84,9 +83,9 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     );
   });
 
-  // ADR 0013 LV2 point 3's row cut by 40 px, revealed whole by the 74-px probe (40 > 74 − 48: carried): the legitimate
-  // case D62's doubt costs one retry — a stroke and a read, the swipe count one higher.
-  it('D62: a probe that carried S 40 px and a reveal that then held: one retry, checked after 3 swipes (was 2)', () => {
+  // ADR 0013 LV2 point 3's row cut by 40 px, revealed whole by the 74-px probe: the legitimate case the doubt costs one
+  // retry — a stroke and a read, the swipe count one higher.
+  it('D62: a probe that moved S 40 px and a reveal that then held: one retry, checked after 3 swipes (was 2)', () => {
     const played = play(RULES, [sAt(0), sAt(40), sAt(40), sAt(40)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
     expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'bottom', container: LOWER, checked: true } });
@@ -178,5 +177,34 @@ describe('a probe that revealed more of a match still flush on the same edge pro
     const played = play(RULES, [sAt(0), sAt(200), sAt(200)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'confirm', 'stop']);
     expect(resultOf(played)).toEqual({ swipes: 1, visible: 1, clipped: [] });
+  });
+});
+
+/**
+ * T11, real bytes: lv-d62-drop on emulator-5554 2026-11-06 (docs/truth/live-records/t11-carousel-visible/group/head-1.json), the three
+ * dumps the call read, whole. The carousel `[66,380][1014,614]`; C dumped `[638,…]`, the 142-px probe carried it 91 px
+ * (`[547,…]`), the reveal after it never reached the device, and the read after that was byte-identical: the app put C at
+ * 547, 948 wide, 481 px past the clip. 91 of 142 is under D62's old carry line (94): the old rule read it as the content
+ * ended and replied "fully visible after 2 swipes". The same AVD's raw `input swipe`s carried 47–132 of 142 with nothing
+ * of averi in the path, so a short stroke says nothing of the content's end.
+ */
+describe('T11: a reveal that held is doubted once, however far the stroke that proved the cut carried the match', () => {
+  const dump = (i: number): Row => {
+    const tree = parseDump(readFileSync(new URL(`../fixtures/t11-lv-d62-drop-${i}.xml`, import.meta.url), 'utf8'));
+    return { tree, found: [...everyNode(tree)].filter((n: UiNode) => n.identifier === 'lab.carousel-recycler-free.C') };
+  };
+  const LEFT: RoundRules & { screen: { width: number; height: number } } = { ...RULES, direction: 'left' };
+
+  it('the captured call: no "fully visible" on the read after the reveal the app never took — the same reveal goes again', () => {
+    const played = play(LEFT, [dump(0), dump(1), dump(2), dump(2)]);
+    expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
+    const [, reveal, again] = played.steps.filter((s) => s.do === 'stroke').map(decided);
+    expect(again).toEqual(reveal);
+    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'right', checked: true } });
+  });
+
+  it('with no swipe left for the retry: the bound names the cut, never "fully visible"', () => {
+    const spent = play({ ...LEFT, maxSwipes: 2 }, [dump(0), dump(1), dump(2)]);
+    expect(spent.outcome).toMatchObject({ kind: 'bound', by: { of: 'maxSwipes' }, short: { of: 'flushCut', edge: 'right', revealed: 91, why: 'budget' } });
   });
 });
