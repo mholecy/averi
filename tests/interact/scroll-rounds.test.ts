@@ -709,9 +709,9 @@ describe('round — a fully: true stop flush with its clipping scroll container 
     );
   });
 
-  it('a probe that shows more of the row still flush on the same edge proved the cut: no confirm, the next stroke a reveal — at a top edge still capped (the pull-to-refresh lies that way); the second after which it holds is accepted', () => {
+  it('a probe that shows more of the row still flush on the same edge proved the cut: no confirm, the next stroke a reveal — at a top edge still capped (the pull-to-refresh lies that way); two after which it holds end in the hedge', () => {
     const played = play({ ...FULLY_ANDROID, maxSwipes: 6 }, [formRead(242, 20), formRead(242, 60), formRead(242, 100), formRead(242, 100), formRead(242, 100)]);
-    // probe; grew (20 → 60): reveal; grew (60 → 100): reveal; held: doubted, the reveal again; held: checked.
+    // probe; grew (20 → 60): reveal; grew (60 → 100): reveal; held: doubted, the reveal again; held: the hedge.
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stroke', 'stop']);
     // The reveal's travel is half the room below the row (1978 − 302 = 1676 → 838), capped at 0.08 of the long side.
     expect(probeOf(played).map((s) => s.do === 'stroke' && [s.reach, s.maxTravel])).toEqual([
@@ -720,7 +720,7 @@ describe('round — a fully: true stop flush with its clipping scroll container 
       [1, 177],
       [1, 177],
     ]);
-    expect(resultOf(played)).toMatchObject({ swipes: 4, flush: { edge: 'top', checked: true } });
+    expect(resultOf(played)).toMatchObject({ swipes: 4, flush: { edge: 'top', checked: false, why: 'held', revealed: 40 } });
   });
 
   it('a probe after which more of the row shows flush on the OTHER edge proved nothing of the edge it asked about: a new candidate, confirmed and probed toward its own edge — no reveal', () => {
@@ -2823,10 +2823,11 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
     }
     expect(probes(played)).toHaveLength(3);
     const result = resultOf(played);
-    expect(result.flush).toEqual({ edge: 'top', container: LIST, pinned: { ...HEADER, label: null }, checked: true });
+    expect(result.flush).toEqual({ edge: 'top', container: LIST, pinned: { ...HEADER, label: null }, checked: false, why: 'held', revealed: 66 });
     expect(describeScrollResult(result)).toBe(
-      "fully visible after 3 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, " +
-        'and a probe swipe toward it moved nothing — nothing of it is cut there',
+      "fully visible after 3 swipes; but its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, " +
+        "where Android cuts a node's bounds at a node drawn over it, and a swipe toward it showed 66 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — " +
+        'it may be cut there, a rect assert or screenshot may measure part of it; calling again tells',
     );
   });
 

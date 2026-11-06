@@ -271,7 +271,7 @@ export function judgeFully(expect: FullyExpect): CarouselJudge {
       const sent = swipes.filter((s) => !s.dropped).length;
       const taken = carouselStrokes(state, launched).length;
       if (taken !== sent) return { ...base, outcome: 'SKIP', why: `the app took ${taken} carousel stroke(s) of the ${sent} sent: the drop not shown to hold` };
-      // D62's retry (flush-check.ts: a held reveal after a carried proof is doubted and "the same reveal is sent again"):
+      // D62's retry (flush-check.ts: a held reveal on a proven cut is doubted and "the same reveal is sent again"):
       // the stroke after the dropped one is that reveal, its points within CUT_TOLERANCE_PX.
       const retry = noRetry(swipes, expect.dropped);
       if (retry !== undefined) return { ...base, outcome: 'LOUD', cls: 'no-retry', why: `no retry seen: ${retry}: ${short(reply)}` };

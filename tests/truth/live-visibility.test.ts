@@ -137,6 +137,14 @@ describe('judgeScroll', () => {
     expect(judgeScroll(c, [reply, 'ERROR'], beside, launched).outcome).toBe('MISMATCH');
     expect(judgeScroll({ ...c, unlisted: true }, [reply, 'ERROR'], beside, launched)).toMatchObject({ outcome: 'LOUD', why: expect.stringMatching(/not in the tree: its strokes unjudged — stroked upper/) });
   });
+  it('T11: the hedge on two held reveals, the app bearing it out or not: ok with the target whole, LOUD with it cut — no claim, so no MISMATCH; the same stop with no hedge stays one', () => {
+    const hedge = 'Element id:"x" fully visible after 3 swipes; but its top edge lies on its scroll container\'s (0,303 1080x1238), where Android cuts a node\'s bounds to the container, and a swipe toward it showed 66 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — it may be cut there, a rect assert or screenshot may measure part of it; calling again tells';
+    expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], reached, launched).outcome).toBe('ok');
+    const cut = state({ frames: { T: { x: 51, y: 840, width: 300, height: 64 } }, offsets: { page: 0 }, strokes: [stroke(382, 0)], events: [{ kind: 'tap', tag: 'T', at }] });
+    expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'held-hedge' });
+    expect(judgeScroll({ ...c, fully: true }, [hedge.split(';')[0], 'Tapped'], cut, launched).outcome).toBe('MISMATCH');
+  });
+
   it('the stop held but the tap after it fired something else: MISMATCH', () => {
     const other = state({ ...reached, events: [{ kind: 'tab', tag: 'home', at }] });
     expect(judgeScroll(c, ['Element id:"x" visible after 1 swipe', 'Tapped id:"x"'], other, launched).outcome).toBe('MISMATCH');

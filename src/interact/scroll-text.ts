@@ -86,10 +86,11 @@ export interface ScrollUntilResult {
    * its scroll container's edge (Android only:
    * interact/flush-check.ts) — where uiautomator cuts a
    * node's bounds, so the rect cannot say whether more of it lies beyond.
-   * `checked`: a probe swipe toward that edge moved nothing, so nothing
+   * `checked`: a first probe swipe toward that edge moved nothing, so nothing
    * does (the probe is one of `swipes`). Not checked (`why`, flush-check.ts
    * #Flush): no swipe or time left, no container with room for a probe, a
-   * probe short enough to be a tap, or — `fills`, with both `edges` and no
+   * probe short enough to be a tap, a cut a swipe proved and two swipes after
+   * it that moved nothing (`held`), or — `fills`, with both `edges` and no
    * one `edge` — it fills its nearest container along the scroll, which no
    * probe can check; the reply says it
    * may be cut. Absent otherwise.
@@ -400,6 +401,8 @@ export function flushText(flush: ScrollUntilResult['flush']): string {
   }
   const { where, cuts } = flushEdgeText(flush, 'lies');
   if (flush.checked) return `; ${where}, and a probe swipe toward it moved nothing — nothing of it is cut there`;
+  // T11: a cut a swipe proved is never called uncut, ADR 0013's T11 amendment; a new call's first probe tells.
+  if (flush.why === 'held') return `; but ${where}, ${cuts}, and a swipe toward it showed ${flush.revealed} px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — ${cut}; calling again tells`;
   const unchecked = {
     budget: 'no swipe or time was left to check it',
     room: 'no scroll container around it has room for a probe swipe to check it',

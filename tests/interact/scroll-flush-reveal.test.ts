@@ -65,12 +65,12 @@ describe('a probe that revealed more of a match still flush on the same edge pro
   });
 
   // Rewritten on purpose (D62): this was "a reveal after which it holds is checked" — but a reveal that moved nothing
-  // may not have been taken by the app (batch-9). Doubted once: sent again, and checked only if that one holds.
-  it('D62: a reveal that held right after the probe is sent again — checked when that one holds too, the cut when no swipe is left', () => {
+  // may not have been taken by the app (batch-9). Doubted once: sent again, and hedged (T11) if that one holds.
+  it('D62: a reveal that held right after the probe is sent again — the hedge when that one holds too, the cut when no swipe is left', () => {
     const played = play(RULES, [sAt(0), sAt(60), sAt(60), sAt(60)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
     expect(strokes(played).map((s) => s.do === 'stroke' && s.maxTravel)).toEqual([177, 206, 206]);
-    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'bottom', container: LOWER, checked: true } });
+    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'bottom', container: LOWER, checked: false, why: 'held', revealed: 60 } });
     const moved = play(RULES, [sAt(0), sAt(60), sAt(60), sAt(280), sAt(280)]);
     expect(moved.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'confirm', 'stop']);
     expect(describeScrollResult(resultOf(moved))).toBe('fully visible after 3 swipes');
@@ -85,10 +85,10 @@ describe('a probe that revealed more of a match still flush on the same edge pro
 
   // ADR 0013 LV2 point 3's row cut by 40 px, revealed whole by the 74-px probe: the legitimate case the doubt costs one
   // retry — a stroke and a read, the swipe count one higher.
-  it('D62: a probe that moved S 40 px and a reveal that then held: one retry, checked after 3 swipes (was 2)', () => {
+  it('D62: a probe that moved S 40 px and a reveal that then held: one retry, hedged after 3 swipes (was checked after 2)', () => {
     const played = play(RULES, [sAt(0), sAt(40), sAt(40), sAt(40)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
-    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'bottom', container: LOWER, checked: true } });
+    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'bottom', container: LOWER, checked: false, why: 'held', revealed: 40 } });
   });
 
   it('no swipe or time left for the reveal: the bound fails naming the cut the probe proved — never "fully visible"', () => {
@@ -195,12 +195,20 @@ describe('T11: a reveal that held is doubted once, however far the stroke that p
   };
   const LEFT: RoundRules & { screen: { width: number; height: number } } = { ...RULES, direction: 'left' };
 
-  it('the captured call: no "fully visible" on the read after the reveal the app never took — the same reveal goes again', () => {
+  // Dumps 0–2 are the call as captured (its reveal dropped); the fourth read reuses dump 2 and is NOT captured: it stands
+  // for a retry that also moved nothing (live, fix-drop-more/fixmore-20.json logged such a retry as 482 → 482).
+  it('the captured call: no plain "fully visible" while the cut is proven — the same reveal goes again, and two that held end in the hedge', () => {
     const played = play(LEFT, [dump(0), dump(1), dump(2), dump(2)]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
     const [, reveal, again] = played.steps.filter((s) => s.do === 'stroke').map(decided);
     expect(again).toEqual(reveal);
-    expect(resultOf(played)).toMatchObject({ swipes: 3, flush: { edge: 'right', checked: true } });
+    const result = resultOf(played);
+    expect(result).toMatchObject({ swipes: 3, flush: { edge: 'right', checked: false, why: 'held', revealed: 91 } });
+    expect(describeScrollResult(result)).toBe(
+      "fully visible after 3 swipes; but its right edge lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, " +
+        'and a swipe toward it showed 91 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — ' +
+        'it may be cut there, a rect assert or screenshot may measure part of it; calling again tells',
+    );
   });
 
   it('with no swipe left for the retry: the bound names the cut, never "fully visible"', () => {

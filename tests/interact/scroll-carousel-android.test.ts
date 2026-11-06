@@ -481,7 +481,7 @@ describe('`fully: true` on a card as wide as a carousel of untold axis (D59): un
     const FULLY = { ...RULES, fully: true };
     const va1 = play({ ...FULLY, direction: 'down' }, [rAt('[128,457][953,567]'), rAt('[128,457][953,633]'), rAt('[128,457][953,633]'), rAt('[128,457][953,633]')]);
     expect(va1.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
-    expect(describeScrollResult(resultOf(va1))).toMatch(/^fully visible after 3 swipes; its top edge lies on the edge of container id:lab\.scroll-sticky-cut\.header/);
+    expect(describeScrollResult(resultOf(va1))).toMatch(/^fully visible after 3 swipes; but its top edge lies on the edge of container id:lab\.scroll-sticky-cut\.header/);
     const carried = replay({ ...FULLY, direction: 'down' }, [rAt('[128,1480][953,1541]'), rAt('[128,1200][953,1310]'), rAt('[128,1200][953,1310]')]);
     expect(carried.outcome).toMatchObject({ kind: 'visible' });
     expect(describeScrollResult(resultOf(carried))).toBe('fully visible after 1 swipe');

@@ -55,14 +55,15 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * A REVEAL THAT MOVED NOTHING on a proven cut is DOUBTED once (D62, T11): the stillness may mean the app did not take the
  * reveal, not that nothing lies past the edge (measured, batch-9: a 142-px probe carried a carousel card 135 px, and the
  * reveal after it was never delivered — read as "fully visible"). No `checked`: the cut stays proven (`ProvenCut.doubted`)
- * and the same reveal is sent again, or, with none to send, the read is short of the cut. A second held reveal is checked.
+ * and the same reveal is sent again, or, with none to send, the read is short of the cut. A second held reveal ends the
+ * call hedged (`Flush` `held`), never `checked`: the content ended there or the app did not take two strokes, and the
+ * tree cannot say which (a real 233-px retry was logged `482 → 482`, T11). A new call asks a first probe again.
  * How far the proving stroke carried the match decides nothing: on a device whose frames run long the same 142-px stroke
  * carries a card 36–142 px with its content nowhere near its end (T11), so a short carry does not say the content ended.
  * The doubt is the proof's, kept with it (`stillProven`): a read between that moved the match without proving the cut anew
  * (a stroke that was no reveal) leaves it owed, so the next held reveal is doubted all the same — once per proof, at most
  * one extra stroke. Cost: one stroke and one read on every held reveal, the legitimate pass whose content did end included.
- * Residuals: a first probe the app did not take still reads checked (no proof to doubt by); so do two reveals dropped in a
- * row.
+ * Residual: a first probe the app did not take still reads checked (no proof to doubt by).
  *
  * A REVEAL NOT WORTH SENDING (D68, interact/aim-floor.ts): on a proven cut, each stroke that proved it is kept with its
  * drawn length and the match's growth (`Memory.measured`); once the room left on the match's uncut side is under what a
@@ -130,13 +131,16 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * ancestor — a row taller than its list, cut at both ends, reads exactly the list's rect. Never probed (one probe
  * cannot tell which side, if either, is cut), so never checked — and never a plain "fully visible".
  *
+ * `held`: a cut a stroke proved, `revealed` px more of it shown, and two swipes after it that moved nothing (T11). A hedge on
+ * the stop where `FlushCut` is a failure: no reveal is left to send, and no further stroke tells the two apart.
+ *
  * `pinned`: the flush edge lies not on the container's own edge but on the inner edge of a node pinned in it at that
  * side, drawn after the match (ui-tree/later-edges.ts#PinnedEdge: a merged sticky header) — the scroll view shows
  * nothing of its content past it, so it is that edge the probe asks about. With `fills`, the pinned one of the two is
  * always `edges[0]`: a node pins at the content's start only (top, left), and the far edge is the container's own.
  */
 export type Flush =
-  | (FlushPlace & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'axis' | 'tap' }))
+  | (FlushPlace & ({ checked: true } | { checked: false; why: 'budget' | 'room' | 'axis' | 'tap' } | { checked: false; why: 'held'; revealed: number }))
   | { edges: readonly [Edge, Edge]; container: Rect; pinned?: QuotedNode; checked: false; why: 'fills' };
 
 /**
@@ -157,7 +161,8 @@ export interface FlushPlace {
  * left (`budget`), no scroll container around it with room for one (`room`), or every one from that edge outward
  * scrolling only across it (`axis`) — those two only when the tree changed since the probe — or a reveal that moved
  * nothing drawn too short to tell from a tap (`tap`: the driver drew it under twice the slop). Never a stop: it is
- * what the target was short of, at the bound or a stuck stop, never "fully visible" with a hedge. The flush check's,
+ * what the target was short of, at the bound or a stuck stop, never "fully visible" with a hedge (a reveal WAS left to send;
+ * `Flush` `held` is the stop whose reveals were sent and held, ADR 0013's T11 amendment). The flush check's,
  * never scroll-read.ts#shortOf's: the tree alone reads it whole.
  * docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md
  */
@@ -462,9 +467,10 @@ function verdictOf(after: Memory, { judged, facts, means }: FlushStop, { chain, 
   // no reveal was sent (`FlushCut`).
   const unchecked = (why: 'budget' | 'room' | 'axis' | 'tap'): FlushVerdict =>
     proven === undefined ? { of: 'flush', flush: { ...where, checked: false, why } } : { of: 'cut', cut: { of: 'flushCut', judged, ...where, revealed: proven.revealed, why } };
-  // A probe, or a reveal already doubted, that moved nothing: checked — nothing lies past the edge now — unless drawn too short to tell
+  // A first probe that moved nothing: checked — nothing lies past the edge. A reveal already doubted that moved nothing:
+  // no `checked` on a proven cut (T11) but `held`, the hedge — either unless drawn too short to tell
   // from a tap, which on a proven cut is no stop but that cut; or doubted (D62), when the reveal goes again below.
-  if (came === 'held') return { of: 'flush', flush: { ...where, checked: true } };
+  if (came === 'held') return { of: 'flush', flush: proven === undefined ? { ...where, checked: true } : { ...where, checked: false, why: 'held', revealed: proven.revealed } };
   if (came === 'tap') return unchecked('tap');
   // With no gesture box (`RoundSeen.screen` absent) nothing has room and the stop says `room` — the wrong reason (it
   // is "no screen box"), accepted as unreachable in practice: screenBox throws only when the device's size is

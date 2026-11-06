@@ -610,7 +610,7 @@ describe('scrollUntilVisible — a fully: true stop flush with its clipping scro
     const fake = new LazyList(settingsLabels, 198, SETTINGS, { offset: 100 }); // Network at 637, read 737–835
     const result = await scrollUntilVisible(fake, 'text:"Network"', { ...FAST, fully: true });
     expect(fake.swipes.map((s) => s.from.y)).toEqual([1021, 1021, 1021]);
-    expect(result).toEqual({ swipes: 3, visible: 1, clipped: [], flush: { edge: 'top', container: SETTINGS, checked: true } });
+    expect(result).toEqual({ swipes: 3, visible: 1, clipped: [], flush: { edge: 'top', container: SETTINGS, checked: false, why: 'held', revealed: 100 } });
     expect(fake.rowRect('Network').height).toBe(198);
   });
 
