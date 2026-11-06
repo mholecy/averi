@@ -1246,7 +1246,7 @@ describe('a failed typing keeps its text out of the message (D70, ADR 0043)', ()
 
   it("a reader's `.message` of a crash during a typing shows neither the text nor the trace", async () => {
     const exec: ExecFn = async (cmd, args) => {
-      if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 1, 'Traceback (most recent call last):\n  File "/Users/someone/x.py", line 1, in m\nException: gone\n');
+      if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 1, 'Traceback (most recent call last):\n  File "/Users/me/x.py", line 1, in m\nException: gone\n');
       return { stdout: Buffer.alloc(0), stderr: '' };
     };
     await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).typeText(secret)).rejects.toThrow(

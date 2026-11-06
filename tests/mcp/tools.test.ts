@@ -670,7 +670,7 @@ describe('what a failed host command replies (D70, D65; ADR 0043): the tools quo
   it('type_text: a crash, its one line, no frame, no home, no typed text', async () => {
     const ios = home();
     ios.typeText = async () => {
-      throw new ExecError('idb ui text hunter2 --udid U', 1, '2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main\nTraceback (most recent call last):\n  File "/Users/someone/.local/idb/main.py", line 313, in gen_main\nException: gone\n');
+      throw new ExecError('idb ui text hunter2 --udid U', 1, '2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main\nTraceback (most recent call last):\n  File "/Users/me/.local/idb/main.py", line 313, in gen_main\nException: gone\n');
     };
     const { call } = await connect({ ios });
     const result = await call('type_text', { platform: 'ios', text: 'hunter2', configPath: missing() });

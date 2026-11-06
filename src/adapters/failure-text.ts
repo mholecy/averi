@@ -14,7 +14,7 @@ const TRACEBACK_HEADER = /^([ |+]*)(?:Exception Group )?Traceback \(most recent 
 function exceptionUnder(below: readonly string[], margin: number): string | undefined {
   return below
     .map((line) => line.slice(margin))
-    .find((line) => line.trim() !== '' && !line.startsWith(' ') && !line.startsWith('+') && !line.startsWith('-'));
+    .find((line) => line !== '' && !/^[ +-]/.test(line));
 }
 
 /** The tool a command line runs: its first word's last path segment, and for xcrun what it runs. */
@@ -25,7 +25,7 @@ function toolOf(command: string): string {
 
 /** `stderr` as an agent reads it: trimmed, or one line when it holds a Python traceback. */
 function saidBy(command: string, stderr: string): string {
-  const lines = stderr.trim().split('\n');
+  const lines = stderr.split('\n');
   const header = lines.map((line) => TRACEBACK_HEADER.test(line)).lastIndexOf(true);
   if (header === -1) return stderr.trim();
   const margin = TRACEBACK_HEADER.exec(lines[header])![1].length;
@@ -40,8 +40,7 @@ const TYPED_TEXT = '<typed text>';
 const TYPING_ARGVS = [/^(idb ui text )[\s\S]*( --udid \S+)$/, /^(adb(?: -s \S+)? shell input text )[\s\S]*()$/];
 
 function withoutTypedText(command: string): string {
-  const typing = TYPING_ARGVS.find((argv) => argv.test(command));
-  return typing === undefined ? command : command.replace(typing, `$1${TYPED_TEXT}$2`);
+  return TYPING_ARGVS.reduce((out, argv) => out.replace(argv, `$1${TYPED_TEXT}$2`), command);
 }
 
 /** Where a path word ends: the marks around a path in a message, whitespace. */
