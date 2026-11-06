@@ -9,12 +9,13 @@ import type { DeviceAdapter } from '../../src/adapters/types.js';
 import { listIosDevices } from '../../src/adapters/discovery.js';
 import type { Platform } from '../differential/corpus.js';
 import { loadSide } from '../differential/side.js';
-import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA, pause, withMeasuredPanel } from './lab-device.js';
-import { hookSwipes, preDragOrSkip, SwipeHook, type PreDragged, type SwipeEntry } from './live-carousel.js';
-import { type Call, type Case, caseConfig, judged, rejudge, type Result, ROOT, type RunRecord, selectCases, sideLabel, summarize, THIS_CHECKOUT } from './live-cases.js';
+import { AndroidLab, IosLab, LAB_AVD, LAB_WDA_DERIVED_DATA } from './lab-device.js';
+import { hookSwipes, SwipeHook } from './live-carousel.js';
+import { type Call, type Case, caseConfig, rejudge, type Result, ROOT, type RunRecord, selectCases, sideLabel, summarize, THIS_CHECKOUT } from './live-cases.js';
 import type { Source } from './live-forms.js';
-import { callReply, isError } from './replies.js';
-import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.js';
+import { callReply } from './replies.js';
+import { type CaseRig, runCase } from './run-case.js';
+import { parseLabApp, type LabApp } from './schema.js';
 
 /**
  * The live golden (docs/plans/2026-10-15-ground-truth-lab-app.md, phase 1b — phase 5's mode brought forward for the
@@ -62,7 +63,7 @@ import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.j
  * `intermittent` that came out ok (fixed: strike it off, as the static ratchet asks). `--record <file>` writes every
  * read (the launch state, the state between the calls, after them) as JSON; `--rejudge <file>` judges such a record
  * again with this checkout's judges, no device (live-cases.ts#rejudge, which tests/truth/live-rejudge.test.ts calls in
- * process). The cases, their judging and the summary live in live-cases.ts; this file is the CLI and the device run.
+ * process). The cases, their judging and the summary live in live-cases.ts, one case's device cycle in run-case.ts; this file is the CLI.
  *
  * `--app react-native` runs the cases of the React Native lab app's cells (fixtures/apps/rn, its own bundle and package:
  * lab-device.ts#LAB_APP; the visibility cases from its own truth runs, the manifests whose `app` is AveriLabRN) — the
@@ -81,7 +82,7 @@ import { labSelector, parseLabApp, type LabApp, type LabState } from './schema.j
  * `carousel` (T7a, Android, not in the default groups): the probes the device batches copied from batch to batch, as
  * cases (live-carousel.ts) — lv-d62's drop and control, D68 from a fresh launch, D59b's strokes in the band, D52's E2,
  * D37's settled read on the snapping pagers. A case may drag the carousel raw first (Case.preDrag, AndroidLab.swipe),
- * and drop its Nth stroke (Case.dropSwipe): the Android adapter the registry builds has its `swipe` routed through one
+ * and drop its Nth stroke (CaseReads.swipes): the Android adapter the registry builds has its `swipe` routed through one
  * SwipeHook, armed around each case's calls, which logs every stroke averi draws into the record (`swipes`).
  */
 
@@ -193,79 +194,25 @@ if (rejudging !== undefined) {
   const selected = await selectCases({ platform, app, groups, only, onlyCells });
   const lab = (ios ?? android)!;
   if (platform === 'ios') console.error(`WDA: port ${port}, derived data ${LAB_WDA_DERIVED_DATA}`);
-  /** The screen now, for the evidence of a case that is not ok. */
-  const shoot = async (file: string) => writeFile(file, await lab.screenshot());
   const { client, close } = await connect();
+  const rig: CaseRig = {
+    lab,
+    callTool: (call, config) => callTool(client, call, config),
+    configFor,
+    swipes: swipeHook,
+    // Where a case that is not ok leaves the screen, for the evidence.
+    ...(shots !== undefined && { keepShot: (name: string, png: Buffer) => writeFile(join(shots, name), png) }),
+    note: (line) => console.error(line),
+  };
   try {
     // Cases outer, sources inner: the keyboard's cases run on both sources before anything types.
     for (const c of selected) {
       for (const source of sources) {
         if (c.sources !== undefined && !c.sources.includes(source)) continue;
-        // Case.warmUp (the ensure cases, timed from the launch: live-ensure.ts): the tree source bound first — WDA
-        // started, idb's companion up — by one read under the case's own config, its reply discarded, so the entry probe
-        // reads the bare screen rather than a Welcome the binding outran. A warm-up that failed is kept in the record.
-        const warm = c.warmUp === true ? await callTool(client, { tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await configFor(source, c)) : undefined;
-        const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
-        if (warmUpError !== undefined) console.error(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
-        let launched = await lab.launch(c.cell);
-        /** The case SKIPped before its calls, `why`: its result and its record (no replies, no state; the launch as read). */
-        const skip = (why: string) => {
-          results.push({ source, c, verdict: { outcome: 'SKIP', why }, replies: [] });
-          record.results.push({ source, id: c.id, skip: why, replies: [], launched, after: [], state: undefined, ...(warmUpError !== undefined && { warmUpError }) });
-          console.error(`${source} ${c.id} SKIP: ${why}`);
-        };
-        // The carousel group's raw pre-drag (Case.preDrag): the calls start from the state it left. One that failed is
-        // the case's SKIP (lv-d62's skipFails then fails the run), never the whole run thrown out.
-        let preDragged: PreDragged | undefined;
-        if (c.preDrag !== undefined) {
-          const preDragRun = android === undefined ? { skip: 'a pre-drag is the Android lab\'s only' } : await preDragOrSkip(android, launched, c.preDrag);
-          if ('skip' in preDragRun) {
-            skip(preDragRun.skip);
-            continue;
-          }
-          ({ preDrag: preDragged, launched } = preDragRun);
-        }
-        if (c.keyboard && launched.keyboard?.visible !== true) {
-          skip(platform === 'ios' ? 'no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)' : 'no IME at launch');
-          continue;
-        }
-        // The first of the two device reads the kf judges rest on (LabState.imeTouchable, lab-device.ts#withMeasuredPanel).
-        // The kf cases' panel reads, on the Android lab only.
-        const panelLab = c.measuresPanel === true ? android : undefined;
-        if (panelLab !== undefined) launched = await withMeasuredPanel(launched, panelLab);
-        const config = await configFor(source, c);
-        const replies: string[] = [];
-        const after: (LabState | undefined)[] = [];
-        let swipes: SwipeEntry[] | undefined;
-        const logsSwipes = c.group === 'carousel';
-        if (logsSwipes) swipeHook.arm(c.dropSwipe);
-        try {
-          for (const [i, call] of c.calls.entries()) {
-            replies.push(await callTool(client, call, config));
-            // A visibility case reads the app between its calls: its stop is judged as scroll_until left it.
-            if (c.group === 'visibility' && i < c.calls.length - 1) after.push(await lab.state());
-          }
-        } finally {
-          swipes = logsSwipes ? swipeHook.disarm() : undefined;
-        }
-        await pause(800);
-        // Stamped with when it was read (LabState.readAt): the ensure judges ask it.
-        const stamped = (s: LabState | undefined) => (s === undefined ? s : { ...s, readAt: Date.now() / 1000 });
-        const read = stamped(await lab.state())!;
-        // The second (D69): the panel again once the calls are done, kept on the final state — the judge holds the two
-        // reads to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged).
-        const state = panelLab !== undefined ? await withMeasuredPanel(read, panelLab) : read;
-        let late: LabState | undefined;
-        // Not a visibility or carousel case: a later read would let a fling finish behind the reply's back.
-        if (c.group !== 'visibility' && c.group !== 'carousel' && c.judge(state, replies, source, launched, after).outcome !== 'ok') {
-          await pause(3_000);
-          late = stamped(await lab.state());
-        }
-        const verdict = judged(c, source, replies, launched, after, state, late, swipes);
-        if (shots !== undefined && verdict.outcome !== 'ok') await shoot(join(shots, `${source}-${c.id}-${Date.now()}.png`));
-        results.push({ source, c, verdict, replies });
-        record.results.push({ source, id: c.id, replies, launched, after, state, ...(late !== undefined && { late }), ...(warmUpError !== undefined && { warmUpError }), ...(preDragged !== undefined && { preDrag: preDragged }), ...(swipes !== undefined && { swipes }) });
-        console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
+        const run = await runCase(c, source, rig);
+        results.push({ source, c, verdict: run.verdict, replies: run.record.replies });
+        record.results.push(run.record);
+        console.error(`${source} ${c.id} ${run.verdict.outcome}: ${run.verdict.why}`);
       }
     }
   } finally {

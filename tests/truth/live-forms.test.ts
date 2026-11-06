@@ -480,14 +480,14 @@ describe('D69: the panel read again after the calls — moved is SKIP naming bot
     // `late` as live.ts reads it, 3 s on: the app's state, no IME region of its own.
     const late: LabState = { ...state, readAt: 1 };
     delete late.imeTouchable;
-    const verdict = judged(kf1, 'uiautomator', misquoted, launched, [], state, late);
+    const verdict = judged(kf1, { source: 'uiautomator', replies: misquoted, launched, after: [], state, late });
     expect(verdict).toMatchObject({ outcome: 'MISMATCH', why: expect.stringMatching(/^averi quoted no panel over ks/) });
     expect(verdict.why).not.toMatch(/only 3 s later/);
     expect(lateWithPanel(state, late)).toEqual({ ...late, imeTouchable: state.imeTouchable });
     // A record before D69 (no second read): late as it was, the verdict today's SKIP.
     const { state: unread } = floated(fu1, 'kf1', FU1_REGION);
     expect(lateWithPanel(unread, late)).toBe(late);
-    expect(judged(kf1, 'uiautomator', misquoted, launched, [], unread, late)).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^averi's reply does not quote the measured panel/) });
+    expect(judged(kf1, { source: 'uiautomator', replies: misquoted, launched, after: [], state: unread, late })).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/^averi's reply does not quote the measured panel/) });
   });
 });
 
