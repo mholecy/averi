@@ -1,3 +1,4 @@
+# 16 `yes` on an 18-core host: FAILED experiment, it restarted system_server again (count 11) and left no record. Not evidence of any rate.
 11:33:14 ctl-1 exit=0 count=10 host=[27.06 26.97 39.36]
 11:33:34 ctl-2 exit=0 count=10 host=[27.51 27.07 39.11]
 11:33:51 ctl-3 exit=0 count=10 host=[27.46 27.09 38.84]

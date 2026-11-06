@@ -2812,7 +2812,7 @@ describe('round — a fully: true stop flush under a node pinned in its own scro
   };
   const probes = (played: Played) => played.steps.filter((s) => s.do === 'stroke' && s.probe === true);
 
-  it('the merged sticky header\'s capture: probed toward the header (content up, the finger down) from inside the list; R grows, flush again — the cut proved, so no confirm — revealed; the second reveal that moves nothing settles it — "fully visible after 2 swipes", naming the header', () => {
+  it('the merged sticky header\'s capture: probed toward the header (content up, the finger down) from inside the list; R grows, flush again — the cut proved, so no confirm — revealed; the second reveal that moves nothing ends it hedged after 3 swipes, naming the header', () => {
     const played = play(FULLY_ANDROID, [read('cut'), read('rest'), read('rest'), read('rest')]);
     expect(played.steps.map((s) => s.do)).toEqual(['stroke', 'stroke', 'stroke', 'stop']);
     for (const p of probes(played)) {

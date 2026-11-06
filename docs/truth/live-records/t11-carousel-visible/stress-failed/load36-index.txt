@@ -1,3 +1,4 @@
+# 36 `yes` on an 18-core host: FAILED experiment, it restarted system_server on the AVD; nearly every run here left no record. Not evidence of any rate.
 07:37:44 calm-1 exit=0 host=[4.61 4.70 5.29]
 07:48:52 load-1 exit=0 host=[66.27 60.18 38.95]
 07:49:12 calm-2 exit=0 host=[50.59 56.98 38.29]

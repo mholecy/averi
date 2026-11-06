@@ -22,8 +22,8 @@ const KBSCROLL = "round 7's A1 keyboard scroll probe from a scratch copy of the 
 /** A3's scratch driver (round 7), its assert replies alone. */
 const HINT_ASSERTS = "round 7's A3 scratch driver's assert replies: no live.ts case id in it";
 
-/** The records no `--rejudge` can judge, each with its reason. (A9's raw typing diagnosis is a folder,
- * a9-fill-tail-diag/, which this guard does not read.) */
+/** The records no `--rejudge` can judge, each with its reason. (A9's raw typing diagnosis, a9-fill-tail-diag/, and T11's
+ * evidence, t11-carousel-visible/, are folders, which this guard does not read.) */
 const EXEMPT: Readonly<Record<string, string>> = {
   'android-hint-everywhere-9fa59ae-asserts.json': HINT_ASSERTS,
   'android-hint-everywhere-e726c77-asserts.json': HINT_ASSERTS,

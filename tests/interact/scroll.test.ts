@@ -606,7 +606,7 @@ describe('scrollUntilVisible — a fully: true stop flush with its clipping scro
     expect(fake.swipes[0].to.y).toBeLessThan(fake.swipes[0].from.y);
   });
 
-  it('a row cut by Settings\' header, at the top of the content: the probe touches down INSIDE the list (the screen box\'s would land on the header at y 444 and move nothing), reveals it, and the second and third probes — at the content\'s start — moves nothing and is accepted', async () => {
+  it('a row cut by Settings\' header, at the top of the content: the probe touches down INSIDE the list (the screen box\'s would land on the header at y 444 and move nothing), reveals it, and the second and third — at the content\'s start — move nothing and end in the hedge', async () => {
     const fake = new LazyList(settingsLabels, 198, SETTINGS, { offset: 100 }); // Network at 637, read 737–835
     const result = await scrollUntilVisible(fake, 'text:"Network"', { ...FAST, fully: true });
     expect(fake.swipes.map((s) => s.from.y)).toEqual([1021, 1021, 1021]);
