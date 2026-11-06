@@ -51,7 +51,7 @@
     "group": "core",
     "tests": ["tests/adapters/failure-text.test.ts"],
     "floor": 98,
-    "baseline": "100.00 % on 2026-11-06 (D70 review round 1, the short home, argparse's line, the colon line; cold): 153 mutants, 0 survived, 0 timeouts; 100 % earlier the same day (D70; cold): 113 mutants"
+    "baseline": "99.44 % on 2026-11-06 (D70 review round 2, argparse at exit 2 to stderr's end, lastResortText, the colon rule; cold): 180 mutants, 1 survived, 0 timeouts — the survivor is exceptionUnder's `why === undefined` emptied to false, equivalent: /^\\s/ on undefined reads \"undefined\", no match, so the exception stands alike; 100 % on the same day (D70 review round 1; cold): 153 mutants"
   },
   "src/adapters/ios-link-failure.ts": {
     "group": "core",

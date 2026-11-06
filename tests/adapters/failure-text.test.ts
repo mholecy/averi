@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { commandFailureText, withoutHostPaths } from '../../src/adapters/failure-text.js';
+import { commandFailureText, lastResortText, withoutHostPaths } from '../../src/adapters/failure-text.js';
 
 const HOME = '/Users/me';
 /** Roots tests/docs/path-hygiene.test.ts strikes in a committed file, spelled apart: here they are the subject, no machine's. */
@@ -13,6 +13,26 @@ const failed = (command: string, stderr: string, extra: { exitCode?: number | nu
 /** docs/truth/live-records/ios-forms-a9.json, b1d under idb: its record wrote the home as `~`. Put back here, as idb printed it. */
 const RECORDED_CRASH = readFileSync(new URL('../fixtures/idb-ui-text-no-keycode-traceback-b1d-stderr.txt', import.meta.url), 'utf8');
 const CRASH_WITH_HOME = RECORDED_CRASH.replaceAll('"~/', `"${HOME}/`);
+
+describe('lastResortText: the words when wording throws', () => {
+  it('names only the tool and the exit, or the timeout', () => {
+    const base = { exitCode: 1, stderr: 'said', timedOut: false, note: 'n' };
+    expect(lastResortText({ ...base, command: 'idb ui text hunter2 --udid U' })).toBe('Command failed (exit 1): idb');
+    expect(lastResortText({ ...base, command: '/opt/homebrew/bin/adb -s S install /Users/me/a.apk' })).toBe('Command failed (exit 1): adb');
+    expect(lastResortText({ ...base, command: 'idb x', timedOut: true })).toBe('Command timed out: idb');
+    expect(lastResortText({ ...base, exitCode: null, command: 'idb x' })).toBe('Command failed (exit null): idb');
+  });
+
+  it('reads no more of a huge argv than a tool\'s name can take', () => {
+    expect(lastResortText({ exitCode: 1, stderr: '', timedOut: false, command: `${'x'.repeat(300)} y` })).toBe(`Command failed (exit 1): ${'x'.repeat(256)}`);
+  });
+
+  it('cannot throw, on any value', () => {
+    const odd = { toString: () => { throw new Error('no'); } } as unknown as string;
+    expect(lastResortText({ exitCode: 1, stderr: '', timedOut: false, command: odd })).toBe('Command failed');
+    expect(lastResortText({ exitCode: Symbol('x') as unknown as number, stderr: '', timedOut: false, command: 'c' })).toBe('Command failed');
+  });
+});
 
 describe('commandFailureText: a command failure with nothing to take out', () => {
   it('is exec\'s shape to the byte', () => {
@@ -70,9 +90,16 @@ describe('commandFailureText: a Python traceback', () => {
   it('takes the message from the next line when the exception line ends at its colon', () => {
     const blank = 'Traceback (most recent call last):\n  File "a.py", line 1, in a\nException: \n\n  real reason  \nmore\n';
     expect(failed('idb x', blank).split('\n')[1]).toMatch(/^idb crashed: Exception: real reason \(Python/);
-    expect(failed('idb x', 'Traceback (most recent call last):\nException:\n   \nwhy\n').split('\n')[1]).toMatch(/^idb crashed: Exception: why \(Python/);
+    expect(failed('idb x', 'Traceback (most recent call last):\nException:\n   \n  why\n').split('\n')[1]).toMatch(/^idb crashed: Exception: why \(Python/);
     expect(failed('idb x', 'Traceback (most recent call last):\nException:\n').split('\n')[1]).toMatch(/^idb crashed: Exception: \(Python/);
     expect(failed('idb x', 'Traceback (most recent call last):\nValueError: a: b\nnext\n').split('\n')[1]).toMatch(/^idb crashed: ValueError: a: b \(Python/);
+  });
+
+  it('joins only an indented next line: a log line and an exception group\'s rule are no message', () => {
+    expect(failed('idb x', 'Traceback (most recent call last):\nException: connect to:\n2026 [INFO] token=abc\n').split('\n')[1]).toMatch(/^idb crashed: Exception: connect to: \(Python/);
+    expect(failed('idb x', 'Traceback (most recent call last):\nException: x:\n  +------------\n').split('\n')[1]).toMatch(/^idb crashed: Exception: x: \(Python/);
+    expect(failed('idb x', 'Traceback (most recent call last):\nException: x:\n  not-found\n').split('\n')[1]).toMatch(/^idb crashed: Exception: x: not-found \(Python/);
+    expect(failed('idb x', 'Traceback (most recent call last):\nException: x:\n  -----\n  why\n').split('\n')[1]).toMatch(/^idb crashed: Exception: x: why \(Python/);
   });
 
   it('drops the lines around the traceback', () => {
@@ -213,12 +240,26 @@ describe('commandFailureText: typed text', () => {
     const rejected = 'idb rejected its arguments (its error line, which can quote the typed text, is left out)';
     expect(failed('idb ui text --log=s3cret --udid U', "usage: idb [-h]\nidb: error: argument --log: invalid choice: 's3cret'\n", { exitCode: 2 }))
       .toBe(`Command failed (exit 2): idb ui text <typed text> --udid U\nusage: idb [-h]\n${rejected}`);
-    expect(failed('idb ui text -abc --udid U', 'idb ui text: error: the following arguments are required: text\n').split('\n')[1]).toBe(rejected);
+    expect(failed('idb ui text -abc --udid U', 'idb ui text: error: the following arguments are required: text\n', { exitCode: 2 }).split('\n')[1]).toBe(rejected);
+  });
+
+  it('a line before argparse\'s stays, argparse\'s goes wherever it stands, and all it echoes goes with it: argparse exits right after it', () => {
+    const rejected = 'idb rejected its arguments (its error line, which can quote the typed text, is left out)';
+    expect(failed('idb ui text -hunter2 --udid U', "log: error: earlier\nidb ui text: error: ignored explicit argument 'unter2'\n", { exitCode: 2 }).split('\n').slice(1))
+      .toEqual(['log: error: earlier', rejected]);
+    expect(failed('idb ui text --c=a\nsecret --udid U', 'idb: error: ambiguous option: --c=a\nsecret could match --companion\n', { exitCode: 2 }).split('\n').slice(1)).toEqual([rejected]);
+  });
+
+  it('only exit 2 is argparse, and only a line naming idb: another tool\'s error keeps its words', () => {
+    expect(failed('idb ui text a --udid U', 'idb ui text: error: gone', { exitCode: 1 }).split('\n')[1]).toBe('idb ui text: error: gone');
+    expect(failed('idb ui text a --udid U', 'grpc: error: connection refused to companion', { exitCode: 2 }).split('\n')[1]).toBe('grpc: error: connection refused to companion');
+    expect(failed('idb ui text a --udid U', 'my idb: error: x', { exitCode: 2 }).split('\n')[1]).toBe('my idb: error: x');
+    expect(failed('idb ui text a --udid U', 'idb: x: error: y', { exitCode: 2 }).split('\n')[1]).toBe('idb: x: error: y');
   });
 
   it('that line stays on every other command, and on Android\'s typing, whose adb errors name the device', () => {
     const line = 'idb describe: error: bad choice';
-    expect(failed('idb describe --udid U', line).split('\n')[1]).toBe(line);
+    expect(failed('idb describe --udid U', line, { exitCode: 2 }).split('\n')[1]).toBe(line);
     expect(failed('adb -s S shell input text h', 'adb: error: connect failed: closed').split('\n')[1]).toBe('adb: error: connect failed: closed');
   });
 

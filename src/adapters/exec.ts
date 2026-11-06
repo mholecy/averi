@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
-import { commandFailureText, type CommandFailure } from './failure-text.js';
+import { commandFailureText, lastResortText, type CommandFailure } from './failure-text.js';
 
 /** stdout stays a Buffer — screenshots come through this path as binary PNG. */
 export interface ExecResult {
@@ -30,17 +30,12 @@ export function hostHome(): string {
   }
 }
 
-/**
- * The words of a failure, and exec's raw shape if wording them throws: nothing may destroy the real error. That shape keeps
- * what the words take out, a typed text too. It is reached only by input the types forbid (a non-string stderr).
- */
+/** The words of a failure, or the last resort's if wording them throws: nothing may destroy the real error. */
 function failureMessage(failure: CommandFailure): string {
   try {
     return commandFailureText(failure, hostHome());
   } catch {
-    const { command, exitCode, stderr, timedOut, note } = failure;
-    const raw = timedOut ? `Command timed out: ${command}` : `Command failed (exit ${exitCode}): ${command}\n${String(stderr).trim()}`;
-    return raw + (note === undefined ? '' : `\n${note}`);
+    return lastResortText(failure);
   }
 }
 

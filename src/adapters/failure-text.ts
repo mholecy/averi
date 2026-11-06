@@ -12,8 +12,8 @@ const TRACEBACK_HEADER = /^([ |+]*)(?:Exception Group )?Traceback \(most recent 
 
 /**
  * The exception under a traceback's header: the first line at the header's margin, frames being indented further and an
- * exception group's rules made of `+` and `-`. A line that ends at its colon (`raise Exception("\nwhy")`) takes the next
- * line with text as its message.
+ * exception group's rules made of `+` and `-`. A line that ends at its colon takes the next line with text as its message,
+ * rules skipped, when that line is indented; one that is not may be a log line, and stays out.
  */
 function exceptionUnder(below: readonly string[], margin: number): string | undefined {
   const lines = below.map((line) => line.slice(margin));
@@ -21,8 +21,8 @@ function exceptionUnder(below: readonly string[], margin: number): string | unde
   if (at === -1) return undefined;
   const exception = lines[at].trimEnd();
   if (!exception.endsWith(':')) return exception;
-  const why = lines.slice(at + 1).find((line) => line.trim() !== '');
-  return why === undefined ? exception : `${exception} ${why.trim()}`;
+  const why = lines.slice(at + 1).find((line) => line.trim() !== '' && !/^\s*[+-]/.test(line));
+  return why === undefined || !/^\s/.test(why) ? exception : `${exception} ${why.trim()}`;
 }
 
 /** The tool a command line runs: its first word's last path segment, and for xcrun what it runs. */
@@ -55,8 +55,13 @@ const ADB_TYPING = /^(adb(?: -s \S+)? shell input text )[\s\S]*()$/;
 const withoutTypedText = (command: string): string =>
   [IDB_TYPING, ADB_TYPING].reduce((out, argv) => out.replace(argv, `$1${TYPED_TEXT}$2`), command);
 
-/** argparse's own line, `<prog>: error: <why>`, whose why quotes a text taken for an option (`-hunter2`, `--log=s3cret`). */
-const ARGPARSE_ERROR = /^[^:\n]*: error: .*/m;
+/**
+ * argparse's own line, `idb[ …]: error: <why>`, whose why quotes a text taken for an option (`-hunter2`, `--log=s3cret`),
+ * across lines if the text holds one. argparse exits right after it, with 2 (idb-helper-script.ts keeps that code), so it
+ * goes to stderr's end.
+ */
+const ARGPARSE_ERROR = /^idb[^:\n]*: error: [\s\S]*/m;
+const ARGPARSE_EXIT = 2;
 const IDB_REJECTED = 'idb rejected its arguments (its error line, which can quote the typed text, is left out)';
 
 /** Where a path word ends: the marks around a path in a message, whitespace. */
@@ -101,6 +106,22 @@ export function withoutHostPaths(text: string, home: string): string {
   return out;
 }
 
+/** The longest a tool's name is read: a near-maximal argv must not make the last resort throw as well. */
+const TOOL_NAME_MAX = 256;
+
+/**
+ * The words when commandFailureText threw: only the tool and the exit, or the timeout, so nothing it takes out can stand
+ * here. It cannot throw itself, on any value: the error it words must survive.
+ */
+export function lastResortText({ command, exitCode, timedOut }: CommandFailure): string {
+  try {
+    const tool = toolOf(String(command).slice(0, TOOL_NAME_MAX));
+    return timedOut ? `Command timed out: ${tool}` : `Command failed (exit ${exitCode}): ${tool}`;
+  } catch {
+    return 'Command failed';
+  }
+}
+
 /**
  * The message of a failed host command (D70, ADR 0043). exec's shape, `Command failed (exit N): <argv>⏎<stderr>` or
  * `Command timed out: <argv>`, byte for byte, except that a Python traceback shrinks to one line, a typed text leaves
@@ -114,6 +135,6 @@ export function commandFailureText(failure: CommandFailure, home: string): strin
   if (timedOut) return withoutHostPaths(`Command timed out: ${command}${tail}`, home);
   // Node's own `Command failed: <argv>` stands in stderr for a silent child (exec.ts), with the text in it.
   const unquoted = stderr.split(failure.command).join(command);
-  const said = saidBy(command, IDB_TYPING.test(failure.command) ? unquoted.replace(ARGPARSE_ERROR, IDB_REJECTED) : unquoted);
+  const said = saidBy(command, exitCode === ARGPARSE_EXIT && IDB_TYPING.test(failure.command) ? unquoted.replace(ARGPARSE_ERROR, IDB_REJECTED) : unquoted);
   return withoutHostPaths(`Command failed (exit ${exitCode}): ${command}\n${said}${tail}`, home);
 }

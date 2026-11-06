@@ -39,7 +39,7 @@ The function does three things to exec's shape and nothing else:
    `Traceback (most recent call last):` header, so a chain's last traceback and an exception group's margin read right,
    and only the first line of a long message is kept. A traceback cut before its exception says `<tool> crashed (…)`. The
    tool is the argv's first word's last segment, and for `xcrun` what it runs. Lines around the traceback, the log line
-   `… [ERROR] - root - Exception thrown in main` among them, are dropped with it: the reply says the crash, and `stderr` keeps the rest. CRLF line ends read the same, and an exception line that ends at its colon takes the next line with text as its message. averi writes no log of an idb command, and none is
+   `… [ERROR] - root - Exception thrown in main` among them, are dropped with it: the reply says the crash, and `stderr` keeps the rest. CRLF line ends read the same, and an exception line that ends at its colon takes the next line with text as its message when that line is indented, an exception group's rules skipped. An unindented one may be a log line and stays out, so `raise Exception("\nwhy")`, printed unindented, reads `Exception:`. averi writes no log of an idb command, and none is
    invented: the pointer is the command, which stays above it, to run by hand with the real text and paths: as printed it is not runnable, `<typed text>` and `<tmp>/app.apk` being shell redirections. Only a header on a line of its own counts, so a stderr
    that merely mentions the words stays.
 2. **Host paths leave the whole text, the argv and the note too.** Told apart by an allowlist of folders only a host has,
@@ -57,11 +57,11 @@ The function does three things to exec's shape and nothing else:
    a command's, such as WDA's `xcodebuild log: <path>`, a pointer the reader needs.
 3. **A typed text leaves the argv**: `idb ui text <text> --udid U` and `adb [-s S] shell input text <character>` read
    `<typed text>`, in the first line and in node's own `Command failed: <argv>` line, which exec puts in stderr for a silent
-   child. For idb's argv, argparse's own line (`<prog>: error: <why>`) becomes `idb rejected its arguments (its error line, which can quote the typed text, is left out)`, because a text starting with a dash is taken for an option: `-hunter2` prints `ignored explicit argument 'unter2'`, `--log=s3cret` prints `invalid choice: 's3cret'`. The usage lines stay. The argv itself does not change here (backlog D74).
+   child. For idb's argv at exit 2, argparse's code (`idb-helper-script.ts` keeps it), argparse's own line (`idb[ …]: error: <why>`) and all after it, since argparse exits right after it and a text can hold a newline, become `idb rejected its arguments (its error line, which can quote the typed text, is left out)`, because a text starting with a dash is taken for an option: `-hunter2` prints `ignored explicit argument 'unter2'`, `--log=s3cret` prints `invalid choice: 's3cret'`. The usage lines stay. The argv itself does not change here (backlog D74).
 
-**Words that throw never destroy the error.** `exec.ts#failureMessage` falls back to exec's raw shape if `commandFailureText` throws, and `hostHome` cannot throw: `os.homedir()` throws when `$HOME` is unset and the uid has no passwd entry, which inside exec's callback would never settle the promise and would end the process.
+**Words that throw never destroy the error.** `exec.ts#failureMessage` falls back to `failure-text.ts#lastResortText` if `commandFailureText` throws: `Command failed (exit N): <tool>` or `Command timed out: <tool>`, the argv's first word and nothing else, and it cannot throw itself (`Command failed` on values it cannot print; a near-maximal argv is read for 256 characters). And `hostHome` cannot throw: `os.homedir()` throws when `$HOME` is unset and the uid has no passwd entry, which inside exec's callback would never settle the promise and would end the process.
 
-**Residuals.** An exception's own message can still quote a piece of the text: `No keycode found for Š` carries one character, and ADR 0037 refuses that value before idb in a fill or `type:`. Any other stderr idb prints for a typing is not parsed. The raw fallback keeps a typed text and host paths; only input the types forbid reaches it. `idb ui text -h` exits 0, so `type_text "-h"` still reports success with nothing typed: not a leak, filed as D74.
+**Residuals.** An exception's own message can still quote a piece of the text: `No keycode found for Š` carries one character, and ADR 0037 refuses that value before idb in a fill or `type:`. Any other stderr idb prints for a typing is not parsed. `idb ui text -h` exits 0, so `type_text "-h"` still reports success with nothing typed: not a leak, filed as D74.
 
 **The argv stays.** It names the device and the failed step, an agent can repeat it once it puts the real text and paths back, the traceback's pointer leans on it, and
 `captureRefusal` and the flow's `✗` line quote exactly that line. Pins and D73's `adb -s emulator-9998 shell monkey …` keep
@@ -107,4 +107,4 @@ live on base and branch through MCP, `launch_app` and Android's `open_deep_link`
 - `tests/fixtures/simctl-openurl-tel-exit115-b13-stderr.txt` is simctl's four stderr lines from batch-13 rerun 2 (main
   51778d00, iOS 27.0, idb, 2/2 byte-identical), exec's first line with the udid cut off; batch-9's D58 P3 reads the same with
   another number. iOS could not run for this change: the new reply is owed a live read by the next iOS batch (backlog D65's row).
-- Cold mutation run (ADR 0038): `failure-text.ts` 100.00 %, 153 mutants; `ios-link-failure.ts` 100 %, 13 mutants; both floors 98.
+- Cold mutation run (ADR 0038): `failure-text.ts` 99.44 %, 180 mutants, the one survivor equivalent; `ios-link-failure.ts` 100 %, 13 mutants; both floors 98.

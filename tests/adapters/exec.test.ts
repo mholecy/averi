@@ -86,9 +86,11 @@ describe('ExecError: its message is commandFailureText, its fields every byte (D
 
   it('a failure to word it never destroys the error: the raw shape stands, and the fields', () => {
     const err = new ExecError('adb devices', 1, undefined as unknown as string, false, Buffer.alloc(0), { note: 'tail' });
-    expect(err.message).toBe('Command failed (exit 1): adb devices\nundefined\ntail');
+    expect(err.message).toBe('Command failed (exit 1): adb');
     expect(err.exitCode).toBe(1);
+    expect(err.stack).toContain('ExecError');
     expect(new ExecError(undefined as unknown as string, null, '', true).message).toBe('Command timed out: undefined');
+    expect(new ExecError('idb ui text hunter2 --udid U', 1, undefined as unknown as string).message).toBe('Command failed (exit 1): idb');
   });
 
   it('the same failure without any of it stays exec\'s bytes', () => {
