@@ -120,9 +120,10 @@ describe('deepLinkText', () => {
     expect(deepLinkText('android', 'bank://home', { holder: 'none' })).toBe('Opened bank://home on android');
   });
 
-  it('with a note: the note on a ⚠ line under it, verbatim', () => {
-    expect(deepLinkText('ios', 'averilab://d49', { holder: 'unknown', caveat: 'averi did not see dev.averi.lab come forward' })).toBe(
-      'Opened averilab://d49 on ios\n⚠ averi did not see dev.averi.lab come forward',
+  it('the wait unconfirmed: its text on a ⚠ line under it', () => {
+    expect(deepLinkText('ios', 'averilab://d49', { holder: 'unknown', wait: 'not-asked', app: 'dev.averi.lab' })).toBe(
+      'Opened averilab://d49 on ios\n⚠ whether dev.averi.lab came forward after the link was not checked (WebDriverAgent ' +
+        'is not running yet) — if iOS asks "Open in “…”?", answer it (a screenshot shows it)',
     );
   });
   // D54: iOS's alert named — the headline says the link is not open yet, quotes the title and every button with its
@@ -155,7 +156,7 @@ describe('deepLinkText', () => {
 
   it('no "Opened" headline and no ⚠ line with an alert; a note alone keeps both', () => {
     expect(deepLinkText('ios', 'averilab://d54', { holder: 'alert', alert: { ...alert, asksForApp: true } })).not.toMatch(/Opened|⚠|\n/);
-    expect(deepLinkText('ios', 'averilab://d54', { holder: 'unknown', caveat: 'x' })).toBe('Opened averilab://d54 on ios\n⚠ x');
+    expect(deepLinkText('ios', 'averilab://d54', { holder: 'unknown', wait: 'not-asked', app: 'x' })).toMatch(/^Opened averilab:\/\/d54 on ios\n⚠ whether x came forward/);
   });
 
   // D55 (ADR 0041): Android's "Open with" chooser in front — the headline says the link is not open yet, names the

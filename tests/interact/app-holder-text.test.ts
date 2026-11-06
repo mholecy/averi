@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AppHolder, ChooserSheet, LinkAlert } from '../../src/adapters/types.js';
-import { appHolderText } from '../../src/interact/app-holder-text.js';
+import { appHolderText, holdsIt } from '../../src/interact/app-holder-text.js';
 
 // A10 (ADR 0041's and ADR 0032's A10 amendments): every word about what holds the app, pinned through the module's one
 // interface: the subject (a link or an app) and the closed answer. The kind of holder decides the wording; no platform
@@ -26,15 +26,74 @@ const ALERT_ADVICE =
   'Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps nothing itself); ' +
   'every launch stays behind the alert until it is answered';
 
-describe('nothing to say: no holder named, or the caveat verbatim', () => {
-  it('no holder: no text, for a link and for a launch', () => {
+describe('no holder named: no text', () => {
+  it('for a link and for a launch', () => {
     expect(appHolderText(LINK, { holder: 'none' })).toBeUndefined();
     expect(appHolderText(APP, { holder: 'none' })).toBeUndefined();
   });
+});
 
-  it("a caveat (the foreground wait's, its words the adapter's): verbatim, for a link and for a launch", () => {
-    expect(appHolderText(LINK, { holder: 'unknown', caveat: 'averi did not see dev.averi.lab come forward' })).toBe('averi did not see dev.averi.lab come forward');
-    expect(appHolderText(APP, { holder: 'unknown', caveat: 'the tree was still another app' })).toBe('the tree was still another app');
+// D48, D49a: the wait did not confirm the app and knows no holder. The lead about what may hold it is these words; the
+// `detail` is the wait's own, about its tree source. The strings are the replies' bytes (tests/adapters/ios-deep-link.test.ts
+// pins them through a real adapter too).
+describe('nothing known to hold it: the foreground wait could not confirm the app (D48, D49a)', () => {
+  const DETAIL = '3 s after opening averilab://d49 in dev.averi.lab, WebDriverAgent still read com.apple.MobileAddressBook as the active app';
+  const SAW: AppHolder = { holder: 'unknown', wait: 'saw', app: 'dev.averi.lab', detail: DETAIL };
+  const UNCHECKED: AppHolder = { holder: 'unknown', wait: 'unchecked', app: 'dev.averi.lab', detail: DETAIL };
+  const NOT_ASKED: AppHolder = { holder: 'unknown', wait: 'not-asked', app: 'dev.averi.lab' };
+
+  it('a link, another app read to the bound: iOS may be asking, or another app, take a screenshot and answer it, then the detail', () => {
+    expect(appHolderText(LINK, SAW)).toBe(
+      'averi did not see dev.averi.lab come forward after the link: iOS may be asking to confirm it ("Open in “…”?") ' +
+        'or another app may be in front — take a screenshot, and if it shows a system alert, answer it (every launch ' +
+        `stays behind it until then). ${DETAIL}`,
+    );
+  });
+
+  it('a link, the wait could not tell: no "did not see", the same advice, then the detail', () => {
+    expect(appHolderText(LINK, UNCHECKED)).toBe(
+      'averi could not check that dev.averi.lab came forward after the link: if iOS asks to confirm it ("Open in “…”?"), ' +
+        'the link waits behind the alert — take a screenshot, and if it shows a system alert, answer it (every launch ' +
+        `stays behind it until then). ${DETAIL}`,
+    );
+  });
+
+  it('a link, WebDriverAgent not up: said, not silent', () => {
+    expect(appHolderText(LINK, NOT_ASKED)).toBe(
+      'whether dev.averi.lab came forward after the link was not checked (WebDriverAgent is not running yet) — ' +
+        'if iOS asks "Open in “…”?", answer it (a screenshot shows it)',
+    );
+  });
+
+  it('a launch: the detail alone, either way; a WebDriverAgent not up says nothing', () => {
+    expect(appHolderText(APP, SAW)).toBe(DETAIL);
+    expect(appHolderText(APP, UNCHECKED)).toBe(DETAIL);
+    expect(appHolderText(APP, NOT_ASKED)).toBeUndefined();
+  });
+
+  const TAIL = '. A screenshot does tell one thing here: whether a system alert is in front (answer it) or the home screen still is';
+
+  it("idb's tree SpringBoard's to the bound: a screenshot tells a system alert from the home screen, after the detail, on both verbs", () => {
+    const onSpringBoard: AppHolder = { holder: 'unknown', wait: 'saw', app: 'dev.averi.lab', detail: DETAIL, springBoardTree: true };
+    expect(appHolderText(APP, onSpringBoard)).toBe(`${DETAIL}${TAIL}`);
+    expect(appHolderText(LINK, onSpringBoard)).toBe(
+      'averi did not see dev.averi.lab come forward after the link: iOS may be asking to confirm it ("Open in “…”?") ' +
+        'or another app may be in front — take a screenshot, and if it shows a system alert, answer it (every launch ' +
+        `stays behind it until then). ${DETAIL}${TAIL}`,
+    );
+  });
+});
+
+describe('holdsIt: whether a holder is named, which a link\'s reply says instead of "Opened"', () => {
+  it('an alert and a chooser hold it', () => {
+    expect(holdsIt({ holder: 'alert', alert: OPEN_IN })).toBe(true);
+    expect(holdsIt({ holder: 'chooser', chooser: { component: 'android/x.ResolverActivity' } })).toBe(true);
+  });
+
+  it('nothing named and nothing known do not', () => {
+    expect(holdsIt({ holder: 'none' })).toBe(false);
+    expect(holdsIt({ holder: 'unknown', wait: 'not-asked', app: 'dev.averi.lab' })).toBe(false);
+    expect(holdsIt({ holder: 'unknown', wait: 'saw', app: 'dev.averi.lab', detail: 'x' })).toBe(false);
   });
 });
 

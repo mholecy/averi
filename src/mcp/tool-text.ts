@@ -22,7 +22,7 @@
 import { everyNode, type AppHolder, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
-import { appHolderText } from '../interact/app-holder-text.js';
+import { appHolderText, holdsIt } from '../interact/app-holder-text.js';
 import type { Direction } from '../interact/swipe.js';
 import { launchedLine, WIPE_LABEL, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
@@ -88,15 +88,15 @@ export const launchText = (platform: Platform, launched: Launched): string =>
   (launched.wiped !== undefined ? `\n${WIPE_LABEL}: ${launched.wiped}` : '');
 
 /**
- * `Opened <url> on <platform>`, and a caveat on its own line as `⚠ <caveat>` (D49a: iOS's foreground wait after a link
- * to the project's own scheme, adapters/ios-foreground.ts — it leads with what to do), as launchText lays out a
- * launch's. When something holds the link instead (D54's system alert, D55's chooser), that is the headline. The words
- * are interact/app-holder-text.ts#appHolderText's; here is only where they go.
+ * `Opened <url> on <platform>`, and what the wait did not confirm on its own line as `⚠ <text>` (D49a: iOS's foreground
+ * wait after a link to the project's own scheme, adapters/ios-foreground.ts — it leads with what to do), as launchText
+ * lays out a launch's. When something holds the link instead (D54's system alert, D55's chooser), that is the headline.
+ * The words, and which answers name a holder, are interact/app-holder-text.ts's; here is only where they go.
  */
-export const deepLinkText = (platform: Platform, url: string, answer: AppHolder): string =>
-  answer.holder === 'alert' || answer.holder === 'chooser'
-    ? appHolderText({ link: url }, answer)
-    : `Opened ${url} on ${platform}` + warnLine(appHolderText({ link: url }, answer));
+export const deepLinkText = (platform: Platform, url: string, answer: AppHolder): string => {
+  const said = appHolderText({ link: url }, answer);
+  return said !== undefined && holdsIt(answer) ? said : `Opened ${url} on ${platform}` + warnLine(said);
+};
 
 /**
  * ui_snapshot's SECOND text block, after the JSON — or nothing. The array

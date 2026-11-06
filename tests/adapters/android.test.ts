@@ -23,7 +23,6 @@ import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 // The one sleep owner (util/sleep.ts) is recorded, not waited on (tests/helpers/sleep-recorder.ts): the adapter's
 // pacing, its settles and the null-root retry are pinned as the delay sequence, and cost no wall clock (T1).
 vi.mock('../../src/util/sleep.js', () => import('../helpers/sleep-recorder.js'));
-
 beforeEach(() => {
   resetSleeps();
 });
@@ -925,7 +924,7 @@ describe('AndroidAdapter interactions', () => {
     // that the launch reads its am start through it.
     it('a launch whose echoed intent has "Error" mid-line resolves', async () => {
       const printed = 'Starting: Intent { act=android.intent.action.VIEW dat=app://x/Error/y pkg=md.bank.app }\n';
-      await expect(amAnswers({ stdout: printed }).adapter.launch('md.bank.app', { intent: SEND }).then(worded)).resolves.toEqual({});
+      await expect(amAnswers({ stdout: printed }).adapter.launch('md.bank.app', { intent: SEND })).resolves.toEqual({ holder: 'none' });
     });
 
     it('a timed-out am start passes through as the timeout, whatever it had printed', async () => {
@@ -943,7 +942,7 @@ describe('AndroidAdapter interactions', () => {
 
     it('pm clear printing an Error line with exit 0 does not fail the launch here (its output is not am\'s)', async () => {
       const { adapter, argvs } = amAnswers({}, { stdout: 'Error: something pm said\n' });
-      await expect(adapter.launch('md.bank.app', { clearState: true, intent: SEND }).then(worded)).resolves.toEqual({});
+      await expect(adapter.launch('md.bank.app', { clearState: true, intent: SEND })).resolves.toEqual({ holder: 'none' });
       expect(argvs).toHaveLength(3); // pm clear, am start -p, and D55b's focus read after it
     });
 
@@ -952,7 +951,7 @@ describe('AndroidAdapter interactions', () => {
         stdout: 'Starting: Intent { cmp=md.bank.app/.MainActivity }\n',
         stderr: 'Warning: Activity not started, its current task has been brought to the front\n',
       });
-      await expect(adapter.launch('md.bank.app', { activity: '.MainActivity' }).then(worded)).resolves.toEqual({});
+      await expect(adapter.launch('md.bank.app', { activity: '.MainActivity' })).resolves.toEqual({ holder: 'none' });
     });
 
     it('an adb failure that is not am\'s diagnosis passes through as it is', async () => {
@@ -1014,7 +1013,7 @@ describe('AndroidAdapter interactions', () => {
     });
 
     it('the monkey launch: exit 0 resolves; an adb failure passes through as it is', async () => {
-      await expect(answering({}).launch('md.bank.app').then(worded)).resolves.toEqual({});
+      await expect(answering({}).launch('md.bank.app')).resolves.toEqual({ holder: 'none' });
       const offline = execErrorLikeExec('adb -s e shell monkey', 255, "adb: device 'e' not found\n");
       await expect(answering(offline).launch('md.bank.app')).rejects.toBe(offline);
     });
@@ -1133,7 +1132,7 @@ describe('AndroidAdapter interactions', () => {
 
     it("launch_app's `-n` start pays nothing for D55: one `am start`, no focus read, `{}` (D55b reads after `-p` only)", async () => {
       const { adapter, argvs } = scripted({ stdout: STARTED }, { stdout: RESOLVER_FOCUS });
-      await expect(adapter.launch('dev.averi.lab', { activity: '.Twin' }).then(worded)).resolves.toEqual({});
+      await expect(adapter.launch('dev.averi.lab', { activity: '.Twin' })).resolves.toEqual({ holder: 'none' });
       expect(argvs).toEqual([['-s', 'e', 'shell', 'am', 'start', '-n', 'dev.averi.lab/.Twin']]);
     });
   });
@@ -1202,7 +1201,7 @@ describe('AndroidAdapter interactions', () => {
     it('E4d: the `-p` start raised the chooser — one focus read after it (2 s), and "Launched" with the chooser named in its ⚠ note', async () => {
       const focus = await fixtureText('dumpsys-window-focus-api33-b10-after-launch-intent.txt');
       const { adapter, argvs, timeouts } = scripted({ start: STARTED, focus });
-      const outcome = await worded(await adapter.launch('dev.averi.lab', { intent: INTENT }));
+      const outcome = worded(await adapter.launch('dev.averi.lab', { intent: INTENT }));
       expect(outcome).toEqual({ note: NOTE });
       // D55c: the pin changed on purpose — the chooser named, its tree is read once (here it prints no XML: the note as before).
       expect(argvs).toEqual([START_P, FOCUS, DUMP]);
@@ -1261,16 +1260,16 @@ describe('AndroidAdapter interactions', () => {
     it('D55c: an app in front after the `-p` start, or `-n`, never dumps — even with a dump that would quote a sheet', async () => {
       const xml = await fixtureText('uiautomator-lab-resolver.xml');
       const lab = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b10-lab-window-null.txt'), dump: xml });
-      await expect(lab.adapter.launch('dev.averi.lab', { intent: INTENT }).then(worded)).resolves.toEqual({});
+      await expect(lab.adapter.launch('dev.averi.lab', { intent: INTENT })).resolves.toEqual({ holder: 'none' });
       expect(lab.argvs).toEqual([START_P, FOCUS]);
       const named = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt'), dump: xml });
-      await expect(named.adapter.launch('dev.averi.lab', { activity: '.Twin', intent: INTENT }).then(worded)).resolves.toEqual({});
+      await expect(named.adapter.launch('dev.averi.lab', { activity: '.Twin', intent: INTENT })).resolves.toEqual({ holder: 'none' });
       expect(named.argvs).toHaveLength(1);
     });
 
     it("D55c: monkey's success never dumps — one call, `{}`, even with the chooser's focus and tree on offer", async () => {
       const { adapter, argvs } = scripted({ monkey: 'Events injected: 1\n', focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt'), dump: await fixtureText('uiautomator-lab-resolver.xml') });
-      await expect(adapter.launch('dev.averi.lab').then(worded)).resolves.toEqual({});
+      await expect(adapter.launch('dev.averi.lab')).resolves.toEqual({ holder: 'none' });
       expect(argvs).toEqual([MONKEY]);
     });
 
@@ -1285,10 +1284,10 @@ describe('AndroidAdapter interactions', () => {
 
     it('the `-p` start with an app in front (batch-10\'s one-handler control read): `{}`, today\'s "Launched" byte for byte', async () => {
       const { adapter, argvs } = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b10-lab-window-null.txt') });
-      const outcome = await worded(await adapter.launch('dev.averi.lab', { intent: INTENT }));
-      expect(outcome).toEqual({});
+      const answer = await adapter.launch('dev.averi.lab', { intent: INTENT });
+      expect(answer).toEqual({ holder: 'none' });
       expect(argvs).toEqual([START_P, FOCUS]);
-      expect(launchText('android', { app: 'dev.averi.lab', note: outcome.note })).toBe('Launched dev.averi.lab on android');
+      expect(launchText('android', { app: 'dev.averi.lab', note: worded(answer).note })).toBe('Launched dev.averi.lab on android');
     });
 
     it('a focus read that fails (grep found nothing, adb gone, a timeout) or says nothing: `{}` — fail open, two calls', async () => {
@@ -1296,7 +1295,7 @@ describe('AndroidAdapter interactions', () => {
       const timedOut = execErrorLikeExec('adb -s e shell dumpsys', null, '', { timedOut: true });
       for (const focus of [failed, timedOut, new Error('timed out'), '', 'garbage\n']) {
         const { adapter, argvs } = scripted({ start: STARTED, focus });
-        await expect(adapter.launch('dev.averi.lab', { intent: INTENT }).then(worded)).resolves.toEqual({});
+        await expect(adapter.launch('dev.averi.lab', { intent: INTENT })).resolves.toEqual({ holder: 'none' });
         expect(argvs).toEqual([START_P, FOCUS]);
       }
     });
@@ -1318,13 +1317,13 @@ describe('AndroidAdapter interactions', () => {
 
     it('`-n` with the same intent pays nothing: one `am start`, `{}` though the chooser is in front (the route around it)', async () => {
       const { adapter, argvs } = scripted({ start: STARTED, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-intent-start.txt') });
-      await expect(adapter.launch('dev.averi.lab', { activity: '.Twin', intent: INTENT }).then(worded)).resolves.toEqual({});
+      await expect(adapter.launch('dev.averi.lab', { activity: '.Twin', intent: INTENT })).resolves.toEqual({ holder: 'none' });
       expect(argvs).toEqual([['-s', 'e', 'shell', 'am', 'start', '-n', 'dev.averi.lab/.Twin', '-a', 'android.intent.action.VIEW', '-d', 'averilab://shared/x']]);
     });
 
     it("monkey's success pays nothing: one call, `{}` — no focus read though a chooser would be named", async () => {
       const { adapter, argvs } = scripted({ monkey: 'Events injected: 1\n', focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt') });
-      await expect(adapter.launch('dev.averi.lab').then(worded)).resolves.toEqual({});
+      await expect(adapter.launch('dev.averi.lab')).resolves.toEqual({ holder: 'none' });
       expect(argvs).toEqual([MONKEY]);
     });
 

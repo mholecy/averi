@@ -136,12 +136,10 @@ import { sleep } from '../util/sleep.js';
  * is expected to bring that app forward, and when it is not in front iOS
  * first asks "Open in “AveriLab”?" over SpringBoard — batch-1 D's probe: the
  * reply said "Opened", and every launch after it stayed behind the alert.
- * Such a link waits here as a launch does (`link` set: the notes say
- * "opening <url> in <bundle>"), and a note it ends with LEADS with what the
- * agent must do: averi did not see the app come forward (it read another app)
- * or could not check — either way iOS may be asking to confirm the link — take
- * a screenshot and answer an alert it shows; a WDA not up yet, which a launch
- * leaves silent, says it did not check.
+ * Such a link waits here as a launch does (`link` set: the detail says
+ * "opening <url> in <bundle>"), and how the wait ended goes up as a fact: the
+ * link's reply LEADS with what the agent must do, in
+ * interact/app-holder-text.ts#appHolderText's words (A10).
  *
  * The alert itself, named (D54, 2026-11-02; ADR 0032's D54 amendment), from
  * its shape as batch-5 D49A captured it (ios-system-alert.ts): a link's wait
@@ -227,7 +225,8 @@ export interface ForegroundCheck {
   ownerOf(label: string): string | undefined;
   /**
    * The deep link that should bring `bundleId` forward, when the wait follows `simctl openurl` rather than a launch
-   * (D49a): the notes then say "opening <link> in <bundle>", and lead with the link's own advice (awaitForeground); a WDA that is not up gets a note too.
+   * (D49a): the detail then says "opening <link> in <bundle>". Asked for that clause alone, and for the names an alert's
+   * title is judged by (alertAtBound).
    */
   link?: string;
   /**
@@ -240,59 +239,48 @@ export interface ForegroundCheck {
 
 /**
  * Read until the Application label is one of the bundle's names (see the module comment), and return what holds the
- * app: nothing when it confirmed that or (a launch only) the source does not ask; iOS's system alert when it found one
- * (D54, D56), `asksForApp` judged with the names the wait held; else the caveat, which stays a sentence from here
- * (adapters/types.ts#AppHolder says why). A link (`check.link`, D49a) has a caveat in every case but the match and the
- * alert, led by what the wait knows: it SAW another app or SpringBoard (LINK_SAW), it could not check (LINK_UNCHECKED),
- * or WebDriverAgent is not running yet and nothing was asked (notAsked) — never a bare "Opened" for a link that may wait
- * behind iOS's "Open in …?".
+ * app: nothing named when it confirmed that; iOS's system alert when it found one (D54, D56), `asksForApp` judged with
+ * the names the wait held; else how the wait ended, with its detail about the tree source (adapters/types.ts#AppHolder).
+ * The same answer on both verbs: what a link's reply leads with (it may wait behind iOS's "Open in …?", D49a) and that a
+ * launch stays silent when nothing was asked are interact/app-holder-text.ts#appHolderText's.
  */
 export async function awaitForeground(check: ForegroundCheck): Promise<AppHolder> {
   const end = await poll(check);
-  if (end.kind === 'matched') return { holder: 'none' };
-  if (end.kind === 'alert') return { holder: 'alert', alert: { ...end.alert, asksForApp: namesApp(end.alert.title, end.names) } };
-  if (check.link === undefined) return end.kind === 'declined' ? { holder: 'none' } : { holder: 'unknown', caveat: end.note };
-  if (end.kind === 'declined') return { holder: 'unknown', caveat: notAsked(check.bundleId) };
-  return { holder: 'unknown', caveat: `${(end.kind === 'saw' ? LINK_SAW : LINK_UNCHECKED)(check.bundleId)}${end.note}` };
+  const app = check.bundleId;
+  switch (end.kind) {
+    case 'matched':
+      return { holder: 'none' };
+    case 'alert':
+      return { holder: 'alert', alert: { ...end.alert, asksForApp: namesApp(end.alert.title, end.names) } };
+    case 'declined':
+      return { holder: 'unknown', wait: 'not-asked', app };
+    case 'saw':
+      return { holder: 'unknown', wait: 'saw', app, detail: end.note, ...(end.springBoardTree === true && { springBoardTree: true }) };
+    case 'unchecked':
+      return { holder: 'unknown', wait: 'unchecked', app, detail: end.note };
+  }
 }
 
 /**
  * How a wait ended: the app confirmed; the source does not ask (WDA not up); a system alert found (D54; a launch's too,
  * D56) — the alert as the source listed it, with the app's names the wait held to judge its title by (`names`: none
  * when they could not be read, or for a WDA launch, which asks none); or a note — `saw` when it read another app (a
- * stale label or bundle), `unchecked` when it could not tell (a read or names error, an unlabelled or empty tree to
- * the bound).
+ * stale label or bundle; `springBoardTree` when idb's tree was SpringBoard's), `unchecked` when it could not tell (a
+ * read or names error, an unlabelled or empty tree to the bound).
  */
-type WaitEnd = { kind: 'matched' } | { kind: 'declined' } | AlertEnd | { kind: 'saw' | 'unchecked'; note: string };
+type WaitEnd =
+  | { kind: 'matched' }
+  | { kind: 'declined' }
+  | AlertEnd
+  | { kind: 'saw'; note: string; springBoardTree?: boolean }
+  | { kind: 'unchecked'; note: string };
 type AlertEnd = { kind: 'alert'; alert: SystemAlert; names: readonly string[] };
-
-/** What every link lead advises (D49a): the alert averi did not find (D54 names one it finds — the module comment), and what it blocks. */
-const ANSWER_IT = '— take a screenshot, and if it shows a system alert, answer it (every launch stays behind it until then). ';
-
-/**
- * The lead of a link's note when the wait read another app to the bound: the app was not seen coming forward, and the
- * likely why — iOS's "Open in …?" confirmation, raised for a custom scheme whose app is not in front (batch-1 D), or
- * another app. Not "the alert is up": nothing here looked for it.
- */
-const LINK_SAW = (bundleId: string): string =>
-  `averi did not see ${bundleId} come forward after the link: iOS may be asking to confirm it ("Open in “…”?") or ` +
-  `another app may be in front ${ANSWER_IT}`;
-
-/** The lead when the wait could not tell which app is in front (review of D49a: no over-claim). */
-const LINK_UNCHECKED = (bundleId: string): string =>
-  `averi could not check that ${bundleId} came forward after the link: if iOS asks to confirm it ("Open in “…”?"), the ` +
-  `link waits behind the alert ${ANSWER_IT}`;
-
-/** A link's note when WebDriverAgent is not up (`declined`): nothing asked, so nothing waited — said, not silent. */
-const notAsked = (bundleId: string): string =>
-  `whether ${bundleId} came forward after the link was not checked (WebDriverAgent is not running yet) — if iOS asks ` +
-  '"Open in “…”?", answer it (a screenshot shows it)';
 
 /** What the notes say came before the wait: the launch, or the link (`ForegroundCheck.link`). */
 const after = (check: ForegroundCheck): string =>
   check.link === undefined ? `launching ${check.bundleId}` : `opening ${check.link} in ${check.bundleId}`;
 
-/** The wait itself: how it ended, the note's words without a link's lead (awaitForeground). */
+/** The wait itself: how it ended, and the detail's words (awaitForeground). */
 async function poll(check: ForegroundCheck): Promise<WaitEnd> {
   let deadline = Date.now() + FOREGROUND_WAIT_MS;
   let names: readonly string[] | undefined;
@@ -355,7 +343,7 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
       const alert = staleBundle === SPRINGBOARD_BUNDLE ? await alertAtBound(check) : undefined;
       if (alert !== undefined) return alert;
       if (staleBundle !== undefined) return { kind: 'saw', note: stillReads(check, staleBundle) };
-      if (stale !== undefined) return { kind: 'saw', note: notInFront(check, stale, names ?? []) };
+      if (stale !== undefined) return { kind: 'saw', note: notInFront(check, stale, names ?? []), springBoardTree: stale.trim() === '' };
       if (unlabelled) {
         return unchecked(check, `${WORDS[check.source].unlabelled} for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`);
       }
@@ -412,12 +400,9 @@ function notInFront(check: ForegroundCheck, label: string, names: readonly strin
     `the UI tree was still ${whose(label)} — iOS can hand idb the previous app's tree for a second or more after an app ` +
     'switch, so a read now may judge the wrong app (an absent check passes on it). ';
   if (label.trim() === '') {
-    // SpringBoard is never the app under another name; what a screenshot can still tell is which part of it is in front.
-    return (
-      head +
-      `${READ_AGAIN[0].toUpperCase()}${READ_AGAIN.slice(1)}. A screenshot does tell one thing here: whether a system alert ` +
-      'is in front (answer it) or the home screen still is'
-    );
+    // SpringBoard is never the app under another name. What a screenshot can still tell, which part of it is in front,
+    // is said above the adapters (the answer's `springBoardTree`).
+    return `${head}${READ_AGAIN[0].toUpperCase()}${READ_AGAIN.slice(1)}`;
   }
   if (owner !== undefined) {
     return (

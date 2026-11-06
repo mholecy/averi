@@ -587,11 +587,14 @@ describe('launch_app — the entry activity', () => {
   // is in front (adapters/ios.ts#openDeepLink) — and the adapter's note reaches the reply as launch_app's does.
   it("open_deep_link on ios hands the adapter averi.yaml's bundle id, and the link's note reaches the reply as its ⚠ line", async () => {
     const ios = home();
-    ios.deepLinkNote = 'averi did not see md.bank.app come forward after the link: iOS may be asking to confirm it';
+    ios.deepLinkAnswer = { holder: 'unknown', wait: 'not-asked', app: 'md.bank.app' };
     const { call } = await connect({ ios });
     const result = await call('open_deep_link', { platform: 'ios', url: 'bank://home', configPath: await validConfig() });
     expect(result.isError).toBe(false);
-    expect(result.text).toBe(`Opened bank://home on ios\n⚠ ${ios.deepLinkNote}`);
+    expect(result.text).toBe(
+      'Opened bank://home on ios\n⚠ whether md.bank.app came forward after the link was not checked (WebDriverAgent is ' +
+        'not running yet) — if iOS asks "Open in “…”?", answer it (a screenshot shows it)',
+    );
     expect(ios.deepLinks).toEqual([{ url: 'bank://home', opts: { appId: 'md.bank.app' } }]);
   });
 

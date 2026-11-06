@@ -294,21 +294,21 @@ export class FakeAdapter implements DeviceAdapter {
     return { width, height };
   }
 
-  /** The caveat the next launches answer with (AppHolder's `unknown`: iOS's foreground wait), for the renderers' tests. */
+  /** The detail the next launches answer with (AppHolder's `unknown`: iOS's foreground wait), for the renderers' tests: a launch's text is its detail, verbatim. */
   launchNote: string | undefined;
 
   async launch(appId: string, opts: LaunchOptions = {}): Promise<AppHolder> {
     this.launches.push({ appId, ...opts });
-    return this.launchNote === undefined ? { holder: 'none' } : { holder: 'unknown', caveat: this.launchNote };
+    return this.launchNote === undefined ? { holder: 'none' } : { holder: 'unknown', wait: 'saw', app: appId, detail: this.launchNote };
   }
 
-  /** The links opened, with what they were opened with; `deepLinkNote` is the caveat the next ones answer with. */
+  /** The links opened, with what they were opened with; `deepLinkAnswer` is what the next ones answer (default: no holder). */
   readonly deepLinks: { url: string; opts?: DeepLinkOptions }[] = [];
-  deepLinkNote: string | undefined;
+  deepLinkAnswer: AppHolder = { holder: 'none' };
 
   async openDeepLink(url: string, opts?: DeepLinkOptions): Promise<AppHolder> {
     this.deepLinks.push(opts === undefined ? { url } : { url, opts });
-    return this.deepLinkNote === undefined ? { holder: 'none' } : { holder: 'unknown', caveat: this.deepLinkNote };
+    return this.deepLinkAnswer;
   }
 
   async isAppRunning(): Promise<boolean> {

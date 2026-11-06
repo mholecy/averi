@@ -767,16 +767,28 @@ a link and a `{ note }` sentence for a launch, and `mcp/tool-text.ts` imported `
   `interact/app-holder-text.ts#appHolderText`'s, which takes the subject (a link's url or an app's id) and the answer.
   The kind of holder decides the wording; no platform is passed. `ios-system-alert.ts` keeps the detectors alone
   (`alertShapeInIdb`, `titleAsksToOpen`, `alertInWda`, `namesApp`).
-- The caveat stays a sentence from `ios-foreground.ts`: every clause of it is about the wait and its tree source (the
-  bound, the label or bundle last read, the names asked, each source's lag), and nothing above the adapters decides on
-  it, so facts for it would only move those clauses and carry a dozen fields up. `appHolderText` shows it verbatim.
+- The wait's end goes up as facts too: `unknown` carries `wait` (`saw`, `unchecked`, `not-asked`), `app`, and a `detail`
+  sentence from `ios-foreground.ts`, about the wait and its tree source alone (the bound, the label or bundle last read,
+  the names asked, each source's lag). Nothing above the adapters decides on those, so facts for them would only move the
+  clauses and carry a dozen fields up. What may hold the app moved up with the rest: `LINK_SAW`, `LINK_UNCHECKED`,
+  `notAsked` and `ANSWER_IT` (code review, round 1), and the SpringBoard tree's "A screenshot does tell one thing here"
+  sentence, now the fact `springBoardTree`. `awaitForeground` no longer branches on `check.link` to pick words: both verbs
+  get the same answer, and that a launch stays silent when WDA was not asked is `appHolderText`'s. `check.link` stays for
+  the detail's "opening <url> in <bundle>" and the names an alert is judged by.
+- One clause still names a possible holder inside `detail`: WDA's "SpringBoard (the home screen, the launch animation or
+  a system alert)". It describes what the read named, mid-sentence, advises nothing, and moving it would split the
+  sentence; left, stated here.
+- `appHolderText`'s switch and `holdsIt`'s table are exhaustive (a `never` default, a `Record` over the kinds): a new kind
+  of holder does not compile until it is worded and decided, so it cannot fall through to a bare "Opened" (code review,
+  round 1).
 - Where the text goes stays the callers': a link's headline or ⚠ line (`mcp/tool-text.ts#deepLinkText`), a launch's ⚠
   line (`flow/launch.ts#launchApp`).
 
 **Tests.** The byte pins moved with the words to `tests/interact/app-holder-text.test.ts`, literally the same strings.
-The end-to-end pins (`tests/mcp/ios-alert-replies.test.ts`, `tests/flow/launch-alert.test.ts`) are unchanged. A temporary
-characterization recorded 260 replies with their device calls at the base and after (both verbs on real adapters, MCP
-and flow): identical.
+The end-to-end pins (`tests/mcp/ios-alert-replies.test.ts`, `tests/flow/launch-alert.test.ts`) are unchanged. Two synthetic
+fixtures could not survive facts (a shortened caveat string in `tool-text.test.ts` and `tools.test.ts`): they pin the real
+full text now. A temporary characterization recorded 274 replies with their device calls at the base and after (both
+verbs on real adapters, MCP and flow): identical.
 
 `npm run mutate -- --group core --force`: `interact/app-holder-text.ts` joins the run at 97.70 % (floor 95; 87 mutants, 2
 survived, both equivalent on the `none` case); `android-chooser.ts` 100 % (152 mutants); every other score unchanged. Golden

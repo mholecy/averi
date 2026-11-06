@@ -977,14 +977,17 @@ export interface LaunchOptions {
  * What holds the app after a launch or a deep link: one closed answer, the same type on both verbs (A10; ADR 0041's and
  * ADR 0032's A10 amendments). The adapters decide the facts, per platform; the words about them are one module's,
  * above the adapters (interact/app-holder-text.ts#appHolderText).
- * - `none`: no holder named and nothing to say: the app seen forward, or nothing asked, or a read that failed open
- *   (Android's focus read, a WDA launch not up yet). Not a promise the app is in front: `Launched`/`Opened` alone.
+ * - `none`: no holder named and nothing to say: the app seen forward, or nothing was asked of a link that expects no
+ *   app, or a read that failed open (Android's focus read). Not a promise the app is in front: `Launched`/`Opened` alone.
  * - `alert`: iOS's system alert holds it (D54, D56): found by the foreground wait (adapters/ios-foreground.ts).
  * - `chooser`: Android's chooser holds it (D55, D55b): the focus read after the start, and its sheet when read (D55c).
- * - `unknown`: nothing is known to hold it, but iOS's foreground wait could not confirm the app (D48, D49a). `caveat`
- *   stays a sentence from the adapter: it is about the wait and its tree source (which tree lags how, the bound, the
- *   names asked), every clause built in ios-foreground.ts#awaitForeground from reads no caller sees, and nothing above
- *   the adapters has a decision to make on it: it is shown verbatim.
+ * - `unknown`: nothing is known to hold it, and iOS's foreground wait did not confirm `app` (D48, D49a): `wait` says how
+ *   it ended: it read another app to the bound (`saw`), it could not tell (`unchecked`), or WebDriverAgent is not up and
+ *   nothing was asked (`not-asked`). `detail` is a sentence from the adapter, about the wait and its tree source alone
+ *   (the bound, the label or bundle read, the names asked, each source's lag): nothing above the adapters decides on
+ *   those. What may hold the app (iOS's "Open in …?") is the words module's, not in `detail`. One clause names it, as
+ *   a description of what was read: WDA's "SpringBoard (the home screen, the launch animation or a system alert)".
+ *   `springBoardTree`: the tree read to the bound was SpringBoard's (idb's; WDA names an active app, not a tree).
  *
  * A launch never FAILS for what holds it: the app was launched, the answer is about the next read. A link's holder
  * replaces the reply's "Opened" headline (mcp/tool-text.ts#deepLinkText); a launch's is a `⚠` line under "Launched"
@@ -994,10 +997,12 @@ export type AppHolder =
   | { holder: 'none' }
   | { holder: 'alert'; alert: LinkAlert }
   | { holder: 'chooser'; chooser: LinkChooser }
-  | { holder: 'unknown'; caveat: string };
+  | { holder: 'unknown'; wait: 'saw' | 'unchecked'; app: string; detail: string; springBoardTree?: true }
+  | { holder: 'unknown'; wait: 'not-asked'; app: string };
 
 /**
- * Android's chooser a link waits behind (D55, adapters/android-chooser.ts): its component as the window manager names
+ * Android's chooser a link or a `-p` launch waits behind (D55, D55b, adapters/android-chooser.ts; the name is D55's, kept
+ * through A10 as `LinkAlert`'s is): its component as the window manager names
  * it (`android/com.android.internal.app.ResolverActivity`), and, since D55c, `sheet`: what its tree shows, read once
  * the component named it (android-chooser.ts#chooserSheet; ADR 0041's D55c amendment). No `sheet` when the dump
  * failed or was not the measured layout: the reply is then D55's, by the component alone.
@@ -1047,7 +1052,8 @@ export interface SystemAlert {
 /**
  * The alert that holds a link or a launch (D54, D56): `asksForApp` — its title contains one of the app's names the wait
  * held, so a link's reply may say iOS asks to open it there; otherwise it calls it a system alert, and no more. A
- * launch's wait may have asked no names (a WDA launch), and its text never reads this.
+ * launch's wait may have asked no names (a WDA launch), and its text never reads this: on a launch it is computed and
+ * unused. The name is D54's, kept through A10.
  */
 export interface LinkAlert extends SystemAlert {
   asksForApp: boolean;

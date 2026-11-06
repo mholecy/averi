@@ -1,7 +1,7 @@
 import type { AppHolder, ChooserButton, ChooserSheet, LinkAlert, LinkChooser, Point } from '../adapters/types.js';
 
 /**
- * Every word averi says about what holds the app after a launch or a deep link (A10; ADR 0041's and ADR 0032's A10
+ * Every word averi says about what holds or may hold the app after a launch or a deep link (A10; ADR 0041's and ADR 0032's A10
  * amendments): one interface, `appHolderText`, over the adapters' closed answer (adapters/types.ts#AppHolder). The
  * detectors decide the facts, per platform (adapters/ios-foreground.ts, adapters/ios-system-alert.ts,
  * adapters/android-chooser.ts); these sentences are the one place they are worded. The holder's kind decides the
@@ -17,25 +17,78 @@ import type { AppHolder, ChooserButton, ChooserSheet, LinkAlert, LinkChooser, Po
 /** What is held: the link a deep link opens, or the app a launch brings forward. */
 export type HeldSubject = { link: string } | { app: string };
 
-/** The answers that name a holder, which always have text. */
-type Named = Extract<AppHolder, { holder: 'alert' | 'chooser' }>;
+/**
+ * Whether the answer names a holder: a link's reply then says that instead of "Opened" (mcp/tool-text.ts#deepLinkText).
+ * A table over every kind, so a new kind does not compile until it is decided here.
+ */
+const NAMES_A_HOLDER: Record<AppHolder['holder'], boolean> = { none: false, alert: true, chooser: true, unknown: false };
+export const holdsIt = (answer: AppHolder): boolean => NAMES_A_HOLDER[answer.holder];
 
 /**
- * The text of `answer` for `subject`: a named holder's sentences, a caveat verbatim (its words are the foreground
- * wait's, about its tree source: adapters/ios-foreground.ts#awaitForeground), and none when nothing holds it.
+ * The text of `answer` for `subject`: a named holder's sentences, what the wait did not confirm (unknownText), and none
+ * when there is nothing to say. Exhaustive: a new kind does not compile until it is worded.
  */
-export function appHolderText(subject: HeldSubject, answer: Named): string;
-export function appHolderText(subject: HeldSubject, answer: AppHolder): string | undefined;
 export function appHolderText(subject: HeldSubject, answer: AppHolder): string | undefined {
   switch (answer.holder) {
     case 'none':
       return undefined;
     case 'unknown':
-      return answer.caveat;
+      return unknownText(subject, answer);
     case 'alert':
       return alertText(subject, answer.alert);
     case 'chooser':
       return chooserText(subject, answer.chooser);
+    default: {
+      const unworded: never = answer;
+      return unworded;
+    }
+  }
+}
+
+/** What every link lead advises (D49a): the alert averi did not find (D54 names one it finds), and what it blocks. */
+const ANSWER_IT = '— take a screenshot, and if it shows a system alert, answer it (every launch stays behind it until then). ';
+
+/**
+ * A link's lead when the wait read another app to the bound: the app was not seen coming forward, and the likely why —
+ * iOS's "Open in …?" confirmation, raised for a custom scheme whose app is not in front (batch-1 D), or another app. Not
+ * "the alert is up": nothing here looked for it.
+ */
+const linkSaw = (app: string): string =>
+  `averi did not see ${app} come forward after the link: iOS may be asking to confirm it ("Open in “…”?") or ` +
+  `another app may be in front ${ANSWER_IT}`;
+
+/** A link's lead when the wait could not tell which app is in front (review of D49a: no over-claim). */
+const linkUnchecked = (app: string): string =>
+  `averi could not check that ${app} came forward after the link: if iOS asks to confirm it ("Open in “…”?"), the ` +
+  `link waits behind the alert ${ANSWER_IT}`;
+
+/** A link's text when WebDriverAgent is not up: nothing asked, so nothing waited — said, not silent. */
+const linkNotAsked = (app: string): string =>
+  `whether ${app} came forward after the link was not checked (WebDriverAgent is not running yet) — if iOS asks ` +
+  '"Open in “…”?", answer it (a screenshot shows it)';
+
+/** After idb's tree read SpringBoard's to the bound: what a screenshot can still tell, which part of it is in front. */
+const SPRINGBOARD_TREE = '. A screenshot does tell one thing here: whether a system alert is in front (answer it) or the home screen still is';
+
+/**
+ * The wait did not confirm the app, and knows no holder (D48, D49a): the wait's `detail` (about its tree source), led for
+ * a link by what may hold it — never a bare "Opened" for a link that may wait behind iOS's "Open in …?". A WDA not up
+ * says so for a link and nothing for a launch, which has no confirmation to ask for.
+ */
+function unknownText(subject: HeldSubject, answer: Extract<AppHolder, { holder: 'unknown' }>): string | undefined {
+  const forLink = 'link' in subject;
+  switch (answer.wait) {
+    case 'not-asked':
+      return forLink ? linkNotAsked(answer.app) : undefined;
+    case 'saw':
+    case 'unchecked': {
+      const lead = !forLink ? '' : answer.wait === 'saw' ? linkSaw(answer.app) : linkUnchecked(answer.app);
+      return `${lead}${answer.detail}${answer.springBoardTree === true ? SPRINGBOARD_TREE : ''}`;
+    }
+    default: {
+      const unworded: never = answer;
+      return unworded;
+    }
   }
 }
 

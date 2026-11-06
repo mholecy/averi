@@ -5,7 +5,7 @@ import { FOREGROUND_POLL_MS, FOREGROUND_WAIT_MS } from '../../src/adapters/ios-f
 import type { ExecFn } from '../../src/adapters/exec.js';
 import { alertInWda } from '../../src/adapters/ios-system-alert.js';
 import type { AppHolder, UiNode } from '../../src/adapters/types.js';
-import { caveatOf, worded } from '../helpers/app-holder.js';
+import { launchCaveatOf, linkCaveatOf, worded } from '../helpers/app-holder.js';
 import { resetSleeps, sleeps } from '../helpers/sleep-recorder.js';
 import { appinfo } from '../helpers/simctl-appinfo.js';
 import {
@@ -197,7 +197,7 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
   it('WebDriverAgent reads SpringBoard to the bound: asks until it and no longer, then a ⚠ note that leads with the link', async () => {
     const d = lab([SPRINGBOARD]);
     const outcome = await d.adapter.openDeepLink('averilab://d49', { appId: LAB });
-    expect(caveatOf(outcome)).toBe(
+    expect(linkCaveatOf(outcome)).toBe(
       'averi did not see dev.averi.lab come forward after the link: iOS may be asking to confirm it ("Open in “…”?") ' +
         'or another app may be in front — take a screenshot, and if it shows a system alert, answer it (every launch ' +
         'stays behind it until then). 3 s after opening averilab://d49 in dev.averi.lab, WebDriverAgent still read ' +
@@ -228,20 +228,18 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
 
   it("idb reads another app's label to the bound: the same lead, then launch's note worded for the link", async () => {
     const outcome = await lab([label('Contacts')], { kind: 'idb' }).adapter.openDeepLink('averilab://d49', { appId: LAB });
-    expect(caveatOf(outcome)).toMatch(/^averi did not see dev\.averi\.lab come forward after the link: iOS may be asking to confirm it/);
-    expect(caveatOf(outcome)).toMatch(/\(every launch stays behind it until then\)\. 3 s after opening averilab:\/\/d49 in dev\.averi\.lab \("AveriLab"\), the UI tree was still the app labelled "Contacts" — /);
+    expect(linkCaveatOf(outcome)).toMatch(/^averi did not see dev\.averi\.lab come forward after the link: iOS may be asking to confirm it/);
+    expect(linkCaveatOf(outcome)).toMatch(/\(every launch stays behind it until then\)\. 3 s after opening averilab:\/\/d49 in dev\.averi\.lab \("AveriLab"\), the UI tree was still the app labelled "Contacts" — /);
   });
 
   // Review of D49a (MINOR 1): a launch before WDA is up stays silent, but an own-scheme link may wait behind "Open in
   // …?" — so it says it did not check rather than a bare "Opened".
   it('WebDriverAgent not up yet (declined): no wait — and a short note that it was not checked', async () => {
     const d = lab([{ kind: 'declined' }]);
-    expect(await d.adapter.openDeepLink('averilab://d49', { appId: LAB })).toEqual({
-      holder: 'unknown',
-      caveat:
-        'whether dev.averi.lab came forward after the link was not checked (WebDriverAgent is not running yet) — ' +
+    expect(linkCaveatOf(await d.adapter.openDeepLink('averilab://d49', { appId: LAB }))).toBe(
+      'whether dev.averi.lab came forward after the link was not checked (WebDriverAgent is not running yet) — ' +
         'if iOS asks "Open in “…”?", answer it (a screenshot shows it)',
-    });
+    );
     expect(d.asks()).toBe(1);
     expect(sleeps).toEqual([]);
   });
@@ -250,7 +248,7 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
   // lead says so.
   it('the ask fails: no "did not see" — a lead that it could not check, then launch\'s "could not check" note worded for the link', async () => {
     const outcome = await lab([new Error('WDA /wda/activeAppInfo request failed: ECONNREFUSED\nstack')]).adapter.openDeepLink('averilab://d49', { appId: LAB });
-    expect(caveatOf(outcome)).toBe(
+    expect(linkCaveatOf(outcome)).toBe(
       'averi could not check that dev.averi.lab came forward after the link: if iOS asks to confirm it ("Open in “…”?"), ' +
         'the link waits behind the alert — take a screenshot, and if it shows a system alert, answer it (every launch ' +
         'stays behind it until then). could not check that dev.averi.lab is in front (WDA /wda/activeAppInfo request ' +
@@ -261,13 +259,13 @@ describe("IosAdapter.openDeepLink — a link to the project's own scheme waits l
 
   it('no bundle id to the bound (unlabelled): the could-not-check lead too', async () => {
     const outcome = await lab([{ kind: 'unlabelled' }]).adapter.openDeepLink('averilab://d49', { appId: LAB });
-    expect(caveatOf(outcome)).toMatch(/^averi could not check that dev\.averi\.lab came forward after the link: /);
-    expect(caveatOf(outcome)).not.toMatch(/did not see/);
+    expect(linkCaveatOf(outcome)).toMatch(/^averi could not check that dev\.averi\.lab came forward after the link: /);
+    expect(linkCaveatOf(outcome)).not.toMatch(/did not see/);
   });
 
   it("idb's tree empty to the bound: the could-not-check lead, then the empty-tree note worded for the link", async () => {
     const outcome = await lab([new IdbEmptyTreeError('AAAA-1111', [])], { kind: 'idb' }).adapter.openDeepLink('averilab://d49', { appId: LAB });
-    expect(caveatOf(outcome)).toMatch(
+    expect(linkCaveatOf(outcome)).toMatch(
       /^averi could not check that dev\.averi\.lab came forward after the link: .*\. idb's tree stayed empty for the 3 s averi waited after opening averilab:\/\/d49 in dev\.averi\.lab, /,
     );
   });
@@ -317,7 +315,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
 
   it('idb: an alert shape whose title neither names the app nor reads "Open in “…”?": no alert — the note at the bound, as before', async () => {
     const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'Allow notifications?')]);
-    expect(caveatOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toMatch(/^averi did not see dev\.averi\.lab come forward/);
+    expect(linkCaveatOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toMatch(/^averi did not see dev\.averi\.lab come forward/);
     expect(d.describeAlls()).toBe(FOREGROUND_WAIT_MS / FOREGROUND_POLL_MS);
   });
 
@@ -351,7 +349,7 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
 
   it('the /source read fails: fails open — exactly the note of before D54', async () => {
     const d = lab([SPRINGBOARD], { tree: new Error('WDA /source request failed: ECONNRESET') });
-    expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ holder: 'unknown', caveat: SAW_SPRINGBOARD });
+    expect(linkCaveatOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(SAW_SPRINGBOARD);
     expect(d.reads()).toBe(1);
   });
 
@@ -363,13 +361,13 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     };
     unmark(home);
     const d = lab([SPRINGBOARD], { tree: home });
-    expect(await d.adapter.openDeepLink('averilab://d54', { appId: LAB })).toEqual({ holder: 'unknown', caveat: SAW_SPRINGBOARD });
+    expect(linkCaveatOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toBe(SAW_SPRINGBOARD);
     expect(d.reads()).toBe(1);
   });
 
   it('another app to the bound (not SpringBoard): no /source read — the note of before', async () => {
     const d = lab([bundle('com.apple.MobileAddressBook')], { tree: WDA_ALERT });
-    expect(caveatOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toMatch(/WebDriverAgent still read com\.apple\.MobileAddressBook as the active app/);
+    expect(linkCaveatOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toMatch(/WebDriverAgent still read com\.apple\.MobileAddressBook as the active app/);
     expect(d.reads()).toBe(0);
   });
 
@@ -399,13 +397,13 @@ describe("IosAdapter.openDeepLink — iOS's \"Open in …?\" alert named (D54)",
     const d = idbLab([IDB_ALERT.replace('Open in “AveriLab”?', 'In „AveriLab“ öffnen?')], NO_NAMES);
     const outcome = await d.adapter.openDeepLink('averilab://d54', { appId: LAB });
     expect(outcome.holder).toBe('unknown');
-    expect(caveatOf(outcome)).toMatch(/^averi could not check that dev\.averi\.lab came forward after the link: .*\(simctl appinfo listed neither CFBundleDisplayName nor CFBundleName\)/);
+    expect(linkCaveatOf(outcome)).toMatch(/^averi could not check that dev\.averi\.lab came forward after the link: .*\(simctl appinfo listed neither CFBundleDisplayName nor CFBundleName\)/);
     expect(d.describeAlls()).toBe(1);
   });
 
   it("idb, the app's names unreadable and no alert shape (the lab's tree): \"could not check\", as before", async () => {
     const d = idbLab([IDB_LAB], NO_NAMES);
-    expect(caveatOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toMatch(/^averi could not check that dev\.averi\.lab came forward/);
+    expect(linkCaveatOf(await d.adapter.openDeepLink('averilab://d54', { appId: LAB }))).toMatch(/^averi could not check that dev\.averi\.lab came forward/);
   });
 });
 
@@ -521,7 +519,7 @@ describe("IosAdapter.launch — the system alert it waits behind, named in its n
 
   it('another app to the bound (not SpringBoard): no /source read — its note as before', async () => {
     const d = lab([bundle('com.apple.MobileAddressBook')], { tree: WDA_ALERT });
-    expect(caveatOf(await d.adapter.launch(LAB))).toMatch(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read com\.apple\.MobileAddressBook as the active app/);
+    expect(launchCaveatOf(await d.adapter.launch(LAB))).toMatch(/^3 s after launching dev\.averi\.lab, WebDriverAgent still read com\.apple\.MobileAddressBook as the active app/);
     expect(d.reads()).toBe(0);
   });
 });
