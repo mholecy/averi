@@ -653,9 +653,12 @@ evidence is kept outside the repo. Where a fact belongs to an ADR, the ADR is na
     for `ResumedActivity|intent=\{|Hist #` prints only the `topResumedActivity`/`ResumedActivity` lines. On the fresh
     chooser one row tap only selects: the chooser stays, both buttons become enabled, no node marks the row; "Just once"
     then starts the chosen component in a new task (batch-11, D55's E2).
-14. With the chooser up, `monkey -p dev.averi.lab -c android.intent.category.LAUNCHER 1` exits 251: stdout holds only its
-    `bash arg:` echo, stderr echoes the args and ends `** SYS_KEYS has no physical keys but with factor 2.0%.` (batch-11,
-    D55b, 3/3).
+14. `monkey -p dev.averi.lab -c android.intent.category.LAUNCHER 1` exits 251 whatever is in front, the chooser or the
+    launcher: stdout holds only its `bash arg:` echo, stderr echoes the args and ends `** SYS_KEYS has no physical keys
+    but with factor 2.0%.` (batch-11, D55b, 3/3 under the chooser; D73, 3/3 from the launcher, 2/2 under the chooser). That
+    line is why it stopped (its `validate()` fails before any event), not a warning, and the chooser plays no part: with
+    `--pct-syskeys 0` it exits 0, `Events injected: 1`, and the app comes forward, from the launcher (6/6, both lab apps)
+    and over the chooser (5/5), which leaves no `ResolverActivity` record (5/5; D73, 2026-11-06).
 15. averi's first uiautomator dump in a `scroll_until` takes about 2.2–2.5 s, and each later round about 2.2 s (6 reads
     13.2–13.9 s); on carousel-recycler-free a 440-px fling in 100 ms settles about 0.8 s after it ends, so it is over
     before averi's first stroke (batch-11, D62).
