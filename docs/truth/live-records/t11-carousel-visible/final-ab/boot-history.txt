@@ -1,0 +1,4 @@
+The boot before this run, 2026-11-06, as the coordinator reported it:
+16:21 the owner killed the emulator and restarted the process. The guest came back from the default_boot snapshot saved at 16:20:42 (uptime 4.37 days, start_count 11).
+About 16:22 the coordinator ran `adb reboot`. At 16:22:35: boot_completed 1, uptime 12 s, start_count 1.
+So this is a guest reboot on a new emulator process, not `-no-snapshot-load`. The script reads its start-count baseline at start.

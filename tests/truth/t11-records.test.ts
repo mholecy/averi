@@ -53,7 +53,7 @@ describe('T11: the measured rate of "fully visible" with C past the clip, lv-d62
     expect(Math.min(...old.filter((r) => !claims(r)).map(probeCarry))).toBeGreaterThan(94);
   });
 
-  it('with the doubt alone 1 of 39, 22 of them on a probe that ran short; the one left: the retry itself moved C 0 px', () => {
+  it('an earlier series, after the load experiment and affected by it: with the doubt alone 1 of 39, 22 of them on a probe that ran short; the one left: the retry itself moved C 0 px', () => {
     const fix = named('lv-d62-drop', ...FIX);
     expect(fix).toHaveLength(39);
     expect(fix.filter((r) => probeCarry(r) <= 94)).toHaveLength(22);
@@ -142,6 +142,60 @@ describe('T11: lv-d62-short, the recorded shape on any device, ABBA over one har
     }
     const carries = [...short('base'), ...short('fix')].map(probeCarry);
     expect([Math.min(...carries), Math.max(...carries)]).toEqual([71, 78]);
+  });
+});
+
+describe('T11: the final A/B (final-ab/, base b3ce0150 vs fix 7a18842e, ABBA, a guest reboot before it)', () => {
+  const F = 'final-ab';
+  const short = (p: string) => named('lv-d62-short', [F, `short-${p}`]);
+  const state = (g: string) => (read(F, `${g}-fix-1.json`) as unknown as { deviceState: { before: { short: number }; after: { short: number }; disagree: boolean } }).deviceState;
+  it('lv-d62-short: base 20 of 20 false, the fix 1 of 20, and that one a first stroke carrying 0, T12; the rest hedged or at the bound', () => {
+    expect(short('base')).toHaveLength(20);
+    expect(short('base').filter(falseClaim)).toHaveLength(20);
+    expect(short('fix')).toHaveLength(20);
+    const [left, ...more] = short('fix').filter(falseClaim);
+    expect(more).toEqual([]);
+    expect(probeCarry(left)).toBe(0);
+    expect(cutOf(left.state)!.right).toBe(542);
+    expect(left.replies[0]).toMatch(/after 1 swipe; .*nothing of it is cut there$/);
+    expect(short('fix').filter((r) => carouselReply(r.replies[0]) === 'maxSwipes-hedged')).toHaveLength(17);
+    expect([...short('base'), ...short('fix')].every((r) => probeCarry(r) <= 94)).toBe(true);
+    expect(state('short')).toMatchObject({ before: { short: 0 }, after: { short: 18 }, disagree: true });
+  });
+  it('lv-d62-drop base 3 of 6, fix 0 of 6; control 0 and 0; drop-two: base false 4 of 4, the fix hedged with C cut, then moved, 8 of 8', () => {
+    expect(named('lv-d62-drop', [F, 'drop-base']).filter(falseClaim)).toHaveLength(3);
+    expect(named('lv-d62-drop', [F, 'drop-fix'])).toHaveLength(6);
+    expect(named('lv-d62-drop', [F, 'drop-fix']).filter(falseClaim)).toEqual([]);
+    expect([...named('lv-d62-control', [F, 'control-base']), ...named('lv-d62-control', [F, 'control-fix'])].filter(claims)).toEqual([]);
+    expect(named('lv-d62-drop-two', [F, 'two-base']).filter((r) => carouselReply(r.replies[0]) === 'fully-visible')).toHaveLength(4);
+    const two = named('lv-d62-drop-two', [F, 'two-fix']);
+    expect(two).toHaveLength(8);
+    for (const r of two) {
+      expect(r.replies[0]).toContain('the content ended there or the app did not take them');
+      expect(strokes(r).length).toBeGreaterThan(2);
+    }
+  });
+  it('the predicted harm: sticky R with maxSwipes 2, base passes, the fix fails hedged 3 of 3, a repeat call passes', () => {
+    for (const r of named('sticky-R-2', [F, 'harm-sticky-max2-base'])) expect(r.replies[0]).toMatch(/fully visible after 2 swipes/);
+    const fix = named('sticky-R-2', [F, 'harm-sticky-max2-fix']);
+    expect(fix).toHaveLength(3);
+    for (const r of fix) {
+      expect(r.replies[0]).toMatch(/^ERROR .*failed after 2 swipes \(maxSwipes\)/);
+      expect(r.replies[1]).toMatch(/fully visible after 1 swipe; .*nothing of it is cut there$/);
+    }
+  });
+  it('the visibility diff lists what the row names', () => {
+    const diff = readFileSync(new URL(`${F}/harm-visibility-diff.txt`, DIR), 'utf8');
+    expect(diff).toContain('cases 153, all three the same 147');
+    expect(diff).toMatch(/Caused by the fix, on the held path: 1\nuiautomator scroll:scroll-sticky-cut\.R\.fully/);
+    expect(diff).toContain('NOT on the held path (unexplained, not called noise): 2');
+    expect(diff).toContain('Differs base-vs-base (not attributable to the fix): 3');
+  });
+  it('raw strokes: fresh 0 of 24 short, then short through the run', () => {
+    const shortOf = (f: string) => readFileSync(new URL(`${F}/${f}`, DIR), 'utf8').trim().split('\n').flatMap((l) => (JSON.parse(l) as { strokes: { carry: number }[] }).strokes.map((s) => s.carry)).filter((c) => c <= 94).length;
+    expect(shortOf('raw-fresh.jsonl')).toBe(0);
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => shortOf(`raw-group-${i}.jsonl`))).toEqual([18, 13, 10, 11, 8, 9, 13, 12, 12]);
+    expect(shortOf('raw-end.jsonl')).toBe(14);
   });
 });
 

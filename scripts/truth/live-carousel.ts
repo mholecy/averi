@@ -431,7 +431,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     calls: [fullyC(RECYCLER_FREE, 'left')],
     judge: judgeFully({ kinds: ['maxSwipes-hedged'], cutBefore: true, dropped: 2 }),
   },
-  // T11: the recorded false claim's shape in any device state on this geometry (94 is the old line for its 142-px probe):
+  // T11: the recorded false claim's shape on this geometry, in both device states seen (94 is the old line for its 142-px probe):
   // lv-d62-drop lied only when its probe ran short, which a device does by its own mood. Here the probe is drawn 90 px and
   // handed back as 142. `unaimable` is accepted by reasoning, never seen on it.
   {

@@ -507,12 +507,25 @@ earlier sentence of this amendment is contradicted.
 the Cost paragraph (below); residuals (b) and (c) (below). D62's cause, point 3 and point 5 stand. The D62 live check is
 history, of the rule then.
 
-**Headline: pending.** The A/B that states the fix's rate runs after the owner's cold boot of the AVD, and its first figure will
-be `lv-d62-short`'s, the recorded shape on any device with no load: the probe sent 90 of its 142 px and handed back as drawn,
-the first reveal dropped (`reads.swipes.shorten`, ADR 0044). Ahead of it, over one harness, ABBA, *after the load experiment*:
-base b3ce0150 12 of 12 false "fully visible" (carries 71–78, C 430–441 px past the clip), the fix 0 of 12, all maxSwipes hedged
-(`short-probe-check/`). Every number below marked *after the load experiment* ran on an AVD whose `system_server` my
-host-load experiment had restarted (07:37–11:39 on 2026-11-06, `sys.system_server.start_count` 11) and states no rate of the fix.
+**Headline, the final A/B, 2026-11-06 16:23–18:50 (`docs/truth/live-records/t11-carousel-visible/final-ab`; base b3ce0150's `src`, the fix 7a18842e, one harness, ABBA).** `lv-d62-short`, the recorded shape drawn on purpose (probe sent 90 of its 142 px, handed back as drawn, first reveal dropped; carries 0–77 px, 94 or less 40 of 40): **base 20 of 20 false "fully visible" (C 436–526 px past the clip across all base false claims), the fix 1 of 20.** That one is not this rule: its first stroke carried 0 (`406 → 406`), a first probe with no proof, read `checked` with C 542 px cut: residual (a), backlog T12. The other 19: 17 maxSwipes hedged, 2 at the 15-s bound. Group state: fast 0/24 short before, short 18/24 after, marked DISAGREE: probes carried 71–77 for the first three pairs, then 27–66 from about 16:26.
+
+The AVD before it: a guest reboot on a new emulator process, not `-no-snapshot-load` (`boot-history.txt`), start count 1 throughout, no restart. Numbers from before the final A/B stay in the evidence folder, and those after the load experiment (07:37–11:39) are affected by it: its `system_server` restarts, count 11.
+
+Cell by cell, each group's raw state before → after (of 24 at 94 px or less; base / fix):
+
+| group | state | base | fix |
+|---|---|---|---|
+| `lv-d62-short` ×20 | 0 → 18 DISAGREE | 20 false | 1 false (T12), 17 hedged, 2 at the bound |
+| `lv-d62-drop` ×6 | 18 → 13 | 3 false | 0 false, 6 hedged |
+| `lv-d62-control` ×6 | 13 → 10 | 0 false, 5 hedged, 1 at the bound | 0 false, same |
+| R, S, P ×4 | 10 → 11 | 10 of 10 ok; R `checked` after 2 | 10 of 10 ok; R hedged after 3 |
+| `lv-d62-drop-two` ×4 base, ×8 fix | 11 → 8 | first call false 4 of 4 | hedge with C cut 8 of 8, second call moved C 8 of 8 |
+| Settings ×4 | 8 → 9 | plain; premise met 0 of 4 | plain; premise met 1 of 4 |
+| sticky R, `maxSwipes: 2` ×3 | 9 → 13 | passes, repeat `checked` | fails hedged at the bound 3 of 3, repeat `checked` 3 of 3 |
+| whole carousel group ×2 | 13 → 12 | 3 mismatches each, 11 of 20 ok | 0 mismatches, 12 of 20 ok, 8 LOUD |
+| whole visibility ×(2 base, 1 fix) | 12 → 12 | 147 ok, 6 LOUD each | 147 ok, 6 LOUD |
+
+The whole-visibility diff, 153 cases, 147 the same on all three. Caused by the fix, on the held path: `scroll-sticky-cut.R.fully`. Differs base-vs-fix, the base runs agreeing, off the held path, unexplained and not called noise: `scroll:carousel-in-list.C` (at most 93 % vs 92 %), `blank:tabbar-floating.F` ("fully visible" and tapped vs "PARTLY UNDER … 86 %"). Differs base-vs-base, not attributable: `scroll:scroll-bounded.O`, `scroll:scroll-bounded.F`, `scroll:tabbar-floating.F`.
 
 **Why the carry line went.** D62 read a proving stroke that fell over 48 px short of its length as "the content ended under
 it". On 2026-11-06, emulator-5554, before the load experiment, raw `input swipe`s of 142 px over 300 ms carried a card
@@ -543,29 +556,13 @@ unchecked stop's existing `it may be cut there`, so `carouselReply` (scripts/tru
 4 live, `final-wording-check/again-*.json`, *after the load experiment*). Golden Changed 0 of 1611 is vacuous for this path: a
 replayed tree never moves, so no proof forms.
 
-**Measured, all *after the load experiment*, none a rate of the fix.** The doubt without the hedge wording: lv-d62-drop 1 of 39
-false, of which 23 had no alternating arm and 22 had a short probe (12 of 16 against 0 of 16 in the alternating part). The one
-left (`fix-drop-more/fixmore-20.json`): the retry, a real 233-px stroke, logged by the app as `482 → 482`. With the final
-wording (`final-wording-check/`, a check of the replies): lv-d62-drop 16 of 16 maxSwipes hedged, lv-d62-control 14
-`unaimable` and 2 maxSwipes hedged, sticky R hedged 9 of 9, bounded S and P plain 8 of 8, the visibility group 153 cases 0
-mismatches, no false "fully visible" in any of them. It cannot speak for the short-probe path: from the 13:11 run on, no probe
-ran short (0 of 40, 134–145 px of 142, as T7a's 135–136; backlog T11), so the hedge after a dropped reveal on a cut was not
-seen live with its final words.
+**What the final A/B cannot show.** No real app reaches the held path: Settings' row comes whole and off the edge on the first probe, and its premise held 1 of 8 runs there. The 20 pairs say the rule held on one lab geometry; `lv-d62-drop` and control carry n=6 a side.
 
-**Exposure, plainly.** No kept record shows a false claim without an injected stroke: control 0 of 41 in the short state, 0 of 16 recovered,
-ctl-12 0 of 8. On the old rule a natural lie needs a proof more than 48 px short and then a held reveal; on a healthy AVD neither was seen (0 of 40
-short, 0 of 224 zero-carry). A11's two are reported only, their records gone. So on a healthy device the fix's measured effect is its cost on every
-content-end pass (about +2.6 s and a hedge); its benefit is against a state that lasted at least 5 hours for unknown reasons, and against absorbed
-strokes at an unmeasured rate. Residual (a) is the remaining way to read `nothing of it is cut` with a cut (backlog T12). **The fix stays, by the
-coordinator's decision: averi doesn't claim what it can't know.**
+**Exposure, plainly.** No kept record shows a false claim with no stroke injected: `lv-d62-control` 0 of 41 and 0 of 6 + 2 a side in the short state, 0 of 16 fast, ctl-12 0 of 8. A11's two are reported only. So the fix's measured benefit is on injected drops; natural held reveals on a proven cut have an unmeasured rate, though absorbed strokes are measured (below). Its cost is measured on every content-end pass: about +2.6 s, a hedge in place of `checked`, and with no budget left a failure where it passed (sticky R, `maxSwipes: 2`, 3 of 3, a repeat call resolves it). **Corrected by the final A/B:** this amendment said the benefit was against a state "that lasted at least 5 hours" and that a healthy device was the case to reckon with; the short state came up within about 3 minutes of work after a fresh reboot and held for all 2 h 25 of the run, so short is the common state of this AVD under this work. **The fix stays, by the coordinator's decision: averi doesn't claim what it can't know.**
 
-**Residuals, stated.** (a) stands: a first probe the app did not take reads `checked`, one stroke is enough (backlog T12).
-(b') Two held reveals on a real cut are now the hedge, not a false claim. Strokes logged with no motion: 5 of 675 sent, 0 of 87
-in T7a's; three of the five are short (53, 53, 61 px), carry loss rather than a swallow; 85 px (`fixmore-16`) and 233 px
-(`fixmore-20`) look like swallows. Whether two come in a row without injection is unmeasured: 6 swipes end most runs, and the 8
-`maxSwipes: 12` controls stopped `unaimable` at 6 with no such stroke.
+**Residuals, stated.** (a) stands: a first probe the app did not take reads `checked`, one stroke is enough, and it was seen: `final-ab/short-fix-12.json`, a shortened stroke, C 542 px cut (backlog T12). (b') Two held reveals on a real cut are now the hedge. Strokes logged with no motion in the final A/B: 7 of 442, all drawn under 100 px (under 60 px 5 of 40, 60–99 px 2 of 133, 100 px and over 0 of 269); the raw 142-px read at 18:47 had one at 0 too, and the earlier series a 233-px one. Whether two come in a row without injection is unmeasured.
 
-**Not known.** Why natural probes carried less from at least 06:59 until at least 12:22, and T7a's figures again from 13:11. Read before
+**Not known.** Why natural probes carry less. The final A/B narrows it: from a fresh reboot raw strokes read 135–146, frames 18 ms; within about 3 minutes of runs probes fell, and by 16:36 raw was 18 of 24 short, staying 8–18 of 24 for the rest of the run; frames 85–97 ms at the end in the lab app and Settings, with the host's load 4.4–5.6 in both states and the AVD's own about 1 rising to 2–3.5. So host load average does not separate the states, and a reboot does not cure. Earlier, natural probes ran short from at least 06:59 until at least 12:22, with T7a's figures again from 13:11 until some time after 14:52. Read before
 any boot, 14:05 (`frames-recovery.txt`, raw-4): raw strokes 135–146 of 142, 0 of 24 at 94 or less; frames 18 ms in the lab app and
 17 ms in Settings against 73 and 81, swap 12 ms against 42, motion events 16 ms apart against about 100; start count 11, the AVD's own
 load, the lead, 0.3–0.8 against 1.3–2.0 at raw-1 on the same workload; the host's about 7, above the 4–5 of the short runs. So the slowness was system-wide in

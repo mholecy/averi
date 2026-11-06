@@ -28,8 +28,7 @@ What a case reads is declared on the case (`Case.reads` and three fields beside 
 - A drop needs the stroke log, so it lives inside the log's field (`swipes: {}` logs, `swipes: { drop: [2] }` also drops): a
   drop with no log, once silently inert, cannot be written. `shorten: { stroke, px }` (T11, ADR 0013) lives there for the same
   reason: the stroke is sent only its first `px` px, averi handed back what it drew, and the log says both (`sentTo`). So
-  `lv-d62-short` draws the short carry a device otherwise gives by its own mood, in any device state and with no load on anything,
-  on its geometry: its premise of 94 px is the old line for that case's 142-px probe. `lv-d62-drop-two` drops strokes 2 and 3.
+  `lv-d62-short` draws the short carry a device otherwise gives by its own mood, with no load on anything, in both device states seen (carry 94 or less 40 of 40), on its geometry: its premise of 94 px is the old line for that case's 142-px probe. `lv-d62-drop-two` drops strokes 2 and 3.
 - The reads before the calls keep their own fields on `Case`: `warmUp`, `preDrag`, `measuresPanel` (which also reads after
   them). So "what a case reads" is `reads` and those three.
 - `c.group` selects a case and names it. No read of it remains in the cycle. A new read costs a field on the declaration,
