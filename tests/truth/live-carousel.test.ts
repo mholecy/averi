@@ -28,7 +28,7 @@ const D62_FALSE_PASS = "Element id:lab.carousel-recycler-free.C fully visible af
 const CASES = await selectCases({ platform: 'android', app: 'native', groups: ['carousel'] });
 const caseOf = (id: string): Case => CASES.find((c) => c.id === id)!;
 /** One recorded case judged by this checkout's judge. */
-const verdictOf = (r: Recorded) => judged(caseOf(r.id), r.source, r.replies, r.launched, r.after, r.state!, r.late, r.swipes);
+const verdictOf = (r: Recorded) => judged(caseOf(r.id), { ...r, state: r.state! });
 /** `s` with C laid at app x `x` (948 wide, the clip's). */
 const withC = (s: LabState, x: number): LabState => ({ ...s, frames: { ...s.frames, C: { x, y: 380, width: 948, height: 234 } } });
 
@@ -126,8 +126,8 @@ describe('selectCases: the carousel group, Android and the native app only, neve
   it('its eight cases, in order, when asked', () => {
     expect(CASES.map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d68-launch', 'lv-d59b-lazy', 'lv-d59b-recycler', 'd52-e2', 'd37-snap-lazy', 'd37-snap-recycler']);
     expect(CASES.every((c) => c.group === 'carousel')).toBe(true);
-    expect(caseOf('lv-d62-drop')).toMatchObject({ preDrag: 440, dropSwipe: 2 });
-    expect(caseOf('lv-d62-control').dropSwipe).toBeUndefined();
+    expect(caseOf('lv-d62-drop')).toMatchObject({ preDrag: 440, reads: { swipes: { drop: 2 } } });
+    expect(caseOf('lv-d62-control').reads?.swipes).toBe(true);
   });
 
   it('a premise SKIP fails the run on lv-d62-control and lv-d62-drop alone (skipFails: the harness broke), never elsewhere', () => {

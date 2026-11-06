@@ -3,7 +3,7 @@ import { pause } from './lab-device.js';
 import { short } from './live-forms.js';
 import { strokesSince, type LiveVerdict } from './live-visibility.js';
 import { carouselReply, inferredAxisSaid, isError, replyKind, snapshotNodes, swipesOf, type CarouselReply } from './replies.js';
-import type { Case } from './live-cases.js';
+import type { Case, CaseReads } from './live-cases.js';
 import { labId, labSelector, type LabState, type Rect } from './schema.js';
 import { TOUCH_SLACK } from './truth.js';
 
@@ -16,7 +16,7 @@ import { TOUCH_SLACK } from './truth.js';
  *
  * The harness additions, each small: a raw pre-drag before the call (`Case.preDrag`: the probes' 440-px, 1-s drag left
  * on the carousel, `preDrag`), a per-case "drop swipe N" hook on the Android adapter the registry builds
- * (`Case.dropSwipe`, `SwipeHook`, `hookSwipes`: the stroke never sent, resolved as drawn — batch-9's untaken reveal on
+ * (`CaseReads.swipes`, `SwipeHook`, `hookSwipes`: the stroke never sent, resolved as drawn — batch-9's untaken reveal on
  * purpose), averi's every stroke logged into the record (RunRecord `swipes`), and the reply's kind
  * (replies.ts#carouselReply). The hard verdict on every `fully: true` case: never "fully visible" while C is still cut.
  */
@@ -344,14 +344,16 @@ export interface CarouselCase {
   platforms: readonly ['android'];
   /** A raw pre-drag of this many px before the calls (`preDrag`). */
   preDrag?: number;
-  /** The call's Nth stroke dropped (SwipeHook). */
-  dropSwipe?: number;
+  /** What it reads: the strokes always (its oracle), the call's Nth dropped when it says (SwipeHook), never late. */
+  reads: CaseReads;
   /** A SKIP fails the run (live-cases.ts#summarize): lv-d62's premises are the harness's own — a SKIP there means it broke. */
   skipFails?: true;
   calls: { tool: 'scroll_until' | 'swipe' | 'ui_snapshot'; args: Record<string, unknown> }[];
   judge: CarouselJudge;
 }
 
+/** The carousel cases' reads: the strokes are their oracle, and a later read would let a fling finish. */
+const CAROUSEL_READS: CaseReads = { swipes: true, late: false };
 const RECYCLER_FREE = 'carousel-recycler-free';
 const LAZY_FREE = 'carousel-lazy-free';
 const fullyC = (cell: string, direction: 'left' | 'right') => ({ tool: 'scroll_until' as const, args: { selector: `id:${labId(cell, 'C')}`, direction, fully: true } });
@@ -366,6 +368,7 @@ const snapStroke = (() => {
 export const CAROUSEL_CASES: readonly CarouselCase[] = [
   {
     id: 'lv-d62-control',
+    reads: CAROUSEL_READS,
     cell: RECYCLER_FREE,
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
@@ -379,7 +382,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     cell: RECYCLER_FREE,
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
-    dropSwipe: 2,
+    reads: { swipes: { drop: 2 }, late: false },
     skipFails: true,
     says: "D62: the same with the call's second stroke (its first reveal) dropped, resolved as drawn: maxSwipes hedged (\"may still be cut\"), never \"fully visible\" with C cut",
     calls: [fullyC(RECYCLER_FREE, 'left')],
@@ -387,6 +390,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
   },
   {
     id: 'lv-d68-launch',
+    reads: CAROUSEL_READS,
     cell: RECYCLER_FREE,
     platforms: ['android'],
     says: 'D68: from a fresh launch, fully: true right on the RecyclerView card: `unaimable` (hedged maxSwipes accepted, counted), never "fully visible" with C cut',
@@ -395,6 +399,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
   },
   {
     id: 'lv-d59b-lazy',
+    reads: CAROUSEL_READS,
     cell: LAZY_FREE,
     platforms: ['android'],
     says: "D59b/D59: from a fresh launch (C not in the tree), fully: true right on the LazyRow card: every stroke inside the carousel's band, which takes them; `unfit` with the inferred-axis clause",
@@ -404,6 +409,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
   // The same call as lv-d68-launch, kept as its own case: the second sample of the hedged ceiling (UNAIMABLE_LEGS).
   {
     id: 'lv-d59b-recycler',
+    reads: CAROUSEL_READS,
     cell: RECYCLER_FREE,
     platforms: ['android'],
     says: "D59b/D68: the same on the RecyclerView card: every stroke inside the band, which takes them; `unaimable` (hedged maxSwipes accepted, counted)",
@@ -412,6 +418,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
   },
   {
     id: 'd52-e2',
+    reads: CAROUSEL_READS,
     cell: 'carousel-in-list',
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
@@ -421,6 +428,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
   },
   ...(['carousel-lazy', 'carousel-recycler'] as const).map((cell) => ({
     id: `d37-snap-${cell.slice('carousel-'.length)}`,
+    reads: CAROUSEL_READS,
     cell,
     platforms: ['android'] as const,
     says: `D37: one 300-ms stroke forward on the snapping ${cell === 'carousel-lazy' ? 'LazyRow' : 'RecyclerView'} pager, then ui_snapshot C: the first read lists C where the pager comes to rest (carousel.index)`,

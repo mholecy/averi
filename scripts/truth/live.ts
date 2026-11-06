@@ -82,7 +82,7 @@ import { parseLabApp, type LabApp } from './schema.js';
  * `carousel` (T7a, Android, not in the default groups): the probes the device batches copied from batch to batch, as
  * cases (live-carousel.ts) — lv-d62's drop and control, D68 from a fresh launch, D59b's strokes in the band, D52's E2,
  * D37's settled read on the snapping pagers. A case may drag the carousel raw first (Case.preDrag, AndroidLab.swipe),
- * and drop its Nth stroke (Case.dropSwipe): the Android adapter the registry builds has its `swipe` routed through one
+ * and drop its Nth stroke (CaseReads.swipes): the Android adapter the registry builds has its `swipe` routed through one
  * SwipeHook, armed around each case's calls, which logs every stroke averi draws into the record (`swipes`).
  */
 
@@ -209,10 +209,10 @@ if (rejudging !== undefined) {
     for (const c of selected) {
       for (const source of sources) {
         if (c.sources !== undefined && !c.sources.includes(source)) continue;
-        const { record: read, verdict } = await runCase(c, source, rig);
-        results.push({ source, c, verdict, replies: read.replies });
-        record.results.push(read);
-        console.error(`${source} ${c.id} ${verdict.outcome}: ${verdict.why}`);
+        const run = await runCase(c, source, rig);
+        results.push({ source, c, verdict: run.verdict, replies: run.record.replies });
+        record.results.push(run.record);
+        console.error(`${source} ${c.id} ${run.verdict.outcome}: ${run.verdict.why}`);
       }
     }
   } finally {

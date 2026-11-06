@@ -6,7 +6,7 @@ import type { LabApp, LabState } from '../../scripts/truth/schema.js';
  * A lab device with no device (scripts/truth/lab-device.ts#LabDevice), for the live golden's cycle
  * (scripts/truth/run-case.ts): what it answers is scripted, and everything asked of it lands in `log`, a list a test's
  * other fakes can share, so one list holds the order of a whole case. `FakeLab` is the iOS shape; `FakeAndroidLab` adds
- * what only the Android lab has (the raw swipe, the guard, the IME's touchable region). Capture's own fakes
+ * what run-case.ts asks only of the Android lab (the raw swipe, the guard before a panel read, the IME's touchable region). Capture's own fakes
  * (tests/truth/truth.test.ts, geometry.test.ts) script a screen and a tap's outcome; this one scripts a case's reads.
  */
 

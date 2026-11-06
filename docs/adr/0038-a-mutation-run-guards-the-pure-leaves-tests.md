@@ -79,7 +79,7 @@ geometry.ts is the run's sixth module. It joined once it had direct tests of its
 which reached 49.5 % alone, and four new files: geometry-viewport.test.ts, geometry-clips.test.ts,
 geometry-screen-size.test.ts and geometry-text.test.ts. Its scope.json entry names them as
 `tests/ui-tree/geometry*.test.ts`, with a floor of 93 under a baseline of 95.1 %. tests/truth/geometry.test.ts stays
-out: it tests scripts/truth/truth.ts, not this module, and the sandbox's allowlist does not copy the scripts it imports.
+out: it tests scripts/truth/truth.ts, not this module, and (until A11, see the amendment at the end) the sandbox's allowlist did not copy the scripts it imports.
 
 One run holds every module's tests, and Stryker's per-test coverage runs a mutant against every test that reaches
 it, not only its module's. draw-order*.test.ts call geometry.ts heavily, so their kills count toward geometry's score
@@ -131,11 +131,11 @@ scope.json; floors 98, 97, 97, 97 and 92. steps.ts's floor is 97, not 98: 98 sat
 less than one mutant, where the rule above asks for about 2 points.
 
 Adding a module outside src/ takes two edits, not one: its scope.json entry, and its folder in stryker.config.mjs's
-allowlist (`ignorePatterns`), which copies `scripts/truth/batch/` into the sandbox and still none of the rest of
-scripts/truth/. A test that imports a scripts/truth module outside that folder therefore stays out of the entry's tests:
+allowlist (`ignorePatterns`), which copies `scripts/truth/batch/` into the sandbox and, until A11 (see the amendment at the
+end), none of the rest of scripts/truth/. A test that imports a scripts/truth module outside that folder therefore stayed out of the entry's tests:
 tests/truth/batch/steps-live.test.ts, which holds steps.ts's live.ts header to live-cases.ts, runs in the normal suite
 only, as does tests/truth/batch/terminal.test.ts, which spawns a child whose stdout's reader has gone.
-tests/mutation/mutate.test.ts accepts a scope key under src/ or scripts/truth/batch/. The cold run of all fifteen
+tests/mutation/mutate.test.ts accepted a scope key under src/ or scripts/truth/batch/ (A11 adds scripts/truth/ itself). The cold run of all fifteen
 modules took 86 to 108 s, past the 90 s at which the amendment for geometry.ts said to revisit one Stryker run per
 module; that is left for a later look, since the five new modules add about 30 s of it.
 
@@ -1442,8 +1442,21 @@ cannot flip them; the bounds are pinned exactly, a millisecond inside and a mill
 
 ## Amendment: run-case.ts joins the run (2026-11-06, backlog A11)
 
-scripts/truth/run-case.ts (ADR 0044) is in the `lab` group, against tests/truth/run-case.test.ts: 99.32 %, 148 mutants, 1
-survived, equivalent (named in scope.json); floor 97. It orchestrates IO, but every device call sits behind its rig and
-its tests take milliseconds, as with T2's runner.ts. Its cases import their judges, so Stryker's allowlist now takes
-scripts/truth/*.ts rather than lab-device.ts and schema.ts alone, plus scripts/is-main.ts; sources only, nothing of
-scripts/truth's outputs or data.
+scripts/truth/run-case.ts (ADR 0044) is in the `lab` group, against tests/truth/run-case.test.ts: 98.62 %, 145 mutants, 2 survived, both equivalent (named in
+scope.json); floor 96. It orchestrates
+IO, but every device call sits behind its rig and its tests take milliseconds, as with T2's runner.ts.
+
+What changes for the earlier text:
+
+- **The allowlist.** Its cases import their judges, so Stryker's allowlist takes scripts/truth/*.ts rather than
+  lab-device.ts and schema.ts alone, plus scripts/is-main.ts. Sources only, none of scripts/truth's outputs or data. The
+  reasons the amendments above give for keeping a test out because its scripts were not copied no longer hold; those tests
+  stay out because they test something else or run a real child, and none was moved.
+- **The path rule.** tests/mutation/mutate.test.ts accepts a scope key under src/ or scripts/truth/batch/ at any depth, and
+  a file directly in scripts/truth/. The allowlist copies no other subfolder.
+- **The cold rule.** "A module they import", followed transitively, would grow by 64 files through run-case.ts's one value
+  import of live-cases.ts (measured over scope.json's modules and tests with value imports: 154 to 218 files, 72 to 122 under
+  src/): the cases, their judges and the src they name. None of them can change a run-case mutant's outcome, because its tests
+  use synthesized judges and a fake lab. So for run-case.ts the rule stops one step out: itself, its test, tests/helpers/fake-lab.ts,
+  and the modules it imports itself (lab-device.ts, live-carousel.ts, live-cases.ts, replies.ts, schema.ts). That adds 6
+  files to the rule. The rule is prose, not code, so this sentence is the exemption.

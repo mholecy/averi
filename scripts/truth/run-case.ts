@@ -8,11 +8,11 @@ import { labSelector, type LabState } from './schema.js';
 
 /**
  * One live case on one tree source: case + lab + tool call → one record and its verdict (backlog A11, docs/adr/0044).
- * The cycle, in the order the device sees it: the warm-up, the start (the launch, unless the case brings its own), the
+ * The cycle, in the order the device sees it: the warm-up, the launch, the
  * pre-drag, the keyboard's SKIP, the panel's first read, the calls with the reads the case declares between them, the
  * pause, the state, the panel's second read, the late read (live-cases.ts#wantsLateRead), the verdict, a screenshot when
- * it is not ok. What a case reads is its declaration (Case.reads), never its group; a new read is a new field there and
- * one line here.
+ * it is not ok. What a case reads is its declaration (Case.reads and the fields beside it), never its group; a new read is a
+ * field there, a field on the record (CaseRecord, caseRecord), and its read in the cycle below.
  *
  * It knows nothing of argv, of which cases run, or of printing: live.ts is the CLI around it, and tests/truth/run-case.test.ts
  * runs the cycle over tests/helpers/fake-lab.ts. A failure of the harness itself (a call that throws, a guard that
@@ -72,9 +72,9 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   // probe timed from the launch reads the bare screen rather than a Welcome the binding outran. A warm-up that failed is
   // kept in the record.
   const warm = c.warmUp === true ? await rig.callTool({ tool: 'ui_snapshot', args: { filter: labSelector(c.cell, 'home') } }, await rig.configFor(source, c)) : undefined;
-  const warmUpError = warm !== undefined && isError(warm) ? warm : undefined;
+  const warmUpError = isError(warm) ? warm : undefined;
   if (warmUpError !== undefined) note(`${source} ${c.id} warm-up failed: ${warmUpError.split('\n')[0]}`);
-  let launched = c.start !== undefined ? await c.start(lab) : await lab.launch(c.cell);
+  let launched = await lab.launch(c.cell);
   /** The case SKIPped before its calls, `why`: no replies, no state, the launch as read. */
   const skip = (why: string): CaseRun => ({ verdict: { outcome: 'SKIP', why }, record: caseRecord(source, c, { skip: why, replies: [], launched, after: [], state: undefined, warmUpError }) });
   // The raw pre-drag (Case.preDrag): the calls start from the state it left. One that failed is the case's SKIP
@@ -94,15 +94,15 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   const replies: string[] = [];
   const after: (LabState | undefined)[] = [];
   let swipes: SwipeEntry[] | undefined;
-  const logsSwipes = c.reads?.swipes === true;
-  if (logsSwipes) rig.swipes.arm(c.dropSwipe);
+  const logged = c.reads?.swipes;
+  if (logged !== undefined) rig.swipes.arm(logged === true ? undefined : logged.drop);
   try {
     for (const [i, call] of c.calls.entries()) {
       replies.push(await rig.callTool(call, config));
       if (c.reads?.betweenCalls === true && i < c.calls.length - 1) after.push(await lab.state());
     }
   } finally {
-    swipes = logsSwipes ? rig.swipes.disarm() : undefined;
+    swipes = logged !== undefined ? rig.swipes.disarm() : undefined;
   }
   await pause(WRITE_SETTLE_MS);
   // Stamped with when it was read (LabState.readAt): the ensure judges ask it.
@@ -111,12 +111,13 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   // The second (D69): the panel again once the calls are done, kept on the final state — the judge holds the two reads
   // to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged).
   const state = panelLab !== undefined ? await withMeasuredPanel(read, panelLab, note) : read;
+  const readings = { source, replies, launched, after, state, swipes };
   let late: LabState | undefined;
-  if (wantsLateRead(c, source, replies, launched, after, state, swipes)) {
+  if (wantsLateRead(c, readings)) {
     await pause(LATE_READ_MS);
     late = stamped(await lab.state());
   }
-  const verdict = judged(c, source, replies, launched, after, state, late, swipes);
+  const verdict = judged(c, { ...readings, late });
   if (rig.keepShot !== undefined && verdict.outcome !== 'ok') await rig.keepShot(`${source}-${c.id}-${now()}.png`, await lab.screenshot());
   return { verdict, record: caseRecord(source, c, { replies, launched, after, state, late, warmUpError, preDrag: preDragged, swipes }) };
 }

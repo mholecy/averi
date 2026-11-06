@@ -218,7 +218,7 @@
   "scripts/truth/run-case.ts": {
     "group": "lab",
     "tests": ["tests/truth/run-case.test.ts"],
-    "floor": 97,
-    "baseline": "99.32 % on 2026-11-06 (A11; cold): 148 mutants, 1 survived — line 75's `warm !== undefined` emptied to true, equivalent: isError(undefined) is false"
+    "floor": 96,
+    "baseline": "98.62 % on 2026-11-06 (A11 review round 1: one `swipes` field, `warm !== undefined` dropped; cold): 145 mutants, 2 survived — both `logged === true` emptied to false, equivalent: `true.drop` is undefined, what the true branch hands the hook; 99.32 % on 2026-11-06 (A11; cold): 148 mutants, 1 survived"
   }
 }

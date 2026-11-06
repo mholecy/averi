@@ -18,14 +18,18 @@ Device calls, records, printed lines and the exit code are byte-identical to the
 **`runCase(case, source, rig)` in `scripts/truth/run-case.ts` runs one case on one source and answers its record and verdict.
 What a case reads is `Case.reads`, never its group.**
 
-- `Case.reads` is `{ betweenCalls?: true; swipes?: true; late?: false }`. Unset is the forms' cycle. A group's cases share
-  one constant, set where `selectCases` builds them; tests/truth/live-reads.test.ts pins every selectable case of each
-  group to what the loop inferred.
-- `c.group` selects a case and names it. No read of it remains in the cycle, so a new read is a new field and one line in
-  `runCase`.
-- `Case.start` takes the place of `lab.launch(cell)` for a case that reaches its first screen otherwise, T7b's. It answers
-  the state the calls start from. Nothing uses it yet; a test pins it.
-- The late-read rule's one home is `live-cases.ts`: `wantsLateRead` (whether), `judged` (how), `LATE_READ_MS`.
+- `Case.reads` is `{ betweenCalls?: true; swipes?: true | { drop: number }; late?: false }`: what a case reads around its
+  calls. Unset is the forms' cycle. The carousel and visibility cases each carry it, a required field where
+  live-carousel.ts and live-visibility.ts build them, beside their judges; `selectCases` only passes it on.
+  tests/truth/live-reads.test.ts pins every selectable case of a group to what the loop inferred, with a list of
+  exceptions that say why (lv-d62-drop).
+- A drop needs the stroke log, so the two are one field: `dropSwipe` with no log, once silently inert, cannot be written.
+- The reads before the calls keep their own fields on `Case`: `warmUp`, `preDrag`, `measuresPanel` (which also reads after
+  them). So "what a case reads" is `reads` and those three.
+- `c.group` selects a case and names it. No read of it remains in the cycle. A new read costs a field on the declaration,
+  a field on `CaseRecord` and in `caseRecord`, and its read in `runCase`; the loop infers nothing.
+- The late-read rule's one home is `live-cases.ts`: `wantsLateRead` (whether), `judged` (how), `LATE_READ_MS`. Both take
+  the readings as a record holds them, so a run and a rejudge pass the same shape.
 - **`judged` judges a recorded `late` whatever the case declares today.** A record is what was read then. If `judged` also
   asked `reads.late`, a declaration changed later would turn over the verdicts of old records. The committed records hold
   no late read on a visibility or carousel case, so this is the safe reading rather than a live difference.
@@ -37,6 +41,19 @@ What a case reads is `Case.reads`, never its group.**
   run's have the same format, so the CLI prints one.
 - `CaseLab` tells the Android lab from the iOS one by `platform`, not by optional methods. A pre-drag and a panel read are
   the Android lab's, and tests/helpers/fake-lab.ts has both shapes.
+
+## What T7b still has to add
+
+This module does not make T7b ready. lc1–lc3 and lc4'' (ADR 0041's proposed cases) are ordinary calls after an ordinary
+launch. The rest is new work:
+
+- a start verb for lc4', which starts from the launcher, not from `lab.launch`;
+- a new read for `mFocusedApp` and for no `ResolverActivity` being left, which `LabState` does not carry;
+- a first `state()` with no cell: the lab app has not written, and the cycle assumes a state (T10);
+- probably a teardown after a chooser, so the next case does not start over it. That is an inference, unmeasured.
+
+A `Case.start` was built here for the first of these and deleted at review: it was a hypothetical seam, and its type could
+not do the work (`adb` is not on `CaseLab`). T7b can add what it needs at the same price.
 
 ## Considered
 
@@ -50,8 +67,10 @@ What a case reads is `Case.reads`, never its group.**
 ## Consequences
 
 - The cycle has a test (tests/truth/run-case.test.ts): order, each read, each SKIP, the screenshot, no real sleep.
+- The cycle still throws a raw TypeError when the app wrote no state and the judge reads it, as the old loop did. A test
+  pins it; T10 is the row.
 - A first verdict that asks for a late read now gets the case's stroke log, as `judged`'s does. The old loop asked without
   it. No case both logs strokes and takes a late read, so nothing changes today.
 - run-case.ts joins the mutation run (ADR 0038): every device call sits behind the rig, its tests take milliseconds, and
-  its branches are what this ADR protects. T2's runner.ts is the precedent for an orchestrator over a fake seam.
+  its branches are what this ADR protects. T2's runner.ts is the precedent for an orchestrator over a fake seam. ADR 0038's amendment says what that costs.
 - iOS is unmeasured live here. The cycle has no iOS-only branch beyond a SKIP's words, and a fake of each shape runs it.

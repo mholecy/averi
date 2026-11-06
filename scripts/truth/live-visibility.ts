@@ -1,5 +1,6 @@
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
+import type { CaseReads } from './live-cases.js';
 import { refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
@@ -451,6 +452,7 @@ export function judgePresentedAssert([assert]: readonly string[], state: LabStat
 export function presentedAssertCase(cell: string, t: TargetTruth): VisibilityCase {
   return {
     id: `assert:${cell}.${t.tag}`,
+    reads: VISIBILITY_READS,
     cell,
     says: `colour assert ${t.tag} (${t.color}) beneath the presented layer: fails, nothing fires`,
     calls: [{ tool: 'assert', args: { asserts: [{ element: { id: t.id }, color: { expected: t.color }, timeout: 3_000 }] } }],
@@ -474,10 +476,15 @@ export interface RunsUnder {
   sources?: readonly string[];
 }
 
+/** A visibility case's reads: its stop is judged as scroll_until left it, on the state read when it returned. */
+const VISIBILITY_READS: CaseReads = { betweenCalls: true, late: false };
+
 export interface VisibilityCase extends RunsUnder {
   id: string;
   cell: string;
   says: string;
+  /** What it reads (VISIBILITY_READS). */
+  reads: CaseReads;
   calls: VisibilityCall[];
   /**
    * The target contract's clause the case judges (target-contract.ts): a tap case's TapAsk, a scroll case's StopAsk
@@ -528,6 +535,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     const fires = ask.must === 'fire';
     cases.push({
       id: `tap:${truth.cell}.${t.tag}`,
+      reads: VISIBILITY_READS,
       cell: truth.cell,
       says: `tap ${t.tag} (${contract.geometry ?? t.declared}): ${fires ? 'fires it alone' : 'refused, nothing fires — or fires it alone'}`,
       calls: [{ tool: 'tap', args: { selector: selectorOf(t) } }],
@@ -539,6 +547,7 @@ export function visibilityCases(truth: CellTruth, platform: Platform): Visibilit
     if (t.declared === 'presented-over') {
       cases.push({
         id: `scroll:${truth.cell}.${t.tag}`,
+        reads: VISIBILITY_READS,
         cell: truth.cell,
         says: `scroll_until ${t.tag} beneath the presented layer: refused, nothing stroked, nothing dismissed`,
         calls: [{ tool: 'scroll_until', args: { selector: selectorOf(t), direction: directionOf(t, truth) } }],
@@ -603,6 +612,7 @@ export const ABSENT_AT_END: readonly { cell: string; view: string; direction: Di
 function absentAtEndCase(cell: string, view: string, direction: Direction): VisibilityCase {
   return {
     id: `absent:${cell}`,
+    reads: VISIBILITY_READS,
     cell,
     says: `scroll_until a row ${cell} does not have, ${direction} into ${view}'s end: fails after at most ${UNMOVED_STROKES_EXHAUST} swipes saying the last did not change the screen, nothing fired — not the whole budget (ADR 0021 decision 6)`,
     calls: [{ tool: 'scroll_until', args: { selector: `id:"lab.${cell}.absent"`, direction } }],
@@ -644,6 +654,7 @@ export const BLANK_STRETCH: readonly { cell: string; tag: string; timeoutMs: num
 function blankStretchCase(cell: string, t: TargetTruth, view: string, timeoutMs: number): VisibilityCase {
   return {
     id: `blank:${cell}.${t.tag}`,
+    reads: VISIBILITY_READS,
     cell,
     says: `scroll_until ${t.tag} down past the blank stretch of ${view} (no node between R and ${t.tag}), timeoutMs ${timeoutMs}: the blank reads end nothing — it stops on ${t.tag}, every stroke on ${view} bringing it closer, then the tap fires it (LV1)`,
     calls: [
@@ -675,6 +686,7 @@ export const AT_REST: readonly { cell: string; tag: string }[] = [{ cell: 'scrol
 function atRestCase(cell: string, t: TargetTruth, view: string): VisibilityCase {
   return {
     id: `rest:${cell}.${t.tag}.fully`,
+    reads: VISIBILITY_READS,
     cell,
     says: `scroll_until ${t.tag} (whole, flush under the sticky header pinned in ${view}) down, fully: stops on it after at most one probe that moves nothing, then the tap fires it (VA1's at-rest twin)`,
     calls: [
@@ -758,6 +770,7 @@ export function judgeCarry(reply: string, state: LabState, start: LabState): Liv
 function carryCase(): VisibilityCase {
   return {
     id: `carry:${CARRY.cell}.${CARRY.tag}`,
+    reads: VISIBILITY_READS,
     cell: CARRY.cell,
     sources: ['wda'],
     says: `scroll_until ${CARRY.tag} (row 30 of the table, whole over offsets 1172–1920, past one stroke's carry from the top and before the table's end) down: stops on it, every stroke on ${CARRY.view} bringing it closer, none carrying it past its window, no turn (LV5's carry on a long list)`,
@@ -769,6 +782,7 @@ function carryCase(): VisibilityCase {
 function scrollCase(cell: string, t: TargetTruth, view: string, direction: Direction, fully: boolean, platform: Platform, says: string): VisibilityCase {
   return {
     id: `scroll:${cell}.${t.tag}${fully ? '.fully' : ''}`,
+    reads: VISIBILITY_READS,
     cell,
     says,
     calls: [

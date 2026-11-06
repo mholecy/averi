@@ -52,11 +52,11 @@ describe('runCase: launch, calls, a pause, the state', () => {
 
 describe('runCase: the reads a case declares', () => {
   const NOT: LiveVerdict = { outcome: 'LOUD', why: 'not held' };
-  const twoCalls = [{ tool: 'tap', args: {} }, { tool: 'tap', args: {} }, { tool: 'tap', args: {} }] as Case['calls'];
+  const threeCalls = [{ tool: 'tap', args: {} }, { tool: 'tap', args: {} }, { tool: 'tap', args: {} }] as Case['calls'];
 
   it('no declaration: no read between the calls, no strokes logged', async () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
-    const run = await runCase(aCase({ calls: twoCalls }), 'idb', rigOver(lab, ['1', '2', '3']));
+    const run = await runCase(aCase({ calls: threeCalls }), 'idb', rigOver(lab, ['1', '2', '3']));
     expect(lab.log).toEqual(['launch c', 'call tap under idb-x1.yaml', 'call tap under idb-x1.yaml', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
     expect(run.record.after).toEqual([]);
     expect(run.record).not.toHaveProperty('swipes');
@@ -64,7 +64,7 @@ describe('runCase: the reads a case declares', () => {
 
   it('betweenCalls: the app read between the calls, not after the last, kept in order and unstamped', async () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('one'), read('two'), read('final')] });
-    const run = await runCase(aCase({ calls: twoCalls, reads: { betweenCalls: true } }), 'idb', rigOver(lab, ['1', '2', '3']));
+    const run = await runCase(aCase({ calls: threeCalls, reads: { betweenCalls: true } }), 'idb', rigOver(lab, ['1', '2', '3']));
     expect(lab.log).toEqual(['launch c', 'call tap under idb-x1.yaml', 'state', 'call tap under idb-x1.yaml', 'state', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
     expect(run.record.after).toEqual([read('one'), read('two')]);
     expect(run.record.state).toEqual({ ...read('final'), readAt: 1000 });
@@ -74,7 +74,7 @@ describe('runCase: the reads a case declares', () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
     const stroke = { from: { x: 1, y: 2 }, to: { x: 3, y: 4 }, dropped: true };
     let logged: unknown;
-    const c = aCase({ reads: { swipes: true }, dropSwipe: 2, judge: (_s, _r, _so, _l, _a, log) => ((logged = log), OK) });
+    const c = aCase({ reads: { swipes: { drop: 2 } }, judge: (_s, _r, _so, _l, _a, log) => ((logged = log), OK) });
     const run = await runCase(c, 'uiautomator', rigOver(lab, ['1'], { swipes: { arm: (d) => void lab.log.push(`arm ${d}`), disarm: () => (lab.log.push('disarm'), [stroke]) } }));
     expect(lab.log).toEqual(['launch c', 'arm 2', 'call tap under uiautomator-x1.yaml', 'disarm', 'pause 800', 'state']);
     expect(run.record.swipes).toEqual([stroke]);
@@ -86,6 +86,12 @@ describe('runCase: the reads a case declares', () => {
     const rig = rigOver(lab, [], { callTool: async () => Promise.reject(new Error('the server is gone')) });
     await expect(runCase(aCase({ reads: { swipes: true } }), 'uiautomator', rig)).rejects.toThrow('the server is gone');
     expect(lab.log).toEqual(['launch c', 'arm undefined', 'disarm']);
+  });
+
+  it('swipes without a drop: the hook armed with none', async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
+    await runCase(aCase({ reads: { swipes: true } }), 'uiautomator', rigOver(lab));
+    expect(lab.log).toContain('arm undefined');
   });
 
   it('a first read not ok: read again 3 s later, stamped, kept; the later read judged', async () => {
@@ -236,14 +242,6 @@ describe('runCase: before the calls', () => {
     expect(lab.log).toEqual(['launch c', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
     expect(run.record.launched).not.toHaveProperty('imeTouchable');
   });
-
-  it('start: a case\'s own start takes the place of the launch, the rest of the cycle unchanged', async () => {
-    const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
-    const started = read('from the launcher');
-    const run = await runCase(aCase({ start: async () => (lab.log.push('own start'), started) }), 'idb', rigOver(lab));
-    expect(lab.log).toEqual(['own start', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
-    expect(run.record.launched).toEqual(started);
-  });
 });
 
 describe('runCase: the rig\'s defaults', () => {
@@ -259,6 +257,14 @@ describe('runCase: the rig\'s defaults', () => {
 
 describe('runCase: after the calls', () => {
   const NOT: LiveVerdict = { outcome: 'MISMATCH', why: 'claimed' };
+
+  // Today's behaviour, pinned (backlog T10): the app wrote no state to read, and the judge meets undefined.
+  it('no state after the calls: a judge that reads it throws a TypeError out of the case, and nothing is recorded', async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [undefined] });
+    const judge: Case['judge'] = (s) => (s.events.length === 0 ? OK : NOT);
+    await expect(runCase(aCase({ judge }), 'idb', rigOver(lab))).rejects.toThrow(TypeError);
+    expect(lab.log).toEqual(['launch c', 'call tap under idb-x1.yaml', 'pause 800', 'state']);
+  });
 
   it('not ok with keepShot: one screenshot once judged, named by source, case and clock, after the late read', async () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('first'), read('late')] });
