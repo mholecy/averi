@@ -119,6 +119,11 @@ describe('pgrepVerdict — what pgrep\'s outcome says about the host process lis
 describe("pgrepReason — pgrep's own words for the stderr line, not its command line", () => {
   const cmd = '/usr/bin/pgrep -f /a/very/long/pattern\\.app/X( |$)';
 
+  it('a host path in that line leaves it (ADR 0043)', () => {
+    expect(pgrepReason(execErrorLikeExec(cmd, 3, 'pgrep: /Users/lab/x unreadable\n'))).toBe('exit 3: pgrep: ~/x unreadable');
+    expect(pgrepReason(execErrorLikeExec(cmd, null, 'spawn /Users/lab/pgrep ENOENT\n'))).toBe('spawn ~/pgrep ENOENT');
+  });
+
   it("an exit: its code and stderr's last non-empty line", () => {
     expect(pgrepReason(execErrorLikeExec(cmd, 3, 'pgrep: warning\nsysmon request failed with error: sysmond service not found  \n   \n'))).toBe(
       'exit 3: sysmon request failed with error: sysmond service not found',

@@ -1,3 +1,0 @@
-(domain=LSApplicationWorkspaceErrorDomain, code=115)
-Simulator device failed to open tel:+421900123456
-LSApplicationWorkspaceErrorDomain error 115

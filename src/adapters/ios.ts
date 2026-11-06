@@ -754,6 +754,7 @@ export class IosAdapter implements DeviceAdapter {
       await this.sourceTyper(text);
       return;
     }
+    // This argv's shape is in failure-text.ts's typing list (IDB_TYPING): what is typed stays out of a failure's message.
     // An app seen dropping a tail (D24, FIRST_KEY_ALONE_MS): its first character alone, a wait, then the rest. The
     // first character is a grapheme (Intl.Segmenter), so a surrogate pair or a letter with its combining mark is never
     // split between two idb calls. A one-character text has no rest: one call, no wait.

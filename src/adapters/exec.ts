@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
-import { commandFailureText } from './failure-text.js';
+import { commandFailureText, type CommandFailure } from './failure-text.js';
 
 /** stdout stays a Buffer — screenshots come through this path as binary PNG. */
 export interface ExecResult {
@@ -19,8 +19,35 @@ export interface ExecOptions {
 export type ExecFn = (cmd: string, args: string[], opts?: ExecOptions) => Promise<ExecResult>;
 
 /**
+ * The host's home, or none: `os.homedir()` throws when $HOME is unset and the uid has no passwd entry (a container's), and
+ * a throw from ExecError's constructor would leave exec's promise unsettled and take the process down.
+ */
+export function hostHome(): string {
+  try {
+    return homedir();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * The words of a failure, and exec's raw shape if wording them throws: nothing may destroy the real error. That shape keeps
+ * what the words take out, a typed text too. It is reached only by input the types forbid (a non-string stderr).
+ */
+function failureMessage(failure: CommandFailure): string {
+  try {
+    return commandFailureText(failure, hostHome());
+  } catch {
+    const { command, exitCode, stderr, timedOut, note } = failure;
+    const raw = timedOut ? `Command timed out: ${command}` : `Command failed (exit ${exitCode}): ${command}\n${String(stderr).trim()}`;
+    return raw + (note === undefined ? '' : `\n${note}`);
+  }
+}
+
+/**
  * A failed host command. Its fields keep every byte, for detectors and logs (a detector reads `stderr`, `exitCode`,
- * `timedOut`); its `message` is the words an agent reads, whichever layer quotes it (failure-text.ts, ADR 0043).
+ * `timedOut`); its `message` is the words an agent reads, whichever layer quotes it (failure-text.ts, ADR 0043). A reader
+ * that quotes `stderr` itself passes it through failure-text.ts#withoutHostPaths.
  */
 export class ExecError extends Error {
   constructor(
@@ -44,7 +71,7 @@ export class ExecError extends Error {
     options: { note?: string; cause?: unknown } = {},
   ) {
     super(
-      commandFailureText({ command, exitCode, stderr, timedOut, note: options.note }, homedir()),
+      failureMessage({ command, exitCode, stderr, timedOut, note: options.note }),
       options.cause === undefined ? undefined : { cause: options.cause },
     );
     this.name = 'ExecError';

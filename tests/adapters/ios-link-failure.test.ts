@@ -4,12 +4,10 @@ import { ExecError } from '../../src/adapters/exec.js';
 import { NoLinkHandlerError, noLinkHandler } from '../../src/adapters/ios-link-failure.js';
 
 /**
- * simctl's stderr for `openurl <udid> tel:…` (batch-13 rerun 2, main 51778d00, iOS 27.0, idb, 2/2 byte-identical; exit 115).
- * NOT that capture's bytes: batch-13 recorded them in its scratch output, which no longer exists. This fixture holds only
- * the fragments the repo recorded, in their order: the domain and code and the "failed to open" line from backlog row D65,
- * the last line from docs/plans/2026-10-07-top4-device-check.md row 10c. The capture had four lines.
+ * simctl's stderr for `openurl <udid> tel:+421900123456`, exit 115: batch-13 rerun 2, main 51778d00, iOS 27.0, idb, 2/2
+ * byte-identical (the D65 probe's reply, its first line, exec's, cut off: it holds the udid). batch-9's D58 P3 reads the same.
  */
-const TEL_STDERR = readFileSync(new URL('../fixtures/simctl-openurl-tel-exit115-stderr-shape-from-d65-row.txt', import.meta.url), 'utf8');
+const TEL_STDERR = readFileSync(new URL('../fixtures/simctl-openurl-tel-exit115-b13-stderr.txt', import.meta.url), 'utf8');
 const failed = (stderr: string, exitCode: number | null = 115, timedOut = false) => new ExecError('xcrun simctl openurl U tel:+421900123456', exitCode, stderr, timedOut);
 
 describe('noLinkHandler (D65)', () => {
@@ -24,6 +22,15 @@ describe('noLinkHandler (D65)', () => {
       'No app on this simulator handles tel: links, so nothing opened (simctl openurl: LSApplicationWorkspaceErrorDomain, code 115). ' +
         'A link to an app\'s own scheme needs that app installed.',
     );
+  });
+
+  it('the fixture is the four lines batch-13 recorded, its shape what the fact is read from', () => {
+    expect(TEL_STDERR.trim().split('\n')).toEqual([
+      'An error was encountered processing the command (domain=LSApplicationWorkspaceErrorDomain, code=115):',
+      'Simulator device failed to open tel:+421900123456.',
+      'Underlying error (domain=LSApplicationWorkspaceErrorDomain, code=115):',
+      '\tThe operation couldn’t be completed. (LSApplicationWorkspaceErrorDomain error 115.)',
+    ]);
   });
 
   it('names a custom scheme as the link has it, lower-cased', () => {

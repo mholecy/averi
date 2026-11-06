@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { homedir } from 'node:os';
-import { exec, ExecError } from '../../src/adapters/exec.js';
+import { exec, ExecError, hostHome } from '../../src/adapters/exec.js';
 
 describe('exec', () => {
   it('captures stdout as a Buffer', async () => {
@@ -49,7 +49,7 @@ describe('ExecError: its message is commandFailureText, its fields every byte (D
   it('a crash reads one line with no home in the message, and stderr, command and stack keep what detectors and logs read', async () => {
     const script = `cat >&2 <<'T'\n${TRACE}T\nexit 1`;
     const err = await exec('sh', ['-c', script]).then(() => undefined, (e: unknown) => e as ExecError);
-    expect(err?.message).toBe(`Command failed (exit 1): sh -c ${script.replace(homedir(), '~')}\nsh crashed: Exception: boom (Python traceback left out: run the command in a terminal to see it)`);
+    expect(err?.message).toBe(`Command failed (exit 1): sh -c ${script.replace(homedir(), '~')}\nsh crashed: Exception: boom (Python traceback left out: run the command by hand, with the real text and paths, to see it)`);
     expect(err?.stderr).toBe(TRACE);
     expect(err?.command).toBe(`sh -c ${script}`);
     expect(err?.exitCode).toBe(1);
@@ -68,6 +68,27 @@ describe('ExecError: its message is commandFailureText, its fields every byte (D
     const err = new ExecError('adb devices', 1, 'said', false, Buffer.alloc(0), { note: 'tail', cause });
     expect(err.message).toBe('Command failed (exit 1): adb devices\nsaid\ntail');
     expect(err.cause).toBe(cause);
+  });
+
+  describe('the home it passes', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('is the real one: the rule only an own home has, past a word\'s start, reaches it', () => {
+      vi.stubEnv('HOME', '/opt/me');
+      expect(new ExecError('c', 1, 'https://h/opt/me/a').message).toBe('Command failed (exit 1): c\nhttps://h~/a');
+    });
+
+    it('hostHome reads it too', () => {
+      vi.stubEnv('HOME', '/opt/me');
+      expect(hostHome()).toBe('/opt/me');
+    });
+  });
+
+  it('a failure to word it never destroys the error: the raw shape stands, and the fields', () => {
+    const err = new ExecError('adb devices', 1, undefined as unknown as string, false, Buffer.alloc(0), { note: 'tail' });
+    expect(err.message).toBe('Command failed (exit 1): adb devices\nundefined\ntail');
+    expect(err.exitCode).toBe(1);
+    expect(new ExecError(undefined as unknown as string, null, '', true).message).toBe('Command timed out: undefined');
   });
 
   it('the same failure without any of it stays exec\'s bytes', () => {

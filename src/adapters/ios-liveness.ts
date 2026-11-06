@@ -7,7 +7,8 @@
  * the ExecError class its `instanceof` reads); IosAdapter owns the calls,
  * the cache and the launchctl confirmation of every "no".
  */
-import { ExecError } from './exec.js';
+import { ExecError, hostHome } from './exec.js';
+import { withoutHostPaths } from './failure-text.js';
 import type { AppBinary } from './simctl-appinfo.js';
 import { errorMessage } from '../util/error-message.js';
 
@@ -70,11 +71,12 @@ export function pgrepVerdict(error: unknown): 'yes' | 'no' | 'timeout' | 'unread
  */
 export function pgrepReason(error: unknown): string {
   if (!(error instanceof ExecError)) return errorMessage(error).split('\n')[0];
-  const line = error.stderr
+  const last = error.stderr
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l !== '' && !l.startsWith('Command failed:'))
     .at(-1);
+  const line = last === undefined ? undefined : withoutHostPaths(last, hostHome());
   if (error.exitCode === null) return line ?? 'no exit code';
   return line === undefined ? `exit ${error.exitCode}` : `exit ${error.exitCode}: ${line}`;
 }

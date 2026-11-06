@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { commandFailureText } from '../../src/adapters/failure-text.js';
+import { commandFailureText, withoutHostPaths } from '../../src/adapters/failure-text.js';
 
 const HOME = '/Users/me';
 /** Roots tests/docs/path-hygiene.test.ts strikes in a committed file, spelled apart: here they are the subject, no machine's. */
@@ -32,7 +32,7 @@ describe('commandFailureText: a Python traceback', () => {
   it('shrinks the recorded idb crash to the tool, its exception and how to see the trace', () => {
     expect(failed('idb describe --udid U', CRASH_WITH_HOME)).toBe(
       'Command failed (exit 1): idb describe --udid U\n' +
-        'idb crashed: Exception: No keycode found for Š (Python traceback left out: run the command in a terminal to see it)',
+        'idb crashed: Exception: No keycode found for Š (Python traceback left out: run the command by hand, with the real text and paths, to see it)',
     );
   });
 
@@ -53,13 +53,32 @@ describe('commandFailureText: a Python traceback', () => {
 
   it('says only the crash when the traceback was cut before its exception', () => {
     expect(failed('idb x', 'Traceback (most recent call last):\n  File "a.py", line 1, in a\n').split('\n')[1])
-      .toBe('idb crashed (Python traceback left out: run the command in a terminal to see it)');
+      .toBe('idb crashed (Python traceback left out: run the command by hand, with the real text and paths, to see it)');
   });
 
   it('takes an exception group\'s rule for no exception, when the traceback was cut there', () => {
-    const left = 'idb crashed (Python traceback left out: run the command in a terminal to see it)';
+    const left = 'idb crashed (Python traceback left out: run the command by hand, with the real text and paths, to see it)';
     expect(failed('idb x', '  + Exception Group Traceback (most recent call last):\n  |   File "a.py", line 1, in a\n  +-+---------------- 1 ----------------\n').split('\n')[1]).toBe(left);
     expect(failed('idb x', '    | Traceback (most recent call last):\n    |   File "b.py", line 2, in b\n    +------------------------------------\n').split('\n')[1]).toBe(left);
+  });
+
+  it('reads a traceback with CRLF line ends', () => {
+    const crlf = 'Traceback (most recent call last):\r\n  File "a.py", line 1, in a\r\nValueError: boom\r\n';
+    expect(failed('idb x', crlf).split('\n')[1]).toMatch(/^idb crashed: ValueError: boom \(Python/);
+  });
+
+  it('takes the message from the next line when the exception line ends at its colon', () => {
+    const blank = 'Traceback (most recent call last):\n  File "a.py", line 1, in a\nException: \n\n  real reason  \nmore\n';
+    expect(failed('idb x', blank).split('\n')[1]).toMatch(/^idb crashed: Exception: real reason \(Python/);
+    expect(failed('idb x', 'Traceback (most recent call last):\nException:\n   \nwhy\n').split('\n')[1]).toMatch(/^idb crashed: Exception: why \(Python/);
+    expect(failed('idb x', 'Traceback (most recent call last):\nException:\n').split('\n')[1]).toMatch(/^idb crashed: Exception: \(Python/);
+    expect(failed('idb x', 'Traceback (most recent call last):\nValueError: a: b\nnext\n').split('\n')[1]).toMatch(/^idb crashed: ValueError: a: b \(Python/);
+  });
+
+  it('drops the lines around the traceback', () => {
+    expect(failed('idb x', 'warning before\nTraceback (most recent call last):\nE: x\nnote after\n')).toBe(
+      'Command failed (exit 1): idb x\nidb crashed: E: x (Python traceback left out: run the command by hand, with the real text and paths, to see it)',
+    );
   });
 
   it('names the tool: a path\'s last word, and what xcrun ran', () => {
@@ -135,6 +154,32 @@ describe('commandFailureText: host paths', () => {
     expect(commandFailureText({ command: 'c', exitCode: 1, stderr: '/sdcard/a', timedOut: false }, '')).toBe('Command failed (exit 1): c\n/sdcard/a');
   });
 
+  const inHome = (text: string, home: string) => withoutHostPaths(text, home);
+
+  it('a home of one folder goes at a word\'s start only: the anywhere rule would cut device paths', () => {
+    expect(inHome('/data/local/tmp/a.xml /tmp/x', '/tmp')).toBe('/data/local/tmp/a.xml ~/x');
+    expect(inHome('/sys/root/a', '/root')).toBe('/sys/root/a');
+    expect(inHome('/data/var/a /var/b', '/var')).toBe('/data/var/a ~/b');
+    expect(inHome('/tmpfs/a', '/tmp')).toBe('/tmpfs/a');
+  });
+
+  it('a home of two folders or more goes anywhere, and ends where its folder ends', () => {
+    expect(inHome('https://h/opt/me/a', '/opt/me')).toBe('https://h~/a');
+    expect(inHome('https://h/opt/mel/a https://h/opt/me.old https://h/opt/me-2', '/opt/me')).toBe('https://h/opt/mel/a https://h/opt/me.old https://h/opt/me-2');
+  });
+
+  it('a home that is no absolute path takes nothing out', () => {
+    expect(inHome('ab abc /ab/c', 'ab')).toBe('ab abc /ab/c');
+    expect(inHome('a/b', 'a/b')).toBe('a/b');
+  });
+
+  it('a home with a trailing slash is the same home', () => {
+    expect(inHome('https://h/opt/me/a', '/opt/me/')).toBe('https://h~/a');
+    expect(inHome('https://h/opt/me/a', '/opt/me//')).toBe('https://h~/a');
+    expect(inHome('/sdcard/', '/')).toBe('/sdcard/');
+    expect(inHome('/tmp/x', '/tmp/')).toBe('~/x');
+  });
+
   it('a home with a regular expression\'s characters is taken literally', () => {
     expect(commandFailureText({ command: 'c', exitCode: 1, stderr: '/data/a+b/c /data/aab/c', timedOut: false }, '/data/a+b').split('\n')[1]).toBe('~/c /data/aab/c');
   });
@@ -162,6 +207,23 @@ describe('commandFailureText: typed text', () => {
     for (const command of ['idb ui tap 1 2 --udid U', 'idb ui key 40 --udid U', 'adb -s S shell input tap 1 2', 'adb -s S shell input keyevent 66', 'xcrun simctl openurl U ui text', 'echo idb ui text a --udid U', 'idb ui text a --udid U and more']) {
       expect(failed(command, 'e')).toBe(`Command failed (exit 1): ${command}\ne`);
     }
+  });
+
+  it('idb\'s argparse line leaves a typing\'s stderr, whatever it quotes; the usage stays', () => {
+    const rejected = 'idb rejected its arguments (its error line, which can quote the typed text, is left out)';
+    expect(failed('idb ui text --log=s3cret --udid U', "usage: idb [-h]\nidb: error: argument --log: invalid choice: 's3cret'\n", { exitCode: 2 }))
+      .toBe(`Command failed (exit 2): idb ui text <typed text> --udid U\nusage: idb [-h]\n${rejected}`);
+    expect(failed('idb ui text -abc --udid U', 'idb ui text: error: the following arguments are required: text\n').split('\n')[1]).toBe(rejected);
+  });
+
+  it('that line stays on every other command, and on Android\'s typing, whose adb errors name the device', () => {
+    const line = 'idb describe: error: bad choice';
+    expect(failed('idb describe --udid U', line).split('\n')[1]).toBe(line);
+    expect(failed('adb -s S shell input text h', 'adb: error: connect failed: closed').split('\n')[1]).toBe('adb: error: connect failed: closed');
+  });
+
+  it('a stderr line that merely holds the words stays on a typing', () => {
+    expect(failed('idb ui text a --udid U', 'x: y: error: z\nerror: gone').split('\n').slice(1)).toEqual(['x: y: error: z', 'error: gone']);
   });
 
   it('a home in a typed text goes with the text', () => {

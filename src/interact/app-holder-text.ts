@@ -9,7 +9,8 @@ import type { AppHolder, ChooserButton, ChooserSheet, LinkAlert, LinkChooser, Po
  * are the facts each platform reports.
  *
  * What stays worded in the adapters, as those ADRs state: monkey's refusals, thrown errors (`REFUSAL_ADVICE` and
- * `chooserAlsoInFront` in adapters/android-chooser.ts; a link no app handles, adapters/ios-link-failure.ts, ADR 0043), and the wait's `detail`, whose WDA clause names a system alert
+ * `chooserAlsoInFront` in adapters/android-chooser.ts; a link no app handles, adapters/ios-link-failure.ts, ADR 0043),
+ * and the wait's `detail`, whose WDA clause names a system alert
  * as one thing SpringBoard may be showing.
  *
  * Why in interact/ rather than mcp/tool-text.ts: a launch's text is a line of the flow's trace too, and the flow engine

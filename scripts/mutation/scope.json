@@ -51,7 +51,7 @@
     "group": "core",
     "tests": ["tests/adapters/failure-text.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-06 (D70, commandFailureText; cold, after tests and simplifications answered two earlier cold runs at 89.84 % and 98.23 %): 113 mutants, 0 survived, 0 timeouts, 1 runtime error"
+    "baseline": "100.00 % on 2026-11-06 (D70 review round 1, the short home, argparse's line, the colon line; cold): 153 mutants, 0 survived, 0 timeouts; 100 % earlier the same day (D70; cold): 113 mutants"
   },
   "src/adapters/ios-link-failure.ts": {
     "group": "core",
@@ -63,7 +63,7 @@
     "group": "core",
     "tests": ["tests/adapters/ios-liveness.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-02 (D33 after review, pgrepReason and the case-free UDID added): 70 mutants, 0 survived, 0 without coverage — after a test killed the first run's one survivor (the ExecError check) and covered one string"
+    "baseline": "100 % on 2026-11-06 (D70 review round 1, pgrepReason's line through withoutHostPaths; cold): 73 mutants, 0 survived; 100 % on 2026-11-02 (D33 after review, pgrepReason and the case-free UDID added): 70 mutants, 0 survived, 0 without coverage — after a test killed the first run's one survivor (the ExecError check) and covered one string"
   },
   "src/adapters/android-chooser.ts": {
     "group": "core",

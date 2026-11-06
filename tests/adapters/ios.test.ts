@@ -1214,7 +1214,7 @@ describe('openDeepLink when simctl answers (D65)', () => {
     if (args.includes('openurl')) throw new ExecError([cmd, ...args].join(' '), exitCode, stderr);
     return { stdout: Buffer.alloc(0), stderr: '' };
   };
-  const TEL_STDERR = readFileSync(new URL('../fixtures/simctl-openurl-tel-exit115-stderr-shape-from-d65-row.txt', import.meta.url), 'utf8');
+  const TEL_STDERR = readFileSync(new URL('../fixtures/simctl-openurl-tel-exit115-b13-stderr.txt', import.meta.url), 'utf8');
 
   it('code 115 throws the fact, with no trace and no argv in the reply', async () => {
     const opening = new IosAdapter({ udid: 'AAAA-1111', exec: failing(TEL_STDERR, 115), treeSource: NO_TREE }).openDeepLink('tel:+421900123456');
@@ -1244,13 +1244,23 @@ describe('a failed typing keeps its text out of the message (D70, ADR 0043)', ()
     await expect(typing).rejects.toMatchObject({ command: `idb ui text ${secret} --udid AAAA-1111` });
   });
 
+  it('idb\'s own argparse line, which quotes a text taken for an option, is left out; the argv the adapter really sends is recognised', async () => {
+    const exec: ExecFn = async (cmd, args) => {
+      if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 2, "usage: idb ui text [-h] text\nidb ui text: error: argument -h/--help: ignored explicit argument 'unter2'\n");
+      return { stdout: Buffer.alloc(0), stderr: '' };
+    };
+    await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).typeText('-hunter2')).rejects.toThrow(
+      /^Command failed \(exit 2\): idb ui text <typed text> --udid AAAA-1111\nusage: idb ui text \[-h\] text\nidb rejected its arguments \(its error line, which can quote the typed text, is left out\)$/,
+    );
+  });
+
   it("a reader's `.message` of a crash during a typing shows neither the text nor the trace", async () => {
     const exec: ExecFn = async (cmd, args) => {
       if (args[1] === 'text') throw new ExecError([cmd, ...args].join(' '), 1, 'Traceback (most recent call last):\n  File "/Users/me/x.py", line 1, in m\nException: gone\n');
       return { stdout: Buffer.alloc(0), stderr: '' };
     };
     await expect(new IosAdapter({ udid: 'AAAA-1111', exec, treeSource: NO_TREE }).typeText(secret)).rejects.toThrow(
-      /^Command failed \(exit 1\): idb ui text <typed text> --udid AAAA-1111\nidb crashed: Exception: gone \(Python traceback left out: run the command in a terminal to see it\)$/,
+      /^Command failed \(exit 1\): idb ui text <typed text> --udid AAAA-1111\nidb crashed: Exception: gone \(Python traceback left out: run the command by hand, with the real text and paths, to see it\)$/,
     );
   });
 });

@@ -676,7 +676,7 @@ describe('what a failed host command replies (D70, D65; ADR 0043): the tools quo
     const result = await call('type_text', { platform: 'ios', text: 'hunter2', configPath: missing() });
     expect(result.isError).toBe(true);
     expect(result.text).toBe(
-      'Command failed (exit 1): idb ui text <typed text> --udid U\nidb crashed: Exception: gone (Python traceback left out: run the command in a terminal to see it)',
+      'Command failed (exit 1): idb ui text <typed text> --udid U\nidb crashed: Exception: gone (Python traceback left out: run the command by hand, with the real text and paths, to see it)',
     );
   });
 
