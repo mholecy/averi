@@ -1,0 +1,34 @@
+Fri Nov  6 15:44:28 CET 2026
+-- 15:44:28 loadavg 1.64 2.14 2.20 1/1584 24769
+Rs    24770 00:00:00 0      ps
+-- 15:44:31 loadavg 1.64 2.14 2.20 1/1584 24776
+Rs    24777 00:00:00 0      ps
+-- 15:44:34 loadavg 1.75 2.15 2.20 1/1584 24780
+R       364 00:29:39 0      adbd
+Rs    24781 00:00:00 0      ps
+-- 15:44:37 loadavg 1.61 2.11 2.19 1/1584 24784
+R       364 00:29:39 0      adbd
+Rs    24785 00:00:00 0      ps
+-- 15:44:40 loadavg 1.61 2.11 2.19 1/1584 24788
+R       364 00:29:39 0      adbd
+Rs    24789 00:00:00 0      ps
+-- 15:44:43 loadavg 1.48 2.08 2.18 1/1584 24795
+Rs    24796 00:00:00 0      ps
+R     24798 00:00:00 0      [kworker/0:2+virtio_vsock]
+== pressure
+cat: /proc/pressure/cpu: Permission denied
+cat: /proc/pressure/io: Permission denied
+cat: /proc/pressure/memory: Permission denied
+== mem
+MemTotal:        2012184 kB
+MemFree:          512692 kB
+MemAvailable:      75156 kB
+Buffers:           10260 kB
+Cached:           529364 kB
+SwapCached:        16812 kB
+Total RAM: 2,012,184K (status normal)
+ Free RAM:   996,535K (  233,795K cached pss +   252,064K cached kernel +   510,676K free)
+ Used RAM: 1,203,701K (  969,501K used pss +   234,200K kernel)
+== emulator-side
+virtual device is running
+OK

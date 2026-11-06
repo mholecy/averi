@@ -571,8 +571,9 @@ any boot, 14:05 (`frames-recovery.txt`, raw-4): raw strokes 135–146 of 142, 0 
 load, the lead, 0.3–0.8 against 1.3–2.0 at raw-1 on the same workload; the host's about 7, above the 4–5 of the short runs. So the slowness was system-wide in
 the AVD, and it ended with no boot. Between: `adb install -r` of the same APK at 12:45 to undo my dexopt change, the one device change I
 know of, and not shown to be the cause (the same APK went in at 23:03 the night before, with T7a's figures before it and the short ones
-after; a lab-app install explains Settings poorly). Not ruled out: something else running in the guest (one `top` only, at 07:22, one instant
-and 396 % idle). Evidence:
+after; a lab-app install explains Settings poorly). **It came back, 2026-11-06:** healthy at 14:52 (AVD load 0.6), load 2.64 at 15:16 after one whole visibility run, raw strokes 0–130 of 142 with 18 of 24 short at 15:42,
+frames 70+ ms again, and one raw stroke at 0 with no averi in the path; it held to at least 16:15. On a two-sample `top` at 15:44: 397 % idle; no process in D state over six reads, one to three in R (adbd, `ps`, a kworker). So
+the load is not a guest process doing work that `top` shows, and the state is not a one-off. Trigger unknown: a visibility run preceded it this time, and the 12:48 one was followed by the fast state. Evidence:
 `docs/truth/live-records/t11-carousel-visible`, `frames.txt`; rates read back by `tests/truth/t11-records.test.ts`.
 
 ## Amendment: D68 — a reveal this call's own strokes say would most likely overshoot is not sent (2026-11-05)

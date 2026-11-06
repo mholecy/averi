@@ -4,4 +4,4 @@ com.android.settings (400-px drag) frames 35 total 81.7/192.1  input 0.0/0.9  an
 gap = IntendedVsync to HandleInputStart; swap = SwapBuffers to FrameCompleted.
 dev.averi.lab gfxinfo: janky 20 of 27, 50th percentile 73 ms, 90th 105 ms; Settings: janky 20 of 36, 50th 81 ms.
 dumpsys input RecentQueue after the 142-px stroke, ages in ms: 1347 1344 1325 1302 1202 1101 1046 (down to lift 301 ms; the last gaps ~100 ms).
-One guest `top -b -n1` at 07:22, a single instant between runs, not during a stroke, not saved in full: 396 % idle of 400; no process over 4 %. The 1-minute load at raw-1 was 1.3–2.0, so that instant does not explain it.
+One guest `top -b -n1` at 07:22, not saved in full: 396 % idle of 400. Worthless as evidence: a first top sample has no interval to measure over (the dry run's `-n2 -d2` at 15:44 in the short state read 397 % idle too, that one a real read).
