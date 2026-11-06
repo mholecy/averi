@@ -974,41 +974,36 @@ export interface LaunchOptions {
 }
 
 /**
- * What a launch has to say beyond "launched". `note` is a
- * caveat the caller shows as a `⚠` line — the launch_app reply's second line
- * (mcp/tool-text.ts#launchText), a flow's `⚠ launch` trace line — and is set
- * by two rules: iOS's foreground wait, when the tree was not seen to be
- * the launched app's within its bound (adapters/ios-foreground.ts) — naming
- * iOS's system alert and its buttons' centres when that holds the launch
- * (D56); and Android's chooser in front after a `-p` start (D55b,
- * adapters/android-chooser.ts#launchChooserNote). A launch never FAILS for
- * that: the app was launched, the caveat is about the next read.
+ * What holds the app after a launch or a deep link: one closed answer, the same type on both verbs (A10; ADR 0041's and
+ * ADR 0032's A10 amendments). The adapters decide the facts, per platform; the words about them are one module's,
+ * above the adapters (interact/app-holder-text.ts#appHolderText).
+ * - `none`: no holder named and nothing to say: the app seen forward, or nothing was asked of a link that expects no
+ *   app, or a read that failed open (Android's focus read). Not a promise the app is in front: `Launched`/`Opened` alone.
+ * - `alert`: iOS's system alert holds it (D54, D56): found by the foreground wait (adapters/ios-foreground.ts).
+ * - `chooser`: Android's chooser holds it (D55, D55b): the focus read after the start, and its sheet when read (D55c).
+ * - `unknown`: nothing is known to hold it, and iOS's foreground wait did not confirm `app` (D48, D49a): `wait` says how
+ *   it ended: it read another app to the bound (`saw`), it could not tell (`unchecked`), or WebDriverAgent is not up and
+ *   nothing was asked (`not-asked`). `detail` is a sentence from the adapter: the wait's account (the bound, the label
+ *   or bundle read, the names asked, each source's lag) and its advice about re-reading it. Nothing above the adapters
+ *   decides on those. What may hold the app (iOS's "Open in …?") is the words module's, not in `detail`. One clause names
+ *   it, as a description of what was read: WDA's "SpringBoard (the home screen, the launch animation or a system alert)".
+ *   `springBoardTree`: the tree read to the bound was SpringBoard's (idb's; WDA names an active app, not a tree).
+ *
+ * A launch never FAILS for what holds it: the app was launched, the answer is about the next read. A link's holder
+ * replaces the reply's "Opened" headline (mcp/tool-text.ts#deepLinkText); a launch's is a `⚠` line under "Launched"
+ * (flow/launch.ts#launchApp).
  */
-export interface LaunchOutcome {
-  note?: string;
-}
+export type AppHolder =
+  | { holder: 'none' }
+  | { holder: 'alert'; alert: LinkAlert }
+  | { holder: 'chooser'; chooser: LinkChooser }
+  | { holder: 'unknown'; wait: 'saw'; app: string; detail: string; springBoardTree?: true }
+  | { holder: 'unknown'; wait: 'unchecked'; app: string; detail: string }
+  | { holder: 'unknown'; wait: 'not-asked'; app: string };
 
 /**
- * What a deep link is opened with (D49a, 2026-11-02). `appId`: the project's app (averi.yaml's `app.ios.bundleId` —
- * open_deep_link passes it on iOS). On iOS, when the link's scheme is one that app declares (its Info.plist's
- * CFBundleURLTypes), the link is expected to bring it forward, and openDeepLink waits for that as a launch does
- * (adapters/ios-foreground.ts); without it, or for any other link, nothing is expected and nothing is read. Android
- * ignores it.
- */
-/**
- * What a deep link has to say beyond "opened" — a launch's shape (LaunchOutcome) and two more: `note` is iOS's
- * foreground-wait caveat for a link to the project's own scheme (D49a), shown as the open_deep_link reply's `⚠` line;
- * `alert` (D54) is the system alert iOS shows instead of opening it ("Open in “AveriLab”?"), which replaces the reply's
- * "Opened" headline (mcp/tool-text.ts#deepLinkText); `chooser` (D55) is Android's "Open with" chooser in front instead
- * of an app, which replaces it too. At most one of the three is set: `note` and `alert` on iOS, `chooser` on Android.
- */
-export interface DeepLinkOutcome extends LaunchOutcome {
-  alert?: LinkAlert;
-  chooser?: LinkChooser;
-}
-
-/**
- * Android's chooser a link waits behind (D55, adapters/android-chooser.ts): its component as the window manager names
+ * Android's chooser a link or a `-p` launch waits behind (D55, D55b, adapters/android-chooser.ts; the name is D55's, kept
+ * through A10 as `LinkAlert`'s is): its component as the window manager names
  * it (`android/com.android.internal.app.ResolverActivity`), and, since D55c, `sheet`: what its tree shows, read once
  * the component named it (android-chooser.ts#chooserSheet; ADR 0041's D55c amendment). No `sheet` when the dump
  * failed or was not the measured layout: the reply is then D55's, by the component alone.
@@ -1056,13 +1051,22 @@ export interface SystemAlert {
 }
 
 /**
- * The alert a link waits behind (D54): `asksForApp` — its title contains one of the link's app's names, so the reply
- * may say iOS asks to open the link there; otherwise it calls it a system alert, and no more.
+ * The alert that holds a link or a launch (D54, D56): `asksForApp` — its title contains one of the app's names the wait
+ * held, so a link's reply may say iOS asks to open it there; otherwise it calls it a system alert, and no more. A
+ * launch's wait may have asked no names (a WDA launch), and its text never reads this: on a launch it is computed and
+ * unused. The name is D54's, kept through A10.
  */
 export interface LinkAlert extends SystemAlert {
   asksForApp: boolean;
 }
 
+/**
+ * What a deep link is opened with (D49a, 2026-11-02). `appId`: the project's app (averi.yaml's `app.ios.bundleId` —
+ * open_deep_link passes it on iOS). On iOS, when the link's scheme is one that app declares (its Info.plist's
+ * CFBundleURLTypes), the link is expected to bring it forward, and openDeepLink waits for that as a launch does
+ * (adapters/ios-foreground.ts); without it, or for any other link, nothing is expected and nothing is read. Android
+ * ignores it.
+ */
 export interface DeepLinkOptions {
   appId?: string;
 }
@@ -1114,21 +1118,22 @@ export interface DeviceAdapter {
   /**
    * Returns when the platform has started the app — on iOS (the idb source)
    * not before the tree is the launched app's, or a bounded wait says it was
-   * not (LaunchOutcome.note; adapters/ios-foreground.ts). Android returns at
+   * not (AppHolder's `unknown`; adapters/ios-foreground.ts). Android returns at
    * once: the stale-tree window after a switch is unmeasured there.
    */
-  launch(bundleId: string, opts?: LaunchOptions): Promise<LaunchOutcome>;
+  launch(bundleId: string, opts?: LaunchOptions): Promise<AppHolder>;
   terminate(bundleId: string): Promise<void>;
   /**
    * Throws when the platform says nothing was opened — on Android an
    * `am start` refusal (no app's intent filter matches the url, or the
-   * activity refused it; android-start.ts). Returns a LaunchOutcome: on iOS,
-   * a link to a scheme of `opts.appId`'s app returns once the tree source
-   * names that app, or with a note when a bounded wait did not see it (iOS
-   * may be asking "Open in …?" — D49a, adapters/ios-foreground.ts); every
-   * other link, and Android's, returns with none.
+   * activity refused it; android-start.ts). Returns what holds the app, as a
+   * launch does (AppHolder): on iOS, a link to a scheme of `opts.appId`'s app
+   * returns once the tree source names that app, or with a holder or `unknown`
+   * when a bounded wait did not see it (iOS may be asking "Open in …?" — D49a,
+   * D54, adapters/ios-foreground.ts); on Android the chooser, when the focus
+   * read names it (D55); every other link says nothing.
    */
-  openDeepLink(url: string, opts?: DeepLinkOptions): Promise<DeepLinkOutcome>;
+  openDeepLink(url: string, opts?: DeepLinkOptions): Promise<AppHolder>;
 
   /**
    * PNG bytes — the device's own, or on Android (D19) a PNG encoded on the host

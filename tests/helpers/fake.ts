@@ -1,4 +1,4 @@
-import { KEYBOARD_ROLE, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOptions, type DeepLinkOutcome, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
+import { KEYBOARD_ROLE, type AppHolder, type DeviceAdapter, type DeviceScreen, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOptions, type LaunchOptions, type Point, type Rect, type SoftKeyboard, type Stroke, type TypingDelivery, type UiNode } from '../../src/adapters/types.js';
 import type { RgbaImage } from '../../src/verify/capture.js';
 import { NOT_PRINTABLE_ASCII, type Typeable } from '../../src/adapters/typeable.js';
 
@@ -294,21 +294,21 @@ export class FakeAdapter implements DeviceAdapter {
     return { width, height };
   }
 
-  /** What the next launches report as their LaunchOutcome note — iOS's foreground-wait caveat, for the renderers' tests. */
-  launchNote: string | undefined;
+  /** The detail the next launches answer with (AppHolder's `unknown`: iOS's foreground wait), for the renderers' tests: a launch's text is its detail, verbatim. */
+  launchDetail: string | undefined;
 
-  async launch(appId: string, opts: LaunchOptions = {}): Promise<LaunchOutcome> {
+  async launch(appId: string, opts: LaunchOptions = {}): Promise<AppHolder> {
     this.launches.push({ appId, ...opts });
-    return this.launchNote === undefined ? {} : { note: this.launchNote };
+    return this.launchDetail === undefined ? { holder: 'none' } : { holder: 'unknown', wait: 'saw', app: appId, detail: this.launchDetail };
   }
 
-  /** The links opened, with what they were opened with; `deepLinkNote` is what the next ones report as their note. */
+  /** The links opened, with what they were opened with; `deepLinkAnswer` is what the next ones answer (default: no holder). */
   readonly deepLinks: { url: string; opts?: DeepLinkOptions }[] = [];
-  deepLinkNote: string | undefined;
+  deepLinkAnswer: AppHolder = { holder: 'none' };
 
-  async openDeepLink(url: string, opts?: DeepLinkOptions): Promise<DeepLinkOutcome> {
+  async openDeepLink(url: string, opts?: DeepLinkOptions): Promise<AppHolder> {
     this.deepLinks.push(opts === undefined ? { url } : { url, opts });
-    return this.deepLinkNote === undefined ? {} : { note: this.deepLinkNote };
+    return this.deepLinkAnswer;
   }
 
   async isAppRunning(): Promise<boolean> {

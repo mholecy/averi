@@ -55,7 +55,7 @@ describe('launch_app response line', () => {
     expect(launchText('android', { app: 'md.bank.app/.MainActivity' })).toBe('Launched md.bank.app/.MainActivity on android');
   });
 
-  // 2026-10-09: the launch's caveat (LaunchOutcome.note — iOS's foreground
+  // 2026-10-09: the launch's caveat (Launched.note — iOS's foreground
   // wait giving up) on its own ⚠ line, as swipeText lays out its note; the
   // wipe's sentence under it, labelled as the flow's trace line is.
   it("says (state cleared) after the platform, and puts the note, then the wipe, each on a ⚠ line of its own — the flow's order", () => {
@@ -116,13 +116,14 @@ describe('ui_snapshot note (2026-10-06: `[]` right after launch_app was indistin
 // D49a: open_deep_link's reply — iOS's note for a link to the project's own scheme on its own ⚠ line.
 describe('deepLinkText', () => {
   it('without a note: the one line', () => {
-    expect(deepLinkText('ios', 'averilab://d49', {})).toBe('Opened averilab://d49 on ios');
-    expect(deepLinkText('android', 'bank://home', {})).toBe('Opened bank://home on android');
+    expect(deepLinkText('ios', 'averilab://d49', { holder: 'none' })).toBe('Opened averilab://d49 on ios');
+    expect(deepLinkText('android', 'bank://home', { holder: 'none' })).toBe('Opened bank://home on android');
   });
 
-  it('with a note: the note on a ⚠ line under it, verbatim', () => {
-    expect(deepLinkText('ios', 'averilab://d49', { note: 'averi did not see dev.averi.lab come forward' })).toBe(
-      'Opened averilab://d49 on ios\n⚠ averi did not see dev.averi.lab come forward',
+  it('the wait unconfirmed: its text on a ⚠ line under it', () => {
+    expect(deepLinkText('ios', 'averilab://d49', { holder: 'unknown', wait: 'not-asked', app: 'dev.averi.lab' })).toBe(
+      'Opened averilab://d49 on ios\n⚠ whether dev.averi.lab came forward after the link was not checked (WebDriverAgent ' +
+        'is not running yet) — if iOS asks "Open in “…”?", answer it (a screenshot shows it)',
     );
   });
   // D54: iOS's alert named — the headline says the link is not open yet, quotes the title and every button with its
@@ -136,7 +137,7 @@ describe('deepLinkText', () => {
   };
 
   it('an alert that names the app: "iOS has not opened <url> yet: it asks …", every button with its centre, the tap advice', () => {
-    expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, asksForApp: true } })).toBe(
+    expect(deepLinkText('ios', 'averilab://d54', { holder: 'alert', alert: { ...alert, asksForApp: true } })).toBe(
       'iOS has not opened averilab://d54 yet: it asks "Open in “AveriLab”?" — buttons "Cancel" at (127, 474), "Open" at ' +
         '(275, 474). Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps ' +
         'nothing itself); every launch stays behind the alert until it is answered',
@@ -144,7 +145,7 @@ describe('deepLinkText', () => {
   });
 
   it('an alert whose title does not name the app: "a system alert", never "Open in" in averi\'s own words', () => {
-    const text = deepLinkText('ios', 'averilab://d54', { alert: { title: 'Allow “Lab” to use your location?', buttons: [{ label: 'Allow Once', centre: { x: 201, y: 500 } }], asksForApp: false } });
+    const text = deepLinkText('ios', 'averilab://d54', { holder: 'alert', alert: { title: 'Allow “Lab” to use your location?', buttons: [{ label: 'Allow Once', centre: { x: 201, y: 500 } }], asksForApp: false } });
     expect(text).toBe(
       'iOS has not opened averilab://d54 yet: a system alert is up, "Allow “Lab” to use your location?" — button ' +
         '"Allow Once" at (201, 500). Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y ' +
@@ -153,9 +154,9 @@ describe('deepLinkText', () => {
     expect(text.replace('"Allow “Lab” to use your location?"', '')).not.toMatch(/Open in|asks/);
   });
 
-  it('no "Opened" headline and no ⚠ line with an alert; a note alone keeps both', () => {
-    expect(deepLinkText('ios', 'averilab://d54', { alert: { ...alert, asksForApp: true } })).not.toMatch(/Opened|⚠|\n/);
-    expect(deepLinkText('ios', 'averilab://d54', { note: 'x' })).toBe('Opened averilab://d54 on ios\n⚠ x');
+  it('no "Opened" headline and no ⚠ line with an alert; the wait unconfirmed keeps both', () => {
+    expect(deepLinkText('ios', 'averilab://d54', { holder: 'alert', alert: { ...alert, asksForApp: true } })).not.toMatch(/Opened|⚠|\n/);
+    expect(deepLinkText('ios', 'averilab://d54', { holder: 'unknown', wait: 'not-asked', app: 'x' })).toMatch(/^Opened averilab:\/\/d54 on ios\n⚠ whether x came forward/);
   });
 
   // D55 (ADR 0041): Android's "Open with" chooser in front — the headline says the link is not open yet, names the
@@ -163,7 +164,7 @@ describe('deepLinkText', () => {
   const RESOLVER = 'android/com.android.internal.app.ResolverActivity';
 
   it('the chooser in front: "Android has not opened <url> yet: its chooser (<component>) is in front …", the advice', () => {
-    expect(deepLinkText('android', 'averilab://shared/open', { chooser: { component: RESOLVER } })).toBe(
+    expect(deepLinkText('android', 'averilab://shared/open', { holder: 'chooser', chooser: { component: RESOLVER } })).toBe(
       'Android has not opened averilab://shared/open yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
         'is in front, asking which app opens it. Take a ui_snapshot, tap the app you mean, then its "Just once" button ' +
         'if it shows one (never "Always": it changes the device\'s default for such links); press_key back drops the ' +
@@ -171,8 +172,8 @@ describe('deepLinkText', () => {
     );
   });
 
-  it('no "Opened" headline and no ⚠ line with the chooser; the chooser\'s headline before any other field', () => {
-    const text = deepLinkText('android', 'bank://home', { chooser: { component: RESOLVER }, note: 'x', alert: { ...alert, asksForApp: true } });
+  it('no "Opened" headline and no ⚠ line with the chooser', () => {
+    const text = deepLinkText('android', 'bank://home', { holder: 'chooser', chooser: { component: RESOLVER } });
     expect(text).toMatch(/^Android has not opened bank:\/\/home yet: its chooser /);
     expect(text).not.toMatch(/Opened|⚠|\n|iOS/);
   });

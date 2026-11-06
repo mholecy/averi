@@ -4,13 +4,13 @@ import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
 import { causeOf, refusalReasons, runStart, startSaid, type StartRefused } from './android-start.js';
-import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet, launchChooserNote, monkeyChooserRefusal } from './android-chooser.js';
+import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet, monkeyChooserRefusal } from './android-chooser.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
 import { sleep } from '../util/sleep.js';
 import { formatSeconds } from '../util/duration.js';
-import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type DeepLinkOutcome, type LaunchIntent, type LaunchOptions, type LaunchOutcome, type Point, type Rect, type ChooserSheet, type LinkChooser, type ScreenCapture, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
+import { everyNode, rectArea, rectIntersection, zeroRect, type ClippedSide, type DeviceAdapter, type DeviceScreen, type DrawnOverStrip, type FocusedWindow, type Key, type KeyboardOracle, type KeyboardTouchable, type KeyboardWitness, type AppHolder, type LaunchIntent, type LaunchOptions, type Point, type Rect, type ChooserSheet, type LinkChooser, type ScreenCapture, type ScrollAxis, type SoftKeyboard, type UiNode } from './types.js';
 
 const KEYCODES: Record<Key, string> = { back: '4', home: '3', enter: '66' };
 
@@ -297,10 +297,10 @@ export class AndroidAdapter implements DeviceAdapter {
    * uiautomator hands out the previous app's tree for a moment after a
    * switch, as idb does, has not been measured on Android (it dumps the
    * focused window, which may close the gap or not), so nothing waits here.
-   * LaunchOutcome carries a note in one case: Android's chooser in front
-   * after a `-p` start (D55b, launchApp below).
+   * The answer names one holder: Android's chooser in front after a `-p`
+   * start (D55b, launchApp below).
    */
-  async launch(packageName: string, opts: LaunchOptions = {}): Promise<LaunchOutcome> {
+  async launch(packageName: string, opts: LaunchOptions = {}): Promise<AppHolder> {
     // The foreground app changes here, and with it whether the status bar shows: the band is read again
     // (`#band`). Dropped once the launch is over, so a read that started before or during it keeps nothing.
     try {
@@ -317,7 +317,7 @@ export class AndroidAdapter implements DeviceAdapter {
     this.#bandEpoch++;
   }
 
-  private async launchApp(packageName: string, opts: LaunchOptions): Promise<LaunchOutcome> {
+  private async launchApp(packageName: string, opts: LaunchOptions): Promise<AppHolder> {
     if (opts.clearState) await this.shell(['pm', 'clear', packageName]);
     if (opts.activity === undefined && opts.intent === undefined) {
       // monkey resolves the launcher activity for us, but picks ARBITRARILY
@@ -353,7 +353,7 @@ export class AndroidAdapter implements DeviceAdapter {
           causeOf(outcome),
         );
       }
-      return {};
+      return { holder: 'none' };
     }
     const argv = ['am', 'start'];
     let component: string | undefined;
@@ -392,18 +392,17 @@ export class AndroidAdapter implements DeviceAdapter {
     // D55b (ADR 0041's D55b amendment): a `-p` intent two of the package's activities handle, none preferred, starts
     // Android's chooser, and am reports it `started` (batch-11: 10 of 10). So D55's one focus read after a `-p` start
     // (≈ 70 ms measured, batch-11) — never after `-n`, which names the activity and cannot raise it. The chooser named
-    // is a ⚠ note under "Launched" (D56's shape on iOS: the start happened); a failed or unmatched read is `{}`.
-    // D55c: the chooser named, one dump of its tree quotes its sheet in the note (linkChooserInFront; none: D55b's note).
-    if (component !== undefined) return {};
-    const chooser = await this.linkChooserInFront();
-    return chooser === undefined ? {} : { note: launchChooserNote(packageName, chooser, NAME_THE_ACTIVITY) };
+    // holds the launch (a ⚠ line under "Launched", D56's shape on iOS: the start happened); a failed or unmatched read
+    // names no holder. D55c: the chooser named, one dump of its tree reads its sheet (linkChooserInFront).
+    if (component !== undefined) return { holder: 'none' };
+    return this.chooserHolder();
   }
 
   async terminate(packageName: string): Promise<void> {
     await this.shell(['am', 'force-stop', packageName]);
   }
 
-  async openDeepLink(url: string): Promise<DeepLinkOutcome> {
+  async openDeepLink(url: string): Promise<AppHolder> {
     // The url as ONE word: the device's sh would cut it at the first `&`
     // (and run the rest), at a space, and expand `$` — adb-shell.ts.
     const outcome = await runStart(
@@ -426,10 +425,15 @@ export class AndroidAdapter implements DeviceAdapter {
     // No wait and no note (D49a is iOS's). A link two activities handle, none of them preferred, starts Android's
     // "Open with" chooser, which am reports as `started` (android-start.ts; measured, batch-9 D55): so ONE focus read
     // after the start asks whether the chooser is in front (D55, android-chooser.ts; ADR 0041). Only a positive
-    // match changes the outcome; a failed or unreadable read, or a chooser not in front yet, is today's `{}`.
-    // D55c: the chooser named, one dump of its tree quotes its sheet (linkChooserInFront); none is D55's `{ component }`.
+    // match names a holder; a failed or unreadable read, or a chooser not in front yet, names none.
+    // D55c: the chooser named, one dump of its tree reads its sheet (linkChooserInFront); none is D55's `{ component }`.
+    return this.chooserHolder();
+  }
+
+  /** What holds the app after averi's own start, on both verbs: the chooser when the focus names it, else nothing named. */
+  private async chooserHolder(): Promise<AppHolder> {
     const chooser = await this.linkChooserInFront();
-    return chooser === undefined ? {} : { chooser };
+    return chooser === undefined ? { holder: 'none' } : { holder: 'chooser', chooser };
   }
 
   /**

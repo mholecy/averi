@@ -1,4 +1,5 @@
 import type { DeviceAdapter, Platform } from '../adapters/types.js';
+import { appHolderText } from '../interact/app-holder-text.js';
 import { resolveLaunchActivity, type AveriConfig, type LaunchEntry } from './config.js';
 
 /**
@@ -66,12 +67,12 @@ export interface Launched {
    */
   app: string;
   /**
-   * The launch's caveat (LaunchOutcome.note — iOS's foreground wait
-   * giving up: the tree may still be the app this launch covered,
-   * adapters/ios-foreground.ts; or Android's chooser in front after a `-p`
-   * start, D55b, adapters/android-chooser.ts). A `⚠` line, not a failure: the
-   * app was launched, and what reads the wrong app's tree next is what it
-   * warns about.
+   * What holds the app, worded (adapters/types.ts#AppHolder, in
+   * interact/app-holder-text.ts#appHolderText's words): iOS's foreground wait
+   * giving up, the tree perhaps still the app this launch covered; iOS's system
+   * alert (D56); Android's chooser in front after a `-p` start (D55b). A `⚠`
+   * line, not a failure: the app was launched, and what reads the wrong app's
+   * tree next is what it warns about.
    */
   note?: string;
   /** The `⚠ clearState` sentence, with the session's count — set exactly when the launch wiped. */
@@ -119,10 +120,10 @@ export async function launchApp(
   { appId, activity: named, intent, clearState }: LaunchRequest,
 ): Promise<Launched> {
   const activity = resolveLaunchActivity(cfg, { platform: adapter.platform, appId, activity: named, intent });
-  const { note } = await adapter.launch(appId, { clearState, activity, intent });
+  const answer = await adapter.launch(appId, { clearState, activity, intent });
   return {
     app: appId + (activity === undefined ? '' : `/${activity.split('/').pop()}`),
-    note,
+    note: appHolderText({ app: appId }, answer),
     wiped: clearState ? wipeSentence(session.recordClearState()) : undefined,
   };
 }

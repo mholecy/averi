@@ -69,7 +69,7 @@ describe("a recorded WDA source answers the launch's foreground question as the 
     expect(side.asksWdaBundle).toBe(true);
     const label = vi.spyOn(RecordedTreeSource.prototype, 'applicationLabel');
     const adapter = recordedAdapter(side, await wdaRaw(), { platform: 'ios', screen: IPHONE, frame: IPHONE });
-    expect(await adapter.launch('differential.app')).toEqual({});
+    expect(await adapter.launch('differential.app')).toEqual({ holder: 'none' });
     await expect(label.mock.results[0].value).resolves.toEqual({ kind: 'bundle', bundleId: 'differential.app' });
     label.mockRestore();
     expect(deviceCalls().filter((c) => c.includes('tree read') || c.includes('appinfo'))).toEqual([]);

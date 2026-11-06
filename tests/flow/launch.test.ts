@@ -41,8 +41,8 @@ describe('launchApp', () => {
 
   it("carries the adapter's note", async () => {
     const fake = device('ios');
-    fake.launchNote = 'the UI tree was still the app labelled "Contacts"';
-    expect((await launchApp(fake, CFG, new EngineSession(), { appId: 'md.bank.app' })).note).toBe(fake.launchNote);
+    fake.launchDetail = 'the UI tree was still the app labelled "Contacts"';
+    expect((await launchApp(fake, CFG, new EngineSession(), { appId: 'md.bank.app' })).note).toBe(fake.launchDetail);
   });
 
   it("a wipe says so in its line, counts against the session, and words the sentence with the session's count", async () => {

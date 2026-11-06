@@ -23,12 +23,9 @@ import { everyNode, labelOf, rectCentre, type Rect, type SystemAlert, type UiNod
  * - Both: the tree is SpringBoard's (idb's Application, WDA's root labelled `' '`; WDA's `/wda/activeAppInfo` named
  *   `com.apple.springboard`). An app's own alert, an app's "Cancel" or "Open in Maps", is never in SpringBoard's tree.
  *
- * What is not done here: deciding which button opens the link. Labels are localised and quoted as they are; the
- * reply lists every button with its centre (mcp/tool-text.ts#deepLinkText) and averi taps none of them.
- *
- * The words an alert is quoted in (D56; ADR 0032's D56 amendment), one wording for both replies that name it —
- * open_deep_link's (mcp/tool-text.ts#deepLinkText) and launch_app's ⚠ note (ios-foreground.ts): alertButtonsText and
- * ALERT_ADVICE.
+ * What is not done here: deciding which button opens the link, and wording anything: the facts go up as
+ * adapters/types.ts#AppHolder's `alert`, and interact/app-holder-text.ts#appHolderText quotes every button with its
+ * centre (A10). averi taps none of them.
  */
 
 /** SpringBoard's Application label in both sources: a single space (2026-10-09, and batch-5 D49A). */
@@ -111,23 +108,3 @@ function alertOfLayer(layer: UiNode): SystemAlert | undefined {
 export function namesApp(title: string, appNames: readonly string[]): boolean {
   return appNames.some((name) => name.trim() !== '' && title.includes(name));
 }
-
-/**
- * An alert's buttons as the replies quote them: `buttons "Cancel" at (127, 474), "Open" at (275, 474)` — every label
- * verbatim, in tree order, with its centre.
- */
-export const alertButtonsText = (alert: SystemAlert): string =>
-  `${alert.buttons.length === 1 ? 'button' : 'buttons'} ${alert.buttons.map((b) => `"${b.label}" at (${b.centre.x}, ${b.centre.y})`).join(', ')}`;
-
-/**
- * The advice after an alert's buttons (D57; ADR 0032's D57 amendment): a tap by the chosen button's label first —
- * proven on a device (batch-7 B: `tap text:"Cancel"` and `text:"Open"` in 8 cases — Cancel and Open × idb and WDA ×
- * over SpringBoard and over Contacts, one run each — one Button matched each time) and settled and judged as every
- * selector tap is — or a tap at its x and y, the fallback for a label the selector grammar cannot write or two buttons
- * sharing one (batch-5 D49A tapped by coordinates); that averi taps nothing; and what the alert holds back (batch-2:
- * every launch after it stayed behind it). `<label>` is literal: the button list before it quotes every label.
- */
-export const ALERT_ADVICE =
-  'Answer it with tap text:"<label>" for the button you mean, or a tap at its x and y (averi taps nothing itself); ' +
-  'every launch stays behind the alert until it is answered';
-

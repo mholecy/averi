@@ -20,7 +20,7 @@ afterEach(() => {
 
 // The replies with iOS's system alert up, end to end — a real IosAdapter (tests/helpers/ios-lab.ts) through the
 // reply text (tool-text.ts): launch_app's ⚠ line names the alert (D56; ADR 0032's D56 amendment), and open_deep_link's
-// reply is D54's headline and buttons with D57's advice (the shared wording, in ios-system-alert.ts).
+// reply is D54's headline and buttons with D57's advice (the shared wording, interact/app-holder-text.ts).
 describe("launch_app's and open_deep_link's replies over iOS's system alert (D56)", () => {
   it("launch_app's reply: the Launched headline, then the alert note as its one ⚠ line", async () => {
     const launched = await launchApp(idbLab([IDB_ALERT]).adapter, undefined, new EngineSession(), { appId: LAB });

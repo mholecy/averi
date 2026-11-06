@@ -26,6 +26,8 @@ should not ask "Open in …?" — see the amendment below).
 Amended 2026-11-03 (batch-8: D58's gate device-checked — the D58 amendment's last paragraph).
 Amended 2026-11-03 (batch-9: D58 checked end to end through averi — the D58 amendment's last paragraph, after
 batch-8's).
+Amended 2026-11-06 (A10: the alert goes up as a fact, on both verbs, and its words move above the adapters — see the
+amendment below; replies byte for byte).
 
 ## Context
 
@@ -571,10 +573,11 @@ Decision (spec-D56, adopting the D56 analysis):
   `Launched`, the flow engine and `launchText` are unchanged: they carry the note already, so `launch_app`'s ⚠ line and
   a flow's `⚠ launch` line both show it. The launch never fails: D48's rule holds, the wait only delays, and `simctl
   launch` succeeded (batch-1: a bare "Launched" behind the alert).
-- One wording of the buttons and the advice, in `adapters/ios-system-alert.ts`: `alertButtonsText(alert)` (`buttons
+- One wording of the buttons and the advice, then in `adapters/ios-system-alert.ts` (since A10 in
+  `interact/app-holder-text.ts`, the amendment below): `alertButtonsText(alert)` (`buttons
   "Cancel" at (127, 474), "Open" at (275, 474)`, "button" for one) and `ALERT_ADVICE` ("Answer it with a tap at the
   chosen button's x and y (averi taps nothing itself); every launch stays behind the alert until it is answered").
-  `mcp/tool-text.ts#alertText` (open_deep_link's reply) uses both and stays byte-identical (since D57 the advice
+  `mcp/tool-text.ts`'s alertText (open_deep_link's reply) uses both and stays byte-identical (since D57 the advice
   leads with a tap by the label — see that amendment).
 - The note: `iOS has not brought <bundle> forward yet: a system alert is up, "<title>" — buttons "<label>" at (x, y),
   …. <ALERT_ADVICE> — then read again before trusting a read`. Always "a system alert is up", never "it asks": the alert
@@ -655,8 +658,9 @@ Decision (spec-D57, adopting the D57 analysis's option A with a test that pins t
 - Only `ALERT_ADVICE` (`adapters/ios-system-alert.ts`) changes, to "Answer it with tap text:"<label>" for the button you
   mean, or a tap at its x and y (averi taps nothing itself); every launch stays behind the alert until it is
   answered". `<label>` is literal: the button list before it already quotes every label, so the agent copies one. Both
-  replies follow the one constant — open_deep_link's (`mcp/tool-text.ts#alertText`) and launch_app's ⚠ note
-  (`ios-foreground.ts#alertNote`) — and change together on purpose.
+  replies follow the one constant — open_deep_link's (then `mcp/tool-text.ts`'s alertText) and launch_app's ⚠ note
+  (then `ios-foreground.ts`'s alertNote; both since A10 `interact/app-holder-text.ts#appHolderText`) — and change
+  together on purpose.
 - No tap code. The selector path already lands on the alert's own Button: idb lists the alert alone (the title and its
   Buttons, nothing of the app or the status bar beneath), and on WDA the alert's layer is the marked top layer
   (`presentation: 'alert'`), so a target behind it — Contacts' hidden "Return to AveriLab" breadcrumb — is refused
@@ -746,3 +750,49 @@ WDA +17 ms (441 against 424 ms), within 50 ms. P5 2/2: with the key present ever
 D58 stderr line an adapter. So the end-to-end check stated open above is done. The remembered answer was restored and
 read back after a reboot. Not D58's: on the simulator the `tel:` link's reply is simctl's raw exit-115 trace (no app
 handles `tel:` there), which averi does not name.
+
+## Amendment: the alert is a fact of one closed answer, worded above the adapters (2026-11-06, A10)
+
+**Context.** The D54 and D56 sections above describe one fact in two shapes: `awaitForeground` returned `{ alert }` for
+a link and a `{ note }` sentence for a launch, and `mcp/tool-text.ts` imported `adapters/ios-system-alert.ts` and
+`adapters/android-chooser.ts` to word the rest, against ARCHITECTURE.md §2 (the architecture review of 2026-11-05).
+
+**Decision.** No reply, device call or order changes.
+- `launch` and `openDeepLink` answer one closed type, `adapters/types.ts#AppHolder`: `none`, `alert` (its facts, the
+  `LinkAlert`), `chooser` (ADR 0041's A10 amendment), or `unknown` with a `detail`. `LaunchOutcome` and `DeepLinkOutcome`
+  are gone, and with them "at most one of the three is set" as a comment.
+- `awaitForeground` answers the same `alert` on both verbs. Whether a link's text says "it asks" stays the fact
+  `asksForApp`, judged with the names the wait held. A launch's text never reads it (D56's rule), now in the words.
+- The words move: `alertButtonsText`, `ALERT_ADVICE` and what `alertNote` and `mcp/tool-text.ts`'s alertText said are
+  `interact/app-holder-text.ts#appHolderText`'s, which takes the subject (a link's url or an app's id) and the answer.
+  The kind of holder decides the wording; no platform is passed. `ios-system-alert.ts` keeps the detectors alone
+  (`alertShapeInIdb`, `titleAsksToOpen`, `alertInWda`, `namesApp`).
+- The wait's end goes up as facts too: `unknown` carries `wait` (`saw`, `unchecked`, `not-asked`), `app`, and a `detail`
+  sentence from `ios-foreground.ts`: the wait's account (the bound, the label or bundle last read, the names asked, each
+  source's lag) and its advice about re-reading it (`READ_AGAIN`, `stillReads`' "Read again; if it repeats, take a
+  screenshot", the localized-name reading's "this note can be ignored"). Nothing above the adapters decides on those, so
+  facts for them would only move the clauses and carry a dozen fields up. What may hold the app moved up with the rest:
+  `LINK_SAW`, `LINK_UNCHECKED`, `notAsked` and `ANSWER_IT` (code review, round 1), and the SpringBoard tree's "A screenshot
+  does tell one thing here" sentence, now the fact `springBoardTree`. `awaitForeground` no longer branches on `check.link`
+  to pick words: both verbs get the same answer, and that a launch stays silent when WDA was not asked is
+  `appHolderText`'s. `check.link` stays for the detail's "opening <url> in <bundle>" and the names an alert is judged by.
+- One clause of `detail` still names a possible holder: WDA's "SpringBoard (the home screen, the launch animation or a
+  system alert)". It describes what the read named, mid-sentence, and moving it would split the sentence; left, stated
+  here.
+- `appHolderText`'s switch and `holdsTheApp`'s table are exhaustive (a `never` default, a `Record` over the kinds): a new kind
+  of holder does not compile until it is worded and decided, so it cannot fall through to a bare "Opened" (code review,
+  round 1).
+- Where the text goes stays the callers': a link's headline or ⚠ line (`mcp/tool-text.ts#deepLinkText`), a launch's ⚠
+  line (`flow/launch.ts#launchApp`).
+
+**Tests.** The byte pins moved with the words to `tests/interact/app-holder-text.test.ts`, literally the same strings.
+The end-to-end pins (`tests/mcp/ios-alert-replies.test.ts`, `tests/flow/launch-alert.test.ts`) keep their assertions unchanged. Two synthetic
+fixtures could not survive facts (a shortened sentence in `tool-text.test.ts` and `tools.test.ts`): they pin the real
+full text now. A temporary characterization recorded 274 replies with their device calls at the base and after (both
+verbs on real adapters, MCP and flow): identical.
+
+`npm run mutate -- --force` (both groups, cold, at f90086a8): `interact/app-holder-text.ts` joins the run at 96.80 % (floor
+95; 125 mutants, 0 survived, 4 without coverage: the two `never` defaults, unreachable while the types hold); `android-chooser.ts` 100 % (152 mutants); every other score unchanged. Golden
+Changed 0 (it replays tree reads, no launch or link seam).
+
+Residual: the amended text above names `alertNote` and `alertText`, which no longer exist, as they were at their date.

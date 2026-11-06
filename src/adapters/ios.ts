@@ -9,7 +9,7 @@ import { screenshotPng } from './screenshot-bytes.js';
 import { rebootSimulatorAdvice } from './simulator-reboot.js';
 import { errorMessage } from '../util/error-message.js';
 import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from './ios-tree-source.js';
-import type { DeepLinkOptions, DeepLinkOutcome, DeviceAdapter, DeviceScreen, Key, LaunchOptions, LaunchOutcome, Point, UiNode } from './types.js';
+import type { AppHolder, DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
 import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, SCHEME_APPROVAL_DOMAIN, schemeApprovalKey, schemeApprovalWrite, urlSchemes } from './ios-url-schemes.js';
@@ -320,7 +320,7 @@ export class IosAdapter implements DeviceAdapter {
     await this.simctl(['install', this.udid, appPath], 120_000);
   }
 
-  async launch(bundleId: string, opts: LaunchOptions = {}): Promise<LaunchOutcome> {
+  async launch(bundleId: string, opts: LaunchOptions = {}): Promise<AppHolder> {
     if (opts.activity !== undefined || opts.intent !== undefined) {
       throw new Error(
         'activity/intent launch is Android-only (iOS apps have a single entry point) — ' +
@@ -338,9 +338,8 @@ export class IosAdapter implements DeviceAdapter {
     // until the source names this app (idb: the tree's Application; WDA, once
     // up: its active app's bundle id), bounded and failing open; the facts,
     // the bound and the cost are ios-foreground.ts's. When iOS's system alert
-    // holds the launch (D56), the note names it and its buttons' centres.
-    const { note } = await awaitForeground(this.foregroundCheck(bundleId));
-    return note === undefined ? {} : { note };
+    // holds the launch (D56), the answer names it and its buttons' centres.
+    return awaitForeground(this.foregroundCheck(bundleId));
   }
 
   /**
@@ -525,19 +524,19 @@ export class IosAdapter implements DeviceAdapter {
    * failed one too. For an own-scheme link the accessibility writes carry the scheme's pre-approval for simctl's opener
    * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes what it wrote before.
    * `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link (D54), the
-   * outcome names it instead of a note: on idb from the wait's own reads, on WDA from one short `/source`
+   * answer names it instead of `unknown`: on idb from the wait's own reads, on WDA from one short `/source`
    * read at the bound (IosTreeSource.systemAlert) — never a tap.
    */
-  async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<DeepLinkOutcome> {
+  async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<AppHolder> {
     const approval = await this.linkHandler(url, opts.appId);
     await this.prepareForOpen(`opening ${url}`, approval);
     await this.simctl(['openurl', this.udid, url]);
-    if (approval === undefined) return {};
+    if (approval === undefined) return { holder: 'none' };
     const handler = approval.bundleId;
-    // A link's wait has a note or an alert in every case but a match (ios-foreground.ts#awaitForeground).
-    const outcome = await awaitForeground(this.foregroundCheck(handler, { link: url }));
-    if (outcome.note === undefined && outcome.alert === undefined) this.front = { kind: 'launched', bundleId: handler };
-    return outcome;
+    // A link's wait answers `unknown` or an alert in every case but a match (ios-foreground.ts#awaitForeground).
+    const answer = await awaitForeground(this.foregroundCheck(handler, { link: url }));
+    if (answer.holder === 'none') this.front = { kind: 'launched', bundleId: handler };
+    return answer;
   }
 
   /**

@@ -19,11 +19,10 @@
  * agree with — the flow engine may not import this layer.
  */
 
-import { everyNode, type DeepLinkOutcome, type LinkAlert, type LinkChooser, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
-import { alertButtonsText, ALERT_ADVICE } from '../adapters/ios-system-alert.js';
-import { CHOOSER_ADVICE, chooserSheetText } from '../adapters/android-chooser.js';
+import { everyNode, type AppHolder, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
+import { appHolderText, holdsTheApp } from '../interact/app-holder-text.js';
 import type { Direction } from '../interact/swipe.js';
 import { launchedLine, WIPE_LABEL, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
@@ -75,9 +74,8 @@ export const swipeText = (swipe: Stroke & { direction?: Direction; note?: string
  * handler 2026-10-03: wording, not delegation.
  *
  * And on their own lines below, as swipeText lays out its note: `⚠ <note>`
- * when the launch said one (LaunchOutcome.note, 2026-10-09 — iOS's
- * foreground wait, adapters/ios-foreground.ts; since D55b also Android's
- * chooser after a `-p` start, adapters/android-chooser.ts), then
+ * when the launch said one (Launched.note, 2026-10-09 — what holds the app,
+ * adapters/types.ts#AppHolder, in interact/app-holder-text.ts's words), then
  * `⚠ clearState: <…>` when it wiped (since 2026-10-09, with the session's
  * count) — the flow's
  * `⚠ launch` and `⚠ clearState` trace lines, in the same words and order.
@@ -90,42 +88,15 @@ export const launchText = (platform: Platform, launched: Launched): string =>
   (launched.wiped !== undefined ? `\n${WIPE_LABEL}: ${launched.wiped}` : '');
 
 /**
- * `Opened <url> on <platform>`, and the link's note on its own line as `⚠ <note>` (D49a: iOS's foreground wait after a
- * link to the project's own scheme, adapters/ios-foreground.ts — the note leads with what to do), as launchText lays
- * out a launch's. When iOS showed a system alert instead of opening it (D54, DeepLinkOutcome.alert), that is the
- * headline: alertText. When Android's chooser is in front instead of an app (D55, DeepLinkOutcome.chooser), so is
- * that: chooserText.
+ * `Opened <url> on <platform>`, and what the wait did not confirm on its own line as `⚠ <text>` (D49a: iOS's foreground
+ * wait after a link to the project's own scheme, adapters/ios-foreground.ts — it leads with what to do), as launchText
+ * lays out a launch's. When something holds the link instead (D54's system alert, D55's chooser), that is the headline.
+ * The words, and which answers name a holder, are interact/app-holder-text.ts's; here is only where they go.
  */
-export const deepLinkText = (platform: Platform, url: string, outcome: DeepLinkOutcome): string =>
-  outcome.chooser !== undefined
-    ? chooserText(url, outcome.chooser)
-    : outcome.alert !== undefined
-      ? alertText(url, outcome.alert)
-      : `Opened ${url} on ${platform}` + warnLine(outcome.note);
-
-/**
- * `Android has not opened <url> yet: its chooser (<component>) is in front, asking which app opens it.`, then the
- * advice (CHOOSER_ADVICE: pick the app, "Just once", never "Always"; BACK drops the link; averi taps nothing) — D55,
- * worded once in adapters/android-chooser.ts. With the chooser's sheet read (D55c, LinkChooser.sheet; ADR 0041's D55c
- * amendment) the advice gives way to the sheet — its title, each app at its row's centre, the buttons at theirs,
- * "(disabled)" where marked — and the advice to tap a row by its x and y, then id:button_once (chooserSheetText); with
- * no sheet, D55's reply byte for byte.
- */
-const chooserText = (url: string, chooser: LinkChooser): string =>
-  `Android has not opened ${url} yet: its chooser (${chooser.component}) is in front, asking which app opens it. ` +
-  (chooser.sheet === undefined ? CHOOSER_ADVICE : chooserSheetText(chooser.sheet, 'such links', 'the link'));
-
-/**
- * `iOS has not opened <url> yet: it asks "<title>" — buttons "<label>" at (x, y), …` (D54), then the advice
- * (ALERT_ADVICE: a tap by the chosen button's label, or at its coordinates (D57), and that averi taps nothing). The
- * buttons and the advice are worded once, in adapters/ios-system-alert.ts, for launch_app's note too (D56). The title
- * and every label are quoted verbatim, localised as iOS shows them; which button opens the link is the agent's to
- * read. "it asks" only when the title names the link's app (`asksForApp`); any other alert is "a system alert", in no
- * words of averi's own about opening.
- */
-const alertText = (url: string, alert: LinkAlert): string => {
-  const what = alert.asksForApp ? `it asks "${alert.title}"` : `a system alert is up, "${alert.title}"`;
-  return `iOS has not opened ${url} yet: ${what} — ${alertButtonsText(alert)}. ${ALERT_ADVICE}`;
+export const deepLinkText = (platform: Platform, url: string, answer: AppHolder): string => {
+  const said = appHolderText({ link: url }, answer);
+  const headline = holdsTheApp(answer) ? said : undefined;
+  return headline ?? `Opened ${url} on ${platform}` + warnLine(said);
 };
 
 /**
