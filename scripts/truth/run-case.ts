@@ -96,7 +96,7 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   const after: (LabState | undefined)[] = [];
   let swipes: SwipeEntry[] | undefined;
   const declared = c.reads?.swipes;
-  if (declared !== undefined) rig.swipes.arm(declared.drop);
+  if (declared !== undefined) rig.swipes.arm(declared.drop, declared.shorten);
   try {
     for (const [i, call] of c.calls.entries()) {
       replies.push(await rig.callTool(call, config));

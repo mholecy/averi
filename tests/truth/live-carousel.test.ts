@@ -51,6 +51,39 @@ describe('SwipeHook and hookSwipes: averi\'s strokes logged, the Nth dropped and
     expect(hook.disarm()).toEqual([]);
   });
 
+  it('armed to shorten stroke 1 to 90 px: sent along its own line that far, in its own time; logged with what it drew and what was sent; the rest as drawn', async () => {
+    const { adapter, hook, sent, waited } = recorder();
+    hook.arm(2, { stroke: 1, px: 90 });
+    await adapter.swipe(p(824), p(682), 300);
+    await adapter.swipe(p(824), p(588), 300);
+    await adapter.swipe(p(824), p(588), 300);
+    expect(sent).toEqual(['824,497→734,497/300', '824,497→588,497/300']);
+    expect(waited).toEqual([300]);
+    expect(hook.disarm()).toEqual([
+      { from: p(824), to: p(682), durationMs: 300, dropped: false, sentTo: p(734) },
+      { from: p(824), to: p(588), durationMs: 300, dropped: true },
+      { from: p(824), to: p(588), durationMs: 300, dropped: false },
+    ]);
+    hook.arm();
+    await adapter.swipe(p(824), p(682), 300);
+    expect(sent.at(-1)).toBe('824,497→682,497/300');
+  });
+
+  it('a shortening never lengthens: a stroke already within its px goes as drawn, nothing marked; along either axis, rounded', async () => {
+    const { adapter, hook, sent } = recorder();
+    hook.arm(undefined, { stroke: 1, px: 90 });
+    await adapter.swipe(p(824), p(780), 300);
+    expect(sent).toEqual(['824,497→780,497/300']);
+    expect(hook.disarm()).toEqual([{ from: p(824), to: p(780), durationMs: 300, dropped: false }]);
+    hook.arm(undefined, { stroke: 1, px: 50 });
+    await adapter.swipe({ x: 100, y: 100 }, { x: 130, y: 140 }, 300);
+    await adapter.swipe({ x: 100, y: 100 }, { x: 160, y: 180 }, 300);
+    expect(sent.slice(1)).toEqual(['100,100→130,140/300', '100,100→160,180/300']);
+    hook.arm(undefined, { stroke: 1, px: 50 });
+    await adapter.swipe({ x: 100, y: 100 }, { x: 160, y: 180 }, 300);
+    expect(sent.at(-1)).toBe('100,100→130,140/300');
+  });
+
   it('armed with a drop of 2: stroke 2 not sent, waited its duration (or 300 ms with none); every stroke logged; disarm returns the log and stops logging', async () => {
     const { adapter, hook, sent, waited } = recorder();
     hook.arm(2);
@@ -123,15 +156,16 @@ describe('preDrag: the probes\' 440-px, 1-s drag left on the carousel, then the 
 });
 
 describe('selectCases: the carousel group, Android and the native app only, never by default', () => {
-  it('its eight cases, in order, when asked', () => {
-    expect(CASES.map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d68-launch', 'lv-d59b-lazy', 'lv-d59b-recycler', 'd52-e2', 'd37-snap-lazy', 'd37-snap-recycler']);
+  it('its nine cases, in order, when asked', () => {
+    expect(CASES.map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d62-short', 'lv-d68-launch', 'lv-d59b-lazy', 'lv-d59b-recycler', 'd52-e2', 'd37-snap-lazy', 'd37-snap-recycler']);
     expect(CASES.every((c) => c.group === 'carousel')).toBe(true);
     expect(caseOf('lv-d62-drop')).toMatchObject({ preDrag: 440, reads: { swipes: { drop: 2 } } });
+    expect(caseOf('lv-d62-short')).toMatchObject({ preDrag: 440, reads: { swipes: { drop: 2, shorten: { stroke: 1, px: 90 } } } });
     expect(caseOf('lv-d62-control').reads?.swipes).toEqual({});
   });
 
   it('a premise SKIP fails the run on lv-d62-control and lv-d62-drop alone (skipFails: the harness broke), never elsewhere', () => {
-    expect(CASES.filter((c) => c.skipFails === true).map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop']);
+    expect(CASES.filter((c) => c.skipFails === true).map((c) => c.id)).toEqual(['lv-d62-control', 'lv-d62-drop', 'lv-d62-short']);
     for (const id of ['lv-d62-control', 'lv-d62-drop']) {
       const r = recorded(id);
       r.launched = withC(r.launched, 66);
@@ -151,7 +185,7 @@ describe('selectCases: the carousel group, Android and the native app only, neve
     expect((await selectCases({ platform: 'android', app: 'native', groups: ['forms'] })).some((c) => c.group === 'carousel')).toBe(false);
     expect(await selectCases({ platform: 'ios', app: 'native', groups: ['carousel'] })).toEqual([]);
     expect(await selectCases({ platform: 'android', app: 'react-native', groups: ['carousel'] })).toEqual([]);
-    expect(CAROUSEL_CASES).toHaveLength(8);
+    expect(CAROUSEL_CASES).toHaveLength(9);
   });
 });
 
@@ -176,6 +210,40 @@ describe('the group\'s record rejudged: every case ok', () => {
     const v = verdictOf(recorded(id));
     expect(v.outcome).toBe('ok');
     expect(v.why).toMatch(why);
+  });
+});
+
+describe('lv-d62-short: the recorded shape on any device, a probe that carries 94 px or less of its 142, then a held reveal (T11)', () => {
+  /** The case's judge over a drop leg's record with the app's first carousel stroke since the call carrying `carry`. */
+  const shortRecord = (carry: number) => {
+    const r = recorded('lv-d62-drop');
+    const [probe, ...rest] = r.state!.strokes!.filter((s) => s.view === 'carousel' && s.at > (r.launched.strokes ?? []).reduce((m, x) => Math.max(m, x.at), 0));
+    const others = rest.map((s) => ({ ...s }));
+    r.state = { ...r.state!, strokes: [...(r.launched.strokes ?? []), { ...probe, to: probe.from + carry }, ...others] };
+    r.swipes = r.swipes!.map((s, i) => (i === 0 ? { ...s, sentTo: { x: s.from.x - 90, y: s.from.y } } : s));
+    return r;
+  };
+  const judged = (r: ReturnType<typeof shortRecord>) => caseOf('lv-d62-short').judge(r.state!, r.replies, r.source, r.launched, r.after, { swipes: r.swipes });
+  it('a probe that carried 94 px: the premise held, maxSwipes hedged is ok', () => {
+    expect(judged(shortRecord(94))).toMatchObject({ outcome: 'ok' });
+  });
+  it('a probe that carried 95: SKIP, the shape not reproduced — the case proves nothing, and its SKIP fails the run', () => {
+    expect(judged(shortRecord(95))).toMatchObject({ outcome: 'SKIP', why: expect.stringMatching(/carried 95 px, over the 94 .* not reproduced/) });
+  });
+  it('the false claim is a MISMATCH whatever the carry, ahead of any premise', () => {
+    for (const carry of [90, 200]) {
+      const r = shortRecord(carry);
+      r.replies = [D62_FALSE_PASS];
+      r.state = withC(r.state!, 438);
+      expect(judged(r)).toMatchObject({ outcome: 'MISMATCH', cls: 'fully-cut' });
+    }
+  });
+  it('a fix that stops `unaimable` is honest too, ok; the hedge on two held reveals is LOUD: not what this case drew', () => {
+    const r = shortRecord(80);
+    r.replies = ["ERROR scroll_until id:lab.carousel-recycler-free.C stopped after 5 swipes, without swiping further — more swipes are unlikely to help"];
+    expect(judged(r).outcome).toBe('ok');
+    r.replies = ["Element id:lab.carousel-recycler-free.C fully visible after 3 swipes; but its right edge lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a swipe toward it showed 55 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — it may be cut there, a rect assert or screenshot may measure part of it; calling again tells"];
+    expect(judged(r)).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind' });
   });
 });
 

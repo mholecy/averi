@@ -16,6 +16,7 @@ const DECLARED: Record<Case['group'], CaseReads | undefined> = {
 
 const EXCEPTIONS: Record<string, { reads: CaseReads; why: string }> = {
   'lv-d62-drop': { reads: { swipes: { drop: 2 }, late: false }, why: 'D62: its second stroke, the first reveal, is dropped: never "fully visible" with C cut' },
+  'lv-d62-short': { reads: { swipes: { drop: 2, shorten: { stroke: 1, px: 90 } }, late: false }, why: 'T11: its probe drawn short and its first reveal dropped, the recorded shape on any device: never "fully visible" with C cut' },
 };
 
 async function everyCase(groups: readonly Case['group'][]): Promise<Case[]> {
