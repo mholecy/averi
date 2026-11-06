@@ -225,7 +225,7 @@ describe('the group\'s record rejudged: every case ok', () => {
   });
 });
 
-describe('lv-d62-short: the recorded shape on any device, a probe that carries 94 px or less of its 142, then a held reveal (T11)', () => {
+describe('lv-d62-short: the recorded shape in both device states seen, a probe that carries 94 px or less of its 142, then a held reveal (T11)', () => {
   /** The case's judge over a drop leg's record with the app's first carousel stroke since the call carrying `carry`. */
   const shortRecord = (carry: number) => {
     const r = recorded('lv-d62-drop');

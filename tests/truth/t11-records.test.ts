@@ -124,7 +124,7 @@ describe('T11: the final wording, a check and not a rate (after the load experim
   });
 });
 
-describe('T11: lv-d62-short, the recorded shape on any device, ABBA over one harness (after the load experiment; a check, the rate is the final A/B)', () => {
+describe('T11: lv-d62-short, the recorded shape in both device states seen, ABBA over one harness (after the load experiment; a check, the rate is the final A/B)', () => {
   const short = (prefix: string) => named('lv-d62-short', ['short-probe-check', prefix]);
   it('base 12 of 12 false, C 430–441 px past the clip; the fix 0 of 12, all maxSwipes hedged', () => {
     expect(short('base')).toHaveLength(12);
@@ -152,6 +152,13 @@ describe('T11: the final A/B (final-ab/, base b3ce0150 vs fix 7a18842e, ABBA, a 
   it('lv-d62-short: base 20 of 20 false, the fix 1 of 20, and that one a first stroke carrying 0, T12; the rest hedged or at the bound', () => {
     expect(short('base')).toHaveLength(20);
     expect(short('base').filter(falseClaim)).toHaveLength(20);
+    const shortCuts = short('base').map((r) => cutOf(r.state)!.right);
+    expect([Math.min(...shortCuts), Math.max(...shortCuts)]).toEqual([436, 526]);
+    // Every base first-call false claim of the run, 33: drop-two's judged on the state between its calls.
+    const first = ['lv-d62-short', 'lv-d62-drop', 'lv-d62-drop-two'].flatMap((id) => named(id, [F, 'short-base'], [F, 'drop-base'], [F, 'two-base'], [F, 'harm-carousel-base'])).filter(claims);
+    expect(first).toHaveLength(33);
+    const cuts = first.map((r) => cutOf(r.id === 'lv-d62-drop-two' ? (r as unknown as { after: LabState[] }).after[0] : r.state)!.right);
+    expect([Math.min(...cuts), Math.max(...cuts)]).toEqual([408, 526]);
     expect(short('fix')).toHaveLength(20);
     const [left, ...more] = short('fix').filter(falseClaim);
     expect(more).toEqual([]);
