@@ -295,6 +295,15 @@ describe('runCase: after the calls', () => {
     expect(Object.keys(run.record)).toEqual(['source', 'id', 'replies', 'launched', 'after', 'state', 'late', 'warmUpError', 'preDrag', 'swipes']);
   });
 
+  it('a SKIP\'s record keeps the same order, `skip` right after `id`, by bytes', async () => {
+    const lab = new FakeLab({ launched: read('launch') });
+    const run = await runCase(aCase({ keyboard: true, warmUp: true }), 'idb', rigOver(lab, ['ERROR: down']));
+    expect(Object.keys(run.record)).toEqual(['source', 'id', 'skip', 'replies', 'launched', 'after', 'state', 'warmUpError']);
+    expect(JSON.stringify(run.record)).toBe(
+      `{"source":"idb","id":"x1","skip":"no soft keyboard at launch (the simulator saw HID typing; see IosLab.launch)","replies":[],"launched":${JSON.stringify(read('launch'))},"after":[],"warmUpError":"ERROR: down"}`,
+    );
+  });
+
   it('a SKIP takes no screenshot', async () => {
     const lab = new FakeLab({ launched: read('launch') });
     await runCase(aCase({ keyboard: true }), 'idb', rigOver(lab, ['r'], { keepShot: async () => undefined }));

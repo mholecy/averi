@@ -55,11 +55,12 @@ launch. The rest is new work:
 - a new read for `mFocusedApp` and for no `ResolverActivity` being left, which `LabState` does not carry;
 - a first `state()` with no cell: the lab app has not written, and the cycle assumes a state (T10);
 - `CaseRecord.launched` and the judge's `launched: LabState` are required, and lc4' from the launcher may have no `LabState`
-  to give, so a placeholder or a widened type is T7b's decision;
+  to give. lc4' widens `launched` or judges it apart, which touches every judge; a made-up `LabState` handed to the judges
+  is not an option;
 - probably a teardown after a chooser, so the next case does not start over it. That is an inference, unmeasured.
 
 A `Case.start` was built here for the first of these and deleted at review: it was a hypothetical seam, and its type could
-not do the work (`adb` is not on `CaseLab`). T7b can add what it needs at the same price.
+not do the work (`adb` is not on `CaseLab`). T7b can add the start verb at the same price; widening `launched` costs more, as above.
 
 ## Considered
 
