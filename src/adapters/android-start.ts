@@ -61,14 +61,18 @@ import { ExecError, type ExecResult } from './exec.js';
  * 252 for a package with nothing to launch), and its own diagnoses are the
  * lines it starts with `** ` in column 0 (MONKEY_DIAGNOSIS_LINE_RE), on
  * either stream. A non-zero exit with such a line is `refused`; exit 0 is
- * `started`, whatever it printed.
+ * `started`, whatever it printed. Every such line is a reason, and quoted:
+ * `** SYS_KEYS has no physical keys but with factor 2.0%.` too, which aborts
+ * monkey before any event (exit 251, D73; ADR 0041's D73 amendment) and which
+ * the launch's `--pct-syskeys 0` keeps from being reached (android.ts).
  *
  * What is NOT measured, written down here once (android.ts, the tests and
  * ARCHITECTURE.md point here): the exact text of monkey's line. The review
  * measured the exit and that the reason is on stdout, and did not quote it;
  * "** No activities found to run, monkey aborted." is the line in AOSP's
  * Monkey.java (getMainApps, printed with Logger.out — stdout; run() then
- * returns -4, which is the measured 252), and is the sample the tests use.
+ * returns -4, which is the measured 252), and is the sample the tests use;
+ * measured since, stdout, exit 252, with `--pct-syskeys 0` (D73).
  * Every diagnosis in that file starts `** `, but not all go to stdout: that
  * one is Logger.out, while `** Error: Unknown option …` (run() returns -1,
  * exit 255), `** Error: Unable to connect to activity manager …` (-3, exit
@@ -101,18 +105,9 @@ export interface StartRefused {
 
 export type StartOutcome = { readonly kind: 'started' } | StartRefused;
 
-/**
- * A refusal's lines as the messages quote them: `<command> said: a / b` — all its lines, or the ones given (D55b quotes
- * refusalReasons'). The one place a refusal's quote is built.
- */
-export function startSaid(refused: StartRefused, lines: readonly string[] = refused.lines): string {
-  return `${refused.command} said: ${lines.join(' / ')}`;
-}
-
-/** A refusal's lines that are reasons: monkey's without its emulator warning (MONKEY_EMULATOR_WARNING_RE), am's all. */
-export function refusalReasons(refused: StartRefused): readonly string[] {
-  if (refused.command !== 'monkey') return refused.lines;
-  return refused.lines.filter((line) => !MONKEY_EMULATOR_WARNING_RE.test(line));
+/** A refusal's lines as the messages quote them: `<command> said: a / b`. The one place a refusal's quote is built. */
+export function startSaid(refused: StartRefused): string {
+  return `${refused.command} said: ${refused.lines.join(' / ')}`;
 }
 
 /** `{ cause }` for an Error's options only when there is one — no own `cause: undefined`. */
@@ -151,15 +146,6 @@ const AM_ERROR_LINE_RE = /^(?:Error\b|java\.lang\.\w+(?:Exception|Error)\b).*$/g
  * the line is the reason.
  */
 const MONKEY_DIAGNOSIS_LINE_RE = /^\*\* .*$/gm;
-
-/**
- * monkey's emulator warning, `** SYS_KEYS has no physical keys but with factor 2.0%.`: on the lab emulator monkey
- * prints it whatever the outcome (lab fact 14), and it was the only `** ` line of batch-10's E4c refusal and of
- * batch-11's three exit-251 refusals under the chooser (D55b) — so never a reason. Only a line that IS the warning,
- * from its start; one that mentions SYS_KEYS otherwise is monkey's own. It still counts as a diagnosis for
- * MONKEY_DIAGNOSIS_LINE_RE (a non-zero exit with it is `refused`, so the caller can ask why): refusalReasons drops it.
- */
-const MONKEY_EMULATOR_WARNING_RE = /^\*\* SYS_KEYS /;
 
 /** How many of monkey's last stdout lines a thrown failure carries. */
 const STDOUT_TAIL_LINES = 3;

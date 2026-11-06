@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { refusalReasons, runStart, startSaid, type StartCommand, type StartRefused } from '../../src/adapters/android-start.js';
+import { runStart, startSaid, type StartCommand, type StartRefused } from '../../src/adapters/android-start.js';
 import { ExecError, type ExecResult } from '../../src/adapters/exec.js';
 import { execErrorLikeExec } from '../helpers/exec-error.js';
 
@@ -23,7 +23,7 @@ const UNRESOLVED_VIEW =
   'Error: Activity not started, unable to resolve Intent { act=android.intent.action.VIEW dat=nosuch://x flg=0x10000000 }';
 const MONKEY_ABORTED = '** No activities found to run, monkey aborted.';
 const AM = ['am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'nosuch://x'];
-const MONKEY = ['monkey', '-p', 'p', '-c', 'android.intent.category.LAUNCHER', '1'];
+const MONKEY = ['monkey', '-p', 'p', '--pct-syskeys', '0', '-c', 'android.intent.category.LAUNCHER', '1'];
 const ARGV: Record<StartCommand, string[]> = { 'am start': AM, monkey: MONKEY };
 
 describe('runStart — am start', () => {
@@ -215,25 +215,20 @@ describe('runStart — the argv picks the reading, and is sent as it is', () => 
   });
 });
 
-// D55b (ADR 0041's D55b amendment): a refusal's lines as the messages quote them, and which of monkey's are reasons.
-// `** SYS_KEYS has no physical keys but with factor 2.0%.` is monkey's emulator warning, printed whatever the outcome
-// (batch-10's E4c reply, batch-11's three exit-251 refusals under the chooser: its only `** ` line each time).
-describe('startSaid and refusalReasons — what a refusal quotes (D55b)', () => {
+// A refusal's lines as the messages quote them, all of them (D73, ADR 0041's D73 amendment): `** SYS_KEYS …` is monkey's
+// reason, not a warning to leave out.
+describe('startSaid — what a refusal quotes', () => {
   const SYS_KEYS = '** SYS_KEYS has no physical keys but with factor 2.0%.';
   const refused = (command: StartCommand, lines: string[]): StartRefused => ({ kind: 'refused', command, lines });
 
-  it("startSaid: `<command> said: a / b`, all the lines or the ones given", () => {
+  it('`<command> said: a / b`, every line', () => {
     expect(startSaid(refused('monkey', [MONKEY_ABORTED, SYS_KEYS]))).toBe(`monkey said: ${MONKEY_ABORTED} / ${SYS_KEYS}`);
+    expect(startSaid(refused('monkey', [SYS_KEYS]))).toBe(`monkey said: ${SYS_KEYS}`);
     expect(startSaid(refused('am start', [UNRESOLVED_VIEW]))).toBe(`am start said: ${UNRESOLVED_VIEW}`);
-    expect(startSaid(refused('monkey', [MONKEY_ABORTED, SYS_KEYS]), [MONKEY_ABORTED])).toBe(`monkey said: ${MONKEY_ABORTED}`);
   });
 
-  it("refusalReasons: monkey's lines without its emulator warning, in order; am's all", () => {
-    expect(refusalReasons(refused('monkey', [SYS_KEYS]))).toEqual([]);
-    expect(refusalReasons(refused('monkey', [MONKEY_ABORTED, SYS_KEYS, '** Error: x']))).toEqual([MONKEY_ABORTED, '** Error: x']);
-    // Only a line that IS the warning, from its start: one that mentions SYS_KEYS otherwise is monkey's own.
-    const mentions = ['** Error: SYS_KEYS has no physical keys', '**  SYS_KEYS x', '** echo: ** SYS_KEYS has no physical keys'];
-    expect(refusalReasons(refused('monkey', mentions))).toEqual(mentions);
-    expect(refusalReasons(refused('am start', [SYS_KEYS]))).toEqual([SYS_KEYS]);
+  it("a non-zero exit with `** SYS_KEYS …` alone (batch-11's and D73's exit 251, stderr) is refused, the line kept", async () => {
+    const failure = execErrorLikeExec('adb -s e shell monkey', 251, `data="p"\n${SYS_KEYS}\n`);
+    expect(await runStart(MONKEY, throws(failure))).toEqual({ kind: 'refused', command: 'monkey', lines: [SYS_KEYS], cause: failure });
   });
 });

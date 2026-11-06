@@ -861,7 +861,7 @@ describe('AndroidAdapter interactions', () => {
       await adapter.launch('md.bank.app');
       expect(argvs).toEqual([
         ['-s', 'e', 'shell', 'am', 'start', '-n', 'md.bank.app/.MainActivity'],
-        ['-s', 'e', 'shell', 'monkey', '-p', 'md.bank.app', '-c', 'android.intent.category.LAUNCHER', '1'],
+        ['-s', 'e', 'shell', 'monkey', '-p', 'md.bank.app', '--pct-syskeys', '0', '-c', 'android.intent.category.LAUNCHER', '1'],
       ]);
     });
 
@@ -1139,8 +1139,9 @@ describe('AndroidAdapter interactions', () => {
 
   // D55b (ADR 0041's D55b amendment): launch_app with Android's chooser in front, on the batches' real replies
   // (averi_lab, API 33). After a `-p` start (an intent and no activity) D55's one focus read names the chooser in a ⚠
-  // note — the headline stays "Launched", D56's shape on iOS; on monkey's refusal the same read names the chooser as
-  // the cause. A failed or unmatched read is today's reply byte for byte; `-n` and monkey's success read nothing.
+  // note — the headline stays "Launched", D56's shape on iOS; on monkey's refusal the same read names the chooser as also
+  // in front, never as the cause (D73: with `--pct-syskeys 0` monkey starts over it). A failed or unmatched read adds
+  // nothing; `-n` and monkey's success read nothing.
   // E4d / E4c: batch-10's D55 E4 (main 139256a2) — `launch_app {intent: VIEW averilab://shared/x}` from the launcher
   // replied "Launched dev.averi.lab on android", the focus read 1.5 s later naming the chooser
   // (dumpsys-window-focus-api33-b10-after-launch-intent.txt); a plain `launch_app dev.averi.lab` (monkey) under the
@@ -1150,6 +1151,8 @@ describe('AndroidAdapter interactions', () => {
   // focus read at its return (…-b11-after-launch-intent-start*.txt: the chooser as the activity 10 of 10, the window
   // `null` 7 times and the chooser's own 3), and monkey's whole refusal under the chooser: exit 251 3 of 3, stdout its
   // `bash arg:` echoes, stderr its args ending `** SYS_KEYS …` (monkey-api33-b11-chooser-exit251-{stdout,stderr}.txt).
+  // D73: that exit 251 was monkey's own validate() failing on its key categories, before any event and with or without a
+  // chooser; those fixtures are kept as what a device that still refuses on `** SYS_KEYS` prints.
   describe('launch_app with the chooser in front (D55b)', () => {
     const fixtureText = (name: string) => readFile(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
     /** E2's real `am start -a VIEW -d averilab://shared/open` stdout, the chooser raised (batch-10). */
@@ -1157,7 +1160,7 @@ describe('AndroidAdapter interactions', () => {
     const RESOLVER = 'android/com.android.internal.app.ResolverActivity';
     const INTENT = { action: 'android.intent.action.VIEW', data: 'averilab://shared/x' };
     const START_P = ['-s', 'e', 'shell', 'am', 'start', '-p', 'dev.averi.lab', '-a', 'android.intent.action.VIEW', '-d', 'averilab://shared/x'];
-    const MONKEY = ['-s', 'e', 'shell', 'monkey', '-p', 'dev.averi.lab', '-c', 'android.intent.category.LAUNCHER', '1'];
+    const MONKEY = ['-s', 'e', 'shell', 'monkey', '-p', 'dev.averi.lab', '--pct-syskeys', '0', '-c', 'android.intent.category.LAUNCHER', '1'];
     const FOCUS = ['-s', 'e', 'shell', "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='"];
     /** D55c: the chooser's tree, read once the focus read named it after a `-p` start. */
     const DUMP = ['-s', 'e', 'exec-out', 'uiautomator', 'dump', '/dev/tty'];
@@ -1168,14 +1171,11 @@ describe('AndroidAdapter interactions', () => {
       "changes the device's default for the intent it answers); press_key back drops the chooser. averi taps nothing itself.";
     /** Written on both sides of the seam (the words module, android.ts's NAME_THE_ACTIVITY): one constant, so changing only one fails here. */
     const NAME_THE_ACTIVITY = '`activity:` on the launch step / launch_app';
+    const ALSO_IN_FRONT = `Android's chooser (${RESOLVER}) is also in front. ${ADVICE}`;
     const NOTE =
       'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
       `is in front, and dev.averi.lab is not. ${ADVICE} Naming the activity (${NAME_THE_ACTIVITY}) starts it without the chooser.`;
-    /** The chooser named as THE cause of monkey's refusal (monkey gave no reason of its own), its actual exit code. */
-    const monkeyChooser = (exit: number) =>
-      "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) " +
-      `is in front, and monkey starts nothing over it (it exited ${exit}). ${ADVICE} Then launch again.`;
-    /** Today's monkey refusal, quoting `said` — the reply when the focus read names no chooser. */
+    /** monkey's refusal, quoting `said`: the whole reply when the focus read names no chooser. */
     const monkeyRefused = (said: string) =>
       'monkey started nothing in dev.averi.lab — check that dev.averi.lab is installed and has a launcher activity, ' +
       `or name the activity to start: ${NAME_THE_ACTIVITY}, or app.android.activity in ` +
@@ -1274,12 +1274,12 @@ describe('AndroidAdapter interactions', () => {
       expect(argvs).toEqual([MONKEY]);
     });
 
-    it("D55c: monkey's refusal under the chooser never dumps — its error is D55b's, two calls", async () => {
+    it("D55c: monkey's refusal under the chooser never dumps — its line, the chooser also in front, two calls", async () => {
       const failure = execErrorLikeExec('adb -s e shell monkey', 251, await fixtureText('monkey-api33-b11-chooser-exit251-stderr.txt'), {
         stdout: await fixtureText('monkey-api33-b11-chooser-exit251-stdout.txt'),
       });
       const { adapter, argvs } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt'), dump: await fixtureText('uiautomator-lab-resolver.xml') });
-      expect((await failureOf(adapter.launch('dev.averi.lab')))?.message).toBe(monkeyChooser(251));
+      expect((await failureOf(adapter.launch('dev.averi.lab')))?.message).toBe(`${monkeyRefused(MONKEY_LINE)} ${ALSO_IN_FRONT}`);
       expect(argvs).toEqual([MONKEY, FOCUS]);
     });
 
@@ -1328,50 +1328,49 @@ describe('AndroidAdapter interactions', () => {
       expect(argvs).toEqual([MONKEY]);
     });
 
-    it("E4c on batch-11's real refusal (exit 251, the args echoes, `** SYS_KEYS …` on stderr): the error names the chooser as the cause", async () => {
+    it("D73: `** SYS_KEYS` alone under the chooser (batch-11's real exit 251) is monkey's reason: quoted, the chooser only also in front, never the cause", async () => {
       const failure = execErrorLikeExec('adb -s e shell monkey', 251, await fixtureText('monkey-api33-b11-chooser-exit251-stderr.txt'), {
         stdout: await fixtureText('monkey-api33-b11-chooser-exit251-stdout.txt'),
       });
       const { adapter, argvs, timeouts } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt') });
       const error = await failureOf(adapter.launch('dev.averi.lab'));
-      expect(error?.message).toBe(monkeyChooser(251));
+      expect(error?.message).toBe(`${monkeyRefused(MONKEY_LINE)} ${ALSO_IN_FRONT}`);
+      expect(error?.message).not.toContain('monkey starts nothing over it');
       expect(error?.cause).toBe(failure);
       expect(argvs).toEqual([MONKEY, FOCUS]);
       expect(timeouts[1]).toBe(2_000);
     });
 
-    it("E4c on batch-10's reply (the `** SYS_KEYS` line on stdout), the chooser read 1.5 s later: the same chooser error, no warning quoted", async () => {
+    it("D73: the line on stdout (batch-10's reply), the chooser read 1.5 s later: the same error", async () => {
       const failure = execErrorLikeExec('adb -s e shell monkey', 252, '', { stdout: `${MONKEY_LINE}\n` });
       const { adapter, argvs } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b10-after-launch-monkey.txt') });
       const error = await failureOf(adapter.launch('dev.averi.lab'));
-      expect(error?.message).toBe(monkeyChooser(252));
-      expect(error?.message).not.toContain('SYS_KEYS');
+      expect(error?.message).toBe(`${monkeyRefused(MONKEY_LINE)} ${ALSO_IN_FRONT}`);
       expect(error?.cause).toBe(failure);
       expect(argvs).toEqual([MONKEY, FOCUS]);
     });
 
-    it("monkey refused with a real reason AND the chooser in front: monkey's reason leads (today's error, the warning unquoted), the chooser named as also in front", async () => {
+    it("D73, measured: no launcher activity under the chooser (exit 252, stdout its line): monkey's reason leads, the chooser also in front", async () => {
       const noActivities = '** No activities found to run, monkey aborted.';
-      const failure = execErrorLikeExec('adb -s e shell monkey', 252, `${MONKEY_LINE}\n`, { stdout: `${noActivities}\n` });
+      const failure = execErrorLikeExec('adb -s e shell monkey', 252, '', { stdout: `${noActivities}\n` });
       const { adapter, argvs } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt') });
       const error = await failureOf(adapter.launch('dev.averi.lab'));
-      expect(error?.message).toBe(
-        `${monkeyRefused(noActivities)} Android's chooser (android/com.android.internal.app.ResolverActivity) is also in front. ${ADVICE}`,
-      );
-      expect(error?.message).not.toContain('SYS_KEYS');
-      expect(error?.message).not.toContain('monkey starts nothing over it');
+      expect(error?.message).toBe(`${monkeyRefused(noActivities)} ${ALSO_IN_FRONT}`);
       expect(error?.cause).toBe(failure);
       expect(argvs).toEqual([MONKEY, FOCUS]);
     });
 
-    it('with no chooser named, the refusal is quoted whole, the emulator warning included: today\'s error byte for byte (the fail-open)', async () => {
+    it('D73: every `** ` line is quoted, the SYS_KEYS one beside a real one too, chooser or not', async () => {
       const noActivities = '** No activities found to run, monkey aborted.';
       const failure = execErrorLikeExec('adb -s e shell monkey', 252, `${MONKEY_LINE}\n`, { stdout: `${noActivities}\n` });
-      const { adapter } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b10-launcher.txt') });
-      expect((await failureOf(adapter.launch('dev.averi.lab')))?.message).toBe(monkeyRefused(`${noActivities} / ${MONKEY_LINE}`));
+      const said = monkeyRefused(`${noActivities} / ${MONKEY_LINE}`);
+      const underChooser = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b11-after-launch-monkey.txt') });
+      expect((await failureOf(underChooser.adapter.launch('dev.averi.lab')))?.message).toBe(`${said} ${ALSO_IN_FRONT}`);
+      const noChooser = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b10-launcher.txt') });
+      expect((await failureOf(noChooser.adapter.launch('dev.averi.lab')))?.message).toBe(said);
     });
 
-    it('monkey refused with no chooser named (an app or launcher in front, a failed or empty read): today\'s error byte for byte, two calls', async () => {
+    it('monkey refused with no chooser named (an app or launcher in front, a failed or empty read): the refusal alone, two calls', async () => {
       const failure = execErrorLikeExec('adb -s e shell monkey', 251, await fixtureText('monkey-api33-b11-chooser-exit251-stderr.txt'), {
         stdout: await fixtureText('monkey-api33-b11-chooser-exit251-stdout.txt'),
       });
@@ -1388,9 +1387,6 @@ describe('AndroidAdapter interactions', () => {
         expect(error?.cause).toBe(failure);
         expect(argvs).toEqual([MONKEY, FOCUS]);
       }
-      const noActivities = execErrorLikeExec('adb -s e shell monkey', 252, '', { stdout: '** No activities found to run, monkey aborted.\n' });
-      const { adapter } = scripted({ monkey: noActivities, focus: await fixtureText('dumpsys-window-focus-api33-b10-launcher.txt') });
-      expect((await failureOf(adapter.launch('dev.averi.lab')))?.message).toBe(monkeyRefused('** No activities found to run, monkey aborted.'));
     });
 
     it('a monkey failure with no diagnosis (adb gone, a timeout) passes through as it is, with no focus read', async () => {

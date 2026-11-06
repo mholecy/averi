@@ -56,6 +56,31 @@ const LINK_FAILED_OPEN = (url: string) =>
   '(never "Always": it changes the device\'s default for such links); press_key back drops the link. averi taps ' +
   'nothing itself.';
 
+/**
+ * A real AndroidAdapter over the lab AVD's monkey as D73 measured it (API 33): without `--pct-syskeys 0` it exits 251 on
+ * `** SYS_KEYS …`, with the chooser up or not, and starts nothing; with the flag it exits 0 and starts the app, with the
+ * chooser up too. The focus read names the chooser when `chooser` says so.
+ */
+async function labMonkey(chooser: boolean): Promise<AndroidAdapter> {
+  const started = await fixture('monkey-api33-d73-pct-syskeys-0-stdout.txt');
+  const refused = execErrorLikeExec('adb -s e shell monkey', 251, await fixture('monkey-api33-b11-chooser-exit251-stderr.txt'), {
+    stdout: await fixture('monkey-api33-b11-chooser-exit251-stdout.txt'),
+  });
+  const focus = await fixture(chooser ? 'dumpsys-window-focus-api33-b11-after-launch-monkey.txt' : 'dumpsys-window-focus-api33-b10-launcher.txt');
+  const exec: ExecFn = async (_cmd, args) => {
+    if (args.includes('monkey') && !args.join(' ').includes('--pct-syskeys 0')) throw refused;
+    return { stdout: Buffer.from(args.includes('monkey') ? started : focus), stderr: '' };
+  };
+  return new AndroidAdapter({ drawnOverStrip, serial: 'e', exec });
+}
+
+describe("launch_app with no activity: the reply over the lab's monkey (D73)", () => {
+  it.each([['from the launcher', false], ["with Android's chooser up: monkey starts over it", true]])('%s: Launched, no ⚠ line', async (_where, chooser) => {
+    const launched = await launchApp(await labMonkey(chooser), undefined, new EngineSession(), { appId: 'dev.averi.lab' });
+    expect(launchText('android', launched)).toBe('Launched dev.averi.lab on android');
+  });
+});
+
 // The replies with Android's chooser in front, end to end — a real AndroidAdapter through flow/launch.ts and the reply
 // text (tool-text.ts): launch_app's ⚠ line and the flow's `⚠ launch` line name the chooser (D55b; ADR 0041's D55b
 // amendment, D56's shape on iOS), and open_deep_link's reply over the same chooser stays D55's, byte for byte.

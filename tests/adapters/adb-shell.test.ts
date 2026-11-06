@@ -151,7 +151,7 @@ describe('AndroidAdapter — every user value reaches the device command as one 
     await adapter.terminate('odd pkg;x');
     expect(commands).toEqual([
       ['pm', 'clear', 'odd pkg;x'],
-      ['monkey', '-p', 'odd pkg;x', '-c', 'android.intent.category.LAUNCHER', '1'],
+      ['monkey', '-p', 'odd pkg;x', '--pct-syskeys', '0', '-c', 'android.intent.category.LAUNCHER', '1'],
       ['am', 'force-stop', 'odd pkg;x'],
     ]);
   });
