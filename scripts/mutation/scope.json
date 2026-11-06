@@ -51,7 +51,7 @@
     "group": "core",
     "tests": ["tests/adapters/failure-text.test.ts"],
     "floor": 97,
-    "baseline": "99.53 % on 2026-11-06 (D70 code review, URL words, `=` and file://, a prefixed header, the bounded exception; cold): 211 mutants, 1 survived, 0 timeouts — the same equivalent survivor as below; 99.44 % on 2026-11-06 (D70 review round 2, argparse at exit 2 to stderr's end, lastResortText, the colon rule; cold): 180 mutants, 1 survived, 0 timeouts — the survivor is exceptionUnder's `why === undefined` emptied to false, equivalent: /^\\s/ on undefined reads \"undefined\", no match, so the exception stands alike; 100 % on the same day (D70 review round 1; cold): 153 mutants"
+    "baseline": "99.54 % on 2026-11-06 (D70 verification, a word starting scheme: is a URL word, scrub before the bound, the bound in code points; cold): 218 mutants, 1 survived, 0 timeouts — the same equivalent survivor as below; 99.53 % on 2026-11-06 (D70 code review, URL words, `=` and file://, a prefixed header, the bounded exception; cold): 211 mutants, 1 survived, 0 timeouts — the same equivalent survivor as below; 99.44 % on 2026-11-06 (D70 review round 2, argparse at exit 2 to stderr's end, lastResortText, the colon rule; cold): 180 mutants, 1 survived, 0 timeouts — the survivor is exceptionUnder's `why === undefined` emptied to false, equivalent: /^\\s/ on undefined reads \"undefined\", no match, so the exception stands alike; 100 % on the same day (D70 review round 1; cold): 153 mutants"
   },
   "src/adapters/ios-link-failure.ts": {
     "group": "core",

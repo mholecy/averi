@@ -15,9 +15,12 @@ const FRAME = /^\s+File "/;
 const isHeader = (lines: readonly string[], at: number): boolean =>
   TRACEBACK_HEADER.test(lines[at]) || (PREFIXED_HEADER.test(lines[at]) && FRAME.test(lines[at + 1]));
 
-/** The longest exception line a reply holds: a message can carry a whole response. */
+/** The longest exception line a reply holds, in code points: a message can carry a whole response. */
 const EXCEPTION_MAX = 300;
-const bounded = (exception: string): string => (exception.length > EXCEPTION_MAX ? `${exception.slice(0, EXCEPTION_MAX)}…` : exception);
+function bounded(exception: string): string {
+  const points = [...exception];
+  return points.length > EXCEPTION_MAX ? `${points.slice(0, EXCEPTION_MAX).join('')}…` : exception;
+}
 
 /**
  * The exception under a traceback's header: the first line at the header's margin, frames being indented further and an
@@ -29,9 +32,9 @@ function exceptionUnder(below: readonly string[], margin: number): string | unde
   const at = lines.findIndex((line) => line !== '' && !/^[ +-]/.test(line));
   if (at === -1) return undefined;
   const exception = lines[at].trimEnd();
-  if (!exception.endsWith(':')) return bounded(exception);
+  if (!exception.endsWith(':')) return exception;
   const why = lines.slice(at + 1).find((line) => line.trim() !== '' && !/^\s*[+-]/.test(line));
-  return bounded(why === undefined || !/^\s/.test(why) ? exception : `${exception} ${why.trim()}`);
+  return why === undefined || !/^\s/.test(why) ? exception : `${exception} ${why.trim()}`;
 }
 
 /** The tool a command line runs: its first word's last path segment, and for xcrun what it runs. */
@@ -40,14 +43,14 @@ function toolOf(command: string): string {
   return first === 'xcrun' && second !== undefined ? second : first.split('/').at(-1)!;
 }
 
-/** `stderr` as an agent reads it: trimmed, or one line when it holds a Python traceback. */
-function stderrForAgent(command: string, stderr: string): string {
+/** `stderr` as an agent reads it: trimmed, or one line when it holds a Python traceback, scrubbed before it is bounded: a cut home would no longer match. */
+function stderrForAgent(command: string, stderr: string, home: string): string {
   const lines = stderr.split(/\r?\n/);
   const header = lines.map((_, at) => isHeader(lines, at)).lastIndexOf(true);
   if (header === -1) return stderr.trim();
   const margin = TRACEBACK_HEADER.exec(lines[header])?.[1].length ?? 0;
   const exception = exceptionUnder(lines.slice(header + 1), margin);
-  return `${toolOf(command)} crashed${exception === undefined ? '' : `: ${exception}`} (Python traceback left out: run the command by hand, with the real text and paths, to see it)`;
+  return `${toolOf(command)} crashed${exception === undefined ? '' : `: ${bounded(withoutHostPaths(exception, home))}`} (Python traceback left out: run the command by hand, with the real text and paths, to see it)`;
 }
 
 /** What stands where a typed text stood. */
@@ -101,8 +104,8 @@ function withoutOwnHome(text: string, home: string): string {
   return text.replace(new RegExp(`${anywhere ? '' : WORD_START}${escaped(folder)}(?![\\w.-])`, 'gm'), '~');
 }
 
-/** A word holding a URL: what looks like a path inside it is the URL's, whatever marks stand before it. `file://`'s is the host's. */
-const URL_WORD = /(?<![a-z0-9+.-])(?!file:)[a-z][a-z0-9+.-]*:\/\//i;
+/** A word holding `scheme://` or starting `scheme:`: what looks like a path inside it is the URL's. `file:`'s is the host's. */
+const URL_WORD = /(?<![a-z0-9+.-])(?!file:)[a-z][a-z0-9+.-]*:\/\/|^(?!file:)[a-z][a-z0-9+.-]*:/i;
 
 function wordWithoutHostFolders(word: string): string {
   if (URL_WORD.test(word)) return word;
@@ -155,6 +158,6 @@ export function commandFailureText(failure: CommandFailure, home: string): strin
   // Node's own `Command failed: <argv>` stands in stderr for a silent child (exec.ts), with the text in it.
   const withoutArgvText = stderr.split(failure.command).join(command);
   const argparseRefused = exitCode === ARGPARSE_EXIT && IDB_TYPING.test(failure.command);
-  const said = stderrForAgent(command, argparseRefused ? withoutArgvText.replace(ARGPARSE_ERROR, IDB_REJECTED) : withoutArgvText);
+  const said = stderrForAgent(command, argparseRefused ? withoutArgvText.replace(ARGPARSE_ERROR, IDB_REJECTED) : withoutArgvText, home);
   return withoutHostPaths(`Command failed (exit ${exitCode}): ${command}\n${said}${tail}`, home);
 }

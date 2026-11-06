@@ -127,6 +127,20 @@ describe('commandFailureText: a Python traceback', () => {
     expect(at(301)).toBe(`idb crashed: E${'x'.repeat(299)}… (Python traceback left out: run the command by hand, with the real text and paths, to see it)`);
   });
 
+  it('scrubs before it bounds: a home across the cut goes whole', () => {
+    const text = `E ${'x'.repeat(288)} /srv/alice/secret.log and more ${'y'.repeat(50)}`;
+    const said = commandFailureText({ command: 'idb x', exitCode: 1, stderr: `Traceback (most recent call last):\n${text}\n`, timedOut: false }, '/srv/alice').split('\n')[1];
+    expect(said).not.toContain('/srv');
+    expect(said).toContain(`E ${'x'.repeat(288)} ~/secret`);
+    expect(said).toMatch(/…\s\(Python/);
+  });
+
+  it('cuts on code points, never inside a surrogate pair', () => {
+    const at = (text: string) => failed('idb x', `Traceback (most recent call last):\n${text}\n`).split('\n')[1].replace(/ \(Python.*$/, '').replace('idb crashed: ', '');
+    expect(at(`${'x'.repeat(299)}😀y`)).toBe(`${'x'.repeat(299)}😀…`);
+    expect(at('😀'.repeat(300))).toBe('😀'.repeat(300));
+  });
+
   it('names the tool: a path\'s last word, and what xcrun ran', () => {
     const tb = 'Traceback (most recent call last):\nE: x\n';
     expect(failed('/opt/homebrew/bin/idb x', tb).split('\n')[1]).toMatch(/^idb crashed: E: x/);
@@ -208,6 +222,15 @@ describe('commandFailureText: host paths', () => {
     }
     expect(said('myapp://o/p /tmp/x')).toBe('myapp://o/p <tmp>/x');
     expect(said('MYAPP://o/p,/tmp/x')).toBe('MYAPP://o/p,/tmp/x');
+  });
+
+  it('a word starting with a scheme is a URL with or without `//`, file: apart', () => {
+    for (const url of ['myapp:open?next=/home/x/a', 'mailto:a@b?body=/tmp/x', 'myapp:/go?p=/opt/x', 'MYAPP:a=/tmp/x', 'a+b.c-d:a=/tmp/x']) {
+      expect(said(url)).toBe(url);
+    }
+    expect(said('file:a=/tmp/x')).toBe('file:a=<tmp>/x');
+    expect(said('x=myapp:a=/tmp/x')).toBe('x=myapp:a=<tmp>/x');
+    expect(said('1a:b=/tmp/x')).toBe('1a:b=<tmp>/x');
   });
 
   it('the own home goes from a URL word too; file:// is no such word', () => {

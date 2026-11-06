@@ -42,11 +42,12 @@ The function does three things to exec's shape and nothing else:
    tool is the argv's first word's last segment, and for `xcrun` what it runs. Lines around the traceback, the log line
    `… [ERROR] - root - Exception thrown in main` among them, are dropped with it: the reply says the crash, and `stderr` keeps the rest. CRLF line ends read the same, and an exception line that ends at its colon takes the next line with text as its message when that line is indented, an exception group's rules skipped. An unindented one may be a log line and stays out, so `raise Exception("\nwhy")`, printed unindented, reads `Exception:`. averi writes no log of an idb command, and none is
    invented: the pointer is the command, which stays above it, to run by hand with the real text and paths: as printed it is not runnable, `<typed text>` and `<tmp>/app.apk` being shell redirections. A header on a line of its own counts, and one behind a log prefix (`[ERROR] Traceback …`) when a
-   frame stands beneath it, so a stderr that merely mentions the words stays. The exception line is bounded at 300 characters and an ellipsis.
+   frame stands beneath it, so a stderr that merely mentions the words stays. The exception line is scrubbed, then bounded at 300 code points and an ellipsis.
 2. **Host paths leave the whole text, the argv and the note too.** Told apart by an allowlist of folders only a host has,
    each matched only at a word's start (a line's start, after whitespace, a quote, `(`, `[`, `<`, `,`, `=` or `file://`), so
-   `/data/local/tmp/…`, inside a word, never matches. A word holding `scheme://`, `file://` apart, is left alone by every
-   rule but the own home, so a URL's path never matches, whatever marks stand inside it (`myapp://o/p,/tmp/q`):
+   `/data/local/tmp/…`, inside a word, never matches. A word holding `scheme://` or starting `scheme:`, `file:` apart, is left alone by
+   every rule but the own home, so a URL's path never matches, whatever marks stand inside it (`myapp://o/p,/tmp/q`,
+   `myapp:open?next=/home/…`):
    - the user's own home (`os.homedir()`, a parameter, its trailing slashes dropped) becomes `~` up to its folder's end (`/opt/me`, not `/opt/mel`). With two folders or more it goes **anywhere**, a URL's path too: it must always go. A home of one folder (`/tmp`, `/root`, `/var`) goes only at a word's start, since anywhere would cut `/data/local/tmp/a.xml`. A home that is no absolute path, or that cannot be read (`exec.ts#hostHome` answers `''`), takes nothing out;
    - any `/Users/…`, `/home/…` (the folder under them) and `/root` at a word's start becomes `~`; `Shared` under `/Users`
      is nobody's home and stays;
@@ -63,7 +64,7 @@ The function does three things to exec's shape and nothing else:
 
 **Words that throw never destroy the error.** `exec.ts#failureMessage` falls back to `failure-text.ts#lastResortText` if `commandFailureText` throws: `Command failed (exit N): <tool>` or `Command timed out: <tool>`, the argv's first word and nothing else, and it cannot throw itself (`Command failed` on values it cannot print; a near-maximal argv is read for 256 characters). And `hostHome` cannot throw: `os.homedir()` throws when `$HOME` is unset and the uid has no passwd entry, which inside exec's callback would never settle the promise and would end the process.
 
-**Residuals.** An exception's own message can still quote a piece of the text: `No keycode found for Š` carries one character, and ADR 0037 refuses that value before idb in a fill or `type:`. Any other stderr idb prints for a typing is not parsed. `idb ui text -h` exits 0, so `type_text "-h"` still reports success with nothing typed: not a leak, filed as D74.
+**Residuals.** Host paths: a word holding both a URL and a host path keeps the path (`{"path":"/tmp/…","url":"http://x"}`), and so does a word that starts with `word:` (`error:"/Users/…"`), the own home apart. A device path after `=` that shares a host folder's name is reduced (`remote=/tmp/…`, read as a host's). Typed text: An exception's own message can still quote a piece of the text: `No keycode found for Š` carries one character, and ADR 0037 refuses that value before idb in a fill or `type:`. Any other stderr idb prints for a typing is not parsed. `idb ui text -h` exits 0, so `type_text "-h"` still reports success with nothing typed: not a leak, filed as D74.
 
 **The argv stays.** It names the device and the failed step, an agent can repeat it once it puts the real text and paths back, the traceback's pointer leans on it, and
 `captureRefusal` and the flow's `✗` line quote exactly that line. Pins and D73's `adb -s emulator-9998 shell monkey …` keep
@@ -87,21 +88,21 @@ own (`Android opened nothing for <url> — …`, `android.ts#openDeepLink`), and
 
 ## Replies that change
 
-| Reply | Before | After |
-| --- | --- | --- |
-| A Python crash (idb's, recorded b1d) | `Command failed (exit 1): idb ui text Jan Šťastný --udid U⏎2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main⏎Traceback (most recent call last):⏎  File "/Users/…/idb/cli/main.py", line 313, in gen_main⏎ … ⏎Exception: No keycode found for Š` | `Command failed (exit 1): idb ui text <typed text> --udid U⏎idb crashed: Exception: No keycode found for Š (Python traceback left out: run the command by hand, with the real text and paths, to see it)` |
-| A failed typing, Android (live) | `Command failed (exit 1): adb -s emulator-9998 shell input text h⏎adb: device 'emulator-9998' not found` | `Command failed (exit 1): adb -s emulator-9998 shell input text <typed text>⏎adb: device 'emulator-9998' not found` |
-| A failed typing, iOS, and its timeout | `Command failed (exit 1): idb ui text hunter2 --udid U⏎…`, `Command timed out: idb ui text hunter2 --udid U` | `Command failed (exit 1): idb ui text <typed text> --udid U⏎…`, `Command timed out: idb ui text <typed text> --udid U` |
-| A typing idb's argparse refuses | `Command failed (exit 2): idb ui text -hunter2 --udid U⏎usage: …⏎idb ui text: error: argument -h/--help: ignored explicit argument 'unter2'` | `Command failed (exit 2): idb ui text <typed text> --udid U⏎usage: …⏎idb rejected its arguments (its error line, which can quote the typed text, is left out)` |
-| A host path, home (live, `install_app`) | `Command failed (exit 1): adb -s emulator-5554 install -r /Users/…/app.apk⏎adb: failed to stat /Users/…/app.apk: No such file or directory` | `Command failed (exit 1): adb -s emulator-5554 install -r ~/…/app.apk⏎adb: failed to stat ~/…/app.apk: No such file or directory` |
-| Another user's home | `… /Users/…/a.apk` | `… ~/a.apk` |
-| `/Volumes`, `/opt` | `… install -r /Volumes/…/b.ipa`, `/opt/homebrew/bin/idb` | `… install -r …/b.ipa`, `…/idb` |
-| A path after `=` or `file://` | `NSFilePath=<a temporary folder>/x/app.app, NSURL=file://<a temporary folder>/x/app.app` | `NSFilePath=<tmp>/app.app, NSURL=file://<tmp>/app.app` |
-| The dump's diagnosis, last line of stderr | `adb could not run uiautomator dump: adb: cannot read /Users/…/adb.log` | `adb could not run uiautomator dump: adb: cannot read ~/adb.log` |
-| `get-state`'s diagnosis | `device S is not reachable: adb get-state says "cannot read /Users/…/adb.log" — …` | `device S is not reachable: adb get-state says "cannot read ~/adb.log" — …` |
-| `pgrepReason`, an `averi:` line on stderr | `averi: the host process list is unreadable (exit 3: pgrep: /Users/…/x unreadable) — …` | `averi: the host process list is unreadable (exit 3: pgrep: ~/x unreadable) — …` |
-| A host path, temporary (live, `install_app`) | `… install -r /tmp/…/app.apk⏎adb: failed to stat /tmp/…/app.apk: No such file or directory` | `… install -r <tmp>/app.apk⏎adb: failed to stat <tmp>/app.apk: No such file or directory` |
-| `open_deep_link tel:…`, iOS (batch-13's bytes) | `Command failed (exit 115): xcrun simctl openurl <udid> tel:+421900123456⏎An error was encountered processing the command (domain=LSApplicationWorkspaceErrorDomain, code=115):⏎Simulator device failed to open tel:+421900123456.⏎Underlying error (domain=LSApplicationWorkspaceErrorDomain, code=115):⏎	The operation couldn’t be completed. (LSApplicationWorkspaceErrorDomain error 115.)` | `No app on this simulator handles tel: links, so nothing opened (simctl openurl: LSApplicationWorkspaceErrorDomain, code 115). A link to an app's own scheme needs that app installed.` |
+| Reply | Before | After | Bytes |
+| --- | --- | --- | --- |
+| A Python crash (idb's, recorded b1d) | `Command failed (exit 1): idb ui text Jan Šťastný --udid U⏎2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main⏎Traceback (most recent call last):⏎  File "/Users/…/idb/cli/main.py", line 313, in gen_main⏎ … ⏎Exception: No keycode found for Š` | `Command failed (exit 1): idb ui text <typed text> --udid U⏎idb crashed: Exception: No keycode found for Š (Python traceback left out: run the command by hand, with the real text and paths, to see it)` | before recorded (b1d); after pinned |
+| A failed typing, Android (live) | `Command failed (exit 1): adb -s emulator-9998 shell input text h⏎adb: device 'emulator-9998' not found` | `Command failed (exit 1): adb -s emulator-9998 shell input text <typed text>⏎adb: device 'emulator-9998' not found` | live, both |
+| A failed typing, iOS, and its timeout | `Command failed (exit 1): idb ui text hunter2 --udid U⏎…`, `Command timed out: idb ui text hunter2 --udid U` | `Command failed (exit 1): idb ui text <typed text> --udid U⏎…`, `Command timed out: idb ui text <typed text> --udid U` | illustrative |
+| A typing idb's argparse refuses | `Command failed (exit 2): idb ui text -hunter2 --udid U⏎usage: …⏎idb ui text: error: argument -h/--help: ignored explicit argument 'unter2'` | `Command failed (exit 2): idb ui text <typed text> --udid U⏎usage: …⏎idb rejected its arguments (its error line, which can quote the typed text, is left out)` | illustrative, from the review's probe |
+| A host path, home (live, `install_app`) | `Command failed (exit 1): adb -s emulator-5554 install -r /Users/…/app.apk⏎adb: failed to stat /Users/…/app.apk: No such file or directory` | `Command failed (exit 1): adb -s emulator-5554 install -r ~/…/app.apk⏎adb: failed to stat ~/…/app.apk: No such file or directory` | live, both |
+| Another user's home | `… /Users/…/a.apk` | `… ~/a.apk` | illustrative |
+| `/Volumes`, `/opt` | `… install -r /Volumes/…/b.ipa`, `/opt/homebrew/bin/idb` | `… install -r …/b.ipa`, `…/idb` | illustrative |
+| A path after `=` or `file://` | `NSFilePath=<a temporary folder>/x/app.app, NSURL=file://<a temporary folder>/x/app.app` | `NSFilePath=<tmp>/app.app, NSURL=file://<tmp>/app.app` | illustrative |
+| The dump's diagnosis, last line of stderr | `adb could not run uiautomator dump: adb: cannot read /Users/…/adb.log` | `adb could not run uiautomator dump: adb: cannot read ~/adb.log` | illustrative |
+| `get-state`'s diagnosis | `device S is not reachable: adb get-state says "cannot read /Users/…/adb.log" — …` | `device S is not reachable: adb get-state says "cannot read ~/adb.log" — …` | illustrative |
+| `pgrepReason`, an `averi:` line on stderr | `averi: the host process list is unreadable (exit 3: pgrep: /Users/…/x unreadable) — …` | `averi: the host process list is unreadable (exit 3: pgrep: ~/x unreadable) — …` | illustrative |
+| A host path, temporary (live, `install_app`) | `… install -r /tmp/…/app.apk⏎adb: failed to stat /tmp/…/app.apk: No such file or directory` | `… install -r <tmp>/app.apk⏎adb: failed to stat <tmp>/app.apk: No such file or directory` | live, both |
+| `open_deep_link tel:…`, iOS (batch-13's bytes) | `Command failed (exit 115): xcrun simctl openurl <udid> tel:+421900123456⏎An error was encountered processing the command (domain=LSApplicationWorkspaceErrorDomain, code=115):⏎Simulator device failed to open tel:+421900123456.⏎Underlying error (domain=LSApplicationWorkspaceErrorDomain, code=115):⏎	The operation couldn’t be completed. (LSApplicationWorkspaceErrorDomain error 115.)` | `No app on this simulator handles tel: links, so nothing opened (simctl openurl: LSApplicationWorkspaceErrorDomain, code 115). A link to an app's own scheme needs that app installed.` | before recorded (batch-13); after pinned, owed a live read |
 
 Anything quoting those messages changes with them: a wrapped error, a first line in a `⚠` or fail-closed sentence, an
 `averi:` line on the server's stderr. `Command failed (exit 1): adb -s emulator-9998 shell monkey … ⏎adb: device
@@ -118,4 +119,4 @@ live on base and branch through MCP, `launch_app` and Android's `open_deep_link`
   (and `-2`) in the scratch folder of session 1ea289f1-7bae-463b-9304-adfeaaf20c0c; `batch-9/D58/case-P3-idb.json` beside it reads
   the same with another number. iOS could not run for this change: the new reply is owed a live read by the next iOS batch
   (backlog D65's row).
-- Cold mutation run (ADR 0038): `failure-text.ts` 99.53 %, 211 mutants, the one survivor equivalent; `ios-link-failure.ts` 100 %, 13 mutants; floors 97 and 98.
+- Cold mutation run (ADR 0038): `failure-text.ts` 99.54 %, 218 mutants, the one survivor equivalent; `ios-link-failure.ts` 100 %, 13 mutants; floors 97 and 98.
