@@ -1,0 +1,154 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { commandFailureText } from '../../src/adapters/failure-text.js';
+
+const HOME = '/Users/someone';
+const failed = (command: string, stderr: string, extra: { exitCode?: number | null; timedOut?: boolean; note?: string } = {}) =>
+  commandFailureText({ command, exitCode: extra.exitCode === undefined ? 1 : extra.exitCode, stderr, timedOut: extra.timedOut ?? false, note: extra.note }, HOME);
+
+/** docs/truth/live-records/ios-forms-a9.json, b1d under idb: its record wrote the home as `~`. Put back here, as idb printed it. */
+const RECORDED_CRASH = readFileSync(new URL('../fixtures/idb-ui-text-no-keycode-traceback-b1d-stderr.txt', import.meta.url), 'utf8');
+const CRASH_WITH_HOME = RECORDED_CRASH.replaceAll('"~/', `"${HOME}/`);
+
+describe('commandFailureText: a command failure with nothing to take out', () => {
+  it('is exec\'s shape to the byte', () => {
+    expect(failed('adb -s emulator-9998 shell monkey -p dev.averi.lab 1', "\nadb: device 'emulator-9998' not found\n"))
+      .toBe("Command failed (exit 1): adb -s emulator-9998 shell monkey -p dev.averi.lab 1\nadb: device 'emulator-9998' not found");
+    expect(failed('idb ui tap 1 2 --udid U', 'x', { exitCode: null })).toBe('Command failed (exit null): idb ui tap 1 2 --udid U\nx');
+  });
+
+  it('says a timeout without its stderr, and a note on its own last line', () => {
+    expect(failed('adb devices', 'ignored', { timedOut: true })).toBe('Command timed out: adb devices');
+    expect(failed('adb devices', 'said', { note: 'monkey: stdout tail' })).toBe('Command failed (exit 1): adb devices\nsaid\nmonkey: stdout tail');
+    expect(failed('adb devices', '', { timedOut: true, note: 'n' })).toBe('Command timed out: adb devices\nn');
+  });
+});
+
+describe('commandFailureText: a Python traceback', () => {
+  it('shrinks the recorded idb crash to the tool, its exception and how to see the trace', () => {
+    expect(failed('idb describe --udid U', CRASH_WITH_HOME)).toBe(
+      'Command failed (exit 1): idb describe --udid U\n' +
+        'idb crashed: Exception: No keycode found for Š (Python traceback left out: run the command in a terminal to see it)',
+    );
+  });
+
+  it('reads the last traceback of a chain, and only the first line of a long exception message', () => {
+    const chain =
+      'Traceback (most recent call last):\n  File "a.py", line 1, in a\nKeyError: 1\n\n' +
+      'During handling of the above exception, another exception occurred:\n\n' +
+      'Traceback (most recent call last):\n  File "b.py", line 2, in b\n    raise X\n\ngrpclib.GRPCError: (UNAVAILABLE, down)\n  more detail\nand more\n';
+    expect(failed('idb ui tap 1 2 --udid U', chain).split('\n')[1]).toMatch(/^idb crashed: grpclib\.GRPCError: \(UNAVAILABLE, down\) \(Python/);
+  });
+
+  it('reads an exception group, whose lines sit behind a margin', () => {
+    const group =
+      '  + Exception Group Traceback (most recent call last):\n  |   File "a.py", line 1, in a\n  | ExceptionGroup: unhandled errors (1 sub-exception)\n' +
+      '  +-+---------------- 1 ----------------\n    | Traceback (most recent call last):\n    |   File "b.py", line 2, in b\n    | ValueError: boom\n    +------------------------------------\n';
+    expect(failed('idb x', group).split('\n')[1]).toMatch(/^idb crashed: ValueError: boom \(Python/);
+  });
+
+  it('says only the crash when the traceback was cut before its exception', () => {
+    expect(failed('idb x', 'Traceback (most recent call last):\n  File "a.py", line 1, in a\n').split('\n')[1])
+      .toBe('idb crashed (Python traceback left out: run the command in a terminal to see it)');
+  });
+
+  it('names the tool: a path\'s last word, and what xcrun ran', () => {
+    const tb = 'Traceback (most recent call last):\nE: x\n';
+    expect(failed('/opt/homebrew/bin/idb x', tb).split('\n')[1]).toMatch(/^idb crashed: E: x/);
+    expect(failed('xcrun simctl list', tb).split('\n')[1]).toMatch(/^simctl crashed: E: x/);
+    expect(failed('xcrun', tb).split('\n')[1]).toMatch(/^xcrun crashed: E: x/);
+  });
+
+  it('leaves a stderr that only mentions a traceback alone', () => {
+    expect(failed('idb x', 'see the Traceback (most recent call last): above').split('\n')[1]).toBe('see the Traceback (most recent call last): above');
+  });
+
+  it('keeps a note beside the crash', () => {
+    expect(failed('idb x', 'Traceback (most recent call last):\nE: x\n', { note: 'n' }).split('\n')[2]).toBe('n');
+  });
+});
+
+describe('commandFailureText: host paths', () => {
+  const said = (text: string) => failed('tool', text).split('\n')[1];
+
+  it('takes the user\'s home out wherever it stands, a URL\'s path too, and only that folder', () => {
+    expect(said('open /Users/someone/.idb/x.log failed')).toBe('open ~/.idb/x.log failed');
+    expect(said('cwd=/Users/someone')).toBe('cwd=~');
+    expect(said('file:///Users/someone/a https://h/Users/someone/b')).toBe('file://~/a https://h~/b');
+    expect(said('https://h/Users/someone.old/a')).toBe('https://h/Users/someone.old/a');
+    expect(commandFailureText({ command: 'c', exitCode: 1, stderr: '/data/John Doe/a /home/John Doe/a', timedOut: false }, '/home/John Doe').split('\n')[1]).toBe('/data/John Doe/a ~/a');
+  });
+
+  it('takes out any macOS or Linux home at a word\'s start, another user\'s too', () => {
+    expect(said('/Users/other/a "/home/other/b" (/root/c) /root')).toBe('~/a "~/b" (~/c) ~');
+    expect(said("'/Users/other' [/home/other/d], <file:///Users/other/e>")).toBe("'~' [~/d], <file://~/e>");
+    expect(said('`/Users/other/f`')).toBe('`~/f`');
+  });
+
+  it('leaves what is no home', () => {
+    for (const kept of ['/Users/Shared/a', '/rootfs/a', '/homework/a', '/Users', '/home', 'https://h/Users/other/a', 'x=/home/other/a', 'myapp:/home/other/a']) {
+      expect(said(kept)).toBe(kept);
+    }
+  });
+
+  it('reduces a temporary path to its basename', () => {
+    expect(said('/tmp/a/b.apk /private/tmp/c /var/tmp/d /private/var/tmp/e')).toBe('<tmp>/b.apk <tmp>/c <tmp>/d <tmp>/e');
+    expect(said('/var/folders/ab/cd/T/x.swift:10:3: error')).toBe('<tmp>/x.swift:10:3: error');
+    expect(said('"/private/var/folders/ab/cd/T/y"')).toBe('"<tmp>/y"');
+    expect(said('/tmp /tmp/')).toBe('<tmp> <tmp>');
+  });
+
+  it('reduces a path under the Mac\'s volumes and /opt to its basename', () => {
+    expect(said('/Volumes/Disk/app/b.ipa /opt/homebrew/bin/idb')).toBe('…/b.ipa …/idb');
+    expect(said('/Volumes /opt')).toBe('… …');
+  });
+
+  it('never touches a device path or a URL\'s path', () => {
+    for (const kept of ['/sdcard/Download/a.png', '/data/local/tmp/a.xml', '/data/user/0/dev.averi/tmp/a', '/storage/emulated/0/a', '/system/bin/sh', 'https://example.com/tmp/a', 'myapp://tmp/a', 'myapp:/tmp/a', 'file:///tmp/a', 'https://example.com/?next=/tmp/a', 'a/tmp/b', '/tmpfs/a', '/optional/a', '/Volumes2/a']) {
+      expect(said(kept)).toBe(kept);
+    }
+  });
+
+  it('takes them out of the command and the note too, keeps a line count', () => {
+    expect(failed('adb -s S install -r /Users/someone/b/app.apk', 'adb: failed', { note: 'see /tmp/x/y' }))
+      .toBe('Command failed (exit 1): adb -s S install -r ~/b/app.apk\nadb: failed\nsee <tmp>/y');
+    expect(failed('adb push /tmp/x/a.png /sdcard/a.png', 'e', { timedOut: true })).toBe('Command timed out: adb push <tmp>/a.png /sdcard/a.png');
+  });
+
+  it('asks nothing of a home that is the root folder', () => {
+    expect(commandFailureText({ command: 'c', exitCode: 1, stderr: '/sdcard/a', timedOut: false }, '/')).toBe('Command failed (exit 1): c\n/sdcard/a');
+    expect(commandFailureText({ command: 'c', exitCode: 1, stderr: '/sdcard/a', timedOut: false }, '')).toBe('Command failed (exit 1): c\n/sdcard/a');
+  });
+
+  it('a home with a regular expression\'s characters is taken literally', () => {
+    expect(commandFailureText({ command: 'c', exitCode: 1, stderr: '/data/a+b/c /data/aab/c', timedOut: false }, '/data/a+b').split('\n')[1]).toBe('~/c /data/aab/c');
+  });
+});
+
+describe('commandFailureText: typed text', () => {
+  it('stays out of an idb ui text argv, whatever it holds', () => {
+    expect(failed('idb ui text hunter2 --udid U', 'e')).toBe('Command failed (exit 1): idb ui text <typed text> --udid U\ne');
+    expect(failed('idb ui text a b --udid c --udid U', 'e', { timedOut: true })).toBe('Command timed out: idb ui text <typed text> --udid U');
+    expect(failed('idb ui text line\ntwo --udid U', 'e')).toBe('Command failed (exit 1): idb ui text <typed text> --udid U\ne');
+  });
+
+  it('stays out of an adb input text argv, one character or many', () => {
+    expect(failed("adb -s emulator-5554 shell input text 'h'", 'e')).toBe('Command failed (exit 1): adb -s emulator-5554 shell input text <typed text>\ne');
+    expect(failed("adb shell input text '%s'", 'e', { timedOut: true })).toBe('Command timed out: adb shell input text <typed text>');
+  });
+
+  it('stays out of node\'s own line, which exec puts in stderr for a silent child', () => {
+    expect(failed('idb ui text hunter2 --udid U', 'Command failed: idb ui text hunter2 --udid U\n'))
+      .toBe('Command failed (exit 1): idb ui text <typed text> --udid U\nCommand failed: idb ui text <typed text> --udid U');
+  });
+
+  it('leaves every other argv as it is', () => {
+    for (const command of ['idb ui tap 1 2 --udid U', 'idb ui key 40 --udid U', 'adb -s S shell input tap 1 2', 'adb -s S shell input keyevent 66', 'xcrun simctl openurl U ui text']) {
+      expect(failed(command, 'e')).toBe(`Command failed (exit 1): ${command}\ne`);
+    }
+  });
+
+  it('a home in a typed text goes with the text', () => {
+    expect(failed('idb ui text /Users/someone/x --udid U', 'e')).toBe('Command failed (exit 1): idb ui text <typed text> --udid U\ne');
+  });
+});

@@ -2237,3 +2237,14 @@ describe('AndroidAdapter.capture — the raw frame, `screencap -p` where the dev
     expect(calls).toEqual([RAW]);
   });
 });
+
+describe('a failed typing keeps its text out of the message (D70, ADR 0043)', () => {
+  it('each character is one call, whose text a whole-secret redaction could not match: the character stays out', async () => {
+    const exec: ExecFn = async (cmd, args) => {
+      throw new ExecError([cmd, ...args].join(' '), 1, "adb: device 'emulator-9998' not found\n");
+    };
+    await expect(new AndroidAdapter({ drawnOverStrip, serial: 'emulator-9998', exec }).typeText('h')).rejects.toThrow(
+      /^Command failed \(exit 1\): adb -s emulator-9998 shell input text <typed text>\nadb: device 'emulator-9998' not found$/,
+    );
+  });
+});

@@ -1,3 +1,5 @@
+import { ExecError } from '../../src/adapters/exec.js';
+import { noLinkHandler } from '../../src/adapters/ios-link-failure.js';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -664,6 +666,46 @@ describe('launch_app — the entry activity', () => {
 // in IosAdapter.typeText (idb refuses `ui text ''`) and not in fillField:
 // a fill-only skip would have left the selector-less path throwing idb's
 // bare error. Pinned here: the response, and that "" reaches the adapter.
+describe('what a failed host command replies (D70, D65; ADR 0043): the tools quote the error, no tool words it', () => {
+  it('type_text: a crash, its one line, no frame, no home, no typed text', async () => {
+    const ios = home();
+    ios.typeText = async () => {
+      throw new ExecError('idb ui text hunter2 --udid U', 1, '2026-10-19 05:39:32,796 [ERROR] - root - Exception thrown in main\nTraceback (most recent call last):\n  File "/Users/someone/.local/idb/main.py", line 313, in gen_main\nException: gone\n');
+    };
+    const { call } = await connect({ ios });
+    const result = await call('type_text', { platform: 'ios', text: 'hunter2', configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toBe(
+      'Command failed (exit 1): idb ui text <typed text> --udid U\nidb crashed: Exception: gone (Python traceback left out: run the command in a terminal to see it)',
+    );
+  });
+
+  it('open_deep_link on ios: no app handles the scheme, an error that says so', async () => {
+    const ios = home();
+    const stderr = '(domain=LSApplicationWorkspaceErrorDomain, code=115)\n';
+    ios.openDeepLink = async (url) => {
+      throw noLinkHandler(new ExecError(`xcrun simctl openurl U ${url}`, 115, stderr), url);
+    };
+    const { call } = await connect({ ios });
+    const result = await call('open_deep_link', { platform: 'ios', url: 'tel:+421900123456', configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toBe(
+      "No app on this simulator handles tel: links, so nothing opened (simctl openurl: LSApplicationWorkspaceErrorDomain, code 115). A link to an app's own scheme needs that app installed.",
+    );
+  });
+
+  it("an ordinary failure, argv and stderr, is exec's bytes", async () => {
+    const android = home();
+    android.tap = async () => {
+      throw new ExecError('adb -s emulator-9998 shell input tap 1 2', 1, "adb: device 'emulator-9998' not found\n");
+    };
+    const { call } = await connect({ android });
+    const result = await call('tap', { platform: 'android', x: 1, y: 2, configPath: missing() });
+    expect(result.isError).toBe(true);
+    expect(result.text).toBe("Command failed (exit 1): adb -s emulator-9998 shell input tap 1 2\nadb: device 'emulator-9998' not found");
+  });
+});
+
 describe('type_text with an empty text', () => {
   const form = () => new FakeAdapter({ form: screen(el({ role: 'textfield', identifier: 'amount_input', value: '2.50' })) }, 'form');
 

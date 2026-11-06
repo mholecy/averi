@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { homedir } from 'node:os';
+import { commandFailureText } from './failure-text.js';
 
 /** stdout stays a Buffer — screenshots come through this path as binary PNG. */
 export interface ExecResult {
@@ -16,6 +18,10 @@ export interface ExecOptions {
 
 export type ExecFn = (cmd: string, args: string[], opts?: ExecOptions) => Promise<ExecResult>;
 
+/**
+ * A failed host command. Its fields keep every byte, for detectors and logs (a detector reads `stderr`, `exitCode`,
+ * `timedOut`); its `message` is the words an agent reads, whichever layer quotes it (failure-text.ts, ADR 0043).
+ */
 export class ExecError extends Error {
   constructor(
     readonly command: string,
@@ -38,10 +44,7 @@ export class ExecError extends Error {
     options: { note?: string; cause?: unknown } = {},
   ) {
     super(
-      (timedOut
-        ? `Command timed out: ${command}`
-        : `Command failed (exit ${exitCode}): ${command}\n${stderr.trim()}`) +
-        (options.note === undefined ? '' : `\n${options.note}`),
+      commandFailureText({ command, exitCode, stderr, timedOut, note: options.note }, homedir()),
       options.cause === undefined ? undefined : { cause: options.cause },
     );
     this.name = 'ExecError';

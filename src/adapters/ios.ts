@@ -12,6 +12,7 @@ import { DESCRIBE_ALL_TIMEOUT_MS, IdbEmptyTreeError, type IosTreeSource } from '
 import type { AppHolder, DeepLinkOptions, DeviceAdapter, DeviceScreen, Key, LaunchOptions, Point, UiNode } from './types.js';
 import { awaitForeground, type ForegroundCheck } from './ios-foreground.js';
 import { appInfoBundle, appInfoNames, type AppBinary } from './simctl-appinfo.js';
+import { noLinkHandler } from './ios-link-failure.js';
 import { isSystemScheme, isWebScheme, linkScheme, PLUTIL_NO_SUCH_KEY, SCHEME_APPROVAL_DOMAIN, schemeApprovalKey, schemeApprovalWrite, urlSchemes } from './ios-url-schemes.js';
 import { hostProcessPattern, pgrepReason, pgrepVerdict } from './ios-liveness.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -525,12 +526,15 @@ export class IosAdapter implements DeviceAdapter {
    * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes what it wrote before.
    * `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link (D54), the
    * answer names it instead of `unknown`: on idb from the wait's own reads, on WDA from one short `/source`
-   * read at the bound (IosTreeSource.systemAlert) — never a tap.
+   * read at the bound (IosTreeSource.systemAlert) — never a tap. A link no app on the simulator handles throws that
+   * fact (ios-link-failure.ts, D65); any other `openurl` failure is exec's error.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<AppHolder> {
     const approval = await this.linkHandler(url, opts.appId);
     await this.prepareForOpen(`opening ${url}`, approval);
-    await this.simctl(['openurl', this.udid, url]);
+    await this.simctl(['openurl', this.udid, url]).catch((e: unknown) => {
+      throw noLinkHandler(e, url) ?? e;
+    });
     if (approval === undefined) return { holder: 'none' };
     const handler = approval.bundleId;
     // A link's wait answers `unknown` or an alert in every case but a match (ios-foreground.ts#awaitForeground).
