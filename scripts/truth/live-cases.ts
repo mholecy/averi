@@ -99,11 +99,11 @@ export interface CaseReads {
   betweenCalls?: true;
   /**
    * The strokes averi draws during the calls, logged by the SwipeHook (RunRecord `swipes`, the judge's `log`); `{}` logs
-   * them. `drop`: the Nth is not sent (live-carousel.ts#SwipeHook), which needs the log, so it lives inside this field.
+   * them. `drop`: the Nth (or each of a list) is not sent (live-carousel.ts#SwipeHook), which needs the log, so it lives inside this field.
    * `shorten`: stroke `stroke` is sent only its first `px` px, averi handed back the stroke it asked for, the short carry
    * of a device whose frames run long drawn on any device (T11).
    */
-  swipes?: { drop?: number; shorten?: Shorten };
+  swipes?: { drop?: number | readonly number[]; shorten?: Shorten };
   /** Never read again after a first read not ok (wantsLateRead): a later read would let a fling finish behind the reply's back. */
   late?: false;
 }

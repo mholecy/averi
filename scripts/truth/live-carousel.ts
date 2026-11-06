@@ -2,7 +2,7 @@ import type { Point } from '../../src/adapters/types.js';
 import { pause } from './lab-device.js';
 import { short } from './live-forms.js';
 import { strokesSince, type LiveVerdict } from './live-visibility.js';
-import { carouselReply, inferredAxisSaid, isError, replyKind, snapshotNodes, swipesOf, type CarouselReply } from './replies.js';
+import { carouselReply, heldCutHedged, inferredAxisSaid, isError, replyKind, snapshotNodes, swipesOf, type CarouselReply } from './replies.js';
 import type { Case, CaseReads } from './live-cases.js';
 import { labId, labSelector, type LabState, type Rect } from './schema.js';
 import { TOUCH_SLACK } from './truth.js';
@@ -60,10 +60,10 @@ export const DROP_DEFAULT_MS = 300;
  */
 export class SwipeHook {
   private log: SwipeEntry[] | undefined;
-  private drop: number | undefined;
+  private drop: number | readonly number[] | undefined;
   private shorten: Shorten | undefined;
 
-  arm(drop?: number, shorten?: Shorten): void {
+  arm(drop?: number | readonly number[], shorten?: Shorten): void {
     this.log = [];
     this.drop = drop;
     this.shorten = shorten;
@@ -83,7 +83,7 @@ export class SwipeHook {
     if (this.log === undefined) return undefined;
     const nth = this.log.length + 1;
     const sentTo = nth === this.shorten?.stroke ? shortened(from, to, this.shorten.px) : undefined;
-    const entry: SwipeEntry = { from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ...(durationMs !== undefined && { durationMs }), dropped: nth === this.drop, ...(sentTo !== undefined && { sentTo }) };
+    const entry: SwipeEntry = { from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ...(durationMs !== undefined && { durationMs }), dropped: [this.drop].flat().includes(nth), ...(sentTo !== undefined && { sentTo }) };
     this.log.push(entry);
     return entry;
   }
@@ -328,6 +328,21 @@ export function judgeFully(expect: FullyExpect): CarouselJudge {
   };
 }
 
+/** lv-d62-drop-two: no call claims C whole while it is cut; the first ends in the hedge with C cut; the second's first stroke moves C. */
+export const judgeDropTwo: CarouselJudge = (state, [first, second], _source, launched, [hedged], log) => {
+  const base = { app: appText(state, launched), kind: replyKind(first) };
+  if (hedged === undefined || !hasClip(state)) return { ...base, outcome: 'SKIP', why: NO_CLIP };
+  for (const [reply, app] of [[first, hedged], [second, state]] as const) {
+    if (carouselReply(reply) === 'fully-visible' && isCut(app)) return { ...base, outcome: 'MISMATCH', cls: 'fully-cut', why: `"fully visible" while ${cutText(app)}: ${short(reply)}` };
+  }
+  if (!isCut(hedged)) return { ...base, outcome: 'SKIP', why: `C whole after the first call (${cutText(hedged)}): no cut to tell` };
+  if (log?.swipes?.[1]?.dropped !== true || log.swipes[2]?.dropped !== true) return { ...base, outcome: 'SKIP', why: 'strokes 2 and 3 not both dropped' };
+  if (!heldCutHedged(first)) return { ...base, outcome: 'LOUD', cls: 'carousel-kind', why: `no hedge on the first call, ${cutText(hedged)}: ${short(first)}` };
+  const next = carouselStrokes(state, hedged)[0];
+  if (next === undefined || Math.abs(next.to - next.from) <= CUT_TOLERANCE_PX) return { ...base, outcome: 'LOUD', cls: 'carousel-kind', why: `the second call's first stroke ${next === undefined ? 'was not logged' : 'did not move C'}: ${short(second)}` };
+  return { ...base, outcome: 'ok', why: `hedged with ${cutText(hedged)}; the second call moved C ${next.from}→${next.to}: ${short(second)}` };
+};
+
 /**
  * D37's settled read on a snapping pager (D10, ADR 0021 decision 7): one stroke through averi's `swipe`, then a filtered
  * `ui_snapshot` — the first read after it must list C where the app comes to rest: at the clip (± CUT_TOLERANCE_PX) when
@@ -416,8 +431,9 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     calls: [fullyC(RECYCLER_FREE, 'left')],
     judge: judgeFully({ kinds: ['maxSwipes-hedged'], cutBefore: true, dropped: 2 }),
   },
-  // T11: the recorded false claim's shape on any device: lv-d62-drop lied only when its probe ran short (94 px or less of
-  // 142, D62's old line), which a device does by its own mood. Here the probe is drawn 90 px and handed back as 142.
+  // T11: the recorded false claim's shape in any device state on this geometry (94 is the old line for its 142-px probe):
+  // lv-d62-drop lied only when its probe ran short, which a device does by its own mood. Here the probe is drawn 90 px and
+  // handed back as 142. `unaimable` is accepted by reasoning, never seen on it.
   {
     id: 'lv-d62-short',
     cell: RECYCLER_FREE,
@@ -428,6 +444,19 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     says: 'T11: the same with the probe sent 90 of its 142 px and the first reveal dropped: a cut proved by a short carry, then a held reveal: maxSwipes hedged or `unaimable`, never "fully visible" with C cut',
     calls: [fullyC(RECYCLER_FREE, 'left')],
     judge: judgeFully({ kinds: ['maxSwipes-hedged', 'unaimable'], cutBefore: true, dropped: 2, probeAtMost: 94 }),
+  },
+  // T11: "calling again tells", in the cut direction, never otherwise observed: two reveals dropped, so the first call ends
+  // in the hedge with C cut (a carried probe or a short one), and the same call again must move C, not read `checked`.
+  {
+    id: 'lv-d62-drop-two',
+    cell: RECYCLER_FREE,
+    platforms: ['android'],
+    preDrag: PRE_DRAG_PX,
+    reads: { swipes: { drop: [2, 3] }, betweenCalls: true, late: false },
+    skipFails: true,
+    says: 'T11: the first two reveals dropped: the hedge with C cut, never "fully visible"; the same call again moves C',
+    calls: [fullyC(RECYCLER_FREE, 'left'), fullyC(RECYCLER_FREE, 'left')],
+    judge: judgeDropTwo,
   },
   {
     id: 'lv-d68-launch',

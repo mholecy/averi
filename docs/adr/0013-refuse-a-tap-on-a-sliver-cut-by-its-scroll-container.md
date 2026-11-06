@@ -539,8 +539,8 @@ unchecked stop's existing `it may be cut there`, so `carouselReply` (scripts/tru
 
 **Cost.** Every legitimate pass of this kind (content that did end under the proving stroke, the lab's sticky R, Settings'
 "Network", VA1's R, formRead) pays one stroke and one read, about 2.5 s on this AVD, and carries the hedge instead of
-`checked`; at the bound it fails hedged. A repeat call resolves it: its first probe holds, `checked`, 1 swipe (sticky R, 5 of
-5 live, `final-wording-check/again-*.json`, *after the load experiment*). Golden Changed 0 of 1611 is vacuous for this path: a
+`checked`; at the bound it fails hedged. A repeat call resolves it: its first probe holds, `checked`, 1 swipe (sticky R, 4 of
+4 live, `final-wording-check/again-*.json`, *after the load experiment*). Golden Changed 0 of 1611 is vacuous for this path: a
 replayed tree never moves, so no proof forms.
 
 **Measured, all *after the load experiment*, none a rate of the fix.** The doubt without the hedge wording: lv-d62-drop 1 of 39
@@ -552,19 +552,27 @@ mismatches, no false "fully visible" in any of them. It cannot speak for the sho
 ran short (0 of 40, 134–145 px of 142, as T7a's 135–136; backlog T11), so the hedge after a dropped reveal on a cut was not
 seen live with its final words.
 
+**Exposure, plainly.** No kept record shows a false claim without an injected stroke: control 0 of 41 in the short state, 0 of 16 recovered,
+ctl-12 0 of 8. On the old rule a natural lie needs a proof more than 48 px short and then a held reveal; on a healthy AVD neither was seen (0 of 40
+short, 0 of 224 zero-carry). A11's two are reported only, their records gone. So on a healthy device the fix's measured effect is its cost on every
+content-end pass (about +2.6 s and a hedge); its benefit is against a state that lasted at least 5 hours for unknown reasons, and against absorbed
+strokes at an unmeasured rate. Residual (a) is the remaining way to read `nothing of it is cut` with a cut (backlog T12). **The fix stays, by the
+coordinator's decision: averi doesn't claim what it can't know.**
+
 **Residuals, stated.** (a) stands: a first probe the app did not take reads `checked`, one stroke is enough (backlog T12).
 (b') Two held reveals on a real cut are now the hedge, not a false claim. Strokes logged with no motion: 5 of 675 sent, 0 of 87
 in T7a's; three of the five are short (53, 53, 61 px), carry loss rather than a swallow; 85 px (`fixmore-16`) and 233 px
 (`fixmore-20`) look like swallows. Whether two come in a row without injection is unmeasured: 6 swipes end most runs, and the 8
 `maxSwipes: 12` controls stopped `unaimable` at 6 with no such stroke.
 
-**Not known.** Why strokes carried less from at least 06:59 until at least 12:22, and T7a's figures again from 13:11. Read before
+**Not known.** Why natural probes carried less from at least 06:59 until at least 12:22, and T7a's figures again from 13:11. Read before
 any boot, 14:05 (`frames-recovery.txt`, raw-4): raw strokes 135–146 of 142, 0 of 24 at 94 or less; frames 18 ms in the lab app and
-17 ms in Settings against 73 and 81, swap 12 ms against 42, motion events 16 ms apart against about 100; start count 11, the host's
-load about 7, above the 4–5 of the short runs, the AVD's own load 0.3–0.8 against 1.3–2.0 at raw-1. So the slowness was system-wide in
+17 ms in Settings against 73 and 81, swap 12 ms against 42, motion events 16 ms apart against about 100; start count 11, the AVD's own
+load, the lead, 0.3–0.8 against 1.3–2.0 at raw-1 on the same workload; the host's about 7, above the 4–5 of the short runs. So the slowness was system-wide in
 the AVD, and it ended with no boot. Between: `adb install -r` of the same APK at 12:45 to undo my dexopt change, the one device change I
 know of, and not shown to be the cause (the same APK went in at 23:03 the night before, with T7a's figures before it and the short ones
-after; a lab-app install explains Settings poorly). Evidence:
+after; a lab-app install explains Settings poorly). Not ruled out: something else running in the guest (one `top` only, at 07:22, one instant
+and 396 % idle). Evidence:
 `docs/truth/live-records/t11-carousel-visible`, `frames.txt`; rates read back by `tests/truth/t11-records.test.ts`.
 
 ## Amendment: D68 — a reveal this call's own strokes say would most likely overshoot is not sent (2026-11-05)

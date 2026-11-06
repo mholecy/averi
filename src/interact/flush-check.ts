@@ -44,7 +44,7 @@ import { axisOf, strokeLength, TOUCH_SLOP, type Direction } from './swipe.js';
  * no stop and confirms none (`FlushSeen.waits`): the next stroke is a REVEAL (course.ts#Revealing: the whole stroke,
  * its travel half the room the match leaves in that container, `roomPast`), a probe in every other respect. The proof
  * is kept while the match lies flush on that edge of that container (`ProvenCut`, `stillProven`), so no later read
- * claims it fully visible there either; with no reveal to send (no swipe or time left, or a tree changed since the
+ * calls it uncut there; with no reveal to send (no swipe or time left, or a tree changed since the
  * probe with no room or only a scroll view across the axis) the read is short of the cut (`FlushCut`), which the bound
  * or a stuck stop names — never "fully visible". Measured on the lab's bounded list
  * (docs/bugs/2026-10-16-lab-android-fully-flush-probe-moves-a-deeply-cut-row-a-fraction-of-its-cut-and-stops.md): a
@@ -192,7 +192,7 @@ export interface FlushAim extends FlushPlace {
  * A cut the flush check's probe PROVED (`revealedBy`): after the probe the match lay flush on the same `edge` of the
  * same `container` — its own edge or a `pinned` node's there, alike — with `revealed` px more of it showing. Kept
  * (`Memory.proven`) while every later stop the check is shown finds the judged match flush on that edge of that
- * container (`stillProven`): such a read claims no stop and confirms none (`FlushSeen.waits`), and its next stroke is a
+ * container (`stillProven`): such a read claims no stop and confirms none (`FlushSeen.waits`) unless two reveals held on it (`Flush` `held`, the hedge), and its next stroke is a
  * reveal (course.ts#Revealing) — or, with none to send, the read is short of the cut (`FlushCut`). A read that finds it
  * anywhere else lets it go: the round judges that read like any other. Kept by edge and container, not by node:
  * another match judged there (a selector matching two rows) is taken for the same — the cost a failure naming the cut,
