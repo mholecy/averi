@@ -476,8 +476,8 @@ it.
 `android.test.ts` pins the adapter's answer as the same notes through `appHolderText`, and
 `tests/mcp/android-chooser-replies.test.ts` is unchanged.
 
-`npm run mutate -- --group core --force`: `interact/app-holder-text.ts` joins the run at 96.88 % (floor 95; 128 mutants, 0
-survived, 4 without coverage: the two `never` defaults, unreachable while the types hold); `android-chooser.ts` 100 % (152 mutants); every other score unchanged. Golden
+`npm run mutate -- --force` (both groups, cold, at f90086a8): `interact/app-holder-text.ts` joins the run at 96.80 % (floor
+95; 125 mutants, 0 survived, 4 without coverage: the two `never` defaults, unreachable while the types hold); `android-chooser.ts` 100 % (152 mutants); every other score unchanged. Golden
 Changed 0 (it replays tree reads, no launch or link seam).
 
 Residual: two wordings are written on both sides of the seam, for the same reason (thrown errors built in the adapter): a

@@ -63,7 +63,7 @@
     "group": "core",
     "tests": ["tests/interact/app-holder-text.test.ts"],
     "floor": 95,
-    "baseline": "96.88 % on 2026-11-06 (A10 review round 1, the never defaults, holdsIt's table, the link leads moved here; cold): 128 mutants, 0 survived, 4 without coverage: the two never defaults, unreachable while the types hold; 97.70 % on 2026-11-06 (A10, every word about what holds the app, moved here from android-chooser.ts, ios-system-alert.ts, ios-foreground.ts and mcp/tool-text.ts; cold): 87 mutants, 2 survived, 0 without coverage: both on appHolderText's `case 'none'` (the condition and the emptied string), equivalent, as a switch that falls off its end returns undefined too"
+    "baseline": "96.80 % on 2026-11-06 (A10 code review, the unknown arm split, holdsTheApp; `npm run mutate -- --force` at f90086a8, cold): 125 mutants, 0 survived, 4 without coverage: the two never defaults, unreachable while the types hold; 96.88 % on 2026-11-06 (A10 review round 1, the never defaults, holdsIt's table, the link leads moved here; cold): 128 mutants, 0 survived, 4 without coverage: the two never defaults, unreachable while the types hold; 97.70 % on 2026-11-06 (A10, every word about what holds the app, moved here from android-chooser.ts, ios-system-alert.ts, ios-foreground.ts and mcp/tool-text.ts; cold): 87 mutants, 2 survived, 0 without coverage: both on appHolderText's `case 'none'` (the condition and the emptied string), equivalent, as a switch that falls off its end returns undefined too"
   },
   "src/adapters/typeable.ts": {
     "group": "core",

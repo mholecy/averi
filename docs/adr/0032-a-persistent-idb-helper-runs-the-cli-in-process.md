@@ -791,8 +791,8 @@ fixtures could not survive facts (a shortened sentence in `tool-text.test.ts` an
 full text now. A temporary characterization recorded 274 replies with their device calls at the base and after (both
 verbs on real adapters, MCP and flow): identical.
 
-`npm run mutate -- --group core --force`: `interact/app-holder-text.ts` joins the run at 96.88 % (floor 95; 128 mutants, 0
-survived, 4 without coverage: the two `never` defaults, unreachable while the types hold); `android-chooser.ts` 100 % (152 mutants); every other score unchanged. Golden
+`npm run mutate -- --force` (both groups, cold, at f90086a8): `interact/app-holder-text.ts` joins the run at 96.80 % (floor
+95; 125 mutants, 0 survived, 4 without coverage: the two `never` defaults, unreachable while the types hold); `android-chooser.ts` 100 % (152 mutants); every other score unchanged. Golden
 Changed 0 (it replays tree reads, no launch or link seam).
 
 Residual: the amended text above names `alertNote` and `alertText`, which no longer exist, as they were at their date.
