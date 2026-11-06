@@ -150,6 +150,8 @@ describe('judgeScroll', () => {
     expect(judgeScroll({ ...c, fully: true }, [hedge, 'ERROR refused'], nowhere, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim' });
     const offScreen = state({ frames: { T: { x: 51, y: 5000, width: 300, height: 64 } }, offsets: { page: 0 }, strokes: [stroke(382, 0)] });
     expect(judgeScroll(c, [hedge, 'ERROR refused'], offScreen, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim' });
+    // fully: true and off the screen: laid out, the tap not wrong, the hedge stands.
+    expect(judgeScroll({ ...c, fully: true }, [hedge, 'ERROR refused'], offScreen, launched)).toMatchObject({ outcome: 'LOUD', cls: 'held-hedge' });
   });
 
   it('the stop held but the tap after it fired something else: MISMATCH', () => {

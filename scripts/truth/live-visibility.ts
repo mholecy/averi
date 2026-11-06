@@ -353,7 +353,7 @@ export function judgeScroll(
   const kind = replyKind(scroll);
   const visible = kind === 'visible';
   // T11: "it may be cut there" on a cut a swipe proved claims nothing whole: honest, and not a pass.
-  if (visible && !holds && c.fully && g !== undefined && tapped?.outcome !== 'MISMATCH' && heldCutHedged(scroll)) return { outcome: 'LOUD', cls: 'held-hedge', kind, why: `hedged, and the app lays it out ${g ?? 'nowhere'}: ${short(scroll)}`, app };
+  if (visible && !holds && c.fully && g !== undefined && tapped?.outcome !== 'MISMATCH' && heldCutHedged(scroll)) return { outcome: 'LOUD', cls: 'held-hedge', kind, why: `hedged, and the app lays it out ${g}: ${short(scroll)}`, app };
   if (visible && !holds) return { outcome: 'MISMATCH', cls: 'stop-claim', kind, why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
   if (tapped?.outcome === 'MISMATCH') return { ...tapped, why: `after ${short(scroll)}, the tap: ${tapped.why}`, app };
   // Whatever the tree listed: a claim about the screen the app's own strokes contradict.

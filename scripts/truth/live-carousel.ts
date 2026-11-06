@@ -60,10 +60,10 @@ export const DROP_DEFAULT_MS = 300;
  */
 export class SwipeHook {
   private log: SwipeEntry[] | undefined;
-  private drop: number | readonly number[] | undefined;
+  private drop: readonly number[] | undefined;
   private shorten: Shorten | undefined;
 
-  arm(drop?: number | readonly number[], shorten?: Shorten): void {
+  arm(drop?: readonly number[], shorten?: Shorten): void {
     this.log = [];
     this.drop = drop;
     this.shorten = shorten;
@@ -83,7 +83,7 @@ export class SwipeHook {
     if (this.log === undefined) return undefined;
     const nth = this.log.length + 1;
     const sentTo = nth === this.shorten?.stroke ? shortened(from, to, this.shorten.px) : undefined;
-    const entry: SwipeEntry = { from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ...(durationMs !== undefined && { durationMs }), dropped: [this.drop].flat().includes(nth), ...(sentTo !== undefined && { sentTo }) };
+    const entry: SwipeEntry = { from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ...(durationMs !== undefined && { durationMs }), dropped: this.drop?.includes(nth) === true, ...(sentTo !== undefined && { sentTo }) };
     this.log.push(entry);
     return entry;
   }
@@ -425,7 +425,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     cell: RECYCLER_FREE,
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
-    reads: { swipes: { drop: 2 }, late: false },
+    reads: { swipes: { drop: [2] }, late: false },
     skipFails: true,
     says: "D62: the same with the call's second stroke (its first reveal) dropped, resolved as drawn: maxSwipes hedged (\"may still be cut\"), never \"fully visible\" with C cut",
     calls: [fullyC(RECYCLER_FREE, 'left')],
@@ -439,7 +439,7 @@ export const CAROUSEL_CASES: readonly CarouselCase[] = [
     cell: RECYCLER_FREE,
     platforms: ['android'],
     preDrag: PRE_DRAG_PX,
-    reads: { swipes: { drop: 2, shorten: { stroke: 1, px: 90 } }, late: false },
+    reads: { swipes: { drop: [2], shorten: { stroke: 1, px: 90 } }, late: false },
     skipFails: true,
     says: 'T11: the same with the probe sent 90 of its 142 px and the first reveal dropped: a cut proved by a short carry, then a held reveal: maxSwipes hedged or `unaimable`, never "fully visible" with C cut',
     calls: [fullyC(RECYCLER_FREE, 'left')],
