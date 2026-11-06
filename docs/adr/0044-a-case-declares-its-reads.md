@@ -8,14 +8,14 @@ Device calls, records, printed lines and the exit code are byte-identical to the
 - The live device loop sat at the top of the CLI (`live.ts`), and no test ran it. D30, D67, D69 and T7a each added a phase
   to it.
 - It inferred phases from three `c.group` branches: `logsSwipes`, the reads between calls, and the late read.
-- The late-read rule was split between the loop (whether) and `live-cases.ts#judged` (how), and the record was built in
+- The late-read rule was split between the loop (whether) and `judged` in `live-cases.ts` (how), and the record was built in
   two places, a skip's and a run's.
 - T7b adds cases that reach their first screen by a verb the harness does not perform, so a fourth inferred phase was
   coming.
 
 ## Decision
 
-**`scripts/truth/run-case.ts#runCase(case, source, rig)` runs one case on one source and answers its record and verdict.
+**`runCase(case, source, rig)` in `scripts/truth/run-case.ts` runs one case on one source and answers its record and verdict.
 What a case reads is `Case.reads`, never its group.**
 
 - `Case.reads` is `{ betweenCalls?: true; swipes?: true; late?: false }`. Unset is the forms' cycle. A group's cases share
