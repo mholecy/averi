@@ -23,7 +23,7 @@ const UNRESOLVED_VIEW =
   'Error: Activity not started, unable to resolve Intent { act=android.intent.action.VIEW dat=nosuch://x flg=0x10000000 }';
 const MONKEY_ABORTED = '** No activities found to run, monkey aborted.';
 const AM = ['am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'nosuch://x'];
-const MONKEY = ['monkey', '-p', 'p', '--pct-syskeys', '0', '-c', 'android.intent.category.LAUNCHER', '1'];
+const MONKEY = ['monkey', '-p', 'p', '--pct-syskeys', '0', '--pct-nav', '0', '--pct-majornav', '0', '-c', 'android.intent.category.LAUNCHER', '1'];
 const ARGV: Record<StartCommand, string[]> = { 'am start': AM, monkey: MONKEY };
 
 describe('runStart — am start', () => {

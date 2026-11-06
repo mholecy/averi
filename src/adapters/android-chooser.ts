@@ -10,7 +10,7 @@ import { everyNode, labelOf, rectCentre, type ChooserApp, type ChooserButton, ty
  * focus once after the start (CHOOSER_FOCUS_COMMAND) and asks chooserInFocus. Since D55b launch_app does the same
  * after its `-p` start (an intent scoped to the package, which two of its activities may handle), and after monkey's
  * refusal, where the chooser is only also in front: ADR 0041's D55b and D73 amendments. monkey itself starts over the
- * chooser, which goes (D73, 5 of 5 on API 33), so its success reads nothing.
+ * chooser, which goes (D73, on API 33), so its success reads nothing.
  *
  * The device facts (batch-9 D55, 2026-11-03, averi_lab emulator, Android 13 / API 33, main e734fedf;
  * `averilab://shared/open`, which the lab's `.MainActivity` and its alias `.Twin` both handle): a raw `am start` and
@@ -107,9 +107,9 @@ export function chooserInFocus(dump: string): string | undefined {
 }
 
 /**
- * The advice in monkey's refusal (D55b, chooserAlsoInFront), the one sentence about the chooser the adapter still words: a refusal is a
- * thrown error, whose message the adapter builds, and the adapter may not import upward (ARCHITECTURE.md §2). Its bytes
- * are a launch's advice in interact/app-holder-text.ts#appHolderText, written twice for that reason and pinned whole on
+ * The advice in monkey's refusal (D55b, chooserAlsoInFront), the one sentence about the chooser the adapter still words:
+ * a refusal is a thrown error, whose message the adapter builds, and the adapter may not import upward (ARCHITECTURE.md
+ * §2). Its bytes are a launch's advice in interact/app-holder-text.ts#appHolderText, written twice for that reason and pinned whole on
  * each side. Neutral on whose intent the chooser answers: a chooser left up by another app's link reads the same.
  */
 const REFUSAL_ADVICE =
@@ -117,9 +117,10 @@ const REFUSAL_ADVICE =
   "the device's default for the intent it answers); press_key back drops the chooser. averi taps nothing itself.";
 
 /**
- * The chooser beside monkey's refusal (D55b, D73): every refusal has its `** ` line, the chooser is never its cause
- * (with `--pct-syskeys 0` monkey starts over it; `** No activities found to run` exits 252 with it up or not), and it
- * is still what is in front (measured there), so it is named as also in front, with the advice. The caller's message leads.
+ * The chooser beside monkey's refusal (D55b, D73): every refusal has its `** ` line, and the chooser was not its cause
+ * on API 33 (with the launch's `--pct-… 0` flags monkey starts over it; `** No activities found to run` exits 252 with
+ * it up or not). It is still what is in front (measured there), so it is named as also in front, with the advice. The
+ * caller's message leads.
  */
 export function chooserAlsoInFront(component: string): string {
   return `Android's chooser (${component}) is also in front. ${REFUSAL_ADVICE}`;

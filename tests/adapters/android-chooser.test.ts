@@ -2,8 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet } from '../../src/adapters/android-chooser.js';
 import { everyNode, type ChooserSheet, type UiNode } from '../../src/adapters/types.js';
-import type { StartRefused } from '../../src/adapters/android-start.js';
-import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
 // D55 (ADR 0041): Android's "Open with" chooser in front after a deep link, judged by the focused component alone.

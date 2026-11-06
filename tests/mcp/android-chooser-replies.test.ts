@@ -59,10 +59,11 @@ const LINK_FAILED_OPEN = (url: string) =>
 /**
  * A real AndroidAdapter over the lab AVD's monkey as D73 measured it (API 33): without `--pct-syskeys 0` it exits 251 on
  * `** SYS_KEYS …`, with the chooser up or not, and starts nothing; with the flag it exits 0 and starts the app, with the
- * chooser up too. The focus read names the chooser when `chooser` says so.
+ * chooser up too. The focus read names the chooser when `chooser` says so. The started stdout
+ * (monkey-api33-d73-started-stdout.txt) is a SHAPE RECORD: runStart reads nothing on exit 0, so its bytes guard no averi code.
  */
 async function labMonkey(chooser: boolean): Promise<AndroidAdapter> {
-  const started = await fixture('monkey-api33-d73-pct-syskeys-0-stdout.txt');
+  const started = await fixture('monkey-api33-d73-started-stdout.txt');
   const refused = execErrorLikeExec('adb -s e shell monkey', 251, await fixture('monkey-api33-b11-chooser-exit251-stderr.txt'), {
     stdout: await fixture('monkey-api33-b11-chooser-exit251-stdout.txt'),
   });
@@ -75,7 +76,7 @@ async function labMonkey(chooser: boolean): Promise<AndroidAdapter> {
 }
 
 describe("launch_app with no activity: the reply over the lab's monkey (D73)", () => {
-  it.each([['from the launcher', false], ["with Android's chooser up: monkey starts over it", true]])('%s: Launched, no ⚠ line', async (_where, chooser) => {
+  it.each([['from the launcher', false], ['a focus read would name the chooser, but monkey\'s success reads none', true]])('%s: Launched, no ⚠ line', async (_where, chooser) => {
     const launched = await launchApp(await labMonkey(chooser), undefined, new EngineSession(), { appId: 'dev.averi.lab' });
     expect(launchText('android', launched)).toBe('Launched dev.averi.lab on android');
   });

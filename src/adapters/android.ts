@@ -324,11 +324,12 @@ export class AndroidAdapter implements DeviceAdapter {
       // when the package declares several (LeakCanary adds one in debug
       // builds, so this may open LeakCanary) — set app.android.activity in
       // averi.yaml to pin the entry point.
-      // `--pct-syskeys 0` (D73, ADR 0041's D73 amendment): monkey checks its key categories before any event, and with
-      // no HOME, BACK or volume key in the device's key map, as on the lab AVD, it aborts on `** SYS_KEYS has no physical
-      // keys…` (exit 251, 8 of 8 launches refused) unless their share of events is 0. Its one event is the launch.
+      // The three `--pct-… 0` (D73, ADR 0041's D73 amendment): monkey checks its key categories before any event and aborts
+      // on one with a share of events and no key in the device's key map: `** SYS_KEYS has no physical keys…`, exit 251, 8
+      // of 8 launches refused on the lab AVD. NAV_KEYS and MAJOR_NAV_KEYS abort the same way, per AOSP. Its one event is
+      // the launch, so no key category has a part in it.
       const outcome = await runStart(
-        ['monkey', '-p', packageName, '--pct-syskeys', '0', '-c', 'android.intent.category.LAUNCHER', '1'],
+        ['monkey', '-p', packageName, '--pct-syskeys', '0', '--pct-nav', '0', '--pct-majornav', '0', '-c', 'android.intent.category.LAUNCHER', '1'],
         (argv) => this.shell(argv),
       );
       if (outcome.kind === 'refused') {

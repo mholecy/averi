@@ -861,7 +861,7 @@ describe('AndroidAdapter interactions', () => {
       await adapter.launch('md.bank.app');
       expect(argvs).toEqual([
         ['-s', 'e', 'shell', 'am', 'start', '-n', 'md.bank.app/.MainActivity'],
-        ['-s', 'e', 'shell', 'monkey', '-p', 'md.bank.app', '--pct-syskeys', '0', '-c', 'android.intent.category.LAUNCHER', '1'],
+        ['-s', 'e', 'shell', 'monkey', '-p', 'md.bank.app', '--pct-syskeys', '0', '--pct-nav', '0', '--pct-majornav', '0', '-c', 'android.intent.category.LAUNCHER', '1'],
       ]);
     });
 
@@ -1140,13 +1140,13 @@ describe('AndroidAdapter interactions', () => {
   // D55b (ADR 0041's D55b amendment): launch_app with Android's chooser in front, on the batches' real replies
   // (averi_lab, API 33). After a `-p` start (an intent and no activity) D55's one focus read names the chooser in a ⚠
   // note — the headline stays "Launched", D56's shape on iOS; on monkey's refusal the same read names the chooser as also
-  // in front, never as the cause (D73: with `--pct-syskeys 0` monkey starts over it). A failed or unmatched read adds
+  // in front, not as the cause (D73: with `--pct-syskeys 0` monkey starts over it on API 33). A failed or unmatched read adds
   // nothing; `-n` and monkey's success read nothing.
   // E4d / E4c: batch-10's D55 E4 (main 139256a2) — `launch_app {intent: VIEW averilab://shared/x}` from the launcher
   // replied "Launched dev.averi.lab on android", the focus read 1.5 s later naming the chooser
   // (dumpsys-window-focus-api33-b10-after-launch-intent.txt); a plain `launch_app dev.averi.lab` (monkey) under the
   // chooser replied "monkey started nothing … monkey said: ** SYS_KEYS has no physical keys …", blaming the install
-  // and quoting monkey's emulator warning as the reason (…-after-launch-monkey.txt). batch-11's D55b (main a5fefd32)
+  // and quoting the line D55b then took for an emulator warning (…-after-launch-monkey.txt). batch-11's D55b (main a5fefd32)
   // kept what batch-10 did not: the `-p` start's stdout (am-start-p-api33-b11-chooser.txt), averi's own
   // focus read at its return (…-b11-after-launch-intent-start*.txt: the chooser as the activity 10 of 10, the window
   // `null` 7 times and the chooser's own 3), and monkey's whole refusal under the chooser: exit 251 3 of 3, stdout its
@@ -1160,7 +1160,7 @@ describe('AndroidAdapter interactions', () => {
     const RESOLVER = 'android/com.android.internal.app.ResolverActivity';
     const INTENT = { action: 'android.intent.action.VIEW', data: 'averilab://shared/x' };
     const START_P = ['-s', 'e', 'shell', 'am', 'start', '-p', 'dev.averi.lab', '-a', 'android.intent.action.VIEW', '-d', 'averilab://shared/x'];
-    const MONKEY = ['-s', 'e', 'shell', 'monkey', '-p', 'dev.averi.lab', '--pct-syskeys', '0', '-c', 'android.intent.category.LAUNCHER', '1'];
+    const MONKEY = ['-s', 'e', 'shell', 'monkey', '-p', 'dev.averi.lab', '--pct-syskeys', '0', '--pct-nav', '0', '--pct-majornav', '0', '-c', 'android.intent.category.LAUNCHER', '1'];
     const FOCUS = ['-s', 'e', 'shell', "dumpsys window displays | grep -E 'Display: mDisplayId=|mCurrentFocus=|mFocusedApp='"];
     /** D55c: the chooser's tree, read once the focus read named it after a `-p` start. */
     const DUMP = ['-s', 'e', 'exec-out', 'uiautomator', 'dump', '/dev/tty'];
@@ -1341,6 +1341,7 @@ describe('AndroidAdapter interactions', () => {
       expect(timeouts[1]).toBe(2_000);
     });
 
+    // A recorded oddity: batch-10 noted exit 252 and this line on stdout; every later run of it is exit 251, on stderr.
     it("D73: the line on stdout (batch-10's reply), the chooser read 1.5 s later: the same error", async () => {
       const failure = execErrorLikeExec('adb -s e shell monkey', 252, '', { stdout: `${MONKEY_LINE}\n` });
       const { adapter, argvs } = scripted({ monkey: failure, focus: await fixtureText('dumpsys-window-focus-api33-b10-after-launch-monkey.txt') });

@@ -64,7 +64,7 @@ import { ExecError, type ExecResult } from './exec.js';
  * `started`, whatever it printed. Every such line is a reason, and quoted:
  * `** SYS_KEYS has no physical keys but with factor 2.0%.` too, which aborts
  * monkey before any event (exit 251, D73; ADR 0041's D73 amendment) and which
- * the launch's `--pct-syskeys 0` keeps from being reached (android.ts).
+ * the launch's `--pct-… 0` flags keep from being reached (android.ts).
  *
  * What is NOT measured, written down here once (android.ts, the tests and
  * ARCHITECTURE.md point here): the exact text of monkey's line. The review
@@ -72,7 +72,7 @@ import { ExecError, type ExecResult } from './exec.js';
  * "** No activities found to run, monkey aborted." is the line in AOSP's
  * Monkey.java (getMainApps, printed with Logger.out — stdout; run() then
  * returns -4, which is the measured 252), and is the sample the tests use;
- * measured since, stdout, exit 252, with `--pct-syskeys 0` (D73).
+ * measured since, stdout, exit 252, with those flags (D73).
  * Every diagnosis in that file starts `** `, but not all go to stdout: that
  * one is Logger.out, while `** Error: Unknown option …` (run() returns -1,
  * exit 255), `** Error: Unable to connect to activity manager …` (-3, exit
