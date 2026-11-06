@@ -561,11 +561,11 @@ describe('launch_app — the entry activity', () => {
     expect(byTool).toEqual({ appId: 'md.bank.app', ...entry, activity });
   });
 
-  // 2026-10-09: what the adapter's launch says (AppHolder's caveat — iOS's
+  // 2026-10-09: what the adapter's launch says (AppHolder's `unknown` — iOS's
   // foreground wait, adapters/ios-foreground.ts) reaches the reply.
   it("the launch's note reaches the reply as a ⚠ line; a launch with none replies with the one line", async () => {
     const ios = home();
-    ios.launchNote = '3 s after launching md.bank.app, the UI tree was still the app labelled "Contacts"';
+    ios.launchDetail = '3 s after launching md.bank.app, the UI tree was still the app labelled "Contacts"';
     const { call } = await connect({ ios });
     const result = await call('launch_app', { platform: 'ios', appId: 'md.bank.app', configPath: await validConfig() });
     expect(result.isError).toBe(false);
@@ -576,11 +576,11 @@ describe('launch_app — the entry activity', () => {
 
   it("a WebDriverAgent launch's note (D48) reaches the reply as its ⚠ line, verbatim", async () => {
     const ios = home();
-    ios.launchNote =
+    ios.launchDetail =
       "3 s after launching md.bank.app, WebDriverAgent still read com.apple.MobileAddressBook as the active app — a ui_snapshot now reads that app's tree, on which an absent check passes. Read again; if it repeats, take a screenshot";
     const { call } = await connect({ ios });
     const result = await call('launch_app', { platform: 'ios', appId: 'md.bank.app', configPath: await validConfig() });
-    expect(result.text).toBe(`Launched md.bank.app on ios\n⚠ ${ios.launchNote}`);
+    expect(result.text).toBe(`Launched md.bank.app on ios\n⚠ ${ios.launchDetail}`);
   });
 
   // D49a (2026-11-02): open_deep_link hands the iOS adapter the project's app — a link to its own scheme waits until it

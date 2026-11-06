@@ -1166,10 +1166,11 @@ describe('AndroidAdapter interactions', () => {
     const ADVICE =
       'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
       "changes the device's default for the intent it answers); press_key back drops the chooser. averi taps nothing itself.";
+    /** Written on both sides of the seam (the words module, android.ts's NAME_THE_ACTIVITY): one constant, so changing only one fails here. */
+    const NAME_THE_ACTIVITY = '`activity:` on the launch step / launch_app';
     const NOTE =
       'Android has not brought dev.averi.lab forward yet: its chooser (android/com.android.internal.app.ResolverActivity) ' +
-      `is in front, and dev.averi.lab is not. ${ADVICE} Naming the activity (\`activity:\` on the launch step / ` +
-      'launch_app) starts it without the chooser.';
+      `is in front, and dev.averi.lab is not. ${ADVICE} Naming the activity (${NAME_THE_ACTIVITY}) starts it without the chooser.`;
     /** The chooser named as THE cause of monkey's refusal (monkey gave no reason of its own), its actual exit code. */
     const monkeyChooser = (exit: number) =>
       "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) " +
@@ -1177,7 +1178,7 @@ describe('AndroidAdapter interactions', () => {
     /** Today's monkey refusal, quoting `said` — the reply when the focus read names no chooser. */
     const monkeyRefused = (said: string) =>
       'monkey started nothing in dev.averi.lab — check that dev.averi.lab is installed and has a launcher activity, ' +
-      'or name the activity to start: `activity:` on the launch step / launch_app, or app.android.activity in ' +
+      `or name the activity to start: ${NAME_THE_ACTIVITY}, or app.android.activity in ` +
       `averi.yaml — or monkey itself could not run; its line says which. monkey said: ${said}`;
     type Answer = string | Error;
     /** Each call's argv and timeout; `am start` answers `start`, monkey `monkey`, the focus read `focus`, the dump `dump`, anything else ''. */

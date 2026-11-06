@@ -983,10 +983,10 @@ export interface LaunchOptions {
  * - `chooser`: Android's chooser holds it (D55, D55b): the focus read after the start, and its sheet when read (D55c).
  * - `unknown`: nothing is known to hold it, and iOS's foreground wait did not confirm `app` (D48, D49a): `wait` says how
  *   it ended: it read another app to the bound (`saw`), it could not tell (`unchecked`), or WebDriverAgent is not up and
- *   nothing was asked (`not-asked`). `detail` is a sentence from the adapter, about the wait and its tree source alone
- *   (the bound, the label or bundle read, the names asked, each source's lag): nothing above the adapters decides on
- *   those. What may hold the app (iOS's "Open in …?") is the words module's, not in `detail`. One clause names it, as
- *   a description of what was read: WDA's "SpringBoard (the home screen, the launch animation or a system alert)".
+ *   nothing was asked (`not-asked`). `detail` is a sentence from the adapter: the wait's account (the bound, the label
+ *   or bundle read, the names asked, each source's lag) and its advice about re-reading it. Nothing above the adapters
+ *   decides on those. What may hold the app (iOS's "Open in …?") is the words module's, not in `detail`. One clause names
+ *   it, as a description of what was read: WDA's "SpringBoard (the home screen, the launch animation or a system alert)".
  *   `springBoardTree`: the tree read to the bound was SpringBoard's (idb's; WDA names an active app, not a tree).
  *
  * A launch never FAILS for what holds it: the app was launched, the answer is about the next read. A link's holder

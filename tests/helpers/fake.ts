@@ -295,11 +295,11 @@ export class FakeAdapter implements DeviceAdapter {
   }
 
   /** The detail the next launches answer with (AppHolder's `unknown`: iOS's foreground wait), for the renderers' tests: a launch's text is its detail, verbatim. */
-  launchNote: string | undefined;
+  launchDetail: string | undefined;
 
   async launch(appId: string, opts: LaunchOptions = {}): Promise<AppHolder> {
     this.launches.push({ appId, ...opts });
-    return this.launchNote === undefined ? { holder: 'none' } : { holder: 'unknown', wait: 'saw', app: appId, detail: this.launchNote };
+    return this.launchDetail === undefined ? { holder: 'none' } : { holder: 'unknown', wait: 'saw', app: appId, detail: this.launchDetail };
   }
 
   /** The links opened, with what they were opened with; `deepLinkAnswer` is what the next ones answer (default: no holder). */

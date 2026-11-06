@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AppHolder, ChooserSheet, LinkAlert } from '../../src/adapters/types.js';
-import { appHolderText, holdsIt } from '../../src/interact/app-holder-text.js';
+import { appHolderText, holdsTheApp } from '../../src/interact/app-holder-text.js';
 
 // A10 (ADR 0041's and ADR 0032's A10 amendments): every word about what holds the app, pinned through the module's one
 // interface: the subject (a link or an app) and the closed answer. The kind of holder decides the wording; no platform
@@ -84,16 +84,16 @@ describe('nothing known to hold it: the foreground wait could not confirm the ap
   });
 });
 
-describe('holdsIt: whether a holder is named, which a link\'s reply says instead of "Opened"', () => {
+describe('holdsTheApp: whether a holder is named, which a link\'s reply says instead of "Opened"', () => {
   it('an alert and a chooser hold it', () => {
-    expect(holdsIt({ holder: 'alert', alert: OPEN_IN })).toBe(true);
-    expect(holdsIt({ holder: 'chooser', chooser: { component: 'android/x.ResolverActivity' } })).toBe(true);
+    expect(holdsTheApp({ holder: 'alert', alert: OPEN_IN })).toBe(true);
+    expect(holdsTheApp({ holder: 'chooser', chooser: { component: 'android/x.ResolverActivity' } })).toBe(true);
   });
 
   it('nothing named and nothing known do not', () => {
-    expect(holdsIt({ holder: 'none' })).toBe(false);
-    expect(holdsIt({ holder: 'unknown', wait: 'not-asked', app: 'dev.averi.lab' })).toBe(false);
-    expect(holdsIt({ holder: 'unknown', wait: 'saw', app: 'dev.averi.lab', detail: 'x' })).toBe(false);
+    expect(holdsTheApp({ holder: 'none' })).toBe(false);
+    expect(holdsTheApp({ holder: 'unknown', wait: 'not-asked', app: 'dev.averi.lab' })).toBe(false);
+    expect(holdsTheApp({ holder: 'unknown', wait: 'saw', app: 'dev.averi.lab', detail: 'x' })).toBe(false);
   });
 });
 

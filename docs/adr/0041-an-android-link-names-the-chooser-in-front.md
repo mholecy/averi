@@ -480,6 +480,8 @@ it.
 survived, 4 without coverage: the two `never` defaults, unreachable while the types hold); `android-chooser.ts` 100 % (152 mutants); every other score unchanged. Golden
 Changed 0 (it replays tree reads, no launch or link seam).
 
-Residual: a change to the launch's chooser advice must be made twice (the words module and `REFUSAL_ADVICE`). The guard is
-`tests/adapters/android.test.ts`: its one `ADVICE` literal feeds both the note's and monkey's expected text, so changing
-only one side fails there.
+Residual: two wordings are written on both sides of the seam, for the same reason (thrown errors built in the adapter): a
+launch's chooser advice (the words module and `REFUSAL_ADVICE`) and the "`activity:` on the launch step / launch_app" hint
+(the words module and `android.ts`'s `NAME_THE_ACTIVITY`, one constant until A10). The guard is
+`tests/adapters/android.test.ts`: its one `ADVICE` and one `NAME_THE_ACTIVITY` constant each feed both the note's and
+monkey's expected text, so changing only one side fails there.

@@ -1,13 +1,16 @@
 import type { AppHolder, ChooserButton, ChooserSheet, LinkAlert, LinkChooser, Point } from '../adapters/types.js';
 
 /**
- * Every word averi says about what holds or may hold the app after a launch or a deep link (A10; ADR 0041's and ADR 0032's A10
- * amendments): `appHolderText` says it and `holdsIt` says whether a holder is named, over the adapters' closed answer
- * (adapters/types.ts#AppHolder). The
- * detectors decide the facts, per platform (adapters/ios-foreground.ts, adapters/ios-system-alert.ts,
- * adapters/android-chooser.ts); these sentences are the one place they are worded. The holder's kind decides the
- * wording, an alert's or a chooser's, and no platform is asked: "iOS has not" belongs to an alert and "Android has not"
- * to a chooser, because those are the facts each platform reports.
+ * What averi says about what holds or may hold the app after a launch or a deep link (A10; ADR 0041's and ADR 0032's A10
+ * amendments): `appHolderText` says it and `holdsTheApp` says whether a holder is named, over the adapters' closed answer
+ * (adapters/types.ts#AppHolder). The detectors decide the facts, per platform (adapters/ios-foreground.ts,
+ * adapters/ios-system-alert.ts, adapters/android-chooser.ts). The holder's kind decides the wording, an alert's or a
+ * chooser's, and no platform is asked: "iOS has not" belongs to an alert and "Android has not" to a chooser, because those
+ * are the facts each platform reports.
+ *
+ * What stays worded in the adapters, as those ADRs state: monkey's refusals, thrown errors (`REFUSAL_ADVICE` and
+ * `chooserAlsoInFront` in adapters/android-chooser.ts), and the wait's `detail`, whose WDA clause names a system alert
+ * as one thing SpringBoard may be showing.
  *
  * Why in interact/ rather than mcp/tool-text.ts: a launch's text is a line of the flow's trace too, and the flow engine
  * may not import mcp/ (ARCHITECTURE.md §2), the precedent being interact/fill-text.ts and interact/scroll-text.ts: the
@@ -23,7 +26,7 @@ export type HeldSubject = { link: string } | { app: string };
  * A table over every kind, so a new kind does not compile until it is decided here.
  */
 const NAMES_A_HOLDER: Record<AppHolder['holder'], boolean> = { none: false, alert: true, chooser: true, unknown: false };
-export const holdsIt = (answer: AppHolder): boolean => NAMES_A_HOLDER[answer.holder];
+export const holdsTheApp = (answer: AppHolder): boolean => NAMES_A_HOLDER[answer.holder];
 
 /**
  * The text of `answer` for `subject`: a named holder's sentences, what the wait did not confirm (unknownText), and none

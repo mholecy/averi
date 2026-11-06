@@ -22,7 +22,7 @@
 import { everyNode, type AppHolder, type Platform, type Stroke, type UiNode } from '../adapters/types.js';
 import { BARE_TREE_CONTENTS, isBareTree, nodeCount, treeShape } from '../ui-tree/bare-tree.js';
 import { charactersText } from '../util/count.js';
-import { appHolderText, holdsIt } from '../interact/app-holder-text.js';
+import { appHolderText, holdsTheApp } from '../interact/app-holder-text.js';
 import type { Direction } from '../interact/swipe.js';
 import { launchedLine, WIPE_LABEL, type Launched } from '../flow/launch.js';
 import { ASSERT_TIMEOUT_MS } from '../verify/assert.js';
@@ -95,7 +95,8 @@ export const launchText = (platform: Platform, launched: Launched): string =>
  */
 export const deepLinkText = (platform: Platform, url: string, answer: AppHolder): string => {
   const said = appHolderText({ link: url }, answer);
-  return said !== undefined && holdsIt(answer) ? said : `Opened ${url} on ${platform}` + warnLine(said);
+  const headline = holdsTheApp(answer) ? said : undefined;
+  return headline ?? `Opened ${url} on ${platform}` + warnLine(said);
 };
 
 /**

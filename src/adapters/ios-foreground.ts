@@ -240,7 +240,7 @@ export interface ForegroundCheck {
 /**
  * Read until the Application label is one of the bundle's names (see the module comment), and return what holds the
  * app: nothing named when it confirmed that; iOS's system alert when it found one (D54, D56), `asksForApp` judged with
- * the names the wait held; else how the wait ended, with its detail about the tree source (adapters/types.ts#AppHolder).
+ * the names the wait held; else how the wait ended, with its detail (adapters/types.ts#AppHolder).
  * The same answer on both verbs: what a link's reply leads with (it may wait behind iOS's "Open in …?", D49a) and that a
  * launch stays silent when nothing was asked are interact/app-holder-text.ts#appHolderText's.
  */

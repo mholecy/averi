@@ -1409,7 +1409,7 @@ flows:
     expect(trace).toContainEqual({ action: 'launch', detail: 'md.bank.app' });
   });
 
-  // 2026-10-09: the launch's caveat (AppHolder's caveat — iOS's foreground
+  // 2026-10-09: the launch's caveat (AppHolder's `unknown` — iOS's foreground
   // wait giving up, adapters/ios-foreground.ts) is a ⚠ line right under the
   // launch line, in launch_app's words; the flow goes on.
   it("the launch's note is a `⚠ launch` line right under the launch line, and the flow goes on; no note, no line", async () => {
@@ -1424,7 +1424,7 @@ flows:
 `);
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     fake.platform = 'ios';
-    fake.launchNote = 'the UI tree was still the app labelled "Contacts"';
+    fake.launchDetail = 'the UI tree was still the app labelled "Contacts"';
     const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'open' });
     const at = trace.findIndex((t) => t.action === 'launch');
     expect(trace.slice(at, at + 2)).toEqual([
@@ -1433,7 +1433,7 @@ flows:
     ]);
     expect(trace.at(-1)).toEqual({ action: 'flow open', detail: 'done' });
 
-    fake.launchNote = undefined;
+    fake.launchDetail = undefined;
     const quiet = await FlowEngine.run(cfg, fake, FAST, { flow: 'open' });
     expect(quiet.filter((t) => t.action === '⚠ launch')).toEqual([]);
   });
@@ -1451,7 +1451,7 @@ flows:
 `);
     const fake = new FakeAdapter(buildScreens(), 'dashboard');
     fake.platform = 'ios';
-    fake.launchNote = 'the UI tree was still the app labelled "Contacts"';
+    fake.launchDetail = 'the UI tree was still the app labelled "Contacts"';
     const trace = await FlowEngine.run(cfg, fake, FAST, { flow: 'cold' });
     const at = trace.findIndex((t) => t.action === 'launch');
     expect(trace.slice(at, at + 3).map((t) => t.action)).toEqual(['launch', '⚠ launch', '⚠ clearState']);
