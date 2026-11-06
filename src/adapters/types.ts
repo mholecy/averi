@@ -997,7 +997,8 @@ export type AppHolder =
   | { holder: 'none' }
   | { holder: 'alert'; alert: LinkAlert }
   | { holder: 'chooser'; chooser: LinkChooser }
-  | { holder: 'unknown'; wait: 'saw' | 'unchecked'; app: string; detail: string; springBoardTree?: true }
+  | { holder: 'unknown'; wait: 'saw'; app: string; detail: string; springBoardTree?: true }
+  | { holder: 'unknown'; wait: 'unchecked'; app: string; detail: string }
   | { holder: 'unknown'; wait: 'not-asked'; app: string };
 
 /**
@@ -1127,7 +1128,7 @@ export interface DeviceAdapter {
    * `am start` refusal (no app's intent filter matches the url, or the
    * activity refused it; android-start.ts). Returns what holds the app, as a
    * launch does (AppHolder): on iOS, a link to a scheme of `opts.appId`'s app
-   * returns once the tree source names that app, or with a holder or a caveat
+   * returns once the tree source names that app, or with a holder or `unknown`
    * when a bounded wait did not see it (iOS may be asking "Open in …?" — D49a,
    * D54, adapters/ios-foreground.ts); on Android the chooser, when the focus
    * read names it (D55); every other link says nothing.

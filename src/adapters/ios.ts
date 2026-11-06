@@ -524,7 +524,7 @@ export class IosAdapter implements DeviceAdapter {
    * failed one too. For an own-scheme link the accessibility writes carry the scheme's pre-approval for simctl's opener
    * (prepareForOpen, D58), so iOS should not ask "Open in “…”?" at all; every other link writes what it wrote before.
    * `front` moves to the app only when the wait saw it in front. When iOS's system alert holds the link (D54), the
-   * answer names it instead of a caveat: on idb from the wait's own reads, on WDA from one short `/source`
+   * answer names it instead of `unknown`: on idb from the wait's own reads, on WDA from one short `/source`
    * read at the bound (IosTreeSource.systemAlert) — never a tap.
    */
   async openDeepLink(url: string, opts: DeepLinkOptions = {}): Promise<AppHolder> {
@@ -533,7 +533,7 @@ export class IosAdapter implements DeviceAdapter {
     await this.simctl(['openurl', this.udid, url]);
     if (approval === undefined) return { holder: 'none' };
     const handler = approval.bundleId;
-    // A link's wait has a caveat or an alert in every case but a match (ios-foreground.ts#awaitForeground).
+    // A link's wait answers `unknown` or an alert in every case but a match (ios-foreground.ts#awaitForeground).
     const answer = await awaitForeground(this.foregroundCheck(handler, { link: url }));
     if (answer.holder === 'none') this.front = { kind: 'launched', bundleId: handler };
     return answer;

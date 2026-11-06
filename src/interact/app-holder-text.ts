@@ -2,7 +2,8 @@ import type { AppHolder, ChooserButton, ChooserSheet, LinkAlert, LinkChooser, Po
 
 /**
  * Every word averi says about what holds or may hold the app after a launch or a deep link (A10; ADR 0041's and ADR 0032's A10
- * amendments): one interface, `appHolderText`, over the adapters' closed answer (adapters/types.ts#AppHolder). The
+ * amendments): `appHolderText` says it and `holdsIt` says whether a holder is named, over the adapters' closed answer
+ * (adapters/types.ts#AppHolder). The
  * detectors decide the facts, per platform (adapters/ios-foreground.ts, adapters/ios-system-alert.ts,
  * adapters/android-chooser.ts); these sentences are the one place they are worded. The holder's kind decides the
  * wording, an alert's or a chooser's, and no platform is asked: "iOS has not" belongs to an alert and "Android has not"
@@ -81,10 +82,9 @@ function unknownText(subject: HeldSubject, answer: Extract<AppHolder, { holder: 
     case 'not-asked':
       return forLink ? linkNotAsked(answer.app) : undefined;
     case 'saw':
-    case 'unchecked': {
-      const lead = !forLink ? '' : answer.wait === 'saw' ? linkSaw(answer.app) : linkUnchecked(answer.app);
-      return `${lead}${answer.detail}${answer.springBoardTree === true ? SPRINGBOARD_TREE : ''}`;
-    }
+      return `${forLink ? linkSaw(answer.app) : ''}${answer.detail}${answer.springBoardTree === true ? SPRINGBOARD_TREE : ''}`;
+    case 'unchecked':
+      return `${forLink ? linkUnchecked(answer.app) : ''}${answer.detail}`;
     default: {
       const unworded: never = answer;
       return unworded;

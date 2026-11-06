@@ -154,7 +154,7 @@ describe('deepLinkText', () => {
     expect(text.replace('"Allow “Lab” to use your location?"', '')).not.toMatch(/Open in|asks/);
   });
 
-  it('no "Opened" headline and no ⚠ line with an alert; a note alone keeps both', () => {
+  it('no "Opened" headline and no ⚠ line with an alert; the wait unconfirmed keeps both', () => {
     expect(deepLinkText('ios', 'averilab://d54', { holder: 'alert', alert: { ...alert, asksForApp: true } })).not.toMatch(/Opened|⚠|\n/);
     expect(deepLinkText('ios', 'averilab://d54', { holder: 'unknown', wait: 'not-asked', app: 'x' })).toMatch(/^Opened averilab:\/\/d54 on ios\n⚠ whether x came forward/);
   });

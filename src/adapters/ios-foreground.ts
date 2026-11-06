@@ -343,7 +343,7 @@ async function poll(check: ForegroundCheck): Promise<WaitEnd> {
       const alert = staleBundle === SPRINGBOARD_BUNDLE ? await alertAtBound(check) : undefined;
       if (alert !== undefined) return alert;
       if (staleBundle !== undefined) return { kind: 'saw', note: stillReads(check, staleBundle) };
-      if (stale !== undefined) return { kind: 'saw', note: notInFront(check, stale, names ?? []), springBoardTree: stale.trim() === '' };
+      if (stale !== undefined) return { kind: 'saw', note: notInFront(check, stale, names ?? []), springBoardTree: isSpringBoard(stale) };
       if (unlabelled) {
         return unchecked(check, `${WORDS[check.source].unlabelled} for the ${formatSeconds(FOREGROUND_WAIT_MS)} averi waited`);
       }
@@ -382,9 +382,12 @@ const headline = (e: unknown): string => errorMessage(e).split('\n')[0];
 
 const quoted = (names: readonly string[]) => names.map((n) => `"${n}"`).join(' or ');
 
-/** SpringBoard's Application is labelled with a single space: named as what it is, not as `" "`. */
+/** Whether an Application label is SpringBoard's, labelled with a single space. */
+const isSpringBoard = (label: string): boolean => label.trim() === '';
+
+/** The label read, SpringBoard's named as what it is, not as `" "`. */
 const whose = (label: string) =>
-  label.trim() === '' ? "SpringBoard's (the home screen or the launch animation)" : `the app labelled "${label}"`;
+  isSpringBoard(label) ? "SpringBoard's (the home screen or the launch animation)" : `the app labelled "${label}"`;
 
 /**
  * The note for a label that never matched, chosen by the label (see the
@@ -399,7 +402,7 @@ function notInFront(check: ForegroundCheck, label: string, names: readonly strin
     `${formatSeconds(FOREGROUND_WAIT_MS)} after ${after(check)}${names.length > 0 ? ` (${quoted(names)})` : ''}, ` +
     `the UI tree was still ${whose(label)} — iOS can hand idb the previous app's tree for a second or more after an app ` +
     'switch, so a read now may judge the wrong app (an absent check passes on it). ';
-  if (label.trim() === '') {
+  if (isSpringBoard(label)) {
     // SpringBoard is never the app under another name. What a screenshot can still tell, which part of it is in front,
     // is said above the adapters (the answer's `springBoardTree`).
     return `${head}${READ_AGAIN[0].toUpperCase()}${READ_AGAIN.slice(1)}`;
