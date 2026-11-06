@@ -75,7 +75,7 @@ const linkNotAsked = (app: string): string =>
 const SPRINGBOARD_TREE = '. A screenshot does tell one thing here: whether a system alert is in front (answer it) or the home screen still is';
 
 /**
- * The wait did not confirm the app, and knows no holder (D48, D49a): the wait's `detail` (about its tree source), led for
+ * The wait did not confirm the app, and knows no holder (D48, D49a): the wait's `detail` (its account and its advice on re-reading), led for
  * a link by what may hold it — never a bare "Opened" for a link that may wait behind iOS's "Open in …?". A WDA not up
  * says so for a link and nothing for a launch, which has no confirmation to ask for.
  */
