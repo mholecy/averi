@@ -3,8 +3,8 @@ import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
-import { causeOf, refusalReasons, runStart, startSaid, type StartRefused } from './android-start.js';
-import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet, monkeyChooserRefusal } from './android-chooser.js';
+import { causeOf, runStart, startSaid, type StartRefused } from './android-start.js';
+import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet } from './android-chooser.js';
 import { encodePng } from './png-encode.js';
 import { screencapRaw, screenshotPng, type ScreenshotSource } from './screenshot-bytes.js';
 import { ViewportMemo } from './viewport-memo.js';
@@ -324,21 +324,19 @@ export class AndroidAdapter implements DeviceAdapter {
       // when the package declares several (LeakCanary adds one in debug
       // builds, so this may open LeakCanary) — set app.android.activity in
       // averi.yaml to pin the entry point.
+      // The three `--pct-… 0` (D73, ADR 0041's D73 amendment): monkey checks its key categories before any event and aborts
+      // on one with a share of events and no key in the device's key map: `** SYS_KEYS has no physical keys…`, exit 251, 8
+      // of 8 launches refused on the lab AVD. NAV_KEYS and MAJOR_NAV_KEYS abort the same way, per AOSP. Its one event is
+      // the launch, so no key category has a part in it.
       const outcome = await runStart(
-        ['monkey', '-p', packageName, '-c', 'android.intent.category.LAUNCHER', '1'],
+        ['monkey', '-p', packageName, '--pct-syskeys', '0', '--pct-nav', '0', '--pct-majornav', '0', '-c', 'android.intent.category.LAUNCHER', '1'],
         (argv) => this.shell(argv),
       );
       if (outcome.kind === 'refused') {
-        // D55b: with Android's chooser in front monkey starts nothing (exit 251 on API 33, batch-11) and its one `** `
-        // line is the emulator's SYS_KEYS warning, not a reason. So one focus read, on the refusal only (a monkey that
-        // started something pays nothing). The chooser named and no reason of monkey's own: the chooser is the cause.
-        // The chooser named beside a real reason: that reason leads, the chooser is also in front. No chooser named
-        // (a failed or unmatched read): today's error byte for byte, the warning quoted as before.
+        // One focus read, on the refusal only (a monkey that started something pays nothing): the chooser is not why
+        // monkey refused (D73), but it is what is in front, so it is named after monkey's reason. No chooser named (a
+        // failed or unmatched read): the refusal alone.
         const chooser = await this.chooserInFront();
-        const reasons = refusalReasons(outcome);
-        if (chooser !== undefined && reasons.length === 0) {
-          throw new Error(monkeyChooserRefusal(packageName, chooser, outcome), causeOf(outcome));
-        }
         // monkey's reason may be on its stdout, which the ExecError's
         // message drops — read here, or this would fail with no reason at
         // all. Not every reason is the package's: monkey itself may have
@@ -347,7 +345,7 @@ export class AndroidAdapter implements DeviceAdapter {
           `monkey started nothing in ${packageName} — check that ${packageName} is installed and has a launcher ` +
           `activity, or name the activity to start: ${NAME_THE_ACTIVITY}, or ` +
           `${ACTIVITY_IN_CONFIG} — or monkey itself could not run; its line says which. ` +
-          startSaid(outcome, chooser === undefined ? outcome.lines : reasons);
+          startSaid(outcome);
         throw new Error(
           chooser === undefined ? monkeyRefusal : `${monkeyRefusal} ${chooserAlsoInFront(chooser)}`,
           causeOf(outcome),

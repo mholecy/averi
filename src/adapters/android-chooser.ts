@@ -1,4 +1,3 @@
-import type { StartRefused } from './android-start.js';
 import { everyNode, labelOf, rectCentre, type ChooserApp, type ChooserButton, type ChooserSheet, type UiNode } from './types.js';
 
 /**
@@ -10,7 +9,8 @@ import { everyNode, labelOf, rectCentre, type ChooserApp, type ChooserButton, ty
  * (android-start.ts): the start was right, but which activity it started was never asked. So openDeepLink reads the
  * focus once after the start (CHOOSER_FOCUS_COMMAND) and asks chooserInFocus. Since D55b launch_app does the same
  * after its `-p` start (an intent scoped to the package, which two of its activities may handle), and after monkey's
- * refusal (monkey starts nothing over the chooser): ADR 0041's D55b amendment.
+ * refusal, where the chooser is only also in front: ADR 0041's D55b and D73 amendments. monkey itself starts over the
+ * chooser, which goes (D73, on API 33), so its success reads nothing.
  *
  * The device facts (batch-9 D55, 2026-11-03, averi_lab emulator, Android 13 / API 33, main e734fedf;
  * `averilab://shared/open`, which the lab's `.MainActivity` and its alias `.Twin` both handle): a raw `am start` and
@@ -107,33 +107,20 @@ export function chooserInFocus(dump: string): string | undefined {
 }
 
 /**
- * The advice in monkey's refusal (D55b), the one sentence about the chooser the adapter still words: a refusal is a
- * thrown error, whose message the adapter builds, and the adapter may not import upward (ARCHITECTURE.md §2). Its bytes
- * are a launch's advice in interact/app-holder-text.ts#appHolderText, written twice for that reason and pinned whole on
- * each side. Neutral on whose intent the chooser answers: a chooser left up by another app's link reads the same.
+ * The advice in monkey's refusal (D55b, chooserAlsoInFront), the one sentence about the chooser the adapter still words:
+ * a refusal is a thrown error, whose message the adapter builds, and the adapter may not import upward (ARCHITECTURE.md
+ * §2). Its bytes are a launch's advice in interact/app-holder-text.ts#appHolderText, written twice for that reason and
+ * pinned whole on each side. Neutral on whose intent the chooser answers: a chooser left up by another app's link reads the same.
  */
 const REFUSAL_ADVICE =
   'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it changes ' +
   "the device's default for the intent it answers); press_key back drops the chooser. averi taps nothing itself.";
 
 /**
- * monkey's refusal when the chooser is in front and monkey gave no reason of its own (D55b; refusalReasons empty, its
- * only `** ` line the emulator's SYS_KEYS warning): monkey starts nothing over the chooser (exit 251 3 of 3 in
- * batch-11, averi_lab API 33; batch-10's refusal was recorded as 252), so the message names the chooser as the cause
- * instead of the install, with monkey's actual exit code when it had one (the refusal's ExecError; none at exit 0, and
- * `null` on a signal). It quotes no line; the ExecError, the caller's cause, keeps the whole output.
- */
-export function monkeyChooserRefusal(packageName: string, component: string, refused: StartRefused): string {
-  const exitCode = refused.cause?.exitCode;
-  return (
-    `monkey started nothing in ${packageName}: Android's chooser (${component}) is in front, and monkey starts ` +
-    `nothing over it${exitCode == null ? '' : ` (it exited ${exitCode})`}. ${REFUSAL_ADVICE} Then launch again.`
-  );
-}
-
-/**
- * The chooser beside a refusal with a reason of its own (D55b: monkey's real `** ` line, e.g. `** No activities found
- * to run`): not claimed as the cause, only named as also in front, with the advice. The caller's message leads.
+ * The chooser beside monkey's refusal (D55b, D73): every refusal has its `** ` line, and the chooser was not its cause
+ * on API 33 (with the launch's `--pct-… 0` flags monkey starts over it; `** No activities found to run` exits 252 with
+ * it up or not). It is still what is in front (measured there), so it is named as also in front, with the advice. The
+ * caller's message leads.
  */
 export function chooserAlsoInFront(component: string): string {
   return `Android's chooser (${component}) is also in front. ${REFUSAL_ADVICE}`;

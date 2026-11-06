@@ -1,0 +1,13 @@
+  bash arg: -p
+  bash arg: dev.averi.lab
+  bash arg: --pct-syskeys
+  bash arg: 0
+  bash arg: --pct-nav
+  bash arg: 0
+  bash arg: --pct-majornav
+  bash arg: 0
+  bash arg: -c
+  bash arg: android.intent.category.LAUNCHER
+  bash arg: 1
+Events injected: 1
+## Network stats: elapsed time=10ms (0ms mobile, 0ms wifi, 10ms not connected)

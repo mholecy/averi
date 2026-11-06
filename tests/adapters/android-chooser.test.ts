@@ -1,9 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet, monkeyChooserRefusal } from '../../src/adapters/android-chooser.js';
+import { CHOOSER_FOCUS_COMMAND, chooserAlsoInFront, chooserInFocus, chooserSheet } from '../../src/adapters/android-chooser.js';
 import { everyNode, type ChooserSheet, type UiNode } from '../../src/adapters/types.js';
-import type { StartRefused } from '../../src/adapters/android-start.js';
-import { execErrorLikeExec } from '../helpers/exec-error.js';
 import { parseDump } from '../helpers/android-dumps.js';
 
 // D55 (ADR 0041): Android's "Open with" chooser in front after a deep link, judged by the focused component alone.
@@ -323,39 +321,14 @@ describe('CHOOSER_FOCUS_COMMAND — each display\'s header and focus lines of `d
   });
 });
 
-// D55b (ADR 0041's D55b amendment): monkey's refusal with the chooser in front, a thrown error and so worded here, each
+// D55b, D73 (ADR 0041's amendments): monkey's refusal with the chooser also in front, a thrown error and so worded here,
 // pinned whole (D55's first mutation run lost two mutants to unpinned advice strings). The chooser's other words:
 // tests/interact/app-holder-text.test.ts (A10).
-describe('D55b — monkey\'s refusal: monkeyChooserRefusal, chooserAlsoInFront', () => {
+describe('D55b — monkey\'s refusal: chooserAlsoInFront', () => {
   /** The advice both launch paths share: neutral on whose intent the chooser answers (it may be another link's). */
   const LAUNCH_ADVICE =
     'Take a ui_snapshot, tap the app you mean, then its "Just once" button if it shows one (never "Always": it ' +
     "changes the device's default for the intent it answers); press_key back drops the chooser. averi taps nothing itself.";
-  const SYS_KEYS = '** SYS_KEYS has no physical keys but with factor 2.0%.';
-  const MONKEY_HEAD = "monkey started nothing in dev.averi.lab: Android's chooser (android/com.android.internal.app.ResolverActivity) is in front, and monkey starts nothing over it";
-
-  /** monkey's refusal as runStart reports it: its `** ` lines, and the ExecError of its exit when it had one. */
-  const refusedBy = (lines: string[], exitCode?: number | null): StartRefused => ({
-    kind: 'refused',
-    command: 'monkey',
-    lines,
-    ...(exitCode !== undefined && { cause: execErrorLikeExec('adb -s e shell monkey', exitCode, '') }),
-  });
-
-  it("monkeyChooserRefusal: the chooser as THE cause, monkey's actual exit code, the shared advice — no line quoted", () => {
-    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, refusedBy([SYS_KEYS], 251))).toBe(
-      `${MONKEY_HEAD} (it exited 251). ${LAUNCH_ADVICE} Then launch again.`,
-    );
-    expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, refusedBy([SYS_KEYS], 252))).toBe(
-      `${MONKEY_HEAD} (it exited 252). ${LAUNCH_ADVICE} Then launch again.`,
-    );
-  });
-
-  it('monkeyChooserRefusal with no exit code (exit 0, so no cause; or a signal, `null`): no exit clause', () => {
-    for (const refused of [refusedBy([SYS_KEYS]), refusedBy([SYS_KEYS], null)]) {
-      expect(monkeyChooserRefusal('dev.averi.lab', RESOLVER, refused)).toBe(`${MONKEY_HEAD}. ${LAUNCH_ADVICE} Then launch again.`);
-    }
-  });
 
   it('chooserAlsoInFront: the chooser named beside a reason of its own, with the shared advice', () => {
     expect(chooserAlsoInFront(RESOLVER)).toBe(`Android's chooser (android/com.android.internal.app.ResolverActivity) is also in front. ${LAUNCH_ADVICE}`);
