@@ -1,0 +1,6 @@
+2026-11-06, emulator-5554, after a 440-px pre-drag and a 142-px 300-ms `input swipe`; dumpsys gfxinfo framestats, median/max ms per phase.
+dev.averi.lab frames 24 total 92.8/175.9  input 3.9/7.7  anim 0.0/5.3  trav 0.1/0.5  draw 1.0/1.7  syncq 0.1/0.3  sync 0.0/0.7  issue 0.3/0.8  swap 42.5/98.8  gap 42.0/87.1
+com.android.settings (400-px drag) frames 35 total 81.7/192.1  input 0.0/0.9  anim 0.0/0.9  trav 0.0/0.6  draw 0.2/16.7  syncq 0.3/57.0  sync 0.2/1.9  issue 1.1/23.5  swap 25.1/109.8  gap 7.9/97.9
+gap = IntendedVsync to HandleInputStart; swap = SwapBuffers to FrameCompleted.
+dev.averi.lab gfxinfo: janky 20 of 27, 50th percentile 73 ms, 90th 105 ms; Settings: janky 20 of 36, 50th 81 ms.
+dumpsys input RecentQueue after the 142-px stroke, ages in ms: 1347 1344 1325 1302 1202 1101 1046 (down to lift 301 ms; the last gaps ~100 ms).

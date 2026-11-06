@@ -7,6 +7,8 @@ way past kept after the remedy, a fill into the strip refused by design, k7's "f
 Amended 2026-11-03 (D62: a held reveal after a carried proof is doubted once — see the amendment below).
 Amended 2026-11-05 (D68: a reveal this call's own strokes say would most likely overshoot is not sent — see the
 amendment below).
+Amended 2026-11-06 (T11: every held reveal on a proven cut is doubted once, however far the proving stroke carried the
+match; D62's carry line is gone — see the amendment below).
 
 ## Context
 
@@ -443,7 +445,7 @@ were the probe and the reveal. The stroke before the wrong pass DID move the tar
 before it moved the target" would not have caught it.
 
 **Decision.** A stroke that proves the cut (`revealedBy`) also records whether it CARRIED the match its whole drawn
-length: `grown > strokeLength(drawn) − CARRY_LOSS`, `CARRY_LOSS` = 2 × TOUCH_SLOP (`flush-check.ts#ProvenCut.carry`:
+length: `grown > strokeLength(drawn) − CARRY_LOSS`, `CARRY_LOSS` = 2 × TOUCH_SLOP (`ProvenCut.carry`, gone since the T11 amendment:
 `short`, `carried`, `doubted`; `drawn` the stroke the round is handed back after every stroke, the probe's own on a
 proving read; none → `short`). Measured carry losses lie within one TOUCH_SLOP (batch-10's RecyclerView strokes 48→24,
 54→33, 87→67; batch-9's probe ~142→135; the lab's 74-px probe on S 74→57–61), so the threshold leaves a 24-px margin;
@@ -497,6 +499,46 @@ both (its 74-px probe carried S 59–62 px, but the reveal after it moved S, so 
 time beyond the budget in the doubted case (main's drop runs and the control both 6 swipes, about 16.1 s). Not
 exercised live: the Cost case proper (a held reveal after S's carried probe, one retry), and residuals (a)–(c). No
 earlier sentence of this amendment is contradicted.
+
+## Amendment: T11 — every held reveal on a proven cut is doubted once (2026-11-06)
+
+Replaces D62's carry line (point 4 above, `Carry`, `CARRY_LOSS`) and residual (b); D62's cause, points 1–3 and 5 stand.
+**Why it changed.** D62 read a proving stroke that fell more than 48 px short of its length as "the content ended
+under it", on measured losses within one slop. On 2026-11-06, emulator-5554 (averi_lab, API 33), that premise did not
+hold: with nothing of averi in the path, raw `input swipe`s of 142 px over 300 ms carried a card 47–132 px, 18 of 24 at
+94 or less (T7a's three runs, 2026-11-05: 136), with the content hundreds of px from its end. So lv-d62-drop (the first
+reveal dropped) replied "fully visible after 2 swipes … moved nothing — nothing of it is cut there" on
+c899839d 10 of 16 and b3ce0150 25 of 38, alternating, same harness, C cut 429–532 px; every claim on a probe that
+carried 94 px or less, none above. The reply was the side that was wrong: the last dump equalled the one before it byte
+for byte and agreed with the app 800 ms later (`[547,380][1014,614]` against C at 547, 948 wide; the fixtures
+`tests/fixtures/t11-lv-d62-drop-*.xml`), and the app recorded no motion after it, so no race with the oracle. D62 had
+named this as residual (b); no carry threshold separates it, since a legitimate short carry (177→66, 177→100) overlaps
+the device's own loss (142→36).
+
+**Decision.** A held reveal, drawn as a stroke, on a proven cut is doubted once whatever the proving stroke carried
+(`ProvenCut.doubted`). The second held reveal is checked. No swipe left for the retry: the bound names the cut.
+
+**Cost, accepted against the "every reveal that held is NOT sent again" of D62's point 4, on the owner's rule that a false
+"fully visible" is the failure this product exists to avoid.** A pass whose content really ended under the proving
+stroke pays one stroke and one read, about 2.5 s on this AVD (a read about 2.2 s, a stroke about 0.35 s): measured, lab's
+sticky R "fully visible after 2 swipes" 4 of 4 on b3ce0150, "after 3" 4 of 4 with the doubt, both ok in the visibility
+group; bounded S and P unchanged in kind. With no swipe or time left it now fails hedged where it said `checked`.
+Golden against b3ce0150: 0 of 1611 checks changed (a replayed tree never moves, so no proof forms).
+
+**Measured with the doubt.** lv-d62-drop 1 of 39 false, 22 of the 39 on a probe that ran short; the other 38 maxSwipes,
+hedged. The one left (`fix-drop-more/fixmore-20.json`): the retry, a real 233-px stroke, was logged by the app as
+`482 → 482`.
+
+**Residuals, stated.** (a) stands. (b') A reveal held twice in a row still reads `checked`. It is not only theory: the
+device itself swallows strokes, 5 of the 668 sent in these records carried 0 px while the app logged a stroke (0 of 87
+in T7a's), all with the app's count equal to the strokes sent. Injected drop plus one such stroke is the 1 of 39; two
+natural ones in a row have not been seen. No control run claimed falsely here, 0 of 41 (none on b3ce0150, 38), but
+A11's A/B saw 2 of 8 and its records are gone, so that rate and its conditions stay unmeasured.
+**Not known.** Why strokes carry less than at T7a. Measured: frames of 70–100 ms in both the lab app and Settings, the
+time in the vsync gap and the swap, the app's own phases about 5 ms; injected motion events about 100 ms apart near the lift
+(`frames.txt`). Not the app build (the APK's hash is that of the build of HEAD's source), not averi (raw strokes), not
+`system_server`'s uptime (restarted, unchanged). Untested: a cold boot of the AVD. Evidence:
+`docs/truth/live-records/t11-carousel-visible`, its rates pinned by `tests/truth/t11-records.test.ts`.
 
 ## Amendment: D68 — a reveal this call's own strokes say would most likely overshoot is not sent (2026-11-05)
 
