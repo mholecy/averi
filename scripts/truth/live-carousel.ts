@@ -45,7 +45,7 @@ export interface SwipeEntry {
 export const DROP_DEFAULT_MS = 300;
 
 /**
- * The per-case hook live.ts arms around a case's calls: every stroke averi draws is logged, and the `dropSwipe`th
+ * The per-case hook run-case.ts arms around the calls of a case that declares `reads.swipes`: every stroke averi draws is logged, and the `dropSwipe`th
  * (1-based, counted from the case's first call) is not sent — resolved after as long as it would have taken, so the
  * scroll loop is handed back the stroke it asked for, as batch-9's app did when it did not take the reveal. Disarmed,
  * it logs nothing and drops nothing.
@@ -146,7 +146,7 @@ export async function preDrag(lab: PreDragLab, launch: LabState, px: number, wai
 }
 
 /**
- * preDrag for live.ts: a pre-drag that fails (adb, the lab gone, no carousel) is that case's SKIP with the reason,
+ * preDrag for run-case.ts: a pre-drag that fails (adb, the lab gone, no carousel) is that case's SKIP with the reason,
  * never the whole run thrown out — on lv-d62's legs `skipFails` then fails the run, honestly.
  */
 export async function preDragOrSkip(lab: PreDragLab, launch: LabState, px: number, wait?: (ms: number) => Promise<unknown>): Promise<{ preDrag: PreDragged; launched: LabState } | { skip: string }> {

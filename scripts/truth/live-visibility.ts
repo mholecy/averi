@@ -21,7 +21,7 @@ import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type D
  * contract asks it (fullyAsked); plus the turn-back cases (TURN_BACK), whose direction is the wrong one on purpose. Each
  * case stamps the clause it judges (VisibilityCase.asks; tests/truth/target-contract.test.ts holds it equal to the
  * replayed row's). What a reply says is read by replies.ts alone (replyKind: what kind of reply a verdict rests on,
- * LiveVerdict.kind). Everything here is pure: live.ts runs the calls.
+ * LiveVerdict.kind). Everything here is pure: run-case.ts runs the calls.
  *
  * Verdicts, as live.ts's: `ok` the app holds what the case asks and the reply agrees; `LOUD` it does not, and averi
  * said so (an error); `MISMATCH` averi claimed what did not happen (`Tapped` with nothing fired or something else
@@ -37,7 +37,7 @@ import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type D
  *    item's index (Edges.kt: the header item, then rows of a fixed height), exact only while every item is that height;
  *  - sheet-long-list's UITableView reports no offset before its first scroll: the launch offset falls back to 0 — its
  *    real rest at launch (classStrokes' `o0`);
- *  - the stop is judged on the state read right after scroll_until returns (live.ts reads it between the calls), the
+ *  - the stop is judged on the state read right after scroll_until returns (run-case.ts reads it between the calls: Case.reads), the
  *    tap on the state after the tap. That read has no pause: a stroke the app has not yet written when it is read (its
  *    rest still to come) is missing from it — unchangedClaimBroken then counts fewer strokes than swipes and silently
  *    does not judge, and R-direction judges the strokes written so far.
@@ -488,7 +488,7 @@ export interface VisibilityCase extends RunsUnder {
   asks?: TapAsk | StopAsk;
   /**
    * `source`: the tree source the case ran under — a target its static capture's tree of that source did not list
-   * (TargetTruth.listed) is not held to R-direction. `after[i]`: the state read right after call i (live.ts reads one
+   * (TargetTruth.listed) is not held to R-direction. `after[i]`: the state read right after call i (run-case.ts reads one
    * between the calls of a visibility case).
    */
   judge(state: LabState, replies: string[], launched: LabState, source: string, after: readonly (LabState | undefined)[]): LiveVerdict;

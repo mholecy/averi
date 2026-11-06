@@ -72,6 +72,11 @@ describe('judged — the first read, and the late one 3 s after it', () => {
   const c: Case = { id: 'x1', group: 'forms', cell: 'form-basic', says: 'a synthesized case', calls: [], judge: (s) => VERDICTS[s.focus!] };
   const judge = (state: string, late?: string) => judged(c, 'idb', [], read('name'), [], read(state), late === undefined ? undefined : read(late));
 
+  it('a recorded late read is judged whatever the case declares now: a record is what was read then', () => {
+    const declared: Case = { ...c, reads: { late: false } };
+    expect(judged(declared, 'idb', [], read('name'), [], read('phone'), read('name')).outcome).toBe('ok');
+  });
+
   it('no late read: the first verdict', () => {
     expect(judge('phone')).toEqual(VERDICTS.phone);
   });

@@ -8,15 +8,16 @@ import { CAROUSEL_CASES, hedgedCeiling, type DeviceLog, type PreDragged, type Sw
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
 import { FLOATING_PANEL_EVIDENCE, holds, holdsShown, judgeFloatingGap, judgeMissUnderSheet, judgeNoteFill, judgePhoneAfterBack, judgePhoneScroll, judgeUnderSheet, refusedCapped, refusedKept, refusedOnFocus, refusedUnchanged, short, type Source, valueOf } from './live-forms.js';
+import type { CaseLab } from './run-case.js';
 import { judgeDismissal, PRESENTED_WINDOW_CELLS, presentedAssertCase, visibilityCases, type LiveVerdict, type RunsUnder } from './live-visibility.js';
 import { allPassed, claimsTap, isError } from './replies.js';
 import { appOf, labId, labSelector, parseLabApp, type Catalog, type CellTruth, type HeldSpec, type LabApp, type LabState } from './schema.js';
 
 /**
- * The live golden's cases and their judging, no device (scripts/truth/live.ts is the CLI that runs them): the forms
+ * The live golden's cases and their judging, no device (run-case.ts runs one on a device, scripts/truth/live.ts is the CLI): the forms
  * cases, the visibility cases built from the cells' static truth, the dismissal cases, the carousel group's
- * (live-carousel.ts); `judged` (a case's reads, the
- * late one included); `summarize` (the report and the exit code, against live-known.ts); and `rejudge` — a recorded
+ * (live-carousel.ts); `wantsLateRead` and `judged` (a case's reads, the
+ * late one included: the one home of that rule); `summarize` (the report and the exit code, against live-known.ts); and `rejudge` — a recorded
  * run judged again by this checkout's judges, in process: what `live.ts --rejudge <record>` prints, and what
  * tests/truth/live-rejudge.test.ts reads without a node process a record.
  */
@@ -61,22 +62,25 @@ export interface RunRecord {
   /** The lab app the run drove; absent on records before round 7: the native one. */
   app?: LabApp;
   side: string;
-  results: {
-    source: Source;
-    id: string;
-    skip?: string;
-    replies: string[];
-    /** The state the calls started from: the launch's, or — a case with a pre-drag — the one read after it. */
-    launched: LabState;
-    after: (LabState | undefined)[];
-    state: LabState | undefined;
-    late?: LabState;
-    warmUpError?: string;
-    /** A carousel case's raw pre-drag (Case.preDrag) and the launch's state before it. */
-    preDrag?: PreDragged;
-    /** A carousel case's strokes as averi drew them during its calls, a dropped one marked (Case.dropSwipe). */
-    swipes?: SwipeEntry[];
-  }[];
+  results: CaseRecord[];
+}
+
+/** What one case read on one source: built in one place, run-case.ts#caseRecord. */
+export interface CaseRecord {
+  source: Source;
+  id: string;
+  skip?: string;
+  replies: string[];
+  /** The state the calls started from: the launch's, or — a case with a pre-drag — the one read after it. */
+  launched: LabState;
+  after: (LabState | undefined)[];
+  state: LabState | undefined;
+  late?: LabState;
+  warmUpError?: string;
+  /** A carousel case's raw pre-drag (Case.preDrag) and the launch's state before it. */
+  preDrag?: PreDragged;
+  /** A carousel case's strokes as averi drew them during its calls, a dropped one marked (Case.dropSwipe). */
+  swipes?: SwipeEntry[];
 }
 
 // --- the cases ---
@@ -86,11 +90,37 @@ export interface Call {
   args: Record<string, unknown>;
 }
 
+/**
+ * What a case reads beyond the launch and the state after its calls, declared here and never inferred from its group
+ * (docs/adr/0044): run-case.ts#runCase asks only this. Unset is the forms' cycle: no read between the calls, no strokes
+ * logged, and a late read when the first is not ok.
+ */
+export interface CaseReads {
+  /** The app read after every call but the last (`after`): a stop is judged as scroll_until left it. */
+  betweenCalls?: true;
+  /** The strokes averi draws during the calls, logged by the SwipeHook (RunRecord `swipes`, the judge's `log`). */
+  swipes?: true;
+  /** Never read again after a first read not ok (wantsLateRead): a later read would let a fling finish behind the reply's back. */
+  late?: false;
+}
+
+/** The visibility group's reads: its stop is judged as scroll_until left it, and on the state read when it returned. */
+const VISIBILITY_READS: CaseReads = { betweenCalls: true, late: false };
+/** The carousel group's reads: the strokes are its oracle, and a later read would let a fling finish. */
+const CAROUSEL_READS: CaseReads = { swipes: true, late: false };
+
 export interface Case extends RunsUnder {
   id: string;
   group: 'forms' | 'visibility' | 'dismissal' | 'ensure' | 'carousel';
   cell: string;
   says: string;
+  /** What it reads besides the launch and the final state. */
+  reads?: CaseReads;
+  /**
+   * How the case reaches its first screen when `lab.launch(cell)` is not it (a verb or an intent the harness does not
+   * perform, T7b's): the state it answers is `launched`. Unset, the lab launches the cell in a fresh process.
+   */
+  start?(lab: CaseLab): Promise<LabState>;
   /** averi.yaml `app.ios.keyboardDismiss` for this case. */
   dismiss?: unknown[];
   /** averi.yaml `flows` for this case: what its `run_flow` calls name, and its `states`' reach rungs. */
@@ -125,8 +155,8 @@ export interface Case extends RunsUnder {
   calls: Call[];
   /**
    * `launched`: the model as the launch left it, before any call — what a LOUD case's field held. `after[i]`: the state
-   * read right after call i, for a visibility case (its stop judged before the tap after it ran); else empty. `log`: the
-   * strokes averi drew during the calls (a carousel case's; RunRecord `swipes`).
+   * read right after call i, for a case that declares `reads.betweenCalls` (its stop judged before the tap after it ran); else empty. `log`: the
+   * strokes averi drew during the calls (a case that declares `reads.swipes`; RunRecord `swipes`).
    */
   judge(state: LabState, replies: string[], source: Source, launched: LabState, after: readonly (LabState | undefined)[], log?: DeviceLog): LiveVerdict;
 }
@@ -609,13 +639,13 @@ export async function selectCases({ platform, app, groups, only, onlyCells }: Se
   const cases: Case[] = [
     ...FORMS.map((c) => ({ ...c, group: 'forms' as const })),
     ...ENSURE.map(({ judgeOf, ...c }) => ({ ...c, group: 'ensure' as const, judge: judgeOf(heldOf(c.cell)) })),
-    ...CAROUSEL_CASES.map((c) => ({ ...c, group: 'carousel' as const })),
+    ...CAROUSEL_CASES.map((c) => ({ ...c, group: 'carousel' as const, reads: CAROUSEL_READS })),
   ];
   if (groups.includes('visibility')) {
     for (const truth of await truthsOf(platform, app)) {
       if (truth.targets.length === 0 || (onlyCells !== undefined && !onlyCells.includes(truth.cell))) continue;
       const asserts = PRESENTED_WINDOW_CELLS.includes(truth.cell) ? truth.targets.filter((t) => t.declared === 'presented-over').map((t) => presentedAssertCase(truth.cell, t)) : [];
-      for (const v of [...visibilityCases(truth, platform), ...asserts]) cases.push({ ...v, group: 'visibility', judge: (s, replies, source, launched, after) => v.judge(s, replies, launched, source, after) });
+      for (const v of [...visibilityCases(truth, platform), ...asserts]) cases.push({ ...v, group: 'visibility', reads: VISIBILITY_READS, judge: (s, replies, source, launched, after) => v.judge(s, replies, launched, source, after) });
     }
   }
   /**
@@ -655,20 +685,35 @@ export type Result = { source: Source; c: Case; verdict: LiveVerdict; replies: s
 /** What a rejudge selects by: a selection whose platform is the record's, and its app the record's when it names one. */
 export type RejudgeSelection = Omit<Selection, 'platform' | 'app'> & { app?: LabApp };
 
+/** How long after the first read the late one is taken. */
+export const LATE_READ_MS = 3_000;
+
+/** The verdict on the state after the calls: what asks for a late read, and what the late read is held against. */
+function firstVerdict(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, swipes: SwipeEntry[] | undefined): { verdict: LiveVerdict; log: DeviceLog } {
+  const log: DeviceLog = swipes === undefined ? {} : { swipes };
+  return { verdict: c.judge(state, replies, source, launched, after, log), log };
+}
+
 /**
- * Judge one case's reads: the state after the calls; a forms case not ok is read again 3 s later (`late`: a model that
- * catches up was the app's lag, not a lost value) — never a visibility case, whose stop is judged on the state read
- * when scroll_until returned, and which a later read would let a fling finish behind the reply's back. When the re-read
+ * Whether a case is read again: its first read is not ok (a model that catches up was the app's lag, not a lost value)
+ * and it did not declare `reads.late: false`.
+ */
+export function wantsLateRead(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, swipes?: SwipeEntry[]): boolean {
+  return c.reads?.late !== false && firstVerdict(c, source, replies, launched, after, state, swipes).verdict.outcome !== 'ok';
+}
+
+/**
+ * Judge one case's reads: the state after the calls, and the late read if one was taken. A `late` is judged whatever
+ * the case declares today: a record is what was read then, so a rejudge of an old one reads the same. When the re-read
  * comes out the same, the first read's verdict is kept whole — its cls and kind included. The late read is the app's
  * only: the IME region read after the calls (`state.imeTouchable`, a kf case's second read, D69) is carried onto it, so
  * a later read can never turn a verdict over both reads into one over the launch's alone (`lateWithPanel`).
  */
 export function judged(c: Case, source: Source, replies: string[], launched: LabState, after: (LabState | undefined)[], state: LabState, late: LabState | undefined, swipes?: SwipeEntry[]): LiveVerdict {
-  const log: DeviceLog = swipes === undefined ? {} : { swipes };
-  const verdict = c.judge(state, replies, source, launched, after, log);
+  const { verdict, log } = firstVerdict(c, source, replies, launched, after, state, swipes);
   if (verdict.outcome === 'ok' || late === undefined) return verdict;
   const again = c.judge(lateWithPanel(state, late), replies, source, launched, after, log);
-  return again.outcome === verdict.outcome ? verdict : { ...again, why: `${again.why} (only 3 s later; first read: ${verdict.why})` };
+  return again.outcome === verdict.outcome ? verdict : { ...again, why: `${again.why} (only ${LATE_READ_MS / 1000} s later; first read: ${verdict.why})` };
 }
 
 /** `late` with the IME region read after the calls (`state.imeTouchable`), where it read none of its own. */

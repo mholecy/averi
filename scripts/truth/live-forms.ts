@@ -369,7 +369,7 @@ export function floatingAtLaunch(launched: LabState): LiveVerdict | undefined {
 
 /**
  * The floating panel, as the IME window's touchable region named it right after the launch (LabState.imeTouchable,
- * live.ts's first device read for the kf cases — averi's own query, src/adapters/android.ts#TOUCHABLE_COMMAND), read by
+ * run-case.ts's first device read for the kf cases — averi's own query, src/adapters/android.ts#TOUCHABLE_COMMAND), read by
  * averi's own readers (src/adapters/android.ts#parseInputShown, #parseTouchableRegion) and admitted by averi's own
  * rules (src/ui-tree/keyboard-cover.ts#panelsBeyond, beside `strip`, the inset the app hears of) — no second parser,
  * no rule of the harness's. The panel lies wherever the hand dragged it: no list of placements. Anything but one
@@ -415,7 +415,7 @@ function panelAtLaunch(launched: LabState): Measured | { skip: LiveVerdict } {
 }
 
 /**
- * D69: the panel read again once the calls are done (`s.imeTouchable`, live.ts's second lab-device.ts#withMeasuredPanel)
+ * D69: the panel read again once the calls are done (`s.imeTouchable`, run-case.ts's second lab-device.ts#withMeasuredPanel)
  * against the one the launch measured — admitted by the same `measuredPanel`, beside the launch's strip. No second read
  * (a record before D69): `unread`, the judge as it was. The same panel: `agreed`, so a reply quoting another panel (or
  * none) is averi's reading wrong — a MISMATCH, not "not run". Another panel, or none: the SKIP naming both reads, since

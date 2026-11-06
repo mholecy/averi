@@ -55,7 +55,7 @@ export function otherApp(cell: Pick<CatalogCell, 'family'>, app: LabApp): string
   const builder = appOf(cell.family);
   return builder === app ? undefined : `a cell of the ${builder} lab app (${LAB_APP[builder].name}), not of ${LAB_APP[app].name}`;
 }
-/** The harness's one wait: the lab drivers', live.ts's, and the capture's probe (capture-run.ts#probe). */
+/** The harness's one wait: the lab drivers', run-case.ts's, and the capture's probe (capture-run.ts#probe). */
 export const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** One raw tree of the screen as it is now: a capture of the run, its file `<cell><suffix>`. */
@@ -97,7 +97,7 @@ export interface LabDevice {
   ime?(): Promise<ImeCapture>;
   /**
    * Android: averi's touchable query (src/adapters/android.ts#TOUCHABLE_COMMAND) now, raw — the IME window's touchable region beside `mInputShown`,
-   * read at a kf case's launch and again once its calls are done (live.ts, withMeasuredPanel; LabState.imeTouchable,
+   * read at a kf case's launch and again once its calls are done (run-case.ts, withMeasuredPanel; LabState.imeTouchable,
    * D69). Leaves the keyboard up. Absent on iOS.
    */
   imeTouchable?(): Promise<string>;
@@ -292,7 +292,7 @@ export class IosLab implements LabDevice {
 // --- Android: adb ---
 
 /**
- * The kf cases' device read (live.ts; LabState.imeTouchable): the state with what averi's touchable query answered —
+ * The kf cases' device read (run-case.ts; LabState.imeTouchable): the state with what averi's touchable query answered —
  * right after the launch, and again once the calls are done (D69). A device the guard refuses rethrows — the run stops,
  * as any other call there would; a read that fails past the guard is said on stderr (`log`) and kept as `{ error }`,
  * which live-forms.ts#measuredPanel reads as "no measured panel (the IME region read failed)".
