@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exec as defaultExec, ExecError, type ExecFn } from './exec.js';
+import { exec as defaultExec, ExecError, hostHome, type ExecFn } from './exec.js';
 import { simctl } from './xcode-env.js';
 import { runIdb } from './idb.js';
 import type { IdbHelper } from './idb-helper.js';
@@ -911,7 +911,7 @@ export class IosAdapter implements DeviceAdapter {
       case 'unreadable':
         this.hostListUnreadable = true;
         console.error(
-          `averi: the host process list is unreadable (${pgrepReason(failure)}) — ` +
+          `averi: the host process list is unreadable (${pgrepReason(failure, hostHome())}) — ` +
             `app liveness on ${this.udid} asks launchctl instead (~240 ms a check)`,
         );
         return this.launchctlLists(bundleId);

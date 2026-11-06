@@ -1,7 +1,7 @@
 # 43. A failed host command's words have one seam: `ExecError`'s message
 
-Status: accepted 2026-11-06 (performance backlog rows D70 and D65, docs/plans/2026-10-30-performance-backlog.md). Five
-kinds of reply change on purpose, listed below with their bytes and pinned. Every other failure is byte-identical. No
+Status: accepted 2026-11-06 (performance backlog rows D70 and D65, docs/plans/2026-10-30-performance-backlog.md). The
+kinds of reply below change on purpose, listed below with their bytes and pinned. Every other failure is byte-identical. No
 tool description changes.
 
 ## Context
@@ -24,9 +24,10 @@ tool description changes.
 **`ExecError`'s `message` is `adapters/failure-text.ts#commandFailureText(failure, home)`, a pure function; its fields
 keep every byte.** `command`, `stderr`, `stdout`, `exitCode`, `timedOut` and `cause` are unchanged for detectors and for
 `writeBuildLog`. There is no per-call wrapping and no catch in `mcp/`: a wrapped error, a first-line quote and the flow
-get the same words because all of them read `message`. Three readers quote `stderr` itself instead, for its last line:
-`android.ts`'s dump and `get-state` diagnosis and `ios-liveness.ts#pgrepReason`. They pass it through the exported
-`withoutHostPaths`, their bytes otherwise unchanged; none is a typing. `android-start.ts` quotes `am`'s lines, the
+get the same words because all of them read `message`. Three readers quote `stderr` itself instead: `android.ts`'s dump diagnosis and `ios-liveness.ts#pgrepReason` its last
+line, `android.ts`'s `get-state` diagnosis the whole trimmed stderr less its `Command failed:` and `error:`/`adb:` prefix.
+They pass it through the exported `withoutHostPaths` (`exec.ts#hostPathsOut` on Android; IosAdapter hands the home to
+`pgrepReason`, which stays a pure leaf, ADR 0038's D33), their bytes otherwise unchanged; none is a typing. `android-start.ts` quotes `am`'s lines, the
 device's words, and is left as it is. Rejected: a text function at the MCP boundary. Replies that quote
 a failure without throwing (`FAILED:` sections, an assert's fail-closed sentence, a `⚠ screenshot:` line) would need
 their own call, and text already wrapped would have to be parsed back. The message's stack header, written once at
@@ -40,13 +41,14 @@ The function does three things to exec's shape and nothing else:
    and only the first line of a long message is kept. A traceback cut before its exception says `<tool> crashed (…)`. The
    tool is the argv's first word's last segment, and for `xcrun` what it runs. Lines around the traceback, the log line
    `… [ERROR] - root - Exception thrown in main` among them, are dropped with it: the reply says the crash, and `stderr` keeps the rest. CRLF line ends read the same, and an exception line that ends at its colon takes the next line with text as its message when that line is indented, an exception group's rules skipped. An unindented one may be a log line and stays out, so `raise Exception("\nwhy")`, printed unindented, reads `Exception:`. averi writes no log of an idb command, and none is
-   invented: the pointer is the command, which stays above it, to run by hand with the real text and paths: as printed it is not runnable, `<typed text>` and `<tmp>/app.apk` being shell redirections. Only a header on a line of its own counts, so a stderr
-   that merely mentions the words stays.
+   invented: the pointer is the command, which stays above it, to run by hand with the real text and paths: as printed it is not runnable, `<typed text>` and `<tmp>/app.apk` being shell redirections. A header on a line of its own counts, and one behind a log prefix (`[ERROR] Traceback …`) when a
+   frame stands beneath it, so a stderr that merely mentions the words stays. The exception line is bounded at 300 characters and an ellipsis.
 2. **Host paths leave the whole text, the argv and the note too.** Told apart by an allowlist of folders only a host has,
-   each matched only at a word's start (a line's start, after whitespace, a quote, `(`, `[`, `<` or `,`), so a URL's path
-   and `/data/local/tmp/…`, inside a word, never match:
+   each matched only at a word's start (a line's start, after whitespace, a quote, `(`, `[`, `<`, `,`, `=` or `file://`), so
+   `/data/local/tmp/…`, inside a word, never matches. A word holding `scheme://`, `file://` apart, is left alone by every
+   rule but the own home, so a URL's path never matches, whatever marks stand inside it (`myapp://o/p,/tmp/q`):
    - the user's own home (`os.homedir()`, a parameter, its trailing slashes dropped) becomes `~` up to its folder's end (`/opt/me`, not `/opt/mel`). With two folders or more it goes **anywhere**, a URL's path too: it must always go. A home of one folder (`/tmp`, `/root`, `/var`) goes only at a word's start, since anywhere would cut `/data/local/tmp/a.xml`. A home that is no absolute path, or that cannot be read (`exec.ts#hostHome` answers `''`), takes nothing out;
-   - any `/Users/…`, `/home/…` (the folder under them) and `/root` at a word's start or after `file://` becomes `~`; `Shared` under `/Users`
+   - any `/Users/…`, `/home/…` (the folder under them) and `/root` at a word's start becomes `~`; `Shared` under `/Users`
      is nobody's home and stays;
    - `/tmp`, `/var/tmp`, `/var/folders` and their `/private` forms become `<tmp>/<basename>`;
    - `/Volumes` and `/opt` become `…/<basename>`.
@@ -92,6 +94,12 @@ own (`Android opened nothing for <url> — …`, `android.ts#openDeepLink`), and
 | A failed typing, iOS, and its timeout | `Command failed (exit 1): idb ui text hunter2 --udid U⏎…`, `Command timed out: idb ui text hunter2 --udid U` | `Command failed (exit 1): idb ui text <typed text> --udid U⏎…`, `Command timed out: idb ui text <typed text> --udid U` |
 | A typing idb's argparse refuses | `Command failed (exit 2): idb ui text -hunter2 --udid U⏎usage: …⏎idb ui text: error: argument -h/--help: ignored explicit argument 'unter2'` | `Command failed (exit 2): idb ui text <typed text> --udid U⏎usage: …⏎idb rejected its arguments (its error line, which can quote the typed text, is left out)` |
 | A host path, home (live, `install_app`) | `Command failed (exit 1): adb -s emulator-5554 install -r /Users/…/app.apk⏎adb: failed to stat /Users/…/app.apk: No such file or directory` | `Command failed (exit 1): adb -s emulator-5554 install -r ~/…/app.apk⏎adb: failed to stat ~/…/app.apk: No such file or directory` |
+| Another user's home | `… /Users/…/a.apk` | `… ~/a.apk` |
+| `/Volumes`, `/opt` | `… install -r /Volumes/…/b.ipa`, `/opt/homebrew/bin/idb` | `… install -r …/b.ipa`, `…/idb` |
+| A path after `=` or `file://` | `NSFilePath=<a temporary folder>/x/app.app, NSURL=file://<a temporary folder>/x/app.app` | `NSFilePath=<tmp>/app.app, NSURL=file://<tmp>/app.app` |
+| The dump's diagnosis, last line of stderr | `adb could not run uiautomator dump: adb: cannot read /Users/…/adb.log` | `adb could not run uiautomator dump: adb: cannot read ~/adb.log` |
+| `get-state`'s diagnosis | `device S is not reachable: adb get-state says "cannot read /Users/…/adb.log" — …` | `device S is not reachable: adb get-state says "cannot read ~/adb.log" — …` |
+| `pgrepReason`, an `averi:` line on stderr | `averi: the host process list is unreadable (exit 3: pgrep: /Users/…/x unreadable) — …` | `averi: the host process list is unreadable (exit 3: pgrep: ~/x unreadable) — …` |
 | A host path, temporary (live, `install_app`) | `… install -r /tmp/…/app.apk⏎adb: failed to stat /tmp/…/app.apk: No such file or directory` | `… install -r <tmp>/app.apk⏎adb: failed to stat <tmp>/app.apk: No such file or directory` |
 | `open_deep_link tel:…`, iOS (batch-13's bytes) | `Command failed (exit 115): xcrun simctl openurl <udid> tel:+421900123456⏎An error was encountered processing the command (domain=LSApplicationWorkspaceErrorDomain, code=115):⏎Simulator device failed to open tel:+421900123456.⏎Underlying error (domain=LSApplicationWorkspaceErrorDomain, code=115):⏎	The operation couldn’t be completed. (LSApplicationWorkspaceErrorDomain error 115.)` | `No app on this simulator handles tel: links, so nothing opened (simctl openurl: LSApplicationWorkspaceErrorDomain, code 115). A link to an app's own scheme needs that app installed.` |
 
@@ -104,7 +112,10 @@ live on base and branch through MCP, `launch_app` and Android's `open_deep_link`
 
 - The traceback fixture is b1d's stderr from `docs/truth/live-records/ios-forms-a9.json` (idb, 2026-10-19), real bytes
   except that the record wrote the home as `~`; the test puts a home back.
-- `tests/fixtures/simctl-openurl-tel-exit115-b13-stderr.txt` is simctl's four stderr lines from batch-13 rerun 2 (main
-  51778d00, iOS 27.0, idb, 2/2 byte-identical), exec's first line with the udid cut off; batch-9's D58 P3 reads the same with
-  another number. iOS could not run for this change: the new reply is owed a live read by the next iOS batch (backlog D65's row).
-- Cold mutation run (ADR 0038): `failure-text.ts` 99.44 %, 180 mutants, the one survivor equivalent; `ios-link-failure.ts` 100 %, 13 mutants; both floors 98.
+- `tests/fixtures/simctl-openurl-tel-exit115-b13-stderr.txt` is simctl's four stderr lines, cut from the reply batch-13 kept
+  on 2026-11-05: rerun 2, main 51778d00, iOS 27.0, idb, 2/2 byte-identical, exec's first line left off (it holds the udid).
+  The repo holds no other record of them. The source is outside it: `batch-13/D65/run-20261105-113643-64641/d65-reply-1.txt`
+  (and `-2`) in the scratch folder of session 1ea289f1-7bae-463b-9304-adfeaaf20c0c; `batch-9/D58/case-P3-idb.json` beside it reads
+  the same with another number. iOS could not run for this change: the new reply is owed a live read by the next iOS batch
+  (backlog D65's row).
+- Cold mutation run (ADR 0038): `failure-text.ts` 99.53 %, 211 mutants, the one survivor equivalent; `ios-link-failure.ts` 100 %, 13 mutants; floors 97 and 98.

@@ -1103,6 +1103,17 @@ describe('IosAdapter.isAppRunning — the host process list first, a no confirme
     );
   });
 
+  it('that line asks the host\'s home: the adapter hands it to the pure leaf', async () => {
+    vi.stubEnv('HOME', '/opt/me');
+    try {
+      const d = device({ pgrep: [fail('/usr/bin/pgrep -f x', 3, 'pgrep: https://h/opt/me/x\n')] });
+      await d.adapter.isAppRunning(BUNDLE);
+      expect(String(stderr.mock.calls[0][0])).toContain('(exit 3: pgrep: https://h~/x)');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('a spawn failure of pgrep is an unreadable list too', async () => {
     const d = device({ pgrep: [fail('/usr/bin/pgrep -f x', null, 'spawn /usr/bin/pgrep EPERM')] });
     expect(await d.adapter.isAppRunning(BUNDLE)).toBe(true);

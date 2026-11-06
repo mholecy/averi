@@ -108,6 +108,25 @@ describe('commandFailureText: a Python traceback', () => {
     );
   });
 
+  it('reads a header behind a log prefix, its frames beneath it', () => {
+    const logged = '2026-10-19 05:39:32 [ERROR] Traceback (most recent call last):\n  File "/Users/me/a.py", line 1, in a\nValueError: boom\n';
+    expect(failed('idb x', logged).split('\n').slice(1)).toEqual([expect.stringMatching(/^idb crashed: ValueError: boom \(Python/)]);
+    expect(failed('idb x', '[ERROR]Traceback (most recent call last):\n  File "a.py", line 1, in a\nE: x\n').split('\n')[1]).toMatch(/^idb crashed: E: x/);
+    expect(failed('idb x', 'first\n  [E] Traceback (most recent call last):\n  File "a.py", line 1, in a\nE: x\n').split('\n')[1]).toMatch(/^idb crashed: E: x/);
+  });
+
+  it('no frame beneath it, a prefixed header is a mention', () => {
+    for (const mention of ['see Traceback (most recent call last):\nnext', 'see Traceback (most recent call last):', 'see Traceback (most recent call last):\nFile "a.py" said', 'seeTraceback (most recent call last):\n  File "a.py"', 'x Traceback (most recent call last): more\n  File "a.py"', 'see Traceback (most recent call last):\nhe said File "a.py"']) {
+      expect(failed('idb x', mention).split('\n').slice(1).join('\n')).toBe(mention);
+    }
+  });
+
+  it('bounds the exception line, at 300 characters and an ellipsis', () => {
+    const at = (length: number) => failed('idb x', `Traceback (most recent call last):\nE${'x'.repeat(length - 1)}\n`).split('\n')[1];
+    expect(at(300)).toBe(`idb crashed: E${'x'.repeat(299)} (Python traceback left out: run the command by hand, with the real text and paths, to see it)`);
+    expect(at(301)).toBe(`idb crashed: E${'x'.repeat(299)}… (Python traceback left out: run the command by hand, with the real text and paths, to see it)`);
+  });
+
   it('names the tool: a path\'s last word, and what xcrun ran', () => {
     const tb = 'Traceback (most recent call last):\nE: x\n';
     expect(failed('/opt/homebrew/bin/idb x', tb).split('\n')[1]).toMatch(/^idb crashed: E: x/);
@@ -141,10 +160,11 @@ describe('commandFailureText: host paths', () => {
     expect(said('/Users/lab/a "/home/x/b" (/root/c) /root')).toBe('~/a "~/b" (~/c) ~');
     expect(said("'/Users/lab' [/home/x/d], <file:///Users/lab/e>")).toBe("'~' [~/d], <file://~/e>");
     expect(said('`/Users/lab/f`')).toBe('`~/f`');
+    expect(said('/Users/lab/a,/home/x/b')).toBe('~/a,~/b');
   });
 
   it('leaves what is no home', () => {
-    for (const kept of [`${USERS}/Shared/a`, '/rootfs/a', '/homework/a', '/Users', '/home', 'https://h/Users/lab/a', 'x=/home/x/a', 'myapp:/home/x/a']) {
+    for (const kept of [`${USERS}/Shared/a`, '/rootfs/a', '/homework/a', '/Users', '/home', 'https://h/Users/lab/a', 'myapp:/home/x/a']) {
       expect(said(kept)).toBe(kept);
     }
   });
@@ -162,10 +182,11 @@ describe('commandFailureText: host paths', () => {
   it('reduces a path under the Mac\'s volumes and /opt to its basename', () => {
     expect(said(`${VOLUMES}/Disk/app/b.ipa /opt/homebrew/bin/idb`)).toBe('…/b.ipa …/idb');
     expect(said(`${VOLUMES} /opt`)).toBe('… …');
+    expect(said('/opt/a,/opt/b')).toBe('…/a,…/b');
   });
 
   it('never touches a device path or a URL\'s path', () => {
-    for (const kept of ['/sdcard/Download/a.png', '/data/local/tmp/a.xml', '/data/user/0/dev.averi/tmp/a', '/storage/emulated/0/a', '/system/bin/sh', 'https://example.com/tmp/a', 'myapp://tmp/a', 'myapp:/tmp/a', 'file:///tmp/a', 'https://example.com/?next=/tmp/x', 'a/tmp/b', '/tmpfs/a', '/optional/a', `${VOLUMES}2/a`]) {
+    for (const kept of ['/sdcard/Download/a.png', '/data/local/tmp/a.xml', '/data/user/0/dev.averi/tmp/a', '/storage/emulated/0/a', '/system/bin/sh', 'https://example.com/tmp/a', 'myapp://tmp/a', 'myapp:/tmp/a', 'file:///data/local/tmp/a', 'file:///sdcard/a', 'https://example.com/?next=/tmp/x', 'a/tmp/b', '/tmpfs/a', '/optional/a', `${VOLUMES}2/a`]) {
       expect(said(kept)).toBe(kept);
     }
   });
@@ -179,6 +200,33 @@ describe('commandFailureText: host paths', () => {
   it('asks nothing of a home that is the root folder', () => {
     expect(commandFailureText({ command: 'c', exitCode: 1, stderr: '/sdcard/', timedOut: false }, '/')).toBe('Command failed (exit 1): c\n/sdcard/');
     expect(commandFailureText({ command: 'c', exitCode: 1, stderr: '/sdcard/a', timedOut: false }, '')).toBe('Command failed (exit 1): c\n/sdcard/a');
+  });
+
+  it('leaves a word with a URL alone, whatever marks stand inside it', () => {
+    for (const url of ['myapp://o/p,/tmp/x', 'myapp://o/a?x=(/home/x/a)', 'https://x.y/a,/Users/lab/profile', '(https://x.y/a=/opt/b)', 'a+b.c-d://o,/tmp/x']) {
+      expect(said(url)).toBe(url);
+    }
+    expect(said('myapp://o/p /tmp/x')).toBe('myapp://o/p <tmp>/x');
+    expect(said('MYAPP://o/p,/tmp/x')).toBe('MYAPP://o/p,/tmp/x');
+  });
+
+  it('the own home goes from a URL word too; file:// is no such word', () => {
+    expect(said('myapp://o,/Users/me/a')).toBe('myapp://o,~/a');
+    expect(said('file:///tmp/x,/tmp/x')).toBe('file://<tmp>/x,<tmp>/x');
+    expect(said('profile://a/tmp/x')).toBe('profile://a/tmp/x');
+  });
+
+  it('takes a host path after `=` and `file://`', () => {
+    expect(said(`NSFilePath=${PRIVATE}/tmp/x/app.app, NSURL=file://${PRIVATE}/tmp/x/app.app`)).toBe('NSFilePath=<tmp>/app.app, NSURL=file://<tmp>/app.app');
+    expect(said('path=/tmp/x other=/Users/lab/a.apk')).toBe('path=<tmp>/x other=~/a.apk');
+    expect(said(`file://${VOLUMES}/Disk/b.ipa x=/opt/y/z`)).toBe('file://…/b.ipa x=…/z');
+    expect(said('file:///home/x')).toBe('file://~');
+  });
+
+  it('keeps a device path after `=` and `file://`', () => {
+    for (const kept of ['path=/data/local/tmp/a.xml', 'x=/sdcard/a', 'file:///data/local/tmp/a', 'x=/storage/emulated/0/a']) {
+      expect(said(kept)).toBe(kept);
+    }
   });
 
   const inHome = (text: string, home: string) => withoutHostPaths(text, home);

@@ -7,8 +7,17 @@ export interface CommandFailure {
   note?: string;
 }
 
-/** A traceback's header, behind the margin an exception group prints; the margin's width is where its lines start. */
+/** A traceback's header on its own line, behind the margin an exception group prints; the margin's width is where its lines start. */
 const TRACEBACK_HEADER = /^([ |+]*)(?:Exception Group )?Traceback \(most recent call last\):$/;
+/** A header behind a log prefix (`[ERROR] Traceback …`). Only a frame beneath tells it from a sentence that mentions one. */
+const PREFIXED_HEADER = /\bTraceback \(most recent call last\):$/;
+const FRAME = /^\s+File "/;
+const isHeader = (lines: readonly string[], at: number): boolean =>
+  TRACEBACK_HEADER.test(lines[at]) || (PREFIXED_HEADER.test(lines[at]) && FRAME.test(lines[at + 1]));
+
+/** The longest exception line a reply holds: a message can carry a whole response. */
+const EXCEPTION_MAX = 300;
+const bounded = (exception: string): string => (exception.length > EXCEPTION_MAX ? `${exception.slice(0, EXCEPTION_MAX)}…` : exception);
 
 /**
  * The exception under a traceback's header: the first line at the header's margin, frames being indented further and an
@@ -20,9 +29,9 @@ function exceptionUnder(below: readonly string[], margin: number): string | unde
   const at = lines.findIndex((line) => line !== '' && !/^[ +-]/.test(line));
   if (at === -1) return undefined;
   const exception = lines[at].trimEnd();
-  if (!exception.endsWith(':')) return exception;
+  if (!exception.endsWith(':')) return bounded(exception);
   const why = lines.slice(at + 1).find((line) => line.trim() !== '' && !/^\s*[+-]/.test(line));
-  return why === undefined || !/^\s/.test(why) ? exception : `${exception} ${why.trim()}`;
+  return bounded(why === undefined || !/^\s/.test(why) ? exception : `${exception} ${why.trim()}`);
 }
 
 /** The tool a command line runs: its first word's last path segment, and for xcrun what it runs. */
@@ -32,11 +41,11 @@ function toolOf(command: string): string {
 }
 
 /** `stderr` as an agent reads it: trimmed, or one line when it holds a Python traceback. */
-function saidBy(command: string, stderr: string): string {
+function stderrForAgent(command: string, stderr: string): string {
   const lines = stderr.split(/\r?\n/);
-  const header = lines.map((line) => TRACEBACK_HEADER.test(line)).lastIndexOf(true);
+  const header = lines.map((_, at) => isHeader(lines, at)).lastIndexOf(true);
   if (header === -1) return stderr.trim();
-  const margin = TRACEBACK_HEADER.exec(lines[header])![1].length;
+  const margin = TRACEBACK_HEADER.exec(lines[header])?.[1].length ?? 0;
   const exception = exceptionUnder(lines.slice(header + 1), margin);
   return `${toolOf(command)} crashed${exception === undefined ? '' : `: ${exception}`} (Python traceback left out: run the command by hand, with the real text and paths, to see it)`;
 }
@@ -50,6 +59,7 @@ const TYPED_TEXT = '<typed text>';
  * the adapters' own tests drive their real argv through it.
  */
 const IDB_TYPING = /^(idb ui text )[\s\S]*( --udid \S+)$/;
+// The empty group: withoutTypedText's one replacement names `$2` for both shapes.
 const ADB_TYPING = /^(adb(?: -s \S+)? shell input text )[\s\S]*()$/;
 
 const withoutTypedText = (command: string): string =>
@@ -66,19 +76,19 @@ const IDB_REJECTED = 'idb rejected its arguments (its error line, which can quot
 
 /** Where a path word ends: the marks around a path in a message, whitespace. */
 const STOP = String.raw`\s"'` + '`' + String.raw`()\[\],<>`;
-/** Where a host path may start: a line's or word's start, after an opening mark. So a URL's path, `/data/local/tmp/…` and `x=/tmp/…`, inside a word, never match. */
-const WORD_START = String.raw`(?<=^|[\s"'` + '`' + String.raw`(\[<,])`;
+/** Where a host path may start: a line's or word's start, after an opening mark, `=` or `file://`. So `/data/local/tmp/…`, inside a word, never matches. */
+const WORD_START = String.raw`(?<=^|[\s"'` + '`' + String.raw`(\[<,=]|file://)`;
 const PATH_REST = `(/[^${STOP}]*)?(?![^${STOP}])`;
 
-/** Any macOS or Linux home at a word's start; file:// too, whose path is the host's by definition. `/Users/Shared` is nobody's home. */
+/** Any macOS or Linux home at a word's start. `/Users/Shared` is nobody's home. */
 const ANY_HOME = new RegExp(
-  String.raw`(?:${WORD_START}|(?<=file://))/(?:Users/(?!Shared(?![^${STOP}/]))[^${STOP}/]+|home/[^${STOP}/]+|root(?![^${STOP}/]))`,
-  'gm',
+  String.raw`${WORD_START}/(?:Users/(?!Shared(?![^${STOP}/]))[^${STOP}/]+|home/[^${STOP}/]+|root(?![^${STOP}/]))`,
+  'g',
 );
 /** Folders only a host has, each reduced to a mark and the path's last word. */
 const HOST_FOLDERS: readonly (readonly [RegExp, string])[] = [
-  [new RegExp(String.raw`${WORD_START}/(?:private/)?(?:tmp|var/tmp|var/folders)${PATH_REST}`, 'gm'), '<tmp>'],
-  [new RegExp(String.raw`${WORD_START}/(?:Volumes|opt)${PATH_REST}`, 'gm'), '…'],
+  [new RegExp(String.raw`${WORD_START}/(?:private/)?(?:tmp|var/tmp|var/folders)${PATH_REST}`, 'g'), '<tmp>'],
+  [new RegExp(String.raw`${WORD_START}/(?:Volumes|opt)${PATH_REST}`, 'g'), '…'],
 ];
 
 const escaped = (literal: string): string => literal.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
@@ -91,19 +101,28 @@ function withoutOwnHome(text: string, home: string): string {
   return text.replace(new RegExp(`${anywhere ? '' : WORD_START}${escaped(folder)}(?![\\w.-])`, 'gm'), '~');
 }
 
-/**
- * `text` with its host paths out: the rule of every quote of a host command's words, the three readers that quote
- * `stderr` themselves included (android.ts's dump and get-state diagnosis, ios-liveness.ts#pgrepReason).
- */
-export function withoutHostPaths(text: string, home: string): string {
-  let out = withoutOwnHome(text, home).replace(ANY_HOME, '~');
+/** A word holding a URL: what looks like a path inside it is the URL's, whatever marks stand before it. `file://`'s is the host's. */
+const URL_WORD = /(?<![a-z0-9+.-])(?!file:)[a-z][a-z0-9+.-]*:\/\//i;
+
+function wordWithoutHostFolders(word: string): string {
+  if (URL_WORD.test(word)) return word;
+  let out = word.replace(ANY_HOME, '~');
   for (const [folder, mark] of HOST_FOLDERS) {
     out = out.replace(folder, (_whole, rest: string | undefined) => {
-      const last = rest?.split('/').filter((word) => word !== '').at(-1);
+      const last = rest?.split('/').filter((part) => part !== '').at(-1);
       return last === undefined ? mark : `${mark}/${last}`;
     });
   }
   return out;
+}
+
+/**
+ * `text` with its host paths out: the rule of every quote of a host command's words, the three readers that quote
+ * `stderr` themselves included (android.ts's dump and get-state diagnosis, ios-liveness.ts#pgrepReason). The own home goes
+ * first, over the whole text, since it may hold a space; every other rule goes word by word.
+ */
+export function withoutHostPaths(text: string, home: string): string {
+  return withoutOwnHome(text, home).replace(/\S+/g, wordWithoutHostFolders);
 }
 
 /** The longest a tool's name is read: a near-maximal argv must not make the last resort throw as well. */
@@ -134,7 +153,8 @@ export function commandFailureText(failure: CommandFailure, home: string): strin
   const tail = note === undefined ? '' : `\n${note}`;
   if (timedOut) return withoutHostPaths(`Command timed out: ${command}${tail}`, home);
   // Node's own `Command failed: <argv>` stands in stderr for a silent child (exec.ts), with the text in it.
-  const unquoted = stderr.split(failure.command).join(command);
-  const said = saidBy(command, exitCode === ARGPARSE_EXIT && IDB_TYPING.test(failure.command) ? unquoted.replace(ARGPARSE_ERROR, IDB_REJECTED) : unquoted);
+  const withoutArgvText = stderr.split(failure.command).join(command);
+  const argparseRefused = exitCode === ARGPARSE_EXIT && IDB_TYPING.test(failure.command);
+  const said = stderrForAgent(command, argparseRefused ? withoutArgvText.replace(ARGPARSE_ERROR, IDB_REJECTED) : withoutArgvText);
   return withoutHostPaths(`Command failed (exit ${exitCode}): ${command}\n${said}${tail}`, home);
 }

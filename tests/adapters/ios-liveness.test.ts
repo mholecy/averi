@@ -118,29 +118,34 @@ describe('pgrepVerdict — what pgrep\'s outcome says about the host process lis
 
 describe("pgrepReason — pgrep's own words for the stderr line, not its command line", () => {
   const cmd = '/usr/bin/pgrep -f /a/very/long/pattern\\.app/X( |$)';
+  const NO_HOME = '';
 
   it('a host path in that line leaves it (ADR 0043)', () => {
-    expect(pgrepReason(execErrorLikeExec(cmd, 3, 'pgrep: /Users/lab/x unreadable\n'))).toBe('exit 3: pgrep: ~/x unreadable');
-    expect(pgrepReason(execErrorLikeExec(cmd, null, 'spawn /Users/lab/pgrep ENOENT\n'))).toBe('spawn ~/pgrep ENOENT');
+    expect(pgrepReason(execErrorLikeExec(cmd, 3, 'pgrep: /Users/lab/x unreadable\n'), NO_HOME)).toBe('exit 3: pgrep: ~/x unreadable');
+    expect(pgrepReason(execErrorLikeExec(cmd, null, 'spawn /Users/lab/pgrep ENOENT\n'), NO_HOME)).toBe('spawn ~/pgrep ENOENT');
+  });
+
+  it('the home is the caller\'s: this leaf reads nothing', () => {
+    expect(pgrepReason(execErrorLikeExec(cmd, 3, 'pgrep: https://h/opt/me/x\n'), '/opt/me')).toBe('exit 3: pgrep: https://h~/x');
   });
 
   it("an exit: its code and stderr's last non-empty line", () => {
-    expect(pgrepReason(execErrorLikeExec(cmd, 3, 'pgrep: warning\nsysmon request failed with error: sysmond service not found  \n   \n'))).toBe(
+    expect(pgrepReason(execErrorLikeExec(cmd, 3, 'pgrep: warning\nsysmon request failed with error: sysmond service not found  \n   \n'), NO_HOME)).toBe(
       'exit 3: sysmon request failed with error: sysmond service not found',
     );
   });
 
   it("an exit with nothing on stderr: exec's stand-in message's last line — the code alone when that is the command", () => {
-    expect(pgrepReason(execErrorLikeExec(cmd, 2, ''))).toBe('exit 2');
+    expect(pgrepReason(execErrorLikeExec(cmd, 2, ''), NO_HOME)).toBe('exit 2');
   });
 
   it('no exit code (a spawn failure): the last line alone, or that there was no exit code', () => {
-    expect(pgrepReason(execErrorLikeExec(cmd, null, 'spawn /usr/bin/pgrep ENOENT'))).toBe('spawn /usr/bin/pgrep ENOENT');
-    expect(pgrepReason(execErrorLikeExec(cmd, null, ''))).toBe('no exit code');
+    expect(pgrepReason(execErrorLikeExec(cmd, null, 'spawn /usr/bin/pgrep ENOENT'), NO_HOME)).toBe('spawn /usr/bin/pgrep ENOENT');
+    expect(pgrepReason(execErrorLikeExec(cmd, null, ''), NO_HOME)).toBe('no exit code');
   });
 
   it("another error: its message's first line", () => {
-    expect(pgrepReason(new Error('boom\nmore'))).toBe('boom');
-    expect(pgrepReason('odd')).toBe('odd');
+    expect(pgrepReason(new Error('boom\nmore'), NO_HOME)).toBe('boom');
+    expect(pgrepReason('odd', NO_HOME)).toBe('odd');
   });
 });

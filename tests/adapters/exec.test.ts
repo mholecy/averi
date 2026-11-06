@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { homedir } from 'node:os';
-import { exec, ExecError, hostHome } from '../../src/adapters/exec.js';
+import { exec, ExecError, hostHome, hostPathsOut } from '../../src/adapters/exec.js';
 
 describe('exec', () => {
   it('captures stdout as a Buffer', async () => {
@@ -78,9 +78,10 @@ describe('ExecError: its message is commandFailureText, its fields every byte (D
       expect(new ExecError('c', 1, 'https://h/opt/me/a').message).toBe('Command failed (exit 1): c\nhttps://h~/a');
     });
 
-    it('hostHome reads it too', () => {
+    it('hostHome reads it too, and hostPathsOut asks it', () => {
       vi.stubEnv('HOME', '/opt/me');
       expect(hostHome()).toBe('/opt/me');
+      expect(hostPathsOut('https://h/opt/me/a')).toBe('https://h~/a');
     });
   });
 

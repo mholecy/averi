@@ -1,6 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { exec as defaultExec, ExecError, hostHome, type ExecFn } from './exec.js';
-import { withoutHostPaths } from './failure-text.js';
+import { exec as defaultExec, ExecError, hostPathsOut, type ExecFn } from './exec.js';
 import { adbShellArgv, shellCommandLine } from './adb-shell.js';
 import { CONTROL_CHAR_RE, controlCharRemedy, inputTextControlFate } from './input-text.js';
 import { NOT_PRINTABLE_ASCII, refusalOf, type Typeable } from './typeable.js';
@@ -559,7 +558,7 @@ export class AndroidAdapter implements DeviceAdapter {
         // 28). Diagnose both like a dump that returned nothing, so the caller
         // never has to read a bare adb error.
         if (e instanceof ExecError) {
-          const last = withoutHostPaths(e.stderr.trim().split('\n').pop() ?? '', hostHome());
+          const last = hostPathsOut(e.stderr.trim().split('\n').pop() ?? '');
           throw new Error(await this.diagnoseDumpFailure(e.timedOut ? 'timeout' : 'exec-error', last, false), { cause: e });
         }
         throw e;
@@ -621,7 +620,7 @@ export class AndroidAdapter implements DeviceAdapter {
       // `adb get-state` on an offline/missing device exits 1 with
       // "error: device offline" / "error: device '<id>' not found" on stderr.
       state = e instanceof ExecError
-        ? (withoutHostPaths(e.stderr.trim().replace(/^(Command failed:.*\n)?\s*(error|adb):\s*/s, ''), hostHome()) || `exit ${e.exitCode}`)
+        ? (hostPathsOut(e.stderr.trim().replace(/^(Command failed:.*\n)?\s*(error|adb):\s*/s, '')) || `exit ${e.exitCode}`)
         : String(e);
     }
     if (state !== 'device') {
