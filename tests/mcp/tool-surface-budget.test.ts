@@ -11,7 +11,7 @@ import { createAveriServer, REPOSITORY_URL } from '../../src/mcp/tools.js';
  * moves its detail to skill/references/tools.md, or raises this number deliberately. Bytes are UTF-8 (an em dash is
  * three); tokens are roughly bytes / 4.
  */
-const BUDGET_BYTES = 31_000;
+const BUDGET_BYTES = 31_100; // T11: scroll_until says a proven cut may succeed hedged (84 bytes), raised on purpose.
 
 /**
  * Claude Code cuts an MCP server's instructions and each tool description past CLAUDE_CODE_MAX_MCP_DESCRIPTION_LENGTH

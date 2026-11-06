@@ -97,13 +97,13 @@ export type VerdictClass =
   | 'held-said'
   | 'window-cut'
   | 'entry-not-bare'
+  // judgeScroll: a stop hedged on two held reveals (T11) with the target not whole.
+  | 'held-hedge'
   // The carousel group (live-carousel.ts, T7a): "fully visible" while C is cut; a reply of another kind than the case's;
   // strokes drawn outside the carousel's band (D59b); a first read after a stroke that disagrees with the pager at rest (D37);
   // the drop leg with no D62 retry seen in its stroke log.
   | 'fully-cut'
   | 'carousel-kind'
-  // judgeScroll: a stop hedged on two held reveals (T11) with the target not whole.
-  | 'held-hedge'
   | 'off-band'
   | 'unsettled-read'
   | 'no-retry';

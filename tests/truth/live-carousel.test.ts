@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Point } from '../../src/adapters/types.js';
+import { flushText } from '../../src/interact/scroll-text.js';
 import { CAROUSEL_CASES, CUT_TOLERANCE_PX, D68_SPREAD, hedgedCeiling, hookSwipes, LAB_CAROUSEL, preDrag, preDragOrSkip, preDragStroke, SwipeHook, UNAIMABLE_LEGS, type SwipeEntry } from '../../scripts/truth/live-carousel.js';
 import { TOUCH_SLACK } from '../../scripts/truth/truth.js';
 import { judged, rejudge, rejudgedResults, selectCases, summarize, type Case, type RunRecord } from '../../scripts/truth/live-cases.js';
@@ -263,13 +264,13 @@ describe('lv-d62-short: the recorded shape in both device states seen, a probe t
     const r = shortRecord(80);
     r.replies = ["ERROR scroll_until id:lab.carousel-recycler-free.C stopped after 5 swipes, without swiping further — more swipes are unlikely to help"];
     expect(judged(r).outcome).toBe('ok');
-    r.replies = ["Element id:lab.carousel-recycler-free.C fully visible after 3 swipes; but its right edge lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a swipe toward it showed 55 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — it may be cut there, a rect assert or screenshot may measure part of it; calling again tells"];
+    r.replies = [`Element id:lab.carousel-recycler-free.C fully visible after 3 swipes${flushText({ edge: 'right', container: LAB_CAROUSEL, checked: false, why: 'held', revealed: 55 })}`];
     expect(judged(r)).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind' });
   });
 });
 
 describe('lv-d62-drop-two: two reveals dropped, the hedge with C cut, then "calling again tells" in the cut direction (T11)', () => {
-  const HEDGE = "Element id:lab.carousel-recycler-free.C fully visible after 3 swipes; but its right edge lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a swipe toward it showed 136 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — it may be cut there, a rect assert or screenshot may measure part of it; calling again tells";
+  const HEDGE = `Element id:lab.carousel-recycler-free.C fully visible after 3 swipes${flushText({ edge: 'right', container: LAB_CAROUSEL, checked: false, why: 'held', revealed: 136 })}`;
   const SECOND = 'ERROR scroll_until id:lab.carousel-recycler-free.C failed after 6 swipes (maxSwipes) — … so it may still be cut there; raise maxSwipes or timeoutMs';
   const dropped = (d: boolean) => ({ from: { x: 824, y: 497 }, to: { x: 682, y: 497 }, durationMs: 300, dropped: d });
   const at = 100;
@@ -308,7 +309,7 @@ describe('lv-d62-drop-two: two reveals dropped, the hedge with C cut, then "call
 describe('the hard check: never "fully visible" while C is cut (lv-d62, D68, D52, D59b alike)', () => {
   it('T11: the hedge on two held reveals with C cut is no claim: LOUD, not what the case was built for, never fully-cut', () => {
     const r = recorded('lv-d62-drop');
-    r.replies = ["Element id:lab.carousel-recycler-free.C fully visible after 3 swipes; but its right edge lies on its scroll container's (66,380 948x234), where Android cuts a node's bounds to the container, and a swipe toward it showed 55 px more of it, then 2 swipes after it moved nothing — the content ended there or the app did not take them — it may be cut there, a rect assert or screenshot may measure part of it; calling again tells"];
+    r.replies = [`Element id:lab.carousel-recycler-free.C fully visible after 3 swipes${flushText({ edge: 'right', container: LAB_CAROUSEL, checked: false, why: 'held', revealed: 55 })}`];
     r.state = withC(r.state!, 532);
     expect(verdictOf(r)).toMatchObject({ outcome: 'LOUD', cls: 'carousel-kind' });
   });

@@ -195,6 +195,7 @@ describe('T11: a reveal that held is doubted once, however far the stroke that p
   };
   const LEFT: RoundRules & { screen: { width: number; height: number } } = { ...RULES, direction: 'left' };
 
+  // The one byte pin of the hedge's sentence for a scroll container's edge; the truth tests build theirs through flushText.
   // Dumps 0–2 are the call as captured (its reveal dropped); the fourth read reuses dump 2 and is NOT captured: it stands
   // for a retry that also moved nothing (live, fix-drop-more/fixmore-20.json logged such a retry as 482 → 482).
   it('the captured call: no plain "fully visible" while the cut is proven — the same reveal goes again, and two that held end in the hedge', () => {

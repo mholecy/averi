@@ -202,7 +202,7 @@ interface ProvenCut {
   readonly edge: Edge;
   readonly container: Rect;
   readonly revealed: number;
-  /** A reveal held on this proof and was sent again (D62, T11): the next that holds is checked. A fresh proof starts anew. */
+  /** A reveal held on this proof and was sent again (D62, T11): the next that holds ends the call hedged (`Flush` `held`). A fresh proof starts anew. */
   readonly doubted: boolean;
 }
 

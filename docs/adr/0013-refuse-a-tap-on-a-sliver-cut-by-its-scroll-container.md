@@ -464,7 +464,7 @@ it, and would miss batch-9 had its probe been the 177-px cap (135 < 153).
 3. The doubt is the proof's and is kept with it (`stillProven`): a read between that moved the match without proving
    the cut anew (a stroke that was no reveal, the match still flush on that edge) leaves it owed, so the next held
    reveal is doubted all the same — once per proof, at most one extra stroke.
-4. Unchanged: a held reveal after a stroke that ran short (the content ended more than CARRY_LOSS before its end —
+4. Unchanged (gone since T11): a held reveal after a stroke that ran short (the content ended more than CARRY_LOSS before its end —
    Settings' "Network", VA1's R, formRead), every first probe that held, a reveal too short to tell from a tap
    (`tap`). Every reveal that held is NOT sent again: that rule turned Settings' "Network", VA1's R and formRead from
    "after 2 swipes" to "after 3", about 2.5–2.9 s more on the 2026-10-09 case, on the legitimate path.
@@ -566,8 +566,7 @@ replayed tree never moves, so no proof forms.
 any boot, 14:05 (`frames-recovery.txt`, raw-4): raw strokes 135–146 of 142, 0 of 24 at 94 or less; frames 18 ms in the lab app and
 17 ms in Settings against 73 and 81, swap 12 ms against 42, motion events 16 ms apart against about 100; start count 11, the AVD's own
 load, the lead, 0.3–0.8 against 1.3–2.0 at raw-1 on the same workload; the host's about 7, above the 4–5 of the short runs. So the slowness was system-wide in
-the AVD, and it ended with no boot. Between: `adb install -r` of the same APK at 12:45 to undo my dexopt change, the one device change I
-know of, and not shown to be the cause (the same APK went in at 23:03 the night before, with T7a's figures before it and the short ones
+the AVD, and it ended with no boot. Between: `adb install -r` of the same APK at 12:45 to undo the dexopt change, the one device change on record, and not shown to be the cause (the same APK went in at 23:03 the night before, with T7a's figures before it and the short ones
 after; a lab-app install explains Settings poorly). **It came back, 2026-11-06:** healthy at 14:52 (AVD load 0.6), load 2.64 at 15:16 after one whole visibility run, raw strokes 0–130 of 142 with 18 of 24 short at 15:42,
 frames 70+ ms again, and one raw stroke at 0 with no averi in the path; it held to at least 16:15. On a two-sample `top` at 15:44: 397 % idle; no process in D state over six reads, one to three in R (adbd, `ps`, a kworker). So
 the load is not a guest process doing work that `top` shows, and the state is not a one-off. Trigger unknown: a visibility run preceded it this time, and the 12:48 one was followed by the fast state. Evidence:

@@ -329,18 +329,18 @@ export function judgeFully(expect: FullyExpect): CarouselJudge {
 }
 
 /** lv-d62-drop-two: no call claims C whole while it is cut; the first ends in the hedge with C cut; the second's first stroke moves C. */
-export const judgeDropTwo: CarouselJudge = (state, [first, second], _source, launched, [hedged], log) => {
+export const judgeDropTwo: CarouselJudge = (state, [first, second], _source, launched, [afterFirst], log) => {
   const base = { app: appText(state, launched), kind: replyKind(first) };
-  if (hedged === undefined || !hasClip(state)) return { ...base, outcome: 'SKIP', why: NO_CLIP };
-  for (const [reply, app] of [[first, hedged], [second, state]] as const) {
+  if (afterFirst === undefined || !hasClip(state)) return { ...base, outcome: 'SKIP', why: NO_CLIP };
+  for (const [reply, app] of [[first, afterFirst], [second, state]] as const) {
     if (carouselReply(reply) === 'fully-visible' && isCut(app)) return { ...base, outcome: 'MISMATCH', cls: 'fully-cut', why: `"fully visible" while ${cutText(app)}: ${short(reply)}` };
   }
-  if (!isCut(hedged)) return { ...base, outcome: 'SKIP', why: `C whole after the first call (${cutText(hedged)}): no cut to tell` };
+  if (!isCut(afterFirst)) return { ...base, outcome: 'SKIP', why: `C whole after the first call (${cutText(afterFirst)}): no cut to tell` };
   if (log?.swipes?.[1]?.dropped !== true || log.swipes[2]?.dropped !== true) return { ...base, outcome: 'SKIP', why: 'strokes 2 and 3 not both dropped' };
-  if (!heldCutHedged(first)) return { ...base, outcome: 'LOUD', cls: 'carousel-kind', why: `no hedge on the first call, ${cutText(hedged)}: ${short(first)}` };
-  const next = carouselStrokes(state, hedged)[0];
+  if (!heldCutHedged(first)) return { ...base, outcome: 'LOUD', cls: 'carousel-kind', why: `no hedge on the first call, ${cutText(afterFirst)}: ${short(first)}` };
+  const next = carouselStrokes(state, afterFirst)[0];
   if (next === undefined || Math.abs(next.to - next.from) <= CUT_TOLERANCE_PX) return { ...base, outcome: 'LOUD', cls: 'carousel-kind', why: `the second call's first stroke ${next === undefined ? 'was not logged' : 'did not move C'}: ${short(second)}` };
-  return { ...base, outcome: 'ok', why: `hedged with ${cutText(hedged)}; the second call moved C ${next.from}→${next.to}: ${short(second)}` };
+  return { ...base, outcome: 'ok', why: `hedged with ${cutText(afterFirst)}; the second call moved C ${next.from}→${next.to}: ${short(second)}` };
 };
 
 /**

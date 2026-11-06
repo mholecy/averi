@@ -299,6 +299,15 @@ describe('the flush check doubts a reveal that held on a proven cut (D62, T11)',
     expect(seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82), { drawn: TAP })).verdict).toMatchObject({ of: 'cut', cut: { why: 'tap', revealed: 60 } });
   });
 
+  it('a move with no new proof between the two held reveals: exactly 2 held, the hedge after the second, on the figure of the proof', () => {
+    const held = seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82)));
+    expect(said(held)).toEqual(reveal(82));
+    const shifted = { ...flushOn('bottom', 82), x: flushOn('bottom', 82).x + 5 };
+    const moved = seeFlush(sent(held.verdict), stopAt(shifted));
+    expect(moved.verdict).toMatchObject({ of: 'probe' });
+    expect(said(seeFlush(sent(moved.verdict), stopAt(shifted)))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'held', revealed: 60 } });
+  });
+
   it('a stroke too short to tell from a tap spends no doubt: a reveal that holds after it is still sent again', () => {
     const tapped = seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82), { drawn: TAP }));
     expect(tapped.verdict).toMatchObject({ of: 'cut', cut: { why: 'tap' } });
