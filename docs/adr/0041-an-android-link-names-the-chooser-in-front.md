@@ -181,7 +181,7 @@ the one read suffices, and no `resolve-activity` prediction or bounded poll is n
 ## Amendment: `launch_app`'s `-p` start and monkey's refusal read the same focus (2026-11-03, D55b)
 
 **Corrected by the D73 amendment below**: everything here about monkey's refusal rested on reading `** SYS_KEYS` as an
-emulator warning, and the chooser never was its cause. The `-p` half stands. Kept as written, as the record of what was
+emulator warning, and the chooser was not its cause (measured on API 33). The `-p` half stands. Kept as written, as the record of what was
 decided then.
 
 **Context.** Batch-10's E4 and batch-11's D55b (2026-11-03, averi_lab emulator, API 33; batch-11 on main a5fefd32)
@@ -567,8 +567,43 @@ and API 33's jar: the source of no other release was read.
    ** No activities found to run, monkey aborted. / ** SYS_KEYS has no physical keys but with factor 2.0%.`, the rest as
    before.
 
-Unchanged byte for byte: a refusal with no chooser named, and a refusal with a real line alone and the chooser up. The
-flow's `launch` step and the ensure_state ladder get replies 1 and 2 through the same launch.
+5. A thrown monkey failure with no `** ` line, whose message `ExecError` builds from the argv (`adapters/exec.ts`) and
+   `launch_app`'s reply carries unchanged, so it now shows the flags. Read live on an unreachable serial, base 2f6ba8b6:
+
+   > Command failed (exit 1): adb -s emulator-9998 shell monkey -p dev.averi.lab -c android.intent.category.LAUNCHER 1
+   > adb: device 'emulator-9998' not found
+
+   This branch:
+
+   > Command failed (exit 1): adb -s emulator-9998 shell monkey -p dev.averi.lab --pct-syskeys 0 --pct-nav 0 --pct-majornav 0 -c android.intent.category.LAUNCHER 1
+   > adb: device 'emulator-9998' not found
+
+   The same insertion in `Command timed out: adb -s <serial> shell monkey …` and in a non-zero exit with no `** ` line
+   (pinned, not seen live). Raw exec text in a reply is D70's and D65's to deal with, not this change's.
+
+Unchanged byte for byte: a refusal with no chooser named, and a refusal with a real line alone and the chooser up.
+
+**The flow and ensure_state.** Both go through the same launch. Before, over the recorded refusal (base 2f6ba8b6, a real
+adapter and engine over batch-11's exit-251 output, `<R>` being reply 1, or reply 2 with the chooser named), a flow's
+`launch` step failed the run with:
+
+> <R>
+>
+> Steps that ran before the failure:
+> flow open: start
+> ✗ launch: failed — <R>
+
+and `ensure_state` with the same and one more line, `⚠ reach open: failed — <R>`. After, the traces pinned in
+`tests/mcp/android-chooser-replies.test.ts`, with a focus read that would name the chooser and the chooser's tree until
+monkey starts. The flow's:
+
+> flow open: start
+> launch: dev.averi.lab
+> flow open: done
+
+and `ensure_state`'s, the same three lines and then:
+
+> state lab: reached after open
 
 **Live, through the MCP layer** (a throwaway script over a real registry and the in-memory transport, not kept: the live
 golden launches its cells itself and judges the app's model, so a `launch_app` case would need a new group and a focus
@@ -587,11 +622,17 @@ what a refusing device prints.
 `npm run mutate -- --force` (both groups, cold, at 8f9286d6): `android-chooser.ts` 100 % (floor 98; 143 mutants, 0
 survived, down from 152 with `monkeyChooserRefusal` gone); every other score unchanged; floors unchanged. `android.ts` and
 `android-start.ts` are not in the mutation scope, so hand mutants, each killed: the flag dropped (12 tests fail), its value
-`1` (12), `chooserAlsoInFront` dropped (5), the `** SYS_KEYS` line filtered from the quote again (5), `startSaid`'s separator (3). Review round 1 changed only comments
-in `android-chooser.ts`, so the run was not repeated; its hand mutants, each killed: `--pct-syskeys` dropped (12 tests
-fail), `--pct-nav` dropped (10), `--pct-majornav` dropped (10).
+`1` (12), `chooserAlsoInFront` dropped (5), the `** SYS_KEYS` line filtered from the quote again (5), `startSaid`'s separator (3).
+Review round 1's hand mutants, each killed: `--pct-syskeys` dropped (12 tests fail), `--pct-nav` dropped (10),
+`--pct-majornav` dropped (10). The code review's, on the new pins in
+`tests/mcp/android-chooser-replies.test.ts`, each killed: `--pct-syskeys` dropped (7 tests fail), `--pct-majornav` dropped
+(3), a focus read and a chooser answer after monkey's success (3), monkey's stdout tail dropped (1), the flow's `launch`
+line dropped (4). The rounds changed only comments in `android-chooser.ts`; `npm run mutate -- --force` was repeated, both
+groups, cold, at ae47ab69: `android-chooser.ts` still 100 % (143 mutants, 0 survived), all 34 scores as at 8f9286d6, floors
+unchanged, so `scope.json` is unchanged.
 
-Golden Changed 0 (it replays tree reads, no launch seam), so it is no evidence either way.
+Golden Changed 0 at 8f9286d6, before the review rounds' two more flags (it replays tree reads, no launch seam), so it is
+no evidence either way.
 
 Residuals, stated:
 - Only API 33 on one AVD is measured. The three flags were read in android-5.0.0_r1's source and found in API 33's jar, and
