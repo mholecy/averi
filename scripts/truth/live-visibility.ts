@@ -1,7 +1,7 @@
 import { UNMOVED_STROKES_EXHAUST } from '../../src/interact/scroll-rounds.js';
 import type { Platform } from '../differential/corpus.js';
 import type { CaseReads } from './live-cases.js';
-import { refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind } from './replies.js';
+import { refusedAfterDismissal, replyKind, screenChangedSaid, screenUnchangedFor, swipesOf, turnsSaid, type ReplyKind, heldCutHedged } from './replies.js';
 import type { CellTruth, Geometry, LabState, ProbeEvent, Rect, Stroke, TargetTruth } from './schema.js';
 import { askedUnlistedBy, contractOf, judgedContext, stopHolds, type StopAsk, type TapAsk } from './target-contract.js';
 import { axisOf, bandsOf, directionOf, geometryOf, intersect, selectorOf, type Direction, type GeometryContext } from './truth.js';
@@ -97,6 +97,8 @@ export type VerdictClass =
   | 'held-said'
   | 'window-cut'
   | 'entry-not-bare'
+  // judgeScroll: a stop hedged on two held reveals (T11) with the target not whole.
+  | 'held-hedge'
   // The carousel group (live-carousel.ts, T7a): "fully visible" while C is cut; a reply of another kind than the case's;
   // strokes drawn outside the carousel's band (D59b); a first read after a stroke that disagrees with the pager at rest (D37);
   // the drop leg with no D62 retry seen in its stroke log.
@@ -350,6 +352,8 @@ export function judgeScroll(
   const unchanged = unchangedClaimBroken(scroll, strokesSince(state, launched));
   const kind = replyKind(scroll);
   const visible = kind === 'visible';
+  // T11: "it may be cut there" on a cut a swipe proved claims nothing whole: honest, and not a pass.
+  if (visible && !holds && c.fully && g !== undefined && tapped?.outcome !== 'MISMATCH' && heldCutHedged(scroll)) return { outcome: 'LOUD', cls: 'held-hedge', kind, why: `hedged, and the app lays it out ${g}: ${short(scroll)}`, app };
   if (visible && !holds) return { outcome: 'MISMATCH', cls: 'stop-claim', kind, why: `averi says ${short(scroll)} — the app lays it out ${g ?? 'nowhere'}, not ${stop}${tapped?.outcome === 'MISMATCH' ? `; then the tap: ${tapped.why}` : ''}`, app };
   if (tapped?.outcome === 'MISMATCH') return { ...tapped, why: `after ${short(scroll)}, the tap: ${tapped.why}`, app };
   // Whatever the tree listed: a claim about the screen the app's own strokes contradict.

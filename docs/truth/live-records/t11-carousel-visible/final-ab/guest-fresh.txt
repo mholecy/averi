@@ -1,0 +1,111 @@
+== scales
+window_animation_scale=1.0
+transition_animation_scale=1.0
+animator_duration_scale=null
+== top
+Tasks: 321 total,   1 running, 320 sleeping,   0 stopped,   0 zombie
+  Mem:  2012184K total,  1816364K used,   195820K free,     5616K buffers
+ Swap:  1509132K total,   636160K used,   872972K free,   682088K cached
+400%cpu   0%user   0%nice   4%sys 396%idle   0%iow   0%irq   0%sirq   0%host
+  PID USER         PR  NI VIRT  RES  SHR S[%CPU] %MEM     TIME+ ARGS
+ 4126 shell        20   0  10G 4.5M 3.6M R  4.0   0.2   0:00.00 top -b -n2 -d2 -m 25
+ 3935 root          0 -20    0    0    0 I  0.0   0.0   0:00.09 [kworker/u9:4-fscrypt_read_queue]
+ 3875 u0_a133      20   0  14G  49M  30M S  0.0   2.4   0:00.03 com.google.android.marvin.talkback
+ 3848 u0_a120      20   0  39G  77M  48M S  0.0   3.9   0:00.31 com.google.android.gms.ui
+ 3797 u0_a101      20   0  14G  44M  25M S  0.0   2.2   0:00.03 com.android.traceur
+ 3795 u0_a156      20   0  14G  41M  22M S  0.0   2.1   0:00.03 com.android.emergency
+ 3707 u0_a129      20   0  14G  56M  32M S  0.0   2.8   0:00.14 com.google.android.tts
+ 3664 u0_a118      20   0  14G  47M  27M S  0.0   2.3   0:00.07 com.google.android.setupwizard
+ 3591 u0_a107      20   0  15G  57M  29M S  0.0   2.9   0:00.31 com.google.android.settings.intelligence
+ 3566 u0_a115      20   0  14G  41M  23M S  0.0   2.1   0:00.04 com.google.android.projection.gearhead:shared
+ 3518 u0_a119      20   0  14G  46M  27M S  0.0   2.3   0:00.11 com.google.android.partnersetup
+ 3498 u0_a83       20   0  14G  38M  21M S  0.0   1.9   0:00.03 com.google.android.packageinstaller
+ 3467 u0_a108      20   0  14G  38M  20M S  0.0   1.9   0:00.02 com.google.android.onetimeinitializer
+ 3378 u0_a114      20   0  14G  39M  22M S  0.0   1.9   0:00.03 com.google.android.configupdater
+ 3310 u0_a135      20   0  15G  48M  28M S  0.0   2.4   0:00.17 com.google.android.calendar
+ 3247 u0_a128      20   0  15G  39M  22M S  0.0   2.0   0:00.04 com.google.android.apps.maps:server_recovery_process
+ 3158 u0_a120      20   0  15G  83M  47M S  0.0   4.2   0:00.63 com.google.android.gms.unstable
+ 3136 u0_a128      20   0  15G  54M  29M S  0.0   2.7   0:00.38 com.google.android.apps.maps
+ 3113 shell        20   0  14G  38M  21M S  0.0   1.9   0:00.02 com.android.shell
+ 3080 u0_a153      20   0  14G  43M  24M S  0.0   2.1   0:00.06 com.android.remoteprovisioner
+ 3062 u0_a84       20   0  14G  42M  23M S  0.0   2.1   0:00.04 com.android.providers.calendar
+ 3029 u0_a80       20   0  14G  38M  20M S  0.0   1.9   0:00.02 com.android.managedprovisioning
+ 3006 u0_a105      20   0  14G  38M  21M S  0.0   1.9   0:00.03 com.android.imsserviceentitlement
+ 2983 system       20   0  14G  39M  21M S  0.0   1.9   0:00.02 com.android.dynsystem:dynsystem
+ 2967 system       20   0  14G  37M  20M S  0.0   1.9   0:00.02 com.android.dynsystem
+
+
+
+Tasks: 321 total,   1 running, 320 sleeping,   0 stopped,   0 zombie
+  Mem:  2012184K total,  1828920K used,   183264K free,     5712K buffers
+ Swap:  1509132K total,   635648K used,   873484K free,   692252K cached
+400%cpu   2%user   2%nice   5%sys 389%idle   1%iow   2%irq   0%sirq   0%host
+  PID USER         PR  NI VIRT  RES  SHR S[%CPU] %MEM     TIME+ ARGS
+  862 u0_a120      20   0  16G 194M 110M S  2.5   9.8   0:04.95 com.google.android.gms
+  496 system       18  -2  18G 244M 175M S  2.5  12.3   0:07.55 system_server
+ 1384 u0_a112      20   0  15G 233M 190M S  1.0  11.8   0:01.10 com.google.android.apps.wellbeing
+ 4126 shell        20   0  10G 4.6M 3.6M R  0.5   0.2   0:00.01 top -b -n2 -d2 -m 25
+  313 system       20   0  10G 2.6M 2.3M S  0.5   0.1   0:00.18 android.hardware.sensors@2.1-service.multihal
+  307 system       -3   0  11G 4.1M 3.4M S  0.5   0.2   0:00.73 android.hardware.graphics.composer@2.4-service
+  189 root          0 -20    0    0    0 I  0.5   0.0   0:00.24 [kworker/u9:3-fscrypt_read_queue]
+  160 root         20   0    0    0    0 I  0.5   0.0   0:00.25 [kworker/0:2-virtio_vsock]
+   31 root         20   0    0    0    0 S  0.5   0.0   0:00.02 [ksoftirqd/2]
+ 3935 root          0 -20    0    0    0 I  0.0   0.0   0:00.09 [kworker/u9:4-fscrypt_read_queue]
+ 3875 u0_a133      20   0  14G  49M  30M S  0.0   2.4   0:00.03 com.google.android.marvin.talkback
+ 3848 u0_a120      20   0  39G  77M  48M S  0.0   3.9   0:00.31 com.google.android.gms.ui
+ 3797 u0_a101      20   0  14G  44M  25M S  0.0   2.2   0:00.03 com.android.traceur
+ 3795 u0_a156      20   0  14G  41M  22M S  0.0   2.1   0:00.03 com.android.emergency
+ 3707 u0_a129      20   0  14G  56M  32M S  0.0   2.8   0:00.14 com.google.android.tts
+ 3664 u0_a118      20   0  14G  47M  27M S  0.0   2.3   0:00.07 com.google.android.setupwizard
+ 3591 u0_a107      20   0  15G  57M  29M S  0.0   2.9   0:00.31 com.google.android.settings.intelligence
+ 3566 u0_a115      20   0  14G  41M  23M S  0.0   2.1   0:00.04 com.google.android.projection.gearhead:shared
+ 3518 u0_a119      20   0  14G  46M  27M S  0.0   2.3   0:00.11 com.google.android.partnersetup
+ 3498 u0_a83       20   0  14G  38M  21M S  0.0   1.9   0:00.03 com.google.android.packageinstaller
+ 3467 u0_a108      20   0  14G  38M  20M S  0.0   1.9   0:00.02 com.google.android.onetimeinitializer
+ 3378 u0_a114      20   0  14G  39M  22M S  0.0   1.9   0:00.03 com.google.android.configupdater
+ 3310 u0_a135      20   0  15G  48M  28M S  0.0   2.4   0:00.17 com.google.android.calendar
+ 3247 u0_a128      20   0  15G  39M  22M S  0.0   2.0   0:00.04 com.google.android.apps.maps:server_recovery_process
+ 3158 u0_a120      20   0  15G  83M  47M S  0.0   4.2   0:00.63 com.google.android.gms.unstable
+== cpuinfo
+Load: 0.31 / 0.07 / 0.02
+CPU usage from 34660ms to 26217ms ago (2026-11-06 16:22:29.034 to 2026-11-06 16:22:37.478):
+  37% 496/system_server: 22% user + 14% kernel / faults: 113146 minor 3859 major
+  23% 57/kswapd0: 0% user + 23% kernel
+  6.5% 307/android.hardware.graphics.composer@2.4-service: 0.4% user + 6.1% kernel / faults: 887 minor 17 major
+  5.7% 327/surfaceflinger: 1.8% user + 3.9% kernel / faults: 4667 minor 25 major
+  2.1% 185/kworker/u9:2-blk_crypto_wq: 0% user + 2.1% kernel
+  1.9% 184/kworker/u9:1-blk_crypto_wq: 0% user + 1.9% kernel
+  1.8% 58/kworker/u9:0-blk_crypto_wq: 0% user + 1.8% kernel
+  1.6% 142/logd: 0.6% user + 1% kernel / faults: 1327 minor 20 major
+  1.6% 290/statsd: 0.3% user + 1.3% kernel / faults: 872 minor 8 major
+  1.3% 292/zygote64: 0% user + 1.3% kernel / faults: 3189 minor
+  1.2% 145/servicemanager: 0.5% user + 0.6% kernel / faults: 816 minor 5 major
+  1.1% 324/audioserver: 0.5% user + 0.5% kernel / faults: 1917 minor 68 major
+  0.9% 1/init: 0.2% user + 0.6% kernel / faults: 1958 minor 4 major
+  0.9% 400/media.swcodec: 0.4% user + 0.4% kernel / faults: 2025 minor 166 major
+  0.7% 190/jbd2/dm-33-8: 0% user + 0.7% kernel
+  0.5% 72/kworker/0:1H-kblockd: 0% user + 0.5% kernel
+  0.5% 322/kworker/u8:3-ext4-rsv-conversion: 0% user + 0.5% kernel
+  0.4% 8/kworker/u8:0-loop22: 0% user + 0.4% kernel
+  0.4% 56/kworker/u8:2-loop13: 0% user + 0.4% kernel
+  0.4% 291/netd: 0% user + 0.4% kernel / faults: 1454 minor 68 major
+  0.4% 306/android.hardware.graphics.allocator@3.0-service: 0% user + 0.4% kernel / faults: 344 minor 1 major
+  0.4% 374/adbd: 0.2% user + 0.2% kernel / faults: 6488 minor 1 major
+  0.4% 392/media.extractor: 0.1% user + 0.3% kernel / faults: 707 minor 228 major
+  0.4% 394/mediaserver: 0.2% user + 0.2% kernel / faults: 755 minor 273 major
+  0.4% 399/libgoldfish-rild: 0.1% user + 0.3% kernel / faults: 183 minor 20 major
+  0.4% 463/kworker/1:2H-kverityd: 0% user + 0.4% kernel
+  0.3% 14/rcu_preempt: 0% user + 0.3% kernel
+  0.3% 66/kworker/2:1H-kverityd: 0% user + 0.3% kernel
+  0.3% 92/kworker/3:1H-kblockd: 0% user + 0.3% kernel
+  0.3% 160/kworker/0:2-kdmflush: 0% user + 0.3% kernel
+  0.3% 189/kworker/u9:3-hci0: 0% user + 0.3% kernel
+  0.2% 13/ksoftirqd/0: 0% user + 0.2% kernel
+  0.2% 144/lmkd: 0% user + 0.2% kernel / faults: 4 minor
+  0.2% 167/android.system.suspend@1.0-service: 0% user + 0.2% kernel / faults: 97 minor 42 major
+  0.2% 201/apexd: 0.1% user + 0.1% kernel / faults: 1736 minor 101 major
+  0.2% 313/android.hardware.sensors@2.1-service.multihal: 0% user + 0.2% kernel / faults: 501 minor 2 major
+  0.2% 388/cameraserver: 0.1% user + 0.1% kernel / faults: 661 minor 36 major
+  0.2% 391/installd: 0.1% user + 0.1% kernel / faults: 117 minor 50 major
+== host (ps was refused in this sandbox; its error kept)
+guest_read: operation not permitted: ps

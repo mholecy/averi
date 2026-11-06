@@ -1,0 +1,25 @@
+dev.averi.lab frames 87 total 17.6/20.1  input 3.4/6.6  anim 0.0/5.2  trav 0.1/0.3  draw 0.6/1.1  syncq 0.1/0.3  sync 0.0/0.5  issue 0.2/1.8  swap 11.4/15.4  gap 1.3/3.7
+Total frames rendered: 87
+Janky frames: 2 (2.30%)
+50th percentile: 17ms
+90th percentile: 19ms
+Number Missed Vsync: 0
+Number Slow UI thread: 1
+Number Slow issue draw commands: 0
+  RecentQueue: length=10
+    MotionEvent, age=1123ms
+    MotionEvent, age=1107ms
+    MotionEvent, age=1089ms
+    MotionEvent, age=1072ms
+    MotionEvent, age=1055ms
+    MotionEvent, age=1039ms
+    MotionEvent, age=1021ms
+    MotionEvent, age=1006ms
+    MotionEvent, age=988ms
+    MotionEvent, age=972ms
+com.android.settings frames 83 total 17.5/20.1  input 0.5/1.9  anim 0.0/0.6  trav 0.1/0.4  draw 0.2/1.1  syncq 0.2/1.0  sync 0.2/0.7  issue 1.1/3.8  swap 13.8/17.0  gap 1.2/4.3
+Janky frames: 2 (2.38%)
+50th percentile: 17ms
+Number Missed Vsync: 0
+Number Slow UI thread: 0
+Number Slow issue draw commands: 1

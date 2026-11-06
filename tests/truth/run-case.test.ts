@@ -33,7 +33,7 @@ function rigOver(lab: FakeLab | FakeAndroidLab, replies: readonly string[] = ['T
       return replies[answered++] ?? 'no reply scripted';
     },
     configFor: async (source, c) => `${source}-${c.id}.yaml`,
-    swipes: { arm: (drop) => void lab.log.push(`arm ${drop}`), disarm: () => (lab.log.push('disarm'), []) },
+    swipes: { arm: (drop, shorten) => void lab.log.push(shorten === undefined ? `arm ${drop}` : `arm ${drop} shorten ${shorten.stroke} ${shorten.px}`), disarm: () => (lab.log.push('disarm'), []) },
     pause: async (ms) => void lab.log.push(`pause ${ms}`),
     now: () => 1_000_000,
     ...over,
@@ -74,11 +74,17 @@ describe('runCase: the reads a case declares', () => {
     const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
     const stroke = { from: { x: 1, y: 2 }, to: { x: 3, y: 4 }, dropped: true };
     let logged: unknown;
-    const c = aCase({ reads: { swipes: { drop: 2 } }, judge: (_s, _r, _so, _l, _a, log) => ((logged = log), OK) });
+    const c = aCase({ reads: { swipes: { drop: [2] } }, judge: (_s, _r, _so, _l, _a, log) => ((logged = log), OK) });
     const run = await runCase(c, 'uiautomator', rigOver(lab, ['1'], { swipes: { arm: (d) => void lab.log.push(`arm ${d}`), disarm: () => (lab.log.push('disarm'), [stroke]) } }));
     expect(lab.log).toEqual(['launch c', 'arm 2', 'call tap under uiautomator-x1.yaml', 'disarm', 'pause 800', 'state']);
     expect(run.record.swipes).toEqual([stroke]);
     expect(logged).toEqual({ swipes: [stroke] });
+  });
+
+  it('swipes: a shortening declared beside the drop reaches the hook', async () => {
+    const lab = new FakeLab({ launched: read('launch'), states: [read('final')] });
+    await runCase(aCase({ reads: { swipes: { drop: [2], shorten: { stroke: 1, px: 90 } } } }), 'uiautomator', rigOver(lab, ['1']));
+    expect(lab.log).toContain('arm 2 shorten 1 90');
   });
 
   it('swipes: a call that throws still disarms the hook, and the case throws', async () => {

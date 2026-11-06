@@ -88,6 +88,8 @@ function flushOn(edge: Edge, shows: number, list: Rect = LIST): Rect {
 
 /** The verdict on a stop flush on the bottom edge of `LIST` that a probe or reveal which held settled. */
 const CHECKED = { of: 'flush', flush: { edge: 'bottom', container: LIST, checked: true } } as const;
+/** A cut a stroke proved, showing `revealed` px more, and two held reveals after it: the hedge, never `checked` (T11). */
+const HELD = (revealed: number) => ({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'held', revealed } }) as const;
 
 /** The direction whose axis an edge lies on and that a probe toward it keeps (any along the axis: the probe goes toward the edge). */
 const ALONG: Record<Edge, Direction> = { bottom: 'down', top: 'up', right: 'right', left: 'left' };
@@ -222,12 +224,11 @@ describe('the flush check', () => {
 });
 
 /**
- * D62: a reveal that moved nothing right after a stroke that CARRIED the match its whole drawn length (less twice the
- * slop) is doubted once — the same reveal sent again — and accepted only when that one holds too. A held reveal after
- * a stroke that ran short (the content ended under it) is accepted at once, as is every first probe that held.
+ * D62, T11: a reveal that moved nothing is doubted once — the same reveal sent again — and accepted only when that one
+ * holds too, however far the stroke that proved the cut carried the match. A first probe that held is accepted at once.
  */
-describe('the flush check doubts a reveal that held right after a stroke that carried the match its whole length (D62)', () => {
-  /** A 74-px probe: the lab's bounded list's (tests/interact/scroll-flush-reveal.test.ts). Carried past 74 − 2·24 = 26 px. */
+describe('the flush check doubts a reveal that held on a proven cut (D62, T11)', () => {
+  /** A 74-px probe: the lab's bounded list's (tests/interact/scroll-flush-reveal.test.ts). */
   const PROBE: Stroke = { from: { x: 540, y: 1480 }, to: { x: 540, y: 1406 } };
   /** The check with the cut proved by `PROBE`, which showed `grown` px more of a row showing 22 at the list's bottom. */
   function provedBy(grown: number, { drawn }: { drawn: Stroke | undefined } = { drawn: PROBE }): FlushSeen {
@@ -236,48 +237,45 @@ describe('the flush check doubts a reveal that held right after a stroke that ca
   }
   const reveal = (shows: number): unknown => ({ of: 'probe', toward: 'down', reach: 1, maxTravel: Math.floor((LIST.height - shows) / 2) });
 
-  it('the carry rule\'s boundary: 26 px of a 74-px probe ran short — the held reveal is checked; 27 px carried — it is sent again, no wait', () => {
-    // 26/27 px is how far the row GREW under the 74-px stroke: a loss of 48/47 px against CARRY_LOSS (48).
-    const short = provedBy(26);
-    expect(said(seeFlush(sent(short.verdict), stopAt(flushOn('bottom', 48))))).toEqual(CHECKED);
-    const carried = provedBy(27);
-    const doubted = seeFlush(sent(carried.verdict), stopAt(flushOn('bottom', 49)));
+  it.each([2, 26, 27, 74])('%i px of a 74-px probe: the held reveal is sent again, no wait — how far it carried says nothing of the content\'s end', (grown) => {
+    const doubted = seeFlush(sent(provedBy(grown).verdict), stopAt(flushOn('bottom', 22 + grown)));
     expect(doubted).toMatchObject({ settles: true, waits: false });
-    expect(said(doubted)).toEqual(reveal(49));
+    expect(said(doubted)).toEqual(reveal(22 + grown));
+    expect(said(seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 22 + grown))))).toEqual(HELD(grown));
   });
 
-  it('a proving read with no stroke handed back: not carried — the held reveal is checked, as before', () => {
+  it('a proving read with no stroke handed back: doubted all the same', () => {
     const proved = provedBy(60, { drawn: undefined });
-    expect(said(seeFlush(sent(proved.verdict), stopAt(flushOn('bottom', 82))))).toEqual(CHECKED);
+    expect(said(seeFlush(sent(proved.verdict), stopAt(flushOn('bottom', 82))))).toEqual(reveal(82));
   });
 
-  it('doubted once: the retry held again — checked; no swipe left for the retry — the cut (`FlushCut` budget)', () => {
+  it('doubted once: the retry held again — the hedge (`held`); no swipe left for the retry — the cut (`FlushCut` budget)', () => {
     const doubted = seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82)));
     expect(said(doubted)).toEqual(reveal(82));
-    expect(said(seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 82))))).toEqual(CHECKED);
+    expect(said(seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 82))))).toEqual(HELD(60));
     expect(seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82), { budget: false })).verdict).toMatchObject({
       of: 'cut',
       cut: { of: 'flushCut', edge: 'bottom', container: LIST, revealed: 60, why: 'budget' },
     });
   });
 
-  it('a retry that moved and grew it is a fresh proof: a reveal that holds after it, carried, is doubted again', () => {
+  it('a retry that moved and grew it is a fresh proof: a reveal that holds after it is doubted again', () => {
     const doubted = seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82)));
-    // 100 px drawn, 68 px more of it showing: carried (68 > 52).
+    // 100 px drawn, 68 px more of it showing.
     const retry: Stroke = { from: { x: 540, y: 1480 }, to: { x: 540, y: 1380 } };
     const fresh = seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 150), { drawn: retry }));
     expect(said(fresh)).toEqual(reveal(150));
     const again = seeFlush(sent(fresh.verdict), stopAt(flushOn('bottom', 150)));
     expect(said(again)).toEqual(reveal(150));
-    expect(said(seeFlush(sent(again.verdict), stopAt(flushOn('bottom', 150))))).toEqual(CHECKED);
+    expect(said(seeFlush(sent(again.verdict), stopAt(flushOn('bottom', 150))))).toEqual(HELD(68));
   });
 
-  // ADR 0013 LV2 point 3's row cut by 40 px, which the 74-px probe brings whole at the list's end: 40 > 26, carried —
-  // the legitimate case D62 pays for: one retry before `checked`.
-  it('LV2\'s row cut by 40 px, revealed whole by the 74-px probe: carried — the held reveal is sent again, and checked when that one holds', () => {
+  // ADR 0013 LV2 point 3's row cut by 40 px, which the 74-px probe brings whole at the list's end —
+  // the legitimate case the doubt pays for: one retry, then the hedge (a new call's first probe holds: `checked`).
+  it('LV2\'s row cut by 40 px, revealed whole by the 74-px probe: the held reveal is sent again, and hedged when that one holds', () => {
     const doubted = seeFlush(sent(provedBy(40).verdict), stopAt(flushOn('bottom', 62)));
     expect(said(doubted)).toEqual(reveal(62));
-    expect(said(seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 62))))).toEqual(CHECKED);
+    expect(said(seeFlush(sent(doubted.verdict), stopAt(flushOn('bottom', 62))))).toEqual(HELD(40));
   });
 
   it('a doubted reveal with a keyboard the moot rule offered and never asked about: the witness first, then the reveal — the read shown again with the check from before the witness doubts it again', () => {
@@ -293,12 +291,29 @@ describe('the flush check doubts a reveal that held right after a stroke that ca
     // touch down under it.
     expect(answered.verdict).toMatchObject({ of: 'probe', stroke: { coverTop: 1400, points: { from: { y: 1329 } } } });
     expect(seeFlush(inFlight, stopAt(flushOn('bottom', 82))).verdict).toMatchObject({ of: 'probe', stroke: { points: { from: { y: 1443 } } } });
-    // That reveal held too: checked.
-    expect(said(seeFlush(sent(answered.verdict), stopAt(flushOn('bottom', 82))))).toEqual(CHECKED);
+    // That reveal held too: the hedge.
+    expect(said(seeFlush(sent(answered.verdict), stopAt(flushOn('bottom', 82))))).toEqual(HELD(60));
   });
 
-  it('a reveal drawn too short to tell from a tap after a carried proof: the cut (`tap`), not a retry', () => {
+  it('a reveal drawn too short to tell from a tap on a proven cut: the cut (`tap`), not a retry', () => {
     expect(seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82), { drawn: TAP })).verdict).toMatchObject({ of: 'cut', cut: { why: 'tap', revealed: 60 } });
+  });
+
+  it('a move with no new proof between the two held reveals: exactly 2 held, the hedge after the second, on the figure of the proof', () => {
+    const held = seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82)));
+    expect(said(held)).toEqual(reveal(82));
+    const shifted = { ...flushOn('bottom', 82), x: flushOn('bottom', 82).x + 5 };
+    const moved = seeFlush(sent(held.verdict), stopAt(shifted));
+    expect(moved.verdict).toMatchObject({ of: 'probe' });
+    expect(said(seeFlush(sent(moved.verdict), stopAt(shifted)))).toEqual({ of: 'flush', flush: { edge: 'bottom', container: LIST, checked: false, why: 'held', revealed: 60 } });
+  });
+
+  it('a stroke too short to tell from a tap spends no doubt: a reveal that holds after it is still sent again', () => {
+    const tapped = seeFlush(sent(provedBy(60).verdict), stopAt(flushOn('bottom', 82), { drawn: TAP }));
+    expect(tapped.verdict).toMatchObject({ of: 'cut', cut: { why: 'tap' } });
+    const shown = seeFlush(tapped.check, stopAt(flushOn('bottom', 82)));
+    expect(said(shown)).toEqual(reveal(82));
+    expect(said(seeFlush(sent(shown.verdict), stopAt(flushOn('bottom', 82))))).toEqual(reveal(82));
   });
 
   it('a first probe that held is checked whatever came before it: no proof, nothing to doubt', () => {
@@ -323,7 +338,7 @@ describe('the flush check doubts a reveal that held right after a stroke that ca
     const held = seeFlush(sent(proved.verdict), carouselStop(after, untaken));
     expect(held).toMatchObject({ waits: false, verdict: { of: 'probe', toward: 'right' } });
     expect(seeFlush(sent(proved.verdict), carouselStop(after, untaken, false)).verdict).toMatchObject({ of: 'cut', cut: { revealed: 135, why: 'budget', edge: 'right', container: CLIP } });
-    expect(seeFlush(sent(held.verdict), carouselStop(after, untaken)).verdict).toEqual({ of: 'flush', flush: { edge: 'right', container: CLIP, checked: true } });
+    expect(seeFlush(sent(held.verdict), carouselStop(after, untaken)).verdict).toEqual({ of: 'flush', flush: { edge: 'right', container: CLIP, checked: false, why: 'held', revealed: 135 } });
   });
 });
 

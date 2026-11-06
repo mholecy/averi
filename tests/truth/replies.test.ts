@@ -5,7 +5,7 @@ import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid } from '../../scripts/truth/replies.js';
+import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged } from '../../scripts/truth/replies.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
 
@@ -68,7 +68,8 @@ describe('flushProbedSide: the probed side in both forms src builds (src/interac
     }
   });
 
-  it('none where no probe moved nothing: unchecked, or spanning the container', () => {
+  it('none where no probe moved nothing: unchecked, held on a proven cut, or spanning the container', () => {
+    expect(flushProbedSide(`fully visible after 3 swipes${flushText({ edge: 'top', container, checked: false, why: 'held', revealed: 66 })}`)).toBeUndefined();
     expect(flushProbedSide(`fully visible after 0 swipes${flushText({ edge: 'top', container, pinned, checked: false, why: 'budget' })}`)).toBeUndefined();
     expect(flushProbedSide(`fully visible after 0 swipes${flushText({ edges: ['top', 'bottom'], container, pinned, checked: false, why: 'fills' })}`)).toBeUndefined();
   });
@@ -148,6 +149,12 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
     expect(carouselReply(fits.replace('fully visible after', 'fully visible by the tree after'))).toBe('fully-visible');
     const unchecked = `Element C fully visible after 0 swipes${flushText({ edge: 'right', container: CAROUSEL, checked: false, why: 'budget' })}`;
     expect(carouselReply(unchecked)).toBe('other');
+    // T11: two held reveals on a proven cut are no claim either.
+    const held = `Element C fully visible after 3 swipes${flushText({ edge: 'right', container: CAROUSEL, checked: false, why: 'held', revealed: 55 })}`;
+    expect(carouselReply(held)).toBe('other');
+    expect(heldCutHedged(held)).toBe(true);
+    expect(heldCutHedged(unchecked)).toBe(false);
+    expect(heldCutHedged(d62)).toBe(false);
   });
 
   it('other: the stuck reply (batch-11), a plain stop, a not-found, a timeout', () => {

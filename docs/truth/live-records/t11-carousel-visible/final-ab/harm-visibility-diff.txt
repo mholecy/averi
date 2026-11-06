@@ -1,0 +1,34 @@
+cases 153, all three the same 147
+
+## Caused by the fix, on the held path: 1
+uiautomator scroll:scroll-sticky-cut.R.fully
+  base-1: Element id:"lab.scroll-sticky-cut.R" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut 
+  fix   : Element id:"lab.scroll-sticky-cut.R" fully visible after 3 swipes; but its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, where Android cuts a node's bounds at a node drawn over it, a
+  base-2: Element id:"lab.scroll-sticky-cut.R" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-cut.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut 
+
+## Differs base-vs-fix, base runs agree, NOT on the held path (unexplained, not called noise): 2
+uiautomator scroll:carousel-in-list.C
+  base-1: Element id:"lab.carousel-in-list.C" visible after 2 swipes — CLIPPED at right, at most 93% of it is in the viewport — uiautomator does not say how far it runs past the screen's right edge. A rect assert or screenshot on this element will measure the CLIPPED box | Tapped id:"lab.carousel-in-list.C"
+  fix   : Element id:"lab.carousel-in-list.C" visible after 2 swipes — CLIPPED at right, at most 92% of it is in the viewport — uiautomator does not say how far it runs past the screen's right edge. A rect assert or screenshot on this element will measure the CLIPPED box | Tapped id:"lab.carousel-in-list.C"
+  base-2: Element id:"lab.carousel-in-list.C" visible after 2 swipes — CLIPPED at right, at most 93% of it is in the viewport — uiautomator does not say how far it runs past the screen's right edge. A rect assert or screenshot on this element will measure the CLIPPED box | Tapped id:"lab.carousel-in-list.C"
+uiautomator blank:tabbar-floating.F
+  base-1: Element id:"lab.tabbar-floating.F" fully visible after 6 swipes | Tapped id:"lab.tabbar-floating.F"
+  fix   : Element id:"lab.tabbar-floating.F" visible after 6 swipes — PARTLY UNDER container id:lab.tabbar-floating.tabBar (66,1860 948x239), drawn over it — 86% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too | Tapped id:"lab.tabbar-floating.F
+  base-2: Element id:"lab.tabbar-floating.F" fully visible after 6 swipes | Tapped id:"lab.tabbar-floating.F"
+
+## Differs base-vs-base (not attributable to the fix): 3
+uiautomator scroll:scroll-bounded.O
+  base-1: ERROR scroll_until id:"lab.scroll-bounded.O" failed after 15246ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 12755ms, the last 2104ms) — element never appeared in the tree; after the last 3 swipes over the scroll container 0,303 1080x605 the tree listed none of its content where a swipe's mo
+  fix   : ERROR scroll_until id:"lab.scroll-bounded.O" failed after 15551ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 13148ms, the last 2413ms) — element never appeared in the tree; after the last 3 swipes over the scroll container 0,303 1080x605 the tree listed none of its content where a swipe's mo
+  base-2: ERROR scroll_until id:"lab.scroll-bounded.O" failed after 15251ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 12841ms, the last 2104ms) — element never appeared in the tree; after the last 3 swipes over the scroll container 0,303 1080x605 the tree listed none of its content where a swipe's mo
+uiautomator scroll:scroll-bounded.F
+  base-1: ERROR scroll_until id:"lab.scroll-bounded.F" failed after 15266ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 12758ms, the last 2264ms) — element never appeared in the tree; after the last 3 swipes over the scroll container 0,303 1080x605 the tree listed none of its content where a swipe's mo
+  fix   : ERROR scroll_until id:"lab.scroll-bounded.F" failed after 15157ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 12755ms, the last 2155ms) — element never appeared in the tree; after the last 3 swipes over the scroll container 0,303 1080x605 the tree listed none of its content where a swipe's mo
+  base-2: ERROR scroll_until id:"lab.scroll-bounded.F" failed after 15276ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 12849ms, the last 2245ms) — element never appeared in the tree; after the last 3 swipes over the scroll container 0,303 1080x605 the tree listed none of its content where a swipe's mo
+uiautomator scroll:tabbar-floating.F
+  base-1: ERROR scroll_until id:"lab.tabbar-floating.F" failed after 17151ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 12662ms, the last 2106ms) — element never appeared in the tree; after the last 3 swipes over the scroll container 0,550 1080x1670 the tree listed none of its content where a swipe's 
+  fix   : ERROR scroll_until id:"lab.tabbar-floating.F" failed after 17324ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 12803ms, the last 2075ms) — element never appeared in the tree; after the last 4 swipes over the scroll container 0,550 1080x1670 the tree listed none of its content where a swipe's 
+  base-2: ERROR scroll_until id:"lab.tabbar-floating.F" failed after 17627ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 13188ms, the last 2145ms) — element never appeared in the tree; after the last 4 swipes over the scroll container 0,550 1080x1670 the tree listed none of its content where a swipe's 
+
+## Missing from a run: 0
+

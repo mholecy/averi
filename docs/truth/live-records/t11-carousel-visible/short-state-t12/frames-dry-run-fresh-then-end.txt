@@ -1,0 +1,50 @@
+dev.averi.lab frames 87 total 18.2/23.4  input 2.8/10.6  anim 0.0/3.2  trav 0.1/0.3  draw 0.6/0.9  syncq 0.1/0.2  sync 0.0/0.3  issue 0.2/0.4  swap 12.2/20.2  gap 1.9/7.0
+Total frames rendered: 87
+Janky frames: 3 (3.45%)
+50th percentile: 18ms
+90th percentile: 21ms
+Number Missed Vsync: 0
+Number Slow UI thread: 0
+Number Slow issue draw commands: 2
+  RecentQueue: length=10
+    MotionEvent, age=1126ms
+    MotionEvent, age=1108ms
+    MotionEvent, age=1091ms
+    MotionEvent, age=1075ms
+    MotionEvent, age=1058ms
+    MotionEvent, age=1042ms
+    MotionEvent, age=1025ms
+    MotionEvent, age=1007ms
+    MotionEvent, age=990ms
+    MotionEvent, age=974ms
+com.android.settings frames 81 total 18.3/23.0  input 0.4/1.5  anim 0.0/0.6  trav 0.0/0.3  draw 0.1/0.7  syncq 0.1/0.5  sync 0.1/0.6  issue 1.0/2.8  swap 14.0/20.4  gap 2.3/7.7
+Janky frames: 2 (2.47%)
+50th percentile: 18ms
+Number Missed Vsync: 0
+Number Slow UI thread: 0
+Number Slow issue draw commands: 1
+dev.averi.lab frames 19 total 90.7/160.3  input 3.3/6.0  anim 0.0/0.0  trav 0.1/0.2  draw 0.8/1.3  syncq 0.1/0.5  sync 0.0/0.0  issue 0.2/0.4  swap 41.4/94.3  gap 43.7/79.6
+Total frames rendered: 19
+Janky frames: 16 (84.21%)
+50th percentile: 89ms
+90th percentile: 150ms
+Number Missed Vsync: 13
+Number Slow UI thread: 14
+Number Slow issue draw commands: 13
+  RecentQueue: length=10
+    MotionEvent, age=2646ms
+    MotionEvent, age=2546ms
+    MotionEvent, age=1291ms
+    MotionEvent, age=1288ms
+    MotionEvent, age=1249ms
+    MotionEvent, age=1218ms
+    MotionEvent, age=1149ms
+    MotionEvent, age=1138ms
+    MotionEvent, age=1045ms
+    MotionEvent, age=966ms
+com.android.settings frames 36 total 77.0/193.4  input 0.0/1.6  anim 0.0/0.4  trav 0.0/0.4  draw 0.2/14.2  syncq 1.6/22.2  sync 0.1/0.3  issue 0.8/12.1  swap 35.8/107.6  gap 16.2/93.5
+Janky frames: 21 (56.76%)
+50th percentile: 73ms
+Number Missed Vsync: 9
+Number Slow UI thread: 10
+Number Slow issue draw commands: 19

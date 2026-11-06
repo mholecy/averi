@@ -250,7 +250,7 @@ export const MAX_SWIPES = bound.slice(bound.indexOf('('));
  * through a whole ScrollOutcome, or (the unchecked flush clause) inside #flushText's sentence around a container's rect
  * — so tests/truth/replies.test.ts holds each one to that file and drives the builders that write them. The unaimable
  * stop's end (D68), the unfit stop's remedy (D52), the flush cut a probe proved (the hedge D62 keeps), the unchecked
- * flush clause of a stop, and the inferred axis (D59).
+ * flush clause of a stop, the inferred axis (D59), and the hedge on two held reveals (T11).
  */
 export const CAROUSEL_REPLY_WORDS = [
   'more swipes are unlikely to help',
@@ -258,8 +258,9 @@ export const CAROUSEL_REPLY_WORDS = [
   'so it may still be cut there',
   'it may be cut there',
   '(the tree does not say which way it scrolls: ',
+  'the content ended there or the app did not take them',
 ] as const;
-const [UNAIMABLE, UNFIT, PROVEN_CUT, UNCHECKED_CUT, INFERRED_AXIS] = CAROUSEL_REPLY_WORDS;
+const [UNAIMABLE, UNFIT, PROVEN_CUT, UNCHECKED_CUT, INFERRED_AXIS, HELD_CUT] = CAROUSEL_REPLY_WORDS;
 
 /**
  * What a carousel's `scroll_until … fully: true` replied, from a closed set (T7a; the carousel judges read it): `unaimable`
@@ -279,6 +280,9 @@ export function carouselReply(reply: string): CarouselReply {
   }
   return /^Element .* fully visible (?:by the tree )?after /.test(reply) && !reply.includes(UNCHECKED_CUT) ? 'fully-visible' : 'other';
 }
+
+/** A stop hedged on a cut a swipe proved and two swipes after it that moved nothing (T11, scroll-text.ts#flushText's `held`): it claims nothing whole. */
+export const heldCutHedged = (reply: string) => reply.includes(HELD_CUT);
 
 /** The unfit stop says the tree told no axis of its scroll view, the swipes over it did (D59: scroll-text.ts#unfitText). */
 export const inferredAxisSaid = (reply: string) => reply.includes(INFERRED_AXIS);

@@ -522,12 +522,12 @@ export function createAveriServer({ registry, version }: AveriServerDeps): McpSe
     'scroll_until',
     {
       description:
-        'Swipe until the element is in the viewport — the portable way to reach content off screen (no coordinates). direction = where the content lies (down = below the current view). ' +
+        'Swipe until the element is in the viewport. direction = where the content lies (down = below the current view). ' +
         'A default stop has the element\'s CENTRE on screen, below the status bar, clear of anything of the app drawn over it (a pinned button bar, a floating tab bar) and not cut to a strip too thin to tap; the rest may still be clipped — the reply says which edges and what fraction show, or "fully visible". ' +
-        `Pass fully: true when the next step MEASURES the element (a rect/color/ocr assert, a screenshot): none of it may then be clipped, covered, under the keyboard, or under a system bar past ${SLACK} units (pt on iOS, px on Android), and the call fails loudly naming the shortfall. ` +
+        `Pass fully: true when the next step MEASURES the element (a rect/color/ocr assert, a screenshot): none of it may then be clipped, covered, under the keyboard, or under a system bar past ${SLACK} units (pt on iOS, px on Android), and the call fails loudly naming the shortfall, or, on Android on a cut a swipe proved, may succeed hedged ("it may be cut there"; call again). ` +
         'It fails, naming the cause, when swiping no longer moves the element out (the cover, the status bar, the cut), when content is exhausted, or at maxSwipes / timeoutMs (checked once a round, so a call can run past it by one swipe and one more read). ' +
         `It never swipes on a screen presented over the target — a swipe there could dismiss it — and fails "… ${presentedStop()}". ` +
-        'Where no tree shows such a layer (iOS idb), a swipe that CHANGES THE SCREEN stops the call: it most likely dismissed a sheet or modal. ' +
+        'Where no tree shows such a layer (iOS idb), a swipe that CHANGES THE SCREEN stops the call. ' +
         'Two controls iOS lists in reading order are judged on one screenshot, as for tap; with the target not seen on top it stops before any swipe. ' +
         'A top bar the tree lists before the scroll view (iOS\'s navigation bar under wda) is not seen: check a stop near the top with a screenshot. ' +
         'With the soft keyboard up the viewport is the screen above it; nothing is pressed to hide it (press_key back first on Android to use the whole screen). ' +
