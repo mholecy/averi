@@ -448,6 +448,13 @@ export interface TargetTruth {
 }
 
 /**
+ * A target the app laid out no frame for (CellTruth.absent): what the catalog says of it and, per raw tree, whether the
+ * tree lists it anyway (TargetTruth.listed, TargetTruth.textListed — recorded always: a frameless target has no
+ * geometry to gate them on).
+ */
+export type AbsentTarget = Pick<TargetTruth, 'tag' | 'id' | 'text' | 'label' | 'color' | 'declared' | 'scrollView' | 'textListed'> & { listed: Partial<Record<SourceKind, boolean>> };
+
+/**
  * Where a target's frame lies, measured (truth.ts#geometryOf), in averi's judging order (ADR 0005: off the screen, the
  * system bands, cut, covered): `off-screen` none of it on the screen (a frame of no area too, wherever it lies: nothing
  * of it can be drawn, and it is never probed); `outside-scroll-view` on the screen but none of it in its scroll view's
@@ -478,6 +485,14 @@ export interface CellTruth {
   screen: { width: number; height: number };
   scale: number;
   targets: TargetTruth[];
+  /**
+   * The catalog's targets the app laid out no frame for (no `frames[<tag>]` in its state — a lazy list's or a
+   * recycler's card not composed at launch: carousel-lazy's C), ControlTruth's `not-rendered` for a target: not in
+   * `targets`, which hold a frame, never probed, nothing measured — and, as each raw tree has it (truth.ts#listedIn),
+   * whether it lists the target: the `listed` golden's `absent` derives from (target-contract.ts#askedUnlistedBy). No
+   * golden row reads it yet (backlog T6). Absent when every target had a frame.
+   */
+  absent?: AbsentTarget[];
   /** A form cell's truth (its `targets` empty). */
   form?: FormTruth;
   /** As the state reported them (LabState): what the targets' geometry was measured against. Absent before phase 3. */

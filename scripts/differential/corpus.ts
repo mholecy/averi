@@ -57,6 +57,11 @@ export interface RunManifest {
   device?: string;
   note?: string;
   captures: CaptureEntry[];
+  /**
+   * The truth capture's cells whose last attempt threw (scripts/truth/capture-run.ts), each with why — none of its
+   * files written by that run, so a capture of it listed above is an earlier one. Read by no replay; absent when none.
+   */
+  failed?: { cell: string; reason: string }[];
 }
 
 /** One tree of the corpus, ready to replay: `id` is `<run>/<file>`, the payload the file's text. */

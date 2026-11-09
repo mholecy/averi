@@ -34,6 +34,15 @@ import { consistency, controlConsistency, controlPiece, imePanels, listedIn, mea
  * per control (field, submit, the picker's probe rows) where its frame lies (truth.ts#situationOf) and what its probe
  * did.
  *
+ * A catalog target the app laid out no frame for (no `frames[<tag>]`: carousel-lazy's C, not composed at launch by
+ * design) is recorded absent (CellTruth.absent): never probed or measured, each raw tree's word on whether it lists it
+ * kept. A cell whose capture throws (the app's state missing what the capture needs, a device command failing) fails
+ * alone and loudly: nothing of it is written — its files are written only once it ends — so an earlier capture of it
+ * stays whole; the cells after it are captured; the manifest is written listing it under `failed` with why
+ * (RunManifest.failed, kept until a run captures it again); CaptureResult.failed says it, and the command line exits 1
+ * (capture.ts#outcome). A refusal (CaptureRefusal: the IME set up against the cell, a pinned submit with no bar) stops
+ * the run, once the manifest is written.
+ *
  * averi judges nothing here: the trees are read with the raw tools, so the truth does not depend on the code it will
  * test. Run it against a device that holds nothing else of value: the lab app's data is replaced per launch.
  */
@@ -53,6 +62,11 @@ export interface CaptureResult {
   broken: string[];
   /** Cells the app cannot build — `<cell>: why`. */
   skipped: string[];
+  /**
+   * Cells whose capture threw — `<cell>: why`: nothing of the cell written this run, so an earlier capture of it stays
+   * as it was; listed on the manifest too (RunManifest.failed).
+   */
+  failed: string[];
   manifest: RunManifest;
 }
 
@@ -71,6 +85,9 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   const manifest: RunManifest = { platform: lab.platform, app, device, note: opts.note, captures: [] };
   const broken: string[] = [];
   const skipped: string[] = [];
+  const failed: string[] = [];
+  const failures: NonNullable<RunManifest['failed']> = [];
+  let refusal: CaptureRefusal | undefined;
   // Who takes a tap in the navigation band depends on it (truth.ts#navigationBandTakes): read once per run.
   const navigation = await lab.navigation?.();
   const captured = new Set<string>();
@@ -81,122 +98,174 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       log(`${cell.id}: skipped — ${why}`);
       continue;
     }
-    const s = await lab.launch(cell.id);
-    const trees = await lab.trees();
-    // Android: the window manager's word on the focused window (CellTruth.windows), right after the trees: the dumped window's.
-    const windows = await lab.windows?.();
-    const shot = await lab.screenshot();
-    const png = PNG.sync.read(shot);
-    await writeFile(join(opts.out, `${cell.id}.png`), shot);
-    for (const t of trees) await writeFile(join(opts.out, `${cell.id}${t.suffix}`), t.payload);
-    await writeFile(join(opts.out, `${cell.id}.state.json`), JSON.stringify(s, null, 2) + '\n');
-    // Android: the device's own system bands with the IME down (CellTruth.displays) — read here, before the probes, when
-    // the launch shows no IME: a probe that focuses a field raises it, and the last probe leaves it up (rn-field's M,
-    // round 7: its dump held the IME, and golden's colour and ocr rows read the keyboard over M). A cell launched with
-    // the IME up is read after ime()'s back hid it, below.
-    let displays = lab.displays !== undefined && s.keyboard?.visible !== true ? await lab.displays() : undefined;
+    // Everything the cell writes waits for its end (`put`), and so do its broken lines: a cell that throws midway writes
+    // nothing — an earlier capture of it stays whole — and says why, loudly; the cells after it go on.
+    const files: [string, string | Buffer][] = [];
+    const put = (name: string, data: string | Buffer) => void files.push([name, data]);
+    const cellBroken: string[] = [];
+    const entries: RunManifest['captures'] = [];
+    try {
+      const s = await lab.launch(cell.id);
+      const trees = await lab.trees();
+      // Android: the window manager's word on the focused window (CellTruth.windows), right after the trees: the dumped window's.
+      const windows = await lab.windows?.();
+      const shot = await lab.screenshot();
+      const png = PNG.sync.read(shot);
+      put(`${cell.id}.png`, shot);
+      for (const t of trees) put(`${cell.id}${t.suffix}`, t.payload);
+      put(`${cell.id}.state.json`, JSON.stringify(s, null, 2) + '\n');
+      // Android: the device's own system bands with the IME down (CellTruth.displays) — read here, before the probes, when
+      // the launch shows no IME: a probe that focuses a field raises it, and the last probe leaves it up (rn-field's M,
+      // round 7: its dump held the IME, and golden's colour and ocr rows read the keyboard over M). A cell launched with
+      // the IME up is read after ime()'s back hid it, below.
+      let displays = lab.displays !== undefined && s.keyboard?.visible !== true ? await lab.displays() : undefined;
 
-    const truth: CellTruth = {
-      cell: cell.id,
-      layer: cell.layer,
-      device,
-      screen: { width: s.screen.width, height: s.screen.height },
-      scale: s.scale,
-      targets: [],
-      ...(s.safeArea !== undefined && { safeArea: s.safeArea }),
-      ...(s.scrollViews !== undefined && { scrollViews: s.scrollViews }),
-      ...(s.chrome !== undefined && { chrome: s.chrome }),
-      ...(cell.config !== undefined && { config: cell.config }),
-      ...(navigation !== undefined && { navigation }),
-    };
-    if (windows !== undefined) {
-      await writeFile(join(opts.out, `${cell.id}.windows.txt`), windows);
-      truth.windows = `${cell.id}.windows.txt`;
-    }
-    for (const t of cell.targets) {
-      const frame = s.frames[t.tag];
-      if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
-      // A text or label target is drawn on its control: how much of the control's box shows its colour (the text or
-      // the icon on it).
-      const box = t.text === undefined && t.label === undefined ? frame : s.frames[`${t.tag}.box`];
-      if (box === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for ${t.text === undefined ? 'label' : 'text'} target ${t.tag}'s box (${t.tag}.box)`);
-      const { drawn, seen } = measure(png, box, s.scale, t.color);
-      const geometry = measuredGeometry(frame, s, t.scrollView);
-      // The centre is never tapped where it lies off the screen (truth.ts#unprobedReason, the rule consistency holds
-      // the target to).
-      const unprobed = unprobedReason({ frame, ...geometry }, s.screen)?.says;
-      const read = unprobed !== undefined ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
-      const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
-      const reachedAtPiece = second === undefined ? undefined : readTargetProbe((await probe(lab, cell.id, second)).events, t.tag).reached;
-      const id = `lab.${cell.id}.${t.tag}`;
-      const target: TargetTruth = {
-        tag: t.tag,
-        id,
-        ...(t.text !== undefined && { text: t.text }),
-        ...(t.label !== undefined && { label: t.label }),
-        color: t.color,
-        declared: t.declared,
-        frame,
-        ...read,
-        drawn: Math.round(drawn * 1000) / 1000,
-        seen,
-        ...geometry,
-        ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
-        // Whether each tree lists it — read by the edge rows (target-contract.ts#unlistedBy), so recorded with a geometry.
-        ...(geometry.geometry !== undefined && { listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, tree.source, id)])) }),
-        // Whether each tree lists its string (golden-spec/text.ts: a covered string's "not found" is right only there).
-        ...(t.text !== undefined && { textListed: Object.fromEntries(trees.map((tree) => [tree.source, textListedIn(tree.payload, tree.source, t.text!)])) }),
-        ...(reachedAtPiece !== undefined && { reachedAtPiece }),
-        ...(unprobed !== undefined && { unprobed }),
+      const truth: CellTruth = {
+        cell: cell.id,
+        layer: cell.layer,
+        device,
+        screen: { width: s.screen.width, height: s.screen.height },
+        scale: s.scale,
+        targets: [],
+        ...(s.safeArea !== undefined && { safeArea: s.safeArea }),
+        ...(s.scrollViews !== undefined && { scrollViews: s.scrollViews }),
+        ...(s.chrome !== undefined && { chrome: s.chrome }),
+        ...(cell.config !== undefined && { config: cell.config }),
+        ...(navigation !== undefined && { navigation }),
       };
-      truth.targets.push(target);
-      const bad = consistency(target, lab.platform, s.screen, navigation);
-      if (bad !== undefined) broken.push(`${cell.id}/${t.tag}: ${bad}`);
-      log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${unprobed === undefined ? '' : ` (unprobed: ${unprobed})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
+      if (windows !== undefined) {
+        put(`${cell.id}.windows.txt`, windows);
+        truth.windows = `${cell.id}.windows.txt`;
+      }
+      for (const t of cell.targets) {
+        const frame = s.frames[t.tag];
+        if (frame === undefined) {
+          // Laid out nowhere (carousel-lazy's C before a swipe composes it): recorded absent (CellTruth.absent) — nothing
+          // to tap or measure — with each tree's word on it.
+          const id = `lab.${cell.id}.${t.tag}`;
+          (truth.absent ??= []).push({
+            tag: t.tag,
+            id,
+            ...(t.text !== undefined && { text: t.text }),
+            ...(t.label !== undefined && { label: t.label }),
+            color: t.color,
+            declared: t.declared,
+            ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
+            listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, tree.source, id)])),
+            ...(t.text !== undefined && { textListed: Object.fromEntries(trees.map((tree) => [tree.source, textListedIn(tree.payload, tree.source, t.text!)])) }),
+          });
+          log(`${cell.id}/${t.tag}: absent — the app reported no frame for it, not probed`);
+          continue;
+        }
+        // A text or label target is drawn on its control: how much of the control's box shows its colour (the text or
+        // the icon on it).
+        const box = t.text === undefined && t.label === undefined ? frame : s.frames[`${t.tag}.box`];
+        if (box === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for ${t.text === undefined ? 'label' : 'text'} target ${t.tag}'s box (${t.tag}.box)`);
+        const { drawn, seen } = measure(png, box, s.scale, t.color);
+        const geometry = measuredGeometry(frame, s, t.scrollView);
+        // The centre is never tapped where it lies off the screen (truth.ts#unprobedReason, the rule consistency holds
+        // the target to).
+        const unprobed = unprobedReason({ frame, ...geometry }, s.screen)?.says;
+        const read = unprobed !== undefined ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
+        const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
+        const reachedAtPiece = second === undefined ? undefined : readTargetProbe((await probe(lab, cell.id, second)).events, t.tag).reached;
+        const id = `lab.${cell.id}.${t.tag}`;
+        const target: TargetTruth = {
+          tag: t.tag,
+          id,
+          ...(t.text !== undefined && { text: t.text }),
+          ...(t.label !== undefined && { label: t.label }),
+          color: t.color,
+          declared: t.declared,
+          frame,
+          ...read,
+          drawn: Math.round(drawn * 1000) / 1000,
+          seen,
+          ...geometry,
+          ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
+          // Whether each tree lists it — read by the edge rows (target-contract.ts#unlistedBy), so recorded with a geometry.
+          ...(geometry.geometry !== undefined && { listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, tree.source, id)])) }),
+          // Whether each tree lists its string (golden-spec/text.ts: a covered string's "not found" is right only there).
+          ...(t.text !== undefined && { textListed: Object.fromEntries(trees.map((tree) => [tree.source, textListedIn(tree.payload, tree.source, t.text!)])) }),
+          ...(reachedAtPiece !== undefined && { reachedAtPiece }),
+          ...(unprobed !== undefined && { unprobed }),
+        };
+        truth.targets.push(target);
+        const bad = consistency(target, lab.platform, s.screen, navigation);
+        if (bad !== undefined) cellBroken.push(`${cell.id}/${t.tag}: ${bad}`);
+        log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${unprobed === undefined ? '' : ` (unprobed: ${unprobed})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
+      }
+      // Android with the IME up: what averi's keyboard queries answer, for the golden mode's fake device to serve
+      // (CellTruth.ime) — read after the trees and the screenshot, since it leaves the keyboard hidden.
+      let afterBack: LabState | undefined;
+      let panels: Rect[] = [];
+      if (s.keyboard?.visible === true && lab.ime !== undefined) {
+        const ime = await lab.ime();
+        // A floating IME's panels (truth.ts#imePanels): only on a cell captured floating (CatalogCell.ime), and always there.
+        panels = imePanels(ime.shown.touchable, s.keyboard.frame);
+        if (cell.ime === 'floating' && panels.length === 0) throw new CaptureRefusal(`cell ${cell.id}: captured with the IME floating only, but its touchable region holds no panel beyond its band — switch Gboard to Floating first`);
+        if (cell.ime !== 'floating' && panels.length > 0) throw new CaptureRefusal(`cell ${cell.id}: the IME is floating (a panel beyond its band: ${panels.map((p) => `${p.x},${p.y} ${p.width}x${p.height}`).join(', ')}) — dock it first; only a cell marked ime: floating is captured so`);
+        put(`${cell.id}.ime.json`, JSON.stringify(ime, null, 1) + '\n');
+        truth.ime = `${cell.id}.ime.json`;
+        // ime() left the keyboard hidden by one back: the layout averi finds an element again in after its guard's
+        // back — its trees and the app's state, beside the truth (CellTruth.afterBack).
+        const backTrees = await lab.trees();
+        afterBack = await lab.state();
+        if (afterBack === undefined) throw new Error(`cell ${cell.id}: no state after back`);
+        for (const t of backTrees) put(`${cell.id}.after-back${t.suffix}`, t.payload);
+        put(`${cell.id}.after-back.state.json`, JSON.stringify(afterBack, null, 2) + '\n');
+        truth.afterBack = { state: `${cell.id}.after-back.state.json`, trees: Object.fromEntries(backTrees.map((t) => [t.source, `${cell.id}.after-back${t.suffix}`])) };
+      }
+      // Android: the device's own system bands with the IME down (CellTruth.displays; a cell captured with it up has been
+      // hidden by ime()'s back by now) — the navigation bar's top depends on the navigation mode, which the fake device's
+      // stock dump (gesture navigation) does not follow.
+      if (lab.displays !== undefined) {
+        displays ??= await lab.displays();
+        put(`${cell.id}.displays.txt`, displays);
+        truth.displays = `${cell.id}.displays.txt`;
+      }
+      if (cell.ime === 'floating' && panels.length === 0) throw new CaptureRefusal(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);
+      if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, cellBroken, log, afterBack, panels);
+      put(`${cell.id}.truth.json`, JSON.stringify(truth, null, 2) + '\n');
+      for (const t of trees) {
+        entries.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
+      }
+      for (const [name, data] of files) await writeFile(join(opts.out, name), data);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      failed.push(`${cell.id}: ${reason}`);
+      failures.push({ cell: cell.id, reason });
+      if (e instanceof CaptureRefusal) {
+        log(`${cell.id}: REFUSED — ${reason}; the run stops here, its manifest written`);
+        refusal = e;
+        break;
+      }
+      log(`${cell.id}: FAILED — ${reason}; nothing of it written, the other cells go on`);
+      continue;
     }
-    // Android with the IME up: what averi's keyboard queries answer, for the golden mode's fake device to serve
-    // (CellTruth.ime) — read after the trees and the screenshot, since it leaves the keyboard hidden.
-    let afterBack: LabState | undefined;
-    let panels: Rect[] = [];
-    if (s.keyboard?.visible === true && lab.ime !== undefined) {
-      const ime = await lab.ime();
-      // A floating IME's panels (truth.ts#imePanels): only on a cell captured floating (CatalogCell.ime), and always there.
-      panels = imePanels(ime.shown.touchable, s.keyboard.frame);
-      if (cell.ime === 'floating' && panels.length === 0) throw new Error(`cell ${cell.id}: captured with the IME floating only, but its touchable region holds no panel beyond its band — switch Gboard to Floating first`);
-      if (cell.ime !== 'floating' && panels.length > 0) throw new Error(`cell ${cell.id}: the IME is floating (a panel beyond its band: ${panels.map((p) => `${p.x},${p.y} ${p.width}x${p.height}`).join(', ')}) — dock it first; only a cell marked ime: floating is captured so`);
-      await writeFile(join(opts.out, `${cell.id}.ime.json`), JSON.stringify(ime, null, 1) + '\n');
-      truth.ime = `${cell.id}.ime.json`;
-      // ime() left the keyboard hidden by one back: the layout averi finds an element again in after its guard's
-      // back — its trees and the app's state, beside the truth (CellTruth.afterBack).
-      const backTrees = await lab.trees();
-      afterBack = await lab.state();
-      if (afterBack === undefined) throw new Error(`cell ${cell.id}: no state after back`);
-      for (const t of backTrees) await writeFile(join(opts.out, `${cell.id}.after-back${t.suffix}`), t.payload);
-      await writeFile(join(opts.out, `${cell.id}.after-back.state.json`), JSON.stringify(afterBack, null, 2) + '\n');
-      truth.afterBack = { state: `${cell.id}.after-back.state.json`, trees: Object.fromEntries(backTrees.map((t) => [t.source, `${cell.id}.after-back${t.suffix}`])) };
-    }
-    // Android: the device's own system bands with the IME down (CellTruth.displays; a cell captured with it up has been
-    // hidden by ime()'s back by now) — the navigation bar's top depends on the navigation mode, which the fake device's
-    // stock dump (gesture navigation) does not follow.
-    if (lab.displays !== undefined) {
-      displays ??= await lab.displays();
-      await writeFile(join(opts.out, `${cell.id}.displays.txt`), displays);
-      truth.displays = `${cell.id}.displays.txt`;
-    }
-    if (cell.ime === 'floating' && panels.length === 0) throw new Error(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);
-    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, broken, log, afterBack, panels);
-    await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');
-    for (const t of trees) {
-      manifest.captures.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
-    }
+    broken.push(...cellBroken);
+    manifest.captures.push(...entries);
     captured.add(cell.id);
   }
   const order = (file: string) => opts.catalog.findIndex((c) => file.startsWith(`${c.id}.`));
   const kept = (previous?.captures ?? []).filter((c) => !captured.has(c.file.slice(0, c.file.indexOf('.'))));
   manifest.captures = [...kept, ...manifest.captures].sort((a, b) => order(a.file) - order(b.file));
+  // A failure stands until a run captures the cell again: the earlier ones of cells this run neither captured nor
+  // failed are kept.
+  const stillFailed = [...(previous?.failed ?? []).filter((f) => !captured.has(f.cell) && !failures.some((x) => x.cell === f.cell)), ...failures];
+  if (stillFailed.length > 0) manifest.failed = stillFailed.sort((a, b) => order(`${a.cell}.`) - order(`${b.cell}.`));
   await writeFile(join(opts.out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-  return { broken, skipped, manifest };
+  if (refusal !== undefined) throw refusal;
+  return { broken, skipped, failed, manifest };
 }
+
+/**
+ * The capture refusing to go on — the device set up wrong for the cell (the IME floating or docked against its
+ * CatalogCell.ime), or a pinned submit with no bar, which would read every control under it open. Unlike any other
+ * throw, which fails its cell alone (CaptureResult.failed), it stops the run: the manifest is written first, the cell
+ * listed failed, then it is thrown.
+ */
+export class CaptureRefusal extends Error {}
 
 /**
  * Relaunch the cell, run `first` when given (LabDevice.hideKeyboard), tap the frame's centre (or the point given), give
@@ -250,7 +319,7 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
   ];
   // The pinned submit's bar is what situationOf reads as its cover: a state without it would measure every control
   // under it open.
-  if (form.submit.pinned === true) frameOf(`${form.submit.tag}.bar`);
+  if (form.submit.pinned === true && s.frames[`${form.submit.tag}.bar`] === undefined) throw new CaptureRefusal(`cell ${cell.id}: the app reported no frame for ${form.submit.tag}.bar`);
   const keyboard = s.keyboard?.visible === true ? s.keyboard : undefined;
   const controls: ControlTruth[] = [];
   for (const w of wanted) {

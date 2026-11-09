@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RunManifest } from '../../scripts/differential/corpus.js';
 import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
@@ -435,6 +436,96 @@ describe('capture', () => {
     expect(broken).toEqual([expect.stringMatching(/^open\/A: the probe tap left no touch/)]);
   });
 
+  it('a target the app laid out no frame for is recorded absent — never probed, never a target with a made-up frame — and the cell is captured', async () => {
+    // carousel-lazy's C, absent at launch by design: the state's frames hold A alone.
+    const cell: CatalogCell = { ...OPEN, targets: [...OPEN.targets, { tag: 'C', color: '#D81B60', slot: 1, declared: 'open', scrollView: 'carousel' }] };
+    const lab = new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]);
+    const lines: string[] = [];
+    const { broken, manifest } = await capture(lab, [cell], { out, note: 'test', catalog: [cell], log: (l) => lines.push(l) });
+    expect(broken).toEqual([]);
+    expect(lab.taps).toEqual([[20, 20]]); // A's probe only: nothing of C to tap
+    const truth = JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')) as CellTruth;
+    expect(truth.targets.map((t) => t.tag)).toEqual(['A']);
+    // listed as each raw tree has it (truth.ts#listedIn): golden's `absent` (target-contract.ts#askedUnlistedBy) reads it.
+    expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', color: '#D81B60', declared: 'open', scrollView: 'carousel', listed: { uiautomator: false } }]);
+    expect(lines).toContain('open/C: absent — the app reported no frame for it, not probed');
+    expect(manifest.captures.map((c) => c.file)).toEqual(['open.xml']);
+  });
+
+  it('an absent target a raw tree lists anyway is recorded listed there; a text target, its string too', async () => {
+    const cell: CatalogCell = { ...OPEN, targets: [{ tag: 'C', color: '#D81B60', slot: 0, declared: 'open', text: 'Card C' }] };
+    class ListingLab extends FakeLab {
+      override async trees(): Promise<RawTree[]> {
+        return [{ source: 'uiautomator', suffix: '.xml', payload: '<hierarchy><node resource-id="lab.open.C" text="" bounds="[0,0][1,1]"/></hierarchy>' }];
+      }
+    }
+    await capture(new ListingLab(() => []), [cell], { out, note: 'test', catalog: [cell], log: () => undefined });
+    const truth = JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')) as CellTruth;
+    expect(truth.targets).toEqual([]);
+    expect(truth.absent).toEqual([{ tag: 'C', id: 'lab.open.C', text: 'Card C', color: '#D81B60', declared: 'open', listed: { uiautomator: true }, textListed: { uiautomator: false } }]);
+  });
+
+  it('a cell that throws fails alone, loudly: the cells after it are captured, the manifest is written and lists it, and it writes no file', async () => {
+    const BAD: CatalogCell = { id: 'bad', layer: 'none', targets: [{ tag: 'A', color: GREEN, slot: 0, declared: 'open' }] };
+    // bad's probe tap dies, its trees, screenshot and state read already.
+    class FailingLab extends FakeLab {
+      private current = '';
+      override async launch(cell: string): Promise<LabState> {
+        this.current = cell;
+        return super.launch(cell);
+      }
+      override async tap(x: number, y: number) {
+        if (this.current === 'bad') throw new Error('adb: device offline');
+        await super.tap(x, y);
+      }
+    }
+    const lab = new FailingLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]);
+    const lines: string[] = [];
+    const result = await capture(lab, [BAD, OPEN], { out, note: 'test', catalog: [BAD, OPEN], log: (l) => lines.push(l) });
+    expect(result.failed).toEqual(['bad: adb: device offline']);
+    expect(result.broken).toEqual([]);
+    expect(lines).toContain('bad: FAILED — adb: device offline; nothing of it written, the other cells go on');
+    const written = JSON.parse(await readFile(join(out, 'manifest.json'), 'utf8')) as RunManifest;
+    expect(written).toEqual(result.manifest);
+    expect(written.captures.map((c) => c.file)).toEqual(['open.xml']);
+    expect(written.failed).toEqual([{ cell: 'bad', reason: 'adb: device offline' }]);
+    expect((await readdir(out)).filter((f) => f.startsWith('bad.'))).toEqual([]);
+    expect(JSON.parse(await readFile(join(out, 'open.truth.json'), 'utf8')).targets).toHaveLength(1);
+  });
+
+  it("a failed cell's broken targets are not reported: its truth was never written", async () => {
+    // A's probe leaves no touch (broken), then the text target's box is missing: the cell throws.
+    const cell: CatalogCell = { ...OPEN, targets: [...OPEN.targets, { tag: 'A', color: GREEN, slot: 1, declared: 'open', text: 'Pay' }] };
+    const result = await capture(new FakeLab(() => []), [cell], { out, note: 'test', catalog: [cell], log: () => undefined });
+    expect(result.failed).toEqual(["open: cell open: the app reported no frame for text target A's box (A.box)"]);
+    expect(result.broken).toEqual([]);
+  });
+
+  it("a failed cell keeps its earlier capture, untouched, and is listed failed; a later run that captures it clears its failure, one that does not ask for it keeps it", async () => {
+    const lab = new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]);
+    await run(lab, [OPEN]);
+    const before = await readFile(join(out, 'open.truth.json'), 'utf8');
+    class Dying extends FakeLab {
+      override async trees(): Promise<RawTree[]> {
+        throw new Error('uiautomator: could not get idle state');
+      }
+    }
+    const failedRun = await run(new Dying(() => []), [OPEN]);
+    expect(failedRun.failed).toEqual(['open: uiautomator: could not get idle state']);
+    expect(failedRun.manifest.captures.map((c) => c.file)).toEqual(['open.xml']);
+    expect(failedRun.manifest.failed).toEqual([{ cell: 'open', reason: 'uiautomator: could not get idle state' }]);
+    expect(await readFile(join(out, 'open.truth.json'), 'utf8')).toBe(before);
+
+    // A run of another cell: open's failure stays on the manifest.
+    const other = await run(new FakeLab(() => []), []);
+    expect(other.manifest.failed).toEqual([{ cell: 'open', reason: 'uiautomator: could not get idle state' }]);
+    // Captured again: its failure is gone (no `failed` left at all).
+    const again = await run(lab, [OPEN]);
+    expect(again.failed).toEqual([]);
+    expect(again.manifest.failed).toBeUndefined();
+    expect(JSON.parse(await readFile(join(out, 'manifest.json'), 'utf8'))).not.toHaveProperty('failed');
+  });
+
   it('a run of some cells keeps the others — from the same device only', async () => {
     await writeFile(join(out, 'manifest.json'), JSON.stringify({ platform: 'android', app: 'AveriLab', device: 'fake emulator, Android 13 (API 33)', captures: [{ file: 'form-x.xml', source: 'uiautomator', form: 'raw' }] }));
     const { manifest } = await run(new FakeLab((x, y) => [ev('touch', `${x},${y}`), ev('tap', 'A')]), [OPEN]);
@@ -701,6 +792,15 @@ describe('capture of a form cell (Android)', () => {
     const lab = new FakeAndroidFormLab();
     floatingIme(lab, '');
     await expect(runForm(lab, [FORM_KEYBOARD])).rejects.toThrow(/the IME is floating \(a panel beyond its band: 20,300 360x200\) — dock it first/);
+  }, 15_000);
+  it('a refusal still stops the run, but only once the manifest is written, the refused cell listed failed', async () => {
+    const lab = new FakeAndroidFormLab();
+    floatingIme(lab, '');
+    await expect(runForm(lab, [FORM_KEYBOARD])).rejects.toThrow(/dock it first/);
+    const written = JSON.parse(await readFile(join(out, 'manifest.json'), 'utf8')) as RunManifest;
+    expect(written.captures).toEqual([]);
+    expect(written.failed).toEqual([{ cell: 'form-k', reason: expect.stringMatching(/^cell form-k: the IME is floating .* dock it first/) }]);
+    expect((await readdir(out)).filter((f) => f.startsWith('form-k.'))).toEqual([]);
   }, 15_000);
   it('a cell marked ime: floating is refused docked (no panel beyond the band)', async () => {
     await expect(runForm(new FakeAndroidFormLab(), [{ ...FORM_KEYBOARD, ime: 'floating' }])).rejects.toThrow(/captured with the IME floating only, but its touchable region holds no panel/);
