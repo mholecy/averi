@@ -191,11 +191,18 @@ describe('L7: carousel-lazy and carousel-recycler (D37\'s snapping pager) and th
     const of = (id: string) => cells.find((c) => c.id === id)!;
     for (const id of ['carousel-lazy', 'carousel-recycler', 'carousel-lazy-free', 'carousel-recycler-free']) {
       expect(of(id)).toMatchObject({ family: 'edges', layer: 'none', platforms: ['android'] });
-      expect(of(id).targets).toEqual(of('carousel-in-list').targets);
+      // C, the second card, may be absent (no frame, no node) at launch — the lazy list composes it only once it scrolls in
+      // (CatalogTarget.mayBeAbsent: the capture records it in CellTruth.absent).
+      expect(of(id).targets).toEqual(of('carousel-in-list').targets.map((t) => (t.tag === 'C' ? { ...t, mayBeAbsent: true } : t)));
       expect(captureRefusal(of(id), 'ios', undefined)).toBe('built for android only');
       expect(captureRefusal(of(id), 'android', 'gesture')).toBeUndefined();
     }
     expect(of('carousel-in-list').platforms).toBeUndefined();
+  });
+
+  it('only those four carousels\' C may be absent: every other target must report a frame', async () => {
+    const may = (await loadCatalog()).cells.flatMap((c) => c.targets.filter((t) => t.mayBeAbsent !== undefined).map((t) => `${c.id}.${t.tag}`));
+    expect(may).toEqual(['carousel-lazy.C', 'carousel-recycler.C', 'carousel-lazy-free.C', 'carousel-recycler-free.C']);
   });
 });
 

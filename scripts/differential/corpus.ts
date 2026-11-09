@@ -57,6 +57,18 @@ export interface RunManifest {
   device?: string;
   note?: string;
   captures: CaptureEntry[];
+  /**
+   * The truth capture's cells whose last attempt threw (scripts/truth/capture-run.ts), each with why — none of its
+   * files written by that run (unless the why says a rename failed midway), so a capture of it listed above is an
+   * earlier one. Read by no replay (golden says them, failedCaptureLines); absent when none.
+   */
+  failed?: CellFailure[];
+}
+
+/** A truth-capture cell that failed, and why (host paths out): RunManifest.failed, capture-run.ts#CaptureResult. */
+export interface CellFailure {
+  cell: string;
+  reason: string;
 }
 
 /** One tree of the corpus, ready to replay: `id` is `<run>/<file>`, the payload the file's text. */
@@ -90,15 +102,8 @@ const KINDS: Record<Platform, readonly SourceKind[]> = { ios: ['wda', 'idb'], an
  */
 export async function loadCorpus(dir: string): Promise<Recording[]> {
   const out: Recording[] = [];
-  for (const run of (await readdir(dir)).sort()) {
+  for (const { run, manifest } of await readManifests(dir)) {
     const runDir = join(dir, run);
-    if (!(await stat(runDir)).isDirectory()) continue;
-    let manifest: RunManifest;
-    try {
-      manifest = JSON.parse(await readFile(join(runDir, 'manifest.json'), 'utf8')) as RunManifest;
-    } catch (e) {
-      throw new Error(`corpus run ${run}: no readable manifest.json (${(e as Error).message})`, { cause: e });
-    }
     if (!Object.hasOwn(KINDS, manifest.platform)) {
       throw new Error(`corpus run ${run}: platform ${JSON.stringify(manifest.platform)} is not one of ${Object.keys(KINDS).join(', ')}`);
     }
@@ -155,9 +160,41 @@ export async function runLines(dir: string, ids: readonly string[]): Promise<str
   }
   const lines: string[] = [];
   for (const [run, n] of [...counts].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
-    const { device, note } = JSON.parse(await readFile(join(dir, run, 'manifest.json'), 'utf8')) as RunManifest;
+    const { device, note } = await readManifest(dir, run);
     const says = [device, note].filter((s) => s !== undefined && s !== '').join(' — ');
     lines.push(`- ${run}: ${n} trees${says === '' ? '' : ` — ${says}`}`);
   }
   return lines;
+}
+
+/**
+ * One stderr line per run of the corpus whose manifest lists failed cells (RunManifest.failed: the truth capture's
+ * cells whose last attempt threw) — golden says them before it replays, so a cell missing from a run, or replayed from
+ * an earlier capture, is never silent. It changes no row and no count.
+ */
+export async function failedCaptureLines(dir: string): Promise<string[]> {
+  const lines: string[] = [];
+  for (const { run, manifest: { failed = [] } } of await readManifests(dir)) {
+    if (failed.length > 0) lines.push(`golden: corpus run ${run} holds no capture from its last attempt at ${failed.length} cell${failed.length === 1 ? '' : 's'} (manifest.json \`failed\`): ${failed.map((f) => `${f.cell}: ${f.reason}`).join('; ')}`);
+  }
+  return lines;
+}
+
+/** One run's manifest, parsed — or the corpus's one error for a run without a readable one. */
+async function readManifest(dir: string, run: string): Promise<RunManifest> {
+  try {
+    return JSON.parse(await readFile(join(dir, run, 'manifest.json'), 'utf8')) as RunManifest;
+  } catch (e) {
+    throw new Error(`corpus run ${run}: no readable manifest.json (${(e as Error).message})`, { cause: e });
+  }
+}
+
+/** Every run of the corpus (each directory, in name order) with its manifest (readManifest). */
+async function readManifests(dir: string): Promise<{ run: string; manifest: RunManifest }[]> {
+  const runs: { run: string; manifest: RunManifest }[] = [];
+  for (const run of (await readdir(dir)).sort()) {
+    if (!(await stat(join(dir, run))).isDirectory()) continue;
+    runs.push({ run, manifest: await readManifest(dir, run) });
+  }
+  return runs;
 }

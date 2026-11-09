@@ -1,11 +1,13 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
-import type { RunManifest } from '../differential/corpus.js';
-import { LAB_APP, type LabDevice, pause } from './lab-device.js';
+import { hostHome } from '../../src/adapters/exec.js';
+import { withoutHostPaths } from '../../src/adapters/failure-text.js';
+import type { CellFailure, RunManifest, SourceKind } from '../differential/corpus.js';
+import { LAB_APP, type LabDevice, pause, type RawTree } from './lab-device.js';
 import { captureRefusal } from './catalog.js';
 import { measure } from './pixels.js';
-import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, FormTruth, LabState, Rect, TargetTruth } from './schema.js';
+import type { AbsentTarget, CatalogCell, CatalogForm, CatalogTarget, CellTruth, ControlTruth, FormTruth, LabState, NavigationMode, Rect, TargetTruth } from './schema.js';
 import { consistency, controlConsistency, controlPiece, imePanels, listedIn, measuredGeometry, outOfProcessKeyboard, pieceAfterBack, pieceProbePoint, probeEvents, probePoint, readControlProbe, readDismissalProbe, readTargetProbe, situationOf, textListedIn, unprobedReason } from './truth.js';
 
 /**
@@ -34,6 +36,21 @@ import { consistency, controlConsistency, controlPiece, imePanels, listedIn, mea
  * per control (field, submit, the picker's probe rows) where its frame lies (truth.ts#situationOf) and what its probe
  * did.
  *
+ * A catalog target the app laid out no frame for (no `frames[<tag>]`) where the catalog allows it
+ * (CatalogTarget.mayBeAbsent: the four L7 carousels' C, not composed at launch by design) is recorded absent
+ * (CellTruth.absent): never probed or measured, each raw tree's word on whether it lists it kept (a tree that does is
+ * logged as a WARNING). Any other missing frame fails the cell, and so does a cell left with no framed target where the
+ * catalog lists some. A cell whose capture throws (the app's state missing what the capture needs, a device command
+ * failing) fails alone and loudly, its stack logged: its files are written only once it ends, each to `<name>.tmp`
+ * and then renamed (flush), so a cell that throws, or whose `.tmp` writing fails, leaves an earlier capture of it whole; the
+ * cells after it are captured; the manifest is written listing it under `failed` with why, host paths out
+ * (RunManifest.failed, kept until a run captures it again or the catalog drops the cell); CaptureResult.failed says it,
+ * CaptureResult.carried the earlier runs' failures still listed, and the command line exits 1 (capture.ts#outcome). A
+ * rename that fails after every `.tmp` was written leaves the cell's files mixed, and its why names the files renamed
+ * and the `.tmp` files left. A halt (CaptureHalt: the IME set up against the cell, a pinned submit with no bar; or a
+ * programming error — a TypeError, ReferenceError, RangeError, the capture's own or a library's) stops the run once the
+ * manifest is written, returned as CaptureResult.halted.
+ *
  * averi judges nothing here: the trees are read with the raw tools, so the truth does not depend on the code it will
  * test. Run it against a device that holds nothing else of value: the lab app's data is replaced per launch.
  */
@@ -53,6 +70,20 @@ export interface CaptureResult {
   broken: string[];
   /** Cells the app cannot build — `<cell>: why`. */
   skipped: string[];
+  /**
+   * Cells whose capture threw this run, each with why (host paths out): nothing of the cell written — unless a rename
+   * failed midway, which the why says — so an earlier capture of it stays as it was; listed on the manifest too
+   * (RunManifest.failed).
+   */
+  failed: CellFailure[];
+  /** Failures of earlier runs the manifest still lists (cells this run neither captured nor failed). */
+  carried: CellFailure[];
+  /**
+   * The run stopped at this cell (it is in `failed` too): a CaptureHalt, or a programming error (`bug`: a TypeError,
+   * ReferenceError or RangeError — the capture's own or a library's — for the command line to rethrow once the summary
+   * is said). The cells after it were not launched.
+   */
+  halted?: CellFailure & { bug?: Error };
   manifest: RunManifest;
 }
 
@@ -71,6 +102,8 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
   const manifest: RunManifest = { platform: lab.platform, app, device, note: opts.note, captures: [] };
   const broken: string[] = [];
   const skipped: string[] = [];
+  const failed: CellFailure[] = [];
+  let halted: CaptureResult['halted'];
   // Who takes a tap in the navigation band depends on it (truth.ts#navigationBandTakes): read once per run.
   const navigation = await lab.navigation?.();
   const captured = new Set<string>();
@@ -81,15 +114,62 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       log(`${cell.id}: skipped — ${why}`);
       continue;
     }
+    // Everything the cell writes waits for its end (captureCell buffers it), and so do its broken lines: a cell that
+    // throws midway writes nothing — an earlier capture of it stays whole — and says why, loudly; the cells after it go on.
+    try {
+      const done = await captureCell(lab, cell, { device, navigation, log });
+      await flush(opts.out, done.files);
+      broken.push(...done.broken);
+      manifest.captures.push(...done.entries);
+      captured.add(cell.id);
+    } catch (e) {
+      const f = failureOf(e);
+      failed.push({ cell: cell.id, reason: f.reason });
+      if (e instanceof Error && e.stack !== undefined) log(`${cell.id}: ${e.stack}`);
+      if (f.halt) {
+        log(`${cell.id}: HALTED — ${f.bug === undefined ? '' : `a programming error (${f.bug.name}) — halting: `}${f.reason}; the run stops here, its manifest written`);
+        halted = { cell: cell.id, reason: f.reason, ...(f.bug !== undefined && { bug: f.bug }) };
+        break;
+      }
+      log(`${cell.id}: FAILED — ${f.reason}; ${f.partial ? 'partly written (the reason names what), the earlier capture no longer whole' : 'nothing of it written'}, the other cells go on`);
+    }
+  }
+  const order = (file: string) => opts.catalog.findIndex((c) => file.startsWith(`${c.id}.`));
+  const cellOrder = (id: string) => opts.catalog.findIndex((c) => c.id === id);
+  const kept = (previous?.captures ?? []).filter((c) => !captured.has(c.file.slice(0, c.file.indexOf('.'))));
+  manifest.captures = [...kept, ...manifest.captures].sort((a, b) => order(a.file) - order(b.file));
+  // A failure stands until a run captures the cell again: the earlier ones of cells this run neither captured nor
+  // failed are kept (carried), unless the catalog no longer has the cell.
+  const carried = (previous?.failed ?? []).filter((f) => !captured.has(f.cell) && !failed.some((x) => x.cell === f.cell) && cellOrder(f.cell) >= 0);
+  const stillFailed = [...carried, ...failed].sort((a, b) => cellOrder(a.cell) - cellOrder(b.cell));
+  if (stillFailed.length > 0) manifest.failed = stillFailed;
+  await writeFile(join(opts.out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+  return { broken, skipped, failed, carried, manifest, ...(halted !== undefined && { halted }) };
+}
+
+/** What one cell's capture leaves for the run, buffered: its files (flushed by the run), its manifest entries, its broken lines. */
+interface CellCapture {
+  files: [string, string | Buffer][];
+  entries: RunManifest['captures'];
+  broken: string[];
+}
+
+/** One cell's capture: launch, read, probe — every file it writes buffered (`put`), nothing written here. */
+async function captureCell(lab: LabDevice, cell: CatalogCell, ctx: { device: string; navigation: NavigationMode | undefined; log: (line: string) => void }): Promise<CellCapture> {
+  const { device, navigation, log } = ctx;
+  const files: [string, string | Buffer][] = [];
+  const put = (name: string, data: string | Buffer) => void files.push([name, data]);
+  const cellBroken: string[] = [];
+  const entries: RunManifest['captures'] = [];
     const s = await lab.launch(cell.id);
     const trees = await lab.trees();
     // Android: the window manager's word on the focused window (CellTruth.windows), right after the trees: the dumped window's.
     const windows = await lab.windows?.();
     const shot = await lab.screenshot();
     const png = PNG.sync.read(shot);
-    await writeFile(join(opts.out, `${cell.id}.png`), shot);
-    for (const t of trees) await writeFile(join(opts.out, `${cell.id}${t.suffix}`), t.payload);
-    await writeFile(join(opts.out, `${cell.id}.state.json`), JSON.stringify(s, null, 2) + '\n');
+    put(`${cell.id}.png`, shot);
+    for (const t of trees) put(`${cell.id}${t.suffix}`, t.payload);
+    put(`${cell.id}.state.json`, JSON.stringify(s, null, 2) + '\n');
     // Android: the device's own system bands with the IME down (CellTruth.displays) — read here, before the probes, when
     // the launch shows no IME: a probe that focuses a field raises it, and the last probe leaves it up (rn-field's M,
     // round 7: its dump held the IME, and golden's colour and ocr rows read the keyboard over M). A cell launched with
@@ -110,12 +190,25 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       ...(navigation !== undefined && { navigation }),
     };
     if (windows !== undefined) {
-      await writeFile(join(opts.out, `${cell.id}.windows.txt`), windows);
+      put(`${cell.id}.windows.txt`, windows);
       truth.windows = `${cell.id}.windows.txt`;
     }
     for (const t of cell.targets) {
       const frame = s.frames[t.tag];
-      if (frame === undefined) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
+      if (frame === undefined) {
+        // No frame where the catalog does not allow it (CatalogTarget.mayBeAbsent): a renamed tag, a wrong screen, a
+        // lab regression — the cell fails, never "absent".
+        if (t.mayBeAbsent !== true) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
+        // Laid out nowhere (carousel-lazy's C before a swipe composes it): recorded absent (CellTruth.absent) — nothing
+        // to tap or measure — with each tree's word on it.
+        const absent: AbsentTarget = catalogPart(cell.id, t, trees);
+        (truth.absent ??= []).push(absent);
+        log(`${cell.id}/${t.tag}: absent — the app reported no frame for it (the catalog allows it), not probed`);
+        // A tree listing what the app laid out nowhere: said, for whoever reads the run — the truth keeps it (`listed`).
+        const listing = Object.entries(absent.listed).filter(([, listed]) => listed).map(([source]) => source);
+        if (listing.length > 0) log(`${cell.id}/${t.tag}: WARNING — the app reported no frame for it, but the ${listing.join(' and ')} tree${listing.length > 1 ? 's list' : ' lists'} it`);
+        continue;
+      }
       // A text or label target is drawn on its control: how much of the control's box shows its colour (the text or
       // the icon on it).
       const box = t.text === undefined && t.label === undefined ? frame : s.frames[`${t.tag}.box`];
@@ -128,30 +221,26 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       const read = unprobed !== undefined ? { reached: false, probe: [] } : readTargetProbe((await probe(lab, cell.id, frame)).events, t.tag);
       const second = geometry.geometry === 'off-screen' ? undefined : pieceProbePoint(frame, geometry.piece);
       const reachedAtPiece = second === undefined ? undefined : readTargetProbe((await probe(lab, cell.id, second)).events, t.tag).reached;
-      const id = `lab.${cell.id}.${t.tag}`;
+      // The catalog's half (catalogPart), in TargetTruth's key order; `listed` kept with a geometry only.
+      const { listed, textListed, scrollView, ...named } = catalogPart(cell.id, t, trees);
       const target: TargetTruth = {
-        tag: t.tag,
-        id,
-        ...(t.text !== undefined && { text: t.text }),
-        ...(t.label !== undefined && { label: t.label }),
-        color: t.color,
-        declared: t.declared,
+        ...named,
         frame,
         ...read,
         drawn: Math.round(drawn * 1000) / 1000,
         seen,
         ...geometry,
-        ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
+        ...(scrollView !== undefined && { scrollView }),
         // Whether each tree lists it — read by the edge rows (target-contract.ts#unlistedBy), so recorded with a geometry.
-        ...(geometry.geometry !== undefined && { listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, tree.source, id)])) }),
+        ...(geometry.geometry !== undefined && { listed }),
         // Whether each tree lists its string (golden-spec/text.ts: a covered string's "not found" is right only there).
-        ...(t.text !== undefined && { textListed: Object.fromEntries(trees.map((tree) => [tree.source, textListedIn(tree.payload, tree.source, t.text!)])) }),
+        ...(textListed !== undefined && { textListed }),
         ...(reachedAtPiece !== undefined && { reachedAtPiece }),
         ...(unprobed !== undefined && { unprobed }),
       };
       truth.targets.push(target);
       const bad = consistency(target, lab.platform, s.screen, navigation);
-      if (bad !== undefined) broken.push(`${cell.id}/${t.tag}: ${bad}`);
+      if (bad !== undefined) cellBroken.push(`${cell.id}/${t.tag}: ${bad}`);
       log(`${cell.id}/${t.tag}: ${target.geometry === undefined ? '' : `${target.geometry}, `}reached ${target.reached}${unprobed === undefined ? '' : ` (unprobed: ${unprobed})`}${reachedAtPiece === undefined ? '' : ` (at its piece ${reachedAtPiece})`}, drawn ${target.drawn}, seen ${seen}${described(target.probe)}`);
     }
     // Android with the IME up: what averi's keyboard queries answer, for the golden mode's fake device to serve
@@ -162,17 +251,17 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
       const ime = await lab.ime();
       // A floating IME's panels (truth.ts#imePanels): only on a cell captured floating (CatalogCell.ime), and always there.
       panels = imePanels(ime.shown.touchable, s.keyboard.frame);
-      if (cell.ime === 'floating' && panels.length === 0) throw new Error(`cell ${cell.id}: captured with the IME floating only, but its touchable region holds no panel beyond its band — switch Gboard to Floating first`);
-      if (cell.ime !== 'floating' && panels.length > 0) throw new Error(`cell ${cell.id}: the IME is floating (a panel beyond its band: ${panels.map((p) => `${p.x},${p.y} ${p.width}x${p.height}`).join(', ')}) — dock it first; only a cell marked ime: floating is captured so`);
-      await writeFile(join(opts.out, `${cell.id}.ime.json`), JSON.stringify(ime, null, 1) + '\n');
+      if (cell.ime === 'floating' && panels.length === 0) throw new CaptureHalt(`cell ${cell.id}: captured with the IME floating only, but its touchable region holds no panel beyond its band — switch Gboard to Floating first`);
+      if (cell.ime !== 'floating' && panels.length > 0) throw new CaptureHalt(`cell ${cell.id}: the IME is floating (a panel beyond its band: ${panels.map((p) => `${p.x},${p.y} ${p.width}x${p.height}`).join(', ')}) — dock it first; only a cell marked ime: floating is captured so`);
+      put(`${cell.id}.ime.json`, JSON.stringify(ime, null, 1) + '\n');
       truth.ime = `${cell.id}.ime.json`;
       // ime() left the keyboard hidden by one back: the layout averi finds an element again in after its guard's
       // back — its trees and the app's state, beside the truth (CellTruth.afterBack).
       const backTrees = await lab.trees();
       afterBack = await lab.state();
       if (afterBack === undefined) throw new Error(`cell ${cell.id}: no state after back`);
-      for (const t of backTrees) await writeFile(join(opts.out, `${cell.id}.after-back${t.suffix}`), t.payload);
-      await writeFile(join(opts.out, `${cell.id}.after-back.state.json`), JSON.stringify(afterBack, null, 2) + '\n');
+      for (const t of backTrees) put(`${cell.id}.after-back${t.suffix}`, t.payload);
+      put(`${cell.id}.after-back.state.json`, JSON.stringify(afterBack, null, 2) + '\n');
       truth.afterBack = { state: `${cell.id}.after-back.state.json`, trees: Object.fromEntries(backTrees.map((t) => [t.source, `${cell.id}.after-back${t.suffix}`])) };
     }
     // Android: the device's own system bands with the IME down (CellTruth.displays; a cell captured with it up has been
@@ -180,23 +269,95 @@ export async function capture(lab: LabDevice, cells: readonly CatalogCell[], opt
     // stock dump (gesture navigation) does not follow.
     if (lab.displays !== undefined) {
       displays ??= await lab.displays();
-      await writeFile(join(opts.out, `${cell.id}.displays.txt`), displays);
+      put(`${cell.id}.displays.txt`, displays);
       truth.displays = `${cell.id}.displays.txt`;
     }
-    if (cell.ime === 'floating' && panels.length === 0) throw new Error(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);
-    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, broken, log, afterBack, panels);
-    await writeFile(join(opts.out, `${cell.id}.truth.json`), JSON.stringify(truth, null, 2) + '\n');
+    // Every target absent where the catalog lists some: no screen of this cell's (a wrong screen, a lab regression).
+    if (cell.targets.length > 0 && truth.targets.length === 0) throw new Error(`cell ${cell.id}: the app reported a frame for none of its ${cell.targets.length} targets (${cell.targets.map((t) => t.tag).join(', ')}) — the wrong screen?`);
+    if (cell.ime === 'floating' && panels.length === 0) throw new CaptureHalt(`cell ${cell.id}: captured with the IME floating only, but no IME was up`);
+    if (cell.form !== undefined) truth.form = await formTruth(lab, cell, cell.form, s, png, cellBroken, log, afterBack, panels);
+    put(`${cell.id}.truth.json`, JSON.stringify(truth, null, 2) + '\n');
     for (const t of trees) {
-      manifest.captures.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
+      entries.push({ file: `${cell.id}${t.suffix}`, source: t.source, form: 'raw', screen: truth.screen, screenshot: `${cell.id}.png`, truth: `${cell.id}.truth.json` });
     }
-    captured.add(cell.id);
-  }
-  const order = (file: string) => opts.catalog.findIndex((c) => file.startsWith(`${c.id}.`));
-  const kept = (previous?.captures ?? []).filter((c) => !captured.has(c.file.slice(0, c.file.indexOf('.'))));
-  manifest.captures = [...kept, ...manifest.captures].sort((a, b) => order(a.file) - order(b.file));
-  await writeFile(join(opts.out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-  return { broken, skipped, manifest };
+  return { files, entries, broken: cellBroken };
 }
+
+/**
+ * The catalog's half of a target's truth, shared by a framed target (TargetTruth) and an absent one (AbsentTarget): its
+ * tag, identifier, text or label, colour, declared kind and scroll view, and — from each raw tree — whether the tree
+ * lists it (truth.ts#listedIn) and, for a text target, its string (truth.ts#textListedIn).
+ */
+function catalogPart(cell: string, t: CatalogTarget, trees: readonly RawTree[]) {
+  const id = `lab.${cell}.${t.tag}`;
+  return {
+    tag: t.tag,
+    id,
+    ...(t.text !== undefined && { text: t.text }),
+    ...(t.label !== undefined && { label: t.label }),
+    color: t.color,
+    declared: t.declared,
+    ...(t.scrollView !== undefined && { scrollView: t.scrollView }),
+    listed: Object.fromEntries(trees.map((tree) => [tree.source, listedIn(tree.payload, tree.source, id)])) as Partial<Record<SourceKind, boolean>>,
+    ...(t.text !== undefined && { textListed: Object.fromEntries(trees.map((tree) => [tree.source, textListedIn(tree.payload, tree.source, t.text!)])) as Partial<Record<SourceKind, boolean>> }),
+  };
+}
+
+/**
+ * What a caught throw makes of its cell: `reason`, host paths out (failure-text.ts#withoutHostPaths: it goes to a
+ * committed manifest); `halt` for a CaptureHalt or a programming error (`bug`: a TypeError, ReferenceError or
+ * RangeError — the capture's own or a library's — its reason naming its kind); `partial` when the cell's files were
+ * left half renamed (PartialFlush).
+ */
+function failureOf(e: unknown): { reason: string; halt: boolean; bug?: Error; partial: boolean } {
+  const bug = isProgrammingError(e) ? e : undefined;
+  const reason = withoutHostPaths(bug !== undefined ? `${bug.name}: ${bug.message}` : e instanceof Error ? e.message : String(e), hostHome());
+  return { reason, halt: e instanceof CaptureHalt || bug !== undefined, ...(bug !== undefined && { bug }), partial: e instanceof PartialFlush };
+}
+
+/** A programming error — the capture's own or a library's (pngjs's), not the device's or the app's: it halts the run (CaptureResult.halted). */
+const isProgrammingError = (e: unknown): e is Error => e instanceof TypeError || e instanceof ReferenceError || e instanceof RangeError;
+
+/** A rename failed after every `.tmp` write succeeded: the cell's files are mixed, its message says which. */
+class PartialFlush extends Error {}
+
+/**
+ * Write a cell's files all or none, as far as a file system lets: each to `<name>.tmp` first, then each renamed over its
+ * name. A write that fails removes the cell's `.tmp` files and throws, the earlier capture whole. A rename that fails
+ * (after every write succeeded) leaves the cell's files mixed: it throws a PartialFlush naming the files already renamed
+ * and the `.tmp` files left.
+ */
+async function flush(out: string, files: readonly (readonly [string, string | Buffer])[]): Promise<void> {
+  const written: string[] = [];
+  try {
+    for (const [name, data] of files) {
+      await writeFile(join(out, `${name}.tmp`), data);
+      written.push(name);
+    }
+  } catch (e) {
+    await Promise.all(written.map((name) => rm(join(out, `${name}.tmp`), { force: true })));
+    throw e;
+  }
+  const renamed: string[] = [];
+  for (const name of written) {
+    try {
+      await rename(join(out, `${name}.tmp`), join(out, name));
+    } catch (e) {
+      const left = written.filter((n) => !renamed.includes(n)).map((n) => `${n}.tmp`);
+      throw new PartialFlush(`${(e as Error).message}; renamed already: ${renamed.join(', ') || 'none'}; left as .tmp: ${left.join(', ')}`, { cause: e });
+    }
+    renamed.push(name);
+  }
+}
+
+/**
+ * The capture refusing to go on — the device set up wrong for the cell (the IME floating or docked against its
+ * CatalogCell.ime), or a pinned submit with no bar, which would read every control under it open. (Not
+ * catalog.ts#captureRefusal, a cell skipped before it is launched.) Unlike any other throw, which fails its cell alone
+ * (CaptureResult.failed), it halts the run: the cell listed failed, the manifest written, the halt returned
+ * (CaptureResult.halted) — not thrown, so the command line still says the run's summary.
+ */
+export class CaptureHalt extends Error {}
 
 /**
  * Relaunch the cell, run `first` when given (LabDevice.hideKeyboard), tap the frame's centre (or the point given), give
@@ -250,7 +411,7 @@ async function formTruth(lab: LabDevice, cell: CatalogCell, form: CatalogForm, s
   ];
   // The pinned submit's bar is what situationOf reads as its cover: a state without it would measure every control
   // under it open.
-  if (form.submit.pinned === true) frameOf(`${form.submit.tag}.bar`);
+  if (form.submit.pinned === true && s.frames[`${form.submit.tag}.bar`] === undefined) throw new CaptureHalt(`cell ${cell.id}: the app reported no frame for ${form.submit.tag}.bar`);
   const keyboard = s.keyboard?.visible === true ? s.keyboard : undefined;
   const controls: ControlTruth[] = [];
   for (const w of wanted) {
