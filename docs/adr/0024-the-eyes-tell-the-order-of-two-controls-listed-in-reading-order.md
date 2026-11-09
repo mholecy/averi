@@ -5,7 +5,8 @@ and stability of results; the agent's hands must not be stuck on a false refusal
 exists). Implemented on `fix/r9-l4w`. Amends ADR 0015 (its 2026-10-19 amendment's first residual closed, its second
 narrowed) and extends ADR 0013 (the eyes get a second question). Amended 2026-10-22 (round 16, LE2's rest): a third
 trigger for the order question (below, "WHEN"). Amended 2026-10-23 (round 1023, ADR 0026): a second pair kind, below
-("Amendment 2026-10-23").
+("Amendment 2026-10-23"). Amended 2026-11-09 (D75, lab note LR4): the order question is asked on Android too — see "Amendment
+2026-11-09" below.
 
 ## Context
 
@@ -223,3 +224,13 @@ reducer can keep what it saw of margin texts (`scroll-rounds.ts#State.marginKept
 question is followed by strokes, unlike this ADR's unordered stop. The pixel assert never keeps a `clear` across poll
 rounds, as it never keeps an `over`. Every reading-order behaviour of this ADR is unchanged (a `clear` is no order of
 two controls: `reading-order.ts` reads it as nothing seen).
+
+## Amendment 2026-11-09: Android classic Views (D75, ADR 0015's amendment "Android Views list children by location")
+
+AOSP lists a classic ViewGroup's accessibility children by LOCATION, not by Z, so the uiautomator parser marks a run so
+listed `readingOrder` (src/adapters/android-accessibility-order.ts) — never one a node provider (Compose) lists. This
+ADR's question, its judge, its WHEN and its remedy now hold for those Android runs unchanged: the lab's rn-banner on
+Android (a cover listed before its target, a later JSX sibling) is refused "drawn over it as a screenshot shows" on one
+screenshot per tap, live and in golden. Nothing in ui-tree or verify knows Android; the frame is the device's
+screencap. One direction is unmeasured live (ADR 0015's D75 residual): a control listed AFTER the target over its
+centre, a `drawn` cover before the mark, is now an untold peer that a screenshot seeing the target on top lifts.

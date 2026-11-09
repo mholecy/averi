@@ -39,7 +39,7 @@
     "group": "core",
     "tests": ["tests/ui-tree/draw-order*.test.ts"],
     "floor": 84,
-    "baseline": "86.60 % on 2026-11-02 (D45, direct tests of paintsOver, drawnOverAt, drawnOverStrip, ofKeyboardBand): 948 mutants, 124 survived, 3 without coverage; 77.22 % on 2026-11-01 (D36)"
+    "baseline": "86.60 % on 2026-11-09 (D75, comments only; `npm run mutate -- --group core --force` at 0a52f450, cold): 821 mutants, 124 survived, 3 without coverage; 86.60 % on 2026-11-02 (D45, direct tests of paintsOver, drawnOverAt, drawnOverStrip, ofKeyboardBand): 948 mutants, 124 survived, 3 without coverage; 77.22 % on 2026-11-01 (D36)"
   },
   "src/ui-tree/geometry.ts": {
     "group": "core",
@@ -64,6 +64,12 @@
     "tests": ["tests/adapters/ios-liveness.test.ts"],
     "floor": 98,
     "baseline": "100 % on 2026-11-06 (D70 review round 1, pgrepReason's line through withoutHostPaths; cold): 73 mutants, 0 survived; 100 % on 2026-11-02 (D33 after review, pgrepReason and the case-free UDID added): 70 mutants, 0 survived, 0 without coverage — after a test killed the first run's one survivor (the ExecError check) and covered one string"
+  },
+  "src/adapters/android-accessibility-order.ts": {
+    "group": "core",
+    "tests": ["tests/adapters/android-accessibility-order.test.ts", "tests/ui-tree/draw-order-android-reading-order.test.ts", "tests/ui-tree/draw-order-rn-covers.test.ts"],
+    "floor": 98,
+    "baseline": "100 % on 2026-11-09 (D75, compareByLocation and markLocationSorted; `npm run mutate -- --group core --force` at 0a52f450, cold): 47 mutants, 0 survived, 0 without coverage"
   },
   "src/adapters/android-chooser.ts": {
     "group": "core",

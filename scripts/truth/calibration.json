@@ -1471,7 +1471,8 @@
     {
       "n": "LR4",
       "note": "2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured.md",
-      "status": "open",
+      "status": "calibrate",
+      "fix": ["9d4e391"],
       "verified": "golden",
       "defect": "^(Tapped|passed on #263238): ",
       "checks": [
@@ -1482,7 +1483,7 @@
         "android-rn-averi_lab-api33/rn-banner.xml C tap",
         "android-rn-averi_lab-api33/rn-banner.xml C colour"
       ],
-      "remark": "T6's Android capture of rn-banner (2026-11-09, averi_lab API 33): uiautomator lists each cover before its target, though React Native draws it over — C's too, whose frame starts below its target's — so every tap is Tapped and every colour assert passes on the cover #263238 (LR3's Android twin; backlog D75)."
+      "remark": "T6's Android capture of rn-banner (2026-11-09, averi_lab API 33): uiautomator lists each cover before its target, though React Native draws it over — C's too, whose frame starts below its target's — so every tap is Tapped and every colour assert passes on the cover #263238 (LR3's Android twin; backlog D75). Fixed by D75 (fix/d75-android-reading-order; ADR 0015 amendment 2026-11-09 \"Android Views list children by location\": AOSP sorts a classic ViewGroup's accessibility children by location, so the uiautomator parser marks such a run readingOrder and LR3's rules apply — each cover a peer the eyes tell, a named leaf drawn): the six rows green, nothing else in the corpus changed."
     }
   ],
   "excluded": [

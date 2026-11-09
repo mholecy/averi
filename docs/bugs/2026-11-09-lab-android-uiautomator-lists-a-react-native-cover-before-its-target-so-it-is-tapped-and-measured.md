@@ -1,5 +1,14 @@
 # BUG: on Android, uiautomator lists a React Native cover BEFORE the target it is drawn over — averi taps the covered target (`Tapped`) and its colour assert measures the cover as the target
 
+> **Status (2026-11-09): fixed** at `9d4e391e` on `fix/d75-android-reading-order` (backlog D75; ADR 0015's amendment
+> "Android Views list children by location"): AOSP sorts a classic ViewGroup's accessibility children by location
+> (`ViewGroup.ChildListForAccessibility`, the stripe comparator — in one stripe the left edge first: every cover's left
+> 73 before every target's 128), so the uiautomator parser marks a run so listed `readingOrder`
+> (src/adapters/android-accessibility-order.ts), never one a node provider lists (Compose's), and LR3's rules apply: each
+> cover a peer the eyes tell, a named bare leaf drawn. Golden: the six rows green, nothing else changed; calibrate LR4
+> CALIBRATED; react-native.known.ts struck. Live on the averi_lab AVD: see the D75 row and
+> docs/truth/live-records/d75-reading-order/.
+>
 > **Status (2026-11-09): open.** Lab note LR4 (scripts/truth/calibration.json, open). Found by T6's Android capture of
 > **rn-banner** (tests/fixtures/truth/android-rn-averi_lab-api33/rn-banner.*), golden red on all six uiautomator rows,
 > listed in tests/differential/golden/react-native.known.ts as this note. Backlog D75. No fix yet.

@@ -8,7 +8,8 @@ alone). Amended again 2026-10-19 (round 9) by docs/adr/0024-the-eyes-tell-the-or
 a screenshot tells the order the listing does not — the amendment's first residual closed, its second narrowed (below).
 Amended 2026-10-20 (round 14, LE3): a heading listed before a target it overlaps is drawn over it — see "Amendment: a
 heading listed before" below. Amended 2026-10-22 (round 16, LE2's rest): the break no longer excuses a control that overlaps the
-target and holds its centre — see "Amendment: a control past the break that holds the centre" below.
+target and holds its centre — see "Amendment: a control past the break that holds the centre" below. Amended 2026-11-09 (D75, lab note LR4):
+uiautomator's runs of classic Android Views are marked too — see "Amendment: Android Views list children by location" below.
 
 ## Context
 
@@ -309,3 +310,113 @@ the RN forms group (12 of 12) unchanged (docs/truth/live-records/ios-rn-*-lr3*.j
   LR3 (the listing tells the order there), a later cell's to measure.
 - A named childless host listed AFTER a sibling whose top lies above it (a badge on a pressable host) now covers that
   sibling — a false refusal of the badge, the safe direction; no fixture has the shape.
+
+## Amendment: Android Views list children by location (2026-11-09, D75, LR4)
+
+### Context
+
+Lab note LR4 (docs/bugs/2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured.md),
+LR3's Android twin: T6's capture of rn-banner on the averi_lab AVD (API 33) lists every cover BEFORE the target it is
+drawn over — `T.cover [73,276][1008,419]` before `T [128,303][953,479]`, and `C.cover [73,1321][1008,1464]` before
+`C [128,1293][953,1469]` though it starts lower. Read as draw order, each target was drawn over its cover: `tap` T, U
+and C `Tapped` at the centre (on the cover; the probe fired nothing), the colour assert passing on the cover
+`#263238`. Golden red on all six uiautomator rows.
+
+The cause is AOSP's, not React Native's. A classic ViewGroup hands its children to accessibility SORTED BY LOCATION
+(android-36 sources, `ViewGroup.java`): `addChildrenForAccessibility` and `onInitializeAccessibilityNodeInfoInternal`
+take `ChildListForAccessibility.obtain(this, true)`, whose `init` sorts the children with `ViewLocationHolder`'s
+stripe comparator (`compareBoundsOfTree`, COMPARISON_STRATEGY_STRIPE): a child wholly above another first; in one
+STRIPE (their vertical extents overlap) the left edge first (under a right-to-left layout direction the larger right
+edge), then the higher top, the taller, the wider, then the children's bounds and the accessibility id. In rn-banner
+every cover's left is 73 and every target's 128, so each cover is listed first whatever the JSX draws last. The API 33
+dump carries no `drawing-order` attribute; nothing else in it tells the Z order. `addChildrenForAccessibility` returns
+early for a view with an `AccessibilityNodeProvider`: Compose's `AndroidComposeView` lists its semantics children in its
+own (composition) order, unsorted — scroll-sticky's R `[128,391][953,567]` listed before the header `[0,303][1080,457]`
+drawn over it.
+
+### Decision
+
+- The uiautomator parser marks a node `readingOrder` (`UiNode.readingOrder`, as WDA's run) when its two or more
+  children are listed in that location order: every consecutive pair compares at or before (≤ 0) under the stripe
+  comparator, read off the dumped bounds (adapters/android-accessibility-order.ts#compareByLocation,
+  #markLocationSorted, called by android.ts#parseUiautomatorXml before the widening). A SORT CHECK, as WDA's: a run of
+  classic Views passes it; a run listed so by chance passes it too.
+- LEFT-TO-RIGHT is assumed: the dump names no layout direction, so a right-to-left run (sorted by right edges) reads
+  out of order and is not marked — it keeps its order as draw order, as before.
+- NOT a node a node provider lists: any node of the class `android.view.View` hosts virtual nodes (a plain View holds no
+  child views, so any children it lists are virtual) — Compose's AndroidComposeView, under a `ComposeView` on a screen and under a bare
+  ViewGroup in a Compose dialog's window — and nothing under it is marked (android.ts#providesNodes). Compose's order is
+  composition order: form-shared-id lists each outlined field (left 55) before its label drawn over its outline (left
+  77) — location order by chance; marked, the five labels would gain their fields as untold covers.
+- From there LR3's rules apply unchanged, through `listsNestedReadingOrder` (any nested run marked so):
+  reading-order.ts#peersOf (a sibling listed before the target that draws there is a peer whose order the eyes tell,
+  ADR 0024), placed.ts#FRAME_EXCUSES's `structural` (a childless leaf the app named is drawn unless it wraps a sibling),
+  and the eyes. Nothing in ui-tree knows Android.
+- `ui_snapshot` prints the mark on Android too ("readingOrder": true — its children are listed by location, not in
+  draw order).
+
+Measured: golden over the truth corpus against `7eb998dd` (1667 checks): exactly rn-banner's six uiautomator rows
+change, MISMATCH → ok (T and U refused "drawn over it as a screenshot shows", C too; the colour asserts fail closed
+naming the cover), struck from react-native.known.ts; calibrate `--note LR4`: CALIBRATED. Over the 66 Android trees
+of tests/fixtures (1087 nodes, each judged as a target, marked against unmarked): 36 nodes marked; 13 nodes' exposure
+changes, in two trees — rn-banner's seven (T, U and C, their three covers, and the toast's text `Saved`) and
+bands-three-button's six (its five screen-sized containers — the window, its wrappers and `android:id/content` — now
+partly under the navigation bar's background, and N `[127,2088][952,2220]`); of those only T, U, C and N are lab targets. N is now under the decor's `navigationBarBackground` `[0,2088][1080,2220]` — a childless leaf with an id, listed after the
+content, so drawn (the named-leaf rule, below); the truth agrees (N not reached, 0 % drawn) and its golden rows did not
+change. The chooser (ResolverActivity, classic Views) gains seven marks and no changed target. Live on the averi_lab AVD
+(docs/truth/live-records/d75-reading-order/, base `7eb998dd` and the fix under one harness): the React Native forms and
+visibility groups, 24 cases a src — base `Tapped` on rn-banner's T, U and C with nothing fired, the fix refusing all
+three, nothing else changed; native visibility on the three cells whose trees the mark changes, 31 cases a src, every
+reply identical. The eyes cost one screenshot per tap on those three targets only; the RN arm took 242 s against 251 s (the fix arm rerun at `03d15b19` on a clean tree: 240 s, the same verdicts).
+
+**The named-leaf change.** LR3's rule that a childless node the app named is drawn (`structural`'s exception) now
+reaches marked uiautomator runs: a bare View with only a resource id — rn-banner's U.cover and C.cover, the decor's
+`navigationBarBackground`, a synthetic classic overlay (tests/adapters/android.test.ts) — counts as drawn where before
+it was excused as structural. That change alone runs in the safe direction: a cover where there was none (a refusal
+or a widened row). An unnamed bare View stays excused. The mark as a whole is NOT monotone-cautious: a control listed
+AFTER the target that the draw order made a cover becomes a peer the eyes may lift (the residual below).
+
+Rejected: a helper APK reading the real drawing order (far too costly to ship and keep); hedging every overlap with no
+eyes (falsely refuses a form's label or error text over its field); a React-Native-only rule (the wrong scope: the sort
+is AOSP's, every classic ViewGroup's).
+
+### Residuals of the amendment
+
+- **Compose, and anything not location-sorted, stay on draw order.** A Compose sibling drawn over an earlier one with
+  `zIndex` (or listed by a provider in another order) is read by its listing, as before. AndroidView interop — classic
+  Views hosted inside Compose — sits under the provider's host, so it is never marked either, though AOSP sorts its own
+  ViewGroups.
+- A provider other than Compose (an `ExploreByTouchHelper` on a custom View) is caught by the same shape (any node of the
+  class `android.view.View`); a WebView (`android.webkit.WebView`) is not, and its virtual DOM nodes are marked where they happen to
+  be in location order: their overlaps then ask the eyes — a screenshot per tap, a refusal when the eyes cannot tell.
+  Unmeasured.
+- The dump's bounds are CUT (to a scroll view, to the screen) where AOSP sorted the whole drawing rect: a classic run
+  with a child cut so may fail the check and keep its order as draw order — a later-drawn cover listed first stays
+  read beneath the target, as before this amendment.
+- ViewLocationHolder sorts LAYOUT positions (`getDrawingRect` offset by `offsetDescendantRectToMyCoords`, which
+  applies no translation or scale), while the dump's bounds are on-screen, transforms included: a run whose child is
+  translated or scaled (an animation, a `translationX` offset) can fail the check and keep its order as draw order.
+- AOSP falls back to COMPARISON_STRATEGY_LOCATION (no stripes: top, then left …) when TimSort finds the stripe
+  comparator intransitive (`ChildListForAccessibility.sort`, the IllegalArgumentException): such a run fails the
+  stripe check and keeps its order as draw order.
+- A right-to-left classic run is not marked (above).
+- **A later-listed control over the target's centre, refused as drawn before D75, is now lifted when the eyes see the
+  target on top** — ADR 0024's judgement on Android frames, unmeasured live in that direction. In a marked run such a
+  control (B listed after A, holding A's centre) is an untold peer, no longer the draw order's `drawn` cover: with no
+  screenshot it still covers (refused, as before), but a screenshot that sees A over B lifts it and A is `Tapped`
+  (tests/ui-tree/draw-order-android-reading-order.test.ts, the review's repro). Where AOSP's listing is location order
+  that is right (the listing says nothing of Z); where the eyes misjudge, it is a false `Tapped` that was a refusal.
+  Backlog D77 asks for a classic cell whose target is truly drawn over a later-listed control.
+- **React Native maps some accessibility roles to the className `android.view.View`** (verified in the lab app's
+  react-native 0.88.0, ReactAndroid/…/uimanager/ReactAccessibilityDelegate.kt, `AccessibilityRole.getValue`, set by
+  `setRole` only when a role is given): `none` (given explicitly), `link`, `summary`, `header`, `alert`, `combobox`,
+  `menu`, `menubar`, `menuitem`, `progressbar`, `radiogroup`, `scrollbar`, `tab`, `tabbar`, `tablist`, `timer`,
+  `toolbar`. Such a view dumps like a node provider's host (android.ts#providesNodes), so its own children and
+  everything under it stay unmarked: an RN container with one of those roles holding a target and its cover keeps
+  LR4's lie (a `Tapped` on the cover). A view with such a role as a CHILD (a toast with `role="alert"`) does not unmark
+  its parent's run. Not narrowed (the owner's decision, D75 round 1); backlog D77 asks for an RN banner cell whose
+  container carries such a role.
+- Every marked run pays what WDA's does (this ADR's second residual and the LR3 amendment's third): two overlapping
+  siblings that are really drawn in list order — a badge over an avatar, a label laid over its field — ask the eyes,
+  and are refused where a screenshot cannot tell them apart. The lab's classic-Views twin of rn-banner is not built
+  (backlog D77): the generality of the mark rests on AOSP's source and rn-banner, not on a native capture.

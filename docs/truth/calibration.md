@@ -72,6 +72,7 @@ open note on the working tree. See the script for the verdicts.
 | LR1 | 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
 | LR3 | 2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order | calibrate | c4853bb → 1390816 | CALIBRATED |
 | LR2 | 2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
+| LR4 | 2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured | calibrate | 7eb998d → 9d4e391 | CALIBRATED |
 
 ## 1.1: CALIBRATED
 
@@ -1528,6 +1529,27 @@ Round 9's react-native cell rn-banner (each target under a later sibling drawn o
   - ok android-rn-averi_lab-api33/rn-field.xml M ocr — PASS  element text:"Message for the recipient" renders text "Message for the recipient" — read "Message for the recipient"; vs expected "Message for the recipient" =
 
 Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#labelOverhang — the own-label overhang is 2 pt or dp, half a percent of the screen's shorter side: 5 px on averi_lab, where RN's 1-dp overhang is 3 px; the field shape no longer asks its parent's size; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src.
+
+## LR4: CALIBRATED
+
+2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured.md — defect: `^(Tapped|passed on #263238): `
+
+- before 7eb998d:
+  - RED android-rn-averi_lab-api33/rn-banner.xml T tap — Tapped: Tapped id:"lab.rn-banner.T"
+  - RED android-rn-averi_lab-api33/rn-banner.xml T colour — passed on #263238: it measured the cover over the target as the target
+  - RED android-rn-averi_lab-api33/rn-banner.xml U tap — Tapped: Tapped id:"lab.rn-banner.U"
+  - RED android-rn-averi_lab-api33/rn-banner.xml U colour — passed on #263238: it measured the cover over the target as the target
+  - RED android-rn-averi_lab-api33/rn-banner.xml C tap — Tapped: Tapped id:"lab.rn-banner.C"
+  - RED android-rn-averi_lab-api33/rn-banner.xml C colour — passed on #263238: it measured the cover over the target as the target
+- after 9d4e391:
+  - ok android-rn-averi_lab-api33/rn-banner.xml T tap — ERROR id:"lab.rn-banner.T" is under container "Saved" (73,276 935x143) at its centre (541,391), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x60 part of it shows, under the 65x65 a
+  - ok android-rn-averi_lab-api33/rn-banner.xml T colour — FAIL  element id:"lab.rn-banner.T" fill within dE00 8 of #263238 — container "Saved" (73,276 935x143) is drawn over the element (element 128,303 825x176) as a screenshot shows (the two are listed in reading order) — the 
+  - ok android-rn-averi_lab-api33/rn-banner.xml U tap — ERROR id:"lab.rn-banner.U" is under other id:lab.rn-banner.U.cover (73,771 935x143) at its centre (541,886), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x60 part of it shows, unde
+  - ok android-rn-averi_lab-api33/rn-banner.xml U colour — FAIL  element id:"lab.rn-banner.U" fill within dE00 8 of #263238 — other id:lab.rn-banner.U.cover (73,771 935x143) is drawn over the element (element 128,798 825x176) as a screenshot shows (the two are listed in reading 
+  - ok android-rn-averi_lab-api33/rn-banner.xml C tap — ERROR id:"lab.rn-banner.C" is under other id:lab.rn-banner.C.cover (73,1321 935x143) at its centre (541,1381), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x28 part of it shows, un
+  - ok android-rn-averi_lab-api33/rn-banner.xml C colour — FAIL  element id:"lab.rn-banner.C" fill within dE00 8 of #263238 — other id:lab.rn-banner.C.cover (73,1321 935x143) is drawn over the element (element 128,1293 825x176) as a screenshot shows (the two are listed in readin
+
+T6's Android capture of rn-banner (2026-11-09, averi_lab API 33): uiautomator lists each cover before its target, though React Native draws it over — C's too, whose frame starts below its target's — so every tap is Tapped and every colour assert passes on the cover #263238 (LR3's Android twin; backlog D75). Fixed by D75 (fix/d75-android-reading-order; ADR 0015 amendment 2026-11-09 "Android Views list children by location": AOSP sorts a classic ViewGroup's accessibility children by location, so the uiautomator parser marks such a run readingOrder and LR3's rules apply — each cover a peer the eyes tell, a named leaf drawn): the six rows green, nothing else in the corpus changed.
 
 ## Not reproducible with the existing cells
 

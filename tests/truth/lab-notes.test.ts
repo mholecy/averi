@@ -226,9 +226,9 @@ describe('calibration.json ↔ the KNOWN rows', () => {
 
   it('every note expected OPEN-RED has rows, each a static KNOWN row filed as that note', () => {
     const open = table.notes.filter((e) => expected(e) === 'OPEN-RED');
-    // Pinned, so the rule below cannot go vacuous unseen: LR4 (T6, 2026-11-09: uiautomator lists a React Native cover
-    // before its target) is open; LR3 was fixed in round 9. A note opened again is added here.
-    expect(open.map((e) => e.n)).toEqual(['LR4']);
+    // Pinned: the open list is EMPTY ON PURPOSE today (LR3 fixed in round 9, LR4 by D75), so the rule below has nothing
+    // to check until a note reopens — a note opened again is added here, which arms the rule for it.
+    expect(open.map((e) => e.n)).toEqual([]);
     const bad = open.flatMap((e) => {
       if ((e.checks ?? []).length === 0) return [`#${e.n}: no rows`];
       return e.checks!.flatMap((k) => {
