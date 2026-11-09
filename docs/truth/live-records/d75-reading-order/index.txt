@@ -41,3 +41,14 @@ native: the forms group (~50 cases, ~13 min an arm) and the whole visibility gro
   their logs), kept for the record, not compared.
 cost of the extra screenshot: only rn-banner's three taps ask the eyes (one screenshot each); RN arm 242 s vs 251 s —
   no cost visible at this resolution.
+
+== Round 2 (code review): the RN fix arm rerun at HEAD 03d15b19, supersedes rn-fix-0 ==
+before rn-fix-1 19:01:38 start_count=1 uptime=50445.26 dev=[0.11 0.06 0.26 1/1643 19313]
+after rn-fix-1 rc=0 secs=240 19:05:38 start_count=1 uptime=50684.67 dev=[0.65 0.50 0.40 1/1650 23506]
+device 4.0 min (budget 10); start_count 1 before and after; /proc/uptime 50439.59 -> 50692.68 (read before and after);
+  no restart, no install, no pm clear, no dexopt change; src untouched while it ran.
+rn-fix-1 (--app react-native --groups forms,visibility): 24 cases, ok 24 — tap:rn-banner.T/U/C refused, nothing fired.
+  vs rn-base (7eb998dd): those three MISMATCH -> ok, nothing else changed; vs rn-fix-0: 0 changed verdicts.
+Which src each arm ran: rn-base and native-base* the base 7eb998dd (git archive, --side); rn-fix-0 the fix d9094566
+  (taint caveat above: the tree was hand-mutated after it started, live.ts loads its src once at start); native-fix
+  4b0fd33e; rn-fix-1 03d15b19 (this round's HEAD, clean tree) — it supersedes rn-fix-0 as the RN fix arm.

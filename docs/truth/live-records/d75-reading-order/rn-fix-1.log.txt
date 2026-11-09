@@ -1,0 +1,55 @@
+lab: emulator-5554, AVD averi_lab
+averi: <repo>
+uiautomator rn1 ok: Filled id:"lab.rn-field.N.field" (9 characters)
+uiautomator rn2 ok: Filled id:"lab.rn-field.M.field" (20 characters)
+uiautomator rn3 ok: Filled id:"lab.rn-field.I.field" (9 characters)
+uiautomator rn4 ok: Tapped text:"Payee’s name"
+uiautomator rn5 ok: All 1 asserts passed
+uiautomator rn6 ok: Tapped label:"Clear"
+uiautomator rf1 ok: Filled id:"lab.rn-format.G.field" (12 characters, the field shows them reformatted: 2 separators added)
+uiautomator rf2 ok: Filled id:"lab.rn-format.A.field" (10 characters, the field shows them reformatted: 2 separators added)
+uiautomator rf3 ok: Typed 8 characters
+uiautomator rf4 ok: flow type_it: start
+uiautomator rf5 ok: flow pin_it: start
+uiautomator rfe1 ok: Filled id:"lab.rn-format-eager.E.field" (24 characters, the field shows them reformatted: 5 separators added)
+uiautomator rfe2 ok: Filled id:"lab.rn-format-eager.E.field" (10 characters, the field shows them reformatted: 2 separators added)
+uiautomator rfe3 ok: Filled id:"lab.rn-format-eager.E.field" (12 characters, the field shows them reformatted: 2 separators added)
+uiautomator tap:rn-field.N ok: Tapped text:"Payee’s name"
+uiautomator tap:rn-field.I ok: Tapped label:"Clear"
+uiautomator tap:rn-field.M ok: Tapped text:"Message for the recipient"
+uiautomator tap:rn-banner.T ok: refused, nothing fired: ERROR id:"lab.rn-banner.T" is under container "Saved" (73,276 935x143) at its centre (541,391), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x60 part of it shows, under the 65x65 a tap may be moved to — if it is a menu o
+uiautomator tap:rn-banner.U ok: refused, nothing fired: ERROR id:"lab.rn-banner.U" is under other id:lab.rn-banner.U.cover (73,771 935x143) at its centre (541,886), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x60 part of it shows, under the 65x65 a tap may be moved to — if i
+uiautomator tap:rn-banner.C ok: refused, nothing fired: ERROR id:"lab.rn-banner.C" is under other id:lab.rn-banner.C.cover (73,1321 935x143) at its centre (541,1381), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x28 part of it shows, under the 65x65 a tap may be moved to — if
+uiautomator tap:rn-format.G ok: Tapped text:"IBAN"
+uiautomator tap:rn-format.A ok: Tapped text:"Amount"
+uiautomator tap:rn-format-eager.E ok: Tapped text:"IBAN"
+uiautomator tap:rn-format-eager.P ok: Tapped text:"Phone"
+<!-- averi: this checkout -->
+# Live golden: 24 cases, 24 ok, 0 loud, 0 mismatches (0 not known), 0 skipped
+
+## uiautomator
+- ok rn1 rn-field: fill, no clear, the single-line RN field — Filled id:"lab.rn-field.N.field" (9 characters)
+- ok rn2 rn-field: fill, clear, the multiline RN field — Filled id:"lab.rn-field.M.field" (20 characters)
+- ok rn3 rn-field: fill, no clear, the RN field with an icon — Filled id:"lab.rn-field.I.field" (9 characters)
+- ok rn4 rn-field: a tap on the floating label (text:"Payee’s name") focuses its field — Tapped text:"Payee’s name"
+- ok rn5 rn-field: fill the single-line RN field, then assert its text reads what the app holds — All 1 asserts passed
+- ok rn6 rn-field: fill the RN field with an icon, then tap its icon (label:"Clear"): the field emptied — Tapped label:"Clear"
+- ok rf1 rn-format: fill, no clear, the RN field that groups an IBAN in fours — Filled id:"lab.rn-format.G.field" (12 characters, the field shows them reformatted: 2 separators added)
+- ok rf2 rn-format: fill, clear, the RN field that groups an amount by thousands — Filled id:"lab.rn-format.A.field" (10 characters, the field shows them reformatted: 2 separators added)
+- ok rf3 rn-format: fill the RN grouping field, then type_text without a selector types on — Typed 8 characters
+- ok rf4 rn-format: a flow's tap + `type:` into the RN grouping field — flow type_it: start
+- ok rf5 rn-format: a flow's tap + `type_pin:` into the RN amount field — flow pin_it: start
+- ok rfe1 rn-format-eager: fill, clear, 24 characters into the RN eager field: a drop of the last 4 leaves `… 4263 ` (the eager mark), the full value takes none — Filled id:"lab.rn-format-eager.E.field" (24 characters, the field shows them reformatted: 5 separators added)
+- ok rfe2 rn-format-eager: fill, no clear, 10 characters into the RN eager field: a drop of the last 2 leaves `SK31 1200 ` (the eager mark), the full value ends mid-group — Filled id:"lab.rn-format-eager.E.field" (10 characters, the field shows them reformatted: 2 separators added)
+- ok rfe3 rn-format-eager: fill, no clear, an IBAN ending on a complete group into the RN eager field — expected MISMATCH failed-holds by design on iOS (idb, wda; D53 `separated`: averi refuses the trailing mark, the app holds the value); React Native on Android unread — Filled id:"lab.rn-format-eager.E.field" (12 characters, the field shows them reformatted: 2 separators added)
+- ok tap:rn-field.N rn-field: tap N (open): fires it alone — Tapped text:"Payee’s name"
+- ok tap:rn-field.I rn-field: tap I (open): fires it alone — Tapped label:"Clear"
+- ok tap:rn-field.M rn-field: tap M (open): fires it alone — Tapped text:"Message for the recipient"
+- ok tap:rn-banner.T rn-banner: tap T (covered): refused, nothing fires — or fires it alone — refused, nothing fired: ERROR id:"lab.rn-banner.T" is under container "Saved" (73,276 935x143) at its centre (541,391), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x60 part of it shows, under the 65x65 a tap may be moved to — if it is a menu o
+- ok tap:rn-banner.U rn-banner: tap U (covered): refused, nothing fires — or fires it alone — refused, nothing fired: ERROR id:"lab.rn-banner.U" is under other id:lab.rn-banner.U.cover (73,771 935x143) at its centre (541,886), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x60 part of it shows, under the 65x65 a tap may be moved to — if i
+- ok tap:rn-banner.C rn-banner: tap C (covered): refused, nothing fires — or fires it alone — refused, nothing fired: ERROR id:"lab.rn-banner.C" is under other id:lab.rn-banner.C.cover (73,1321 935x143) at its centre (541,1381), drawn over it as a screenshot shows (the two are listed in reading order); only a 825x28 part of it shows, under the 65x65 a tap may be moved to — if
+- ok tap:rn-format.G rn-format: tap G (open): fires it alone — Tapped text:"IBAN"
+- ok tap:rn-format.A rn-format: tap A (open): fires it alone — Tapped text:"Amount"
+- ok tap:rn-format-eager.E rn-format-eager: tap E (open): fires it alone — Tapped text:"IBAN"
+- ok tap:rn-format-eager.P rn-format-eager: tap P (open): fires it alone — Tapped text:"Phone"
+

@@ -367,7 +367,7 @@ change. The chooser (ResolverActivity, classic Views) gains seven marks and no c
 (docs/truth/live-records/d75-reading-order/, base `7eb998dd` and the fix under one harness): the React Native forms and
 visibility groups, 24 cases a src — base `Tapped` on rn-banner's T, U and C with nothing fired, the fix refusing all
 three, nothing else changed; native visibility on the three cells whose trees the mark changes, 31 cases a src, every
-reply identical. The eyes cost one screenshot per tap on those three targets only; the RN arm took 242 s against 251 s.
+reply identical. The eyes cost one screenshot per tap on those three targets only; the RN arm took 242 s against 251 s (the fix arm rerun at `03d15b19` on a clean tree: 240 s, the same verdicts).
 
 **The named-leaf change.** LR3's rule that a childless node the app named is drawn (`structural`'s exception) now
 reaches marked uiautomator runs: a bare View with only a resource id — rn-banner's U.cover and C.cover, the decor's
