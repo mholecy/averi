@@ -158,10 +158,12 @@ describe('round — the end turn: the caller\'s way first, proven exhausted, the
     expect(played.outcome).toMatchObject({ kind: 'bound', by: { of: 'exhausted', lastStroke: 'down' }, endTurn: { way: 'up', to: 'down' } });
   });
 
-  it('a target not in the tree: no scroll view of its own is known — on WDA no node clips, so no largest scroller either — and a stroke over the screen box proves no end: two unmoved strokes, as before', () => {
+  it('a target not in the tree: no scroll view of its own is known — on WDA no node clips, so no largest scroller either — and a stroke over the screen box proves no end: two unmoved strokes, as before; the stop names `lower`, the listed scroll view along the stroke the swipes did not go over (D76: re-pinned — the generic causes now follow it after the else)', () => {
     const played = play(IPHONE, [at(0, 'nope'), at(0, 'nope'), at(0, 'nope')]);
     expect(strokesToward(played)).toEqual(['up', 'up']);
-    expect(failureOf(played, 'id:"nope"').message).toMatch(/failed after 2 swipes \(the last 2, swiping up, did not change the screen: content exhausted, still loading, or the swipes were not taken\)/);
+    expect(failureOf(played, 'id:"nope"').message).toContain(
+      'failed after 2 swipes (the last 2, swiping up, did not change the screen: the swipes were drawn over the screen whole, aimed at no scroll view; the tree shows a scroll view that scrolls vertically, which the swipes did not go over: scrollable (0,380 402x180) — if the element lies in it, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it; else: content exhausted, still loading, or the swipes were not taken)',
+    );
   });
 
   it('a list still settling proves nothing: a read the stroke left moving (a bounce at its top) is no proof; the next read that finds it still is', () => {

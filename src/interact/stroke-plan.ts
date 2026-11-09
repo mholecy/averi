@@ -477,6 +477,45 @@ export function strokedAcross(memory: StrokeMemory, facts: Pick<TreeFacts, 'scen
 }
 
 /**
+ * The scroll views the strokes did not try (`strokedBeside`): `within`, the one the last stroke sent went over
+ * (undefined: the gesture box whole), and `others`, every other scroll view the tree tells scrolls the stroke's way,
+ * largest first.
+ */
+export interface StrokedBeside {
+  readonly within?: Rect;
+  readonly others: readonly QuotedNode[];
+}
+
+/**
+ * Before any read found the target (`Memory.target` unset), every scroll view of the WHOLE tree told to scroll along
+ * the stroke (ui-tree/geometry.ts#Clips.toldOn: text inputs and the keyboard's own left out, those off the usable
+ * `screen` too) that the strokes did not go over — none holding the touch-down of the last stroke as the driver handed
+ * it back (`drawn`), so neither the one stroked nor an outer one the finger also landed in — largest first. D76:
+ * before the target is read the plan's candidates are the screen's largest scroller and the scroll views nested in it
+ * (`candidatesOf`), never a sibling, so on android scroll-bounded every stroke for a row of `lower` went over the
+ * larger `upper`, at (540,788), and the reply blamed exhaustion; the exhausted stop's sentence
+ * (scroll-text.ts#boundText) names them, the remedy the caller's (a swipe inside it). Trying them in turn instead was
+ * rejected: device time, state the caller never named moved, and F still unreached within the defaults. Undefined
+ * once the target was found (its own scroll views are the candidates), when the last stroke went ACROSS the scroll
+ * view it was drawn over (`strokedAcross` says that), and when the tree tells no other — idb's flat list never does.
+ * One walk of the tree, at the stop only.
+ */
+export function strokedBeside(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect, drawn: Stroke | undefined): StrokedBeside | undefined {
+  const { target, within } = open(memory);
+  if (target !== undefined) return undefined;
+  const { clips } = facts.scene;
+  const way = axisOf(toward);
+  const axis = within === undefined ? undefined : clips.axesOf(within)?.axis;
+  if (axis !== undefined && axis !== way) return undefined;
+  const others = clips
+    .toldOn(way, screen, facts.reading.ofKeyboard)
+    .filter((n) => !(within !== undefined && sameRect(n.rect, within)) && !(drawn !== undefined && containsPoint(n.rect, drawn.from)))
+    .sort((a, b) => rectArea(b.rect) - rectArea(a.rect));
+  if (others.length === 0) return undefined;
+  return { ...(within !== undefined && { within }), others: others.map(quoted) };
+}
+
+/**
  * What THIS read's tree lists of the content of the scroll view the last stroke sent went over (`within`), toward the
  * edge `toward` reveals (ui-tree/geometry.ts#Clips.contentToward: for content that lies up, its top): `ends` when
  * nothing of it lies that way, so no stroke toward `toward` over it can move anything in — the content is exhausted

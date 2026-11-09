@@ -15,8 +15,8 @@ import { absenceError, type WaitEvidence } from './resolve.js';
 import { fullyClaimed, shortOf, unfitRoom, type AppliedKeyboard, type Judged, type Unfit } from './scroll-read.js';
 import { UNMOVED_STROKES_EXHAUST, type BoundBy, type DetentMove, type EndProof, type EndTurn, type Flush, type FlushCut, type FlushPlace, type PastSide, type ScrollOutcome, type Shortfall } from './scroll-rounds.js';
 import type { CarriedUnder, UnseenStrokes } from './motion-ledger.js';
-import type { PresentedTouchDown, StrokedAcross, TouchedOn } from './stroke-plan.js';
-import { EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
+import type { PresentedTouchDown, StrokedAcross, StrokedBeside, TouchedOn } from './stroke-plan.js';
+import { axisOf, EDGE_TOWARD, OPPOSITE, type Direction } from './swipe.js';
 import { cutByRemedy, cutRemedy, cutSliverText, dismissKeyboardFirstText, hideClause, hideKeyboardHow, pastSideText, ridingKeyboard, underKeyboardText, untriedSideText, wholeThinWayPast, type KeyboardUp } from './target-text.js';
 
 /**
@@ -911,14 +911,17 @@ export function boundText(by: BoundBy, swipes: number): string {
       }
       const others = by.unchanged === 'tree' ? 'content exhausted, still loading' : 'content exhausted';
       // `across` (D59b): the strokes went across the scroll view they were drawn over, for want of one along them —
-      // said first, with the way out, after a node named under the touch-down.
+      // said first, with the way out, after a node named under the touch-down. `beside` (D76): the scroll views along
+      // the stroke they never went over, the target not read yet — said the same way, after both.
       const untaken = `${others}, or the swipes were not taken${by.unlisted !== undefined ? ` — ${TOP_LAYER_ONLY_HINT[by.unlisted]}` : ''}`;
       const why =
         by.touched !== undefined
           ? `${touchedText(by.touched)} (else: ${others})`
           : by.across !== undefined
             ? `${acrossText(by.across)}; else: ${untaken}`
-            : untaken;
+            : by.beside !== undefined
+              ? `${besideText(by.beside, by.lastStroke)}; else: ${untaken}`
+              : untaken;
       return `after ${swipesText(swipes)} (the last ${UNMOVED_STROKES_EXHAUST}, swiping ${by.lastStroke}, ${verb}: ${why})`;
     }
     case 'movesWith':
@@ -963,6 +966,22 @@ function acrossText({ rect, axis, along }: StrokedAcross): string {
     return `${drawn} ${nodeText(along.view)}, which scrolls ${way}ly, ${why} — swipe inside it (swipe, its coordinates), then scroll_until it`;
   }
   return `${drawn} no scroll view that may scroll ${way}ly — if the element lies in a ${way} list the tree does not show as one, swipe inside that list (swipe, its coordinates), then scroll_until it`;
+}
+
+/**
+ * The scroll views along the stroke the swipes did not go over, the target not read yet (scroll-rounds.ts#BoundBy's
+ * `beside`, D76): `the swipes went over the scroll view <rect> only` (or `were drawn over the screen whole, aimed at no
+ * scroll view`: WDA, which marks no node clipping, before the target is read), then `the tree shows another scroll view that scrolls vertically, which the swipes did not go
+ * over: <node>` — several counted, largest first — with `if the element lies in it, swipe inside it (swipe, its
+ * coordinates) until the element shows, then scroll_until it`. The remedy is the caller's: the swipes are not tried
+ * there (D76's decision, ADR 0021's amendment). `boundText`'s; the troubleshooting reference quotes it.
+ */
+function besideText({ within, others }: StrokedBeside, toward: Direction): string {
+  const went = within === undefined ? 'the swipes were drawn over the screen whole, aimed at no scroll view' : `the swipes went over the scroll view ${rectText(within)} only`;
+  const one = others.length === 1;
+  const some = one ? `${within === undefined ? 'a' : 'another'} scroll view that scrolls` : `${others.length} ${within === undefined ? '' : 'other '}scroll views that scroll`;
+  const names = others.map(nodeText).join(', ');
+  return `${went}; the tree shows ${some} ${axisOf(toward)}ly, which the swipes did not go over: ${names} — if the element lies in ${one ? 'it' : 'one of them'}, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it`;
 }
 
 /** The node the strokes touched down on, drawn over their list: `they touched down at x,y on <role> "<label>" (id <id>) at <rect>, drawn over the list <rect>, which may have taken them`. */
