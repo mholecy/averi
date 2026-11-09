@@ -86,7 +86,7 @@ export function outcome(result: CaptureResult): { lines: string[]; exitCode: 0 |
   const list = (xs: string[]) => xs.map((x) => `  ${x}`).join('\n');
   const said = (fs: readonly CellFailure[]) => fs.map((f) => `${f.cell}: ${f.reason}`);
   if (result.broken.length > 0) lines.push(`\nBROKEN CELLS — the truth's sources disagree:\n${list(result.broken)}`);
-  if (result.failed.length > 0) lines.push(`\nFAILED CELLS — the capture threw; nothing of them written this run (an earlier capture, if any, kept; manifest.json lists them under \`failed\`):\n${list(said(result.failed))}`);
+  if (result.failed.length > 0) lines.push(`\nFAILED CELLS — the capture threw; nothing of them written this run unless its reason names what was (an earlier capture, if any, kept; manifest.json lists them under \`failed\`):\n${list(said(result.failed))}`);
   if (result.halted !== undefined) lines.push(`\nHALTED at ${result.halted.cell} — ${result.halted.reason}; the cells after it were not captured`);
   const exitCode = lines.length > 0 ? 1 : 0;
   if (result.carried.length > 0) lines.push(`\nstill failed from an earlier run (manifest.json \`failed\`): ${said(result.carried).join('; ')}`);

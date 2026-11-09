@@ -15,7 +15,7 @@ describe("capture.ts's outcome: what the command line says of a run, and its exi
     expect(exitCode).toBe(1);
     expect(lines).toEqual([
       "\nBROKEN CELLS — the truth's sources disagree:\n  open/A: no touch",
-      '\nFAILED CELLS — the capture threw; nothing of them written this run (an earlier capture, if any, kept; manifest.json lists them under `failed`):\n  carousel-lazy: adb: device offline',
+      '\nFAILED CELLS — the capture threw; nothing of them written this run unless its reason names what was (an earlier capture, if any, kept; manifest.json lists them under `failed`):\n  carousel-lazy: adb: device offline',
     ]);
     expect(outcome(result({ failed: [{ cell: 'bad', reason: 'x' }] })).exitCode).toBe(1);
   });
