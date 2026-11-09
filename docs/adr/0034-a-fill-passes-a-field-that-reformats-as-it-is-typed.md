@@ -934,7 +934,7 @@ after review round 1), each killed: the disjunct as it was (16 fail — every ne
 its `&&` as `||` (44), without `before` (2), without the placeholder (5); the widening dropped (5), `landedSome` dropped
 from it (9), the guard always true (4), its `||` as `&&` (14); the `tookText` gate dropped (3) or negated (26),
 `retypable` by the marker instead of `wholeLandingToo` (1); fill-verdict's `clear-unchanged` said of a landed read-back
-too (10). fill-landing cold score: recorded at merge.
+too (10). fill-landing cold score at merge (444c8210): 97.10 % (345 mutants, 10 survived, 1 timeout), floor 94 → 95.
 
 **Golden and live.** The golden replays tree reads and never types: Changed 0 against 3b7393ba. The unit tests are the
 evidence (fill-landing.test.ts's D71 group and the flipped pin, fill-type.test.ts's `55` refused and `55` then `555`
