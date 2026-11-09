@@ -63,13 +63,13 @@ export const VISIBLE_STOP = /^Element .* visible (?:by the tree )?after /;
 /**
  * A `fully: true` stop whose opening claims nothing whole or uncovered (T17, ADR 0013's T17 amendment), read apart:
  * src's lead `Element … visible [by the tree ]after N swipes, NOT CONFIRMED <what>: …` (scroll-text.ts
- * #describeScrollResult, its words `HEDGED_LEAD` and `HEDGE_WHATS`), `old: false`; or the pre-T17 opening the committed
+ * #describeScrollResult, its words `HEDGED_LEAD` and `HEDGE_WHATS`), `preT17: false`; or the pre-T17 opening the committed
  * live records hold (the t11/t12 records, tests/fixtures/d59-b9-lazy-predrag.json), `fully visible [by the tree ]after
- * N swipes[, judged above …]; but …` — always a flush hedge, so `WHOLE`, `old: true`. Undefined on any other reply.
+ * N swipes[, judged above …]; but …` — always a flush hedge, so `WHOLE`, `preT17: true`. Undefined on any other reply.
  */
 export interface HedgedLead {
   readonly what: HedgeWhat;
-  readonly old: boolean;
+  readonly preT17: boolean;
 }
 // Longest first, so no alternative is read as a shorter one's prefix.
 const HEDGE_WHAT_PATTERN = [...HEDGE_WHATS].sort((a, b) => b.length - a.length).join('|');
@@ -77,8 +77,8 @@ const HEDGED_STOP = new RegExp(`^Element .* visible (?:by the tree )?after \\d+ 
 const OLD_HEDGED_STOP = /^Element .* fully visible (?:by the tree )?after \d+ swipes?[^;]*; but /;
 export function hedgedLead(reply: string): HedgedLead | undefined {
   const lead = HEDGED_STOP.exec(reply);
-  if (lead !== null) return { what: lead[1] as HedgeWhat, old: false };
-  return OLD_HEDGED_STOP.test(reply) ? { what: 'WHOLE', old: true } : undefined;
+  if (lead !== null) return { what: lead[1] as HedgeWhat, preT17: false };
+  return OLD_HEDGED_STOP.test(reply) ? { what: 'WHOLE', preT17: true } : undefined;
 }
 
 /** A hedged `fully: true` stop (`hedgedLead`), of either form: a stop, never a claim. */

@@ -272,7 +272,7 @@ const UNLOCATED_TEXT = `${UNLOCATED_KEYBOARD} — it was not judged and may cove
 /**
  * The words a hedged `fully: true` stop opens with after `visible after N swipes, ` (T17, ADR 0013's T17 amendment):
  * `NOT CONFIRMED <what>:`, `<what>` one of `HEDGE_WHATS`. The truth reader builds its pattern from both
- * (`fullyHedged` in scripts/truth/replies.ts).
+ * (`hedgedLead` in scripts/truth/replies.ts).
  */
 export const HEDGED_LEAD = 'NOT CONFIRMED';
 

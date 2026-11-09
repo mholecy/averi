@@ -684,14 +684,17 @@ Where a stop was judged above a docked keyboard, nothing comes between `visible 
 the hedge's clause: ` — judged above the soft keyboard over …` follows the clause. A `checked` flush with an unlocated
 keyboard puts the probe's clause after the keyboard's. A `checked` stop keeps `fully visible after N swipes; … nothing of it
 is cut there`, and a clean stop `fully visible after N swipes`. The flow log marks every hedged stop `⚠ scroll_until`
-through the same `stopHedges` (flow/engine.ts), as it marked the `unlocated` one; the scroll_until tool description names the
+through the same `stopHedges` (flow/engine.ts), as it marked the `unlocated` one — and keeps that row's own ⚠ beside it,
+defensively: `stopHedges` says nothing of a stop with a surface the eyes saw, and no such stop carries the row (under
+`fully: true` a surface is no stop, and the row is asked of `fully: true` stops only — tests/interact/scroll-eyes.test.ts,
+tests/interact/scroll-rounds.test.ts pin both); the scroll_until tool description names the
 lead as the signal of a hedged success.
 
 **The truth reader.** `VISIBLE_STOP` (scripts/truth/replies.ts) reads `visible (?:by the tree )?after`, so every stop is kind
 `visible` — the new lead, and the unjudged claim `fully visible by the tree after`, which it missed before T17 (no committed
 record holds one). `hedgedLead` (same file) reads both forms, its pattern built from src's `HEDGED_LEAD` and `HEDGE_WHATS`:
-src's lead, `old: false`, and the pre-T17 `fully visible …; but …` the committed t11/t12 records and
-tests/fixtures/d59-b9-lazy-predrag.json hold, always a flush hedge, so `WHOLE`, `old: true`. `carouselReply` calls either
+src's lead, `preT17: false`, and the pre-T17 `fully visible …; but …` the committed t11/t12 records and
+tests/fixtures/d59-b9-lazy-predrag.json hold, always a flush hedge, so `WHOLE`, `preT17: true`. `carouselReply` calls either
 `other`. `judgeScroll` (scripts/truth/live-visibility.ts) calls a stop LOUD only where the hedge covers what the app shows:
 a `WHOLE` hedge (alone or with `UNCOVERED`) on a target the app lays out CUT (`CUT_GEOMETRIES` in scripts/truth/target-contract.ts:
 `partly-centre-in`, `centre-out`, `sliver` — cut by its scroll view or the screen, the cut a flush edge can hide): LOUD
@@ -718,13 +721,16 @@ proven one dropped.
 that keyed on `it may be cut there` still finds it. No src verdict changes — no stroke, read, success or failure — only the
 reply's opening, the flow log's ⚠; in the harness, `VISIBLE_STOP`, the LOUD classes and `judgeScroll`'s gate change. Golden
 Changed 0, and not for want of movement alone: `fills`, `room` and `axis` need no probe, so a replayed tree could reach them,
-and none does — of the corpus's 197 `fully visible` replies (base and branch alike) none is hedged and 4 are `checked`, so no
-fixture reaches any hedge. The rejudge of the committed live records (`live.ts --rejudge`'s path, 668 records with
+and none does — of the corpus's 1667 replies, 180 open `Element … fully visible` (base and branch alike, counted from a fresh
+golden JSON of each), none is hedged in either form and 4 are `checked`, so no fixture reaches any hedge. The rejudge of the committed live records (`live.ts --rejudge`'s path, 668 records with
 tests/fixtures, 7915 cases) flips no verdict.
 
 **Residuals.** (1) The old form stays readable only through `hedgedLead` (`fullyHedged`); a new reader that keys on the opening must use
 it, not `fully visible`. (2) The two-held-first-probes residual of the T12 amendment is a `checked` stop, not a hedge: it
-still opens `fully visible`, and is still a lie when both probes were not taken.
+still opens `fully visible`, and is still a lie when both probes were not taken. (3) `judgeScroll`'s LOUD gate asks only that
+the app shows the target cut, not that it is cut at the edge the hedge names: the harness's `Geometry` carries no edge, so a
+hedge on the top edge of a target the app cuts at its bottom reads LOUD too, though that hedge does not cover the cut the
+app shows.
 
 ## Residuals accepted
 

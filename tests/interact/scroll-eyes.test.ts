@@ -75,6 +75,20 @@ describe('scroll_until — the eyes confirm a fully claim', () => {
     expect(fake.screenshots).toHaveLength(1);
   });
 
+  it('T17: an unlocated keyboard never meets a surface the eyes saw on a stop — under fully: true a surface is no stop (scroll-rounds.ts, the eyes\' gate), and `unlocated` is asked of fully: true stops only — so every stop with it carries the UNCOVERED lead', async () => {
+    // k7's tree, the window state giving the keyboard no area while the input method says shown: the `unlocated` row.
+    const surfaced = await fakeOf('android-lab-form-keyboard-k7-stop.xml', { ime: false });
+    surfaced.attachKeyboard({ state: 'hidden' }, 'shown');
+    await expect(scrollUntilVisible(surfaced, PHONE, { ...FAST, maxSwipes: 0, fully: true, eyes: eyesOn(surfaced) })).rejects.toThrow(/PARTLY UNDER a surface the tree does not list/);
+    // The eyes unable to tell: a stop, the keyboard hedge its lead.
+    const untold = await fakeOf('android-lab-form-keyboard-k7-stop.xml', { ime: false });
+    untold.attachKeyboard({ state: 'hidden' }, 'shown');
+    const unjudged: Eyes = { fully: async ({ edges }): Promise<EyesAnswer> => ({ sees: 'unjudged', edge: edges[0]!.edge, by: edges[0]!.by as UiNode, why: 'the screenshot failed: offline' }), order: async () => [] };
+    const result = await scrollUntilVisible(untold, PHONE, { ...FAST, fully: true, eyes: unjudged });
+    expect(result.keyboard).toEqual({ state: 'unlocated' });
+    expect(describeScrollResult(result)).toMatch(/^visible by the tree after 0 swipes, NOT CONFIRMED UNCOVERED: the input method reports a soft keyboard shown/);
+  });
+
   it('k7, fully: true at the bound (maxSwipes: 0): the bound names the surface', async () => {
     const fake = await k7();
     await expect(scrollUntilVisible(fake, PHONE, { ...FAST, maxSwipes: 0, fully: true, eyes: eyesOn(fake) })).rejects.toThrow(

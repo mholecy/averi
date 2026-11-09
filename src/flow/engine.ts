@@ -1356,10 +1356,16 @@ export class FlowEngine {
     // row qualifies: the input method says a keyboard is up that nothing
     // could place, so "fully visible" is not established either — nor
     // (T17) on a flush edge no probe checked: both open NOT CONFIRMED
-    // (scroll-text.ts#stopHedges). A stop judged above a docked keyboard is
-    // not ⚠ on its own: the judgement already excluded it, and the line says so.
+    // (scroll-text.ts#stopHedges). The `unlocated` row is asked again on its
+    // own, defensively: stopHedges says nothing of a stop with a surface the
+    // eyes saw, and such a stop never carries it (under fully: true a surface
+    // is no stop, and the row is asked of fully: true stops only —
+    // tests/interact/scroll-eyes.test.ts pins it), but the ⚠ must not hang on
+    // that. A stop judged above a docked keyboard is not ⚠ on its own: the
+    // judgement already excluded it, and the line says so.
+    const warned = result.clipped.length > 0 || result.covered !== undefined || stopHedges(result) !== undefined || result.keyboard?.state === 'unlocated';
     this.log(
-      result.clipped.length > 0 || result.covered !== undefined || stopHedges(result) !== undefined ? '⚠ scroll_until' : 'scroll_until',
+      warned ? '⚠ scroll_until' : 'scroll_until',
       `${describeElementSpec(element)} ${describeScrollResult(result)}`,
     );
   }

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
+import { liveGeometry, touchTurns, classStrokes, directionBreaks, distanceAt, judgeAbsentAtEnd, judgeAndroidTurn, judgeAtRest, judgeBlankStretch, judgeCarry, judgeDismissal, judgePresentedAssert, judgePresentedScroll, presentedAssertCase, unchangedClaimBroken, judgeScroll, judgeTap, showRegion, visibilityCases } from '../../scripts/truth/live-visibility.js';
 import { describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
 import { stopHolds } from '../../scripts/truth/target-contract.js';
 import { turnsSaid } from '../../scripts/truth/replies.js';
 import type { CellTruth, LabState, Stroke, TargetTruth } from '../../scripts/truth/schema.js';
+import type { Rect } from '../../src/adapters/types.js';
 import { knownLive, LIVE_KNOWN } from '../../scripts/truth/live-known.js';
 
 // The live golden's visibility judges (scripts/truth/live-visibility.ts): pure over the lab app's state — its tap log,
@@ -156,19 +157,35 @@ describe('judgeScroll', () => {
     /** The pre-T17 opening the committed records hold: `fully visible …; but <the clause>`. */
     const oldLeads = flushes.map((flush) => `Element id:"x" fully visible after 3 swipes; but ${flushText(flush)}`);
     const uncovered = stop({ keyboard: { state: 'unlocated' } });
-    const at = (y: number, clip = SCREEN) => state({ frames: { T: { x: 51, y, width: 300, height: 64 } }, scrollViews: { page: clip }, offsets: { page: 0 }, strokes: [stroke(382, 0)], events: [{ kind: 'tap', tag: 'T', at: 1 }] });
+    const at = (y: number, clip = SCREEN, chrome?: Record<string, Rect>) =>
+      state({ frames: { T: { x: 51, y, width: 300, height: 64 } }, scrollViews: { page: clip }, offsets: { page: 0 }, strokes: [stroke(382, 0)], events: [{ kind: 'tap', tag: 'T', at: 1 }], ...(chrome !== undefined && { chrome }) });
+    const TAB_BAR = { tabBar: { x: 0, y: 700, width: 402, height: 90 } };
     // The cuts (target-contract.ts#CUT_GEOMETRIES), and two places a cut is not: off the screen, outside its scroll view.
     const CUTS = [['partly-centre-in', at(840)], ['centre-out', at(-40)], ['sliver', at(860)]] as const;
-    const NOT_CUT = [['off-screen', at(5000)], ['outside-scroll-view', at(700, { x: 0, y: 200, width: 402, height: 400 })]] as const;
+    // …nor a system band or the app's chrome over it: no flush edge hedges those.
+    const NOT_CUT = [
+      ['off-screen', at(5000)],
+      ['outside-scroll-view', at(700, { x: 0, y: 200, width: 402, height: 400 })],
+      ['status-band', at(10)],
+      ['band-overlap:status', at(40)],
+      ['chrome-overlap:tabBar', at(660, SCREEN, TAB_BAR)],
+      ['under-chrome:tabBar', at(700, SCREEN, TAB_BAR)],
+    ] as const;
 
     it.each(CUTS)('on a %s target: src\'s WHOLE lead LOUD hedged-stop; the old opening LOUD hedged-stop-old-lead, its why naming that opening', (geometry, cut) => {
-      for (const hedge of newLeads) expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'hedged-stop', why: expect.stringContaining(geometry) });
+      expect(liveGeometry(cut, 'ios', 'T', 'page')).toBe(geometry);
+      for (const flush of flushes) {
+        expect(judgeScroll({ ...c, fully: true }, [stop({ flush }), 'Tapped'], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'hedged-stop', why: expect.stringMatching(new RegExp(`^hedged \\(NOT CONFIRMED WHOLE\\), and the app lays it out ${geometry}`)) });
+        const both = stop({ flush, keyboard: { state: 'unlocated' } });
+        expect(judgeScroll({ ...c, fully: true }, [both, 'Tapped'], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'hedged-stop', why: expect.stringMatching(/^hedged \(NOT CONFIRMED WHOLE OR UNCOVERED\), and/) });
+      }
       for (const hedge of oldLeads) {
         expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], cut, launched)).toMatchObject({ outcome: 'LOUD', cls: 'hedged-stop-old-lead', why: expect.stringMatching(/^hedged in its body, but its opening claimed "fully visible" \(before T17\)/) });
       }
     });
 
-    it.each(NOT_CUT)('on an %s target: every hedge a stop-claim MISMATCH — a cut hedged is not the target elsewhere', (_geometry, away) => {
+    it.each(NOT_CUT)('on a %s target: every hedge a stop-claim MISMATCH — a cut hedged is not the target elsewhere', (geometry, away) => {
+      expect(liveGeometry(away, 'ios', 'T', 'page')).toBe(geometry);
       for (const hedge of [...newLeads, ...oldLeads, uncovered]) expect(judgeScroll({ ...c, fully: true }, [hedge, 'Tapped'], away, launched)).toMatchObject({ outcome: 'MISMATCH', cls: 'stop-claim' });
     });
 

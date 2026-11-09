@@ -207,23 +207,23 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
       expect(reply).toMatch(VISIBLE_STOP);
       expect(replyKind(reply)).toBe('visible');
       expect(fullyHedged(reply)).toBe(true);
-      expect(hedgedLead(reply)).toEqual({ what: 'WHOLE', old: false });
+      expect(hedgedLead(reply)).toEqual({ what: 'WHOLE', preT17: false });
       expect(carouselReply(reply)).toBe('other');
       // The eyes unjudged: `visible by the tree after …, NOT CONFIRMED WHOLE:` — still a stop, still hedged.
       const byTree = at({ swipes: 3, visible: 1, clipped: [], flush, eyes: unjudged });
       expect(byTree).toMatch(/^Element id:"x" visible by the tree after 3 swipes, NOT CONFIRMED WHOLE: /);
       expect(replyKind(byTree)).toBe('visible');
-      expect(hedgedLead(byTree)).toEqual({ what: 'WHOLE', old: false });
+      expect(hedgedLead(byTree)).toEqual({ what: 'WHOLE', preT17: false });
       // With an unlocated keyboard too: `NOT CONFIRMED WHOLE OR UNCOVERED:`.
       const both = at({ swipes: 3, visible: 1, clipped: [], flush, keyboard: { state: 'unlocated' } });
       expect(both).toContain(', NOT CONFIRMED WHOLE OR UNCOVERED: ');
-      expect(hedgedLead(both)).toEqual({ what: 'WHOLE OR UNCOVERED', old: false });
-      expect(hedgedLead(at({ swipes: 3, visible: 1, clipped: [], flush, keyboard: { state: 'unlocated' }, eyes: unjudged }))).toEqual({ what: 'WHOLE OR UNCOVERED', old: false });
+      expect(hedgedLead(both)).toEqual({ what: 'WHOLE OR UNCOVERED', preT17: false });
+      expect(hedgedLead(at({ swipes: 3, visible: 1, clipped: [], flush, keyboard: { state: 'unlocated' }, eyes: unjudged }))).toEqual({ what: 'WHOLE OR UNCOVERED', preT17: false });
       // The pre-T17 form, as the committed records hold it.
-      expect(hedgedLead(`Element id:"x" fully visible after 3 swipes; but ${flushText(flush)}`)).toEqual({ what: 'WHOLE', old: true });
+      expect(hedgedLead(`Element id:"x" fully visible after 3 swipes; but ${flushText(flush)}`)).toEqual({ what: 'WHOLE', preT17: true });
       expect(fullyHedged(`Element id:"x" fully visible by the tree after 3 swipes, judged above the soft keyboard over [0,1400][1080,2200]; but ${flushText(flush)}`)).toBe(true);
     }
-    expect(hedgedLead(at({ swipes: 1, visible: 1, clipped: [], keyboard: { state: 'unlocated' } }))).toEqual({ what: 'UNCOVERED', old: false });
+    expect(hedgedLead(at({ swipes: 1, visible: 1, clipped: [], keyboard: { state: 'unlocated' } }))).toEqual({ what: 'UNCOVERED', preT17: false });
     // M2: the unjudged claim is a stop too — `fully visible by the tree after` reads `visible`, not hedged.
     const claimByTree = at({ swipes: 1, visible: 1, clipped: [], eyes: unjudged });
     expect(claimByTree).toMatch(/^Element id:"x" fully visible by the tree after 1 swipe; /);
