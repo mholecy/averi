@@ -1331,9 +1331,9 @@ export class FlowEngine {
     // (mcp/tool-text.ts#swipeText): the mark, not the layout, is what the
     // two share (A12).
     const { note } = await swipeScreen(this.adapter, { direction: spec.direction, meaning: 'finger', times });
-    const counted = `${spec.direction}${times > 1 ? ` ×${times}` : ''}`;
-    if (note === undefined) this.log('swipe', counted);
-    else this.log('⚠ swipe', `${counted} — ${note}`);
+    const stroke = `${spec.direction}${times > 1 ? ` ×${times}` : ''}`;
+    if (note === undefined) this.log('swipe', stroke);
+    else this.log('⚠ swipe', `${stroke} — ${note}`);
   }
 
   private async runScrollUntil(spec: ScrollUntilSpec): Promise<void> {
