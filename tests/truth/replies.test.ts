@@ -5,9 +5,24 @@ import type { MarkedLayer } from '../../src/ui-tree/presentation.js';
 import { ACTIVE_WINDOW_HINT, COVERED_FIRST, IDB_UNLISTS, missNote, withMissNote } from '../../src/ui-tree/miss.js';
 import { presentedRemedy, presentedStop } from '../../src/ui-tree/standing.js';
 import { boundText, describeScrollResult, flushText } from '../../src/interact/scroll-text.js';
-import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged } from '../../scripts/truth/replies.js';
+import { CAROUSEL_REPLY_WORDS, carouselReply, MAX_SWIPES, flushProbedSide, idbReasonsSaid, inferredAxisSaid, noIdListedSaid, OCR_FAILED_CLOSED, presentedRemedySaid, windowHintSaid, heldCutHedged, bandSaid, directionNamed, UNCHANGED_SAID, LIVE_REPLY_WORDS, refusedUnsentSaid, scrollVerdictSaid, underBarRemedySaid, untriedSideSaid } from '../../scripts/truth/replies.js';
+import { refusalOf, type Typeable } from '../../src/adapters/typeable.js';
+import { revealText } from '../../src/ui-tree/sides.js';
+import { untriedSideText } from '../../src/interact/target-text.js';
+import { EDGES } from '../../src/ui-tree/geometry.js';
 import { parseDump } from '../helpers/android-dumps.js';
 import { failureOf, play, resultOf, type Row } from '../helpers/rounds.js';
+
+/**
+ * A src file's code without its comments, so a phrase that only a comment still says counts as no longer written. It
+ * strips block comments (`/* … *\/`, JSDoc included, across lines) and whole-line `//` comments (a line whose first
+ * non-blank characters are `//`); a `//` comment after code on the same line stays, as does anything that only looks
+ * like a comment inside a string or a regex.
+ */
+const src = (file: string) =>
+  readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
 
 // The two "close it first" the harness reads apart (scripts/truth/replies.ts): the presented remedy, driven here by
 // src's own builders (ui-tree/standing.ts#presentedRemedy, #presentedStop) over every layer they word, and the
@@ -164,10 +179,83 @@ describe("carouselReply: the five kinds of a carousel's `fully: true` reply (T7a
   });
 
   it('each phrase it keys on is written in src/interact/scroll-text.ts', () => {
-    const source = readFileSync(new URL('../../src/interact/scroll-text.ts', import.meta.url), 'utf8');
+    const source = src('src/interact/scroll-text.ts');
     for (const words of CAROUSEL_REPLY_WORDS) expect(source).toContain(words);
     expect(MAX_SWIPES).toBe('(maxSwipes)');
     expect(boundText({ of: 'maxSwipes' }, 6).endsWith(MAX_SWIPES)).toBe(true);
     expect(source).toContain('`fully visible by the tree after ${n}`');
+  });
+});
+
+describe('untriedSideSaid: the hint for a side never read, as src builds it (src/interact/target-text.ts#untriedSideText)', () => {
+  it('each side src words, in a scroll_until failure as it ends', () => {
+    for (const edge of EDGES) {
+      expect(untriedSideSaid(`ERROR scroll_until id:"lab.x" failed after 3 swipes — element never appeared in the tree — ${untriedSideText(edge)}`)).toBe(true);
+    }
+  });
+
+  it('not a failure that names no side, nor the turn-back remedy alone', () => {
+    expect(untriedSideSaid('ERROR scroll_until id:"lab.x" failed after 3 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never appeared in the tree')).toBe(false);
+    expect(untriedSideSaid('ERROR … swiping up no longer moves it out from under the status bar — try direction: "down"')).toBe(false);
+  });
+});
+
+describe('LIVE_REPLY_WORDS: the words the live forms and turn judges key on, each pinned where src writes it', () => {
+  /** Where each phrase is written: a word without its file fails the type check, a rewording there fails the test. */
+  const WRITTEN_IN: Record<(typeof LIVE_REPLY_WORDS)[number], string> = {
+    'Refused before anything was sent': 'src/adapters/typeable.ts',
+    'did not change': 'src/interact/fill-text.ts',
+    'scroll_until it out from under': 'src/interact/target-text.ts',
+    'dismiss it first': 'src/interact/target-text.ts',
+    'PARTLY UNDER a surface': 'src/interact/scroll-text.ts',
+    'direction: "': 'src/ui-tree/sides.ts',
+  };
+  it('each phrase is written in its src file, in code', () => {
+    expect(Object.keys(WRITTEN_IN)).toEqual([...LIVE_REPLY_WORDS]);
+    for (const [words, file] of Object.entries(WRITTEN_IN)) expect(src(file)).toContain(words);
+    // 'did not change' is in another fill sentence too (the deletes'): UNCHANGED_SAID is held to the `unchanged` caveat's own
+    expect(src('src/interact/fill-text.ts')).toContain(`— the field ${UNCHANGED_SAID}: `);
+    // scrollVerdictSaid's head: scroll_until's own failures and stops (src/interact/scroll-text.ts)
+    expect(src('src/interact/scroll-text.ts')).toContain('`scroll_until ${describe} failed after ');
+  });
+
+  it('refusedUnsentSaid: the typeable refusal src builds, not another error', () => {
+    const typeable = { refuses: /Š/u, says: 'it types ASCII only', otherPath: 'Type it another way.' } as Typeable;
+    expect(refusedUnsentSaid(`ERROR ${refusalOf('Šx', typeable)}`)).toBe(true);
+    expect(refusedUnsentSaid('ERROR Timed out after 5000ms waiting for element id:"lab.x" to appear')).toBe(false);
+  });
+
+  it('underBarRemedySaid: either remedy for a field under the bar, and no other refusal', () => {
+    expect(underBarRemedySaid('ERROR … cut at its top edge by container id:"lab.submit" …; scroll_until it out from under that container first (…)')).toBe(true);
+    expect(underBarRemedySaid('ERROR … the soft keyboard is up (its top edge at y 1398): dismiss it first (press_key back …)')).toBe(true);
+    expect(underBarRemedySaid('ERROR id:"lab.note" was not tapped: it lies below the viewport — scroll_until it with direction: "down"')).toBe(false);
+  });
+
+  it('bandSaid: the band sentence src wrote on the device (k7, android-k7-eyes-1), not a lookalike', () => {
+    const record = JSON.parse(readFileSync(new URL('../../docs/truth/live-records/android-k7-eyes-1.json', import.meta.url), 'utf8')) as { results: { id: string; replies: string[] }[] };
+    const k7 = record.results.find((r) => r.id === 'k7')!.replies[0];
+    expect(k7).toMatch(/^Element id:"lab\.form-keyboard\.phone" visible after 1 swipe — PARTLY UNDER a surface the tree does not list: /);
+    expect(bandSaid(k7)).toBe(true);
+    for (const lookalike of ['PARTLY UNDER a surfaced', 'XPARTLY UNDER a surface', 'PARTLY UNDER  a surface', 'partly under a surface', 'PARTLY UNDER the surface']) {
+      expect(bandSaid(k7.replace('PARTLY UNDER a surface', lookalike))).toBe(false);
+    }
+  });
+
+  it('bandSaid: the eyes\' band as a word, not inside another', () => {
+    expect(bandSaid('Element phone visible after 1 swipe — PARTLY UNDER a surface the tree does not list: …')).toBe(true);
+    expect(bandSaid('Element phone fully visible after 1 swipe')).toBe(false);
+    expect(bandSaid('… PARTLY UNDER a surfaces …')).toBe(false);
+  });
+
+  it('directionNamed: the direction a reply names, from src\'s reveal (src/ui-tree/sides.ts#revealText)', () => {
+    expect(directionNamed(`ERROR scroll_until id:"lab.x" failed after 4 swipes — ${revealText('top')}`, 'up')).toBe(true);
+    expect(directionNamed(`ERROR scroll_until id:"lab.x" failed after 4 swipes — ${revealText('top')}`, 'down')).toBe(false);
+  });
+
+  it('scrollVerdictSaid: scroll_until\'s own failure, not a failed tree read nor a tool error', () => {
+    expect(scrollVerdictSaid('ERROR scroll_until id:"lab.ks" failed after 2 swipes — …')).toBe(true);
+    expect(scrollVerdictSaid('ERROR scroll_until id:"lab.ks" failed after 0 swipes — last UI tree read failed: …')).toBe(false);
+    expect(scrollVerdictSaid('ERROR scroll_until: maxSwipes must be a positive integer')).toBe(false);
+    expect(scrollVerdictSaid('Element id:"lab.ks" visible after 1 swipe')).toBe(false);
   });
 });
