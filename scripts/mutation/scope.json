@@ -219,6 +219,6 @@
     "group": "lab",
     "tests": ["tests/truth/run-case.test.ts"],
     "floor": 98,
-    "baseline": "100 % on 2026-11-06 (A11 review round 2: `swipes?: { drop?: number }`, no ternary; cold): 142 mutants, 0 survived; 98.62 % on 2026-11-06 (A11 review round 1, `swipes?: true | { drop }`; cold): 145 mutants, 2 survived, both equivalent; 99.32 % on 2026-11-06 (A11; cold): 148 mutants, 1 survived"
+    "baseline": "100 % on 2026-11-09 (T7b, the chooser group: fromLauncher, the focus reads, the teardown; cold): 216 mutants, 0 survived; 100 % on 2026-11-06 (A11 review round 2: `swipes?: { drop?: number }`, no ternary; cold): 142 mutants, 0 survived; 98.62 % on 2026-11-06 (A11 review round 1, `swipes?: true | { drop }`; cold): 145 mutants, 2 survived, both equivalent; 99.32 % on 2026-11-06 (A11; cold): 148 mutants, 1 survived"
   }
 }
