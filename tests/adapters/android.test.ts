@@ -136,6 +136,8 @@ describe('parseUiautomatorXml', () => {
       expect(findAll(tree, 'text:"Jan"')).toHaveLength(0);
       expect(findAll(tree, 'text:"Jan "')).toHaveLength(1);
       expect(findAll(tree, 'value:"Jan "')).toHaveLength(1);
+      expect(findAll(tree, 'value:Jan')).toHaveLength(0);
+      expect(findAll(tree, 'value~^Jan$')).toHaveLength(0);
     });
 
     it('an input with no content-desc still matches `text:Jan` through its label', () => {

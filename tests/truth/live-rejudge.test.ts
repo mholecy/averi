@@ -401,7 +401,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // batch-9's device run at e734fedf (2026-11-03), L7's first read. The forms group's f1–f14 and g1–g5: every case ok
     // under uiautomator, g2 included (the reading judged there had no trailing space — trimmed, PRE_D72_G2); under WDA g2 the D53 `separated`
     // MISMATCH, known (ADR 0034 residual 10). (Under idb g3 too — the src before D61's fix, below.)
-    ['android-forms-l7-1.json', 'forms', { cases: 19, ok: 19, loud: 0, mismatches: 0 , preD72: true }],
+    ['android-forms-l7-1.json', 'forms', { cases: 19, ok: 19, loud: 0, mismatches: 0, preD72: true }],
     ['ios-wda-forms-l7-1.json', 'forms', { cases: 18, ok: 17, loud: 0, mismatches: 1 }],
     // …the RN app's rf1–rf5 and rfe1–rfe3 once, then rfe1–rfe3 four times more, under idb and WDA (D60's live proof):
     // rfe1 and rfe2 ok 20 of 20, 5 of them through the retype from the eager mark; rfe3 the D53 `separated` MISMATCH,
@@ -433,7 +433,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-idb-forms-d61-2.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-wda-forms-d61-1.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-wda-forms-d61-2.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
-    ['android-forms-d61-whole.json', 'forms', { cases: 54, ok: 49, loud: 2, mismatches: 0, skipped: 3 , preD72: true }],
+    ['android-forms-d61-whole.json', 'forms', { cases: 54, ok: 49, loud: 2, mismatches: 0, skipped: 3, preD72: true }],
     ['ios-idb-forms-d61-whole.json', 'forms', { cases: 46, ok: 42, loud: 3, mismatches: 1 }],
     ['ios-wda-forms-d61-whole.json', 'forms', { cases: 46, ok: 42, loud: 3, mismatches: 1, preD43Wda: true }],
     // T7a's live check at 75774dfd (2026-11-05): the carousel group three times on the AVD, every case ok — never "fully

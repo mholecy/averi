@@ -23,3 +23,6 @@ android-rn-forms-d72-fix.*    20:39:17–20:40:10  the RN app's rfe1–rfe3, the
 Not seen live: the base's `JJan ` damage (needs a partial landing with clear; pinned by the unit test
 tests/adapters/android.test.ts "typeAndConfirm with clear, `Jan ` of `Jan Novak` landed").
 The fix records are read back by tests/truth/live-rejudge.test.ts; the base record is a --side run, kept as evidence.
+Running `live.ts --rejudge` by hand on the two pre-D72 Android forms records (android-forms-l7-1.json,
+android-forms-d61-whole.json) now exits 1 on purpose: g2 is known since D72 and ok there, so FIXED (PRE_D72_G2 in
+tests/truth/live-rejudge.test.ts pins it).

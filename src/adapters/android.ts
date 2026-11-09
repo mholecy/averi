@@ -1787,7 +1787,7 @@ const providesNodes = (raw: RawNode): boolean => raw.class === 'android.view.Vie
 function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';
   // The text as the app holds it, outer spaces kept (a text input's value), and as it names the node, trimmed (D72).
-  const heldText = emptyToNull(raw.text);
+  const rawText = emptyToNull(raw.text);
   const text = emptyToNull(raw.text === undefined ? undefined : trimOuter(String(raw.text)));
   const contentDesc = emptyToNull(raw['content-desc']);
   const rawChildren = raw.node === undefined ? [] : Array.isArray(raw.node) ? raw.node : [raw.node];
@@ -1811,7 +1811,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
     label: contentDesc ?? text,
     // resource-id is "com.example.app:id/login_button" — selectors use the short name
     identifier: emptyToNull(raw['resource-id']?.split('/').pop()),
-    value: isTextInput ? heldText : null,
+    value: isTextInput ? rawText : null,
     rect,
     children,
     // The one fact the role cannot carry: uiautomator cuts its descendants'

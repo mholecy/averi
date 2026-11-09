@@ -956,9 +956,10 @@ cases) are on the owner's list.
 Android. averi did: `parseUiautomatorXml` (adapters/android.ts) parsed the dump with fast-xml-parser's default
 `trimValues`, which trims every attribute before its entities are decoded, so every Android reading lost its outer
 spaces. A fill judges a reading, so `Jan ` typed read back `Jan`: a false failure ("typed 4 characters but the field
-shows 3") of a field that holds the value. With clear it also damaged the field: the retype's wipe deletes the
-reading's length (fill-type.ts, `heldText(observed)`), one short per trimmed space, and `clearText` deletes from the
-end, so `Jan ` of `Jan Novak` became `JJan Novak`. A clear of a field ending in a space counted short the same way.
+shows 3") of a field that holds the value. With clear it also damaged the field: the retype's wipe deletes what the
+reading holds (fill-type.ts#typeAndConfirm sizes it by fill-facts.ts#heldText of the reading), one short per trimmed
+space, and `clearText` deletes from the end, so `Jan ` of `Jan Novak` became `JJan Novak`. A clear of a field ending in
+a space counted short the same way (fill-clear.ts, through the same `heldText`).
 iOS already kept them (ios-node.ts).
 
 **Decision: the narrow fix, `text` and `hint` alone.** The parser runs with `trimValues: false`, and an attribute
@@ -987,11 +988,12 @@ appended to `Jan` lands (`JanJan `); `Jan ` typed after `Jan `, no key landing, 
 **Consequences.**
 - g2 under uiautomator (`SK3112000000` without clear into form-grouped's ibanEager, the app holding `SK31 1200 0000 `)
   moves from ok to the `separated` MISMATCH, as on iOS: honest, the field undamaged; rfe3 (React Native) reads the
-  same. Filed in live-known.ts as `android uiautomator g2|rfe3` under residual 10. The Android forms records committed before D72 (android-forms-l7-1.json,
-  android-forms-d61-whole.json) rejudge g2 as known but ok, FIXED — the replies of a trimming averi
-  (tests/truth/live-rejudge.test.ts, `PRE_D72_G2`).
+  same. Filed in live-known.ts as `android uiautomator g2|rfe3` under residual 10. The Android forms records committed
+  before D72 (android-forms-l7-1.json, android-forms-d61-whole.json) rejudge g2 as known but ok, FIXED — the replies of
+  a trimming averi (tests/truth/live-rejudge.test.ts, `PRE_D72_G2`); `live.ts --rejudge` run by hand on either exits 1,
+  on purpose.
 - ADR 0028's D64b-3 line counts what the app holds: fp2's ⚠ line says 5 characters, not 4, and a typed `+421` over an
-  inserted `+421 ` is no longer silent (ADR 0028 residual 3, restated). The two `+421 ` pins in
+  inserted `+421 ` is no longer silent (ADR 0028 residual 3, narrowed). The two `+421 ` pins in
   tests/adapters/android.test.ts are re-pinned so.
 - `ui_snapshot` shows an Android input's value with its outer spaces, as iOS does.
 - Selectors through the value change on Android (review round 1, MAJOR-1, accepted): the `value` path (`value:`,
