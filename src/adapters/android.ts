@@ -1598,6 +1598,12 @@ export function parseUiautomatorXml(xml: string, drawnOverStrip: DrawnOverStrip)
     // Here, not after parsing: a second pass could not tell an app's literal `&#10;` from a reference. HTML's named
     // entities (`&nbsp;`, `&copy;` …) decode too — harmless, as uiautomator escapes every `&` it does not mean as one.
     htmlEntities: true,
+    // A text input's value keeps its outer spaces, as the app holds them (D72; iOS's reading does too, ios-node.ts):
+    // the parser's own trim cut them, so `Jan ` read back `Jan` — a false failure, and with clear a wipe one short per
+    // space (`JJan `). `text` alone keeps them; every other attribute is trimmed as before (`trimOuter`), and a label
+    // drawn from `text` is trimmed in normalizeNode, so `text:` and `label:` selectors match as they did.
+    trimValues: false,
+    attributeValueProcessor: (name: string, value: string) => (name === 'text' ? value : trimOuter(value)),
     isArray: (name) => name === 'node',
   }).parse(xml);
   const roots: RawNode[] = parsed.hierarchy?.node ?? [];
@@ -1777,7 +1783,9 @@ const providesNodes = (raw: RawNode): boolean => raw.class === 'android.view.Vie
 
 function normalizeNode(raw: RawNode, around: Around): UiNode {
   const className = raw.class?.split('.').pop() ?? '';
-  const text = emptyToNull(raw.text);
+  // The text as the app holds it, outer spaces kept (a text input's value), and as it names the node, trimmed (D72).
+  const heldText = emptyToNull(raw.text);
+  const text = emptyToNull(raw.text === undefined ? undefined : trimOuter(String(raw.text)));
   const contentDesc = emptyToNull(raw['content-desc']);
   const rawChildren = raw.node === undefined ? [] : Array.isArray(raw.node) ? raw.node : [raw.node];
   // Compose text inputs don't always dump as EditText: a BasicTextField with
@@ -1800,7 +1808,7 @@ function normalizeNode(raw: RawNode, around: Around): UiNode {
     label: contentDesc ?? text,
     // resource-id is "com.example.app:id/login_button" — selectors use the short name
     identifier: emptyToNull(raw['resource-id']?.split('/').pop()),
-    value: isTextInput ? text : null,
+    value: isTextInput ? heldText : null,
     rect,
     children,
     // The one fact the role cannot carry: uiautomator cuts its descendants'
@@ -1956,6 +1964,15 @@ function parseBounds(bounds: string | undefined): Rect {
   if (!m) return zeroRect();
   const [, l, t, r, b] = m.map(Number);
   return { x: l, y: t, width: r - l, height: b - t };
+}
+
+/**
+ * An attribute's outer whitespace cut, as fast-xml-parser's `trimValues` cut it before D72 — but after the entities
+ * are decoded, where the parser trimmed before: so a newline, a tab or a return, which uiautomator writes only as a
+ * reference (`&#10;`, `&#9;`, `&#13;`, never raw), is kept at the edges as it was, and every other whitespace is cut.
+ */
+function trimOuter(value: string): string {
+  return value.replace(/^[^\S\n\t\r]+|[^\S\n\t\r]+$/g, '');
 }
 
 function emptyToNull(value: string | undefined): string | null {

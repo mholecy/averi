@@ -4,6 +4,8 @@ import { PNG as Pngjs } from 'pngjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { landingOf, type Expectation } from '../../src/interact/fill-landing.js';
 import { fillReply } from '../../src/interact/fill-text.js';
+import { typeAndConfirm, type FieldIo } from '../../src/interact/fill-type.js';
+import { clearStep, startClear } from '../../src/interact/fill-clear.js';
 import { tapElement } from '../../src/interact/tap.js';
 import { launchText } from '../../src/mcp/tool-text.js';
 import { worded } from '../helpers/app-holder.js';
@@ -60,20 +62,97 @@ UI hierchary dumped to: /dev/tty`;
 describe('parseUiautomatorXml', () => {
   const tree = parseDump(UIAUTOMATOR_XML.slice(0, UIAUTOMATOR_XML.lastIndexOf('>') + 1));
 
-  // D64b-3 (ADR 0028's amendment): the parser trims a value's outer spaces, so the ⚠ line counts what averi read.
-  describe('a field holding `+421 `, the re-read skipped: the reading is `+421`', () => {
+  // D72: a text input's value keeps its outer spaces, as the app holds them (iOS's too, ios-node.ts); what names a node
+  // — its label, content-desc, hint, resource-id — is trimmed as before, so `text:` and `label:` selectors match as before.
+  describe("a value's outer spaces (D72)", () => {
+    it('an EditText holding `Jan ` reads value `Jan `, labelled `Jan`', () => {
+      const field = parseDump('<hierarchy><node class="android.widget.EditText" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(field).toMatchObject({ role: 'textfield', value: 'Jan ', label: 'Jan' });
+    });
+
+    it('a Compose input (a focusable, long-clickable scroll view) holding `Jan ` reads value `Jan `, labelled `Jan`', () => {
+      const field = parseDump('<hierarchy><node class="android.widget.HorizontalScrollView" focusable="true" long-clickable="true" text="Jan " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(field).toMatchObject({ role: 'textfield', value: 'Jan ', label: 'Jan' });
+    });
+
+    it('a label drawn from text, a content-desc, a hint and a resource-id are trimmed as before', () => {
+      const tree = parseDump(`<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+        <node class="android.widget.TextView" text=" Close " bounds="[0,0][100,100]" />
+        <node class="android.widget.Button" content-desc=" Send " resource-id=" app:id/send " bounds="[0,100][100,200]" />
+        <node class="android.widget.EditText" text="" hint=" IBAN " bounds="[0,200][100,300]" />
+      </node></hierarchy>`);
+      expect(tree.children[0]).toMatchObject({ label: 'Close', value: null });
+      expect(tree.children[1]).toMatchObject({ label: 'Send', identifier: 'send' });
+      expect(tree.children[2]).toMatchObject({ value: null, placeholder: 'IBAN' });
+    });
+
+    it('an input holding only spaces keeps them as its value, and has no label', () => {
+      const field = parseDump('<hierarchy><node class="android.widget.EditText" text="  " bounds="[0,0][100,100]" /></hierarchy>');
+      expect(field).toMatchObject({ value: '  ', label: null });
+    });
+
+    it('a newline at the edge, written `&#10;`, still decodes and stays, in a value and in a label', () => {
+      const tree = parseDump(`<hierarchy><node class="android.widget.FrameLayout" bounds="[0,0][1080,2220]">
+        <node class="android.widget.EditText" text="Jan&#10; " bounds="[0,0][100,100]" />
+        <node class="android.widget.Button" content-desc=" &#10;Send " bounds="[0,100][100,200]" />
+      </node></hierarchy>`);
+      expect(tree.children[0]).toMatchObject({ value: 'Jan\n ', label: 'Jan\n' });
+      expect(tree.children[1]).toMatchObject({ label: '\nSend' });
+    });
+
+    /** An Android field holding `held`, as its dump reads (the parser is the seam: base trimmed `Jan ` to `Jan`). */
+    const dumped = (held: string): UiNode =>
+      parseDump(`<hierarchy><node class="android.widget.EditText" resource-id="app:id/f" text="${held}" bounds="[0,0][100,20]" /></hierarchy>`);
+
+    it('typeAndConfirm with clear, `Jan ` of `Jan Novak` landed: the wipe deletes 4, not 3, and the retype lands', async () => {
+      let held = '';
+      const wipes: number[] = [];
+      let typings = 0;
+      const io: FieldIo = {
+        type: async (text) => {
+          held += typings++ === 0 ? text.slice(0, 4) : text;
+        },
+        wipe: async (count) => {
+          wipes.push(count);
+          held = held.slice(0, Math.max(0, held.length - count));
+        },
+        read: async () => dumped(held).value ?? '',
+        screen: () => dumped(held),
+        reportDroppedTail: () => undefined,
+      };
+      const out = await typeAndConfirm(io, {
+        value: 'Jan Novak', clear: true, isInput: true, resolvedValue: null, before: '', placeholder: undefined, held: 0, pollMs: 1,
+        field: dumped(''), delivery: 'may-arrive-late',
+      });
+      expect(wipes).toEqual([4]);
+      expect(out).toMatchObject({ kind: 'landed', observed: 'Jan Novak' });
+      expect(held).toBe('Jan Novak'); // base: `JJan Novak`
+    });
+
+    it('the clear of a field holding `Jan ` deletes 4', () => {
+      const first = clearStep(startClear(undefined), { value: dumped('Jan ').value });
+      expect(first.step).toEqual({ do: 'delete', count: 4 });
+    });
+  });
+
+  // D64b-3 (ADR 0028's amendment), re-pinned by D72: the parser no longer trims a value's outer spaces, so the ⚠ line
+  // counts what the app holds (5, where it counted 4), and a typed `+421` over an inserted `+421 ` is no longer silent.
+  describe('a field holding `+421 `, the re-read skipped: the reading is `+421 `', () => {
     const reading = parseDump('<hierarchy><node class="android.widget.EditText" text="+421 " password="false" bounds="[0,0][100,100]" /></hierarchy>').value ?? '';
     const expecting = (value: string): Expectation => ({ value, clear: false, before: '', placeholder: undefined, isInput: true, resolvedValue: null, held: 'unread' });
 
-    it('`421` typed: the line says 4 characters, where the app holds 5', () => {
+    it('`421` typed: the line says 5 characters, as the app holds', () => {
       const landing = landingOf(reading, expecting('421'));
-      expect(landing).toEqual({ kind: 'landed', focusUnread: { shows: 4 } });
+      expect(landing).toEqual({ kind: 'landed', focusUnread: { shows: 5 } });
       const focusUnread = landing?.kind === 'landed' ? landing.focusUnread : undefined;
-      expect(fillReply({ role: 'textfield', typed: 3, readBack: { kind: 'landed' }, focusUnread }, 'id:dial')).toContain('\n⚠ the field shows 4 characters for the 3 typed,');
+      expect(fillReply({ role: 'textfield', typed: 3, readBack: { kind: 'landed' }, focusUnread }, 'id:dial')).toContain('\n⚠ the field shows 5 characters for the 3 typed,');
     });
 
-    it('`+421` typed: exactly the value as read, so no line, whatever the field took (ADR 0028 residual 3)', () => {
-      expect(landingOf(reading, expecting('+421'))).toEqual({ kind: 'landed' });
+    it('`+421` typed: the reading is not the value typed, so the ⚠ line, where it was silent (ADR 0028 residual 3, D72)', () => {
+      const landing = landingOf(reading, expecting('+421'));
+      expect(landing).toEqual({ kind: 'landed', focusUnread: { shows: 5 } });
+      const focusUnread = landing?.kind === 'landed' ? landing.focusUnread : undefined;
+      expect(fillReply({ role: 'textfield', typed: 4, readBack: { kind: 'landed' }, focusUnread }, 'id:dial')).toContain('\n⚠ the field shows 5 characters for the 4 typed,');
     });
   });
 
