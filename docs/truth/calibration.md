@@ -9,10 +9,10 @@ open note on the working tree. See the script for the verdicts.
 | 1.1 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 7d9a783 → cb77485 | CALIBRATED, regressed elsewhere: 1 row (recorded) |
 | 1.2 | 2026-10-05-android-floating-gboard-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED (partial: the docked leg of the fix cb77485 was built on (fix/keyboard-aware-scroll, #5's fix): scroll_until judging the screen above the IME's band) |
 | 2 | 2026-10-05-ios-tap-lands-on-soft-keyboard | calibrate | 73eea5f → 6f41787 | CALIBRATED (partial: stage A only) |
-| 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | **NOT-ASKED** (expected CALIBRATED) |
+| 3 | 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element | calibrate | 926b826 → 95f75f4 | CALIBRATED |
 | 4 | 2026-10-08-ios-tap-off-screen-reported-done | calibrate | 2ae8b10 → 1221b0f | CALIBRATED |
 | 5 | 2026-10-08-scroll-until-ignores-android-soft-keyboard | calibrate | 98e49b7 → 9131730 | CALIBRATED |
-| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 48 rows (recorded) |
+| 6 | 2026-10-08-tap-and-scroll-until-ignore-pinned-app-chrome | calibrate | 16ae6bb → 13d68a2 | CALIBRATED, regressed elsewhere: 40 rows (recorded) |
 | 7.1 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | 5cff2ad → 7542021 | CALIBRATED; live ios: CALIBRATED |
 | 7.2 | 2026-10-08-wda-dismissal-shadowed-by-fullscreen-swiftui-toolbar | calibrate | d928789 → c3ebc62 | CALIBRATED; live ios: CALIBRATED-ON-DEFECT |
 | 8.1 | 2026-10-09-android-compose-button-text-refused-as-under-its-own-button | calibrate | dd50327 → cccf6b8 | CALIBRATED |
@@ -31,7 +31,7 @@ open note on the working tree. See the script for the verdicts.
 | 19.2 | 2026-10-09-ios-wda-childless-toolbar-refuses-keyboard-dismissal | calibrate | c11d179 → cd4d177 | STILL-RED-AFTER |
 | 20 | 2026-10-09-wda-offscreen-cell-text-parked-at-sheet-origin-reads-visible | calibrate | 7566443 → 83e282a | CALIBRATED (partial: R-off only), regressed elsewhere: 1 row (recorded) |
 | 21 | 2026-10-10-android-tap-and-scroll-until-treat-the-system-status-bar-as-app-screen | calibrate | 0cb8b62 → 5e47ff4 | CALIBRATED |
-| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | **NOT-ASKED** (expected CALIBRATED-ON-DEFECT) (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts), regressed elsewhere: 6 rows (recorded) |
+| 22 | 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element | calibrate | ad7ed11 → 596a379 | CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts), regressed elsewhere: 8 rows (recorded) |
 | 23 | 2026-10-12-android-pixel-asserts-read-a-text-cut-at-the-navigation-bar | calibrate | 94bae14 → e85bcdf | CALIBRATED (partial: the band's pixel half: a text across the gesture navigation band (text-nav-cut's T), its colour assert) |
 | 24 | 2026-10-13-android-fab-host-layer-refuses-taps-beside-the-fab | residual:accepted (round 13: the FAB host layer is a cover) | — | — |
 | 25 | 2026-10-13-ios-idb-quicktype-bar-lies-above-the-keyboard-band-and-is-tapped | residual:ADR 0007 (idb's QuickType bar) | — | — |
@@ -48,7 +48,7 @@ open note on the working tree. See the script for the verdicts.
 | 36 | 2026-08-26-ios-ocr-crop-scale | needs-ocr | — | — |
 | FE1 | 2026-10-14-ios-field-error-with-its-own-identifier-is-never-paired-with-its-field | calibrate | e1384aa → 7566443 | CALIBRATED |
 | FE2 | 2026-10-14-ios-field-errors-pair-a-shared-component-id-with-the-next-fields-title | calibrate | d407256 → dfe63da | CALIBRATED |
-| TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | **NOT-ASKED** (expected CALIBRATED) |
+| TX1 | 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight | calibrate | 92f2a46 → 35321b4 | CALIBRATED |
 | L1.1 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | calibrate | b71cbbb → d43df5d | CALIBRATED (partial: AlertDialog and half-expanded sheet; the fully expanded sheet (form-picker), ADR 0018's residual 18, by the second pair (the window manager's word, round 1023b) for its three taps; its three scroll_until rows stay filed as that residual (narrowed: the strokes on the sheet's own list)) |
 | L1.2 | 2026-10-15-lab-android-scroll-until-strokes-the-presented-layer-over-its-target | calibrate | 103c405 → 64e0cb7 | CALIBRATED |
 | L2 | 2026-10-15-lab-ios-idb-pinned-safe-area-bar-is-no-cover-tap-submits-the-form | calibrate | 6f3a633 → 837ec3e | CALIBRATED; live ios: CALIBRATED |
@@ -64,15 +64,14 @@ open note on the working tree. See the script for the verdicts.
 | B4-L1 | 2026-10-16-lab-android-fully-calls-a-row-under-a-pinned-button-fully-visible | calibrate | 706dfae → 151b2ca | CALIBRATED |
 | F2A1 | 2026-10-16-lab-android-scroll-until-calls-a-field-under-the-ime-riding-bar-visible | calibrate | b71cbbb → 6d8f8de | CALIBRATED |
 | FU1 | 2026-10-16-lab-android-scroll-until-refuses-the-submit-between-a-floating-keyboard-and-its-strip | calibrate | 9aee4db → 760dade | CALIBRATED |
-| OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | calibrate | 3d668f1 → 9837ef6 | **NOT-ASKED** (expected CALIBRATED) |
-| OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | calibrate | 9837ef6 → cb0b7ac | **NOT-ASKED** (expected CALIBRATED) |
+| OC1 | 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters | calibrate | 3d668f1 → 9837ef6 | CALIBRATED |
+| OC2 | 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing | calibrate | 9837ef6 → cb0b7ac | CALIBRATED |
 | NI1 | 2026-10-16-lab-ios-idb-lists-uikit-table-rows-without-their-identifier | calibrate | a0463c6 → 75d6c07 | CALIBRATED |
 | LW1.1 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 054a59f → f924893 | CALIBRATED |
 | LW1.2 | 2026-10-19-lab-android-views-bottom-sheet-dialog-is-no-presented-window-scroll-until-strokes-its-scrim-and-dismisses-it | calibrate | 103c405 → b584755 | CALIBRATED |
-| LR1 | 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label | calibrate | 565bcb9 → f3a7043 | **NOT-ASKED** (expected CALIBRATED) |
+| LR1 | 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
 | LR3 | 2026-10-19-lab-ios-wda-lists-react-native-views-by-their-frames-top-not-in-draw-order | calibrate | c4853bb → 1390816 | CALIBRATED |
-| LR2 | 2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it | calibrate | 565bcb9 → f3a7043 | **NOT-ASKED** (expected CALIBRATED) |
-| LR4 | 2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured | open | working tree | OPEN-RED |
+| LR2 | 2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it | calibrate | 565bcb9 → f3a7043 | CALIBRATED |
 
 ## 1.1: CALIBRATED
 
@@ -153,7 +152,7 @@ Regressions recorded:
 
 Stage A (6f41787) only; stage B (0036762, the keyboardDismiss list) needs a config variant. The same fields' scroll_until rows stay red here: they are #5's (iOS leg, 9131730).
 
-## 3: NOT-ASKED
+## 3: CALIBRATED
 
 2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md — defect: `^passed on|^measured the layer over the target as the target`
 
@@ -162,13 +161,13 @@ Stage A (6f41787) only; stage B (0036762, the keyboardDismiss list) needs a conf
   - RED android-averi_lab-api33/form-keyboard.xml ks colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard.ks" fill within dE00 8 of #FFFFFF — sampled #FAFAFB (dominant, 95% of region) vs expected #FFFFFF → dE00 1.12 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/form-keyboard.xml ss colour — passed on #FFFFFF, the keyboard's: PASS  element id:"lab.form-keyboard.ss" fill within dE00 8 of #FFFFFF — sampled #FBFBFC (dominant, 95% of region) vs expected #FFFFFF → dE00 0.95 ≤ 8; scale 1.000
   - RED android-averi_lab-api33/form-keyboard.xml note colour — passed on #F0F0F3, the keyboard's: PASS  element id:"lab.form-keyboard.note" fill within dE00 8 of #F0F0F3 — sampled #F6F6F7 (dominant, 87% of region) vs expected #F0F0F3 → dE00 1.60 ≤ 8; scale 1.000
-  - ok android-averi_lab-api33/form-keyboard.xml ks ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED android-averi_lab-api33/form-keyboard.xml ks ocr — measured the layer over the target as the target: FAIL  element id:"lab.form-keyboard.ks" renders text "Constant symbol" — read "d f a S"; vs expected "Constant symbol" ≠
 - after 95f75f4:
   - ok android-averi_lab-api33/form-keyboard.xml vs colour — FAIL  element id:"lab.form-keyboard.vs" fill within dE00 8 of #F0F0F3 — the soft keyboard covers the element (element 55,1462 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
   - ok android-averi_lab-api33/form-keyboard.xml ks colour — FAIL  element id:"lab.form-keyboard.ks" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1644 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
   - ok android-averi_lab-api33/form-keyboard.xml ss colour — FAIL  element id:"lab.form-keyboard.ss" fill within dE00 8 of #FFFFFF — the soft keyboard covers the element (element 55,1826 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or 
   - ok android-averi_lab-api33/form-keyboard.xml note colour — FAIL  element id:"lab.form-keyboard.note" fill within dE00 8 of #F0F0F3 — the soft keyboard covers the element (element 55,2008 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, o
-  - ok android-averi_lab-api33/form-keyboard.xml ks ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok android-averi_lab-api33/form-keyboard.xml ks ocr — FAIL  element id:"lab.form-keyboard.ks" renders text "Constant symbol" — the soft keyboard covers the element (element 55,1644 970x132, keyboard 0,1398 1080x822) — dismiss it (e.g. `dismissKeyboard: true` on the fill, or
 
 Each field under the docked IME asked for the colour the screenshot shows over it (ControlTruth.seen: the keyboard's #F0F0F3 / #FFFFFF): at 926b826 every one PASSes, measuring the keyboard (sampled #F8F8F9, 98 % of the region, for vs); at 95f75f4 each fails closed naming the soft keyboard over the element. The OCR half (phase 4, golden-spec/text.ts#ocrFailsClosed, judged on the real pixels by the host's recognizer — NOT-ASKED where it has none, golden.ts#ocrAvailability): each field asked `ocr` for its own copy (its title); at 926b826 ks reads the keyboard's keys (`read "d f a S"`) as the field's text — the note's `read "123"` — and at 95f75f4 fails closed naming the soft keyboard. vs, ss and note are not named: at 926b826 the recognizer reads nothing in their rects (`read no text …; failing closed`), the right class by chance, so their rows are green on both sides.
 
@@ -245,14 +244,6 @@ Regressed elsewhere at 13d68a2 (green at 16ae6bb):
   - RED android-rn-averi_lab-api33/rn-field.xml N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-field.N.field (177,363 726x55) at its centre (305,391), drawn over it — 10% of i
   - RED android-rn-averi_lab-api33/rn-field.xml M tap — not tapped: ERROR text:"Message for the recipient" is under textfield id:lab.rn-field.M.field (177,1353 726x55) at its centre (415,1381), drawn over it; only a 475x3 part of it shows, under the 65x65 a tap may be
   - RED android-rn-averi_lab-api33/rn-field.xml M scroll_until — stopped: ERROR scroll_until text:"Message for the recipient" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-field.M.field (177,1353 726x55) at its centre (415,1381), drawn ove
-  - RED android-rn-averi_lab-api33/rn-format-eager.xml E tap — not tapped: ERROR text:"IBAN" is under textfield id:lab.rn-format-eager.E.field (177,363 726x55) at its centre (224,391), drawn over it; only a 94x3 part of it shows, under the 65x65 a tap may be moved to — scrol
-  - RED android-rn-averi_lab-api33/rn-format-eager.xml E scroll_until — stopped: ERROR scroll_until text:"IBAN" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-format-eager.E.field (177,363 726x55) at its centre (224,391), drawn over it — 10% of it
-  - RED android-rn-averi_lab-api33/rn-format-eager.xml P tap — not tapped: ERROR text:"Phone" is under textfield id:lab.rn-format-eager.P.field (177,858 726x55) at its centre (237,886), drawn over it; only a 119x3 part of it shows, under the 65x65 a tap may be moved to — scr
-  - RED android-rn-averi_lab-api33/rn-format-eager.xml P scroll_until — stopped: ERROR scroll_until text:"Phone" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-format-eager.P.field (177,858 726x55) at its centre (237,886), drawn over it — 10% of i
-  - RED android-rn-averi_lab-api33/rn-format.xml G tap — not tapped: ERROR text:"IBAN" is under textfield id:lab.rn-format.G.field (177,363 726x55) at its centre (224,391), drawn over it; only a 94x3 part of it shows, under the 65x65 a tap may be moved to — scroll_unti
-  - RED android-rn-averi_lab-api33/rn-format.xml G scroll_until — stopped: ERROR scroll_until text:"IBAN" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-format.G.field (177,363 726x55) at its centre (224,391), drawn over it — 10% of it shows
-  - RED android-rn-averi_lab-api33/rn-format.xml A tap — not tapped: ERROR text:"Amount" is under textfield id:lab.rn-format.A.field (177,858 726x55) at its centre (251,886), drawn over it; only a 148x3 part of it shows, under the 65x65 a tap may be moved to — scroll_u
-  - RED android-rn-averi_lab-api33/rn-format.xml A scroll_until — stopped: ERROR scroll_until text:"Amount" failed after 2 swipes — element is in the viewport but under textfield id:lab.rn-format.A.field (177,858 726x55) at its centre (251,886), drawn over it — 10% of it sho
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W tap — not tapped: ERROR id:"lab.blur-menu-grouped.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_unt
   - RED ios-iphone17-ios27/blur-menu-grouped.idb.json W scroll_until — stopped: ERROR scroll_until id:"lab.blur-menu-grouped.W" failed after 2 swipes — element is in the viewport but under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it — 34% of it shows 
   - RED ios-iphone17-ios27/blur-menu-stacked.idb.json W tap — not tapped: ERROR id:"lab.blur-menu-stacked.W" is under button "Target C" (51,470 300x64) at its centre (201,480), drawn over it; only a 300x22 part of it shows, under the 24x24 a tap may be moved to — scroll_unt
@@ -295,7 +286,6 @@ Regressions recorded:
 - android-averi_lab-api33/fab.xml L tap, android-averi_lab-api33/fab.xml L scroll_until, android-averi_lab-api33/fab.xml K tap, android-averi_lab-api33/fab.xml K scroll_until: broke at 13d68a2, not fixed — pinned app chrome became a cover: the FAB host, a cover by the accepted round-13 reading (#24, residual), refuses the targets beside the FAB
 - ios-iphone17-ios27/tabbar-hidden-push.wda.json C scroll_until, ios-iphone17-ios27/tabbar-hidden-push.wda.json C tap: broke at 13d68a2, fixed at 83e282a — pinned app chrome became a cover: WDA's hidden host tab bar (#26) stops the plain stop, and moves C's tap 20 pt off its probe point to 'the uncovered part' (red on the open row's tap at its probe point since phase 3 round 3), until ADR 0019's hidden subtree
 - android-rn-averi_lab-api33/rn-field.xml N tap, android-rn-averi_lab-api33/rn-field.xml N scroll_until, android-rn-averi_lab-api33/rn-field.xml M tap, android-rn-averi_lab-api33/rn-field.xml M scroll_until: broke at 13d68a2, fixed at ce19c23 — the cover judgement 13d68a2 introduced reads a React Native field's floating label, overhanging its EditText by 3 px past the 2-px own-label allowance, as under its own field (green at 16ae6bb: round 7's RN corpus, captured after the fact, shows it) — lab note LR2 (docs/bugs/2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md), fixed by A8's ce19c23 (the overhang half a percent of the screen's shorter side, 5 px here), f3a7043 keeping it green
-- android-rn-averi_lab-api33/rn-format.xml G tap, android-rn-averi_lab-api33/rn-format.xml G scroll_until, android-rn-averi_lab-api33/rn-format.xml A tap, android-rn-averi_lab-api33/rn-format.xml A scroll_until, android-rn-averi_lab-api33/rn-format-eager.xml E tap, android-rn-averi_lab-api33/rn-format-eager.xml E scroll_until, android-rn-averi_lab-api33/rn-format-eager.xml P tap, android-rn-averi_lab-api33/rn-format-eager.xml P scroll_until: broke at 13d68a2, fixed at ce19c23 — rn-field's shape (LR2) in the two RN format cells, captured after the last full calibrate: a React Native field's floating label overhanging its EditText read as under its own field by 13d68a2's cover judgement (green at 16ae6bb), fixed by A8's ce19c23, f3a7043 keeping it green — rn-format captured by D18 (e5e70767, 2026-10-31), rn-format-eager by T6 (2026-11-09); found by T6's full calibrate and checked by golden --side --only rn-format,rn-format-eager: red at ce19c23^ (565bcb9), green at ce19c23 and f3a7043
 - ios-rn-iphone17-ios27/rn-field.wda.json N tap, ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until, ios-rn-iphone17-ios27/rn-field.wda.json M tap, ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until: broke at 13d68a2, fixed at ce19c23 — the cover judgement 13d68a2 introduced reads WDA's RN text input, listed inside an unnamed wrapper of its own rect, as a cover of its own floating label (M's under the field's horizontal scroll bar until 81a7d62, then under its field) — green at 16ae6bb; lab note LR1 (docs/bugs/2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md), fixed by A8's ce19c23 (the field's outermost self is the label's sibling), f3a7043 keeping it green
 - ios-rn-iphone17-ios27/rn-field.idb.json N tap, ios-rn-iphone17-ios27/rn-field.idb.json N scroll_until: broke at 13d68a2, fixed at 8c0fb41 — the same cover judgement on idb's flat list: N's label read as under its own field (green at 16ae6bb), green again from 8c0fb41 (fix/r6-ios-top) — first-parent bisect over round 7's RN corpus: red at b75b8b5 … dff7381, green at 8c0fb41 and every merge after; no note (the RN corpus did not exist then), LR1/LR2's rows on the other sources fixed by ce19c23 + f3a7043
 - ios-iphone17-ios27/chooser-over-list.idb.json O tap, ios-iphone17-ios27/chooser-over-list.idb.json O scroll_until, ios-iphone17-ios27/chooser-over-list.idb.json S tap, ios-iphone17-ios27/chooser-over-list.idb.json S scroll_until: broke at 13d68a2, fixed at 8a55d2b — round 16's chooser-over-list (mp-native's chooser rebuilt): the cover judgement 13d68a2 introduced reads the card's rows as under the list listed after them (O under the date header, S under R; green at 16ae6bb) — the shape of mp-native's founding capture; green again at 8a55d2b, ADR 0015's reading-order break (red at its first parent 20053ae, golden --side); S red again from LE2's rest (19525e2), the accepted residual (#LE2)
@@ -486,10 +476,10 @@ presented/blur-menu-grouped: the menu card and the screen beneath it each an acc
   - RED ios-iphone17-ios27/form-keyboard.idb.json ss scroll_until — touched down under the keyboard at (201,699) (201,699): ERROR scroll_until id:"lab.form-keyboard.ss" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never
   - RED ios-iphone17-ios27/form-keyboard.idb.json note scroll_until — touched down under the keyboard at (201,699) (201,699): ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element nev
 - after f4ff4be:
-  - RED ios-iphone17-ios27/form-keyboard.idb.json vs scroll_until — not found, without naming idb's reasons and the soft keyboard: ERROR scroll_until id:"lab.form-keyboard.vs" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element ne
-  - RED ios-iphone17-ios27/form-keyboard.idb.json ks scroll_until — not found, without naming idb's reasons and the soft keyboard: ERROR scroll_until id:"lab.form-keyboard.ks" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element ne
-  - RED ios-iphone17-ios27/form-keyboard.idb.json ss scroll_until — not found, without naming idb's reasons and the soft keyboard: ERROR scroll_until id:"lab.form-keyboard.ss" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element ne
-  - RED ios-iphone17-ios27/form-keyboard.idb.json note scroll_until — not found, without naming idb's reasons and the soft keyboard: ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element 
+  - RED ios-iphone17-ios27/form-keyboard.idb.json vs scroll_until — not in the tree: ERROR scroll_until id:"lab.form-keyboard.vs" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never
+  - RED ios-iphone17-ios27/form-keyboard.idb.json ks scroll_until — not in the tree: ERROR scroll_until id:"lab.form-keyboard.ks" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never
+  - RED ios-iphone17-ios27/form-keyboard.idb.json ss scroll_until — not in the tree: ERROR scroll_until id:"lab.form-keyboard.ss" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element never
+  - RED ios-iphone17-ios27/form-keyboard.idb.json note scroll_until — not in the tree: ERROR scroll_until id:"lab.form-keyboard.note" failed after 2 swipes (the last 2, swiping down, did not change the screen: content exhausted, still loading, or the swipes were not taken) — element nev
 
 idb lists nothing under the keyboard, so these rows stay red at every commit (KNOWN, tests/differential/golden/forms.known.ts): before the fix their mismatch is the judge's own "touched down under the keyboard at (201,699)" — the note's defect; after it, the vacuous "not in the tree" with both swipes above the keyboard.
 
@@ -607,7 +597,7 @@ presented/sheet-long-list: a UIKit table of 40 rows in a large sheet; WDA lists 
 
 bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b62 averi has no status band on Android: the tap answers Tapped and the plain stop calls it fully visible after 0 swipes; at 5e47ff4 both refuse, naming the status bar.
 
-## 22: NOT-ASKED (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts)
+## 22: CALIBRATED-ON-DEFECT (partial: the overlay half, the status band and the pinned button (iOS), the colour and the OCR asserts)
 
 2026-10-10-ios-pixel-asserts-sample-the-chrome-over-their-element.md — defect: `measured the layer over the target as the target|^passed on`
 
@@ -620,10 +610,10 @@ bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b6
   - RED ios-iphone17-ios27/bands.wda.json S colour — passed on #E53935: PASS  element id:"lab.bands.S" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 97% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/pinned-bar.idb.json P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 66% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
   - RED ios-iphone17-ios27/pinned-bar.wda.json P colour — passed on #E53935: PASS  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — sampled #E53935 (dominant, 66% of region) vs expected #E53935 → dE00 0.00 ≤ 8; scale 3.000
-  - ok ios-iphone17-ios27/text-under-bar.wda.json S ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-under-bar.idb.json S ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-under-bar.wda.json P ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-under-bar.idb.json P ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED ios-iphone17-ios27/text-under-bar.wda.json S ocr — measured the layer over the target as the target: FAIL  element text:"Zostatok 1 234,56 €" renders text "Zostatok 1 234,56 €" — read "17:02 Zostatok 1 234,56 €"; vs expected "Zostatok 1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-under-bar.idb.json S ocr — measured the layer over the target as the target: FAIL  element text:"Zostatok 1 234,56 €" renders text "Zostatok 1 234,56 €" — read "17:02 Zostatok 1 234,56 €"; vs expected "Zostatok 1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-under-bar.wda.json P ocr — measured the layer over the target as the target: FAIL  element text:"Pokračovať na súhrn" renders text "Pokračovať na súhrn" — read "Continue"; vs expected "Pokračovať na súhrn" ≠
+  - RED ios-iphone17-ios27/text-under-bar.idb.json P ocr — measured the layer over the target as the target: FAIL  element text:"Pokračovať na súhrn" renders text "Pokračovať na súhrn" — read "Continue"; vs expected "Pokračovať na súhrn" ≠
 - after 596a379:
   - RED ios-iphone17-ios27/sheet-medium.wda.json A colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.A" fill within dE00 8 of #B72E2A — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,110 300x64) — the capture would show it, not
   - RED ios-iphone17-ios27/sheet-medium.wda.json B colour — failed without "close it first": FAIL  element id:"lab.sheet-medium.B" fill within dE00 8 of #186DB7 — container "dismiss popup" (-402,-874 1206x2622) is drawn over the element (element 51,290 300x64) — the capture would show it, not
@@ -633,19 +623,21 @@ bands' S lies centred in Android's status band (the app edge to edge). At 0cb8b6
   - ok ios-iphone17-ios27/bands.wda.json S colour — FAIL  element id:"lab.bands.S" fill within dE00 8 of #E53935 — the status bar is drawn over the element (element 51,21 300x20, status bar 0,0 402x62) — the capture would show it, not the element; scroll_until the element
   - ok ios-iphone17-ios27/pinned-bar.idb.json P colour — FAIL  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — button "Continue" (24,768 354x56, reaching 24,768 354x106) is drawn over the element (element 51,728 300x64) — the capture would show it, not the elemen
   - ok ios-iphone17-ios27/pinned-bar.wda.json P colour — FAIL  element id:"lab.pinned-bar.P" fill within dE00 8 of #E53935 — button "Continue" (24,768 354x56) is drawn over the element (element 51,728 300x64) — the capture would show it, not the element; scroll_until the eleme
-  - ok ios-iphone17-ios27/text-under-bar.wda.json S ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-under-bar.idb.json S ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-under-bar.wda.json P ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-under-bar.idb.json P ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok ios-iphone17-ios27/text-under-bar.wda.json S ocr — FAIL  element text:"Zostatok 1 234,56 €" renders text "Zostatok 1 234,56 €" — the status bar is drawn over the element (element 0,21 402x20, status bar 0,0 402x62) — the capture would show it, not the element; scroll_unt
+  - ok ios-iphone17-ios27/text-under-bar.idb.json S ocr — FAIL  element text:"Zostatok 1 234,56 €" renders text "Zostatok 1 234,56 €" — the status bar is drawn over the element (element 0,21 402x20, status bar 0,0 402x62) — the capture would show it, not the element; scroll_unt
+  - ok ios-iphone17-ios27/text-under-bar.wda.json P ocr — FAIL  element text:"Pokračovať na súhrn" renders text "Pokračovať na súhrn" — button "Continue" (24,768 354x56) is drawn over the element (element 51,760 300x64) — the capture would show it, not the element; scroll_until
+  - ok ios-iphone17-ios27/text-under-bar.idb.json P ocr — FAIL  element text:"Pokračovať na súhrn" renders text "Pokračovať na súhrn" — button "Continue" (24,768 354x56, reaching 24,768 354x106) is drawn over the element (element 51,760 300x64) — the capture would show it, not 
 
 Regressed elsewhere at 596a379 (green at ad7ed11):
 
   - RED android-averi_lab-api33/fab.xml L colour — failed: FAIL  element id:"lab.fab.L" fill within dE00 8 of #E53935 — container id:lab.fab.host (0,1758 1080x352) is drawn over the element (element 44,1846 320x176) — the capture would show it, not the elemen
   - RED android-averi_lab-api33/fab.xml K colour — failed: FAIL  element id:"lab.fab.K" fill within dE00 8 of #FB8C00 — container id:lab.fab.host (0,1758 1080x352) is drawn over the element (element 716,1846 320x176) — the capture would show it, not the eleme
+  - RED android-rn-averi_lab-api33/rn-field.xml M ocr — failed: FAIL  element text:"Message for the recipient" renders text "Message for the recipient" — textfield id:lab.rn-field.M.field (177,1353 726x55) is drawn over the element (element 177,1350 475x61) — the 
   - RED ios-iphone17-ios27/blur-menu.idb.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
   - RED ios-iphone17-ios27/blur-menu.wda.json W colour — failed: FAIL  element id:"lab.blur-menu.W" fill within dE00 8 of #00897B — button "Target C" (51,470 300x64) is drawn over the element (element 51,448 300x64) — the capture would show it, not the element; scr
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json B colour — failed: FAIL  element id:"lab.tabbar-hidden-push.B" fill within dE00 8 of #1E88E5 — button "More" (283,754 82x64, reaching 283,741 82x77) is drawn over the element (element 51,698 300x64) — the capture would 
   - RED ios-iphone17-ios27/tabbar-hidden-push.wda.json C colour — failed: FAIL  element id:"lab.tabbar-hidden-push.C" fill within dE00 8 of #43A047 — button "Cards" (201,754 82x64, reaching 201,741 82x77) is drawn over the element (element 51,778 300x64) — the capture would
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json M ocr — failed: FAIL  element text:"Message for the recipient" renders text "Message for the recipient" — textfield id:lab.rn-field.M.field (69,492 264x20) is drawn over the element (element 69,491 175x23) — the capt
 
 Regressions recorded:
 
@@ -1002,30 +994,30 @@ A text field error, not visibility; in the table because the form-errors cell re
 
 form-shared-id: a pristine form whose five fields and their floating titles (each reaching into its field's top) carry one identifier, lab.form-shared-id.component; each field's error assert, asked with the next field's title, passes at d407256 (the title read as its error, under WDA and idb) and fails at dfe63da. The ui_snapshot half (golden-spec/forms.ts#snapshotRow, the `snapshot` verb: the textfield at each field's centre in `ui_snapshot` filtered to the textfields): at d407256 each of those fields reads the next field's title as its `error`, at dfe63da none does. The last field has no title below it: no error row, and its snapshot row is green on both sides (not named). Moved from form-errors' same-identifier rows (name, amount), which every title's own id kept green on both sides (DOES-NOT-FAIL).
 
-## TX1: NOT-ASKED
+## TX1: CALIBRATED
 
 2026-10-15-ocr-assert-fails-on-a-typographic-apostrophe-the-recognizer-reads-as-straight.md — defect: `≠`
 
 - before 92f2a46:
-  - ok ios-iphone17-ios27/own-parts.wda.json N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/own-parts.idb.json N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/own-parts.xml N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.wda.json E ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json E ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/text-sample.xml E ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.wda.json A ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json A ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/text-sample.xml A ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED ios-iphone17-ios27/own-parts.wda.json N ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/own-parts.idb.json N ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED android-averi_lab-api33/own-parts.xml N ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json E ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json E ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED android-averi_lab-api33/text-sample.xml E ocr — read "Payee's name", not the string: FAIL  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json A ocr — read "Prihlasit sa", not the string: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json A ocr — read "Prihlasit sa", not the string: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" ≠
+  - RED android-averi_lab-api33/text-sample.xml A ocr — read "Prihlásit sa", not the string: FAIL  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlásit sa"; vs expected "Prihlásiť sa" ≠
 - after 35321b4:
-  - ok ios-iphone17-ios27/own-parts.wda.json N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/own-parts.idb.json N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/own-parts.xml N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.wda.json E ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json E ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/text-sample.xml E ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.wda.json A ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json A ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/text-sample.xml A ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok ios-iphone17-ios27/own-parts.wda.json N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok ios-iphone17-ios27/own-parts.idb.json N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok android-averi_lab-api33/own-parts.xml N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok ios-iphone17-ios27/text-sample.wda.json E ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok ios-iphone17-ios27/text-sample.idb.json E ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok android-averi_lab-api33/text-sample.xml E ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer reads typographic punctuation as ASCII and drops diacritics)
+  - ok ios-iphone17-ios27/text-sample.wda.json A ocr — PASS  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" = (differs only in á vs a, ť vs t — the recognizer reads typographic punctuation as ASCII and drops diacriti
+  - ok ios-iphone17-ios27/text-sample.idb.json A ocr — PASS  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlasit sa"; vs expected "Prihlásiť sa" = (differs only in á vs a, ť vs t — the recognizer reads typographic punctuation as ASCII and drops diacriti
+  - ok android-averi_lab-api33/text-sample.xml A ocr — PASS  element text:"Prihlásiť sa" renders text "Prihlásiť sa" — read "Prihlásit sa"; vs expected "Prihlásiť sa" = (differs only in ť vs t — the recognizer reads typographic punctuation as ASCII and drops diacritics)
 
 A text note, not visibility (phase 4: OCR on the real pixels, golden-spec/text.ts, by the host's recognizer — NOT-ASKED where it has none, golden.ts#ocrAvailability). own-parts' N draws Payee’s name (U+2019); asked `ocr` for that string the recognizer reads Payee's name: at 92f2a46 the assert fails on the reading (≠), at 35321b4 it passes, naming the fold (’ vs '). text-sample's E draws the same string (16 pt, both platforms), and its A the note's Slovak `Prihlásiť sa`, which the same fix folds (a combining mark off): read `Prihlásit sa`, red at 92f2a46 and green at 35321b4 alike. Its neighbours that the fold does not reach are lab notes OC1 (Ľ read L', ĺ read í) and OC2 (iOS: an NBSP thousands separator read as nothing), fixed in round 14 by one-way readings beside the fold (ADR 0025) and calibrated below.
 
@@ -1349,41 +1341,41 @@ Fixed by round 6's S2, 6d8f8de on arch/r22-f2a1 (ui-tree/standing.ts#cutByLater:
 
 Fixed by round 1023b, 34f82f2 on bugs/r1023b-fu1 (ui-tree/keyboard-cover.ts#panelGap, interact/scroll-read.ts#inGap: a match wholly in the strip between a floating keyboard's panels and its band, stopping cleanly there, is judged there; ADR 0027): the pair is 760dade (the last fix: a gap only from a region admitted whole) and 34f82f2's parent 9aee4db7. Before: refused after two swipes above the panel, `never intersected the 1080x1092 screen above the soft keyboard`; after: `fully visible after 0 swipes`, no stroke. Red since cb77485 (#1's regression elsewhere, recorded there), green at 7d9a783. Live, 2026-10-23 on averi_lab with Gboard floated by hand (region `(359,1269,1040,1912)(0,2088,1080,2220)`): kf1–kf3 ok three runs of three, kf1 and kf2 each quoting the panel over ks (docs/truth/live-android-2026-10-23-floating-gap.md).
 
-## OC1: NOT-ASKED
+## OC1: CALIBRATED
 
 2026-10-16-lab-ocr-assert-fails-on-slovak-l-caron-and-l-acute-the-recognizer-reads-as-other-letters.md — defect: `≠`
 
 - before 3d668f1:
-  - ok ios-iphone17-ios27/text-sample.wda.json B ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.wda.json C ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json B ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json C ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/text-sample.xml B ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/text-sample.xml C ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED ios-iphone17-ios27/text-sample.wda.json B ocr — read "L'ubomír Stastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json C ocr — read "Makčeň, dižeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json B ocr — read "L'ubomír Stastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json C ocr — read "Makčeň, dižeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
+  - RED android-averi_lab-api33/text-sample.xml B ocr — read "L'ubomír Sťastný", not the string: FAIL  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Sťastný"; vs expected "Ľubomír Šťastný" ≠
+  - RED android-averi_lab-api33/text-sample.xml C ocr — read "Mäkčeň, dížeň a vokáň", not the string: FAIL  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Mäkčeň, dížeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" ≠
 - after 9837ef6:
-  - ok ios-iphone17-ios27/text-sample.wda.json B ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.wda.json C ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json B ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json C ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/text-sample.xml B ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok android-averi_lab-api33/text-sample.xml C ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok ios-iphone17-ios27/text-sample.wda.json B ocr — PASS  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" = (differs only in Ľ vs L', Š vs S, ť vs t — the recognizer does not tell a letter from the loo
+  - ok ios-iphone17-ios27/text-sample.wda.json C ocr — PASS  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" = (differs only in ä vs a, ĺ vs i — the recognizer does not tell a lette
+  - ok ios-iphone17-ios27/text-sample.idb.json B ocr — PASS  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Stastný"; vs expected "Ľubomír Šťastný" = (differs only in Ľ vs L', Š vs S, ť vs t — the recognizer does not tell a letter from the loo
+  - ok ios-iphone17-ios27/text-sample.idb.json C ocr — PASS  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Makčeň, dižeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" = (differs only in ä vs a, ĺ vs i — the recognizer does not tell a lette
+  - ok android-averi_lab-api33/text-sample.xml B ocr — PASS  element text:"Ľubomír Šťastný" renders text "Ľubomír Šťastný" — read "L'ubomír Sťastný"; vs expected "Ľubomír Šťastný" = (differs only in Ľ vs L', Š vs S — the recognizer does not tell a letter from the look-alike 
+  - ok android-averi_lab-api33/text-sample.xml C ocr — PASS  element text:"Mäkčeň, dĺžeň a vokáň" renders text "Mäkčeň, dĺžeň a vokáň" — read "Mäkčeň, dížeň a vokáň"; vs expected "Mäkčeň, dĺžeň a vokáň" = (differs only in ĺ vs í — the recognizer does not tell a letter from t
 
 A text note judged on the real pixels by the host's recognizer (NOT-ASKED where it has none, golden.ts#ocrAvailability). Red before the fix (3d668f1, its first parent: the prep that moved the ocr assert onto ocr-fold.ts#readingDifference with no misreading yet): text-sample's B (Ľubomír Šťastný) read L'ubomír Stastný on iOS and L'ubomír Sťastný on Android, C (dĺžeň) read dižeň on iOS and dížeň on Android — ≠. Fixed by round 14's 9837ef6: a letter of the copy may be read as its measured misreadings, one way (ocr-fold.ts MISREADINGS: Ľ ľ ď ť with an apostrophe beside the letter, Ĺ ĺ as Í í; ADR 0025) — all six pass, naming Ľ vs L' and ĺ vs í with the reason the recognizer does not tell a letter from the look-alike it is read as.
 
-## OC2: NOT-ASKED
+## OC2: CALIBRATED
 
 2026-10-16-lab-ios-ocr-assert-fails-on-an-amount-whose-nbsp-thousands-separator-the-recognizer-reads-as-nothing.md — defect: `≠`
 
 - before 9837ef6:
-  - ok ios-iphone17-ios27/text-sample.wda.json H ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.wda.json I ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json H ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json I ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED ios-iphone17-ios27/text-sample.wda.json H ocr — read "1234,56 €", not the string: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-sample.wda.json I ocr — read "-12345,00 EUR", not the string: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json H ocr — read "1234,56 €", not the string: FAIL  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" ≠
+  - RED ios-iphone17-ios27/text-sample.idb.json I ocr — read "-12345,00 EUR", not the string: FAIL  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" ≠
 - after cb0b7ac:
-  - ok ios-iphone17-ios27/text-sample.wda.json H ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.wda.json I ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json H ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
-  - ok ios-iphone17-ios27/text-sample.idb.json I ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok ios-iphone17-ios27/text-sample.wda.json H ocr — PASS  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" = (differs only in 1 234 vs 1234 — the recognizer does not tell a thousands separator between digit groups from no sp
+  - ok ios-iphone17-ios27/text-sample.wda.json I ocr — PASS  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" = (differs only in − vs -, 12 345 vs 12345 — the recognizer does not tell typographic punctuation fro
+  - ok ios-iphone17-ios27/text-sample.idb.json H ocr — PASS  element text:"1 234,56 €" renders text "1 234,56 €" — read "1234,56 €"; vs expected "1 234,56 €" = (differs only in 1 234 vs 1234 — the recognizer does not tell a thousands separator between digit groups from no sp
+  - ok ios-iphone17-ios27/text-sample.idb.json I ocr — PASS  element text:"−12 345,00 EUR" renders text "−12 345,00 EUR" — read "-12345,00 EUR"; vs expected "−12 345,00 EUR" = (differs only in − vs -, 12 345 vs 12345 — the recognizer does not tell typographic punctuation fro
 
 A text note judged on the real pixels by the host's recognizer (NOT-ASKED where it has none, golden.ts#ocrAvailability). Red before the fix (9837ef6, its first parent: OC1's fix, no separator rule yet): on iOS text-sample's H (1 234,56 €, NBSP) read 1234,56 € and I (−12 345,00 EUR, narrow NBSP) read -12345,00 EUR — ≠. Fixed by round 14's cb0b7ac: a space between the groups of a grouped number (ocr-fold.ts GROUPED_NUMBER, \d{1,3}( \d{3})+ wholly, on the copy as compared) may be read as nothing, one way (ADR 0025) — both pass, naming 1 234 vs 1234 and 12 345 vs 12345. Android reads the spaces (H, I green on both sides), and iOS's J (an IBAN in groups of four) is read with them.
 
@@ -1474,24 +1466,24 @@ Fixed by round 7's A7, f924893 on arch/r23-sheet-dialog (adapters/android.ts#pre
 
 2: b3acdeb (bugs/r1023b-r19, ADR 0018's amendment "Android's window by the window manager's word"; open-bugs #17, residual 19 — this note's "The full-screen dialog" section), judged on the full-screen Compose dialog's (dialog-fullscreen) and round 1023b's Views dialog laid full screen (dialog-views-fullscreen, captured at 103c405) taps and scroll_until: at its parent 103c405 the taps time out "to appear" with the active-window hint and scroll_until strokes the dialog twice; at b3acdeb the window manager types the focused window a Dialog's at the root's bounds, asked on the miss, so the taps say the presented remedy and scroll_until stops before any swipe. The colour rows stay KNOWN as no note's (vacuous). Live: the four dialog-fullscreen scroll cases struck off scripts/truth/live-known.ts, the dialog cells ok in three runs of three (docs/truth/live-records/android-vis-r1023b-r19-1…3.json). The pair is 103c405 → b584755 (before given: the review fixes' first parents already hold b3acdeb), b3acdeb's review fixes 59dccf2 and b584755 judged with it (the ask by one door, the frame within a pixel; these rows' replies unchanged).
 
-## LR1: NOT-ASKED
+## LR1: CALIBRATED
 
 2026-10-19-lab-ios-wda-rn-text-input-wrapped-in-its-component-view-reads-as-a-cover-of-its-own-label.md — defect: `^(not tapped|stopped|failed): .*\bunder textfield\b|textfield .* is drawn over the element`
 
 - before 565bcb9:
   - RED ios-rn-iphone17-ios27/rn-field.wda.json N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.rn-field.N.field (69,132 264x20) at its centre (116,143), drawn over it; only a 94x2 part of it shows, under the 24x24 a tap may be moved to — scrol
   - RED ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 3 swipes — element is in the viewport but under textfield id:lab.rn-field.N.field (69,132 264x20) at its centre (116,143), drawn over it — 13% of it
-  - ok ios-rn-iphone17-ios27/rn-field.wda.json N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — textfield id:lab.rn-field.N.field (69,132 264x20) is drawn over the element (element 69,131 94x23) — the capture would show it, not the 
   - RED ios-rn-iphone17-ios27/rn-field.wda.json M tap — not tapped: ERROR text:"Message for the recipient" is under textfield id:lab.rn-field.M.field (69,492 264x20) at its centre (157,503), drawn over it; only a 175x2 part of it shows, under the 24x24 a tap may be mo
   - RED ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until — stopped: ERROR scroll_until text:"Message for the recipient" failed after 3 swipes — element is in the viewport but under textfield id:lab.rn-field.M.field (69,492 264x20) at its centre (157,503), drawn over i
-  - ok ios-rn-iphone17-ios27/rn-field.wda.json M ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED ios-rn-iphone17-ios27/rn-field.wda.json M ocr — failed: FAIL  element text:"Message for the recipient" renders text "Message for the recipient" — textfield id:lab.rn-field.M.field (69,492 264x20) is drawn over the element (element 69,491 175x23) — the capt
 - after f3a7043:
   - ok ios-rn-iphone17-ios27/rn-field.wda.json N tap — Tapped text:"Payee’s name"
   - ok ios-rn-iphone17-ios27/rn-field.wda.json N scroll_until — Element text:"Payee’s name" fully visible after 0 swipes
-  - ok ios-rn-iphone17-ios27/rn-field.wda.json N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok ios-rn-iphone17-ios27/rn-field.wda.json N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer does not tell typographic punctuation from its ASCII look-alike)
   - ok ios-rn-iphone17-ios27/rn-field.wda.json M tap — Tapped text:"Message for the recipient"
   - ok ios-rn-iphone17-ios27/rn-field.wda.json M scroll_until — Element text:"Message for the recipient" fully visible after 0 swipes
-  - ok ios-rn-iphone17-ios27/rn-field.wda.json M ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok ios-rn-iphone17-ios27/rn-field.wda.json M ocr — PASS  element text:"Message for the recipient" renders text "Message for the recipient" — read "Message for the recipient"; vs expected "Message for the recipient" =
 
 Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#outermostSelf — the input and every unnamed `container` of its rect holding it alone are one node to its label, the label's sibling in any parent; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height, so a composer or search field in a screen-sized parent still covers). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes; idb lists the field flat and is green on both sides. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src.
 
@@ -1516,40 +1508,26 @@ Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd
 
 Round 9's react-native cell rn-banner (each target under a later sibling drawn over its centre, `declared: covered`): under WDA and idb every tap Tapped and every colour assert passing on the cover. Fixed under WDA by round 9 (fix/r9-lr3; ADR 0015 amendment 2026-10-25: a sibling listed before the target and drawn there is an untold peer of any target, and a named childless leaf in a WDA run is drawn unless it wraps a sibling): the six WDA rows green, nothing else in the corpus changed. The six idb rows stay red as ADR 0015 residual 4 (idb lists no bare View; T's toast above the flat list's top-bar line reads as the bar).
 
-## LR2: NOT-ASKED
+## LR2: CALIBRATED
 
 2026-10-19-lab-android-rn-label-overhanging-its-edittext-by-3-px-reads-as-covered-by-it.md — defect: `^(not tapped|stopped|failed): .*\bunder textfield\b|textfield .* is drawn over the element`
 
 - before 565bcb9:
   - RED android-rn-averi_lab-api33/rn-field.xml N tap — not tapped: ERROR text:"Payee’s name" is under textfield id:lab.rn-field.N.field (177,363 726x55) at its centre (305,391), drawn over it; only a 255x3 part of it shows, under the 65x65 a tap may be moved to — scr
   - RED android-rn-averi_lab-api33/rn-field.xml N scroll_until — stopped: ERROR scroll_until text:"Payee’s name" failed after 3 swipes — element is in the viewport but under textfield id:lab.rn-field.N.field (177,363 726x55) at its centre (305,391), drawn over it — 10% of i
-  - ok android-rn-averi_lab-api33/rn-field.xml N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED android-rn-averi_lab-api33/rn-field.xml N ocr — failed: FAIL  element text:"Payee’s name" renders text "Payee’s name" — textfield id:lab.rn-field.N.field (177,363 726x55) is drawn over the element (element 177,360 255x61) — the capture would show it, not t
   - RED android-rn-averi_lab-api33/rn-field.xml M tap — not tapped: ERROR text:"Message for the recipient" is under textfield id:lab.rn-field.M.field (177,1353 726x55) at its centre (415,1381), drawn over it; only a 475x3 part of it shows, under the 65x65 a tap may be
   - RED android-rn-averi_lab-api33/rn-field.xml M scroll_until — stopped: ERROR scroll_until text:"Message for the recipient" failed after 3 swipes — element is in the viewport but under textfield id:lab.rn-field.M.field (177,1353 726x55) at its centre (415,1381), drawn ove
-  - ok android-rn-averi_lab-api33/rn-field.xml M ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - RED android-rn-averi_lab-api33/rn-field.xml M ocr — failed: FAIL  element text:"Message for the recipient" renders text "Message for the recipient" — textfield id:lab.rn-field.M.field (177,1353 726x55) is drawn over the element (element 177,1350 475x61) — the 
 - after f3a7043:
   - ok android-rn-averi_lab-api33/rn-field.xml N tap — Tapped text:"Payee’s name"
   - ok android-rn-averi_lab-api33/rn-field.xml N scroll_until — Element text:"Payee’s name" fully visible after 0 swipes
-  - ok android-rn-averi_lab-api33/rn-field.xml N ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok android-rn-averi_lab-api33/rn-field.xml N ocr — PASS  element text:"Payee’s name" renders text "Payee’s name" — read "Payee's name"; vs expected "Payee’s name" = (differs only in ’ vs ' — the recognizer does not tell typographic punctuation from its ASCII look-alike)
   - ok android-rn-averi_lab-api33/rn-field.xml M tap — Tapped text:"Message for the recipient"
   - ok android-rn-averi_lab-api33/rn-field.xml M scroll_until — Element text:"Message for the recipient" fully visible after 0 swipes
-  - ok android-rn-averi_lab-api33/rn-field.xml M ocr — SKIPPED — no OCR on this host: Vision answers nilError (it does not run here: a sandbox)
+  - ok android-rn-averi_lab-api33/rn-field.xml M ocr — PASS  element text:"Message for the recipient" renders text "Message for the recipient" — read "Message for the recipient"; vs expected "Message for the recipient" =
 
 Fixed by round 7's A8 on arch/r23-rn-label, merged into arch/round-23 as bf0becd: ce19c23 (src/ui-tree/draw-order.ts#labelOverhang — the own-label overhang is 2 pt or dp, half a percent of the screen's shorter side: 5 px on averi_lab, where RN's 1-dp overhang is 3 px; the field shape no longer asks its parent's size; docs/adr/0014-a-text-input-is-no-cover-of-its-own-label.md, refinement 2026-10-19) and f3a7043 (the label must span the field's height). The pair is the parent of ce19c23, round 6's src 565bcb9, and f3a7043. Before: N's and M's label refused as under textfield (the tap, scroll_until's stop after 3 swipes, the ocr assert failed closed); after: tapped at the node's centre, reached with no swipe, the ocr passes. The six react-native.known.ts rows struck. #6's fix (13d68a2) and #22's (596a379), under which these rows first read red, record them as regressions fixed at ce19c23. Live: LOUD at round 7's first RN run (rn4, tap:rn-field.N, tap:rn-field.M refused: docs/truth/live-rn-2026-10-19.md); the live-known entries stay until the final device check runs the RN group at the merged src.
-
-## LR4: OPEN-RED
-
-2026-11-09-lab-android-uiautomator-lists-a-react-native-cover-before-its-target-so-it-is-tapped-and-measured.md — defect: `^(Tapped|passed on #263238): `
-
-- working tree:
-  - RED android-rn-averi_lab-api33/rn-banner.xml T tap — Tapped: Tapped id:"lab.rn-banner.T"
-  - RED android-rn-averi_lab-api33/rn-banner.xml T colour — passed on #263238: it measured the cover over the target as the target
-  - RED android-rn-averi_lab-api33/rn-banner.xml U tap — Tapped: Tapped id:"lab.rn-banner.U"
-  - RED android-rn-averi_lab-api33/rn-banner.xml U colour — passed on #263238: it measured the cover over the target as the target
-  - RED android-rn-averi_lab-api33/rn-banner.xml C tap — Tapped: Tapped id:"lab.rn-banner.C"
-  - RED android-rn-averi_lab-api33/rn-banner.xml C colour — passed on #263238: it measured the cover over the target as the target
-
-T6's Android capture of rn-banner (2026-11-09, averi_lab API 33): uiautomator lists each cover before its target, though React Native draws it over — C's too, whose frame starts below its target's — so every tap is Tapped and every colour assert passes on the cover #263238 (LR3's Android twin; backlog D75).
 
 ## Not reproducible with the existing cells
 
