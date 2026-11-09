@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Case } from '../../scripts/truth/live-cases.js';
-import type { FocusRead } from '../../scripts/truth/live-chooser.js';
+import type { FocusRead } from '../../scripts/truth/lab-device.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
 import { runCase, type CaseRig } from '../../scripts/truth/run-case.js';
 import type { LabState } from '../../scripts/truth/schema.js';
@@ -366,12 +366,22 @@ describe('runCase: the focus reads and the launcher start (the chooser group, T7
     expect(notes).toEqual(['uiautomator x1: the chooser is still in front after one BACK (android/com.android.internal.app.ResolverActivity)']);
   });
 
-  it('fromLauncher: the lab sent to the launcher after the launch, before the first focus read and the calls', async () => {
-    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [HOME, LAB] });
-    const run = await runCase(aCase({ fromLauncher: true, reads: { focus: true, late: false } }), 'uiautomator', rigOver(lab));
+  it('fromLauncher: the lab sent to the launcher after the launch, before the first focus read and the calls; the HOME read it answers kept first in the focus reads', async () => {
+    const home = { resolved: 'priority=0\nlauncher/.Home\n' };
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [HOME, LAB], home });
+    let logged: unknown;
+    const run = await runCase(aCase({ fromLauncher: true, reads: { focus: true, late: false }, judge: (_s, _r, _so, _l, _a, log) => ((logged = log), OK) }), 'uiautomator', rigOver(lab));
     expect(lab.log).toEqual(['launch c', 'toLauncher', 'focus', 'call tap under uiautomator-x1.yaml', 'pause 800', 'state', 'focus']);
     expect(run.record.launched).toEqual(read('launch'));
-    expect(run.record.focus?.before).toEqual(HOME);
+    expect(run.record.focus).toEqual({ home, before: HOME, between: [], after: LAB });
+    expect(Object.keys(run.record.focus!)).toEqual(['home', 'before', 'between', 'after']);
+    expect(logged).toEqual({ focus: { home, before: HOME, between: [], after: LAB } });
+  });
+
+  it('no launcher start: no HOME read in the focus reads', async () => {
+    const lab = new FakeAndroidLab({ launched: read('launch'), states: [read('final')], focus: [LAB] });
+    const run = await runCase(aCase({ reads: { focus: true, late: false } }), 'uiautomator', rigOver(lab));
+    expect(run.record.focus).not.toHaveProperty('home');
   });
 
   it('fromLauncher or focus on a lab with neither (iOS): SKIP, the launch done, no call', async () => {

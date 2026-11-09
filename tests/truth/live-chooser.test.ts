@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { AppHolder } from '../../src/adapters/types.js';
 import { appHolderText } from '../../src/interact/app-holder-text.js';
 import { deepLinkText, launchText } from '../../src/mcp/tool-text.js';
-import { CHOOSER_CASES, frontOf, isChooser, type FocusRead, type FocusReads } from '../../scripts/truth/live-chooser.js';
+import type { FocusRead } from '../../scripts/truth/lab-device.js';
+import { CHOOSER_CASES, chooserInFront, frontOf, homeOf, isChooser, type FocusReads } from '../../scripts/truth/live-chooser.js';
 import type { LiveVerdict } from '../../scripts/truth/live-visibility.js';
 import type { LabState } from '../../scripts/truth/schema.js';
 
@@ -25,17 +26,29 @@ const AT_LAUNCHER: FocusRead = { window: windowOf(LAUNCHER), activities: hist(LA
 /** Recorded: the lab's cell launched (`am start -W -n …/.MainActivity`), one record of it over the launcher's. */
 const AT_LAB: FocusRead = { window: windowOf(MAIN), activities: hist(MAIN, 6235) + hist(LAUNCHER, 4862, '      ') };
 /** Recorded: `am start -p dev.averi.lab -a VIEW -d averilab://shared/x` over the lab: the chooser in front, in a task of its own. */
+/** Recorded (T7b's first run, lc4''): the window mid-transition, `mCurrentFocus=null`, `component` already mFocusedApp. */
+const UNSETTLED = (component: string) => `  mCurrentFocus=null\n  mFocusedApp=ActivityRecord{d0a6cbc u0 ${component}} t6245}\n`;
 const AT_CHOOSER: FocusRead = { window: windowOf(RESOLVER, RESOLVER), activities: hist(RESOLVER, 6236) + hist(MAIN, 6235) + hist(LAUNCHER, 4862, '      ') };
 
 describe('frontOf: what one read says is in front, and on the stack', () => {
   it('the focused activity and every record, top first, as the device prints them', () => {
-    expect(frontOf(AT_CHOOSER)).toEqual({ focused: RESOLVER, records: [RESOLVER, MAIN, LAUNCHER] });
-    expect(frontOf(AT_LAB)).toEqual({ focused: MAIN, records: [MAIN, LAUNCHER] });
-    expect(frontOf(AT_LAUNCHER)).toEqual({ focused: LAUNCHER, records: [LAUNCHER] });
+    expect(frontOf(AT_CHOOSER)).toEqual({ focused: RESOLVER, current: RESOLVER, settled: true, records: [RESOLVER, MAIN, LAUNCHER] });
+    expect(frontOf(AT_LAB)).toEqual({ focused: MAIN, current: MAIN, settled: true, records: [MAIN, LAUNCHER] });
+    expect(frontOf(AT_LAUNCHER)).toEqual({ focused: LAUNCHER, current: LAUNCHER, settled: true, records: [LAUNCHER] });
+  });
+
+  it('a read that waited: `focused` is the first window read\'s (what the device showed when averi replied), `current` the settled one\'s', () => {
+    expect(frontOf({ ...AT_LAB, firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 })).toEqual({ focused: LAUNCHER, current: MAIN, settled: true, records: [MAIN, LAUNCHER] });
+    expect(frontOf({ ...AT_LAB, firstWindow: '  mCurrentFocus=null\n', waitedMs: 300 })).toEqual({ why: 'the first focus read holds no mFocusedApp line' });
+  });
+
+  it('a window still mid-transition (`mCurrentFocus=null`) is not settled, waited for or not', () => {
+    expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1) })).toEqual({ focused: MAIN, current: MAIN, settled: false, records: [MAIN] });
+    expect(frontOf({ window: UNSETTLED(MAIN), activities: hist(MAIN, 1), firstWindow: UNSETTLED(MAIN), waitedMs: 5_000 })).toMatchObject({ settled: false });
   });
 
   it("API 36's shape, the task after a space: the component ends there", () => {
-    expect(frontOf({ window: `  mFocusedApp=ActivityRecord{1 u0 ${LAUNCHER} t2}\n`, activities: `  * Hist  #0: ActivityRecord{1 u0 ${LAUNCHER} t2}\n` })).toEqual({ focused: LAUNCHER, records: [LAUNCHER] });
+    expect(frontOf({ window: `  mFocusedApp=ActivityRecord{1 u0 ${LAUNCHER} t2}\n`, activities: `  * Hist  #0: ActivityRecord{1 u0 ${LAUNCHER} t2}\n` })).toEqual({ focused: LAUNCHER, current: LAUNCHER, settled: true, records: [LAUNCHER] });
   });
 
   it('a read that failed, or one with no mFocusedApp line, is unread with why — never "nothing in front"', () => {
@@ -56,6 +69,20 @@ describe('frontOf: what one read says is in front, and on the stack', () => {
     expect(isChooser(MAIN)).toBe(false);
     expect(isChooser(undefined)).toBe(false);
   });
+
+  it('chooserInFront: the chooser the settled read has focused, else none (an unread read, a record below, a chooser only in the first read)', () => {
+    expect(chooserInFront(AT_CHOOSER)).toBe(RESOLVER);
+    expect(chooserInFront(AT_LAB)).toBeUndefined();
+    expect(chooserInFront({ window: windowOf(MAIN), activities: hist(MAIN, 1) + hist(RESOLVER, 2) })).toBeUndefined();
+    expect(chooserInFront({ ...AT_LAB, firstWindow: UNSETTLED(RESOLVER), waitedMs: 300 })).toBeUndefined();
+    expect(chooserInFront({ error: 'offline' })).toBeUndefined();
+  });
+
+  it('homeOf: the HOME activity `cmd package resolve-activity --brief` names on its last line (recorded), else unread with why', () => {
+    expect(homeOf({ resolved: `priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n${LAUNCHER}\n` })).toBe(LAUNCHER);
+    expect(homeOf({ error: 'offline' })).toEqual({ why: 'the HOME activity read failed: offline' });
+    expect(homeOf({ resolved: 'No activity found\n' })).toEqual({ why: 'the HOME activity read names no component: No activity found' });
+  });
 });
 
 // --- the judges, each over recorded reads: what passes, and the regression each one is there to catch ---
@@ -68,6 +95,8 @@ const launched = (app: string, answer: AppHolder = { holder: 'none' }) => launch
 const linked = (url: string, answer: AppHolder) => deepLinkText('android', url, answer);
 const REFUSED = 'ERROR monkey started nothing in dev.averi.lab — check that dev.averi.lab is installed … ** SYS_KEYS has no physical keys but with factor 2.0%.';
 
+const NEVER_SETTLED: LiveVerdict = { outcome: 'SKIP', why: 'the read after the calls never settled (mCurrentFocus=null): whether a chooser is left on the stack is unread' };
+const HOME = { resolved: `priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n${LAUNCHER}\n` };
 const caseOf = (id: string) => CHOOSER_CASES.find((c) => c.id === id)!;
 const judge = (id: string, replies: string[], focus: Partial<FocusReads>, s: LabState = LAUNCHED): LiveVerdict =>
   caseOf(id).judge(s, replies, 'uiautomator', LAUNCHED, [], { focus: { before: AT_LAB, between: [], after: AT_LAB, ...focus } });
@@ -108,6 +137,11 @@ describe('lc1: launch_app with a -p intent two activities answer names the choos
 
   it('MISMATCH: the chooser named with the lab in front', () => {
     expect(judge('lc1', [launched('dev.averi.lab', chooser)], { after: AT_LAB })).toMatchObject({ outcome: 'MISMATCH', why: `averi names the chooser (${RESOLVER}) — ${MAIN} is in front` });
+  });
+
+  it("MISMATCH: a headline that names another app than the lab, in its own words", () => {
+    const other = `Launched com.other on android\n⚠ ${appHolderText({ app: 'com.other' }, chooser)}`;
+    expect(judge('lc1', [other], { after: AT_CHOOSER })).toEqual({ outcome: 'MISMATCH', why: 'averi\'s headline names com.other, not dev.averi.lab: "Launched com.other on android"' });
   });
 
   it('MISMATCH: another component named than the one in front', () => {
@@ -172,6 +206,10 @@ describe('lc3: launch_app naming .Twin with the same intent: no chooser, no note
     expect(judge('lc3', [launched('dev.averi.lab/.Twin', chooser)], { after: AT_LAB }).outcome).toBe('MISMATCH');
   });
 
+  it('SKIP: the read after the call never settled, so whether a chooser is on the stack is unread', () => {
+    expect(judge('lc3', [launched('dev.averi.lab/.Twin')], { after: { window: UNSETTLED(MAIN), activities: hist(MAIN, 1), firstWindow: UNSETTLED(MAIN), waitedMs: 5_000 } })).toEqual(NEVER_SETTLED);
+  });
+
   it('MISMATCH: two starts — two more records of the lab than before', () => {
     const twice: FocusRead = { window: windowOf(MAIN), activities: hist(MAIN, 6235) + hist(MAIN, 6235) + hist(MAIN, 6235) + hist(LAUNCHER, 4862) };
     expect(judge('lc3', [launched('dev.averi.lab/.Twin')], { after: twice })).toEqual({ outcome: 'MISMATCH', why: 'averi says "Launched dev.averi.lab/.Twin on android" — the lab has 3 activity records, 1 before the call: more than one start' });
@@ -187,7 +225,7 @@ describe('lc3: launch_app naming .Twin with the same intent: no chooser, no note
 });
 
 describe("lc4': launch_app with no activity, from the launcher (monkey): Launched, the app in front", () => {
-  const fromLauncher = { before: AT_LAUNCHER };
+  const fromLauncher = { before: AT_LAUNCHER, home: HOME };
   it('ok: a bare Launched, the lab\'s .MainActivity focused, no chooser', () => {
     expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: AT_LAB }, state(''))).toMatchObject({ outcome: 'ok' });
   });
@@ -198,19 +236,43 @@ describe("lc4': launch_app with no activity, from the launcher (monkey): Launche
 
   it('MISMATCH: Launched with the launcher still in front, or with a ⚠ line', () => {
     const twin: FocusRead = { window: windowOf('dev.averi.lab/.Twin'), activities: hist('dev.averi.lab/.Twin', 1) };
-    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: twin })).toEqual({ outcome: 'MISMATCH', why: `averi says "Launched dev.averi.lab on android" — dev.averi.lab/.Twin is in front, not ${MAIN}` });
+    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: twin })).toEqual({ outcome: 'MISMATCH', why: `averi says "Launched dev.averi.lab on android" — dev.averi.lab/.Twin was mFocusedApp at the first read after it, not ${MAIN}` });
     expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: AT_LAUNCHER }).outcome).toBe('MISMATCH');
     expect(judge("lc4'", [launched('dev.averi.lab', chooser)], { ...fromLauncher, after: AT_LAB }).outcome).toBe('MISMATCH');
   });
 
-  it('SKIP: the lab in front before the calls, not the launcher', () => {
-    expect(judge("lc4'", [launched('dev.averi.lab')], { before: AT_LAB, after: AT_LAB })).toEqual({ outcome: 'SKIP', why: `not started from the launcher: ${MAIN} was in front before the calls` });
+  it('mFocusedApp is judged on the first read (when averi replied), the stack on the settled one', () => {
+    const late = { ...AT_LAB, firstWindow: UNSETTLED(LAUNCHER), waitedMs: 300 };
+    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: late })).toEqual({ outcome: 'MISMATCH', why: `averi says "Launched dev.averi.lab on android" — ${LAUNCHER} was mFocusedApp at the first read after it, not ${MAIN}` });
+    const settledLater = { ...AT_LAB, firstWindow: UNSETTLED(MAIN), waitedMs: 300 };
+    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: settledLater }, state('')).outcome).toBe('ok');
+    const neverSettled = { window: UNSETTLED(MAIN), activities: hist(MAIN, 1) + hist(RESOLVER, 2) };
+    expect(judge("lc4'", [launched('dev.averi.lab')], { ...fromLauncher, after: neverSettled })).toEqual(NEVER_SETTLED);
+  });
+
+  it('SKIP: not the HOME activity in front before the calls (the lab, another app), or the HOME activity unread', () => {
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: AT_LAB, home: HOME, after: AT_LAB })).toEqual({ outcome: 'SKIP', why: `not started from the launcher: ${MAIN} was in front before the calls, not the HOME activity ${LAUNCHER}` });
+    const settings: FocusRead = { window: windowOf('com.android.settings/.Settings'), activities: hist('com.android.settings/.Settings', 3) + hist(LAUNCHER, 4862) };
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: settings, home: HOME, after: AT_LAB }).outcome).toBe('SKIP');
+    const expanded = { resolved: 'x\ncom.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity\n' };
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: AT_LAUNCHER, home: expanded, after: AT_LAB }, state('')).outcome).toBe('ok');
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: AT_LAUNCHER, home: { error: 'offline' }, after: AT_LAB })).toEqual({ outcome: 'SKIP', why: 'the HOME activity read failed: offline' });
+  });
+
+  it('a record with no HOME read (before the review): at least not the platform in front, and no lab or chooser record', () => {
+    const settings: FocusRead = { window: windowOf('com.android.settings/.Settings'), activities: hist('com.android.settings/.Settings', 3) + hist(LAUNCHER, 4862) };
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: settings, after: AT_LAB }, state('')).outcome).toBe('ok');
+    const platform: FocusRead = { window: windowOf('android/.Something'), activities: hist(LAUNCHER, 4862) };
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: platform, after: AT_LAB })).toEqual({ outcome: 'SKIP', why: 'not started from the launcher: android/.Something was in front before the calls (no HOME activity read: the platform\'s)' });
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: AT_LAB, after: AT_LAB }).outcome).toBe('SKIP');
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: { window: windowOf(LAUNCHER), activities: hist(LAUNCHER, 1) + hist(MAIN, 2) }, after: AT_LAB }).outcome).toBe('SKIP');
+    expect(judge("lc4'", [launched('dev.averi.lab')], { before: { window: windowOf(LAUNCHER), activities: hist(LAUNCHER, 1) + hist(RESOLVER, 2) }, after: AT_LAB }).outcome).toBe('SKIP');
   });
 });
 
 describe("lc4'': open_deep_link's chooser, then launch_app with no activity: Launched, no ResolverActivity left", () => {
   const LINK = 'averilab://shared/open';
-  const over = { before: AT_LAUNCHER, between: [AT_CHOOSER] };
+  const over = { before: AT_LAUNCHER, home: HOME, between: [AT_CHOOSER] };
   it('ok: the link names the chooser, the launch is a bare Launched, the lab focused, no chooser record left', () => {
     expect(judge("lc4''", [linked(LINK, chooser), launched('dev.averi.lab')], { ...over, after: AT_LAB }, state(''))).toMatchObject({ outcome: 'ok' });
   });

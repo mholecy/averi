@@ -1,7 +1,7 @@
-import { type LabDevice, pause as realPause, withMeasuredPanel } from './lab-device.js';
+import { type FocusRead, type HomeRead, type LabDevice, pause as realPause, withMeasuredPanel } from './lab-device.js';
 import { type PreDragged, type PreDragLab, preDragOrSkip, type SwipeEntry, type SwipeHook } from './live-carousel.js';
 import { type Call, type Case, type CaseRecord, judged, LATE_READ_MS, wantsLateRead } from './live-cases.js';
-import { type FocusRead, type FocusReads, frontOf, isChooser } from './live-chooser.js';
+import { chooserInFront, type FocusReads } from './live-chooser.js';
 import type { Source } from './live-forms.js';
 import type { LiveVerdict } from './live-visibility.js';
 import { isError } from './replies.js';
@@ -28,7 +28,7 @@ export type CaseLab = (LabDevice & { readonly platform: 'ios' }) | (LabDevice & 
 /** What the chooser group asks of the Android lab (lab-device.ts#AndroidLab): the focus read, the launcher start, one BACK. */
 export interface FocusLab {
   focus(): Promise<FocusRead>;
-  toLauncher(): Promise<void>;
+  toLauncher(): Promise<HomeRead>;
   back(): Promise<void>;
 }
 
@@ -96,10 +96,12 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
     if ('skip' in dragged) return skip(dragged.skip);
     ({ preDrag: preDragged, launched } = dragged);
   }
-  // The launcher start (Case.fromLauncher): the lab stopped and HOME pressed, `launched` kept as the launch's.
+  // The launcher start (Case.fromLauncher): the lab stopped and HOME pressed, `launched` kept as the launch's; the HOME
+  // activity it read goes with the focus reads.
+  let home: HomeRead | undefined;
   if (c.fromLauncher === true) {
     if (lab.platform !== 'android') return skip("a start from the launcher is the Android lab's only");
-    await lab.toLauncher();
+    home = await lab.toLauncher();
   }
   const focusLab = c.reads?.focus === true ? (lab.platform === 'android' ? lab : undefined) : undefined;
   if (c.reads?.focus === true && focusLab === undefined) return skip("a focus read is the Android lab's only");
@@ -132,7 +134,7 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   // The second (D69): the panel again once the calls are done, kept on the final state — the judge holds the two reads
   // to agree (live-forms.ts#panelAfterCalls); `late` gets it from there (live-cases.ts#judged).
   const state = panelLab !== undefined ? await withMeasuredPanel(read, panelLab, note) : read;
-  const focus: FocusReads | undefined = focusLab === undefined ? undefined : { before: before!, between, after: await focusLab.focus() };
+  const focus: FocusReads | undefined = focusLab === undefined ? undefined : { ...(home !== undefined && { home }), before: before!, between, after: await focusLab.focus() };
   const evidence = { source, replies, launched, after, state, swipes, focus };
   let late: LabState | undefined;
   if (wantsLateRead(c, evidence)) {
@@ -143,14 +145,11 @@ export async function runCase(c: Case, source: Source, rig: CaseRig): Promise<Ca
   if (rig.keepShot !== undefined && verdict.outcome !== 'ok') await rig.keepShot(`${source}-${c.id}-${now()}.png`, await lab.screenshot());
   // The teardown: a chooser left in front is dropped with one BACK (batch-9: one dismissed it), so the next case does not
   // start over it; read again, and said when it is still there.
-  if (focusLab !== undefined && focus !== undefined) {
-    const front = frontOf(focus.after);
-    if (!('why' in front) && isChooser(front.focused)) {
-      await focusLab.back();
-      focus.teardown = await focusLab.focus();
-      const still = frontOf(focus.teardown);
-      if (!('why' in still) && isChooser(still.focused)) note(`${source} ${c.id}: the chooser is still in front after one BACK (${still.focused})`);
-    }
+  if (focusLab !== undefined && chooserInFront(focus!.after) !== undefined) {
+    await focusLab.back();
+    focus!.teardown = await focusLab.focus();
+    const still = chooserInFront(focus!.teardown);
+    if (still !== undefined) note(`${source} ${c.id}: the chooser is still in front after one BACK (${still})`);
   }
   return { verdict, record: caseRecord(source, c, { replies, launched, after, state, late, warmUpError, preDrag: preDragged, swipes, focus }) };
 }

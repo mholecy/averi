@@ -1,6 +1,6 @@
 import type { Point } from '../../src/adapters/types.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
-import type { FocusRead } from '../../scripts/truth/live-chooser.js';
+import type { FocusRead, HomeRead } from '../../scripts/truth/lab-device.js';
 import type { LabApp, LabState } from '../../scripts/truth/schema.js';
 
 /**
@@ -82,6 +82,8 @@ export interface FakeAndroidLabScript extends FakeLabScript {
   guardFails?: Error;
   /** What each `focus()` answers, in turn (past the end, the last again). */
   focus?: readonly FocusRead[];
+  /** What `toLauncher()` answers: the HOME activity's read. */
+  home?: HomeRead;
 }
 
 export class FakeAndroidLab extends ScriptedLab {
@@ -92,6 +94,7 @@ export class FakeAndroidLab extends ScriptedLab {
   private touchableRead = 0;
   private readonly focusReads: readonly FocusRead[];
   private focusRead = 0;
+  private readonly home: HomeRead;
 
   constructor(script: FakeAndroidLabScript) {
     super(script);
@@ -99,6 +102,7 @@ export class FakeAndroidLab extends ScriptedLab {
     this.swipeFails = script.swipeFails;
     this.guardFails = script.guardFails;
     this.focusReads = script.focus ?? [{ error: 'no focus scripted' }];
+    this.home = script.home ?? { error: 'no home scripted' };
   }
 
   async focus(): Promise<FocusRead> {
@@ -108,8 +112,9 @@ export class FakeAndroidLab extends ScriptedLab {
     return answer;
   }
 
-  async toLauncher(): Promise<void> {
+  async toLauncher(): Promise<HomeRead> {
     this.log.push('toLauncher');
+    return this.home;
   }
 
   async back(): Promise<void> {

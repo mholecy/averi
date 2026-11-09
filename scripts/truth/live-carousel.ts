@@ -3,8 +3,7 @@ import { pause } from './lab-device.js';
 import { short } from './live-forms.js';
 import { strokesSince, type LiveVerdict } from './live-visibility.js';
 import { carouselReply, heldCutHedged, inferredAxisSaid, isError, replyKind, snapshotNodes, swipesOf, type CarouselReply } from './replies.js';
-import type { Case, CaseReads } from './live-cases.js';
-import type { FocusReads } from './live-chooser.js';
+import type { Case, CaseReads, DeviceLog } from './live-cases.js';
 import { labId, labSelector, type LabState, type Rect } from './schema.js';
 import { TOUCH_SLACK } from './truth.js';
 
@@ -212,15 +211,6 @@ const appText = (s: LabState, launched: LabState): string =>
   `${cutText(s)}; offset ${s.offsets?.carousel ?? '?'}, index ${s.offsets?.['carousel.index'] ?? '-'}; ${carouselStrokes(s, launched).length} carousel stroke(s) since the call`;
 
 // --- the judges ---
-
-/**
- * What a judge reads beyond the app's states: the strokes averi drew (RunRecord `swipes`, a carousel case's), the device's
- * focus reads (RunRecord `focus`, a chooser case's: live-chooser.ts).
- */
-export interface DeviceLog {
-  swipes?: readonly SwipeEntry[];
-  focus?: FocusReads;
-}
 
 export type CarouselJudge = Case['judge'];
 

@@ -7,7 +7,6 @@ import { INPUT_SHOWN_COMMAND, TOUCHABLE_COMMAND } from '../../src/adapters/andro
 import type { Point } from '../../src/adapters/types.js';
 import { WdaServer } from '../../src/adapters/wda.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
-import type { FocusRead } from './live-chooser.js';
 import { appOf, type CatalogCell, type ImeCapture, type ImeWitness, type LabApp, type LabState, type NavigationMode, WINDOW_MANAGER_WORD } from './schema.js';
 
 /**
@@ -314,17 +313,28 @@ export async function withMeasuredPanel(
 }
 
 /**
+ * One focus read as the device printed it (AndroidLab.focus; the chooser group's, live-chooser.ts): the two greps, with how
+ * long it waited for the window transition to settle when it did (`waitedMs`), or the error that stopped it.
+ */
+export type FocusRead = { window: string; activities: string; waitedMs?: number; firstWindow?: string } | { error: string };
+
+/** The HOME activity as `cmd package resolve-activity --brief` prints it (HOME_COMMAND), raw, or the error that stopped it. */
+export type HomeRead = { resolved: string } | { error: string };
+
+/**
  * The chooser group's focus read (live-chooser.ts, T7b), the harness's own, beside src's (android-chooser.ts
  * #CHOOSER_FOCUS_COMMAND) and not imported from it, so the oracle does not share the code it judges: the window
  * manager's focus lines, and every activity record on the stack (`* Hist  #<n>: ActivityRecord{…}`, top first).
  */
 export const FOCUS_WINDOW_COMMAND = "dumpsys window displays | grep -E 'mCurrentFocus=|mFocusedApp='";
 export const ACTIVITIES_COMMAND = "dumpsys activity activities | grep -E 'Hist +#'";
+/** The HOME activity the device resolves (read-only): the launcher a start from it must find in front. */
+export const HOME_COMMAND = 'cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN';
 /** How long a key (HOME, BACK) is given to take effect before the next read. */
 const KEY_SETTLE_MS = 1_000;
 /**
- * A focus read taken mid-transition (`mCurrentFocus=null`) is taken again every FOCUS_POLL_MS, at most FOCUS_SETTLE_MS:
- * the stack is read once a window has focus. Measured 2026-11-09 (T7b's first run, emulator-5554, API 33): after monkey
+ * A focus read taken mid-transition (`mCurrentFocus=null`) is taken again every FOCUS_POLL_MS, FOCUS_SETTLE_MS at most
+ * (the last poll shortened to end there): the stack is read once a window has focus. Measured 2026-11-09 (T7b's first run, emulator-5554, API 33): after monkey
  * started the force-stopped lab over the chooser, `mCurrentFocus` read null and the ResolverActivity record stayed on the
  * stack for about 1.3 s, both gone together.
  */
@@ -424,33 +434,44 @@ export class AndroidLab implements LabDevice {
 
   /**
    * The device's word on what is in front and on the stack (FOCUS_WINDOW_COMMAND, ACTIVITIES_COMMAND), raw, after the
-   * guard, once settled: a window read mid-transition is taken again (FOCUS_SETTLE_MS), and the wait kept (`waitedMs`). A
-   * read that fails is kept as adb's words (`{ error }`): the judge reads it as unread, never as nothing in front.
+   * guard, once settled: a window read mid-transition is taken again (FOCUS_SETTLE_MS), and the wait kept (`waitedMs`)
+   * with the first window read (`firstWindow`: what the device showed when averi had replied). A read that fails is kept as adb's words (`{ error }`): the judge reads it as unread, never as nothing in front.
    */
   async focus(): Promise<FocusRead> {
     await this.guard();
     try {
       const windowRead = async () => (await this.adb('shell', FOCUS_WINDOW_COMMAND)).stdout;
-      let window = await windowRead();
+      const firstWindow = await windowRead();
+      let window = firstWindow;
       let waitedMs = 0;
       while (/mCurrentFocus=null\b/.test(window) && waitedMs < FOCUS_SETTLE_MS) {
-        await pause(FOCUS_POLL_MS);
-        waitedMs += FOCUS_POLL_MS;
+        const step = Math.min(FOCUS_POLL_MS, FOCUS_SETTLE_MS - waitedMs);
+        await pause(step);
+        waitedMs += step;
         window = await windowRead();
       }
       const activities = (await this.adb('shell', ACTIVITIES_COMMAND)).stdout;
-      return { window, activities, ...(waitedMs > 0 && { waitedMs }) };
+      return { window, activities, ...(waitedMs > 0 && { waitedMs, firstWindow }) };
     } catch (e) {
       return { error: adbSaid(e) };
     }
   }
 
-  /** The chooser group's launcher start (Case.fromLauncher): the lab force-stopped, HOME, a second to settle. */
-  async toLauncher(): Promise<void> {
+  /**
+   * The chooser group's launcher start (Case.fromLauncher): the lab force-stopped, HOME, a second to settle; then the
+   * HOME activity the device resolves (HOME_COMMAND, read-only), raw, for the judge's premise — a read that fails kept as
+   * adb's words.
+   */
+  async toLauncher(): Promise<HomeRead> {
     await this.guard();
     await this.adb('shell', 'am', 'force-stop', this.package);
     await this.adb('shell', 'input', 'keyevent', 'KEYCODE_HOME');
     await pause(KEY_SETTLE_MS);
+    try {
+      return { resolved: (await this.adb('shell', HOME_COMMAND)).stdout };
+    } catch (e) {
+      return { error: adbSaid(e) };
+    }
   }
 
   /** One BACK, a second to settle: the chooser group's teardown of a chooser left in front (batch-9: one dismissed it). */

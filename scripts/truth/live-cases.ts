@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Platform } from '../differential/corpus.js';
 import { familyOf } from './catalog.js';
 import { LAB_APP } from './lab-device.js';
-import { CAROUSEL_CASES, hedgedCeiling, type DeviceLog, type PreDragged, type Shorten, type SwipeEntry } from './live-carousel.js';
+import { CAROUSEL_CASES, hedgedCeiling, type PreDragged, type Shorten, type SwipeEntry } from './live-carousel.js';
 import { CHOOSER_CASES, type FocusReads } from './live-chooser.js';
 import { knownEntry, knownLive } from './live-known.js';
 import { judgeFullWindow, judgeHeldNo } from './live-ensure.js';
@@ -82,6 +82,15 @@ export interface CaseRecord {
   /** A carousel case's strokes as averi drew them during its calls, a dropped one marked (CaseReads.swipes). */
   swipes?: SwipeEntry[];
   /** A chooser case's focus reads: before, between and after its calls, and after a teardown (CaseReads.focus). */
+  focus?: FocusReads;
+}
+
+/**
+ * What a judge reads beyond the app's states: the strokes averi drew (RunRecord `swipes`, a carousel case's), the device's
+ * focus reads (RunRecord `focus`, a chooser case's: live-chooser.ts).
+ */
+export interface DeviceLog {
+  swipes?: readonly SwipeEntry[];
   focus?: FocusReads;
 }
 
