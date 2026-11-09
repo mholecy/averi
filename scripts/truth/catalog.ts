@@ -50,6 +50,11 @@ export function buildCatalog(files: readonly FamilyFile[]): Catalog {
       // A target is asked by one thing (truth.ts#elementOf): its text, its label, or its identifier — never two.
       const both = c.targets.filter((t) => t.text !== undefined && t.label !== undefined).map((t) => t.tag);
       if (both.length > 0) throw new Error(`catalog: cell ${c.id}'s ${both.join(', ')} names both a text and a label — a target is asked by one`);
+      // An absent target's direction goes with its absence, both ways: golden asks scroll_until for it that way.
+      for (const t of c.targets) {
+        if (t.mayBeAbsent === true && t.toward === undefined) throw new Error(`catalog: cell ${c.id}'s ${t.tag} may be absent but names no \`toward\` — the direction its scroll view lays it out in`);
+        if (t.toward !== undefined && t.mayBeAbsent !== true) throw new Error(`catalog: cell ${c.id}'s ${t.tag} names \`toward\` but may not be absent — a framed target's direction is its frame's`);
+      }
       const other = seen.get(c.id);
       if (other !== undefined) throw new Error(`catalog: cell ${c.id} is in ${other}.json and ${family}.json`);
       seen.set(c.id, family);

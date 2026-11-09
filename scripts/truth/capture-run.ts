@@ -200,8 +200,8 @@ async function captureCell(lab: LabDevice, cell: CatalogCell, ctx: { device: str
         // lab regression — the cell fails, never "absent".
         if (t.mayBeAbsent !== true) throw new Error(`cell ${cell.id}: the app reported no frame for target ${t.tag}`);
         // Laid out nowhere (carousel-lazy's C before a swipe composes it): recorded absent (CellTruth.absent) — nothing
-        // to tap or measure — with each tree's word on it.
-        const absent: AbsentTarget = catalogPart(cell.id, t, trees);
+        // to tap or measure — with each tree's word on it, and the direction it lies in (CatalogTarget.toward).
+        const absent: AbsentTarget = { ...catalogPart(cell.id, t, trees), ...(t.toward !== undefined && { toward: t.toward }) };
         (truth.absent ??= []).push(absent);
         log(`${cell.id}/${t.tag}: absent — the app reported no frame for it (the catalog allows it), not probed`);
         // A tree listing what the app laid out nowhere: said, for whoever reads the run — the truth keeps it (`listed`).

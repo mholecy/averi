@@ -101,7 +101,7 @@
       "layer": "none",
       "platforms": ["android"],
       "targets": [
-        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel", "mayBeAbsent": true },
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel", "mayBeAbsent": true, "toward": "right" },
         { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
         { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
       ]
@@ -111,7 +111,7 @@
       "layer": "none",
       "platforms": ["android"],
       "targets": [
-        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel", "mayBeAbsent": true },
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel", "mayBeAbsent": true, "toward": "right" },
         { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
         { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
       ]
@@ -121,7 +121,7 @@
       "layer": "none",
       "platforms": ["android"],
       "targets": [
-        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel", "mayBeAbsent": true },
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel", "mayBeAbsent": true, "toward": "right" },
         { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
         { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
       ]
@@ -131,7 +131,7 @@
       "layer": "none",
       "platforms": ["android"],
       "targets": [
-        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel", "mayBeAbsent": true },
+        { "tag": "C", "color": "#D81B60", "slot": 0, "declared": "open", "scrollView": "carousel", "mayBeAbsent": true, "toward": "right" },
         { "tag": "B", "color": "#00ACC1", "slot": 1, "declared": "open", "scrollView": "page" },
         { "tag": "U", "color": "#7CB342", "slot": 2, "declared": "open", "scrollView": "page" }
       ]

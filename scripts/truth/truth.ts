@@ -138,24 +138,43 @@ export function listedIn(payload: string, source: SourceKind, id: string): boole
  */
 export function nodeFramesIn(payload: string, source: SourceKind, by: AssertElement): Rect[] {
   const frames: Rect[] = [];
-  const add = (r: Rect) => {
-    if (!frames.some((f) => f.x === r.x && f.y === r.y && f.width === r.width && f.height === r.height)) frames.push(r);
-  };
-  const rectOf = (r: unknown): Rect | undefined => {
-    const o = r as Partial<Rect> | null | undefined;
-    return typeof o?.x === 'number' && typeof o.y === 'number' && typeof o.width === 'number' && typeof o.height === 'number' ? { x: o.x, y: o.y, width: o.width, height: o.height } : undefined;
-  };
   for (const o of rawNodes(payload, source)) {
     if (!isTarget(o, source, by)) continue;
-    if (source === 'uiautomator') {
-      const b = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(typeof o.bounds === 'string' ? o.bounds : '');
-      if (b !== null) add({ x: +b[1], y: +b[2], width: +b[3] - +b[1], height: +b[4] - +b[2] });
-      continue;
-    }
-    const r = rectOf(source === 'idb' ? o.frame : o.rect);
-    if (r !== undefined) add(r);
+    const r = rawFrame(o, source);
+    if (r !== undefined && !frames.some((f) => f.x === r.x && f.y === r.y && f.width === r.width && f.height === r.height)) frames.push(r);
   }
   return frames;
+}
+
+/** A raw node's frame as its source writes it (WDA's `rect`, idb's `frame`, uiautomator's `bounds`), or undefined. */
+function rawFrame(o: Record<string, unknown>, source: SourceKind): Rect | undefined {
+  if (source === 'uiautomator') {
+    const b = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(typeof o.bounds === 'string' ? o.bounds : '');
+    return b === null ? undefined : { x: +b[1], y: +b[2], width: +b[3] - +b[1], height: +b[4] - +b[2] };
+  }
+  const r = (source === 'idb' ? o.frame : o.rect) as Partial<Rect> | null | undefined;
+  return typeof r?.x === 'number' && typeof r.y === 'number' && typeof r.width === 'number' && typeof r.height === 'number' ? { x: r.x, y: r.y, width: r.width, height: r.height } : undefined;
+}
+
+/** WDA's element types of a scroller: a node of one of these scrolls what it holds. */
+const WDA_SCROLLERS: readonly unknown[] = ['ScrollView', 'Table', 'CollectionView'];
+
+/**
+ * Whether a raw tree's payload lists a scroller whose frame is `clip` (within a pixel or point, each edge): a
+ * uiautomator node marked `scrollable="true"` — whatever its class, a Compose LazyRow (`android.view.View`) or a
+ * RecyclerView carries no axis but is listed scrollable; a WDA node of a scroller's type (WDA_SCROLLERS); never an idb
+ * node (idb lists no scroll view: ADR 0010 residual 5). The harness's own reading (rawNodes), no averi code: whether
+ * averi could see the scroll view a target lies in, though it never saw the target (golden-spec/rows.ts#strokeRow).
+ */
+export function scrollerListedIn(payload: string, source: SourceKind, clip: Rect): boolean {
+  if (source === 'idb') return false;
+  const scroller = (o: Record<string, unknown>) => (source === 'uiautomator' ? o.scrollable === 'true' : WDA_SCROLLERS.includes(o.type));
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1;
+  return rawNodes(payload, source).some((o) => {
+    if (!scroller(o)) return false;
+    const r = rawFrame(o, source);
+    return r !== undefined && near(r.x, clip.x) && near(r.y, clip.y) && near(r.x + r.width, clip.x + clip.width) && near(r.y + r.height, clip.y + clip.height);
+  });
 }
 
 /**
