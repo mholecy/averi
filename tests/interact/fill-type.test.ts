@@ -598,6 +598,24 @@ describe('typeAndConfirm — an earlier text that holds the value is no landing 
     expect(typed).toEqual(['11']);
   });
 
+  // D71: `55` after `5` was the value itself and replied Filled at once, the second key dropped — an append should have
+  // left `555`. Refused now, and nothing typed again: a select-all field reads `55` too, and a retyped `5` there would
+  // end Filled over `555`.
+  it.each(['on-return', 'may-arrive-late'] as const)('%s: `55` after `5`, the second key dropped — missed, a length that is a whole landing too, nothing typed again', async (delivery) => {
+    const { io, intent, typed } = scripted({ prefilled: '5', keep: [1] });
+    expect(await typeAndConfirm(io, { ...intent, value: '55', before: '5', delivery })).toEqual({ kind: 'missed', observed: '55', again: [], differs: { kind: 'length', wholeToo: true } });
+    expect(typed).toEqual(['55']);
+  });
+
+  // a refused reading keeps the poll going: the late key that makes `555` lands
+  it.each(['on-return', 'may-arrive-late'] as const)('%s: `55` then `555` after `5` (a late key) — landed, nothing typed again', async (delivery) => {
+    const s = scripted({ prefilled: '5', keep: [1] });
+    let reads = 0;
+    const io: FieldIo = { ...s.io, read: async () => (++reads === 2 && (s.field.value = '555'), s.io.read()) };
+    expect(await typeAndConfirm(io, { ...s.intent, value: '55', before: '5', delivery })).toEqual({ kind: 'landed', observed: '555', again: [] });
+    expect(s.typed).toEqual(['55']);
+  });
+
   // D64 round 3: keys proven typed elsewhere are no select-all, so the reading's whole-landing hedge goes with them
   // (fill-landing.ts#withoutWholeToo) — the reply must not say both.
   it.each([
