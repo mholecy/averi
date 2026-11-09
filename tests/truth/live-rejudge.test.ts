@@ -110,6 +110,14 @@ const PRE_D43A_LOUD = /^- LOUD \(loud-changed\) (b1d|b7) .*\[NOT known: loud-cha
  */
 const PRE_D43_WDA_LOUD = /^- LOUD \(loud-untouched\) (b1d|b7) (?!.*\[known).*$/gm;
 
+/**
+ * A pre-D72 Android g2: the reply of an averi whose dump parser trimmed the eager trailing space (`SK31 1200 0000 ` read
+ * `SK31 1200 0000`), so g2 came out ok — known since D72, which reads the space and refuses it `separated` as iOS does
+ * (ADR 0034 residual 10, the D72 amendment). Rejudged by HEAD's ratchet, the record says g2 is known but ok, FIXED: those
+ * two lines, exactly, and the exit 1 that fixed sets. Every Android forms record with g2 committed before D72 reads them.
+ */
+const PRE_D72_G2 = /^(Known but ok this run|FIXED, not intermittent — strike off live-known\.ts): uiautomator g2$/gm;
+
 describe('live.ts --rejudge over the committed visibility records', () => {
   it.each([
     // round 6's closing review: the active-window hint run live (src and lab app ea070d2) — form-picker's c2–c4 ok with
@@ -391,9 +399,9 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     // 10 of 10 ok.
     ['android-forms-d37-uptime-1.json', 'forms', { cases: 10, ok: 10, loud: 0, mismatches: 0 }],
     // batch-9's device run at e734fedf (2026-11-03), L7's first read. The forms group's f1–f14 and g1–g5: every case ok
-    // under uiautomator, g2 included (the reading judged there had no trailing space); under WDA g2 the D53 `separated`
+    // under uiautomator, g2 included (the reading judged there had no trailing space — trimmed, PRE_D72_G2); under WDA g2 the D53 `separated`
     // MISMATCH, known (ADR 0034 residual 10). (Under idb g3 too — the src before D61's fix, below.)
-    ['android-forms-l7-1.json', 'forms', { cases: 19, ok: 19, loud: 0, mismatches: 0 }],
+    ['android-forms-l7-1.json', 'forms', { cases: 19, ok: 19, loud: 0, mismatches: 0 , preD72: true }],
     ['ios-wda-forms-l7-1.json', 'forms', { cases: 18, ok: 17, loud: 0, mismatches: 1 }],
     // …the RN app's rf1–rf5 and rfe1–rfe3 once, then rfe1–rfe3 four times more, under idb and WDA (D60's live proof):
     // rfe1 and rfe2 ok 20 of 20, 5 of them through the retype from the eager mark; rfe3 the D53 `separated` MISMATCH,
@@ -425,7 +433,7 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     ['ios-idb-forms-d61-2.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-wda-forms-d61-1.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
     ['ios-wda-forms-d61-2.json', 'forms', { cases: 6, ok: 6, loud: 0, mismatches: 0 }],
-    ['android-forms-d61-whole.json', 'forms', { cases: 54, ok: 49, loud: 2, mismatches: 0, skipped: 3 }],
+    ['android-forms-d61-whole.json', 'forms', { cases: 54, ok: 49, loud: 2, mismatches: 0, skipped: 3 , preD72: true }],
     ['ios-idb-forms-d61-whole.json', 'forms', { cases: 46, ok: 42, loud: 3, mismatches: 1 }],
     ['ios-wda-forms-d61-whole.json', 'forms', { cases: 46, ok: 42, loud: 3, mismatches: 1, preD43Wda: true }],
     // T7a's live check at 75774dfd (2026-11-05): the carousel group three times on the AVD, every case ok — never "fully
@@ -439,18 +447,20 @@ describe('live.ts --rejudge over the committed visibility records', () => {
     const header = /^# Live golden: (\d+) cases, (\d+) ok, (\d+) loud, (\d+) mismatches \((\d+) not known\), (\d+) skipped$/m.exec(out);
     expect(header, out.slice(0, 2000)).not.toBeNull();
     const [, cases, ok, loud, mismatches, notKnown, skipped] = header!.map(Number);
-    const { preD43a, preD43Wda, ...counts } = want as typeof want & { preD43a?: true; preD43Wda?: true };
+    const { preD43a, preD43Wda, preD72, ...counts } = want as typeof want & { preD43a?: true; preD43Wda?: true; preD72?: true };
     expect({ cases, ok, loud, mismatches, notKnown, skipped }).toEqual({ notKnown: 0, skipped: 0, ...counts });
     // An Android forms record from before D43a: b1d and b7 read as `input text` left them (a prefix typed, then exit
     // 255 — loud-changed), NOT known against the entry D43a pins (loud-untouched: refused before the tap). Those two
     // lines, exactly, and nothing else not known; a LOUD fails no run, so the exit stays 0.
     const stale = [...out.matchAll(PRE_D43A_LOUD)].map((m) => m[1]);
     expect(stale.sort()).toEqual(preD43a ? ['b1d', 'b7'] : []);
-    expect(out.replace(PRE_D43A_LOUD, '')).not.toMatch(/NOT known|FIXED, not intermittent/);
+    // A pre-D72 Android g2 (PRE_D72_G2): ok then, known since — the known-but-ok and FIXED lines, exactly, and exit 1.
+    expect([...out.matchAll(PRE_D72_G2)].map((m) => m[1])).toEqual(preD72 ? ['Known but ok this run', 'FIXED, not intermittent — strike off live-known.ts'] : []);
+    expect(out.replace(PRE_D43A_LOUD, '').replace(PRE_D72_G2, '')).not.toMatch(/NOT known|FIXED, not intermittent/);
     // A forms record with a WDA leg from before D43: b1d and b7 refused before anything was sent, a LOUD known no more
     // (WDA types them since) — those two lines, exactly, unmarked; a LOUD fails no run.
     expect([...out.matchAll(PRE_D43_WDA_LOUD)].map((m) => m[1]).sort()).toEqual(preD43Wda ? ['b1d', 'b7'] : []);
-    expect(code, out.slice(-2000)).toBe(0);
+    expect(code, out.slice(-2000)).toBe(preD72 ? 1 : 0);
   });
 });
 

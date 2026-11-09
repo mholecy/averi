@@ -972,16 +972,16 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
     const all = [...(await native('ios')), ...(await rn('ios'))];
     expect(all.filter((c) => /expected MISMATCH/.test(c.says)).map((c) => c.id)).toEqual(['g2', 'rfe3']);
     const g2 = all.find((c) => c.id === 'g2')!.says;
-    expect(g2).toMatch(/by design on iOS \(idb, wda; D53 `separated`/);
-    // Android read since batch-9: ok, the reading judged there had no trailing space.
+    expect(g2).toMatch(/by design under every source \(D53 `separated`/);
+    // Android read since batch-9: ok while its parser trimmed the trailing space; the MISMATCH since D72, which keeps it.
     expect(g2).not.toMatch(/not yet read/);
-    expect(g2).toMatch(/ok on Android/);
+    expect(g2).toMatch(/on Android since D72, whose reading keeps the trailing space/);
   });
 
-  it('known as the device read them: g2 and rfe3 under idb and WDA alone, failed-holds on a refusal, ADR 0034 residual 10; none of the others under any source', () => {
+  it('known as the device read them: g2 and rfe3 under idb and WDA, g2 under uiautomator since D72 (its parser keeps the trailing space), failed-holds on a refusal, ADR 0034 residual 10; none of the others under any source', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
     const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => [...G_IDS, ...RFE_IDS].filter((id) => knownEntry(platform, source, id) !== undefined).map((id) => `${platform} ${source} ${id}`)));
-    expect(known.sort()).toEqual(['ios idb g2', 'ios idb rfe3', 'ios wda g2', 'ios wda rfe3']);
+    expect(known.sort()).toEqual(['android uiautomator g2', 'ios idb g2', 'ios idb rfe3', 'ios wda g2', 'ios wda rfe3']);
     for (const key of known) {
       const [platform, source, id] = key.split(' ');
       expect(knownEntry(platform, source, id), key).toEqual({ note: expect.stringMatching(/^residual:ADR 0034 residual 10 — /), cls: 'failed-holds', kind: 'refused' });

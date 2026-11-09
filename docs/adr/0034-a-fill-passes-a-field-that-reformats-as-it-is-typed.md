@@ -26,6 +26,8 @@ folded into the rule; residual 8 (A) closed, residual 9 accepted; implemented on
 Amended 2026-11-03 (batch-10: D61, D63 and D64 proven live — the last paragraph of each of those amendments).
 Amended 2026-11-03 (T3: the eager trailing mark on a full reading numbered, residual 10; g2 and rfe3 filed in
 live-known.ts).
+Amended 2026-11-09 (D72: Android's reading keeps a value's outer spaces — the dump's parser trimmed them; g2 under
+uiautomator filed under residual 10; implemented on `fix/d72-android-outer-spaces`).
 
 ## Context
 
@@ -860,6 +862,44 @@ value only on the select-all reading the tree cannot tell apart. It reaches ever
 with (`1212` after `12`, keys dropped). Unmeasured on a device, and not accepted here: backlog row D71. The D53 row
 `a-b1234` after `ab` lands too, and the row is now `a-b12.34`.
 
+## Amendment: Android's reading keeps a value's outer spaces (2026-11-09, D72)
+
+**Context.** The D60 amendment's live proof left it unread whether the dump or averi drops g2's trailing space on
+Android. averi did: `parseUiautomatorXml` (adapters/android.ts) parsed the dump with fast-xml-parser's default
+`trimValues`, which trims every attribute before its entities are decoded, so every Android reading lost its outer
+spaces. A fill judges a reading, so `Jan ` typed read back `Jan`: a false failure ("typed 4 characters but the field
+shows 3") of a field that holds the value. With clear it also damaged the field: the retype's wipe deletes the
+reading's length (fill-type.ts, `heldText(observed)`), one short per trimmed space, and `clearText` deletes from the
+end, so `Jan ` of `Jan Novak` became `JJan Novak`. A clear of a field ending in a space counted short the same way.
+iOS already kept them (ios-node.ts).
+
+**Decision: the narrow fix, `text` alone.** The parser runs with `trimValues: false`, and an attribute value processor
+trims every attribute but `text` as before (`trimOuter`: after decoding, so it keeps at the edges a newline, a tab or a
+return — which uiautomator writes only as a reference, `&#10;`, `&#9;`, `&#13;`, never raw — exactly as the pre-decode
+trim did, and cuts every other whitespace). A text input's value is the raw `text`, outer spaces kept; a whitespace-only
+input keeps its value. A node's label drawn from `text` is trimmed, and content-desc, hint and resource-id stay trimmed,
+so `text:` and `label:` selectors match exactly as before.
+
+**Rejected: the global `trimValues: false`.** It would move every label and selector match: an app's `Close ` would no
+longer match `text:"Close"`, a change no case asked for. Also rejected: `v.trim()` in the processor — after decoding it
+would cut a leading or trailing `&#10;` the old trim kept, a label change beside the point.
+
+**Consequences.**
+- g2 under uiautomator (`SK3112000000` without clear into form-grouped's ibanEager, the app holding `SK31 1200 0000 `)
+  moves from ok to the `separated` MISMATCH, as on iOS: honest, the field undamaged. Filed in live-known.ts as
+  `android uiautomator g2` under residual 10. The Android forms records committed before D72 (android-forms-l7-1.json,
+  android-forms-d61-whole.json) rejudge g2 as known but ok, FIXED — the replies of a trimming averi
+  (tests/truth/live-rejudge.test.ts, `PRE_D72_G2`).
+- ADR 0028's D64b-3 line counts what the app holds: fp2's ⚠ line says 5 characters, not 4, and a typed `+421` over an
+  inserted `+421 ` is no longer silent (ADR 0028 residual 3, restated). The two `+421 ` pins in
+  tests/adapters/android.test.ts are re-pinned so.
+- `ui_snapshot` shows an Android input's value with its outer spaces, as iOS does.
+- Golden (`scripts/differential/golden.ts --corpus tests/fixtures/truth`, base 3b7393ba): 0 checks changed — no captured
+  dump has a value with an outer space.
+
+**Residuals, stated.** Residual 10 now holds on Android too. A label still loses its outer spaces on Android, as
+before (iOS's label keeps what WDA or idb gives it); no case asks for them.
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
@@ -905,4 +945,5 @@ with (`1212` after `12`, keys dropped). Unmeasured on a device, and not accepted
    T3's amendment): `SK31 1200 0000 ` for a typed `SK3112000000` — every typed character is there, in order, and the
    field holds the value, but the trailing mark is no grouping the rules take, so averi refuses it and the reply names
    the check and the remedy. The safe side: a false mismatch, never a wrong Filled. Filed in live-known.ts as
-   `ios idb|wda g2` and `ios idb|wda rfe3`; on Android g2 passes, the reading judged there having no trailing space.
+   `ios idb|wda g2`, `ios idb|wda rfe3` and, since D72's amendment (Android's reading keeps the trailing space; it
+   passed before, the space trimmed), `android uiautomator g2`.

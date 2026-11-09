@@ -6,7 +6,8 @@ misses a transformed value is unacceptable). Implemented in 5ea9bfd2…546c8804,
 (D31: the residuals numbered under "Residuals accepted", p5's secure field that iOS clears accepted as residual 2).
 Amended 2026-11-03 (D64, docs only: the safety claim and cost C1 corrected — a focus-inserted prefix that holds the
 value passes with no key landed; residual 3 accepted; follow-up D64b). Amended 2026-11-05 (D64b-3: option B3b, a caveat
-where such a reading is not exactly the value; residual 3 restated).
+where such a reading is not exactly the value; residual 3 restated). Amended 2026-11-09 (D72: Android's reading keeps
+outer spaces — the ⚠ line counts what the app holds; residual 3 narrowed).
 
 ## Context
 
@@ -231,7 +232,8 @@ What keeps its bytes, no `focusUnread`:
   and fp2's line says 4 characters where the app holds 5 (pinned in tests/adapters/android.test.ts). Not this amendment's
   to change: the line says what averi read, and `ui_snapshot` reads through the same parser. The trim also silences the
   line: a typed `+421` into a field that inserted `+421 ` and refused every key reads as exactly the value, so it replies a
-  plain Filled while the app holds 5 characters (residual 3; the trim's own false failures are backlog D72).
+  plain Filled while the app holds 5 characters (residual 3; the trim's own false failures are backlog D72). Since D72
+  (ADR 0034's D72 amendment) the parser keeps a value's outer spaces: fp2's line says 5, and the typed `+421` gets it.
 - A field that adds a mark to a truly empty field (`50%` for `50`, `+421903123456` for `421903123456`) gets the line too on
   Android, a caveat true of it, at no cost to the fill.
 
@@ -252,6 +254,7 @@ the re-read runs there.
    D64b-3's): on Android, an empty plain field by sole id that shows `+421 ` once focused and takes none of a typed `421`
    replies Filled — the re-read would have read `+421 ` first and failed it as "did not change" — now with a ⚠ line that
    its text after focus was not read (measured: live cases fp1, fp2). Silent only where the inserted text IS the value as
-   read, exactly or with separators (`421`, `4 21`; on Android also with outer spaces the dump's parser trims, `+421 ` for
-   a typed `+421`, the app holding 5 characters): no reading tells that from the typing. Filed by fp2's judge
-   (`FOCUS_UNREAD_HEDGE`), no more in live-known.ts.
+   read, exactly or with separators (`421`, `4 21`): no reading tells that from the typing. (Until D72 also with outer
+   spaces the dump's parser trimmed — `+421 ` for a typed `+421`, the app holding 5 characters; since ADR 0034's D72
+   amendment the reading keeps them, so that case gets the ⚠ line, pinned in tests/adapters/android.test.ts.) Filed by
+   fp2's judge (`FOCUS_UNREAD_HEDGE`), no more in live-known.ts.
