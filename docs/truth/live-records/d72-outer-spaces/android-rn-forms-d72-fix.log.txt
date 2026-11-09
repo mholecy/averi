@@ -1,0 +1,14 @@
+lab: emulator-5554, AVD averi_lab
+averi: <this checkout>
+uiautomator rfe1 ok: Filled id:"lab.rn-format-eager.E.field" (24 characters, the field shows them reformatted: 5 separators added)
+uiautomator rfe2 ok: Filled id:"lab.rn-format-eager.E.field" (10 characters, the field shows them reformatted: 2 separators added)
+uiautomator rfe3 MISMATCH: the app holds "SK31 1200 0000 ", but averi failed: ERROR fill: typed 12 characters but the field shows 15 — every typed character is there, in order, with 3 separators added (spaces or . , - /) that the fill does not take for the field's grouping (a decimal point or a si
+<!-- averi: this checkout -->
+# Live golden: 3 cases, 2 ok, 0 loud, 1 mismatches (1 not known), 0 skipped
+
+## uiautomator
+- ok rfe1 rn-format-eager: fill, clear, 24 characters into the RN eager field: a drop of the last 4 leaves `… 4263 ` (the eager mark), the full value takes none — Filled id:"lab.rn-format-eager.E.field" (24 characters, the field shows them reformatted: 5 separators added)
+- ok rfe2 rn-format-eager: fill, no clear, 10 characters into the RN eager field: a drop of the last 2 leaves `SK31 1200 ` (the eager mark), the full value ends mid-group — Filled id:"lab.rn-format-eager.E.field" (10 characters, the field shows them reformatted: 2 separators added)
+- MISMATCH (failed-holds) rfe3 rn-format-eager: fill, no clear, an IBAN ending on a complete group into the RN eager field — expected MISMATCH failed-holds by design on iOS (idb, wda; D53 `separated`: averi refuses the trailing mark, the app holds the value); React Native on Android unread — the app holds "SK31 1200 0000 ", but averi failed: ERROR fill: typed 12 characters but the field shows 15 — every typed character is there, in order, with 3 separators added (spaces or . , - /) that the fill does not take for the field's grouping (a decimal point or a si
+    type_text → ERROR fill: typed 12 characters but the field shows 15 — every typed character is there, in order, with 3 separators added (spaces or . , - /) that the fill does not take for the field's grouping (a decimal point or a sign, mixed or trailing marks, groups of one, a word split by autocorrect): check the field holds the value you meant — a cents mask shows a typed 1234 as 12.34 — and if it does, type the value as the field shows it; content withheld from this error
+

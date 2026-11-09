@@ -1,0 +1,56 @@
+20:21:26
+Starting: Intent { cmp=dev.averi.lab/.MainActivity (has extras) }
+Status: ok
+LaunchState: COLD
+Activity: dev.averi.lab/.MainActivity
+TotalTime: 1208
+WaitTime: 1212
+Complete
+<node index="0" text="Recipient’s name &amp; surname" resource-id="lab.form-basic.name.title" class="android.widget.TextView" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[55,314][508,370]" /
+<node index="1" text="" resource-id="lab.form-basic.name" class="android.widget.EditText" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[55,370][1025,502]"
+<node index="3" text="" resource-id="lab.form-basic.email" class="android.widget.EditText" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[55,552][1025,684]"
+<node index="5" text="" resource-id="lab.form-basic.iban" class="android.widget.EditText" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[55,734][1025,866]"
+<node index="7" text="" resource-id="lab.form-basic.amount" class="android.widget.EditText" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[55,916][1025,1048]"
+<node index="9" text="" resource-id="lab.form-basic.pin" class="android.widget.EditText" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="true" password="true" selected="false" bounds="[55,1098][1025,1230]"
+20:21:37
+<node index="1" text="Jan " resource-id="lab.form-basic.name" class="android.widget.EditText" package="dev.averi.lab" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="true" scrollable="false" long-clickable="true" password="false" selected="false" bounds="[55,370][1025,502]"
+{
+  "cell": "form-basic",
+  "ready": true,
+  "screen": {
+    "x": 0,
+    "y": 0,
+    "width": 1080,
+    "height": 2220
+  },
+  "scale": 1,
+  "density": 2.75,
+  "frames": {
+    "name.title": {
+      "x": 55,
+      "y": 314,
+      "width": 453,
+      "height": 66
+    },
+    "name": {
+      "x": 55,
+      "y": 386,
+      "width": 970,
+      "height": 99
+    },
+    "email.title": {
+      "x": 55,
+      "y": 496,
+      "width": 321,
+      "height": 66
+    },
+    "email": {
+      "x": 55,
+      "y": 568,
+      "width": 970,
+      "height": 99
+    },
+    "iban.title": {
+      "x": 55,
+      "y": 678,
+

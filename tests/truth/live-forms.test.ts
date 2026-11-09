@@ -871,7 +871,8 @@ describe('f16 (D64): digits the date field at its cap keeps only the head of, th
  * rn-format-eager's E (group4eager on React Native) — D60's eager trailing mark and D37's `+421` grouping field. Judged here
  * over D40's records (form-format's f1 under WDA, rn-format's rf1 under idb), their final state set to what each fill
  * would leave; what each source answered on the device is batch-9's and batch-10's records (tests/truth/
- * live-rejudge.test.ts): g2 and rfe3 the D53 `separated` MISMATCH under idb and WDA, known since (ADR 0034 residual 10).
+ * live-rejudge.test.ts): g2 and rfe3 the D53 `separated` MISMATCH under idb and WDA, known since (ADR 0034 residual 10);
+ * under uiautomator too since D72 (the reading keeps the trailing space).
  */
 describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421` phone, native and React Native', () => {
   const G_IDS = ['g1', 'g2', 'g3', 'g4', 'g5'];
@@ -963,7 +964,7 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
     const ten = 'Filled id:"lab.rn-format-eager.E.field" (10 characters, the last 2 characters typed again after the field dropped them, the field shows them reformatted: 2 separators added)';
     expect(rfe2.judge(rnLeft('SK31 1200 00'), [ten], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'ok' });
     expect(rfe2.judge(rnLeft('SK31 1200 '), ['ERROR the field shows "SK31 1200 ", not the 10 characters typed'], 'wda', rnLaunched, [])).toMatchObject({ outcome: 'LOUD', cls: 'loud-changed' });
-    expect(rfe3.says).toMatch(/expected MISMATCH failed-holds by design on iOS \(idb, wda; D53 `separated`/);
+    expect(rfe3.says).toMatch(/expected MISMATCH failed-holds by design under every source \(D53 `separated`/);
     const separated = 'ERROR typed 12 characters but the field shows 15 — every typed character is there, in order, with 3 separators added';
     expect(rfe3.judge(rnLeft('SK31 1200 0000 '), [separated], 'idb', rnLaunched, [])).toMatchObject({ outcome: 'MISMATCH', cls: 'failed-holds' });
   });
@@ -972,16 +973,16 @@ describe('g1–g5 and rfe1–rfe3 (L7): an eager-spaced IBAN and a grouped `+421
     const all = [...(await native('ios')), ...(await rn('ios'))];
     expect(all.filter((c) => /expected MISMATCH/.test(c.says)).map((c) => c.id)).toEqual(['g2', 'rfe3']);
     const g2 = all.find((c) => c.id === 'g2')!.says;
-    expect(g2).toMatch(/by design on iOS \(idb, wda; D53 `separated`/);
-    // Android read since batch-9: ok, the reading judged there had no trailing space.
+    expect(g2).toMatch(/by design under every source \(D53 `separated`/);
+    // Android read since batch-9: ok while its parser trimmed the trailing space; the MISMATCH since D72, which keeps it.
     expect(g2).not.toMatch(/not yet read/);
-    expect(g2).toMatch(/ok on Android/);
+    expect(g2).toMatch(/on Android since D72, whose reading keeps the trailing space/);
   });
 
-  it('known as the device read them: g2 and rfe3 under idb and WDA alone, failed-holds on a refusal, ADR 0034 residual 10; none of the others under any source', () => {
+  it('known as the device read them: g2 and rfe3 under idb and WDA, and under uiautomator since D72 (its parser keeps the trailing space), failed-holds on a refusal, ADR 0034 residual 10; none of the others under any source', () => {
     const sources = { ios: ['idb', 'wda'], android: ['uiautomator'] } as const;
     const known = Object.entries(sources).flatMap(([platform, ss]) => ss.flatMap((source) => [...G_IDS, ...RFE_IDS].filter((id) => knownEntry(platform, source, id) !== undefined).map((id) => `${platform} ${source} ${id}`)));
-    expect(known.sort()).toEqual(['ios idb g2', 'ios idb rfe3', 'ios wda g2', 'ios wda rfe3']);
+    expect(known.sort()).toEqual(['android uiautomator g2', 'android uiautomator rfe3', 'ios idb g2', 'ios idb rfe3', 'ios wda g2', 'ios wda rfe3']);
     for (const key of known) {
       const [platform, source, id] = key.split(' ');
       expect(knownEntry(platform, source, id), key).toEqual({ note: expect.stringMatching(/^residual:ADR 0034 residual 10 — /), cls: 'failed-holds', kind: 'refused' });

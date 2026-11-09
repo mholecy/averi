@@ -250,10 +250,15 @@ export const LIVE_KNOWN: Readonly<Record<string, KnownLive>> = Object.fromEntrie
     // refuses it, "… with 3 separators added …" (D53 `separated`): a MISMATCH failed-holds by design, the last reply
     // `refused`. g2 under both sources in batch-9 (ios-idb-forms-l7-1.json, ios-wda-forms-l7-1.json) and batch-10
     // (ios-idb-forms-d61-whole.json, ios-wda-forms-d61-whole.json); rfe3 ×5 under each (ios-rn-idb-forms-l7-1…5.json,
-    // ios-rn-wda-forms-l7-1…5.json). Under uiautomator g2 is ok (android-forms-l7-1.json, android-forms-d61-whole.json:
-    // the reading judged there had no trailing space), so no Android entry; React Native on Android unread.
+    // ios-rn-wda-forms-l7-1…5.json).
     ...each(`ios ${src}`, ['g2', 'rfe3'], EAGER_FULL, 'failed-holds', 'refused'),
   ]),
+  // g2 and rfe3 under uiautomator since D72: the dump's parser no longer trims a value's outer spaces, so Android reads
+  // the eager trailing space the app holds (`SK31 1200 0000 `) as iOS does, and averi refuses it `separated` — the same
+  // MISMATCH as iOS's above, honest, the field undamaged (d72-outer-spaces/android-forms-d72-fix.json,
+  // android-rn-forms-d72-fix.json: "… with 3 separators added …"). g2 was ok before D72 (android-forms-l7-1.json,
+  // android-forms-d61-whole.json: the reading judged there was trimmed); rfe3 was first read on Android by D72.
+  ...each('android uiautomator', ['g2', 'rfe3'], EAGER_FULL, 'failed-holds', 'refused'),
 ]);
 
 /** The KNOWN entry of a live case, whatever it failed by. */

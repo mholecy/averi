@@ -30,6 +30,8 @@ Amended 2026-11-05 (A9: one answer about a reading; two corrections to the D64 a
 Amended 2026-11-09 (D71: without clear, a reading equal to the value lands only as the earlier text or the named
 placeholder — `55` after `5`, the second key dropped, no longer replies Filled; residuals 11 and 12 accepted;
 implemented on `fix/d71-append-landing`).
+Amended 2026-11-09 (D72: Android's reading keeps a value's outer spaces — the dump's parser trimmed them; g2 under
+uiautomator filed under residual 10; implemented on `fix/d72-android-outer-spaces`).
 
 ## Context
 
@@ -948,6 +950,74 @@ uiautomator's reading is trimmed (pre-D72), `Jan Šťastný Jr.`, which does not
 loudly by length — D72's false failure, not D71's (the reading is not the value). idb and wda (g5 and the no-clear
 cases) are on the owner's list.
 
+## Amendment: Android's reading keeps a value's outer spaces (2026-11-09, D72)
+
+**Context.** The D60 amendment's live proof left it unread whether the dump or averi drops g2's trailing space on
+Android. averi did: `parseUiautomatorXml` (adapters/android.ts) parsed the dump with fast-xml-parser's default
+`trimValues`, which trims every attribute before its entities are decoded, so every Android reading lost its outer
+spaces. A fill judges a reading, so `Jan ` typed read back `Jan`: a false failure ("typed 4 characters but the field
+shows 3") of a field that holds the value. With clear it also damaged the field: the retype's wipe deletes what the
+reading holds (fill-type.ts#typeAndConfirm sizes it by fill-facts.ts#heldText of the reading), one short per trimmed
+space, and `clearText` deletes from the end, so `Jan ` of `Jan Novak` became `JJan Novak`. A clear of a field ending in
+a space counted short the same way (fill-clear.ts, through the same `heldText`).
+iOS already kept them (ios-node.ts).
+
+**Decision: the narrow fix, `text` and `hint` alone.** The parser runs with `trimValues: false`, and an attribute
+value processor trims every attribute but `text` and `hint` as before (`trimOuter`: after decoding, so it keeps at the
+edges a newline, a tab or a return — which uiautomator writes only as a reference, `&#10;`, `&#9;`, `&#13;`, never raw —
+and cuts every other whitespace). That is exactly the old trim for uiautomator's output; a space written as a reference
+at an edge (`&#32;`, `&#160;`), which uiautomator never writes, is cut now where the old trim kept it. A text input's
+value is the raw `text`, outer spaces kept; a whitespace-only input keeps its value. Its `hint` is kept raw too (review
+round 1, MINOR-1): it is the same kind of string, and a reading is compared with the placeholder exactly
+(fill-landing.ts, fill-clear.ts) — an empty field whose dump names `hint="Name "` and shows it as `text="Name "` reads
+empty, where a trimmed hint would make it 5 characters of content ("cleared 5 characters first" of an empty field). A
+node's label drawn from `text` is trimmed, and content-desc and resource-id stay trimmed, so matching through the LABEL
+is unchanged; the `value` path now sees the field's real text, as on iOS (Consequences).
+
+**Rejected: the global `trimValues: false`.** It would move every label match: an app's `Close ` would no longer match
+`text:"Close"`, a change no case asked for. Also rejected: `v.trim()` in the processor — after decoding it would cut a
+leading or trailing `&#10;` the old trim kept, a label change beside the point.
+
+**Sequencing.** D72 merges after D71 — met: D71 merged as ec51cc74. D72 makes the `1 `/`1` class reachable on
+Android: before it, a reading's outer space was trimmed away, so a no-clear `1 ` typed after `1` with a key dropped
+could not be read as it is. With D72 alone that reading would reply a plain Filled; D71's refusal of that class is what
+D72's Android outer-space readings rely on. Pinned through the dump's parser (tests/adapters/android.test.ts): `1 `
+typed after `1`, the `1` dropped, reads `1 ` and is refused with the select-all hedge (`wholeToo`), never Filled; `Jan `
+appended to `Jan` lands (`JanJan `); `Jan ` typed after `Jan `, no key landing, lands — residual 7.
+
+**Consequences.**
+- g2 under uiautomator (`SK3112000000` without clear into form-grouped's ibanEager, the app holding `SK31 1200 0000 `)
+  moves from ok to the `separated` MISMATCH, as on iOS: honest, the field undamaged; rfe3 (React Native) reads the
+  same. Filed in live-known.ts as `android uiautomator g2|rfe3` under residual 10. The Android forms records committed
+  before D72 (android-forms-l7-1.json, android-forms-d61-whole.json) rejudge g2 as known but ok, FIXED — the replies of
+  a trimming averi (tests/truth/live-rejudge.test.ts, `PRE_D72_G2`); `live.ts --rejudge` run by hand on either exits 1,
+  on purpose.
+- ADR 0028's D64b-3 line counts what the app holds: fp2's ⚠ line says 5 characters, not 4, and a typed `+421` over an
+  inserted `+421 ` is no longer silent (ADR 0028 residual 3, narrowed). The two `+421 ` pins in
+  tests/adapters/android.test.ts are re-pinned so.
+- `ui_snapshot` shows an Android input's value with its outer spaces, as iOS does.
+- Selectors through the value change on Android (review round 1, MAJOR-1, accepted): the `value` path (`value:`,
+  `value~`, and `text:`, which asks a node's label and its value — selectors.ts#fieldValues; `assert`'s `text` and
+  `scroll_until`'s target the same) sees the field's real text, as on iOS. On an EditText with `content-desc="First
+  name"` holding `Jan `, `text:Jan`, `value:Jan` and `value~^Jan$` matched before and no longer do; `text:"Jan "` and
+  `value:"Jan "` match. The old match was against a falsified value. A flow that matched a trimmed Android value quotes
+  the space (`text:"Jan "`) or uses `~` (`value~^Jan`). An input with no content-desc still matches `text:Jan` through
+  its label, trimmed as before. Pinned in tests/adapters/android.test.ts.
+- Golden (`scripts/differential/golden.ts --corpus tests/fixtures/truth`, base 3b7393ba): 0 checks changed — no captured
+  dump has a value with an outer space.
+
+**Measured (2026-11-09, emulator-5554, averi_lab API 33; docs/truth/live-records/d72-outer-spaces/).** First, the raw
+dump of form-basic's name after `input text 'Jan%s'`: `text="Jan "` — the space is the dump's; averi trimmed it. The
+new live cases os1 (`Jan ` without clear) and os2 (`Jan `, then `Ema ` with clear) on the base (3b7393ba, `--side`):
+both MISMATCH, "typed 4 characters but the field shows 3", the app holding the value; g2 ok; fp2's line saying 4. On
+the fix, the whole forms group: 58 cases, 55 ok, b1d and b7 LOUD (known), g2 the residual-10 MISMATCH (known); os1 ok,
+os2 ok "cleared 4 characters first", fp2's line saying 5. The RN app's rfe3, first read on Android: the same
+residual-10 MISMATCH, filed with g2 (`android uiautomator g2|rfe3`); rfe1 and rfe2 ok. Not seen live: the base's
+`JJan ` damage, which needs a partial landing under clear (pinned in tests/adapters/android.test.ts).
+
+**Residuals, stated.** Residual 10 now holds on Android too. A label still loses its outer spaces on Android, as
+before (iOS's label keeps what WDA or idb gives it); no case asks for them.
+
 ## Residuals accepted
 
 1. **A split inside a code, or between a letter and a digit, passes as a reformat** (review round 3, MINOR-1;
@@ -993,7 +1063,8 @@ cases) are on the owner's list.
    T3's amendment): `SK31 1200 0000 ` for a typed `SK3112000000` — every typed character is there, in order, and the
    field holds the value, but the trailing mark is no grouping the rules take, so averi refuses it and the reply names
    the check and the remedy. The safe side: a false mismatch, never a wrong Filled. Filed in live-known.ts as
-   `ios idb|wda g2` and `ios idb|wda rfe3`; on Android g2 passes, the reading judged there having no trailing space.
+   `ios idb|wda g2`, `ios idb|wda rfe3` and, since D72's amendment (Android's reading keeps the trailing space; g2
+   passed before, the space trimmed), `android uiautomator g2|rfe3`.
 11. **Without clear, a value whose head key dropped still lands as the value alone** (D71's amendment): `12` typed after
    `1` reads `12` with the first key lost — its letters and digits exactly the value's and no start of `112`, so D61's
    `valueAlone` judges it as a select-all field's value. idb's unnamed placeholders need that rule (`421903123456` after

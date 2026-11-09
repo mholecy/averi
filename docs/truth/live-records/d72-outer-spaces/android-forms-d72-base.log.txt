@@ -1,0 +1,22 @@
+lab: emulator-5554, AVD averi_lab
+averi: <base 3b7393ba extract>
+uiautomator os1 MISMATCH: the app holds "Jan ", but averi failed: ERROR fill: typed 4 characters but the field shows 3 (content withheld from this error)
+uiautomator os2 MISMATCH: the app holds "Ema ", but averi failed: ERROR fill: typed 4 characters (after one wipe and retype) but the field shows 3 (content withheld from this error)
+uiautomator g2 ok: Filled id:"lab.form-grouped.ibanEager" (12 characters, the field shows them reformatted: 2 separators added)
+uiautomator fp2 ok: Filled, hedged on its ⚠ line, over "+421 ": Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) ⚠ the field shows 4 characters for the 3 typed, and its text after focus was not read, so that text may not all come from these keys (a field can insert text on focus): check its value with ui_snapshot
+<!-- averi: <base 3b7393ba extract> -->
+# Live golden: 4 cases, 2 ok, 0 loud, 2 mismatches (2 not known), 0 skipped
+
+## uiautomator
+- MISMATCH (failed-holds) os1 form-basic: fill, no clear, a name ending in a space (D72) — the app holds "Jan ", but averi failed: ERROR fill: typed 4 characters but the field shows 3 (content withheld from this error)
+    type_text → ERROR fill: typed 4 characters but the field shows 3 (content withheld from this error)
+- MISMATCH (failed-holds) os2 form-basic: fill a name ending in a space, then fill with clear another ending in a space: the clear deletes all 4 (D72) — the app holds "Ema ", but averi failed: ERROR fill: typed 4 characters (after one wipe and retype) but the field shows 3 (content withheld from this error)
+    type_text → ERROR fill: typed 4 characters but the field shows 3 (content withheld from this error)
+    type_text → ERROR fill: typed 4 characters (after one wipe and retype) but the field shows 3 (content withheld from this error)
+- ok g2 form-grouped: fill, no clear, an IBAN ending on a complete group: the field shows the eager space after it — expected MISMATCH failed-holds by design under every source (D53 `separated`: averi refuses the trailing mark, the app holds the value; on Android since D72, whose reading keeps the trailing space — ok there before, the space trimmed) — Filled id:"lab.form-grouped.ibanEager" (12 characters, the field shows them reformatted: 2 separators added) [known, ok this run: residual:ADR 0034 residual 10 — a full reading that ends in an eager trailing mark fails `separated`: averi refuses it by design, the app holds the value]
+- ok fp2 form-focus-prefix: fill, no clear, digits into a field that inserted a `+421 ` dial code on focus and refuses every key: did not change on iOS (idb, wda: the re-read runs); on Android (uiautomator: the re-read skipped, the inserted `+421 ` holds `421`) a Filled hedged on its ⚠ line, ok and counted under ADR 0028 residual 3, and without the line a MISMATCH fill-claim — Filled, hedged on its ⚠ line, over "+421 ": Filled id:"lab.form-focus-prefix.dialRefuses" (3 characters) ⚠ the field shows 4 characters for the 3 typed, and its text after focus was not read, so that text may not all come from these keys (a field can insert text on focus): check its value with ui_snapshot
+
+Known but ok this run: uiautomator g2
+
+Accepted under residual:ADR 0028 residual 3 — a prefix inserted on focus that holds the value lands on the skipped re-read: Android's Filled says on a ⚠ line that the text after focus was not read: 1 of 1 judged run(s) of fp2
+
