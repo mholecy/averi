@@ -142,6 +142,10 @@ interface Memory {
   readonly within: Rect | undefined;
   /** The scroll view the last plan chose (undefined: the gesture box whole), which `strokeSent` makes `within`. */
   readonly chosen: Rect | undefined;
+  /** Where the last plan's stroke touches down (undefined: no box, no points), which `strokeSent` adds to `touchDowns`. */
+  readonly chosenAt: Point | undefined;
+  /** Where every stroke SENT this call touched down, in order, a probe's included — for `strokedBeside` (D76). */
+  readonly touchDowns: readonly Point[];
   /** The candidates along the stroke (or of unknown axis) the last plan judged WITHOUT room before its fallback took one across it (`StrokeRoom.roomless`) — for `strokedAcross`'s `noRoom`; empty when it took none across. */
   readonly roomless: readonly Rect[];
   /** The carry model's measure (`carried`): the most a stroke of this scroll over the scroll view `within` (undefined: the gesture box whole) carried its target per point of finger travel; undefined until one did (UNMEASURED_CARRY stands in, `carryOver`). */
@@ -153,7 +157,7 @@ const close = (m: Memory): StrokeMemory => m as unknown as StrokeMemory;
 
 /** The memory before any read: no scroll view known, no keyboard line, no stroke sent. */
 export function startStrokes(): StrokeMemory {
-  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, roomless: [], carry: undefined });
+  return close({ target: undefined, last: [], line: undefined, within: undefined, chosen: undefined, chosenAt: undefined, touchDowns: [], roomless: [], carry: undefined });
 }
 
 /** One read that read, as the plan keeps it (`seeRead`): its facts, the line its strokes stay above (scroll-read.ts#ReadJudgement.strokeLine), the target's node when it judged one, and the region the target's motion showed, read only on a tree that tells no scroll view of it (`ScrollRegion`). */
@@ -341,17 +345,19 @@ export function planStroke(memory: StrokeMemory, { toward, reach: turnsReach, ge
   const presented = press === undefined || points === undefined ? undefined : { ...press, touchDown: points.from };
   // The latest cut read for the target's scroll views is the one a later read that has lost a rect falls back to — not the oldest.
   const planned: Memory = { ...m, last: candidates, ...(m.target !== undefined && read !== undefined && { target: candidates }) };
-  return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.within }, roomless: room?.roomless ?? [] }) };
+  const chosenAt = points === undefined ? undefined : { ...points.from };
+  return { stroke, presented, memory: close({ ...planned, chosen: room === undefined ? undefined : { ...room.within }, chosenAt, roomless: room?.roomless ?? [] }) };
 }
 
 /**
  * The memory once the stroke its last plan made (`planStroke` or `planProbe`) is SENT: the scroll view that plan chose
- * is the one the last stroke went over (`touchedOn`), undefined when it went over the gesture box whole. A plan held
- * — for a presented screen's confirming read — is never sent, and the stroke before it stays the last one sent.
+ * is the one the last stroke went over (`touchedOn`), undefined when it went over the gesture box whole, and its
+ * touch-down joins the call's (`Memory.touchDowns`). A plan held — for a presented screen's confirming read — is
+ * never sent, and the stroke before it stays the last one sent.
  */
 export function strokeSent(memory: StrokeMemory): StrokeMemory {
   const m = open(memory);
-  return close({ ...m, within: m.chosen === undefined ? undefined : { ...m.chosen } });
+  return close({ ...m, within: m.chosen === undefined ? undefined : { ...m.chosen }, touchDowns: m.chosenAt === undefined ? m.touchDowns : [...m.touchDowns, m.chosenAt] });
 }
 
 /** What a round asks of the plan for the `fully: true` flush check's probe. */
@@ -389,7 +395,7 @@ export function planProbe(memory: StrokeMemory, { toward, reach, maxTravel, gest
   const points = scrollStroke({ toward, reach, ...(coverTop !== undefined && { coverTop }), box, maxTravel });
   return {
     stroke: { toward, reach, ...(coverTop !== undefined && { coverTop }), box: { ...box }, maxTravel, points, kind: 'full' },
-    memory: close({ ...open(memory), chosen: { ...room.within } }),
+    memory: close({ ...open(memory), chosen: { ...room.within }, chosenAt: { ...points.from } }),
   };
 }
 
@@ -499,31 +505,28 @@ const toldLargestFirst = (facts: Pick<TreeFacts, 'scene' | 'reading'>, way: Scro
 /**
  * Before any read found the target (`Memory.target` unset), every scroll view of the WHOLE tree told to scroll along
  * the stroke (ui-tree/geometry.ts#Clips.toldOn: text inputs and the keyboard's own left out, those off the usable
- * `screen` too) that the strokes did not go over — none holding the touch-down of the last stroke as the driver handed
- * it back (`drawn`), so neither the one stroked nor an outer one the finger also landed in — largest first. D76:
- * before the target is read the plan's candidates are the screen's largest scroller and the scroll views nested in it
- * (`candidatesOf`), never a sibling, so on android scroll-bounded every stroke for a row of `lower` went over the
- * larger `upper`, at (540,788), and the reply blamed exhaustion; the exhausted stop's sentence
- * (scroll-text.ts#boundText) names them, the remedy the caller's (a swipe inside it). Trying them in turn instead was
- * rejected: device time, state the caller never named moved, and F still unreached within the defaults. Undefined
- * once the target was found (its own scroll views are the candidates), when the last stroke went ACROSS the scroll
- * view it was drawn over (`strokedAcross` says that), and when the tree tells no other — idb's flat list never does.
- * One walk of the tree, at the stop only.
+ * `screen` too) that the strokes did not go over — none holding a touch-down of ANY stroke sent this call
+ * (`Memory.touchDowns`: an earlier stroke inside a nested list and the last over the page holding it leave out both;
+ * the scroll view each stroke went over holds its touch-down, so it is left out with it) — largest first. Before the
+ * target is read the plan's candidates hold no sibling of the largest scroller (`candidatesOf`), so the stop's
+ * sentence names them (scroll-text.ts#boundText) and the remedy is the caller's; why, and why the plan does not try
+ * them in turn: ADR 0010's D76 amendment. Undefined once the target was found (its own scroll views are the
+ * candidates), when the last stroke went ACROSS the scroll view it was drawn over (`strokedAcross` says that), and
+ * when the tree tells no other — idb's flat list never does. One walk of the tree, at the stop only.
  */
-export function strokedBeside(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect, drawn: Stroke | undefined): StrokedBeside | undefined {
-  const { target, within } = open(memory);
+export function strokedBeside(memory: StrokeMemory, facts: Pick<TreeFacts, 'scene' | 'reading'>, toward: Direction, screen: Rect): StrokedBeside | undefined {
+  const { target, within, touchDowns } = open(memory);
   if (target !== undefined) return undefined;
-  const { clips } = facts.scene;
   const way = axisOf(toward);
-  const axis = within === undefined ? undefined : clips.axesOf(within)?.axis;
+  const axis = within === undefined ? undefined : facts.scene.clips.axesOf(within)?.axis;
   if (axis !== undefined && axis !== way) return undefined;
   const told = toldLargestFirst(facts, way, screen);
-  const holds = (n: UiNode): boolean => drawn !== undefined && containsPoint(n.rect, drawn.from);
-  const others = told.filter((n) => !(within !== undefined && sameRect(n.rect, within)) && !holds(n));
+  const others = told.filter((n) => !touchDowns.some((p) => containsPoint(n.rect, p)));
   if (others.length === 0) return undefined;
   if (within !== undefined) return { axis: way, within, others: others.map(quoted) };
-  const landed = told.filter(holds).at(-1);
-  return { axis: way, ...(drawn !== undefined && { at: { ...drawn.from } }), ...(landed !== undefined && { landed: { ...landed.rect } }), others: others.map(quoted) };
+  const at = touchDowns.at(-1);
+  const landed = at === undefined ? undefined : told.filter((n) => containsPoint(n.rect, at)).at(-1);
+  return { axis: way, ...(at !== undefined && { at: { ...at } }), ...(landed !== undefined && { landed: { ...landed.rect } }), others: others.map(quoted) };
 }
 
 /**

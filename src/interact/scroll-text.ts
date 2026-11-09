@@ -929,7 +929,7 @@ export function boundText(by: BoundBy, swipes: number): string {
       // The text drawn over it moves with it (scroll-rounds.ts#BoundBy's `movesWith`): an app layout fact, no remedy.
       return `after ${swipesText(swipes)} (the text drawn over it moved with it, both by ${by.offset.dx},${by.offset.dy} since a screenshot saw it there: it scrolls with the element, so no swipe brings the element out from under it)`;
     case 'maxSwipes':
-      return `after ${swipesText(swipes)} (maxSwipes${boundBeside(by.beside)})`;
+      return `after ${swipesText(swipes)} (maxSwipes${boundBeside(by.beside, ': ')})`;
     case 'timeout':
       return timeoutText(by, swipes);
   }
@@ -946,17 +946,17 @@ export function timeoutText(by: Extract<BoundBy, { of: 'timeout' }>, swipes: num
   const sent = swipes === 0 ? 'no swipe was sent' : `${swipesText(swipes)} sent`;
   const { count, totalMs, lastMs } = by.reads;
   const reads = `${countOf(count, 'tree read')} took ${totalMs}ms${count > 1 ? `, the last ${lastMs}ms` : ''}`;
-  return `after ${by.elapsedMs}ms (timeout ${by.timeoutMs}ms; ${sent}; ${reads}${boundBeside(by.beside)})`;
+  return `after ${by.elapsedMs}ms (timeout ${by.timeoutMs}ms; ${sent}; ${reads}${boundBeside(by.beside, '; ')})`;
 }
 
 /**
  * The scroll views beside at a budget's bound (maxSwipes, the timeout; scroll-rounds.ts#BoundBy's `beside`, D76 review
- * round 1): `: <besideText>; else: raise maxSwipes or timeoutMs` — the bound's own way out kept after them, since the
- * element may lie further along the list swiped. Empty without them. The swipes' axis is `beside`'s own scroll views'
- * (every one told along the stroke).
+ * round 1): `<lead><besideText>; else: raise maxSwipes or timeoutMs` — the bound's own way out kept after them, since
+ * the element may lie further along the list swiped; `lead` the separator from the bound's own words (`: ` after
+ * `maxSwipes`, `; ` after the timeout's reads, a clause of their own). Empty without them.
  */
-function boundBeside(beside: StrokedBeside | undefined): string {
-  return beside === undefined ? '' : `: ${besideText(beside)}; else: raise maxSwipes or timeoutMs`;
+function boundBeside(beside: StrokedBeside | undefined, lead: ': ' | '; '): string {
+  return beside === undefined ? '' : `${lead}${besideText(beside)}; else: raise maxSwipes or timeoutMs`;
 }
 
 /**
@@ -982,23 +982,27 @@ function acrossText({ rect, axis, along }: StrokedAcross): string {
 /**
  * The scroll views along the stroke the swipes did not go over, the target not read yet (scroll-rounds.ts#BoundBy's
  * `beside`, D76): `the swipes went over the scroll view <rect> only` (or, over the screen box — WDA, which marks no
- * node clipping, before the target is read — `were drawn over the screen whole, aimed at no scroll view, touching
- * down at x,y in the scroll view <rect>`), then `the tree shows another scroll view that scrolls vertically, which the
- * swipes did not go over: <node>` — several counted, the BESIDE_NAMED largest named and the rest counted (`and 2
- * more`) — with `if the element lies in it, swipe inside it (swipe, its coordinates) until the element shows, then
+ * node clipping, before the target is read — `were drawn over the screen whole (aimed at no scroll view), touching down
+ * at x,y inside the scroll view <rect>`), then `the tree shows another scroll view that scrolls vertically, which the
+ * swipes did not go over: <node>` — several counted, the BESIDE_NAMED largest named and the rest counted (`and 2 more`)
+ * — with `if the element lies in it, swipe inside it (swipe, its coordinates) until the element shows, then
  * scroll_until it`. "Did not go over": no swipe touched down in it. The remedy is the caller's: the swipes are not
  * tried there (D76's decision, ADR 0010's D76 amendment). `boundText`'s and `boundBeside`'s; the troubleshooting
  * reference quotes it.
  */
 function besideText({ within, at, landed, axis, others }: StrokedBeside): string {
-  const where = at === undefined ? '' : `, touching down at ${at.x},${at.y}${landed === undefined ? '' : ` in the scroll view ${rectText(landed)}`}`;
-  const went = within === undefined ? `the swipes were drawn over the screen whole, aimed at no scroll view${where}` : `the swipes went over the scroll view ${rectText(within)} only`;
+  const where = at === undefined ? '' : `, touching down at ${at.x},${at.y}${landed === undefined ? '' : ` inside the scroll view ${rectText(landed)}`}`;
+  const went = within === undefined ? `the swipes were drawn over the screen whole (aimed at no scroll view)${where}` : `the swipes went over the scroll view ${rectText(within)} only`;
   const one = others.length === 1;
   const some = one ? `${within === undefined ? 'a' : 'another'} scroll view that scrolls` : `${others.length} ${within === undefined ? '' : 'other '}scroll views that scroll`;
   const named = others.slice(0, BESIDE_NAMED).map(nodeText).join(', ');
   const names = others.length > BESIDE_NAMED ? `${named} and ${others.length - BESIDE_NAMED} more` : named;
-  return `${went}; the tree shows ${some} ${axis}ly, which the swipes did not go over: ${names} — if the element lies in ${one ? 'it' : 'one of them'}, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it`;
+  return `${went}; the tree shows ${some} ${axis}ly, ${UNTRIED_LEAD}${names}${UNTRIED_END}${one ? 'it' : 'one of them'}, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it`;
 }
+
+/** `besideText`'s words around the scroll views it names — exported for `namesUntried` in scripts/truth/replies.ts, which reads the names between them. */
+export const UNTRIED_LEAD = 'which the swipes did not go over: ';
+export const UNTRIED_END = ' — if the element lies in ';
 
 /** The most scroll views `besideText` names, the largest; the rest are counted (review round 1). */
 const BESIDE_NAMED = 3;

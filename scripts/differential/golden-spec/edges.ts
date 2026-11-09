@@ -23,13 +23,13 @@ import { absentFullyRow, colourFails, directionRow, fullyRow, stopRow, strokeRow
  *
  * What each row asks is the target contract's (`c`, scripts/truth/target-contract.ts#contractOf — the live golden's
  * cases read the same clauses), handed to the row that judges it: the judged geometry, the tap's clause (rows.ts
- * #tapRow), the plain stop's (rows.ts#stopRow, strokeRow), `fully`'s where it is asked, and whether the target may be missing from the tree — the off-screen and
- * outside-scroll-view rows accept a target missing from the tree where its capture's tree of that source did not list
- * it — as each row asks it: the tap and the stroke by truth.ts#selectorOf (askedUnlistedBy: a text target's string), the
- * colour by its identifier (unlistedBy); R-stroke asks every touch-down inside the target's own scroll view where the truth names one
- * (rows.ts#strokeRow) — for a target its tree does not list, only where `tree`, the replayed tree's payload, lists that
- * scroll view a scroller, and then a touch-down beside it passes when the reply names it (StrokeOptions.namedSuffices,
- * D76); with no tree, the screen's region only.
+ * #tapRow), the plain stop's (rows.ts#stopRow, strokeRow), `fully`'s where it is asked, and whether the target may be
+ * missing from the tree — the off-screen and outside-scroll-view rows accept a target missing from the tree where its
+ * capture's tree of that source did not list it — as each row asks it: the tap and the stroke by truth.ts#selectorOf
+ * (askedUnlistedBy: a text target's string), the colour by its identifier (unlistedBy); R-stroke asks every touch-down
+ * inside the target's own scroll view where the truth names one (rows.ts#strokeRow) — for a target its tree does not
+ * list, only where `tree`, the replayed tree's payload, lists that scroll view a scroller, and then a touch-down beside
+ * it passes when the reply names it (StrokeOptions.namedSuffices, D76); with no tree, the screen's region only.
  *
  * A target laid out nowhere (CellTruth.absent: no frame, so no geometry) is asked absentRows' R-absent rows below.
  */
@@ -85,9 +85,10 @@ function ownScrollerListed(t: Pick<TargetTruth, 'scrollView'>, cell: CellTruth, 
  * accept a reply that never found it where the capture's tree did not list it (askedUnlistedBy), judged by the swipes
  * sent for it: every touch-down inside its scroll view where the replayed tree lists that a scroller (D59b — on the L7
  * carousels a horizontal stroke over the page's vertical axis goes over the carousel of unknown axis, inside its band),
- * along `toward`'s axis (why only an absent target is held to its scroll view outright: rows.ts#StrokeOptions.scrollerListed;
- * a framed one the tree does not list is held to its scroll view or the reply's naming it, edgeRows, D76). What the contract asks of it is target-contract.ts#ABSENT_STOPS. No tap or colour row: nothing of it is
- * on the screen to tap or measure, and the off-screen rows already ask both of such targets.
+ * along `toward`'s axis (why only an absent target is held to its scroll view outright:
+ * rows.ts#StrokeOptions.scrollerListed; a framed one the tree does not list is held to its scroll view or the reply's
+ * naming it, edgeRows, D76). What the contract asks of it is target-contract.ts#ABSENT_STOPS. No tap or colour row:
+ * nothing of it is on the screen to tap or measure, and the off-screen rows already ask both of such targets.
  */
 export function absentRows(platform: Platform, a: AbsentTarget, cell: CellTruth, source: SourceKind, tree?: string): Expectation[] {
   if (a.toward === undefined) return [];

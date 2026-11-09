@@ -361,10 +361,10 @@ export interface DetentMove {
  * `across`: the scroll view the last stroke went over scrolls, as the tree tells, on the other axis than the stroke
  * (stroke-plan.ts#strokedAcross: no candidate along it had room, so the plan's fallback drew it across) — said where
  * no end is proven and nothing is named under the touch-down (scroll-text.ts#boundText), D59b; no device call.
- * `beside`: before any read found the target, the scroll views the tree tells scroll along the stroke that the strokes
- * did not go over (stroke-plan.ts#strokedBeside: the plan's candidates hold no sibling of the largest scroller) — said
- * after `touched` and `across`, where no end is proven, D76 — and at `maxSwipes` and `timeout` too, before their way
- * out (review round 1); no device call.
+ * `beside`: before any read found the target, the scroll views the tree tells scroll along the stroke that the
+ * strokes did not go over (stroke-plan.ts#strokedBeside: the plan's candidates hold no sibling of the largest
+ * scroller) — said after `touched` and `across`, where no end is proven, D76 — and at `maxSwipes` and `timeout` too,
+ * before their way out (review round 1); no device call.
  */
 export type BoundBy =
   | { of: 'exhausted'; lastStroke: Direction; unchanged: 'matches' | 'tree'; touched?: TouchedOn; ends?: EndProof; unlisted?: TopLayerOnlySource; across?: StrokedAcross; beside?: StrokedBeside }
@@ -1179,9 +1179,10 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
     const across = exhausted === undefined || now === undefined ? undefined : strokedAcross(s.strokes, now.facts, course.lastStroke, usable);
     // D76: the scroll views along the stroke the strokes never went over, while no read has found the target (none
     // when the strokes went across their scroll view: `across` says that) — at every bound (`movesWith` has found a
-    // match, so it gets none), once a swipe was sent and this round's tree read: a caller told only to raise maxSwipes or timeoutMs
-    // strokes the same list again (review round 1).
-    const beside = now === undefined || s.swipes === 0 ? undefined : strokedBeside(s.strokes, now.facts, course.lastStroke, usable, lastDrawn(s.motion));
+    // match, so it gets none), once a swipe was sent and this round's tree read: a caller told only to raise
+    // maxSwipes or timeoutMs strokes the same list again (review round 1).
+    const beside = now === undefined || s.swipes === 0 ? undefined : strokedBeside(s.strokes, now.facts, course.lastStroke, usable);
+    const besideSaid = beside === undefined ? {} : { beside };
     // Where the swipe the bound held back would have touched down, when that is a presented screen's surface: said,
     // since the reader's next step would otherwise be another scroll that lands there (the plan's `presented`).
     // Quoted only on behalf of a target: with none in the tree the bound says nothing of where its held-back swipe
@@ -1198,13 +1199,13 @@ export function round(state: Rounds, seen: RoundSeen): { state: Rounds; step: Ro
           ...(ends !== undefined && observed !== undefined && { ends: { way: course.lastStroke, ...endProof(s, ends, exhausted, observed.streaks) } }),
           ...(learnt.of === 'unfelt' && (miss === undefined || !saysTopLayerOnly(miss)) && { unlisted: learnt.source }),
           ...(across !== undefined && { across }),
-          ...(beside !== undefined && { beside }),
+          ...besideSaid,
         }
       : movesWith !== undefined
         ? { of: 'movesWith', offset: movesWith }
         : s.swipes >= s.rules.maxSwipes
-        ? { of: 'maxSwipes', ...(beside !== undefined && { beside }) }
-        : { of: 'timeout', timeoutMs: s.rules.timeoutMs, elapsedMs: seen.elapsedMs, reads: s.reads, ...(beside !== undefined && { beside }) };
+        ? { of: 'maxSwipes', ...besideSaid }
+        : { of: 'timeout', timeoutMs: s.rules.timeoutMs, elapsedMs: seen.elapsedMs, reads: s.reads, ...besideSaid };
     return stop(s, {
       kind: 'bound',
       swipes: s.swipes,

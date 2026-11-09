@@ -3137,7 +3137,7 @@ describe('round — the scroll views the strokes did not go over, before the tar
       'after 2 swipes (the last 2, swiping up, did not move it: the swipes went over the scroll view 0,303 1080x605 only; the tree shows 2 other scroll views that scroll vertically, which the swipes did not go over: scrollable (0,1046 1080x495), scrollable id:mid (0,1600 1080x300) — if the element lies in one of them, swipe inside it (swipe, its coordinates) until the element shows, then scroll_until it; else: content exhausted, or the swipes were not taken)',
     );
     expect(boundText({ of: 'exhausted', lastStroke: 'left', unchanged: 'tree', beside: { axis: 'horizontal', others: [lower] } }, 2)).toContain(
-      'did not change the screen: the swipes were drawn over the screen whole, aimed at no scroll view; the tree shows a scroll view that scrolls horizontally, which the swipes did not go over: scrollable (0,1046 1080x495) — if the element lies in it,',
+      'did not change the screen: the swipes were drawn over the screen whole (aimed at no scroll view); the tree shows a scroll view that scrolls horizontally, which the swipes did not go over: scrollable (0,1046 1080x495) — if the element lies in it,',
     );
   });
 
@@ -3165,16 +3165,16 @@ describe('round — the scroll views the strokes did not go over, before the tar
 
   it('boundText over the screen box names the touch-down, and the scroll view it lies in when the tree lists one (review round 1)', () => {
     expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'tree', beside: { axis: 'vertical', at: { x: 201, y: 437 }, landed: { x: 0, y: 100, width: 402, height: 200 }, others: [lower] } }, 2)).toContain(
-      'did not change the screen: the swipes were drawn over the screen whole, aimed at no scroll view, touching down at 201,437 in the scroll view 0,100 402x200; the tree shows a scroll view',
+      'did not change the screen: the swipes were drawn over the screen whole (aimed at no scroll view), touching down at 201,437 inside the scroll view 0,100 402x200; the tree shows a scroll view',
     );
-    expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'tree', beside: { axis: 'vertical', at: { x: 201, y: 437 }, others: [lower] } }, 2)).toContain('aimed at no scroll view, touching down at 201,437; the tree shows a scroll view');
+    expect(boundText({ of: 'exhausted', lastStroke: 'up', unchanged: 'tree', beside: { axis: 'vertical', at: { x: 201, y: 437 }, others: [lower] } }, 2)).toContain('(aimed at no scroll view), touching down at 201,437; the tree shows a scroll view');
   });
 
   it('boundText at maxSwipes and at the timeout: the scroll views beside said too, then the bound\'s own way out (review round 1)', () => {
     const beside = { axis: 'vertical' as const, within: UPPER, others: [lower] };
     expect(boundText({ of: 'maxSwipes', beside }, 1)).toBe(`after 1 swipe (maxSwipes: ${BESIDE}; else: raise maxSwipes or timeoutMs)`);
     expect(boundText({ of: 'timeout', timeoutMs: 15_000, elapsedMs: 16_000, reads: { count: 2, totalMs: 900, lastMs: 450 }, beside }, 1)).toBe(
-      `after 16000ms (timeout 15000ms; 1 swipe sent; 2 tree reads took 900ms, the last 450ms: ${BESIDE}; else: raise maxSwipes or timeoutMs)`,
+      `after 16000ms (timeout 15000ms; 1 swipe sent; 2 tree reads took 900ms, the last 450ms; ${BESIDE}; else: raise maxSwipes or timeoutMs)`,
     );
   });
 
