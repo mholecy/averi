@@ -204,11 +204,13 @@ export interface StrokeOptions extends RowOptions {
   /**
    * The replayed tree lists a scroller at the clip of the scroll view the truth names (truth.ts#scrollerListedIn): a
    * target the tree does not list (`absent`) is held inside it too. Set by edges.ts#absentRows only — for a target laid
-   * out nowhere (CellTruth.absent), whose scroll view is the one place it can come from; a framed target the tree does
-   * not list is not (edges.ts#edgeRows: scroll-bounded's O and F, rows of one of two vertical lists, which averi cannot
-   * tell apart for a row it never saw). The absent-only condition stands in for "the named scroll view is the only
-   * listed scroller that could take the stroke" (backlog D76: with two along the stroke averi strokes the largest alone
-   * and its reply does not name the other).
+   * out nowhere (CellTruth.absent), whose scroll view is the one place it can come from (the L7 carousels: the page lies
+   * across the stroke, so the carousel is the only listed scroller that could take it). A framed target the tree does
+   * not list is not held so (edges.ts#edgeRows): scroll-bounded's O and F on Android lie in `lower`, one of two
+   * vertical lists, and averi strokes only the largest, its reply blaming exhaustion without naming `lower` — holding
+   * them inside turned both rows red (T6). The absent-only condition stands in for "the named scroll view is the only
+   * listed scroller that could take the stroke"; the case of two along the stroke is backlog D76 (D59b's honesty
+   * class).
    */
   scrollerListed?: boolean;
 }
@@ -220,12 +222,10 @@ export interface StrokeOptions extends RowOptions {
  * `absent`, given by the caller where the tree may not list the target (target-contract.ts#unlistedBy: the capture's
  * tree of that source did not — uiautomator dumps only what is visible to the user), lets a "never appeared in the tree"
  * reply be judged by its strokes, the swipes sent looking for it the evidence all the same; the scroll-view check is
- * then not asked — averi cannot know which scroll view holds a node it never saw — but where the caller says the
- * replayed tree lists that scroll view a scroller (`scrollerListed`, T6: a target laid out nowhere, edges.ts#absentRows):
- * then every touch-down inside it (D59b: a stroke across the page's axis goes over the nested carousel of unknown axis).
- * Every swipe runs along the axis
- * of its direction (its larger leg on that axis, whichever way — a turn back is a stroke along it too): a scroll view
- * moves along its own axis, and a stroke across a carousel's moves it not (the residual of
+ * then not asked — averi cannot know which scroll view holds a node it never saw — but where the caller sets
+ * `scrollerListed` (StrokeOptions: when, and why only then): then every touch-down inside it (D59b). Every swipe runs
+ * along the axis of its direction (its larger leg on that axis, whichever way — a turn back is a stroke along it too):
+ * a scroll view moves along its own axis, and a stroke across a carousel's moves it not (the residual of
  * docs/bugs/2026-10-16-lab-ios-wda-scroll-until-strokes-beside-the-targets-scroll-view.md). `direction`: the caller's —
  * truth.ts#directionOf of a framed target, AbsentTarget.toward of one with no frame (edges.ts#absentRows).
  */
@@ -235,9 +235,9 @@ export function strokeRow(platform: Platform, t: StrokeTarget, cell: CellTruth, 
     {
       verb: 'scroll_until',
       asks: ask,
-      says: `${row}, R-stroke: swipes ${direction} for it, ${strokesSaid(t, own)}`,
+      says: `${row}, R-stroke: swipes ${direction} for it, ${touchDownClause(t, own)}`,
       call: scrollCall(platform, t, direction),
-      judge: strokesJudge(cell, t, own, direction),
+      judge: strokesJudge(t, cell, own, direction),
     },
     opts,
   );
@@ -250,12 +250,12 @@ export function strokeRow(platform: Platform, t: StrokeTarget, cell: CellTruth, 
  */
 export function absentFullyRow(platform: Platform, t: StrokeTarget, cell: CellTruth, row: string, ask: StopAsk, direction: Direction, opts: StrokeOptions = {}): Expectation {
   const own = ownScrollView(t, cell, opts);
-  const strokesOk = strokesJudge(cell, t, own, direction);
+  const strokesOk = strokesJudge(t, cell, own, direction);
   return withAbsent(
     {
       verb: 'fully',
       asks: ask,
-      says: `${row}, R-fully: fully: true never "visible" (it has no frame), swipes ${direction} for it, ${strokesSaid(t, own)}`,
+      says: `${row}, R-fully: fully: true never "visible" (it has no frame), swipes ${direction} for it, ${touchDownClause(t, own)}`,
       call: scrollCall(platform, t, direction, true),
       judge: (o) => (claimsVisible(o.reply) ? said(o, `fully visible though it has no frame, after ${swipes(o)} swipe(s) that move nothing`) : strokesOk(o)),
     },
@@ -273,10 +273,11 @@ type StrokeTarget = Pick<TargetTruth, 'id' | 'text' | 'label' | 'scrollView'>;
 const ownScrollView = (t: StrokeTarget, cell: CellTruth, { absent, scrollerListed }: StrokeOptions): Rect | undefined =>
   t.scrollView !== undefined && (absent === undefined || scrollerListed === true) ? cell.scrollViews?.[t.scrollView] : undefined;
 
-const strokesSaid = (t: StrokeTarget, own: Rect | undefined) => `every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`;
+/** What R-stroke's `says` asks of the touch-downs: clear of the bands and the chrome, and inside `own` where given. */
+const touchDownClause = (t: StrokeTarget, own: Rect | undefined) => `every touch-down clear of the bands and the chrome${own === undefined ? '' : ` and inside its scroll view ${t.scrollView}`}`;
 
 /** R-stroke's judge: a swipe; every touch-down strokeable, inside `own` where given; every swipe along `direction`'s axis. */
-function strokesJudge(cell: CellTruth, t: StrokeTarget, own: Rect | undefined, direction: Direction): (o: Outcome) => string | undefined {
+function strokesJudge(t: StrokeTarget, cell: CellTruth, own: Rect | undefined, direction: Direction): (o: Outcome) => string | undefined {
   return (o) => {
     if (swipes(o) === 0) return said(o, 'no swipe');
     const beside = own === undefined ? [] : touchDowns(o).filter((p) => !within(p, own));

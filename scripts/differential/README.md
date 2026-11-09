@@ -156,9 +156,8 @@ container …"), is no such reply: the target is in the tree, refused for where 
 `right` or `left` for one wholly beside its scroll view's clip and level with it (a carousel's card,
 edges/carousel-in-list), else `down` or `up` by its centre; R-stroke holds every swipe along that direction's axis (its
 larger leg on it, either way — a turn back too): a stroke across a carousel's axis moves the page, not the carousel
-(rows.ts#strokeRow). Its scroll view is not asked of a target its tree does not list (averi cannot tell which scroll
-view holds a row it never saw: scroll-bounded's O and F on Android, rows of one of two vertical lists, which averi
-strokes over the largest alone and whose reply never names `lower` — backlog D76) — but of a
+(rows.ts#strokeRow). Its scroll view is not asked of a target its tree does not list — averi cannot tell which scroll
+view holds a row it never saw (why, and the exception: rows.ts#StrokeOptions.scrollerListed; backlog D76) — but of a
 target laid out nowhere (`CellTruth.absent`, T6: the L7 carousels' C at launch), asked `R-absent`
 (golden-spec/edges.ts#absentRows) toward where the catalog says it lies (`CatalogTarget.toward`, kept as
 `AbsentTarget.toward`): scroll_until and `fully: true` toward it, a reply that never found it judged by its strokes,

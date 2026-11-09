@@ -124,8 +124,8 @@ export function judgedGeometry(platform: Platform, t: Pick<TargetTruth, 'geometr
  * F and scroll-top-edge's A are not in the Android dump (docs/bugs/2026-10-08-ios-tap-off-screen-reported-done.md, its
  * Android part). undefined: the tree lists it, or the capture did not record it — held to be in the tree. The replayed
  * rows of a target off what shows accept a reply that never found it (golden-spec/edges.ts: its `absent`), and R-stroke
- * asks no scroll view of its strokes (golden-spec/rows.ts#strokeRow) — but of a target laid out nowhere (CellTruth.absent)
- * where the replayed tree lists its scroll view a scroller (golden-spec/edges.ts#absentRows, T6); the live case holds its strokes to no
+ * asks no scroll view of its strokes (golden-spec/rows.ts#strokeRow; the one exception, a target laid out nowhere, at
+ * rows.ts#StrokeOptions.scrollerListed, backlog D76); the live case holds its strokes to no
  * R-direction (live-visibility.ts#judgeScroll): averi cannot know where a node it never saw lies, nor which scroll view
  * holds it.
  */

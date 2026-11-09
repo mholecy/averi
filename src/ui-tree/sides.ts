@@ -8,7 +8,10 @@ import type { Edge } from './geometry.js';
  * the table).
  */
 
-/** A `scroll_until` direction (where the content lies), a swipe's (where the finger travels): the four ways. */
+/**
+ * A `scroll_until` direction (where the content lies), a swipe's (where the finger travels): the four ways. The
+ * harness's own is `Direction` in scripts/truth/schema.ts, the same union (src imports no script).
+ */
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
 /** What one side of a rect means to a scroll and to a sentence (`SIDES`). */

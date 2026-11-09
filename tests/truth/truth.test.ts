@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RunManifest } from '../../scripts/differential/corpus.js';
 import { capture } from '../../scripts/truth/capture-run.js';
 import type { LabDevice, RawTree } from '../../scripts/truth/lab-device.js';
+import { SCROLL_TYPES } from '../../src/adapters/wda-source.js';
 import type { CatalogCell, CatalogForm, CellTruth, ControlTruth, LabState, ProbeEvent, Rect, TargetTruth } from '../../scripts/truth/schema.js';
 import {
   axisOf,
@@ -25,6 +26,7 @@ import {
   readTargetProbe,
   scrollerListedIn,
   selectorOf,
+  WDA_SCROLLERS,
   situationOf,
   touchTargetOf,
   touchesAt,
@@ -111,6 +113,9 @@ describe('scrollerListedIn — whether a raw tree lists a scroller at a scroll v
     expect(scrollerListedIn(JSON.stringify({ value: { type: 'Other', rect: carousel } }), 'wda', carousel)).toBe(false);
     expect(scrollerListedIn(JSON.stringify({ value: { type: 'Table', rect: carousel } }), 'wda', carousel)).toBe(true);
     expect(scrollerListedIn(await read('ios-iphone17-ios27/carousel-in-list.idb.json'), 'idb', carousel)).toBe(false);
+  });
+  it("WDA's scroller types are averi's own (src/adapters/wda-source.ts#SCROLL_TYPES), copied: the two held equal", () => {
+    expect([...WDA_SCROLLERS].sort()).toEqual([...SCROLL_TYPES].sort());
   });
 });
 

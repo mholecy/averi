@@ -22,6 +22,13 @@ import type { Platform, SourceKind } from '../differential/corpus.js';
 /** What a cell builds around a target. New kinds come with the cells that need them. */
 export type Declared = 'open' | 'presented-over' | 'covered';
 
+/**
+ * Where content lies, as scroll_until's `direction` names it (`down`: below the current view) — the harness's one
+ * definition (truth.ts re-exports it). src/ui-tree/sides.ts#Direction is averi's own, the same union: src imports no
+ * script.
+ */
+export type Direction = 'up' | 'down' | 'left' | 'right';
+
 export interface CatalogTarget {
   tag: string;
   /** `#RRGGBB`: the target is a solid rectangle of it, nothing else drawn on it. */
@@ -61,10 +68,9 @@ export interface CatalogTarget {
    * With `mayBeAbsent` only, and always with it (catalog.ts#buildCatalog): the direction its scroll view lays it out in
    * once scrolled — right of the first card for the L7 carousels' C. The capture keeps it on the absent entry
    * (AbsentTarget.toward), where golden asks scroll_until for it that way (golden-spec/edges.ts#absentRows): with no
-   * frame, truth.ts#directionOf has nothing to read a direction from. The same union as truth.ts#Direction, spelled
-   * out: truth.ts imports this module, so importing it back would point the schema at the code that reads it.
+   * frame, truth.ts#directionOf has nothing to read a direction from.
    */
-  toward?: 'up' | 'down' | 'left' | 'right';
+  toward?: Direction;
 }
 
 /**

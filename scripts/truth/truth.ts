@@ -1,7 +1,7 @@
 import { parseInputShown, parseTouchableRegion } from '../../src/adapters/android.js';
 import { sameRect } from '../../src/adapters/types.js';
 import type { Platform, SourceKind } from '../differential/corpus.js';
-import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
+import { DRAWN, pct, type CatalogField, type CatalogForm, type CellTruth, type Direction, type ControlTruth, type Geometry, type Insets, type LabState, type NavigationMode, type ProbeEvent, type Rect, type Situation, type TargetTruth } from './schema.js';
 
 /**
  * The truth's arithmetic, free of any device (docs/plans/2026-10-15-ground-truth-lab-app.md): where a form control
@@ -156,8 +156,12 @@ function rawFrame(o: Record<string, unknown>, source: SourceKind): Rect | undefi
   return typeof r?.x === 'number' && typeof r.y === 'number' && typeof r.width === 'number' && typeof r.height === 'number' ? { x: r.x, y: r.y, width: r.width, height: r.height } : undefined;
 }
 
-/** WDA's element types of a scroller: a node of one of these scrolls what it holds. */
-const WDA_SCROLLERS: readonly unknown[] = ['ScrollView', 'Table', 'CollectionView'];
+/**
+ * WDA's element types of a scroller: a node of one of these scrolls what it holds. A deliberate copy of
+ * src/adapters/wda-source.ts#SCROLL_TYPES (the harness reads the raw tree without averi's code);
+ * tests/truth/truth.test.ts holds the two equal.
+ */
+export const WDA_SCROLLERS: ReadonlySet<string> = new Set(['ScrollView', 'Table', 'CollectionView']);
 
 /**
  * Whether a raw tree's payload lists a scroller whose frame is `clip` (within a pixel or point, each edge): a
@@ -168,7 +172,7 @@ const WDA_SCROLLERS: readonly unknown[] = ['ScrollView', 'Table', 'CollectionVie
  */
 export function scrollerListedIn(payload: string, source: SourceKind, clip: Rect): boolean {
   if (source === 'idb') return false;
-  const scroller = (o: Record<string, unknown>) => (source === 'uiautomator' ? o.scrollable === 'true' : WDA_SCROLLERS.includes(o.type));
+  const scroller = (o: Record<string, unknown>) => (source === 'uiautomator' ? o.scrollable === 'true' : typeof o.type === 'string' && WDA_SCROLLERS.has(o.type));
   const near = (a: number, b: number) => Math.abs(a - b) <= 1;
   return rawNodes(payload, source).some((o) => {
     if (!scroller(o)) return false;
@@ -685,8 +689,8 @@ export function controlConsistency(c: ControlTruth, outOfProcess: readonly Rect[
   return undefined;
 }
 
-/** Where content lies, as scroll_until's `direction` names it (`down`: below the current view). */
-export type Direction = 'up' | 'down' | 'left' | 'right';
+/** Where content lies, as scroll_until's `direction` names it: schema.ts#Direction, re-exported for the readers here. */
+export type { Direction };
 
 /**
  * Toward the target: across, along a horizontal scroll view's axis, where the target lies wholly right (`right`) or
