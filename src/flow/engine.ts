@@ -1327,10 +1327,13 @@ export class FlowEngine {
     // not witnessed as the screen held the way it is now — the tree's window
     // stood in for the device size, or the tree could not be read and the
     // panel was taken as built (ScreenBox.note). With a note the line is
-    // `⚠ swipe`, as the swipe reply puts it on a `⚠` line (mcp/tool-text.ts#swipeText):
-    // the mark, not the layout, is what the two share (A12).
+    // `⚠ swipe`, as the swipe reply puts it on a `⚠` line
+    // (mcp/tool-text.ts#swipeText): the mark, not the layout, is what the
+    // two share (A12).
     const { note } = await swipeScreen(this.adapter, { direction: spec.direction, meaning: 'finger', times });
-    this.log(note !== undefined ? '⚠ swipe' : 'swipe', `${spec.direction}${times > 1 ? ` ×${times}` : ''}${note !== undefined ? ` — ${note}` : ''}`);
+    const counted = `${spec.direction}${times > 1 ? ` ×${times}` : ''}`;
+    if (note === undefined) this.log('swipe', counted);
+    else this.log('⚠ swipe', `${counted} — ${note}`);
   }
 
   private async runScrollUntil(spec: ScrollUntilSpec): Promise<void> {
