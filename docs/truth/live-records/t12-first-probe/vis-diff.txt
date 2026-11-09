@@ -1,0 +1,35 @@
+cases 153, all three the same 147
+
+## Caused by the fix, on T12's path: 3
+uiautomator scroll:scroll-sticky.R.fully
+  base-1: Element id:"lab.scroll-sticky.R" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut there | 
+  fix   : Element id:"lab.scroll-sticky.R" fully visible after 3 swipes; its top edge lies on the edge of container id:lab.scroll-sticky.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and 2 probe swipes toward it moved nothing — nothing of it is cut there |
+  base-2: Element id:"lab.scroll-sticky.R" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut there | 
+uiautomator rest:scroll-sticky-rest.R.fully
+  base-1: Element id:"lab.scroll-sticky-rest.R" fully visible after 1 swipe; its top edge lies on the edge of container id:lab.scroll-sticky-rest.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut
+  fix   : Element id:"lab.scroll-sticky-rest.R" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-rest.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and 2 probe swipes toward it moved nothing — nothing of it is c
+  base-2: Element id:"lab.scroll-sticky-rest.R" fully visible after 1 swipe; its top edge lies on the edge of container id:lab.scroll-sticky-rest.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cut
+uiautomator scroll:scroll-sticky-view.R.fully
+  base-1: Element id:"lab.scroll-sticky-view.R" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-view.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cu
+  fix   : Element id:"lab.scroll-sticky-view.R" fully visible after 3 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-view.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and 2 probe swipes toward it moved nothing — nothing of it is c
+  base-2: Element id:"lab.scroll-sticky-view.R" fully visible after 2 swipes; its top edge lies on the edge of container id:lab.scroll-sticky-view.header (0,303 1080x154), pinned at its scroll container's (0,303 1080x1238) top and drawn after it, and a probe swipe toward it moved nothing — nothing of it is cu
+
+## Differs base-vs-fix, base runs agree, NOT on T12's path (unexplained, not called noise): 0
+
+
+## Differs base-vs-base (not attributable to the fix): 3
+uiautomator scroll:carousel-in-list.C
+  base-1: Element id:"lab.carousel-in-list.C" visible after 2 swipes — CLIPPED at left, 97% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box | Tapped id:"lab.carousel-in-list.C"
+  fix   : Element id:"lab.carousel-in-list.C" visible after 2 swipes — CLIPPED at left, 97% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box | Tapped id:"lab.carousel-in-list.C"
+  base-2: Element id:"lab.carousel-in-list.C" visible after 2 swipes — CLIPPED at left, 98% of it is in the viewport. A rect assert or screenshot on this element will measure the CLIPPED box | Tapped id:"lab.carousel-in-list.C"
+uiautomator scroll:tabbar-floating.F
+  base-1: Element id:"lab.tabbar-floating.F" visible after 5 swipes — PARTLY UNDER other "more" (766,1893 226x176), drawn over it — 54% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too | Tapped id:"lab.tabbar-floating.F"
+  fix   : Element id:"lab.tabbar-floating.F" visible after 5 swipes — PARTLY UNDER other "more" (766,1893 226x176), drawn over it — 54% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too | Tapped id:"lab.tabbar-floating.F"
+  base-2: ERROR scroll_until id:"lab.tabbar-floating.F" failed after 16348ms (timeout 15000ms; 5 swipes sent; 6 tree reads took 11910ms, the last 1985ms) — element reached the viewport but stayed under container id:lab.tabbar-floating.tabBar (66,1860 948x239) at its centre (540,1860), drawn over it — 50% of i
+uiautomator blank:tabbar-floating.F
+  base-1: Element id:"lab.tabbar-floating.F" visible after 5 swipes — PARTLY UNDER other "more" (766,1893 226x176), drawn over it — 55% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too | Tapped id:"lab.tabbar-floating.F"
+  fix   : Element id:"lab.tabbar-floating.F" visible after 5 swipes — PARTLY UNDER other "more" (766,1893 226x176), drawn over it — 55% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too | Tapped id:"lab.tabbar-floating.F"
+  base-2: Element id:"lab.tabbar-floating.F" visible after 5 swipes — PARTLY UNDER other "more" (766,1893 226x176), drawn over it — 53% of it shows, its centre clear. A rect assert or screenshot on this element will measure what is drawn over it too | Tapped id:"lab.tabbar-floating.F"
+
+## Missing from a run: 0
+

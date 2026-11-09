@@ -588,6 +588,72 @@ points 2–4 and in the D62 amendment stands: the proof, how it is kept, the dou
 sent. The rule, its evidence, the reply and its residuals: ADR 0021's D68 amendment
 (docs/adr/0021-scroll-until-turns-once-at-a-proven-end.md).
 
+## Amendment: T12 — a first probe that held is sent again, and two holds are `checked` (2026-11-09)
+
+**Replaces, in the T11 amendment above:** "Bare `checked` stays for a first probe with no proof" (two first probes now),
+and residual (a) (below). In the D62 amendment, residual (a) likewise. Everything else in both stands: the proof, its doubt,
+the `held` hedge, the `FlushCut` at the bound.
+
+**Cause.** T11's final A/B, `final-ab/short-fix-12.json`: on `lv-d62-short`'s fix arm a 90-px first probe carried C 0 px
+(`406 → 406`), and the read after it found C where the probe left from, held, with no proof: `checked`, "a probe swipe
+toward it moved nothing — nothing of it is cut there", with C 542 px past the clip. T11 doubts a held reveal on a proven
+cut; a first probe has no proof to doubt by. To an agent the reply is the same lie.
+
+**Decision (the orchestrator's: option 1 of backlog T12).** A first probe that held, drawn as a stroke, with no proof, is
+sent again once from where it held (`flush-check.ts#Memory.heldFirst`, its rect and edge; `Came` `doubted`): the same
+first probe, not a reveal (`verdictOf` with no proof plans a first probe), at once — the read neither waits nor confirms.
+That one holding too is `checked`; the reply counts the two (`CHECKED_AFTER_HOLDS`): `… and 2 probe swipes toward it moved
+nothing — nothing of it is cut there`. Moving the match, the paths before T12 take over: a fresh proof (then T11), or a new
+candidate whose own first held probe is doubted in turn. No swipe or time left for the second: unchecked `budget`, never
+`checked`. A probe drawn too short to tell from a tap: `tap`, as before. A proof and two held reveals stay T11's hedge.
+No type change outside `Memory`. iOS, idb and WDA unchanged: only the Android adapter marks a clipping container
+(`clipsDescendants`), so they never probe.
+
+**Rejected.** (2) Keep the fact, drop the inference ("a probe swipe toward it moved nothing" without "nothing of it is cut
+there"): no strokes, but every checked reply weakens to a fact the agent must interpret, and the one claim `fully: true`
+exists for is gone. (3) Doubt only probes under 100 px: favoured by T11's absorption figures (strokes sent under 100 px
+logged no motion 7 of 173), but T11's own lesson is that length lines do not hold on this AVD (a 142-px raw stroke read 0,
+a 233-px retry `482 → 482`), so a line would leave the long absorbed probe a lie. No signal was found that tells "content ended"
+from "stroke not taken" without another stroke: after a stroke the app did not take the dump equalled the one before it
+byte for byte (T11, `tests/fixtures/t11-lv-d62-drop-*.xml`), as it does after a stroke at the content's end, and the
+stroke the driver hands back is the one drawn either way.
+
+**Cost.** One stroke and one read on every held first probe, the legitimate pass included: a first row at rest (sticky
+R), a row whose content ends at the edge. Live, all fast (below): the visibility group's sticky-rest R took 2 swipes where it
+took 1, its run +3.25 s (89.75 s base, 93.0 s fix, the mean of 4, whole-second stamps; R the only case that changed; in the whole group also scroll-sticky R and scroll-sticky-view R, 2 → 3 swipes);
+bounded S and P unchanged (their first probes move them: no held first probe); Settings' "Network & internet" unchanged
+(its first probe moves the row off the edge, 8 of 8, 7.1–7.3 s a first call on both arms). With `maxSwipes: 1` such a stop is the `budget` hedge where it was
+`checked` (sticky-rest R, 2 of 2); with a swipe left for the second probe it is `checked`, after 2 (above). Golden: exactly 4 rows from "after 1 swipe" to "after 2
+swipes", the reply's clause now counting 2 (scroll-bounded-flush P and S, scroll-collapsing D, scroll-sticky-cut R: a
+replayed tree never moves, so every probe holds), Changed 4 of 1611, nothing else; mismatches 120 both sides.
+
+**Live check (2026-11-09, emulator-5554, `docs/truth/live-records/t12-first-probe`).** Base 5f126fdc's `src` against the fix
+(78132aba, harness 28e1a0ce), one harness (the fix's checkout), ABBA, 11:06–12:45 (99 min, and 2 min of smoke runs kept in
+`smoke/`, not counted); the AVD up about 6 h, `start_count` 1 throughout, no restart. Every group labelled by a raw-strokes
+read (6 rounds, 24 strokes of 142 px) before and after it: 0 of 24 at 94 px or less every time, the fast state, never the
+short state T11 met. So the rates below are mechanism, the drop injected by the harness, not frequency.
+
+| group | state before → after | base | fix |
+|---|---|---|---|
+| `lv-t12-drop-first` ×8 (first probe dropped) | 0 → 0 of 24 | 8 of 8 false "fully visible after 1 swipe … nothing of it is cut there", C 505–512 px cut | 0 of 8 false; the dropped probe sent again 8 of 8 (the `no-retry` premise), then maxSwipes hedged 8 of 8, C 42–46 px short (D68's spread, as `lv-d62-control`) |
+| `lv-t12-drop-two-first` ×3, fix only (`drop: [1, 2]`) | 0 → 0 | — | 3 of 3 false "fully visible after 2 swipes … 2 probe swipes toward it moved nothing", C 509–513 px cut: the residual |
+| visibility cells scroll-sticky-rest, scroll-bounded-flush ×4 | 0 → 0 | 9 of 9 ok each; sticky-rest R `checked` after 1 | 9 of 9 ok each; R `checked` after 2; P, S the same replies; run 93.0 s against 89.75 |
+| Settings "Network & internet" ×4 | 0 → 0 | premise met 4 of 4; after 1, then after 0 | the same, 4 of 4 |
+| sticky-rest R, `maxSwipes: 1` ×2 | 0 → 0 | `checked` after 1, 2 of 2 | `budget` hedge after 1, 2 of 2 |
+| whole visibility, base, fix, base | 0 → 0 | 148 ok, 5 LOUD; then 147 ok, 6 LOUD | 148 ok, 5 LOUD; 0 mismatches on all three |
+
+The whole-visibility diff (`vis-diff.txt`), 153 cases, 147 the same on all three. Caused by the fix, on T12's path, each
+one probe more, `checked` with `2 probe swipes`: `rest:scroll-sticky-rest.R.fully` (1 → 2 swipes),
+`scroll:scroll-sticky.R.fully` and `scroll:scroll-sticky-view.R.fully` (2 → 3). Base-vs-fix with the base runs agreeing,
+off the path: none. Base-vs-base, not attributable: `scroll:carousel-in-list.C`, `scroll:tabbar-floating.F`,
+`blank:tabbar-floating.F` (T11's three again; base-2's sixth LOUD is `scroll:tabbar-floating.F`). Read back by
+`tests/truth/t12-records.test.ts`.
+
+**Residual, stated.** Two first probes in a row the app did not take still read `checked`, "nothing of it is cut there",
+with the element cut: `lv-t12-drop-two-first` (strokes 1 and 2 dropped) did so 3 of 3, C 509–513 px past the clip — the record of the residual,
+not a pass. Whether two come in a row without injection is unmeasured; T11's final A/B logged 7 of 442 strokes with no
+motion, all under 100 px. Measured benefit is on injected drops only, as T11's was.
+
 ## Residuals accepted
 
 1. A node that only READS cut (whole, its own content running to the edge, `geometry.ts#evidentCut`) is refused too;

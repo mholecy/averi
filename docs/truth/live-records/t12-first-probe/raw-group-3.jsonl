@@ -1,0 +1,6 @@
+{"label":"after residual","t":"2026-11-09T10:13:58.622Z","pre":440,"preMs":1059,"strokes":[{"carry":142,"ms":361},{"carry":143,"ms":360},{"carry":145,"ms":361},{"carry":135,"ms":347}],"load":"1.05 0.69 0.40 1/1743 9829"}
+{"label":"after residual","t":"2026-11-09T10:14:10.368Z","pre":439,"preMs":1064,"strokes":[{"carry":144,"ms":349},{"carry":135,"ms":342},{"carry":136,"ms":337},{"carry":142,"ms":345}],"load":"0.96 0.69 0.40 1/1743 9924"}
+{"label":"after residual","t":"2026-11-09T10:14:22.039Z","pre":441,"preMs":1041,"strokes":[{"carry":136,"ms":334},{"carry":136,"ms":333},{"carry":135,"ms":331},{"carry":143,"ms":347}],"load":"0.89 0.69 0.41 2/1745 10021"}
+{"label":"after residual","t":"2026-11-09T10:14:33.730Z","pre":437,"preMs":1056,"strokes":[{"carry":136,"ms":336},{"carry":135,"ms":337},{"carry":142,"ms":339},{"carry":135,"ms":331}],"load":"0.98 0.71 0.42 1/1743 10116"}
+{"label":"after residual","t":"2026-11-09T10:14:45.591Z","pre":437,"preMs":1039,"strokes":[{"carry":144,"ms":337},{"carry":136,"ms":336},{"carry":135,"ms":339},{"carry":136,"ms":349}],"load":"0.83 0.69 0.41 1/1743 10214"}
+{"label":"after residual","t":"2026-11-09T10:14:57.453Z","pre":436,"preMs":1037,"strokes":[{"carry":137,"ms":346},{"carry":142,"ms":369},{"carry":143,"ms":359},{"carry":143,"ms":362}],"load":"0.64 0.66 0.41 1/1743 10309"}
