@@ -330,7 +330,12 @@ node --import tsx scripts/truth/capture.ts --udid <udid> --out tests/fixtures/tr
 `--family` keeps the cells of those families, `--cells` those cells (both given: the named cells of those families); a
 name that matches nothing is an error. A run of some cells adds to (or replaces those cells in) the run's manifest; the
 other cells keep their captures. A manifest names one device: a run into a directory captured on another device is
-refused. Exit code 1 when a cell is broken.
+refused. A catalog target the app lays out no frame for (carousel-lazy's C, not composed at launch) is recorded in the
+truth's `absent`, never probed, with whether each raw tree lists it; no golden row reads it yet (backlog T6). A cell
+whose capture throws fails alone: nothing of it is written (an earlier capture of it stays whole), the other cells are
+captured, and the manifest is written listing it under `failed` with why, until a run captures it again; a refusal
+(`CaptureRefusal`: the IME set up against the cell, a pinned submit with no bar) stops the run once the manifest is
+written. Exit code 1 when a cell is broken or failed.
 
 Android (fixtures/apps/android, Compose; an emulator of its own — the committed run is a dedicated `averi_lab` AVD,
 Pixel 3a profile, API 33 — never the device-check AVD; JDK 17, the Gradle wrapper's 8.13). The truth is in screen
