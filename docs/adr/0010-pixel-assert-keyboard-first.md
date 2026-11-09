@@ -464,6 +464,67 @@ tests/ui-tree/geometry-viewport.test.ts (`clearOfSystemBands`). Hand mutants, ea
 
 Device gate: `d59b-measure` rerun in the next batch, FAIL → PASS.
 
+## Amendment: D76 — the scroll views along the stroke the swipes did not go over (2026-11-09)
+
+**Context.** D59b's candidates, before a read finds the target, are the largest scroller and the scroll views nested
+in it (`stroke-plan.ts#candidatesOf`). A sibling of the largest is never one. On android `scroll-bounded`
+(tests/fixtures/truth/android-averi_lab-api33/scroll-bounded.*) the screen holds two vertical lists, `upper`
+`0,303 1080x605` and `lower` `0,1046 1080x495`. O and F are rows of `lower` that uiautomator does not list. Every
+stroke for them went over `upper`, at (540,788), twice, and the call failed "content exhausted, still loading, or the
+swipes were not taken". The reply never said that `lower` was not tried. That is D59b's honesty class: there the
+scroll view lay across the stroke, here beside it.
+
+**Decision.** (a) When the exhausted stop comes before any read found the target, the reply names the scroll views
+the tree tells scroll along the stroke that the swipes did not go over (`stroke-plan.ts#strokedBeside`, carried as
+`scroll-rounds.ts#BoundBy`'s `beside`, said by `scroll-text.ts#boundText`). They are asked of the whole tree
+(`Clips.toldOn`, as the across clause asks it: the usable screen, no text input, none of the keyboard's own), less
+any that holds the last stroke's touch-down (the one stroked, and an outer one the finger also landed in), largest
+first. The clause comes after a node named under the touch-down and after the across clause, and never with the
+across clause: `strokedBeside` is undefined when the last stroke went across its scroll view. An end the tree proves
+outranks it, as it outranks both. The wording:
+
+`failed after 2 swipes (the last 2, swiping down, did not change the screen: the swipes went over the scroll view
+0,303 1080x605 only; the tree shows another scroll view that scrolls vertically, which the swipes did not go over:
+scrollable (0,1046 1080x495) — if the element lies in it, swipe inside it (swipe, its coordinates) until the element
+shows, then scroll_until it; else: content exhausted, still loading, or the swipes were not taken)`
+
+Several are counted (`2 other scroll views that scroll vertically, …: A, B — if the element lies in one of them, …`).
+Over the screen box (WDA marks no node clipping, so before the target is read it strokes the screen whole) the first
+clause reads `the swipes were drawn over the screen whole, aimed at no scroll view`, and `a scroll view` replaces
+`another`. On the WDA capture of the same cell a target not in the tree now names `lower` (0,380 402x180): the
+touch-down lies in `upper`.
+
+(b) **Rejected:** trying the candidates in turn, as D59b's nested ones are tried. It spends device time. It moves
+lists the caller never named. On `scroll-bounded` it still cannot reach F within the defaults (6 swipes, 15 s).
+
+(c) **Filed, not built:** a `within` option on `scroll_until` that names the scroll view to stroke (backlog D78).
+Once it exists, this reply should cite it as the remedy, in place of the manual swipe.
+
+**Residuals.** (1) The remedy is manual: a swipe inside the named list, then `scroll_until` again. (2) idb lists no
+scroll view (`Clips.toldOn` answers none on a flat tree), so nothing is named there. The reply is the generic one, as
+before. (3) A scroll view of unknown axis (a RecyclerView or a LazyColumn dumped as `android.view.View`) is not named,
+as residual (c) of D59b. (4) Only the exhausted stop says it. A maxSwipes or timeout stop before the target was read
+does not.
+
+**Golden.** Against a `git archive 6b7e49b5` base: Changed exactly 2, android `scroll-bounded` O and F `scroll_until`,
+the reply only; Strike 0, COUNTS 0, Re-pin 0. The R-stroke row of a framed target that the tree does not list, in a
+scroll view the replayed tree lists, now holds a touch-down beside that scroll view only when the reply quotes its
+rect (StrokeOptions' `namedSuffices` in scripts/differential/golden-spec/rows.ts, set by
+`edgeRows` in golden-spec/edges.ts). It is red at 6b7e49b5's src
+(`--side` at the extract: 2 new) and green here. Holding the strokes inside `lower` outright stays out: T6 tried that,
+and averi cannot know which list holds a row it never saw.
+
+**Tests.** tests/interact/stroke-plan.test.ts (`strokedBeside`: the sibling named; the touch-down's list left out; one
+across the axis left out; undefined once found and when across; largest first; text inputs and the keyboard left
+out; none when no other list), tests/interact/scroll-rounds.test.ts (`boundText` with one and several, the screen box,
+the clause order; the round over the real `scroll-bounded` dump), tests/interact/scroll-end-turn.test.ts (the WDA
+"nope" stop re-pinned: it names `lower`), tests/differential/golden-rows.test.ts (`namedSuffices`). Hand mutants,
+each killed: the found and the across guards, the touch-down and stroked-view filters, the sort, the empty result,
+the keyboard predicate, the text-input predicate (geometry.ts), `beside` dropped from the bound, the clause put
+first, the `a`/`another` and `it`/`one of them` words, the axis word; in golden, `namedSuffices` always and never met,
+its clip unset, its `absent` guard and its listed-scroller guard. One redundant guard was removed rather than left as
+an equivalent mutant: the round's `across !== undefined` before asking `strokedBeside`, which asks it itself.
+
 ## Bug note
 
 docs/bugs/2026-10-06-pixel-assert-measures-the-keyboard-over-its-element.md
